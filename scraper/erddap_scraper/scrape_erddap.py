@@ -123,7 +123,7 @@ def scrape_erddap(erddap_url, result):
         print(domain + ": ", *kw)
 
     datasets_not_pulled = []
-    df_all = pd.DataFrame()
+    profile_data = pd.DataFrame()
     dataset_metadata_all = pd.DataFrame()
 
     erddap = ERDDAP(erddap_url)
@@ -141,37 +141,37 @@ def scrape_erddap(erddap_url, result):
 
         thread_log("Querying dataset:", dataset_id)
 
-        metadata = {}
+        dataset_variables = {}
         try:
             # thread_log("getting metadata")
-            metadata = erddap.get_metadata_for_dataset(dataset_id)
+            metadata_globals_variables_combined = erddap.get_metadata_for_dataset(dataset_id)
             # print(metadata)
-            dataset_globals = metadata["NC_GLOBAL"]
-            del metadata["NC_GLOBAL"]
+            dataset_globals = metadata_globals_variables_combined["NC_GLOBAL"]
 
-            dataset_standard_names = ",".join(
+            # dataset_globals is globals, and 
+            del metadata_globals_variables_combined["NC_GLOBAL"]
+            dataset_variables=metadata_globals_variables_combined
+
+            standard_names_in_dataset = ",".join(
                 [
                     x["standard_name"]
-                    for x in metadata.values()
+                    for x in dataset_variables.values()
                     if x.get("standard_name")
                 ]
             )
 
             cdm_data_type = dataset_globals["cdm_data_type"]
 
-            dataset_metadata = pd.DataFrame(
+            dataset_table_record = pd.DataFrame(
                 {
                     "erddap_url": [erddap_url],
                     "dataset_id": [dataset_id],
                     "cdm_data_type": [cdm_data_type],
-                    "dataset_standard_names": [dataset_standard_names],
+                    "dataset_standard_names": [standard_names_in_dataset],
                 }
             )
 
-            dataset_metadata_all = dataset_metadata_all.append(dataset_metadata)
-
-            # this could be in the dataset table
-
+            dataset_metadata_all = dataset_metadata_all.append(dataset_table_record)
 
             if cdm_data_type == "Trajectory":
                 # TODO handle this
@@ -197,36 +197,35 @@ def scrape_erddap(erddap_url, result):
                 # "Point":"cdm_profile_variables",
             }
             profile_variable = None
-            # cdm_mapping[cdm_data_type]
+
             if cdm_data_type in cdm_mapping:
                 profile_variable = safe_list_get(
                     dataset_globals[cdm_mapping[cdm_data_type]].split(","), 0, ""
                 )
-
+            # these are the variables we are pulling max/min values for   
             important_vars = [
                 "latitude",
                 "longitude",
                 "depth",
                 "time",
             ]
-            important_vars_in_dataset = [x for x in important_vars if x in metadata]
+            important_vars_in_dataset = [x for x in important_vars if x in dataset_variables]
             # thread_log(dataset_id, cdm_data_type, important_vars_in_dataset)
 
-            # profile_vars = [profile_variable]
             # thread_log("getting profiles")
-            profile_stats = get_max_min_stats(
+            profile_table_record = get_max_min_stats(
                 erddap_url,
                 profile_variable,
                 dataset_id,
                 important_vars_in_dataset,
                 cdm_data_type,
-                metadata,
+                dataset_variables,
             )
 
             # profile_stats["cdm_data_type"] = cdm_data_type
-            profile_stats["dataset_id"] = dataset_id
+            profile_table_record["dataset_id"] = dataset_id
 
-            df_all = df_all.append(profile_stats.reset_index(drop=True))
+            profile_data = profile_data.append(profile_table_record.reset_index(drop=True))
 
             # This df should look like:
             # profile_id min_time, max_time, min_lat,max_lat,min_depth,max_depth
@@ -242,7 +241,7 @@ def scrape_erddap(erddap_url, result):
 
             traceback.print_exc()
 
-    df_all["server"] = domain
+    profile_data["server"] = domain
 
     column_order = [
         "server",
@@ -258,11 +257,11 @@ def scrape_erddap(erddap_url, result):
         "depth_max",
     ]
 
-    reordered = [x for x in column_order if (x in df_all)]
-    df_all = df_all[reordered]
+    reordered = [x for x in column_order if (x in profile_data)]
+    profile_data = profile_data[reordered]
 
     # logger.info(record_count)
     thread_log("datasets_not_pulled", datasets_not_pulled)
 
     # using 'result' to return data from each thread
-    result.append([df_all, dataset_metadata_all])
+    result.append([profile_data, dataset_metadata_all])
