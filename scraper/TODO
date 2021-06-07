@@ -1,0 +1,6 @@
+bb1_bop_level1 dataset fails because it has no max/min for lat/long?
+make sure it can handle that scenario
+
+if we use actual_range when it exists we can get out of ONC error?
+
+if that worked, load all the data into the DB and then start setting up the endpoints, maybe try to serverless deploy the Hakai API?
