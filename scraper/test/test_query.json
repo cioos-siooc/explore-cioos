@@ -1,0 +1,518 @@
+{
+  "user_query": {
+    "time_min": "2020-01-01",
+    "time_max": "2020-02-01",
+    "lat_min": 50.00,
+    "lat_max": 50.15,
+    "lon_min": -125.2,
+    "lon_max": -125.0,
+    "polygon_region": "POLYGON ((-125.2071249 50.0725658, -125.1617769 49.9989123, -125.0566522 50.012593, -125.0539038 50.0355326, -125.0367266 50.1126528, -125.1308579 50.1333439, -125.1432255 50.0888689, -125.2071249 50.0725658))",
+    "eovs": ["temperature", "salinity"],
+    "email": "cozycoops@gmail.com"
+  },
+  "cache_filtered": [
+    {
+      "dataset_id": "HakaiWaterPropertiesInstrumentProfileProvisional" ,
+      "erddap_url": "https://catalogue.hakai.org/erddap" ,
+      "cdm_data_type": "Profile" ,
+      "ckan_id": "0bd1190b-c1fd-4e42-9d87-7c49430c476f" ,
+      "profile_id_variable": "mission_id" ,
+      "erddap_metadata": {
+        "globals": {
+          "acknowledgment": "Hakai Field Technicians, Research and IT groups" ,
+          "cdm_data_type": "TimeSeriesProfile" ,
+          "cdm_profile_variables": "hakai_id" ,
+          "cdm_timeseries_variables": "station,latitude,longitude" ,
+          "contributor_name": "Jennifer Jackson" ,
+          "contributor_role": "principalInvestigator" ,
+          "Conventions": "COARDS, CF-1.6, ACDD-1.3" ,
+          "creator_url": "https://www.hakai.org/" ,
+          "date_created": "2012-06-01" ,
+          "Easternmost_Easting": "-124.4" ,
+          "featureType": "TimeSeriesProfile" ,
+          "geospatial_bounds": "-128.5,52.27 -127.4,52.21 -127.2,51.66 -125.6,51.13 -124.8,50.96 -124.1,50.43 -124.7,49.98 -124.9,49.80 -126.7,50.45 -128.1,51.37 -128.4,51.69 -128.5,52.27" ,
+          "geospatial_lat_max": "52.1497000000001" ,
+          "geospatial_lat_min": "49.9170570000001" ,
+          "geospatial_lat_units": "degrees_north" ,
+          "geospatial_lon_max": "-124.4" ,
+          "geospatial_lon_min": "-128.5126" ,
+          "geospatial_lon_units": "degrees_east" ,
+          "geospatial_vertical_max": "635.511" ,
+          "geospatial_vertical_min": "-0.291" ,
+          "geospatial_vertical_positive": "down" ,
+          "geospatial_vertical_units": "m" ,
+          "id": "HakaiCTDProvisional" ,
+          "infoUrl": "https://www.hakai.org" ,
+          "institution": "Hakai Institute" ,
+          "instrument": "66061,1907674,18032,18066,65679,80217,1907467" ,
+          "keywords": "Calvert Island, coastal zone, fluorescence, Johnstone Strait, oxygen, PAR, photosynthetically active radiation, Quadra Island, Queen Charlotte Sound, salinity, Strait of Georgia, subSurfaceSalinity, subSurfaceTemperature, transmissometer, turbidity" ,
+          "keywords_vocabulary": "GCMD Science Keywords" ,
+          "language": "en" ,
+          "license": "Creative Commons Attribution 4.0" ,
+          "Northernmost_Northing": "52.1497000000001" ,
+          "publisher_email": "data@hakai.org" ,
+          "publisher_name": "Hakai Institiute" ,
+          "publisher_url": "https://www.hakai.org/" ,
+          "sourceUrl": "(local files)" ,
+          "Southernmost_Northing": "49.9170570000001" ,
+          "standard_name_vocabulary": "CF Standard Name Table v70" ,
+          "subsetVariables": "cruise, vessel, bottle_drop, device_model, device_sn, device_firmware, work_area, direction_flag, conductivity_UQL,  temperature_UQL, depth_UQL, pressure_UQL, flc_UQL, turbidity_UQL, salinity_UQL, spec_cond, dissolved_oxygen_ml_l_UQL, rinko_do_ml_l_UQL, c_star_at_UQL, hakai_id, station" ,
+          "summary": "Temperature, conductivity, dissolved oxygen, fluorescence, photosynthetic active radiation, and turbidity data collected from 2012 to present by the Hakai Institute in waters surrounding Calvert Island, Johnstone Strait, and Quadra Island areas. This dataset presents data collected by oceanographic profiler instruments (RBR XR-620, RBR Concerto, RBR Maestro, and Seabird SBE 19plus v2) which have been automatically processed by following respective manufacturer's guidelines (see Hakai Water Properties Profile Processing and QA/QC Procedure Manual). The provisional processed data are then quality controlled by applying a series of tests that are following the QARTOD standards and more tests specific to the Hakai Institute data (see Hakai Water Properties Profile Processing and QA/QC Procedure Manual). The research dataset provides a subset of the provisional dataset which has been manually reviewed and judged good for science quality level. Data were collected by the Hakai Institute Oceanography Program, the Nearshore Program, and the Juvenile Salmon Program." ,
+          "time_coverage_duration": "186270869.667 seconds" ,
+          "time_coverage_end": "2021-03-17T21:38:41Z" ,
+          "time_coverage_start": "2012-06-06T21:48:57Z" ,
+          "title": "Hakai Water Properties Vertical Profiles Measured by Oceanographic Profilers, Provisional" ,
+          "Westernmost_Easting": "-128.5126"
+        } ,
+        "variables": {
+          "work_area": {
+            "long_name": "Work Area"
+          } ,
+          "cruise": {
+            "long_name": "Cruise"
+          } ,
+          "hakai_id": {
+            "cf_role": "profile_id" ,
+            "long_name": "Hakai ID"
+          } ,
+          "vessel": {
+            "long_name": "Vessel"
+          } ,
+          "operators": {
+            "long_name": "Operators"
+          } ,
+          "comments": {
+            "long_name": "Comments"
+          } ,
+          "device_model": {
+            "long_name": "Device Model"
+          } ,
+          "device_sn": {
+            "long_name": "Device Serial Number"
+          } ,
+          "device_firmware": {
+            "long_name": "Device Firmware"
+          } ,
+          "bottle_drop": {
+            "long_name": "Bottle Drop"
+          } ,
+          "station": {
+            "cf_role": "timeseries_id" ,
+            "long_name": "Station"
+          } ,
+          "latitude": {
+            "_CoordinateAxisType": "Lat" ,
+            "_FillValue": "NaN" ,
+            "actual_range": "49.9170570000001, 52.1497000000001" ,
+            "axis": "Y" ,
+            "colorBarMaximum": "90.0" ,
+            "colorBarMinimum": "-90.0" ,
+            "ioos_category": "Location" ,
+            "long_name": "Latitude" ,
+            "standard_name": "latitude" ,
+            "units": "degrees_north"
+          } ,
+          "longitude": {
+            "_CoordinateAxisType": "Lon" ,
+            "_FillValue": "NaN" ,
+            "actual_range": "-128.5126, -124.4" ,
+            "axis": "X" ,
+            "colorBarMaximum": "180.0" ,
+            "colorBarMinimum": "-180.0" ,
+            "ioos_category": "Location" ,
+            "long_name": "Longitude" ,
+            "standard_name": "longitude" ,
+            "units": "degrees_east"
+          } ,
+          "precise_latitude": {
+            "_FillValue": "NaN" ,
+            "actual_range": "50.0272790939271, 52.149286320652" ,
+            "colorBarMaximum": "90.0" ,
+            "colorBarMinimum": "-90.0" ,
+            "long_name": "Latitude" ,
+            "standard_name": "latitude" ,
+            "units": "degrees_north"
+          } ,
+          "precise_longitude": {
+            "_FillValue": "NaN" ,
+            "actual_range": "-128.51265, -124.401847405432" ,
+            "colorBarMaximum": "180.0" ,
+            "colorBarMinimum": "-180.0" ,
+            "long_name": "Longitude" ,
+            "standard_name": "longitude" ,
+            "units": "degrees_east"
+          } ,
+          "time": {
+            "_CoordinateAxisType": "Time" ,
+            "actual_range": "1.339019337E9, 1.616017121E9" ,
+            "axis": "T" ,
+            "calendar": "proleptic_gregorian" ,
+            "ioos_category": "Time" ,
+            "long_name": "Profile Start Time" ,
+            "source_name": "Profile Start Time" ,
+            "standard_name": "time" ,
+            "time_origin": "01-JAN-1970 00:00:00" ,
+            "timezone": "UTC" ,
+            "units": "seconds since 1970-01-01T00:00:00Z"
+          } ,
+          "bottom_date_time": {
+            "actual_range": "1.339019409E9, 1.616017613E9" ,
+            "calendar": "proleptic_gregorian" ,
+            "ioos_category": "Time" ,
+            "long_name": "Profile Bottom Time" ,
+            "time_origin": "01-JAN-1970 00:00:00" ,
+            "timezone": "UTC" ,
+            "units": "seconds since 1970-01-01T00:00:00Z"
+          } ,
+          "end_date_time": {
+            "calendar": "proleptic_gregorian" ,
+            "ioos_category": "Time" ,
+            "long_name": "Profile End Time" ,
+            "time_origin": "01-JAN-1970 00:00:00" ,
+            "timezone": "UTC" ,
+            "units": "seconds since 1970-01-01T00:00:00Z"
+          } ,
+          "measurement_dt": {
+            "actual_range": "1.3390193387500002E9, 1.6160181315E9" ,
+            "calendar": "proleptic_gregorian" ,
+            "ioos_category": "Time" ,
+            "long_name": "Precise Measurement Time" ,
+            "standard_name": "time" ,
+            "time_origin": "01-JAN-1970 00:00:00" ,
+            "timezone": "UTC" ,
+            "units": "seconds since 1970-01-01T00:00:00Z"
+          } ,
+          "bottom_depth": {
+            "long_name": "Bottom Depth"
+          } ,
+          "target_depth": {
+            "_FillValue": "2147483647" ,
+            "long_name": "Target Depth"
+          } ,
+          "drop_speed": {
+            "long_name": "Drop Speed"
+          } ,
+          "direction_flag": {
+            "long_name": "Direction Flag"
+          } ,
+          "descent_rate": {
+            "_FillValue": "NaN" ,
+            "actual_range": "-106.341, 145.459" ,
+            "long_name": "Profiling Speed" ,
+            "standard_name": "platform_speed_wrt_sea_water" ,
+            "units": "m s-1"
+          } ,
+          "depth": {
+            "_CoordinateAxisType": "Height" ,
+            "_CoordinateZisPositive": "down" ,
+            "_FillValue": "NaN" ,
+            "actual_range": "-0.291, 635.511" ,
+            "ancillary_variables": "depth_UQL" ,
+            "axis": "Z" ,
+            "colorBarMaximum": "8000.0" ,
+            "colorBarMinimum": "0.0" ,
+            "colorBarPalette": "TopographyDepth" ,
+            "ioos_category": "Location" ,
+            "long_name": "Depth" ,
+            "positive": "down" ,
+            "standard_name": "depth" ,
+            "units": "m"
+          } ,
+          "depth_UQL": {
+            "_FillValue": "-1" ,
+            "_Unsigned": "true" ,
+            "actual_range": "1, 9" ,
+            "colorBarMaximum": "10.0" ,
+            "colorBarMinimum": "0.0" ,
+            "flag_meaning": "PASS NOT_EVALUATED SUSPECT FAIL MISSING" ,
+            "flag_values": "1, 2, 3, 4, 9" ,
+            "long_name": "Depth UNESCO Q Level" ,
+            "missing_value": "2" ,
+            "standard_name": "aggregate_quality_flag"
+          } ,
+          "depth_flag_description": {
+            "long_name": "Depth Flag Description"
+          } ,
+          "pressure": {
+            "_FillValue": "2147483647" ,
+            "actual_range": "0, 642" ,
+            "ancillary_variables": "pressure_UQL" ,
+            "colorBarMaximum": "700.0" ,
+            "colorBarMinimum": "0.0" ,
+            "long_name": "Sea Water Pressure" ,
+            "standard_name": "sea_water_pressure" ,
+            "units": "dBar"
+          } ,
+          "pressure_UQL": {
+            "_FillValue": "-1" ,
+            "_Unsigned": "true" ,
+            "actual_range": "1, 4" ,
+            "colorBarMaximum": "10.0" ,
+            "colorBarMinimum": "0.0" ,
+            "flag_meaning": "PASS NOT_EVALUATED SUSPECT FAIL MISSING" ,
+            "flag_values": "1, 2, 3, 4, 9" ,
+            "long_name": "Pressure UNESCO Q Level" ,
+            "missing_value": "2" ,
+            "standard_name": "aggregate_quality_flag"
+          } ,
+          "pressure_flag_description": {
+            "long_name": "Pressure Flag Description"
+          } ,
+          "conductivity": {
+            "_FillValue": "NaN" ,
+            "actual_range": "-0.230893, 40.79734" ,
+            "ancillary_variables": "conductivity_UQL" ,
+            "colorBarMaximum": "40.0" ,
+            "colorBarMinimum": "15.0" ,
+            "long_name": "Sea Water Conductivity" ,
+            "standard_name": "sea_water_electrical_conductivity" ,
+            "units": "mS cm-1"
+          } ,
+          "conductivity_UQL": {
+            "_FillValue": "-1" ,
+            "_Unsigned": "true" ,
+            "actual_range": "1, 9" ,
+            "colorBarMaximum": "10.0" ,
+            "colorBarMinimum": "0.0" ,
+            "flag_meaning": "PASS NOT_EVALUATED SUSPECT FAIL MISSING" ,
+            "flag_values": "1, 2, 3, 4, 9" ,
+            "long_name": "Conductivity UNESCO Q Level" ,
+            "missing_value": "2" ,
+            "standard_name": "aggregate_quality_flag"
+          } ,
+          "conductivity_flag_description": {
+            "long_name": "Conductivity Flag Description"
+          } ,
+          "temperature": {
+            "_FillValue": "NaN" ,
+            "actual_range": "2.3904, 21.2494" ,
+            "ancillary_variables": "temperature_UQL" ,
+            "colorBarMaximum": "15.0" ,
+            "colorBarMinimum": "5.0" ,
+            "long_name": "Sea Water Temperature" ,
+            "scale": "ITS-90" ,
+            "standard_name": "sea_water_temperature" ,
+            "units": "deg C"
+          } ,
+          "temperature_UQL": {
+            "_FillValue": "-1" ,
+            "_Unsigned": "true" ,
+            "actual_range": "1, 9" ,
+            "colorBarMaximum": "10.0" ,
+            "colorBarMinimum": "0.0" ,
+            "flag_meaning": "PASS NOT_EVALUATED SUSPECT FAIL MISSING" ,
+            "flag_values": "1, 2, 3, 4, 9" ,
+            "long_name": "Temperature UNESCO Q Level" ,
+            "missing_value": "2" ,
+            "standard_name": "aggregate_quality_flag"
+          } ,
+          "temperature_flag_description": {
+            "long_name": "Temperature Flag Description"
+          } ,
+          "salinity": {
+            "_FillValue": "NaN" ,
+            "actual_range": "-0.1465, 34.01" ,
+            "ancillary_variables": "salinity_UQL" ,
+            "colorBarMaximum": "33.0" ,
+            "colorBarMinimum": "20.0" ,
+            "long_name": "Practical Salinity" ,
+            "scale": "PSS-78" ,
+            "standard_name": "sea_water_practical_salinity" ,
+            "units": "PSU"
+          } ,
+          "salinity_UQL": {
+            "_FillValue": "-1" ,
+            "_Unsigned": "true" ,
+            "actual_range": "1, 9" ,
+            "colorBarMaximum": "10.0" ,
+            "colorBarMinimum": "0.0" ,
+            "flag_meaning": "PASS NOT_EVALUATED SUSPECT FAIL MISSING" ,
+            "flag_values": "1, 2, 3, 4, 9" ,
+            "long_name": "Salinity UNESCO Q Level" ,
+            "missing_value": "2" ,
+            "standard_name": "aggregate_quality_flag"
+          } ,
+          "salinity_flag_description": {
+            "long_name": "Salinity Flag Description"
+          } ,
+          "spec_cond": {
+            "long_name": "Specific Conductance"
+          } ,
+          "dissolved_oxygen_ml_l": {
+            "_FillValue": "NaN" ,
+            "actual_range": "-15.6005, 32.7664" ,
+            "ancillary_variables": "dissolved_oxygen_ml_l_UQL" ,
+            "colorBarMaximum": "12.0" ,
+            "colorBarMinimum": "0.0" ,
+            "long_name": "Dissolved Oxygen Concentration" ,
+            "standard_name": "volume_fraction_of_oxygen_in_sea_water" ,
+            "units": "mL L-1"
+          } ,
+          "dissolved_oxygen_ml_l_UQL": {
+            "_FillValue": "-1" ,
+            "_Unsigned": "true" ,
+            "actual_range": "1, 9" ,
+            "colorBarMaximum": "10.0" ,
+            "colorBarMinimum": "0.0" ,
+            "flag_meaning": "PASS NOT_EVALUATED SUSPECT FAIL MISSING" ,
+            "flag_values": "1, 2, 3, 4, 9" ,
+            "long_name": "Dissolved_oxygen_ml_l UNESCO Q Level" ,
+            "missing_value": "2" ,
+            "standard_name": "aggregate_quality_flag"
+          } ,
+          "dissolved_oxygen_ml_l_flag_description": {
+            "long_name": "Dissolved Oxygen Ml L Flag Description"
+          } ,
+          "rinko_do_ml_l": {
+            "_FillValue": "NaN" ,
+            "actual_range": "-47.3636, 265.546" ,
+            "ancillary_variables": "rinko_do_ml_l_UQL" ,
+            "colorBarMaximum": "12.0" ,
+            "colorBarMinimum": "0.0" ,
+            "long_name": "Secondary Dissolved Oxygen Concentration" ,
+            "standard_name": "volume_fraction_of_oxygen_in_sea_water" ,
+            "units": "mL L-1"
+          } ,
+          "rinko_do_ml_l_UQL": {
+            "_FillValue": "-1" ,
+            "_Unsigned": "true" ,
+            "actual_range": "1, 9" ,
+            "colorBarMaximum": "10.0" ,
+            "colorBarMinimum": "0.0" ,
+            "flag_meaning": "PASS NOT_EVALUATED SUSPECT FAIL MISSING" ,
+            "flag_values": "1, 2, 3, 4, 9" ,
+            "long_name": "Rinko_do_ml_l UNESCO Q Level" ,
+            "missing_value": "2" ,
+            "standard_name": "aggregate_quality_flag"
+          } ,
+          "rinko_do_ml_l_flag_description": {
+            "long_name": "Rinko Do Ml L Flag Description"
+          } ,
+          "flc": {
+            "_FillValue": "NaN" ,
+            "actual_range": "-1.777, 93.303" ,
+            "ancillary_variables": "flc_UQL" ,
+            "colorBarMaximum": "30.0" ,
+            "colorBarMinimum": "0.0" ,
+            "long_name": "Chlorophyll-a Concentration" ,
+            "standard_name": "mass_concentration_of_chlorophyll_in_sea_water" ,
+            "units": "ug L-1"
+          } ,
+          "flc_UQL": {
+            "_FillValue": "-1" ,
+            "_Unsigned": "true" ,
+            "actual_range": "1, 9" ,
+            "colorBarMaximum": "10.0" ,
+            "colorBarMinimum": "0.0" ,
+            "flag_meaning": "PASS NOT_EVALUATED SUSPECT FAIL MISSING" ,
+            "flag_values": "1, 2, 3, 4, 9" ,
+            "long_name": "Flc UNESCO Q Level" ,
+            "missing_value": "2" ,
+            "standard_name": "aggregate_quality_flag"
+          } ,
+          "flc_flag_description": {
+            "long_name": "Flc Flag Description"
+          } ,
+          "turbidity": {
+            "_FillValue": "NaN" ,
+            "actual_range": "-15.676, 2425.658" ,
+            "ancillary_variables": "turbidity_UQL" ,
+            "colorBarMaximum": "30.0" ,
+            "colorBarMinimum": "0.0" ,
+            "long_name": "Turbidity" ,
+            "standard_name": "sea_water_turbidity" ,
+            "units": "FTU"
+          } ,
+          "turbidity_UQL": {
+            "_FillValue": "-1" ,
+            "_Unsigned": "true" ,
+            "actual_range": "1, 9" ,
+            "colorBarMaximum": "10.0" ,
+            "colorBarMinimum": "0.0" ,
+            "flag_meaning": "PASS NOT_EVALUATED SUSPECT FAIL MISSING" ,
+            "flag_values": "1, 2, 3, 4, 9" ,
+            "long_name": "Turbidity UNESCO Q Level" ,
+            "missing_value": "2" ,
+            "standard_name": "aggregate_quality_flag"
+          } ,
+          "turbidity_flag_description": {
+            "long_name": "Turbidity Flag Description"
+          } ,
+          "par": {
+            "_FillValue": "NaN" ,
+            "actual_range": "-199.998, 4485.964" ,
+            "ancillary_variables": "par_UQL" ,
+            "colorBarMaximum": "10000.0" ,
+            "colorBarMinimum": "0.0" ,
+            "long_name": "Photosynthetically Active Radiation" ,
+            "standard_name": "downwelling_photosynthetic_photon_spherical_irradiance_in_sea_water" ,
+            "units": "umol m-2 s-1"
+          } ,
+          "par_UQL": {
+            "_FillValue": "-1" ,
+            "_Unsigned": "true" ,
+            "actual_range": "1, 9" ,
+            "colorBarMaximum": "10.0" ,
+            "colorBarMinimum": "0.0" ,
+            "flag_meaning": "PASS NOT_EVALUATED SUSPECT FAIL MISSING" ,
+            "flag_values": "1, 2, 3, 4, 9" ,
+            "long_name": "Par UNESCO Q Level" ,
+            "missing_value": "2" ,
+            "standard_name": "aggregate_quality_flag"
+          } ,
+          "par_flag_description": {
+            "long_name": "Par Flag Description"
+          } ,
+          "c_star_at": {
+            "_FillValue": "NaN" ,
+            "actual_range": "-0.2862, 48.524" ,
+            "ancillary_variables": "c_star_at_UQL" ,
+            "colorBarMaximum": "3.0" ,
+            "colorBarMinimum": "0.0" ,
+            "long_name": "Beam Attenuation" ,
+            "standard_name": "volume_beam_attenuation_coefficient_of_radiative_flux_in_sea_water_corrected_for_pure_water_attenuance" ,
+            "units": "m-1"
+          } ,
+          "c_star_at_UQL": {
+            "_FillValue": "-1" ,
+            "_Unsigned": "true" ,
+            "actual_range": "1, 9" ,
+            "colorBarMaximum": "10.0" ,
+            "colorBarMinimum": "0.0" ,
+            "flag_meaning": "PASS NOT_EVALUATED SUSPECT FAIL MISSING" ,
+            "flag_values": "1, 2, 3, 4, 9" ,
+            "long_name": "Beam Attenuation UNESCO Q Level" ,
+            "missing_value": "2" ,
+            "standard_name": "aggregate_quality_flag"
+          } ,
+          "c_star_at_flag_description": {
+            "long_name": "Beam Attenutation Flag Description"
+          } ,
+          "ph": {
+            "long_name": "pH" ,
+            "standard_name": "sea_water_ph_reported_on_total_scale" ,
+            "units": "-log[H+]"
+          } ,
+          "sos_un": {
+            "long_name": "Speed of Sound" ,
+            "units": "m s-1"
+          } ,
+          "backscatter_beta": {
+            "long_name": "Backscatter" ,
+            "units": "m-1"
+          } ,
+          "cdom_ppb": {
+            "long_name": "Carbon Dissolved Organic Matter" ,
+            "units": "ppb"
+          } ,
+          "oxygen_voltage": {
+            "_FillValue": "NaN" ,
+            "actual_range": "-0.1518, 4.7979" ,
+            "long_name": "Oxygen Sensor Raw Voltage" ,
+            "units": "Volts"
+          }
+        }
+      }
+    }
+  ]
+}

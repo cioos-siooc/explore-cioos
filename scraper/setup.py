@@ -7,5 +7,9 @@ setup(name='erddap_scraper',
       description='',
       url='',
       packages=['erddap_scraper'],
-      install_requires=['pandas']
+      install_requires=[
+            'pandas',
+            'erddapy',
+            'shapely',
+      ]
       )
