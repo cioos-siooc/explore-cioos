@@ -15,6 +15,7 @@
         "erddap_url": "https://pac-dev2.cioos.org/erddap",
         "cdm_data_type": "Profile",
         "ckan_id": "7adc4ad0-7841-4839-a91f-6d14edf4000f",
+        "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
         "profile_id_variable": "mission_id",
         "erddap_metadata": { "globals": {}, "variables": {} }
       },
@@ -23,6 +24,7 @@
         "erddap_url": "https://pac-dev2.cioos.org/erddap",
         "cdm_data_type": "Profile",
         "ckan_id": "0bd1190b-c1fd-4e42-9d87-7c49430c476f",
+        "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
         "profile_id_variable": "mission_id",
         "erddap_metadata": { "globals": {}, "variables": {} }
       }
