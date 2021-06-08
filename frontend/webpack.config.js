@@ -11,6 +11,11 @@ module.exports = {
     // filename: 'main.js',
     path: path.resolve(__dirname, 'dist')
   },
+  resolve: {
+    alias: {
+      'mapbox-gl': 'maplibre-gl'
+    }
+  },
   mode: 'development',
   module: {
     rules: [

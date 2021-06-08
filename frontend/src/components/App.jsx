@@ -1,25 +1,13 @@
 import React, { useState } from 'react'
 import ReactDOM from 'react-dom'
 import MapGL from 'react-map-gl';
+import createMap from './Map/Map.jsx'
+import './styles.css'
 
 export default function ReactD3Viz () {
-  const [viewport, setViewport] = useState({
-    latitude: 37.8,
-    longitude: -122.4,
-    zoom: 14,
-    bearing: 0,
-    pitch: 0
-  });
-
+  createMap() // creates map and uses the id='map' div to render the map
   return (
-    <MapGL
-      {...viewport}
-      width="100vw"
-      height="100vh"
-      mapStyle="mapbox://styles/mapbox/dark-v9"
-      onViewportChange={setViewport}
-      mapboxApiAccessToken={'pk.eyJ1Ijoiam9yaW5oYWthaSIsImEiOiJjazlhdWF1cmEwOXRzM2ZxeHN2Ymozd3NrIn0.eUILV3NQqvV8XD_EfiNpuA'}
-    />
+    <div></div>
   );
 }
 

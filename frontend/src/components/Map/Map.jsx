@@ -1,27 +1,19 @@
-/* global document */
-import * as React from 'react';
-import {useState} from 'react';
-import MapGL from 'react-map-gl';
+import {Map, GeolocateControl} from 'maplibre-gl'
 
-const MAPBOX_TOKEN = ''; // Set your mapbox token here
+export default function createMap() {
+  const mapTilerKey = "8qh5kEULltP5TFa7eZYO"// created at https://cloud.maptiler.com/account/keys/
+  const map = new Map({
+    container: "map",
+    style: `https://api.maptiler.com/maps/hybrid/style.json?key=${mapTilerKey}`,
+    center: [1, 15],
+    zoom: 3
+  })
 
-export default function Map() {
-  const [viewport, setViewport] = useState({
-    latitude: 37.8,
-    longitude: -122.4,
-    zoom: 14,
-    bearing: 0,
-    pitch: 0
-  });
-
-  return (
-    <MapGL
-      {...viewport}
-      width="100vw"
-      height="100vh"
-      mapStyle="mapbox://styles/mapbox/dark-v9"
-      onViewportChange={setViewport}
-      mapboxApiAccessToken={MAPBOX_TOKEN}
-    />
-  );
+  map.addControl(
+    new GeolocateControl({
+      positionOptions: {
+        enableHighAccuracy: true
+      },
+    })
+  )
 }
