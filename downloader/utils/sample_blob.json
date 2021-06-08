@@ -1,0 +1,30 @@
+{
+    "user_query": {
+      "time_min": "1990-01-01",
+      "time_max": "1991-01-01",
+      "lat_min": 49,
+      "lat_max": 50,
+      "lon_min": -123,
+      "lon_max": -123.1,
+      "eovs": ["sea temperature"],
+      "email": "cozycoops@gmail.com"
+    },
+    "cache_filtered": [
+      {
+        "dataset_id": "IOS_CTD_Profiles",
+        "erddap_url": "https://pac-dev2.cioos.org/erddap",
+        "cdm_data_type": "Profile",
+        "ckan_id": "7adc4ad0-7841-4839-a91f-6d14edf4000f",
+        "profile_id_variable": "mission_id",
+        "erddap_metadata": { "globals": {}, "variables": {} }
+      },
+      {
+        "dataset_id": "IOS_BOT_Profiles",
+        "erddap_url": "https://pac-dev2.cioos.org/erddap",
+        "cdm_data_type": "Profile",
+        "ckan_id": "0bd1190b-c1fd-4e42-9d87-7c49430c476f",
+        "profile_id_variable": "mission_id",
+        "erddap_metadata": { "globals": {}, "variables": {} }
+      }
+    ]
+  }
