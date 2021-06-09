@@ -204,7 +204,12 @@ def get_dataset(json_query, output_path=""):
 
     for dataset in json_query["cache_filtered"]:
         # If metadata for the dataset is not available retrieve it
-        if dataset['erddap_metadata'] is None:
+        if (
+                'erddap_metadata' not in dataset or
+                'globals' not in dataset['erddap_metadata'] or
+                'variables' not in dataset['erddap_metadata'] or
+                dataset['erddap_metadata']['variables'] == []
+        ):
             scrape_erddap = erddap_scraper.ERDDAP(dataset['erddap_url'])
             dataset['erddap_metadata'] = scrape_erddap.get_metadata_for_dataset(dataset['dataset_id'])
 
