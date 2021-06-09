@@ -156,7 +156,7 @@ def filter_polygon_region(file_path, polygone):
 
     # Determinate the type of data
     file_type = file_path.split(".")[-1]
-
+    print('Filter within polygon', end=' ... ')
     if file_type == "csv":
         # ERDDAP CSV has two lines header, let's read them first
         with open(file_path) as f:
@@ -186,6 +186,10 @@ def filter_polygon_region(file_path, polygone):
         warnings.warn(
             "Polygon filtration is not compatible with {0} format".format(file_type)
         )
+        return
+
+    print('Completed')
+
 
 
 def get_dataset(json_query, output_path=""):
