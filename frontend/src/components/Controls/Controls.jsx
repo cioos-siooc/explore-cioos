@@ -2,6 +2,7 @@ import * as React from 'react'
 import {useState} from 'react'
 import {Container, Row, Col, Accordion, Card, Button, InputGroup, OverlayTrigger, Tooltip} from 'react-bootstrap'
 import classnames from 'classnames'
+import { Check } from 'react-bootstrap-icons';
 
 import TimeSelector from './TimeSelector/TimeSelector.jsx'
 import DepthSelector from './DepthSelector/DepthSelector.jsx'
@@ -9,34 +10,54 @@ import './styles.css'
 
 export default function Controls() {
   const [controlsClosed, setControlsClosed] = useState(false)
+  const [requestSubmitted, setRequestSubmitted] = useState(false)
   const controlClassName = classnames('controlAccordion', 'mb-3', 'animate__animated', {'animate__slideOutRight': controlsClosed}, {'animate__slideInRight': !controlsClosed})
   return (
     <div className='controls'>
       <Container fluid>
         <Row>
-          {/* <Col xs={9}></Col> */}
-          <Col xs={{span: 3, offset:9}}>
-            <Row>
-              <Col xs={{ span: 1, offset: 11 }} className='mr-0 pr-0'>
-              <OverlayTrigger
-                key='left'
-                placement='left'
-                overlay={
-                  <Tooltip id={`tooltip-left`}>
-                    {controlsClosed ? 'Open' : 'Close'} Controls
-                  </Tooltip>
-                }
-              >
-                <Button 
-                  className='toggleControlsOpenAndClosed' 
-                  onClick={() => setControlsClosed(!controlsClosed)}
+          <Col style={{pointerEvents: 'none'}} xs={{span: 3, offset:9}}>
+            <Row style={{pointerEvents: 'auto'}}>
+              <Col xs={{ span: 6, offset: 5 }}>
+                <OverlayTrigger
+                  key='left'
+                  placement='top'
+                  overlay={
+                    <Tooltip id={`tooltip-left`}>
+                      Submit Request
+                    </Tooltip>
+                  }
                 >
-                  {controlsClosed ? '<' : '>'}
-                </Button>
-              </OverlayTrigger>
+                  <Button 
+                    className='toggleControlsOpenAndClosed' 
+                    onClick={() => setRequestSubmitted(true)}
+                    variant={requestSubmitted ? 'success' : 'secondary'}
+                  >
+                    {requestSubmitted ? 'Request Submitted' : 'Submit Request'}
+                    {requestSubmitted && <Check/>}
+                  </Button>
+                </OverlayTrigger>
+              </Col>
+              <Col xs={{ span: 1, offset: 0 }} className='mr-0 pr-0'>
+                <OverlayTrigger
+                  key='left'
+                  placement='top'
+                  overlay={
+                    <Tooltip id={`tooltip-left`}>
+                      {controlsClosed ? 'Open' : 'Close'} Controls
+                    </Tooltip>
+                  }
+                >
+                  <Button 
+                    className='toggleControlsOpenAndClosed' 
+                    onClick={() => setControlsClosed(!controlsClosed)}
+                  >
+                    {controlsClosed ? '<' : '>'}
+                  </Button>
+                </OverlayTrigger>
               </Col>
             </Row>
-            <Row>
+            <Row style={{pointerEvents: 'auto'}}>
               <Accordion defaultActiveKey="0" className={controlClassName}>
                 <Card>
                   <Card.Header>

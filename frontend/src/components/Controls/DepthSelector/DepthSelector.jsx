@@ -3,6 +3,7 @@ import {useState, forwardRef} from 'react'
 import {Col, Row, Button} from 'react-bootstrap'
 import RangeSlider from 'react-bootstrap-range-slider'
 import Slider, { SliderTooltip } from 'rc-slider';
+import RangeSelector from './RangeSelector.jsx'
 
 import 'react-bootstrap-range-slider/dist/react-bootstrap-range-slider.css';
 import 'rc-slider/assets/index.css';
@@ -31,16 +32,9 @@ export default function DepthSelector() {
       <Row>
         <Col>
           <div style={{ width: 385, margin: '15px 0px 0px 15px' }}>
-            <Range 
-              min={0} 
-              max={1000} 
-              defaultValue={[0, 100]}
-              value={[startDepth, endDepth]} 
-              tipFormatter={value => `${value}m`} 
-              onChange={(value) => {
-                setStartDepth(value[0]) 
-                setEndDepth(value[1])
-              }}
+            <RangeSelector
+              setStartDepth={setStartDepth}
+              setEndDepth={setEndDepth}
             />
           </div>
         </Col>
