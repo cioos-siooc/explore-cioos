@@ -1,29 +1,21 @@
 {
     "user_query": {
-      "time_min": "1990-01-01",
-      "time_max": "1991-01-01",
+      "time_min": "2020-01-01",
+      "time_max": "2020-02-01",
       "lat_min": 49,
       "lat_max": 50,
       "lon_min": -123,
       "lon_max": -123.1,
-      "eovs": ["sea temperature"],
+      "polygon_region": "POLYGON ((-125.2071249 50.0725658, -125.1617769 49.9989123, -125.0566522 50.012593, -125.0539038 50.0355326, -125.0367266 50.1126528, -125.1308579 50.1333439, -125.1432255 50.0888689, -125.2071249 50.0725658))",
+      "eovs": ["temperature"],
       "email": "cozycoops@gmail.com"
     },
     "cache_filtered": [
       {
-        "dataset_id": "IOS_CTD_Profiles",
-        "erddap_url": "https://pac-dev2.cioos.org/erddap",
+        "dataset_id": "HakaiWaterPropertiesInstrumentProfileProvisional",
+        "erddap_url": "https://catalogue.hakai.org/erddap" ,
         "cdm_data_type": "Profile",
-        "ckan_id": "7adc4ad0-7841-4839-a91f-6d14edf4000f",
-        "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
-        "profile_id_variable": "mission_id",
-        "erddap_metadata": { "globals": {}, "variables": {} }
-      },
-      {
-        "dataset_id": "IOS_BOT_Profiles",
-        "erddap_url": "https://pac-dev2.cioos.org/erddap",
-        "cdm_data_type": "Profile",
-        "ckan_id": "0bd1190b-c1fd-4e42-9d87-7c49430c476f",
+        "ckan_id": "f239e86c-38d1-4fb2-8b17-acaed794221c" ,
         "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
         "profile_id_variable": "mission_id",
         "erddap_metadata": { "globals": {}, "variables": {} }
