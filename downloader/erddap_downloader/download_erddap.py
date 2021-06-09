@@ -103,8 +103,12 @@ def get_erddap_download_url(
     # Add constraint for lat/long range
     # If polygon given get the boundaries for erddap
     if "polygon_region" in user_constraint:
-        user_constraint['lon_min'], user_constraint['lat_min'], \
-            user_constraint['lon_max'], user_constraint['lat_max'] = user_constraint["polygon_object"].bounds
+        (
+            user_constraint["lon_min"],
+            user_constraint["lat_min"],
+            user_constraint["lon_max"],
+            user_constraint["lat_max"],
+        ) = user_constraint["polygon_object"].bounds
 
     if (
         "lat_min" in user_constraint
@@ -133,8 +137,9 @@ def get_file_name_output(dataset_info):
     :return:
     """
     # Output file is {erddap server}_{dataset_id}_{CKAN_ID}
-    output_file_name = "{0}_{1}".format(dataset_info["dataset_id"],
-        erddap_server_to_name(dataset_info["erddap_url"]))
+    output_file_name = "{0}_{1}".format(
+        dataset_info["dataset_id"], erddap_server_to_name(dataset_info["erddap_url"])
+    )
     return output_file_name
 
 
@@ -156,19 +161,25 @@ def filter_polygon_region(file_path, polygone):
             columns_name = f.readline()
             columns_units = f.readline()
         # Read with pandas
-        df = pd.read_csv(file_path,
-                         skiprows=2,
-                         names=columns_name.split(','),
-                         float_precision='round_trip')
+        df = pd.read_csv(
+            file_path,
+            skiprows=2,
+            names=columns_name.split(","),
+            float_precision="round_trip",
+        )
 
         # Exclude data outside the polygon
-        df = df.loc[df.apply(lambda x: polygone.contains(Point(x.longitude, x.latitude)), axis=1)]
+        df = df.loc[
+            df.apply(
+                lambda x: polygone.contains(Point(x.longitude, x.latitude)), axis=1
+            )
+        ]
 
         # Overwrite original file
-        with open(file_path+'_test.csv', 'w') as f:
+        with open(file_path + "_test.csv", "w") as f:
             f.write(columns_name)
             f.write(columns_units)
-            df.to_csv(f, index=False, header=False, line_terminator='\n')
+            df.to_csv(f, index=False, header=False, line_terminator="\n")
     else:
         warnings.warn(
             "Polygon filtration is not compatible with {0} format".format(file_type)
