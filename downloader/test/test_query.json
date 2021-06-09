@@ -16,6 +16,7 @@
       "erddap_url": "https://catalogue.hakai.org/erddap" ,
       "cdm_data_type": "Profile" ,
       "ckan_id": "0bd1190b-c1fd-4e42-9d87-7c49430c476f" ,
+      "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
       "profile_id_variable": "mission_id" ,
       "erddap_metadata": {
         "globals": {
