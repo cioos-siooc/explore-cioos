@@ -15,7 +15,7 @@
       "dataset_id": "HakaiWaterPropertiesInstrumentProfileProvisional" ,
       "erddap_url": "https://catalogue.hakai.org/erddap" ,
       "cdm_data_type": "Profile" ,
-      "ckan_id": "0bd1190b-c1fd-4e42-9d87-7c49430c476f" ,
+      "ckan_id": "ca-cioos_6143028b-028d-46c7-a67d-f3a513435e63" ,
       "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
       "profile_id_variable": "mission_id" ,
       "erddap_metadata": {}
@@ -23,7 +23,7 @@
       "dataset_id": "HakaiWaterPropertiesInstrumentProfileResearch" ,
       "erddap_url": "https://catalogue.hakai.org/erddap" ,
       "cdm_data_type": "Profile" ,
-      "ckan_id": "0bd1190b-c1fd-4e42-9d87-7c49430c476f" ,
+      "ckan_id": "ca-cioos_ba41d935-f293-447f-be3d-7098e569b431" ,
       "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
       "profile_id_variable": "mission_id" ,
       "erddap_metadata": {}
@@ -31,7 +31,7 @@
       "dataset_id": "IOS_CTD_Profiles" ,
       "erddap_url": "https://data.cioospacific.ca/erddap" ,
       "cdm_data_type": "Profile" ,
-      "ckan_id": "0bd1190b-c1fd-4e42-9d87-7c49430c476f" ,
+      "ckan_id": "d98c6fb7-fbdf-4430-85f2-1472c9be3b9a" ,
       "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
       "profile_id_variable": "mission_id" ,
       "erddap_metadata": {}
@@ -39,7 +39,7 @@
       "dataset_id": "IOS_BOT_Profiles" ,
       "erddap_url": "https://data.cioospacific.ca/erddap" ,
       "cdm_data_type": "Profile" ,
-      "ckan_id": "a49ae4fe-79b4-45f7-814a-b751d5c17fba" ,
+      "ckan_id": "0bd1190b-c1fd-4e42-9d87-7c49430c476f" ,
       "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
       "profile_id_variable": "mission_id" ,
       "erddap_metadata": {}
