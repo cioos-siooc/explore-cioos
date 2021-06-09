@@ -1,16 +1,53 @@
-import {Map, NavigationControl} from 'maplibre-gl'
-import mapboxgl from 'mapbox-gl'
-import MapboxDraw from '@mapbox/mapbox-gl-draw'
+import { Map, NavigationControl } from "maplibre-gl";
+import mapboxgl from "mapbox-gl";
+import MapboxDraw from "@mapbox/mapbox-gl-draw";
 
 export default function createMap() {
-  const mapTilerKey = "8qh5kEULltP5TFa7eZYO"// created at https://cloud.maptiler.com/account/keys/
-  const map = new Map({
+  var map = new Map({
     container: "map",
-    style: `https://api.maptiler.com/maps/hybrid/style.json?key=${mapTilerKey}`,
-    center: [-100, 49],
-    zoom: 3
-  })
-  const drawPolygon = new MapboxDraw()
-  map.addControl(drawPolygon, 'top-left')
-  map.addControl(new NavigationControl(), 'bottom-left');
+    style: {
+      version: 8,
+      sources: {
+        osm: {
+          type: "raster",
+          tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+
+          tileSize: 256,
+          attribution:
+            'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.',
+        },
+      },
+      layers: [
+        {
+          id: "osm",
+          type: "raster",
+          source: "osm",
+        },
+      ],
+    },
+  });
+
+  map.on("load", function () {
+    console.log("test");
+
+    map.addLayer({
+      id: "internal-layer-name",
+      type: "circle",
+
+      source: {
+        type: "vector",
+        tiles: ["https://pac-dev2.cioos.org/ceda/tiles/{z}/{x}/{y}.mvt"],
+      },
+      "source-layer": "internal-layer-name",
+      paint: {
+        "circle-radius": 1,
+        "circle-color": "#25420b",
+        "circle-opacity": 0.75,
+      },
+    });
+  });
+
+  const drawPolygon = new MapboxDraw();
+  map.addControl(drawPolygon, "top-left");
+  map.addControl(new NavigationControl(), "bottom-left");
 }
