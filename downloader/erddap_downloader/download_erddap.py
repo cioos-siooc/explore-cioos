@@ -15,6 +15,8 @@ import os
 
 import warnings
 
+import scraper.erddap_scraper.ERDDAP as erddap_scraper
+
 
 def erddap_server_to_name(server):
     """
@@ -103,8 +105,12 @@ def get_erddap_download_url(
     # Add constraint for lat/long range
     # If polygon given get the boundaries for erddap
     if "polygon_region" in user_constraint:
-        user_constraint['lon_min'], user_constraint['lat_min'], \
-            user_constraint['lon_max'], user_constraint['lat_max'] = user_constraint["polygon_object"].bounds
+        (
+            user_constraint["lon_min"],
+            user_constraint["lat_min"],
+            user_constraint["lon_max"],
+            user_constraint["lat_max"],
+        ) = user_constraint["polygon_object"].bounds
 
     if (
         "lat_min" in user_constraint
@@ -133,8 +139,9 @@ def get_file_name_output(dataset_info):
     :return:
     """
     # Output file is {erddap server}_{dataset_id}_{CKAN_ID}
-    output_file_name = "{0}_{1}".format(dataset_info["dataset_id"],
-        erddap_server_to_name(dataset_info["erddap_url"]))
+    output_file_name = "{0}_{1}".format(
+        dataset_info["dataset_id"], erddap_server_to_name(dataset_info["erddap_url"])
+    )
     return output_file_name
 
 
@@ -151,23 +158,30 @@ def filter_polygon_region(file_path, polygone):
     file_type = file_path.split(".")[-1]
 
     if file_type == "csv":
+        # ERDDAP CSV has two lines header, let's read them first
+        with open(file_path) as f:
+            columns_name = f.readline()
+            columns_units = f.readline()
         # Read with pandas
-        df = pd.read_csv(file_path, header=[0, 1])
-        column_names = df.columns
-        df = df.droplevel(1, axis="columns")
+        df = pd.read_csv(
+            file_path,
+            skiprows=2,
+            names=columns_name.split(","),
+            float_precision="round_trip",
+        )
 
         # Exclude data outside the polygon
-        df = df.loc[df.apply(lambda x: polygone.contains(Point(x.longitude, x.latitude)), axis=1)]
-
-        # Rename columns to be the same as ERDDAP
-        column_names = [
-            tuple("" if item.startswith("Unnamed") else item for item in col)
-            for col in column_names
+        df = df.loc[
+            df.apply(
+                lambda x: polygone.contains(Point(x.longitude, x.latitude)), axis=1
+            )
         ]
-        df.columns = column_names
 
         # Overwrite original file
-        df.to_csv(file_path, index=False)
+        with open(file_path + "_test.csv", "w") as f:
+            f.write(columns_name)
+            f.write(columns_units)
+            df.to_csv(f, index=False, header=False, line_terminator="\n")
     else:
         warnings.warn(
             "Polygon filtration is not compatible with {0} format".format(file_type)
@@ -189,9 +203,14 @@ def get_dataset(json_query, output_path=""):
         json_query["user_query"]["response"] = "csv"
 
     for dataset in json_query["cache_filtered"]:
+        # If metadata for the dataset is not available retrieve it
+        if dataset['erddap_metadata'] is None:
+            scrape_erddap = erddap_scraper.ERDDAP(dataset['erddap_url'])
+            dataset['erddap_metadata'] = scrape_erddap.get_metadata_for_dataset(dataset['dataset_id'])
+
         # Get variable list to download
         variable_list = get_variable_list(
-            dataset["erddap_metadata"], json_query["user_query"]["eovs"]
+            dataset["erddap_metadata"], json_query["user_query"]["eovs"],
         )
 
         # Get download url
