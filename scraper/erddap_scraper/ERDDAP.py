@@ -88,7 +88,7 @@ class ERDDAP(object):
         vars = {}
 
         # data contains a mix of globals and variable attributes
-        # must separate them
+        # group by variable first
         for var in metadata:
 
             varname = var['Variable Name']
@@ -101,7 +101,13 @@ class ERDDAP(object):
             # values are all strings
             if len(val) > 0:
                 vars[varname][attr] = val
-        return vars
+
+        # Separate globals versus variables
+        metadata = {
+            'globals': vars.pop('NC_GLOBAL'),
+            'variables': vars
+        }
+        return metadata
 
     def scrape_contact_from_jsonld(self):
         '''
