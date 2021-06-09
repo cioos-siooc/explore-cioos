@@ -151,23 +151,24 @@ def filter_polygon_region(file_path, polygone):
     file_type = file_path.split(".")[-1]
 
     if file_type == "csv":
+        # ERDDAP CSV has two lines header, let's read them first
+        with open(file_path) as f:
+            columns_name = f.readline()
+            columns_units = f.readline()
         # Read with pandas
-        df = pd.read_csv(file_path, header=[0, 1])
-        column_names = df.columns
-        df = df.droplevel(1, axis="columns")
+        df = pd.read_csv(file_path,
+                         skiprows=2,
+                         names=columns_name.split(','),
+                         float_precision='round_trip')
 
         # Exclude data outside the polygon
         df = df.loc[df.apply(lambda x: polygone.contains(Point(x.longitude, x.latitude)), axis=1)]
 
-        # Rename columns to be the same as ERDDAP
-        column_names = [
-            tuple("" if item.startswith("Unnamed") else item for item in col)
-            for col in column_names
-        ]
-        df.columns = column_names
-
         # Overwrite original file
-        df.to_csv(file_path, index=False)
+        with open(file_path+'_test.csv', 'w') as f:
+            f.write(columns_name)
+            f.write(columns_units)
+            df.to_csv(f, index=False, header=False, line_terminator='\n')
     else:
         warnings.warn(
             "Polygon filtration is not compatible with {0} format".format(file_type)
