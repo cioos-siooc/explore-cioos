@@ -1,11 +1,18 @@
 import pdfkit
 from multiprocessing import Process
 from . import download_erddap
+import os
+
+if os.name == 'nt':
+    path_wkthmltopdf = b'C:\Program Files\wkhtmltopdf\\bin\wkhtmltopdf.exe'
+    config = pdfkit.configuration(wkhtmltopdf=path_wkthmltopdf)
+else:
+    config = pdfkit.configuration()
 
 
 def download_ckan_pdf(ckan_url=None, ckan_id=None, pdf_filename=None):
     download_url = ckan_url + ckan_id
-    if pdfkit.from_url(download_url, pdf_filename):
+    if pdfkit.from_url(download_url, pdf_filename, configuration=config):
         return 0
     else:
         raise Exception("Unable to download file")
