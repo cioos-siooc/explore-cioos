@@ -16,8 +16,8 @@ export default function Controls() {
     <div className='controls'>
       <Container fluid>
         <Row>
-          <Col xs={{span: 3, offset:9}}>
-            <Row>
+          <Col style={{pointerEvents: 'none'}} xs={{span: 3, offset:9}}>
+            <Row style={{pointerEvents: 'auto'}}>
               <Col xs={{ span: 6, offset: 5 }}>
                 <OverlayTrigger
                   key='left'
@@ -57,7 +57,7 @@ export default function Controls() {
                 </OverlayTrigger>
               </Col>
             </Row>
-            <Row>
+            <Row style={{pointerEvents: 'auto'}}>
               <Accordion defaultActiveKey="0" className={controlClassName}>
                 <Card>
                   <Card.Header>

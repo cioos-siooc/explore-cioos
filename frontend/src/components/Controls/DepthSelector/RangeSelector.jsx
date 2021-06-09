@@ -13,7 +13,6 @@ export default class RangeSelector extends React.Component {
     };
   }
   onSliderChange = value => {
-    // console.log(value);
     this.setState({
       value: value
     });
@@ -22,8 +21,6 @@ export default class RangeSelector extends React.Component {
   };
 
   onInputChange = (value, index) => {
-    // console.log(value);
-
     // When an input changes we set the dynamicKey
     this.setState({
       dynamicKey: Date.now()
@@ -40,7 +37,6 @@ export default class RangeSelector extends React.Component {
   };
 
   render() {
-    console.log("Value in State on render:", this.state.value);
     return (
       <div>
         <Range
