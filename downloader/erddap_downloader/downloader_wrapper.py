@@ -1,7 +1,7 @@
 import pdfkit
 import json
 from multiprocessing import Process
-
+from . import download_erddap
 
 def download_ckan_pdf(ckan_url=None, ckan_id=None, pdf_filename=None):
     download_url = ckan_url+ckan_id
@@ -24,12 +24,9 @@ def parallel_downloader(json_blob=None, output_folder='../'):
 
         # call jessy's code here to download data from erddap
 
+        pid = Process(target=download_erddap.get_dataset, args =(json_blob, output_folder))
+        pid.start()
+        pid.join()
 
-
-
-if __name__ == "__main__":
-    with open('sample_blob.json','r') as fid:
-        json_blob = json.load(fid)
-    parallel_downloader(json_blob=json_blob, output_folder='./')
 
     
