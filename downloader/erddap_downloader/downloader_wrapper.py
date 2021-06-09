@@ -31,7 +31,7 @@ def parallel_downloader(json_blob=None, output_folder="../"):
         blob = json_blob
         blob["cache_filtered"] = [filtered_result]
         pid = Process(
-            target=download_erddap.get_dataset, args=(json_blob, output_folder)
+            target=download_erddap.get_dataset, args=(blob, output_folder)
         )
         pid.start()
         pid.join()
