@@ -219,22 +219,34 @@ def get_dataset(json_query, output_path=""):
         )
 
         # Get download url
-        download_url = get_erddap_download_url(
-            dataset, json_query["user_query"], variable_list
-        )
-
-        # Generate the default file name
-        output_file_name = get_file_name_output(dataset)
-        output_path = os.path.join(output_path, output_file_name)
-        output_path += "." + json_query["user_query"]["response"]
-
-        # Download data
-        print("Download {0}".format(download_url), end=" ... ")
-        r = requests.get(download_url)
-        open(output_path, "wb").write(r.content)
-        print("Completed")
-        # If polygon filter out data outside the polygon
-        if "polygon_object" in json_query["user_query"]:
-            filter_polygon_region(
-                output_path, json_query["user_query"]["polygon_object"]
+        try:
+            download_url = get_erddap_download_url(
+                dataset, json_query["user_query"], variable_list
             )
+
+
+            # Generate the default file name
+            output_file_name = get_file_name_output(dataset)
+            output_file_path = os.path.join(output_path, output_file_name)
+            output_file_path += "." + json_query["user_query"]["response"]
+
+            # Download data
+            print("Download {0}".format(download_url), end=" ... ")
+            r = requests.get(download_url)
+            open(output_file_path, "wb").write(r.content)
+            print("Completed")
+
+            # If polygon filter out data outside the polygon
+            if "polygon_object" in json_query["user_query"]:
+                filter_polygon_region(
+                    output_file_path, json_query["user_query"]["polygon_object"]
+                )
+        except requests.exceptions.HTTPError:
+            warnings.warn(
+                'Failed to download data from erddap: {0} dataset_id:{1}. \n'
+                ' There''s likely no data available.'.format(
+                    dataset['erddap_url'],
+                    dataset['dataset_id']
+                )
+            )
+
