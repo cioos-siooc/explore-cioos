@@ -6,3 +6,9 @@
 *.pdf
 
 downloader/out/
+
+downloader/erddap_downloader/__pycache__/
+
+*.egg-info*
+
+__pycache__
