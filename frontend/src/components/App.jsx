@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import ReactDOM from 'react-dom'
 import MapGL from 'react-map-gl';
-import createMap from './Map/Map.jsx'
+import createMap from './Map/Map.js'
 import Controls from './Controls/Controls.jsx'
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './styles.css'
