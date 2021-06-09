@@ -1,6 +1,7 @@
-from erddap_scraper import download_erddap
+from utils.erddap_scraper import download_erddap
+
 import json
-output_path = r'E:\test_ceda'
+output_path = "../"
 
 with open('test_query.json', 'r') as f:
     query_json = json.load(f)
