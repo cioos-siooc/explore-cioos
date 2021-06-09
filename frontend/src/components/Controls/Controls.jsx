@@ -2,6 +2,7 @@ import * as React from 'react'
 import {useState} from 'react'
 import {Container, Row, Col, Accordion, Card, Button, InputGroup, OverlayTrigger, Tooltip} from 'react-bootstrap'
 import classnames from 'classnames'
+import { Check } from 'react-bootstrap-icons';
 
 import TimeSelector from './TimeSelector/TimeSelector.jsx'
 import DepthSelector from './DepthSelector/DepthSelector.jsx'
@@ -9,6 +10,7 @@ import './styles.css'
 
 export default function Controls() {
   const [controlsClosed, setControlsClosed] = useState(false)
+  const [requestSubmitted, setRequestSubmitted] = useState(false)
   const controlClassName = classnames('controlAccordion', 'mb-3', 'animate__animated', {'animate__slideOutRight': controlsClosed}, {'animate__slideInRight': !controlsClosed})
   return (
     <div className='controls'>
@@ -16,10 +18,30 @@ export default function Controls() {
         <Row>
           <Col xs={{span: 3, offset:9}}>
             <Row>
-              <Col xs={{ span: 1, offset: 11 }} className='mr-0 pr-0'>
+              <Col xs={{ span: 6, offset: 5 }}>
                 <OverlayTrigger
                   key='left'
-                  placement='left'
+                  placement='top'
+                  overlay={
+                    <Tooltip id={`tooltip-left`}>
+                      Submit Request
+                    </Tooltip>
+                  }
+                >
+                  <Button 
+                    className='toggleControlsOpenAndClosed' 
+                    onClick={() => setRequestSubmitted(true)}
+                    variant={requestSubmitted ? 'success' : 'secondary'}
+                  >
+                    {requestSubmitted ? 'Request Submitted' : 'Submit Request'}
+                    {requestSubmitted && <Check/>}
+                  </Button>
+                </OverlayTrigger>
+              </Col>
+              <Col xs={{ span: 1, offset: 0 }} className='mr-0 pr-0'>
+                <OverlayTrigger
+                  key='left'
+                  placement='top'
                   overlay={
                     <Tooltip id={`tooltip-left`}>
                       {controlsClosed ? 'Open' : 'Close'} Controls
