@@ -144,13 +144,11 @@ def scrape_erddap(erddap_url, result):
         dataset_variables = {}
         try:
             # thread_log("getting metadata")
-            metadata_globals_variables_combined = erddap.get_metadata_for_dataset(dataset_id)
+            dataset_metadata = erddap.get_metadata_for_dataset(dataset_id)
+            
             # print(metadata)
-            dataset_globals = metadata_globals_variables_combined["NC_GLOBAL"]
-
-            # dataset_globals is globals, and 
-            del metadata_globals_variables_combined["NC_GLOBAL"]
-            dataset_variables=metadata_globals_variables_combined
+            dataset_globals = dataset_metadata["globals"]
+            dataset_variables= dataset_metadata["variables"]
 
             standard_names_in_dataset = ",".join(
                 [
