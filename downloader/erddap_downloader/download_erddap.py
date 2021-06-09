@@ -124,6 +124,19 @@ def get_erddap_download_url(
         e.constraints["longitude>="] = user_constraint["lon_min"]
         e.constraints["longitude<="] = user_constraint["lon_max"]
 
+    # Add depth filter
+    if 'depth' in variables_list:
+        if (
+                "depth_min" in user_constraint and
+                user_constraint["depth_min"]
+        ):
+            e.constraints['depth>='] = user_constraint["depth_min"]
+        if (
+                "depth_max" in user_constraint and
+                user_constraint["depth_max"]
+        ):
+            e.constraints['depth<='] = user_constraint["depth_max"]
+
     # Add variable list to retrieve
     if variables_list:
         e.variables = variables_list
