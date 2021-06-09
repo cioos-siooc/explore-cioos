@@ -15,6 +15,8 @@ import os
 
 import warnings
 
+import scraper.erddap_scraper.ERDDAP as erddap_scraper
+
 
 def erddap_server_to_name(server):
     """
@@ -201,9 +203,14 @@ def get_dataset(json_query, output_path=""):
         json_query["user_query"]["response"] = "csv"
 
     for dataset in json_query["cache_filtered"]:
+        # If metadata for the dataset is not available retrieve it
+        if dataset['erddap_metadata'] is None:
+            scrape_erddap = erddap_scraper.ERDDAP(dataset['erddap_url'])
+            dataset['erddap_metadata'] = scrape_erddap.get_metadata_for_dataset(dataset['dataset_id'])
+
         # Get variable list to download
         variable_list = get_variable_list(
-            dataset["erddap_metadata"], json_query["user_query"]["eovs"]
+            dataset["erddap_metadata"], json_query["user_query"]["eovs"],
         )
 
         # Get download url
