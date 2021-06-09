@@ -2,7 +2,6 @@ import { Map, GeolocateControl } from "maplibre-gl";
 
 export default function createMap() {
   var map = new Map({
-    renderWorldCopies: false,
     container: "map",
     style: {
       version: 8,
