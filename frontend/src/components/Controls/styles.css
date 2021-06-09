@@ -1,0 +1,18 @@
+.controls {
+  position: relative;
+  top: 50px;
+  overflow-x: hidden;
+}
+.toggleControlsOpenAndClosed {
+  float: right;
+}
+.closed {
+  width: 0px;
+}
+
+.timeInput {
+  overflow:visible;
+}
+.controlAccordion{
+  width: 500px;
+}
