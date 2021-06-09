@@ -11,5 +11,6 @@ setup(name='erddap_downloader',
             'pandas',
             'erddapy',
             'shapely',
+            'pdfkit'
       ]
       )

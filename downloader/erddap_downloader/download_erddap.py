@@ -133,11 +133,8 @@ def get_file_name_output(dataset_info):
     :return:
     """
     # Output file is {erddap server}_{dataset_id}_{CKAN_ID}
-    output_file_name = "{0}_{1}_{2}".format(
-        erddap_server_to_name(dataset_info["erddap_url"]),
-        dataset_info["dataset_id"],
-        dataset_info["ckan_id"],
-    )
+    output_file_name = "{0}_{1}".format(dataset_info["dataset_id"],
+        erddap_server_to_name(dataset_info["erddap_url"]))
     return output_file_name
 
 
