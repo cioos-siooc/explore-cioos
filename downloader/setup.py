@@ -2,11 +2,11 @@
 
 from distutils.core import setup
 
-setup(name='erddap_scraper',
+setup(name='erddap_downloader',
       version='0.1',
       description='',
       url='',
-      packages=['erddap_scraper'],
+      packages=['erddap_downloader'],
       install_requires=[
             'pandas',
             'erddapy',

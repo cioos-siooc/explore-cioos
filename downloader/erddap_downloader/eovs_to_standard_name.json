@@ -1,0 +1,27 @@
+{
+  "time": [
+    "time"
+  ],
+  "latitude": [
+    "latitude"
+  ],
+  "longitude": [
+    "longitude"
+  ],
+  "depth": [
+    "sea_surface_height",
+    "sea_surface_height_above_geoid",
+    "sea_water_pressure_at_sea_floor",
+    "sea_water_pressure_due_to_sea_water"
+  ],
+  "temperature":[
+    "sea_surface_temperature",
+    "sea_water_temperature"
+  ],
+  "salinity": [
+    "sea_surface_practical_salinity",
+    "sea_surface_salinity",
+    "sea_water_practical_salinity",
+    "sea_water_salinity"
+  ]
+}
