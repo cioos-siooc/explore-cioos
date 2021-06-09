@@ -14,26 +14,25 @@ export default function Controls() {
     <div className='controls'>
       <Container fluid>
         <Row>
-          {/* <Col xs={9}></Col> */}
           <Col xs={{span: 3, offset:9}}>
             <Row>
               <Col xs={{ span: 1, offset: 11 }} className='mr-0 pr-0'>
-              <OverlayTrigger
-                key='left'
-                placement='left'
-                overlay={
-                  <Tooltip id={`tooltip-left`}>
-                    {controlsClosed ? 'Open' : 'Close'} Controls
-                  </Tooltip>
-                }
-              >
-                <Button 
-                  className='toggleControlsOpenAndClosed' 
-                  onClick={() => setControlsClosed(!controlsClosed)}
+                <OverlayTrigger
+                  key='left'
+                  placement='left'
+                  overlay={
+                    <Tooltip id={`tooltip-left`}>
+                      {controlsClosed ? 'Open' : 'Close'} Controls
+                    </Tooltip>
+                  }
                 >
-                  {controlsClosed ? '<' : '>'}
-                </Button>
-              </OverlayTrigger>
+                  <Button 
+                    className='toggleControlsOpenAndClosed' 
+                    onClick={() => setControlsClosed(!controlsClosed)}
+                  >
+                    {controlsClosed ? '<' : '>'}
+                  </Button>
+                </OverlayTrigger>
               </Col>
             </Row>
             <Row>

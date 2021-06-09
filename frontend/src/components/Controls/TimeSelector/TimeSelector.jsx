@@ -6,68 +6,72 @@ import "react-datepicker/dist/react-datepicker.css";
 import './styles.css'
 
 export default function TimeSelector() {
-  const showCalendarToggle = false
-  const [useSingleCalendar, setUseSingleCalendar] = useState(false)
   var startDateInit = new Date()
   startDateInit.setHours(0, 0, 0, 0)
   startDateInit.setDate(startDateInit.getDate() - 7)
   var earliestDateAllowed = new Date()
-  earliestDateAllowed.setDate(earliestDateAllowed.getDate() - 60)
-  const [startDate, setStartDate] = useState(useSingleCalendar? new Date() : startDateInit);
-  const [endDate, setEndDate] = useState(useSingleCalendar ? null : new Date());
-  const onChange = (dates) => {
-    const [start, end] = dates;
-    setStartDate(start);
-    setEndDate(end);
-  };
+  earliestDateAllowed.setDate(earliestDateAllowed.getDate() - (365 * 20))
+  const [startDate, setStartDate] = useState(startDateInit);
+  const [endDate, setEndDate] = useState(new Date());
 
-  const ExampleCustomInput = forwardRef(({ value, onClick }, ref) => (
-    <Button className="example-custom-input" onClick={onClick} ref={ref}>
-      {value}
-    </Button>
-  ));
+  // const [tempStartDate, setTempStartDate] = useState(startDate.toLocaleDateString())
+  // const [tempEndDate, setTempEndDate] = useState(endDate.toLocaleDateString())
+
+  // function handleStartDateChange (dateString) {
+  //  var newDate
+  //   try {
+  //     newDate = new Date(date)
+  //     setStartDate(newDate)
+  //   } catch (error) {
+  //     console.log(error, 'incomplete date')
+  //   }
+  // }
+  // function handleEndDateChange (dateString) {
+  //   var newDate
+  //   try {
+  //     newDate = new Date(date)
+  //     setEndDate(newDate)
+  //   } catch (error) {
+  //     console.log(error, 'incomplete date')
+  //   }
+  //  }
 
   return (
     <div className='timeSelector'>
-      {showCalendarToggle && <Button onClick={() => setUseSingleCalendar(!useSingleCalendar)}>Toggle Calendar Type: {useSingleCalendar ? 'single' : 'double'}</Button>}
-      {useSingleCalendar ?
-          <Row>
-            <Col>
-              Select Timeframe
+        <Row>
+          <Col xs={6}>
+              Start Date: {startDate.toLocaleDateString()}
+              {/* <input value={tempStartDate.toLocaleDateString()} onChange={(value) => handleStartDateChange(value)}/> */}
               <DatePicker
                 selected={startDate}
-                onChange={onChange}
-                startDate={startDate}
-                endDate={endDate}
-                selectsRange
+                onChange={date => setStartDate(date)}
+                minDate={earliestDateAllowed}
+                maxDate={new Date(endDate).setDate(endDate.getDate() - 1)}
                 inline
+                fixedHeight
+                peekNextMonth
+                showMonthDropdown
+                showYearDropdown
+                dropdownMode="select"
                 />
-            </Col>
-          </Row>
-        :
-          <Row>
-            <Col xs={6}>
-                Start Date
-                <DatePicker
-                  selected={startDate}
-                  onChange={date => setStartDate(date)}
-                  minDate={earliestDateAllowed}
-                  maxDate={new Date(endDate).setDate(endDate.getDate() - 1)}
-                  // customInput={<ExampleCustomInput/>}
-                  />
-            </Col>
-            <Col xs={6}>
-                End Date
-                <DatePicker
-                  selected={endDate}
-                  onChange={date => setEndDate(date)}
-                  minDate={new Date(startDate).setDate(startDate.getDate() + 1)}
-                  maxDate={new Date()}
-                  // customInput={<ExampleCustomInput/>}
-                />
-            </Col>
-          </Row>
-        }
+          </Col>
+          <Col xs={6}>
+              End Date: {endDate.toLocaleDateString()}
+              {/* <input value={tempEndDate.toLocaleDateString()} onChange={(value) => handleEndDateChange(value)}/> */}
+              <DatePicker
+                selected={endDate}
+                onChange={date => setEndDate(date)}
+                minDate={new Date(startDate).setDate(startDate.getDate() + 1)}
+                maxDate={new Date()}
+                inline
+                fixedHeight
+                peekNextMonth
+                showMonthDropdown
+                showYearDropdown
+                dropdownMode="select"
+              />
+          </Col>
+        </Row>
       </div>
       )
 }

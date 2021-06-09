@@ -1,3 +1,4 @@
-.timeSelector {
-  /* overflow: auto; */
+.react-datepicker__day-name, .react-datepicker__day, .react-datepicker__time-name{
+  width: 1.3rem;
+  line-height: 1.3rem;
 }
