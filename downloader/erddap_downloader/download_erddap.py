@@ -15,7 +15,7 @@ import os
 
 import warnings
 
-import scraper.erddap_scraper.ERDDAP as erddap_scraper
+import erddap_scraper.ERDDAP as erddap_scraper
 
 
 def erddap_server_to_name(server):
@@ -156,7 +156,7 @@ def filter_polygon_region(file_path, polygone):
 
     # Determinate the type of data
     file_type = file_path.split(".")[-1]
-
+    print('Filter within polygon', end=' ... ')
     if file_type == "csv":
         # ERDDAP CSV has two lines header, let's read them first
         with open(file_path) as f:
@@ -178,7 +178,7 @@ def filter_polygon_region(file_path, polygone):
         ]
 
         # Overwrite original file
-        with open(file_path + "_test.csv", "w") as f:
+        with open(file_path, "w") as f:
             f.write(columns_name)
             f.write(columns_units)
             df.to_csv(f, index=False, header=False, line_terminator="\n")
@@ -186,6 +186,10 @@ def filter_polygon_region(file_path, polygone):
         warnings.warn(
             "Polygon filtration is not compatible with {0} format".format(file_type)
         )
+        return
+
+    print('Completed')
+
 
 
 def get_dataset(json_query, output_path=""):
@@ -204,7 +208,12 @@ def get_dataset(json_query, output_path=""):
 
     for dataset in json_query["cache_filtered"]:
         # If metadata for the dataset is not available retrieve it
-        if dataset['erddap_metadata'] is None:
+        if (
+                'erddap_metadata' not in dataset or
+                'globals' not in dataset['erddap_metadata'] or
+                'variables' not in dataset['erddap_metadata'] or
+                dataset['erddap_metadata']['variables'] == []
+        ):
             scrape_erddap = erddap_scraper.ERDDAP(dataset['erddap_url'])
             dataset['erddap_metadata'] = scrape_erddap.get_metadata_for_dataset(dataset['dataset_id'])
 
@@ -212,24 +221,36 @@ def get_dataset(json_query, output_path=""):
         variable_list = get_variable_list(
             dataset["erddap_metadata"], json_query["user_query"]["eovs"],
         )
-
-        # Get download url
-        download_url = get_erddap_download_url(
-            dataset, json_query["user_query"], variable_list
-        )
+        # Try getting
+        try:
+            # Get download url
+            download_url = get_erddap_download_url(
+                dataset, json_query["user_query"], variable_list
+            )
+        except requests.exceptions.HTTPError:
+            # Failed to get a download url
+            warnings.warn(
+                'Failed to download data from erddap: {0} dataset_id:{1}. \n'
+                ' There''s likely no data available.'.format(
+                    dataset['erddap_url'],
+                    dataset['dataset_id']
+                )
+            )
+            continue
 
         # Generate the default file name
         output_file_name = get_file_name_output(dataset)
-        output_path = os.path.join(output_path, output_file_name)
-        output_path += "." + json_query["user_query"]["response"]
+        output_file_path = os.path.join(output_path, output_file_name)
+        output_file_path += "." + json_query["user_query"]["response"]
 
         # Download data
         print("Download {0}".format(download_url), end=" ... ")
         r = requests.get(download_url)
-        open(output_path, "wb").write(r.content)
+        open(output_file_path, "wb").write(r.content)
         print("Completed")
+
         # If polygon filter out data outside the polygon
         if "polygon_object" in json_query["user_query"]:
             filter_polygon_region(
-                output_path, json_query["user_query"]["polygon_object"]
+                output_file_path, json_query["user_query"]["polygon_object"]
             )
