@@ -64,4 +64,8 @@ def parallel_downloader(json_blob=None, output_folder="../"):
         pid.start()
         pid.join()
     # zip files in folder
+    if os.name is not 'nt':
+        retval = os.system('tar -czf {}.tar.gz {}'.format(output_folder, output_folder))
+        if retval==0:
+            os.system('rm -r {}'.format(output_folder) )
 
