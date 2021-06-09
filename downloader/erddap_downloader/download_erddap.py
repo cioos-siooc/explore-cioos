@@ -15,7 +15,7 @@ import os
 
 import warnings
 
-import scraper.erddap_scraper.ERDDAP as erddap_scraper
+import erddap_scraper.ERDDAP as erddap_scraper
 
 
 def erddap_server_to_name(server):
