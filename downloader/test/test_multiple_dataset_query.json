@@ -1,48 +1,53 @@
 {
-  "user_query": {
-    "time_min": "2017-01-01",
-    "time_max": "2020-02-01",
-    "lat_min": 50.00,
-    "lat_max": 50.15,
-    "lon_min": -125.2,
-    "lon_max": -125.0,
-    "polygon_region": "POLYGON ((-125.2071249 50.0725658, -125.1617769 49.9989123, -125.0566522 50.012593, -125.0539038 50.0355326, -125.0367266 50.1126528, -125.1308579 50.1333439, -125.1432255 50.0888689, -125.2071249 50.0725658))",
-    "eovs": ["temperature", "salinity"],
-    "email": "cozycoops@gmail.com"
-  },
-  "cache_filtered": [
-    {
-      "dataset_id": "HakaiWaterPropertiesInstrumentProfileProvisional" ,
-      "erddap_url": "https://catalogue.hakai.org/erddap" ,
-      "cdm_data_type": "Profile" ,
-      "ckan_id": "ca-cioos_6143028b-028d-46c7-a67d-f3a513435e63" ,
-      "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
-      "profile_id_variable": "mission_id" ,
-      "erddap_metadata": {}
-    }, {
-      "dataset_id": "HakaiWaterPropertiesInstrumentProfileResearch" ,
-      "erddap_url": "https://catalogue.hakai.org/erddap" ,
-      "cdm_data_type": "Profile" ,
-      "ckan_id": "ca-cioos_ba41d935-f293-447f-be3d-7098e569b431" ,
-      "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
-      "profile_id_variable": "mission_id" ,
-      "erddap_metadata": {}
-    }, {
-      "dataset_id": "IOS_CTD_Profiles" ,
-      "erddap_url": "https://data.cioospacific.ca/erddap" ,
-      "cdm_data_type": "Profile" ,
-      "ckan_id": "d98c6fb7-fbdf-4430-85f2-1472c9be3b9a" ,
-      "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
-      "profile_id_variable": "mission_id" ,
-      "erddap_metadata": {}
-    }, {
-      "dataset_id": "IOS_BOT_Profiles" ,
-      "erddap_url": "https://data.cioospacific.ca/erddap" ,
-      "cdm_data_type": "Profile" ,
-      "ckan_id": "0bd1190b-c1fd-4e42-9d87-7c49430c476f" ,
-      "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
-      "profile_id_variable": "mission_id" ,
-      "erddap_metadata": {}
-    }
-  ]
+    "user_query": {
+        "time_min": "2017-01-01",
+        "time_max": "2020-02-01",
+        "lat_min": 50.00,
+        "lat_max": 50.15,
+        "lon_min": -125.2,
+        "lon_max": -125.0,
+        "depth_min": 0,
+        "depth_max": 100,
+        "polygon_region": "POLYGON ((-125.2071249 50.0725658, -125.1617769 49.9989123, -125.0566522 50.012593, -125.0539038 50.0355326, -125.0367266 50.1126528, -125.1308579 50.1333439, -125.1432255 50.0888689, -125.2071249 50.0725658))",
+        "eovs": ["temperature", "salinity"],
+        "email": "cozycoops@gmail.com"
+    },
+    "cache_filtered": [
+        {
+            "dataset_id": "HakaiWaterPropertiesInstrumentProfileProvisional",
+            "erddap_url": "https://catalogue.hakai.org/erddap",
+            "cdm_data_type": "Profile",
+            "ckan_id": "ca-cioos_6143028b-028d-46c7-a67d-f3a513435e63",
+            "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
+            "profile_id_variable": "mission_id",
+            "erddap_metadata": {}
+        },
+        {
+            "dataset_id": "HakaiWaterPropertiesInstrumentProfileResearch",
+            "erddap_url": "https://catalogue.hakai.org/erddap",
+            "cdm_data_type": "Profile",
+            "ckan_id": "ca-cioos_ba41d935-f293-447f-be3d-7098e569b431",
+            "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
+            "profile_id_variable": "mission_id",
+            "erddap_metadata": {}
+        },
+        {
+            "dataset_id": "IOS_CTD_Profiles",
+            "erddap_url": "https://data.cioospacific.ca/erddap",
+            "cdm_data_type": "Profile",
+            "ckan_id": "d98c6fb7-fbdf-4430-85f2-1472c9be3b9a",
+            "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
+            "profile_id_variable": "mission_id",
+            "erddap_metadata": {}
+        },
+        {
+            "dataset_id": "IOS_BOT_Profiles",
+            "erddap_url": "https://data.cioospacific.ca/erddap",
+            "cdm_data_type": "Profile",
+            "ckan_id": "0bd1190b-c1fd-4e42-9d87-7c49430c476f",
+            "ckan_url": "https://catalogue.cioospacific.ca/dataset/",
+            "profile_id_variable": "mission_id",
+            "erddap_metadata": {}
+        }
+    ]
 }
