@@ -1,15 +1,19 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import ReactDOM from 'react-dom'
-import MapGL from 'react-map-gl';
-import createMap from './Map/Map.js'
 import Controls from './Controls/Controls.jsx'
+import CIOOSMap from './Map/Map.js'
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './styles.css'
 
 export default function App () {
-  createMap() // creates map and uses the id='map' div to render the map
+  // const mapRefContainer = useRef(new CIOOSMap());
+  // mapRefContainer.current.addLayer()
+  // createMap() // creates map and uses the id='map' div to render the map
+  const map = new CIOOSMap()
   return (
-    <Controls/>
+    <Controls
+      map={map}
+    />
   );
 }
 

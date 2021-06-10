@@ -1,53 +1,90 @@
 import { Map, NavigationControl } from "maplibre-gl";
-import mapboxgl from "mapbox-gl";
+// import mapboxgl from "mapbox-gl";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
+import React from "react";
 
-export default function createMap() {
-  var map = new Map({
-    container: "map",
-    style: {
-      version: 8,
-      sources: {
-        osm: {
-          type: "raster",
-          tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-
-          tileSize: 256,
-          attribution:
-            'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.',
+export default class CIOOSMap extends React.Component {
+  constructor(props) {
+    super(props)
+    this.layerId = 'data-layer'
+    this.sourceId = 'sourceID'
+    this.counter = 0
+    this.map = new Map({
+      container: "map",
+      style: {
+        version: 8,
+        sources: {
+          osm: {
+            type: "raster",
+            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+  
+            tileSize: 256,
+            attribution:
+              'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.',
+          },
         },
+        layers: [
+          {
+            id: "osm",
+            type: "raster",
+            source: "osm",
+          },
+        ],
       },
-      layers: [
-        {
-          id: "osm",
-          type: "raster",
-          source: "osm",
+      center: [-100, 49], // starting position
+      zoom: 3 // starting zoom
+    })
+    
+    const drawPolygon = new MapboxDraw();
+    
+    this.map.addControl(drawPolygon, "top-left");
+    this.map.addControl(new NavigationControl(), "bottom-left");
+    const query = {
+      timeMin: "2000-01-01",
+      timeMax: "2021-12-01",
+      eovs: ["oxygen", 'seaSurfaceSalinity'],
+      // dataType: "Profile",
+    }
+    this.map.on('load', () => {
+      const queryString = Object.entries(query)
+      .map(([k, v]) => `${k}=${v}`)
+      .join("&");
+
+      this.map.addLayer({
+        id: this.layerId,
+        type: "circle",
+        
+        source: {
+          type: "vector",
+          tiles: [`https://pac-dev2.cioos.org/ceda/tiles/{z}/{x}/{y}.mvt?${queryString}`],
+          
+          // tiles: [`http://localhost:3000/tiles/{z}/{x}/{y}.mvt?${queryString}`],
         },
-      ],
-    },
-  });
+        "source-layer": "internal-layer-name",
+        paint: {
+          "circle-radius": 1,
+          "circle-color": "#25420b",
+          "circle-opacity": 0.75,
+        },
+      });
+    })
+  }
 
-  map.on("load", function () {
-    console.log("test");
+  getLoaded() {
+    console.log(this.map.loaded())
+    return this.map.loaded()
+  }
 
-    map.addLayer({
-      id: "internal-layer-name",
-      type: "circle",
+  updateSource(queryString) {
+    this.map.getSource('data-layer').tiles = [ `https://pac-dev2.cioos.org/ceda/tiles/{z}/{x}/{y}.mvt?${queryString}` ]
 
-      source: {
-        type: "vector",
-        tiles: ["https://pac-dev2.cioos.org/ceda/tiles/{z}/{x}/{y}.mvt"],
-      },
-      "source-layer": "internal-layer-name",
-      paint: {
-        "circle-radius": 1,
-        "circle-color": "#25420b",
-        "circle-opacity": 0.75,
-      },
-    });
-  });
+    // Remove the tiles for a particular source
+    this.map.style.sourceCaches['data-layer'].clearTiles()
 
-  const drawPolygon = new MapboxDraw();
-  map.addControl(drawPolygon, "top-left");
-  map.addControl(new NavigationControl(), "bottom-left");
+    // Load the new tiles for the current viewport (map.transform -> viewport)
+    this.map.style.sourceCaches['data-layer'].update(this.map.transform)
+
+    // Force a repaint, so that the map will be repainted without you having to touch the map
+    this.map.triggerRepaint()
+  }
 }
