@@ -22,7 +22,7 @@ export default function Controls(props) {
 
   var startDateInit = new Date()
   startDateInit.setHours(0, 0, 0, 0)
-  startDateInit.setDate(startDateInit.getDate() - 365*20)
+  startDateInit.setDate(startDateInit.getDate() - 365*50)
   const [startDate, setStartDate] = useState(startDateInit);
   const [endDate, setEndDate] = useState(new Date());
 
@@ -40,11 +40,16 @@ export default function Controls(props) {
       const query = {
         timeMin: startDate.getFullYear() + '-' + startDate.getMonth() + '-' + startDate.getDate(),
         timeMax: endDate.getFullYear() + '-' + endDate.getMonth() + '-' + endDate.getDate(),
-        eovs: [salinity && 'seaSurfaceSalinity', pressure && 'pressure', temperature && 'seaSurfaceTemeperature', oxygen && 'oxygen'].filter(elem => elem),
+        eovs: [salinity && 'seaSurfaceSalinity', pressure && 'pressure', temperature && 'seaSurfaceTemperature', oxygen && 'oxygen'].filter(elem => elem),
         // dataType: ''
       }
       console.log(query)
-      props.map.addDataLayer(query)
+      const queryString = Object.entries(query)
+      .map(([k, v]) => `${k}=${v}`)
+      .join("&");
+      // Set the tile url to a cache-busting url (to circumvent browser caching behaviour):
+      props.map.updateSource(queryString)
+      // props.map.addDataLayer(query)
     }
   }, [temperature, salinity, pressure, oxygen, fixedStations, casts, trajectories, startDate, endDate, startDepth, endDepth])
 

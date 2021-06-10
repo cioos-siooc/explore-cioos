@@ -18,7 +18,7 @@ export default function TimeSelector(props) {
             selected={props.startDate}
             onChange={date => props.setStartDate(date)}
             minDate={earliestDateAllowed}
-            maxDate={new Date(props.endDate).setDate(props.endDate.getDate() - 1)}
+            maxDate={new Date(props.endDate).setDate(props.endDate.getDate())}
             inline
             fixedHeight
             peekNextMonth

@@ -7,6 +7,7 @@ export default class CIOOSMap extends React.Component {
   constructor(props) {
     super(props)
     this.layerId = 'data-layer'
+    this.sourceId = 'sourceID'
     this.counter = 0
     this.map = new Map({
       container: "map",
@@ -38,13 +39,35 @@ export default class CIOOSMap extends React.Component {
     
     this.map.addControl(drawPolygon, "top-left");
     this.map.addControl(new NavigationControl(), "bottom-left");
-
-    this.map.on('load', () => this.addDataLayer({
+    const query = {
       timeMin: "2000-01-01",
       timeMax: "2021-12-01",
       eovs: ["oxygen", 'seaSurfaceSalinity'],
       // dataType: "Profile",
-    }))
+    }
+    this.map.on('load', () => {
+      const queryString = Object.entries(query)
+      .map(([k, v]) => `${k}=${v}`)
+      .join("&");
+
+      this.map.addLayer({
+        id: this.layerId,
+        type: "circle",
+        
+        source: {
+          type: "vector",
+          tiles: [`https://pac-dev2.cioos.org/ceda/tiles/{z}/{x}/{y}.mvt?${queryString}`],
+          
+          // tiles: [`http://localhost:3000/tiles/{z}/{x}/{y}.mvt?${queryString}`],
+        },
+        "source-layer": "internal-layer-name",
+        paint: {
+          "circle-radius": 1,
+          "circle-color": "#25420b",
+          "circle-opacity": 0.75,
+        },
+      });
+    })
   }
 
   getLoaded() {
@@ -52,49 +75,16 @@ export default class CIOOSMap extends React.Component {
     return this.map.loaded()
   }
 
-  getLayer(id) {
-    return this.map.getLayer(id)
-  }
+  updateSource(queryString) {
+    this.map.getSource('data-layer').tiles = [ `https://pac-dev2.cioos.org/ceda/tiles/{z}/{x}/{y}.mvt?${queryString}` ]
 
-  removeLayer(id) {
-    return this.map.removeLayer(id)
-  }
-  updateSource (query) {
-    const queryString = Object.entries(query)
-    .map(([k, v]) => `${k}=${v}`)
-    .join("&");
+    // Remove the tiles for a particular source
+    this.map.style.sourceCaches['data-layer'].clearTiles()
 
-    this.map.getSource('')
-  }
-  addDataLayer(query) {
-    console.log("load data called");
-    const queryString = Object.entries(query)
-    .map(([k, v]) => `${k}=${v}`)
-    .join("&");
-    console.log('querystring', queryString);
-    
-    // console.log('getlayer1', this.map.getLayer(this.layerId))
-    // if(this.map.getLayer(this.layerId)){
-    //   this.map.removeLayer(this.layerId)
-    // }
-    this.map.addLayer({
-      id: this.layerId,
-      type: "circle",
-      
-      source: {
-        type: "vector",
-        tiles: [`https://pac-dev2.cioos.org/ceda/tiles/{z}/{x}/{y}.mvt?${queryString}`],
-        
-        // tiles: [`http://localhost:3000/tiles/{z}/{x}/{y}.mvt?${queryString}`],
-      },
-      "source-layer": "internal-layer-name",
-      paint: {
-        "circle-radius": 1,
-        "circle-color": "#25420b",
-        "circle-opacity": 0.75,
-      },
-    });
-    // this.counter++
-    // console.log('getlayer2', this.map.getLayer(this.layerId))
+    // Load the new tiles for the current viewport (map.transform -> viewport)
+    this.map.style.sourceCaches['data-layer'].update(this.map.transform)
+
+    // Force a repaint, so that the map will be repainted without you having to touch the map
+    this.map.triggerRepaint()
   }
 }
