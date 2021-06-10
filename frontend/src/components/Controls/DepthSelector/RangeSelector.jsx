@@ -7,9 +7,9 @@ export default class RangeSelector extends React.Component {
     super(props);
     this.state = {
       dynamicKey: Date.now(),
-      value: [0, 100],
+      value: [0, 1000],
       min: 0,
-      max: 1000
+      max: 12000
     };
   }
   onSliderChange = value => {
