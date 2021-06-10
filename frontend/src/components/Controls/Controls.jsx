@@ -32,26 +32,53 @@ export default function Controls(props) {
   const [controlsClosed, setControlsClosed] = useState(false)
   const [requestSubmitted, setRequestSubmitted] = useState(false)
   // const mapRefContainer = useRef(new CIOOSMap());
-  
+
+  function createPolygonQueryString () {
+    console.log(props.map.getPolygon())
+    const query = {
+      timeMin: startDate.getFullYear() + '-' + startDate.getMonth() + '-' + startDate.getDate(),
+      timeMax: endDate.getFullYear() + '-' + endDate.getMonth() + '-' + endDate.getDate(),
+      depthMin: startDepth,
+      depthMax: endDepth,
+      eovs: [salinity && 'seaSurfaceSalinity', pressure && 'pressure', temperature && 'seaSurfaceTemperature', oxygen && 'oxygen'].filter(elem => elem),
+      // dataType: ''
+      polygon: JSON.stringify(props.map.getPolygon())
+    }
+    console.log(query)
+    return Object.entries(query)
+    .map(([k, v]) => `${k}=${v}`)
+    .join("&");
+  }
+
+  function createDataFilterQueryString () {
+    const query = {
+      timeMin: startDate.getFullYear() + '-' + startDate.getMonth() + '-' + startDate.getDate(),
+      timeMax: endDate.getFullYear() + '-' + endDate.getMonth() + '-' + endDate.getDate(),
+      eovs: [salinity && 'seaSurfaceSalinity', pressure && 'pressure', temperature && 'seaSurfaceTemperature', oxygen && 'oxygen'].filter(elem => elem),
+      // dataType: ''
+    }
+    console.log(query)
+    return Object.entries(query)
+    .map(([k, v]) => `${k}=${v}`)
+    .join("&");
+  } 
+
   useEffect(() => {
     console.log('isLoaded', props.map.getLoaded())
     if(props.map.getLoaded()){
-      // if(props.map.getLayer('data-layer')) props.map.removeLayer('data-layer')
-      const query = {
-        timeMin: startDate.getFullYear() + '-' + startDate.getMonth() + '-' + startDate.getDate(),
-        timeMax: endDate.getFullYear() + '-' + endDate.getMonth() + '-' + endDate.getDate(),
-        eovs: [salinity && 'seaSurfaceSalinity', pressure && 'pressure', temperature && 'seaSurfaceTemperature', oxygen && 'oxygen'].filter(elem => elem),
-        // dataType: ''
-      }
-      console.log(query)
-      const queryString = Object.entries(query)
-      .map(([k, v]) => `${k}=${v}`)
-      .join("&");
-      // Set the tile url to a cache-busting url (to circumvent browser caching behaviour):
-      props.map.updateSource(queryString)
-      // props.map.addDataLayer(query)
+      props.map.updateSource(createDataFilterQueryString())
     }
   }, [temperature, salinity, pressure, oxygen, fixedStations, casts, trajectories, startDate, endDate, startDepth, endDepth])
+
+  useEffect(() => {
+    if(props.map.getPolygon()) {
+      console.log(`https://pac-dev2.cioos.org/ceda/download?${createPolygonQueryString()}`)
+      fetch(`https://pac-dev2.cioos.org/ceda/download?${createPolygonQueryString()}`).then((value) => {
+        console.log(value.ok)
+      })
+    }
+    
+  }, [requestSubmitted])
 
   const controlClassName = classnames('controlAccordion', 'mb-3', 'animate__animated', {'animate__slideOutRight': controlsClosed}, {'animate__slideInRight': !controlsClosed})
   return (

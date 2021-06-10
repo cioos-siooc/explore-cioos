@@ -40,7 +40,7 @@ export default class CIOOSMap extends React.Component {
     this.map.addControl(drawPolygon, "top-left");
     this.map.addControl(new NavigationControl(), "bottom-left");
     const query = {
-      timeMin: "2000-01-01",
+      timeMin: "1900-01-01",
       timeMax: "2021-12-01",
       eovs: ["oxygen", 'seaSurfaceSalinity'],
       // dataType: "Profile",
@@ -71,8 +71,13 @@ export default class CIOOSMap extends React.Component {
   }
 
   getLoaded() {
-    console.log(this.map.loaded())
     return this.map.loaded()
+  }
+  
+  getPolygon() {
+    if(this.map.getSource('mapbox-gl-draw-cold')){
+      return this.map.getSource('mapbox-gl-draw-cold')._data.features.map(elem => elem.geometry)[0].coordinates[0]//.filter(elem => elem.type !== 'Feature')
+    }
   }
 
   updateSource(queryString) {
