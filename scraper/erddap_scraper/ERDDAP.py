@@ -5,7 +5,6 @@
 import requests
 import json
 import re
-from bs4 import BeautifulSoup
 from .setup_logging import setup_logging
 
 logger = setup_logging()
@@ -108,45 +107,3 @@ class ERDDAP(object):
             'variables': vars
         }
         return metadata
-
-    def scrape_contact_from_jsonld(self):
-        '''
-        TODO we may not end up needing this data!
-
-        Scrape the json-ld from html of <erddap_url>/info/index.html
-
-        This is an example of the data produced:
-        {
-          "@type": "Organization",
-          "name": "Hakai Institute",
-          "address": {
-            "@type": "PostalAddress",
-            "addressCountry": "Canada",
-            "addressLocality": "PO Box 309, Heriot Bay",
-            "addressRegion": "BC",
-            "postalCode": "V0P 1H0"
-          },
-          "telephone": "5555555555",
-          "email": "admin@hakai.org",
-          "sameAs": "http://hakai.org"
-        }
-
-        '''
-        url_add = "/info/index.html"
-        # the json-ld is embedded inside the source html
-        html = self.session.get(self.url + url_add).text
-        soup = BeautifulSoup(html, "html5lib")
-        # find the json-ld bit and strip the <script> tags
-        jsonld_string = soup.find('script',
-                                  {"type": "application/ld+json"}).text.strip()
-        # parse the json string to a dict
-        jsonld = json.loads(jsonld_string)
-        publisher = jsonld['publisher']
-
-        parsed = {
-            'telephone': publisher["telephone"],
-            'email': publisher["email"],
-            'address': publisher["address"]
-        }
-
-        return parsed
