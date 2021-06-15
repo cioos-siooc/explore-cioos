@@ -12,18 +12,11 @@ import './styles.css'
 
 export default function Controls(props) {
   const eovsToggleStart = {
-    "inorganicCarbon":true,
-    "nitrate":true,
-    "other":true,
-    "oxygen":true,
-    "phosphate":true,
-    "seaSurfaceHeight":true,
-    "seaSurfaceSalinity":true,
-    "temperature":true,
-    "silicate":true,
-    "subSurfaceCurrents":true,
-    "subSurfaceSalinity":true,
-    "surfaceCurrents":true,
+    carbon: true,
+    currents: true,
+    nutrients: true,
+    salinity: true,
+    temperature: true,
   };
 
   const [eovsSelected, setEOVs] = useState(eovsToggleStart)
