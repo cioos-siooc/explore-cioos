@@ -18,4 +18,4 @@ RUN sh -c "pip install -e downloader && \
     unzip *zip"
 
 # TODO get this line working and add after the unzip line
-#python -c ""import pandas,glob;pandas.read_csv(glob.glob('*.csv')[0]);"""
+RUN python -c "import pandas,glob; zip_file=glob.glob('*zip')[0].replace('.zip','');df=pandas.read_csv(glob.glob(zip_file+'/'+'*csv')[0])"
