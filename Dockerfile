@@ -11,6 +11,7 @@ RUN sh -c "apk add --no-cache \
 COPY . .
 # for pdf creation
 RUN apk add wkhtmltopdf
+RUN apk add zip
 RUN sh -c "pip install -e downloader && \
     pip install -e scraper && \
     python -m erddap_downloader downloader/test/test_query.json && \
