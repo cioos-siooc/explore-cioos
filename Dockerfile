@@ -1,20 +1,17 @@
 # Run `docker build .` from this folder to test
 FROM nickgryg/alpine-pandas
 
-# for shapely
-RUN sh -c "apk add --no-cache \
-            gcc \
-            libc-dev \
-            geos-dev && \
-            pip install shapely"
+# for shapely, pdf creation
+RUN sh -c "apk -q add --no-cache gcc libc-dev geos-dev wkhtmltopdf zip"
 
-COPY . .
-# for pdf creation
-RUN apk add wkhtmltopdf
-RUN sh -c "pip install -e downloader && \
-    pip install -e scraper && \
-    python -m erddap_downloader downloader/test/test_query.json && \
-    unzip *zip"
+COPY . /
+
+RUN sh -c "pip install -qe downloader  && \
+    pip install -qe scraper && \
+    mkdir out && cd out && \
+    python -m erddap_downloader /downloader/test/test_query.json && \
+    unzip *zip && \
+    ls -l **/*"
 
 # TODO get this line working and add after the unzip line
-#python -c ""import pandas,glob;pandas.read_csv(glob.glob('*.csv')[0]);"""
+RUN python -c "import pandas,glob;csv_file=glob.glob('out/**/*.csv')[0];print('Loading csv_file:',csv_file);df=pandas.read_csv(csv_file);print(df)"
