@@ -48,8 +48,12 @@ export default class CIOOSMap extends React.Component {
     const query = {
       timeMin: "1900-01-01",
       timeMax: "2021-12-01",
-      eovs: ["oxygen", "seaSurfaceSalinity"],
-      // dataType: "Profile",
+      eovs: ["carbon",
+             "currents",
+             "nutrients",
+             "salinity",
+             "temperature"],
+             // dataType: "Profile",
     };
     this.map.on("load", () => {
       const queryString = Object.entries(query)
