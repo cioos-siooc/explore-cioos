@@ -143,9 +143,9 @@ export default function Controls(props) {
                   </Card.Header>
                   <Accordion.Collapse eventKey="0">
                   <Card.Body style={{maxHeight:"300px",overflowY:"scroll"}}>
-                      {Object.keys(eovsToggleStart).map(eov=>  (<InputGroup className="mb-3">
+                      {Object.keys(eovsToggleStart).map(eov=>  (
+                      <InputGroup key={eov} className="mb-3">
                         <InputGroup.Checkbox
-                            key={eov}
                             checked={eovsSelected[eov]}
                             onChange={(e) => {
                                   console.log(e.target.value);
