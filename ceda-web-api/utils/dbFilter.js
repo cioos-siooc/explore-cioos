@@ -3,7 +3,7 @@ const eovGrouping = require("../utils/eovGrouping.json");
 const removeDuplicates = (arr) => [...new Set(arr)];
 
 function createDBFilter({
-  eovs = "no-data",
+  eovs,
   timeMin,
   timeMax,
   depthMin,
@@ -14,13 +14,14 @@ function createDBFilter({
   lonMax,
   dataType,
 }) {
-  const eovsCommaSeparatedString = removeDuplicates(
-    eovs
-      .split(",")
-      .map((eov) => eovGrouping[eov])
-      .flat()
-      .map((eov) => `'${eov}'`)
-  ).join();
+  const eovsCommaSeparatedString =
+    removeDuplicates(
+      eovs
+        .split(",")
+        .map((eov) => eovGrouping[eov])
+        .flat()
+        .map((eov) => `'${eov}'`)
+    ).join() || "return-no-data";
 
   console.log(eovsCommaSeparatedString);
   const filters = [];
@@ -37,11 +38,9 @@ function createDBFilter({
   if (depthMax) filters.push(`p.depth_max < '${depthMax}'`);
 
   if (dataType) filters.push(`p.cdm_data_type = '${dataType}'`);
-
-  if (eovs.length)
-    filters.push(
-      `(d.ckan_record -> 'eov') \\?| array[${eovsCommaSeparatedString}]`
-    );
+  filters.push(
+    `(d.ckan_record -> 'eov') \\?| array[${eovsCommaSeparatedString}]`
+  );
   return filters.join(" AND ");
 }
 
