@@ -3,12 +3,12 @@ var express = require("express");
 var router = express.Router();
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
+const { cdmDataTypeGrouping } = require("../utils/grouping");
 
 /* GET /tiles/:z/:x/:y.mvt */
 /* Retreive a vector tile by tileid */
 router.get("/:z/:x/:y.mvt", async (req, res) => {
   const { z, x, y } = req.params;
-  console.log(req.params);
 
   const filters = createDBFilter(req.query);
 
@@ -24,19 +24,26 @@ router.get("/:z/:x/:y.mvt", async (req, res) => {
     geom_column: isHexGrid ? zoomColumn : "geom",
   };
 
+  // eg (^Point$|^TimeSeries$)
+  // eventually we can just populate is_station in the database
+  const typeStr = cdmDataTypeGrouping["fixedStations"]
+    .map((t) => `^${t}$`)
+    .join("|");
+
   const SQL = `
   with relevent_points as (
-        SELECT ${isHexGrid ? "count(*) count," : "p.pk,"} p.${
-    sqlQuery.geom_column
-  } as geom from cioos_api.profiles p
-
+        SELECT ${
+          isHexGrid
+            ? "count(*) count,"
+            : `p.pk,(d.cdm_data_type~'(${typeStr})')::integer pointtype,`
+        } p.${sqlQuery.geom_column} as geom from cioos_api.profiles p
         JOIN cioos_api.datasets d ON p.dataset_pk =d.pk 
        ${filters ? "WHERE " + filters : ""}
         ${isHexGrid ? ` group by ${sqlQuery.geom_column}` : ""} ),
     te as (select ST_TileEnvelope(${z}, ${x}, ${y}) tile_envelope ),
     mvtgeom as (
       SELECT
-       ${isHexGrid ? ` count,` : "pk,"}
+       ${isHexGrid ? ` count,` : "pk,pointtype,"}
         ST_AsMVTGeom (
           relevent_points.geom,
           tile_envelope
