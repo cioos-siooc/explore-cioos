@@ -37,34 +37,28 @@ export default function Controls(props) {
   const [controlsClosed, setControlsClosed] = useState(false)
   const [requestSubmitted, setRequestSubmitted] = useState(false)
   // const mapRefContainer = useRef(new CIOOSMap());
+  
   const eovsSelectedArray = Object.entries(eovsSelected).filter(([eov,isSelected]) => isSelected).map(([eov,isSelected])=>eov).filter(e=>e);
+  
+  const query = {
+    timeMin: startDate.getFullYear() + '-' + startDate.getMonth() + '-' + startDate.getDate(),
+    timeMax: endDate.getFullYear() + '-' + endDate.getMonth() + '-' + endDate.getDate(),
+    depthMin: startDepth,
+    depthMax: endDepth,
+    eovs: eovsSelectedArray,
+    dataType: [casts && 'casts', fixedStations &&'fixedStations'].filter(e=>e),
+  }
+  
   function createPolygonQueryString () {
-    console.log(props.map.getPolygon())
-    const query = {
-      timeMin: startDate.getFullYear() + '-' + startDate.getMonth() + '-' + startDate.getDate(),
-      timeMax: endDate.getFullYear() + '-' + endDate.getMonth() + '-' + endDate.getDate(),
-      depthMin: startDepth,
-      depthMax: endDepth,
-      eovs: eovsSelectedArray,
-      // dataType: ''
-      polygon: JSON.stringify(props.map.getPolygon())
-    }
-    console.log(query)
+    console.log(props.map.getPolygon());
+    query.polygon=JSON.stringify(props.map.getPolygon());
+
     return Object.entries(query)
     .map(([k, v]) => `${k}=${v}`)
     .join("&");
   }
 
   function createDataFilterQueryString () {
-    console.log(eovsSelected);
-
-    const query = {
-      timeMin: startDate.getFullYear() + '-' + startDate.getMonth() + '-' + startDate.getDate(),
-      timeMax: endDate.getFullYear() + '-' + endDate.getMonth() + '-' + endDate.getDate(),
-      eovs: eovsSelectedArray,
-      // dataType: ''
-    }
-    console.log(query)
     return Object.entries(query)
     .map(([k, v]) => `${k}=${v}`)
     .join("&");
@@ -185,14 +179,14 @@ export default function Controls(props) {
                         />
                         <label> Casts </label>
                       </InputGroup>
-                      <InputGroup className="mb-3">
+                      {/* <InputGroup className="mb-3">
                         <InputGroup.Checkbox 
                           checked={trajectories}
                           onChange={() => setTrajectories(!trajectories)}
                           aria-label="Checkbox for following text input" 
                         />
                         <label> Trajectories </label>
-                      </InputGroup>
+                      </InputGroup> */}
                     </Card.Body>
                   </Accordion.Collapse>
                 </Card>

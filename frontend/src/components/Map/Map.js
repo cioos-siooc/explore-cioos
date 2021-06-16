@@ -48,12 +48,8 @@ export default class CIOOSMap extends React.Component {
     const query = {
       timeMin: "1900-01-01",
       timeMax: "2021-12-01",
-      eovs: ["carbon",
-             "currents",
-             "nutrients",
-             "salinity",
-             "temperature"],
-             // dataType: "Profile",
+      eovs: ["carbon", "currents", "nutrients", "salinity", "temperature"],
+      dataType: ["casts", "fixedStations"],
     };
     this.map.on("load", () => {
       const queryString = Object.entries(query)
@@ -73,7 +69,20 @@ export default class CIOOSMap extends React.Component {
         paint: {
           "circle-color": "orange",
           "circle-opacity": 0.8,
-          "circle-radius": 3,
+          "circle-stroke-width": {
+            property: "pointtype",
+            stops: [
+              [0, 0],
+              [1, 1],
+            ],
+          },
+          "circle-radius": {
+            property: "pointtype",
+            stops: [
+              [0, 3],
+              [1, 10],
+            ],
+          },
         },
       });
 
@@ -88,6 +97,7 @@ export default class CIOOSMap extends React.Component {
           tiles: [`${server}/tiles/{z}/{x}/{y}.mvt?${queryString}`],
         },
         "source-layer": "internal-layer-name",
+
         paint: {
           "fill-opacity": 0.5,
           "fill-color": {
@@ -108,6 +118,7 @@ export default class CIOOSMap extends React.Component {
   }
 
   getPolygon() {
+    console.log("get polygon");
     if (this.map.getSource("mapbox-gl-draw-cold")) {
       return this.map
         .getSource("mapbox-gl-draw-cold")
