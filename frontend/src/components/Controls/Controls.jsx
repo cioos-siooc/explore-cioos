@@ -7,15 +7,19 @@ import { Check } from 'react-bootstrap-icons';
 
 import TimeSelector from './TimeSelector/TimeSelector.jsx'
 import DepthSelector from './DepthSelector/DepthSelector.jsx'
-import CIOOSMap from '../Map/Map.js'
+// import CIOOSMap from '../Map/Map.js'
 import './styles.css'
 
 export default function Controls(props) {
-  // Filter State
-  const [temperature, setTemperature] = useState(true)
-  const [salinity, setSalinity] = useState(true)
-  const [pressure, setPressure] = useState(true)
-  const [oxygen, setOxygen] = useState(true)
+  const eovsToggleStart = {
+    carbon: true,
+    currents: true,
+    nutrients: true,
+    salinity: true,
+    temperature: true,
+  };
+
+  const [eovsSelected, setEOVs] = useState(eovsToggleStart)
 
   const [fixedStations, setFixedStations] = useState(true)
   const [casts, setCasts] = useState(true)
@@ -42,31 +46,30 @@ export default function Controls(props) {
   const [polygonPresent, setPolygonPresent] = useState(false)
   // const [map, setMap] = useState(new CIOOSMap((value) => setPolygonPresent(value)))
 
+  const [requestSubmitted, setRequestSubmitted] = useState(false)
+  // const mapRefContainer = useRef(new CIOOSMap());
+  
+  const eovsSelectedArray = Object.entries(eovsSelected).filter(([eov,isSelected]) => isSelected).map(([eov,isSelected])=>eov).filter(e=>e);
+  
+  const query = {
+    timeMin: startDate.getFullYear() + '-' + startDate.getMonth() + '-' + startDate.getDate(),
+    timeMax: endDate.getFullYear() + '-' + endDate.getMonth() + '-' + endDate.getDate(),
+    depthMin: startDepth,
+    depthMax: endDepth,
+    eovs: eovsSelectedArray,
+    dataType: [casts && 'casts', fixedStations &&'fixedStations'].filter(e=>e),
+  }
+  
   function createPolygonQueryString () {
-    console.log(props.map.getPolygon())
-    const query = {
-      timeMin: startDate.getFullYear() + '-' + startDate.getMonth() + '-' + startDate.getDate(),
-      timeMax: endDate.getFullYear() + '-' + endDate.getMonth() + '-' + endDate.getDate(),
-      depthMin: startDepth,
-      depthMax: endDepth,
-      eovs: [salinity && 'seaSurfaceSalinity', pressure && 'pressure', temperature && 'seaSurfaceTemperature', oxygen && 'oxygen'].filter(elem => elem),
-      // dataType: ''
-      polygon: JSON.stringify(props.map.getPolygon())
-    }
-    console.log(query)
+    console.log(props.map.getPolygon());
+    query.polygon=JSON.stringify(props.map.getPolygon());
+
     return Object.entries(query)
     .map(([k, v]) => `${k}=${v}`)
     .join("&");
   }
 
   function createDataFilterQueryString () {
-    const query = {
-      timeMin: startDate.getFullYear() + '-' + startDate.getMonth() + '-' + startDate.getDate(),
-      timeMax: endDate.getFullYear() + '-' + endDate.getMonth() + '-' + endDate.getDate(),
-      eovs: [salinity && 'seaSurfaceSalinity', pressure && 'pressure', temperature && 'seaSurfaceTemperature', oxygen && 'oxygen'].filter(elem => elem),
-      // dataType: ''
-    }
-    console.log(query)
     return Object.entries(query)
     .map(([k, v]) => `${k}=${v}`)
     .join("&");
@@ -81,7 +84,7 @@ export default function Controls(props) {
     if(props.map.getLoaded()){
       props.map.updateSource(createDataFilterQueryString())
     }
-  }, [temperature, salinity, pressure, oxygen, fixedStations, casts, trajectories, startDate, endDate, startDepth, endDepth])
+  }, [eovsSelected, fixedStations, casts, trajectories, startDate, endDate, startDepth, endDepth])
 
   useEffect(() => {
     if(props.map.getPolygon()) {
@@ -165,39 +168,22 @@ export default function Controls(props) {
                     </Accordion.Toggle>
                   </Card.Header>
                   <Accordion.Collapse eventKey="0">
-                    <Card.Body>
-                    <InputGroup className="mb-3">
-                          <InputGroup.Checkbox 
-                            checked={temperature}
-                            onChange={() => setTemperature(!temperature)}
+                  <Card.Body style={{maxHeight:"300px",overflowY:"scroll"}}>
+                      {Object.keys(eovsToggleStart).map(eov=>  (
+                      <InputGroup key={eov} className="mb-3">
+                        <InputGroup.Checkbox
+                            checked={eovsSelected[eov]}
+                            onChange={(e) => {
+                                  console.log(e.target.value);
+                                  setEOVs({...eovsSelected,
+                                    [eov]:!eovsSelected[eov]
+                                  })
+                            }}
                             aria-label="Checkbox for following text input"
                           />
-                        <label> Temperature </label>
-                      </InputGroup>
-                      <InputGroup className="mb-3">
-                        <InputGroup.Checkbox 
-                          checked={salinity}
-                          onChange={() => setSalinity(!salinity)}
-                          aria-label="Checkbox for following text input" 
-                        />
-                        <label> Salinity </label>
-                      </InputGroup>
-                      <InputGroup className="mb-3">
-                        <InputGroup.Checkbox 
-                          checked={pressure}
-                          onChange={() => setPressure(!pressure)}
-                          aria-label="Checkbox for following text input" 
-                        />
-                        <label> Pressure </label>
-                      </InputGroup>
-                      <InputGroup className="mb-3">
-                        <InputGroup.Checkbox 
-                          checked={oxygen}
-                          onChange={() => setOxygen(!oxygen)}
-                          aria-label="Checkbox for following text input" 
-                        />
-                        <label> Oxygen </label>
-                      </InputGroup>
+                        <label>{eov}</label>
+                      </InputGroup>))
+                      }
                     </Card.Body>
                   </Accordion.Collapse>
                 </Card>
@@ -300,5 +286,5 @@ export default function Controls(props) {
 } 
 
 Controls.propTypes = {
-  // map: PropTypes.object.isRequired
+  map: PropTypes.object.isRequired
 }

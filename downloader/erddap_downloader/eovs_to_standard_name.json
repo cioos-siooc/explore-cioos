@@ -16,7 +16,7 @@
     "sea_water_pressure_due_to_sea_water",
     "sea_water_pressure_at_sea_floor"
   ],
-  "sea_surface_height": [
+  "seaSurfaceHeight": [
     "sea_surface_height",
     "sea_surface_height_above_geoid",
     "sea_surface_height_above_geopotential_datum",
@@ -33,24 +33,24 @@
   "sea_floor_pressure": [
     "sea_water_pressure_at_sea_floor"
   ],
-  "temperature":[
+  "subSurfaceTemperature":[
     "sea_surface_temperature",
     "sea_water_temperature",
     "sea_water_temperature_anomaly",
     "sea_water_temperature_at_sea_floor"
   ],
-  "sea_surface_temperature": [
+  "seaSurfaceTemperature": [
     "sea_surface_skin_temperature",
     "sea_surface_subskin_temperature"
   ],
-  "potential_temperature": [
+  "subSurfacePotentialTemperature": [
     "sea_water_potential_temperature",
     "sea_water_potential_temperature_at_sea_floor"
   ],
-  "conductivity": [
+  "subSurfaceConductivity": [
     "sea_water_electrical_conductivity"
   ],
-  "salinity": [
+  "subSurfaceSalinity": [
     "sea_surface_practical_salinity",
     "sea_surface_salinity",
     "sea_water_practical_salinity",
@@ -102,12 +102,12 @@
     "mole_concentration_of_nitrate_and_nitrite_in_sea_water",
     "moles_of_nitrate_and_nitrite_per_unit_mass_in_sea_water"
   ],
-  "sub_surface_currents": [
+  "subSurfaceCurrents": [
     "sea_water_speed",
     "sea_water_speed_due_to_tides",
     "sea_water_speed_at_sea_floor"
   ],
-  "co2": [
+  "inorganicCarbon": [
     "mole_concentration_of_dissolved_inorganic_carbon_in_sea_water",
     "partial_pressure_of_carbon_dioxide_in_sea_water"
   ]

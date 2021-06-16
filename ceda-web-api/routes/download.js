@@ -4,6 +4,7 @@ const fs = require("fs");
 var express = require("express");
 var router = express.Router();
 const db = require("../db");
+const createDBFilter = require("../utils/dbFilter");
 
 const { spawn } = require("child_process");
 /* GET /tiles/:z/:x/:y.mvt */
@@ -14,20 +15,8 @@ router.get("/test", async (req, res) => {
 
 router.get("/", async (req, res) => {
   console.log("download");
-  const {
-    depthMin = -1000,
-    depthMax = 1000,
-    polygon = "[]",
-    timeMin = "1800-01-01",
-    timeMax = "2030-01-01",
-    eovs = "temperature,salinity,pressure,oxygen",
-    dataType = "Profile",
-    lonMin = -180,
-    lonMax = 180,
-    latMin = 0,
-    latMax = 90,
-  } = req.query;
 
+  const filters = createDBFilter(req.query);
   // const wkt
   const wktPolygon =
     "POLYGON((" +
@@ -37,26 +26,14 @@ router.get("/", async (req, res) => {
     "))";
   console.log("wktPolygon", wktPolygon);
 
-  const eovsCommaSeparatedString = eovs
-    .split(",")
-    .map((eov) => `'${eov}'`)
-    .join();
-  console.log(eovsCommaSeparatedString);
-
   // TODO add depth
   const SQL = `
         with profiles_subset as (
         select d.erddap_url, d.dataset_id,d.profile_variable,d.cdm_data_type, d.ckan_record->>'id' ckan_id, 'https://catalogue.cioos.ca/dataset/' ckan_url  FROM cioos_api.profiles p
         JOIN cioos_api.datasets d ON p.dataset_pk =d.pk
         where
-        p.latitude_max<${latMax} and
-        p.latitude_min > ${latMin} and
-        p.longitude_max< ${lonMax} and
-        p.longitude_min > ${lonMin} and
-        p.time_min >= '${timeMin}'::timestamp AND
-        p.time_max < '${timeMax}'::timestamp AND
-        (d.ckan_record->'eov') \\?| array[${eovsCommaSeparatedString}] AND
-        cdm_data_type='${dataType}' AND
+        ${filters ? filters + " AND " : ""} 
+
         ST_Contains( ST_SetSRID('${wktPolygon}'::geometry,3857),geom) is true
         group by d.pk)
         select json_agg(t) from profiles_subset t;`;
