@@ -1,4 +1,4 @@
-import { Map, NavigationControl } from "maplibre-gl";
+import { Map, NavigationControl, Popup } from "maplibre-gl";
 // import mapboxgl from "mapbox-gl";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import React from "react";
@@ -110,6 +110,35 @@ export default class CIOOSMap extends React.Component {
           },
         },
       });
+
+      // Create a popup, but don't add it to the map yet.
+var popup = new Popup({
+  closeButton: false,
+  closeOnClick: false
+  });
+
+            // When a click event occurs on a feature in the places layer, open a popup at the
+        // location of the feature, with description HTML from its properties.
+        this.map.on('mouseenter', "points", e => {
+            var coordinates = e.features[0].geometry.coordinates.slice();
+            var description = e.features[0].properties.pk;
+            
+            // Ensure that if the map is zoomed out such that multiple
+            // copies of the feature are visible, the popup appears
+            // over the copy being pointed to.
+            while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+            coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+            }
+            
+           popup
+            .setLngLat(coordinates)
+            .setHTML(description)
+            .addTo(this.map);
+          });
+
+          this.map.on('mouseleave', 'points',  () => {
+            popup.remove();
+            });
     });
   }
 
