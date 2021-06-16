@@ -139,6 +139,29 @@ var popup = new Popup({
           this.map.on('mouseleave', 'points',  () => {
             popup.remove();
             });
+
+            this.map.on('mousemove', "hexes", e => {
+              console.log(e, [e.lngLat.lng, e.lngLat.lat])
+              var coordinates = [e.lngLat.lng, e.lngLat.lat];
+              var description = e.features[0].properties.count;
+              
+              // Ensure that if the map is zoomed out such that multiple
+              // copies of the feature are visible, the popup appears
+              // over the copy being pointed to.
+              while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+              coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+              }
+              
+             popup
+              .setLngLat(coordinates)
+              .setHTML(description + " profiles")
+              .addTo(this.map);
+            });
+
+            this.map.on('mouseleave', 'hexes',  () => {
+              popup.remove();
+              });
+     
     });
   }
 
