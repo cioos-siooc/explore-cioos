@@ -1,11 +1,11 @@
 .controls {
   position: relative;
-  top: 50px;
+  top: 40px;
   overflow-x: hidden;
   pointer-events: none;
 }
 .toggleControlsOpenAndClosed {
-  float: right;
+  /* float: right; */
 }
 .closed {
   width: 0px;
@@ -16,4 +16,19 @@
 }
 .controlAccordion{
   width: 500px;
+}
+.emailInput{
+  margin-right: 15px;
+}
+.filterRow {
+  background-color: white;
+  border-radius: 0.25rem;
+}
+.filterStatus {
+  font-style: italic;
+  /* line-height: ; */
+}
+.controlAccordion .card-body {
+  max-height: 445px;
+  overflow: auto;
 }

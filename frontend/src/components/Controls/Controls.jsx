@@ -11,6 +11,7 @@ import CIOOSMap from '../Map/Map.js'
 import './styles.css'
 
 export default function Controls(props) {
+  // Filter State
   const [temperature, setTemperature] = useState(true)
   const [salinity, setSalinity] = useState(true)
   const [pressure, setPressure] = useState(true)
@@ -29,9 +30,17 @@ export default function Controls(props) {
   const [startDepth, setStartDepth] = useState(0)
   const [endDepth, setEndDepth] = useState(100)
 
+  // UI state
   const [controlsClosed, setControlsClosed] = useState(false)
-  const [requestSubmitted, setRequestSubmitted] = useState(false)
-  // const mapRefContainer = useRef(new CIOOSMap());
+  const [email, setEmail] = useState('')
+  const [querySubmitted, setQuerySubmitted] = useState(false)
+  const [filterReady, setFilterReady] = useState(false)
+  const [filterStatus, setFilterStatus] = useState('No new filters')
+  const [numberOfPoints, setNumberOfPoints] = useState(999999)
+
+  // Map
+  const [polygonPresent, setPolygonPresent] = useState(false)
+  // const [map, setMap] = useState(new CIOOSMap((value) => setPolygonPresent(value)))
 
   function createPolygonQueryString () {
     console.log(props.map.getPolygon())
@@ -63,8 +72,12 @@ export default function Controls(props) {
     .join("&");
   } 
 
+  function applyFilters() {
+    console.log('filters applied')
+  }
+
   useEffect(() => {
-    console.log('isLoaded', props.map.getLoaded())
+    setFilterStatus('Filters updated')
     if(props.map.getLoaded()){
       props.map.updateSource(createDataFilterQueryString())
     }
@@ -78,16 +91,33 @@ export default function Controls(props) {
       })
     }
     
-  }, [requestSubmitted])
+  }, [querySubmitted])
 
-  const controlClassName = classnames('controlAccordion', 'mb-3', 'animate__animated', {'animate__slideOutRight': controlsClosed}, {'animate__slideInRight': !controlsClosed})
+  // useEffect(() => {
+  //   console.log('polygonPresent:', polygonPresent)
+  // }, [polygonPresent])
+
+  const controlClassName = classnames('filterRow', 'mb-3', 'animate__animated', {'animate__slideOutRight': controlsClosed}, {'animate__slideInRight': !controlsClosed})
   return (
     <div className='controls'>
       <Container fluid>
         <Row>
           <Col style={{pointerEvents: 'none'}} xs={{span: 3, offset:9}}>
-            <Row style={{pointerEvents: 'auto'}}>
-              <Col xs={{ span: 6, offset: 5 }}>
+            <Row style={{pointerEvents: 'auto'}} className='controlRow'>
+              <Col xs={{span: 5, offset: 0}}>
+                <OverlayTrigger
+                  key='left'
+                  placement='top'
+                  overlay={
+                    <Tooltip id={`tooltip-left`}>
+                      Email address
+                    </Tooltip>
+                  }
+                >
+                  <input value={email} onChange={(e) => props.setEmail(e.target.value)} placeholder='abc@gmail.com' className='emailInput'/>
+                </OverlayTrigger>
+              </Col>
+              <Col  xs={{span: 6, offset: 0}}>
                 <OverlayTrigger
                   key='left'
                   placement='top'
@@ -98,16 +128,16 @@ export default function Controls(props) {
                   }
                 >
                   <Button 
-                    className='toggleControlsOpenAndClosed' 
-                    onClick={() => setRequestSubmitted(true)}
-                    variant={requestSubmitted ? 'success' : 'secondary'}
-                  >
-                    {requestSubmitted ? 'Request Submitted' : 'Submit Request'}
-                    {requestSubmitted && <Check/>}
+                    className='submitQueryButton' 
+                    onClick={() => setQuerySubmitted(true)}
+                    variant={querySubmitted ? 'success' : 'secondary'}
+                    >
+                    {querySubmitted ? 'Request Submitted' : 'Submit Request'}
+                    {querySubmitted && <Check/>}
                   </Button>
                 </OverlayTrigger>
               </Col>
-              <Col xs={{ span: 1, offset: 0 }} className='mr-0 pr-0'>
+              <Col xs={{ span: 1, offset: 0 }} className='mr-0 pr-0 pl-0'>
                 <OverlayTrigger
                   key='left'
                   placement='top'
@@ -126,8 +156,8 @@ export default function Controls(props) {
                 </OverlayTrigger>
               </Col>
             </Row>
-            <Row style={{pointerEvents: 'auto'}}>
-              <Accordion defaultActiveKey="0" className={controlClassName}>
+            <Row style={{pointerEvents: 'auto'}} className={controlClassName}>
+              <Accordion defaultActiveKey="0" className='controlAccordion'>
                 <Card>
                   <Card.Header>
                     <Accordion.Toggle as={Button} variant="link" eventKey="0">
@@ -195,14 +225,14 @@ export default function Controls(props) {
                         />
                         <label> Casts </label>
                       </InputGroup>
-                      <InputGroup className="mb-3">
+                      {/* <InputGroup className="mb-3">
                         <InputGroup.Checkbox 
                           checked={trajectories}
                           onChange={() => setTrajectories(!trajectories)}
                           aria-label="Checkbox for following text input" 
                         />
                         <label> Trajectories </label>
-                      </InputGroup>
+                      </InputGroup> */}
                     </Card.Body>
                   </Accordion.Collapse>
                 </Card>
@@ -235,6 +265,32 @@ export default function Controls(props) {
                   </Accordion.Collapse>
                 </Card>
               </Accordion>
+              <Col>
+                <Row className='mb-3 mt-3'>
+                  <Col xs={{span: 6, offset: 0}} >
+                    Filter Status: <span className='filterStatus'>{filterStatus}</span>
+                  </Col>
+                  <Col xs={{span: 4, offset: 2}}>
+                    <OverlayTrigger
+                      key='left'
+                      placement='top'
+                      overlay={
+                        <Tooltip id={`tooltip-left`}>
+                          Apply Filters
+                        </Tooltip>
+                      }
+                      >
+                      <Button 
+                        className='applyFiltersButton' 
+                        onClick={() => applyFilters()}
+                        variant={filterReady ? 'disabled' : 'primary'}
+                        >
+                          Apply Filters
+                      </Button>
+                    </OverlayTrigger>
+                  </Col>
+                </Row>
+              </Col>
             </Row>
           </Col>
         </Row>
@@ -244,5 +300,5 @@ export default function Controls(props) {
 } 
 
 Controls.propTypes = {
-  map: PropTypes.object.isRequired
+  // map: PropTypes.object.isRequired
 }

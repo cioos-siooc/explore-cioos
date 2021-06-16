@@ -14,11 +14,11 @@ export default function DepthSelector(props) {
       <Row>
         <Col>
           Start Depth (m): 
-          <input value={props.startDepth} type='number' max={12000} min={0} onChange={(e) => props.setStartDepth(e.target.value)}/>
-        </Col>
-        <Col>
+          <input className='startDepth' value={props.startDepth} type='number' max={12000} min={0} onChange={(e) => props.setStartDepth(e.target.value)}/>
+        {/* </Col>
+        <Col> */}
           End Depth (m):
-          <input value={props.endDepth} type='number' max={12000} min={0} onChange={(e) => props.setEndDepth(e.target.value)}/>
+          <input className='endDepth' value={props.endDepth} type='number' max={12000} min={0} onChange={(e) => props.setEndDepth(e.target.value)}/>
         </Col>
       </Row>
       <Row>
