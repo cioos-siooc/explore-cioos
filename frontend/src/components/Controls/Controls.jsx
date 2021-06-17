@@ -3,14 +3,16 @@ import {useState, useRef, useEffect} from 'react'
 import PropTypes from 'prop-types'
 import {Container, Row, Col, Accordion, Card, Button, InputGroup, OverlayTrigger, Tooltip} from 'react-bootstrap'
 import classnames from 'classnames'
-import { Check } from 'react-bootstrap-icons';
+import { ChevronCompactLeft, ChevronCompactRight } from 'react-bootstrap-icons'
 
 import TimeSelector from './TimeSelector/TimeSelector.jsx'
 import DepthSelector from './DepthSelector/DepthSelector.jsx'
-import CIOOSMap from '../Map/Map.js'
 import './styles.css'
 
 export default function Controls(props) {
+  const isMounted = useRef(false)
+
+  // Filters
   const eovsToggleStart = {
     carbon: true,
     currents: true,
@@ -34,10 +36,6 @@ export default function Controls(props) {
   const [startDepth, setStartDepth] = useState(0)
   const [endDepth, setEndDepth] = useState(100)
 
-  const [controlsClosed, setControlsClosed] = useState(false)
-  const [requestSubmitted, setRequestSubmitted] = useState(false)
-  // const mapRefContainer = useRef(new CIOOSMap());
-  
   const eovsSelectedArray = Object.entries(eovsSelected).filter(([eov,isSelected]) => isSelected).map(([eov,isSelected])=>eov).filter(e=>e);
   
   const query = {
@@ -48,15 +46,11 @@ export default function Controls(props) {
     eovs: eovsSelectedArray,
     dataType: [casts && 'casts', fixedStations &&'fixedStations'].filter(e=>e),
   }
-  
-  function createPolygonQueryString () {
-    console.log(props.map.getPolygon());
-    query.polygon=JSON.stringify(props.map.getPolygon());
 
-    return Object.entries(query)
-    .map(([k, v]) => `${k}=${v}`)
-    .join("&");
-  }
+  // UI state
+  const [controlsClosed, setControlsClosed] = useState(false)
+  const [filtersChanged, setFiltersChanged] = useState(false)
+  const [previousQueryString, setPreviousQueryString] = useState(createDataFilterQueryString())
 
   function createDataFilterQueryString () {
     return Object.entries(query)
@@ -64,54 +58,41 @@ export default function Controls(props) {
     .join("&");
   } 
 
-  useEffect(() => {
-    console.log('isLoaded', props.map.getLoaded())
+  function applyFilters() {
+    setFiltersChanged(false)
+    setPreviousQueryString(createDataFilterQueryString())
     if(props.map.getLoaded()){
       props.map.updateSource(createDataFilterQueryString())
     }
-  }, [eovsSelected, fixedStations, casts, trajectories, startDate, endDate, startDepth, endDepth])
+  }
 
   useEffect(() => {
-    if(props.map.getPolygon()) {
-      console.log(`https://pac-dev2.cioos.org/ceda/download?${createPolygonQueryString()}`)
-      fetch(`https://pac-dev2.cioos.org/ceda/download?${createPolygonQueryString()}`).then((value) => {
-        console.log(value.ok)
-      })
+    if(isMounted.current) {
+      if(previousQueryString !== createDataFilterQueryString()) {
+        setFiltersChanged(true)
+      } else {
+        setFiltersChanged(false)
+      }
+    } else {
+      isMounted.current = true
     }
-    
-  }, [requestSubmitted])
+  }, [eovsSelected, fixedStations, casts, trajectories, startDate, endDate, startDepth, endDepth])
 
-  const controlClassName = classnames('controlAccordion', 'mb-3', 'animate__animated', {'animate__slideOutRight': controlsClosed}, {'animate__slideInRight': !controlsClosed})
+  function capitalizeFirstLetter(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+  }
+
+  const controlClassName = classnames('filterRow', 'mb-3', 'animate__animated', {'animate__slideOutRight': controlsClosed}, {'animate__slideInRight': !controlsClosed})
   return (
     <div className='controls'>
       <Container fluid>
         <Row>
           <Col style={{pointerEvents: 'none'}} xs={{span: 3, offset:9}}>
-            <Row style={{pointerEvents: 'auto'}}>
-              <Col xs={{ span: 6, offset: 5 }}>
+            <Row style={{pointerEvents: 'auto'}} className='controlRow'>
+              <Col xs={{ span: 1, offset: 11 }} className='mr-0 pr-0 pl-0'>
                 <OverlayTrigger
                   key='left'
-                  placement='top'
-                  overlay={
-                    <Tooltip id={`tooltip-left`}>
-                      Submit Request
-                    </Tooltip>
-                  }
-                >
-                  <Button 
-                    className='toggleControlsOpenAndClosed' 
-                    onClick={() => setRequestSubmitted(true)}
-                    variant={requestSubmitted ? 'success' : 'secondary'}
-                  >
-                    {requestSubmitted ? 'Request Submitted' : 'Submit Request'}
-                    {requestSubmitted && <Check/>}
-                  </Button>
-                </OverlayTrigger>
-              </Col>
-              <Col xs={{ span: 1, offset: 0 }} className='mr-0 pr-0'>
-                <OverlayTrigger
-                  key='left'
-                  placement='top'
+                  placement='left'
                   overlay={
                     <Tooltip id={`tooltip-left`}>
                       {controlsClosed ? 'Open' : 'Close'} Controls
@@ -122,13 +103,13 @@ export default function Controls(props) {
                     className='toggleControlsOpenAndClosed' 
                     onClick={() => setControlsClosed(!controlsClosed)}
                   >
-                    {controlsClosed ? '<' : '>'}
+                    {controlsClosed ? <ChevronCompactLeft/> : <ChevronCompactRight/>}
                   </Button>
                 </OverlayTrigger>
               </Col>
             </Row>
-            <Row style={{pointerEvents: 'auto'}}>
-              <Accordion defaultActiveKey="0" className={controlClassName}>
+            <Row style={{pointerEvents: 'auto'}} className={controlClassName}>
+              <Accordion defaultActiveKey="0" className='controlAccordion'>
                 <Card>
                   <Card.Header>
                     <Accordion.Toggle as={Button} variant="link" eventKey="0">
@@ -149,7 +130,7 @@ export default function Controls(props) {
                             }}
                             aria-label="Checkbox for following text input"
                           />
-                        <label>{eov}</label>
+                        <label className='ml-2'>{capitalizeFirstLetter(eov)}</label>
                       </InputGroup>))
                       }
                     </Card.Body>
@@ -169,7 +150,7 @@ export default function Controls(props) {
                             onChange={() => setFixedStations(!fixedStations)}
                             aria-label="Checkbox for following text input"
                           />
-                        <label> Fixed Stations </label>
+                        <label className='ml-2'> Fixed Stations </label>
                       </InputGroup>
                       <InputGroup className="mb-3">
                         <InputGroup.Checkbox 
@@ -177,7 +158,7 @@ export default function Controls(props) {
                           onChange={() => setCasts(!casts)}
                           aria-label="Checkbox for following text input" 
                         />
-                        <label> Casts </label>
+                        <label className='ml-2'> Casts </label>
                       </InputGroup>
                       {/* <InputGroup className="mb-3">
                         <InputGroup.Checkbox 
@@ -219,6 +200,34 @@ export default function Controls(props) {
                   </Accordion.Collapse>
                 </Card>
               </Accordion>
+              <Col>
+                <Row className='mb-3 mt-3'>
+                  <Col xs={{span: 7, offset: 0}} >
+                    Status: <span className='filterStatus'>{filtersChanged ? 'New filters to apply' : 'No new filters' }</span> 
+                    {/* {previousQueryString} */}
+                  </Col>
+                  <Col xs={{span: 5, offset: 0}}>
+                    <OverlayTrigger
+                      key='left'
+                      placement='top'
+                      overlay={
+                        <Tooltip id={`tooltip-left`}>
+                          {filtersChanged ? 'Filter map data with current selection' : 'Select new filters to apply them'}
+                        </Tooltip>
+                      }
+                      >
+                      <Button 
+                        className='applyFiltersButton' 
+                        onClick={() => filtersChanged && applyFilters()}
+                        variant={filtersChanged ? 'primary' : 'secondary'}
+                        // disabled={!filtersChanged}
+                        >
+                          Apply New Filters
+                      </Button>
+                    </OverlayTrigger>
+                  </Col>
+                </Row>
+              </Col>
             </Row>
           </Col>
         </Row>

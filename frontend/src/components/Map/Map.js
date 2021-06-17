@@ -1,5 +1,4 @@
 import { Map, NavigationControl } from "maplibre-gl";
-// import mapboxgl from "mapbox-gl";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import React from "react";
 const server = "https://pac-dev2.cioos.org/ceda";
@@ -11,7 +10,7 @@ const config = {
 
 export default class CIOOSMap extends React.Component {
   constructor(props) {
-    super(props);
+    super(props)
     this.layerId = "data-layer";
     this.sourceId = "sourceID";
     this.counter = 0;
@@ -42,6 +41,17 @@ export default class CIOOSMap extends React.Component {
     });
 
     const drawPolygon = new MapboxDraw();
+
+    // this.map.on('draw.create', function (e) {
+    //   setPolygonPresent(true)
+    // });
+
+    // this.map.on('draw.delete', function (e) {
+    //   const polygons = drawPolygon.getAll()
+    //   if (polygons.length === 0) {
+    //     setPolygonPresent(false)
+    //   }
+    // })
 
     this.map.addControl(drawPolygon, "top-left");
     this.map.addControl(new NavigationControl(), "bottom-left");
@@ -120,11 +130,16 @@ export default class CIOOSMap extends React.Component {
   getPolygon() {
     console.log("get polygon");
     if (this.map.getSource("mapbox-gl-draw-cold")) {
-      return this.map
-        .getSource("mapbox-gl-draw-cold")
-        ._data.features.map((elem) => elem.geometry)[0].coordinates[0]; //.filter(elem => elem.type !== 'Feature')
+      const polygonSource = this.map.getSource("mapbox-gl-draw-cold")
+      if (polygonSource) { // there is a polygon drawn
+        const polygonFeatures = polygonSource._data.features.map((elem) => elem.geometry)
+        if(polygonFeatures[0]){
+          return polygonFeatures[0].coordinates[0]; // get coordinates array of polygon
+        }
+      }
     }
   }
+
   updateSource(queryString) {
     this.map.getSource("points").tiles = [
       `${server}/tiles/{z}/{x}/{y}.mvt?${queryString}`,
