@@ -56,7 +56,7 @@ export default function SubmitRequest (props) {
     }, 500);
   }, [])
 
-  const buttonTooltip = polygonCreated ? 'Submit request' : (emailValid ? 'Add polygon map selection to request data' : 'Add valid email address')
+  const buttonTooltip = (polygonCreated && emailValid) ? 'Submit request' : (emailValid ? 'Add polygon map selection to request data' : 'Add valid email address')
   return (
     <Row className='submitRequest'>
       {/* {queryError && 'Error submitting query' } */}

@@ -82,6 +82,19 @@ export default function Controls(props) {
     return string.charAt(0).toUpperCase() + string.slice(1);
   }
 
+  // Load the institution dropdown with all institutions in the dataset
+  useEffect(() => {
+    fetch('url').then((result) => {
+      if(result.ok) {
+
+      } else {
+        throw ('could not get list of institutions')
+      }
+    }).catch(error => {
+      throw (error)
+    })
+  }, [])
+
   const controlClassName = classnames('filterRow', 'mb-3', 'animate__animated', {'animate__slideOutRight': controlsClosed}, {'animate__slideInRight': !controlsClosed})
   return (
     <div className='controls'>
@@ -145,11 +158,11 @@ export default function Controls(props) {
                   <Accordion.Collapse eventKey="1">
                     <Card.Body>
                     <InputGroup className="mb-3">
-                          <InputGroup.Checkbox 
-                            checked={fixedStations}
-                            onChange={() => setFixedStations(!fixedStations)}
-                            aria-label="Checkbox for following text input"
-                          />
+                      <InputGroup.Checkbox 
+                        checked={fixedStations}
+                        onChange={() => setFixedStations(!fixedStations)}
+                        aria-label="Checkbox for following text input"
+                      />
                         <label className='ml-2'> Fixed Stations </label>
                       </InputGroup>
                       <InputGroup className="mb-3">
@@ -160,24 +173,43 @@ export default function Controls(props) {
                         />
                         <label className='ml-2'> Casts </label>
                       </InputGroup>
-                      {/* <InputGroup className="mb-3">
-                        <InputGroup.Checkbox 
-                          checked={trajectories}
-                          onChange={() => setTrajectories(!trajectories)}
-                          aria-label="Checkbox for following text input" 
-                        />
-                        <label> Trajectories </label>
-                      </InputGroup> */}
                     </Card.Body>
                   </Accordion.Collapse>
                 </Card>
                 <Card>
                   <Card.Header>
                     <Accordion.Toggle as={Button} variant="link" eventKey="2">
-                    Timeframe and Depth Range
+                      Organizations
                     </Accordion.Toggle>
                   </Card.Header>
                   <Accordion.Collapse eventKey="2">
+                  <Card.Body style={{maxHeight:"300px",overflowY:"scroll"}}>
+                      {Object.keys(eovsToggleStart).map(eov=>  (
+                      <InputGroup key={eov} className="mb-3">
+                        <InputGroup.Checkbox
+                            checked={eovsSelected[eov]}
+                            onChange={(e) => {
+                                  console.log(e.target.value);
+                                  setEOVs({...eovsSelected,
+                                    [eov]:!eovsSelected[eov]
+                                  })
+                            }}
+                            aria-label="Checkbox for following text input"
+                          />
+                        <label className='ml-2'>{capitalizeFirstLetter(eov)}</label>
+                      </InputGroup>))
+                      }
+                    </Card.Body>
+                  </Accordion.Collapse>
+                </Card>
+                <Card></Card>
+                <Card>
+                  <Card.Header>
+                    <Accordion.Toggle as={Button} variant="link" eventKey="3">
+                    Timeframe and Depth Range
+                    </Accordion.Toggle>
+                  </Card.Header>
+                  <Accordion.Collapse eventKey="3">
                     <Card.Body>
                       <InputGroup className="mb-3">
                         <TimeSelector
