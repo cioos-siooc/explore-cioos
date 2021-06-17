@@ -1,0 +1,16 @@
+.emailInput{
+  width: 260px;
+}
+.submitRequest{
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+}
+.emailValidityIndicator {
+  border-radius: 3rem !important;
+}
+.indicatorIcon {
+  position:relative;
+  top:4px;
+  left:-34px;
+}

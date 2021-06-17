@@ -1,25 +1,19 @@
 .controls {
   position: relative;
-  top: 40px;
+  top: 10px;
   overflow-x: hidden;
   pointer-events: none;
-}
-.toggleControlsOpenAndClosed {
-  /* float: right; */
 }
 .closed {
   width: 0px;
 }
-
 .timeInput {
   overflow:visible;
 }
 .controlAccordion{
   width: 500px;
 }
-.emailInput{
-  margin-right: 15px;
-}
+
 .filterRow {
   background-color: white;
   border-radius: 0.25rem;
