@@ -3,14 +3,8 @@ from multiprocessing import Process
 from . import download_erddap
 import os
 import random
-import zipfile
 
-
-if os.name == "nt":
-    path_wkthmltopdf = b"C:\Program Files\wkhtmltopdf\\bin\wkhtmltopdf.exe"
-    config = pdfkit.configuration(wkhtmltopdf=path_wkthmltopdf)
-else:
-    config = pdfkit.configuration()
+import uuid
 
 
 def gen_folder_name(fpath="../"):
@@ -31,6 +25,12 @@ def gen_folder_name(fpath="../"):
 
 
 def download_ckan_pdf(ckan_url=None, ckan_id=None, pdf_filename=None):
+    if os.name == "nt":
+        path_wkthmltopdf = b"C:\Program Files\wkhtmltopdf\\bin\wkhtmltopdf.exe"
+        config = pdfkit.configuration(wkhtmltopdf=path_wkthmltopdf)
+    else:
+        config = pdfkit.configuration()
+
     download_url = ckan_url + ckan_id
     if pdfkit.from_url(download_url, pdf_filename, configuration=config):
         return 0
@@ -38,28 +38,29 @@ def download_ckan_pdf(ckan_url=None, ckan_id=None, pdf_filename=None):
         raise Exception("Unable to download file")
 
 
-def parallel_downloader(json_blob=None, output_folder="./"):
+def parallel_downloader(json_blob=None, output_folder="", create_pdf=False):
     # output_folder = gen_folder_name(fpath=output_folder)
-    full_output_path = os.path.join(
-        output_folder,
-        json_blob["user_query"].get("zip_file_name").replace(".zip", ""),
-    )
-    print(full_output_path)
-    if not os.path.exists(full_output_path):
-        os.makedirs(full_output_path)
+    temp_folder= 'ceda_download_' + str(uuid.uuid4())[0:6]
+    zip_filename=json_blob["user_query"]["zip_filename"]
+    
+    # crash on UUID collision
+    os.makedirs(temp_folder)
+    
+    # output_folder will never be created in production, just for development
+    os.makedirs(output_folder,exist_ok=True)
 
     for filtered_result in json_blob["cache_filtered"]:
         erddap_url = filtered_result["erddap_url"]
         ckan_url = filtered_result["ckan_url"]
         ckan_id = filtered_result["ckan_id"]
         ckan_filename = os.path.join(
-            full_output_path,
+            temp_folder,
             "{}_{}.pdf".format(
                 filtered_result["dataset_id"],
                 erddap_url.split("/")[2].replace(".", "_"),
             ),
         )
-        if json_blob.get("create_pdf", None) is True:
+        if create_pdf:
             print("creating pdf file ...")
             pid = Process(
                 target=download_ckan_pdf,
@@ -72,17 +73,19 @@ def parallel_downloader(json_blob=None, output_folder="./"):
         blob = json_blob
         blob["cache_filtered"] = [filtered_result]
         pid = Process(
-            target=download_erddap.get_dataset, args=(blob, full_output_path)
+            target=download_erddap.get_dataset, args=(blob, temp_folder)
         )
         pid.start()
         pid.join()
     # zip files in folder
-    if os.name != "nt":
+        zip_full_path = os.path.join(output_folder,zip_filename)
+        print("Writing zip ",zip_full_path)
         retval = os.system(
-            "zip -r {}.zip {}".format(full_output_path, full_output_path)
+            "zip -r {} {}".format(zip_full_path, temp_folder)
         )
+        
         if retval == 0:
-            os.system("rm -f {}/*".format(full_output_path))
+            os.system("rm -rf {}".format(temp_folder))
         else:
-            raise Exception("Error creating zip file!")
-    return "{}.zip".format(full_output_path)
+            raise Exception("Error creating zip file!", zip_full_path, " from files in ", temp_folder)
+    return zip_filename
