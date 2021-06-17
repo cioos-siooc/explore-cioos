@@ -40,7 +40,19 @@ export default class CIOOSMap extends React.Component {
       zoom: 2, // starting zoom
     });
 
-    const drawPolygon = new MapboxDraw();
+    const drawControlOptions = {
+      displayControlsDefault: false,
+      controls: {
+        point: false, 
+        line_string: false,
+        polygon: true, 
+        trash: true,
+        combine_features: false,
+        uncombine_features: false
+      }
+    }
+
+    const drawPolygon = new MapboxDraw(drawControlOptions);
 
     // this.map.on('draw.create', function (e) {
     //   setPolygonPresent(true)
