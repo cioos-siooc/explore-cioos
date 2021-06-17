@@ -26,3 +26,7 @@
   max-height: 445px;
   overflow: auto;
 }
+.card-header svg {
+  float: right;
+  margin-top: 10px;
+}

@@ -82,8 +82,8 @@ export default function SubmitRequest (props) {
       >
         
         {emailValid ? 
-          <CheckCircle color='#212529' style={{backgroundColor: '#d4edda', borderRadius: '2rem' }} size={30} className='indicatorIcon'/> : 
-          <XCircle color='##212529' style={{backgroundColor: '#fff3cd', borderRadius: '2rem' }} size={30} className='indicatorIcon'/>
+          <CheckCircle color='#212529' style={{backgroundColor: '#d4edda', borderRadius: '2rem' }} size={20} className='indicatorIcon'/> : 
+          <XCircle color='##212529' style={{backgroundColor: '#fff3cd', borderRadius: '2rem' }} size={20} className='indicatorIcon'/>
         }
       </OverlayTrigger>
       <OverlayTrigger

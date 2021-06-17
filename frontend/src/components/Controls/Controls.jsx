@@ -1,9 +1,9 @@
 import * as React from 'react'
 import {useState, useRef, useEffect} from 'react'
 import PropTypes from 'prop-types'
-import {Container, Row, Col, Accordion, Card, Button, InputGroup, OverlayTrigger, Tooltip} from 'react-bootstrap'
+import {Container, Row, Col, Accordion, Card, Button, InputGroup, OverlayTrigger, Tooltip, useAccordionToggle} from 'react-bootstrap'
 import classnames from 'classnames'
-import { ChevronCompactLeft, ChevronCompactRight } from 'react-bootstrap-icons'
+import { ChevronCompactLeft, ChevronCompactRight, QuestionCircle } from 'react-bootstrap-icons'
 
 import TimeSelector from './TimeSelector/TimeSelector.jsx'
 import DepthSelector from './DepthSelector/DepthSelector.jsx'
@@ -128,7 +128,18 @@ export default function Controls(props) {
                     <Accordion.Toggle as={Button} variant="link" eventKey="0">
                       Ocean Variables
                     </Accordion.Toggle>
-                  </Card.Header>
+                    <OverlayTrigger
+                      key='oceanVariablesHelp'
+                      placement='top'
+                      overlay={
+                        <Tooltip id={`tooltip-left`}>
+                          This is some info about the filters in this section
+                        </Tooltip>
+                      }
+                      >
+                        <QuestionCircle color='#007bff' size={20}/>
+                      </OverlayTrigger>
+                    </Card.Header>
                   <Accordion.Collapse eventKey="0">
                   <Card.Body style={{maxHeight:"300px",overflowY:"scroll"}}>
                       {Object.keys(eovsToggleStart).map(eov=>  (
@@ -154,6 +165,17 @@ export default function Controls(props) {
                     <Accordion.Toggle as={Button} variant="link" eventKey="1">
                       Data Source Types
                     </Accordion.Toggle>
+                    <OverlayTrigger
+                      key='dataSourcesHelp'
+                      placement='top'
+                      overlay={
+                        <Tooltip id={`tooltip-left`}>
+                          This is some info about the filters in this section
+                        </Tooltip>
+                      }
+                      >
+                        <QuestionCircle color='#007bff' size={20}/>
+                      </OverlayTrigger>
                   </Card.Header>
                   <Accordion.Collapse eventKey="1">
                     <Card.Body>
@@ -181,6 +203,17 @@ export default function Controls(props) {
                     <Accordion.Toggle as={Button} variant="link" eventKey="2">
                       Organizations
                     </Accordion.Toggle>
+                    <OverlayTrigger
+                      key='organizationsHelp'
+                      placement='top'
+                      overlay={
+                        <Tooltip id={`tooltip-left`}>
+                          This is some info about the filters in this section
+                        </Tooltip>
+                      }
+                      >
+                        <QuestionCircle color='#007bff' size={20}/>
+                      </OverlayTrigger>
                   </Card.Header>
                   <Accordion.Collapse eventKey="2">
                   <Card.Body style={{maxHeight:"300px",overflowY:"scroll"}}>
@@ -208,6 +241,17 @@ export default function Controls(props) {
                     <Accordion.Toggle as={Button} variant="link" eventKey="3">
                     Timeframe and Depth Range
                     </Accordion.Toggle>
+                    <OverlayTrigger
+                      key='timeframeDepthHelp'
+                      placement='top'
+                      overlay={
+                        <Tooltip id={`tooltip-left`}>
+                          This is some info about the filters in this section
+                        </Tooltip>
+                      }
+                      >
+                        <QuestionCircle color='#007bff' size={20}/>
+                      </OverlayTrigger>
                   </Card.Header>
                   <Accordion.Collapse eventKey="3">
                     <Card.Body>
