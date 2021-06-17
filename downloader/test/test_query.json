@@ -9,12 +9,8 @@
         "depth_min": 0,
         "depth_max": 100,
         "polygon_region": "POLYGON ((-125.2071249 50.0725658, -125.1617769 49.9989123, -125.0566522 50.012593, -125.0539038 50.0355326, -125.0367266 50.1126528, -125.1308579 50.1333439, -125.1432255 50.0888689, -125.2071249 50.0725658))",
-        "eovs": [
-            "temperature",
-            "salinity"
-        ],
-        "email": "cozycoops@gmail.com",
-        "zip_filename": "sdfsd.zip"
+        "eovs": ["seaSurfaceTemperature", "subSurfaceSalinity"],
+        "email": "cozycoops@gmail.com"
     },
     "cache_filtered": [
         {
