@@ -3,7 +3,7 @@ import {useState, useRef, useEffect} from 'react'
 import PropTypes from 'prop-types'
 import {Container, Row, Col, Accordion, Card, Button, InputGroup, OverlayTrigger, Tooltip, useAccordionToggle} from 'react-bootstrap'
 import classnames from 'classnames'
-import { ChevronCompactLeft, ChevronCompactRight, QuestionCircle } from 'react-bootstrap-icons'
+import { ChevronCompactLeft, ChevronCompactRight, QuestionCircle, ChevronCompactDown, ChevronCompactUp } from 'react-bootstrap-icons'
 
 import TimeSelector from './TimeSelector/TimeSelector.jsx'
 import DepthSelector from './DepthSelector/DepthSelector.jsx'
@@ -51,7 +51,7 @@ export default function Controls(props) {
   const [controlsClosed, setControlsClosed] = useState(false)
   const [filtersChanged, setFiltersChanged] = useState(false)
   const [previousQueryString, setPreviousQueryString] = useState(createDataFilterQueryString())
-
+  const [accordionSectionsOpen, setAccordionSectionsOpen] = useState([true,false,false,false])
   function createDataFilterQueryString () {
     return Object.entries(query)
     .map(([k, v]) => `${k}=${v}`)
@@ -116,7 +116,7 @@ export default function Controls(props) {
                     className='toggleControlsOpenAndClosed' 
                     onClick={() => setControlsClosed(!controlsClosed)}
                   >
-                    {controlsClosed ? <ChevronCompactLeft/> : <ChevronCompactRight/>}
+                    {controlsClosed ? <ChevronCompactLeft size={20}/> : <ChevronCompactRight size={20}/>}
                   </Button>
                 </OverlayTrigger>
               </Col>
@@ -125,8 +125,8 @@ export default function Controls(props) {
               <Accordion defaultActiveKey="0" className='controlAccordion'>
                 <Card>
                   <Card.Header>
-                    <Accordion.Toggle as={Button} variant="link" eventKey="0">
-                      Ocean Variables
+                    <Accordion.Toggle as={Button} variant="light" eventKey="0" onClick={() => setAccordionSectionsOpen(accordionSectionsOpen.map((elem, index) => index === 0 ? !elem : false))}>
+                      Ocean Variables 
                     </Accordion.Toggle>
                     <OverlayTrigger
                       key='oceanVariablesHelp'
@@ -137,8 +137,11 @@ export default function Controls(props) {
                         </Tooltip>
                       }
                       >
-                        <QuestionCircle color='#007bff' size={20}/>
+                        <QuestionCircle className='helpIcon' color='#007bff' size={20}/>
                       </OverlayTrigger>
+                      <Accordion.Toggle className='chevronAccordionToggle' as={Button} variant='light' eventKey='0' onClick={() => setAccordionSectionsOpen(accordionSectionsOpen.map((elem, index) => index === 0 ? !elem : false))}>
+                        {accordionSectionsOpen[0] ? <ChevronCompactUp  size={20}/> : <ChevronCompactDown className='chevronIcon' size={20}/>}
+                      </Accordion.Toggle>
                     </Card.Header>
                   <Accordion.Collapse eventKey="0">
                   <Card.Body style={{maxHeight:"300px",overflowY:"scroll"}}>
@@ -162,8 +165,8 @@ export default function Controls(props) {
                 </Card>
                 <Card>
                   <Card.Header>
-                    <Accordion.Toggle as={Button} variant="link" eventKey="1">
-                      Data Source Types
+                    <Accordion.Toggle as={Button} variant="light" eventKey="1" onClick={() => setAccordionSectionsOpen(accordionSectionsOpen.map((elem, index) => index === 1 ? !elem : false))}>
+                      Data Source Types 
                     </Accordion.Toggle>
                     <OverlayTrigger
                       key='dataSourcesHelp'
@@ -173,9 +176,12 @@ export default function Controls(props) {
                           This is some info about the filters in this section
                         </Tooltip>
                       }
-                      >
-                        <QuestionCircle color='#007bff' size={20}/>
-                      </OverlayTrigger>
+                    >
+                      <QuestionCircle className='helpIcon' color='#007bff' size={20}/>
+                    </OverlayTrigger>
+                    <Accordion.Toggle className='chevronAccordionToggle' as={Button} variant='light' eventKey='1' onClick={() => setAccordionSectionsOpen(accordionSectionsOpen.map((elem, index) => index === 1 ? !elem : false))}>
+                        {accordionSectionsOpen[1] ? <ChevronCompactUp  size={20}/> : <ChevronCompactDown className='chevronIcon' size={20}/>}
+                      </Accordion.Toggle>
                   </Card.Header>
                   <Accordion.Collapse eventKey="1">
                     <Card.Body>
@@ -200,8 +206,8 @@ export default function Controls(props) {
                 </Card>
                 <Card>
                   <Card.Header>
-                    <Accordion.Toggle as={Button} variant="link" eventKey="2">
-                      Organizations
+                    <Accordion.Toggle as={Button} variant="light" eventKey="2" onClick={() => setAccordionSectionsOpen(accordionSectionsOpen.map((elem, index) => index === 2 ? !elem : false))}>
+                      Organizations 
                     </Accordion.Toggle>
                     <OverlayTrigger
                       key='organizationsHelp'
@@ -211,9 +217,12 @@ export default function Controls(props) {
                           This is some info about the filters in this section
                         </Tooltip>
                       }
-                      >
-                        <QuestionCircle color='#007bff' size={20}/>
-                      </OverlayTrigger>
+                    >
+                      <QuestionCircle className='helpIcon' color='#007bff' size={20}/>
+                    </OverlayTrigger>
+                    <Accordion.Toggle className='chevronAccordionToggle' as={Button} variant='light' eventKey='2' onClick={() => setAccordionSectionsOpen(accordionSectionsOpen.map((elem, index) => index === 2 ? !elem : false))}>
+                        {accordionSectionsOpen[2] ? <ChevronCompactUp  size={20}/> : <ChevronCompactDown className='chevronIcon' size={20}/>}
+                      </Accordion.Toggle>
                   </Card.Header>
                   <Accordion.Collapse eventKey="2">
                   <Card.Body style={{maxHeight:"300px",overflowY:"scroll"}}>
@@ -238,8 +247,8 @@ export default function Controls(props) {
                 <Card></Card>
                 <Card>
                   <Card.Header>
-                    <Accordion.Toggle as={Button} variant="link" eventKey="3">
-                    Timeframe and Depth Range
+                    <Accordion.Toggle as={Button} variant="light" eventKey="3" onClick={() => setAccordionSectionsOpen(accordionSectionsOpen.map((elem, index) => index === 3 ? !elem : false))}>
+                      Timeframe and Depth Range 
                     </Accordion.Toggle>
                     <OverlayTrigger
                       key='timeframeDepthHelp'
@@ -249,9 +258,12 @@ export default function Controls(props) {
                           This is some info about the filters in this section
                         </Tooltip>
                       }
-                      >
-                        <QuestionCircle color='#007bff' size={20}/>
-                      </OverlayTrigger>
+                    >
+                      <QuestionCircle className='helpIcon' color='#007bff' size={20}/>
+                    </OverlayTrigger>
+                    <Accordion.Toggle className='chevronAccordionToggle' as={Button} variant='light' eventKey='3' onClick={() => setAccordionSectionsOpen(accordionSectionsOpen.map((elem, index) => index === 3 ? !elem : false))}>
+                        {accordionSectionsOpen[3] ? <ChevronCompactUp  size={20}/> : <ChevronCompactDown className='chevronIcon' size={20}/>}
+                      </Accordion.Toggle>
                   </Card.Header>
                   <Accordion.Collapse eventKey="3">
                     <Card.Body>

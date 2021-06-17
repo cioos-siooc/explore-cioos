@@ -69,7 +69,7 @@ export default function SubmitRequest (props) {
           </Tooltip>
         }
       >
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder='abc@gmail.com' className='emailInput'/>
+        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder='exampleEmail@cioos.ca' className='emailInput'/>
       </OverlayTrigger>
       <OverlayTrigger
         key='emailValidityIndicatorKey'

@@ -1,3 +1,6 @@
+.toggleControlsOpenAndClosed svg{
+  margin-bottom: 2px;
+}
 .controls {
   position: relative;
   top: 10px;
@@ -27,6 +30,11 @@
   overflow: auto;
 }
 .card-header svg {
+  /* margin-top: 10px; */
+}
+.helpIcon {
+  margin-left: 10px;
+}
+.chevronAccordionToggle {
   float: right;
-  margin-top: 10px;
 }
