@@ -12,11 +12,11 @@ RUN pip3 install -q ./downloader
 
 RUN sh -c "python3 -m erddap_downloader downloader/test/test_query.json && \
     unzip out/*zip && \
-    ls -l **/*"
+    ls"
 
 # Verify that a real CSV was created
 RUN python3 -c "import pandas,glob; \
-               csv_file=glob.glob('ceda_download*/**/*.csv')[0]; \
+               csv_file=glob.glob('ceda_download*/*.csv')[0]; \
                print('Loading csv_file:',csv_file); \
                df=pandas.read_csv(csv_file); \
                print(df)"
