@@ -1,10 +1,24 @@
-from erddap_downloader import download_erddap
 from erddap_downloader import downloader_wrapper
-import json 
+import json
+import sys
 
 if __name__ == "__main__":
-    with open('test/test_query.json','r') as fid:
+    if len(sys.argv) < 3:
+        raise Exception(
+            "Insufficient inputs. Include json filename with path and pdf option[y/n]"
+        )
+
+    json_file = sys.argv[1]
+    pdf_option = sys.argv[2]
+    with open(json_file, "r") as fid:
         json_blob = json.load(fid)
 
-    # print(downloader_wrapper.gen_folder_name())
-    print(downloader_wrapper.parallel_downloader(json_blob=json_blob, output_folder='./out/'))
+    json_blob["create_pdf"] = pdf_option.upper() == "Y"
+    if json_blob.get("output_folder_name") is None:
+        output_folder_name = "./out/"
+
+    print(
+        downloader_wrapper.parallel_downloader(
+            json_blob=json_blob, output_folder=output_folder_name
+        )
+    )

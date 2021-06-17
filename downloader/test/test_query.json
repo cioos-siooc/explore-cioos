@@ -9,8 +9,12 @@
         "depth_min": 0,
         "depth_max": 100,
         "polygon_region": "POLYGON ((-125.2071249 50.0725658, -125.1617769 49.9989123, -125.0566522 50.012593, -125.0539038 50.0355326, -125.0367266 50.1126528, -125.1308579 50.1333439, -125.1432255 50.0888689, -125.2071249 50.0725658))",
-        "eovs": ["temperature", "salinity"],
-        "email": "cozycoops@gmail.com"
+        "eovs": [
+            "temperature",
+            "salinity"
+        ],
+        "email": "cozycoops@gmail.com",
+        "zip_file_name": "sdfsd.zip"
     },
     "cache_filtered": [
         {
@@ -68,17 +72,41 @@
                     "Westernmost_Easting": "-128.5126"
                 },
                 "variables": {
-                    "work_area": {"long_name": "Work Area"},
-                    "cruise": {"long_name": "Cruise"},
-                    "hakai_id": {"cf_role": "profile_id", "long_name": "Hakai ID"},
-                    "vessel": {"long_name": "Vessel"},
-                    "operators": {"long_name": "Operators"},
-                    "comments": {"long_name": "Comments"},
-                    "device_model": {"long_name": "Device Model"},
-                    "device_sn": {"long_name": "Device Serial Number"},
-                    "device_firmware": {"long_name": "Device Firmware"},
-                    "bottle_drop": {"long_name": "Bottle Drop"},
-                    "station": {"cf_role": "timeseries_id", "long_name": "Station"},
+                    "work_area": {
+                        "long_name": "Work Area"
+                    },
+                    "cruise": {
+                        "long_name": "Cruise"
+                    },
+                    "hakai_id": {
+                        "cf_role": "profile_id",
+                        "long_name": "Hakai ID"
+                    },
+                    "vessel": {
+                        "long_name": "Vessel"
+                    },
+                    "operators": {
+                        "long_name": "Operators"
+                    },
+                    "comments": {
+                        "long_name": "Comments"
+                    },
+                    "device_model": {
+                        "long_name": "Device Model"
+                    },
+                    "device_sn": {
+                        "long_name": "Device Serial Number"
+                    },
+                    "device_firmware": {
+                        "long_name": "Device Firmware"
+                    },
+                    "bottle_drop": {
+                        "long_name": "Bottle Drop"
+                    },
+                    "station": {
+                        "cf_role": "timeseries_id",
+                        "long_name": "Station"
+                    },
                     "latitude": {
                         "_CoordinateAxisType": "Lat",
                         "_FillValue": "NaN",
@@ -161,13 +189,19 @@
                         "timezone": "UTC",
                         "units": "seconds since 1970-01-01T00:00:00Z"
                     },
-                    "bottom_depth": {"long_name": "Bottom Depth"},
+                    "bottom_depth": {
+                        "long_name": "Bottom Depth"
+                    },
                     "target_depth": {
                         "_FillValue": "2147483647",
                         "long_name": "Target Depth"
                     },
-                    "drop_speed": {"long_name": "Drop Speed"},
-                    "direction_flag": {"long_name": "Direction Flag"},
+                    "drop_speed": {
+                        "long_name": "Drop Speed"
+                    },
+                    "direction_flag": {
+                        "long_name": "Direction Flag"
+                    },
                     "descent_rate": {
                         "_FillValue": "NaN",
                         "actual_range": "-106.341, 145.459",
@@ -203,7 +237,9 @@
                         "missing_value": "2",
                         "standard_name": "aggregate_quality_flag"
                     },
-                    "depth_flag_description": {"long_name": "Depth Flag Description"},
+                    "depth_flag_description": {
+                        "long_name": "Depth Flag Description"
+                    },
                     "pressure": {
                         "_FillValue": "2147483647",
                         "actual_range": "0, 642",
@@ -306,7 +342,9 @@
                     "salinity_flag_description": {
                         "long_name": "Salinity Flag Description"
                     },
-                    "spec_cond": {"long_name": "Specific Conductance"},
+                    "spec_cond": {
+                        "long_name": "Specific Conductance"
+                    },
                     "dissolved_oxygen_ml_l": {
                         "_FillValue": "NaN",
                         "actual_range": "-15.6005, 32.7664",
@@ -379,7 +417,9 @@
                         "missing_value": "2",
                         "standard_name": "aggregate_quality_flag"
                     },
-                    "flc_flag_description": {"long_name": "Flc Flag Description"},
+                    "flc_flag_description": {
+                        "long_name": "Flc Flag Description"
+                    },
                     "turbidity": {
                         "_FillValue": "NaN",
                         "actual_range": "-15.676, 2425.658",
@@ -427,7 +467,9 @@
                         "missing_value": "2",
                         "standard_name": "aggregate_quality_flag"
                     },
-                    "par_flag_description": {"long_name": "Par Flag Description"},
+                    "par_flag_description": {
+                        "long_name": "Par Flag Description"
+                    },
                     "c_star_at": {
                         "_FillValue": "NaN",
                         "actual_range": "-0.2862, 48.524",
@@ -458,8 +500,14 @@
                         "standard_name": "sea_water_ph_reported_on_total_scale",
                         "units": "-log[H+]"
                     },
-                    "sos_un": {"long_name": "Speed of Sound", "units": "m s-1"},
-                    "backscatter_beta": {"long_name": "Backscatter", "units": "m-1"},
+                    "sos_un": {
+                        "long_name": "Speed of Sound",
+                        "units": "m s-1"
+                    },
+                    "backscatter_beta": {
+                        "long_name": "Backscatter",
+                        "units": "m-1"
+                    },
                     "cdom_ppb": {
                         "long_name": "Carbon Dissolved Organic Matter",
                         "units": "ppb"
