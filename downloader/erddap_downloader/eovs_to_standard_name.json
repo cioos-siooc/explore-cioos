@@ -1,17 +1,5 @@
 {
-  "time": [
-    "time"
-  ],
-  "latitude": [
-    "latitude"
-  ],
-  "longitude": [
-    "longitude"
-  ],
-  "depth": [
-    "depth"
-  ],
-  "sea_pressure": [
+  "pressure": [
     "sea_water_pressure",
     "sea_water_pressure_due_to_sea_water",
     "sea_water_pressure_at_sea_floor"
@@ -43,7 +31,7 @@
     "sea_surface_skin_temperature",
     "sea_surface_subskin_temperature"
   ],
-  "subSurfacePotentialTemperature": [
+  "potentialTemperature": [
     "sea_water_potential_temperature",
     "sea_water_potential_temperature_at_sea_floor"
   ],
@@ -55,6 +43,9 @@
     "sea_surface_salinity",
     "sea_water_practical_salinity",
     "sea_water_salinity"
+  ],
+  "seaSurfaceSalinity": [
+    "sea_surface_salinity"
   ],
   "oxygen": [
     "mass_concentration_of_oxygen_in_sea_water",
@@ -109,6 +100,28 @@
   ],
   "inorganicCarbon": [
     "mole_concentration_of_dissolved_inorganic_carbon_in_sea_water",
+    "ocean_mass_content_of_dissolved_inorganic_carbon",
     "partial_pressure_of_carbon_dioxide_in_sea_water"
+  ],
+  "speedOfSound": [
+    "speed_of_sound_in_sea_water"
+  ],
+  "seaIce": [
+    "sea_ice_draft",
+    "sea_ice_thickness"
+  ],
+  "seawaterDensity": [
+    "sea_water_density"
+  ],
+  "potentialDensity": [
+    "sea_water_potential_density"
+  ],
+  "dissolvedOrganicCarbon": [
+    "mole_concentration_of_dissolved_organic_carbon_in_sea_water",
+    "ocean_mass_content_of_dissolved_organic_carbon"
+  ],
+  "surfaceCurrents": [
+  ],
+  "seaState": [
   ]
 }
