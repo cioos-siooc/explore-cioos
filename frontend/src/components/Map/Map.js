@@ -143,7 +143,6 @@ var popup = new Popup({
             // When a click event occurs on a feature in the places layer, open a popup at the
         // location of the feature, with description HTML from its properties.
         this.map.on('mouseenter', "points", e => {
-          console.log(e)
             var coordinates = e.features[0].geometry.coordinates.slice();
             var description = e.features[0].properties.count;
             
@@ -165,7 +164,6 @@ var popup = new Popup({
             });
 
             this.map.on('mousemove', "hexes", e => {
-              console.log(e, e.features)
               var coordinates = [e.lngLat.lng, e.lngLat.lat];
               var description = e.features[0].properties.count;
               
@@ -194,7 +192,6 @@ var popup = new Popup({
   }
 
   getPolygon() {
-    console.log("get polygon");
     if (this.map.getSource("mapbox-gl-draw-cold")) {
       const polygonSource = this.map.getSource("mapbox-gl-draw-cold")
       if (polygonSource) { // there is a polygon drawn
