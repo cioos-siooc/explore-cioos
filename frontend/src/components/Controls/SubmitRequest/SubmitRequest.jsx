@@ -31,9 +31,9 @@ export default function SubmitRequest (props) {
   }
 
   useEffect(() => {
-    if(props.map.getPolygon()) {
+    if(props.map.getPolygon() && emailValid) {
       console.log(`https://pac-dev2.cioos.org/ceda/download?${createPolygonQueryString()}`)
-      fetch(`https://pac-dev2.cioos.org/ceda/download?${createPolygonQueryString()}`).then((value) => {
+      fetch(`https://pac-dev2.cioos.org/ceda/download?${createPolygonQueryString()}&email=${email}`).then((value) => {
         if(value.ok) {
           setQuerySubmitted(true)
         }
