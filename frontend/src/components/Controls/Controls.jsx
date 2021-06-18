@@ -20,12 +20,11 @@ export default function Controls(props) {
     salinity: true,
     temperature: true,
   };
-
-  const [eovsSelected, setEOVs] = useState(eovsToggleStart)
-
+  const [eovsSelected, setEovsSelected] = useState(eovsToggleStart)
+  const [organizationsToggleStart, setOrganizationsToggleStart] = useState()
+  const [organizationsSelected, setOrganizationsSelected] = useState()
   const [fixedStations, setFixedStations] = useState(true)
   const [casts, setCasts] = useState(true)
-  const [trajectories, setTrajectories] = useState(true)
 
   var startDateInit = new Date()
   startDateInit.setHours(0, 0, 0, 0)
@@ -36,14 +35,17 @@ export default function Controls(props) {
   const [startDepth, setStartDepth] = useState(0)
   const [endDepth, setEndDepth] = useState(100)
 
-  const eovsSelectedArray = Object.entries(eovsSelected).filter(([eov,isSelected]) => isSelected).map(([eov,isSelected])=>eov).filter(e=>e);
-  
+  const eovsSelectedArray = Object.entries(eovsSelected).filter(([eov,isSelected]) => isSelected).map(([eov,isSelected])=>eov).filter(e=>e)
+  let organizationsSelectedArray
+  if(organizationsSelected) organizationsSelectedArray =  Object.entries(organizationsSelected).filter(([org, isSelected]) => isSelected).map(([org, isSelected]) => org).filter(o=>o)
+
   const query = {
     timeMin: startDate.getFullYear() + '-' + startDate.getMonth() + '-' + startDate.getDate(),
     timeMax: endDate.getFullYear() + '-' + endDate.getMonth() + '-' + endDate.getDate(),
     depthMin: startDepth,
     depthMax: endDepth,
     eovs: eovsSelectedArray,
+    organizations: organizationsSelected && organizationsSelectedArray,
     dataType: [casts && 'casts', fixedStations &&'fixedStations'].filter(e=>e),
   }
 
@@ -52,6 +54,7 @@ export default function Controls(props) {
   const [filtersChanged, setFiltersChanged] = useState(false)
   const [previousQueryString, setPreviousQueryString] = useState(createDataFilterQueryString())
   const [accordionSectionsOpen, setAccordionSectionsOpen] = useState([true,false,false,false])
+
   function createDataFilterQueryString () {
     return Object.entries(query)
     .map(([k, v]) => `${k}=${v}`)
@@ -68,6 +71,7 @@ export default function Controls(props) {
 
   useEffect(() => {
     if(isMounted.current) {
+      console.log('triggered')
       if(previousQueryString !== createDataFilterQueryString()) {
         setFiltersChanged(true)
       } else {
@@ -76,24 +80,23 @@ export default function Controls(props) {
     } else {
       isMounted.current = true
     }
-  }, [eovsSelected, fixedStations, casts, trajectories, startDate, endDate, startDepth, endDepth])
+  }, [eovsSelected, organizationsSelected, fixedStations, casts, startDate, endDate, startDepth, endDepth])
+
+  // Load the institution dropdown with all institutions in the dataset
+  useEffect(() => {
+    fetch('https://pac-dev2.cioos.org/ceda/organizations').then(response => response.json()).then(data => { 
+      let orgsReturned = {}
+      data.forEach(elem => {
+        orgsReturned[elem.name] = true
+      })
+      setOrganizationsToggleStart(orgsReturned)
+      setOrganizationsSelected(orgsReturned)
+    }).catch(error => {throw error})
+  }, [])
 
   function capitalizeFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
   }
-
-  // Load the institution dropdown with all institutions in the dataset
-  useEffect(() => {
-    fetch('url').then((result) => {
-      if(result.ok) {
-
-      } else {
-        throw ('could not get list of institutions')
-      }
-    }).catch(error => {
-      throw (error)
-    })
-  }, [])
 
   const controlClassName = classnames('filterRow', 'mb-3', 'animate__animated', {'animate__slideOutRight': controlsClosed}, {'animate__slideInRight': !controlsClosed})
   return (
@@ -130,10 +133,10 @@ export default function Controls(props) {
                     </Accordion.Toggle>
                     <OverlayTrigger
                       key='oceanVariablesHelp'
-                      placement='top'
+                      placement='bottom'
                       overlay={
                         <Tooltip id={`tooltip-left`}>
-                          This is some info about the filters in this section
+                          Select the Ocean Variables you want to download. Checkboxes work as logical OR operators -- i.e.: if you select ‘Oxygen’ and ‘Temperature’, locations that have at least one of those variables can be selected for download.
                         </Tooltip>
                       }
                       >
@@ -151,7 +154,7 @@ export default function Controls(props) {
                             checked={eovsSelected[eov]}
                             onChange={(e) => {
                                   console.log(e.target.value);
-                                  setEOVs({...eovsSelected,
+                                  setEovsSelected({...eovsSelected,
                                     [eov]:!eovsSelected[eov]
                                   })
                             }}
@@ -170,10 +173,10 @@ export default function Controls(props) {
                     </Accordion.Toggle>
                     <OverlayTrigger
                       key='dataSourcesHelp'
-                      placement='top'
+                      placement='bottom'
                       overlay={
                         <Tooltip id={`tooltip-left`}>
-                          This is some info about the filters in this section
+                          Select the Data Source types you want to download data from. Checkboxes work as logical OR operations -- i.e.: if you select ‘Stations’ and ‘Casts’, locations that have data from at least one of those two types of data sources can be selected for download.
                         </Tooltip>
                       }
                     >
@@ -211,7 +214,7 @@ export default function Controls(props) {
                     </Accordion.Toggle>
                     <OverlayTrigger
                       key='organizationsHelp'
-                      placement='top'
+                      placement='bottom'
                       overlay={
                         <Tooltip id={`tooltip-left`}>
                           This is some info about the filters in this section
@@ -226,19 +229,19 @@ export default function Controls(props) {
                   </Card.Header>
                   <Accordion.Collapse eventKey="2">
                   <Card.Body style={{maxHeight:"300px",overflowY:"scroll"}}>
-                      {Object.keys(eovsToggleStart).map(eov=>  (
-                      <InputGroup key={eov} className="mb-3">
+                      {(organizationsToggleStart && organizationsSelected) && Object.keys(organizationsToggleStart).map(org=>  (
+                      <InputGroup key={org} className="mb-3">
                         <InputGroup.Checkbox
-                            checked={eovsSelected[eov]}
+                            checked={organizationsSelected[org]}
                             onChange={(e) => {
                                   console.log(e.target.value);
-                                  setEOVs({...eovsSelected,
-                                    [eov]:!eovsSelected[eov]
+                                  setOrganizationsSelected({...organizationsSelected,
+                                    [org]:!organizationsSelected[org]
                                   })
                             }}
                             aria-label="Checkbox for following text input"
                           />
-                        <label className='ml-2'>{capitalizeFirstLetter(eov)}</label>
+                        <label className='ml-2'>{capitalizeFirstLetter(org)}</label>
                       </InputGroup>))
                       }
                     </Card.Body>
@@ -252,10 +255,10 @@ export default function Controls(props) {
                     </Accordion.Toggle>
                     <OverlayTrigger
                       key='timeframeDepthHelp'
-                      placement='top'
+                      placement='bottom'
                       overlay={
                         <Tooltip id={`tooltip-left`}>
-                          This is some info about the filters in this section
+                          Select depth and time range you want data for. Selection works as logical AND operation -- i.e.: only locations that have data in the selected time and depth range will be selected for download.
                         </Tooltip>
                       }
                     >

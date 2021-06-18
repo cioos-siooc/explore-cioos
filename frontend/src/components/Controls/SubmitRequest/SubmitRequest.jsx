@@ -80,7 +80,6 @@ export default function SubmitRequest (props) {
           </Tooltip>
         }
       >
-        
         {emailValid ? 
           <CheckCircle color='#212529' style={{backgroundColor: '#d4edda', borderRadius: '2rem' }} size={20} className='indicatorIcon'/> : 
           <XCircle color='##212529' style={{backgroundColor: '#fff3cd', borderRadius: '2rem' }} size={20} className='indicatorIcon'/>
