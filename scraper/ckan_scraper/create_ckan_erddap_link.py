@@ -19,8 +19,9 @@ def split_erddap_url(url):
     [erddap_host,f]=url.split('/erddap/tabledap/')
     dataset_id=f.split('.html')[0]
     return (erddap_host,dataset_id)
-
-def get_ckan_records(record_id_erddap_url_map,limit=None):
+def python_to_postgres_list(l):
+    return str(l).replace('[','{').replace(']','}').replace('"','').replace("'",'')
+def get_ckan_records(record_id_erddap_url_map,limit=999999):
     """
     Goes through the list of ERDDAP URLs and dataset IDs and gets the full CKAN record for each dataset ID
 
@@ -33,12 +34,25 @@ def get_ckan_records(record_id_erddap_url_map,limit=None):
         # retreive the data for each record
         record_url=CKAN_API_URL + "/action/package_show?id="+package_id
         record_full=requests.get(record_url).json()['result']
-
+        partiesRaw=[x['value'] for x in record_full['extras'] if x['key']=='responsible-party']
+        if len(partiesRaw):
+            partiesRaw2=json.loads(partiesRaw[0])
+            organizations=[x['name'] for x in partiesRaw2]
+        else:
+            organizations=[]
+            
         (erddap_host,dataset_id)=split_erddap_url(url)
-        out.append([erddap_host,dataset_id,record_full])
+        out.append([erddap_host,dataset_id,python_to_postgres_list(record_full['eov']),record_full['id'],python_to_postgres_list(organizations)])
 
         # compile a dataframe
-    df=pd.DataFrame({"erddap_server":[x[0] for x in out], "dataset_id":[x[1] for x in out], "ckan_record":[str(json.dumps(x[2])) for x in out]}) 
+    line = {
+     "erddap_server":[x[0] for x in out],
+     "dataset_id":[x[1] for x in out], 
+     "eovs":[x[2] for x in out], 
+     "ckan_id":[x[3] for x in out],
+     "parties":[x[4] for x in out],
+     }
+    df=pd.DataFrame(line) 
     
     return df
 

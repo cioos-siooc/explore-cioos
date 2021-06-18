@@ -12,6 +12,9 @@ CREATE TABLE cioos_api.datasets (
     ckan_record jsonb,
     profile_variable text,
     ckan_url text,
+    eovs text[],
+    ckan_id text,
+    parties text[],
     UNIQUE(dataset_id, erddap_url)
 );
 
@@ -38,6 +41,14 @@ CREATE TABLE cioos_api.profiles (
 CREATE INDEX
   ON cioos_api.profiles
   USING GIST (geom);
+
+CREATE INDEX
+  ON cioos_api.profiles
+  USING GIST (geom_snapped_0);
+
+CREATE INDEX
+  ON cioos_api.profiles
+  USING GIST (geom_snapped_1);
 
 -- hex bins at 2 zoom levels
 alter table cioos_api.profiles add column geom_snapped_0 geometry; 

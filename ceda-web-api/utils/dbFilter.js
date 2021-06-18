@@ -37,7 +37,8 @@ function createDBFilter({
       .split(",")
       .map((dataType) => cdmDataTypeGrouping[dataType])
       .flat()
-      .join("|") || "return-no-data";
+      .map((e) => `'${e}'`)
+      .join(",") || "return-no-data";
 
   const filters = [];
 
@@ -53,11 +54,9 @@ function createDBFilter({
   // if (depthMin) filters.push(`p.depth_min >= ${depthMin}`);
   // if (depthMax) filters.push(`p.depth_max < ${depthMax}`);
 
-  filters.push(`cdm_data_type ~ ('${pointTypeCommaSeparatedString}')`);
+  filters.push(`cdm_data_type = any(array[${pointTypeCommaSeparatedString}])`);
 
-  filters.push(
-    `(d.ckan_record -> 'eov') \\?| array[${eovsCommaSeparatedString}]`
-  );
+  filters.push(`eovs && array[${eovsCommaSeparatedString}]`);
   return filters.join(" AND \n");
 }
 
