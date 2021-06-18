@@ -143,8 +143,9 @@ var popup = new Popup({
             // When a click event occurs on a feature in the places layer, open a popup at the
         // location of the feature, with description HTML from its properties.
         this.map.on('mouseenter', "points", e => {
+          console.log(e)
             var coordinates = e.features[0].geometry.coordinates.slice();
-            var description = e.features[0].properties.pk;
+            var description = e.features[0].properties.count;
             
             // Ensure that if the map is zoomed out such that multiple
             // copies of the feature are visible, the popup appears
@@ -164,7 +165,7 @@ var popup = new Popup({
             });
 
             this.map.on('mousemove', "hexes", e => {
-              console.log(e, [e.lngLat.lng, e.lngLat.lat])
+              console.log(e, e.features)
               var coordinates = [e.lngLat.lng, e.lngLat.lat];
               var description = e.features[0].properties.count;
               
