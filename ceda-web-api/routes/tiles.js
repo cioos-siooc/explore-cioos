@@ -27,23 +27,23 @@ router.get("/:z/:x/:y.mvt", async (req, res) => {
   // eg (^Point$|^TimeSeries$)
   // eventually we can just populate is_station in the database
   const typeStr = cdmDataTypeGrouping["fixedStations"]
-    .map((t) => `^${t}$`)
-    .join("|");
+    .map((t) => `'${t}'`)
+    .join(",");
 
   const SQL = `
   with relevent_points as (
-        SELECT ${
+        SELECT count(*) count, ${
           isHexGrid
-            ? "count(*) count,"
-            : `p.pk,(d.cdm_data_type~'(${typeStr})')::integer pointtype,`
+            ? ""
+            : `(d.cdm_data_type = any(array[${typeStr}]))::integer pointtype,`
         } p.${sqlQuery.geom_column} as geom from cioos_api.profiles p
         JOIN cioos_api.datasets d ON p.dataset_pk =d.pk 
        ${filters ? "WHERE " + filters : ""}
-        ${isHexGrid ? ` group by ${sqlQuery.geom_column}` : ""} ),
+        ${isHexGrid ? `group by ${sqlQuery.geom_column}` : "group by geom, cdm_data_type"} ),
     te as (select ST_TileEnvelope(${z}, ${x}, ${y}) tile_envelope ),
     mvtgeom as (
-      SELECT
-       ${isHexGrid ? ` count,` : "pk,pointtype,"}
+      SELECT count,
+       ${isHexGrid ? "" : "pointtype,"}
         ST_AsMVTGeom (
           relevent_points.geom,
           tile_envelope
@@ -51,6 +51,7 @@ router.get("/:z/:x/:y.mvt", async (req, res) => {
       FROM
         relevent_points, te
       WHERE relevent_points.geom && tile_envelope
+    
     )
     SELECT ST_AsMVT(mvtgeom.*, 'internal-layer-name', 4096, 'geom' ${
       sqlQuery.id_column ? `, '${sqlQuery.id_column}'` : ""
