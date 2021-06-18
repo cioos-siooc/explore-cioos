@@ -156,7 +156,7 @@ var popup = new Popup({
             
            popup
             .setLngLat(coordinates)
-            .setHTML(description)
+            .setHTML(description + " points")
             .addTo(this.map);
           });
 
@@ -178,7 +178,7 @@ var popup = new Popup({
               
              popup
               .setLngLat(coordinates)
-              .setHTML(description + " profiles")
+              .setHTML(description + " points")
               .addTo(this.map);
             });
 
