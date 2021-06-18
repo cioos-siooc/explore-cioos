@@ -1,6 +1,6 @@
 require("dotenv").config();
-const fs = require("fs");
 
+const { v4: uuidv4 } = require("uuid");
 var express = require("express");
 var router = express.Router();
 const db = require("../db");
@@ -51,8 +51,8 @@ router.get("/", async (req, res) => {
         depth_max: depthMax,
         polygon_region: wktPolygon,
         eovs: eovs.split(","),
-        email: "cozycoops@gmail.com",
-        zip_filename: "zip_filename",
+        email,
+        zip_filename: `ceda_download_${uuidv4().substr(0, 6)}.zip`,
       },
       cache_filtered: tile.json_agg,
     };
