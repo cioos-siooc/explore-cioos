@@ -44,7 +44,7 @@ export default function SubmitRequest (props) {
     } else {
       setQueryError(true)
     }
-  }, [querySubmitted])
+  }, [queryRequested])
 
   useEffect(() => {
     setInterval(() => {
