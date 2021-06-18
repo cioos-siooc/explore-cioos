@@ -1,19 +1,28 @@
 .controls {
   position: relative;
-  top: 50px;
+  top: 10px;
   overflow-x: hidden;
   pointer-events: none;
-}
-.toggleControlsOpenAndClosed {
-  float: right;
 }
 .closed {
   width: 0px;
 }
-
 .timeInput {
   overflow:visible;
 }
 .controlAccordion{
   width: 500px;
+}
+
+.filterRow {
+  background-color: white;
+  border-radius: 0.25rem;
+}
+.filterStatus {
+  font-style: italic;
+  /* line-height: ; */
+}
+.controlAccordion .card-body {
+  max-height: 445px;
+  overflow: auto;
 }
