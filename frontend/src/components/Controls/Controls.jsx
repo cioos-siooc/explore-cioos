@@ -7,6 +7,8 @@ import { ChevronCompactLeft, ChevronCompactRight, QuestionCircle, ChevronCompact
 
 import TimeSelector from './TimeSelector/TimeSelector.jsx'
 import DepthSelector from './DepthSelector/DepthSelector.jsx'
+import SubmitRequest from './SubmitRequest/SubmitRequest.jsx'
+
 import './styles.css'
 
 export default function Controls(props) {
@@ -323,6 +325,11 @@ export default function Controls(props) {
           </Col>
         </Row>
       </Container>
+      <SubmitRequest 
+        map={props.map} 
+        query={createDataFilterQueryString(query)}
+        filtersChanged={filtersChanged}
+      />
     </div>
   )
 } 

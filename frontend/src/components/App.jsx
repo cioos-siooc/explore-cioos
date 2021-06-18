@@ -1,22 +1,15 @@
 import React, { useState, useRef } from 'react'
 import ReactDOM from 'react-dom'
 import Controls from './Controls/Controls.jsx'
-import SubmitRequest from './Controls/SubmitRequest/SubmitRequest.jsx'
 import CIOOSMap from './Map/Map.js'
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './styles.css'
 
 export default function App () {
-  // const mapRefContainer = useRef(new CIOOSMap());
-  // mapRefContainer.current.addLayer()
-  // createMap() // creates map and uses the id='map' div to render the map
   const map = new CIOOSMap()
   return (
     <>
       <Controls
-        map={map}
-      />
-      <SubmitRequest
         map={map}
       />
     </>
