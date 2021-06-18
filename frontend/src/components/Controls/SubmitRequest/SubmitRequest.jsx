@@ -31,9 +31,9 @@ export default function SubmitRequest (props) {
   }
 
   useEffect(() => {
-    if(props.map.getPolygon()) {
+    if(props.map.getPolygon() && emailValid) {
       console.log(`https://pac-dev2.cioos.org/ceda/download?${createPolygonQueryString()}`)
-      fetch(`https://pac-dev2.cioos.org/ceda/download?${createPolygonQueryString()}`).then((value) => {
+      fetch(`https://pac-dev2.cioos.org/ceda/download?${createPolygonQueryString()}&email=${email}`).then((value) => {
         if(value.ok) {
           setQuerySubmitted(true)
         }
@@ -56,7 +56,7 @@ export default function SubmitRequest (props) {
     }, 500);
   }, [])
 
-  const buttonTooltip = polygonCreated ? 'Submit request' : (emailValid ? 'Add polygon map selection to request data' : 'Add valid email address')
+  const buttonTooltip = (polygonCreated && emailValid) ? 'Submit request' : (emailValid ? 'Add polygon map selection to request data' : 'Add valid email address')
   return (
     <Row className='submitRequest'>
       {/* {queryError && 'Error submitting query' } */}
@@ -69,7 +69,7 @@ export default function SubmitRequest (props) {
           </Tooltip>
         }
       >
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder='abc@gmail.com' className='emailInput'/>
+        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder='exampleEmail@cioos.ca' className='emailInput'/>
       </OverlayTrigger>
       <OverlayTrigger
         key='emailValidityIndicatorKey'
@@ -80,10 +80,9 @@ export default function SubmitRequest (props) {
           </Tooltip>
         }
       >
-        
         {emailValid ? 
-          <CheckCircle color='#212529' style={{backgroundColor: '#d4edda', borderRadius: '2rem' }} size={30} className='indicatorIcon'/> : 
-          <XCircle color='##212529' style={{backgroundColor: '#fff3cd', borderRadius: '2rem' }} size={30} className='indicatorIcon'/>
+          <CheckCircle color='#212529' style={{backgroundColor: '#d4edda', borderRadius: '2rem' }} size={20} className='indicatorIcon'/> : 
+          <XCircle color='##212529' style={{backgroundColor: '#fff3cd', borderRadius: '2rem' }} size={20} className='indicatorIcon'/>
         }
       </OverlayTrigger>
       <OverlayTrigger

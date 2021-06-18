@@ -1,3 +1,6 @@
+.toggleControlsOpenAndClosed svg{
+  margin-bottom: 2px;
+}
 .controls {
   position: relative;
   top: 10px;
@@ -25,4 +28,13 @@
 .controlAccordion .card-body {
   max-height: 445px;
   overflow: auto;
+}
+.card-header svg {
+  /* margin-top: 10px; */
+}
+.helpIcon {
+  margin-left: 10px;
+}
+.chevronAccordionToggle {
+  float: right;
 }
