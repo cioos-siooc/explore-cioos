@@ -10,8 +10,22 @@ const { spawn } = require("child_process");
 /* GET /tiles/:z/:x/:y.mvt */
 /* Retreive a vector tile by tileid */
 router.get("/", async (req, res) => {
+  const {
+    timeMin,
+    timeMax,
+    latMin,
+    latMax,
+    depthMin,
+    depthMax,
+    lonMin,
+    lonMax,
+    eovs,
+    email,
+    polygon,
+  } = req.query;
+
   console.log("download");
-  const { email } = req.query;
+
   const filters = createDBFilter(req.query);
   // const wkt
   const wktPolygon =
@@ -30,7 +44,7 @@ router.get("/", async (req, res) => {
         where
         ${filters ? filters + " AND " : ""} 
 
-        ST_Contains( ST_SetSRID('${wktPolygon}'::geometry,3857),geom) is true
+        ST_Contains(ST_Transform(ST_SetSRID('${wktPolygon}'::geometry,4326),3857),geom) is true
         group by d.pk)
         select json_agg(t) from profiles_subset t;`;
 
@@ -39,7 +53,7 @@ router.get("/", async (req, res) => {
     const tileRaw = await db.raw(SQL);
     const tile = tileRaw.rows[0];
 
-    const downloader_input = {
+    const downloaderInput = {
       user_query: {
         time_min: timeMin,
         time_max: timeMax,
@@ -56,11 +70,9 @@ router.get("/", async (req, res) => {
       },
       cache_filtered: tile.json_agg,
     };
-    if (tile.json_agg.length === 0) {
-      res.status(204);
-    }
+
     // add to the jobs queue
-    await db("cioos_api.datasets").insert({
+    await db("cioos_api.download_jobs").insert({
       downloader_input: downloaderInput,
     });
 

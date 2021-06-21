@@ -3,7 +3,7 @@ import configparser
 import json
 import time
 from re import L
-
+from download_email import send_email
 from erddap_downloader import downloader_wrapper
 from sqlalchemy import create_engine
 
@@ -31,32 +31,60 @@ def get_a_download_job():
     )
     return rs.fetchone()
 
+def email_user(email, status,zip_filename):
+    '''
+    Send the user a success/failed message
+    '''
+
+    
+    download_url='https://pac-dev2.cioos.org/images/ceda/'+zip_filename
+    subject='Your CEDA download'
+    message=""
+    if status=='completed':
+        message=f"Your CEDA downoad is available at {download_url}"
+        subject+=' was successful.'
+    else:
+        message=f"Your CEDA downoad failed. Please try again with a smaller polygon or fewer filters."
+        subject+=' failed.'
+    
+    send_email(email,message,subject)
+    
 
 def run_download(row):
     pk = row["pk"]
 
     # Update status
     update_download_jobs(pk, {"status": "downloading"})
-
+    status=''
+    zip_filename=None
     # Run Download
+    downloader_input = json.loads(row["downloader_input"])
+    user_query=downloader_input['user_query']
+
+    email=user_query['email']
+    zip_filename=user_query['zip_filename']
+
     try:
-        downloader_input = json.loads(row["downloader_input"])
-        print(downloader_input)
+        print("starting download")
         # Run query in parallel mode
         result = downloader_wrapper.parallel_downloader(
             json_blob=downloader_input,
             output_folder=output_folder,
             create_pdf=create_pdf,
         )
-
+        print("download complete")
+        status='completed'
         # Download Completed Update Status
         update_download_jobs(
-            pk, {"status": "completed", "downloader_output": str(result)}
+            pk, {"status": status, "downloader_output": str(result)}
         )
-
+        
     except Exception as e:
-        update_download_jobs(pk, {"status": "failed", "downloader_output": str(e)})
+        status='failed'
+        update_download_jobs(pk, {"status": status, "downloader_output": str(e).replace('\'','')})
         print(e)
+    
+    email_user(email,status,zip_filename)
 
 
 def update_download_jobs(pk, row):
