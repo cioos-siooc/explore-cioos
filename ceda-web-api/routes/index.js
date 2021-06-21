@@ -10,6 +10,10 @@ router.get("/organizations", async function (req, res, next) {
   res.send(await db("cioos_api.organizations"));
 });
 
+router.get("/jobs", async function (req, res, next) {
+  res.send(await db("cioos_api.download_jobs"));
+});
+
 /* GET home page. */
 router.get("/", function (req, res, next) {
   res.render("index", { title: "Express" });

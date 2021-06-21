@@ -20,6 +20,7 @@
     "lru-cache": "^6.0.0",
     "morgan": "~1.9.1",
     "pg": "^8.6.0",
-    "pg-parse-float": "^0.0.1"
+    "pg-parse-float": "^0.0.1",
+    "uuid": "^8.3.2"
   }
 }
