@@ -4,6 +4,8 @@ import { Check, CheckCircle, XCircle } from 'react-bootstrap-icons'
 import PropTypes from 'prop-types'
 import './styles.css'
 
+import {server} from '../../../config'
+
 export default function SubmitRequest (props) {
   const [email, setEmail] = useState('')
   const [emailValid, setEmailValid] = useState(false)
@@ -36,7 +38,7 @@ export default function SubmitRequest (props) {
   useEffect(() => {
     if(polygonCreated && emailValid) {
       console.log(JSON.stringify(props.map.getPolygon()))
-      fetch(`https://pac-dev2.cioos.org/ceda/download?${props.query}&polygon=${JSON.stringify(props.map.getPolygon())}&email=${email}`).then((value) => {
+      fetch(`${server}/download?${props.query}&polygon=${JSON.stringify(props.map.getPolygon())}&email=${email}`).then((value) => {
         if(value.ok) {
           setQuerySubmitted(true)
         }

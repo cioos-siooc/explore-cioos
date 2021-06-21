@@ -8,9 +8,8 @@ import { ChevronCompactLeft, ChevronCompactRight, QuestionCircle, ChevronCompact
 import TimeSelector from './TimeSelector/TimeSelector.jsx'
 import DepthSelector from './DepthSelector/DepthSelector.jsx'
 import SubmitRequest from './SubmitRequest/SubmitRequest.jsx'
-
+import {server} from '../../config'
 import './styles.css'
-
 export default function Controls(props) {
   // Initialization properties
   const isMounted = useRef(false)
@@ -97,7 +96,7 @@ export default function Controls(props) {
 
   // Load the institution dropdown with all institutions in the dataset
   useEffect(() => {
-    fetch('https://pac-dev2.cioos.org/ceda/organizations').then(response => response.json()).then(data => { 
+    fetch(`${server}/organizations`).then(response => response.json()).then(data => { 
       let orgsReturned = {}
       console.log(data)
       data.forEach(elem => {
