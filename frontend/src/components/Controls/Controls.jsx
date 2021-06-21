@@ -12,7 +12,9 @@ import SubmitRequest from './SubmitRequest/SubmitRequest.jsx'
 import './styles.css'
 
 export default function Controls(props) {
+  // Initialization properties
   const isMounted = useRef(false)
+  const orgsLoaded = useRef(false)
 
   // Filters
   const eovsToggleStart = {
@@ -25,6 +27,7 @@ export default function Controls(props) {
   const [eovsSelected, setEovsSelected] = useState(eovsToggleStart)
   const [organizationsToggleStart, setOrganizationsToggleStart] = useState()
   const [organizationsSelected, setOrganizationsSelected] = useState()
+  const [prevOrganizationsSelected, setPreviousOrganizationsSelected] = useState(organizationsSelected)
   const [fixedStations, setFixedStations] = useState(true)
   const [casts, setCasts] = useState(true)
 
@@ -39,7 +42,7 @@ export default function Controls(props) {
 
   const eovsSelectedArray = Object.entries(eovsSelected).filter(([eov,isSelected]) => isSelected).map(([eov,isSelected])=>eov).filter(e=>e)
   let organizationsSelectedArray
-  if(organizationsSelected) organizationsSelectedArray =  Object.entries(organizationsSelected).filter(([org, isSelected]) => isSelected).map(([org, isSelected]) => org).filter(o=>o)
+  if(organizationsSelected) organizationsSelectedArray =  Object.entries(organizationsSelected).filter(([org, isSelectedAndPK]) => isSelectedAndPK[0]).map(([org, isSelectedAndPK]) => isSelectedAndPK[1]).filter(pk=>pk)
 
   const query = {
     timeMin: startDate.getFullYear() + '-' + startDate.getMonth() + '-' + startDate.getDate(),
@@ -72,7 +75,7 @@ export default function Controls(props) {
   }
 
   useEffect(() => {
-    if(isMounted.current) {
+    if(isMounted.current && orgsLoaded.current) {
       console.log('triggered')
       if(previousQueryString !== createDataFilterQueryString()) {
         setFiltersChanged(true)
@@ -84,12 +87,24 @@ export default function Controls(props) {
     }
   }, [eovsSelected, organizationsSelected, fixedStations, casts, startDate, endDate, startDepth, endDepth])
 
+  useEffect(() => {
+    console.log(organizationsSelected)
+    if(prevOrganizationsSelected === undefined && organizationsSelected) {
+      setPreviousOrganizationsSelected(organizationsSelected)
+    } else {
+      if(!orgsLoaded.current) {
+        orgsLoaded.current = true
+      }
+    }
+  }, [organizationsSelected])
+
   // Load the institution dropdown with all institutions in the dataset
   useEffect(() => {
     fetch('https://pac-dev2.cioos.org/ceda/organizations').then(response => response.json()).then(data => { 
       let orgsReturned = {}
+      console.log(data)
       data.forEach(elem => {
-        orgsReturned[elem.name] = true
+        orgsReturned[elem.name] = [true, elem.pk]
       })
       setOrganizationsToggleStart(orgsReturned)
       setOrganizationsSelected(orgsReturned)
@@ -231,14 +246,14 @@ export default function Controls(props) {
                   </Card.Header>
                   <Accordion.Collapse eventKey="2">
                   <Card.Body style={{maxHeight:"300px",overflowY:"scroll"}}>
-                      {(organizationsToggleStart && organizationsSelected) && Object.keys(organizationsToggleStart).map(org=>  (
+                      {(organizationsToggleStart && organizationsSelected) && Object.keys(organizationsToggleStart).map(org =>  (
                       <InputGroup key={org} className="mb-3">
                         <InputGroup.Checkbox
-                            checked={organizationsSelected[org]}
+                            checked={organizationsSelected[org][0]}
                             onChange={(e) => {
                                   console.log(e.target.value);
                                   setOrganizationsSelected({...organizationsSelected,
-                                    [org]:!organizationsSelected[org]
+                                    [org]:[!organizationsSelected[org][0], organizationsSelected[org][1]]
                                   })
                             }}
                             aria-label="Checkbox for following text input"
