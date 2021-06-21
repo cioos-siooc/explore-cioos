@@ -6,9 +6,6 @@ import "react-datepicker/dist/react-datepicker.css";
 import './styles.css'
 
 export default function TimeSelector(props) {
-  var earliestDateAllowed = new Date()
-  earliestDateAllowed.setDate(earliestDateAllowed.getDate() - (365 * 20))
-
   return (
     <div className='timeSelector'>
       <Row>
@@ -17,7 +14,6 @@ export default function TimeSelector(props) {
           <DatePicker
             selected={props.startDate}
             onChange={date => props.setStartDate(date)}
-            minDate={earliestDateAllowed}
             maxDate={new Date(props.endDate).setDate(props.endDate.getDate())}
             inline
             fixedHeight
@@ -51,5 +47,5 @@ TimeSelector.propTypes = {
   startDate: PropTypes.object.isRequired,
   endDate: PropTypes.object.isRequired,
   setStartDate: PropTypes.func.isRequired,
-  setEndDate: PropTypes.func.isRequired
+  setEndDate: PropTypes.func.isRequired,
 }

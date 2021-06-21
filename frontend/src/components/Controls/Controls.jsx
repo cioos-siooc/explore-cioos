@@ -31,10 +31,7 @@ export default function Controls(props) {
   const [fixedStations, setFixedStations] = useState(true)
   const [casts, setCasts] = useState(true)
 
-  var startDateInit = new Date()
-  startDateInit.setHours(0, 0, 0, 0)
-  startDateInit.setDate(startDateInit.getDate() - 365*50)
-  const [startDate, setStartDate] = useState(startDateInit);
+  const [startDate, setStartDate] = useState(new Date('2000-01-01'));
   const [endDate, setEndDate] = useState(new Date());
 
   const [startDepth, setStartDepth] = useState(0)
