@@ -12,39 +12,44 @@ export default function SubmitRequest (props) {
   const [queryError, setQueryError] = useState(false)
   const [polygonCreated, setPolygonCreated] = useState(false)
 
+  const [buttonText, setButtonText] = useState('Not Ready')
+  const [buttonVariant, setButtonVariant] = useState('secondary')
+
   function validateEmail(email) {
     const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
     return re.test(String(email).toLowerCase());
   }
 
   useEffect(() => {
-    setEmailValid(validateEmail(email))
-  }, [email])
-
-  function createPolygonQueryString () {
-    console.log(props.map.getPolygon());
-    query.polygon=JSON.stringify(props.map.getPolygon());
-
-    return Object.entries(query)
-    .map(([k, v]) => `${k}=${v}`)
-    .join("&");
-  }
+    if(props.filtersChanged) {
+      setQuerySubmitted(false)
+      setQueryRequested(false)
+    }
+  }, [props.filtersChanged])
 
   useEffect(() => {
-    if(props.map.getPolygon() && emailValid) {
-      console.log(`https://pac-dev2.cioos.org/ceda/download?${createPolygonQueryString()}`)
-      fetch(`https://pac-dev2.cioos.org/ceda/download?${createPolygonQueryString()}&email=${email}`).then((value) => {
+    setEmailValid(validateEmail(email))
+    setQueryRequested(false)
+    setQuerySubmitted(false)
+  }, [email])
+
+  useEffect(() => {
+    if(polygonCreated && emailValid) {
+      console.log(JSON.stringify(props.map.getPolygon()))
+      fetch(`https://pac-dev2.cioos.org/ceda/download?${props.query}&polygon=${JSON.stringify(props.map.getPolygon())}&email=${email}`).then((value) => {
         if(value.ok) {
           setQuerySubmitted(true)
         }
       }).catch(error => {
         console.log(error)
-        setQueryError(true)
+        setQueryRequested(false)
+        setQuerySubmitted(false)
       })
     } else {
-      setQueryError(true)
+      setQueryRequested(false)
+      setQuerySubmitted(false)
     }
-  }, [querySubmitted])
+  }, [queryRequested])
 
   useEffect(() => {
     setInterval(() => {
@@ -52,14 +57,28 @@ export default function SubmitRequest (props) {
         setPolygonCreated(true)
       } else {
         setPolygonCreated(false)
+        setQueryRequested(false)
+        setQuerySubmitted(false)
       }
     }, 500);
   }, [])
 
+  useEffect(() => {
+    if(!polygonCreated || !emailValid) {
+      setButtonText('Not Ready')
+      setButtonVariant('secondary')
+    } else if(polygonCreated && emailValid && !querySubmitted) {
+      setButtonText('Submit Request')
+      setButtonVariant('primary')
+    } else if(polygonCreated && emailValid && querySubmitted) {
+      setButtonText('Request Submitted')
+      setButtonVariant('success')
+    }
+  }, [polygonCreated, emailValid, querySubmitted])
+
   const buttonTooltip = (polygonCreated && emailValid) ? 'Submit request' : (emailValid ? 'Add polygon map selection to request data' : 'Add valid email address')
   return (
     <Row className='submitRequest'>
-      {/* {queryError && 'Error submitting query' } */}
       <OverlayTrigger
         key='emailInputKey'
         placement='top'
@@ -97,9 +116,9 @@ export default function SubmitRequest (props) {
         <Button 
           className='submitQueryButton' 
           onClick={() => setQueryRequested(true)}
-          variant={(polygonCreated && emailValid) ? 'success' : 'secondary'}
+          variant={buttonVariant}
           >
-          Submit Request
+          {buttonText}
         </Button>
       </OverlayTrigger>
     </Row>
@@ -108,5 +127,7 @@ export default function SubmitRequest (props) {
 
 
 SubmitRequest.propTypes = {
-  map: PropTypes.object.isRequired
+  map: PropTypes.object.isRequired,
+  query: PropTypes.string.isRequired,
+  filtersChanged: PropTypes.bool.isRequired
 }
