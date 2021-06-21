@@ -5,13 +5,27 @@ var express = require("express");
 var router = express.Router();
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
+const { eovGrouping } = require("../utils/grouping");
 
-const { spawn } = require("child_process");
 /* GET /tiles/:z/:x/:y.mvt */
 /* Retreive a vector tile by tileid */
 router.get("/", async (req, res) => {
+  const {
+    timeMin,
+    timeMax,
+    latMin,
+    latMax,
+    depthMin,
+    depthMax,
+    lonMin,
+    lonMax,
+    eovs,
+    email,
+    polygon,
+  } = req.query;
+
   console.log("download");
-  const { email } = req.query;
+
   const filters = createDBFilter(req.query);
   // const wkt
   const wktPolygon =
@@ -30,7 +44,7 @@ router.get("/", async (req, res) => {
         where
         ${filters ? filters + " AND " : ""} 
 
-        ST_Contains( ST_SetSRID('${wktPolygon}'::geometry,3857),geom) is true
+        ST_Contains(ST_Transform(ST_SetSRID('${wktPolygon}'::geometry,4326),3857),geom) is true
         group by d.pk)
         select json_agg(t) from profiles_subset t;`;
 
@@ -39,28 +53,29 @@ router.get("/", async (req, res) => {
     const tileRaw = await db.raw(SQL);
     const tile = tileRaw.rows[0];
 
-    const downloader_input = {
+    const downloaderInput = {
       user_query: {
         time_min: timeMin,
         time_max: timeMax,
-        lat_min: latMin,
-        lat_max: latMax,
-        lon_min: lonMin,
-        lon_max: lonMax,
-        depth_min: depthMin,
-        depth_max: depthMax,
+        lat_min: Number.parseFloat(latMin),
+        lat_max: Number.parseFloat(latMax),
+        lon_min: Number.parseFloat(lonMin),
+        lon_max: Number.parseFloat(lonMax),
+        depth_min: Number.parseFloat(depthMin),
+        depth_max: Number.parseFloat(depthMax),
         polygon_region: wktPolygon,
-        eovs: eovs.split(","),
+        eovs: eovs
+          .split(",")
+          .map((eov) => eovGrouping[eov])
+          .flat(),
         email,
         zip_filename: `ceda_download_${uuidv4().substr(0, 6)}.zip`,
       },
       cache_filtered: tile.json_agg,
     };
-    if (tile.json_agg.length === 0) {
-      res.status(204);
-    }
+
     // add to the jobs queue
-    await db("cioos_api.datasets").insert({
+    await db("cioos_api.download_jobs").insert({
       downloader_input: downloaderInput,
     });
 

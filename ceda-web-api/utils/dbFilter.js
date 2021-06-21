@@ -48,8 +48,8 @@ function createDBFilter({
     filters.push(`organization_pks && array[${organizationsString}]`);
 
   // disabled until we get depth data into the database
-  // if (depthMin) filters.push(`p.depth_min >= ${depthMin}`);
-  // if (depthMax) filters.push(`p.depth_max < ${depthMax}`);
+  if (depthMin) filters.push(`p.depth_min >= ${depthMin}`);
+  if (depthMax) filters.push(`p.depth_max < ${depthMax}`);
 
   filters.push(`cdm_data_type = any(array[${pointTypeCommaSeparatedString}])`);
 
