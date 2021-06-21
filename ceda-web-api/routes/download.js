@@ -5,8 +5,8 @@ var express = require("express");
 var router = express.Router();
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
+const { eovGrouping } = require("../utils/grouping");
 
-const { spawn } = require("child_process");
 /* GET /tiles/:z/:x/:y.mvt */
 /* Retreive a vector tile by tileid */
 router.get("/", async (req, res) => {
@@ -57,14 +57,17 @@ router.get("/", async (req, res) => {
       user_query: {
         time_min: timeMin,
         time_max: timeMax,
-        lat_min: latMin,
-        lat_max: latMax,
-        lon_min: lonMin,
-        lon_max: lonMax,
-        depth_min: depthMin,
-        depth_max: depthMax,
+        lat_min: Number.parseFloat(latMin),
+        lat_max: Number.parseFloat(latMax),
+        lon_min: Number.parseFloat(lonMin),
+        lon_max: Number.parseFloat(lonMax),
+        depth_min: Number.parseFloat(depthMin),
+        depth_max: Number.parseFloat(depthMax),
         polygon_region: wktPolygon,
-        eovs: eovs.split(","),
+        eovs: eovs
+          .split(",")
+          .map((eov) => eovGrouping[eov])
+          .flat(),
         email,
         zip_filename: `ceda_download_${uuidv4().substr(0, 6)}.zip`,
       },
