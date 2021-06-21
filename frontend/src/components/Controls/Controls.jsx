@@ -193,7 +193,15 @@ export default function Controls(props) {
                       placement='bottom'
                       overlay={
                         <Tooltip id={`tooltip-left`}>
-                          Select the Data Source types you want to download data from. Checkboxes work as logical OR operations -- i.e.: if you select ‘Stations’ and ‘Casts’, locations that have data from at least one of those two types of data sources can be selected for download.
+                          Select the Data Sources from which you want to download data. Checkboxes work as logical OR operations -- i.e.: if you select ‘Buoys/Moorings’ and ‘Casts/Profiles’, locations that have data from at least one of those two types of data sources can be selected for download.
+                          <ul>
+                            <li>
+                              Buoys/Moorings: Tooltip: “Examples include mooring, buoys, cabled observatories.
+                            </li>
+                            <li>
+                              Casts/Profiles: Tooltip: “Examples include vertical CTD and Rosette (bottle) profiles.
+                            </li>
+                          </ul>
                         </Tooltip>
                       }
                     >
@@ -211,7 +219,7 @@ export default function Controls(props) {
                         onChange={() => setFixedStations(!fixedStations)}
                         aria-label="Checkbox for following text input"
                       />
-                        <label className='ml-2'> Fixed Stations </label>
+                        <label className='ml-2'> Buoys/Moorings </label>
                       </InputGroup>
                       <InputGroup className="mb-3">
                         <InputGroup.Checkbox 
@@ -219,7 +227,7 @@ export default function Controls(props) {
                           onChange={() => setCasts(!casts)}
                           aria-label="Checkbox for following text input" 
                         />
-                        <label className='ml-2'> Casts </label>
+                        <label className='ml-2'> Casts/Profiles </label>
                       </InputGroup>
                     </Card.Body>
                   </Accordion.Collapse>
@@ -234,7 +242,7 @@ export default function Controls(props) {
                       placement='bottom'
                       overlay={
                         <Tooltip id={`tooltip-left`}>
-                          This is some info about the filters in this section
+                          Filter data by Responsible Organisation name. Selection works as logical OR operation -- i.e.: if you select ‘Institute of Ocean Science’ and ‘Hakai Institute’, data from both organisations will be selected for download.
                         </Tooltip>
                       }
                     >
@@ -275,7 +283,7 @@ export default function Controls(props) {
                       placement='bottom'
                       overlay={
                         <Tooltip id={`tooltip-left`}>
-                          Select depth and time range you want data for. Selection works as logical AND operation -- i.e.: only locations that have data in the selected time and depth range will be selected for download.
+                          Select depth and time range for which you want to download data. Selection works as logical AND operation -- i.e.: only locations that have data in the selected time and depth range will be selected for download.
                         </Tooltip>
                       }
                     >
