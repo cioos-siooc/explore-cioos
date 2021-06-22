@@ -2,8 +2,9 @@ import { Map, NavigationControl, Popup } from "maplibre-gl";
 // import mapboxgl from "mapbox-gl";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import React from "react";
-const server = "https://pac-dev2.cioos.org/ceda";
-// const server = "http://localhost:3000";
+
+import {server} from '../../config'
+
 const config = {
   fillOpacity: 0.8,
   colorScale: ["#ffffD9", "#50BAC3", "#1A468A"],
@@ -204,12 +205,10 @@ var popup = new Popup({
   }
 
   updateSource(queryString) {
-    this.map.getSource("points").tiles = [
-      `${server}/tiles/{z}/{x}/{y}.mvt?${queryString}`,
-    ];
-    this.map.getSource("hexes").tiles = [
-      `${server}/tiles/{z}/{x}/{y}.mvt?isHexGrid=true&${queryString}`,
-    ];
+    const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${queryString}`;
+
+    this.map.getSource("points").tiles = [tileQuery];
+    this.map.getSource("hexes").tiles = [tileQuery];
     // console.log(this.map);
     // Remove the tiles for a particular source
     this.map.style.sourceCaches["hexes"].clearTiles();
