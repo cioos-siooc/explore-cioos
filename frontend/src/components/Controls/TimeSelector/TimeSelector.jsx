@@ -6,8 +6,8 @@ export default function TimeSelector(props) {
   return (
     <div className="timeSelector">
       <Row>
-        <Col xs>Start Date:</Col>
-        <Col xs>
+        <Col>Start Date:</Col>
+        <Col>
           <input
             type="date"
             value={props.startDate}
@@ -17,8 +17,8 @@ export default function TimeSelector(props) {
         </Col>
       </Row>
       <Row>
-        <Col xs>End Date:</Col>
-        <Col xs>
+        <Col>End Date:</Col>
+        <Col>
           <input
             type="date"
             value={props.endDate}
