@@ -3,8 +3,6 @@ import PropTypes from "prop-types";
 import { Col, Row, Button } from "react-bootstrap";
 
 export default function TimeSelector(props) {
-  console.log('startDate',props.startDate);
-  console.log('endDate',props.endDate);
   return (
     <div className="timeSelector">
       <Row>
@@ -14,10 +12,7 @@ export default function TimeSelector(props) {
             type="date"
             value={props.startDate}
             max={props.endDate}
-            onChange={(e) => {
-              
-              props.setStartDate(e.target.value || null);
-            }}
+            onChange={(e) => props.setStartDate(e.target.value)}
           />
         </Col>
       </Row>
@@ -28,7 +23,7 @@ export default function TimeSelector(props) {
             type="date"
             value={props.endDate}
             min={props.startDate}
-            onChange={(e) => props.setEndDate(e.target.value  || null)}
+            onChange={(e) => props.setEndDate(e.target.value)}
           />
         </Col>
       </Row>
@@ -37,8 +32,8 @@ export default function TimeSelector(props) {
 }
 
 TimeSelector.propTypes = {
-  startDate: PropTypes.object.isRequired,
-  endDate: PropTypes.object.isRequired,
+  startDate: PropTypes.string.isRequired,
+  endDate: PropTypes.string.isRequired,
   setStartDate: PropTypes.func.isRequired,
   setEndDate: PropTypes.func.isRequired,
 };

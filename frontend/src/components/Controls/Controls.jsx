@@ -30,11 +30,12 @@ export default function Controls(props) {
   const [fixedStations, setFixedStations] = useState(true)
   const [casts, setCasts] = useState(true)
 
-  const [startDate, setStartDate] = useState();
-  const [endDate, setEndDate] = useState();
+  const [startDate, setStartDate] = useState('2000-01-01');
+  
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const [startDepth, setStartDepth] = useState()
-  const [endDepth, setEndDepth] = useState()
+  const [startDepth, setStartDepth] = useState(0)
+  const [endDepth, setEndDepth] = useState(100)
 
   const eovsSelectedArray = Object.entries(eovsSelected).filter(([eov,isSelected]) => isSelected).map(([eov,isSelected])=>eov).filter(e=>e)
   let organizationsSelectedArray
