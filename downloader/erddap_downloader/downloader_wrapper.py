@@ -28,7 +28,7 @@ def parallel_downloader(json_blob=None, output_folder="", create_pdf=False):
     
     # output_folder will never be created in production, just for development
     os.makedirs(output_folder,exist_ok=True)
-
+    
     for filtered_result in json_blob["cache_filtered"]:
         erddap_url = filtered_result["erddap_url"]
         ckan_url = filtered_result["ckan_url"]
@@ -43,21 +43,11 @@ def parallel_downloader(json_blob=None, output_folder="", create_pdf=False):
                 ),
             )
             print("creating pdf file ...")
-            pid = Process(
-                target=download_ckan_pdf,
-                args=(ckan_url, ckan_id, ckan_filename),
-            )
-            pid.start()
-            pid.join()
-
+            download_ckan_pdf(ckan_url, ckan_id, ckan_filename)
+            
+        download_erddap.get_dataset(json_blob, temp_folder)
         # call jessy's code here to download data from erddap
-        blob = json_blob
-        blob["cache_filtered"] = [filtered_result]
-        pid = Process(
-            target=download_erddap.get_dataset, args=(blob, temp_folder)
-        )
-        pid.start()
-        pid.join()
+        
     # zip files in folder
     zip_full_path = os.path.join(output_folder,zip_filename)
     print("Writing zip ",zip_full_path)

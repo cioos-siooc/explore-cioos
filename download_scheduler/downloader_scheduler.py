@@ -2,10 +2,13 @@ import configparser
 # from sqlalchemy import JSON, Text
 import json
 import time
+import traceback
 from re import L
-from download_email import send_email
+
 from erddap_downloader import downloader_wrapper
 from sqlalchemy import create_engine
+
+from download_email import send_email
 
 config = configparser.ConfigParser()
 config.read(".env")
@@ -31,39 +34,39 @@ def get_a_download_job():
     )
     return rs.fetchone()
 
-def email_user(email, status,zip_filename):
-    '''
-    Send the user a success/failed message
-    '''
 
-    
-    download_url='https://pac-dev2.cioos.org/images/ceda/'+zip_filename
-    subject='Your CEDA download'
-    message=""
-    if status=='completed':
-        message=f"Your CEDA downoad is available at {download_url}"
-        subject+=' was successful.'
+def email_user(email, status, zip_filename):
+    """
+    Send the user a success/failed message
+    """
+
+    download_url = "https://pac-dev2.cioos.org/images/ceda/" + zip_filename
+    subject = "Your CEDA download"
+    message = ""
+    if status == "completed":
+        message = f"Your CEDA download is available at {download_url}"
+        subject += " was successful."
     else:
-        message=f"Your CEDA downoad failed. Please try again with a smaller polygon or fewer filters."
-        subject+=' failed.'
-    
-    send_email(email,message,subject)
-    
+        message = f"Your CEDA download failed. Please try again with a smaller polygon or fewer filters."
+        subject += " failed."
+
+    send_email(email, message, subject)
+
 
 def run_download(row):
     pk = row["pk"]
 
     # Update status
     update_download_jobs(pk, {"status": "downloading"})
-    status=''
-    zip_filename=None
+    status = ""
+    zip_filename = None
     # Run Download
     downloader_input = json.loads(row["downloader_input"])
-    user_query=downloader_input['user_query']
+    user_query = downloader_input["user_query"]
 
-    email=user_query['email']
-    zip_filename=user_query['zip_filename']
-
+    email = user_query["email"]
+    zip_filename = user_query["zip_filename"]
+    downloader_output = ""
     try:
         print("starting download")
         # Run query in parallel mode
@@ -73,25 +76,25 @@ def run_download(row):
             create_pdf=create_pdf,
         )
         print("download complete")
-        status='completed'
-        # Download Completed Update Status
-        update_download_jobs(
-            pk, {"status": status, "downloader_output": str(result)}
-        )
-        
+        status = "completed"
+        # Download Completed. Update Status
+        downloader_output = str(result)
+
     except Exception as e:
-        status='failed'
-        update_download_jobs(pk, {"status": status, "downloader_output": str(e).replace('\'','')})
+        status = "failed"
+        stack_trace = traceback.format_exc()
+        downloader_output = str(stack_trace).replace("'", "")
         print(e)
-    
-    email_user(email,status,zip_filename)
+
+    update_download_jobs(pk, {"status": status, "downloader_output": downloader_output, "time_complete":"NOW()"})
+
+    email_user(email, status, zip_filename)
 
 
 def update_download_jobs(pk, row):
-    for key, value in row.items():
-        engine.execute(
-            f"UPDATE cioos_api.download_jobs SET {key}='{value}' WHERE PK={pk}"
-        )
+    params = ",".join([f"{key}='{value}'" for key, value in row.items()])
+    sql = f"UPDATE cioos_api.download_jobs SET {params} WHERE PK={pk}"
+    engine.execute(sql)
 
 
 if __name__ == "__main__":
