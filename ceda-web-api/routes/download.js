@@ -7,8 +7,6 @@ const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { eovGrouping } = require("../utils/grouping");
 
-/* GET /tiles/:z/:x/:y.mvt */
-/* Retreive a vector tile by tileid */
 router.get("/", async (req, res) => {
   const {
     timeMin,
@@ -24,8 +22,6 @@ router.get("/", async (req, res) => {
     polygon,
   } = req.query;
 
-  console.log("download");
-
   const filters = createDBFilter(req.query);
   // const wkt
   const wktPolygon =
@@ -34,9 +30,7 @@ router.get("/", async (req, res) => {
       .map(([lat, lon]) => `${lat} ${lon}`)
       .join() +
     "))";
-  console.log("wktPolygon", wktPolygon);
 
-  // TODO add depth
   const SQL = `
         with profiles_subset as (
         select d.erddap_url, d.dataset_id,d.profile_variable,d.cdm_data_type, d.ckan_record->>'id' ckan_id, 'https://catalogue.cioos.ca/dataset/' ckan_url  FROM cioos_api.profiles p
@@ -76,6 +70,7 @@ router.get("/", async (req, res) => {
 
     // add to the jobs queue
     await db("cioos_api.download_jobs").insert({
+      email: email,
       downloader_input: downloaderInput,
     });
 
