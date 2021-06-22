@@ -115,15 +115,20 @@ export default function Controls(props) {
 
   const controlClassName = classnames('filterRow', 'mb-3', 'animate__animated', {'animate__slideOutRight': controlsClosed}, {'animate__slideInRight': !controlsClosed})
   return (
-    <div className='controls'>
+    <div className='controls float-right'>
       <Container fluid>
         <Row>
-          <Col style={{pointerEvents: 'none'}} xs={{span: 3, offset:9}}>
+          <Col style={{pointerEvents: 'none', width:  '450px'}}>
             <Row style={{pointerEvents: 'auto'}} className='controlRow'>
-              <Col xs={{ span: 1, offset: 11 }} className='mr-0 pr-0 pl-0'>
+              {/* <Col> */}
+                <SubmitRequest 
+                  map={props.map} 
+                  query={createDataFilterQueryString(query)}
+                  filtersChanged={filtersChanged}
+                />
                 <OverlayTrigger
                   key='left'
-                  placement='left'
+                  placement='bottom'
                   overlay={
                     <Tooltip id={`tooltip-left`}>
                       {controlsClosed ? 'Open' : 'Close'} Controls
@@ -137,7 +142,7 @@ export default function Controls(props) {
                     {controlsClosed ? <ChevronCompactLeft size={20}/> : <ChevronCompactRight size={20}/>}
                   </Button>
                 </OverlayTrigger>
-              </Col>
+              {/* </Col> */}
             </Row>
             <Row style={{pointerEvents: 'auto'}} className={controlClassName}>
               <Accordion defaultActiveKey="0" className='controlAccordion'>
@@ -346,11 +351,6 @@ export default function Controls(props) {
           </Col>
         </Row>
       </Container>
-      <SubmitRequest 
-        map={props.map} 
-        query={createDataFilterQueryString(query)}
-        filtersChanged={filtersChanged}
-      />
     </div>
   )
 } 

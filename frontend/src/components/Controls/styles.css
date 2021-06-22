@@ -38,3 +38,6 @@
 .chevronAccordionToggle {
   float: right;
 }
+.toggleControlsOpenAndClosed {
+  margin-bottom:5px;
+}

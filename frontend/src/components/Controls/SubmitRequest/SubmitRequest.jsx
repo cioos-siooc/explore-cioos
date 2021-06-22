@@ -80,10 +80,10 @@ export default function SubmitRequest (props) {
 
   const buttonTooltip = (polygonCreated && emailValid) ? 'Submit request' : (emailValid ? 'Add polygon map selection to request data' : 'Add valid email address')
   return (
-    <Row className='submitRequest'>
+    <div className='submitRequest'>
       <OverlayTrigger
         key='emailInputKey'
-        placement='top'
+        placement='bottom'
         overlay={
           <Tooltip id={`tooltip-left`}>
             Email address to receive data download link
@@ -94,7 +94,7 @@ export default function SubmitRequest (props) {
       </OverlayTrigger>
       <OverlayTrigger
         key='emailValidityIndicatorKey'
-        placement='top'
+        placement='bottom'
         overlay={
           <Tooltip id={`tooltip-left`}>
             {emailValid ? 'Valid email address' : 'Invalid email address'}
@@ -108,7 +108,7 @@ export default function SubmitRequest (props) {
       </OverlayTrigger>
       <OverlayTrigger
         key='submitKey'
-        placement='top'
+        placement='bottom'
         overlay={
           <Tooltip id={`tooltip-left`}>
             {buttonTooltip}
@@ -123,7 +123,7 @@ export default function SubmitRequest (props) {
           {buttonText}
         </Button>
       </OverlayTrigger>
-    </Row>
+    </div>
   )
 }
 
