@@ -30,19 +30,19 @@ export default function Controls(props) {
   const [fixedStations, setFixedStations] = useState(true)
   const [casts, setCasts] = useState(true)
 
-  const [startDate, setStartDate] = useState(new Date('2000-01-01'));
-  const [endDate, setEndDate] = useState(new Date());
+  const [startDate, setStartDate] = useState();
+  const [endDate, setEndDate] = useState();
 
-  const [startDepth, setStartDepth] = useState(0)
-  const [endDepth, setEndDepth] = useState(100)
+  const [startDepth, setStartDepth] = useState()
+  const [endDepth, setEndDepth] = useState()
 
   const eovsSelectedArray = Object.entries(eovsSelected).filter(([eov,isSelected]) => isSelected).map(([eov,isSelected])=>eov).filter(e=>e)
   let organizationsSelectedArray
   if(organizationsSelected) organizationsSelectedArray =  Object.entries(organizationsSelected).filter(([org, isSelectedAndPK]) => isSelectedAndPK[0]).map(([org, isSelectedAndPK]) => isSelectedAndPK[1]).filter(pk=>pk)
 
   const query = {
-    timeMin: startDate.getFullYear() + '-' + startDate.getMonth() + '-' + startDate.getDate(),
-    timeMax: endDate.getFullYear() + '-' + endDate.getMonth() + '-' + endDate.getDate(),
+    timeMin: startDate,
+    timeMax: endDate,
     depthMin: startDepth,
     depthMax: endDepth,
     eovs: eovsSelectedArray,
@@ -58,6 +58,7 @@ export default function Controls(props) {
 
   function createDataFilterQueryString () {
     return Object.entries(query)
+    .filter(([k, v])=> v )
     .map(([k, v]) => `${k}=${v}`)
     .join("&");
   } 

@@ -25,8 +25,8 @@ export default function DepthSelector(props) {
         <Col>
           <div style={{ width: 385, margin: '15px 0px 0px 15px' }}>
             <RangeSelector
-              setStartDepth={props.setStartDepth}
-              setEndDepth={props.setEndDepth}
+              setStartDepth={val=>props.setStartDepth(val || null)}
+              setEndDepth={val=>props.setEndDepth(val || null)}
             />
           </div>
         </Col>
