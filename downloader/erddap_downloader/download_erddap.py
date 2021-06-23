@@ -240,13 +240,14 @@ def get_dataset(json_query, output_path=""):
             download_url = get_erddap_download_url(
                 dataset, json_query["user_query"], variable_list
             )
-        except requests.exceptions.HTTPError:
+        except requests.exceptions.HTTPError as e:
             # Failed to get a download url
             warnings.warn(
                 'Failed to download data from erddap: {0} dataset_id:{1}. \n'
-                ' There''s likely no data available.'.format(
+                '{2}'.format(
                     dataset['erddap_url'],
-                    dataset['dataset_id']
+                    dataset['dataset_id'],
+                    "\n".join(e.args)
                 )
             )
             continue
@@ -259,7 +260,16 @@ def get_dataset(json_query, output_path=""):
         # Download data
         print("Download {0}".format(download_url), end=" ... ")
         r = requests.get(download_url)
-        open(output_file_path, "wb").write(r.content)
+        
+        # Make sure the connection is working otherswise make a warning and send the error.
+        if r.status_code != 200:
+            warnings.warn(
+                f"Failed to download {download_url}\n{r.text}"
+            )
+            continue
+        
+        with open(output_file_path, "wb") as f:
+            f.write(r.content)
         print("Completed")
 
         # If polygon filter out data outside the polygon

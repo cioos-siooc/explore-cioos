@@ -47,17 +47,24 @@ def parallel_downloader(json_blob=None, output_folder="", create_pdf=False):
             
         download_erddap.get_dataset(json_blob, temp_folder)
         # call jessy's code here to download data from erddap
-        
-    # zip files in folder
+
+    # Review if temp_folder has files in it
+    if os.listdir(temp_folder) == []:
+        return 0
+
+    # Zip files in temporary folder
     zip_full_path = os.path.join(output_folder,zip_filename)
     print("Writing zip ",zip_full_path)
     retval = os.system(
         "zip -FSr {} {}".format(zip_full_path, temp_folder)
     )
-            
+
+    # Create an error if failed to zipped file            
     if retval:
         raise Exception("Error creating zip file!", zip_full_path, " from files in ", temp_folder)
 
+    # Delete temporary folder
     os.system("rm -rf {}".format(temp_folder))
-
-    return zip_filename
+    
+    # Output zipped file size and return zipped file size in bytes
+    return os.stat(zip_full_path).st_size
