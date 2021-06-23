@@ -263,6 +263,13 @@ def get_dataset(json_query, output_path=""):
         open(output_file_path, "wb").write(r.content)
         print("Completed")
 
+        # If file is not empty run the rest
+        if os.stats(output_file_name).st_size == 0:
+            warnings.warn(
+                'Downloaded file from erddap: {0} dataset_id:{1} is empty.\n'
+            )
+            continue
+
         # If polygon filter out data outside the polygon
         if "polygon_object" in json_query["user_query"]:
             filter_polygon_region(
