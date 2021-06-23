@@ -71,7 +71,9 @@ export default class CIOOSMap extends React.Component {
     this.map.addControl(new NavigationControl(), "bottom-left");
     const query = {
       timeMin: "1900-01-01",
-      timeMax: "2021-12-01",
+      timeMax: new Date().toLocaleDateString(),
+      depthMin: 0,
+      depthMax: 12000,
       eovs: ["carbon", "currents", "nutrients", "salinity", "temperature"],
       dataType: ["casts", "fixedStations"],
     };

@@ -31,12 +31,12 @@ export default function Controls(props) {
   const [fixedStations, setFixedStations] = useState(true)
   const [casts, setCasts] = useState(true)
 
-  const [startDate, setStartDate] = useState('2000-01-01');
+  const [startDate, setStartDate] = useState('1900-01-01');
   
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [startDepth, setStartDepth] = useState(0)
-  const [endDepth, setEndDepth] = useState(100)
+  const [endDepth, setEndDepth] = useState(12000)
 
   const eovsSelectedArray = Object.entries(eovsSelected).filter(([eov,isSelected]) => isSelected).map(([eov,isSelected])=>eov).filter(e=>e)
   let organizationsSelectedArray
@@ -69,6 +69,7 @@ export default function Controls(props) {
     setFiltersChanged(false)
     setPreviousQueryString(createDataFilterQueryString())
     if(props.map.getLoaded()){
+      console.log(createDataFilterQueryString())
       props.map.updateSource(createDataFilterQueryString())
     }
   }

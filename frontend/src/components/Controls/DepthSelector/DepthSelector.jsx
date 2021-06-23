@@ -20,7 +20,7 @@ export default function DepthSelector(props) {
               type="number"
               max={12000}
               min={0}
-              onChange={(e) => props.setStartDepth(e.target.value)}
+              onChange={(e) => props.setStartDepth(e.target.value * 1.0)} // Force type-conversion to number
               size={"6"}
             />
           </Col>
@@ -35,19 +35,19 @@ export default function DepthSelector(props) {
               type="number"
               max={12000}
               min={0}
-              onChange={(e) => props.setEndDepth(e.target.value)}
+              onChange={(e) => props.setEndDepth(e.target.value * 1.0)} // Force type-conversion to number
               size={"6"}
             />
           </Col>
         </Row>
         <Row>
           <Col>
-            <div style={{ width: 330, margin: "15px 0px 0px 15px" }}>
-              <RangeSelector
-                setStartDepth={props.setStartDepth}
-                setEndDepth={props.setEndDepth}
-              />
-            </div>
+            <RangeSelector
+              startDepth={props.startDepth}
+              endDepth={props.endDepth}
+              setStartDepth={props.setStartDepth}
+              setEndDepth={props.setEndDepth}
+            />
           </Col>
         </Row>
       </Col>
