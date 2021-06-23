@@ -209,7 +209,6 @@ var popup = new Popup({
 
     this.map.getSource("points").tiles = [tileQuery];
     this.map.getSource("hexes").tiles = [tileQuery];
-    // console.log(this.map);
     // Remove the tiles for a particular source
     this.map.style.sourceCaches["hexes"].clearTiles();
     this.map.style.sourceCaches["points"].clearTiles();
