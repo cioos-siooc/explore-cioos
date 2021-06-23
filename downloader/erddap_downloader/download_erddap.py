@@ -118,6 +118,14 @@ def get_erddap_download_url(
         and "lon_min" in user_constraint
         and "lon_max" in user_constraint
     ):
+        # Limit longitudes to [-180 to 180] range
+        if user_constraint["lon_min"] < -180:
+            user_constraint["lon_min"] = -180
+
+        if user_constraint["lon_max"] > 180:
+            user_constraint["lon_max"] = 180
+        
+
         e.constraints["latitude>="] = user_constraint["lat_min"]
         e.constraints["latitude<="] = user_constraint["lat_max"]
 
@@ -173,8 +181,9 @@ def filter_polygon_region(file_path, polygone):
     if file_type == "csv":
         # ERDDAP CSV has two lines header, let's read them first
         with open(file_path) as f:
-            columns_name = f.readline()
-            columns_units = f.readline()
+            columns_name = f.readline().strip()
+            columns_units = f.readline().strip()
+
         # Read with pandas
         df = pd.read_csv(
             file_path,
@@ -211,14 +220,29 @@ def get_dataset(json_query, output_path=""):
     :param json_query: JSON CEDA query
     :param output_path: path where to save the downloaded data.
     """
+    # Convert WKT polygon to shapely polygon object
     if "polygon_region" in json_query["user_query"]:
         json_query["user_query"]["polygon_object"] = shapely.wkt.loads(
             json_query["user_query"]["polygon_region"]
         )
-
+    
+    # Make ERDDAP CSV output default output
     if "response" not in json_query["user_query"]:
         json_query["user_query"]["response"] = "csv"
+    
+    # Duplicate polygon over -180 to 180 limit and generate multiple queries to match each side
+    user_subqueries = []
+    if (json_query["user_query"]["polygon_object"].bounds[0] < -180 or
+            json_query["user_query"]["polygon_object"].bounds[2] > 180):
+        for shift in [-360, 0, 360]:
+            new_region = shapely.affinity.translate(json_query["user_query"]['polygon_object'], xoff=shift)
+            if -180 < new_region.bounds[0] < 180 or -180 < new_region.bounds[2] < 180:
+                user_subqueries += [json_query["user_query"].copy()]
+                user_subqueries[-1]['polygon_object'] = new_region
+    else:
+        user_subqueries = json_query['user_query']
 
+    # Run through each datasets
     for dataset in json_query["cache_filtered"]:
         # If metadata for the dataset is not available retrieve it
         if (
@@ -234,46 +258,54 @@ def get_dataset(json_query, output_path=""):
         variable_list = get_variable_list(
             dataset["erddap_metadata"], json_query["user_query"]["eovs"],
         )
-        # Try getting
-        try:
-            # Get download url
-            download_url = get_erddap_download_url(
-                dataset, json_query["user_query"], variable_list
-            )
-        except requests.exceptions.HTTPError as e:
-            # Failed to get a download url
-            warnings.warn(
-                'Failed to download data from erddap: {0} dataset_id:{1}. \n'
-                '{2}'.format(
-                    dataset['erddap_url'],
-                    dataset['dataset_id'],
-                    "\n".join(e.args)
+        # Try getting data
+        query_id = 0
+        for user_subquery in user_subqueries:
+            try:
+                # Get download url
+                download_url = get_erddap_download_url(
+                    dataset, user_subquery, variable_list
                 )
-            )
-            continue
+            except requests.exceptions.HTTPError as e:
+                # Failed to get a download url
+                warnings.warn(
+                    'Failed to download data from erddap: {0} dataset_id:{1}. \n'
+                    '{2}'.format(
+                        dataset['erddap_url'],
+                        dataset['dataset_id'],
+                        "\n".join(e.args)
+                    )
+                )
+                continue
 
-        # Generate the default file name
-        output_file_name = get_file_name_output(dataset)
-        output_file_path = os.path.join(output_path, output_file_name)
-        output_file_path += "." + json_query["user_query"]["response"]
+            # Generate the default file name
+            # Add suffix if multiple query per dataset
+            if len(user_subquery) > 1:
+                file_suffix = f"_part{query_id}"
+                query_id += 1
+            else:
+                file_suffix = ''
+            output_file_name = get_file_name_output(dataset) + file_suffix
+            output_file_name = get_file_name_output(dataset)
+            output_file_path = os.path.join(output_path, output_file_name)
+            output_file_path += "." + user_subquery["response"]
 
-        # Download data
-        print("Download {0}".format(download_url), end=" ... ")
-        r = requests.get(download_url)
-        
-        # Make sure the connection is working otherswise make a warning and send the error.
-        if r.status_code != 200:
-            warnings.warn(
-                f"Failed to download {download_url}\n{r.text}"
-            )
-            continue
-        
-        with open(output_file_path, "wb") as f:
-            f.write(r.content)
-        print("Completed")
+            # Download data
+            print("Download {0}".format(download_url), end=" ... ")
+            r = requests.get(download_url)
+            
+            # Make sure the connection is working otherswise make a warning and send the error.
+            if r.status_code != 200:
+                warnings.warn(f"Failed to download {download_url}\n{r.text}")
+                continue
+            
+            # Download file locally
+            with open(output_file_path, "wb") as f:
+                f.write(r.content)
+            print("Completed")
 
-        # If polygon filter out data outside the polygon
-        if "polygon_object" in json_query["user_query"]:
-            filter_polygon_region(
-                output_file_path, json_query["user_query"]["polygon_object"]
-            )
+            # If polygon filter out data outside the polygon
+            if "polygon_object" in user_subquery:
+                filter_polygon_region(
+                    output_file_path, user_subquery["polygon_object"]
+                )
