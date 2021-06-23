@@ -1,1 +1,39 @@
-{"user_query":{"time_min":"2000-01-01","time_max":"2021-06-22","lat_min":null,"lat_max":null,"lon_min":null,"lon_max":null,"depth_min":null,"depth_max":100,"polygon_region":"POLYGON((-55.17835890622166 46.571589324894205,-55.52865920093892 46.384148186391315,-55.149956179623416 46.031982321761205,-54.610304374248116 46.45594105877038,-55.17835890622166 46.571589324894205))","eovs":["inorganicCarbon","surfaceCurrents","subSurfaceCurrents","surfaceCurrents","nitrate","phosphate","sulphate","silicate","seaSurfaceSalinity","subSurfaceSalinity","seaSurfaceTemperature","subSurfaceTemperature"],"email":"pramod.thupaki@hakai.org","zip_filename":"ceda_download_b3d2bc.zip"},"cache_filtered":[{"erddap_url":"https://www.smartatlantic.ca/erddap","dataset_id":"SMA_head_of_placentia_bay-come_by_chance_point","profile_variable":"profile_variable","cdm_data_type":"Point","ckan_id":"5d527a49-e131-4479-9f22-ca26c106d65f","ckan_url":"https://catalogue.cioos.ca/dataset/"}]}
+{
+  "user_query": {
+    "time_min": "2000-01-01",
+    "time_max": "2021-06-22",
+    "lat_min": null,
+    "lat_max": null,
+    "lon_min": null,
+    "lon_max": null,
+    "depth_min": null,
+    "depth_max": 100,
+    "polygon_region": "POLYGON((-55.17835890622166 46.571589324894205,-55.52865920093892 46.384148186391315,-55.149956179623416 46.031982321761205,-54.610304374248116 46.45594105877038,-55.17835890622166 46.571589324894205))",
+    "eovs": [
+      "inorganicCarbon",
+      "surfaceCurrents",
+      "subSurfaceCurrents",
+      "surfaceCurrents",
+      "nitrate",
+      "phosphate",
+      "sulphate",
+      "silicate",
+      "seaSurfaceSalinity",
+      "subSurfaceSalinity",
+      "seaSurfaceTemperature",
+      "subSurfaceTemperature"
+    ],
+    "email": "pramod.thupaki@hakai.org",
+    "zip_filename": "ceda_download_b3d2bc.zip"
+  },
+  "cache_filtered": [
+    {
+      "erddap_url": "https://www.smartatlantic.ca/erddap",
+      "dataset_id": "SMA_head_of_placentia_bay-come_by_chance_point",
+      "profile_variable": "profile_variable",
+      "cdm_data_type": "Point",
+      "ckan_id": "5d527a49-e131-4479-9f22-ca26c106d65f",
+      "ckan_url": "https://catalogue.cioos.ca/dataset/"
+    }
+  ]
+}
