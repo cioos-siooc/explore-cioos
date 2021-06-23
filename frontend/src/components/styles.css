@@ -5,5 +5,9 @@
   width: 100%;
   margin: 0px;
   min-height: 800px;
-  overflow-y: scroll;
+  overflow-y: auto;
 }
+.mapboxgl-ctrl-group > button {
+  width: 42px;
+  height: 42px;
+  }

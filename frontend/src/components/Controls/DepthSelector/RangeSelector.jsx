@@ -1,21 +1,18 @@
 import React from "react";
+import PropTypes from 'prop-types'
 import { Range } from "rc-slider";
 import 'rc-slider/assets/index.css';
+import './styles.css'
 
 export default class RangeSelector extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
       dynamicKey: Date.now(),
-      value: [0, 1000],
-      min: 0,
-      max: 12000
     };
   }
+
   onSliderChange = value => {
-    this.setState({
-      value: value
-    });
     this.props.setStartDepth(value[0])
     this.props.setEndDepth(value[1])
   };
@@ -38,12 +35,12 @@ export default class RangeSelector extends React.Component {
 
   render() {
     return (
-      <div>
+      <div className='rangeSelector'>
         <Range
           key={this.state.dynamicKey}
-          min={this.state.min}
-          max={this.state.max}
-          value={this.state.value}
+          min={0}
+          max={12000}
+          value={[this.props.startDepth, this.props.endDepth]}
           onChange={this.onSliderChange}
           railStyle={{
             height: 2
@@ -53,14 +50,36 @@ export default class RangeSelector extends React.Component {
             width: 28,
             marginLeft: -14,
             marginTop: -14,
-            backgroundColor: "red",
+            // backgroundColor: "red",
             border: 0
           }}
           trackStyle={{
             background: "none"
           }}
+          marks={{
+            0: '0m',
+            // 1000: '1000m',
+            2000: '2000m',
+            // 3000: '3000m',
+            4000: '4000m',
+            // 5000: '5000m',
+            6000: '6000m',
+            // 7000: '7000m',
+            8000: '8000m',
+            // 9000: '9000m',
+            10000: '10000m',
+            // 11000: '11000m',
+            12000: '12000m'
+          }}
         />
       </div>
     );
   }
+}
+
+RangeSelector.propTypes = {
+  startDepth: PropTypes.number.isRequired,
+  endDepth: PropTypes.number.isRequired,
+  setStartDepth: PropTypes.func.isRequired,
+  setEndDepth: PropTypes.func.isRequired
 }

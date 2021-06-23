@@ -11,7 +11,6 @@ export default function SubmitRequest (props) {
   const [emailValid, setEmailValid] = useState(false)
   const [queryRequested, setQueryRequested] = useState(false)
   const [querySubmitted, setQuerySubmitted] = useState(false)
-  const [queryError, setQueryError] = useState(false)
   const [polygonCreated, setPolygonCreated] = useState(false)
 
   const [buttonText, setButtonText] = useState('Not Ready')
@@ -36,7 +35,7 @@ export default function SubmitRequest (props) {
   }, [email])
 
   useEffect(() => {
-    if(polygonCreated && emailValid) {
+    if(polygonCreated && emailValid && !props.filtersChanged) {
       fetch(`${server}/download?${props.query}&polygon=${JSON.stringify(props.map.getPolygon())}&email=${email}`).then((value) => {
         if(value.ok) {
           setQuerySubmitted(true)
@@ -65,19 +64,29 @@ export default function SubmitRequest (props) {
   }, [])
 
   useEffect(() => {
-    if(!polygonCreated || !emailValid) {
+    if(!polygonCreated || !emailValid || props.filtersChanged) {
       setButtonText('Not Ready')
       setButtonVariant('secondary')
-    } else if(polygonCreated && emailValid && !querySubmitted) {
+    } else if(polygonCreated && emailValid && !querySubmitted && !props.filtersChanged) {
       setButtonText('Submit Request')
       setButtonVariant('primary')
-    } else if(polygonCreated && emailValid && querySubmitted) {
+    } else if(polygonCreated && emailValid && querySubmitted && !props.filtersChanged) {
       setButtonText('Request Submitted')
       setButtonVariant('success')
     }
-  }, [polygonCreated, emailValid, querySubmitted])
+  }, [polygonCreated, emailValid, querySubmitted, props.filtersChanged])
 
-  const buttonTooltip = (polygonCreated && emailValid) ? 'Submit request' : (emailValid ? 'Add polygon map selection to request data' : 'Add valid email address')
+  let buttonTooltip // = (polygonCreated && emailValid) ? 'Submit request' : (emailValid ? 'Add polygon map selection to request data' : 'Add valid email address')
+  if(polygonCreated && emailValid && !props.filtersChanged) {
+    buttonTooltip = 'Submit Request'
+  } else if (!emailValid) {
+    buttonTooltip = 'Add valid email address'
+  } else if (!polygonCreated) {
+    buttonTooltip = 'Add polygon map selection to request data'
+  } else if (props.filtersChanged) {
+    buttonTooltip = 'Apply filters before submitting request'
+  }
+
   return (
     <div className='submitRequest'>
       <OverlayTrigger

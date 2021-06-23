@@ -1,6 +1,4 @@
-.startDepth {
-  /* margin: 0px 15px 0px 5px; */
-}
-.endDepth {
-  /* margin: 0px 0px 0px 5px; */
+.rangeSelector {
+  width: 320px;
+  margin: 20px 10px 20px 10px;
 }
