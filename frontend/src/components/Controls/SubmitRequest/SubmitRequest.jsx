@@ -37,7 +37,6 @@ export default function SubmitRequest (props) {
 
   useEffect(() => {
     if(polygonCreated && emailValid) {
-      console.log(JSON.stringify(props.map.getPolygon()))
       fetch(`${server}/download?${props.query}&polygon=${JSON.stringify(props.map.getPolygon())}&email=${email}`).then((value) => {
         if(value.ok) {
           setQuerySubmitted(true)
@@ -102,8 +101,8 @@ export default function SubmitRequest (props) {
         }
       >
         {emailValid ? 
-          <CheckCircle color='#212529' style={{backgroundColor: '#d4edda', borderRadius: '2rem' }} size={20} className='indicatorIcon'/> : 
-          <XCircle color='##212529' style={{backgroundColor: '#fff3cd', borderRadius: '2rem' }} size={20} className='indicatorIcon'/>
+          <CheckCircle color='#212529' style={{backgroundColor: '#d4edda', borderRadius: '2rem', opacity:0.5}} size={20} className='indicatorIcon'/> : 
+          <XCircle color='##212529' style={{backgroundColor: '#fff3cd', borderRadius: '2rem', opacity:0.5}} size={20} className='indicatorIcon'/>
         }
       </OverlayTrigger>
       <OverlayTrigger

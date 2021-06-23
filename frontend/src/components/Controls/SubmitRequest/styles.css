@@ -1,5 +1,5 @@
 .emailInput{
-  width: 265px;
+  width: 217px;
   height: 37px;
 }
 .submitRequest{
@@ -10,11 +10,11 @@
 }
 .indicatorIcon {
   position:relative;
-  top:0px;
+  top:-2px;
   left:-30px;
 }
 .submitQueryButton {
   /* height: 50px; */
   margin-bottom: 5px;
-  margin-right: 15px;
+  margin-right: 20px;
 }

@@ -14,7 +14,7 @@
   overflow:visible;
 }
 .controlAccordion{
-  width: 500px;
+  width: 400px;
 }
 
 .filterRow {
@@ -40,4 +40,14 @@
 }
 .toggleControlsOpenAndClosed {
   margin-bottom:5px;
+}
+.accordionColumn {
+  /* pointer-events: 'none'; */
+  width: 385px;
+}
+.filters{
+  margin-top:50px;
+}
+.topControls {
+  margin-right:-385px;
 }
