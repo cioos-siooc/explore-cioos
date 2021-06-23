@@ -260,15 +260,17 @@ def get_dataset(json_query, output_path=""):
         # Download data
         print("Download {0}".format(download_url), end=" ... ")
         r = requests.get(download_url)
-        open(output_file_path, "wb").write(r.content)
-        print("Completed")
-
-        # If file is not empty run the rest
-        if os.stats(output_file_name).st_size == 0:
+        
+        # Make sure the connection is working otherswise make a warning and send the error.
+        if r.status_code != 200:
             warnings.warn(
-                'Downloaded file from erddap: {0} dataset_id:{1} is empty.\n'
+                f"Failed to download {download_url}\n{r.text}"
             )
             continue
+        
+        with open(output_file_path, "wb") as f:
+            f.write(r.content)
+        print("Completed")
 
         # If polygon filter out data outside the polygon
         if "polygon_object" in json_query["user_query"]:
