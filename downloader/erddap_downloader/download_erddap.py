@@ -240,13 +240,14 @@ def get_dataset(json_query, output_path=""):
             download_url = get_erddap_download_url(
                 dataset, json_query["user_query"], variable_list
             )
-        except requests.exceptions.HTTPError:
+        except requests.exceptions.HTTPError as e:
             # Failed to get a download url
             warnings.warn(
                 'Failed to download data from erddap: {0} dataset_id:{1}. \n'
-                ' There''s likely no data available.'.format(
+                '{2}'.format(
                     dataset['erddap_url'],
-                    dataset['dataset_id']
+                    dataset['dataset_id'],
+                    "\n".join(e.args)
                 )
             )
             continue
