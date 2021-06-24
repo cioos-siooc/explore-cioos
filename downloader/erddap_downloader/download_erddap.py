@@ -77,6 +77,7 @@ def get_erddap_download_url(
     dataset_info: dict,
     user_constraint: dict,
     variables_list: list = None,
+    polygon_region=None,
 ):
     """
     Method to retrieve the an ERDDAP download url based on the query provided by the user.
@@ -104,13 +105,13 @@ def get_erddap_download_url(
 
     # Add constraint for lat/long range
     # If polygon given get the boundaries for erddap
-    if "polygon_region" in user_constraint:
+    if polygon_region:
         (
             user_constraint["lon_min"],
             user_constraint["lat_min"],
             user_constraint["lon_max"],
             user_constraint["lat_max"],
-        ) = user_constraint["polygon_object"].bounds
+        ) = polygon_region.bounds
 
     if (
         "lat_min" in user_constraint
@@ -118,6 +119,13 @@ def get_erddap_download_url(
         and "lon_min" in user_constraint
         and "lon_max" in user_constraint
     ):
+        # Limit longitudes to [-180 to 180] range
+        if user_constraint["lon_min"] < -180:
+            user_constraint["lon_min"] = -180
+
+        if user_constraint["lon_max"] > 180:
+            user_constraint["lon_max"] = 180
+
         e.constraints["latitude>="] = user_constraint["lat_min"]
         e.constraints["latitude<="] = user_constraint["lat_max"]
 
@@ -125,17 +133,11 @@ def get_erddap_download_url(
         e.constraints["longitude<="] = user_constraint["lon_max"]
 
     # Add depth filter
-    if 'depth' in variables_list:
-        if (
-                "depth_min" in user_constraint and
-                user_constraint["depth_min"]
-        ):
-            e.constraints['depth>='] = user_constraint["depth_min"]
-        if (
-                "depth_max" in user_constraint and
-                user_constraint["depth_max"]
-        ):
-            e.constraints['depth<='] = user_constraint["depth_max"]
+    if "depth" in variables_list:
+        if "depth_min" in user_constraint and user_constraint["depth_min"]:
+            e.constraints["depth>="] = user_constraint["depth_min"]
+        if "depth_max" in user_constraint and user_constraint["depth_max"]:
+            e.constraints["depth<="] = user_constraint["depth_max"]
 
     # Add variable list to retrieve
     if variables_list:
@@ -169,12 +171,13 @@ def filter_polygon_region(file_path, polygone):
 
     # Determinate the type of data
     file_type = file_path.split(".")[-1]
-    print('Filter within polygon', end=' ... ')
+    print("Filter within polygon", end=" ... ")
     if file_type == "csv":
         # ERDDAP CSV has two lines header, let's read them first
         with open(file_path) as f:
-            columns_name = f.readline()
-            columns_units = f.readline()
+            columns_name = f.readline().strip()
+            columns_units = f.readline().strip()
+
         # Read with pandas
         df = pd.read_csv(
             file_path,
@@ -201,8 +204,7 @@ def filter_polygon_region(file_path, polygone):
         )
         return
 
-    print('Completed')
-
+    print("Completed")
 
 
 def get_dataset(json_query, output_path=""):
@@ -211,69 +213,88 @@ def get_dataset(json_query, output_path=""):
     :param json_query: JSON CEDA query
     :param output_path: path where to save the downloaded data.
     """
+    # Convert WKT polygon to shapely polygon object
     if "polygon_region" in json_query["user_query"]:
-        json_query["user_query"]["polygon_object"] = shapely.wkt.loads(
-            json_query["user_query"]["polygon_region"]
-        )
+        polygon_regions = [
+            shapely.wkt.loads(json_query["user_query"]["polygon_region"])
+        ]
 
+    # Make ERDDAP CSV output default output
     if "response" not in json_query["user_query"]:
         json_query["user_query"]["response"] = "csv"
 
+    # Duplicate polygon over -180 to 180 limit and generate multiple queries to match each side
+    if polygon_regions[0].bounds[0] < -180 or polygon_regions[0].bounds[2] > 180:
+        for shift in [-360, 0, 360]:
+            new_region = shapely.affinity.translate(polygon_regions[0], xoff=shift)
+            if -180 < new_region.bounds[0] < 180 or -180 < new_region.bounds[2] < 180:
+                polygon_regions += [new_region]
+
+    # Run through each datasets
     for dataset in json_query["cache_filtered"]:
         # If metadata for the dataset is not available retrieve it
         if (
-                'erddap_metadata' not in dataset or
-                'globals' not in dataset['erddap_metadata'] or
-                'variables' not in dataset['erddap_metadata'] or
-                dataset['erddap_metadata']['variables'] == []
+            "erddap_metadata" not in dataset
+            or "globals" not in dataset["erddap_metadata"]
+            or "variables" not in dataset["erddap_metadata"]
+            or dataset["erddap_metadata"]["variables"] == []
         ):
-            scrape_erddap = erddap_scraper.ERDDAP(dataset['erddap_url'])
-            dataset['erddap_metadata'] = scrape_erddap.get_metadata_for_dataset(dataset['dataset_id'])
+            scrape_erddap = erddap_scraper.ERDDAP(dataset["erddap_url"])
+            dataset["erddap_metadata"] = scrape_erddap.get_metadata_for_dataset(
+                dataset["dataset_id"]
+            )
 
         # Get variable list to download
         variable_list = get_variable_list(
-            dataset["erddap_metadata"], json_query["user_query"]["eovs"],
+            dataset["erddap_metadata"],
+            json_query["user_query"]["eovs"],
         )
-        # Try getting
-        try:
-            # Get download url
-            download_url = get_erddap_download_url(
-                dataset, json_query["user_query"], variable_list
-            )
-        except requests.exceptions.HTTPError as e:
-            # Failed to get a download url
-            warnings.warn(
-                'Failed to download data from erddap: {0} dataset_id:{1}. \n'
-                '{2}'.format(
-                    dataset['erddap_url'],
-                    dataset['dataset_id'],
-                    "\n".join(e.args)
+        # Try getting data
+        query_id = 0
+        for polygon_region in polygon_regions:
+            try:
+                # Get download url
+                download_url = get_erddap_download_url(
+                    dataset,
+                    json_query["user_query"],
+                    variable_list,
+                    polygon_region=polygon_region,
                 )
-            )
-            continue
+            except requests.exceptions.HTTPError as e:
+                # Failed to get a download url
+                warnings.warn(
+                    "Failed to download data from erddap: {0} dataset_id:{1}. \n"
+                    "{2}".format(
+                        dataset["erddap_url"], dataset["dataset_id"], "\n".join(e.args)
+                    )
+                )
+                continue
 
-        # Generate the default file name
-        output_file_name = get_file_name_output(dataset)
-        output_file_path = os.path.join(output_path, output_file_name)
-        output_file_path += "." + json_query["user_query"]["response"]
+            # Generate the default file name
+            # Add suffix if multiple query per dataset
+            if len(polygon_regions) > 1:
+                file_suffix = f"_part{query_id}"
+                query_id += 1
+            else:
+                file_suffix = ""
+            output_file_name = get_file_name_output(dataset) + file_suffix
+            output_file_path = os.path.join(output_path, output_file_name)
+            output_file_path += "." + json_query["user_query"]["response"]
 
-        # Download data
-        print("Download {0}".format(download_url), end=" ... ")
-        r = requests.get(download_url)
-        
-        # Make sure the connection is working otherswise make a warning and send the error.
-        if r.status_code != 200:
-            warnings.warn(
-                f"Failed to download {download_url}\n{r.text}"
-            )
-            continue
-        
-        with open(output_file_path, "wb") as f:
-            f.write(r.content)
-        print("Completed")
+            # Download data
+            print("Download {0}".format(download_url), end=" ... ")
+            r = requests.get(download_url)
 
-        # If polygon filter out data outside the polygon
-        if "polygon_object" in json_query["user_query"]:
-            filter_polygon_region(
-                output_file_path, json_query["user_query"]["polygon_object"]
-            )
+            # Make sure the connection is working otherswise make a warning and send the error.
+            if r.status_code != 200:
+                warnings.warn(f"Failed to download {download_url}\n{r.text}")
+                continue
+
+            # Download file locally
+            with open(output_file_path, "wb") as f:
+                f.write(r.content)
+            print("Completed")
+
+            # If polygon filter out data outside the polygon
+            if polygon_region:
+                filter_polygon_region(output_file_path, polygon_region)

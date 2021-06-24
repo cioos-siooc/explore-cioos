@@ -1,0 +1,51 @@
+{
+    "user_query": {
+        "time_min": "1900-01-01",
+        "time_max": "2021-06-24",
+        "lat_min": null,
+        "lat_max": null,
+        "lon_min": null,
+        "lon_max": null,
+        "depth_min": null,
+        "depth_max": 12000,
+        "polygon_region": "POLYGON((-191.60546874999608 49.01094989164244,-158.91015624999608 52.027240056192824,-153.4609374999962 35.71318867669336,-195.64843749999594 32.21525064233795,-195.9999999999959 40.81600043841149,-191.60546874999608 49.01094989164244))",
+        "eovs": [
+            "nitrate",
+            "phosphate",
+            "sulphate",
+            "silicate",
+            "seaSurfaceSalinity",
+            "subSurfaceSalinity",
+            "seaSurfaceTemperature",
+            "subSurfaceTemperature"
+        ],
+        "email": "jessy.barrette@hakai.org",
+        "zip_filename": "ceda_download_56660b.zip"
+    },
+    "cache_filtered": [
+        {
+            "erddap_url": "https://pac-dev2.cioos.org/erddap",
+            "dataset_id": "IOS_CTD_Profiles",
+            "profile_variable": "profile_variable",
+            "cdm_data_type": "Profile",
+            "ckan_id": "7adc4ad0-7841-4839-a91f-6d14edf4000f",
+            "ckan_url": "https://catalogue.cioos.ca/dataset/"
+        },
+        {
+            "erddap_url": "https://pac-dev2.cioos.org/erddap",
+            "dataset_id": "IOS_CTD_Moorings",
+            "profile_variable": "profile_variable",
+            "cdm_data_type": "TimeSeries",
+            "ckan_id": "0260cab3-a316-4e1a-b1ac-f8f49d3f141c",
+            "ckan_url": "https://catalogue.cioos.ca/dataset/"
+        },
+        {
+            "erddap_url": "https://pac-dev2.cioos.org/erddap",
+            "dataset_id": "IOS_BOT_Profiles",
+            "profile_variable": "profile_variable",
+            "cdm_data_type": "Profile",
+            "ckan_id": "0bd1190b-c1fd-4e42-9d87-7c49430c476f",
+            "ckan_url": "https://catalogue.cioos.ca/dataset/"
+        }
+    ]
+}
