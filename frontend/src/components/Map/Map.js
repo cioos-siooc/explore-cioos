@@ -125,13 +125,13 @@ export default class CIOOSMap extends React.Component {
         "source-layer": "internal-layer-name",
 
         paint: {
-          "fill-opacity": 0.5,
+          "fill-opacity": 0.7,
           "fill-color": {
             property: "count",
             stops: [
-              [0, config.colorScale[0]],
-              [50, config.colorScale[1]],
-              [100, config.colorScale[2]],
+              [0, "rgb(251, 231, 35)"],
+              [50, "rgb(37, 171, 130)"],
+              [100, "rgb(68, 1, 84)"],
             ],
           },
         },
