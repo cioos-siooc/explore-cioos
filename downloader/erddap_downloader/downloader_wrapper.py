@@ -29,11 +29,13 @@ def parallel_downloader(json_blob=None, output_folder="", create_pdf=False):
     # output_folder will never be created in production, just for development
     os.makedirs(output_folder,exist_ok=True)
     
+    if "cache_filtered" not in json_blob:
+        raise Exception("Received empty profiles data from API")
+
     for filtered_result in json_blob["cache_filtered"]:
         erddap_url = filtered_result["erddap_url"]
         ckan_url = filtered_result["ckan_url"]
         ckan_id = filtered_result["ckan_id"]
-        
         if create_pdf:
             ckan_filename = os.path.join(
                 temp_folder,
