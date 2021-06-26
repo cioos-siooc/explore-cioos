@@ -195,8 +195,8 @@ def filter_polygon_region(file_path, polygone):
 
         # Overwrite original file
         with open(file_path, "w") as f:
-            f.write(columns_name)
-            f.write(columns_units)
+            f.write(columns_name + "\n")
+            f.write(columns_units + "\n")
             df.to_csv(f, index=False, header=False, line_terminator="\n")
     else:
         warnings.warn(
