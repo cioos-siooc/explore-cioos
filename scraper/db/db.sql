@@ -15,9 +15,14 @@ CREATE TABLE cioos_api.datasets (
     eovs text[],
     ckan_id text,
     parties text[],
-    UNIQUE(dataset_id, erddap_url)
+    organization_pks INTEGER[],
+    UNIQUE(dataset_id, erddap_url),
 );
-
+CREATE TABLE cioos_api.organizations (
+    pk SERIAL PRIMARY KEY,
+    name text,
+    color text
+);
 -- from csv: server,dataset_id,time_min,time_max,latitude_min,latitude_max,longitude_min,longitude_max
 DROP TABLE IF EXISTS cioos_api.profiles;
 CREATE TABLE cioos_api.profiles (
@@ -37,6 +42,14 @@ CREATE TABLE cioos_api.profiles (
     depth_max double precision,
     profile_id text
 );
+
+DROP TABLE cioos_api.cdm_data_type_override;
+CREATE TABLE cioos_api.cdm_data_type_override (
+    pk SERIAL PRIMARY KEY,
+    erddap_url text,
+    dataset_id text,
+    cdm_data_type text
+);    
 
 CREATE INDEX
   ON cioos_api.profiles
@@ -83,4 +96,32 @@ select p.pk,hexes.geom from ST_HexagonGrid(
 UPDATE cioos_api.profiles p
 SET geom_snapped_1 = z.geom
 FROM zoom AS z
-WHERE z.pk = p.pk;
+WHERE z.pk = p.pk;     
+
+-- Run after scraper runs
+UPDATE cioos_api.datasets d
+SET cdm_data_type=o.cdm_data_type
+FROM cioos_api.cdm_data_type_override o
+WHERE o.erddap_url=d.erddap_url AND
+o.dataset_id=d.dataset_id;
+
+
+-- if datasets have no depth assume depth=0
+UPDATE cioos_api.profiles SET depth_min=0,depth_max=0 WHERE depth_min is NULL;
+
+-- after loading CKAN data into the database via the python script
+insert into cioos_api.organizations (name)
+select distinct unnest(parties) from cioos_api.datasets;
+
+
+-- convert organization list of names into list of pks
+with orgs as(
+select d.pk,(
+select array_remove(array_agg((select case when name=any(parties) then pk end)),null) from cioos_api.organizations) as asdf from cioos_api.datasets d)
+update cioos_api.datasets set organization_pks=orgs.asdf
+from orgs
+where orgs.pk=datasets.pk;
+
+
+ -- changed ODF_CTD_Profiles to  subSurfaceTemperature, {16}. Added 16,"Bedford Institute of Oceanography" to organizations
+

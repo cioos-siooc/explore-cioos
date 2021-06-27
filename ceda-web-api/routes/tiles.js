@@ -13,7 +13,7 @@ router.get("/:z/:x/:y.mvt", async (req, res) => {
   const filters = createDBFilter(req.query);
 
   const isHexGrid = z < 7;
-  const zoomColumn = z < 3 ? "geom_snapped_0" : "geom_snapped_1";
+  const zoomColumn = z < 5 ? "geom_snapped_0" : "geom_snapped_1";
 
   console.log("req.query");
   console.log(req.query);
@@ -39,7 +39,11 @@ router.get("/:z/:x/:y.mvt", async (req, res) => {
         } p.${sqlQuery.geom_column} as geom from cioos_api.profiles p
         JOIN cioos_api.datasets d ON p.dataset_pk =d.pk 
        ${filters ? "WHERE " + filters : ""}
-        ${isHexGrid ? `group by ${sqlQuery.geom_column}` : "group by geom, cdm_data_type"} ),
+        ${
+          isHexGrid
+            ? `group by ${sqlQuery.geom_column}`
+            : "group by geom, cdm_data_type"
+        } ),
     te as (select ST_TileEnvelope(${z}, ${x}, ${y}) tile_envelope ),
     mvtgeom as (
       SELECT count,
