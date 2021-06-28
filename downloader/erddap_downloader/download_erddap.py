@@ -225,7 +225,7 @@ def get_dataset(json_query, output_path=""):
 
     # Duplicate polygon over -180 to 180 limit and generate multiple queries to match each side
     if polygon_regions[0].bounds[0] < -180 or polygon_regions[0].bounds[2] > 180:
-        for shift in [-360, 0, 360]:
+        for shift in [-360, 360]:
             new_region = shapely.affinity.translate(polygon_regions[0], xoff=shift)
             if -180 < new_region.bounds[0] < 180 or -180 < new_region.bounds[2] < 180:
                 polygon_regions += [new_region]
