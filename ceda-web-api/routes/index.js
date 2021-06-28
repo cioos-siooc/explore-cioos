@@ -22,7 +22,7 @@ router.get("/organizations", async function (req, res, next) {
 });
 
 router.get("/jobs", async function (req, res, next) {
-  res.send(await db("cioos_api.download_jobs"));
+  res.send(await db("cioos_api.download_jobs").orderBy("time", "desc"));
 });
 
 /* GET home page. */
