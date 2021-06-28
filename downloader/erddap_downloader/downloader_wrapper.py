@@ -3,6 +3,7 @@ from multiprocessing import Process
 from . import download_erddap
 import os
 import uuid
+import zipfile
 
 
 def download_ckan_pdf(ckan_url=None, ckan_id=None, pdf_filename=None):
@@ -57,13 +58,18 @@ def parallel_downloader(json_blob=None, output_folder="", create_pdf=False):
     # Zip files in temporary folder
     zip_full_path = os.path.join(output_folder,zip_filename)
     print("Writing zip ",zip_full_path)
-    retval = os.system(
-        "zip -FSr {} {}".format(zip_full_path, temp_folder)
-    )
+    zip_fid = zipfile.ZipFile(zip_full_path, "w", compression=zipfile.ZIP_DEFLATED)
+    # walk the path and zip all files
+    for dirname, subdirs, files in os.walk(temp_folder):
+        for filename in files:
+            print('compressing...',dirname, filename)
+            retval = zip_fid.write(filename=os.path.join(dirname,filename), arcname=filename)
+    zip_fid.close()
 
     # Create an error if failed to zipped file            
     if retval:
         raise Exception("Error creating zip file!", zip_full_path, " from files in ", temp_folder)
+    
 
     # Delete temporary folder
     os.system("rm -rf {}".format(temp_folder))
