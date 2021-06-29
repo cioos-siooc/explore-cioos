@@ -38,9 +38,9 @@ router.get("/", async (req, res) => {
         where
         ${filters ? filters + " AND " : ""} 
 
-        ST_Contains(ST_Transform(ST_SetSRID('${wktPolygon}'::geometry,4326),3857),geom) is true
+        ST_Contains(ST_GeomFromText('${wktPolygon}',4326),ST_Transform(geom,4326)) is true
         group by d.pk)
-        select json_agg(t) from profiles_subset t;`;
+      select json_agg(t) from profiles_subset t;`;
 
   console.log(SQL);
   let count = 0;
