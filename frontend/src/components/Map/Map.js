@@ -7,7 +7,12 @@ import {server} from '../../config'
 
 const config = {
   fillOpacity: 0.8,
-  colorScale: ["#ffffD9", "#50BAC3", "#1A468A"],
+  // colorScale: ["#DDF3DF",  "#B0E1C8" , "#85CDC4" , "#5CA2B8" , "#4B719B", "#3B487E", "#302B5F"],
+  // colorScale: ["#D2F4F0","#BDE7E2","#A7DAD4","#92CEC6","#7DC1B7","#67B4A9", "#52A79B"]
+  // colorScale: ["#bbddd8","#9fd0c9","#76bcb2","#52a79b","#4a968c","#3d7b73", "#2f6059"]
+  colorScale: ["#52A79B","#4A968C","#3D7B73","#2F6059","#224440","#1B3733", "#142926"]
+
+
 };
 
 export default class CIOOSMap extends React.Component {
@@ -56,17 +61,6 @@ export default class CIOOSMap extends React.Component {
 
     const drawPolygon = new MapboxDraw(drawControlOptions);
 
-    // this.map.on('draw.create', function (e) {
-    //   setPolygonPresent(true)
-    // });
-
-    // this.map.on('draw.delete', function (e) {
-    //   const polygons = drawPolygon.getAll()
-    //   if (polygons.length === 0) {
-    //     setPolygonPresent(false)
-    //   }
-    // })
-
     this.map.addControl(drawPolygon, "top-left");
     this.map.addControl(new NavigationControl(), "bottom-left");
     const query = {
@@ -93,8 +87,13 @@ export default class CIOOSMap extends React.Component {
         },
         "source-layer": "internal-layer-name",
         paint: {
-          "circle-color": "orange",
-          "circle-opacity": 0.8,
+          "circle-color": {
+            stops: [
+              // [0, "#fa7268"],
+              [1, "#52A79B"]
+            ]
+          },
+          "circle-opacity": 0.9,
           "circle-stroke-width": {
             property: "pointtype",
             stops: [
@@ -105,7 +104,7 @@ export default class CIOOSMap extends React.Component {
           "circle-radius": {
             property: "pointtype",
             stops: [
-              [0, 3],
+              [0, 4],
               [1, 10],
             ],
           },
@@ -129,9 +128,13 @@ export default class CIOOSMap extends React.Component {
           "fill-color": {
             property: "count",
             stops: [
-              [0, "rgb(251, 231, 35)"],
-              [50, "rgb(37, 171, 130)"],
-              [100, "rgb(68, 1, 84)"],
+              [0, config.colorScale[0]],
+              [3, config.colorScale[1]],
+              [9, config.colorScale[2]],
+              [27, config.colorScale[3]],
+              [200, config.colorScale[4]],
+              [1000, config.colorScale[5]],
+              [2000, config.colorScale[6]],
             ],
           },
         },
