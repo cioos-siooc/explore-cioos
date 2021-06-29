@@ -49,7 +49,13 @@ CREATE TABLE cioos_api.cdm_data_type_override (
     erddap_url text,
     dataset_id text,
     cdm_data_type text
-);    
+);  
+
+DROP TABLE cioos_api.allowed_users;
+CREATE TABLE cioos_api.allowed_users (
+    pk SERIAL PRIMARY KEY,
+    email text UNIQUE
+);
 
 CREATE INDEX
   ON cioos_api.profiles

@@ -7,7 +7,7 @@ const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { eovGrouping } = require("../utils/grouping");
 
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   const {
     timeMin,
     timeMax,
@@ -44,6 +44,16 @@ router.get("/", async (req, res) => {
 
   console.log(SQL);
   let count = 0;
+
+  // Make sure they are a registered user
+  const allowedUsers = (await db("cioos_api.allowed_users")).map(
+    (e) => e.email
+  );
+  if (!allowedUsers.includes(email)) {
+    res.send(403);
+    return next();
+  }
+
   try {
     const tileRaw = await db.raw(SQL);
     const tile = tileRaw.rows[0];
