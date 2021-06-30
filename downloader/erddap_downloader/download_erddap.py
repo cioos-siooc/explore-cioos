@@ -168,20 +168,100 @@ def save_erddap_metadata(dataset, output_path, file_name="erddaps_metadata.csv")
         df_meta.to_csv(output_file_path, index=False)
 
 
-def get_file_name_output(dataset_info):
+def get_file_name_output(dataset_info, output_path, extension, file_suffix):
     """
     Generate default file name output to use for each dataset downloaded.
     :param dataset_info: cache dataset info
     :return:
     """
     # Output file is {erddap server}_{dataset_id}_{CKAN_ID}
-    output_file_name = "{0}_{1}".format(
+    file_name = "{0}_{1}".format(
         dataset_info["dataset_id"], erddap_server_to_name(dataset_info["erddap_url"])
     )
-    return output_file_name
+    # Add suffix
+    if file_suffix:
+        file_name = file_name + file_suffix
+    return os.path.join(output_path, f"{file_name}.{extension}")
 
 
-def filter_polygon_region(file_path, polygone):
+def data_download_transform(response, output_path, type, polygon, report):
+    """
+    Method to retrieve data from an erddap server. If in CSV format, download data by chunk,
+    filter by lat/long within the provided polygon and save to a csv file.
+    Other format are directely saved to file.
+    """
+    # Download file locally
+    chunk_id = 0
+    max_file_size = 10 ** 8
+    complete_download = "Completed"
+
+    if type == "csv":
+        max_chunk_number = 10000
+        chunk_size = 10000
+        get_header = True
+        with open(output_path, "w") as f:
+            for chunk in pd.read_csv(
+                response.raw, compression="gzip", chunksize=chunk_size, low_memory=False
+            ):
+                # Read header and units and save them to output
+                if get_header:
+                    units = chunk.iloc[0]
+                    chunk = chunk.iloc[1:]  # skip units
+                    f.write(",".join(list(chunk.columns)) + "\n")
+                    f.write(",".join(units.astype(str).to_list()) + "\n")
+                    get_header = False
+
+                # Filter data to polygon
+                chunk = filter_polygon_region(chunk, polygon)
+                chunk.to_csv(
+                    f, mode="a", header=False, index=False, line_terminator="\n"
+                )
+
+                # Review file size and stop if exceed maximum size or if iterated to many times on download
+                if os.stat(output_path).st_size > max_file_size:
+                    complete_download = "Exceed File Size Limit"
+                    break
+                if chunk_id > max_chunk_number:
+                    complete_download = "Exceed Server Download Limit"
+                    break
+
+                chunk_id += 1
+
+    else:
+        chunksize = max_file_size
+        with open(output_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=chunksize):
+                # Download chunk
+                f.write(chunk)
+                chunk_id += 1
+
+                if os.stat(output_path).st_size > max_file_size:
+                    complete_download = "Exceed File Size Limit"
+                    break
+
+    # Return download report
+    if complete_download == "Completed":
+        print("Completed")
+        result = "successful"
+        result_description = os.stat(output_path).st_size
+    elif complete_download == "Exceed File Size Limit":
+        print("Partial")
+        result = "warning"
+        result_description = f"Reached download limit: >{max_file_size} bytes"
+        warnings.warn(result_description)
+    elif complete_download == "Exceed Server Download Limit":
+        print("Partial")
+        result = "warning"
+        result_description = f"Reached Server Download Limit"
+        warnings.warn(result_description)
+
+    # Add download report
+    report[result] += [{"query": response.url, "result": result_description}]
+
+    return report
+
+
+def filter_polygon_region(data, polygone):
     """
     ERDDAP is only compatible with a box method to filter lat/long data.
     This present tool reads back the data downloaded and remove any data which is outside the provided polygone.
@@ -191,41 +271,19 @@ def filter_polygon_region(file_path, polygone):
     """
 
     # Determinate the type of data
-    file_type = file_path.split(".")[-1]
-    print("Filter within polygon", end=" ... ")
-    if file_type == "csv":
-        # ERDDAP CSV has two lines header, let's read them first
-        with open(file_path) as f:
-            columns_name = f.readline().strip()
-            columns_units = f.readline().strip()
-
-        # Read with pandas
-        df = pd.read_csv(
-            file_path,
-            skiprows=2,
-            names=columns_name.split(","),
-            float_precision="round_trip",
-        )
-
-        # Exclude data outside the polygon
-        df = df.loc[
-            df.apply(
+    if isinstance(data, pd.DataFrame):
+        data[["latitude", "longitude"]] = data[["latitude", "longitude"]].astype(float)
+        data = data.loc[
+            data.apply(
                 lambda x: polygone.contains(Point(x.longitude, x.latitude)), axis=1
             )
         ]
-
-        # Overwrite original file
-        with open(file_path, "w") as f:
-            f.write(columns_name + "\n")
-            f.write(columns_units + "\n")
-            df.to_csv(f, index=False, header=False, line_terminator="\n")
     else:
         warnings.warn(
-            "Polygon filtration is not compatible with {0} format".format(file_type)
+            "Polygon filtration is not compatible with {0} format".format(type(data))
         )
-        return
 
-    print("Completed")
+    return data
 
 
 def get_dataset(json_query, output_path=""):
@@ -252,6 +310,12 @@ def get_dataset(json_query, output_path=""):
                 polygon_regions += [new_region]
 
     # Run through each datasets
+    report = {
+        "successful": [],
+        "empty": [],
+        "failed": [],
+        "warning": [],
+    }
     for dataset in json_query["cache_filtered"]:
         # If metadata for the dataset is not available retrieve it
         if (
@@ -295,30 +359,36 @@ def get_dataset(json_query, output_path=""):
                 continue
 
             # Generate the default file name
-            # Add suffix if multiple query per dataset
             if len(polygon_regions) > 1:
                 file_suffix = f"_part{query_id}"
                 query_id += 1
             else:
-                file_suffix = ""
-            output_file_name = get_file_name_output(dataset) + file_suffix
-            output_file_path = os.path.join(output_path, output_file_name)
-            output_file_path += "." + json_query["user_query"]["response"]
+                file_suffix = None
+            output_file_path = get_file_name_output(
+                dataset, output_path, json_query["user_query"]["response"], file_suffix
+            )
 
             # Download data
-            print("Download {0}".format(download_url), end=" ... ")
-            r = requests.get(download_url)
+            print(f"Download {download_url}", end=" ... ")
+            with requests.get(download_url, stream=True) as response:
+                # Make sure the connection is working otherswise make a warning and send the error.
+                if response.status_code != 200:
+                    if response.status_code == 404:
+                        result = "empty"
+                    else:
+                        result = "failed"
 
-            # Make sure the connection is working otherswise make a warning and send the error.
-            if r.status_code != 200:
-                warnings.warn(f"Failed to download {download_url}\n{r.text}")
-                continue
+                    report[result] += [{"query": download_url, "result": response.text}]
+                    warnings.warn(f"Failed to download {download_url}\n{response.text}")
+                    print("Failed")
+                    continue
 
-            # Download file locally
-            with open(output_file_path, "wb") as f:
-                f.write(r.content)
-            print("Completed")
+                report = data_download_transform(
+                    response,
+                    output_file_path,
+                    json_query["user_query"]["response"],
+                    polygon_region,
+                    report,
+                )
 
-            # If polygon filter out data outside the polygon
-            if polygon_region:
-                filter_polygon_region(output_file_path, polygon_region)
+    return report

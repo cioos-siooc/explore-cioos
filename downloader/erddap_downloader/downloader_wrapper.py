@@ -48,11 +48,8 @@ def parallel_downloader(json_blob=None, output_folder="", create_pdf=False):
             print("creating pdf file ...")
             download_ckan_pdf(ckan_url, ckan_id, ckan_filename)
 
-        # Generate single query to be pass in parallel
-        dataset_json_blob = json_blob
-        dataset_json_blob["cache_filtered"] = [filtered_result]
-        download_erddap.get_dataset(dataset_json_blob, temp_folder)
-        # call jessy's code here to download data from erddap
+    # Get data from erddap datasets
+    erddap_report = download_erddap.get_dataset(json_blob, temp_folder)
 
     # Review if temp_folder has files in it
     if os.listdir(temp_folder) == []:
@@ -80,5 +77,10 @@ def parallel_downloader(json_blob=None, output_folder="", create_pdf=False):
     # Delete temporary folder
     os.system("rm -rf {}".format(temp_folder))
 
-    # Output zipped file size and return zipped file size in bytes
-    return os.stat(zip_full_path).st_size
+    # Output run report json
+    query_report = {
+        "zip_file_size": os.stat(zip_full_path).st_size,
+        "erddap_report": erddap_report,
+    }
+
+    return query_report
