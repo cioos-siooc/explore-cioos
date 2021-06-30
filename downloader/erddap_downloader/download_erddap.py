@@ -147,6 +147,27 @@ def get_erddap_download_url(
     return e.get_download_url()
 
 
+def save_erddap_metadata(dataset, output_path, file_name="erddaps_metadata.csv"):
+    # Define ERDDAPy dataset connection
+    e = ERDDAP(server=dataset["erddap_url"], protocol="tabledap", response="csv")
+    e.dataset_id = dataset["dataset_id"]
+
+    # Retrieve info url
+    metadata_url = e.get_info_url()
+
+    # Retrieve metadata and add server url and dataset_id
+    df_meta = pd.read_csv(metadata_url)
+    df_meta.insert(loc=0, column="erddap_url", value=dataset["erddap_url"])
+    df_meta.insert(loc=1, column="dataset_id", value=dataset["dataset_id"])
+
+    # If file exist already append to it
+    output_file_path = os.path.join(output_path, file_name)
+    if os.path.exists(output_file_path):
+        df_meta.to_csv(output_file_path, index=False, mode="a", header=False)
+    else:
+        df_meta.to_csv(output_file_path, index=False)
+
+
 def get_file_name_output(dataset_info):
     """
     Generate default file name output to use for each dataset downloaded.
@@ -249,6 +270,9 @@ def get_dataset(json_query, output_path=""):
             dataset["erddap_metadata"],
             json_query["user_query"]["eovs"],
         )
+        # Retrieve metadata
+        save_erddap_metadata(dataset, output_path=output_path)
+
         # Try getting data
         query_id = 0
         for polygon_region in polygon_regions:
