@@ -2,6 +2,7 @@ import { Map, NavigationControl, Popup } from "maplibre-gl";
 // import mapboxgl from "mapbox-gl";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import React from "react";
+import './styles.css'
 
 import {server} from '../../config'
 
@@ -141,33 +142,72 @@ export default class CIOOSMap extends React.Component {
       });
 
       // Create a popup, but don't add it to the map yet.
-var popup = new Popup({
-  closeButton: false,
-  closeOnClick: false
-  });
+      var popup = new Popup({
+        closeButton: false,
+        closeOnClick: false
+        });
 
-            // When a click event occurs on a feature in the places layer, open a popup at the
-        // location of the feature, with description HTML from its properties.
-        this.map.on('mouseenter', "points", e => {
-            var coordinates = e.features[0].geometry.coordinates.slice();
-            var description = e.features[0].properties.count;
-            
-            // Ensure that if the map is zoomed out such that multiple
-            // copies of the feature are visible, the popup appears
-            // over the copy being pointed to.
-            while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-            coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
-            }
-            
-           popup
-            .setLngLat(coordinates)
-            .setHTML(description + " points")
-            .addTo(this.map);
-          });
+      // When a click event occurs on a feature in the places layer, open a popup at the
+      // location of the feature, with description HTML from its properties.
+      this.map.on('mouseenter', "points", e => {
+        fetch(`https://pac-dev2.cioos.org/ceda/pointQuery/${e.features[0].properties.pk}`).then(result => {
+          if(result.ok) {
+            result.json().then(pointProperties => {
+              var coordinates = e.features[0].geometry.coordinates.slice()
+              var pointProps = pointProperties[0]
+              console.log(pointProps)
+              // Ensure that if the map is zoomed out such that multiple
+              // copies of the feature are visible, the popup appears
+              // over the copy being pointed to.
+              while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+                coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360
+              }
+              const eovs = pointProps.eovs.map(eov => `<div>${eov}</div>`).toString()
+              console.log(eovs.replace(/,/g,''))
+              popup
+              .setLngLat(coordinates)
+              .setHTML(
+                ` <div>
+                    <h6>
+                      Title:
+                    </h6>
+                    ${pointProps.ckan_record.title}
+                    <hr/>
+                    <h6>
+                      Parties: 
+                    </h6>
+                    ${pointProps.parties}
+                    <hr/>
+                    <h6>
+                      Essential Ocean Variables: 
+                    </h6>
+                    ${eovs.replace(/,/g,'')}
+                    <hr/>
+                    <h6>
+                      Timeframe: 
+                    </h6>
+                    ${new Date(pointProps.time_min).toLocaleDateString()} - ${new Date(pointProps.time_max).toLocaleDateString()}
+                    <hr/>
+                    <h6>
+                      Depth Range: 
+                    </h6>
+                    ${pointProps.depth_min.toFixed(3)} - ${pointProps.depth_max.toFixed(3)} (m)
+                  </div> 
+                `
+              )
+              .addTo(this.map)
+            })
+          } else {
+            throw new Error('Error getting point information')
+          }
+        }).catch(error => {
+          console.log(error)
+        })
+      })
 
           this.map.on('mouseleave', 'points',  () => {
-            popup.remove();
-            });
+            popup.remove()
+            })
 
             this.map.on('mousemove', "hexes", e => {
               var coordinates = [e.lngLat.lng, e.lngLat.lat];
