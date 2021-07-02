@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react'
-import { Row, Button, Tooltip, OverlayTrigger} from 'react-bootstrap'
+import { Row, Button, Tooltip, OverlayTrigger, Spinner} from 'react-bootstrap'
 import { Check, CheckCircle, XCircle } from 'react-bootstrap-icons'
 import PropTypes from 'prop-types'
 import './styles.css'
@@ -11,8 +11,9 @@ export default function SubmitRequest (props) {
   const [emailValid, setEmailValid] = useState(false)
   const [queryRequested, setQueryRequested] = useState(false)
   const [querySubmitted, setQuerySubmitted] = useState(false)
+  const [queryFetch, setQueryFetch] = useState(false)
+  const [queryFailed, setQueryFailed] = useState(false)
   const [polygonCreated, setPolygonCreated] = useState(false)
-
   const [buttonText, setButtonText] = useState('Not Ready')
   const [buttonVariant, setButtonVariant] = useState('secondary')
 
@@ -25,6 +26,7 @@ export default function SubmitRequest (props) {
     if(props.filtersChanged) {
       setQuerySubmitted(false)
       setQueryRequested(false)
+      setQueryFailed(false)
     }
   }, [props.filtersChanged])
 
@@ -32,20 +34,28 @@ export default function SubmitRequest (props) {
     setEmailValid(validateEmail(email))
     setQueryRequested(false)
     setQuerySubmitted(false)
+    setQueryFailed(false)
   }, [email])
 
   useEffect(() => {
     if(polygonCreated && emailValid && !props.filtersChanged) {
+      setQueryFetch(true)
       fetch(`${server}/download?${props.query}&polygon=${JSON.stringify(props.map.getPolygon())}&email=${email}`).then((value) => {
         if(value.ok) {
+          setQueryFetch(false)
           setQuerySubmitted(true)
+        } else {
+          setQueryFetch(false)
+          setQuerySubmitted(false)
+          setQueryFailed(true)
         }
       }).catch(error => {
-        console.log(error)
+        setQueryFetch(false)
         setQueryRequested(false)
         setQuerySubmitted(false)
       })
     } else {
+      setQueryFetch(false)
       setQueryRequested(false)
       setQuerySubmitted(false)
     }
@@ -64,7 +74,10 @@ export default function SubmitRequest (props) {
   }, [])
 
   useEffect(() => {
-    if(!polygonCreated || !emailValid || props.filtersChanged) {
+    if(queryFailed) {
+      setButtonText('Query Failed')
+      setButtonVariant('warning')
+    } else if(!polygonCreated || !emailValid || props.filtersChanged) {
       setButtonText('Not Ready')
       setButtonVariant('secondary')
     } else if(polygonCreated && emailValid && !querySubmitted && !props.filtersChanged) {
@@ -74,11 +87,13 @@ export default function SubmitRequest (props) {
       setButtonText('Request Submitted')
       setButtonVariant('success')
     }
-  }, [polygonCreated, emailValid, querySubmitted, props.filtersChanged])
+  }, [polygonCreated, emailValid, querySubmitted, props.filtersChanged, queryFailed])
 
   let buttonTooltip // = (polygonCreated && emailValid) ? 'Submit request' : (emailValid ? 'Add polygon map selection to request data' : 'Add valid email address')
-  if(polygonCreated && emailValid && !props.filtersChanged) {
-    buttonTooltip = 'Submit Request'
+  if(queryFailed) {
+    buttonTooltip = 'Query failed: email not permitted or no data found'
+  } else if(polygonCreated && emailValid && !props.filtersChanged) {
+    buttonTooltip = 'Submit request'
   } else if (!emailValid) {
     buttonTooltip = 'Add valid email address'
   } else if (!polygonCreated) {
@@ -128,7 +143,19 @@ export default function SubmitRequest (props) {
           onClick={() => setQueryRequested(true)}
           variant={buttonVariant}
           >
-          {buttonText}
+          <span>
+            {buttonText}
+          </span>
+          {queryFetch && 
+            <Spinner
+              className='ml-2'
+              as="span"
+              animation="border"
+              size="sm"
+              role="status"
+              aria-hidden="true"
+            />
+          }
         </Button>
       </OverlayTrigger>
     </div>
