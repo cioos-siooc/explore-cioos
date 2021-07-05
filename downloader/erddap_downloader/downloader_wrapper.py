@@ -49,14 +49,7 @@ def parallel_downloader(json_blob=None, output_folder="", create_pdf=False):
             download_ckan_pdf(ckan_url, ckan_id, ckan_filename)
 
     # Get data from erddap datasets
-    erddap_report = download_erddap.get_dataset(json_blob, temp_folder)
-
-    # Review if any of the downloads reached the download limit
-    over_limit = False
-    if erddap_report["warning"]:
-        for item in erddap_report["warning"]:
-            if item["result"].startswith("Reached download limit"):
-                over_limit = True
+    query_report = download_erddap.get_datasets(json_blob, temp_folder)
 
     # Review if temp_folder has files in it
     if os.listdir(temp_folder) == []:
@@ -85,10 +78,6 @@ def parallel_downloader(json_blob=None, output_folder="", create_pdf=False):
     os.system("rm -rf {}".format(temp_folder))
 
     # Output run report json
-    query_report = {
-        "zip_file_size": os.stat(zip_full_path).st_size,
-        "over_limit": over_limit,
-        "erddap_report": erddap_report,
-    }
+    query_report["zip_file_size"] = os.stat(zip_full_path).st_size
 
     return query_report

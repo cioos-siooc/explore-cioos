@@ -12,10 +12,16 @@ import re
 import json
 
 import os
+import io
+import sys
 
 import warnings
 
 import erddap_scraper.ERDDAP as erddap_scraper
+
+SERVER_DOWNLOAD_LIMIT = 10 ** 7
+DATASET_SIZE_LIMIT = 10 ** 7
+QUERY_SIZE_LIMIT = 10 ** 8
 
 
 def erddap_server_to_name(server):
@@ -184,79 +190,82 @@ def get_file_name_output(dataset_info, output_path, extension, file_suffix):
     return os.path.join(output_path, f"{file_name}.{extension}")
 
 
-def data_download_transform(response, output_path, type, polygon, report):
+def data_download_transform(response, output_path, polygon, report):
     """
     Method to retrieve data from an erddap server. If in CSV format, download data by chunk,
     filter by lat/long within the provided polygon and save to a csv file.
     Other format are directely saved to file.
     """
     # Download file locally
-    chunk_id = 0
-    max_file_size = 10 ** 8
+    chunksize = DATASET_SIZE_LIMIT
+    get_header = True
+    bytes_downloaded = 0
     complete_download = "Completed"
 
-    if type == "csv":
-        max_chunk_number = 10000
-        chunk_size = 10000
-        get_header = True
-        with open(output_path, "w") as f:
-            for chunk in pd.read_csv(
-                response.raw, compression="gzip", chunksize=chunk_size, low_memory=False
-            ):
-                # Read header and units and save them to output
-                if get_header:
-                    units = chunk.iloc[0]
-                    chunk = chunk.iloc[1:]  # skip units
-                    f.write(",".join(list(chunk.columns)) + "\n")
-                    f.write(",".join(units.astype(str).to_list()) + "\n")
-                    get_header = False
+    # Download data to drive, download maximum size allowed
+    with open(output_path, "w") as f:
+        for chunk in response.iter_content(chunk_size=chunksize):
+            # Get data downloaded
+            bytes_downloaded += sys.getsizeof(chunk)
 
-                # Filter data to polygon
-                chunk = filter_polygon_region(chunk, polygon)
-                chunk.to_csv(
-                    f, mode="a", header=False, index=False, line_terminator="\n"
-                )
+            # Read CSV file with pandas
+            # Retrieve header and units on the first and second lines
+            if get_header:
+                df = pd.read_csv(io.BytesIO(chunk), low_memory=False)
+                columns = df.columns.to_list()
+                units = df.iloc[0]  # get units
+                df = df.iloc[1:]
+                f.write(",".join(list(df.columns)) + "\n")
+                f.write(",".join(units.astype(str).to_list()) + "\n")
+                get_header = False
+            else:
+                df = pd.read_csv(io.BytesIO(chunk), low_memory=False, names=columns)
 
-                # Review file size and stop if exceed maximum size or if iterated to many times on download
-                if os.stat(output_path).st_size > max_file_size:
-                    complete_download = "Exceed File Size Limit"
-                    break
-                if chunk_id > max_chunk_number:
-                    complete_download = "Exceed Server Download Limit"
-                    break
+            # Filter data to polygon
+            df = filter_polygon_region(df, polygon)
 
-                chunk_id += 1
+            # Save to file
+            df.to_csv(f, mode="a", header=False, index=False, line_terminator="\n")
+            file_size = os.stat(output_path).st_size
 
-    else:
-        chunksize = max_file_size
-        with open(output_path, "wb") as f:
-            for chunk in response.iter_content(chunk_size=chunksize):
-                # Download chunk
-                f.write(chunk)
-                chunk_id += 1
-
-                if os.stat(output_path).st_size > max_file_size:
-                    complete_download = "Exceed File Size Limit"
-                    break
+            # Output feed to console of download
+            print(
+                f"\rDownload: {file_size/10**6:.3f}/{bytes_downloaded/10**6:.3f}MB saved/downloaded",
+                end="",
+                flush=True,
+            )
+            # Review file saved and downloaded so far
+            if file_size > DATASET_SIZE_LIMIT:
+                complete_download = "Exceed File Size Limit"
+                break
+            if bytes_downloaded > SERVER_DOWNLOAD_LIMIT:
+                complete_download = "Exceed Server Download Limit"
+                break
 
     # Return download report
     if complete_download == "Completed":
         print("Completed")
         result = "successful"
         result_description = os.stat(output_path).st_size
-    elif complete_download == "Exceed File Size Limit":
+    else:
         print("Partial")
-        result = "warning"
-        result_description = f"Reached download limit: >{max_file_size} bytes"
-        warnings.warn(result_description)
-    elif complete_download == "Exceed Server Download Limit":
-        print("Partial")
-        result = "warning"
-        result_description = f"Reached Server Download Limit"
+        result = "partial"
+        report["over_limit"] = True
+
+        # Reason for partial download
+        if complete_download == "Exceed File Size Limit":
+            result_description = f"Reached download limit: >{DATASET_SIZE_LIMIT} bytes"
+        if complete_download == "Exceed Server Download Limit":
+            result_description = (
+                f"Reached Server Download Limit: {SERVER_DOWNLOAD_LIMIT} bytes"
+            )
         warnings.warn(result_description)
 
     # Add download report
     report[result] += [{"query": response.url, "result": result_description}]
+
+    # Add downloaded file size
+    report["total_size"] += report["total_size"] + file_size
 
     return report
 
@@ -286,7 +295,7 @@ def filter_polygon_region(data, polygone):
     return data
 
 
-def get_dataset(json_query, output_path=""):
+def get_datasets(json_query, output_path=""):
     """
     General method use to retrieve erddap datasets from a ceda query.
     :param json_query: JSON CEDA query
@@ -312,11 +321,18 @@ def get_dataset(json_query, output_path=""):
     # Run through each datasets
     report = {
         "successful": [],
+        "partial": [],
         "empty": [],
+        "ignored": [],
         "failed": [],
-        "warning": [],
+        "over_limit": False,
+        "total_size": 0,
     }
-    for dataset in json_query["cache_filtered"]:
+    while json_query["cache_filtered"]:
+
+        # Grab the first dataset within the list
+        dataset = json_query["cache_filtered"].pop(0)
+
         # If metadata for the dataset is not available retrieve it
         if (
             "erddap_metadata" not in dataset
@@ -368,6 +384,14 @@ def get_dataset(json_query, output_path=""):
                 dataset, output_path, json_query["user_query"]["response"], file_suffix
             )
 
+            # If maximum size of query reached just don't download and give query url
+            if report["total_size"] > QUERY_SIZE_LIMIT:
+                warnings.warn(
+                    f"Reach maximum query limit size! Ignored: \n{download_url}"
+                )
+                report["ignored"] += [{"query": download_url, "result": "Ignored"}]
+                continue
+
             # Download data
             print(f"Download {download_url}", end=" ... ")
             with requests.get(download_url, stream=True) as response:
@@ -386,7 +410,6 @@ def get_dataset(json_query, output_path=""):
                 report = data_download_transform(
                     response,
                     output_file_path,
-                    json_query["user_query"]["response"],
                     polygon_region,
                     report,
                 )
