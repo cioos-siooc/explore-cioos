@@ -35,19 +35,19 @@ router.get("/:z/:x/:y.mvt", async (req, res) => {
         SELECT count(*) count, ${
           isHexGrid
             ? ""
-            : `(d.cdm_data_type = any(array[${typeStr}]))::integer pointtype,`
+            : `point_pk as pk, (d.cdm_data_type = any(array[${typeStr}]))::integer pointtype,`
         } p.${sqlQuery.geom_column} as geom from cioos_api.profiles p
         JOIN cioos_api.datasets d ON p.dataset_pk =d.pk 
        ${filters ? "WHERE " + filters : ""}
         ${
           isHexGrid
             ? `group by ${sqlQuery.geom_column}`
-            : "group by geom, cdm_data_type"
+            : "group by point_pk,geom, cdm_data_type"
         } ),
     te as (select ST_TileEnvelope(${z}, ${x}, ${y}) tile_envelope ),
     mvtgeom as (
       SELECT count,
-       ${isHexGrid ? "" : "pointtype,"}
+       ${isHexGrid ? "" : "pk,pointtype,"}
         ST_AsMVTGeom (
           relevent_points.geom,
           tile_envelope
