@@ -197,11 +197,10 @@ def data_download_transform(response, output_path, polygon, report):
     """
     # Download file locally
     chunksize = DATASET_SIZE_LIMIT
-    get_header = True
     bytes_downloaded = 0
     data_downloaded = b""
-    complete_download = "Completed"
-
+    download_status = "Download"
+    print(download_status, end="")
     # Download data to drive, download maximum size allowed
     with open(output_path, "w") as f:
         for chunk in response.iter_content(chunk_size=chunksize):
@@ -209,16 +208,20 @@ def data_download_transform(response, output_path, polygon, report):
             bytes_downloaded += sys.getsizeof(chunk)
             data_downloaded += chunk
             print(
-                f"\rDownload:{bytes_downloaded/10**6:.3f}MB downloaded",
+                f"\r{download_status} {bytes_downloaded/10**6:.3f}MB",
                 end="",
                 flush=True,
             )
             if bytes_downloaded > DATASET_SIZE_LIMIT:
-                complete_download = "Exceed File Size Limit"
+                download_status = "Exceed File Size Limit"
                 break
+        # If download status hasn't changed, download was successfully completed
+        if download_status == "Download":
+            download_status = "Completed"
 
         # Read CSV file with pandas
         # Retrieve header and units on the first and second lines
+        print(", read", end="")
         df = pd.read_csv(io.BytesIO(data_downloaded), low_memory=False)
         units = df.iloc[0]  # get units
         df = df.iloc[1:]
@@ -226,36 +229,48 @@ def data_download_transform(response, output_path, polygon, report):
         f.write(",".join(units.astype(str).to_list()) + "\n")
 
         # Filter data to polygon
+        print(", filter to polygon", end="")
         df = filter_polygon_region(df, polygon)
 
         # Save to file
+        print(", save", end="")
         df.to_csv(f, mode="a", header=False, index=False, line_terminator="\n")
         file_size = os.stat(output_path).st_size
 
         # Output feed to console of download
         print(
-            f"\Saved: {file_size/10**6:.3f}MB",
+            f" {file_size/10**6:.3f} MB. ",
             end="",
             flush=True,
         )
 
     # Return download report
-    if complete_download == "Completed":
+    if download_status == "Completed":
         print("Completed")
         result = "successful"
         result_description = os.stat(output_path).st_size
-    else:
+
+    elif file_size > 0 and download_status == "Exceed File Size Limit":
+        # Reason for partial download
         print("Partial")
         result = "partial"
         report["over_limit"] = True
+        result_description = (
+            f"Reached download limit (>{DATASET_SIZE_LIMIT/10**6:.3f} MB)"
+        )
+        if file_size < bytes_downloaded:
+            result_description += f" and was filtered to within selected polygon: {file_size/10**6:.3f} MB"
 
-        # Reason for partial download
-        if complete_download == "Exceed File Size Limit":
-            result_description = f"Reached download limit: >{DATASET_SIZE_LIMIT} bytes"
-
-        warnings.warn(result_description)
+    elif file_size == 0 and bytes_downloaded > 0:
+        # If data was downloaded but none was kept
+        print("Failed")
+        result = "failed"
+        report["over_limit"] = True
+        result_description = f"Failed to download any data within the polygon"
 
     # Add download report
+    if download_status != "Completed":
+        warnings.warn(result_description)
     report[result] += [{"query": response.url, "result": result_description}]
 
     # Add downloaded file size
@@ -387,7 +402,7 @@ def get_datasets(json_query, output_path=""):
                 continue
 
             # Download data
-            print(f"Download {download_url}", end=" ... ")
+            print(f"Download {download_url}")
             with requests.get(download_url, stream=True) as response:
                 # Make sure the connection is working otherswise make a warning and send the error.
                 if response.status_code != 200:
