@@ -92,8 +92,10 @@ export default function SubmitRequest (props) {
   let buttonTooltip // = (polygonCreated && emailValid) ? 'Submit request' : (emailValid ? 'Add polygon map selection to request data' : 'Add valid email address')
   if(queryFailed) {
     buttonTooltip = 'Query failed: email not permitted or no data found'
-  } else if(polygonCreated && emailValid && !props.filtersChanged) {
+  } else if(polygonCreated && emailValid && !props.filtersChanged && !querySubmitted) {
     buttonTooltip = 'Submit request'
+  } else if (polygonCreated && emailValid && !props.filtersChanged && querySubmitted) {
+    buttonTooltip = 'Request successful. Change filters or polygon to create another query.'
   } else if (!emailValid) {
     buttonTooltip = 'Add valid email address'
   } else if (!polygonCreated) {
