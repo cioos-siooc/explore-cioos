@@ -19,7 +19,6 @@ import warnings
 
 import erddap_scraper.ERDDAP as erddap_scraper
 
-SERVER_DOWNLOAD_LIMIT = 10 ** 7
 DATASET_SIZE_LIMIT = 10 ** 7
 QUERY_SIZE_LIMIT = 10 ** 8
 
@@ -200,6 +199,7 @@ def data_download_transform(response, output_path, polygon, report):
     chunksize = DATASET_SIZE_LIMIT
     get_header = True
     bytes_downloaded = 0
+    data_downloaded = b""
     complete_download = "Completed"
 
     # Download data to drive, download maximum size allowed
@@ -207,40 +207,37 @@ def data_download_transform(response, output_path, polygon, report):
         for chunk in response.iter_content(chunk_size=chunksize):
             # Get data downloaded
             bytes_downloaded += sys.getsizeof(chunk)
-
-            # Read CSV file with pandas
-            # Retrieve header and units on the first and second lines
-            if get_header:
-                df = pd.read_csv(io.BytesIO(chunk), low_memory=False)
-                columns = df.columns.to_list()
-                units = df.iloc[0]  # get units
-                df = df.iloc[1:]
-                f.write(",".join(list(df.columns)) + "\n")
-                f.write(",".join(units.astype(str).to_list()) + "\n")
-                get_header = False
-            else:
-                df = pd.read_csv(io.BytesIO(chunk), low_memory=False, names=columns)
-
-            # Filter data to polygon
-            df = filter_polygon_region(df, polygon)
-
-            # Save to file
-            df.to_csv(f, mode="a", header=False, index=False, line_terminator="\n")
-            file_size = os.stat(output_path).st_size
-
-            # Output feed to console of download
+            data_downloaded += chunk
             print(
-                f"\rDownload: {file_size/10**6:.3f}/{bytes_downloaded/10**6:.3f}MB saved/downloaded",
+                f"\rDownload:{bytes_downloaded/10**6:.3f}MB downloaded",
                 end="",
                 flush=True,
             )
-            # Review file saved and downloaded so far
-            if file_size > DATASET_SIZE_LIMIT:
+            if bytes_downloaded > DATASET_SIZE_LIMIT:
                 complete_download = "Exceed File Size Limit"
                 break
-            if bytes_downloaded > SERVER_DOWNLOAD_LIMIT:
-                complete_download = "Exceed Server Download Limit"
-                break
+
+        # Read CSV file with pandas
+        # Retrieve header and units on the first and second lines
+        df = pd.read_csv(io.BytesIO(data_downloaded), low_memory=False)
+        units = df.iloc[0]  # get units
+        df = df.iloc[1:]
+        f.write(",".join(list(df.columns)) + "\n")
+        f.write(",".join(units.astype(str).to_list()) + "\n")
+
+        # Filter data to polygon
+        df = filter_polygon_region(df, polygon)
+
+        # Save to file
+        df.to_csv(f, mode="a", header=False, index=False, line_terminator="\n")
+        file_size = os.stat(output_path).st_size
+
+        # Output feed to console of download
+        print(
+            f"\Saved: {file_size/10**6:.3f}MB",
+            end="",
+            flush=True,
+        )
 
     # Return download report
     if complete_download == "Completed":
@@ -255,10 +252,7 @@ def data_download_transform(response, output_path, polygon, report):
         # Reason for partial download
         if complete_download == "Exceed File Size Limit":
             result_description = f"Reached download limit: >{DATASET_SIZE_LIMIT} bytes"
-        if complete_download == "Exceed Server Download Limit":
-            result_description = (
-                f"Reached Server Download Limit: {SERVER_DOWNLOAD_LIMIT} bytes"
-            )
+
         warnings.warn(result_description)
 
     # Add download report
