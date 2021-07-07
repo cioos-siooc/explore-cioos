@@ -22,6 +22,12 @@ export default class CIOOSMap extends React.Component {
     this.layerId = "data-layer";
     this.sourceId = "sourceID";
     this.counter = 0;
+    this.tooltipTimeout
+    this.hoveredPointDetails 
+    this.popup = new Popup({
+      closeButton: false,
+      closeOnClick: true
+      });
     this.map = new Map({
       container: "map",
       style: {
@@ -47,6 +53,8 @@ export default class CIOOSMap extends React.Component {
       center: [-106, 56], // starting position
       zoom: 2, // starting zoom
     });
+    this.canvas = this.map.getCanvasContainer()
+    this.canvas.style.cursor = 'grab'
 
     const drawControlOptions = {
       displayControlsDefault: false,
@@ -141,37 +149,85 @@ export default class CIOOSMap extends React.Component {
         },
       });
 
-      // Create a popup, but don't add it to the map yet.
-      var popup = new Popup({
-        closeButton: false,
-        closeOnClick: false
-        });
+      this.map.on('click', 'points', e => {
+        console.log(e)
+      })
 
+      this.map.on('mouseenter', "points", e => {
+        this.canvas.style.cursor = 'pointer'
+        this.hoveredPointDetails = e
+        console.log(e)
+        this.tooltipTimeout = setTimeout(() => this.createTooltip(), 300)
+      })
+
+      this.map.on('mouseleave', 'points',  () => {
+        this.canvas.style.cursor = 'grab'
+        clearTimeout(this.tooltipTimeout)
+        this.hoveredPointDetails = undefined
+        this.popup.remove()
+      })
+
+      this.map.on('mousemove', "hexes", e => {
+        var coordinates = [e.lngLat.lng, e.lngLat.lat];
+        var description = e.features[0].properties.count;
+        
+        // Ensure that if the map is zoomed out such that multiple
+        // copies of the feature are visible, the popup appears
+        // over the copy being pointed to.
+        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+          coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+        }
+        
+        this.popup
+        .setLngLat(coordinates)
+        .setHTML(description + " points")
+        .addTo(this.map);
+      });
+
+      this.map.on('mouseleave', 'hexes',  () => {
+        this.popup.remove();
+      });
+    });
+  }
+
+  createTooltip() {
+    if(this.hoveredPointDetails !== undefined) {
       // When a click event occurs on a feature in the places layer, open a popup at the
       // location of the feature, with description HTML from its properties.
-      this.map.on('mouseenter', "points", e => {
-        fetch(`https://pac-dev2.cioos.org/ceda/pointQuery/${e.features[0].properties.pk}`).then(result => {
+      if(this.hoveredPointDetails.features.length > 1) {
+        var coordinates = this.hoveredPointDetails.features[0].geometry.coordinates.slice()
+        this.popup
+          .setLngLat(coordinates)
+          .setHTML(
+            ` <div>
+                ${this.hoveredPointDetails.features.length} points hovered. Zoom in, or click for multi-point information.
+              </div> 
+            `
+          )
+          .addTo(this.map)
+      } else {
+        fetch(`${server}/pointQuery/${this.hoveredPointDetails.features[0].properties.pk}`).then(result => {
           if(result.ok) {
             result.json().then(pointProperties => {
-              var coordinates = e.features[0].geometry.coordinates.slice()
+              var coordinates = this.hoveredPointDetails.features[0].geometry.coordinates.slice()
               var pointProps = pointProperties[0]
-              console.log(pointProps)
+              console.log(pointProps, this.hoveredPointDetails.features.length)
               // Ensure that if the map is zoomed out such that multiple
               // copies of the feature are visible, the popup appears
               // over the copy being pointed to.
-              while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-                coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360
+              while (Math.abs(this.hoveredPointDetails.lngLat.lng - coordinates[0]) > 180) {
+                coordinates[0] += this.hoveredPointDetails.lngLat.lng > coordinates[0] ? 360 : -360
               }
               const eovs = pointProps.eovs.map(eov => `<div>${eov}</div>`).toString()
-              console.log(eovs.replace(/,/g,''))
-              popup
+              // console.log(eovs.replace(/,/g,''))
+              this.popup
               .setLngLat(coordinates)
               .setHTML(
                 ` <div>
                     <h6>
                       Title:
                     </h6>
-                    ${pointProps.ckan_record.title}
+                    ${pointProps.title}
                     <hr/>
                     <h6>
                       Parties: 
@@ -186,51 +242,25 @@ export default class CIOOSMap extends React.Component {
                     <h6>
                       Timeframe: 
                     </h6>
-                    ${new Date(pointProps.time_min).toLocaleDateString()} - ${new Date(pointProps.time_max).toLocaleDateString()}
+                    ${new Date(pointProps.profiles[0].time_min).toLocaleDateString()} - ${new Date(pointProps.profiles[0].time_max).toLocaleDateString()}
                     <hr/>
                     <h6>
                       Depth Range: 
                     </h6>
-                    ${pointProps.depth_min.toFixed(3)} - ${pointProps.depth_max.toFixed(3)} (m)
+                    ${pointProps.profiles[0].depth_min.toFixed(3)} - ${pointProps.profiles[0].depth_max.toFixed(3)} (m)
                   </div> 
                 `
               )
               .addTo(this.map)
             })
           } else {
-            throw new Error('Error getting point information')
+            throw new Error('Error fetching point information')
           }
         }).catch(error => {
           console.log(error)
         })
-      })
-
-          this.map.on('mouseleave', 'points',  () => {
-            popup.remove()
-            })
-
-            this.map.on('mousemove', "hexes", e => {
-              var coordinates = [e.lngLat.lng, e.lngLat.lat];
-              var description = e.features[0].properties.count;
-              
-              // Ensure that if the map is zoomed out such that multiple
-              // copies of the feature are visible, the popup appears
-              // over the copy being pointed to.
-              while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-              coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
-              }
-              
-             popup
-              .setLngLat(coordinates)
-              .setHTML(description + " points")
-              .addTo(this.map);
-            });
-
-            this.map.on('mouseleave', 'hexes',  () => {
-              popup.remove();
-              });
-     
-    });
+      }
+    }
   }
 
   getLoaded() {
