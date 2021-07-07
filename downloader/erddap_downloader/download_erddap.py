@@ -287,19 +287,13 @@ def filter_polygon_region(data, polygone):
     :param file_path: path to the file data.
     :param polygone: Polygone region to use
     """
-
-    # Determinate the type of data
-    if isinstance(data, pd.DataFrame):
-        data[["latitude", "longitude"]] = data[["latitude", "longitude"]].astype(float)
-        data = data.loc[
-            data.apply(
-                lambda x: polygone.contains(Point(x.longitude, x.latitude)), axis=1
-            )
-        ]
-    else:
-        warnings.warn(
-            "Polygon filtration is not compatible with {0} format".format(type(data))
+    # Retrieve lat/long and keep only data within the polygon
+    data[["latitude", "longitude"]] = data[["latitude", "longitude"]].astype(float)
+    data = data.loc[
+        data.apply(
+            lambda x: polygone.contains(Point(x.longitude, x.latitude)), axis=1
         )
+    ]
 
     return data
 
