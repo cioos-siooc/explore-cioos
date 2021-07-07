@@ -3,6 +3,8 @@ var router = express.Router();
 const db = require("../db");
 const { eovGrouping } = require("../utils/grouping");
 
+const createDBFilter = require("../utils/dbFilter");
+
 // These routes are too small to have their own files
 
 // gets all of them, not dependant on query
@@ -20,6 +22,16 @@ router.get("/organizations", async function (req, res, next) {
   );
   res.send(orgs && orgs.rows);
 });
+router.get("/profilesCount", async function (req, res, next) {
+  const filters = createDBFilter(req.query);
+
+  const SQL = `SELECT count(*) count  FROM cioos_api.profiles p
+        JOIN cioos_api.datasets d ON p.dataset_pk = d.pk
+        WHERE ${filters}`;
+
+  const count = (await db.raw(SQL)).rows[0].count;
+  res.send(200, count);
+});
 
 router.get("/jobs", async function (req, res, next) {
   res.send(await db("cioos_api.download_jobs").orderBy("time", "desc"));
@@ -28,6 +40,37 @@ router.get("/jobs", async function (req, res, next) {
 /* GET home page. */
 router.get("/", function (req, res, next) {
   res.render("index", { title: "Express" });
+});
+
+/* GET home page. */
+router.get("/pointQuery/:point_pk", async function (req, res, next) {
+  const { point_pk } = req.params;
+  const rows = await db.raw(
+    `SELECT 
+        d.dataset_id,
+        ckan_record->>'title' title,
+        eovs,
+        parties,
+        d.erddap_url,
+        json_agg(json_build_object(
+                'time_min',p.time_min,
+                'time_max',p.time_max,
+                'depth_min',p.depth_min,
+                'depth_max',p.depth_max
+        )) as profiles
+        FROM cioos_api.profiles p
+        JOIN cioos_api.datasets d
+        ON p.dataset_pk =d.pk
+        WHERE point_pk = :point_pk
+        GROUP BY d.dataset_id,
+        ckan_record,
+        eovs,
+        parties,
+        d.erddap_url`,
+    { point_pk }
+  );
+
+  res.send(rows && rows.rows);
 });
 
 module.exports = router;
