@@ -196,7 +196,7 @@ def data_download_transform(response, output_path, polygon, report):
     Other format are directely saved to file.
     """
     # Download file locally
-    chunksize = DATASET_SIZE_LIMIT
+    chunksize = 1024 ** 2  # 1MB
     bytes_downloaded = 0
     data_downloaded = b""
     download_status = "Download"
