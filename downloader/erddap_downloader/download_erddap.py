@@ -207,21 +207,21 @@ def data_download_transform(response, output_path, polygon, report):
             # Get data downloaded
             bytes_downloaded += sys.getsizeof(chunk)
             data_downloaded += chunk
-            print(
-                f"\r{download_status} {bytes_downloaded/10**6:.3f}MB",
-                end="",
-                flush=True,
-            )
+
             if bytes_downloaded > DATASET_SIZE_LIMIT:
-                download_status = "Exceed File Size Limit"
+                download_status = "Exceeded File Size Limit"
                 break
+
         # If download status hasn't changed, download was successfully completed
         if download_status == "Download":
             download_status = "Completed"
 
+        # Print Download Result
+        print(f"ed {bytes_downloaded/10**6:.3f} MB. {download_status}\n", end="")
+
         # Read CSV file with pandas
         # Retrieve header and units on the first and second lines
-        print(", read", end="")
+        print("Read file", end="")
         df = pd.read_csv(io.BytesIO(data_downloaded), low_memory=False)
         units = df.iloc[0]  # get units
         df = df.iloc[1:]
@@ -233,15 +233,14 @@ def data_download_transform(response, output_path, polygon, report):
         df = filter_polygon_region(df, polygon)
 
         # Save to file
-        print(", save", end="")
+        print(", saved", end="")
         df.to_csv(f, mode="a", header=False, index=False, line_terminator="\n")
         file_size = os.stat(output_path).st_size
 
         # Output feed to console of download
         print(
-            f" {file_size/10**6:.3f} MB. ",
+            f" {file_size/10**6:.3f} MB to csv format",
             end="",
-            flush=True,
         )
 
     # Return download report
@@ -250,7 +249,7 @@ def data_download_transform(response, output_path, polygon, report):
         result = "successful"
         result_description = os.stat(output_path).st_size
 
-    elif file_size > 0 and download_status == "Exceed File Size Limit":
+    elif file_size > 0 and download_status == "Exceeded File Size Limit":
         # Reason for partial download
         print("Partial")
         result = "partial"
