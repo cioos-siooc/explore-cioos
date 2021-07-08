@@ -30,6 +30,10 @@ export default function Controls(props) {
   const [prevOrganizationsSelected, setPreviousOrganizationsSelected] = useState(organizationsSelected)
   const [fixedStations, setFixedStations] = useState(true)
   const [casts, setCasts] = useState(true)
+  const [pointsClicked, setPointsClicked] = useState(false)
+  const [pointsData, setPointsData] = useState()
+  const [pointCount, setPointCount] = useState(0)
+  const [projectedPointCount, setProjectedPointCount] = useState(0)
 
   const [startDate, setStartDate] = useState('1900-01-01');
   
@@ -54,6 +58,7 @@ export default function Controls(props) {
 
   // UI state
   const [controlsClosed, setControlsClosed] = useState(false)
+  const [pointDetailsOpen, setPointDetailsOpen] = useState(true)
   const [filtersChanged, setFiltersChanged] = useState(false)
   const [previousQueryString, setPreviousQueryString] = useState(createDataFilterQueryString())
   const [accordionSectionsOpen, setAccordionSectionsOpen] = useState([true,false,false,false])
@@ -69,7 +74,6 @@ export default function Controls(props) {
     setFiltersChanged(false)
     setPreviousQueryString(createDataFilterQueryString())
     if(props.map.getLoaded()){
-      console.log(createDataFilterQueryString())
       props.map.updateSource(createDataFilterQueryString())
     }
   }
@@ -78,6 +82,13 @@ export default function Controls(props) {
     if(isMounted.current && orgsLoaded.current >= 1) {
       if(previousQueryString !== createDataFilterQueryString() && prevOrganizationsSelected !== organizationsSelected) {
         setFiltersChanged(true)
+        fetch(`${server}/profilesCount?${createDataFilterQueryString()}`).then(response => {
+          if(response.ok) {
+            return response.text()
+          }
+        }).then(data => {
+          setProjectedPointCount(data)
+        }).catch(error => {throw error})
       } else {
         setFiltersChanged(false)
       }
@@ -109,7 +120,40 @@ export default function Controls(props) {
     return string.charAt(0).toUpperCase() + string.slice(1);
   }
 
+  useEffect(() => {
+    if(pointsData) {
+      pointsData.forEach((point, index) => {
+        console.log(point)
+        fetch(`${server}/pointQuery/${point.pk}`).then(result => {
+          console.log(result.json())
+        })
+      })
+    }
+  },[pointsClicked])
+
+  useEffect(() => {
+    setInterval(() => {
+      if(pointsData !== props.map.getPointClicked()) {
+        setPointsClicked(true)
+        setPointsData(props.map.getPointClicked())
+      } else {
+        setPointsClicked(false)
+      }
+    }, 500);
+  }, [])
+
+  useEffect(() => {
+    fetch(`${server}/profilesCount?${previousQueryString}`).then(response => {
+      if(response.ok) {
+        return response.text()
+      }
+    }).then(data => {
+      setPointCount(data)
+    }).catch(error => {throw error})
+  }, [previousQueryString])
+
   const controlClassName = classnames('filterRow', 'mb-3', 'animate__animated', {'animate__slideOutRight': controlsClosed}, {'animate__slideInRight': !controlsClosed})
+  const pointDetailsClassName = classnames('pointDetails', 'animate__animated', {'animate__slideInUp': pointDetailsOpen}, {'animate__slideOutDown': !pointDetailsOpen})
   return (
     <div className='controls'>
       <div className='filters float-right'>
@@ -145,7 +189,6 @@ export default function Controls(props) {
                           <InputGroup.Checkbox
                               checked={eovsSelected[eov]}
                               onChange={(e) => {
-                                    console.log(e.target.value);
                                     setEovsSelected({...eovsSelected,
                                       [eov]:!eovsSelected[eov]
                                     })
@@ -234,7 +277,6 @@ export default function Controls(props) {
                           <InputGroup.Checkbox
                               checked={organizationsSelected[org][0]}
                               onChange={(e) => {
-                                    console.log(e.target.value);
                                     setOrganizationsSelected({...organizationsSelected,
                                       [org]:[!organizationsSelected[org][0], organizationsSelected[org][1]]
                                     })
@@ -247,7 +289,6 @@ export default function Controls(props) {
                       </Card.Body>
                     </Accordion.Collapse>
                   </Card>
-                  <Card></Card>
                   <Card>
                     <Card.Header>
                       <Accordion.Toggle as={Button} variant="light" eventKey="3" onClick={() => setAccordionSectionsOpen(accordionSectionsOpen.map((elem, index) => index === 3 ? !elem : false))}>
@@ -293,11 +334,18 @@ export default function Controls(props) {
                 </Accordion>
                 <Col>
                   <Row className='mb-3 mt-3'>
-                    <Col xs={{span: 7, offset: 0}} >
-                      Status: <span className='filterStatus'>{filtersChanged ? 'New filters to apply' : 'No new filters' }</span> 
-                      {/* {previousQueryString} */}
+                    <Col xs={{span: 6, offset: 0}} >
+                      <div>
+                        Points: {pointCount}
+                      </div>
+                      <div>
+                        Filtered: {filtersChanged ? projectedPointCount : 'n/a'}
+                      </div>
+                      <div>
+                        Difference: {filtersChanged ? projectedPointCount - pointCount : 'n/a'}
+                      </div>
                     </Col>
-                    <Col xs={{span: 5, offset: 0}}>
+                    <Col xs={{span: 6, offset: 0}}>
                       <OverlayTrigger
                         key='left'
                         placement='top'
@@ -353,10 +401,21 @@ export default function Controls(props) {
             </Row>
         </Container>
       </div>
+      <div>
+        <Container className='fixed-bottom justify-content-middle' style={{pointerEvents: 'auto'}}>
+          <Row>
+            {/* <Col> */}
+              <Button className='pointDetailsTabToggleButton float-left' onClick={() => setPointDetailsOpen(!pointDetailsOpen)}>
+                {pointDetailsOpen ? <ChevronCompactDown size={20}/> : <ChevronCompactUp size={20} />}
+              </Button>
+            {/* </Col> */}
+            <Col className={pointDetailsClassName}>
+              Point Details: {JSON.stringify(pointsData)}
+            </Col>
+          </Row>
+        </Container>
+      </div>
     </div>
   )
 } 
 
-Controls.propTypes = {
-  map: PropTypes.object.isRequired
-}

@@ -51,3 +51,24 @@
 .topControls {
   margin-right:-385px;
 }
+.pointDetails {
+  width: 250px;
+  height: 100px;
+  background-color: white;
+  border-radius: 0.25rem;
+  max-height: 300px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* pointer-events: auto; */
+  /* /* margin-left:50px; */
+}
+.pointDetailsTabToggleButton {
+  height: 40px;
+  width: 50px;
+  position: fixed;
+  bottom: 0px;
+  z-index: 19;
+  /* margin-right:50px; */
+  /* color: red; */
+  /* background-color:  */
+}
