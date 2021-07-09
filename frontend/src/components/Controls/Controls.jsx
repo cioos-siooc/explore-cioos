@@ -473,7 +473,7 @@ export default function Controls(props) {
                           Ocean Variables: 
                         </h5>
                         <div>
-                          {currentPage.eovs.map((eov, index) => <div key={index}>{eov}</div>)}
+                          {currentPage.eovs.map((eov, index) => ' ' + eov ).join(',')}
                         </div>
                         <hr/>
                         <h5>
