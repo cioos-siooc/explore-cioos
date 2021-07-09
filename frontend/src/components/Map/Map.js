@@ -148,7 +148,7 @@ export default class CIOOSMap extends React.Component {
       this.map.addLayer({
         id: "points-highlighted",
         type: "circle",
-        minzoom: 1,
+        minzoom: 7,
         source: {
           type: "vector",
           tiles: [`${server}/tiles/{z}/{x}/{y}.mvt?${queryString}`],
@@ -177,6 +177,7 @@ export default class CIOOSMap extends React.Component {
 
       this.map.on('click', e => {
         this.map.setFilter('points-highlighted', ['in', 'pk', '']);
+        this.clickedPointDetails = undefined
       })
 
       this.map.on('click', 'points', e => {
@@ -248,7 +249,7 @@ export default class CIOOSMap extends React.Component {
           .setLngLat(coordinates)
           .setHTML(
             ` <div>
-                Multiple points hovered. Zoom in, or click for multi-point information.
+                Multiple points hovered. Zoom in, or click for point details.
               </div> 
             `
           )
@@ -329,6 +330,7 @@ export default class CIOOSMap extends React.Component {
   }
 
   updateSource(queryString) {
+    this.map.setFilter('points-highlighted', ['in', 'pk', ''])
     const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${queryString}`;
 
     this.map.getSource("points").tiles = [tileQuery];
