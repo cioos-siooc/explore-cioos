@@ -97,7 +97,25 @@ export default class CIOOSMap extends React.Component {
         },
         "source-layer": "internal-layer-name",
         paint: {
-          "circle-color":  "#52A79B",
+          "circle-color":  [
+            'interpolate',
+            ['linear'],
+            ['get', 'count'],
+            1,
+            config.colorScale[0],
+            3,
+            config.colorScale[1],
+            9,
+            config.colorScale[2],
+            27,
+            config.colorScale[3],
+            81,
+            config.colorScale[4],
+            243,
+            config.colorScale[5],
+            729,
+            config.colorScale[6],
+          ],
           // "circle-opacity": 0.9,
           "circle-stroke-width": {
             property: "pointtype",
@@ -133,13 +151,13 @@ export default class CIOOSMap extends React.Component {
           "fill-color": {
             property: "count",
             stops: [
-              [0, config.colorScale[0]],
+              [1, config.colorScale[0]],
               [3, config.colorScale[1]],
               [9, config.colorScale[2]],
               [27, config.colorScale[3]],
-              [200, config.colorScale[4]],
-              [1000, config.colorScale[5]],
-              [2000, config.colorScale[6]],
+              [81, config.colorScale[4]],
+              [243, config.colorScale[5]],
+              [729, config.colorScale[6]],
             ],
           },
         },
@@ -229,7 +247,7 @@ export default class CIOOSMap extends React.Component {
         
         this.popup
         .setLngLat(coordinates)
-        .setHTML(description + " points")
+        .setHTML(description + " profiles")
         .addTo(this.map);
       });
 
@@ -243,69 +261,16 @@ export default class CIOOSMap extends React.Component {
     if(this.hoveredPointDetails !== undefined && this.hoveredPointDetails.features !== undefined) {
       // When a click event occurs on a feature in the places layer, open a popup at the
       // location of the feature, with description HTML from its properties.
-      if(this.hoveredPointDetails.features.length > 1) {
-        var coordinates = this.hoveredPointDetails.features[0].geometry.coordinates.slice()
-        this.popup
-          .setLngLat(coordinates)
-          .setHTML(
-            ` <div>
-                Multiple points hovered. Zoom in, or click for point details.
-              </div> 
-            `
-          )
-          .addTo(this.map)
-      } else {
-        fetch(`${server}/pointQuery/${this.hoveredPointDetails.features[0].properties.pk}`).then(result => {
-          if(result.ok) {
-            result.json().then(pointProperties => {
-              var coordinates = this.hoveredPointDetails.features[0].geometry.coordinates.slice()
-              var pointProps = pointProperties[0]
-              // Ensure that if the map is zoomed out such that multiple
-              // copies of the feature are visible, the popup appears
-              // over the copy being pointed to.
-              while (Math.abs(this.hoveredPointDetails.lngLat.lng - coordinates[0]) > 180) {
-                coordinates[0] += this.hoveredPointDetails.lngLat.lng > coordinates[0] ? 360 : -360
-              }
-              const eovs = pointProps.eovs.map(eov => `<div>${eov}</div>`).toString()
-              this.popup
-              .setLngLat(coordinates)
-              .setHTML(
-                ` <div>
-                    <h6>
-                      Title:
-                    </h6>
-                    ${pointProps.title}
-                    <hr/>
-                    <h6>
-                      Organizations: 
-                    </h6>
-                    ${pointProps.parties}
-                    <hr/>
-                    <h6>
-                      Ocean Variables: 
-                    </h6>
-                    ${eovs.replace(/,/g,'')}
-                    <hr/>
-                    <h6>
-                      Timeframe: 
-                    </h6>
-                    ${new Date(pointProps.profiles[0].time_min).toLocaleDateString()} - ${new Date(pointProps.profiles[0].time_max).toLocaleDateString()}
-                    <hr/>
-                    <h6>
-                      Depth Range: 
-                    </h6>
-                    ${pointProps.profiles[0].depth_min.toFixed(3)} - ${pointProps.profiles[0].depth_max.toFixed(3)} (m)
-                  </div> 
-                `
-              )
-              .addTo(this.map)
-            })
-          } else {
-            throw new Error('Error fetching point information')
-          }
-        }).catch(error => {
-        })
-      }
+      var coordinates = this.hoveredPointDetails.features[0].geometry.coordinates.slice()
+      this.popup
+        .setLngLat(coordinates)
+        .setHTML(
+          ` <div>
+              ${this.hoveredPointDetails.features[0].properties.count} profiles. Click for details.
+            </div> 
+          `
+        )
+        .addTo(this.map)
     }
   }
 
