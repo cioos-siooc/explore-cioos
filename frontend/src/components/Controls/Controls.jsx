@@ -1,13 +1,14 @@
 import * as React from 'react'
 import {useState, useRef, useEffect} from 'react'
 import PropTypes from 'prop-types'
-import {Container, Row, Col, Accordion, Card, Button, InputGroup, OverlayTrigger, Tooltip, useAccordionToggle, Pagination} from 'react-bootstrap'
+import {Container, Row, Col, Accordion, Card, Button, InputGroup, OverlayTrigger, Tooltip, useAccordionToggle} from 'react-bootstrap'
 import classnames from 'classnames'
 import { ChevronCompactLeft, ChevronCompactRight, QuestionCircle, ChevronCompactDown, ChevronCompactUp } from 'react-bootstrap-icons'
 
 import TimeSelector from './TimeSelector/TimeSelector.jsx'
 import DepthSelector from './DepthSelector/DepthSelector.jsx'
 import SubmitRequest from './SubmitRequest/SubmitRequest.jsx'
+import PageControls from './PageControls/PageControls.jsx'
 import {server} from '../../config'
 import './styles.css'
 
@@ -63,7 +64,6 @@ export default function Controls(props) {
   const [previousQueryString, setPreviousQueryString] = useState(createDataFilterQueryString())
   const [accordionSectionsOpen, setAccordionSectionsOpen] = useState([true,false,false,false])
   const [activePage, setActivePage] = useState(1)
-  const [paginationItems, setPaginationItems] = useState()
   const [currentPage, setCurrentPage] = useState()
 
   function createDataFilterQueryString () {
@@ -132,7 +132,7 @@ export default function Controls(props) {
         setPointsClicked(false)
         setPointsData()
         setCurrentPage()
-        setPaginationItems()
+        // setPaginationItems()
         setPointDetailsOpen(false)
       }
     }, 500);
@@ -149,107 +149,6 @@ export default function Controls(props) {
   }, [previousQueryString])
 
   useEffect(() => {
-    let tempPageItems = []
-    if(pointsData) {
-      if(pointsData.length > 7) {
-        tempPageItems.push(
-          <Pagination.Item key={1} active={activePage === 1}onClick={() => setActivePage(1)}>
-            {1}
-          </Pagination.Item>
-        )
-        if(activePage > 3 && activePage < pointsData.length - 3) { // middle pages
-          tempPageItems.push(
-            <Pagination.Ellipsis key='startElipsis'/>
-          )
-          tempPageItems.push(
-            <Pagination.Item key={activePage - 1} onClick={() => setActivePage(activePage - 1)}>
-              {activePage - 1}
-            </Pagination.Item>
-          )
-          tempPageItems.push(
-            <Pagination.Item key={activePage} active={true} onClick={() => setActivePage(activePage)}>
-              {activePage}
-            </Pagination.Item>
-          )
-          tempPageItems.push(
-            <Pagination.Item key={activePage + 1} onClick={() => setActivePage(activePage + 1)}>
-              {activePage + 1}
-            </Pagination.Item>
-          )
-          tempPageItems.push(
-            <Pagination.Ellipsis key='endEllipsis'/>
-          )
-        } else if (activePage > pointsData.length - 4) { // last couple pages
-          tempPageItems.push(
-            <Pagination.Ellipsis key='startEllipsis'/>
-          )
-          tempPageItems.push(
-            <Pagination.Item key={pointsData.length - 4} active={activePage === pointsData.length - 4} onClick={() => setActivePage(pointsData.length - 4)}>
-              {pointsData.length - 4}
-            </Pagination.Item>
-          )
-          tempPageItems.push(
-            <Pagination.Item key={pointsData.length - 3} active={activePage === pointsData.length - 3} onClick={() => setActivePage(pointsData.length - 3)}>
-              {pointsData.length - 3}
-            </Pagination.Item>
-          )
-          tempPageItems.push(
-            <Pagination.Item key={pointsData.length - 2} active={activePage === pointsData.length - 2} onClick={() => setActivePage(pointsData.length - 2)}>
-              {pointsData.length - 2}
-            </Pagination.Item>
-          )
-          tempPageItems.push(
-            <Pagination.Item key={pointsData.length - 1} active={activePage === pointsData.length - 1} onClick={() => setActivePage(pointsData.length - 1)}>
-              {pointsData.length - 1}
-            </Pagination.Item>
-          )
-        } else if (activePage < 4) { // first couple pages
-          tempPageItems.push(
-            <Pagination.Item key={2} active={activePage === 2} onClick={() => setActivePage(2)}>
-              {2}
-            </Pagination.Item>
-          )
-          tempPageItems.push(
-            <Pagination.Item key={3} active={activePage === 3} onClick={() => setActivePage(3)}>
-              {3}
-            </Pagination.Item>
-          )
-          tempPageItems.push(
-            <Pagination.Item key={4} active={activePage === 4} onClick={() => setActivePage(4)}>
-              {4}
-            </Pagination.Item>
-          )
-          tempPageItems.push(
-            <Pagination.Item key={5} active={activePage === 5} onClick={() => setActivePage(5)}>
-              {5}
-            </Pagination.Item>
-          )
-          tempPageItems.push(
-            <Pagination.Ellipsis key='endEllipsis'/>
-          )
-        }
-        tempPageItems.push(
-          <Pagination.Item key={pointsData.length} active={activePage === pointsData.length}onClick={() => setActivePage(pointsData.length)}>
-            {pointsData.length}
-          </Pagination.Item>
-        )
-      } else {
-        for (let number = 1; number <= pointsData.length; number++) {
-          tempPageItems.push(
-            <Pagination.Item key={number} active={number === activePage} onClick={() => setActivePage(number)}>
-              {number}
-            </Pagination.Item>,
-          );
-        }
-      }
-      setPaginationItems(tempPageItems)
-    }
-    if(pointsData && pointsData.length !== 0) {
-      createCurrentPage()
-    }
-  }, [pointsData, activePage])
-  
-  function createCurrentPage() {
     if(pointsData && pointsData.length !== 0 && activePage <= pointsData.length) {
       fetch(`${server}/pointQuery/${pointsData[activePage - 1].properties.pk}`).then(response => {
         if(response.ok) {
@@ -259,11 +158,11 @@ export default function Controls(props) {
         }
       })
     }
-  }
+  }, [pointsData, activePage])
 
-  useEffect(() => {
-    setActivePage(1)
-  }, [pointsData])
+  // useEffect(() => {
+  //   setActivePage(1)
+  // }, [pointsData])
 
   let pointsDetailsTooltip
   if(pointsClicked) {
@@ -547,13 +446,7 @@ export default function Controls(props) {
                 <Row className='paginationRow'>
                   <Col></Col>
                   <Col>
-                    <Pagination size='sm' >
-                      <Pagination.First onClick={() => setActivePage(1)}/>
-                      <Pagination.Prev onClick={() => {activePage !== 1 && setActivePage(activePage - 1)}}/>
-                      {paginationItems}
-                      <Pagination.Next onClick={() => {pointsData && activePage !== pointsData.length  && setActivePage(activePage + 1)}}/>
-                      <Pagination.Last onClick={() => {pointsData && setActivePage(pointsData.length)}}/>
-                    </Pagination>
+                    {pointsData && <PageControls numPages={pointsData.length} activePage={activePage} setActivePage={setActivePage}/>}
                   </Col>
                   <Col></Col>
                 </Row>

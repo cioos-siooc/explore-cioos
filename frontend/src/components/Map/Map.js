@@ -52,8 +52,8 @@ export default class CIOOSMap extends React.Component {
           },
         ],
       },
-      center: [-106, 56], // starting position
-      zoom: 2, // starting zoom
+      center: [-125, 49], // starting position
+      zoom: 7, // starting zoom
     });
     this.canvas = this.map.getCanvasContainer()
     // this.canvas.style.cursor = 'grab'
