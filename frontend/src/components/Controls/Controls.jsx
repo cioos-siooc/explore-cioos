@@ -150,9 +150,10 @@ export default function Controls(props) {
 
   useEffect(() => {
     if(pointsData && pointsData.length !== 0 && activePage <= pointsData.length) {
-      fetch(`${server}/pointQuery/${pointsData[activePage - 1].properties.pk}`).then(response => {
+      fetch(`${server}/pointQuery/${pointsData.map(point => JSON.stringify(point.properties.pk)).join(',')}`).then(response => {
         if(response.ok) {
           response.json().then(data => {
+            console.log(data)
             setCurrentPage(data[0])
           })
         }
@@ -160,15 +161,15 @@ export default function Controls(props) {
     }
   }, [pointsData, activePage])
 
-  // useEffect(() => {
-  //   setActivePage(1)
-  // }, [pointsData])
+  useEffect(() => {
+    setActivePage(1)
+  }, [pointsData])
 
   let pointsDetailsTooltip
   if(pointsClicked) {
-    pointsDetailsTooltip = pointDetailsOpen ? 'Close point details' : 'Open point details'
+    pointsDetailsTooltip = pointDetailsOpen ? 'Close selection details' : 'Open selection details'
   } else {
-    pointsDetailsTooltip = 'Please select points to view point details'
+    pointsDetailsTooltip = 'Please make a point selection to view selection details'
   }
 
   const controlClassName = classnames('filterRow', 'mb-3', 'animate__animated', {'animate__slideOutRight': controlsClosed}, {'animate__slideInRight': !controlsClosed})
