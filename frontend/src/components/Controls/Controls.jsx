@@ -1,7 +1,7 @@
 import * as React from 'react'
 import {useState, useRef, useEffect} from 'react'
 import PropTypes from 'prop-types'
-import {Container, Row, Col, Accordion, Card, Button, InputGroup, OverlayTrigger, Tooltip, useAccordionToggle} from 'react-bootstrap'
+import {Container, Row, Col, Accordion, Card, Button, InputGroup, OverlayTrigger, Tooltip, useAccordionToggle, Table} from 'react-bootstrap'
 import classnames from 'classnames'
 import { ChevronCompactLeft, ChevronCompactRight, QuestionCircle, ChevronCompactDown, ChevronCompactUp } from 'react-bootstrap-icons'
 
@@ -65,6 +65,7 @@ export default function Controls(props) {
   const [accordionSectionsOpen, setAccordionSectionsOpen] = useState([true,false,false,false])
   const [activePage, setActivePage] = useState(1)
   const [currentPage, setCurrentPage] = useState()
+  const [data, setData] = useState()
 
   function createDataFilterQueryString () {
     return Object.entries(query)
@@ -132,8 +133,8 @@ export default function Controls(props) {
         setPointsClicked(false)
         setPointsData()
         setCurrentPage()
-        // setPaginationItems()
         setPointDetailsOpen(false)
+        setData()
       }
     }, 500);
   }, [])
@@ -153,17 +154,27 @@ export default function Controls(props) {
       fetch(`${server}/pointQuery/${pointsData.map(point => JSON.stringify(point.properties.pk)).join(',')}`).then(response => {
         if(response.ok) {
           response.json().then(data => {
-            console.log(data)
-            setCurrentPage(data[0])
+            setData(data)
           })
         }
       })
+      setActivePage(1)
     }
-  }, [pointsData, activePage])
+  }, [pointsData])
 
   useEffect(() => {
-    setActivePage(1)
-  }, [pointsData])
+    if(data) {
+      setCurrentPage(data[activePage - 1])
+    } else {
+      setCurrentPage()
+    }
+  },[data, activePage])
+
+  useEffect(() => {
+    if(currentPage) {
+      setPointDetailsOpen(true)
+    }
+  }, [currentPage])
 
   let pointsDetailsTooltip
   if(pointsClicked) {
@@ -397,30 +408,28 @@ export default function Controls(props) {
         <div className='topControls float-right'>
           <Container fluid>
             <Row style={{pointerEvents: 'auto'}} className='controlRow'>
-                {/* <Col> */}
-                  <SubmitRequest 
-                    map={props.map} 
-                    query={createDataFilterQueryString(query)}
-                    filtersChanged={filtersChanged}
-                  />
-                  <OverlayTrigger
-                    key='left'
-                    placement='bottom'
-                    overlay={
-                      <Tooltip id={`tooltip-left`}>
-                        {controlsClosed ? 'Open' : 'Close'} filters
-                      </Tooltip>
-                    }
-                  >
-                    <Button 
-                      className='toggleControlsOpenAndClosed' 
-                      onClick={() => setControlsClosed(!controlsClosed)}
-                    >
-                      {controlsClosed ? <ChevronCompactLeft size={20}/> : <ChevronCompactRight size={20}/>}
-                    </Button>
-                  </OverlayTrigger>
-                {/* </Col> */}
-              </Row>
+              <SubmitRequest 
+                map={props.map} 
+                query={createDataFilterQueryString(query)}
+                filtersChanged={filtersChanged}
+              />
+              <OverlayTrigger
+                key='left'
+                placement='bottom'
+                overlay={
+                  <Tooltip id={`tooltip-left`}>
+                    {controlsClosed ? 'Open' : 'Close'} filters
+                  </Tooltip>
+                }
+              >
+                <Button 
+                  className='toggleControlsOpenAndClosed' 
+                  onClick={() => setControlsClosed(!controlsClosed)}
+                >
+                  {controlsClosed ? <ChevronCompactLeft size={20}/> : <ChevronCompactRight size={20}/>}
+                </Button>
+              </OverlayTrigger>
+            </Row>
           </Container>
         </div>
       </div>
@@ -445,51 +454,69 @@ export default function Controls(props) {
               </Row>
               <Row className={pointDetailsClassName} style={{pointerEvents: 'auto'}}>
                 <Row className='paginationRow'>
-                  <Col></Col>
                   <Col>
-                    {pointsData && <PageControls numPages={pointsData.length} activePage={activePage} setActivePage={setActivePage}/>}
+                    <h6 style={{marginTop: '5px'}}>
+                      Datasets
+                    </h6>
                   </Col>
-                  <Col></Col>
+                  <Col>
+                    {data && <PageControls numPages={data.length} activePage={activePage} setActivePage={setActivePage}/>}
+                  </Col>
                 </Row>
                 <Row>
                   { currentPage && 
                     <Col>
-                      <Container fluid style={{pointerEvents: 'auto', margin:'10px 0px 10px 0px'}}>
-                        <h5>
-                          Title:
-                        </h5>
+                      <Container style={{pointerEvents: 'auto', margin:'10px 0px 10px 0px'}}>
+                        <hr/>
+                        <h6>
+                          Title
+                        </h6>
                         <div>
                           {currentPage.title}
                         </div>
                         <hr/>
-                        <h5>
-                          Organizations: 
-                        </h5>
+                        <h6>
+                          Organizations
+                        </h6>
                         <div>
                           {currentPage.parties}
                         </div>
                         <hr/>
-                        <h5>
-                          Ocean Variables: 
-                        </h5>
+                        <h6>
+                          Ocean Variables 
+                        </h6>
                         <div>
                           {currentPage.eovs.map((eov, index) => ' ' + eov ).join(',')}
                         </div>
                         <hr/>
-                        <h5>
-                          Timeframe: 
-                        </h5>
-                        <div>
-                          {new Date(currentPage.profiles[0].time_min).toLocaleDateString()} - {new Date(currentPage.profiles[0].time_max).toLocaleDateString()}
-                        </div>
-                        <hr/>
-                        <h5>
-                          Depth Range: 
-                        </h5>
-                        <div>
-                          {currentPage.profiles[0].depth_min.toFixed(3)} - {currentPage.profiles[0].depth_max.toFixed(3)} (m)
-                        </div>
+                        <h6>
+                          Profiles ({currentPage && currentPage.profiles && currentPage.profiles.length} profiles)
+                        </h6>
                       </Container>
+                      <Table className='profileTable' striped bordered size="sm">
+                          <thead>
+                            <tr>
+                              <th>Profile ID</th>
+                              <th>Start Date</th>
+                              <th>End Date</th>
+                              <th>Start Depth</th>
+                              <th>End Depth</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {currentPage.profiles.map((profile, index) => {
+                              return (
+                                <tr key={index}>
+                                  <td>{profile.profile_id}</td>
+                                  <td>{new Date(profile.time_min).toLocaleDateString()}</td>
+                                  <td>{new Date(profile.time_max).toLocaleDateString()}</td>
+                                  <td>{profile.depth_min < Number.EPSILON ? 0 : profile.depth_min > 15000 ? 'too big' : profile.depth_min.toFixed(3)}</td>
+                                  <td>{profile.depth_max < Number.EPSILON ? 0 : profile.depth_max > 15000 ? 'too big' : profile.depth_max.toFixed(3)}</td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </Table>
                     </Col>
                   }
                 </Row>

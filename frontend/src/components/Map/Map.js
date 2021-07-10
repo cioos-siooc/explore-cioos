@@ -266,7 +266,7 @@ export default class CIOOSMap extends React.Component {
         .setLngLat(coordinates)
         .setHTML(
           ` <div>
-              ${this.hoveredPointDetails.features[0].properties.count} profiles. Click for details.
+              ${this.hoveredPointDetails.features[0].properties.count} profiles. Click for details
             </div> 
           `
         )
