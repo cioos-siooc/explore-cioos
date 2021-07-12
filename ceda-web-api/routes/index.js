@@ -18,7 +18,7 @@ router.get("/organizations", async function (req, res, next) {
     SELECT o.pk,o.name,o.color from org_pks
     JOIN cioos_api.organizations o
     ON org_pks.pk=o.pk::text
-`
+    ORDER BY o.name`
   );
   res.send(orgs && orgs.rows);
 });
@@ -45,6 +45,7 @@ router.get("/", function (req, res, next) {
 /* GET home page. */
 router.get("/pointQuery/:point_pk", async function (req, res, next) {
   const { point_pk } = req.params;
+  const point_pk_split = point_pk.split(",").map((e) => Number.parseInt(e));
   const rows = await db.raw(
     `SELECT 
         d.dataset_id,
@@ -53,21 +54,23 @@ router.get("/pointQuery/:point_pk", async function (req, res, next) {
         parties,
         d.erddap_url,
         json_agg(json_build_object(
+                'profile_id',p.profile_id,
                 'time_min',p.time_min,
                 'time_max',p.time_max,
                 'depth_min',p.depth_min,
                 'depth_max',p.depth_max
-        )) as profiles
+        ) ORDER BY time_min DESC
+        ) as profiles
         FROM cioos_api.profiles p
         JOIN cioos_api.datasets d
         ON p.dataset_pk =d.pk
-        WHERE point_pk = :point_pk
+        WHERE point_pk = ANY(:point_pk_split)
         GROUP BY d.dataset_id,
         ckan_record,
         eovs,
         parties,
         d.erddap_url`,
-    { point_pk }
+    { point_pk_split }
   );
 
   res.send(rows && rows.rows);
