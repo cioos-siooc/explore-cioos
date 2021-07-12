@@ -1,5 +1,5 @@
 const eovGrouping = {
-  carbon: ["inorganicCarbon", "surfaceCurrents"],
+  carbon: ["inorganicCarbon", "dissolvedOrganicCarbon"],
   currents: ["subSurfaceCurrents", "surfaceCurrents"],
   nutrients: ["nitrate", "phosphate", "sulphate", "silicate"],
   salinity: ["seaSurfaceSalinity", "subSurfaceSalinity"],

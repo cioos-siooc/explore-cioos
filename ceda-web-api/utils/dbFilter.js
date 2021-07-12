@@ -36,18 +36,19 @@ function createDBFilter({
 
   const filters = [];
 
-  if (timeMin) filters.push(`p.time_min >= '${timeMin}'::timestamp`);
-  if (timeMax) filters.push(`p.time_min < '${timeMax}'::timestamp`);
+  if (timeMin) filters.push(`p.time_max >= '${timeMin}'::timestamp`);
+  if (timeMax) filters.push(`p.time_min <= '${timeMax}'::timestamp`);
 
-  if (latMin) filters.push(`p.latitude_min >= '${latMin}'`);
-  if (latMax) filters.push(`p.latitude_max < '${latMax}'`);
+  // This would be used if there was a rectangle selection for download
+  if (latMin) filters.push(`p.latitude_max >= '${latMin}'`);
+  if (latMax) filters.push(`p.latitude_min <= '${latMax}'`);
 
-  if (lonMin) filters.push(`p.longitude_min >= '${lonMin}'`);
-  if (lonMax) filters.push(`p.longitude_max < '${lonMax}'`);
+  if (lonMin) filters.push(`p.longitude_max >= '${lonMin}'`);
+  if (lonMax) filters.push(`p.longitude_min <= '${lonMax}'`);
 
   // disabled until we get depth data into the database
-  if (depthMin) filters.push(`p.depth_min >= ${depthMin}`);
-  if (depthMax) filters.push(`p.depth_max < ${depthMax}`);
+  if (depthMin) filters.push(`p.depth_max >= ${depthMin}`);
+  if (depthMax) filters.push(`p.depth_min <= ${depthMax}`);
 
   if (organizations) {
     const organizationsString = organizations.split(",").map((e) => `'${e}'`);
