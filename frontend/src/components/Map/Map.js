@@ -2,6 +2,7 @@ import { Map, NavigationControl, Popup } from "maplibre-gl";
 // import mapboxgl from "mapbox-gl";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import React from "react";
+import './styles.css'
 
 import {server} from '../../config'
 
@@ -21,6 +22,14 @@ export default class CIOOSMap extends React.Component {
     this.layerId = "data-layer";
     this.sourceId = "sourceID";
     this.counter = 0;
+    this.tooltipTimeout
+    this.hoveredPointDetails
+    this.clickedPointDetails 
+    this.popup = new Popup({
+      closeButton: false,
+      closeOnClick: true,
+      maxWidth: '400px'
+      });
     this.map = new Map({
       container: "map",
       style: {
@@ -43,9 +52,11 @@ export default class CIOOSMap extends React.Component {
           },
         ],
       },
-      center: [-106, 56], // starting position
-      zoom: 2, // starting zoom
+      center: [-125, 49], // starting position
+      zoom: 7, // starting zoom
     });
+    this.canvas = this.map.getCanvasContainer()
+    // this.canvas.style.cursor = 'grab'
 
     const drawControlOptions = {
       displayControlsDefault: false,
@@ -80,20 +91,32 @@ export default class CIOOSMap extends React.Component {
         id: "points",
         type: "circle",
         minzoom: 7,
-
         source: {
           type: "vector",
           tiles: [`${server}/tiles/{z}/{x}/{y}.mvt?${queryString}`],
         },
         "source-layer": "internal-layer-name",
         paint: {
-          "circle-color": {
-            stops: [
-              // [0, "#fa7268"],
-              [1, "#52A79B"]
-            ]
-          },
-          "circle-opacity": 0.9,
+          "circle-color":  [
+            'interpolate',
+            ['linear'],
+            ['get', 'count'],
+            1,
+            config.colorScale[0],
+            3,
+            config.colorScale[1],
+            9,
+            config.colorScale[2],
+            27,
+            config.colorScale[3],
+            81,
+            config.colorScale[4],
+            243,
+            config.colorScale[5],
+            729,
+            config.colorScale[6],
+          ],
+          // "circle-opacity": 0.9,
           "circle-stroke-width": {
             property: "pointtype",
             stops: [
@@ -128,73 +151,135 @@ export default class CIOOSMap extends React.Component {
           "fill-color": {
             property: "count",
             stops: [
-              [0, config.colorScale[0]],
+              [1, config.colorScale[0]],
               [3, config.colorScale[1]],
               [9, config.colorScale[2]],
               [27, config.colorScale[3]],
-              [200, config.colorScale[4]],
-              [1000, config.colorScale[5]],
-              [2000, config.colorScale[6]],
+              [81, config.colorScale[4]],
+              [243, config.colorScale[5]],
+              [729, config.colorScale[6]],
             ],
           },
         },
       });
 
-      // Create a popup, but don't add it to the map yet.
-var popup = new Popup({
-  closeButton: false,
-  closeOnClick: false
-  });
+      this.map.addLayer({
+        id: "points-highlighted",
+        type: "circle",
+        minzoom: 7,
+        source: {
+          type: "vector",
+          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt?${queryString}`],
+        },
+        "source-layer": "internal-layer-name",
+        paint: {
+          "circle-color":  "red",
+          "circle-opacity": 1.0,
+          "circle-stroke-width": {
+            property: "pointtype",
+            stops: [
+              [0, 0],
+              [1, 1],
+            ],
+          },
+          "circle-radius": {
+            property: "pointtype",
+            stops: [
+              [0, 4],
+              [1, 10],
+            ],
+          },
+        },
+        filter: ['in', 'pk', '']
+      });
 
-            // When a click event occurs on a feature in the places layer, open a popup at the
-        // location of the feature, with description HTML from its properties.
-        this.map.on('mouseenter', "points", e => {
-            var coordinates = e.features[0].geometry.coordinates.slice();
-            var description = e.features[0].properties.count;
-            
-            // Ensure that if the map is zoomed out such that multiple
-            // copies of the feature are visible, the popup appears
-            // over the copy being pointed to.
-            while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-            coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
-            }
-            
-           popup
-            .setLngLat(coordinates)
-            .setHTML(description + " points")
-            .addTo(this.map);
-          });
+      this.map.on('click', e => {
+        this.map.setFilter('points-highlighted', ['in', 'pk', '']);
+        this.clickedPointDetails = undefined
+      })
 
-          this.map.on('mouseleave', 'points',  () => {
-            popup.remove();
-            });
+      this.map.on('click', 'points', e => {
+        this.clickedPointDetails = e.features
+        var bbox = [
+          [e.point.x, e.point.y],
+          [e.point.x, e.point.y]
+        ];
+        var features = this.map.queryRenderedFeatures(bbox, {
+          layers: ['points']
+        });
+          
+        // Run through the selected features and set a filter
+        // to match features with unique ids to activate
+        // the `points-selected' layer.
+        var filter = features.reduce(
+          function (memo, feature) {
+            memo.push(feature.properties.pk);
+            return memo;
+          },
+          ['in', 'pk']
+        );
+        this.map.setFilter('points-highlighted', filter);
+      })
 
-            this.map.on('mousemove', "hexes", e => {
-              var coordinates = [e.lngLat.lng, e.lngLat.lat];
-              var description = e.features[0].properties.count;
-              
-              // Ensure that if the map is zoomed out such that multiple
-              // copies of the feature are visible, the popup appears
-              // over the copy being pointed to.
-              while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-              coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
-              }
-              
-             popup
-              .setLngLat(coordinates)
-              .setHTML(description + " points")
-              .addTo(this.map);
-            });
+      this.map.on('mouseenter', "points", e => {
+        // this.canvas.style.cursor = 'pointer'
+        this.hoveredPointDetails = e
+        this.tooltipTimeout = setTimeout(() => this.createTooltip(), 300)
+      })
 
-            this.map.on('mouseleave', 'hexes',  () => {
-              popup.remove();
-              });
-     
+      this.map.on('mouseleave', 'points',  () => {
+        // this.canvas.style.cursor = 'grab'
+        clearTimeout(this.tooltipTimeout)
+        this.hoveredPointDetails = undefined
+        this.popup.remove()
+      })
+
+      this.map.on('mousemove', "hexes", e => {
+        var coordinates = [e.lngLat.lng, e.lngLat.lat];
+        var description = e.features[0].properties.count;
+        
+        // Ensure that if the map is zoomed out such that multiple
+        // copies of the feature are visible, the popup appears
+        // over the copy being pointed to.
+        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+          coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+        }
+        
+        this.popup
+        .setLngLat(coordinates)
+        .setHTML(description + " profiles")
+        .addTo(this.map);
+      });
+
+      this.map.on('mouseleave', 'hexes',  () => {
+        this.popup.remove();
+      });
     });
+  }
+
+  createTooltip() {
+    if(this.hoveredPointDetails !== undefined && this.hoveredPointDetails.features !== undefined) {
+      // When a click event occurs on a feature in the places layer, open a popup at the
+      // location of the feature, with description HTML from its properties.
+      var coordinates = this.hoveredPointDetails.features[0].geometry.coordinates.slice()
+      this.popup
+        .setLngLat(coordinates)
+        .setHTML(
+          ` <div>
+              ${this.hoveredPointDetails.features[0].properties.count} profiles. Click for details
+            </div> 
+          `
+        )
+        .addTo(this.map)
+    }
   }
 
   getLoaded() {
     return this.map.loaded();
+  }
+
+  getPointClicked() {
+    return this.clickedPointDetails
   }
 
   getPolygon() {
@@ -210,6 +295,7 @@ var popup = new Popup({
   }
 
   updateSource(queryString) {
+    this.map.setFilter('points-highlighted', ['in', 'pk', ''])
     const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${queryString}`;
 
     this.map.getSource("points").tiles = [tileQuery];

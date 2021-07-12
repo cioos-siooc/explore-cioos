@@ -8,11 +8,11 @@ import './styles.css'
 export default function App () {
   const map = new CIOOSMap()
   return (
-    <>
+    <div style={{maxHeight: '800px'}}>
       <Controls
         map={map}
       />
-    </>
+    </div>
   );
 }
 

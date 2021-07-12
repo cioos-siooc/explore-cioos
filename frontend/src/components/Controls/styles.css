@@ -29,9 +29,6 @@
   max-height: 445px;
   overflow: auto;
 }
-.card-header svg {
-  /* margin-top: 10px; */
-}
 .helpIcon {
   margin-left: 10px;
 }
@@ -50,4 +47,34 @@
 }
 .topControls {
   margin-right:-385px;
+}
+.pointDetails {
+  position: absolute;
+  top: 110px;
+  max-height: 600px;
+  pointer-events: none;
+}
+.pointDetailsCard {
+  max-width: 400px;
+  /* max-height: 590px; */
+  background-color: white;
+  border-radius: 0.25rem;
+  overflow-x: hidden;
+  margin-top: 100px;
+  /* overflow-y: hidden; */
+}
+.pointDetailsTabToggleButton {
+  height: 40px;
+  width: 45px;
+}
+.paginationRow{
+  margin: 10px 0px 0px 0px !important;
+  height: 25px;
+}
+table {
+  margin: 0px 0px 0px 0px !important;
+  display: block;
+  max-height: 165px;
+  max-width: 450px;
+  overflow-y: scroll;
 }
