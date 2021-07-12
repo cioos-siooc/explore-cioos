@@ -18,7 +18,7 @@ router.get("/organizations", async function (req, res, next) {
     SELECT o.pk,o.name,o.color from org_pks
     JOIN cioos_api.organizations o
     ON org_pks.pk=o.pk::text
-`
+    ORDER BY o.name`
   );
   res.send(orgs && orgs.rows);
 });
