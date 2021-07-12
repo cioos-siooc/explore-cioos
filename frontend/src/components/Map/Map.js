@@ -70,9 +70,9 @@ export default class CIOOSMap extends React.Component {
       }
     }
 
-    const drawPolygon = new MapboxDraw(drawControlOptions);
+    this.drawPolygon = new MapboxDraw(drawControlOptions);
 
-    this.map.addControl(drawPolygon, "top-left");
+    this.map.addControl(this.drawPolygon, "top-left");
     this.map.addControl(new NavigationControl(), "bottom-left");
     const query = {
       timeMin: "1900-01-01",
@@ -254,7 +254,13 @@ export default class CIOOSMap extends React.Component {
       this.map.on('mouseleave', 'hexes',  () => {
         this.popup.remove();
       });
-    });
+
+      this.map.on('draw.create', e => { // Ensure there are only one polygons on the map at a time
+        if(this.drawPolygon.getAll().features.length > 1) {
+          this.drawPolygon.delete(this.drawPolygon.getAll().features[0].id)
+        }
+      })
+    })
   }
 
   createTooltip() {

@@ -510,8 +510,8 @@ export default function Controls(props) {
                                   <td>{profile.profile_id}</td>
                                   <td>{new Date(profile.time_min).toLocaleDateString()}</td>
                                   <td>{new Date(profile.time_max).toLocaleDateString()}</td>
-                                  <td>{profile.depth_min < Number.EPSILON ? 0 : profile.depth_min > 15000 ? 'too big' : profile.depth_min.toFixed(3)}</td>
-                                  <td>{profile.depth_max < Number.EPSILON ? 0 : profile.depth_max > 15000 ? 'too big' : profile.depth_max.toFixed(3)}</td>
+                                  <td>{profile.depth_min < Number.EPSILON ? 0 : profile.depth_min > 15000 ? 'too big' : profile.depth_min.toFixed(1)}</td>
+                                  <td>{profile.depth_max < Number.EPSILON ? 0 : profile.depth_max > 15000 ? 'too big' : profile.depth_max.toFixed(1)}</td>
                                 </tr>
                               )
                             })}
