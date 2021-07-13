@@ -35,6 +35,7 @@ export default function Controls(props) {
   const [pointsData, setPointsData] = useState()
   const [pointCount, setPointCount] = useState(0)
   const [projectedPointCount, setProjectedPointCount] = useState(0)
+  const [tempPointsData, setTempPointsData] = useState([])
 
   const [startDate, setStartDate] = useState('1900-01-01');
   
@@ -124,19 +125,24 @@ export default function Controls(props) {
     return string.charAt(0).toUpperCase() + string.slice(1);
   }
 
+
+  // Selection details
   useEffect(() => {
-    setInterval(() => {
-      if(pointsData !== props.map.getPointClicked()) {
-        setPointsClicked(true)
-        setPointsData(props.map.getPointClicked())
-      } else {
-        setPointsClicked(false)
-        setPointsData()
-        setCurrentPage()
-        setPointDetailsOpen(false)
-        setData()
-      }
-    }, 500);
+    if(!tempPointsData) { // there are no points selected
+      setPointsClicked(false)
+      // setPointsData()
+      setCurrentPage()
+      setPointDetailsOpen(false)
+      setData()
+    } else if(JSON.stringify(pointsData) !== JSON.stringify(tempPointsData)) { // there are new points selected
+      setPointsClicked(true)
+      setPointsData(tempPointsData)
+      setActivePage(1)
+    } // there are the same points selected so do nothing
+  }, [tempPointsData])
+
+  useEffect(() => {
+    setInterval(() => setTempPointsData(props.map.getPointClicked()), 500);
   }, [])
 
   useEffect(() => {
@@ -150,6 +156,7 @@ export default function Controls(props) {
   }, [previousQueryString])
 
   useEffect(() => {
+    // console.log(pointsData)
     if(pointsData && pointsData.length !== 0 && activePage <= pointsData.length) {
       fetch(`${server}/pointQuery/${pointsData.map(point => JSON.stringify(point.properties.pk)).join(',')}`).then(response => {
         if(response.ok) {
@@ -158,23 +165,19 @@ export default function Controls(props) {
           })
         }
       })
-      setActivePage(1)
     }
+    setActivePage(1)
   }, [pointsData])
 
   useEffect(() => {
     if(data) {
       setCurrentPage(data[activePage - 1])
+      setPointDetailsOpen(true)
     } else {
       setCurrentPage()
+      setPointDetailsOpen(false)
     }
   },[data, activePage])
-
-  useEffect(() => {
-    if(currentPage) {
-      setPointDetailsOpen(true)
-    }
-  }, [currentPage])
 
   let pointsDetailsTooltip
   if(pointsClicked) {
@@ -510,8 +513,8 @@ export default function Controls(props) {
                                   <td>{profile.profile_id}</td>
                                   <td>{new Date(profile.time_min).toLocaleDateString()}</td>
                                   <td>{new Date(profile.time_max).toLocaleDateString()}</td>
-                                  <td>{profile.depth_min < Number.EPSILON ? 0 : profile.depth_min > 15000 ? 'too big' : profile.depth_min.toFixed(3)}</td>
-                                  <td>{profile.depth_max < Number.EPSILON ? 0 : profile.depth_max > 15000 ? 'too big' : profile.depth_max.toFixed(3)}</td>
+                                  <td>{profile.depth_min < Number.EPSILON ? 0 : profile.depth_min > 15000 ? 'too big' : profile.depth_min.toFixed(1)}</td>
+                                  <td>{profile.depth_max < Number.EPSILON ? 0 : profile.depth_max > 15000 ? 'too big' : profile.depth_max.toFixed(1)}</td>
                                 </tr>
                               )
                             })}

@@ -52,8 +52,8 @@ export default class CIOOSMap extends React.Component {
           },
         ],
       },
-      center: [-125, 49], // starting position
-      zoom: 7, // starting zoom
+      center: [-106, 56], // starting position
+      zoom: 2, // starting zoom
     });
     this.canvas = this.map.getCanvasContainer()
     // this.canvas.style.cursor = 'grab'
@@ -70,9 +70,9 @@ export default class CIOOSMap extends React.Component {
       }
     }
 
-    const drawPolygon = new MapboxDraw(drawControlOptions);
+    this.drawPolygon = new MapboxDraw(drawControlOptions);
 
-    this.map.addControl(drawPolygon, "top-left");
+    this.map.addControl(this.drawPolygon, "top-left");
     this.map.addControl(new NavigationControl(), "bottom-left");
     const query = {
       timeMin: "1900-01-01",
@@ -254,7 +254,43 @@ export default class CIOOSMap extends React.Component {
       this.map.on('mouseleave', 'hexes',  () => {
         this.popup.remove();
       });
-    });
+
+      this.map.on('draw.create', e => { // Ensure there are only one polygons on the map at a time
+        if(this.drawPolygon.getAll().features.length > 1) {
+          this.drawPolygon.delete(this.drawPolygon.getAll().features[0].id)
+        }
+      })
+
+      this.map.on('touchend', e => {
+        this.map.setFilter('points-highlighted', ['in', 'pk', '']);
+        this.clickedPointDetails = undefined
+      })
+
+      this.map.on('touchend', 'points', e => {
+        if (e.points.length !== 1) return;
+         
+        this.clickedPointDetails = e.features
+        var bbox = [
+          [e.point.x, e.point.y],
+          [e.point.x, e.point.y]
+        ];
+        var features = this.map.queryRenderedFeatures(bbox, {
+          layers: ['points']
+        });
+          
+        // Run through the selected features and set a filter
+        // to match features with unique ids to activate
+        // the `points-selected' layer.
+        var filter = features.reduce(
+          function (memo, feature) {
+            memo.push(feature.properties.pk);
+            return memo;
+          },
+          ['in', 'pk']
+        );
+        this.map.setFilter('points-highlighted', filter);
+      })
+    })
   }
 
   createTooltip() {
