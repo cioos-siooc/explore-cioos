@@ -223,10 +223,10 @@ def data_download_transform(response, output_path, polygon, report):
         # Retrieve header and units on the first and second lines
         print("Read file", end="")
         df = pd.read_csv(io.BytesIO(data_downloaded), low_memory=False)
-        units = df.iloc[0]  # get units
+        units = df.iloc[0].replace({pd.NA:''}).astype(str)  # get units
         df = df.iloc[1:]
         f.write(",".join(list(df.columns)) + "\n")
-        f.write(",".join(units.astype(str).to_list()) + "\n")
+        f.write(",".join(units.to_list()) + "\n")
 
         # Filter data to polygon
         print(", filter to polygon", end="")
@@ -393,7 +393,7 @@ def get_datasets(json_query, output_path=""):
                 warnings.warn(
                     f"Reach maximum query limit size! Ignored: \n{download_url}"
                 )
-                report["ignored"] += [{"query": download_url, "result": "Ignored"}]
+                report['erddap_report']["ignored"] += [{"query": download_url, "result": "Ignored"}]
                 continue
 
             # Download data
