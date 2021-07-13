@@ -270,7 +270,9 @@ def data_download_transform(response, output_path, polygon, report):
     # Add download report
     if download_status != "Completed":
         warnings.warn(result_description)
-    report[result] += [{"query": response.url, "result": result_description}]
+    report["erddap_report"][result] += [
+        {"query": response.url, "result": result_description}
+    ]
 
     # Add downloaded file size
     report["total_size"] += report["total_size"] + file_size
@@ -289,9 +291,7 @@ def filter_polygon_region(data, polygone):
     # Retrieve lat/long and keep only data within the polygon
     data[["latitude", "longitude"]] = data[["latitude", "longitude"]].astype(float)
     data = data.loc[
-        data.apply(
-            lambda x: polygone.contains(Point(x.longitude, x.latitude)), axis=1
-        )
+        data.apply(lambda x: polygone.contains(Point(x.longitude, x.latitude)), axis=1)
     ]
 
     return data
@@ -322,11 +322,13 @@ def get_datasets(json_query, output_path=""):
 
     # Run through each datasets
     report = {
-        "successful": [],
-        "partial": [],
-        "empty": [],
-        "ignored": [],
-        "failed": [],
+        "erddap_report": {
+            "successful": [],
+            "partial": [],
+            "empty": [],
+            "ignored": [],
+            "failed": [],
+        },
         "over_limit": False,
         "total_size": 0,
     }
@@ -404,7 +406,9 @@ def get_datasets(json_query, output_path=""):
                     else:
                         result = "failed"
 
-                    report[result] += [{"query": download_url, "result": response.text}]
+                    report["erddap_report"][result] += [
+                        {"query": download_url, "result": response.text}
+                    ]
                     warnings.warn(f"Failed to download {download_url}\n{response.text}")
                     print("Failed")
                     continue
