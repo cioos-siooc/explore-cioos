@@ -1,5 +1,4 @@
 import pdfkit
-from multiprocessing import Process
 from . import download_erddap
 import os
 import uuid

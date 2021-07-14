@@ -1,3 +1,7 @@
+truncate cioos_api.ckan_data_loader;
+\copy cioos_api.ckan_data_loader(erddap_url,dataset_id,eovs,ckan_id,parties,ckan_record) FROM '/Users/nate.rosenstock/dev/ceda/scraper/ckan_scraper/erddap_ckan_mapping.csv' WITH CSV HEADER DELIMETER '|';
+
+
 
 -- after loading CKAN data into the database via the python script
 truncate cioos_api.organizations;
@@ -24,3 +28,4 @@ ckan_record=l.ckan_record
 FROM cioos_api.ckan_data_loader l WHERE
 l.dataset_id=d.dataset_id and
 l.erddap_url=d.erddap_url;
+
