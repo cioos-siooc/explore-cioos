@@ -64,13 +64,15 @@ def get_variable_list(erddap_metadata: dict, eovs: list):
     #   - standard_name is considered
     variable_list = []
     for variable, attributes in erddap_metadata["variables"].items():
+
+        # Mandatory
         if variable in mandatory_variables:
             variable_list += [variable]
-
-        if "cf_role" in attributes:
+        # cf_role
+        elif "cf_role" in attributes:
             variable_list += [variable]
-
-        if (
+        # eov
+        elif (
             "standard_name" in attributes
             and attributes["standard_name"] in eov_variables
         ):
