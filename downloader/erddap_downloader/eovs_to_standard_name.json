@@ -21,7 +21,7 @@
   "sea_floor_pressure": [
     "sea_water_pressure_at_sea_floor"
   ],
-  "subSurfaceTemperature":[
+  "subSurfaceTemperature": [
     "sea_surface_temperature",
     "sea_water_temperature",
     "sea_water_temperature_anomaly",
@@ -65,7 +65,7 @@
     "mass_concentration_of_picophytoplankton_expressed_as_chlorophyll_in_sea_water",
     "mass_fraction_of_chlorophyll_a_in_sea_water"
   ],
-  "silicate":[
+  "silicate": [
     "mass_concentration_of_silicate_in_sea_water",
     "mole_concentration_of_silicate_in_sea_water",
     "moles_of_silicate_per_unit_mass_in_sea_water"
@@ -81,7 +81,7 @@
     "mole_concentration_of_nitrate_and_nitrite_in_sea_water",
     "moles_of_nitrate_and_nitrite_per_unit_mass_in_sea_water"
   ],
-  "nutrients":[
+  "nutrients": [
     "mass_concentration_of_silicate_in_sea_water",
     "mole_concentration_of_silicate_in_sea_water",
     "moles_of_silicate_per_unit_mass_in_sea_water",
@@ -95,8 +95,21 @@
   ],
   "subSurfaceCurrents": [
     "sea_water_speed",
+    "sea_water_velocity_from_direction",
+    "sea_water_velocity_to_direction",
     "sea_water_speed_due_to_tides",
-    "sea_water_speed_at_sea_floor"
+    "sea_water_velocity_to_direction_due_to_tides",
+    "sea_water_speed_at_sea_floor",
+    "sea_water_velocity_to_direction_at_sea_floor",
+    "eastward_sea_water_velocity",
+    "northward_sea_water_velocity",
+    "eastward_sea_water_velocity_assuming_no_tide",
+    "eastward_sea_water_velocity_due_to_tides",
+    "eastward_sea_water_velocity_at_sea_floor",
+    "northward_sea_water_velocity_assuming_no_tide",
+    "northward_sea_water_velocity_due_to_tides",
+    "northward_sea_water_velocity_at_sea_floor",
+    "upward_sea_water_velocity"
   ],
   "inorganicCarbon": [
     "mole_concentration_of_dissolved_inorganic_carbon_in_sea_water",
@@ -121,7 +134,8 @@
     "ocean_mass_content_of_dissolved_organic_carbon"
   ],
   "surfaceCurrents": [
+    "surface_eastward_sea_water_velocity",
+    "surface_northward_sea_water_velocity"
   ],
-  "seaState": [
-  ]
+  "seaState": []
 }
