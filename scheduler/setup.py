@@ -3,11 +3,11 @@
 from distutils.core import setup
 
 setup(
-    name="downloader_scheduler",
+    name="download_scheduler",
     version="0.1",
     description="",
     url="",
-    packages=["downloader_scheduler"],
+    packages=["download_scheduler"],
     install_requires=[
         "sqlalchemy",
         "psycopg2",
