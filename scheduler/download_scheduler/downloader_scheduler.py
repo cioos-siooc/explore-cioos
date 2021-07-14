@@ -13,18 +13,21 @@ from download_email import send_email
 
 import sentry_sdk
 
-sentry_sdk.init(
-    "https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595",
-    # Set traces_sample_rate to 1.0 to capture 100%
-    # of transactions for performance monitoring.
-    # We recommend adjusting this value in production.
-    traces_sample_rate=1.0,
-)
-
 config = configparser.ConfigParser()
 config.read(".env")
 db = config["db"]
 scheduler_config = config["config"]
+
+
+if scheduler_config.get("environment") == "production":
+    sentry_sdk.init(
+        "https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595",
+        # Set traces_sample_rate to 1.0 to capture 100%
+        # of transactions for performance monitoring.
+        # We recommend adjusting this value in production.
+        traces_sample_rate=1.0,
+    )
+
 
 data_base_link = (
     f"postgresql://{db['user']}:{db['password']}@{db['host']}:5432/{db['database']}"
