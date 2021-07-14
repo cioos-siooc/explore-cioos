@@ -82,6 +82,7 @@ def email_user(email, status, zip_filename):
     else:
         message = f"Your CEDA download failed. We are aware of the failed query and are working to resolve it."
         subject += " failed."
+        sentry_sdk.capture_message(f"download by {email} failed")
 
     send_email(email, message, subject)
 
