@@ -1,6 +1,8 @@
 """
 download_erddap regroup a set of tool used by CEDA to download ERDDAP datasets.
 """
+from urllib.parse import urlparse
+
 from erddapy import ERDDAP
 import shapely.wkt
 from shapely.geometry import Point
@@ -8,7 +10,6 @@ from shapely.geometry import Point
 import pandas as pd
 
 import requests
-import re
 import json
 
 import os
@@ -18,22 +19,38 @@ import sys
 import warnings
 
 import erddap_scraper.ERDDAP as erddap_scraper
+from erddap_downloader.download_pdf import download_pdf
 
-DATASET_SIZE_LIMIT = 10 ** 7
-QUERY_SIZE_LIMIT = 10 ** 8
+ONE_MB = 10 ** 6
+DATASET_SIZE_LIMIT = 10 * ONE_MB
+QUERY_SIZE_LIMIT = 100 * ONE_MB
+
+DOWNLOADING = "DOWNLOADING"
+COMPLETED = "COMPLETED"
+PARTIAL = "PARTIAL"
+FAILED = "FAILED"
+EMPTY = "EMPTY"
 
 # Downloader report
 report = {
-    "erddap_report": {
-        "successful": [],
-        "partial": [],
-        "empty": [],
-        "ignored": [],
-        "failed": [],
-    },
+    "erddap_report": [],
     "over_limit": False,
     "total_size": 0,
+    "empty_download": True,
 }
+
+
+def load_eov_mapping():
+    # Retrieve EOVs mapping to standard_name
+    path_to_eov_mapper = os.path.dirname(os.path.realpath(__file__))
+    with open(
+        os.path.join(path_to_eov_mapper, "eovs_to_standard_name.json")
+    ) as json_file:
+        evos_to_standard_name = json.load(json_file)
+    return evos_to_standard_name
+
+
+evos_to_standard_name = load_eov_mapping()
 
 
 def erddap_server_to_name(server):
@@ -42,9 +59,7 @@ def erddap_server_to_name(server):
     :param server: erddap server url
     :return: erddap server string
     """
-    server_string = re.sub(r"https*://|/erddap|\.(org|com|ca)", "", server)
-    server_string = re.sub(r"\.", "-", server_string)
-    return server_string.upper()
+    return urlparse(server).netloc.replace(".", "_")
 
 
 def get_variable_list(erddap_metadata: dict, eovs: list):
@@ -57,13 +72,6 @@ def get_variable_list(erddap_metadata: dict, eovs: list):
     """
     # Get a list of mandatory variables to be present if available
     mandatory_variables = ["time", "latitude", "longitude", "depth"]
-
-    # Retrieve EOVs mapping to standard_name
-    path_to_eov_mapper = os.path.dirname(os.path.realpath(__file__))
-    with open(
-        os.path.join(path_to_eov_mapper, "eovs_to_standard_name.json")
-    ) as json_file:
-        evos_to_standard_name = json.load(json_file)
 
     # Retrieve the list of standard_names to consider
     eov_variables = []
@@ -96,8 +104,9 @@ def get_variable_list(erddap_metadata: dict, eovs: list):
 def get_erddap_download_url(
     dataset_info: dict,
     user_constraint: dict,
-    variables_list: list = None,
-    polygon_region=None,
+    variables_list: list,
+    polygon_region,
+    response: str = "csv",
 ):
     """
     Method to retrieve the an ERDDAP download url based on the query provided by the user.
@@ -113,7 +122,7 @@ def get_erddap_download_url(
         protocol="tabledap",
     )
 
-    e.response = user_constraint["response"]
+    e.response = response
     e.dataset_id = dataset_info["dataset_id"]
     e.constraints = {}
 
@@ -160,8 +169,7 @@ def get_erddap_download_url(
             e.constraints["depth<="] = user_constraint["depth_max"]
 
     # Add variable list to retrieve
-    if variables_list:
-        e.variables = variables_list
+    e.variables = variables_list
 
     # Get Download Link
     return e.get_download_url()
@@ -218,29 +226,18 @@ def filter_polygon_region(data, polygone):
     return data
 
 
-def get_datasets(json_query, output_path=""):
+def get_datasets(json_query, output_path="", create_pdf=False):
     """
     General method use to retrieve erddap datasets from a ceda query.
     :param json_query: JSON CEDA query
     :param output_path: path where to save the downloaded data.
     """
 
-    def update_erddap_report(result, message):
-        if result in ["failed", "partial", "empty", "ignored"]:
-            warnings.warn(f"{result.upper()}: {message}")
-        report["erddap_report"][result] += [
-            {"query": download_url_list, "result": message}
-        ]
-
     # Convert WKT polygon to shapely polygon object
     if "polygon_region" in json_query["user_query"]:
         polygon_regions = [
             shapely.wkt.loads(json_query["user_query"]["polygon_region"])
         ]
-
-    # Make ERDDAP CSV output default output
-    if "response" not in json_query["user_query"]:
-        json_query["user_query"]["response"] = "csv"
 
     # Duplicate polygon over -180 to 180 limit and generate multiple queries to match each side
     if polygon_regions[0].bounds[0] < -180 or polygon_regions[0].bounds[2] > 180:
@@ -251,12 +248,9 @@ def get_datasets(json_query, output_path=""):
 
     # Download file locally
     chunksize = 1024 ** 2  # 1MB
+
     # Download data to drive, down
-    while json_query["cache_filtered"]:
-
-        # Grab the first dataset within the list
-        dataset = json_query["cache_filtered"].pop(0)
-
+    for dataset in json_query["cache_filtered"]:
         # If metadata for the dataset is not available retrieve it
         if (
             "erddap_metadata" not in dataset
@@ -274,33 +268,26 @@ def get_datasets(json_query, output_path=""):
             dataset["erddap_metadata"],
             json_query["user_query"]["eovs"],
         )
-        # Retrieve metadata
-        save_erddap_metadata(dataset, output_path=output_path)
 
         # Try getting data
         df = pd.DataFrame()
         bytes_downloaded = 0
-        file_size=0
-        download_status = "Download"
+        file_size = 0
+        download_status = DOWNLOADING
         download_url_list = []
+        erddap_error = ""
         for polygon_region in polygon_regions:
-            try:
-                # Get download url
-                download_url = get_erddap_download_url(
-                    dataset,
-                    json_query["user_query"],
-                    variable_list,
-                    polygon_region=polygon_region,
-                )
-            except requests.exceptions.HTTPError as e:
-                # Failed to get a download url
-                warnings.warn(
-                    "Failed to download data from erddap: {0} dataset_id:{1}. \n"
-                    "{2}".format(
-                        dataset["erddap_url"], dataset["dataset_id"], "\n".join(e.args)
-                    )
-                )
-                continue
+
+            # Get download url
+            download_url = get_erddap_download_url(
+                dataset,
+                json_query["user_query"],
+                variable_list,
+                polygon_region=polygon_region,
+            )
+
+            # Add URL to the lis tof URL for this dataset
+            download_url_list += [download_url]
 
             # If maximum size of query reached just don't download and give query url
             # or if maximum download for this dataset is reached
@@ -318,11 +305,11 @@ def get_datasets(json_query, output_path=""):
                 # Make sure the connection is working otherswise make a warning and send the error.
                 if response.status_code != 200:
                     if response.status_code == 404:
-                        download_status = "empty"
+                        download_status = EMPTY
                     else:
-                        download_status = "failed"
-                    # update_erddap_report(download_status, download_url, response.text)
-                    message = response.text
+                        download_status = FAILED
+
+                    erddap_error = response.text
                     continue
 
                 # Download data up to maximum size allowed
@@ -333,13 +320,13 @@ def get_datasets(json_query, output_path=""):
 
                     # Stop download limit per dataset is reached
                     if bytes_downloaded > DATASET_SIZE_LIMIT:
-                        download_status = "partial"
+                        download_status = PARTIAL
                         report["over_limit"] = True
                         print("Reached download limit per dataset!")
                         break
 
             # Update how much download done
-            print(f"Downloaded {bytes_downloaded/10**6:.3f} MB")
+            print(f"Downloaded {bytes_downloaded/ONE_MB:.3f} MB")
 
             # Parse downloaded data
             # Read CSV file with pandas
@@ -355,10 +342,11 @@ def get_datasets(json_query, output_path=""):
             df = df.append(df_temp)
 
         # If download status hasn't changed, download was successfully completed
-        if download_status == "Download":
-            download_status = "Completed"
+        if download_status == DOWNLOADING:
+            download_status = COMPLETED
 
         if not df.empty:
+            report["empty_download"] = False
             # Sort data along time
             if "time" in df.columns:
                 df = df.sort_values("time")
@@ -376,41 +364,29 @@ def get_datasets(json_query, output_path=""):
 
         # Generate report for each download
         # Return download report
-        if download_status == "Completed":
-            update_erddap_report("successful", os.stat(output_path).st_size)
+        if download_status in [COMPLETED, PARTIAL]:
+            if create_pdf:
+                ckan_url = dataset["ckan_url"] + dataset["ckan_id"]
+                pdf_filename = get_file_name_output(dataset, output_path, "pdf")
+                download_pdf(ckan_url, pdf_filename)
 
-        # Reach query limit
-        elif report["total_size"] > QUERY_SIZE_LIMIT and bytes_downloaded == 0:
-            update_erddap_report("ignored", "Reached query maximum size limit.")
+            # Retrieve metadata
+            save_erddap_metadata(dataset, output_path=output_path)
 
-        # Partial Download
-        elif file_size > 0 and bytes_downloaded > DATASET_SIZE_LIMIT:
-            # Reason for partial download
-            message = f"Reached download limit (>{DATASET_SIZE_LIMIT/10**6:.3f} MB)"
-            if file_size < bytes_downloaded:
-                message += f" and was filtered to within selected polygon: {file_size/10**6:.3f} MB"
-            update_erddap_report("partial", message)
+        dataset_report = {
+            "dataset_id": dataset["dataset_id"],
+            "download_url_list": download_url_list,
+            "status": download_status,
+            "file_size": file_size,
+            "bytes_downloaded": bytes_downloaded,
+            "no_data": df.empty,
+            "dataset_limit_hit": bytes_downloaded > DATASET_SIZE_LIMIT,
+            "query_limit_hit": report["total_size"] > QUERY_SIZE_LIMIT,
+            "erddap_error": erddap_error,
+            "total_size_so_far": report["total_size"],
+        }
 
-        # No data left after polygon filtration
-        elif file_size == 0 and bytes_downloaded > 0:
-            # If data was downloaded but none was kept
-            update_erddap_report(
-                "failed", "Failed to download any data within the polygon"
-            )
-
-        # Empty Query
-        elif download_status == "empty":
-            update_erddap_report("empty", message)
-
-        # Failed to download from ERDDAP
-        elif download_status == "failed":
-            update_erddap_report("failed", message)
-
-        else:
-            # If the tests conditions above never been met make an error to track what kind of result it is.
-            raise RuntimeError("Unreported query status")
-
-        # Add downloaded file size
-        report["total_size"] += report["total_size"] + file_size
+        report["erddap_report"] += [dataset_report]
+        report["total_size"] += file_size
 
     return report

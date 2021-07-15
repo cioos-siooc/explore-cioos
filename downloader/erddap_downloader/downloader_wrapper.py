@@ -1,77 +1,32 @@
-import pdfkit
-from . import download_erddap
 import os
 import uuid
-import zipfile
+from erddap_downloader import download_erddap
+from erddap_downloader.zip_folder import zip_folder
 
 
-def download_ckan_pdf(ckan_url=None, ckan_id=None, pdf_filename=None):
-    if os.name == "nt":
-        path_wkthmltopdf = b"C:\Program Files\wkhtmltopdf\\bin\wkhtmltopdf.exe"
-        config = pdfkit.configuration(wkhtmltopdf=path_wkthmltopdf)
-    else:
-        config = pdfkit.configuration()
-
-    download_url = ckan_url + ckan_id
-    if pdfkit.from_url(download_url, pdf_filename, configuration=config):
-        return 0
-    else:
-        raise Exception("Unable to download file")
-
-
-def parallel_downloader(json_blob=None, output_folder="", create_pdf=False):
+def run_download_query(download_query, output_folder, create_pdf=False):
     temp_folder = "ceda_download_" + str(uuid.uuid4())[0:6]
-    zip_filename = json_blob["user_query"]["zip_filename"]
 
-    # crash on UUID collision
+    # create the temporary folder
     os.makedirs(temp_folder)
 
     # output_folder will never be created in production, just for development
+    # in production, the zip file is saved to a web accessible folder
     os.makedirs(output_folder, exist_ok=True)
 
-    if "cache_filtered" not in json_blob:
-        raise Exception("Received empty profiles data from API")
+    # Run the download
+    query_report = download_erddap.get_datasets(download_query, temp_folder, create_pdf)
 
-    for filtered_result in json_blob["cache_filtered"]:
-        erddap_url = filtered_result["erddap_url"]
-        ckan_url = filtered_result["ckan_url"]
-        ckan_id = filtered_result["ckan_id"]
-        if create_pdf:
-            ckan_filename = os.path.join(
-                temp_folder,
-                "{}_{}.pdf".format(
-                    filtered_result["dataset_id"],
-                    erddap_url.split("/")[2].replace(".", "_"),
-                ),
-            )
-            print("creating pdf file ...")
-            download_ckan_pdf(ckan_url, ckan_id, ckan_filename)
+    # check if no data returned, exit early
+    if query_report["empty_download"]:
+        query_report["zip_file_size"] = 0
+        return query_report
 
-    # Get data from erddap datasets
-    query_report = download_erddap.get_datasets(json_blob, temp_folder)
-
-    # Review if temp_folder has files in it
-    if os.listdir(temp_folder) == []:
-        return 0
-
-    # Zip files in temporary folder
+    # Zip the download
+    zip_filename = download_query["user_query"]["zip_filename"]
     zip_full_path = os.path.join(output_folder, zip_filename)
-    print("Writing zip ", zip_full_path)
-    zip_fid = zipfile.ZipFile(zip_full_path, "w", compression=zipfile.ZIP_DEFLATED)
-    # walk the path and zip all files
-    for dirname, subdirs, files in os.walk(temp_folder):
-        for filename in files:
-            print("compressing...", dirname, filename)
-            retval = zip_fid.write(
-                filename=os.path.join(dirname, filename), arcname=filename
-            )
-    zip_fid.close()
-
-    # Create an error if failed to zipped file
-    if retval:
-        raise Exception(
-            "Error creating zip file!", zip_full_path, " from files in ", temp_folder
-        )
+    print("zip", temp_folder, zip_full_path)
+    zip_folder(temp_folder, zip_full_path)
 
     # Delete temporary folder
     os.system("rm -rf {}".format(temp_folder))

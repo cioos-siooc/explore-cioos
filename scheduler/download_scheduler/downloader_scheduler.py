@@ -20,12 +20,15 @@ scheduler_config = config["config"]
 
 
 if scheduler_config.get("environment") == "production":
+    ignore_errors = [KeyboardInterrupt]
+
     sentry_sdk.init(
         "https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595",
         # Set traces_sample_rate to 1.0 to capture 100%
         # of transactions for performance monitoring.
         # We recommend adjusting this value in production.
         traces_sample_rate=1.0,
+        ignore_errors=ignore_errors,
     )
 
 
@@ -47,7 +50,7 @@ if "output_folder" in scheduler_config:
 
 def get_a_download_job():
     """
-    :return: Latest timestamp avaiable on the CIOOS Bayne Sound database
+    Get the oldest download job in the download_jobs table, return the row
     """
     session = Session(engine)
 
@@ -59,7 +62,9 @@ def get_a_download_job():
     if row:
         pk = row["pk"]
         print("Starting job:", pk)
-        update_download_jobs(pk, {"status": "downloading", "time": "NOW()"}, session)
+        update_download_jobs(
+            pk, {"status": "downloading", "time_start": "NOW()"}, session
+        )
     session.commit()
     return row
 
@@ -70,24 +75,26 @@ def email_user(email, status, zip_filename):
     """
 
     download_url = "https://pac-dev2.cioos.org/images/ceda/" + zip_filename
-    subject = "Your CEDA data query"
-    message = ""
+    messages = {
+        "completed": {
+            "subject": "Your CEDA data query was successful",
+            "body": f"Your CEDA download is available at {download_url}",
+        },
+        "over-limit": {
+            "subject": "Your CEDA data query completed but found too much data.",
+            "body": f"Your CEDA download is available at {download_url}. It has been cut off to return less data. If needed, please try again with a smaller polygon or fewer filters.",
+        },
+        "no-data": {
+            "subject": "Your CEDA data query was successful",
+            "body": f"Your CEDA query didn't find any data.  Please try again with a larger polygon or different filters",
+        },
+        "failed": {
+            "subject": "Your CEDA data query failed",
+            "body": f"Your CEDA download failed. We are aware of the failed query and are working to resolve it",
+        },
+    }
 
-    if status == "completed":
-        message = f"Your CEDA download is available at {download_url}"
-        subject += " was successful."
-    elif status == "no-data":
-        message = f"Your CEDA query didn't find any data.  Please try again with a larger polygon or different filters."
-        subject += " didn't find any results."
-    elif status == "over-limit":
-        message = f"Your CEDA download is available at {download_url}. It has been cut off to return less data. If needed, please try again with a smaller polygon or fewer filters."
-        subject += " completed but returned too much data."
-    else:
-        message = f"Your CEDA download failed. We are aware of the failed query and are working to resolve it."
-        subject += " failed."
-        sentry_sdk.capture_message(f"download by {email} failed")
-
-    send_email(email, message, subject)
+    send_email(email, messages[status]["body"], messages[status]["subject"])
 
 
 def run_download(row):
@@ -106,9 +113,9 @@ def run_download(row):
     downloader_error = ""
 
     try:
-        # Run query in parallel mode
-        downloader_output = downloader_wrapper.parallel_downloader(
-            json_blob=downloader_input,
+        # Run download
+        downloader_output = downloader_wrapper.run_download_query(
+            download_query=downloader_input,
             output_folder=output_folder,
             create_pdf=create_pdf,
         )
@@ -120,6 +127,7 @@ def run_download(row):
         stack_trace = traceback.format_exc()
         downloader_error = str(stack_trace).replace("'", "")
         print(e)
+        sentry_sdk.capture_message(f"download by {email} failed")
 
     # The downloader crashed and returned a string (error message) instead of json
     if downloader_error:
@@ -127,7 +135,9 @@ def run_download(row):
             pk,
             {
                 "status": status,
-                "downloader_output": str(downloader_error),
+                "downloader_output": str(downloader_error)
+                .replace("%", "")
+                .replace("'", ""),
                 "time_complete": "NOW()",
             },
         )
