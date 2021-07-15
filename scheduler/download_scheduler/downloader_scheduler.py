@@ -133,7 +133,9 @@ def run_download(row):
             pk,
             {
                 "status": status,
-                "downloader_output": str(downloader_error),
+                "downloader_output": str(downloader_error)
+                .replace("%", "")
+                .replace("'", ""),
                 "time_complete": "NOW()",
             },
         )
