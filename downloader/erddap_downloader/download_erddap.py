@@ -1,6 +1,8 @@
 """
 download_erddap regroup a set of tool used by CEDA to download ERDDAP datasets.
 """
+from urllib.parse import urlparse
+
 from erddapy import ERDDAP
 import shapely.wkt
 from shapely.geometry import Point
@@ -8,7 +10,6 @@ from shapely.geometry import Point
 import pandas as pd
 
 import requests
-import re
 import json
 
 import os
@@ -18,9 +19,11 @@ import sys
 import warnings
 
 import erddap_scraper.ERDDAP as erddap_scraper
+from erddap_downloader import download_ckan_pdf
 
 DATASET_SIZE_LIMIT = 10 ** 7
 QUERY_SIZE_LIMIT = 10 ** 8
+ONE_MB = 10 ** 6
 
 # Downloader report
 report = {
@@ -42,9 +45,7 @@ def erddap_server_to_name(server):
     :param server: erddap server url
     :return: erddap server string
     """
-    server_string = re.sub(r"https*://|/erddap|\.(org|com|ca)", "", server)
-    server_string = re.sub(r"\.", "-", server_string)
-    return server_string.upper()
+    return urlparse(server).netloc.replace(".", "_")
 
 
 def get_variable_list(erddap_metadata: dict, eovs: list):
@@ -218,7 +219,7 @@ def filter_polygon_region(data, polygone):
     return data
 
 
-def get_datasets(json_query, output_path=""):
+def get_datasets(json_query, output_path="", create_pdf=False):
     """
     General method use to retrieve erddap datasets from a ceda query.
     :param json_query: JSON CEDA query
@@ -274,13 +275,11 @@ def get_datasets(json_query, output_path=""):
             dataset["erddap_metadata"],
             json_query["user_query"]["eovs"],
         )
-        # Retrieve metadata
-        save_erddap_metadata(dataset, output_path=output_path)
 
         # Try getting data
         df = pd.DataFrame()
         bytes_downloaded = 0
-        file_size=0
+        file_size = 0
         download_status = "Download"
         download_url_list = []
         for polygon_region in polygon_regions:
@@ -339,7 +338,7 @@ def get_datasets(json_query, output_path=""):
                         break
 
             # Update how much download done
-            print(f"Downloaded {bytes_downloaded/10**6:.3f} MB")
+            print(f"Downloaded {bytes_downloaded/ONE_MB:.3f} MB")
 
             # Parse downloaded data
             # Read CSV file with pandas
@@ -376,6 +375,15 @@ def get_datasets(json_query, output_path=""):
 
         # Generate report for each download
         # Return download report
+        if download_status in ["Completed", "partial"]:
+            if create_pdf:
+                ckan_url = dataset["ckan_url"] + dataset["ckan_id"]
+                pdf_filename = get_file_name_output(dataset, output_path, ".pdf")
+                download_ckan_pdf(ckan_url, output_path, pdf_filename)
+
+            # Retrieve metadata
+            save_erddap_metadata(dataset, output_path=output_path)
+
         if download_status == "Completed":
             update_erddap_report("successful", os.stat(output_path).st_size)
 
@@ -386,9 +394,9 @@ def get_datasets(json_query, output_path=""):
         # Partial Download
         elif file_size > 0 and bytes_downloaded > DATASET_SIZE_LIMIT:
             # Reason for partial download
-            message = f"Reached download limit (>{DATASET_SIZE_LIMIT/10**6:.3f} MB)"
+            message = f"Reached download limit (>{DATASET_SIZE_LIMIT/ONE_MB:.3f} MB)"
             if file_size < bytes_downloaded:
-                message += f" and was filtered to within selected polygon: {file_size/10**6:.3f} MB"
+                message += f" and was filtered to within selected polygon: {file_size/ONE_MB:.3f} MB"
             update_erddap_report("partial", message)
 
         # No data left after polygon filtration
