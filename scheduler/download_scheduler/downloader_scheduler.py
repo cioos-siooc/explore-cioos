@@ -79,8 +79,8 @@ def email_user(email, status, zip_filename):
             "body": f"Your CEDA download is available at {download_url}",
         },
         "over-limit": {
-            "subject": "Your CEDA data query was successful",
-            "body": f"Your CEDA download is available at {download_url}",
+            "subject": "Your CEDA data query completed but found too much data.",
+            "body": f"Your CEDA download is available at {download_url}. It has been cut off to return less data. If needed, please try again with a smaller polygon or fewer filters.",
         },
         "no-data": {
             "subject": "Your CEDA data query was successful",
@@ -133,7 +133,9 @@ def run_download(row):
             pk,
             {
                 "status": status,
-                "downloader_output": str(downloader_error),
+                "downloader_output": str(downloader_error)
+                .replace("%", "")
+                .replace("'", ""),
                 "time_complete": "NOW()",
             },
         )

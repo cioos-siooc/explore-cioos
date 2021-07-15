@@ -19,7 +19,7 @@ import sys
 import warnings
 
 import erddap_scraper.ERDDAP as erddap_scraper
-from erddap_downloader import download_ckan_pdf
+from erddap_downloader.download_pdf import download_pdf
 
 DATASET_SIZE_LIMIT = 10 ** 7
 QUERY_SIZE_LIMIT = 10 ** 8
@@ -379,8 +379,8 @@ def get_datasets(json_query, output_path="", create_pdf=False):
         if download_status in ["Completed", "partial"]:
             if create_pdf:
                 ckan_url = dataset["ckan_url"] + dataset["ckan_id"]
-                pdf_filename = get_file_name_output(dataset, output_path, ".pdf")
-                download_ckan_pdf(ckan_url, output_path, pdf_filename)
+                pdf_filename = get_file_name_output(dataset, output_path, "pdf")
+                download_pdf(ckan_url, pdf_filename)
 
             # Retrieve metadata
             save_erddap_metadata(dataset, output_path=output_path)
