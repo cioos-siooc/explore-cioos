@@ -281,23 +281,14 @@ def get_datasets(json_query, output_path="", create_pdf=False):
         download_status = "Download"
         download_url_list = []
         for polygon_region in polygon_regions:
-            try:
-                # Get download url
-                download_url = get_erddap_download_url(
-                    dataset,
-                    json_query["user_query"],
-                    variable_list,
-                    polygon_region,
-                )
-            except requests.exceptions.HTTPError as e:
-                # Failed to get a download url
-                warnings.warn(
-                    "Failed to download data from erddap: {0} dataset_id:{1}. \n"
-                    "{2}".format(
-                        dataset["erddap_url"], dataset["dataset_id"], "\n".join(e.args)
-                    )
-                )
-                continue
+
+            # Get download url
+            download_url = get_erddap_download_url(
+                dataset,
+                json_query["user_query"],
+                variable_list,
+                polygon_region=polygon_region,
+            )
 
             # If maximum size of query reached just don't download and give query url
             # or if maximum download for this dataset is reached
