@@ -39,6 +39,19 @@ report = {
 }
 
 
+def load_eov_mapping():
+    # Retrieve EOVs mapping to standard_name
+    path_to_eov_mapper = os.path.dirname(os.path.realpath(__file__))
+    with open(
+        os.path.join(path_to_eov_mapper, "eovs_to_standard_name.json")
+    ) as json_file:
+        evos_to_standard_name = json.load(json_file)
+    return evos_to_standard_name
+
+
+evos_to_standard_name = load_eov_mapping()
+
+
 def erddap_server_to_name(server):
     """
     Read erddap server url and convert it to a readable string format to be use as part of the file name output/
@@ -58,13 +71,6 @@ def get_variable_list(erddap_metadata: dict, eovs: list):
     """
     # Get a list of mandatory variables to be present if available
     mandatory_variables = ["time", "latitude", "longitude", "depth"]
-
-    # Retrieve EOVs mapping to standard_name
-    path_to_eov_mapper = os.path.dirname(os.path.realpath(__file__))
-    with open(
-        os.path.join(path_to_eov_mapper, "eovs_to_standard_name.json")
-    ) as json_file:
-        evos_to_standard_name = json.load(json_file)
 
     # Retrieve the list of standard_names to consider
     eov_variables = []
@@ -97,8 +103,8 @@ def get_variable_list(erddap_metadata: dict, eovs: list):
 def get_erddap_download_url(
     dataset_info: dict,
     user_constraint: dict,
-    variables_list: list = None,
-    polygon_region=None,
+    variables_list: list,
+    polygon_region,
 ):
     """
     Method to retrieve the an ERDDAP download url based on the query provided by the user.
@@ -161,8 +167,7 @@ def get_erddap_download_url(
             e.constraints["depth<="] = user_constraint["depth_max"]
 
     # Add variable list to retrieve
-    if variables_list:
-        e.variables = variables_list
+    e.variables = variables_list
 
     # Get Download Link
     return e.get_download_url()
@@ -253,11 +258,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
     # Download file locally
     chunksize = 1024 ** 2  # 1MB
     # Download data to drive, down
-    while json_query["cache_filtered"]:
-
-        # Grab the first dataset within the list
-        dataset = json_query["cache_filtered"].pop(0)
-
+    for dataset in json_query["cache_filtered"]:
         # If metadata for the dataset is not available retrieve it
         if (
             "erddap_metadata" not in dataset
@@ -289,7 +290,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
                     dataset,
                     json_query["user_query"],
                     variable_list,
-                    polygon_region=polygon_region,
+                    polygon_region,
                 )
             except requests.exceptions.HTTPError as e:
                 # Failed to get a download url
