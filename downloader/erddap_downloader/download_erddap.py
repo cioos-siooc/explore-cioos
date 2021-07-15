@@ -21,21 +21,22 @@ import warnings
 import erddap_scraper.ERDDAP as erddap_scraper
 from erddap_downloader.download_pdf import download_pdf
 
-DATASET_SIZE_LIMIT = 10 ** 7
-QUERY_SIZE_LIMIT = 10 ** 8
 ONE_MB = 10 ** 6
+DATASET_SIZE_LIMIT = 10 * ONE_MB
+QUERY_SIZE_LIMIT = 100 * ONE_MB
+
+DOWNLOADING = "DOWNLOADING"
+COMPLETED = "COMPLETED"
+PARTIAL = "PARTIAL"
+FAILED = "FAILED"
+EMPTY = "EMPTY"
 
 # Downloader report
 report = {
-    "erddap_report": {
-        "successful": [],
-        "partial": [],
-        "empty": [],
-        "ignored": [],
-        "failed": [],
-    },
+    "erddap_report": [],
     "over_limit": False,
     "total_size": 0,
+    "empty_download": True,
 }
 
 
@@ -232,13 +233,6 @@ def get_datasets(json_query, output_path="", create_pdf=False):
     :param output_path: path where to save the downloaded data.
     """
 
-    def update_erddap_report(result, message):
-        if result in ["failed", "partial", "empty", "ignored"]:
-            warnings.warn(f"{result.upper()}: {message}")
-        report["erddap_report"][result] += [
-            {"query": download_url_list, "result": message}
-        ]
-
     # Convert WKT polygon to shapely polygon object
     if "polygon_region" in json_query["user_query"]:
         polygon_regions = [
@@ -254,6 +248,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
 
     # Download file locally
     chunksize = 1024 ** 2  # 1MB
+
     # Download data to drive, down
     for dataset in json_query["cache_filtered"]:
         # If metadata for the dataset is not available retrieve it
@@ -278,8 +273,9 @@ def get_datasets(json_query, output_path="", create_pdf=False):
         df = pd.DataFrame()
         bytes_downloaded = 0
         file_size = 0
-        download_status = "Download"
+        download_status = DOWNLOADING
         download_url_list = []
+        erddap_error = ""
         for polygon_region in polygon_regions:
 
             # Get download url
@@ -289,7 +285,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
                 variable_list,
                 polygon_region=polygon_region,
             )
-            
+
             # Add URL to the lis tof URL for this dataset
             download_url_list += [download_url]
 
@@ -309,11 +305,11 @@ def get_datasets(json_query, output_path="", create_pdf=False):
                 # Make sure the connection is working otherswise make a warning and send the error.
                 if response.status_code != 200:
                     if response.status_code == 404:
-                        download_status = "empty"
+                        download_status = EMPTY
                     else:
-                        download_status = "failed"
-                    # update_erddap_report(download_status, download_url, response.text)
-                    message = response.text
+                        download_status = FAILED
+
+                    erddap_error = response.text
                     continue
 
                 # Download data up to maximum size allowed
@@ -324,7 +320,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
 
                     # Stop download limit per dataset is reached
                     if bytes_downloaded > DATASET_SIZE_LIMIT:
-                        download_status = "partial"
+                        download_status = PARTIAL
                         report["over_limit"] = True
                         print("Reached download limit per dataset!")
                         break
@@ -346,10 +342,11 @@ def get_datasets(json_query, output_path="", create_pdf=False):
             df = df.append(df_temp)
 
         # If download status hasn't changed, download was successfully completed
-        if download_status == "Download":
-            download_status = "Completed"
+        if download_status == DOWNLOADING:
+            download_status = COMPLETED
 
         if not df.empty:
+            report["empty_download"] = False
             # Sort data along time
             if "time" in df.columns:
                 df = df.sort_values("time")
@@ -367,7 +364,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
 
         # Generate report for each download
         # Return download report
-        if download_status in ["Completed", "partial"]:
+        if download_status in [COMPLETED, PARTIAL]:
             if create_pdf:
                 ckan_url = dataset["ckan_url"] + dataset["ckan_id"]
                 pdf_filename = get_file_name_output(dataset, output_path, "pdf")
@@ -376,41 +373,20 @@ def get_datasets(json_query, output_path="", create_pdf=False):
             # Retrieve metadata
             save_erddap_metadata(dataset, output_path=output_path)
 
-        if download_status == "Completed":
-            update_erddap_report("successful", os.stat(output_file_path).st_size)
+        dataset_report = {
+            "dataset_id": dataset["dataset_id"],
+            "download_url_list": download_url_list,
+            "status": download_status,
+            "file_size": file_size,
+            "bytes_downloaded": bytes_downloaded,
+            "no_data": df.empty,
+            "dataset_limit_hit": bytes_downloaded > DATASET_SIZE_LIMIT,
+            "query_limit_hit": report["total_size"] > QUERY_SIZE_LIMIT,
+            "erddap_error": erddap_error,
+            "total_size_so_far": report["total_size"],
+        }
 
-        # Reach query limit
-        elif report["total_size"] > QUERY_SIZE_LIMIT and bytes_downloaded == 0:
-            update_erddap_report("ignored", "Reached query maximum size limit.")
-
-        # Partial Download
-        elif file_size > 0 and bytes_downloaded > DATASET_SIZE_LIMIT:
-            # Reason for partial download
-            message = f"Reached download limit (>{DATASET_SIZE_LIMIT/ONE_MB:.3f} MB)"
-            if file_size < bytes_downloaded:
-                message += f" and was filtered to within selected polygon: {file_size/ONE_MB:.3f} MB"
-            update_erddap_report("partial", message)
-
-        # No data left after polygon filtration
-        elif df.empty and bytes_downloaded > 0:
-            # If data was downloaded but none was kept
-            update_erddap_report(
-                "failed", "Failed to download any data within the polygon"
-            )
-
-        # Empty Query
-        elif download_status == "empty":
-            update_erddap_report("empty", message)
-
-        # Failed to download from ERDDAP
-        elif download_status == "failed":
-            update_erddap_report("failed", message)
-
-        else:
-            # If the tests conditions above never been met make an error to track what kind of result it is.
-            raise RuntimeError("Unreported query status")
-
-        # Add downloaded file size
-        report["total_size"] += report["total_size"] + file_size
+        report["erddap_report"] += [dataset_report]
+        report["total_size"] += file_size
 
     return report

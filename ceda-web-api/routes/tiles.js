@@ -15,8 +15,6 @@ router.get("/:z/:x/:y.mvt", async (req, res) => {
   const isHexGrid = z < 7;
   const zoomColumn = z < 5 ? "geom_snapped_0" : "geom_snapped_1";
 
-  console.log("req.query");
-  console.log(req.query);
   // calculate the bounding polygon for this tile
 
   const sqlQuery = {
@@ -62,7 +60,6 @@ router.get("/:z/:x/:y.mvt", async (req, res) => {
     }) AS st_asmvt from mvtgeom;
   `;
 
-  console.log(SQL);
   try {
     const tileRaw = await db.raw(SQL);
 

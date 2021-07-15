@@ -18,7 +18,7 @@ def run_download_query(download_query, output_folder, create_pdf=False):
     query_report = download_erddap.get_datasets(download_query, temp_folder, create_pdf)
 
     # check if no data returned, exit early
-    if query_report["total_size"] == 0:
+    if query_report["empty_download"]:
         query_report["zip_file_size"] = 0
         return query_report
 

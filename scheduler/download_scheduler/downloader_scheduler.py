@@ -62,7 +62,9 @@ def get_a_download_job():
     if row:
         pk = row["pk"]
         print("Starting job:", pk)
-        update_download_jobs(pk, {"status": "downloading", "time": "NOW()"}, session)
+        update_download_jobs(
+            pk, {"status": "downloading", "time_start": "NOW()"}, session
+        )
     session.commit()
     return row
 
