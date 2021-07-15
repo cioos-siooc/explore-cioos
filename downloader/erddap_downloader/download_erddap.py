@@ -105,6 +105,7 @@ def get_erddap_download_url(
     user_constraint: dict,
     variables_list: list,
     polygon_region,
+    response: str = "csv",
 ):
     """
     Method to retrieve the an ERDDAP download url based on the query provided by the user.
@@ -120,7 +121,7 @@ def get_erddap_download_url(
         protocol="tabledap",
     )
 
-    e.response = user_constraint["response"]
+    e.response = response
     e.dataset_id = dataset_info["dataset_id"]
     e.constraints = {}
 
@@ -243,10 +244,6 @@ def get_datasets(json_query, output_path="", create_pdf=False):
         polygon_regions = [
             shapely.wkt.loads(json_query["user_query"]["polygon_region"])
         ]
-
-    # Make ERDDAP CSV output default output
-    if "response" not in json_query["user_query"]:
-        json_query["user_query"]["response"] = "csv"
 
     # Duplicate polygon over -180 to 180 limit and generate multiple queries to match each side
     if polygon_regions[0].bounds[0] < -180 or polygon_regions[0].bounds[2] > 180:
