@@ -16,7 +16,6 @@ def run_download_query(download_query, output_folder, create_pdf=False):
 
     # Run the download
     query_report = download_erddap.get_datasets(download_query, temp_folder, create_pdf)
-    print(query_report)
 
     # check if no data returned, exit early
     if query_report["total_size"] == 0:
