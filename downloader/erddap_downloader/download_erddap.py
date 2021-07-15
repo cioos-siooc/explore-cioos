@@ -364,7 +364,7 @@ def get_datasets(json_query, output_path=""):
                 df = df.sort_values("time")
 
             # Save to file
-            output_file_path = get_file_name_output(dataset, output_path, ".csv")
+            output_file_path = get_file_name_output(dataset, output_path, "csv")
             with open(output_file_path, "w") as f:
                 # Write Header
                 f.write(",".join(list(df.columns)) + "\n")
