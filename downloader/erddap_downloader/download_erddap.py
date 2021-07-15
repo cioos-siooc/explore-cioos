@@ -289,6 +289,9 @@ def get_datasets(json_query, output_path="", create_pdf=False):
                 variable_list,
                 polygon_region=polygon_region,
             )
+            
+            # Add URL to the lis tof URL for this dataset
+            download_url_list += [download_url]
 
             # If maximum size of query reached just don't download and give query url
             # or if maximum download for this dataset is reached
@@ -374,7 +377,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
             save_erddap_metadata(dataset, output_path=output_path)
 
         if download_status == "Completed":
-            update_erddap_report("successful", os.stat(output_path).st_size)
+            update_erddap_report("successful", os.stat(output_file_path).st_size)
 
         # Reach query limit
         elif report["total_size"] > QUERY_SIZE_LIMIT and bytes_downloaded == 0:
@@ -389,7 +392,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
             update_erddap_report("partial", message)
 
         # No data left after polygon filtration
-        elif file_size == 0 and bytes_downloaded > 0:
+        elif df.empty and bytes_downloaded > 0:
             # If data was downloaded but none was kept
             update_erddap_report(
                 "failed", "Failed to download any data within the polygon"
