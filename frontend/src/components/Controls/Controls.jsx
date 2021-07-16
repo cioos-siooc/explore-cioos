@@ -134,7 +134,7 @@ export default function Controls(props) {
             </ul>
           </div>
           <div>
-            If you have <i><u>successfully</u></i> submitted a request, you will recieve an email at the provided <i><u>registered</u></i> email address from the CEDA service. 
+            If you have <i><u>successfully</u></i> submitted a request, you will receive an email at the provided <i><u>registered</u></i> email address from the CEDA service. 
             A response from CEDA may take some time to prepare, so please be patient. 
             This email will contain a data download link, or error messages if issues occured. 
           </div>
