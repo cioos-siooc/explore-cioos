@@ -15,4 +15,6 @@ def download_pdf(url, filename):
         else:
             raise Exception("Unable to download file")
     except Exception as e:
-        warnings.warn("Error creating PDF", e, traceback.format_exc())
+        print(e)
+        print(traceback.format_exc())
+        warnings.warn("Error creating PDF")

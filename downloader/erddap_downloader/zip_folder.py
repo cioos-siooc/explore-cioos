@@ -8,8 +8,13 @@ def zip_folder(path, zip_full_path):
     # ziph is zipfile handle
     for root, dirs, files in os.walk(path):
         for file in files:
-            ziph.write(
+            res = ziph.write(
                 os.path.join(root, file),
                 os.path.relpath(os.path.join(root, file), os.path.join(path, "..")),
             )
+            if res:
+                raise Exception(
+                    "Error creating zip file!", zip_full_path, " from files in ", path
+                )
+
     ziph.close()

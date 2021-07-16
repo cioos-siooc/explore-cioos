@@ -153,7 +153,7 @@ def run_download(row):
             # clear downloader_output in case it was an error before and now works
             "downloader_output": "",
             # SQLAlchemy struggles with '%
-            "erddap_report": json.dumps(downloader_output.get("erddap_report"))
+            "erddap_report": json.dumps(downloader_output)
             .replace("%", "")
             .replace("'", ""),
             "time_complete": "NOW()",

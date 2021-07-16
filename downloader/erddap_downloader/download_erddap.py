@@ -30,14 +30,7 @@ COMPLETED = "COMPLETED"
 PARTIAL = "PARTIAL"
 FAILED = "FAILED"
 EMPTY = "EMPTY"
-
-# Downloader report
-report = {
-    "erddap_report": [],
-    "over_limit": False,
-    "total_size": 0,
-    "empty_download": True,
-}
+IGNORED = "IGNORED"
 
 
 def load_eov_mapping():
@@ -233,6 +226,14 @@ def get_datasets(json_query, output_path="", create_pdf=False):
     :param output_path: path where to save the downloaded data.
     """
 
+    # Downloader report
+    report = {
+        "erddap_report": [],
+        "over_limit": False,
+        "total_size": 0,
+        "empty_download": True,
+    }
+
     # Convert WKT polygon to shapely polygon object
     if "polygon_region" in json_query["user_query"]:
         polygon_regions = [
@@ -295,7 +296,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
                 report["total_size"] > QUERY_SIZE_LIMIT
                 or bytes_downloaded > DATASET_SIZE_LIMIT
             ):
-                download_status = "ignored"
+                download_status = IGNORED
                 continue
 
             # Download data
@@ -321,7 +322,6 @@ def get_datasets(json_query, output_path="", create_pdf=False):
                     # Stop download limit per dataset is reached
                     if bytes_downloaded > DATASET_SIZE_LIMIT:
                         download_status = PARTIAL
-                        report["over_limit"] = True
                         print("Reached download limit per dataset!")
                         break
 
