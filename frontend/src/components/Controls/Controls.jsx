@@ -1,9 +1,9 @@
 import * as React from 'react'
 import {useState, useRef, useEffect} from 'react'
 import PropTypes from 'prop-types'
-import {Container, Row, Col, Accordion, Card, Button, InputGroup, OverlayTrigger, Tooltip, useAccordionToggle, Table} from 'react-bootstrap'
+import {Container, Row, Col, Accordion, Card, Button, InputGroup, OverlayTrigger, Tooltip, useAccordionToggle, Table, Modal} from 'react-bootstrap'
 import classnames from 'classnames'
-import { ChevronCompactLeft, ChevronCompactRight, QuestionCircle, ChevronCompactDown, ChevronCompactUp } from 'react-bootstrap-icons'
+import { ChevronCompactLeft, ChevronCompactRight, QuestionCircle, ChevronCompactDown, ChevronCompactUp, ArrowRight } from 'react-bootstrap-icons'
 
 import TimeSelector from './TimeSelector/TimeSelector.jsx'
 import DepthSelector from './DepthSelector/DepthSelector.jsx'
@@ -67,6 +67,7 @@ export default function Controls(props) {
   const [activePage, setActivePage] = useState(1)
   const [currentPage, setCurrentPage] = useState()
   const [data, setData] = useState()
+  const [modalShow, setModalShow] = useState(false)
 
   function createDataFilterQueryString () {
     return Object.entries(query)
@@ -82,6 +83,87 @@ export default function Controls(props) {
       props.map.updateSource(createDataFilterQueryString())
     }
   }
+
+  function MyVerticallyCenteredModal(props) {
+    return (
+      <Modal
+        {...props}
+        size="lg"
+        aria-labelledby="contained-modal-title-vcenter"
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title id="contained-modal-title-vcenter">
+            <b>C</b>IOOS Data <b>E</b>xploration, <b>D</b>iscovery and Download <b>A</b>pplication (CEDA) - <i>Closed Beta</i>
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <h6>Closed beta</h6>
+          We are grateful and excited to gather essential end-user feedback from our beta testers.
+          Please submit your feedback through the feedback form we provided in your beta invitation email.
+          <hr></hr>
+          <h6>How to use this application</h6>
+          <div>
+            To download data from map features, at a <u>minimum</u> you must: 
+            <ul className='requirementsList'>
+              <li>
+                <Row>
+                  <Col>draw a polygon using the <i>polygon tool</i> (top left): </Col> <Col><Button disabled variant='light' className='polygonButton'></Button></Col>
+                </Row>
+              </li>
+              <li>
+                <Row>
+                  <Col>
+                    provide a <i><u>registered</u> email address</i> (top right): 
+                  </Col>
+                  <Col>
+                    <input disabled placeholder='exampleEmail@cioos.ca' className='emailInput'/>
+                  </Col>
+                </Row>
+              </li>
+              <li>
+                <Row>
+                  <Col>
+                    and click the <i>Submit Request</i> button (top right): 
+                  </Col>
+                  <Col>
+                    <Button disabled variant='secondary' >Not Ready</Button> <ArrowRight/> <Button disabled variant='primary' >Submit Request</Button>
+                  </Col>
+                </Row>
+              </li> 
+            </ul>
+          </div>
+          <div>
+            If you have <i><u>successfully</u></i> submitted a request, you will recieve an email at the provided <i><u>registered</u></i> email address from the CEDA service. 
+            A response from CEDA may take some time to prepare, so please be patient. 
+            This email will contain a data download link, or error messages if issues occured. 
+          </div>
+          <br/>
+          There are <i>additional features</i>, but we will let you discover those and provide feedback naturally. 
+          <br/>
+          Happy exploring, discovering, and downloading!
+          <hr></hr>
+          <div>
+            <b>Note: </b>We have intentionally limited the amount of data you can download in a request:
+              <ul>
+                <li>
+                  10MB / dataset
+                </li>
+                <li>
+                  100MB / request
+                </li>
+              </ul>
+              You will see information about these limits in your email.
+          </div>
+          <hr></hr>
+          Thank you!
+        </Modal.Body>
+      </Modal>
+    );
+  }
+  useEffect(() => {
+    setTimeout(() => setModalShow(true), 500)
+  }, [])
 
   useEffect(() => {
     if(isMounted.current && orgsLoaded.current >= 1) {
@@ -130,7 +212,7 @@ export default function Controls(props) {
   useEffect(() => {
     if(!tempPointsData) { // there are no points selected
       setPointsClicked(false)
-      // setPointsData()
+      setPointsData()
       setCurrentPage()
       setPointDetailsOpen(false)
       setData()
@@ -191,6 +273,10 @@ export default function Controls(props) {
 
   return (
     <div>
+      <MyVerticallyCenteredModal
+        show={modalShow}
+        onHide={() => setModalShow(false)}
+      />
       <div className='controls'>
         <div className='filters float-right'>
           <Container fluid>
@@ -531,4 +617,8 @@ export default function Controls(props) {
     </div>
   )
 } 
+
+Controls.propTypes = {
+  map: PropTypes.object.isRequired
+}
 
