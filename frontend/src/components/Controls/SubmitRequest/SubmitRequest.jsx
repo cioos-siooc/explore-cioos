@@ -13,6 +13,8 @@ export default function SubmitRequest (props) {
   const [querySubmitted, setQuerySubmitted] = useState(false)
   const [queryFetch, setQueryFetch] = useState(false)
   const [queryFailed, setQueryFailed] = useState(false)
+  const [polygonProperties, setPolygonProperties] = useState()
+  const [prevPolygonProperties, setPrevPolygonProperties] = useState()
   const [polygonCreated, setPolygonCreated] = useState(false)
   const [buttonText, setButtonText] = useState('Not Ready')
   const [buttonVariant, setButtonVariant] = useState('secondary')
@@ -27,6 +29,7 @@ export default function SubmitRequest (props) {
       setQuerySubmitted(false)
       setQueryRequested(false)
       setQueryFailed(false)
+      setQueryFetch(false)
     }
   }, [props.filtersChanged])
 
@@ -34,11 +37,12 @@ export default function SubmitRequest (props) {
     setEmailValid(validateEmail(email))
     setQueryRequested(false)
     setQuerySubmitted(false)
+    setQueryFetch(false)
     setQueryFailed(false)
   }, [email])
 
   useEffect(() => {
-    if(polygonCreated && emailValid && !props.filtersChanged) {
+    if(polygonCreated && emailValid && !props.filtersChanged && queryRequested) {
       setQueryFetch(true)
       fetch(`${server}/download?${props.query}&polygon=${JSON.stringify(props.map.getPolygon())}&email=${email}`).then((value) => {
         if(value.ok) {
@@ -58,19 +62,32 @@ export default function SubmitRequest (props) {
       setQueryFetch(false)
       setQueryRequested(false)
       setQuerySubmitted(false)
+      setQueryFetch(false)
+      setQueryFailed(false)
     }
   }, [queryRequested])
 
   useEffect(() => {
-    setInterval(() => {
-      if(props.map.getPolygon()) {
-        setPolygonCreated(true)
-      } else {
-        setPolygonCreated(false)
+    if(polygonProperties && polygonProperties.length >= 4) {
+      setPolygonCreated(true)
+      if(JSON.stringify(polygonProperties) !== JSON.stringify(prevPolygonProperties) ) {
+        setPrevPolygonProperties(polygonProperties)
         setQueryRequested(false)
         setQuerySubmitted(false)
+        setQueryFetch(false)
+        setQueryFailed(false)
       }
-    }, 500);
+    } else if(!polygonProperties) {
+      setPolygonCreated(false)
+      setQueryRequested(false)
+      setQuerySubmitted(false)
+      setQueryFetch(false)
+      setQueryFailed(false)
+    }
+  }, [polygonProperties])
+
+  useEffect(() => {
+    setInterval(() => setPolygonProperties(props.map.getPolygon()), 300);
   }, [])
 
   useEffect(() => {
@@ -163,7 +180,6 @@ export default function SubmitRequest (props) {
     </div>
   )
 }
-
 
 SubmitRequest.propTypes = {
   map: PropTypes.object.isRequired,

@@ -319,14 +319,9 @@ export default class CIOOSMap extends React.Component {
   }
 
   getPolygon() {
-    if (this.map.getSource("mapbox-gl-draw-cold")) {
-      const polygonSource = this.map.getSource("mapbox-gl-draw-cold")
-      if (polygonSource) { // there is a polygon drawn
-        const polygonFeatures = polygonSource._data.features.map((elem) => elem.geometry)
-        if(polygonFeatures[0]){
-          return polygonFeatures[0].coordinates[0]; // get coordinates array of polygon
-        }
-      }
+    const currentFeatures = this.drawPolygon.getAll().features[0]
+    if(currentFeatures) {
+      return currentFeatures.geometry.coordinates[0]
     }
   }
 
