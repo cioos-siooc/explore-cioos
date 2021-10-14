@@ -17,7 +17,7 @@ router.get("/organizations", async function (req, res, next) {
     WHERE eovs && '{${allEOVS}}')
     SELECT o.pk,o.name,o.color from org_pks
     JOIN cioos_api.organizations o
-    ON org_pks.pk=o.pk::text
+    ON org_pks.pk=o.pk
     ORDER BY o.name`
   );
   res.send(orgs && orgs.rows);

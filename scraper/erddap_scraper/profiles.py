@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
-import pandas as pd
-from urllib.error import HTTPError
 import traceback
 import urllib
+from urllib.error import HTTPError
+
+import pandas as pd
 
 
 def parse_erddap_dates(series):
@@ -49,8 +50,11 @@ def get_profile_ids(erddap_url, dataset_id, profile_variable):
     if not profile_variable:
         return []
     url = f"{erddap_url}/tabledap/{dataset_id}.csv?{profile_variable}&distinct()"
+    print(url)
     profile_ids = erddap_csv_to_df(url)
-    return list(filter(None, profile_ids[profile_variable]))
+    if profile_ids:
+        return list(filter(None, profile_ids[profile_variable]))
+    return []
 
 
 def get_profiles(
@@ -68,7 +72,8 @@ def get_profiles(
 
     # number of profiles in this dataset (eg by counting unique profile_id)
     profile_ids = get_profile_ids(erddap_url, dataset_id, profile_variable)
-
+    if not profile_ids:
+        return None
     profile_records = pd.DataFrame()
     for field in fields:
         print(field)

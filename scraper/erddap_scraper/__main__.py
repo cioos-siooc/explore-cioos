@@ -1,19 +1,42 @@
 import argparse
+import configparser
+import threading
+import uuid
+import os
+
+import pandas as pd
+from sqlalchemy import create_engine, types
+
 from erddap_scraper.scrape_erddap import scrape_erddap
 
-import threading
-import pandas as pd
-import uuid
+float_type = types.Float(precision=3, asdecimal=True)
+dtypes_profile = {
+    "latitude_min": float_type,
+    "latitude_max": float_type,
+    "longitude_min": float_type,
+    "longitude_max": float_type,
+    "depth_min": float_type,
+    "depth_max": float_type,
+}
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("erddap_urls")
-    parser.add_argument(
-        "--dataset_ids",
-        help="only scrape these dataset IDs. Comma separated list",
-    )
 
-    args = parser.parse_args()
+def main(erddap_urls, csv_only):
+    # setup database connection
+    if not csv_only:
+        if os.getenv("DB_HOST"):
+            envs=os.environ
+        else:
+            config = configparser.ConfigParser()
+            config.read(".env")
+            envs = config["scheduler"]
+            
+        
+        database_link = (
+            f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:5432/{envs['DB_NAME']}"
+        )
+
+        engine = create_engine(database_link)
+
     erddap_urls = args.erddap_urls.split(",")
     dataset_ids = None
     if args.dataset_ids:
@@ -35,7 +58,9 @@ if __name__ == "__main__":
 
     profiles = pd.DataFrame()
     datasets = pd.DataFrame()
+
     datasets_not_added_total = []
+
     for [profile, dataset, datasets_not_added] in result:
         profiles = profiles.append(profile)
         datasets = datasets.append(dataset)
@@ -47,8 +72,39 @@ if __name__ == "__main__":
 
     if datasets.empty:
         print("No datasets scraped")
-    else:
+        return
+
+    if csv_only:
         datasets.to_csv(datasets_file, index=False)
         profiles.to_csv(profiles_file, index=False)
         print(f"Wrote {datasets_file} and {profiles_file}")
-        print("datasets_not_added_total", datasets_not_added_total)
+    else:
+        schema = "cioos_api"
+        datasets.to_sql(
+            "datasets_data_loader", con=engine, if_exists="replace", schema=schema
+        )
+        profiles.to_sql(
+            "profiles_data_loader",
+            con=engine,
+            if_exists="replace",
+            schema=schema,
+            dtype=dtypes_profile,
+        )
+        print("Wrote to db:", f"{schema}.datasets_data_loader")
+        print("Wrote to db:", f"{schema}.profiles_data_loader")
+
+    print("datasets_not_added_total", datasets_not_added_total)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("erddap_urls")
+    parser.add_argument(
+        "--dataset_ids",
+        help="only scrape these dataset IDs. Comma separated list",
+    )
+    parser.add_argument(
+        "--csv-only", help="Skip writing to the DB", action="store_true"
+    )
+    args = parser.parse_args()
+    main(args.erddap_urls, args.csv_only)
