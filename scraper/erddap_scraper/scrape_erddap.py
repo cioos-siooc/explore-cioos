@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
+import traceback
+from urllib.error import HTTPError
+from urllib.parse import urlparse
+
+import pandas as pd
+
 from erddap_scraper.ERDDAP import ERDDAP
 from erddap_scraper.profiles import get_profiles
-import pandas as pd
-from urllib.parse import urlparse
-from urllib.error import HTTPError
-import traceback
-
 
 # TIMEOUT = 30
 
@@ -47,12 +48,15 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
     if not datasets:
         raise RuntimeError("No datasets found")
     # loop through each dataset to be processed
-    for dataset_id in datasets:
+    
+    for i,dataset_id in enumerate(datasets):
+  
         if dataset_ids and dataset_id not in dataset_ids:
             continue
 
-        thread_log("Querying dataset:", dataset_id)
-
+        thread_log("Querying dataset:", dataset_id, f"{i+1}/{len(datasets)}")
+        if dataset_id[0] !='p':
+            continue
         dataset_variables = {}
         dataset_was_added = False
         try:

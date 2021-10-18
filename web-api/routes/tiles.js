@@ -4,19 +4,28 @@ var router = express.Router();
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { cdmDataTypeGrouping } = require("../utils/grouping");
+var cache = require("express-redis-cache")({
+  host: process.env.REDIS_HOST,
+});
+
+cache.on("error", function (error) {
+  console.error("Running without Redis, that's ok");
+  cache.removeAllListeners();
+  // hide more error messages
+  cache.on("error", () => {});
+});
 
 /* GET /tiles/:z/:x/:y.mvt */
 /* Retreive a vector tile by tileid */
-router.get("/:z/:x/:y.mvt", async (req, res) => {
+router.get("/:z/:x/:y.mvt", cache.route({ binary: true }), async (req, res) => {
   const { z, x, y } = req.params;
 
   const filters = createDBFilter(req.query);
 
   const isHexGrid = z < 7;
-  const zoomColumn = z < 5 ? "geom_snapped_0" : "geom_snapped_1";
+  const zoomColumn = z < 5 ? "hex_zoom_0" : "hex_zoom_1";
 
   // calculate the bounding polygon for this tile
-
   const sqlQuery = {
     table: "cioos_api.profiles",
     geom_column: isHexGrid ? zoomColumn : "geom",
@@ -71,9 +80,7 @@ router.get("/:z/:x/:y.mvt", async (req, res) => {
     if (tile.st_asmvt.length === 0) {
       res.status(204);
     }
-
-    // send the tile!
-    res.send(tile.st_asmvt);
+    res.status(200).send(tile.st_asmvt);
   } catch (e) {
     res.status(404).send({
       error: e.toString(),

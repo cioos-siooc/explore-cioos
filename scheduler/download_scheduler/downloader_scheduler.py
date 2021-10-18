@@ -2,24 +2,27 @@ import configparser
 
 # from sqlalchemy import JSON, Text
 import json
+import os
 import time
 import traceback
 from re import L
 
+import sentry_sdk
 from erddap_downloader import downloader_wrapper
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from download_email import send_email
 
-import sentry_sdk
+from download_scheduler.download_email import send_email
 
-config = configparser.ConfigParser()
-config.read(".env")
-db = config["db"]
-scheduler_config = config["config"]
+# check if docker has set env variables, if not load from .env
+if os.getenv("DB_HOST"):
+    envs=os.environ
+else:
+    config = configparser.ConfigParser()
+    config.read(".env")
+    envs = config["scheduler"]
 
-
-if scheduler_config.get("environment") == "production":
+if envs['ENVIRONMENT'] == "production":
     ignore_errors = [KeyboardInterrupt]
 
     sentry_sdk.init(
@@ -32,20 +35,20 @@ if scheduler_config.get("environment") == "production":
     )
 
 
-data_base_link = (
-    f"postgresql://{db['user']}:{db['password']}@{db['host']}:5432/{db['database']}"
+database_link = (
+    f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:5432/{envs['DB_NAME']}"
 )
 
-engine = create_engine(data_base_link)
+engine = create_engine(database_link)
 
 create_pdf = False
 output_folder = "./out"
 
-if "create_pdf" in scheduler_config:
-    create_pdf = scheduler_config["create_pdf"] == "True"
+if "create_pdf" in envs:
+    create_pdf = envs["create_pdf"] == "True"
 
-if "output_folder" in scheduler_config:
-    output_folder = scheduler_config["output_folder"]
+if "output_folder" in envs:
+    output_folder = envs["DOWNLOADS_FOLDER"]
 
 
 def get_a_download_job():
@@ -170,15 +173,3 @@ def update_download_jobs(pk, row, session=engine):
     params = ",".join([f"{key}='{value}'" for key, value in row.items()])
     sql = f"UPDATE cioos_api.download_jobs SET {params} WHERE PK={pk}"
     session.execute(sql)
-
-
-if __name__ == "__main__":
-    print("Waiting for jobs..")
-    while True:
-        row = get_a_download_job()
-
-        if row:
-            pk = row["pk"]
-            run_download(row)
-            print("sleeping")
-        time.sleep(0.5)

@@ -1,0 +1,59 @@
+version: "3.9"
+services:
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/var/lib/redis
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+  db:
+    # using this until theres an official arm image for PostGIS 3
+    image: "odidev/postgis:13-3.1-alpine"
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB:"${DB_NAME}"
+      - POSTGRES_PASSWORD:"${DB_PASSWORD}"
+    volumes:
+      # - postgres-data:/var/lib/postgresql/data
+      - ceda_my_named_volume:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+  web-api:
+    build: ./web-api
+    expose:
+      - "4000"
+    depends_on:
+      - redis
+      - db
+    env_file:
+      - .env
+
+    # TODO add nginx load balancer
+  frontend:
+    build: ./frontend
+    expose:
+      - "80"
+    depends_on:
+      - web-api
+  nginx:
+    image: nginx:latest
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - web-api
+    ports:
+      - "5050:4000"
+  scheduler:
+    build:
+      context: .
+      dockerfile: ./scheduler/Dockerfile
+    depends_on:
+      - db
+    env_file:
+      - .env
+
+volumes:
+  # postgres-data:
+  ceda_my_named_volume:
+  redis-data:

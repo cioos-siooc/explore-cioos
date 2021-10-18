@@ -1,13 +1,10 @@
-truncate cioos_api.ckan_data_loader;
-\copy cioos_api.ckan_data_loader(erddap_url,dataset_id,eovs,ckan_id,parties,ckan_record) FROM '/Users/nate.rosenstock/dev/ceda/scraper/ckan_scraper/erddap_ckan_mapping.csv' WITH CSV HEADER DELIMETER '|';
-
-
+ROLLBACK;
+BEGIN;
 
 -- after loading CKAN data into the database via the python script
 truncate cioos_api.organizations;
 insert into cioos_api.organizations (name)
 select distinct unnest(parties) from cioos_api.datasets;
-
 
 -- convert organization list of names into list of pks
 with orgs as(
@@ -16,8 +13,6 @@ select array_remove(array_agg((select case when name=any(parties) then pk end)),
 update cioos_api.datasets set organization_pks=orgs.asdf
 from orgs
 where orgs.pk=datasets.pk;
-
-
 
 -- TODO this may need a limit 1 now
 -- TODO add erddap_url
@@ -29,3 +24,4 @@ FROM cioos_api.ckan_data_loader l WHERE
 l.dataset_id=d.dataset_id and
 l.erddap_url=d.erddap_url;
 
+COMMIT;

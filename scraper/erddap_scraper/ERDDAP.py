@@ -2,8 +2,10 @@
 
 # The ERDDAP class contains functions relating to querying the ERDDAP server
 
-import requests
 import re
+
+import requests
+
 from .setup_logging import setup_logging
 
 logger = setup_logging()

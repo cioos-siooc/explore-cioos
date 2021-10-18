@@ -10,7 +10,7 @@ setup(
     packages=["download_scheduler"],
     install_requires=[
         "sqlalchemy",
-        "psycopg2",
+        "psycopg2-binary",
         "sentry-sdk"
     ],
 )

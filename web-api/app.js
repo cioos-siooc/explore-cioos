@@ -8,6 +8,10 @@ var indexRouter = require("./routes/index");
 var tilesRouter = require("./routes/tiles");
 var downloadRouter = require("./routes/download");
 
+// if environement variables are set via docker, leave them
+// otherwise load from .env
+if (!process.env.DB_USER) require("dotenv").config();
+
 const compression = require("compression");
 
 var app = express();

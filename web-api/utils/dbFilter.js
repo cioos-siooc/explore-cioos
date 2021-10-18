@@ -51,7 +51,7 @@ function createDBFilter({
   if (depthMax) filters.push(`p.depth_min <= ${depthMax}`);
 
   if (organizations) {
-    const organizationsString = organizations.split(",").map((e) => `'${e}'`);
+    const organizationsString = organizations.split(",").map((e) => `${e}`);
     filters.push(`organization_pks && array[${organizationsString}]`);
   }
   filters.push(`cdm_data_type = any(array[${pointTypeCommaSeparatedString}])`);
