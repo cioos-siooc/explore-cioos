@@ -22,14 +22,11 @@ Add a crontab entry for the scheduler to run nightly.
 
 - Start a local database:
   `docker compose up db -d`
-- setup Python virtual env and install Python modules
-- install Python modules
+- Setup Python virtual env and install Python modules:
 
   ```sh
   python3 -m venv venv && source venv/bin/activate
-  pip install -e ./downloader
-  pip install -e ./scheduler
-  pip install -e ./scraper
+  pip install -e ./downloader ./scheduler ./scraper
   ```
 
 - Start the API:
@@ -60,6 +57,8 @@ Add a crontab entry for the scheduler to run nightly.
   ```sh
     sh data_loader_test.sh
   ```
+
+- See website at <http://localhost:8000>
 
 ## Handy docker commands
 
