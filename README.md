@@ -3,7 +3,7 @@
 1. Install or upgrade docker. New versions of Docker include `docker compose`
 1. Rename sample.env to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
 1. `docker compose up -d` to start all services. This will take a few minute to download, build, create the database schema.
-1. Start your python3 environment, eg `python -m venv venv;source venv/bin/activate`
+1. Start your python3 environment, eg `python3 -m venv venv && source venv/bin/activate`
 1. Run scraper to load data, this will take up to an hour or so. From this directory, run:
    `sh data_loader.sh`
 1. See website at <http://localhost:5050>

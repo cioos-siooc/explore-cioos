@@ -1,8 +1,7 @@
 version: "3.9"
 services:
   db:
-    # using this until theres an official arm image for PostGIS 3
-    image: "odidev/postgis:13-3.1-alpine"
+    image: "$DOCKER_POSTGIS_REPO/postgis:13-3.1-alpine"
     # db is exposed so scraper can connect to it
     ports:
       - "5432:5432"
