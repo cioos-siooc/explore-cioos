@@ -8,7 +8,8 @@ REINDEX TABLE cioos_api.ckan_data_loader;
 update cioos_api.datasets d set 
 eovs=l.eovs,
 parties=l.parties,
-ckan_record=l.ckan_record
+ckan_record=l.ckan_record,
+ckan_id=l.ckan_id
 FROM cioos_api.ckan_data_loader l WHERE
 l.dataset_id=d.dataset_id and
 l.erddap_url=d.erddap_url;

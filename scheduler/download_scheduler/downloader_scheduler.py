@@ -42,11 +42,12 @@ print("Connecting to",database_link)
 engine = create_engine(database_link)
 
 create_pdf = False
-output_folder = "./out"
+output_folder = "./downloads"
 
 
 if "CREATE_PDF" in envs:
     create_pdf = envs["CREATE_PDF"] == "True"
+    print("Create PDFs:",create_pdf)
 
 if "DOWNLOADS_FOLDER" in envs:
     output_folder = envs["DOWNLOADS_FOLDER"]
@@ -131,6 +132,7 @@ def run_download(row):
         stack_trace = traceback.format_exc()
         downloader_error = str(stack_trace).replace("'", "")
         print(e)
+        print(stack_trace)
         sentry_sdk.capture_message(f"download by {email} failed")
 
     # The downloader crashed and returned a string (error message) instead of json
