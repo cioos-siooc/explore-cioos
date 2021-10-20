@@ -62,6 +62,9 @@ Add a crontab entry for the scheduler to run nightly.
 
 ## Handy docker commands
 
+See which CEDA services are running:
+`docker compose ps`
+
 Start all containers, the first time this runs it will build containers:
 `docker compose up -d`
 
