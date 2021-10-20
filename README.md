@@ -1,11 +1,13 @@
 # CEDA - CIOOS Exploration and Data Discovery
 
+## Starting using docker
+
 1. Install or upgrade docker. New versions of Docker include `docker compose`
 1. Rename sample.env to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
 1. `docker compose up -d` to start all services. This will take a few minute to download, build, create the database schema.
 1. Start your python3 environment, eg `python3 -m venv venv && source venv/bin/activate`
-1. Run scraper to load data, this will take up to an hour or so. From this directory, run:
-   `sh data_loader.sh`
+1. Run scraper to load data. From this directory, run:
+   `sh data_loader.sh` to load all data or `sh data_loader_test.sh` to just load one dataset for testing purposes
 1. See website at <http://localhost:5050>
 
 ## Production deployment
@@ -14,15 +16,50 @@ From the production server, run:
 `docker compose up -d`
 Add a crontab entry for the scheduler to run nightly.
 
-TODO: change where it writes the files to
-
 ## Development
 
-- If you need to run a local database, run:
-  `docker compose up db -d`
+- To run CEDA locally, you will need Python and Node and 3 terminal windows
 
-- Start the API by running `npm start` from the `web-api` directory
-- Start the frontend by running `npm start` from the `frontend` directory
+- Start a local database:
+  `docker compose up db -d`
+- setup Python virtual env and install Python modules
+- install Python modules
+
+  ```sh
+  python3 -m venv venv && source venv/bin/activate
+  pip install -e ./downloader
+  pip install -e ./scheduler
+  pip install -e ./scraper
+  ```
+
+- Start the API:
+
+  ```sh
+      cd web-api
+      npm install
+      npm start
+  ```
+
+- Start the download scheduler:
+
+  ```sh
+      cd scheduler
+      python -m download_scheduler
+  ```
+
+- Start the frontend:
+
+  ```sh
+      cd frontend
+      npm install
+      npm start
+  ```
+
+- Scrape one dataset
+
+  ```sh
+    sh data_loader_test.sh
+  ```
 
 ## Handy docker commands
 
