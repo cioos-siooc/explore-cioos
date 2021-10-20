@@ -18,7 +18,7 @@ Add a crontab entry for the scheduler to run nightly.
 
 ## Development
 
-- To run CEDA locally, you will need Python and Node and 3 terminal windows
+- To run CEDA locally, you will need Python and Node and a few terminal windows
 
 - Start a local database:
   `docker compose up db -d`
@@ -52,7 +52,7 @@ Add a crontab entry for the scheduler to run nightly.
       npm start
   ```
 
-- Scrape one dataset
+- Scrape one dataset. NOTE: If you are running the scraper with `python -m erddap_scraper` you must first `cd` into the scraper directory.
 
   ```sh
     sh data_loader_test.sh

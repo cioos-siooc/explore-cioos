@@ -42,7 +42,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./downloads:$DOWNLOADS_FOLDER
+      - $DOWNLOADS_FOLDER:/usr/src/app/downloads
 
 volumes:
   postgres-data:
