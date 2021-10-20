@@ -4,6 +4,7 @@ var router = express.Router();
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { cdmDataTypeGrouping } = require("../utils/grouping");
+console.log("Connecting to redis at", process.env.REDIS_HOST);
 var cache = require("express-redis-cache")({
   host: process.env.REDIS_HOST,
 });

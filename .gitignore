@@ -17,3 +17,5 @@ notforrepo
 .vscode
 out
 ceda_download*
+venv
+*.rdb

@@ -1,10 +1,12 @@
 # CEDA - CIOOS Exploration and Data Discovery
 
-1. docker compose up to start all services
-1. Setup the .env file in this directory to connect to a dev or production DB
-1. Load data, this will 30 mins or so. From this directory, run:
-   `sh database/data_loader_test.sh`
-1. See website at <http://localhost:3000>
+1. Install or upgrade docker. New versions of Docker include `docker compose`
+1. Rename sample.env to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
+1. `docker compose up -d` to start all services. This will take a few minute to download, build, create the database schema.
+1. Start your python3 environment, eg `python -m venv venv;source venv/bin/activate`
+1. Run scraper to load data, this will take up to an hour or so. From this directory, run:
+   `sh data_loader.sh`
+1. See website at <http://localhost:5050>
 
 ## Production deployment
 
@@ -24,8 +26,8 @@ TODO: change where it writes the files to
 
 ## Handy docker commands
 
-Build and start all containers:
-`docker compose up -d --build`
+Start all containers, the first time this runs it will build containers:
+`docker compose up -d`
 
 Tail logs:
 `docker compose logs -f`
@@ -38,3 +40,6 @@ Delete database data:
 
 Delete tile cache:
 `docker rm ceda_redis-data`
+
+Flush redis cache:
+`docker exec -it ceda_redis_1 redis-cli FLUSHALL`

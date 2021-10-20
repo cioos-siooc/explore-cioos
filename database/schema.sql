@@ -4,6 +4,7 @@ CREATE schema cioos_api;
 
 -- ERDDAP Datasets
 -- data comes via cioos_api.datasets_data_loader
+DROP TABLE IF EXISTS cioos_api.datasets;
 CREATE TABLE cioos_api.datasets (
     pk serial PRIMARY KEY,
     dataset_id text,
@@ -20,6 +21,7 @@ CREATE TABLE cioos_api.datasets (
 );
 
 -- List of organizations to show in CEDA, from CKAN, can be many per dataset
+DROP TABLE IF EXISTS cioos_api.organizations;
 CREATE TABLE cioos_api.organizations (
     pk SERIAL PRIMARY KEY,
     name text,
@@ -116,3 +118,37 @@ CREATE TABLE cioos_api.download_jobs (
 -- cioos_api.ckan_data_loader
 -- cioos_api.datasets_data_loader
 -- cioos_api.profiles_data_loader
+DROP TABLE IF EXISTS cioos_api.ckan_data_loader;
+CREATE TABLE cioos_api.ckan_data_loader (
+    erddap_url text,
+    dataset_id text,
+    eovs text[],
+    ckan_id text,
+    parties text[],
+    ckan_record jsonb,
+    CONSTRAINT ckan_loader_unique UNIQUE(erddap_url,dataset_id)
+);
+
+DROP TABLE IF EXISTS cioos_api.datasets_data_loader;
+CREATE TABLE cioos_api.datasets_data_loader (
+    erddap_url text,
+    dataset_id text,
+    cdm_data_type text,
+    CONSTRAINT dataset_loader_unique UNIQUE(erddap_url,dataset_id)
+);
+
+DROP TABLE IF EXISTS cioos_api.profiles_data_loader;
+CREATE TABLE cioos_api.profiles_data_loader (
+    erddap_url text,
+    dataset_id text,
+    profile_id text,
+    time_min timestamp with time zone,
+    time_max timestamp with time zone,
+    latitude_min real,
+    latitude_max real,
+    longitude_min real,
+    longitude_max real,
+    depth_min real,
+    depth_max real,
+    CONSTRAINT profile_loader_unique UNIQUE(erddap_url,dataset_id,profile_id)
+);

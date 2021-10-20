@@ -2,7 +2,7 @@ import smtplib
 import os
 
 def send_email(mail_to, mail_message_body, mail_subject):
-    
+    print(mail_to, mail_message_body, mail_subject)
     # gmail_user = os.env('GMAIL_USER')
     # if not gmail_user:
     #     return

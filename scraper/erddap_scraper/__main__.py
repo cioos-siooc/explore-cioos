@@ -22,14 +22,11 @@ dtypes_profile = {
 
 def main(erddap_urls, csv_only):
     # setup database connection
+    # This is only run from outside docker
     if not csv_only:
-        if os.getenv("DB_HOST"):
-            envs=os.environ
-        else:
-            config = configparser.ConfigParser()
-            config.read(".env")
-            envs = config["scheduler"]
-            
+        config = configparser.ConfigParser()
+        config.read(".env")
+        envs = config["scheduler"]            
         
         database_link = (
             f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:5432/{envs['DB_NAME']}"
@@ -81,14 +78,15 @@ def main(erddap_urls, csv_only):
     else:
         schema = "cioos_api"
         datasets.to_sql(
-            "datasets_data_loader", con=engine, if_exists="replace", schema=schema
+            "datasets_data_loader", con=engine, if_exists="append", schema=schema,index=False
         )
         profiles.to_sql(
             "profiles_data_loader",
             con=engine,
-            if_exists="replace",
+            if_exists="append",
             schema=schema,
             dtype=dtypes_profile,
+            index=False
         )
         print("Wrote to db:", f"{schema}.datasets_data_loader")
         print("Wrote to db:", f"{schema}.profiles_data_loader")

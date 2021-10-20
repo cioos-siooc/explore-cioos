@@ -55,8 +55,7 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
             continue
 
         thread_log("Querying dataset:", dataset_id, f"{i+1}/{len(datasets)}")
-        if dataset_id[0] !='p':
-            continue
+
         dataset_variables = {}
         dataset_was_added = False
         try:
@@ -127,7 +126,6 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
                 profile_variable,
                 dataset_id,
                 important_vars_in_dataset,
-                cdm_data_type,
                 dataset_variables,
             )
 

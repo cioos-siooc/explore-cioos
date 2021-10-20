@@ -21,18 +21,13 @@ output_file = "erddap_ckan_mapping.csv"
 
 def main(csv_only=False, limit=None):
     """Run the CKAN scraper on CIOOS National (cioos.ca)"""
-
-
+    
     # setup database connection
+    # This is only run from outside docker
     if not csv_only:
-
-        if os.getenv("DB_HOST"):
-            envs=os.environ
-        else:
-            config = configparser.ConfigParser()
-            config.read(".env")
-            envs = config["scraper"]
-
+        config = configparser.ConfigParser()
+        config.read(".env")
+        envs = config["scheduler"]
 
         table = "ckan_data_loader"
         engine = create_engine(
@@ -53,7 +48,8 @@ def main(csv_only=False, limit=None):
         df.to_csv(output_file)
         print("Wrote ", output_file)
     else:
-        df.to_sql(table, con=engine, if_exists="replace", schema=schema, dtype=dtype)
+        schema='cioos_api'
+        df.to_sql(table, con=engine, if_exists="replace", schema=schema, dtype=dtype,index=False)
         print("Wrote to db:", f"{schema}.{table}")
 
 

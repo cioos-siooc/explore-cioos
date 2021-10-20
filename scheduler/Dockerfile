@@ -12,4 +12,5 @@ RUN pip install ./downloader
 RUN pip install ./scheduler
 RUN pip install ./scraper
 
-CMD [ "python", "-m","download_scheduler" ]
+# -u seems to be needed to get it to print to stdout
+CMD [ "python", "-u","-m","download_scheduler" ]
