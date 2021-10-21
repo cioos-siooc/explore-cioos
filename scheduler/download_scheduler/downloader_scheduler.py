@@ -42,16 +42,14 @@ print("Connecting to",database_link)
 engine = create_engine(database_link)
 
 create_pdf = False
+
+# In production, this is mapped to a WAF via a host mounted volume
 output_folder = "./downloads"
 
 
 if "CREATE_PDF" in envs:
     create_pdf = envs["CREATE_PDF"] == "True"
     print("Create PDFs:",create_pdf)
-
-if "DOWNLOADS_FOLDER" in envs:
-    output_folder = envs["DOWNLOADS_FOLDER"]
-
 
 def get_a_download_job():
     """

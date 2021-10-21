@@ -1,4 +1,4 @@
-# this version adds Redis (tile cache) and replicas (4xapi, 4x downloader)
+# this version adds Redis (tile cache) and replicas (4x api, 4x downloader)
 version: "3.3"
 services:
   redis:
@@ -9,8 +9,7 @@ services:
       - redis-data:/var/lib/redis
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
   db:
-    # using this until theres an official arm image for PostGIS 3
-    image: "odidev/postgis:13-3.1-alpine"
+    image: "postgis/postgis:13-3.1-alpine"
     ports:
       - "5432:5432"
     environment:
@@ -21,11 +20,13 @@ services:
       - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
   web-api:
     build: ./web-api
+    env_file:
+      - .env
     expose:
       - "4000"
     depends_on:
-      - redis
       - db
+      - redis
     deploy:
       replicas: 4
   nginx:
