@@ -5,4 +5,4 @@ This script checks the database every n seconds, and runs the downloader if ther
 Run from this directory with:
 `python -m download_scheduler`
 
-To get started change sample.env to .env and fill out your connection info
+To get started change .env.sample to .env and fill out your connection info

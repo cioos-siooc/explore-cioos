@@ -19,3 +19,4 @@ out
 ceda_download*
 venv
 *.rdb
+*.env

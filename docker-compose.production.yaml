@@ -1,5 +1,5 @@
 # this version adds Redis (tile cache) and replicas (4xapi, 4x downloader)
-version: "3.9"
+version: "3.3"
 services:
   redis:
     image: "redis:alpine"
@@ -20,7 +20,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
   web-api:
-    build: ./ceda-web-api
+    build: ./web-api
     expose:
       - "4000"
     depends_on:
@@ -28,12 +28,6 @@ services:
       - db
     deploy:
       replicas: 4
-  frontend:
-    build: ./frontend
-    expose:
-      - "80"
-    depends_on:
-      - web-api
   nginx:
     image: nginx:latest
     volumes:
@@ -50,7 +44,21 @@ services:
       - db
     deploy:
       replicas: 4
+    env_file:
+      - .env
+    volumes:
+      - $DOWNLOADS_FOLDER:/usr/src/app/downloads
 
+  # This would get used if/when we stop hosting Gitpages
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        API_URL: $API_URL
+    expose:
+      - "80"
+    depends_on:
+      - web-api
 volumes:
   postgres-data:
   redis-data:

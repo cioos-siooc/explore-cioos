@@ -2,9 +2,9 @@
 
 ## Starting using docker
 
-1. Install or upgrade docker. New versions of Docker include `docker compose`
-1. Rename sample.env to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
-1. `docker compose up -d` to start all services. This will take a few minute to download, build, create the database schema.
+1. Install [Docker](https://docs.docker.com/get-docker/) and [Docker compose](https://docs.docker.com/compose/install/). New versions of Docker include `docker-compose`
+1. Rename .env.sample to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
+1. `docker-compose up -d` to start all services. This will take a few minute to download, build, create the database schema.
 1. Start your python3 environment, eg `python3 -m venv venv && source venv/bin/activate`
 1. Run scraper to load data. From this directory, run:
    `sh data_loader.sh` to load all data or `sh data_loader_test.sh` to just load one dataset for testing purposes
@@ -13,7 +13,7 @@
 ## Production deployment
 
 From the production server, run:
-`docker compose up -d`
+`docker-compose -f docker-compose.production.yaml up -d`
 Add a crontab entry for the scheduler to run nightly.
 
 ## Development
@@ -21,7 +21,7 @@ Add a crontab entry for the scheduler to run nightly.
 - To run CEDA locally, you will need Python and Node and a few terminal windows
 
 - Start a local database:
-  `docker compose up db -d`
+  `docker-compose up db -d`
 - Setup Python virtual env and install Python modules:
 
   ```sh
@@ -63,16 +63,16 @@ Add a crontab entry for the scheduler to run nightly.
 ## Handy docker commands
 
 See which CEDA services are running:
-`docker compose ps`
+`docker-compose ps`
 
 Start all containers, the first time this runs it will build containers:
-`docker compose up -d`
+`docker-compose up -d`
 
 Tail logs:
-`docker compose logs -f`
+`docker-compose logs -f`
 
 (Re/)Build and (re/)start one container:
-``docker compose up frontend --build`
+``docker-compose up frontend --build`
 
 Delete database data:
 `docker rm ceda_postgres-data`

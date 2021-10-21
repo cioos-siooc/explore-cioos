@@ -1,7 +1,7 @@
 # Scrapers
 
 - Run the scrapers from this directory only
-- Copy sample.env to .env and change if needed.
+- Copy .env.sample to .env and change if needed.
 - Install with `pip install -e .`
 
 ## ERDDAP scraper
