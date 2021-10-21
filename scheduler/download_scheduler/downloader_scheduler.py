@@ -38,16 +38,18 @@ if envs['ENVIRONMENT'] == "production":
 database_link = (
     f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:5432/{envs['DB_NAME']}"
 )
-
+print("Connecting to",database_link)
 engine = create_engine(database_link)
 
 create_pdf = False
-output_folder = "./out"
+output_folder = "./downloads"
 
-if "create_pdf" in envs:
-    create_pdf = envs["create_pdf"] == "True"
 
-if "output_folder" in envs:
+if "CREATE_PDF" in envs:
+    create_pdf = envs["CREATE_PDF"] == "True"
+    print("Create PDFs:",create_pdf)
+
+if "DOWNLOADS_FOLDER" in envs:
     output_folder = envs["DOWNLOADS_FOLDER"]
 
 
@@ -77,7 +79,7 @@ def email_user(email, status, zip_filename):
     Send the user a success/failed message
     """
 
-    download_url = "https://pac-dev2.cioos.org/images/ceda/" + zip_filename
+    download_url= envs['DOWNLOAD_WAF_URL'] + zip_filename
     messages = {
         "completed": {
             "subject": "Your CEDA data query was successful",
@@ -130,6 +132,7 @@ def run_download(row):
         stack_trace = traceback.format_exc()
         downloader_error = str(stack_trace).replace("'", "")
         print(e)
+        print(stack_trace)
         sentry_sdk.capture_message(f"download by {email} failed")
 
     # The downloader crashed and returned a string (error message) instead of json

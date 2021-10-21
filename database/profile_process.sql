@@ -74,5 +74,4 @@ SET point_pk=points.pk
 FROM cioos_api.points
 WHERE points.geom = profiles.geom;
 
-
 COMMIT;

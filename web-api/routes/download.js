@@ -46,12 +46,14 @@ router.get("/", async (req, res, next) => {
   let count = 0;
 
   // Make sure they are a registered user
-  const allowedUsers = (await db("cioos_api.allowed_users")).map(
-    (e) => e.email
-  );
-  if (!allowedUsers.includes(email)) {
-    res.send(403);
-    return next();
+  if (process.env.BETA_MODE) {
+    const allowedUsers = (await db("cioos_api.allowed_users")).map(
+      (e) => e.email
+    );
+    if (!allowedUsers.includes(email)) {
+      res.send(403);
+      return next();
+    }
   }
 
   try {
