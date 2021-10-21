@@ -2,7 +2,6 @@ version: "3.3"
 services:
   db:
     image: "$DOCKER_POSTGIS_REPO/postgis:13-3.1-alpine"
-    # db is exposed so scraper can connect to it
     ports:
       - "5432:5432"
     environment:
@@ -13,26 +12,12 @@ services:
       - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
   web-api:
     build: ./web-api
+    env_file:
+      - .env
     expose:
       - "4000"
     depends_on:
       - db
-    env_file:
-      - .env
-  frontend:
-    build:
-      context: ./frontend
-      args:
-        API_URL: $API_URL
-
-    expose:
-      - "80"
-    depends_on:
-      - web-api
-    # environment:
-    #   - "API_URL=$API_URL"
-    #   - "ENVIRONMENT=$ENVIRONMENT"
-
   nginx:
     image: nginx:latest
     volumes:
@@ -51,6 +36,14 @@ services:
       - .env
     volumes:
       - $DOWNLOADS_FOLDER:/usr/src/app/downloads
-
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        API_URL: $API_URL
+    expose:
+      - "80"
+    depends_on:
+      - web-api
 volumes:
   postgres-data:
