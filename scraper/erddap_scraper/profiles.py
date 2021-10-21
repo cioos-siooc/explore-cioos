@@ -163,15 +163,21 @@ def get_profiles(erddap_url, profile_variable, dataset_id, fields, metadata):
 
     # Get Count for each dataset
     print("Get record Count")
-    count_variables = f"{profile_variable_string},time"
+    count_variables = profile_variable_list.copy()
+    if "time" not in count_variables:
+        count_variables.append("time")
     if (
         "timeseries_id" in profile_variable
         and "profile_id" in profile_variable
         and "depth" in metadata
+        and "depth" not in count_variables
     ):
-        count_variables += ",depth"
+        count_variables.append("depth")
+    # If time and depth are used as cf_roles grab the last variable
+    if count_variables == profile_variable_list:
+        count_variables.append(list(metadata.keys())[-1])
     profile_count = get_count(
-        erddap_url, dataset_id, count_variables, profile_variable_string
+        erddap_url, dataset_id, set(count_variables), profile_variable_list
     )
     profile_records["n_records"] = profile_count.set_index(profile_variable_list).max(
         axis="columns"
