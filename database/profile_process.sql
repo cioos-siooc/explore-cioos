@@ -16,7 +16,9 @@ INSERT INTO cioos_api.profiles (erddap_url,
         longitude_min,
         longitude_max,
         depth_min,
-        depth_max)
+        depth_max,
+        n_records,
+        n_profiles)
 SELECT erddap_url,
         dataset_id,
         profile_id,
@@ -27,7 +29,9 @@ SELECT erddap_url,
         longitude_min,
         longitude_max,
         depth_min,
-        depth_max
+        depth_max,
+        n_records,
+        n_profiles,
 FROM cioos_api.profiles_data_loader;
 
 INSERT INTO cioos_api.datasets (erddap_url,dataset_id, cdm_data_type )

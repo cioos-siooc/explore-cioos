@@ -34,7 +34,7 @@ def erddap_csv_to_df(url):
 
 # Get max/min values for each of certain variables, in each profile
 # usually time,lat,long,depth
-def max_min_url(erddap_url, dataset_id, two_vars, max_min):
+def get_max_min(erddap_url, dataset_id, two_vars, max_min):
     url = f"{erddap_url}/tabledap/{dataset_id}.csv?{two_vars}" + urllib.parse.quote(
         f'&orderBy{max_min}("{two_vars}")'
     )
@@ -53,14 +53,27 @@ def get_profile_ids(erddap_url, dataset_id, profile_variable):
     profile_ids = erddap_csv_to_df(url)
 
     if profile_ids.empty:
-        return []
+        return pd.DataFrame()
 
-    return list(filter(None, profile_ids[profile_variable]))
+    return profile_ids
 
 
-def get_profiles(
-    erddap_url, profile_variable, dataset_id, fields, metadata
-):
+# Get count for each of certain variables, in each profile
+def get_count(erddap_url, dataset_id, vars, groupby):
+    if vars is list:
+        vars = ",".join(vars)
+    if groupby is list:
+        groupby = ",".join(groupby)
+
+    url = f"{erddap_url}/tabledap/{dataset_id}.csv?{vars}"
+    if groupby:
+        url += urllib.parse.quote(f'&orderByCount("{groupby}")')
+    # Download data as csv and convert to dataframe
+    res = erddap_csv_to_df(url)
+    return res
+
+
+def get_profiles(erddap_url, profile_variable, dataset_id, fields, metadata):
     """
     Get max/min stats for each profile in a dataset
 
@@ -72,30 +85,69 @@ def get_profiles(
     fields is any of lat/long/time/depth variables, if they exist in this dataset
 
     """
+    # Profile Variable List
+    cf_roles = ["trajectory_id", "timeseries_id", "profile_id"]
+    profile_variable_list = []
+    for cf_role in cf_roles:
+        if cf_role in profile_variable:
+            profile_variable_list += [profile_variable[cf_role]]
+    profile_variable_string = ",".join(profile_variable_list)
 
     # number of profiles in this dataset (eg by counting unique profile_id)
-    profile_ids = get_profile_ids(erddap_url, dataset_id, profile_variable)
-    
-    if not profile_ids:
-        return None
-    print("Found",len(profile_ids), "profiles")
-    profile_records = pd.DataFrame()
-    for field in fields:
-        two_vars = ",".join([x for x in [profile_variable, field] if x])
+    profile_records = get_profile_ids(erddap_url, dataset_id, profile_variable_string)
 
+    if len(profile_records) == 0:
+        return None
+    print("Found", len(profile_records), "profiles")
+
+    # If TimeSeriesProfiles review how many profiles per timeseries exist
+    if "timeseries_id" in profile_variable and "profile_id" in profile_variable:
+        # Review if there's a enough samples to group by timeseries only
+        profiles_per_timeseries = profile_records.groupby(
+            profile_variable["timeseries_id"]
+        ).agg("count")[profile_variable["profile_id"]]
+        if (profiles_per_timeseries > 2000).any():
+            # If too many profiles per timeseries just group by timeseries_id
+            profile_variable.pop("profile_id")
+            profile_variable_list = profile_variable_list[:-1]
+            profile_variable_string = ",".join(profile_variable_list)
+
+            profile_records["n_profiles"] = profiles_per_timeseries
+
+    if "profile_id" in profile_variable:
+        # if subseted by profile_id there's only one per profile
+        profile_records["n_profiles"] = 1
+
+    # Start profile_records table
+    profile_records = profile_records.set_index(profile_variable_list)
+
+    for field in fields:
+        print(field)
+        variables = ",".join([x for x in [profile_variable_string, field] if x])
+        if field in profile_records.index.names:
+            # If this variable is already use to distinqguish individual profiles just copy their values
+            profile_records[field + "_min"] = profile_records.index.get_level_values(
+                field
+            )
+            profile_records[field + "_max"] = profile_records.index.get_level_values(
+                field
+            )
+            continue
         # if this dataset is a single profile and actual_range is set, use that
-        if len(profile_ids) == 1 and "actual_range" in metadata[field]:
-            profile_id = profile_ids[0]
+        elif len(profile_records) == 1 and "actual_range" in metadata[field]:
+            # if this dataset is a single profile and actual_range is set, use that
             print("Using dataset actual_range for", field)
             [min, max] = metadata[field]["actual_range"].split(",")
-            profile_min = pd.DataFrame({profile_variable: [profile_id], field: [min]})
-            profile_max = pd.DataFrame({profile_variable: [profile_id], field: [max]})
+            profile_records[field + "_min"] = min
+            profile_records[field + "_max"] = max
+            continue
         else:
-            profile_min = max_min_url(erddap_url, dataset_id, two_vars, "Min")
-            profile_max = max_min_url(erddap_url, dataset_id, two_vars, "Max")
+            # Get the min max values from erddap
+            profile_min = get_max_min(erddap_url, dataset_id, variables, "Min")
+            profile_max = get_max_min(erddap_url, dataset_id, variables, "Max")
 
         # Something went wrong
-        if profile_min is None or profile_max is None:
+        if len(profile_min) == 0 or len(profile_max) == 0:
             print("No data found for ", dataset_id)
             return None
 
@@ -105,8 +157,8 @@ def get_profiles(
             profile_max[profile_variable] = dataset_id
 
         # setting same index so they can be joined more easily
-        profile_max.set_index(profile_variable, inplace=True)
-        profile_min.set_index(profile_variable, inplace=True)
+        profile_max.set_index(profile_variable_list, inplace=True)
+        profile_min.set_index(profile_variable_list, inplace=True)
 
         # join this field's max and min
         field_max_min = profile_min.join(
@@ -115,17 +167,33 @@ def get_profiles(
             lsuffix="_min",
             rsuffix="_max",
         )
-        # thread_log(field_max_min)
-        if profile_records.empty:
-            profile_records = field_max_min
-        else:
-            # join the different max/min fields within the dataset
-            profile_records = profile_records.join(field_max_min)
 
+        # join the different max/min fields within the dataset
+        profile_records = profile_records.join(field_max_min)
+
+    # Get Count for each dataset
+    print("Get record Count")
+    count_variables = f"{profile_variable_string},time"
+    if (
+        "timeseries_id" in profile_variable
+        and "profile_id" in profile_variable
+        and "depth" in metadata
+    ):
+        count_variables += ",depth"
+    profile_count = get_count(
+        erddap_url, dataset_id, count_variables, profile_variable_string
+    )
+    profile_records["n_records"] = profile_count.set_index(profile_variable_list).max(
+        axis="columns"
+    )
+
+    # Generate profile_id variable from indexed variables
+    profile_records.index = profile_records.index.to_flat_index().rename("profile_id")
     profile_records.reset_index(drop=False, inplace=True)
+
+    # Convert time variables and add dataset_id
     profile_records["time_min"] = parse_erddap_dates(profile_records["time_min"])
     profile_records["time_max"] = parse_erddap_dates(profile_records["time_max"])
-    profile_records["profile_id"] = profile_records.get(profile_variable, dataset_id)
     profile_records["dataset_id"] = dataset_id
 
     return profile_records

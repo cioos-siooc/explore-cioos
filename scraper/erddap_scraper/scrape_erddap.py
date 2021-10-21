@@ -33,6 +33,8 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
         "longitude_max",
         "depth_min",
         "depth_max",
+        "n_records",
+        "n_profiles",
     ]
 
     df_profiles_all = pd.DataFrame(columns=column_order)
@@ -48,9 +50,9 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
     if not datasets:
         raise RuntimeError("No datasets found")
     # loop through each dataset to be processed
-    
-    for i,dataset_id in enumerate(datasets):
-  
+
+    for i, dataset_id in enumerate(datasets):
+
         if dataset_ids and dataset_id not in dataset_ids:
             continue
 
@@ -99,16 +101,15 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
                 "TimeSeriesProfile": "profile_id"  # not cdm_profile_variables
                 # "Point":"cdm_profile_variables",
             }
-            profile_variable = None
+            profile_variable = {}
 
             # Find out which variable has cf_role=timeseries_id or profile_id
             if cdm_data_type in cdm_mapping:
                 for variable in dataset_variables:
-                    if (
-                        dataset_variables[variable].get("cf_role")
-                        == cdm_mapping[cdm_data_type]
-                    ):
-                        profile_variable = variable
+                    if "cf_role" in dataset_variables[variable]:
+                        profile_variable[
+                            dataset_variables[variable]["cf_role"]
+                        ] = variable
 
             # these are the variables we are pulling max/min values for
             important_vars = [
