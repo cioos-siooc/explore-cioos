@@ -34,9 +34,10 @@ def erddap_csv_to_df(url):
 
 # Get max/min values for each of certain variables, in each profile
 # usually time,lat,long,depth
-def get_max_min(erddap_url, dataset_id, two_vars, max_min):
-    url = f"{erddap_url}/tabledap/{dataset_id}.csv?{two_vars}" + urllib.parse.quote(
-        f'&orderBy{max_min}("{two_vars}")'
+def get_max_min(erddap_url, dataset_id, vars, max_min):
+    url = (
+        f"{erddap_url}/tabledap/{dataset_id}.csv?{','.join(vars)}"
+        + urllib.parse.quote(f'&orderBy{max_min}("{",".join(vars)}")')
     )
     return erddap_csv_to_df(url)
 
@@ -80,10 +81,11 @@ def get_profiles(erddap_url, profile_variable, dataset_id, fields, metadata):
     for cf_role in cf_roles:
         if cf_role in profile_variable:
             profile_variable_list += [profile_variable[cf_role]]
-    profile_variable_string = ",".join(profile_variable_list)
 
     # number of profiles in this dataset (eg by counting unique profile_id)
-    profile_records = get_profile_ids(erddap_url, dataset_id, profile_variable_string)
+    profile_records = get_profile_ids(
+        erddap_url, dataset_id, ",".join(profile_variable_list)
+    )
 
     if len(profile_records) == 0:
         return None
@@ -99,8 +101,6 @@ def get_profiles(erddap_url, profile_variable, dataset_id, fields, metadata):
             # If too many profiles per timeseries just group by timeseries_id
             profile_variable.pop("profile_id")
             profile_variable_list = profile_variable_list[:-1]
-            profile_variable_string = ",".join(profile_variable_list)
-
             profile_records["n_profiles"] = profiles_per_timeseries
 
     if "profile_id" in profile_variable:
@@ -112,7 +112,8 @@ def get_profiles(erddap_url, profile_variable, dataset_id, fields, metadata):
 
     for field in fields:
         print(field)
-        variables = ",".join([x for x in [profile_variable_string, field] if x])
+        variables = profile_variable_list.copy()
+        variables.append(field)
         if field in profile_records.index.names:
             # If this variable is already use to distinqguish individual profiles just copy their values
             profile_records[field + "_min"] = profile_records.index.get_level_values(
