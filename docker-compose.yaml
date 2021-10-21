@@ -1,4 +1,4 @@
-version: "3.9"
+version: "3.3"
 services:
   db:
     image: "$DOCKER_POSTGIS_REPO/postgis:13-3.1-alpine"
@@ -20,11 +20,19 @@ services:
     env_file:
       - .env
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        API_URL: $API_URL
+
     expose:
       - "80"
     depends_on:
       - web-api
+    # environment:
+    #   - "API_URL=$API_URL"
+    #   - "ENVIRONMENT=$ENVIRONMENT"
+
   nginx:
     image: nginx:latest
     volumes:
