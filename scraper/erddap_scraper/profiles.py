@@ -38,12 +38,7 @@ def get_max_min(erddap_url, dataset_id, two_vars, max_min):
     url = f"{erddap_url}/tabledap/{dataset_id}.csv?{two_vars}" + urllib.parse.quote(
         f'&orderBy{max_min}("{two_vars}")'
     )
-
-    # url = f'{erddap_url}/tabledap/{dataset_id}.csv?{two_vars}&orderBy{max_min}("{two_vars}")'
-
-    # the second row in the CSV are units
-    res = erddap_csv_to_df(url)
-    return res
+    return erddap_csv_to_df(url)
 
 
 def get_profile_ids(erddap_url, dataset_id, profile_variable):
@@ -60,17 +55,11 @@ def get_profile_ids(erddap_url, dataset_id, profile_variable):
 
 # Get count for each of certain variables, in each profile
 def get_count(erddap_url, dataset_id, vars, groupby):
-    if vars is list:
-        vars = ",".join(vars)
-    if groupby is list:
-        groupby = ",".join(groupby)
-
-    url = f"{erddap_url}/tabledap/{dataset_id}.csv?{vars}"
-    if groupby:
-        url += urllib.parse.quote(f'&orderByCount("{groupby}")')
-    # Download data as csv and convert to dataframe
-    res = erddap_csv_to_df(url)
-    return res
+    url = (
+        f"{erddap_url}/tabledap/{dataset_id}.csv?{','.join(vars)}"
+        + urllib.parse.quote(f'&orderByCount("{",".join(groupby)}")')
+    )
+    return erddap_csv_to_df(url)
 
 
 def get_profiles(erddap_url, profile_variable, dataset_id, fields, metadata):
