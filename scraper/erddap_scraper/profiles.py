@@ -29,7 +29,7 @@ def erddap_csv_to_df(url):
         if status_code != 404:
             traceback.print_exc()
 
-        return None
+        return pd.DataFrame()
 
 
 # Get max/min values for each of certain variables, in each profile
@@ -50,15 +50,16 @@ def get_profile_ids(erddap_url, dataset_id, profile_variable):
     if not profile_variable:
         return []
     url = f"{erddap_url}/tabledap/{dataset_id}.csv?{profile_variable}&distinct()"
-    print(url)
     profile_ids = erddap_csv_to_df(url)
-    if profile_ids:
-        return list(filter(None, profile_ids[profile_variable]))
-    return []
+
+    if profile_ids.empty:
+        return []
+
+    return list(filter(None, profile_ids[profile_variable]))
 
 
 def get_profiles(
-    erddap_url, profile_variable, dataset_id, fields, cdm_data_type, metadata
+    erddap_url, profile_variable, dataset_id, fields, metadata
 ):
     """
     Get max/min stats for each profile in a dataset
@@ -68,21 +69,24 @@ def get_profiles(
     For ONC we can't get max min values for profiles but we can get it for the entire dataset. This works because
     they only use one profile per dataset
 
+    fields is any of lat/long/time/depth variables, if they exist in this dataset
+
     """
 
     # number of profiles in this dataset (eg by counting unique profile_id)
     profile_ids = get_profile_ids(erddap_url, dataset_id, profile_variable)
+    
     if not profile_ids:
         return None
+    print("Found",len(profile_ids), "profiles")
     profile_records = pd.DataFrame()
     for field in fields:
-        print(field)
         two_vars = ",".join([x for x in [profile_variable, field] if x])
 
         # if this dataset is a single profile and actual_range is set, use that
         if len(profile_ids) == 1 and "actual_range" in metadata[field]:
             profile_id = profile_ids[0]
-            # print("Using actual_range for", field)
+            print("Using dataset actual_range for", field)
             [min, max] = metadata[field]["actual_range"].split(",")
             profile_min = pd.DataFrame({profile_variable: [profile_id], field: [min]})
             profile_max = pd.DataFrame({profile_variable: [profile_id], field: [max]})

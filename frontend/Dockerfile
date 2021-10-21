@@ -1,7 +1,10 @@
 # Stage 1 - the build process
 FROM node as build-deps
 WORKDIR /usr/src/app
-# COPY package-lock.json ./
+
+ARG API_URL
+ENV API_URL $API_URL
+
 COPY . .
 RUN npm install
 RUN npm run build

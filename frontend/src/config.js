@@ -1,3 +1,3 @@
-const server = process.env.API_URL || "http://localhost:5050/api";
+const server = process.env.API_URL || "http://localhost:5000";
 
 module.exports = { server };
