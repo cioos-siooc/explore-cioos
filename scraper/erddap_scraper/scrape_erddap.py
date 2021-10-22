@@ -14,7 +14,7 @@ from erddap_scraper.profiles import get_profiles
 
 def scrape_erddap(erddap_url, result, dataset_ids=None):
     # """ """
-
+    erddap_url=erddap_url.rstrip('/')
     domain = urlparse(erddap_url).netloc
 
     def thread_log(*kw):
