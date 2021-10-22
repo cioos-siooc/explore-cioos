@@ -72,7 +72,7 @@ Tail logs:
 `docker-compose logs -f`
 
 (Re/)Build and (re/)start one container:
-``docker-compose up frontend --build`
+`docker-compose -f docker-compose.production.yaml up -d --build web-api`
 
 Delete database data:
 `docker rm ceda_postgres-data`
