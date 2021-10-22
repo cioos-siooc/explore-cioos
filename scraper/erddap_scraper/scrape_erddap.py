@@ -137,10 +137,13 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
 
         except HTTPError as e:
 
-            thread_log("HTTP ERROR", e.ecode, erddap_url)
-            if e.ecode != 404:
+            thread_log("HTTP ERROR", e.code, erddap_url)
+            if e.code != 404:
                 traceback.print_exc()
 
+        except Exception as e:
+            traceback.print_exc()
+            
         if not dataset_was_added:
             datasets_not_added.append(erddap_url + "/tabledap/" + dataset_id + ".html")
 

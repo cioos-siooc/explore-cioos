@@ -8,14 +8,25 @@ console.log("Connecting to redis at", process.env.REDIS_HOST);
 var cache = require("express-redis-cache")({
   host: process.env.REDIS_HOST,
 });
-
-cache.on("error", function (error) {
-  console.error("Running without Redis, that's ok");
-  cache.removeAllListeners();
-  // hide more error messages
-  cache.on("error", () => {});
+cache.on("connected", function (message) {
+  console.log(message);
+});
+cache.on("message", function (message) {
+  console.log(message);
 });
 
+cache.on("error", function (error) {
+  if (process.env.NODE_ENV === "production") {
+    console.log(error);
+  } else {
+    cache.on("error", function (error) {
+      console.error("Running without Redis, that's ok");
+      cache.removeAllListeners();
+      // hide more error messages
+      cache.on("error", () => {});
+    });
+  }
+});
 /* GET /tiles/:z/:x/:y.mvt */
 /* Retreive a vector tile by tileid */
 router.get("/:z/:x/:y.mvt", cache.route({ binary: true }), async (req, res) => {
@@ -29,6 +40,7 @@ router.get("/:z/:x/:y.mvt", cache.route({ binary: true }), async (req, res) => {
   // calculate the bounding polygon for this tile
   const sqlQuery = {
     table: "cioos_api.profiles",
+    // if its a zoom level where hexes are show, return the hex shapes, otherwise return a point
     geom_column: isHexGrid ? zoomColumn : "geom",
   };
 
@@ -63,11 +75,8 @@ router.get("/:z/:x/:y.mvt", cache.route({ binary: true }), async (req, res) => {
       FROM
         relevent_points, te
       WHERE relevent_points.geom && tile_envelope
-    
     )
-    SELECT ST_AsMVT(mvtgeom.*, 'internal-layer-name', 4096, 'geom' ${
-      sqlQuery.id_column ? `, '${sqlQuery.id_column}'` : ""
-    }) AS st_asmvt from mvtgeom;
+    SELECT ST_AsMVT(mvtgeom.*, 'internal-layer-name', 4096, 'geom') AS st_asmvt from mvtgeom;
   `;
 
   try {
@@ -80,8 +89,7 @@ router.get("/:z/:x/:y.mvt", cache.route({ binary: true }), async (req, res) => {
     // trigger catch if the vector tile has no data, (return a 204)
     if (tile.st_asmvt.length === 0) {
       res.status(204);
-    }
-    res.status(200).send(tile.st_asmvt);
+    } else res.status(200).send(tile.st_asmvt);
   } catch (e) {
     res.status(404).send({
       error: e.toString(),
