@@ -1,16 +1,16 @@
-# this version adds Redis (tile cache) and replicas (4xapi, 4x downloader)
+# this version adds Redis (tile cache) and replicas (4x api, 4x downloader)
 version: "3.3"
 services:
   redis:
     image: "redis:alpine"
     ports:
       - "6379:6379"
+    command: redis-server /usr/local/etc/redis/redis.conf
     volumes:
       - redis-data:/var/lib/redis
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
   db:
-    # using this until theres an official arm image for PostGIS 3
-    image: "odidev/postgis:13-3.1-alpine"
+    image: "postgis/postgis:13-3.1-alpine"
     ports:
       - "5432:5432"
     environment:
@@ -18,16 +18,19 @@ services:
       - "POSTGRES_PASSWORD=$DB_PASSWORD"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./database:/docker-entrypoint-initdb.d
   web-api:
     build: ./web-api
+    env_file:
+      - .env
     expose:
       - "4000"
     depends_on:
-      - redis
       - db
+      - redis
     deploy:
       replicas: 4
+    restart: always
   nginx:
     image: nginx:latest
     volumes:
@@ -38,6 +41,7 @@ services:
       - "8080:4000"
   scheduler:
     build:
+      # Scheduler needs context ., see the dockerfile
       context: .
       dockerfile: ./scheduler/Dockerfile
     depends_on:
@@ -48,7 +52,7 @@ services:
       - .env
     volumes:
       - $DOWNLOADS_FOLDER:/usr/src/app/downloads
-
+    restart: always
   # This would get used if/when we stop hosting Gitpages
   frontend:
     build:

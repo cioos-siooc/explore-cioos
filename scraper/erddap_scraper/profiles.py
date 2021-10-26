@@ -58,9 +58,7 @@ def get_profile_ids(erddap_url, dataset_id, profile_variable):
     return list(filter(None, profile_ids[profile_variable]))
 
 
-def get_profiles(
-    erddap_url, profile_variable, dataset_id, fields, metadata
-):
+def get_profiles(erddap_url, profile_variable, dataset_id, fields, metadata):
     """
     Get max/min stats for each profile in a dataset
 
@@ -75,10 +73,10 @@ def get_profiles(
 
     # number of profiles in this dataset (eg by counting unique profile_id)
     profile_ids = get_profile_ids(erddap_url, dataset_id, profile_variable)
-    
+
     if not profile_ids:
         return None
-    print("Found",len(profile_ids), "profiles")
+    print("Found", len(profile_ids), "profiles")
     profile_records = pd.DataFrame()
     for field in fields:
         two_vars = ",".join([x for x in [profile_variable, field] if x])
