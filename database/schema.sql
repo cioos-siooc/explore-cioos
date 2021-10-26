@@ -49,7 +49,8 @@ CREATE TABLE cioos_api.profiles (
     hex_zoom_0 geometry(polygon,3857),
     hex_zoom_1 geometry(polygon,3857),
     point_pk INTEGER,
-    profile_id text
+    profile_id text,
+    UNIQUE(erddap_url,dataset_id,profile_id)
 );
 
 CREATE INDEX
