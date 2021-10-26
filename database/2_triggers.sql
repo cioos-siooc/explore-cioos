@@ -1,3 +1,6 @@
+
+---- Triggers
+
 -- makes upsert easier, since Pandas to_sql doesn't support upsert
 CREATE OR REPLACE FUNCTION replace_datasets() RETURNS trigger
     LANGUAGE plpgsql
@@ -21,7 +24,11 @@ CREATE OR REPLACE FUNCTION replace_profiles() RETURNS trigger
     AS $$
 BEGIN
   RAISE NOTICE '%',NEW;
-  DELETE FROM cioos_api.profiles_data_loader WHERE erddap_url=NEW.erddap_url AND dataset_id=NEW.dataset_id;
+  DELETE FROM cioos_api.profiles_data_loader WHERE
+    erddap_url=NEW.erddap_url AND 
+    dataset_id=NEW.dataset_id AND 
+    profile_id=NEW.profile_id AND
+    NEW.profile_id IS NOT NULL;
   RETURN NEW;
 END;
 $$;

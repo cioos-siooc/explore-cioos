@@ -153,3 +153,4 @@ CREATE TABLE cioos_api.profiles_data_loader (
     depth_max real,
     CONSTRAINT profile_loader_unique UNIQUE(erddap_url,dataset_id,profile_id)
 );
+
