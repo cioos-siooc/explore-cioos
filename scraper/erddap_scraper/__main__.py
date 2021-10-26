@@ -1,5 +1,4 @@
 import argparse
-import configparser
 import threading
 import uuid
 import os
@@ -112,9 +111,9 @@ def main(erddap_urls, csv_only):
             )
             transaction.execute("SELECT profile_process();")
             transaction.execute("SELECT create_hexes();")
-            # engine.
-            print("Wrote to db:", f"{schema}.datasets_data_loader")
+
             print("Wrote to db:", f"{schema}.profiles_data_loader")
+            print("Wrote to db:", f"{schema}.datasets_data_loader")
 
     print("datasets_not_added_total", datasets_not_added_total)
 
