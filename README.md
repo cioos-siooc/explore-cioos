@@ -64,12 +64,12 @@ Rebuild database: (this will erase all your data)
 
 ```sh
 docker-compose stop db
-docker rm ceda_postgres-data
+docker volume rm ceda_postgres-data
 docker-compose up -d db
 ```
 
 Delete tile cache:
-`docker rm ceda_redis-data`
+`docker volume rm ceda_redis-data`
 
 Redis CLI:
 `docker exec -it ceda_redis_1 redis-cli`
@@ -93,12 +93,13 @@ From the production server,
 
 - rename `.env.sample` to `production.env` and configure.
 
-- ```sh
-  git pull
-  sudo docker-compose -f docker-compose.production.yaml up -d --build
-  ```
+- Delete old redis and postgres data (if needed):
+  `sudo docker volume rm ceda_postgres-data ceda_redis-data`
 
-- To scrape data:
+- Start all services:
+  `sudo docker-compose -f docker-compose.production.yaml up -d --build`
+
+- Scrape data:
 
   ```sh
   source virtualenv/bin/activate
