@@ -1,10 +1,9 @@
 import argparse
-import configparser
+from dotenv import load_dotenv
 import os
 
-from sqlalchemy import create_engine, dialects, types
+from sqlalchemy import create_engine, types
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.sql.sqltypes import TEXT
 
 from ckan_scraper.create_ckan_erddap_link import (
     get_ckan_records, list_ckan_records_with_erddap_urls)
@@ -25,14 +24,14 @@ def main(csv_only=False, limit=None):
     # setup database connection
     # This is only run from outside docker
     if not csv_only:
-        config = configparser.ConfigParser()
-        config.read(".env")
-        envs = config["scheduler"]
-
+        load_dotenv(os.getcwd() + '/.env')
+        envs=os.environ
         table = "ckan_data_loader"
         engine = create_engine(
-            f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:5432/{envs['DB_NAME']}"
+            f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST_EXTERNAL']}:5432/{envs['DB_NAME']}"
         )
+        # test connection
+        engine.connect()
 
     # query CKAN national for all erddap datsets
     print("Gathering list of records that link to an erddap")
@@ -42,14 +41,13 @@ def main(csv_only=False, limit=None):
     print("Querying each record")
     df = get_ckan_records(record_id_erddap_url_map, limit)
 
-    print("Writing to db or file")
-
     if csv_only:
         df.to_csv(output_file)
         print("Wrote ", output_file)
     else:
         schema='cioos_api'
         df.to_sql(table, con=engine, if_exists="replace", schema=schema, dtype=dtype,index=False)
+        engine.execute('SELECT ckan_process();')
         print("Wrote to db:", f"{schema}.{table}")
 
 

@@ -30,7 +30,7 @@ def get_ckan_records(record_id_erddap_url_map, limit=None):
     This will take a few minutes
 
     """
-    
+
     # just used for testing
     if limit:
         record_id_erddap_url_map = record_id_erddap_url_map[0:limit]
@@ -49,17 +49,17 @@ def get_ckan_records(record_id_erddap_url_map, limit=None):
             x["value"] for x in record_full["extras"] if x["key"] == "responsible-party"
         ]
         # remove empties
-        partiesRaw=list(filter(None, partiesRaw))
-                
+        partiesRaw = list(filter(None, partiesRaw))
+
         if len(partiesRaw):
             partiesRaw2 = json.loads(partiesRaw[0])
             organizations = [x["name"] for x in partiesRaw2]
         else:
-            cited_responsible_party=json.loads(record_full["cited-responsible-party"])
+            cited_responsible_party = json.loads(record_full["cited-responsible-party"])
             if len(cited_responsible_party):
-                indName=cited_responsible_party[0]["individual-name"]
-                if indName=='Ocean Networks Canada Society':
-                    organizations=[indName]
+                indName = cited_responsible_party[0]["individual-name"]
+                if indName == "Ocean Networks Canada Society":
+                    organizations = [indName]
         (erddap_host, dataset_id) = split_erddap_url(url)
         out.append(
             [
@@ -74,7 +74,7 @@ def get_ckan_records(record_id_erddap_url_map, limit=None):
 
         # compile a dataframe
     line = {
-        "erddap_url": [x[0].strip('/') for x in out],
+        "erddap_url": [x[0].strip("/") for x in out],
         "dataset_id": [x[1] for x in out],
         "eovs": [x[2] for x in out],
         "ckan_id": [x[3] for x in out],

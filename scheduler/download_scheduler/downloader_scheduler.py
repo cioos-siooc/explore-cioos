@@ -1,9 +1,7 @@
-import configparser
-
 # from sqlalchemy import JSON, Text
 import json
 import os
-import time
+from dotenv import load_dotenv
 import traceback
 from re import L
 
@@ -15,12 +13,10 @@ from sqlalchemy.orm import Session
 from download_scheduler.download_email import send_email
 
 # check if docker has set env variables, if not load from .env
-if os.getenv("DB_HOST"):
-    envs=os.environ
-else:
-    config = configparser.ConfigParser()
-    config.read(".env")
-    envs = config["scheduler"]
+envs=os.environ
+
+if not os.getenv("DB_HOST"):
+    load_dotenv(os.getcwd() + '/.env')
 
 if envs['ENVIRONMENT'] == "production":
     ignore_errors = [KeyboardInterrupt]
@@ -42,16 +38,14 @@ print("Connecting to",database_link)
 engine = create_engine(database_link)
 
 create_pdf = False
+
+# In production, this is mapped to a WAF via a host mounted volume
 output_folder = "./downloads"
 
 
 if "CREATE_PDF" in envs:
     create_pdf = envs["CREATE_PDF"] == "True"
     print("Create PDFs:",create_pdf)
-
-if "DOWNLOADS_FOLDER" in envs:
-    output_folder = envs["DOWNLOADS_FOLDER"]
-
 
 def get_a_download_job():
     """
