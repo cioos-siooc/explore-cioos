@@ -28,7 +28,7 @@ def main(csv_only=False, limit=None):
         envs=os.environ
         table = "ckan_data_loader"
         engine = create_engine(
-            f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:5432/{envs['DB_NAME']}"
+            f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST_EXTERNAL']}:5432/{envs['DB_NAME']}"
         )
         # test connection
         engine.connect()
@@ -41,15 +41,12 @@ def main(csv_only=False, limit=None):
     print("Querying each record")
     df = get_ckan_records(record_id_erddap_url_map, limit)
 
-    print("Writing to db or file")
-
     if csv_only:
         df.to_csv(output_file)
         print("Wrote ", output_file)
     else:
         schema='cioos_api'
         df.to_sql(table, con=engine, if_exists="replace", schema=schema, dtype=dtype,index=False)
-        engine.execute('SELECT ckan_process();')
         engine.execute('SELECT ckan_process();')
         print("Wrote to db:", f"{schema}.{table}")
 

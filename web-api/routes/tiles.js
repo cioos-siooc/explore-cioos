@@ -88,7 +88,7 @@ router.get("/:z/:x/:y.mvt", cache.route({ binary: true }), async (req, res) => {
 
     // trigger catch if the vector tile has no data, (return a 204)
     if (tile.st_asmvt.length === 0) {
-      res.status(204);
+      res.status(200).send(null);
     } else res.status(200).send(tile.st_asmvt);
   } catch (e) {
     res.status(404).send({

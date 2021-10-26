@@ -89,6 +89,21 @@ Flush redis cache:
 
 ## Production deployment
 
-From the production server, run:
-`docker-compose -f docker-compose.production.yaml up -d`
-Add a crontab entry for the scheduler to run nightly.
+From the production server,
+
+- rename `.env.sample` to `production.env` and configure.
+
+- ```sh
+  git pull
+  sudo docker-compose -f docker-compose.production.yaml up -d --build
+  ```
+
+- To scrape data:
+
+  ```sh
+  source virtualenv/bin/activate
+  pip install -e ./scraper
+  sh data_loader.sh
+  ```
+
+- Add a crontab entry for the scheduler to run nightly.
