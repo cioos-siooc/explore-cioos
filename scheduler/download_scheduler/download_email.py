@@ -3,13 +3,13 @@ from email.message import EmailMessage
 import smtplib
 import os
 import configparser
+from dotenv import load_dotenv
 
-if os.getenv("GMAIL_USER"):
-    envs=os.environ
-else:
-    config = configparser.ConfigParser()
-    config.read(".env")
-    envs = config["scheduler"]
+envs=os.environ
+
+if not os.getenv("GMAIL_USER"):
+    load_dotenv(os.getcwd() + '/.env')
+
 
 def send_email(mail_to, mail_message_body, mail_subject):
     gmail_user = envs['GMAIL_USER']

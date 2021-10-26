@@ -3,6 +3,9 @@ import configparser
 import threading
 import uuid
 import os
+from dotenv import load_dotenv
+
+
 
 import pandas as pd
 from sqlalchemy import create_engine, types
@@ -24,15 +27,14 @@ def main(erddap_urls, csv_only):
     # setup database connection
     # This is only run from outside docker
     if not csv_only:
-        config = configparser.ConfigParser()
-        config.read(".env")
-        envs = config["scheduler"]            
-        
-        database_link = (
-            f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:5432/{envs['DB_NAME']}"
-        )
+        load_dotenv(os.getcwd() + '/.env')
+
+        envs=os.environ
+
+        database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST_EXTERNAL']}:5432/{envs['DB_NAME']}"
 
         engine = create_engine(database_link)
+        # test connection
 
     erddap_urls = args.erddap_urls.split(",")
     dataset_ids = None
