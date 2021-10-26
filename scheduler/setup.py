@@ -11,6 +11,7 @@ setup(
     install_requires=[
         "sqlalchemy",
         "psycopg2-binary",
-        "sentry-sdk"
+        "sentry-sdk",
+        "python-dotenv"
     ],
 )

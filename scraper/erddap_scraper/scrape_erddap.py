@@ -14,7 +14,7 @@ from erddap_scraper.profiles import get_profiles
 
 def scrape_erddap(erddap_url, result, dataset_ids=None):
     # """ """
-
+    erddap_url = erddap_url.rstrip("/")
     domain = urlparse(erddap_url).netloc
 
     def thread_log(*kw):
@@ -82,16 +82,15 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
                 # TODO handle this
                 # Get all distinct lat/longs
                 # Otherwise get min/max values for time,depth
-                thread_log("Skipping")
+                thread_log("Skipping cdm_data_type",cdm_data_type)
                 continue
 
             # Use actual range if its set
 
             if cdm_data_type == "Other":
                 # TODO handle this
-                thread_log("Skipping")
+                thread_log("Skipping cdm_data_type",cdm_data_type)
                 continue
-            # thread_log(cdm_data_type)
 
             # Get the profile variable for each dataset
             cdm_mapping = {
@@ -138,9 +137,12 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
 
         except HTTPError as e:
 
-            thread_log("HTTP ERROR", e.ecode, erddap_url)
-            if e.ecode != 404:
+            thread_log("HTTP ERROR", e.code, erddap_url)
+            if e.code != 404:
                 traceback.print_exc()
+
+        except Exception as e:
+            traceback.print_exc()
 
         if not dataset_was_added:
             datasets_not_added.append(erddap_url + "/tabledap/" + dataset_id + ".html")

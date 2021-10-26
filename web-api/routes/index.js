@@ -65,6 +65,7 @@ router.get("/pointQuery/:point_pk", async function (req, res, next) {
         JOIN cioos_api.datasets d
         ON p.dataset_pk =d.pk
         WHERE point_pk = ANY(:point_pk_split)
+        AND ckan_record IS NOT NULL
         GROUP BY d.dataset_id,
         ckan_record,
         eovs,

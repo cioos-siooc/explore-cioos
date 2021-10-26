@@ -45,13 +45,12 @@ CREATE TABLE cioos_api.profiles (
     longitude_max double precision,
     depth_min double precision,
     depth_max double precision,
-    n_records integer,
-    n_profiles integer,
     -- hex polygon that this point is in for zoom 0 (zoomed out)
     hex_zoom_0 geometry(polygon,3857),
     hex_zoom_1 geometry(polygon,3857),
     point_pk INTEGER,
-    profile_id text
+    profile_id text,
+    UNIQUE(erddap_url,dataset_id,profile_id)
 );
 
 CREATE INDEX
@@ -146,13 +145,12 @@ CREATE TABLE cioos_api.profiles_data_loader (
     profile_id text,
     time_min timestamp with time zone,
     time_max timestamp with time zone,
-    latitude_min real,
-    latitude_max real,
-    longitude_min real,
-    longitude_max real,
-    depth_min real,
-    depth_max real,
-    n_records integer,
-    n_profiles integer,
+    latitude_min double,
+    latitude_max double,
+    longitude_min double,
+    longitude_max double,
+    depth_min double,
+    depth_max double,
     CONSTRAINT profile_loader_unique UNIQUE(erddap_url,dataset_id,profile_id)
 );
+
