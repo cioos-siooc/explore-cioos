@@ -145,12 +145,12 @@ CREATE TABLE cioos_api.profiles_data_loader (
     profile_id text,
     time_min timestamp with time zone,
     time_max timestamp with time zone,
-    latitude_min double,
-    latitude_max double,
-    longitude_min double,
-    longitude_max double,
-    depth_min double,
-    depth_max double,
+    latitude_min double precision,
+    latitude_max double precision,
+    longitude_min double precision,
+    longitude_max double precision,
+    depth_min double precision,
+    depth_max double precision,
     CONSTRAINT profile_loader_unique UNIQUE(erddap_url,dataset_id,profile_id)
 );
 
