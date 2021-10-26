@@ -56,13 +56,15 @@ def main(erddap_urls, csv_only):
 
     profiles = pd.DataFrame()
     datasets = pd.DataFrame()
+    metadata = pd.DataFrame()
 
     datasets_not_added_total = []
 
-    for [profile, dataset, datasets_not_added] in result:
+    for [profile, dataset, datasets_not_added, meta] in result:
         profiles = profiles.append(profile)
         datasets = datasets.append(dataset)
         datasets_not_added_total = datasets_not_added_total + datasets_not_added
+        metadata = metadata.append(meta)
 
     uuid_suffix = str(uuid.uuid4())[0:6]
     datasets_file = f"datasets_{uuid_suffix}.csv"
@@ -92,26 +94,19 @@ def main(erddap_urls, csv_only):
         print(f"Wrote {datasets_file} and {profiles_file}")
     else:
         schema = "cioos_api"
-        with engine.begin() as transaction:
-            print("Writing to DB")
-            datasets.to_sql(
-                "datasets_data_loader",
-                con=transaction,
-                if_exists="append",
-                schema=schema,
-                index=False,
-            )
-            profiles.to_sql(
-                "profiles_data_loader",
-                con=transaction,
-                if_exists="append",
-                schema=schema,
-                index=False,
-            )
-            print("Processing new records")
-            transaction.execute("SELECT profile_process();")
-            transaction.execute("SELECT ckan_process();")
-            transaction.execute("SELECT create_hexes();")
+        datasets.to_sql(
+            "datasets_data_loader", con=engine, if_exists="append", schema=schema,index=False
+        )
+        profiles.to_sql(
+            "profiles_data_loader",
+            con=engine,
+            if_exists="append",
+            schema=schema,
+            dtype=dtypes_profile,
+            index=False
+        )
+        print("Wrote to db:", f"{schema}.datasets_data_loader")
+        print("Wrote to db:", f"{schema}.profiles_data_loader")
 
             print("Wrote to db:", f"{schema}.profiles_data_loader")
             print("Wrote to db:", f"{schema}.datasets_data_loader")

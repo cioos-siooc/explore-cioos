@@ -41,6 +41,8 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
 
     df_datasets_all = pd.DataFrame()
 
+    df_metadata_all = pd.DataFrame()
+
     erddap = ERDDAP(erddap_url)
 
     thread_log("Quering ERDDAP server", erddap_url)
@@ -129,11 +131,15 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
                 dataset_variables,
             )
 
-            # only write dataset/profile if there are some profiles
+            # Get Metadata
+            df_metadata = erddap.get_metadata_table_for_dataset(dataset_id)
+
+            # only write dataset/metadata/profile if there are some profiles
             if df_profiles is not None:
                 df_profiles_all = df_profiles_all.append(df_profiles)
                 df_datasets_all = df_datasets_all.append(df_dataset)
                 dataset_was_added = not df_dataset.empty and not df_profiles.empty
+                df_metadata_all = df_metadata_all.append(df_metadata)
 
         except HTTPError as e:
 
