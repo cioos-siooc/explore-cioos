@@ -7,18 +7,17 @@ from dotenv import load_dotenv
 
 
 import pandas as pd
-from sqlalchemy import create_engine, types
+from sqlalchemy import create_engine
 
 from erddap_scraper.scrape_erddap import scrape_erddap
 
-float_type = types.Float(precision=3, asdecimal=True)
 dtypes_profile = {
-    "latitude_min": float_type,
-    "latitude_max": float_type,
-    "longitude_min": float_type,
-    "longitude_max": float_type,
-    "depth_min": float_type,
-    "depth_max": float_type,
+    "latitude_min": float,
+    "latitude_max": float,
+    "longitude_min": float,
+    "longitude_max": float,
+    "depth_min": float,
+    "depth_max": float,
 }
 
 
@@ -76,7 +75,7 @@ def main(erddap_urls, csv_only):
     # set all null depths to 0
     profiles["depth_min"] = profiles["depth_min"].fillna(0)
     profiles["depth_max"] = profiles["depth_max"].fillna(0)
-
+    profiles=profiles.astype(dtypes_profile).round(4)
     profiles_bad_geom_query = "(latitude_min <= -90) or (latitude_max >= 90) or (longitude_min <= -180) or (longitude_max >= 180)"
     profiles_bad_geom = profiles.query(profiles_bad_geom_query)
 
@@ -106,7 +105,6 @@ def main(erddap_urls, csv_only):
                 con=transaction,
                 if_exists="append",
                 schema=schema,
-                dtype=dtypes_profile,
                 index=False,
             )
             transaction.execute("SELECT profile_process();")
