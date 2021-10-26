@@ -7,6 +7,19 @@ var cors = require("cors");
 var indexRouter = require("./routes/index");
 var tilesRouter = require("./routes/tiles");
 var downloadRouter = require("./routes/download");
+const Sentry = require("@sentry/node");
+// Importing @sentry/tracing patches the global hub for tracing to work.
+const Tracing = require("@sentry/tracing");
+
+if (process.env.NODE_ENV === "production") {
+  Sentry.init({
+    dsn: "https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595",
+
+    // We recommend adjusting this value in production, or using tracesSampler
+    // for finer control
+    tracesSampleRate: 1.0,
+  });
+}
 
 // if environement variables are set via docker, leave them
 // otherwise load from .env

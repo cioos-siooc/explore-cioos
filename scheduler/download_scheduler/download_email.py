@@ -2,16 +2,20 @@ import smtplib
 from email.message import EmailMessage
 import smtplib
 import os
-import configparser
+import traceback
+from dotenv import load_dotenv
 
-if os.getenv("GMAIL_USER"):
-    envs=os.environ
-else:
-    config = configparser.ConfigParser()
-    config.read(".env")
-    envs = config["scheduler"]
+envs=os.environ
+
+if not os.getenv("GMAIL_USER"):
+    load_dotenv(os.getcwd() + '/.env')
+
 
 def send_email(mail_to, mail_message_body, mail_subject):
+    if 'GMAIL_USER' not in envs:
+        print("GMAIL auth not configured")
+        return 
+
     gmail_user = envs['GMAIL_USER']
     if not gmail_user:
         return
@@ -23,9 +27,11 @@ def send_email(mail_to, mail_message_body, mail_subject):
     msg['To'] = mail_to
     msg.set_content(mail_message_body)
 
-    s = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-    s.login(gmail_user,gmail_password)
-    s.send_message(msg)
-    s.quit()
+    try:
+        s = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        s.login(gmail_user,gmail_password)
+        s.send_message(msg)
+        s.quit()
+    except smtplib.SMTPAuthenticationError as e:
+        print(e,traceback.format_exc())
 
-    
