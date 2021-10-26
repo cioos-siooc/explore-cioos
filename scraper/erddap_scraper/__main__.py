@@ -76,7 +76,7 @@ def main(erddap_urls, csv_only):
     profiles["depth_min"] = profiles["depth_min"].fillna(0)
     profiles["depth_max"] = profiles["depth_max"].fillna(0)
     profiles=profiles.astype(dtypes_profile).round(4)
-    profiles_bad_geom_query = "(latitude_min <= -90) or (latitude_max >= 90) or (longitude_min <= -180) or (longitude_max >= 180)"
+    profiles_bad_geom_query = "((latitude_min <= -90) or (latitude_max >= 90) or (longitude_min <= -180) or (longitude_max >= 180))"
     profiles_bad_geom = profiles.query(profiles_bad_geom_query)
 
     if not profiles_bad_geom.empty:
@@ -84,8 +84,8 @@ def main(erddap_urls, csv_only):
             "These profiles with bad lat/long values will be removed:",
             profiles_bad_geom,
         )
-        profiles.drop(profiles_bad_geom.index, inplace=True)
-
+        profiles=profiles.query("not " + profiles_bad_geom_query)
+    print("Adding",datasets.size, "datasets and",profiles.size,"profiles")
     if csv_only:
         datasets.to_csv(datasets_file, index=False)
         profiles.to_csv(profiles_file, index=False)
@@ -93,6 +93,7 @@ def main(erddap_urls, csv_only):
     else:
         schema = "cioos_api"
         with engine.begin() as transaction:
+            print("Writing to DB")
             datasets.to_sql(
                 "datasets_data_loader",
                 con=transaction,
@@ -107,7 +108,9 @@ def main(erddap_urls, csv_only):
                 schema=schema,
                 index=False,
             )
+            print("Processing new records")
             transaction.execute("SELECT profile_process();")
+            transaction.execute("SELECT ckan_process();")
             transaction.execute("SELECT create_hexes();")
 
             print("Wrote to db:", f"{schema}.profiles_data_loader")
