@@ -154,3 +154,13 @@ CREATE TABLE cioos_api.profiles_data_loader (
     CONSTRAINT profile_loader_unique UNIQUE(erddap_url,dataset_id,profile_id)
 );
 
+DROP TABLE IF EXISTS cioos_api.metadata;
+CREATE TABLE cioos_api.metadata (
+    erddap_url text NOT NULL,
+    dataset_id text NOT NULL,
+    row_type text NOT NULL,
+    variable_name text NOT NULL,
+    attribute_name text,
+    data_type text NOT NULL,
+    value text
+);

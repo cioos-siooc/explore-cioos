@@ -5,6 +5,7 @@
 import re
 
 import requests
+import pandas as pd
 
 from .setup_logging import setup_logging
 
@@ -105,3 +106,18 @@ class ERDDAP(object):
         # Separate globals versus variables
         metadata = {"globals": vars.pop("NC_GLOBAL"), "variables": vars}
         return metadata
+
+    def get_metadata_table_for_dataset(self, dataset_id):
+        "get all the global and variable metadata for a dataset in a dataframe format"
+        url = "/info/" + dataset_id + "/index.json"
+        # Get JSON representation of this dataset's metadata
+        try:
+            metadata_json = self.get_json_from_url(url)
+        except Exception as err:
+            raise err
+
+        df_meta = pd.DataFrame(metadata_json)
+        df_meta["erddap_url"] = self.url
+        df_meta["dataset_id"] = dataset_id
+        df_meta.columns = [var.replace(" ", "_").lower() for var in df_meta.columns]
+        return df_meta
