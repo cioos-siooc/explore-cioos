@@ -35,6 +35,7 @@ def main(erddap_urls, csv_only):
 
         engine = create_engine(database_link)
         # test connection
+        engine.connect()
 
     erddap_urls = args.erddap_urls.split(",")
     dataset_ids = None
@@ -72,6 +73,20 @@ def main(erddap_urls, csv_only):
     if datasets.empty:
         print("No datasets scraped")
         return
+
+    # set all null depths to 0
+    profiles["depth_min"] = profiles["depth_min"].fillna(0)
+    profiles["depth_max"] = profiles["depth_max"].fillna(0)
+
+    profiles_bad_geom_query = "(latitude_min <= -90) or (latitude_max >= 90) or (longitude_min <= -180) or (longitude_max >= 180)"
+    profiles_bad_geom = profiles.query(profiles_bad_geom_query)
+
+    if not profiles_bad_geom.empty:
+        print(
+            "These profiles with bad lat/long values will be removed:",
+            profiles_bad_geom,
+        )
+        profiles.drop(profiles_bad_geom.index, inplace=True)
 
     if csv_only:
         datasets.to_csv(datasets_file, index=False)
