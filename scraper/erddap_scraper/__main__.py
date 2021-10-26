@@ -5,7 +5,6 @@ import os
 from dotenv import load_dotenv
 
 
-
 import pandas as pd
 from sqlalchemy import create_engine
 
@@ -25,9 +24,9 @@ def main(erddap_urls, csv_only):
     # setup database connection
     # This is only run from outside docker
     if not csv_only:
-        load_dotenv(os.getcwd() + '/.env')
+        load_dotenv(os.getcwd() + "/.env")
 
-        envs=os.environ
+        envs = os.environ
 
         database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST_EXTERNAL']}:5432/{envs['DB_NAME']}"
 
@@ -77,7 +76,7 @@ def main(erddap_urls, csv_only):
     # set all null depths to 0
     profiles["depth_min"] = profiles["depth_min"].fillna(0)
     profiles["depth_max"] = profiles["depth_max"].fillna(0)
-    profiles=profiles.astype(dtypes_profile).round(4)
+    profiles = profiles.astype(dtypes_profile).round(4)
     profiles_bad_geom_query = "((latitude_min <= -90) or (latitude_max >= 90) or (longitude_min <= -180) or (longitude_max >= 180))"
     profiles_bad_geom = profiles.query(profiles_bad_geom_query)
 
@@ -86,8 +85,8 @@ def main(erddap_urls, csv_only):
             "These profiles with bad lat/long values will be removed:",
             profiles_bad_geom,
         )
-        profiles=profiles.query("not " + profiles_bad_geom_query)
-    print("Adding",datasets.size, "datasets and",profiles.size,"profiles")
+        profiles = profiles.query("not " + profiles_bad_geom_query)
+    print("Adding", datasets.size, "datasets and", profiles.size, "profiles")
     if csv_only:
         datasets.to_csv(datasets_file, index=False)
         profiles.to_csv(profiles_file, index=False)
@@ -95,7 +94,11 @@ def main(erddap_urls, csv_only):
     else:
         schema = "cioos_api"
         datasets.to_sql(
-            "datasets_data_loader", con=engine, if_exists="append", schema=schema,index=False
+            "datasets_data_loader",
+            con=engine,
+            if_exists="append",
+            schema=schema,
+            index=False,
         )
         profiles.to_sql(
             "profiles_data_loader",
@@ -103,7 +106,7 @@ def main(erddap_urls, csv_only):
             if_exists="append",
             schema=schema,
             dtype=dtypes_profile,
-            index=False
+            index=False,
         )
         print("Wrote to db:", f"{schema}.datasets_data_loader")
         print("Wrote to db:", f"{schema}.profiles_data_loader")
