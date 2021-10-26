@@ -18,7 +18,9 @@ INSERT INTO
                 longitude_min,
                 longitude_max,
                 depth_min,
-                depth_max
+                depth_max,
+                n_records,
+                n_profiles
         )
 SELECT
         erddap_url,
@@ -31,7 +33,9 @@ SELECT
         longitude_min,
         longitude_max,
         depth_min,
-        depth_max
+        depth_max,
+        n_records,
+        n_profiles
 FROM
         cioos_api.profiles_data_loader ON CONFLICT (erddap_url, dataset_id, profile_id) DO
 UPDATE
@@ -43,7 +47,9 @@ SET
         longitude_min = excluded.longitude_min,
         longitude_max = excluded.longitude_max,
         depth_min = excluded.depth_min,
-        depth_max = excluded.depth_max;
+        depth_max = excluded.depth_max,
+        n_records = excluded.n_records,
+        n_profiles = excluded.n_profiles;
 
 INSERT INTO
         cioos_api.datasets (erddap_url, dataset_id, cdm_data_type)
