@@ -14,7 +14,7 @@ from erddap_scraper.profiles import get_profiles
 
 def scrape_erddap(erddap_url, result, dataset_ids=None):
     # """ """
-    erddap_url=erddap_url.rstrip('/')
+    erddap_url = erddap_url.rstrip("/")
     domain = urlparse(erddap_url).netloc
 
     def thread_log(*kw):
@@ -48,9 +48,9 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
     if not datasets:
         raise RuntimeError("No datasets found")
     # loop through each dataset to be processed
-    
-    for i,dataset_id in enumerate(datasets):
-  
+
+    for i, dataset_id in enumerate(datasets):
+
         if dataset_ids and dataset_id not in dataset_ids:
             continue
 
@@ -143,7 +143,7 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
 
         except Exception as e:
             traceback.print_exc()
-            
+
         if not dataset_was_added:
             datasets_not_added.append(erddap_url + "/tabledap/" + dataset_id + ".html")
 
