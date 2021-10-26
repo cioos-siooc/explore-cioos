@@ -2,9 +2,8 @@ import argparse
 from dotenv import load_dotenv
 import os
 
-from sqlalchemy import create_engine, dialects, types
+from sqlalchemy import create_engine, types
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.sql.sqltypes import TEXT
 
 from ckan_scraper.create_ckan_erddap_link import (
     get_ckan_records, list_ckan_records_with_erddap_urls)
@@ -31,6 +30,8 @@ def main(csv_only=False, limit=None):
         engine = create_engine(
             f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:5432/{envs['DB_NAME']}"
         )
+        # test connection
+        engine.connect()
 
     # query CKAN national for all erddap datsets
     print("Gathering list of records that link to an erddap")
@@ -48,6 +49,8 @@ def main(csv_only=False, limit=None):
     else:
         schema='cioos_api'
         df.to_sql(table, con=engine, if_exists="replace", schema=schema, dtype=dtype,index=False)
+        engine.execute('SELECT ckan_process();')
+        engine.execute('SELECT ckan_process();')
         print("Wrote to db:", f"{schema}.{table}")
 
 

@@ -1,31 +1,18 @@
 # CEDA - CIOOS Exploration and Data Discovery
 
-## Starting using docker
-
-1. Install [Docker](https://docs.docker.com/get-docker/) and [Docker compose](https://docs.docker.com/compose/install/). New versions of Docker include `docker-compose`
-1. Rename .env.sample to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
-1. `docker-compose up -d` to start all services. This will take a few minute to download, build, create the database schema.
-1. Start your python3 environment, eg `python3 -m venv venv && source venv/bin/activate`
-1. Run scraper to load data. From this directory, run:
-   `sh data_loader.sh` to load all data or `sh data_loader_test.sh` to just load one dataset for testing purposes
-1. See website at <http://localhost:5050>
-
-## Production deployment
-
-From the production server, run:
-`docker-compose -f docker-compose.production.yaml up -d`
-Add a crontab entry for the scheduler to run nightly.
-
 ## Development
 
-- To run CEDA locally, you will need Python and Node and a few terminal windows
+- To run CEDA locally, you will need Docker, Python and Node and a few terminal windows
 
-- Start a local database:
+- Rename .env.sample from the root directory to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
+
+- Start a local database using `docker`:
   `docker-compose up db -d`
 - Setup Python virtual env and install Python modules:
 
   ```sh
-  python3 -m venv venv && source venv/bin/activate
+  python3 -m venv venv
+  source venv/bin/activate
   pip install -e ./downloader ./scheduler ./scraper
   ```
 
@@ -40,7 +27,6 @@ Add a crontab entry for the scheduler to run nightly.
 - Start the download scheduler:
 
   ```sh
-      cd scheduler
       python -m download_scheduler
   ```
 
@@ -52,10 +38,10 @@ Add a crontab entry for the scheduler to run nightly.
       npm start
   ```
 
-- Scrape one dataset. NOTE: If you are running the scraper with `python -m erddap_scraper` you must first `cd` into the scraper directory.
+- Scrape one dataset
 
   ```sh
-    sh data_loader_test.sh
+    python -m erddap_scraper https://data.cioospacific.ca/erddap --dataset_ids BCSOP_daily
   ```
 
 - See website at <http://localhost:8000>
@@ -71,11 +57,16 @@ Start all containers, the first time this runs it will build containers:
 Tail logs:
 `docker-compose logs -f`
 
-(Re/)Build and (re/)start one container:
-`docker-compose -f docker-compose.production.yaml up -d --build web-api`
+(Re/)Build and (re/)start all containers that have code changes:
+`docker-compose -f docker-compose.production.yaml up -d --build`
 
-Delete database data:
-`docker rm ceda_postgres-data`
+Rebuild database: (this will erase all your data)
+
+```sh
+docker-compose stop db
+docker rm ceda_postgres-data
+docker-compose up -d db
+```
 
 Delete tile cache:
 `docker rm ceda_redis-data`
@@ -85,3 +76,19 @@ Redis CLI:
 
 Flush redis cache:
 `docker exec -it ceda_redis_1 redis-cli FLUSHALL`
+
+## Starting using docker
+
+1. Install [Docker](https://docs.docker.com/get-docker/) and [Docker compose](https://docs.docker.com/compose/install/). New versions of Docker include `docker-compose`
+1. Rename .env.sample to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
+1. `docker-compose up -d` to start all services. This will take a few minute to download, build, create the database schema.
+1. Start your python3 environment, eg `python3 -m venv venv && source venv/bin/activate`
+1. Run scraper to load data. From this directory, run:
+   `sh data_loader.sh` to load all data or `sh data_loader_test.sh` to just load one dataset for testing purposes
+1. See website at <http://localhost:5050>
+
+## Production deployment
+
+From the production server, run:
+`docker-compose -f docker-compose.production.yaml up -d`
+Add a crontab entry for the scheduler to run nightly.
