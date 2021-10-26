@@ -162,4 +162,4 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
     thread_log("datasets_not_added", datasets_not_added)
 
     # using 'result' to return data from each thread
-    result.append([df_profiles_all, df_datasets_all, datasets_not_added])
+    result.append([df_profiles_all, df_datasets_all, datasets_not_added, df_metadata_all])
