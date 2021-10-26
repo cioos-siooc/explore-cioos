@@ -30,6 +30,7 @@ services:
       - redis
     deploy:
       replicas: 4
+    restart: always
   nginx:
     image: nginx:latest
     volumes:
@@ -39,9 +40,7 @@ services:
     ports:
       - "8080:4000"
   scheduler:
-    build:
-      context: .
-      dockerfile: ./scheduler/Dockerfile
+    build: ./scheduler
     depends_on:
       - db
     deploy:
@@ -50,7 +49,7 @@ services:
       - .env
     volumes:
       - $DOWNLOADS_FOLDER:/usr/src/app/downloads
-
+    restart: always
   # This would get used if/when we stop hosting Gitpages
   frontend:
     build:
