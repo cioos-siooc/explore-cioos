@@ -1,5 +1,5 @@
 import argparse
-import configparser
+from dotenv import load_dotenv
 import os
 
 from sqlalchemy import create_engine, dialects, types
@@ -25,10 +25,8 @@ def main(csv_only=False, limit=None):
     # setup database connection
     # This is only run from outside docker
     if not csv_only:
-        config = configparser.ConfigParser()
-        config.read(".env")
-        envs = config["scheduler"]
-
+        load_dotenv(os.getcwd() + '/.env')
+        envs=os.environ
         table = "ckan_data_loader"
         engine = create_engine(
             f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:5432/{envs['DB_NAME']}"
