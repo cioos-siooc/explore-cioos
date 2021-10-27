@@ -87,6 +87,7 @@ class ERDDAP(object):
         # transform this JSON to an easier to use format
         metadata = erddap_json_to_dict_list(metadata_json)
         vars = {}
+        var_type = {}
 
         # data contains a mix of globals and variable attributes
         # group by variable first
@@ -103,21 +104,14 @@ class ERDDAP(object):
             if len(val) > 0:
                 vars[varname][attr] = val
 
+            # Retrieve variable type
+            if var["Row Type"] == "variable":
+                var_type[varname] = var["Data Type"]
+
         # Separate globals versus variables
-        metadata = {"globals": vars.pop("NC_GLOBAL"), "variables": vars}
+        metadata = {
+            "globals": vars.pop("NC_GLOBAL"),
+            "variables": vars,
+            "type": var_type,
+        }
         return metadata
-
-    def get_metadata_table_for_dataset(self, dataset_id):
-        "get all the global and variable metadata for a dataset in a dataframe format"
-        url = "/info/" + dataset_id + "/index.json"
-        # Get JSON representation of this dataset's metadata
-        try:
-            metadata_json = self.get_json_from_url(url)
-        except Exception as err:
-            raise err
-
-        df_meta = pd.DataFrame(metadata_json)
-        df_meta["erddap_url"] = self.url
-        df_meta["dataset_id"] = dataset_id
-        df_meta.columns = [var.replace(" ", "_").lower() for var in df_meta.columns]
-        return df_meta
