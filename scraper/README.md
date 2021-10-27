@@ -12,3 +12,8 @@
 ## CKAN scraper
 
 - `python -m ckan_scraper`
+
+## ERDDAP estimate
+
+- `python erddap_estimate path/to/ceda_query.json`
+- `python erddap_estimate {ceda_query_json_string}`
