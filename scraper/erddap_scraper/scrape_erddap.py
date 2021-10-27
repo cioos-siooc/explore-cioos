@@ -10,6 +10,7 @@ from erddap_scraper.ERDDAP import ERDDAP
 from erddap_scraper.profiles import get_profiles
 
 # TIMEOUT = 30
+considered_attributes = ["cf_role", "standard_name"]
 
 
 def scrape_erddap(erddap_url, result, dataset_ids=None):
@@ -41,7 +42,7 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
 
     df_datasets_all = pd.DataFrame()
 
-    df_metadata_all = pd.DataFrame()
+    df_variables_all = pd.DataFrame()
 
     erddap = ERDDAP(erddap_url)
 
@@ -72,6 +73,26 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
 
             cdm_data_type = dataset_globals["cdm_data_type"]
 
+            # Generate metadata table
+            df_variables = pd.DataFrame(
+                {
+                    "erddap_url": erddap_url,
+                    "dataset_id": dataset_id,
+                    "type": pd.Series(dataset_metadata["type"]),
+                }
+            )
+            df_variables = df_variables.join(
+                pd.DataFrame.from_dict(dataset_variables, orient="index").filter(
+                    items=considered_attributes
+                )
+            )
+            df_variables.index.rename("variable", inplace=True)
+            df_variables.set_index(
+                ["erddap_url", "dataset_id"], append=True, inplace=True
+            )
+            df_variables.reset_index(level=0, inplace=True)
+
+            # Generate dataset
             df_dataset = pd.DataFrame(
                 {
                     "erddap_url": [erddap_url],
@@ -131,15 +152,12 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
                 dataset_variables,
             )
 
-            # Get Metadata
-            df_metadata = erddap.get_metadata_table_for_dataset(dataset_id)
-
             # only write dataset/metadata/profile if there are some profiles
             if df_profiles is not None:
                 df_profiles_all = df_profiles_all.append(df_profiles)
                 df_datasets_all = df_datasets_all.append(df_dataset)
                 dataset_was_added = not df_dataset.empty and not df_profiles.empty
-                df_metadata_all = df_metadata_all.append(df_metadata)
+                df_variables_all = df_variables_all.append(df_variables)
 
         except HTTPError as e:
 
@@ -162,4 +180,6 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
     thread_log("datasets_not_added", datasets_not_added)
 
     # using 'result' to return data from each thread
-    result.append([df_profiles_all, df_datasets_all, datasets_not_added, df_metadata_all])
+    result.append(
+        [df_profiles_all, df_datasets_all, datasets_not_added, df_variables_all]
+    )

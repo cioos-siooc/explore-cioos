@@ -55,15 +55,15 @@ def main(erddap_urls, csv_only):
 
     profiles = pd.DataFrame()
     datasets = pd.DataFrame()
-    metadata = pd.DataFrame()
+    variables = pd.DataFrame()
 
     datasets_not_added_total = []
 
-    for [profile, dataset, datasets_not_added, meta] in result:
+    for [profile, dataset, datasets_not_added, variable] in result:
         profiles = profiles.append(profile)
         datasets = datasets.append(dataset)
         datasets_not_added_total = datasets_not_added_total + datasets_not_added
-        metadata = metadata.append(meta)
+        variables = variables.append(variable)
 
     uuid_suffix = str(uuid.uuid4())[0:6]
     datasets_file = f"datasets_{uuid_suffix}.csv"
@@ -109,8 +109,8 @@ def main(erddap_urls, csv_only):
             index=False,
         )
 
-        metadata.to_sql(
-            "metadata",
+        variables.to_sql(
+            "variables",
             con=engine,
             if_exists="append",
             schema=schema,
