@@ -17,6 +17,8 @@ dtypes_profile = {
     "longitude_max": float,
     "depth_min": float,
     "depth_max": float,
+    "n_records": float,
+    "n_profiles": float,
 }
 
 
@@ -114,7 +116,7 @@ def main(erddap_urls, csv_only):
             con=engine,
             if_exists="append",
             schema=schema,
-            index=False,
+            index=True,
         )
         print("Wrote to db:", f"{schema}.datasets_data_loader")
         print("Wrote to db:", f"{schema}.profiles_data_loader")
