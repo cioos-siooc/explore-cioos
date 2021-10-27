@@ -5,7 +5,6 @@
 import re
 
 import requests
-import pandas as pd
 
 from .setup_logging import setup_logging
 
