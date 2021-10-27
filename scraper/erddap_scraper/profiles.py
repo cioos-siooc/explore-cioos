@@ -101,7 +101,9 @@ def get_profiles(erddap_url, profile_variable, dataset_id, fields, metadata):
             # If too many profiles per timeseries just group by timeseries_id
             profile_variable.pop("profile_id")
             profile_variable_list = profile_variable_list[:-1]
-            profile_records["n_profiles"] = profiles_per_timeseries
+            profile_records = profiles_per_timeseries.to_frame(
+                name="n_profiles"
+            ).reset_index()
 
     if "profile_id" in profile_variable:
         # if subseted by profile_id there's only one per profile
