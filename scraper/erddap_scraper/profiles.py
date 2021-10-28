@@ -175,6 +175,7 @@ def get_profiles(erddap_url, profile_variable, dataset_id, fields, metadata):
         profile_records = profile_records.join(field_max_min)
 
     # Get Count for each dataset
+    # First identify variables to use
     print("Get record Count")
     count_variables = profile_variable_list.copy()
     if "time" not in count_variables:
@@ -186,15 +187,19 @@ def get_profiles(erddap_url, profile_variable, dataset_id, fields, metadata):
         and "depth" not in count_variables
     ):
         count_variables.append("depth")
+
     # If time and depth are used as cf_roles grab the last variable
     if count_variables == profile_variable_list:
         count_variables.append(list(metadata.keys())[-1])
+
+    # Retrieve Count value per profile
     profile_count = get_count(
         erddap_url, dataset_id, set(count_variables), profile_variable_list
     )
-    profile_records["n_records"] = profile_count.set_index(profile_variable_list).max(
-        axis="columns"
-    )
+    if len(profile_count) > 0:
+        profile_records["n_records"] = profile_count.set_index(
+            profile_variable_list
+        ).max(axis="columns")
 
     # Generate profile_id variable from indexed variables
     profile_records.index = profile_records.index.to_flat_index().rename("profile_id")
