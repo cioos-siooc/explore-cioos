@@ -220,7 +220,7 @@ if __name__ == "__main__":
         with open(args.query) as f:
             query = json.load(f)
     else:
-        query = args.query
+        query = json.loads(args.query)
 
     df_estimated = estimate_query_size_per_dataset(query)
     print(df_estimated)
