@@ -103,7 +103,11 @@ def get_profiles(erddap_url, profile_variable, dataset_id, fields, metadata):
     print("Found", len(profile_records), "profiles")
 
     # If TimeSeriesProfiles review how many profiles per timeseries exist
-    if "timeseries_id" in profile_variable and "profile_id" in profile_variable:
+    if (
+        "timeseries_id" in profile_variable
+        and "profile_id" in profile_variable
+        and len(profile_records) > 0
+    ):
         # Review if there's a enough samples to group by timeseries only
         profiles_per_timeseries = profile_records.groupby(
             profile_variable["timeseries_id"]
