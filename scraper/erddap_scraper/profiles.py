@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-import traceback
-import urllib
-from urllib.error import HTTPError
+from io import StringIO
+
+import requests
 
 import pandas as pd
 
@@ -19,17 +19,28 @@ def parse_erddap_dates(series):
 
 def erddap_csv_to_df(url):
     print(url)
-    try:
-        return pd.read_csv(url, skiprows=[1])
-
-    except HTTPError as e:
-
-        status_code = e.code
-        print("HTTP ERROR", status_code, url, e.reason)
-        if status_code != 404:
-            traceback.print_exc()
-
+    response = requests.get(url)
+    if response.status_code == 404:
         return pd.DataFrame()
+    elif (
+        response.status_code == 500
+        and "Query error: No operator found in constraint=&quot;orderByCount"
+        in response.text
+    ):
+        print("OrderByCount not available within this ERDDAP Version")
+        return pd.DataFrame()
+    elif (
+        response.status_code == 500
+        and "You are requesting too much data." in response.text
+    ):
+        print("Query too big for the server")
+        return pd.DataFrame()
+    elif response.status_code != 200:
+        # Report if not All OK
+        response.raise_for_status()
+        response.text
+    else:
+        return pd.read_csv(StringIO(response.text))
 
 
 # Get max/min values for each of certain variables, in each profile
@@ -37,7 +48,7 @@ def erddap_csv_to_df(url):
 def get_max_min(erddap_url, dataset_id, vars, max_min):
     url = (
         f"{erddap_url}/tabledap/{dataset_id}.csv?{','.join(vars)}"
-        + urllib.parse.quote(f'&orderBy{max_min}("{",".join(vars)}")')
+        + requests.utils.quote(f'&orderBy{max_min}("{",".join(vars)}")')
     )
     return erddap_csv_to_df(url)
 
@@ -58,7 +69,7 @@ def get_profile_ids(erddap_url, dataset_id, profile_variable):
 def get_count(erddap_url, dataset_id, vars, groupby):
     url = (
         f"{erddap_url}/tabledap/{dataset_id}.csv?{','.join(vars)}"
-        + urllib.parse.quote(f'&orderByCount("{",".join(groupby)}")')
+        + requests.utils.quote(f'&orderByCount("{",".join(groupby)}")')
     )
     return erddap_csv_to_df(url)
 
