@@ -95,33 +95,31 @@ def main(erddap_urls, csv_only):
         print(f"Wrote {datasets_file} and {profiles_file}")
     else:
         schema = "cioos_api"
-        datasets.to_sql(
-            "datasets_data_loader",
-            con=engine,
-            if_exists="append",
-            schema=schema,
-            index=False,
-        )
-        profiles.to_sql(
-            "profiles_data_loader",
-            con=engine,
-            if_exists="append",
-            schema=schema,
-            dtype=dtypes_profile,
-            index=False,
-        )
+        with engine.begin() as transaction:
+            print("Writing to DB")
+            datasets.to_sql(
+                "datasets_data_loader",
+                con=transaction,
+                if_exists="append",
+                schema=schema,
+                index=False,
+            )
+            profiles.to_sql(
+                "profiles_data_loader",
+                con=transaction,
+                if_exists="append",
+                schema=schema,
+                index=False,
+            )
+            print("Processing new records")
+            transaction.execute("SELECT profile_process();")
+            transaction.execute("SELECT ckan_process();")
+            transaction.execute("SELECT create_hexes();")
 
-        variables.to_sql(
-            "variables",
-            con=engine,
-            if_exists="append",
-            schema=schema,
-            index=True,
-        )
         print("Wrote to db:", f"{schema}.datasets_data_loader")
         print("Wrote to db:", f"{schema}.profiles_data_loader")
         print("Wrote to db:", f"{schema}.metadata")
-
+           
     print("datasets_not_added_total", datasets_not_added_total)
 
 
