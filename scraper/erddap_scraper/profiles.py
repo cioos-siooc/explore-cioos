@@ -205,9 +205,11 @@ def get_profiles(erddap_url, profile_variable, dataset_id, fields, metadata):
             profile_variable_list
         ).max(axis="columns")
 
-    # Generate profile_id variable from indexed variables
-    profile_records.index = profile_records.index.to_flat_index().rename("profile_id")
+    # Rename cf_role variables as cf_role and drop from index
     profile_records.reset_index(drop=False, inplace=True)
+    profile_records.rename(
+        columns={value: key for key, value in profile_variable.items()}, inplace=True
+    )
 
     # Convert time variables and add dataset_id
     profile_records["time_min"] = parse_erddap_dates(profile_records["time_min"])
