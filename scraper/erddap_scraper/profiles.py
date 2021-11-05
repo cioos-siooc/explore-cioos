@@ -37,10 +37,10 @@ def erddap_csv_to_df(url):
         return pd.DataFrame()
     elif response.status_code != 200:
         # Report if not All OK
-        response.raise_for_status()
         response.text
+        response.raise_for_status()
     else:
-        return pd.read_csv(StringIO(response.text))
+        return pd.read_csv(StringIO(response.text), skiprows=[1])
 
 
 # Get max/min values for each of certain variables, in each profile
