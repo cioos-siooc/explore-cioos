@@ -10,6 +10,7 @@ INSERT INTO
         cioos_api.profiles (
                 erddap_url,
                 dataset_id,
+                timeseries_id,
                 profile_id,
                 time_min,
                 time_max,
@@ -25,6 +26,7 @@ INSERT INTO
 SELECT
         erddap_url,
         dataset_id,
+        timeseries_id,
         profile_id,
         time_min,
         time_max,
@@ -37,7 +39,7 @@ SELECT
         n_records,
         n_profiles
 FROM
-        cioos_api.profiles_data_loader ON CONFLICT (erddap_url, dataset_id, profile_id) DO
+        cioos_api.profiles_data_loader ON CONFLICT (erddap_url, dataset_id, timeseries_id, profile_id) DO
 UPDATE
 SET
         time_min = excluded.time_min,
