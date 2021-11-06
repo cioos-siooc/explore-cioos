@@ -25,6 +25,7 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
     column_order = [
         "erddap_url",
         "dataset_id",
+        "timeseries_id",
         "profile_id",
         "time_min",
         "time_max",
