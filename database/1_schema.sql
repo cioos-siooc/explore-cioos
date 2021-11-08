@@ -37,6 +37,8 @@ CREATE TABLE cioos_api.profiles (
     dataset_pk integer REFERENCES cioos_api.datasets(pk),
     erddap_url text,
     dataset_id text,
+    timeseries_id text,
+    profile_id text,
     time_min timestamptz,
     time_max timestamptz,
     latitude_min double precision,
@@ -51,8 +53,7 @@ CREATE TABLE cioos_api.profiles (
     hex_zoom_0 geometry(polygon,3857),
     hex_zoom_1 geometry(polygon,3857),
     point_pk INTEGER,
-    profile_id text,
-    UNIQUE(erddap_url,dataset_id,profile_id)
+    UNIQUE(erddap_url,dataset_id,timeseries_id,profile_id)
 );
 
 CREATE INDEX
@@ -144,6 +145,7 @@ DROP TABLE IF EXISTS cioos_api.profiles_data_loader;
 CREATE TABLE cioos_api.profiles_data_loader (
     erddap_url text,
     dataset_id text,
+    timeseries_id text,
     profile_id text,
     time_min timestamp with time zone,
     time_max timestamp with time zone,
@@ -156,6 +158,15 @@ CREATE TABLE cioos_api.profiles_data_loader (
     n_records integer,
     n_profiles integer,
 
-    CONSTRAINT profile_loader_unique UNIQUE(erddap_url,dataset_id,profile_id)
+    CONSTRAINT profile_loader_unique UNIQUE(erddap_url,dataset_id,timeseries_id,profile_id)
 );
 
+DROP TABLE IF EXISTS cioos_api.variables;
+CREATE TABLE cioos_api.variables (
+    erddap_url text NOT NULL,
+    dataset_id text NOT NULL,
+    variable text NOT NULL,
+    "type" text NOT NULL,
+    cf_role text,
+    standard_name text
+);
