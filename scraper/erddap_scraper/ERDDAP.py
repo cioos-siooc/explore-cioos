@@ -86,6 +86,7 @@ class ERDDAP(object):
         # transform this JSON to an easier to use format
         metadata = erddap_json_to_dict_list(metadata_json)
         vars = {}
+        var_type = {}
 
         # data contains a mix of globals and variable attributes
         # group by variable first
@@ -102,6 +103,14 @@ class ERDDAP(object):
             if len(val) > 0:
                 vars[varname][attr] = val
 
+            # Retrieve variable type
+            if var["Row Type"] == "variable":
+                var_type[varname] = var["Data Type"]
+
         # Separate globals versus variables
-        metadata = {"globals": vars.pop("NC_GLOBAL"), "variables": vars}
+        metadata = {
+            "globals": vars.pop("NC_GLOBAL"),
+            "variables": vars,
+            "type": var_type,
+        }
         return metadata

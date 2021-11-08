@@ -10,6 +10,7 @@ from erddap_scraper.ERDDAP import ERDDAP
 from erddap_scraper.profiles import get_profiles
 
 # TIMEOUT = 30
+considered_attributes = ["cf_role", "standard_name"]
 
 
 def scrape_erddap(erddap_url, result, dataset_ids=None):
@@ -24,6 +25,7 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
     column_order = [
         "erddap_url",
         "dataset_id",
+        "timeseries_id",
         "profile_id",
         "time_min",
         "time_max",
@@ -33,11 +35,15 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
         "longitude_max",
         "depth_min",
         "depth_max",
+        "n_records",
+        "n_profiles",
     ]
 
     df_profiles_all = pd.DataFrame(columns=column_order)
 
     df_datasets_all = pd.DataFrame()
+
+    df_variables_all = pd.DataFrame()
 
     erddap = ERDDAP(erddap_url)
 
@@ -54,6 +60,8 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
         if dataset_ids and dataset_id not in dataset_ids:
             continue
 
+        datasetHTMLForm=erddap_url + "/tabledap/" + dataset_id + ".html"
+
         thread_log("Querying dataset:", dataset_id, f"{i+1}/{len(datasets)}")
 
         dataset_variables = {}
@@ -68,6 +76,26 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
 
             cdm_data_type = dataset_globals["cdm_data_type"]
 
+            # Generate metadata table
+            df_variables = pd.DataFrame(
+                {
+                    "erddap_url": erddap_url,
+                    "dataset_id": dataset_id,
+                    "type": pd.Series(dataset_metadata["type"]),
+                }
+            )
+            df_variables = df_variables.join(
+                pd.DataFrame.from_dict(dataset_variables, orient="index").filter(
+                    items=considered_attributes
+                )
+            )
+            df_variables.index.rename("variable", inplace=True)
+            df_variables.set_index(
+                ["erddap_url", "dataset_id"], append=True, inplace=True
+            )
+            df_variables.reset_index(level=0, inplace=True)
+
+            # Generate dataset
             df_dataset = pd.DataFrame(
                 {
                     "erddap_url": [erddap_url],
@@ -75,20 +103,6 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
                     "cdm_data_type": [cdm_data_type],
                 }
             )
-
-            if cdm_data_type == "Trajectory":
-                # TODO handle this
-                # Get all distinct lat/longs
-                # Otherwise get min/max values for time,depth
-                thread_log("Skipping cdm_data_type",cdm_data_type)
-                continue
-
-            # Use actual range if its set
-
-            if cdm_data_type == "Other":
-                # TODO handle this
-                thread_log("Skipping cdm_data_type",cdm_data_type)
-                continue
 
             # Get the profile variable for each dataset
             cdm_mapping = {
@@ -98,16 +112,20 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
                 "TimeSeriesProfile": "profile_id"  # not cdm_profile_variables
                 # "Point":"cdm_profile_variables",
             }
-            profile_variable = None
+            if cdm_data_type not in cdm_mapping.keys():
+                thread_log("cdm_data_type:",cdm_data_type, "is not in",list(cdm_mapping.keys()))
+                datasets_not_added.append(datasetHTMLForm)
+                continue
+
+            profile_variable = {}
 
             # Find out which variable has cf_role=timeseries_id or profile_id
             if cdm_data_type in cdm_mapping:
                 for variable in dataset_variables:
-                    if (
-                        dataset_variables[variable].get("cf_role")
-                        == cdm_mapping[cdm_data_type]
-                    ):
-                        profile_variable = variable
+                    if "cf_role" in dataset_variables[variable]:
+                        profile_variable[
+                            dataset_variables[variable]["cf_role"]
+                        ] = variable
 
             # these are the variables we are pulling max/min values for
             important_vars = [
@@ -128,11 +146,12 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
                 dataset_variables,
             )
 
-            # only write dataset/profile if there are some profiles
+            # only write dataset/metadata/profile if there are some profiles
             if df_profiles is not None:
                 df_profiles_all = df_profiles_all.append(df_profiles)
                 df_datasets_all = df_datasets_all.append(df_dataset)
                 dataset_was_added = not df_dataset.empty and not df_profiles.empty
+                df_variables_all = df_variables_all.append(df_variables)
 
         except HTTPError as e:
 
@@ -144,7 +163,7 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
             traceback.print_exc()
 
         if not dataset_was_added:
-            datasets_not_added.append(erddap_url + "/tabledap/" + dataset_id + ".html")
+            datasets_not_added.append(datasetHTMLForm)
 
     df_profiles_all["erddap_url"] = erddap_url
 
@@ -155,4 +174,6 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
     thread_log("datasets_not_added", datasets_not_added)
 
     # using 'result' to return data from each thread
-    result.append([df_profiles_all, df_datasets_all, datasets_not_added])
+    result.append(
+        [df_profiles_all, df_datasets_all, datasets_not_added, df_variables_all]
+    )

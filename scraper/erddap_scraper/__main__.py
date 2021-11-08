@@ -5,7 +5,6 @@ import os
 from dotenv import load_dotenv
 
 
-
 import pandas as pd
 from sqlalchemy import create_engine
 
@@ -18,6 +17,8 @@ dtypes_profile = {
     "longitude_max": float,
     "depth_min": float,
     "depth_max": float,
+    "n_records": float,
+    "n_profiles": float,
 }
 
 
@@ -25,9 +26,9 @@ def main(erddap_urls, csv_only):
     # setup database connection
     # This is only run from outside docker
     if not csv_only:
-        load_dotenv(os.getcwd() + '/.env')
+        load_dotenv(os.getcwd() + "/.env")
 
-        envs=os.environ
+        envs = os.environ
 
         database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST_EXTERNAL']}:5432/{envs['DB_NAME']}"
 
@@ -56,13 +57,15 @@ def main(erddap_urls, csv_only):
 
     profiles = pd.DataFrame()
     datasets = pd.DataFrame()
+    variables = pd.DataFrame()
 
     datasets_not_added_total = []
 
-    for [profile, dataset, datasets_not_added] in result:
+    for [profile, dataset, datasets_not_added, variable] in result:
         profiles = profiles.append(profile)
         datasets = datasets.append(dataset)
         datasets_not_added_total = datasets_not_added_total + datasets_not_added
+        variables = variables.append(variable)
 
     uuid_suffix = str(uuid.uuid4())[0:6]
     datasets_file = f"datasets_{uuid_suffix}.csv"
@@ -75,17 +78,17 @@ def main(erddap_urls, csv_only):
     # set all null depths to 0
     profiles["depth_min"] = profiles["depth_min"].fillna(0)
     profiles["depth_max"] = profiles["depth_max"].fillna(0)
-    profiles=profiles.astype(dtypes_profile).round(4)
+    profiles = profiles.astype(dtypes_profile).round(4)
     profiles_bad_geom_query = "((latitude_min <= -90) or (latitude_max >= 90) or (longitude_min <= -180) or (longitude_max >= 180))"
     profiles_bad_geom = profiles.query(profiles_bad_geom_query)
 
     if not profiles_bad_geom.empty:
         print(
             "These profiles with bad lat/long values will be removed:",
-            profiles_bad_geom,
+            profiles_bad_geom.to_csv(None),
         )
-        profiles=profiles.query("not " + profiles_bad_geom_query)
-    print("Adding",datasets.size, "datasets and",profiles.size,"profiles")
+        profiles = profiles.query("not " + profiles_bad_geom_query)
+    print("Adding", datasets.size, "datasets and", profiles.size, "profiles")
     if csv_only:
         datasets.to_csv(datasets_file, index=False)
         profiles.to_csv(profiles_file, index=False)
@@ -113,8 +116,9 @@ def main(erddap_urls, csv_only):
             transaction.execute("SELECT ckan_process();")
             transaction.execute("SELECT create_hexes();")
 
-            print("Wrote to db:", f"{schema}.profiles_data_loader")
-            print("Wrote to db:", f"{schema}.datasets_data_loader")
+        print("Wrote to db:", f"{schema}.datasets_data_loader")
+        print("Wrote to db:", f"{schema}.profiles_data_loader")
+        print("Wrote to db:", f"{schema}.metadata")
 
     print("datasets_not_added_total", datasets_not_added_total)
 
