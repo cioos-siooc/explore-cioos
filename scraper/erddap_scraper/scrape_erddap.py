@@ -60,6 +60,8 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
         if dataset_ids and dataset_id not in dataset_ids:
             continue
 
+        datasetHTMLForm=erddap_url + "/tabledap/" + dataset_id + ".html"
+
         thread_log("Querying dataset:", dataset_id, f"{i+1}/{len(datasets)}")
 
         dataset_variables = {}
@@ -102,20 +104,6 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
                 }
             )
 
-            if cdm_data_type == "Trajectory":
-                # TODO handle this
-                # Get all distinct lat/longs
-                # Otherwise get min/max values for time,depth
-                thread_log("Skipping cdm_data_type",cdm_data_type)
-                continue
-
-            # Use actual range if its set
-
-            if cdm_data_type == "Other":
-                # TODO handle this
-                thread_log("Skipping cdm_data_type",cdm_data_type)
-                continue
-
             # Get the profile variable for each dataset
             cdm_mapping = {
                 "TimeSeries": "timeseries_id",
@@ -124,6 +112,11 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
                 "TimeSeriesProfile": "profile_id"  # not cdm_profile_variables
                 # "Point":"cdm_profile_variables",
             }
+            if cdm_data_type not in cdm_mapping.keys():
+                thread_log("cdm_data_type:",cdm_data_type, "is not in",list(cdm_mapping.keys()))
+                datasets_not_added.append(datasetHTMLForm)
+                continue
+
             profile_variable = {}
 
             # Find out which variable has cf_role=timeseries_id or profile_id
@@ -170,7 +163,7 @@ def scrape_erddap(erddap_url, result, dataset_ids=None):
             traceback.print_exc()
 
         if not dataset_was_added:
-            datasets_not_added.append(erddap_url + "/tabledap/" + dataset_id + ".html")
+            datasets_not_added.append(datasetHTMLForm)
 
     df_profiles_all["erddap_url"] = erddap_url
 

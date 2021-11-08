@@ -31,6 +31,13 @@ def erddap_csv_to_df(url):
         return pd.DataFrame()
     elif (
         response.status_code == 500
+        and "Your query produced no matching results"
+        in response.text
+    ):
+        return pd.DataFrame()
+    
+    elif (
+        response.status_code == 500
         and "You are requesting too much data." in response.text
     ):
         print("Query too big for the server")
@@ -60,7 +67,7 @@ def get_profile_ids(erddap_url, dataset_id, profile_variable):
     profile_ids = erddap_csv_to_df(url)
 
     if profile_ids.empty:
-        return pd.DataFrame()
+        print("No profiles found")
 
     return profile_ids
 
