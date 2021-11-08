@@ -85,7 +85,7 @@ def main(erddap_urls, csv_only):
     if not profiles_bad_geom.empty:
         print(
             "These profiles with bad lat/long values will be removed:",
-            profiles_bad_geom,
+            profiles_bad_geom.to_csv(None),
         )
         profiles = profiles.query("not " + profiles_bad_geom_query)
     print("Adding", datasets.size, "datasets and", profiles.size, "profiles")
