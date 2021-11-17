@@ -113,7 +113,7 @@ def main(erddap_urls, csv_only):
                 index=False,
             )
             variables.to_sql(
-                "variables_loader",
+                "erddap_variables",
                 con=transaction,
                 if_exists="append",
                 schema=schema,
@@ -126,7 +126,7 @@ def main(erddap_urls, csv_only):
 
         print("Wrote to db:", f"{schema}.datasets_data_loader")
         print("Wrote to db:", f"{schema}.profiles_data_loader")
-        print("Wrote to db:", f"{schema}.variables_loader")
+        print("Wrote to db:", f"{schema}.erddap_variables")
 
     print("datasets_not_added_total", datasets_not_added_total)
 
