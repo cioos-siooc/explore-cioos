@@ -92,6 +92,7 @@ def main(erddap_urls, csv_only):
     if csv_only:
         datasets.to_csv(datasets_file, index=False)
         profiles.to_csv(profiles_file, index=False)
+        variables.to_csv(variables, index=False)
         print(f"Wrote {datasets_file} and {profiles_file}")
     else:
         schema = "cioos_api"
@@ -111,6 +112,13 @@ def main(erddap_urls, csv_only):
                 schema=schema,
                 index=False,
             )
+            variables.to_sql(
+                "variables",
+                con=transaction,
+                if_exists="append",
+                schema=schema,
+                index=False,
+            )
             print("Processing new records")
             transaction.execute("SELECT profile_process();")
             transaction.execute("SELECT ckan_process();")
@@ -118,7 +126,7 @@ def main(erddap_urls, csv_only):
 
         print("Wrote to db:", f"{schema}.datasets_data_loader")
         print("Wrote to db:", f"{schema}.profiles_data_loader")
-        print("Wrote to db:", f"{schema}.metadata")
+        print("Wrote to db:", f"{schema}.variables")
 
     print("datasets_not_added_total", datasets_not_added_total)
 
