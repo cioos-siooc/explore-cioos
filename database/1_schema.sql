@@ -161,7 +161,7 @@ CREATE TABLE cioos_api.profiles_data_loader (
     CONSTRAINT profile_loader_unique UNIQUE(erddap_url,dataset_id,timeseries_id,profile_id)
 );
 
-DROP TABLE IF EXISTS cioos_api.variables;
+DROP TABLE IF EXISTS cioos_api.erddap_variables;
 CREATE TABLE cioos_api.variables (
     erddap_url text NOT NULL,
     dataset_id text NOT NULL,
