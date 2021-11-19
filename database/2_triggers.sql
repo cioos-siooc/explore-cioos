@@ -28,7 +28,7 @@ BEGIN
     erddap_url=NEW.erddap_url AND 
     dataset_id=NEW.dataset_id AND 
     (profile_id=NEW.profile_id OR profile_id IS NULL AND NEW.profile_id IS NULL) AND
-    (timseries_id=NEW.timseries_id OR timseries_id IS NULL AND NEW.timseries_id IS NULL);
+    (timeseries_id=NEW.timeseries_id OR timeseries_id IS NULL AND NEW.timeseries_id IS NULL);
   RETURN NEW;
 END;
 $$;

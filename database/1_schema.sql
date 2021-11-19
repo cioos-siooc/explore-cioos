@@ -130,7 +130,7 @@ CREATE TABLE cioos_api.ckan_data_loader (
     eovs text[],
     ckan_id text,
     parties text[],
-    ckan_record jsonb,
+    ckan_record jsonb
 );
 
 DROP TABLE IF EXISTS cioos_api.datasets_data_loader;
