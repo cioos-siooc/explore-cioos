@@ -27,8 +27,8 @@ BEGIN
   DELETE FROM cioos_api.profiles_data_loader WHERE
     erddap_url=NEW.erddap_url AND 
     dataset_id=NEW.dataset_id AND 
-    profile_id=NEW.profile_id AND
-    NEW.profile_id IS NOT NULL;
+    (profile_id=NEW.profile_id OR profile_id IS NULL AND NEW.profile_id IS NULL) AND
+    (timseries_id=NEW.timseries_id OR timseries_id IS NULL AND NEW.timseries_id IS NULL);
   RETURN NEW;
 END;
 $$;

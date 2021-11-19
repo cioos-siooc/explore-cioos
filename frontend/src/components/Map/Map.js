@@ -116,21 +116,7 @@ export default class CIOOSMap extends React.Component {
             729,
             config.colorScale[6],
           ],
-          // "circle-opacity": 0.9,
-          "circle-stroke-width": {
-            property: "pointtype",
-            stops: [
-              [0, 0],
-              [1, 1],
-            ],
-          },
-          "circle-radius": {
-            property: "pointtype",
-            stops: [
-              [0, 4],
-              [1, 10],
-            ],
-          },
+
         },
       });
 
@@ -175,20 +161,6 @@ export default class CIOOSMap extends React.Component {
         paint: {
           "circle-color":  "red",
           "circle-opacity": 1.0,
-          "circle-stroke-width": {
-            property: "pointtype",
-            stops: [
-              [0, 0],
-              [1, 1],
-            ],
-          },
-          "circle-radius": {
-            property: "pointtype",
-            stops: [
-              [0, 4],
-              [1, 10],
-            ],
-          },
         },
         filter: ['in', 'pk', '']
       });
@@ -247,7 +219,7 @@ export default class CIOOSMap extends React.Component {
         
         this.popup
         .setLngLat(coordinates)
-        .setHTML(description + " profiles")
+        .setHTML(description + " records")
         .addTo(this.map);
       });
 
@@ -302,7 +274,7 @@ export default class CIOOSMap extends React.Component {
         .setLngLat(coordinates)
         .setHTML(
           ` <div>
-              ${this.hoveredPointDetails.features[0].properties.count} profiles. Click for details
+              ${this.hoveredPointDetails.features[0].properties.count} records. Click for details
             </div> 
           `
         )

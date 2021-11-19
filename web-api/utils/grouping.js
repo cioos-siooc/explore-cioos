@@ -5,9 +5,5 @@ const eovGrouping = {
   salinity: ["seaSurfaceSalinity", "subSurfaceSalinity"],
   temperature: ["seaSurfaceTemperature", "subSurfaceTemperature"],
 };
-const cdmDataTypeGrouping = {
-  casts: ["Profile", "TimeSeriesProfile"],
-  fixedStations: ["TimeSeries", "Point"],
-};
 
-module.exports = { eovGrouping, cdmDataTypeGrouping };
+module.exports = { eovGrouping };

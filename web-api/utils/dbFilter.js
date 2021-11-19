@@ -1,4 +1,4 @@
-const { eovGrouping, cdmDataTypeGrouping } = require("./grouping");
+const { eovGrouping } = require("./grouping");
 // this is used by the tiler and the downloader routes
 const removeDuplicates = (arr) => [...new Set(arr)];
 const IMPOSSIBLE_FILTER = "1=0";
@@ -26,14 +26,6 @@ function createDBFilter({
       .map((eov) => `'${eov}'`)
   ).join();
 
-  const pointTypeCommaSeparatedString =
-    dataType
-      .split(",")
-      .map((dataType) => cdmDataTypeGrouping[dataType])
-      .flat()
-      .map((e) => `'${e}'`)
-      .join(",") || "return-no-data";
-
   const filters = [];
 
   if (timeMin) filters.push(`p.time_max >= '${timeMin}'::timestamp`);
@@ -54,7 +46,6 @@ function createDBFilter({
     const organizationsString = organizations.split(",").map((e) => `${e}`);
     filters.push(`organization_pks && array[${organizationsString}]`);
   }
-  filters.push(`cdm_data_type = any(array[${pointTypeCommaSeparatedString}])`);
   filters.push(`eovs && array[${eovsCommaSeparatedString}]`);
 
   return filters.join(" AND \n");

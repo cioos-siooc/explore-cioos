@@ -24,7 +24,7 @@ CREATE TABLE cioos_api.datasets (
 DROP TABLE IF EXISTS cioos_api.organizations;
 CREATE TABLE cioos_api.organizations (
     pk SERIAL PRIMARY KEY,
-    name text,
+    name text UNIQUE,
     color text
 );
 
@@ -130,7 +130,6 @@ CREATE TABLE cioos_api.ckan_data_loader (
     ckan_id text,
     parties text[],
     ckan_record jsonb,
-    CONSTRAINT ckan_loader_unique UNIQUE(erddap_url,dataset_id)
 );
 
 DROP TABLE IF EXISTS cioos_api.datasets_data_loader;
@@ -162,7 +161,7 @@ CREATE TABLE cioos_api.profiles_data_loader (
 );
 
 DROP TABLE IF EXISTS cioos_api.erddap_variables;
-CREATE TABLE cioos_api.variables (
+CREATE TABLE cioos_api.erddap_variables (
     erddap_url text NOT NULL,
     dataset_id text NOT NULL,
     variable text NOT NULL,
