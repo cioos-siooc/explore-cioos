@@ -32,7 +32,7 @@ if envs['ENVIRONMENT'] == "production":
 
 
 database_link = (
-    f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:5432/{envs['DB_NAME']}"
+    f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
 )
 print("Connecting to",database_link)
 engine = create_engine(database_link)
@@ -96,7 +96,7 @@ def email_user(email, status, zip_filename):
     send_email(email, messages[status]["body"], messages[status]["subject"])
 
 
-def run_download(row):
+def run_download(row,download_size_estimated):
     pk = row["pk"]
 
     # Update status
@@ -158,6 +158,7 @@ def run_download(row):
             .replace("'", ""),
             "time_complete": "NOW()",
             "download_size": str(downloader_output.get("zip_file_size")),
+            "download_size_estimated": download_size_estimated.replace("'",""),
         }
         update_download_jobs(
             pk,
