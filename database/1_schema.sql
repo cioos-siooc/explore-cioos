@@ -112,6 +112,7 @@ CREATE TABLE cioos_api.download_jobs (
     time_total interval GENERATED ALWAYS AS (time_complete - time) STORED,
     email text,
     download_size numeric,
+    download_size_estimated text,
     erddap_report text,
     time_start timestamptz
 );
