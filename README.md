@@ -38,10 +38,10 @@
       npm start
   ```
 
-- Scrape one dataset
+- Scrape a single dataset and load CKAN data.
 
   ```sh
-    python -m erddap_scraper https://data.cioospacific.ca/erddap --dataset_ids BCSOP_daily
+    sh data_loader_test.sh
   ```
 
 - See website at <http://localhost:8000>
