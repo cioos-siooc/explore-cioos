@@ -2,9 +2,9 @@ const pg = require("pg");
 
 require("pg-parse-float")(pg);
 require("dotenv").config();
-const { DB_USER, DB_PASSWORD, DB_HOST, DB_NAME } = process.env;
+const { DB_USER, DB_PASSWORD, DB_HOST, DB_NAME, DB_PORT } = process.env;
 
-console.log(DB_USER, DB_PASSWORD, DB_HOST, DB_NAME);
+console.log(DB_USER, DB_PASSWORD, DB_HOST, DB_NAME, DB_PORT);
 
 const db = require("knex")({
   client: "pg",
@@ -13,6 +13,7 @@ const db = require("knex")({
     password: DB_PASSWORD,
     host: DB_HOST,
     database: DB_NAME,
+    port: DB_PORT || 5432,
   },
 });
 

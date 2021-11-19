@@ -28,7 +28,7 @@ def main(csv_only=False, limit=None):
         envs=os.environ
         table = "ckan_data_loader"
         engine = create_engine(
-            f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST_EXTERNAL']}:5432/{envs['DB_NAME']}"
+            f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST_EXTERNAL']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
         )
         # test connection
         engine.connect()

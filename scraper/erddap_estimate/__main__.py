@@ -8,11 +8,11 @@ import argparse
 import json
 import os
 
-from downloader import erddap_downloader
+import erddap_downloader
 
 load_dotenv(os.getcwd() + "/.env")
 envs = os.environ
-database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST_EXTERNAL']}:5432/{envs['DB_NAME']}"
+database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST_EXTERNAL']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
 
 engine = create_engine(database_link)
 engine.connect()
@@ -40,12 +40,12 @@ def query_profiles(query, datasets):
     sql_query = f"""
     SELECT * FROM {schema}.profiles WHERE(
         ST_Contains(ST_GeomFromText('{query['polygon_region']}',4326),ST_Transform(geom,4326)) is true AND
-        (erddap_url,dataset_id) in {tuple((x['erddap_url'],x['dataset_id']) for x in datasets)} AND
+        (erddap_url,dataset_id) in ({",".join(f"('{x['erddap_url']}','{x['dataset_id']}')" for x in datasets)}) AND
         time_min<'{query['time_max']}' AND 
         time_max>'{query['time_min']}' AND
         (  
-            (depth_min<{query['depth_max']} AND  
-            depth_max>{query['depth_min'] if query['depth_min'] else 0}) 
+            (depth_min<={query['depth_max']} AND  
+            depth_max>={query['depth_min'] if query['depth_min'] else 0}) 
             OR depth_min IS {'NOT'if query['depth_min'] else ''} NULL
         )
     )"""
@@ -140,9 +140,9 @@ def get_dataset_size(datasets, standard_name=[""]):
     Method to estimate the download size based on the amount of records and variables expected to download.
     """
     sql_query = f"""
-    SELECT erddap_url ,dataset_id ,"type",COUNT("type") FROM {schema}.variables 
+    SELECT erddap_url ,dataset_id ,"type",COUNT("type") FROM {schema}.erddap_variables 
     WHERE  ( 
-        (erddap_url,dataset_id) in {tuple(datasets.index.values)} 
+        (erddap_url,dataset_id) in {str(datasets.index.values).replace('[','(').replace(']',')')}
         AND (
                 variable in ('time','latitude','longitude','depth') 
                 OR cf_role is not NULL 
@@ -187,6 +187,7 @@ def estimate_query_size_per_dataset(query):
     """
     General method that interact with the different components to estimate a query download size.
     """
+    print(query)
     # Regroup by dataset
     profiles = query_profiles(query["user_query"], query["cache_filtered"])
 

@@ -30,11 +30,12 @@ def main(erddap_urls, csv_only):
 
         envs = os.environ
 
-        database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST_EXTERNAL']}:5432/{envs['DB_NAME']}"
+        database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST_EXTERNAL']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
 
         engine = create_engine(database_link)
         # test connection
         engine.connect()
+        print("Connected to ",database_link)
 
     erddap_urls = args.erddap_urls.split(",")
     dataset_ids = None
@@ -97,7 +98,9 @@ def main(erddap_urls, csv_only):
     else:
         schema = "cioos_api"
         with engine.begin() as transaction:
-            print("Writing to DB")
+            print("Writing to DB:")
+            print("Clearing tables")
+            # transaction.execute("SELECT remove_all_data();")
             datasets.to_sql(
                 "datasets_data_loader",
                 con=transaction,
@@ -112,7 +115,8 @@ def main(erddap_urls, csv_only):
                 schema=schema,
                 index=False,
             )
-            variables.to_sql(
+
+            variables.reset_index().to_sql(
                 "erddap_variables",
                 con=transaction,
                 if_exists="append",

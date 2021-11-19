@@ -7,7 +7,7 @@ CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
   -- the polygons are copied over to that table
   DROP TABLE IF EXISTS cioos_api.hexes_zoom_0;
   CREATE TABLE cioos_api.hexes_zoom_0 AS SELECT geom from ST_HexagonGrid(
-          100000,
+          10000,
           st_setsrid(ST_EstimatedExtent('cioos_api','points', 'geom'),3857)
       ); 
   CREATE INDEX

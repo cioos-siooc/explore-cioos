@@ -12,8 +12,9 @@ services:
   db:
     image: "postgis/postgis:13-3.1-alpine"
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:${DB_PORT:-5432}"
     environment:
+      - "PGPORT=${DB_PORT:-5432}"
       - "POSTGRES_DB=$DB_NAME"
       - "POSTGRES_PASSWORD=$DB_PASSWORD"
     volumes:
