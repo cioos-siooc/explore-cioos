@@ -35,7 +35,7 @@ def main(erddap_urls, csv_only):
         engine = create_engine(database_link)
         # test connection
         engine.connect()
-        print("Connected to ",database_link)
+        print("Connected to ", database_link)
 
     erddap_urls = args.erddap_urls.split(",")
     dataset_ids = None
@@ -71,6 +71,7 @@ def main(erddap_urls, csv_only):
     uuid_suffix = str(uuid.uuid4())[0:6]
     datasets_file = f"datasets_{uuid_suffix}.csv"
     profiles_file = f"profiles_{uuid_suffix}.csv"
+    variables_file = f"variables_{uuid_suffix}.csv"
 
     if datasets.empty:
         print("No datasets scraped")
@@ -93,7 +94,7 @@ def main(erddap_urls, csv_only):
     if csv_only:
         datasets.to_csv(datasets_file, index=False)
         profiles.to_csv(profiles_file, index=False)
-        variables.to_csv(variables, index=False)
+        variables.to_csv(variables_file)
         print(f"Wrote {datasets_file} and {profiles_file}")
     else:
         schema = "cioos_api"
