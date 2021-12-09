@@ -68,13 +68,12 @@ docker volume rm ceda_postgres-data
 docker-compose up -d db
 ```
 
-Delete tile cache:
-`docker volume rm ceda_redis-data`
 
 Redis CLI:
 `docker exec -it ceda_redis_1 redis-cli`
 
-Flush redis cache:
+
+Flush redis tile cache:
 `docker exec -it ceda_redis_1 redis-cli FLUSHALL`
 
 ## Starting using docker

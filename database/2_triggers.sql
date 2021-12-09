@@ -45,7 +45,7 @@ CREATE OR REPLACE FUNCTION replace_erddap_variables() RETURNS trigger
     AS $$
 BEGIN
   RAISE NOTICE '%',NEW;
-  DELETE FROM cioos_api.erddap_variables WHERE erddap_url=NEW.erddap_url AND dataset_id=NEW.dataset_id;
+  DELETE FROM cioos_api.erddap_variables WHERE erddap_url=NEW.erddap_url AND dataset_id=NEW.dataset_id AND variable=NEW.variable;
   RETURN NEW;
 END;
 $$;

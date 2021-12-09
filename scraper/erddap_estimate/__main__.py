@@ -1,14 +1,12 @@
-import pandas as pd
-import numpy as np
-
-from sqlalchemy import create_engine, types
-from dotenv import load_dotenv
 import argparse
-
 import json
 import os
 
 import erddap_downloader
+import numpy as np
+import pandas as pd
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, types
 
 load_dotenv(os.getcwd() + "/.env")
 envs = os.environ
