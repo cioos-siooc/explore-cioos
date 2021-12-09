@@ -37,6 +37,7 @@ CREATE TABLE cioos_api.profiles (
     dataset_pk integer REFERENCES cioos_api.datasets(pk),
     erddap_url text,
     dataset_id text,
+    timeseries_profile_id text,
     timeseries_id text,
     profile_id text,
     time_min timestamptz,
@@ -145,6 +146,8 @@ DROP TABLE IF EXISTS cioos_api.profiles_data_loader;
 CREATE TABLE cioos_api.profiles_data_loader (
     erddap_url text,
     dataset_id text,
+    profile_id text,
+    timeseries_profile_id text,
     timeseries_id text,
     profile_id text,
     time_min timestamp with time zone,
