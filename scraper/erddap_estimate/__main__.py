@@ -143,7 +143,7 @@ def get_dataset_size(datasets, standard_name=[""]):
     sql_query = f"""
     SELECT erddap_url ,dataset_id ,"type",COUNT("type") FROM {schema}.erddap_variables 
     WHERE  ( 
-        (erddap_url,dataset_id) in {tuple(datasets.index.values.tolist())}
+        (erddap_url,dataset_id) in {'('+str(datasets.index.values[0])+')' if len(datasets.index.values)==1 else tuple(datasets.index.values)}
         AND (
                 variable in ('time','latitude','longitude','depth') 
                 OR cf_role is not NULL 
