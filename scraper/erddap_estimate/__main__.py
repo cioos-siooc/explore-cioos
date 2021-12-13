@@ -126,13 +126,13 @@ def estimate_query_size_per_dataset(query):
     return datasets
 
 
-def standard_name_from_eovs(eovs):
+def standard_name_from_eovs(eovs: list):
     """
     Method use to retrieve the mapping from eovs to downloader available within the downloader package.
     """
     standard_names = set()
-    for eov in eovs.split(","):
-        standard_names.union(eovs_to_standard_name[eov])
+    for eov in eovs:
+        standard_names = standard_names.union(eovs_to_standard_name[eov])
     return standard_names
 
 
@@ -208,7 +208,8 @@ def estimate_query_size_per_dataset(query):
     )
 
     # Get download_size per dataset
-    datasets["bytes_size"] = get_dataset_size(datasets, query["user_query"]["eovs"])
+    standard_names = standard_name_from_eovs(query["user_query"]["eovs"])
+    datasets["bytes_size"] = get_dataset_size(datasets, standard_names)
 
     # Get string based on estimated size
     datasets["download_size_string"] = datasets["bytes_size"].apply(
