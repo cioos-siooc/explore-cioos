@@ -132,7 +132,10 @@ def standard_name_from_eovs(eovs: list):
     """
     standard_names = set()
     for eov in eovs:
-        standard_names = standard_names.union(eovs_to_standard_name[eov])
+        if eov in eovs_to_standard_name:
+            standard_names = standard_names.union(eovs_to_standard_name[eov])
+        else:
+            warnings.warn(f"EOV {eov} is unavailable", UserWarning)
     return standard_names
 
 
