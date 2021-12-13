@@ -4,6 +4,7 @@ import numpy as np
 from sqlalchemy import create_engine, types
 from dotenv import load_dotenv
 import argparse
+import warnings
 
 import json
 import os
@@ -190,6 +191,11 @@ def estimate_query_size_per_dataset(query):
     print(query)
     # Regroup by dataset
     profiles = query_profiles(query["user_query"], query["cache_filtered"])
+
+    # If no profiles exists for such query just return an empty dataframe
+    if profiles.empty:
+        warnings.warn("No data available", UserWarning)
+        return profiles
 
     # Estimate records per profiles
     profiles = estimate_n_record_per_profile(profiles, query["user_query"])
