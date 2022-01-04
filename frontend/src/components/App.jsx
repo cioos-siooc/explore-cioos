@@ -18,10 +18,10 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
-export default function App () {
+export default function App() {
   const map = new CIOOSMap()
   return (
-    <div style={{maxHeight: '800px'}}>
+    <div style={{ maxHeight: '800px' }}>
       <Controls
         map={map}
       />

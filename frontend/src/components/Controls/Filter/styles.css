@@ -1,0 +1,13 @@
+.controls {
+  position: relative;
+  top: 10px;
+  left: 60px;
+  overflow-x: hidden;
+  pointer-events: none;
+}
+
+.filterChip {
+  fill: darkgrey;
+  background-color: darkgrey;
+  pointer-events: all;
+}
