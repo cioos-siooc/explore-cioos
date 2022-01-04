@@ -29,13 +29,38 @@ export default function Filter({ badgeTitle }) {
       break;
   }
 
-  return (
-    <Badge className='filterChip' badge-color='white'>
-      {badgeTitle}:{Object.keys(optionsSelected).map((key, index) => {
+  function resetDefaults(optionsSelected, setOptionsSelected) {
+    let copyOfOptionsSelected = { ...optionsSelected }
+    Object.keys(optionsSelected).forEach(option => copyOfOptionsSelected[option] = false)
+    setOptionsSelected(copyOfOptionsSelected)
+  }
+
+  function generateBadgeTitle(optionsSelected, badgeTitle) {
+    let count = 0
+    let newBadge
+    Object.keys(optionsSelected).forEach(key => {
+      if (optionsSelected[key] === true) {
+        count++
+      }
+    })
+    if (count === 0) {
+      return capitalizeFirstLetter(badgeTitle)
+    } else if (count === 1) {
+      Object.keys(optionsSelected).forEach(key => {
         if (optionsSelected[key]) {
-          return capitalizeFirstLetter(key)
+          newBadge = capitalizeFirstLetter(key)
         }
-      })}
+      })
+      return newBadge
+    } else if (count > 1) {
+      return (badgeTitle === 'Ocean Variables' ? count + ' variables' : count + ' organizations')
+    }
+  }
+
+
+  return (
+    <div className='filter'>
+      {generateBadgeTitle(optionsSelected, badgeTitle)}
       <button onClick={() => setFilterOpen(!filterOpen)}>
         {filterOpen ? <ChevronCompactUp /> : <ChevronCompactDown />}
       </button>
@@ -56,8 +81,17 @@ export default function Filter({ badgeTitle }) {
               <label className='ml-2'>{capitalizeFirstLetter(option)}</label>
             </InputGroup>))
           }
+          <hr />
+          <div>
+            <button onClick={() => resetDefaults(optionsSelected, setOptionsSelected)}>
+              Reset
+            </button>
+            <button onClick={() => setFilterOpen(false)}>
+              Close
+            </button>
+          </div>
         </div>
       }
-    </Badge>
+    </div>
   )
 }
