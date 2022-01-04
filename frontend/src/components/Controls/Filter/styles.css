@@ -1,13 +1,15 @@
 .controls {
   position: relative;
   top: 10px;
-  left: 60px;
   overflow-x: hidden;
   pointer-events: none;
+  margin-left: 52px;
 }
 
-.filterChip {
+.filter {
+  /* width: 300px; */
   fill: darkgrey;
   background-color: darkgrey;
   pointer-events: all;
+  max-width: 200px;
 }

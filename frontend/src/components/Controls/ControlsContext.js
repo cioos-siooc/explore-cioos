@@ -10,7 +10,7 @@ const ControlsContext = React.createContext({
   },
   setEovsSelected: () => { },
   orgsSelected: {},
-  setOrgsSelected: () => {}
+  setOrgsSelected: () => { }
 })
 
 export default ControlsContext;

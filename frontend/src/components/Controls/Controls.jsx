@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useState } from 'react'
 import PropTypes from 'prop-types'
+import { Container, Row, Col } from 'react-bootstrap'
 
 import Filter from './Filter/Filter.jsx'
 import ControlsContext from './ControlsContext.js'
@@ -24,20 +25,9 @@ export default function Controls(props) {
   }
   const [eovsSelected, setEovsSelected] = useState(eovsFilterInit)
 
-  // Organization filter initial values and state
+  // Organization filter initial values from API and state
   const orgsFilterInit = {}
   const [orgsSelected, setOrgsSelected] = useState(orgsFilterInit)
-
-  // Gets populated with all of the initalized state, and setters, for the controls
-  const controlsContextValue = {
-    // EOVs filter context
-    eovsSelected,
-    setEovsSelected,
-    // Orgs filter context
-    orgsSelected,
-    setOrgsSelected
-  }
-
   useEffect(() => {
     fetch(`${server}/organizations`).then(response => response.json()).then(data => {
       let orgsReturned = {}
@@ -49,11 +39,29 @@ export default function Controls(props) {
     }).catch(error => { throw error })
   }, [])
 
+  // Context populated with all of the initalized state, and setters, for the controls
+  const controlsContextValue = {
+    // EOVs filter context
+    eovsSelected,
+    setEovsSelected,
+    // Orgs filter context
+    orgsSelected,
+    setOrgsSelected
+  }
+
   return (
     <div className='controls'>
       <ControlsContext.Provider value={controlsContextValue}>
-        <Filter badgeTitle='Ocean Variables' />
-        <Filter badgeTitle='Organizations' />
+        <Container fluid>
+          <Row>
+            <Col sm='auto'>
+              <Filter badgeTitle='Ocean Variables' />
+            </Col>
+            <Col sm='auto'>
+              <Filter badgeTitle='Organizations' />
+            </Col>
+          </Row>
+        </Container>
       </ControlsContext.Provider>
     </div>
   )
