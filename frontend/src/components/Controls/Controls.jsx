@@ -1,81 +1,60 @@
 import * as React from 'react'
-import { useState, useRef, useEffect, useContext } from 'react'
+import { useState } from 'react'
 import PropTypes from 'prop-types'
-import { Container, Row, Col, Accordion, Card, Button, InputGroup, OverlayTrigger, Tooltip, useAccordionToggle, Table, Modal, Badge } from 'react-bootstrap'
-import classnames from 'classnames'
-import { ChevronCompactLeft, ChevronCompactRight, QuestionCircle, ChevronCompactDown, ChevronCompactUp, ArrowRight } from 'react-bootstrap-icons'
 
-import TimeSelector from './TimeSelector/TimeSelector.jsx'
-import DepthSelector from './DepthSelector/DepthSelector.jsx'
-import SubmitRequest from './SubmitRequest/SubmitRequest.jsx'
-import PageControls from './PageControls/PageControls.jsx'
+import Filter from './Filter/Filter.jsx'
+import ControlsContext from './ControlsContext.js'
 import { server } from '../../config'
 
 import './styles.css'
+import { useEffect } from 'react'
 
 export default function Controls(props) {
 
   // Making changes to context within context consumers
   //https://stackoverflow.com/questions/41030361/how-to-update-react-context-from-inside-a-child-component
-  const eovsToggleStart = {
+
+  // EOV filter initial values and state
+  const eovsFilterInit = {
     carbon: false,
     currents: false,
     nutrients: false,
     salinity: false,
     temperature: false,
   }
-  const [eovsSelected, setEovsSelected] = useState(eovsToggleStart)
-  const eovsSelectedValue = { eovsSelected, setEovsSelected }
-  const AppContext = React.createContext({
-    eovsSelected: eovsToggleStart,
-    setEovsSelected: () => { }
-  })
-  const EovFilter = () => {
-    const [filterOpen, setFilterOpen] = useState(false)
-    const { eovsSelected, setEovsSelected } = useContext(AppContext)
-    const badgeTitle = 'Ocean Variables'
-    return (
-      <Badge className='filterChip' badge-color='white'>
-        {badgeTitle}:{Object.keys(eovsSelected).map((key, index) => {
-          if (eovsSelected[key]) {
-            return capitalizeFirstLetter(key)
-          }
-        })}
-        <button onClick={() => setFilterOpen(!filterOpen)}>
-          {filterOpen ? <ChevronCompactUp /> : <ChevronCompactDown />}
-        </button>
-        {filterOpen &&
-          <div className='filterOptions'>
-            {Object.keys(eovsSelected).map(eov => (
-              <InputGroup key={eov} className="mb-3">
-                <InputGroup.Checkbox
-                  checked={eovsSelected[eov]}
-                  onChange={(e) => {
-                    setEovsSelected({
-                      ...eovsSelected,
-                      [eov]: !eovsSelected[eov]
-                    })
-                  }}
-                  aria-label="Checkbox for following text input"
-                />
-                <label className='ml-2'>{capitalizeFirstLetter(eov)}</label>
-              </InputGroup>))
-            }
-          </div>
-        }
-      </Badge>
-    )
+  const [eovsSelected, setEovsSelected] = useState(eovsFilterInit)
+
+  // Organization filter initial values and state
+  const orgsFilterInit = {}
+  const [orgsSelected, setOrgsSelected] = useState(orgsFilterInit)
+
+  // Gets populated with all of the initalized state, and setters, for the controls
+  const controlsContextValue = {
+    // EOVs filter context
+    eovsSelected,
+    setEovsSelected,
+    // Orgs filter context
+    orgsSelected,
+    setOrgsSelected
   }
 
-  function capitalizeFirstLetter(string) {
-    return string.charAt(0).toUpperCase() + string.slice(1);
-  }
+  useEffect(() => {
+    fetch(`${server}/organizations`).then(response => response.json()).then(data => {
+      let orgsReturned = {}
+      data.forEach(elem => {
+        orgsReturned[elem.name] = false
+      })
+      setOrgsSelected(orgsReturned)
+      // setOrgs(orgsReturned)
+    }).catch(error => { throw error })
+  }, [])
 
   return (
     <div className='controls'>
-      <AppContext.Provider value={eovsSelectedValue}>
-        <EovFilter />
-      </AppContext.Provider>
+      <ControlsContext.Provider value={controlsContextValue}>
+        <Filter badgeTitle='Ocean Variables' />
+        <Filter badgeTitle='Organizations' />
+      </ControlsContext.Provider>
     </div>
   )
 }
