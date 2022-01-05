@@ -1,4 +1,5 @@
 import argparse
+import warnings
 import json
 import os
 
@@ -123,13 +124,16 @@ def estimate_query_size_per_dataset(query):
     return datasets
 
 
-def standard_name_from_eovs(eovs):
+def standard_name_from_eovs(eovs: list):
     """
     Method use to retrieve the mapping from eovs to downloader available within the downloader package.
     """
     standard_names = set()
-    for eov in eovs.split(","):
-        standard_names.union(eovs_to_standard_name[eov])
+    for eov in eovs:
+        if eov in eovs_to_standard_name:
+            standard_names = standard_names.union(eovs_to_standard_name[eov])
+        else:
+            warnings.warn(f"EOV {eov} is unavailable", UserWarning)
     return standard_names
 
 
@@ -140,7 +144,7 @@ def get_dataset_size(datasets, standard_name=[""]):
     sql_query = f"""
     SELECT erddap_url ,dataset_id ,"type",COUNT("type") FROM {schema}.erddap_variables 
     WHERE  ( 
-        (erddap_url,dataset_id) in {tuple(datasets.index.values.tolist())}
+        (erddap_url,dataset_id) in {'('+str(datasets.index.values[0])+')' if len(datasets.index.values)==1 else tuple(datasets.index.values)}
         AND (
                 variable in ('time','latitude','longitude','depth') 
                 OR cf_role is not NULL 
@@ -189,6 +193,11 @@ def estimate_query_size_per_dataset(query):
     # Regroup by dataset
     profiles = query_profiles(query["user_query"], query["cache_filtered"])
 
+    # If no profiles exists for such query just return an empty dataframe
+    if profiles.empty:
+        warnings.warn("No data available", UserWarning)
+        return profiles
+
     # Estimate records per profiles
     profiles = estimate_n_record_per_profile(profiles, query["user_query"])
 
@@ -200,7 +209,8 @@ def estimate_query_size_per_dataset(query):
     )
 
     # Get download_size per dataset
-    datasets["bytes_size"] = get_dataset_size(datasets, query["user_query"]["eovs"])
+    standard_names = standard_name_from_eovs(query["user_query"]["eovs"])
+    datasets["bytes_size"] = get_dataset_size(datasets, standard_names)
 
     # Get string based on estimated size
     datasets["download_size_string"] = datasets["bytes_size"].apply(
