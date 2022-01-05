@@ -11,10 +11,10 @@ export default function DepthSelector(props) {
     <Row className="timeSelector">
       <Col>
         <Row>
-          <Col xs={{span: 5, offset: 0}}>Start Depth (m):</Col>
-          <Col xs={{span: 1, offset: 2}}>
+          <Col xs='auto' >Start Depth (m):</Col>
+          <Col xs='auto'>
             <input
-              style={{width: '130px'}}
+              style={{ width: '130px' }}
               className="startDepth"
               value={props.startDepth}
               type="number"
@@ -26,10 +26,10 @@ export default function DepthSelector(props) {
           </Col>
         </Row>
         <Row>
-          <Col xs={{span: 5, offset: 0}}>End Depth (m):</Col>
-          <Col xs={{span: 1, offset: 2}}>
+          <Col xs='auto'>End Depth (m):</Col>
+          <Col xs='auto'>
             <input
-              style={{width: '130px'}}
+              style={{ width: '130px' }}
               className="endDepth"
               value={props.endDepth}
               type="number"

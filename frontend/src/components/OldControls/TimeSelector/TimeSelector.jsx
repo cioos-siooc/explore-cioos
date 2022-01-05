@@ -6,12 +6,12 @@ export default function TimeSelector(props) {
   return (
     <div className="timeSelector">
       <Row>
-        <Col xs={{span: 5, offset: 0}}>
-        Start Date:
+        <Col xs='auto'>
+          Start Date:
         </Col>
-        <Col xs={{span: 3, offset: 1}}>
+        <Col xs='auto'>
           <input
-            style={{width: '185px'}}
+            style={{ width: '150px' }}
             type="date"
             value={props.startDate}
             max={props.endDate}
@@ -20,10 +20,10 @@ export default function TimeSelector(props) {
         </Col>
       </Row>
       <Row>
-        <Col xs={{span: 5, offset: 0}}>End Date:</Col>
-        <Col  xs={{span: 3, offset: 1}}>
+        <Col xs='auto'>End Date:</Col>
+        <Col xs='auto'>
           <input
-          style={{width: '185px'}}
+            style={{ width: '150px' }}
             type="date"
             value={props.endDate}
             min={props.startDate}
