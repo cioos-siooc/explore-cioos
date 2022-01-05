@@ -4,7 +4,7 @@ import PropTypes from 'prop-types'
 import { Container, Row, Col } from 'react-bootstrap'
 
 import Filter from './Filter/Filter.jsx'
-import ControlsContext from './ControlsContext.js'
+import MultiCheckboxFilter from './Filter/MultiCheckboxFilter.jsx'
 import { server } from '../../config'
 
 import './styles.css'
@@ -39,31 +39,29 @@ export default function Controls(props) {
     }).catch(error => { throw error })
   }, [])
 
-  // Context populated with all of the initalized state, and setters, for the controls
-  const controlsContextValue = {
-    // EOVs filter context
-    eovsSelected,
-    setEovsSelected,
-    // Orgs filter context
-    orgsSelected,
-    setOrgsSelected
-  }
-
   return (
     <div className='controls'>
-      <ControlsContext.Provider value={controlsContextValue}>
-        <Container fluid>
-          <Row>
-            <Col sm='auto'>
-              <Filter badgeTitle='Ocean Variables' />
+      <Container fluid>
+        <Row>
+          <Col sm='auto'>
+            <Filter badgeTitle='Ocean Variables' optionsSelected={eovsSelected} setOptionsSelected={setEovsSelected}>
+              <MultiCheckboxFilter optionsSelected={eovsSelected} setOptionsSelected={setEovsSelected} />
+            </Filter>
+          </Col>
+          <Col sm='auto'>
+            <Filter badgeTitle='Organizations' optionsSelected={orgsSelected} setOptionsSelected={setOrgsSelected}>
+              <MultiCheckboxFilter optionsSelected={orgsSelected} setOptionsSelected={setOrgsSelected} />
+            </Filter>
+          </Col>
+          {/* <Col sm='auto'>
+              <Filter badgeTitle='Timeframe' type='range' />
             </Col>
             <Col sm='auto'>
-              <Filter badgeTitle='Organizations' />
-            </Col>
-          </Row>
-        </Container>
-      </ControlsContext.Provider>
-    </div>
+              <Filter badgeTitle='Depth Range' type='range' />
+            </Col> */}
+        </Row>
+      </Container>
+    </div >
   )
 }
 
