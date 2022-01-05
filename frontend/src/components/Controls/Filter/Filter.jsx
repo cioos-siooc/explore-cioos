@@ -1,7 +1,5 @@
 import * as React from 'react'
-import { useState, useRef, useEffect, useContext } from 'react'
-import { Badge, InputGroup } from 'react-bootstrap'
-import { capitalizeFirstLetter } from '../../../utilities'
+import { useState } from 'react'
 import { ChevronCompactDown, ChevronCompactUp } from 'react-bootstrap-icons'
 
 import './styles.css'
@@ -16,31 +14,9 @@ export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected
     setOptionsSelected(copyOfOptionsSelected)
   }
 
-  function generateBadgeTitle(optionsSelected, badgeTitle) {
-    let count = 0
-    let newBadge
-    Object.keys(optionsSelected).forEach(key => {
-      if (optionsSelected[key] === true) {
-        count++
-      }
-    })
-    if (count === 0) {
-      return capitalizeFirstLetter(badgeTitle)
-    } else if (count === 1) {
-      Object.keys(optionsSelected).forEach(key => {
-        if (optionsSelected[key]) {
-          newBadge = capitalizeFirstLetter(key)
-        }
-      })
-      return newBadge
-    } else if (count > 1) {
-      return (badgeTitle === 'Ocean Variables' ? count + ' variables' : count + ' organizations')
-    }
-  }
-
   return (
     <div className='filter'>
-      {generateBadgeTitle(optionsSelected, badgeTitle)}
+      {badgeTitle}
       <button onClick={() => setFilterOpen(!filterOpen)}>
         {filterOpen ? <ChevronCompactUp /> : <ChevronCompactDown />}
       </button>
