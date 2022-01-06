@@ -1,5 +1,8 @@
 import pandas as pd
 import requests
+import logging
+
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
 class Dataset(object):
@@ -12,7 +15,7 @@ class Dataset(object):
         self.globals = {}
         self.df_variables = None
         self.variables_list = []
-
+        self.logger = self.get_logger()
         self.get_metadata()
         self.df = pd.DataFrame(
             {
@@ -95,3 +98,7 @@ class Dataset(object):
         self.cdm_data_type = globals_dict["cdm_data_type"]
         self.globals = globals_dict
         self.df_variables = df_variables
+      
+    def get_logger(self):
+        logger = logging.getLogger(f"{self.erddap_server.domain} - {self.id}")
+        return logger

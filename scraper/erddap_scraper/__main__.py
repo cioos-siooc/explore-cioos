@@ -2,6 +2,7 @@ import argparse
 import os
 import threading
 import uuid
+import logging 
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -130,5 +131,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--csv-only", help="Skip writing to the DB", action="store_true"
     )
+
+
+    parser.add_argument(
+                        '--log-level',
+                        default='info',
+                        help='Provide logging level. Example --loglevel debug, default=warning' )
+
     args = parser.parse_args()
+    logging.basicConfig(format="%(name)s : %(message)s", level=args.log_level.upper())
+    # logging.basicConfig( level=args.log_level.upper() )
     main(args.erddap_urls, args.csv_only)
