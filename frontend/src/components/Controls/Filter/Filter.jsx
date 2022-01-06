@@ -17,25 +17,30 @@ export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected
 
   return (
     <div className='filter'>
-      {tooltip &&
-        <OverlayTrigger
-          key={badgeTitle}
-          placement='bottom'
-          overlay={
-            <Tooltip id={`tooltip-left`}>
-              {tooltip}
-            </Tooltip>
-          }
-        >
-          <QuestionCircle className='helpIcon' color='#007bff' size={20} />
-        </OverlayTrigger>
-      }
-      {badgeTitle}
-      <button onClick={() => setFilterOpen(!filterOpen)}>
-        {filterOpen ? <ChevronCompactUp /> : <ChevronCompactDown />}
-      </button>
+      <div className='filterHeader' >
+        {tooltip &&
+          <OverlayTrigger
+            key={badgeTitle}
+            placement='bottom'
+            overlay={
+              <Tooltip id={`tooltip-left`}>
+                {tooltip}
+              </Tooltip>
+            }
+          >
+            <QuestionCircle className='helpIcon' color='#007bff' size={20} />
+          </OverlayTrigger>
+        }
+        <div className='badgeTitle'>
+          {badgeTitle}
+        </div>
+        <button onClick={() => setFilterOpen(!filterOpen)}>
+          {filterOpen ? <ChevronCompactUp /> : <ChevronCompactDown />}
+        </button>
+      </div>
       {filterOpen &&
         <div className='filterOptions'>
+          <hr />
           {children}
           <hr />
           <div>

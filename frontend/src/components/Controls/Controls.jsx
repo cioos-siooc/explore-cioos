@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
 import { Container, Row, Col } from 'react-bootstrap'
 import _ from 'lodash'
@@ -12,7 +12,6 @@ import { generateMultipleSelectBadgeTitle, generateRangeSelectBadgeTitle } from 
 import { server } from '../../config'
 
 import './styles.css'
-import { useEffect } from 'react'
 
 export default function Controls(props) {
 
@@ -107,6 +106,9 @@ export default function Controls(props) {
                 setEndDepth={setEndDepth}
               />
             </Filter>
+          </Col>
+          <Col xs='auto'>
+            <button className='downloadButton' onClick={() => console.log('downloading')}>Download</button>
           </Col>
         </Row>
       </Container>

@@ -1,0 +1,11 @@
+.controls {
+  position: relative;
+  top: 10px;
+  overflow-x: hidden;
+  pointer-events: none;
+  margin-left: 52px;
+}
+
+.downloadButton {
+  pointer-events: all;
+}
