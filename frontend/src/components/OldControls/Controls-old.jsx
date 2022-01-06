@@ -5,8 +5,8 @@ import { Container, Row, Col, Accordion, Card, Button, InputGroup, OverlayTrigge
 import classnames from 'classnames'
 import { ChevronCompactLeft, ChevronCompactRight, QuestionCircle, ChevronCompactDown, ChevronCompactUp, ArrowRight } from 'react-bootstrap-icons'
 
-import TimeSelector from './TimeSelector/TimeSelector.jsx'
-import DepthSelector from './DepthSelector/DepthSelector.jsx'
+import TimeSelector from '../Controls/Filter/TimeSelector/TimeSelector.jsx'
+import DepthSelector from '../Controls/Filter/DepthSelector/DepthSelector.jsx'
 import SubmitRequest from './SubmitRequest/SubmitRequest.jsx'
 import PageControls from './PageControls/PageControls.jsx'
 import { server } from '../../config'
