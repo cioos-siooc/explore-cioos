@@ -14,6 +14,6 @@ setup(
         "shapely",
         "sqlalchemy",
         "psycopg2-binary",
-        "python-dotenv"
+        "python-dotenv",
     ],
 )
