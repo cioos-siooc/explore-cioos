@@ -6,7 +6,7 @@ import { abbreviateString } from '../../../utilities'
 
 import './styles.css'
 
-export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected, tooltip, children }) {
+export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected, tooltip, icon, children }) {
   // Open/Closed state for filter dropdown
   const [filterOpen, setFilterOpen] = useState(false)
 
@@ -18,7 +18,7 @@ export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected
 
   return (
     <div className='filter'>
-      <div className='filterHeader' >
+      <div className='filterHeader' onClick={() => setFilterOpen(!filterOpen)} >
         {tooltip &&
           <OverlayTrigger
             key={badgeTitle}
@@ -32,10 +32,11 @@ export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected
             <QuestionCircle className='helpIcon' color='#007bff' size={20} />
           </OverlayTrigger>
         }
+        {icon}
         <div className='badgeTitle' title={badgeTitle}>
           {abbreviateString(badgeTitle, 40)}
         </div>
-        {filterOpen ? <ChevronCompactUp onClick={() => setFilterOpen(!filterOpen)} /> : <ChevronCompactDown onClick={() => setFilterOpen(!filterOpen)} />}
+        {filterOpen ? <ChevronCompactUp /> : <ChevronCompactDown />}
       </div>
       {filterOpen &&
         <div className='filterOptions'>

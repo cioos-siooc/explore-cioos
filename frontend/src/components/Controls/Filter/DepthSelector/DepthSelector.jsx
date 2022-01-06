@@ -1,7 +1,7 @@
 import * as React from "react";
 import PropTypes from "prop-types";
 import { Col, Row, Button } from "react-bootstrap";
-import RangeSelector from "./RangeSelector.jsx";
+import RangeSelector from "../RangeSelector/RangeSelector.jsx";
 
 import "react-bootstrap-range-slider/dist/react-bootstrap-range-slider.css";
 import "rc-slider/assets/index.css";
