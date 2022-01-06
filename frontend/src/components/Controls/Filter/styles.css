@@ -1,15 +1,24 @@
-.controls {
-  position: relative;
-  top: 10px;
-  overflow-x: hidden;
-  pointer-events: none;
-  margin-left: 52px;
-}
-
 .filter {
   /* width: 300px; */
   fill: darkgrey;
   background-color: darkgrey;
   pointer-events: all;
-  max-width: 310px;
+  max-width: 350px;
+  display: block;
+}
+
+.filter hr {
+  margin: 5px 0px;
+}
+
+.filterHeader {
+  display: inline-flex;
+}
+
+.badgeTitle {
+  margin: 0px 10px 0px 10px;
+}
+
+.filterOptions {
+
 }
