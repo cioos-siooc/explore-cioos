@@ -1,3 +1,5 @@
+import * as _ from 'lodash'
+
 export function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
@@ -26,10 +28,10 @@ export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
   return newBadge
 }
 
-export function generateRangeSelectBadgeTitle(badgeTitle, optionsSelected, defaults) {
+export function generateRangeSelectBadgeTitle(badgeTitle, optionsSelected, defaults, units) {
   return optionsSelected[0] === defaults[0] && optionsSelected[1] === defaults[1] 
   ? badgeTitle
-  : `${badgeTitle}: ${optionsSelected[0]} - ${optionsSelected[1]}`
+  : `${optionsSelected[0]} - ${optionsSelected[1]}` + (!_.isEmpty(units) ? ' ' + units : '')
 }
 
 export function abbreviateString(text, maxLength) {

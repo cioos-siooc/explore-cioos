@@ -1,36 +1,35 @@
 import * as React from "react";
 import PropTypes from "prop-types";
-import { Col, Row, Button } from "react-bootstrap";
 
+import './styles.css'
+
+// Spacing elements out to the left and right using justify-content: space-between. https://medium.com/12-developer-labors/css-all-the-ways-to-align-elements-left-and-right-52ecce4a4af9
 export default function TimeSelector(props) {
   return (
-    <div className="timeSelector">
-      <Row>
-        <Col xs='auto'>
+    <div className='timeSelector'>
+      <div className='date'>
+        <span>
           Start Date:
-        </Col>
-        <Col xs='auto'>
-          <input
-            style={{ width: '150px' }}
-            type="date"
-            value={props.startDate}
-            max={props.endDate}
-            onChange={(e) => props.setStartDate(e.target.value)}
-          />
-        </Col>
-      </Row>
-      <Row>
-        <Col xs='auto'>End Date:</Col>
-        <Col xs='auto'>
-          <input
-            style={{ width: '150px' }}
-            type="date"
-            value={props.endDate}
-            min={props.startDate}
-            onChange={(e) => props.setEndDate(e.target.value)}
-          />
-        </Col>
-      </Row>
+        </span>
+        <input
+          type="date"
+          value={props.startDate}
+          max={props.endDate}
+          onChange={(e) => props.setStartDate(e.target.value)}
+        />
+      </div>
+      <div className='date'>
+        <span>
+          End Date:
+        </span>
+        <input
+          type="date"
+          value={props.endDate}
+          min={props.startDate}
+          onChange={(e) => props.setEndDate(e.target.value)}
+        />
+      </div>
+
     </div>
   );
 }
