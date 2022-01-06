@@ -6,8 +6,8 @@ import _ from 'lodash'
 
 import Filter from './Filter/Filter.jsx'
 import MultiCheckboxFilter from './Filter/MultiCheckboxFilter.jsx'
-import TimeSelector from '../OldControls/TimeSelector/TimeSelector.jsx'
-import DepthSelector from '../OldControls/DepthSelector/DepthSelector.jsx'
+import TimeSelector from './Filter/TimeSelector/TimeSelector.jsx'
+import DepthSelector from './Filter/DepthSelector/DepthSelector.jsx'
 import { generateMultipleSelectBadgeTitle, generateRangeSelectBadgeTitle } from '../../utilities.js'
 import { server } from '../../config'
 
@@ -43,12 +43,16 @@ export default function Controls(props) {
   }, [])
 
   // Timeframe filter initial values and state
-  const [startDate, setStartDate] = useState('1900-01-01');
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const defaultStartDate = '1900-01-01'
+  const defaultEndDate = new Date().toISOString().split('T')[0]
+  const [startDate, setStartDate] = useState(defaultStartDate);
+  const [endDate, setEndDate] = useState(defaultEndDate);
 
   // Depth filter initial values and state
-  const [startDepth, setStartDepth] = useState(0)
-  const [endDepth, setEndDepth] = useState(12000)
+  const defaultStartDepth = 0
+  const defaultEndDepth = 12000
+  const [startDepth, setStartDepth] = useState(defaultStartDepth)
+  const [endDepth, setEndDepth] = useState(defaultEndDepth)
 
   return (
     <div className='controls'>
@@ -59,6 +63,7 @@ export default function Controls(props) {
               badgeTitle={generateMultipleSelectBadgeTitle('Ocean Variables', eovsSelected)}
               optionsSelected={eovsSelected}
               setOptionsSelected={setEovsSelected}
+              tooltip='Filter data by ocean variable name. Selection works as logical OR operation.'
             >
               <MultiCheckboxFilter optionsSelected={eovsSelected} setOptionsSelected={setEovsSelected} />
             </Filter>
@@ -68,15 +73,17 @@ export default function Controls(props) {
               badgeTitle={generateMultipleSelectBadgeTitle('Organizations', orgsSelected)}
               optionsSelected={orgsSelected}
               setOptionsSelected={setOrgsSelected}
+              tooltip='Filter data by responsible organisation name. Selection works as logical OR operation.'
             >
               <MultiCheckboxFilter optionsSelected={orgsSelected} setOptionsSelected={setOrgsSelected} />
             </Filter>
           </Col>
           <Col xs='auto'>
             <Filter
-              badgeTitle={generateRangeSelectBadgeTitle('Timeframe', [startDate, endDate])}
+              badgeTitle={generateRangeSelectBadgeTitle('Timeframe', [startDate, endDate], [defaultStartDate, defaultEndDate])}
               optionsSelected={startDate, endDate}
               setOptionsSelected={() => { setStartDate('1900-01-01'); setEndDate(new Date().toISOString().split('T')[0]) }}
+              tooltip='Filter data by timeframe. Selection works as inclusive range.'
             >
               <TimeSelector
                 startDate={startDate}
@@ -88,9 +95,10 @@ export default function Controls(props) {
           </Col>
           <Col xs='auto'>
             <Filter
-              badgeTitle={generateRangeSelectBadgeTitle('Depth Range', [startDepth, endDepth])}
+              badgeTitle={generateRangeSelectBadgeTitle('Depth Range (m)', [startDepth, endDepth], [defaultStartDepth, defaultEndDepth])}
               optionsSelected={startDepth, endDepth}
               setOptionsSelected={() => { setStartDepth(0); setEndDepth(12000) }}
+              tooltip='Filter data by depth. Selection works as inclusive range, and negative values are meters above ocean surface.'
             >
               <DepthSelector
                 startDepth={startDepth}

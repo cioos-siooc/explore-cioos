@@ -1,10 +1,11 @@
 import * as React from 'react'
 import { useState } from 'react'
-import { ChevronCompactDown, ChevronCompactUp } from 'react-bootstrap-icons'
+import { OverlayTrigger, Tooltip } from 'react-bootstrap'
+import { ChevronCompactDown, ChevronCompactUp, QuestionCircle } from 'react-bootstrap-icons'
 
 import './styles.css'
 
-export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected, children }) {
+export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected, tooltip, children }) {
   // Open/Closed state for filter dropdown
   const [filterOpen, setFilterOpen] = useState(false)
 
@@ -16,6 +17,19 @@ export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected
 
   return (
     <div className='filter'>
+      {tooltip &&
+        <OverlayTrigger
+          key={badgeTitle}
+          placement='bottom'
+          overlay={
+            <Tooltip id={`tooltip-left`}>
+              {tooltip}
+            </Tooltip>
+          }
+        >
+          <QuestionCircle className='helpIcon' color='#007bff' size={20} />
+        </OverlayTrigger>
+      }
       {badgeTitle}
       <button onClick={() => setFilterOpen(!filterOpen)}>
         {filterOpen ? <ChevronCompactUp /> : <ChevronCompactDown />}

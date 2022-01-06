@@ -26,6 +26,8 @@ export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
   }
 }
 
-export function generateRangeSelectBadgeTitle(badgeTitle, optionsSelected) {
-  return `${badgeTitle}:${optionsSelected[0]} - ${optionsSelected[1]}`
+export function generateRangeSelectBadgeTitle(badgeTitle, optionsSelected, defaults) {
+  return optionsSelected[0] === defaults[0] && optionsSelected[1] === defaults[1] 
+  ? badgeTitle
+  : `${badgeTitle}: ${optionsSelected[0]} - ${optionsSelected[1]}`
 }
