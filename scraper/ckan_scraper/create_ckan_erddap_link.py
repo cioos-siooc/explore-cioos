@@ -50,9 +50,9 @@ def get_ckan_records(record_id_erddap_url_map, limit=None):
         ]
         # remove empties
         partiesRaw = list(filter(None, partiesRaw))
-        
-        organizations=[]
-        
+
+        organizations = []
+
         if len(partiesRaw):
             partiesRaw2 = json.loads(partiesRaw[0])
             organizations = [x["name"] for x in partiesRaw2]
@@ -60,9 +60,9 @@ def get_ckan_records(record_id_erddap_url_map, limit=None):
             cited_responsible_party = json.loads(record_full["cited-responsible-party"])
             if len(cited_responsible_party):
                 for contact in cited_responsible_party:
-                    if 'organisation-name' in contact or 'organization-name' in contact:
+                    if "organisation-name" in contact or "organization-name" in contact:
                         print(contact)
-                        organizations+= [contact.get('organisation-name')]
+                        organizations += [contact.get("organisation-name")]
 
         # remove duplicates, empty strings
         organizations = list(filter(None, organizations))
