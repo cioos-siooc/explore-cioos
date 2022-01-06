@@ -10,6 +10,7 @@
   text-align: center;
   border-radius: 30px;
   padding: 5px;
+  cursor: pointer;
 }
 
 .filterHeader > *{
@@ -37,24 +38,4 @@
 
 .filterOptions button:hover {
   background-color: lightgray;
-}
-
-.multiCheckboxFilter label{
-  height: 30px;
-}
-
-.multiCheckboxFilter > * {
-  margin: 0px 0px 10px 10px;
-}
-
-.multiCheckboxFilter > svg {
-  margin: 0px 10px 0px 0px;
-}
-
-.multiCheckboxFilter .optionName {
-  margin-left: 10px;
-} 
-
-.multiCheckboxFilter .optionButton{
-  display: flex;
 }

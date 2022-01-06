@@ -1,6 +1,8 @@
 import * as React from 'react'
 import { CheckSquare, Square } from 'react-bootstrap-icons'
-import { capitalizeFirstLetter, abbreviateString } from '../../../utilities'
+import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
+
+import './styles.css'
 
 export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected }) {
   return (
