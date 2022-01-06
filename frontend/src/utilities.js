@@ -13,21 +13,31 @@ export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
     })
   }
   if (count === 0) {
-    return capitalizeFirstLetter(badgeTitle)
+    newBadge = badgeTitle
   } else if (count === 1) {
     Object.keys(optionsSelected).forEach(key => {
       if (optionsSelected[key]) {
         newBadge = capitalizeFirstLetter(key)
       }
     })
-    return newBadge
   } else if (count > 1) {
-    return (badgeTitle === 'Ocean Variables' ? count + ' variables' : count + ' organizations')
+    newBadge = badgeTitle === 'Ocean Variables' ? count + ' variables' : count + ' organizations'
   }
+  return newBadge
 }
 
 export function generateRangeSelectBadgeTitle(badgeTitle, optionsSelected, defaults) {
   return optionsSelected[0] === defaults[0] && optionsSelected[1] === defaults[1] 
   ? badgeTitle
   : `${badgeTitle}: ${optionsSelected[0]} - ${optionsSelected[1]}`
+}
+
+export function abbreviateString(text, maxLength) {
+  if(text) {
+    if(text.length > maxLength) {
+      return `${text.slice(0, maxLength)}...`
+    } else {
+      return text
+    }
+  }
 }
