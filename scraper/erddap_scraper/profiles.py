@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from os import error
 import pandas as pd
 from numpy import datetime64
 from pandas.arrays import DatetimeArray
@@ -9,12 +10,16 @@ from erddap_scraper.ERDDAP import ERDDAP
 dtypes = {
     "erddap_url": str,
     "dataset_id": str,
-    "timeseries_profile_id": str,
+    # "timeseries_profile_id": str,
     "timeseries_id": str,
     "profile_id": str,
+    "longitude_min": float,
+    "longitude_max": float,
+    "latitude_min": float,
+    "latitude_max": float,
 }
 
-
+# ,timeseries_id,latitude_min,latitude_max,longitude_min,longitude_max,time_min,time_max,n_records,dataset_id,erddap_url,depth_min,depth_max
 def get_profiles(dataset):
     """
     Get max/min stats for each profile in a dataset
@@ -61,9 +66,9 @@ def get_profiles(dataset):
 
     # print(profiles)
     if profiles.empty:
-        return None
-    logger = dataset.erddap_server.logger
-    logger.info(f"Found {len(profiles)} profiles")
+        return profiles
+    logger = dataset.logger
+    logger.debug(f"Found {len(profiles)} profiles")
 
     # If TimeSeriesProfiles review how many profiles per timeseries exist
     if dataset.cdm_data_type == "TimeSeriesProfile":
@@ -86,7 +91,6 @@ def get_profiles(dataset):
     profiles = profiles.set_index(profile_variable_list)
 
     for llat_variable in llat_variables_in_dataset:
-        logger.info(llat_variable)
         if llat_variable in profile_variable_list:
             # If this variable is already use to distinqguish individual profiles just copy their values
             profiles[llat_variable + "_min"] = profiles.index.get_level_values(
@@ -97,9 +101,9 @@ def get_profiles(dataset):
             )
             continue
         # if this dataset is a single profile and actual_range is set, use that
-        elif len(profiles) == 1 and "actual_range" in df_variables.loc[llat_variable]:
+        elif len(profiles) == 1 and df_variables.loc[llat_variable].get("actual_range"):
             # if this dataset is a single profile and actual_range is set, use that
-            logger.info(f"Using dataset actual_range for {llat_variable}")
+            logger.debug(f"Using dataset actual_range for {llat_variable}")
 
             [min, max] = df_variables.loc[llat_variable]["actual_range"].split(",")
             profiles[llat_variable + "_min"] = min
@@ -114,8 +118,9 @@ def get_profiles(dataset):
 
             # Something went wrong
             if profile_min.empty or profile_max.empty:
-                logger.info(f"No data found for  {dataset.id}")
-                return None
+                logger.error(f"No data found for  {dataset.id}")
+                # return empty df
+                return pd.DataFrame()
 
         if not profile_variables:
             # Probably a Point or Other. Treat it as a single profile
@@ -139,7 +144,7 @@ def get_profiles(dataset):
 
     # Get Count for each dataset
     # First identify variables to use
-    logger.info("Get record Count")
+    logger.debug("Get record Count")
     count_variables = profile_variable_list.copy()
     if "time" not in count_variables:
         count_variables.append("time")
@@ -156,6 +161,7 @@ def get_profiles(dataset):
 
     # Retrieve Count value per profile
     profile_count = dataset.get_count(set(count_variables), profile_variable_list)
+
     if not profile_count.empty:
         profiles["n_records"] = profile_count.set_index(profile_variable_list).max(
             axis="columns"
@@ -187,20 +193,30 @@ def get_profiles(dataset):
         )
 
     profiles = profiles.fillna("")
-    # print(profiles.to_csv(None))
 
     # profiles=profiles.fillna('')
     # set all null depths to 0
+    
+    # if depth isnt a variable, set it to 0
+    if "depth_min" not in profiles:
+        profiles["depth_min"]=0
+        profiles["depth_max"]=0
+
     profiles["depth_min"] = profiles["depth_min"].fillna(0)
     profiles["depth_max"] = profiles["depth_max"].fillna(0)
 
-    profiles = profiles.astype(dtypes)
-    print(profiles.columns)
+    if not "profile_id" in profiles:
+        profiles['profile_id']=""
+    if not "timeseries_id" in profiles:
+        profiles['timeseries_id']=""
+    # if not "timeseries_profile_id" in profiles:
+        # profiles['timeseries_profile_id']=""
+    profiles = profiles.astype(dtypes,errors="ignore")
 
-    profiles["timeseries_profile_id"] = (
-        profiles[["profile_id", "timeseries_id"]]
-        .fillna("")
-        .apply(lambda x: "_".join(x[x.notnull() & x.notna()]), axis=1)
-    )
-    # print(profiles.to_csv(None))
+    # set timeseries_profile_id to be concatenation
+    
+    # profiles["timeseries_profile_id"]=profiles[['timeseries_id', 'profile_id']].apply(lambda x: '_'.join(x.dropna()), axis=1)
+    
+    profiles=profiles.round(4)
+
     return profiles
