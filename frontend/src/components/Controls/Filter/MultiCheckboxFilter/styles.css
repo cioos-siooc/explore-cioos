@@ -1,31 +1,23 @@
+.multiCheckboxFilter {
+  white-space: nowrap;
+}
 
 .multiCheckboxFilter label{
   height: 30px;
 }
 
 .multiCheckboxFilter > * {
-  margin: 0px 0px 10px 10px;
+  margin: 0px 10px 10px 10px;
 }
 
-.multiCheckboxFilter > svg {
-  margin: 0px 10px 0px 0px;
-}
-
-.multiCheckboxFilter .optionName {
+.optionName {
   margin-left: 10px;
 } 
 
-.multiCheckboxFilter .optionButton{
-  display: flex;
-}
-
 .optionButton {
-  /* pointer-events: all; */
   cursor: pointer;
-}
-
-.optionButton svg{
-  margin: 5px 0px 0px 0px;
+  line-height: 30px;
+  padding-right: 15px;
 }
 
 .optionButton:hover {

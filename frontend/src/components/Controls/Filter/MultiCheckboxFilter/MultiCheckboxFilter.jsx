@@ -8,18 +8,16 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
   return (
     <div className='multiCheckboxFilter'>
       {Object.keys(optionsSelected).length > 0 && Object.keys(optionsSelected).map(option => (
-        <div className='filterCheckBoxOption' key={option}
+        <div className='optionButton' key={option} title={option}
           onClick={() => setOptionsSelected({
             ...optionsSelected,
             [option]: !optionsSelected[option]
           })}
         >
-          <label className='optionButton' title={option}>
-            {optionsSelected[option] ? <CheckSquare /> : <Square />}
-            <div className='optionName'>
-              {capitalizeFirstLetter(abbreviateString(option, 30))}
-            </div>
-          </label>
+          {optionsSelected[option] ? <CheckSquare /> : <Square />}
+          <span className='optionName'>
+            {capitalizeFirstLetter(abbreviateString(option, 30))}
+          </span>
         </div>
       ))
       }
