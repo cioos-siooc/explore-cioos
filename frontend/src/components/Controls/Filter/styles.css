@@ -1,24 +1,60 @@
 .filter {
-  /* width: 300px; */
-  fill: darkgrey;
-  background-color: darkgrey;
   pointer-events: all;
-  max-width: 350px;
-  display: block;
-}
-
-.filter hr {
-  margin: 5px 0px;
+  /* max-width: 300px; */
+  /* min-width: 150px; */
 }
 
 .filterHeader {
+  background-color: #f7f7f7;
   display: inline-flex;
+  text-align: center;
+  border-radius: 30px;
+  padding: 5px;
 }
 
-.badgeTitle {
-  margin: 0px 10px 0px 10px;
+.filterHeader > *{
+  margin: 0px 5px;
+  height: 30px;
+}
+
+.filterHeader button {
+  border-radius: 10px;
 }
 
 .filterOptions {
+  background-color: #f7f7f7;
+  border-radius: 10px;
+  padding: 10px;
+}
 
+.filterOptions button {
+  background-color: #f7f7f7;
+  border: solid 2px darkgrey;
+  border-radius: 10px;
+  margin: 5px 5px;
+  height: 30px;
+}
+
+.filterOptions button:hover {
+  background-color: lightgray;
+}
+
+.multiCheckboxFilter label{
+  height: 30px;
+}
+
+.multiCheckboxFilter > * {
+  margin: 0px 0px 10px 10px;
+}
+
+.multiCheckboxFilter > svg {
+  margin: 0px 10px 0px 0px;
+}
+
+.multiCheckboxFilter .optionName {
+  margin-left: 10px;
+} 
+
+.multiCheckboxFilter .optionButton{
+  display: flex;
 }

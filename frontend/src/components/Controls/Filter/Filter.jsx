@@ -2,6 +2,7 @@ import * as React from 'react'
 import { useState } from 'react'
 import { OverlayTrigger, Tooltip } from 'react-bootstrap'
 import { ChevronCompactDown, ChevronCompactUp, QuestionCircle } from 'react-bootstrap-icons'
+import { abbreviateString } from '../../../utilities'
 
 import './styles.css'
 
@@ -23,7 +24,7 @@ export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected
             key={badgeTitle}
             placement='bottom'
             overlay={
-              <Tooltip id={`tooltip-left`}>
+              <Tooltip>
                 {tooltip}
               </Tooltip>
             }
@@ -31,26 +32,20 @@ export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected
             <QuestionCircle className='helpIcon' color='#007bff' size={20} />
           </OverlayTrigger>
         }
-        <div className='badgeTitle'>
-          {badgeTitle}
+        <div className='badgeTitle' title={badgeTitle}>
+          {abbreviateString(badgeTitle, 40)}
         </div>
-        <button onClick={() => setFilterOpen(!filterOpen)}>
-          {filterOpen ? <ChevronCompactUp /> : <ChevronCompactDown />}
-        </button>
+        {filterOpen ? <ChevronCompactUp onClick={() => setFilterOpen(!filterOpen)} /> : <ChevronCompactDown onClick={() => setFilterOpen(!filterOpen)} />}
       </div>
       {filterOpen &&
         <div className='filterOptions'>
-          <hr />
           {children}
-          <hr />
-          <div>
-            <button onClick={() => resetDefaults(optionsSelected, setOptionsSelected)}>
-              Reset
-            </button>
-            <button onClick={() => setFilterOpen(false)}>
-              Close
-            </button>
-          </div>
+          <button onClick={() => resetDefaults(optionsSelected, setOptionsSelected)}>
+            Reset
+          </button>
+          <button onClick={() => setFilterOpen(false)}>
+            Close
+          </button>
         </div>
       }
     </div>

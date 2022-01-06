@@ -1,11 +1,20 @@
 .controls {
   position: relative;
   top: 10px;
-  overflow-x: hidden;
+  /* overflow-x: hidden; */
   pointer-events: none;
   margin-left: 52px;
 }
 
 .downloadButton {
   pointer-events: all;
+  background-color: #f7f7f7;
+  border: solid 2px darkgrey;
+  border-radius: 10px;
+  height: 40px;
+  text-align: center;
+}
+
+.downloadButton:hover {
+  background-color: lightgray;
 }
