@@ -10,6 +10,8 @@ from urllib.parse import unquote, urlparse
 import pandas as pd
 import requests
 
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 from erddap_scraper.dataset import Dataset
 
 
@@ -58,9 +60,10 @@ class ERDDAP(object):
 
     def erddap_csv_to_df(self, url, skiprows=[1]):
         """If theres an error in the request, this raises up to the dataset loop, so this dataset gets skipped"""
-        print = self.logger.info
-        url_combined = self.url + url
-        print(unquote(url_combined))
+        logger=self.logger
+        
+        url_combined = self.url + url 
+        logger.debug(unquote(url_combined))
 
         response = self.session.get(url_combined)
         no_data = False
@@ -72,7 +75,7 @@ class ERDDAP(object):
             and "Query error: No operator found in constraint=&quot;orderByCount"
             in response.text
         ):
-            print("OrderByCount not available within this ERDDAP Version")
+            logger.error("OrderByCount not available within this ERDDAP Version")
             no_data = True
         elif (
             # Older erddaps respond with 500 for no data
@@ -85,17 +88,18 @@ class ERDDAP(object):
             response.status_code == 500
             and "You are requesting too much data." in response.text
         ):
-            print("Query too big for the server")
+            logger.error("Query too big for the server")
             no_data = True
         elif response.status_code != 200:
             # Report if not All OK
-            response.text
+            # response.text
             response.raise_for_status()
+            # raise Exception
         else:
             # skip units line
             return pd.read_csv(StringIO(response.text), skiprows=skiprows)
         if no_data:
-            print("Empty response")
+            logger.error("Empty response")
             return pd.DataFrame()
 
     def get_dataset(self, dataset_id):
@@ -103,5 +107,5 @@ class ERDDAP(object):
 
     def get_logger(self):
         logger = logging.getLogger(self.domain)
-        logging.basicConfig(format="%(name)s: %(message)s", level=logging.INFO)
+        # logging.basicConfig(format="%(name)s: %(message)s", level=logging.INFO)
         return logger

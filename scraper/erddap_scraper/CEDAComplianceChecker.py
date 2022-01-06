@@ -5,7 +5,7 @@ import os
 class CEDAComplianceChecker(object):
     def __init__(self, dataset):
         self.dataset = dataset
-        self.logger = dataset.erddap_server.logger
+        self.logger = dataset.logger
 
     def check_required_variables(self):
         # make sure LLAT variables exist. Depth/Altitude is assumed to be 0 if it doesnt exist
@@ -17,7 +17,7 @@ class CEDAComplianceChecker(object):
         ]
 
         if missing_required_vars:
-            self.logger.info(f"Can't find required variable: {missing_required_vars}")
+            self.logger.error(f"Can't find required variable: {missing_required_vars}")
             return False
         return True
 
@@ -27,7 +27,7 @@ class CEDAComplianceChecker(object):
             self.dataset.df_variables["standard_name"].to_list(),
         )
         if not supported_variables:
-            self.logger.info("No supported variables found")
+            self.logger.error("No supported variables found")
             return False
         return True
 
@@ -43,7 +43,7 @@ class CEDAComplianceChecker(object):
         ]
 
         if self.dataset.cdm_data_type not in cdm_data_types_supported:
-            self.logger.info(
+            self.logger.error(
                 f"cdm_data_type {self.dataset.cdm_data_type} is not in {cdm_data_types_supported}"
             )
             return False
