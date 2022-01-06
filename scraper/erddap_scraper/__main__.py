@@ -1,3 +1,4 @@
+import sys
 import argparse
 import os
 import threading
@@ -10,6 +11,21 @@ from sqlalchemy import create_engine
 
 from erddap_scraper.scrape_erddap import scrape_erddap
 
+def setup_logging(log_time):
+    # setup logging
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler(sys.stdout)
+    
+    if log_time:
+        format = '%(asctime)s - %(name)s : %(message)s'
+    else:
+        format = '%(name)s : %(message)s'
+    
+    formatter = logging.Formatter(format)
+    
+    handler.setFormatter(formatter)
+    root.addHandler(handler)
 
 def main(erddap_urls, csv_only):
     # setup database connection
@@ -35,7 +51,6 @@ def main(erddap_urls, csv_only):
     result = []
 
     for erddap_url in erddap_urls:
-        print("Starting scraper:", erddap_url)
         scraping_thread = threading.Thread(
             target=scrape_erddap, args=(erddap_url, result, limit_dataset_ids)
         )
@@ -135,10 +150,17 @@ if __name__ == "__main__":
 
     parser.add_argument(
                         '--log-level',
-                        default='info',
-                        help='Provide logging level. Example --loglevel debug, default=warning' )
+                        default='debug',
+                        help='Provide logging level. Example --loglevel debug, default=debug' )
+    parser.add_argument(
+                        '--log-time',
+                        type=bool,
+                        default=False,
+                        nargs='?',
+                        help='add time to logs' )
 
     args = parser.parse_args()
-    logging.basicConfig(format="%(name)s : %(message)s", level=args.log_level.upper())
-    # logging.basicConfig( level=args.log_level.upper() )
+    setup_logging(args.log_time)
+    
     main(args.erddap_urls, args.csv_only)
+

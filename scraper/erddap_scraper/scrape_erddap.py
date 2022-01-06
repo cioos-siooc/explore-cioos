@@ -42,7 +42,7 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None):
     if limit_dataset_ids:
         df_all_datasets = df_all_datasets.query("datasetID in @limit_dataset_ids")
 
-    for i, df_dataset_row in df_all_datasets.head(1).iterrows():
+    for i, df_dataset_row in df_all_datasets.iterrows():
         dataset_id = df_dataset_row["datasetID"]
         dataset_was_added = False
         try:
@@ -68,7 +68,9 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None):
 
         except HTTPError as e:
             response = e.response
-            dataset_logger.error(response.text)
+            # dataset_logger.error(response.text)
+            dataset_logger.error(f"HTTP ERROR: {response.status_code} {response.reason}")
+
             
         except Exception as e:
             dataset_logger(traceback.format_exc())
