@@ -27,7 +27,7 @@ class Dataset(object):
 
     def dataset_tabledap_query(self, url):
         return self.erddap_server.erddap_csv_to_df(
-            "/tabledap/" + self.id + ".csv?" + url
+            "/tabledap/" + self.id + ".csv?" + url, logger=self.logger
         )
 
     def get_max_min(self, vars, max_min):
@@ -61,7 +61,7 @@ class Dataset(object):
         # transform this JSON to an easier to use format
         url = "/info/" + self.id + "/index.csv"
         # erddap_csv_to_df's skiprows defaults to [1]
-        df = self.erddap_csv_to_df(url, skiprows=[]).fillna("")
+        df = self.erddap_csv_to_df(url, skiprows=[],logger=self.logger).fillna("")
 
         considered_attributes = ["cf_role", "standard_name", "actual_range"]
 

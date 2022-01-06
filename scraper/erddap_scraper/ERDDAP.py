@@ -58,9 +58,10 @@ class ERDDAP(object):
 
         return pd.to_datetime(series, errors="coerce")
 
-    def erddap_csv_to_df(self, url, skiprows=[1]):
+    def erddap_csv_to_df(self, url, skiprows=[1],logger=None):
         """If theres an error in the request, this raises up to the dataset loop, so this dataset gets skipped"""
-        logger=self.logger
+        if not logger:
+            logger=self.logger
         
         url_combined = self.url + url 
         logger.debug(unquote(url_combined))
@@ -92,9 +93,7 @@ class ERDDAP(object):
             no_data = True
         elif response.status_code != 200:
             # Report if not All OK
-            # response.text
             response.raise_for_status()
-            # raise Exception
         else:
             # skip units line
             return pd.read_csv(StringIO(response.text), skiprows=skiprows)
