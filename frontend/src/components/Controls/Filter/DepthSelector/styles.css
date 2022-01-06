@@ -1,0 +1,17 @@
+.depthSelector {
+  max-width: fit-content;
+  min-width: 340px;
+}
+
+.depth {
+  display: flex;
+  justify-content: space-between;
+}
+
+.depth span {
+  width: 200px;
+}
+
+.depth input {
+  width: 100px;
+}

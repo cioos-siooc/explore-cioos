@@ -98,7 +98,7 @@ export default function Controls(props) {
           </Col>
           <Col xs='auto'>
             <Filter
-              badgeTitle={generateRangeSelectBadgeTitle('Depth Range (m)', [startDepth, endDepth], [defaultStartDepth, defaultEndDepth])}
+              badgeTitle={generateRangeSelectBadgeTitle('Depth Range (m)', [startDepth, endDepth], [defaultStartDepth, defaultEndDepth], '(m)')}
               optionsSelected={startDepth, endDepth}
               setOptionsSelected={() => { setStartDepth(0); setEndDepth(12000) }}
               tooltip='Filter data by depth. Selection works as inclusive range, and negative values are meters above ocean surface.'

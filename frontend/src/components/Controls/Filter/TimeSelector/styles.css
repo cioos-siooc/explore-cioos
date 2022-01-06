@@ -1,3 +1,17 @@
-.timeSelector input {
-  /* width: 100%; */
+.timeSelector {
+  max-width: fit-content;
 }
+
+.date {
+  display: flex;
+  justify-content: space-between;
+}
+
+.date span {
+  width: 100px;
+}
+
+.date input{
+  width: 150px;
+}
+
