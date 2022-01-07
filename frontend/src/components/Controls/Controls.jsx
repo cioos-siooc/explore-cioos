@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
-import PropTypes from 'prop-types'
 import { Container, Row, Col } from 'react-bootstrap'
 import _ from 'lodash'
 
@@ -12,29 +11,23 @@ import DepthSelector from './Filter/DepthSelector/DepthSelector.jsx'
 import { generateMultipleSelectBadgeTitle, generateRangeSelectBadgeTitle } from '../../utilities.js'
 import { server } from '../../config'
 
-import './styles.css'
-import { ArrowBarDown, ArrowsExpand, Building, CalendarWeek, Water } from 'react-bootstrap-icons'
-import classNames from 'classnames'
+import { ArrowsExpand, Building, CalendarWeek, Water } from 'react-bootstrap-icons'
 
-export default function Controls({ selectionType, map }) {
+import './styles.css'
+import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from '../config.js'
+
+export default function Controls({ selectionType, map, setQuery }) {
 
   // Making changes to context within context consumers (ie. passing mutable state down to children to manipulate)
   //https://stackoverflow.com/questions/41030361/how-to-update-react-context-from-inside-a-child-component
 
   // EOV filter initial values and state
-  const [eovsSelected, setEovsSelected] = useState(
-    {
-      carbon: false,
-      currents: false,
-      nutrients: false,
-      salinity: false,
-      temperature: false,
-    })
+  const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
   const eovsFilterName = 'Ocean Variables'
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(eovsFilterName, eovsSelected)
 
   // Organization filter initial values from API and state
-  const [orgsSelected, setOrgsSelected] = useState({})
+  const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected)
   useEffect(() => {
     fetch(`${server}/organizations`).then(response => response.json()).then(data => {
       let orgsReturned = {}
@@ -49,16 +42,12 @@ export default function Controls({ selectionType, map }) {
   const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterName, orgsSelected)
 
   // Timeframe filter initial values and state
-  const defaultStartDate = '1900-01-01'
-  const defaultEndDate = new Date().toISOString().split('T')[0]
   const [startDate, setStartDate] = useState(defaultStartDate);
   const [endDate, setEndDate] = useState(defaultEndDate);
   const timeframesFilterName = 'Timeframe'
   const timeframesBadgeTitle = generateRangeSelectBadgeTitle(timeframesFilterName, [startDate, endDate], [defaultStartDate, defaultEndDate])
 
   // Depth filter initial values and state
-  const defaultStartDepth = 0
-  const defaultEndDepth = 12000
   const [startDepth, setStartDepth] = useState(defaultStartDepth)
   const [endDepth, setEndDepth] = useState(defaultEndDepth)
   const depthRangeFilterName = 'Depth Range (m)'
@@ -67,8 +56,17 @@ export default function Controls({ selectionType, map }) {
   // Filter open state
   const [openFilter, setOpenFilter] = useState()
 
-  // Selection Panel 
-  const selectionPanelWidth = '400px'
+  // Update query 
+  useEffect(() => {
+    setQuery({
+      startDate: startDate,
+      endDate: endDate,
+      startDepth: startDepth,
+      endDepth: endDepth,
+      eovsSelected: eovsSelected,
+      orgsSelected: orgsSelected
+    })
+  }, [startDate, endDate, startDepth, endDepth, eovsSelected, orgsSelected])
 
   return (
     <div>
@@ -163,8 +161,4 @@ export default function Controls({ selectionType, map }) {
       </div >
     </div>
   )
-}
-
-Controls.propTypes = {
-  map: PropTypes.object.isRequired
 }

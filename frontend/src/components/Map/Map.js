@@ -17,6 +17,8 @@ const config = {
 export default class CIOOSMap extends React.Component {
   constructor(props) {
     super(props)
+    // console.log(props)
+    // this.query = props.query
     this.layerId = "data-layer";
     this.sourceId = "sourceID";
     this.counter = 0;
@@ -81,6 +83,7 @@ export default class CIOOSMap extends React.Component {
       dataType: ["casts", "fixedStations"],
     };
     this.map.on("load", () => {
+      console.log(props.query)
       const queryString = Object.entries(query)
         .map(([k, v]) => `${k}=${v}`)
         .join("&");
@@ -295,9 +298,34 @@ export default class CIOOSMap extends React.Component {
     }
   }
 
-  updateSource(queryString) {
+  createDataFilterQueryString(query) {
+    let eovsArray = [], orgsArray = []
+    const apiMappedQuery = {
+      timeMin: query.startDate,
+      timeMax: query.endDate,
+      depthMin: query.startDepth,
+      depthMax: query.endDepth,
+      eovs: Object.keys(query.eovsSelected).forEach((eov) => {
+        if(query.eovsSelected[eov]) {
+          eovsArray.push(eov)
+        }
+      }),
+      organizations: Object.keys(query.orgsSelected).forEach((org) => {
+        if(query.orgsSelected[org]) {
+          orgsArray.push(org)
+        }
+      })
+    }
+
+    return Object.entries(apiMappedQuery)
+      .filter(([k, v]) => v)
+      .map(([k, v]) => `${k}=${v}`)
+      .join("&");
+  }
+
+  updateQuery(query) {
     this.map.setFilter('points-highlighted', ['in', 'pk', ''])
-    const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${queryString}`;
+    const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${this.createDataFilterQueryString(query)}`;
 
     this.map.getSource("points").tiles = [tileQuery];
     this.map.getSource("hexes").tiles = [tileQuery];
