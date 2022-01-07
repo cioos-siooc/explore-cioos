@@ -3,6 +3,10 @@
   position:relative;
 }
 
+.filterHeader:hover {
+  background-color: lightgray;
+}
+
 .filterHeader {
   background-color: #f7f7f7;
   display: inline-flex;

@@ -28,6 +28,8 @@ export default function Controls(props) {
       salinity: false,
       temperature: false,
     })
+  const eovsFilterName = 'Ocean Variables'
+  const eovsBadgeTitle = generateMultipleSelectBadgeTitle(eovsFilterName, eovsSelected)
 
   // Organization filter initial values from API and state
   const [orgsSelected, setOrgsSelected] = useState({})
@@ -41,18 +43,27 @@ export default function Controls(props) {
       // setOrgs(orgsReturned)
     }).catch(error => { throw error })
   }, [])
+  const orgsFilterName = 'Organizations'
+  const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterName, orgsSelected)
 
   // Timeframe filter initial values and state
   const defaultStartDate = '1900-01-01'
   const defaultEndDate = new Date().toISOString().split('T')[0]
   const [startDate, setStartDate] = useState(defaultStartDate);
   const [endDate, setEndDate] = useState(defaultEndDate);
+  const timeframesFilterName = 'Timeframe'
+  const timeframesBadgeTitle = generateRangeSelectBadgeTitle(timeframesFilterName, [startDate, endDate], [defaultStartDate, defaultEndDate])
 
   // Depth filter initial values and state
   const defaultStartDepth = 0
   const defaultEndDepth = 12000
   const [startDepth, setStartDepth] = useState(defaultStartDepth)
   const [endDepth, setEndDepth] = useState(defaultEndDepth)
+  const depthRangeFilterName = 'Depth Range (m)'
+  const depthRangeBadgeTitle = generateRangeSelectBadgeTitle(depthRangeFilterName, [startDepth, endDepth], [defaultStartDepth, defaultEndDepth], '(m)')
+
+  // Filter open state
+  const [openFilter, setOpenFilter] = useState()
 
   return (
     <div className='controls'>
@@ -60,33 +71,45 @@ export default function Controls(props) {
         <Row>
           <Col xs='auto'>
             <Filter
-              badgeTitle={generateMultipleSelectBadgeTitle('Ocean Variables', eovsSelected)}
+              badgeTitle={eovsBadgeTitle}
               optionsSelected={eovsSelected}
               setOptionsSelected={setEovsSelected}
               tooltip='Filter data by ocean variable name. Selection works as logical OR operation.'
               icon={<Water />}
+              controlled
+              filterName={eovsFilterName}
+              openFilter={openFilter === eovsFilterName}
+              setOpenFilter={setOpenFilter}
             >
               <MultiCheckboxFilter optionsSelected={eovsSelected} setOptionsSelected={setEovsSelected} />
             </Filter>
           </Col>
           <Col xs='auto'>
             <Filter
-              badgeTitle={generateMultipleSelectBadgeTitle('Organizations', orgsSelected)}
+              badgeTitle={orgsBadgeTitle}
               optionsSelected={orgsSelected}
               setOptionsSelected={setOrgsSelected}
               tooltip='Filter data by responsible organisation name. Selection works as logical OR operation.'
               icon={<Building />}
+              controlled
+              filterName={orgsFilterName}
+              openFilter={openFilter === orgsFilterName}
+              setOpenFilter={setOpenFilter}
             >
               <MultiCheckboxFilter optionsSelected={orgsSelected} setOptionsSelected={setOrgsSelected} />
             </Filter>
           </Col>
           <Col xs='auto'>
             <Filter
-              badgeTitle={generateRangeSelectBadgeTitle('Timeframe', [startDate, endDate], [defaultStartDate, defaultEndDate])}
+              badgeTitle={timeframesBadgeTitle}
               optionsSelected={startDate, endDate}
               setOptionsSelected={() => { setStartDate('1900-01-01'); setEndDate(new Date().toISOString().split('T')[0]) }}
               tooltip='Filter data by timeframe. Selection works as inclusive range.'
               icon={<CalendarWeek />}
+              controlled
+              filterName={timeframesFilterName}
+              openFilter={openFilter === timeframesFilterName}
+              setOpenFilter={setOpenFilter}
             >
               <TimeSelector
                 startDate={startDate}
@@ -98,13 +121,17 @@ export default function Controls(props) {
           </Col>
           <Col xs='auto'>
             <Filter
-              badgeTitle={generateRangeSelectBadgeTitle('Depth Range (m)', [startDepth, endDepth], [defaultStartDepth, defaultEndDepth], '(m)')}
+              badgeTitle={depthRangeBadgeTitle}
               optionsSelected={startDepth, endDepth}
               setOptionsSelected={() => { setStartDepth(0); setEndDepth(12000) }}
               tooltip='Filter data by depth. Selection works as inclusive range, and negative values are meters above ocean surface.'
               icon={<ArrowsExpand />}
+              controlled
+              filterName={depthRangeFilterName}
+              openFilter={openFilter === depthRangeFilterName}
+              setOpenFilter={setOpenFilter}
             >
-              <DepthSelector
+              < DepthSelector
                 startDepth={startDepth}
                 setStartDepth={setStartDepth}
                 endDepth={endDepth}
