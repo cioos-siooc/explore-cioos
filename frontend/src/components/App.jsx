@@ -1,10 +1,15 @@
 import React from 'react'
+import { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import * as Sentry from "@sentry/react";
 import { Integrations } from "@sentry/tracing";
+
 import Controls from "./Controls/Controls.jsx";
 import CIOOSMap from "./Map/Map.js";
+import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from './config.js';
+
 import "bootstrap/dist/css/bootstrap.min.css";
+
 import "./styles.css";
 
 if (process.env.NODE_ENV === "production") {
@@ -20,15 +25,34 @@ if (process.env.NODE_ENV === "production") {
 }
 
 export default function App() {
-  const map = new CIOOSMap()
 
-  // const [query, setQuery] = useState('')
+  const [selectionType, setSelectionType] = useState('none')
+  const [selection, setSelection] = useState()
+
+  const [query, setQuery] = useState({
+    startDate: defaultStartDate,
+    endDate: defaultEndDate,
+    startDepth: defaultStartDepth,
+    endDepth: defaultEndDepth,
+    eovsSelected: defaultEovsSelected,
+    orgsSelected: defaultOrgsSelected
+  })
+
+  const map = new CIOOSMap(setSelection, setSelectionType, query)
+
+  // useEffect(() => {
+  //   if (map.getLoaded()) {
+  //     // console.log(query)
+  //     map.updateQuery(query)
+  //   }
+  // }, [query])
 
   return (
     <div>
       <Controls
-        map={map}
-        selectionType='point'
+        selectionType={selectionType}
+        setQuery={setQuery}
+        selection={selection}
       />
     </div>
   );
