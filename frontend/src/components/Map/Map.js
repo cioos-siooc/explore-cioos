@@ -12,8 +12,6 @@ const config = {
   // colorScale: ["#D2F4F0","#BDE7E2","#A7DAD4","#92CEC6","#7DC1B7","#67B4A9", "#52A79B"]
   // colorScale: ["#bbddd8","#9fd0c9","#76bcb2","#52a79b","#4a968c","#3d7b73", "#2f6059"]
   colorScale: ["#52A79B","#4A968C","#3D7B73","#2F6059","#224440","#1B3733", "#142926"]
-
-
 };
 
 export default class CIOOSMap extends React.Component {
@@ -72,8 +70,8 @@ export default class CIOOSMap extends React.Component {
 
     this.drawPolygon = new MapboxDraw(drawControlOptions);
 
-    this.map.addControl(this.drawPolygon, "top-left");
-    this.map.addControl(new NavigationControl(), "bottom-left");
+    this.map.addControl(new NavigationControl(), "bottom-right");
+    this.map.addControl(this.drawPolygon, "bottom-right");
     const query = {
       timeMin: "1900-01-01",
       timeMax: new Date().toLocaleDateString(),
@@ -303,6 +301,7 @@ export default class CIOOSMap extends React.Component {
 
     this.map.getSource("points").tiles = [tileQuery];
     this.map.getSource("hexes").tiles = [tileQuery];
+    
     // Remove the tiles for a particular source
     this.map.style.sourceCaches["hexes"].clearTiles();
     this.map.style.sourceCaches["points"].clearTiles();

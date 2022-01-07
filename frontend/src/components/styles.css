@@ -4,14 +4,12 @@
   bottom: 0;
   width: 100%;
   margin: 0px;
-  min-height: 900px;
-  overflow-y: auto;
+  height: 100vh;
+  /* min-height: 900px; */
+  /* overflow-y: hidden; */
 }
+
 .mapboxgl-ctrl-group > button {
   width: 42px;
   height: 42px;
-}
-html {
-  
-  max-height: 300px;
 }
