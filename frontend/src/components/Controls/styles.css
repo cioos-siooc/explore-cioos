@@ -1,9 +1,7 @@
 .controls {
   position: relative;
   top: 10px;
-  /* overflow-x: hidden; */
   pointer-events: none;
-  margin-left: 52px;
 }
 
 .downloadButton {
@@ -17,4 +15,9 @@
 
 .downloadButton:hover {
   background-color: lightgray;
+}
+
+.row > .selectionPanelColumn {
+  padding-left: 0px;
+  padding-right: 0px;
 }

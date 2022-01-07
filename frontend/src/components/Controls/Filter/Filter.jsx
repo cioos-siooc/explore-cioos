@@ -23,7 +23,7 @@ export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected
 
   // Using tabIndex to enable onBlur() focus loss capturing: https://stackoverflow.com/a/37491578
   return (
-    <div className='filter'>
+    <div className='filter' >
       {/* tabIndex={0} onBlur={() => setFilterOpen(false)}> */}
       <div className='filterHeader' onClick={() => {
         setFilterOpen(!filterOpen)

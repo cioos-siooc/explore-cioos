@@ -6,6 +6,7 @@ import Controls from "./Controls/Controls.jsx";
 import CIOOSMap from "./Map/Map.js";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./styles.css";
+
 if (process.env.NODE_ENV === "production") {
   Sentry.init({
     dsn: "https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595",
@@ -20,10 +21,14 @@ if (process.env.NODE_ENV === "production") {
 
 export default function App() {
   const map = new CIOOSMap()
+
+  // const [query, setQuery] = useState('')
+
   return (
-    <div style={{ maxHeight: '800px' }}>
+    <div>
       <Controls
         map={map}
+        selectionType='point'
       />
     </div>
   );
