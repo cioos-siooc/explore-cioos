@@ -15,7 +15,7 @@ const config = {
 }
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({setSelection, setSelectionType, query, setClickedPointDetails}) {
+export default function CreateMap({ query, setClickedPointDetails}) {
   const mapContainer = useRef(null)
   const map = useRef(null)
   const [mapSetupComplete, setMapSetupComplete] = useState(false)
@@ -86,8 +86,6 @@ export default function CreateMap({setSelection, setSelectionType, query, setCli
     apiMappedQuery.dataType = 'casts,fixedStations'
     return Object.entries(apiMappedQuery).map(([k, v]) => `${k}=${v}`).join("&")
   }
-
-
 
   useEffect(() => {
     if(map && map.current && map.current.loaded()){
@@ -254,12 +252,10 @@ export default function CreateMap({setSelection, setSelectionType, query, setCli
     map.current.on('click', e => {
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
       setClickedPointDetails(undefined)
-      setSelectionType('none')
     })
 
     map.current.on('click', 'points', e => {
       setClickedPointDetails(e.features)
-      setSelectionType('point')
       var bbox = [
         [e.point.x, e.point.y],
         [e.point.x, e.point.y]
@@ -324,14 +320,12 @@ export default function CreateMap({setSelection, setSelectionType, query, setCli
     map.current.on('touchend', e => {
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
       setClickedPointDetails(undefined)
-      setSelectionType('none')
     })
 
     map.current.on('touchend', 'points', e => {
       if (e.points.length !== 1) return
        
       setClickedPointDetails(e.features)
-      setSelectionType('point')
       var bbox = [
         [e.point.x, e.point.y],
         [e.point.x, e.point.y]

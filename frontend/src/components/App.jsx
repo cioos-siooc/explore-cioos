@@ -28,8 +28,8 @@ if (process.env.NODE_ENV === "production") {
 
 export default function App() {
 
-  const [selectionType, setSelectionType] = useState('none')
-  const [selection, setSelection] = useState()
+  const [pointsToDownload, setPointsToDownload] = useState()
+  const [clickedPointDetails, setClickedPointDetails] = useState()
 
   const [query, setQuery] = useState({
     startDate: defaultStartDate,
@@ -40,34 +40,25 @@ export default function App() {
     orgsSelected: defaultOrgsSelected
   })
 
-  const [clickedPointDetails, setClickedPointDetails] = useState()
 
   console.log(clickedPointDetails)
 
   return (
     <div>
       <Map
-        setSelection={setSelection}
-        setSelectionType={setSelectionType}
         setClickedPointDetails={setClickedPointDetails}
         query={query}
       />
       <Controls
         setQuery={setQuery}
       >
-        {selectionType !== 'none' && (
+        {clickedPointDetails && (
           <Col xs='auto' className='selectionPanelColumn'>
             <SelectionPanel>
-              {selectionType === 'point' && (
-                <div>Points</div>
-              )}
-              {selectionType === 'polygon' && (
-                <div>Polygon</div>
-              )}
+              <div>PointDetails</div>
             </SelectionPanel>
           </Col>
-        )
-        }
+        )}
       </Controls>
     </div>
   );
