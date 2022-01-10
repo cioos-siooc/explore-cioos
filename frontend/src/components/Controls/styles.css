@@ -16,8 +16,3 @@
 .downloadButton:hover {
   background-color: lightgray;
 }
-
-.row > .selectionPanelColumn {
-  padding-left: 0px;
-  padding-right: 0px;
-}

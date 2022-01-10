@@ -72,13 +72,7 @@ export default function Controls({ setQuery, children }) {
       <div className='controls'>
         <Container fluid>
           <Row>
-            {children && (
-              <Col xs='auto' className='selectionPanelColumn'>
-                <SelectionPanel>
-                  {children}
-                </SelectionPanel>
-              </Col>
-            )}
+            {children}
             <Col xs='auto'>
               <Filter
                 badgeTitle={eovsBadgeTitle}
@@ -150,7 +144,7 @@ export default function Controls({ setQuery, children }) {
               </Filter>
             </Col>
             <Col xs='auto'>
-              <button className='downloadButton' onClick={() => console.log('downloading')}>Download</button>
+              <button className='downloadButton' onClick={() => console.log('downloading')} disabled={_.isEmpty(children)} >Download</button>
             </Col>
           </Row>
         </Container>

@@ -91,8 +91,6 @@ export default function CreateMap({setSelection, setSelectionType, query, setCli
 
   useEffect(() => {
     if(map && map.current && map.current.loaded()){
-      const qString = createDataFilterQueryString(query)
-      console.log('query changed', qString)
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
       const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${createDataFilterQueryString(query)}`
   
@@ -173,7 +171,6 @@ export default function CreateMap({setSelection, setSelectionType, query, setCli
         .map(([k, v]) => `${k}=${v}`)
         .join("&")
 
-      console.log('initial query', queryString)
       map.current.addLayer({
         id: "points",
         type: "circle",
@@ -257,10 +254,12 @@ export default function CreateMap({setSelection, setSelectionType, query, setCli
     map.current.on('click', e => {
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
       setClickedPointDetails(undefined)
+      setSelectionType('none')
     })
 
     map.current.on('click', 'points', e => {
       setClickedPointDetails(e.features)
+      setSelectionType('point')
       var bbox = [
         [e.point.x, e.point.y],
         [e.point.x, e.point.y]
@@ -325,12 +324,14 @@ export default function CreateMap({setSelection, setSelectionType, query, setCli
     map.current.on('touchend', e => {
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
       setClickedPointDetails(undefined)
+      setSelectionType('none')
     })
 
     map.current.on('touchend', 'points', e => {
       if (e.points.length !== 1) return
        
       setClickedPointDetails(e.features)
+      setSelectionType('point')
       var bbox = [
         [e.point.x, e.point.y],
         [e.point.x, e.point.y]
