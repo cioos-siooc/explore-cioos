@@ -41,15 +41,6 @@ export default function App() {
 
   const [clickedPointDetails, setClickedPointDetails] = useState()
 
-  // const map = CreateMap(setSelection, setSelectionType, query)
-
-  // useEffect(() => {
-  //   if (map.getLoaded()) {
-  //     // console.log(query)
-  //     map.updateQuery(query)
-  //   }
-  // }, [query])
-
   useEffect(() => {
     if (selectionType === 'none') {
       setSelectionDetails()

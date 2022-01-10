@@ -35,7 +35,6 @@ export default function Controls({ setQuery, children }) {
         orgsReturned[elem.name] = false
       })
       setOrgsSelected(orgsReturned)
-      // setOrgs(orgsReturned)
     }).catch(error => { throw error })
   }, [])
   const orgsFilterName = 'Organizations'
