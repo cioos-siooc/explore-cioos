@@ -1,7 +1,7 @@
-import { Map, NavigationControl, Popup } from "maplibre-gl";
-// import mapboxgl from "mapbox-gl";
-import MapboxDraw from "@mapbox/mapbox-gl-draw";
-import React from "react";
+import * as React from "react"
+import maplibreGl, { NavigationControl, Popup } from "maplibre-gl"
+import MapboxDraw from "@mapbox/mapbox-gl-draw"
+import { useState, useEffect, useRef } from "react"
 import './styles.css'
 
 import {server} from '../../config'
@@ -12,33 +12,95 @@ const config = {
   // colorScale: ["#D2F4F0","#BDE7E2","#A7DAD4","#92CEC6","#7DC1B7","#67B4A9", "#52A79B"]
   // colorScale: ["#bbddd8","#9fd0c9","#76bcb2","#52a79b","#4a968c","#3d7b73", "#2f6059"]
   colorScale: ["#52A79B","#4A968C","#3D7B73","#2F6059","#224440","#1B3733", "#142926"]
-};
+}
 
-export default class CIOOSMap extends React.Component {
-  constructor(props) {
-    super(props)
-    // console.log(props)
-    // this.query = props.query
-    this.layerId = "data-layer";
-    this.sourceId = "sourceID";
-    this.counter = 0;
-    this.tooltipTimeout
-    this.hoveredPointDetails
-    this.clickedPointDetails 
-    this.popup = new Popup({
-      closeButton: false,
-      closeOnClick: true,
-      maxWidth: '400px'
-      });
-    this.map = new Map({
-      container: "map",
+// Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
+export default function CreateMap({setSelection, setSelectionType, query, setClickedPointDetails}) {
+  const mapContainer = useRef(null)
+  const map = useRef(null)
+  const [mapSetupComplete, setMapSetupComplete] = useState(false)
+
+  const [hoveredPointDetails, setHoveredPointDetails] = useState()
+  const [tooltipTimeout, setTooltipTimeout] = useState()
+  // const [clickedPointDetails, setClickedPointDetails] = useState()
+  const [popup, setPopup] = useState(new Popup({
+    closeButton: false,
+    closeOnClick: true,
+    maxWidth: '400px'
+  }))
+  
+  function createTooltip() {
+    if(hoveredPointDetails !== undefined && hoveredPointDetails.features !== undefined) {
+      // When a click event occurs on a feature in the places layer, open a popup at the
+      // location of the feature, with description HTML from its properties.
+      var coordinates = hoveredPointDetails.features[0].geometry.coordinates.slice()
+      popup
+        .setLngLat(coordinates)
+        .setHTML(
+          ` <div>
+              ${hoveredPointDetails.features[0].properties.count} records. Click for details
+            </div> 
+          `
+        )
+        .addTo(map.current)
+    }
+  }
+
+  function createDataFilterQueryString(query) {
+    let eovsArray = [], orgsArray = []
+    const apiMappedQuery = {
+      timeMin: query.startDate,
+      timeMax: query.endDate,
+      depthMin: query.startDepth,
+      depthMax: query.endDepth,
+      eovs: Object.keys(query.eovsSelected).forEach((eov) => {
+        if(query.eovsSelected[eov]) {
+          eovsArray.push(eov)
+        }
+      }),
+      organizations: Object.keys(query.orgsSelected).forEach((org) => {
+        if(query.orgsSelected[org]) {
+          orgsArray.push(org)
+        }
+      })
+    }
+    return Object.entries(apiMappedQuery).filter(([k, v]) => v).map(([k, v]) => `${k}=${v}`).join("&")
+  }
+
+  useEffect(() => {
+    if(map && map.current && map.current.loaded()){
+      console.log('query changed', query, createDataFilterQueryString(query))
+      // map.current.setFilter('points-highlighted', ['in', 'pk', ''])
+      // const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${createDataFilterQueryString(query)}`
+  
+      // map.current.getSource("points").tiles = [tileQuery]
+      // map.current.getSource("hexes").tiles = [tileQuery]
+      
+      // // Remove the tiles for a particular source
+      // map.current.style.sourceCaches["hexes"].clearTiles()
+      // map.current.style.sourceCaches["points"].clearTiles()
+  
+      // // Load the new tiles for the current viewport (map.transform -> viewport)
+      // map.current.style.sourceCaches["hexes"].update(map.current.transform)
+      // map.current.style.sourceCaches["points"].update(map.current.transform)
+  
+      // // Force a repaint, so that the map will be repainted without you having to touch the map
+      // map.current.triggerRepaint()
+    }
+  }, [query])
+
+  useEffect(() => {
+    // If already created don't proceed
+    if(map.current) return
+    // Create map
+    map.current = new maplibreGl.Map({
+      container: mapContainer.current,
       style: {
         version: 8,
         sources: {
           osm: {
             type: "raster",
             tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-
             tileSize: 256,
             attribution:
               'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.',
@@ -54,10 +116,9 @@ export default class CIOOSMap extends React.Component {
       },
       center: [-106, 56], // starting position
       zoom: 2, // starting zoom
-    });
-    this.canvas = this.map.getCanvasContainer()
-    // this.canvas.style.cursor = 'grab'
+    })
 
+    // Add controls
     const drawControlOptions = {
       displayControlsDefault: false,
       controls: {
@@ -69,26 +130,28 @@ export default class CIOOSMap extends React.Component {
         uncombine_features: false
       }
     }
+    const drawPolygon = new MapboxDraw(drawControlOptions)
 
-    this.drawPolygon = new MapboxDraw(drawControlOptions);
+    // Called order determines stacking order
+    map.current.addControl(new NavigationControl(), "bottom-right")
+    map.current.addControl(drawPolygon, "bottom-right")
 
-    this.map.addControl(new NavigationControl(), "bottom-right");
-    this.map.addControl(this.drawPolygon, "bottom-right");
-    const query = {
+    //
+    map.current.on("load", () => {
+      const query = {
       timeMin: "1900-01-01",
       timeMax: new Date().toLocaleDateString(),
       depthMin: 0,
       depthMax: 12000,
       eovs: ["carbon", "currents", "nutrients", "salinity", "temperature"],
       dataType: ["casts", "fixedStations"],
-    };
-    this.map.on("load", () => {
-      console.log(props.query)
+    }
       const queryString = Object.entries(query)
         .map(([k, v]) => `${k}=${v}`)
-        .join("&");
+        .join("&")
 
-      this.map.addLayer({
+      console.log(query, queryString)
+      map.current.addLayer({
         id: "points",
         type: "circle",
         minzoom: 7,
@@ -119,9 +182,9 @@ export default class CIOOSMap extends React.Component {
           ],
 
         },
-      });
+      })
 
-      this.map.addLayer({
+      map.current.addLayer({
         id: "hexes",
         type: "fill",
         minzoom: 0,
@@ -148,9 +211,9 @@ export default class CIOOSMap extends React.Component {
             ],
           },
         },
-      });
+      })
 
-      this.map.addLayer({
+      map.current.addLayer({
         id: "points-highlighted",
         type: "circle",
         minzoom: 7,
@@ -164,141 +227,367 @@ export default class CIOOSMap extends React.Component {
           "circle-opacity": 1.0,
         },
         filter: ['in', 'pk', '']
-      });
-
-      this.map.on('click', e => {
-        this.map.setFilter('points-highlighted', ['in', 'pk', '']);
-        this.clickedPointDetails = undefined
       })
 
-      this.map.on('click', 'points', e => {
-        this.clickedPointDetails = e.features
+    })
+
+    map.current.on('click', e => {
+      map.current.setFilter('points-highlighted', ['in', 'pk', ''])
+      setClickedPointDetails(undefined)
+    })
+
+    map.current.on('click', 'points', e => {
+      setClickedPointDetails(e.features)
+      var bbox = [
+        [e.point.x, e.point.y],
+        [e.point.x, e.point.y]
+      ]
+      var features = map.current.queryRenderedFeatures(bbox, {
+        layers: ['points']
+      })
+        
+      // Run through the selected features and set a filter
+      // to match features with unique ids to activate
+      // the `points-selected' layer.
+      var filter = features.reduce(
+        function (memo, feature) {
+          memo.push(feature.properties.pk)
+          return memo
+        },
+        ['in', 'pk']
+      )
+      map.current.setFilter('points-highlighted', filter)
+    })
+
+    map.current.on('mouseenter', "points", e => {
+      // this.canvas.style.cursor = 'pointer'
+      setHoveredPointDetails(e)
+      setTooltipTimeout(setTimeout(() => createTooltip(), 300))
+    })
+
+    map.current.on('mouseleave', 'points',  () => {
+      // this.canvas.style.cursor = 'grab'
+      clearTimeout(tooltipTimeout)
+      setHoveredPointDetails(undefined)
+      popup.remove()
+    })
+
+    map.current.on('mousemove', "hexes", e => {
+      var coordinates = [e.lngLat.lng, e.lngLat.lat]
+      var description = e.features[0].properties.count
+      
+      // Ensure that if the map is zoomed out such that multiple
+      // copies of the feature are visible, the popup appears
+      // over the copy being pointed to.
+      while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+        coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360
+      }
+      
+      popup
+      .setLngLat(coordinates)
+      .setHTML(description + " records")
+      .addTo(map.current)
+    })
+
+    map.current.on('mouseleave', 'hexes',  () => {
+      popup.remove()
+    })
+
+    map.current.on('draw.create', e => { // Ensure there are only one polygons on the map at a time
+      if(drawPolygon.getAll().features.length > 1) {
+        drawPolygon.delete(drawPolygon.getAll().features[0].id)
+      }
+    })
+
+    map.current.on('touchend', e => {
+      map.current.setFilter('points-highlighted', ['in', 'pk', ''])
+      setClickedPointDetails(undefined)
+    })
+
+    map.current.on('touchend', 'points', e => {
+      if (e.points.length !== 1) return
+       
+      setClickedPointDetails(e.features)
+      var bbox = [
+        [e.point.x, e.point.y],
+        [e.point.x, e.point.y]
+      ]
+      var features = map.current.queryRenderedFeatures(bbox, {
+        layers: ['points']
+      })
+        
+      // Run through the selected features and set a filter
+      // to match features with unique ids to activate
+      // the `points-selected' layer.
+      var filter = features.reduce(
+        function (memo, feature) {
+          memo.push(feature.properties.pk)
+          return memo
+        },
+        ['in', 'pk']
+      )
+      map.current.setFilter('points-highlighted', filter)
+    })
+    setMapSetupComplete(true)
+  })
+
+  return (
+    <div ref={mapContainer} className="map" />
+  )
+}
+  /*
+    const [tooltipTimeout, setTooltipTimeout] = useState()
+    const [hoveredPointDetails, setHoveredPointDetails] = useState()
+    const [clickedPointDetails, setClickedPointDetails] = useState()
+    const [popup, setPopup] = useState(new Popup({
+      closeButton: false,
+      closeOnClick: true,
+      maxWidth: '400px'
+      }))
+    // const canvas = this.map.getCanvasContainer()
+    // this.canvas.style.cursor = 'grab'
+
+    const drawControlOptions = {
+      displayControlsDefault: false,
+      controls: {
+        point: false, 
+        line_string: false,
+        polygon: true, 
+        trash: true,
+        combine_features: false,
+        uncombine_features: false
+      }
+    }
+
+    const drawPolygon = new MapboxDraw(drawControlOptions)
+
+    map.addControl(new NavigationControl(), "bottom-right")
+    map.addControl(drawPolygon, "bottom-right")
+    // const query = {
+    //   timeMin: "1900-01-01",
+    //   timeMax: new Date().toLocaleDateString(),
+    //   depthMin: 0,
+    //   depthMax: 12000,
+    //   eovs: ["carbon", "currents", "nutrients", "salinity", "temperature"],
+    //   dataType: ["casts", "fixedStations"],
+    // }
+    map.on("load", (query) => {
+      console.log(query)
+      const queryString = Object.entries(query)
+        .map(([k, v]) => `${k}=${v}`)
+        .join("&")
+
+      map.addLayer({
+        id: "points",
+        type: "circle",
+        minzoom: 7,
+        source: {
+          type: "vector",
+          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt?${queryString}`],
+        },
+        "source-layer": "internal-layer-name",
+        paint: {
+          "circle-color":  [
+            'interpolate',
+            ['linear'],
+            ['get', 'count'],
+            1,
+            config.colorScale[0],
+            3,
+            config.colorScale[1],
+            9,
+            config.colorScale[2],
+            27,
+            config.colorScale[3],
+            81,
+            config.colorScale[4],
+            243,
+            config.colorScale[5],
+            729,
+            config.colorScale[6],
+          ],
+
+        },
+      })
+
+      map.addLayer({
+        id: "hexes",
+        type: "fill",
+        minzoom: 0,
+        maxzoom: 7,
+
+        source: {
+          type: "vector",
+          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt?${queryString}`],
+        },
+        "source-layer": "internal-layer-name",
+
+        paint: {
+          "fill-opacity": 0.7,
+          "fill-color": {
+            property: "count",
+            stops: [
+              [1, config.colorScale[0]],
+              [3, config.colorScale[1]],
+              [9, config.colorScale[2]],
+              [27, config.colorScale[3]],
+              [81, config.colorScale[4]],
+              [243, config.colorScale[5]],
+              [729, config.colorScale[6]],
+            ],
+          },
+        },
+      })
+
+      map.addLayer({
+        id: "points-highlighted",
+        type: "circle",
+        minzoom: 7,
+        source: {
+          type: "vector",
+          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt?${queryString}`],
+        },
+        "source-layer": "internal-layer-name",
+        paint: {
+          "circle-color":  "red",
+          "circle-opacity": 1.0,
+        },
+        filter: ['in', 'pk', '']
+      })
+
+      map.on('click', e => {
+        map.setFilter('points-highlighted', ['in', 'pk', ''])
+        clickedPointDetails = undefined
+      })
+
+      map.on('click', 'points', e => {
+        clickedPointDetails = e.features
         var bbox = [
           [e.point.x, e.point.y],
           [e.point.x, e.point.y]
-        ];
-        var features = this.map.queryRenderedFeatures(bbox, {
+        ]
+        var features = map.queryRenderedFeatures(bbox, {
           layers: ['points']
-        });
+        })
           
         // Run through the selected features and set a filter
         // to match features with unique ids to activate
         // the `points-selected' layer.
         var filter = features.reduce(
           function (memo, feature) {
-            memo.push(feature.properties.pk);
-            return memo;
+            memo.push(feature.properties.pk)
+            return memo
           },
           ['in', 'pk']
-        );
-        this.map.setFilter('points-highlighted', filter);
+        )
+        map.setFilter('points-highlighted', filter)
       })
 
-      this.map.on('mouseenter', "points", e => {
+      map.on('mouseenter', "points", e => {
         // this.canvas.style.cursor = 'pointer'
-        this.hoveredPointDetails = e
-        this.tooltipTimeout = setTimeout(() => this.createTooltip(), 300)
+        hoveredPointDetails = e
+        tooltipTimeout = setTimeout(() => createTooltip(), 300)
       })
 
-      this.map.on('mouseleave', 'points',  () => {
+      map.on('mouseleave', 'points',  () => {
         // this.canvas.style.cursor = 'grab'
-        clearTimeout(this.tooltipTimeout)
-        this.hoveredPointDetails = undefined
-        this.popup.remove()
+        clearTimeout(tooltipTimeout)
+        hoveredPointDetails = undefined
+        popup.remove()
       })
 
-      this.map.on('mousemove', "hexes", e => {
-        var coordinates = [e.lngLat.lng, e.lngLat.lat];
-        var description = e.features[0].properties.count;
+      map.on('mousemove', "hexes", e => {
+        var coordinates = [e.lngLat.lng, e.lngLat.lat]
+        var description = e.features[0].properties.count
         
         // Ensure that if the map is zoomed out such that multiple
         // copies of the feature are visible, the popup appears
         // over the copy being pointed to.
         while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-          coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+          coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360
         }
         
-        this.popup
+        popup
         .setLngLat(coordinates)
         .setHTML(description + " records")
-        .addTo(this.map);
-      });
+        .addTo(map)
+      })
 
-      this.map.on('mouseleave', 'hexes',  () => {
-        this.popup.remove();
-      });
+      map.on('mouseleave', 'hexes',  () => {
+        popup.remove()
+      })
 
-      this.map.on('draw.create', e => { // Ensure there are only one polygons on the map at a time
-        if(this.drawPolygon.getAll().features.length > 1) {
-          this.drawPolygon.delete(this.drawPolygon.getAll().features[0].id)
+      map.on('draw.create', e => { // Ensure there are only one polygons on the map at a time
+        if(drawPolygon.getAll().features.length > 1) {
+          drawPolygon.delete(drawPolygon.getAll().features[0].id)
         }
       })
 
-      this.map.on('touchend', e => {
-        this.map.setFilter('points-highlighted', ['in', 'pk', '']);
-        this.clickedPointDetails = undefined
+      map.on('touchend', e => {
+        map.setFilter('points-highlighted', ['in', 'pk', ''])
+        clickedPointDetails = undefined
       })
 
-      this.map.on('touchend', 'points', e => {
-        if (e.points.length !== 1) return;
+      map.on('touchend', 'points', e => {
+        if (e.points.length !== 1) return
          
-        this.clickedPointDetails = e.features
+        clickedPointDetails = e.features
         var bbox = [
           [e.point.x, e.point.y],
           [e.point.x, e.point.y]
-        ];
-        var features = this.map.queryRenderedFeatures(bbox, {
+        ]
+        var features = map.queryRenderedFeatures(bbox, {
           layers: ['points']
-        });
+        })
           
         // Run through the selected features and set a filter
         // to match features with unique ids to activate
         // the `points-selected' layer.
         var filter = features.reduce(
           function (memo, feature) {
-            memo.push(feature.properties.pk);
-            return memo;
+            memo.push(feature.properties.pk)
+            return memo
           },
           ['in', 'pk']
-        );
-        this.map.setFilter('points-highlighted', filter);
+        )
+        map.setFilter('points-highlighted', filter)
       })
     })
-  }
+  
 
-  createTooltip() {
-    if(this.hoveredPointDetails !== undefined && this.hoveredPointDetails.features !== undefined) {
+  function createTooltip() {
+    if(hoveredPointDetails !== undefined && hoveredPointDetails.features !== undefined) {
       // When a click event occurs on a feature in the places layer, open a popup at the
       // location of the feature, with description HTML from its properties.
-      var coordinates = this.hoveredPointDetails.features[0].geometry.coordinates.slice()
-      this.popup
+      var coordinates = hoveredPointDetails.features[0].geometry.coordinates.slice()
+      popup
         .setLngLat(coordinates)
         .setHTML(
           ` <div>
-              ${this.hoveredPointDetails.features[0].properties.count} records. Click for details
+              ${hoveredPointDetails.features[0].properties.count} records. Click for details
             </div> 
           `
         )
-        .addTo(this.map)
+        .addTo(map)
     }
   }
 
-  getLoaded() {
-    return this.map.loaded();
-  }
+  // function getLoaded() {
+  //   return map.loaded()
+  // }
 
-  getPointClicked() {
-    return this.clickedPointDetails
-  }
+  // function getPointClicked() {
+  //   return clickedPointDetails
+  // }
 
-  getPolygon() {
-    const currentFeatures = this.drawPolygon.getAll().features[0]
-    if(currentFeatures) {
-      return currentFeatures.geometry.coordinates[0]
-    }
-  }
+  // function getPolygon() {
+  //   const currentFeatures = drawPolygon.getAll().features[0]
+  //   if(currentFeatures) {
+  //     return currentFeatures.geometry.coordinates[0]
+  //   }
+  // }
 
-  createDataFilterQueryString(query) {
+  function createDataFilterQueryString(query) {
     let eovsArray = [], orgsArray = []
     const apiMappedQuery = {
       timeMin: query.startDate,
@@ -316,29 +605,26 @@ export default class CIOOSMap extends React.Component {
         }
       })
     }
-
-    return Object.entries(apiMappedQuery)
-      .filter(([k, v]) => v)
-      .map(([k, v]) => `${k}=${v}`)
-      .join("&");
+    return Object.entries(apiMappedQuery).filter(([k, v]) => v).map(([k, v]) => `${k}=${v}`).join("&")
   }
 
-  updateQuery(query) {
-    this.map.setFilter('points-highlighted', ['in', 'pk', ''])
-    const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${this.createDataFilterQueryString(query)}`;
+  function updateQuery(query) {
+    map.setFilter('points-highlighted', ['in', 'pk', ''])
+    const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${createDataFilterQueryString(query)}`
 
-    this.map.getSource("points").tiles = [tileQuery];
-    this.map.getSource("hexes").tiles = [tileQuery];
+    map.getSource("points").tiles = [tileQuery]
+    map.getSource("hexes").tiles = [tileQuery]
     
     // Remove the tiles for a particular source
-    this.map.style.sourceCaches["hexes"].clearTiles();
-    this.map.style.sourceCaches["points"].clearTiles();
+    map.style.sourceCaches["hexes"].clearTiles()
+    map.style.sourceCaches["points"].clearTiles()
 
     // Load the new tiles for the current viewport (map.transform -> viewport)
-    this.map.style.sourceCaches["hexes"].update(this.map.transform);
-    this.map.style.sourceCaches["points"].update(this.map.transform);
+    map.style.sourceCaches["hexes"].update(map.transform)
+    map.style.sourceCaches["points"].update(map.transform)
 
     // Force a repaint, so that the map will be repainted without you having to touch the map
-    this.map.triggerRepaint();
+    map.triggerRepaint()
   }
-}
+  
+}*/

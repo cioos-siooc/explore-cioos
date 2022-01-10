@@ -68,8 +68,6 @@ export default function Controls({ setQuery, children }) {
     })
   }, [startDate, endDate, startDepth, endDepth, eovsSelected, orgsSelected])
 
-  console.log(children)
-
   return (
     <div>
       <div className='controls'>
