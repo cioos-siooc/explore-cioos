@@ -3,9 +3,11 @@ import { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import * as Sentry from "@sentry/react";
 import { Integrations } from "@sentry/tracing";
+import { Col } from 'react-bootstrap'
 
 import Controls from "./Controls/Controls.jsx";
 import Map from "./Map/Map.js";
+import SelectionPanel from './Controls/SelectionPanel/SelectionPanel.jsx';
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from './config.js';
 
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -28,7 +30,6 @@ export default function App() {
 
   const [selectionType, setSelectionType] = useState('none')
   const [selection, setSelection] = useState()
-  const [selectionDetails, setSelectionDetails] = useState()
 
   const [query, setQuery] = useState({
     startDate: defaultStartDate,
@@ -41,15 +42,7 @@ export default function App() {
 
   const [clickedPointDetails, setClickedPointDetails] = useState()
 
-  useEffect(() => {
-    if (selectionType === 'none') {
-      setSelectionDetails()
-    } else if (selectionType === 'point') {
-      setSelectionDetails(<div>Points</div>)
-    } else if (selectionType === 'polygon') {
-      setSelectionDetails(<div>Polygon</div>)
-    }
-  }, [selection, selectionType])
+  console.log(clickedPointDetails)
 
   return (
     <div>
@@ -62,7 +55,19 @@ export default function App() {
       <Controls
         setQuery={setQuery}
       >
-        {selectionDetails}
+        {selectionType !== 'none' && (
+          <Col xs='auto' className='selectionPanelColumn'>
+            <SelectionPanel>
+              {selectionType === 'point' && (
+                <div>Points</div>
+              )}
+              {selectionType === 'polygon' && (
+                <div>Polygon</div>
+              )}
+            </SelectionPanel>
+          </Col>
+        )
+        }
       </Controls>
     </div>
   );
