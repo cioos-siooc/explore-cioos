@@ -5,7 +5,7 @@ import { ChevronCompactLeft, ChevronCompactRight } from 'react-bootstrap-icons'
 
 import './styles.css'
 
-export default function SelectionPanel({ children, selectionType }) {
+export default function SelectionPanel({ children }) {
   const [open, setOpen] = useState(true)
   let selectionPanelClassName = classNames('selectionPanel', { open: open })
   return (
@@ -15,7 +15,7 @@ export default function SelectionPanel({ children, selectionType }) {
           {children}
         </div>
       }
-      {selectionType !== 'none' &&
+      {children &&
         (
           <div className='panelHandle' title={`${open ? 'Close' : 'Open'} selection panel`} onClick={() => setOpen(!open)}>
             {open ? <ChevronCompactLeft /> : <ChevronCompactRight />}

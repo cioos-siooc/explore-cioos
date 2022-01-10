@@ -5,7 +5,7 @@ import * as Sentry from "@sentry/react";
 import { Integrations } from "@sentry/tracing";
 
 import Controls from "./Controls/Controls.jsx";
-import CIOOSMap from "./Map/Map.js";
+import Map from "./Map/Map.js";
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from './config.js';
 
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -28,6 +28,7 @@ export default function App() {
 
   const [selectionType, setSelectionType] = useState('none')
   const [selection, setSelection] = useState()
+  const [selectionDetails, setSelectionDetails] = useState()
 
   const [query, setQuery] = useState({
     startDate: defaultStartDate,
@@ -38,7 +39,9 @@ export default function App() {
     orgsSelected: defaultOrgsSelected
   })
 
-  const map = new CIOOSMap(setSelection, setSelectionType, query)
+  const [clickedPointDetails, setClickedPointDetails] = useState()
+
+  // const map = CreateMap(setSelection, setSelectionType, query)
 
   // useEffect(() => {
   //   if (map.getLoaded()) {
@@ -47,16 +50,33 @@ export default function App() {
   //   }
   // }, [query])
 
+  useEffect(() => {
+    if (selectionType === 'none') {
+      setSelectionDetails()
+    } else if (selectionType === 'point') {
+      setSelectionDetails(<div>Points</div>)
+    } else if (selectionType === 'polygon') {
+      setSelectionDetails(<div>Polygon</div>)
+    }
+  }, [selection, selectionType])
+
   return (
     <div>
-      <Controls
-        selectionType={selectionType}
-        setQuery={setQuery}
-        selection={selection}
+      <Map
+        setSelection={setSelection}
+        setSelectionType={setSelectionType}
+        setClickedPointDetails={setClickedPointDetails}
+        query={query}
       />
+      <Controls
+        setQuery={setQuery}
+      >
+        {selectionDetails}
+      </Controls>
     </div>
   );
 }
+
 
 // This is where react reaches into the DOM, finds the <div id="chart"> element, and replaces it with the content of ReactD3Viz's render function JSX.
 const domContainer = document.querySelector('#app')
