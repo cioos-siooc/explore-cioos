@@ -7,7 +7,8 @@ import { Col } from 'react-bootstrap'
 
 import Controls from "./Controls/Controls.jsx";
 import Map from "./Map/Map.js";
-import SelectionPanel from './Controls/SelectionPanel/SelectionPanel.jsx';
+import SelectionPanel from './Controls/SelectionPanel/SelectionPanel.jsx'
+import PointDetails from './Controls/PointDetails/PointDetails.jsx'
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from './config.js';
 
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -29,7 +30,7 @@ if (process.env.NODE_ENV === "production") {
 export default function App() {
 
   const [pointsToDownload, setPointsToDownload] = useState()
-  const [clickedPointDetails, setClickedPointDetails] = useState()
+  const [selectedPointPKs, setSelectedPointPKs] = useState()
 
   const [query, setQuery] = useState({
     startDate: defaultStartDate,
@@ -41,21 +42,27 @@ export default function App() {
   })
 
 
-  console.log(clickedPointDetails)
+  console.log(selectedPointPKs)
 
   return (
     <div>
       <Map
-        setClickedPointDetails={setClickedPointDetails}
+        setSelectedPointPKs={setSelectedPointPKs}
         query={query}
       />
       <Controls
         setQuery={setQuery}
       >
-        {clickedPointDetails && (
+        {selectedPointPKs && (
           <Col xs='auto' className='selectionPanelColumn'>
             <SelectionPanel>
-              <div>PointDetails</div>
+              <PointDetails>
+                Point Details
+                <div>
+                  {console.log(selectedPointPKs)}
+                  {selectedPointPKs}
+                </div>
+              </PointDetails>
             </SelectionPanel>
           </Col>
         )}

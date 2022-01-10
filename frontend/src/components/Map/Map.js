@@ -15,7 +15,7 @@ const config = {
 }
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({ query, setClickedPointDetails}) {
+export default function CreateMap({ query, setSelectedPointPKs}) {
   const mapContainer = useRef(null)
   const map = useRef(null)
   const [mapSetupComplete, setMapSetupComplete] = useState(false)
@@ -23,7 +23,6 @@ export default function CreateMap({ query, setClickedPointDetails}) {
 
   const [hoveredPointDetails, setHoveredPointDetails] = useState()
   const [tooltipTimeout, setTooltipTimeout] = useState()
-  // const [clickedPointDetails, setClickedPointDetails] = useState()
   const [popup, setPopup] = useState(new Popup({
     closeButton: false,
     closeOnClick: true,
@@ -251,11 +250,11 @@ export default function CreateMap({ query, setClickedPointDetails}) {
 
     map.current.on('click', e => {
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-      setClickedPointDetails(undefined)
+      setSelectedPointPKs(undefined)
     })
 
     map.current.on('click', 'points', e => {
-      setClickedPointDetails(e.features)
+      setSelectedPointPKs(e.features.map(point => point.properties.pk))
       var bbox = [
         [e.point.x, e.point.y],
         [e.point.x, e.point.y]
@@ -319,13 +318,13 @@ export default function CreateMap({ query, setClickedPointDetails}) {
 
     map.current.on('touchend', e => {
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-      setClickedPointDetails(undefined)
+      setSelectedPointPKs(undefined)
     })
 
     map.current.on('touchend', 'points', e => {
       if (e.points.length !== 1) return
        
-      setClickedPointDetails(e.features)
+      setSelectedPointPKs(e.features.map(point => point.properties.pk))
       var bbox = [
         [e.point.x, e.point.y],
         [e.point.x, e.point.y]
