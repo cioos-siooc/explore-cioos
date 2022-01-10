@@ -19,6 +19,7 @@ export default function CreateMap({setSelection, setSelectionType, query, setCli
   const mapContainer = useRef(null)
   const map = useRef(null)
   const [mapSetupComplete, setMapSetupComplete] = useState(false)
+  const [organizations, setOrganizations] = useState()
 
   const [hoveredPointDetails, setHoveredPointDetails] = useState()
   const [tooltipTimeout, setTooltipTimeout] = useState()
@@ -29,6 +30,16 @@ export default function CreateMap({setSelection, setSelectionType, query, setCli
     maxWidth: '400px'
   }))
   
+  useEffect(() => {
+    fetch(`${server}/organizations`).then(response => response.json()).then(data => {
+      let orgsReturned = {}
+      data.forEach(elem => {
+        orgsReturned[elem.name] = elem.pk
+      })
+      setOrganizations(orgsReturned)
+    }).catch(error => { throw error })
+  }, [])
+
   function createTooltip() {
     if(hoveredPointDetails !== undefined && hoveredPointDetails.features !== undefined) {
       // When a click event occurs on a feature in the places layer, open a popup at the
@@ -48,44 +59,56 @@ export default function CreateMap({setSelection, setSelectionType, query, setCli
 
   function createDataFilterQueryString(query) {
     let eovsArray = [], orgsArray = []
-    const apiMappedQuery = {
+    Object.keys(query.eovsSelected).forEach((eov) => {
+      if(query.eovsSelected[eov]) {
+        eovsArray.push(eov)
+      }
+    })
+    Object.keys(query.orgsSelected).forEach((org) => {
+      if(query.orgsSelected[org]) {
+        orgsArray.push(organizations[org])
+      }
+    })
+    let apiMappedQuery = {
       timeMin: query.startDate,
       timeMax: query.endDate,
       depthMin: query.startDepth,
       depthMax: query.endDepth,
-      eovs: Object.keys(query.eovsSelected).forEach((eov) => {
-        if(query.eovsSelected[eov]) {
-          eovsArray.push(eov)
-        }
-      }),
-      organizations: Object.keys(query.orgsSelected).forEach((org) => {
-        if(query.orgsSelected[org]) {
-          orgsArray.push(org)
-        }
-      })
     }
-    return Object.entries(apiMappedQuery).filter(([k, v]) => v).map(([k, v]) => `${k}=${v}`).join("&")
+    if(eovsArray.length === 0) {
+      apiMappedQuery.eovs = "carbon,currents,nutrients,salinity,temperature"
+    } else {
+      apiMappedQuery.eovs = eovsArray
+    }
+    if(orgsArray.length !== 0) {
+      apiMappedQuery.organizations = orgsArray
+    }
+    apiMappedQuery.dataType = 'casts,fixedStations'
+    return Object.entries(apiMappedQuery).map(([k, v]) => `${k}=${v}`).join("&")
   }
+
+
 
   useEffect(() => {
     if(map && map.current && map.current.loaded()){
-      console.log('query changed', query, createDataFilterQueryString(query))
-      // map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-      // const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${createDataFilterQueryString(query)}`
+      const qString = createDataFilterQueryString(query)
+      console.log('query changed', qString)
+      map.current.setFilter('points-highlighted', ['in', 'pk', ''])
+      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${createDataFilterQueryString(query)}`
   
-      // map.current.getSource("points").tiles = [tileQuery]
-      // map.current.getSource("hexes").tiles = [tileQuery]
+      map.current.getSource("points").tiles = [tileQuery]
+      map.current.getSource("hexes").tiles = [tileQuery]
       
-      // // Remove the tiles for a particular source
-      // map.current.style.sourceCaches["hexes"].clearTiles()
-      // map.current.style.sourceCaches["points"].clearTiles()
+      // Remove the tiles for a particular source
+      map.current.style.sourceCaches["hexes"].clearTiles()
+      map.current.style.sourceCaches["points"].clearTiles()
   
-      // // Load the new tiles for the current viewport (map.transform -> viewport)
-      // map.current.style.sourceCaches["hexes"].update(map.current.transform)
-      // map.current.style.sourceCaches["points"].update(map.current.transform)
+      // Load the new tiles for the current viewport (map.transform -> viewport)
+      map.current.style.sourceCaches["hexes"].update(map.current.transform)
+      map.current.style.sourceCaches["points"].update(map.current.transform)
   
-      // // Force a repaint, so that the map will be repainted without you having to touch the map
-      // map.current.triggerRepaint()
+      // Force a repaint, so that the map will be repainted without you having to touch the map
+      map.current.triggerRepaint()
     }
   }, [query])
 
@@ -150,7 +173,7 @@ export default function CreateMap({setSelection, setSelectionType, query, setCli
         .map(([k, v]) => `${k}=${v}`)
         .join("&")
 
-      console.log(query, queryString)
+      console.log('initial query', queryString)
       map.current.addLayer({
         id: "points",
         type: "circle",
