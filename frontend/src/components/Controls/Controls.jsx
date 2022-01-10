@@ -16,7 +16,7 @@ import { ArrowsExpand, Building, CalendarWeek, Water } from 'react-bootstrap-ico
 import './styles.css'
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from '../config.js'
 
-export default function Controls({ selectionType, map, setQuery }) {
+export default function Controls({ setQuery, children }) {
 
   // Making changes to context within context consumers (ie. passing mutable state down to children to manipulate)
   //https://stackoverflow.com/questions/41030361/how-to-update-react-context-from-inside-a-child-component
@@ -68,18 +68,17 @@ export default function Controls({ selectionType, map, setQuery }) {
     })
   }, [startDate, endDate, startDepth, endDepth, eovsSelected, orgsSelected])
 
+  console.log(children)
+
   return (
     <div>
       <div className='controls'>
         <Container fluid>
           <Row>
-            {selectionType !== 'none' && (
+            {children && (
               <Col xs='auto' className='selectionPanelColumn'>
-                <SelectionPanel
-                  selectionType={selectionType}
-                >
-                  {selectionType === 'point' && (<div>Points</div>)}
-                  {selectionType === 'polygon' && (<div>Polygon</div>)}
+                <SelectionPanel>
+                  {children}
                 </SelectionPanel>
               </Col>
             )}
