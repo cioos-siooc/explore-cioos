@@ -1,0 +1,44 @@
+.pointDetails {
+  /* position: relative; */
+}
+
+.pointDetailsTable {
+  table-layout: fixed;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.pointDetailsTable tbody {
+  height:80vh;
+  display:block;
+  overflow: auto;
+}
+
+.pointDetailsTable thead tr {
+  display: block;
+}
+
+.pointDetailsControls {
+  background-color: #f7f7f7;
+  position: absolute;
+  bottom: 0px;
+  width:100%;
+  height:13vh;
+}
+
+.pointDetailsControlRow {
+  display: flex;
+  justify-content: space-between;
+  margin: 10px 0px 10px 0px;
+  padding: 0px 10px 0px 10px;
+}
+
+.emailInput {
+  width: 100%;
+  margin-right: 10px;
+}
+
+.dataTotalBar {
+  width: 100%;
+  margin-right: 10px;
+}

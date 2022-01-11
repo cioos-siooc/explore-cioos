@@ -144,7 +144,14 @@ export default function Controls({ setQuery, children }) {
               </Filter>
             </Col>
             <Col xs='auto'>
-              <button className='downloadButton' onClick={() => console.log('downloading')} disabled={_.isEmpty(children)} >Download</button>
+              <button
+                className='downloadButton'
+                onClick={() => console.log('downloading')}
+                disabled={_.isEmpty(children)}
+                title='Download selected data'
+              >
+                Download
+              </button>
             </Col>
           </Row>
         </Container>
