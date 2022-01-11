@@ -56,13 +56,10 @@ export default function App() {
         {selectedPointPKs && (
           <Col xs='auto' className='selectionPanelColumn'>
             <SelectionPanel>
-              <PointDetails>
-                Point Details
-                <div>
-                  {console.log(selectedPointPKs)}
-                  {selectedPointPKs}
-                </div>
-              </PointDetails>
+              <PointDetails
+                pointPKs={selectedPointPKs}
+                setPointsToDownload={setPointsToDownload}
+              />
             </SelectionPanel>
           </Col>
         )}
