@@ -2,22 +2,6 @@
   /* position: relative; */
 }
 
-.pointDetailsTable {
-  table-layout: fixed;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-.pointDetailsTable tbody {
-  height:80vh;
-  display:block;
-  overflow: auto;
-}
-
-.pointDetailsTable thead tr {
-  display: block;
-}
-
 .pointDetailsControls {
   background-color: #f7f7f7;
   position: absolute;
