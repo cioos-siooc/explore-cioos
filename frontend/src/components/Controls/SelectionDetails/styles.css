@@ -29,6 +29,18 @@
 }
 
 .dataTotalBar {
-  width: 100%;
+  width: 300px;
   margin-right: 10px;
+}
+
+/* .dataTotalBar .progress-bar{
+  color:lightgray;
+} */
+
+.progressbar .upTo100 {
+  color: white;
+}
+
+.progressbar .past100 {
+  color: black;
 }
