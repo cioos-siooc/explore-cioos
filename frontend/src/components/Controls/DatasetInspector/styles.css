@@ -1,0 +1,19 @@
+.datasetInspector .backButton {
+  text-align: center;
+  margin: 10px 10px 10px 10px;
+  border: 2px solid darkgrey;
+  border-radius: 10px;
+  width: 80px;
+  height: 40px;
+  justify-content: space-between;
+  padding: 5px;
+}
+
+.datasetInspector .backButton:hover {
+  background-color: lightgray;
+}
+
+.datasetInspector .backButton svg {
+  margin-right: 5px;
+}
+
