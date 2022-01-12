@@ -10,11 +10,9 @@ export default function SelectionPanel({ children }) {
   let selectionPanelClassName = classNames('selectionPanel', { open: open })
   return (
     <div className={selectionPanelClassName}>
-      {open &&
-        <div className='panelContents'>
-          {children}
-        </div>
-      }
+      <div className='panelContents' style={{ 'display': open ? 'inherit' : 'none' }}>
+        {children}
+      </div>
       {children &&
         (
           <div className='panelHandle' title={`${open ? 'Close' : 'Open'} selection panel`} onClick={() => setOpen(!open)}>
