@@ -132,8 +132,8 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
           },
         ],
       },
-      center: [-106, 56], // starting position
-      zoom: 2, // starting zoom
+      center: [-125, 49], // starting position
+      zoom: 7, // starting zoom
     })
 
     // Add controls
