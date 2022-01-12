@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { ProgressBar } from 'react-bootstrap'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
+import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
 import { server } from '../../../config'
 
 import './styles.css'
@@ -11,7 +12,7 @@ import './styles.css'
 export default function SelectionDetails({ pointPKs, setPointsToDownload }) {
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState([])
-  const [selectedDataset, setSelectedDataset] = useState()
+  const [inspectDataset, setInspectDataset] = useState()
 
   useEffect(() => {
     if (pointPKs && pointPKs.length !== 0) {
@@ -57,17 +58,20 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload }) {
 
   return (
     <div className='pointDetails'>
-      <DatasetsTable
-        handleSelectAllDatasets={handleSelectAllDatasets}
-        handleSelectDataset={handleSelectDataset}
-        selectAll={selectAll}
-        datasets={pointsData}
-      >
-        {/* <DatasetInspector
-          dataset={dataset}
-        /> */}
-      </DatasetsTable>
-
+      {
+        inspectDataset ?
+          <DatasetInspector
+            dataset={inspectDataset}
+            setInspectDataset={setInspectDataset}
+          /> :
+          <DatasetsTable
+            handleSelectAllDatasets={handleSelectAllDatasets}
+            handleSelectDataset={handleSelectDataset}
+            setInspectDataset={setInspectDataset}
+            selectAll={selectAll}
+            datasets={pointsData}
+          />
+      }
       <div className='pointDetailsControls'>
         <div className='pointDetailsControlRow'>
           <ProgressBar className='dataTotalBar' now={75} title='Amount of download size used' label={'75/100'} />
