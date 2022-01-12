@@ -12,8 +12,8 @@ export default function PointDetails({ pointPKs, setPointsToDownload }) {
   const checkColWidth = '33px'
   const titleColWidth = '171px'
   const typeColWidth = '100px'
-  const pointsColWidth = '64.8px'
-  const sizeColWidth = '48.64px'
+  const pointsColWidth = '65px'
+  const sizeColWidth = '80px'
 
   useEffect(() => {
     if (pointPKs && pointPKs.length !== 0) {
