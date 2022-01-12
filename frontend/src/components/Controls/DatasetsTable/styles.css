@@ -21,7 +21,7 @@
 }
 
 .datasetsTable tbody {
-  height:80vh;
+  height:calc(100vh - 140px);
   display:block;
   overflow: auto;
 }
