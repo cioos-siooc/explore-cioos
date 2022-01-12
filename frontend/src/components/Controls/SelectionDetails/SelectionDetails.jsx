@@ -13,6 +13,17 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload }) {
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState([])
   const [inspectDataset, setInspectDataset] = useState()
+  const [dataTotal, setDataTotal] = useState(0)
+
+  useEffect(() => {
+    let total = 0
+    pointsData.forEach((point) => {
+      if (point.selected) {
+        total += Math.floor(point.profiles.length)
+      }
+    })
+    setDataTotal(total)
+  }, [pointsData])
 
   useEffect(() => {
     if (pointPKs && pointPKs.length !== 0) {
@@ -77,8 +88,28 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload }) {
       </div>
       <div className='pointDetailsControls'>
         <div className='pointDetailsControlRow'>
-          <ProgressBar className='dataTotalBar' now={75} title='Amount of download size used' label={'75/100'} />
-          <div className='dataTotalRatio'>75MB/100MB</div>
+          <ProgressBar
+            className='dataTotalBar'
+            title='Amount of download size used'
+          >
+            <ProgressBar
+              className='upTo100'
+              variant='success'
+              now={dataTotal < 100 ? dataTotal : 100}
+              label={dataTotal < 100 ? dataTotal : 100}
+              key={1}
+            />
+            {dataTotal > 100 &&
+              <ProgressBar
+                className='past100'
+                variant='warning'
+                now={dataTotal > 100 ? dataTotal - 100 : 0}
+                label={dataTotal > 100 ? dataTotal - 100 : 0}
+                key={2}
+              />
+            }
+          </ProgressBar>
+          <div className='dataTotalRatio'>{dataTotal} / 100MB</div>
         </div>
         <div className='pointDetailsControlRow'>
           <input className='emailInput' placeholder='Email Address' />
