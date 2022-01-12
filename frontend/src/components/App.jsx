@@ -8,7 +8,7 @@ import { Col } from 'react-bootstrap'
 import Controls from "./Controls/Controls.jsx";
 import Map from "./Map/Map.js";
 import SelectionPanel from './Controls/SelectionPanel/SelectionPanel.jsx'
-import PointDetails from './Controls/PointDetails/PointDetails.jsx'
+import SelectionDetails from './Controls/SelectionDetails/SelectionDetails.jsx'
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from './config.js';
 
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -41,9 +41,6 @@ export default function App() {
     orgsSelected: defaultOrgsSelected
   })
 
-
-  console.log(selectedPointPKs)
-
   return (
     <div>
       <Map
@@ -56,7 +53,7 @@ export default function App() {
         {selectedPointPKs && (
           <Col xs='auto' className='selectionPanelColumn'>
             <SelectionPanel>
-              <PointDetails
+              <SelectionDetails
                 pointPKs={selectedPointPKs}
                 setPointsToDownload={setPointsToDownload}
               />
