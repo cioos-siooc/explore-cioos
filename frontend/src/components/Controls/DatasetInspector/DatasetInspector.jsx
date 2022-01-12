@@ -8,8 +8,10 @@ export default function DatasetInspector({ dataset, setInspectDataset }) {
 
   return (
     <div className='datasetInspector'>
-      <div onClick={() => setInspectDataset()}>
-        <ChevronCompactLeft /> Back
+      <div className='backButton' onClick={() => setInspectDataset()} title='Return to dataset list'>
+        <ChevronCompactLeft />
+        Back
+        {/* <div>Back</div> */}
       </div>
       <div>
         {console.log(dataset)}
