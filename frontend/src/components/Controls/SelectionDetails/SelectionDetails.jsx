@@ -56,22 +56,25 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload }) {
     setSelectAll(!selectAll)
   }
 
+  // console.log(pointsData)
   return (
     <div className='pointDetails'>
-      {
-        inspectDataset ?
-          <DatasetInspector
-            dataset={inspectDataset}
-            setInspectDataset={setInspectDataset}
-          /> :
-          <DatasetsTable
-            handleSelectAllDatasets={handleSelectAllDatasets}
-            handleSelectDataset={handleSelectDataset}
-            setInspectDataset={setInspectDataset}
-            selectAll={selectAll}
-            datasets={pointsData}
-          />
-      }
+      <div className='pointDetailsInfoRow'>
+        {
+          inspectDataset ?
+            <DatasetInspector
+              dataset={inspectDataset}
+              setInspectDataset={setInspectDataset}
+            /> :
+            <DatasetsTable
+              handleSelectAllDatasets={handleSelectAllDatasets}
+              handleSelectDataset={handleSelectDataset}
+              setInspectDataset={setInspectDataset}
+              selectAll={selectAll}
+              datasets={pointsData}
+            />
+        }
+      </div>
       <div className='pointDetailsControls'>
         <div className='pointDetailsControlRow'>
           <ProgressBar className='dataTotalBar' now={75} title='Amount of download size used' label={'75/100'} />

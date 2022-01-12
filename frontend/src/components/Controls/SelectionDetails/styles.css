@@ -3,11 +3,17 @@
 }
 
 .pointDetailsControls {
+  border-top: 1px solid darkgrey;
   background-color: #f7f7f7;
   position: absolute;
   bottom: 0px;
   width:100%;
-  height:13vh;
+  height:100px;
+}
+
+.pointDetailsInfoRow {
+  /* height: calc(100vh - 100px); */
+  /* overflow-y: auto; */
 }
 
 .pointDetailsControlRow {

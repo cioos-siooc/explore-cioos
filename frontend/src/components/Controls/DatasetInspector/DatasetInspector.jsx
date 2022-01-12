@@ -11,10 +11,8 @@ export default function DatasetInspector({ dataset, setInspectDataset }) {
       <div className='backButton' onClick={() => setInspectDataset()} title='Return to dataset list'>
         <ChevronCompactLeft />
         Back
-        {/* <div>Back</div> */}
       </div>
       <div>
-        {console.log(dataset)}
         <Container style={{ pointerEvents: 'auto', margin: '10px 0px 10px 0px' }}>
           <hr />
           <h6>
@@ -39,17 +37,15 @@ export default function DatasetInspector({ dataset, setInspectDataset }) {
           </div>
           <hr />
           <h6>
-            Points ({dataset && dataset.profiles && dataset.profiles.length} profiles)
+            Points ({dataset && dataset.profiles && dataset.profiles.length} points)
           </h6>
         </Container>
-        <Table className='profileTable' striped bordered size="sm">
+        <Table className='inspectorTable' striped bordered size="sm">
           <thead>
             <tr>
               <th>Profile ID</th>
-              <th>Start Date</th>
-              <th>End Date</th>
-              <th>Start Depth</th>
-              <th>End Depth</th>
+              <th>Timeframe</th>
+              <th>Depth Range</th>
             </tr>
           </thead>
           <tbody>
@@ -57,10 +53,8 @@ export default function DatasetInspector({ dataset, setInspectDataset }) {
               return (
                 <tr key={index}>
                   <td>{profile.profile_id}</td>
-                  <td>{new Date(profile.time_min).toLocaleDateString()}</td>
-                  <td>{new Date(profile.time_max).toLocaleDateString()}</td>
-                  <td>{profile.depth_min < Number.EPSILON ? 0 : profile.depth_min > 15000 ? 'too big' : profile.depth_min.toFixed(1)}</td>
-                  <td>{profile.depth_max < Number.EPSILON ? 0 : profile.depth_max > 15000 ? 'too big' : profile.depth_max.toFixed(1)}</td>
+                  <td>{`${new Date(profile.time_min).toLocaleDateString()} - ${new Date(profile.time_max).toLocaleDateString()}`}</td>
+                  <td>{`${profile.depth_min < Number.EPSILON ? 0 : profile.depth_min > 15000 ? 'too big' : profile.depth_min.toFixed(1)} - ${profile.depth_max < Number.EPSILON ? 0 : profile.depth_max > 15000 ? 'too big' : profile.depth_max.toFixed(1)}`}</td>
                 </tr>
               )
             })}
