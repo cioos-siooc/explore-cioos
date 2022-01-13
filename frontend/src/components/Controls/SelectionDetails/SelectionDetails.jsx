@@ -88,33 +88,37 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload }) {
       </div>
       <div className='pointDetailsControls'>
         <div className='pointDetailsControlRow'>
-          <ProgressBar
-            className='dataTotalBar'
-            title='Amount of download size used'
-          >
+          <div>
             <ProgressBar
-              className='upTo100'
-              variant='success'
-              now={dataTotal < 100 ? dataTotal : 100}
-              label={dataTotal < 100 ? dataTotal : 100}
-              key={1}
-            />
-            {dataTotal > 100 &&
+              className='dataTotalBar'
+              title='Amount of download size used'
+            >
               <ProgressBar
-                className='past100'
-                variant='warning'
-                now={dataTotal > 100 ? dataTotal - 100 : 0}
-                label={dataTotal > 100 ? dataTotal - 100 : 0}
-                key={2}
+                striped
+                className='upTo100'
+                variant='success'
+                now={dataTotal < 100 ? dataTotal : 100}
+                label={dataTotal < 100 ? dataTotal : 100}
+                key={1}
               />
-            }
-          </ProgressBar>
-          <div className='dataTotalRatio'>{dataTotal} / 100MB</div>
-        </div>
-        <div className='pointDetailsControlRow'>
-          <input className='emailInput' placeholder='Email Address' />
+              {dataTotal > 100 &&
+                <ProgressBar
+                  striped
+                  className='past100'
+                  variant='warning'
+                  now={dataTotal > 100 ? dataTotal - 100 : 0}
+                  label={dataTotal > 100 ? dataTotal - 100 : 0}
+                  key={2}
+                />
+              }
+            </ProgressBar>
+            <div className='dataTotalRatio'>{dataTotal}MB of 100MB Max</div>
+          </div>
           <button className='downloadButton'>Download</button>
         </div>
+        {/* <div className='pointDetailsControlRow'>
+          <input className='emailInput' placeholder='Email Address' />
+        </div> */}
       </div>
     </div >
   )
