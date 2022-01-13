@@ -30,6 +30,10 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
   }))
   
   useEffect(() => {
+    setSelectedPointPKs()
+  }, [query])
+
+  useEffect(() => {
     fetch(`${server}/organizations`).then(response => response.json()).then(data => {
       let orgsReturned = {}
       data.forEach(elem => {
