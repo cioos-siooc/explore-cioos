@@ -20,7 +20,9 @@
   margin-right: 10px;
 }
 
-
+.dataTotalRatio svg{
+  margin-left: 5px;
+}
 
 .dataTotalBar {
   height: 40px;

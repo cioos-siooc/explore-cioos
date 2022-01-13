@@ -1,8 +1,9 @@
 import * as React from 'react'
 import * as _ from 'lodash'
 import { useState, useEffect } from 'react'
-import { OverlayTrigger, Tooltip } from 'react-bootstrap'
-import { ChevronCompactDown, ChevronCompactUp, QuestionCircle } from 'react-bootstrap-icons'
+import { ChevronCompactDown, ChevronCompactUp } from 'react-bootstrap-icons'
+
+import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
 import { abbreviateString } from '../../../utilities'
 
 import './styles.css'
@@ -24,24 +25,17 @@ export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected
   // Using tabIndex to enable onBlur() focus loss capturing: https://stackoverflow.com/a/37491578
   return (
     <div className='filter' >
-      {/* tabIndex={0} onBlur={() => setFilterOpen(false)}> */}
       <div className='filterHeader' onClick={() => {
         setFilterOpen(!filterOpen)
         if (controlled) setOpenFilter(filterName)
       }}
       >
         {tooltip &&
-          <OverlayTrigger
-            key={badgeTitle}
-            placement='bottom'
-            overlay={
-              <Tooltip>
-                {tooltip}
-              </Tooltip>
-            }
-          >
-            <QuestionCircle className='helpIcon' color='#007bff' size={20} />
-          </OverlayTrigger>
+          <QuestionIconTooltip
+            tooltipText={tooltip}
+            tooltipPlacement={'bottom'}
+            size={20}
+          />
         }
         {icon}
         <div className='badgeTitle' title={badgeTitle}>

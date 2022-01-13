@@ -4,6 +4,7 @@ import { ProgressBar } from 'react-bootstrap'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
+import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
 import { server } from '../../../config'
 
 import './styles.css'
@@ -112,7 +113,14 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload }) {
                 />
               }
             </ProgressBar>
-            <div className='dataTotalRatio'>{dataTotal}MB of 100MB Max</div>
+            <div className='dataTotalRatio'>
+              {dataTotal}MB of 100MB Max
+              <QuestionIconTooltip
+                tooltipText={'Downloads are limited to 100MB.'}
+                size={20}
+                tooltipPlacement={'top'}
+              />
+            </div>
           </div>
           <button className='downloadButton'>Download</button>
         </div>
