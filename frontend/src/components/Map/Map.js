@@ -20,6 +20,7 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
   const map = useRef(null)
   const [mapSetupComplete, setMapSetupComplete] = useState(false)
   const [organizations, setOrganizations] = useState()
+  const [zoom, setZoom] = useState(2)
 
   const [hoveredPointDetails, setHoveredPointDetails] = useState()
   const [tooltipTimeout, setTooltipTimeout] = useState()
@@ -137,7 +138,7 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
         ],
       },
       center: [-125, 49], // starting position
-      zoom: 7, // starting zoom
+      zoom: zoom, // starting zoom
     })
 
     // Add controls
@@ -258,6 +259,8 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
     })
 
     map.current.on('click', 'points', e => {
+      map.current.flyTo({center: [e.lngLat.lng, e.lngLat.lat]})
+
       setSelectedPointPKs(e.features.map(point => point.properties.pk))
       var bbox = [
         [e.point.x, e.point.y],
@@ -291,6 +294,18 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
       clearTimeout(tooltipTimeout)
       setHoveredPointDetails(undefined)
       popup.remove()
+    })
+
+    map.current.on('click', 'hexes', e => {
+      map.current.flyTo({center: [e.lngLat.lng, e.lngLat.lat], zoom: 7})
+      // map.current.panTo([e.lngLat.lng, e.lngLat.lat])
+        // center: [e.lngLat.lng, e.lngLat.lat],
+        // zoom: 7,
+        // pitch: 45,
+        // bearing: 90
+      // })
+
+      // map.current.zoomTo(7)
     })
 
     map.current.on('mousemove', "hexes", e => {
