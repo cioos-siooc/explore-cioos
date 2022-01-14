@@ -10,7 +10,7 @@ import { server } from '../../../config'
 import './styles.css'
 
 // Note: datasets and points are exchangable terminology
-export default function SelectionDetails({ pointPKs, setPointsToDownload }) {
+export default function SelectionDetails({ pointPKs, setPointsToDownload, downloadButton }) {
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState([])
   const [inspectDataset, setInspectDataset] = useState()
@@ -24,11 +24,12 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload }) {
       }
     })
     setDataTotal(total)
+    console.log('updating points to download', pointsData)
+    setPointsToDownload(pointsData.filter(point => point.selected))//.map(point => point.pk))
   }, [pointsData])
 
   useEffect(() => {
     if (pointPKs && pointPKs.length !== 0) {
-      console.log(pointPKs)
       fetch(`${server}/pointQuery/${pointPKs.join(',')}`).then(response => {
         if (response.ok) {
           response.json().then(data => {
@@ -122,11 +123,9 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload }) {
               />
             </div>
           </div>
-          <button className='downloadButton'>Download</button>
+          {downloadButton}
+          {/* <button className='downloadButton'>Download</button> */}
         </div>
-        {/* <div className='pointDetailsControlRow'>
-          <input className='emailInput' placeholder='Email Address' />
-        </div> */}
       </div>
     </div >
   )

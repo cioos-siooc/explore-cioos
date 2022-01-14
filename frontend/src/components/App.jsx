@@ -14,6 +14,7 @@ import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndD
 import "bootstrap/dist/css/bootstrap.min.css";
 
 import "./styles.css";
+import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx';
 
 if (process.env.NODE_ENV === "production") {
   Sentry.init({
@@ -41,6 +42,24 @@ export default function App() {
     orgsSelected: defaultOrgsSelected
   })
 
+  function DownloadButton() {
+    return (
+      <DataDownloadModal
+        disabled={_.isEmpty(selectedPointPKs)}
+      >
+        {/* <SelectionPanel> */}
+        <SelectionDetails
+          pointPKs={pointsToDownload}
+          setPointsToDownload={setPointsToDownload}
+          downloadButton={<button onClick={() => console.log('download')}>Submit Request</button>}
+        />
+        {/* </SelectionPanel> */}
+      </DataDownloadModal>
+    )
+  }
+
+  console.log('pointsToDownload', pointsToDownload)
+
   return (
     <div>
       <Map
@@ -49,6 +68,7 @@ export default function App() {
       />
       <Controls
         setQuery={setQuery}
+        downloadButton={DownloadButton()}
       >
         {selectedPointPKs && (
           <Col xs='auto' className='selectionPanelColumn'>
@@ -56,6 +76,7 @@ export default function App() {
               <SelectionDetails
                 pointPKs={selectedPointPKs}
                 setPointsToDownload={setPointsToDownload}
+                downloadButton={DownloadButton()}
               />
             </SelectionPanel>
           </Col>
