@@ -16,7 +16,7 @@ import { ArrowsExpand, Building, CalendarWeek, Water } from 'react-bootstrap-ico
 import './styles.css'
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from '../config.js'
 
-export default function Controls({ setQuery, children }) {
+export default function Controls({ setQuery, downloadButton, children }) {
 
   // Making changes to context within context consumers (ie. passing mutable state down to children to manipulate)
   //https://stackoverflow.com/questions/41030361/how-to-update-react-context-from-inside-a-child-component
@@ -144,14 +144,7 @@ export default function Controls({ setQuery, children }) {
               </Filter>
             </Col>
             <Col xs='auto'>
-              <button
-                className='downloadButton'
-                onClick={() => console.log('downloading')}
-                disabled={_.isEmpty(children)}
-                title='Download selected data'
-              >
-                Download
-              </button>
+              {downloadButton}
             </Col>
           </Row>
         </Container>
