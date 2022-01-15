@@ -2,20 +2,31 @@
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE schema cioos_api;
 
+-- The scraper will skip datasets in this table
+DROP TABLE IF EXISTS cioos_api.skip_datasets;
+CREATE TABLE cioos_api.skip_datasets (
+    pk serial PRIMARY KEY,
+    dataset_id text,
+    erddap_url text
+);
+
 -- ERDDAP Datasets
--- data comes via cioos_api.datasets_data_loader
 DROP TABLE IF EXISTS cioos_api.datasets;
 CREATE TABLE cioos_api.datasets (
     pk serial PRIMARY KEY,
     dataset_id text,
     erddap_url text,
+    title TEXT,
+    title_fr TEXT,
+    summary TEXT,
+    summary_fr TEXT,
     cdm_data_type text,
+    organizations text[],
     ckan_record jsonb,
     profile_variable text,
     ckan_url text,
     eovs text[],
     ckan_id text,
-    parties text[],
     organization_pks INTEGER[],
     UNIQUE(dataset_id, erddap_url)
 );
@@ -69,21 +80,6 @@ CREATE INDEX
   ON cioos_api.profiles
   USING GIST (hex_zoom_1);
 
--- this probably only works for TimeSeriesProfile
--- DROP TABLE cioos_api.cdm_data_type_override;
--- CREATE TABLE cioos_api.cdm_data_type_override (
---     pk SERIAL PRIMARY KEY,
---     erddap_url text,
---     dataset_id text,
---     cdm_data_type text
--- );  
-
--- users that can download in the beta version
-DROP TABLE IF EXISTS cioos_api.allowed_users;
-CREATE TABLE cioos_api.allowed_users (
-    pk SERIAL PRIMARY KEY,
-    email text UNIQUE
-);
 
 -- One record per unique lat/long
 DROP TABLE IF EXISTS cioos_api.points;
@@ -119,57 +115,14 @@ CREATE TABLE cioos_api.download_jobs (
 );
 
 
-
--- 3 more tables are created by the scrapers
--- cioos_api.ckan_data_loader
--- cioos_api.datasets_data_loader
--- cioos_api.profiles_data_loader
-DROP TABLE IF EXISTS cioos_api.ckan_data_loader;
-CREATE TABLE cioos_api.ckan_data_loader (
-    erddap_url text,
-    dataset_id text,
-    eovs text[],
-    ckan_id text,
-    parties text[],
-    ckan_record jsonb
-);
-
-DROP TABLE IF EXISTS cioos_api.datasets_data_loader;
-CREATE TABLE cioos_api.datasets_data_loader (
-    erddap_url text,
-    dataset_id text,
-    cdm_data_type text,
-    CONSTRAINT dataset_loader_unique UNIQUE(erddap_url,dataset_id)
-);
-
-DROP TABLE IF EXISTS cioos_api.profiles_data_loader;
-CREATE TABLE cioos_api.profiles_data_loader (
-    erddap_url text,
-    dataset_id text,
-    profile_id text,
-    timeseries_profile_id text,
-    timeseries_id text,
-    profile_id text,
-    time_min timestamp with time zone,
-    time_max timestamp with time zone,
-    latitude_min double precision,
-    latitude_max double precision,
-    longitude_min double precision,
-    longitude_max double precision,
-    depth_min double precision,
-    depth_max double precision,
-    n_records integer,
-    n_profiles integer,
-
-    CONSTRAINT profile_loader_unique UNIQUE(erddap_url,dataset_id,timeseries_id,profile_id)
-);
-
 DROP TABLE IF EXISTS cioos_api.erddap_variables;
 CREATE TABLE cioos_api.erddap_variables (
     erddap_url text NOT NULL,
     dataset_id text NOT NULL,
-    variable text NOT NULL,
+    "name" text NOT NULL,
     "type" text NOT NULL,
+    actual_range text,
     cf_role text,
     standard_name text
 );
+

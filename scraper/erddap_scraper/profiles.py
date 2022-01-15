@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 
-from os import error
 import pandas as pd
-from numpy import datetime64
-from pandas.arrays import DatetimeArray
 
 from erddap_scraper.ERDDAP import ERDDAP
 
@@ -47,17 +44,20 @@ def get_profiles(dataset):
     llat_variables_in_dataset = [
         x for x in llat_variables if x in dataset.variables_list
     ]
+    profile_variable_list = []
 
     # Organize dataset variables by their cf_roles
     # eg profile_variable={'profile_id': 'hakai_id', 'timeseries_id': 'station'}
     profile_variables = (
         df_variables.set_index("cf_role", drop=False)
-        .query('cf_role != ""')[["cf_role", "Variable Name"]]["Variable Name"]
+        .query('cf_role != ""')[["cf_role", "name"]]["name"]
         .to_dict()
     )
-
     # Profile Variable List - list of dataset variables that have cf_roles attached to them
     profile_variable_list = list(profile_variables.values())
+
+    # sorting so the url is consistent every time for query caching
+    profile_variable_list.sort()
 
     # number of profiles in this dataset (eg by counting unique profile_id)
 
@@ -122,11 +122,6 @@ def get_profiles(dataset):
                 # return empty df
                 return pd.DataFrame()
 
-        if not profile_variables:
-            # Probably a Point or Other. Treat it as a single profile
-            profile_min[profile_variables] = dataset.id
-            profile_max[profile_variables] = dataset.id
-
         # setting same index so they can be joined more easily
         profile_max.set_index(profile_variable_list, inplace=True)
         profile_min.set_index(profile_variable_list, inplace=True)
@@ -146,6 +141,7 @@ def get_profiles(dataset):
     # First identify variables to use
     logger.debug("Get record Count")
     count_variables = profile_variable_list.copy()
+
     if "time" not in count_variables:
         count_variables.append("time")
     if (
@@ -160,12 +156,22 @@ def get_profiles(dataset):
         count_variables.append(dataset.variables_list)[-1]
 
     # Retrieve Count value per profile
-    profile_count = dataset.get_count(set(count_variables), profile_variable_list)
+    time_min = ERDDAP.parse_erddap_date(profiles["time_min"].min())
+    time_max = ERDDAP.parse_erddap_date(profiles["time_max"].max())
+
+    count_variables = list(set(count_variables))
+    count_variables.sort()
+
+    profile_count = dataset.get_count(
+        count_variables, profile_variable_list, time_min, time_max
+    )
 
     if not profile_count.empty:
         profiles["n_records"] = profile_count.set_index(profile_variable_list).max(
             axis="columns"
         )
+    if not "n_records" in profiles:
+        profiles["n_records"] = None
 
     # Rename cf_role variables as cf_role and drop from index.
     # Eg rename 'station_id' to 'timeseries_id'
@@ -191,32 +197,38 @@ def get_profiles(dataset):
                 "depth_max": "altitude_max",
             }
         )
+    # profiles[["a", "b"]] = df[["a", "b"]].apply(pd.to_numeric)
+    # profiles = profiles.fillna("")
 
-    profiles = profiles.fillna("")
-
-    # profiles=profiles.fillna('')
-    # set all null depths to 0
-    
     # if depth isnt a variable, set it to 0
     if "depth_min" not in profiles:
-        profiles["depth_min"]=0
-        profiles["depth_max"]=0
+        profiles["depth_min"] = 0
+        profiles["depth_max"] = 0
 
-    profiles["depth_min"] = profiles["depth_min"].fillna(0)
-    profiles["depth_max"] = profiles["depth_max"].fillna(0)
+    # profiles["depth_max"]=profiles["depth_max"].astype()
+
+    profiles["depth_min"].fillna(0, inplace=True)
+    profiles["depth_max"].fillna(0, inplace=True)
 
     if not "profile_id" in profiles:
-        profiles['profile_id']=""
+        profiles["profile_id"] = ""
     if not "timeseries_id" in profiles:
-        profiles['timeseries_id']=""
-    # if not "timeseries_profile_id" in profiles:
-        # profiles['timeseries_profile_id']=""
-    profiles = profiles.astype(dtypes,errors="ignore")
+        profiles["timeseries_id"] = ""
 
-    # set timeseries_profile_id to be concatenation
-    
-    # profiles["timeseries_profile_id"]=profiles[['timeseries_id', 'profile_id']].apply(lambda x: '_'.join(x.dropna()), axis=1)
-    
-    profiles=profiles.round(4)
+    cols_to_convert = ["latitude_min", "latitude_max", "longitude_min", "longitude_max"]
+    profiles[cols_to_convert] = profiles[cols_to_convert].apply(
+        pd.to_numeric, errors="coerce"
+    )
 
+    profiles = profiles.astype(dtypes)
+    profiles = profiles.round(4)
+
+    profiles_bad_geom_query = "((latitude_min <= -90) or (latitude_max >= 90) or (longitude_min <= -180) or (longitude_max >= 180))"
+    profiles_bad_geom = profiles.query(profiles_bad_geom_query)
+
+    if not profiles_bad_geom.empty:
+        logger.warn("These profiles with bad lat/long values will be removed:")
+        print(profiles_bad_geom.to_csv(None))
+        profiles = profiles.query("not " + profiles_bad_geom_query)
+    # print(profiles.depth_min.replace('',0)]])
     return profiles

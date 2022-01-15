@@ -1,7 +1,7 @@
 CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
   BEGIN
-  -- clear existing hexes from profiles
-  UPDATE cioos_api.profiles SET hex_zoom_0=null,hex_zoom_1=null;
+  
+  
 
   -- create tables to store the hex polygons. Once they are joined with cioos_api.points
   -- the polygons are copied over to that table
@@ -22,6 +22,10 @@ CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
   CREATE INDEX
     ON cioos_api.hexes_zoom_1
     USING GIST (geom);
+    
+    -- clear existing hexes from profiles
+  UPDATE cioos_api.profiles SET hex_zoom_0=null,hex_zoom_1=null;
+
     
   UPDATE cioos_api.points SET hex_zoom_0=null,hex_zoom_1=null; 
   -- There are many profiles with the same lat/long. 
