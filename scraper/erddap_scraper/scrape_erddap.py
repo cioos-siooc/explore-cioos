@@ -47,7 +47,6 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
     if limit_dataset_ids:
         df_all_datasets = df_all_datasets.query("datasetID in @limit_dataset_ids")
 
-    
     cdm_data_type_test = "cdm_data_type in @cdm_data_types_supported"
 
     unsupported_datasets = df_all_datasets.query(f"not ({cdm_data_type_test})")

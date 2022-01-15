@@ -15,13 +15,12 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 from erddap_scraper.dataset import Dataset
 
 
-
 class ERDDAP(object):
     "Stores the ERDDAP server URL and functions related to querying it"
 
-    def __init__(self, erddap_url,cache_requests=False):
+    def __init__(self, erddap_url, cache_requests=False):
         super(ERDDAP, self).__init__()
-        self.cache_requests=cache_requests
+        self.cache_requests = cache_requests
 
         if cache_requests:
             # limit cache to 10gb
@@ -31,7 +30,7 @@ class ERDDAP(object):
                 size_limit=10000000000,
                 cull_limit=0,
             )
-            
+
         self.url = erddap_url
         self.domain = urlparse(erddap_url).netloc
         self.session = requests.Session()
