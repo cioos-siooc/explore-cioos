@@ -33,7 +33,7 @@ def setup_logging(log_time):
     root.addHandler(handler)
 
 
-def main(erddap_urls, csv_only,cache_requests):
+def main(erddap_urls, csv_only, cache_requests):
     # setup database connection
     # This is only run from outside docker
     if not csv_only:
@@ -58,7 +58,8 @@ def main(erddap_urls, csv_only,cache_requests):
 
     for erddap_url in erddap_urls:
         scraping_thread = threading.Thread(
-            target=scrape_erddap, args=(erddap_url, result, limit_dataset_ids, cache_requests)
+            target=scrape_erddap,
+            args=(erddap_url, result, limit_dataset_ids, cache_requests),
         )
         scraping_thread.start()
         threads.append(scraping_thread)
@@ -98,16 +99,20 @@ def main(erddap_urls, csv_only,cache_requests):
     )
     # query CKAN national for more metadata related to the ERDDAP datsets we have so far
     print("Gathering CKAN data")
-    df_ckan = get_ckan_records(datasets['dataset_id'].to_list(),cache=cache_requests)
-    datasets=datasets.set_index(['erddap_url','dataset_id']).join(df_ckan.set_index(['erddap_url','dataset_id'])).reset_index()
+    df_ckan = get_ckan_records(datasets["dataset_id"].to_list(), cache=cache_requests)
+    datasets = (
+        datasets.set_index(["erddap_url", "dataset_id"])
+        .join(df_ckan.set_index(["erddap_url", "dataset_id"]))
+        .reset_index()
+    )
 
     # TODO make scraper prioritize with organizations from CKAN and then pull ERDDAP if needed
-    datasets['ckan_organizations'].fillna(datasets['organizations'],inplace=True)
-    datasets['ckan_title'].fillna(datasets['title'],inplace=True)
-    del datasets['title']
-    del datasets['organizations']
-    datasets.rename(columns={"ckan_title":"title"},inplace=True)
-    datasets.rename(columns={"ckan_organizations":"organizations"},inplace=True)
+    datasets["ckan_organizations"].fillna(datasets["organizations"], inplace=True)
+    datasets["ckan_title"].fillna(datasets["title"], inplace=True)
+    del datasets["title"]
+    del datasets["organizations"]
+    datasets.rename(columns={"ckan_title": "title"}, inplace=True)
+    datasets.rename(columns={"ckan_organizations": "organizations"}, inplace=True)
 
     profiles["depth_min"] = profiles["depth_min"].fillna(0)
     profiles["depth_max"] = profiles["depth_max"].fillna(0)
