@@ -6,6 +6,9 @@ import json
 
 import pandas as pd
 import requests
+import diskcache as dc
+
+
 
 # National CKAN has all the regions' records
 CKAN_API_URL = "https://catalogue.cioos.ca/api/3"
@@ -23,24 +26,37 @@ def split_erddap_url(url):
     return (erddap_host, dataset_id)
 
 
-def get_ckan_records(record_id_erddap_url_map, limit=None):
+def get_ckan_records(dataset_ids, limit=None, cache=False):
     """
     Goes through the list of ERDDAP URLs and dataset IDs and gets the full CKAN record for each dataset ID
 
     This will take a few minutes
 
+    dataset_ids are the list of datasets IDs that have been scraped
     """
-
+    records = list_ckan_records_with_erddap_urls(cache)
     # just used for testing
+    
     if limit:
-        record_id_erddap_url_map = record_id_erddap_url_map[0:limit]
+        records = records[0:limit]
     out = []
-    for i, [package_id, url] in enumerate(record_id_erddap_url_map):
-        if i % 100 == 0 and i > 0:
-            print(i)
+    for i,record_full in enumerate(records):
+        resources = record_full['resources']
+        erddap_url=""
+        for resource in resources:
+            
+            if "tabledap" in resource['url']:
+                erddap_url=resource['url']
+                continue
+        if not erddap_url:
+            continue
+
+        (erddap_host, dataset_id) = split_erddap_url(erddap_url)
+        
+        if dataset_ids and dataset_id not in dataset_ids:
+            continue
+
         # retreive the data for each record
-        record_url = CKAN_API_URL + "/action/package_show?id=" + package_id
-        record_full = requests.get(record_url).json()["result"]
         ckan_record_text = {
             "title": record_full.get("title"),
         }
@@ -68,26 +84,24 @@ def get_ckan_records(record_id_erddap_url_map, limit=None):
         organizations = list(filter(None, organizations))
         organizations = list(set(organizations))
 
-        (erddap_host, dataset_id) = split_erddap_url(url)
         out.append(
             [
                 erddap_host + "/erddap",
                 dataset_id,
-                record_full["eov"],
                 record_full["id"],
                 organizations,
                 ckan_record_text,
             ],
         )
-
+        # print(out)
         # compile a dataframe
+
     line = {
         "erddap_url": [x[0].strip("/") for x in out],
         "dataset_id": [x[1] for x in out],
-        "eovs": [x[2] for x in out],
-        "ckan_id": [x[3] for x in out],
-        "parties": [x[4] for x in out],
-        "ckan_record": [x[5] for x in out],
+        "ckan_id": [x[2] for x in out],
+        "ckan_organizations": [x[3] for x in out],
+        "ckan_title": [x[4]['title'] for x in out],
     }
 
     df = pd.DataFrame(line)
@@ -95,12 +109,42 @@ def get_ckan_records(record_id_erddap_url_map, limit=None):
     return df
 
 
-def list_ckan_records_with_erddap_urls():
-    erddap_datasets_query = (
-        CKAN_API_URL + "/action/resource_search?query=url:/erddap/tabledap/"
-    )
-    record_id_erddap_url_map = [
-        [x["package_id"], x["url"]]
-        for x in requests.get(erddap_datasets_query).json()["result"]["results"]
-    ]
-    return record_id_erddap_url_map
+def list_ckan_records_with_erddap_urls(cache_requests):
+    row_page_limit = 1000
+    row_start=0
+    # count total records avaiable, but we will have to page queries to get all results
+    # 1000 records per query (or as defined on the server)
+    records_remaining=1
+    records_total=[]
+    while records_remaining:
+        erddap_datasets_query = (
+            CKAN_API_URL + f"/action/package_search?rows={row_page_limit}&start={row_start}&q=erddap"
+        )
+        print(erddap_datasets_query)
+        
+        if cache_requests:
+            # limit cache to 10gb
+            cache = dc.Cache(
+                "erddap_scraper_dc",
+                eviction_policy="none",
+                size_limit=10000000000,
+                cull_limit=0,
+            )
+            if erddap_datasets_query in cache:
+                result = cache[erddap_datasets_query]
+            else:
+                result = requests.get(erddap_datasets_query).json()["result"]
+                cache[erddap_datasets_query] = result
+        else:
+            result = requests.get(erddap_datasets_query).json()["result"]
+
+        # count of total records, regardless of paging
+        count_total = result['count']
+        # count of records in this page, eg < 1000
+        records_total+=result['results']
+        count_page = len(records_total)
+        records_remaining=count_total-count_page
+        row_start+=row_page_limit
+
+    print("Found",len(records_total)," CKAN records")
+    return records_total

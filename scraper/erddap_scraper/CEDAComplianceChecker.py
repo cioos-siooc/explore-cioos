@@ -1,11 +1,13 @@
-import json
-import os
+from erddap_scraper.utils import eov_to_standard_names, flatten, intersection
 
 
 class CEDAComplianceChecker(object):
     def __init__(self, dataset):
         self.dataset = dataset
         self.logger = dataset.logger
+
+    def failed_error(self, msg):
+        self.logger.error("Skipping dataset:" + msg)
 
     def check_required_variables(self):
         # make sure LLAT variables exist. Depth/Altitude is assumed to be 0 if it doesnt exist
@@ -17,35 +19,20 @@ class CEDAComplianceChecker(object):
         ]
 
         if missing_required_vars:
-            self.logger.error(f"Can't find required variable: {missing_required_vars}")
+            self.failed_error(f"Can't find required variable: {missing_required_vars}")
             return False
         return True
 
     def check_supported_cf_name(self):
+        supported_standard_names = flatten(list(eov_to_standard_names.values()))
+        standard_names_in_dataset = self.dataset.df_variables["standard_name"].to_list()
+
         supported_variables = intersection(
             supported_standard_names,
-            self.dataset.df_variables["standard_name"].to_list(),
+            standard_names_in_dataset,
         )
         if not supported_variables:
-            self.logger.error("No supported variables found")
-            return False
-        return True
-
-    def check_supported_cdm_data_type(self):
-        # Get the profile variable for each dataset
-        cdm_data_types_supported = [
-            "Point",
-            "TimeSeries",
-            "Profile",
-            # "Trajectory",
-            # "TrajectoryProfile",
-            "TimeSeriesProfile",
-        ]
-
-        if self.dataset.cdm_data_type not in cdm_data_types_supported:
-            self.logger.error(
-                f"cdm_data_type {self.dataset.cdm_data_type} is not in {cdm_data_types_supported}"
-            )
+            self.failed_error("No supported variables found")
             return False
         return True
 
@@ -54,7 +41,7 @@ class CEDAComplianceChecker(object):
             "depth" in self.dataset.variables_list
             and "altitude" in self.dataset.variables_list
         ):
-            self.logger.error("Found both depth and altitude")
+            self.failed_error("Found both depth and altitude")
             return False
         return True
 
@@ -62,26 +49,5 @@ class CEDAComplianceChecker(object):
         return (
             self.check_required_variables()
             and self.check_supported_cf_name()
-            and self.check_supported_cdm_data_type()
             and self.check_only_one_depth()
         )
-
-
-def get_supported_standard_names():
-    dir = os.path.dirname(os.path.realpath(__file__))
-
-    with open(dir + "/eovs_to_standard_name.json") as f:
-        d = json.loads(f.read()).values()
-        standard_names = [j for sub in d for j in sub]
-        return standard_names
-
-
-supported_standard_names = get_supported_standard_names()
-
-
-def intersection(lst1, lst2):
-    """
-    intersection doesnt include nulls
-    """
-    lst3 = [value for value in lst1 if value in lst2 and value != ""]
-    return lst3

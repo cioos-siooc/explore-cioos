@@ -7,22 +7,35 @@ import re
 from io import StringIO
 from urllib.parse import unquote, urlparse
 
+import diskcache as dc
 import pandas as pd
 import requests
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
-
 from erddap_scraper.dataset import Dataset
+
 
 
 class ERDDAP(object):
     "Stores the ERDDAP server URL and functions related to querying it"
 
-    def __init__(self, erddap_url):
+    def __init__(self, erddap_url,cache_requests=False):
         super(ERDDAP, self).__init__()
+        self.cache_requests=cache_requests
+
+        if cache_requests:
+            # limit cache to 10gb
+            self.cache = dc.Cache(
+                "erddap_scraper_dc",
+                eviction_policy="none",
+                size_limit=10000000000,
+                cull_limit=0,
+            )
+            
         self.url = erddap_url
-        self.session = requests.Session()
         self.domain = urlparse(erddap_url).netloc
+        self.session = requests.Session()
+
         self.logger = self.get_logger()
         self.df_all_datasets = None
         logger = self.logger
@@ -37,10 +50,6 @@ class ERDDAP(object):
             logger.warning("URL doesn't end in /erddap, trying anyway")
         self.get_all_datasets()
 
-    def get_session(self):
-        "get the TCP session so it can be reused"
-        return self.session
-
     def get_all_datasets(self):
         "Get a string list of dataset IDs from the ERDDAP server"
         # allDatasets indexes table and grid datasets
@@ -48,6 +57,15 @@ class ERDDAP(object):
             '/tabledap/allDatasets.csv?&accessible="public"', skiprows=[1, 2]
         )
         self.df_all_datasets = df
+
+    def parse_erddap_date(s):
+        """ERDDAP dates come either as timestamps or ISO 8601 datetimes"""
+        is_timestamp = s.startswith("1.")
+
+        if is_timestamp:
+            return pd.to_datetime(s, unit="s")
+
+        return pd.to_datetime(s, errors="coerce")
 
     def parse_erddap_dates(series):
         """ERDDAP dates come either as timestamps or ISO 8601 datetimes"""
@@ -58,15 +76,28 @@ class ERDDAP(object):
 
         return pd.to_datetime(series, errors="coerce")
 
-    def erddap_csv_to_df(self, url, skiprows=[1],logger=None):
+    def erddap_csv_to_df(self, url, skiprows=[1], logger=None):
         """If theres an error in the request, this raises up to the dataset loop, so this dataset gets skipped"""
         if not logger:
-            logger=self.logger
-        
-        url_combined = self.url + url 
+            logger = self.logger
+
+        url_combined = self.url + url
         logger.debug(unquote(url_combined))
 
-        response = self.session.get(url_combined)
+        # response = self.session.get(url_combined)
+
+        response = None
+        if self.cache_requests:
+            cache = self.cache
+            if url_combined in self.cache:
+                response = cache[url_combined]
+            else:
+                logger.debug("CACHE MISS")
+                response = self.session.get(url_combined)
+                cache[url_combined] = response
+        else:
+            response = self.session.get(url_combined)
+
         no_data = False
         # Newer erddaps respond with 404 for no data
         if response.status_code == 404:
@@ -106,5 +137,4 @@ class ERDDAP(object):
 
     def get_logger(self):
         logger = logging.getLogger(self.domain)
-        # logging.basicConfig(format="%(name)s: %(message)s", level=logging.INFO)
         return logger
