@@ -1,5 +1,7 @@
 .multiCheckboxFilter {
   white-space: nowrap;
+  max-height: 30vh;
+  overflow: auto;
 }
 
 .multiCheckboxFilter label{

@@ -3,3 +3,26 @@
   top: 10px;
   pointer-events: none;
 }
+
+/* .controls .col-auto {
+  
+} */
+
+.controls .controlColumn.col > div{
+  margin: 0px 0px 0px 10px;
+  /* display: flex; */
+  /* flex-direction: row; */
+  /* flex-wrap: wrap;  */
+  /* flex-flow: column wrap; */
+}
+.controlColumn.col {
+  display: flex;
+  flex-wrap: wrap;
+  height: min-content;
+  padding-right: 150px;
+  min-width: 400px;
+}
+
+.controls .row {
+  flex-wrap: nowrap;
+}

@@ -240,7 +240,7 @@ export default function Controls(props) {
   useEffect(() => {
     // console.log(pointsData)
     if (pointsData && pointsData.length !== 0 && activePage <= pointsData.length) {
-      fetch(`${server}/pointQuery/${pointsData.map(point => JSON.stringify(point.properties.pk)).join(',')}`).then(response => {
+      fetch(`${server}/pointQuery?pointPKs=${pointsData.map(point => JSON.stringify(point.properties.pk)).join(',')}`).then(response => {
         if (response.ok) {
           response.json().then(data => {
             setData(data)

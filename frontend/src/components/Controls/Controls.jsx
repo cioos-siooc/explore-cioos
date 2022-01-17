@@ -73,7 +73,7 @@ export default function Controls({ setQuery, downloadButton, children }) {
         <Container fluid>
           <Row>
             {children}
-            <Col xs='auto'>
+            <Col className='controlColumn' >
               <Filter
                 badgeTitle={eovsBadgeTitle}
                 optionsSelected={eovsSelected}
@@ -87,8 +87,6 @@ export default function Controls({ setQuery, downloadButton, children }) {
               >
                 <MultiCheckboxFilter optionsSelected={eovsSelected} setOptionsSelected={setEovsSelected} />
               </Filter>
-            </Col>
-            <Col xs='auto'>
               <Filter
                 badgeTitle={orgsBadgeTitle}
                 optionsSelected={orgsSelected}
@@ -102,8 +100,6 @@ export default function Controls({ setQuery, downloadButton, children }) {
               >
                 <MultiCheckboxFilter optionsSelected={orgsSelected} setOptionsSelected={setOrgsSelected} />
               </Filter>
-            </Col>
-            <Col xs='auto'>
               <Filter
                 badgeTitle={timeframesBadgeTitle}
                 optionsSelected={startDate, endDate}
@@ -122,8 +118,6 @@ export default function Controls({ setQuery, downloadButton, children }) {
                   setEndDate={setEndDate}
                 />
               </Filter>
-            </Col>
-            <Col xs='auto'>
               <Filter
                 badgeTitle={depthRangeBadgeTitle}
                 optionsSelected={startDepth, endDepth}
@@ -142,8 +136,6 @@ export default function Controls({ setQuery, downloadButton, children }) {
                   setEndDepth={setEndDepth}
                 />
               </Filter>
-            </Col>
-            <Col xs='auto'>
               {downloadButton}
             </Col>
           </Row>

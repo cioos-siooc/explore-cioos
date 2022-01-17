@@ -1,6 +1,7 @@
 .filter {
-  pointer-events: all;
+  pointer-events: none;
   position:relative;
+  /* margin-left: 10px; */
 }
 
 .filterHeader:hover {
@@ -8,6 +9,7 @@
 }
 
 .filterHeader {
+  pointer-events: all;
   background-color: #f7f7f7;
   display: inline-flex;
   text-align: center;
@@ -26,6 +28,7 @@
 }
 
 .filterOptions {
+  pointer-events: all;
   position:absolute;
   top: 45px;
   left: 0px;
