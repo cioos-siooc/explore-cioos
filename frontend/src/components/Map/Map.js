@@ -284,13 +284,15 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
     })
 
     map.current.on('mouseenter', "points", e => {
-      // this.canvas.style.cursor = 'pointer'
+      const canvas = map.current.getCanvas()
+      canvas.style.cursor = 'pointer'
       setHoveredPointDetails(e)
       setTooltipTimeout(setTimeout(() => createTooltip(), 300))
     })
 
     map.current.on('mouseleave', 'points',  () => {
-      // this.canvas.style.cursor = 'grab'
+      const canvas = map.current.getCanvas()
+      canvas.style.cursor = 'grab'
       clearTimeout(tooltipTimeout)
       setHoveredPointDetails(undefined)
       popup.remove()
@@ -306,6 +308,11 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
       // })
 
       // map.current.zoomTo(7)
+    })
+
+    map.current.on('mouseenter', 'hexes', e => {
+      const canvas = map.current.getCanvas()
+      canvas.style.cursor = 'pointer'
     })
 
     map.current.on('mousemove', "hexes", e => {
@@ -326,6 +333,8 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
     })
 
     map.current.on('mouseleave', 'hexes',  () => {
+      const canvas = map.current.getCanvas()
+      canvas.style.cursor = 'grab'
       popup.remove()
     })
 
