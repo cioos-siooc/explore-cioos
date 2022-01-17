@@ -21,6 +21,7 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
   const [mapSetupComplete, setMapSetupComplete] = useState(false)
   const [organizations, setOrganizations] = useState()
   const [zoom, setZoom] = useState(2)
+  const [creatingPolygon, setCreatingPolygon] = useState(false)
 
   const [hoveredPointDetails, setHoveredPointDetails] = useState()
   const [tooltipTimeout, setTooltipTimeout] = useState()
@@ -284,18 +285,22 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
     })
 
     map.current.on('mouseenter', "points", e => {
-      const canvas = map.current.getCanvas()
-      canvas.style.cursor = 'pointer'
-      setHoveredPointDetails(e)
-      setTooltipTimeout(setTimeout(() => createTooltip(), 300))
+      if(!creatingPolygon) {
+        const canvas = map.current.getCanvas()
+        canvas.style.cursor = 'pointer'
+        setHoveredPointDetails(e)
+        setTooltipTimeout(setTimeout(() => createTooltip(), 300))
+      }
     })
 
     map.current.on('mouseleave', 'points',  () => {
-      const canvas = map.current.getCanvas()
-      canvas.style.cursor = 'grab'
-      clearTimeout(tooltipTimeout)
-      setHoveredPointDetails(undefined)
-      popup.remove()
+      if(!creatingPolygon) {
+        const canvas = map.current.getCanvas()
+        canvas.style.cursor = 'grab'
+        clearTimeout(tooltipTimeout)
+        setHoveredPointDetails(undefined)
+        popup.remove()
+      }
     })
 
     map.current.on('click', 'hexes', e => {
@@ -311,68 +316,87 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
     })
 
     map.current.on('mouseenter', 'hexes', e => {
-      const canvas = map.current.getCanvas()
-      canvas.style.cursor = 'pointer'
+      if(!creatingPolygon) {
+        const canvas = map.current.getCanvas()
+        canvas.style.cursor = 'pointer'
+      }
     })
 
     map.current.on('mousemove', "hexes", e => {
-      var coordinates = [e.lngLat.lng, e.lngLat.lat]
-      var description = e.features[0].properties.count
-      
-      // Ensure that if the map is zoomed out such that multiple
-      // copies of the feature are visible, the popup appears
-      // over the copy being pointed to.
-      while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-        coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360
+      if(!creatingPolygon) {
+        var coordinates = [e.lngLat.lng, e.lngLat.lat]
+        var description = e.features[0].properties.count
+        
+        // Ensure that if the map is zoomed out such that multiple
+        // copies of the feature are visible, the popup appears
+        // over the copy being pointed to.
+        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+          coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360
+        }
+        
+        popup
+        .setLngLat(coordinates)
+        .setHTML(description + " records")
+        .addTo(map.current)
       }
-      
-      popup
-      .setLngLat(coordinates)
-      .setHTML(description + " records")
-      .addTo(map.current)
     })
 
     map.current.on('mouseleave', 'hexes',  () => {
-      const canvas = map.current.getCanvas()
-      canvas.style.cursor = 'grab'
-      popup.remove()
-    })
-
-    map.current.on('draw.create', e => { // Ensure there are only one polygons on the map at a time
-      if(drawPolygon.getAll().features.length > 1) {
-        drawPolygon.delete(drawPolygon.getAll().features[0].id)
+      if(!creatingPolygon) {
+        const canvas = map.current.getCanvas()
+        canvas.style.cursor = 'grab'
+        popup.remove()
       }
     })
 
-    map.current.on('touchend', e => {
-      map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-      setSelectedPointPKs(undefined)
+    map.current.on('draw.create', e => { 
+      // Ensure there are only one polygons on the map at a time
+      if(drawPolygon.getAll().features.length > 1) {
+        drawPolygon.delete(drawPolygon.getAll().features[0].id)
+      }
+      console.log(e)
+      // const canvas = map.current.getCanvas()
+      // canvas.style.cursor = 'cross'
     })
 
-    map.current.on('touchend', 'points', e => {
-      if (e.points.length !== 1) return
-       
-      setSelectedPointPKs(e.features.map(point => point.properties.pk))
-      var bbox = [
-        [e.point.x, e.point.y],
-        [e.point.x, e.point.y]
-      ]
-      var features = map.current.queryRenderedFeatures(bbox, {
-        layers: ['points']
-      })
-        
-      // Run through the selected features and set a filter
-      // to match features with unique ids to activate
-      // the `points-selected' layer.
-      var filter = features.reduce(
-        function (memo, feature) {
-          memo.push(feature.properties.pk)
-          return memo
-        },
-        ['in', 'pk']
-      )
-      map.current.setFilter('points-highlighted', filter)
+    map.current.on('draw.delete', e => {
+      const canvas = map.current.getCanvas()
+      canvas.style.cursor = 'grab'
     })
+
+    // map.current.on('draw.update', e => {
+    //   const canvas = 
+    // })
+
+    // map.current.on('touchend', e => {
+    //   map.current.setFilter('points-highlighted', ['in', 'pk', ''])
+    //   setSelectedPointPKs(undefined)
+    // })
+
+    // map.current.on('touchend', 'points', e => {
+    //   if (e.points.length !== 1) return
+       
+    //   setSelectedPointPKs(e.features.map(point => point.properties.pk))
+    //   var bbox = [
+    //     [e.point.x, e.point.y],
+    //     [e.point.x, e.point.y]
+    //   ]
+    //   var features = map.current.queryRenderedFeatures(bbox, {
+    //     layers: ['points']
+    //   })
+        
+    //   // Run through the selected features and set a filter
+    //   // to match features with unique ids to activate
+    //   // the `points-selected' layer.
+    //   var filter = features.reduce(
+    //     function (memo, feature) {
+    //       memo.push(feature.properties.pk)
+    //       return memo
+    //     },
+    //     ['in', 'pk']
+    //   )
+    //   map.current.setFilter('points-highlighted', filter)
+    // })
     setMapSetupComplete(true)
   })
 

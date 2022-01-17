@@ -30,7 +30,7 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, downlo
 
   useEffect(() => {
     if (pointPKs && pointPKs.length !== 0) {
-      fetch(`${server}/pointQuery/${pointPKs.join(',')}`).then(response => {
+      fetch(`${server}/pointQuery?pointPKs=${pointPKs.join(',')}`).then(response => {
         if (response.ok) {
           response.json().then(data => {
 
