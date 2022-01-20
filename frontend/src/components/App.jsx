@@ -58,7 +58,7 @@ export default function App() {
     )
   }
 
-  console.log('pointsToDownload', pointsToDownload)
+  // console.log('pointsToDownload', pointsToDownload)
 
   return (
     <div>
@@ -82,7 +82,7 @@ export default function App() {
           </Col>
         )}
       </Controls>
-      <a className='logo' href='https://cioospacific.ca/' ></a>
+      <a className='logo' href='https://cioospacific.ca/' />
     </div>
   );
 }

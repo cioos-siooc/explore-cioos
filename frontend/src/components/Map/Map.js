@@ -21,16 +21,13 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
   const [mapSetupComplete, setMapSetupComplete] = useState(false)
   const [organizations, setOrganizations] = useState()
   const [zoom, setZoom] = useState(2)
-  const [creatingPolygon, setCreatingPolygon] = useState(false)
 
-  const [hoveredPointDetails, setHoveredPointDetails] = useState()
-  const [tooltipTimeout, setTooltipTimeout] = useState()
-  const [popup, setPopup] = useState(new Popup({
+  const popup= new Popup({
     closeButton: false,
     closeOnClick: true,
     maxWidth: '400px'
-  }))
-  
+  })
+
   useEffect(() => {
     setSelectedPointPKs()
   }, [query])
@@ -44,23 +41,6 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
       setOrganizations(orgsReturned)
     }).catch(error => { throw error })
   }, [])
-
-  function createTooltip() {
-    if(hoveredPointDetails !== undefined && hoveredPointDetails.features !== undefined) {
-      // When a click event occurs on a feature in the places layer, open a popup at the
-      // location of the feature, with description HTML from its properties.
-      var coordinates = hoveredPointDetails.features[0].geometry.coordinates.slice()
-      popup
-        .setLngLat(coordinates)
-        .setHTML(
-          ` <div>
-              ${hoveredPointDetails.features[0].properties.count} records. Click for details
-            </div> 
-          `
-        )
-        .addTo(map.current)
-    }
-  }
 
   function createDataFilterQueryString(query) {
     let eovsArray = [], orgsArray = []
@@ -284,46 +264,28 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
       map.current.setFilter('points-highlighted', filter)
     })
 
-    map.current.on('mouseenter', "points", e => {
-      if(!creatingPolygon) {
-        const canvas = map.current.getCanvas()
-        canvas.style.cursor = 'pointer'
-        setHoveredPointDetails(e)
-        setTooltipTimeout(setTimeout(() => createTooltip(), 300))
-      }
+    map.current.on('click', 'hexes', e => {
+      map.current.flyTo({center: [e.lngLat.lng, e.lngLat.lat], zoom: 7})
+    })
+
+    map.current.on('mousemove', 'points', e => {
+      var coordinates = e.features[0].geometry.coordinates.slice()
+      popup
+        .setLngLat(coordinates)
+        .setHTML(
+          ` <div>
+              ${e.features[0].properties.count} points. Click for details
+            </div> 
+          `
+        )
+        .addTo(map.current)
     })
 
     map.current.on('mouseleave', 'points',  () => {
-      if(!creatingPolygon) {
-        const canvas = map.current.getCanvas()
-        canvas.style.cursor = 'grab'
-        clearTimeout(tooltipTimeout)
-        setHoveredPointDetails(undefined)
         popup.remove()
-      }
-    })
-
-    map.current.on('click', 'hexes', e => {
-      map.current.flyTo({center: [e.lngLat.lng, e.lngLat.lat], zoom: 7})
-      // map.current.panTo([e.lngLat.lng, e.lngLat.lat])
-        // center: [e.lngLat.lng, e.lngLat.lat],
-        // zoom: 7,
-        // pitch: 45,
-        // bearing: 90
-      // })
-
-      // map.current.zoomTo(7)
-    })
-
-    map.current.on('mouseenter', 'hexes', e => {
-      if(!creatingPolygon) {
-        const canvas = map.current.getCanvas()
-        canvas.style.cursor = 'pointer'
-      }
     })
 
     map.current.on('mousemove', "hexes", e => {
-      if(!creatingPolygon) {
         var coordinates = [e.lngLat.lng, e.lngLat.lat]
         var description = e.features[0].properties.count
         
@@ -336,17 +298,12 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
         
         popup
         .setLngLat(coordinates)
-        .setHTML(description + " records")
+        .setHTML(description + " points")
         .addTo(map.current)
-      }
     })
 
     map.current.on('mouseleave', 'hexes',  () => {
-      if(!creatingPolygon) {
-        const canvas = map.current.getCanvas()
-        canvas.style.cursor = 'grab'
         popup.remove()
-      }
     })
 
     map.current.on('draw.create', e => { 
@@ -354,49 +311,8 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
       if(drawPolygon.getAll().features.length > 1) {
         drawPolygon.delete(drawPolygon.getAll().features[0].id)
       }
-      console.log(e)
-      // const canvas = map.current.getCanvas()
-      // canvas.style.cursor = 'cross'
     })
 
-    map.current.on('draw.delete', e => {
-      const canvas = map.current.getCanvas()
-      canvas.style.cursor = 'grab'
-    })
-
-    // map.current.on('draw.update', e => {
-    //   const canvas = 
-    // })
-
-    // map.current.on('touchend', e => {
-    //   map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-    //   setSelectedPointPKs(undefined)
-    // })
-
-    // map.current.on('touchend', 'points', e => {
-    //   if (e.points.length !== 1) return
-       
-    //   setSelectedPointPKs(e.features.map(point => point.properties.pk))
-    //   var bbox = [
-    //     [e.point.x, e.point.y],
-    //     [e.point.x, e.point.y]
-    //   ]
-    //   var features = map.current.queryRenderedFeatures(bbox, {
-    //     layers: ['points']
-    //   })
-        
-    //   // Run through the selected features and set a filter
-    //   // to match features with unique ids to activate
-    //   // the `points-selected' layer.
-    //   var filter = features.reduce(
-    //     function (memo, feature) {
-    //       memo.push(feature.properties.pk)
-    //       return memo
-    //     },
-    //     ['in', 'pk']
-    //   )
-    //   map.current.setFilter('points-highlighted', filter)
-    // })
     setMapSetupComplete(true)
   })
 
