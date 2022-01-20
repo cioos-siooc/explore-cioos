@@ -82,7 +82,7 @@ export default function App() {
           </Col>
         )}
       </Controls>
-      <a className='logo' href='https://cioospacific.ca/' />
+      <a title='Return to CIOOS pacific homepage' className='logo' href='https://cioospacific.ca/' />
     </div>
   );
 }

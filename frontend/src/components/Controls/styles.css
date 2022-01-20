@@ -20,6 +20,7 @@
   flex-wrap: wrap;
   height: min-content;
   padding-right: 150px;
+  padding-left: 0px;;
   min-width: 400px;
 }
 

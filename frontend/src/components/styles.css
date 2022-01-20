@@ -5,21 +5,22 @@
 
 .row > .selectionPanelColumn {
   padding-left: 0px;
+  padding-right: 0px;
 }
 
 .logo {
-  width: 200px;
+  width: 153px;
   height: 60px;
   border: 2px solid transparent;
   pointer-events: all;
   position: absolute;
   top: 10px;
   right: 10px;
-  background-image: url(./Images/CIOOSNationalLogoBlack.svg);
+  background-image: url(./Images/CIOOSPacificLogoBlack.svg);
   background-color: transparent;
   background-repeat: no-repeat;
   border-radius: 10px;
-  padding: 5px;
+  background-size: 148px 55px;
 }
 
 .logo:hover {
