@@ -7,7 +7,7 @@
 }
 
 .mapbox-gl-draw_polygon {
-  background-image: url(../Icons/polygonIcon.png) !important;
+  background-image: url(../Images/polygonIcon.png) !important;
   background-size: 30px 30px;
 }
 

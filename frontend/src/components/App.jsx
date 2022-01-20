@@ -9,12 +9,12 @@ import Controls from "./Controls/Controls.jsx";
 import Map from "./Map/Map.js";
 import SelectionPanel from './Controls/SelectionPanel/SelectionPanel.jsx'
 import SelectionDetails from './Controls/SelectionDetails/SelectionDetails.jsx'
+import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx';
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from './config.js';
 
 import "bootstrap/dist/css/bootstrap.min.css";
 
 import "./styles.css";
-import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx';
 
 if (process.env.NODE_ENV === "production") {
   Sentry.init({
@@ -82,6 +82,7 @@ export default function App() {
           </Col>
         )}
       </Controls>
+      <a className='logo' href='https://cioospacific.ca/' ></a>
     </div>
   );
 }
