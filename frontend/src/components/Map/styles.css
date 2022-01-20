@@ -14,3 +14,7 @@
 .mapbox-gl-draw_polygon.active {
   background-color: lightgray;
 }
+
+.mapboxgl-canvas {
+  width: 100%;
+}

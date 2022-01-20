@@ -27,3 +27,9 @@
   background-color: #f7f7f7;
   border: 2px solid lightgray;
 }
+
+@media all and (max-width: 900px) {
+  .logo {
+    left: calc(900px - 163px);
+  }
+}
