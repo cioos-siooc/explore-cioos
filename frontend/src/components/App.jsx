@@ -32,6 +32,7 @@ export default function App() {
 
   const [pointsToDownload, setPointsToDownload] = useState()
   const [selectedPointPKs, setSelectedPointPKs] = useState()
+  const [polygon, setPolygon] = useState()
 
   const [query, setQuery] = useState({
     startDate: defaultStartDate,
@@ -58,11 +59,12 @@ export default function App() {
     )
   }
 
-  // console.log('pointsToDownload', pointsToDownload)
+  // console.log('polygon', polygon)
 
   return (
     <div>
       <Map
+        setPolygon={setPolygon}
         setSelectedPointPKs={setSelectedPointPKs}
         query={query}
       />

@@ -2,6 +2,8 @@ import * as React from "react"
 import maplibreGl, { NavigationControl, Popup } from "maplibre-gl"
 import MapboxDraw from "@mapbox/mapbox-gl-draw"
 import { useState, useEffect, useRef } from "react"
+import * as turf from '@turf/turf'
+
 import './styles.css'
 
 import {server} from '../../config'
@@ -15,7 +17,7 @@ const config = {
 }
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({ query, setSelectedPointPKs}) {
+export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
   const mapContainer = useRef(null)
   const map = useRef(null)
   const [mapSetupComplete, setMapSetupComplete] = useState(false)
@@ -236,12 +238,12 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
 
     map.current.on('click', e => {
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-      setSelectedPointPKs(undefined)
+      setSelectedPointPKs()
+      setPolygon()
     })
 
     map.current.on('click', 'points', e => {
       map.current.flyTo({center: [e.lngLat.lng, e.lngLat.lat]})
-
       setSelectedPointPKs(e.features.map(point => point.properties.pk))
       var bbox = [
         [e.point.x, e.point.y],
@@ -250,7 +252,7 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
       var features = map.current.queryRenderedFeatures(bbox, {
         layers: ['points']
       })
-        
+      
       // Run through the selected features and set a filter
       // to match features with unique ids to activate
       // the `points-selected' layer.
@@ -260,8 +262,10 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
           return memo
         },
         ['in', 'pk']
-      )
+        )
       map.current.setFilter('points-highlighted', filter)
+      drawPolygon.delete(drawPolygon.getAll().features[0].id)
+      setPolygon(bbox)
     })
 
     map.current.on('click', 'hexes', e => {
@@ -304,6 +308,49 @@ export default function CreateMap({ query, setSelectedPointPKs}) {
       if(drawPolygon.getAll().features.length > 1) {
         drawPolygon.delete(drawPolygon.getAll().features[0].id)
       }
+
+      const polygon = drawPolygon.getAll().features[0].geometry.coordinates[0]
+      setPolygon(polygon)
+      
+      var features = map.current.queryRenderedFeatures({layers: ['points']}).map(point => {
+        return {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            // Note order: longitude, latitude.
+            coordinates: point.geometry.coordinates
+          },
+          properties: {...point.properties}
+        }
+      })//turf.point(point.geometry.coordinates,point.properties))
+
+      const featureCollection = {type: 'FeatureCollection', features: features}
+      console.log('rendered points on map', featureCollection)
+
+      var points = turf.points([
+        [-46.6318, -23.5523],
+        [-46.6246, -23.5325],
+        [-46.6062, -23.5513],
+        [-46.663, -23.554],
+        [-46.643, -23.557]
+    ], {test: 'test'});
+    
+    console.log('points', points, 'featureCollection', featureCollection)
+
+    var searchWithin = turf.polygon([polygon]);
+    
+    var pointsWithinPolygon = turf.pointsWithinPolygon(featureCollection, searchWithin);
+
+      console.log('points that are within the polygon', pointsWithinPolygon)
+    })
+
+    map.current.on('draw.update', e => {
+      console.log('update polygon', polygon)
+      setPolygon(drawPolygon.getAll().features[0].geometry.coordinates[0])
+    })
+
+    map.current.on('draw.delete', e => {
+      setPolygon()
     })
 
     setMapSetupComplete(true)
