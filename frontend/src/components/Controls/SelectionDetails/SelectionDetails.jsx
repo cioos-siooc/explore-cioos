@@ -17,15 +17,17 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, downlo
   const [dataTotal, setDataTotal] = useState(0)
 
   useEffect(() => {
-    let total = 0
-    pointsData.forEach((point) => {
-      if (point.selected) {
-        total += Math.floor(point.profiles.length)
-      }
-    })
-    setDataTotal(total)
-    console.log('updating points to download', pointsData)
-    setPointsToDownload(pointsData.filter(point => point.selected))//.map(point => point.pk))
+    if (pointsData) {
+      let total = 0
+      pointsData.forEach((point) => {
+        if (point.selected) {
+          total += Math.floor(point.profiles.length)
+        }
+      })
+      setDataTotal(total)
+      console.log('updating points to download', pointsData)
+      setPointsToDownload(pointsData.filter(point => point.selected))//.map(point => point.pk))
+    }
   }, [pointsData])
 
   useEffect(() => {
@@ -33,7 +35,7 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, downlo
       fetch(`${server}/pointQuery?pointPKs=${pointPKs.join(',')}`).then(response => {
         if (response.ok) {
           response.json().then(data => {
-
+            console.log('pointQuery data', data)
             setPointsData(data.map(point => {
               return {
                 ...point,
