@@ -23,12 +23,19 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
   const [mapSetupComplete, setMapSetupComplete] = useState(false)
   const [organizations, setOrganizations] = useState()
   const [zoom, setZoom] = useState(2)
+  const [pointFilter, setPointFilter] = useState()
 
   const popup= new Popup({
     closeButton: false,
     closeOnClick: true,
     maxWidth: '400px'
   })
+
+  useEffect(() => {
+    if(mapSetupComplete){
+      map.current.setFilter('points-highlighted', pointFilter)
+    }
+  }, [pointFilter])
 
   useEffect(() => {
     setSelectedPointPKs()
@@ -238,7 +245,8 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
 
     map.current.on('click', e => {
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-      setSelectedPointPKs()
+      console.log('click', e)
+      // setSelectedPointPKs()
       setPolygon()
     })
 
@@ -263,8 +271,13 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
         },
         ['in', 'pk']
         )
-      map.current.setFilter('points-highlighted', filter)
-      drawPolygon.delete(drawPolygon.getAll().features[0].id)
+
+      console.log('click filter', filter)
+      setPointFilter(filter)
+      // map.current.setFilter('points-highlighted', filter)
+      if(drawPolygon.getAll().features.length !== 0) {
+        drawPolygon.delete(drawPolygon.getAll().features[0].id)
+      }
       setPolygon(bbox)
     })
 
@@ -308,9 +321,8 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
       if(drawPolygon.getAll().features.length > 1) {
         drawPolygon.delete(drawPolygon.getAll().features[0].id)
       }
-
-      const polygon = drawPolygon.getAll().features[0].geometry.coordinates[0]
-      setPolygon(polygon)
+      
+      const newPolygon = drawPolygon.getAll().features[0].geometry.coordinates[0]
       
       var features = map.current.queryRenderedFeatures({layers: ['points']}).map(point => {
         return {
@@ -322,31 +334,35 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
           },
           properties: {...point.properties}
         }
-      })//turf.point(point.geometry.coordinates,point.properties))
+      })
 
       const featureCollection = {type: 'FeatureCollection', features: features}
-      console.log('rendered points on map', featureCollection)
-
-      var points = turf.points([
-        [-46.6318, -23.5523],
-        [-46.6246, -23.5325],
-        [-46.6062, -23.5513],
-        [-46.663, -23.554],
-        [-46.643, -23.557]
-    ], {test: 'test'});
-    
-    console.log('points', points, 'featureCollection', featureCollection)
-
-    var searchWithin = turf.polygon([polygon]);
-    
-    var pointsWithinPolygon = turf.pointsWithinPolygon(featureCollection, searchWithin);
-
+      var searchWithin = turf.polygon([newPolygon]);
+      var pointsWithinPolygon = turf.pointsWithinPolygon(featureCollection, searchWithin);
       console.log('points that are within the polygon', pointsWithinPolygon)
+      
+      // Filter points layer to show the points that have been selected
+      var filter = pointsWithinPolygon.features.reduce(
+        function (memo, feature) {
+          memo.push(feature.properties.pk)
+          return memo
+        },
+        ['in', 'pk']
+      )
+
+      setPointFilter(filter)
+      // map.current.setFilter('points-highlighted', filter)
+      
+      //set selected PKs and polygon
+      console.log('pointsWithinPolygon point pks', pointsWithinPolygon.features.map(point => point.properties.pk))
+      setSelectedPointPKs(pointsWithinPolygon.features.map(point => point.properties.pk))
+      console.log('polygon', newPolygon)
+      setPolygon(newPolygon)
     })
 
     map.current.on('draw.update', e => {
-      console.log('update polygon', polygon)
-      setPolygon(drawPolygon.getAll().features[0].geometry.coordinates[0])
+      console.log('update polygon', e.features[0].geometry.coordinates[0])
+      setPolygon(e.features[0].geometry.coordinates[0])
     })
 
     map.current.on('draw.delete', e => {

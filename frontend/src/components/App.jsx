@@ -72,6 +72,7 @@ export default function App() {
         setQuery={setQuery}
         downloadButton={DownloadButton()}
       >
+        {console.log('selectedPointPKs', selectedPointPKs)}
         {selectedPointPKs && (
           <Col xs='auto' className='selectionPanelColumn'>
             <SelectionPanel>
