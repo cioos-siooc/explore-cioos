@@ -6,17 +6,15 @@ from urllib.parse import urlparse
 from erddapy import ERDDAP
 import shapely.wkt
 from shapely.geometry import Point
+from erddap_scraper.utils import eov_to_standard_names, flatten
 
 import pandas as pd
-
 import requests
-import json
+
 
 import os
 import io
 import sys
-
-import warnings
 
 import erddap_scraper.ERDDAP as erddap_scraper
 from erddap_downloader.download_pdf import download_pdf
@@ -32,20 +30,6 @@ FAILED = "FAILED"
 EMPTY = "EMPTY"
 IGNORED = "IGNORED"
 
-
-def load_eov_mapping():
-    # Retrieve EOVs mapping to standard_name
-    path_to_eov_mapper = os.path.dirname(os.path.realpath(__file__))
-    with open(
-        os.path.join(path_to_eov_mapper, "eovs_to_standard_name.json")
-    ) as json_file:
-        evos_to_standard_name = json.load(json_file)
-    return evos_to_standard_name
-
-
-evos_to_standard_name = load_eov_mapping()
-
-
 def erddap_server_to_name(server):
     """
     Read erddap server url and convert it to a readable string format to be use as part of the file name output/
@@ -55,50 +39,32 @@ def erddap_server_to_name(server):
     return urlparse(server).netloc.replace(".", "_")
 
 
-def get_variable_list(erddap_metadata: dict, eovs: list):
+def get_variable_list(df_variables, eovs: list):
     """
     Retrieve the list of variables needed within an ERDDAP dataset based on the eovs list provided by the
      user and the mandatory variables required.
-    :param erddap_metadata: erddap dataset attributes dictionary
+    :param erddap_metadata: erddap dataset attributes dataframe
     :param eovs: eov list requested by the query
     :return: list of variables to download from erddap
     """
     # Get a list of mandatory variables to be present if available
     mandatory_variables = ["time", "latitude", "longitude", "depth"]
 
-    # Retrieve the list of standard_names to consider
     eov_variables = []
     for eov in eovs:
-        if eov in evos_to_standard_name:
-            eov_variables += evos_to_standard_name[eov]
+        if eov in eov_to_standard_names:
+            eov_variables += eov_to_standard_names[eov]
+            
+    variables_to_download =  df_variables.query("name in @mandatory_variables or standard_name in @eov_variables or not cf_role.isnull()")['name'].to_list()
 
-    # Iterate over each variables and add to considered list if
-    #   - mandatory_variable
-    #   - cf_role
-    #   - standard_name is considered
-    variable_list = []
-    for variable, attributes in erddap_metadata["variables"].items():
-
-        # Mandatory
-        if variable in mandatory_variables:
-            variable_list += [variable]
-        # cf_role
-        elif "cf_role" in attributes:
-            variable_list += [variable]
-        # eov
-        elif (
-            "standard_name" in attributes
-            and attributes["standard_name"] in eov_variables
-        ):
-            variable_list += [variable]
-    return variable_list
+    return variables_to_download
 
 
 def get_erddap_download_url(
     dataset_info: dict,
     user_constraint: dict,
     variables_list: list,
-    polygon_region,
+    polygon_region, 
     response: str = "csv",
 ):
     """
@@ -259,10 +225,14 @@ def get_datasets(json_query, output_path="", create_pdf=False):
             or "variables" not in dataset["erddap_metadata"]
             or dataset["erddap_metadata"]["variables"] == []
         ):
+
             scrape_erddap = erddap_scraper.ERDDAP(dataset["erddap_url"])
-            dataset["erddap_metadata"] = scrape_erddap.get_metadata_for_dataset(
+
+            scraper_dataset = scrape_erddap.get_dataset(
                 dataset["dataset_id"]
             )
+            
+            dataset["erddap_metadata"] = scraper_dataset.df_variables
 
         # Get variable list to download
         variable_list = get_variable_list(

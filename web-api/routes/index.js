@@ -43,15 +43,17 @@ router.get("/", function (req, res, next) {
 });
 
 /* GET home page. */
-router.get("/pointQuery/:point_pk", async function (req, res, next) {
-  const { point_pk } = req.params;
-  const point_pk_split = point_pk.split(",").map((e) => Number.parseInt(e));
-  const rows = await db.raw(
-    `SELECT 
+router.get("/pointQuery", async function (req, res, next) {
+  // const { point_pk } = req.params;
+  const filters = createDBFilter(req.query);
+
+  // const point_pk_split = point_pk.split(",").map((e) => Number.parseInt(e));
+  const sql = `SELECT 
+        d.pk,
         d.dataset_id,
-        ckan_record->>'title' title,
+        d.title title,
         eovs,
-        parties,
+        organizations,
         d.erddap_url,
         json_agg(json_build_object(
                 'profile_id',p.profile_id,
@@ -64,15 +66,19 @@ router.get("/pointQuery/:point_pk", async function (req, res, next) {
         FROM cioos_api.profiles p
         JOIN cioos_api.datasets d
         ON p.dataset_pk =d.pk
-        WHERE point_pk = ANY(:point_pk_split)
-        AND ckan_record IS NOT NULL
+        WHERE ${filters}
+        -- AND ckan_record IS NOT NULL
         GROUP BY d.dataset_id,
-        ckan_record,
+        d.pk,
+        d.title,
+        -- ckan_record,
         eovs,
-        parties,
-        d.erddap_url`,
-    { point_pk_split }
-  );
+        organizations,
+        d.erddap_url`;
+
+  console.log(sql);
+
+  const rows = await db.raw(sql);
 
   res.send(rows && rows.rows);
 });
