@@ -8,6 +8,8 @@ setup(
     description="",
     url="",
     packages=["erddap_scraper"],
+    include_package_data=True,
+    package_data={"": ["eovs_to_standard_name.json"]},
     install_requires=[
         "pandas",
         "erddapy",
@@ -15,5 +17,6 @@ setup(
         "sqlalchemy",
         "psycopg2-binary",
         "python-dotenv",
+        "diskcache",
     ],
 )

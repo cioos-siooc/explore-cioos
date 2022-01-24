@@ -13,12 +13,12 @@ from sqlalchemy.orm import Session
 from download_scheduler.download_email import send_email
 
 # check if docker has set env variables, if not load from .env
-envs=os.environ
+envs = os.environ
 
 if not os.getenv("DB_HOST"):
-    load_dotenv(os.getcwd() + '/.env')
+    load_dotenv(os.getcwd() + "/.env")
 
-if envs['ENVIRONMENT'] == "production":
+if envs["ENVIRONMENT"] == "production":
     ignore_errors = [KeyboardInterrupt]
 
     sentry_sdk.init(
@@ -31,10 +31,8 @@ if envs['ENVIRONMENT'] == "production":
     )
 
 
-database_link = (
-    f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
-)
-print("Connecting to",database_link)
+database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
+print("Connecting to", database_link)
 engine = create_engine(database_link)
 
 create_pdf = False
@@ -45,7 +43,8 @@ output_folder = "./downloads"
 
 if "CREATE_PDF" in envs:
     create_pdf = envs["CREATE_PDF"] == "True"
-    print("Create PDFs:",create_pdf)
+    print("Create PDFs:", create_pdf)
+
 
 def get_a_download_job():
     """
@@ -73,7 +72,7 @@ def email_user(email, status, zip_filename):
     Send the user a success/failed message
     """
 
-    download_url= envs['DOWNLOAD_WAF_URL'] + zip_filename
+    download_url = envs["DOWNLOAD_WAF_URL"] + zip_filename
     messages = {
         "completed": {
             "subject": "Your CEDA data query was successful",
@@ -96,7 +95,7 @@ def email_user(email, status, zip_filename):
     send_email(email, messages[status]["body"], messages[status]["subject"])
 
 
-def run_download(row,download_size_estimated):
+def run_download(row):
     pk = row["pk"]
 
     # Update status
@@ -118,6 +117,7 @@ def run_download(row,download_size_estimated):
             output_folder=output_folder,
             create_pdf=create_pdf,
         )
+        print(downloader_output)
         # Download Completed. Update Status
         status = "completed"
 
@@ -158,7 +158,6 @@ def run_download(row,download_size_estimated):
             .replace("'", ""),
             "time_complete": "NOW()",
             "download_size": str(downloader_output.get("zip_file_size")),
-            "download_size_estimated": download_size_estimated.replace("'",""),
         }
         update_download_jobs(
             pk,

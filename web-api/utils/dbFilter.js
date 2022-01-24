@@ -1,6 +1,6 @@
 const { eovGrouping } = require("./grouping");
 // this is used by the tiler and the downloader routes
-const removeDuplicates = (arr) => [...new Set(arr)];
+const unique = (arr) => [...new Set(arr)];
 const IMPOSSIBLE_FILTER = "1=0";
 function createDBFilter({
   timeMin,
@@ -25,7 +25,7 @@ function createDBFilter({
   const filters = [];
 
   if (eovs) {
-    const eovsCommaSeparatedString = removeDuplicates(
+    const eovsCommaSeparatedString = unique(
       eovs
         .split(",")
         .map((eov) => eovGrouping[eov])
