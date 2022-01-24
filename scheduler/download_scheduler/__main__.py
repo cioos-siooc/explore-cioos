@@ -1,8 +1,9 @@
-import time
 import json
-from download_scheduler.downloader_scheduler import get_a_download_job, run_download
+import time
 import traceback
 
+from download_scheduler.downloader_scheduler import (get_a_download_job,
+                                                     run_download)
 
 if __name__ == "__main__":
     print("Waiting for jobs..")

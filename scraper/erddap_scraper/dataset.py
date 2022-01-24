@@ -3,9 +3,8 @@ from datetime import datetime
 
 import pandas as pd
 import requests
-from requests.exceptions import HTTPError
-
 from erddap_scraper.utils import eov_to_standard_names, intersection
+from requests.exceptions import HTTPError
 
 
 class Dataset(object):

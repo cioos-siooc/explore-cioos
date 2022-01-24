@@ -4,10 +4,9 @@
 
 import json
 
+import diskcache as dc
 import pandas as pd
 import requests
-import diskcache as dc
-
 
 # National CKAN has all the regions' records
 CKAN_API_URL = "https://catalogue.cioos.ca/api/3"

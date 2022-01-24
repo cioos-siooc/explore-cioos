@@ -1,6 +1,7 @@
 import argparse
-from erddap_downloader import downloader_wrapper
 import json
+
+from erddap_downloader import downloader_wrapper
 
 # This file is just used for testing. In production downloader_wrapper.run_download_query is called by the download scheduler
 

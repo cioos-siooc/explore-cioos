@@ -1,16 +1,15 @@
 # from sqlalchemy import JSON, Text
 import json
 import os
-from dotenv import load_dotenv
 import traceback
 from re import L
 
 import sentry_sdk
+from dotenv import load_dotenv
+from download_scheduler.download_email import send_email
 from erddap_downloader import downloader_wrapper
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-
-from download_scheduler.download_email import send_email
 
 # check if docker has set env variables, if not load from .env
 envs = os.environ

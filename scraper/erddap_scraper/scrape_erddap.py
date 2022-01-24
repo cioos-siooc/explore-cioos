@@ -3,11 +3,10 @@
 import traceback
 
 import pandas as pd
-from requests.exceptions import HTTPError
-
 from erddap_scraper.CEDAComplianceChecker import CEDAComplianceChecker
 from erddap_scraper.ERDDAP import ERDDAP
 from erddap_scraper.profiles import get_profiles
+from requests.exceptions import HTTPError
 
 # TIMEOUT = 30
 

@@ -8,10 +8,5 @@ setup(
     description="",
     url="",
     packages=["download_scheduler"],
-    install_requires=[
-        "sqlalchemy",
-        "psycopg2-binary",
-        "sentry-sdk",
-        "python-dotenv"
-    ],
+    install_requires=["sqlalchemy", "psycopg2-binary", "sentry-sdk", "python-dotenv"],
 )
