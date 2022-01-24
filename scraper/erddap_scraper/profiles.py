@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import pandas as pd
+import numpy as np
 
 from erddap_scraper.ERDDAP import ERDDAP
 
@@ -44,27 +45,17 @@ def get_profiles(dataset):
     llat_variables_in_dataset = [
         x for x in llat_variables if x in dataset.variables_list
     ]
-    profile_variable_list = []
 
     # Organize dataset variables by their cf_roles
     # eg profile_variable={'profile_id': 'hakai_id', 'timeseries_id': 'station'}
-    profile_variables = (
-        df_variables.set_index("cf_role", drop=False)
-        .query('cf_role != ""')[["cf_role", "name"]]["name"]
-        .to_dict()
-    )
-    # Profile Variable List - list of dataset variables that have cf_roles attached to them
-    profile_variable_list = list(profile_variables.values())
-
-    # sorting so the url is consistent every time for query caching
-    profile_variable_list.sort()
-
-    # number of profiles in this dataset (eg by counting unique profile_id)
+    profile_variables = dataset.profile_variables
 
     # profiles=pd.DataFrame(columns=profile_columns.keys())
-    profiles = dataset.get_profile_ids(",".join(profile_variable_list))
+    profiles = dataset.profile_ids
 
-    # print(profiles)
+    # Profile Variable List - list of dataset variables that have cf_roles attached to them
+    profile_variable_list = dataset.profile_variable_list
+
     if profiles.empty:
         return profiles
     logger = dataset.logger
@@ -197,15 +188,11 @@ def get_profiles(dataset):
                 "depth_max": "altitude_max",
             }
         )
-    # profiles[["a", "b"]] = df[["a", "b"]].apply(pd.to_numeric)
-    # profiles = profiles.fillna("")
 
     # if depth isnt a variable, set it to 0
     if "depth_min" not in profiles:
         profiles["depth_min"] = 0
         profiles["depth_max"] = 0
-
-    # profiles["depth_max"]=profiles["depth_max"].astype()
 
     profiles["depth_min"].fillna(0, inplace=True)
     profiles["depth_max"].fillna(0, inplace=True)
@@ -219,6 +206,12 @@ def get_profiles(dataset):
     profiles[cols_to_convert] = profiles[cols_to_convert].apply(
         pd.to_numeric, errors="coerce"
     )
+    # calculate records_per_day
+    days = (profiles["time_max"] - profiles["time_min"]).dt.days
+    # if the start and end date is same day
+    days = days.replace(0, 1)
+
+    profiles["records_per_day"] = profiles["n_records"] / (days)
 
     profiles = profiles.astype(dtypes)
     profiles = profiles.round(4)
@@ -230,5 +223,5 @@ def get_profiles(dataset):
         logger.warn("These profiles with bad lat/long values will be removed:")
         print(profiles_bad_geom.to_csv(None))
         profiles = profiles.query("not " + profiles_bad_geom_query)
-    # print(profiles.depth_min.replace('',0)]])
+
     return profiles

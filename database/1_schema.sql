@@ -28,6 +28,8 @@ CREATE TABLE cioos_api.datasets (
     eovs text[],
     ckan_id text,
     organization_pks INTEGER[],
+    n_profiles integer,
+    profile_variables text[],
     UNIQUE(dataset_id, erddap_url)
 );
 
@@ -60,6 +62,7 @@ CREATE TABLE cioos_api.profiles (
     depth_min double precision,
     depth_max double precision,
     n_records integer,
+    records_per_day float,
     n_profiles integer,
     -- hex polygon that this point is in for zoom 0 (zoomed out)
     hex_zoom_0 geometry(polygon,3857),
@@ -117,6 +120,7 @@ CREATE TABLE cioos_api.download_jobs (
 
 DROP TABLE IF EXISTS cioos_api.erddap_variables;
 CREATE TABLE cioos_api.erddap_variables (
+    dataset_pk integer REFERENCES cioos_api.datasets(pk),
     erddap_url text NOT NULL,
     dataset_id text NOT NULL,
     "name" text NOT NULL,
@@ -126,3 +130,18 @@ CREATE TABLE cioos_api.erddap_variables (
     standard_name text
 );
 
+
+DROP TABLE IF EXISTS cioos_api.eov_to_standard_name;
+CREATE TABLE cioos_api.eov_to_standard_name (
+    pk SERIAL PRIMARY KEY,
+    eov text,
+    standard_name text,
+    UNIQUE(eov,standard_name)
+);
+
+-- DROP VIEW cioos_api.dataset_to_eov;
+CREATE OR REPLACE VIEW cioos_api.dataset_to_eov AS
+ SELECT d.pk, eov,v.standard_name
+   FROM cioos_api.datasets d
+     JOIN cioos_api.erddap_variables v ON v.dataset_pk =  d.pk
+     JOIN cioos_api.eov_to_standard_name ets ON ets.standard_name = v.standard_name;

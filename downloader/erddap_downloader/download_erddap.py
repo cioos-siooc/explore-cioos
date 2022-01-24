@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from erddapy import ERDDAP
 import shapely.wkt
 from shapely.geometry import Point
-from erddap_scraper.utils import eov_to_standard_names, flatten
+from erddap_scraper.utils import eov_to_standard_names
 
 import pandas as pd
 import requests
@@ -30,6 +30,7 @@ FAILED = "FAILED"
 EMPTY = "EMPTY"
 IGNORED = "IGNORED"
 
+
 def erddap_server_to_name(server):
     """
     Read erddap server url and convert it to a readable string format to be use as part of the file name output/
@@ -51,12 +52,25 @@ def get_variable_list(df_variables, eovs: list):
     mandatory_variables = ["time", "latitude", "longitude", "depth"]
 
     eov_variables = []
+    print("eovs", eovs)
     for eov in eovs:
         if eov in eov_to_standard_names:
             eov_variables += eov_to_standard_names[eov]
-            
-    variables_to_download =  df_variables.query("name in @mandatory_variables or standard_name in @eov_variables or not cf_role.isnull()")['name'].to_list()
 
+    print("eov_to_standard_names")
+    print(eov_to_standard_names)
+
+    print("eov_variables")
+    print(eov_variables)
+
+    print("mandatory_variables")
+    print(mandatory_variables)
+
+    print(df_variables.to_csv("a.csv"))
+    variables_to_download = df_variables.query(
+        "name in @mandatory_variables or standard_name in @eov_variables or not cf_role.isnull()"
+    )["name"].to_list()
+    print("variables_to_download", variables_to_download)
     return variables_to_download
 
 
@@ -64,7 +78,7 @@ def get_erddap_download_url(
     dataset_info: dict,
     user_constraint: dict,
     variables_list: list,
-    polygon_region, 
+    polygon_region,
     response: str = "csv",
 ):
     """
@@ -228,10 +242,8 @@ def get_datasets(json_query, output_path="", create_pdf=False):
 
             scrape_erddap = erddap_scraper.ERDDAP(dataset["erddap_url"])
 
-            scraper_dataset = scrape_erddap.get_dataset(
-                dataset["dataset_id"]
-            )
-            
+            scraper_dataset = scrape_erddap.get_dataset(dataset["dataset_id"])
+
             dataset["erddap_metadata"] = scraper_dataset.df_variables
 
         # Get variable list to download

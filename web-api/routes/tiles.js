@@ -45,7 +45,7 @@ router.get("/:z/:x/:y.mvt", cache.route({ binary: true }), async (req, res) => {
 
   const SQL = `
   with relevent_points as (
-        SELECT sum(p.n_records) count, ${
+        SELECT sum(p.records_per_day) count, ${
           isHexGrid ? "" : `point_pk as pk,`
         } p.${sqlQuery.geom_column} as geom from cioos_api.profiles p
         JOIN cioos_api.datasets d ON p.dataset_pk =d.pk 

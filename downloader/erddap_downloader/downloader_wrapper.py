@@ -25,7 +25,7 @@ def run_download_query(download_query, output_folder, create_pdf=False):
     # Zip the download
     zip_filename = download_query["user_query"]["zip_filename"]
     zip_full_path = os.path.join(output_folder, zip_filename)
-    print("zip", temp_folder, zip_full_path)
+
     zip_folder(temp_folder, zip_full_path)
 
     # Delete temporary folder
@@ -33,5 +33,5 @@ def run_download_query(download_query, output_folder, create_pdf=False):
 
     # Output run report json
     query_report["zip_file_size"] = os.stat(zip_full_path).st_size
-
+    query_report["path"] = zip_full_path
     return query_report

@@ -21,9 +21,9 @@ The erddap scraper also calls the CKAN scraper
 
 ## CKAN scraper
 
-Only used for testing
+Only used for testing as it is called by the erddap scraper
 
-- `python -m ckan_scraper`
+- `python -m erddap_scraper.ckan`
 
 ## ERDDAP estimate
 

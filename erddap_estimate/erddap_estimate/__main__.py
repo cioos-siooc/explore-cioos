@@ -3,14 +3,17 @@ import warnings
 import json
 import os
 
-import erddap_downloader
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, types
+from sqlalchemy import create_engine
+from erddap_scraper.utils import eov_to_standard_names
 
-load_dotenv(os.getcwd() + "/.env")
 envs = os.environ
+
+if not os.getenv("DB_HOST"):
+    load_dotenv(os.getcwd() + "/.env")
+
 database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST_EXTERNAL']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
 
 engine = create_engine(database_link)
@@ -18,11 +21,6 @@ engine.connect()
 
 schema = "cioos_api"
 
-# Load eov to cf mapping
-with open(
-    os.path.join(erddap_downloader.__path__[0], "eovs_to_standard_name.json")
-) as f:
-    eovs_to_standard_name = json.load(f)
 
 header_size_per_var = 18
 data_type_size = {
@@ -130,8 +128,8 @@ def standard_name_from_eovs(eovs: list):
     """
     standard_names = set()
     for eov in eovs:
-        if eov in eovs_to_standard_name:
-            standard_names = standard_names.union(eovs_to_standard_name[eov])
+        if eov in eov_to_standard_names:
+            standard_names = standard_names.union(eov_to_standard_names[eov])
         else:
             warnings.warn(f"EOV {eov} is unavailable", UserWarning)
     return standard_names
@@ -146,7 +144,7 @@ def get_dataset_size(datasets, standard_name=[""]):
     WHERE  ( 
         (erddap_url,dataset_id) in {'('+str(datasets.index.values[0])+')' if len(datasets.index.values)==1 else tuple(datasets.index.values)}
         AND (
-                variable in ('time','latitude','longitude','depth') 
+                "name" in ('time','latitude','longitude','depth') 
                 OR cf_role is not NULL 
                 OR (standard_name in ('{"','".join(standard_name)}')
             )
@@ -189,7 +187,7 @@ def estimate_query_size_per_dataset(query):
     """
     General method that interact with the different components to estimate a query download size.
     """
-    print(query)
+
     # Regroup by dataset
     profiles = query_profiles(query["user_query"], query["cache_filtered"])
 

@@ -4,6 +4,7 @@ const db = require("../db");
 const { eovGrouping } = require("../utils/grouping");
 
 const createDBFilter = require("../utils/dbFilter");
+const unique = (arr) => [...new Set(arr)];
 
 // These routes are too small to have their own files
 
@@ -47,16 +48,53 @@ router.get("/pointQuery", async function (req, res, next) {
   // const { point_pk } = req.params;
   const filters = createDBFilter(req.query);
 
-  // const point_pk_split = point_pk.split(",").map((e) => Number.parseInt(e));
-  const sql = `SELECT 
+  let eovsQuery = "";
+  let eovsCommaSeparatedString = "";
+  const { timeMax, timeMin, eovs } = req.query;
+  if (eovs) {
+    eovsCommaSeparatedString = unique(
+      eovs
+        .split(",")
+        .map((eov) => eovGrouping[eov])
+        .flat()
+        .map((eov) => `'${eov}'`)
+    ).join();
+
+    eovsQuery = `where eov = any(array[${eovsCommaSeparatedString}])`;
+  }
+
+  const adder = 0;
+  const multiplier = 1000;
+
+  const sql = `WITH sub as (
+  SELECT 
         d.pk,
         d.dataset_id,
         d.title title,
         eovs,
         organizations,
         d.erddap_url,
+        sum(coalesce(nullif(date_part('days',least(${
+          timeMax ? "'timeMax'," : ""
+        }p.time_max)-greatest(${
+    timeMin ? "'timeMin'," : ""
+  }p.time_min)),0),1)) as record_count,
+        
+  
+     (select count(*) from cioos_api.erddap_variables 
+        where 
+		standard_name = any((select standard_name from cioos_api.eov_to_standard_name
+        ${eovsQuery} )) 
+       or
+		cf_role is not null or
+	 	name = any(array['time', 'latitude', 'longitude', 'depth']) )
+     
+     eov_cols,
+
+
+
         json_agg(json_build_object(
-                'profile_id',p.profile_id,
+                'profile_id',coalesce(p.profile_id, p.timeseries_id),
                 'time_min',p.time_min,
                 'time_max',p.time_max,
                 'depth_min',p.depth_min,
@@ -74,7 +112,8 @@ router.get("/pointQuery", async function (req, res, next) {
         -- ckan_record,
         eovs,
         organizations,
-        d.erddap_url`;
+        d.erddap_url)
+        select *,${adder} + record_count * eov_cols * ${multiplier} as size from sub`;
 
   console.log(sql);
 

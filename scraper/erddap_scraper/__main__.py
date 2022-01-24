@@ -4,14 +4,16 @@ import os
 import sys
 import threading
 import uuid
+import numpy as np
 
 import pandas as pd
-from ckan_scraper.create_ckan_erddap_link import get_ckan_records
+from erddap_scraper.ckan.create_ckan_erddap_link import get_ckan_records
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 
 from erddap_scraper.scrape_erddap import scrape_erddap
 from erddap_scraper.utils import outersection, supported_standard_names
+from erddap_scraper.utils import get_df_eov_to_standard_names
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -129,6 +131,9 @@ def main(erddap_urls, csv_only, cache_requests):
             print("Writing to DB:")
             print("Clearing tables")
             transaction.execute("SELECT remove_all_data();")
+
+            print("Writing datasets")
+
             datasets.to_sql(
                 "datasets",
                 con=transaction,
@@ -137,6 +142,10 @@ def main(erddap_urls, csv_only, cache_requests):
                 index=False,
             )
 
+            profiles["profile_id"] = profiles["profile_id"].replace("", np.NaN)
+
+            print("Writing profiles")
+
             profiles.to_sql(
                 "profiles",
                 con=transaction,
@@ -144,7 +153,9 @@ def main(erddap_urls, csv_only, cache_requests):
                 schema=schema,
                 index=False,
             )
+            variables = variables.replace("", np.NaN)
 
+            print("Writing erddap_variables")
             variables.to_sql(
                 "erddap_variables",
                 con=transaction,
@@ -152,9 +163,21 @@ def main(erddap_urls, csv_only, cache_requests):
                 schema=schema,
                 index=False,
             )
+
+            print("Writing eov_to_standard_name")
+            get_df_eov_to_standard_names().to_sql(
+                "eov_to_standard_name",
+                con=transaction,
+                if_exists="append",
+                schema=schema,
+                index=False,
+            )
+
             print("Processing new records")
             transaction.execute("SELECT profile_process();")
             transaction.execute("SELECT ckan_process();")
+
+            print("Creating hexes")
             transaction.execute("SELECT create_hexes();")
 
         print("Wrote to db:", f"{schema}.datasets")

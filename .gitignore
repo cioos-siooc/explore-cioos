@@ -24,3 +24,4 @@ venv
 *.csv
 *.ipynb
 erddap_scraper_dc
+venv
