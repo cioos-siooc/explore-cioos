@@ -11,22 +11,30 @@ function createDBFilter({
   latMax,
   lonMin,
   lonMax,
+  polygon,
+
   // These are comma separated lists
   eovs,
   organizations,
   dataType,
+  datasetPKs,
+  pointPKs,
 }) {
-  if (!dataType || !eovs) return IMPOSSIBLE_FILTER;
-
-  const eovsCommaSeparatedString = removeDuplicates(
-    eovs
-      .split(",")
-      .map((eov) => eovGrouping[eov])
-      .flat()
-      .map((eov) => `'${eov}'`)
-  ).join();
+  if ((!dataType || !eovs) && !pointPKs && !polygon) return IMPOSSIBLE_FILTER;
 
   const filters = [];
+
+  if (eovs) {
+    const eovsCommaSeparatedString = removeDuplicates(
+      eovs
+        .split(",")
+        .map((eov) => eovGrouping[eov])
+        .flat()
+        .map((eov) => `'${eov}'`)
+    ).join();
+
+    filters.push(`eovs && array[${eovsCommaSeparatedString}]`);
+  }
 
   if (timeMin) filters.push(`p.time_max >= '${timeMin}'::timestamp`);
   if (timeMax) filters.push(`p.time_min <= '${timeMax}'::timestamp`);
@@ -42,11 +50,31 @@ function createDBFilter({
   if (depthMin) filters.push(`p.depth_max >= ${depthMin}`);
   if (depthMax) filters.push(`p.depth_min <= ${depthMax}`);
 
+  if (datasetPKs) {
+    filters.push(`d.pk = ANY ('{${datasetPKs}}')`);
+  }
+
+  if (pointPKs) {
+    filters.push(`point_pk = ANY ('{${pointPKs}}')`);
+  }
+
   if (organizations) {
     const organizationsString = organizations.split(",").map((e) => `${e}`);
     filters.push(`organization_pks && array[${organizationsString}]`);
   }
-  filters.push(`eovs && array[${eovsCommaSeparatedString}]`);
+
+  if (polygon) {
+    const wktPolygon =
+      "POLYGON((" +
+      JSON.parse(polygon)
+        .map(([lat, lon]) => `${lat} ${lon}`)
+        .join() +
+      "))";
+
+    filters.push(
+      `ST_Contains(ST_GeomFromText('${wktPolygon}',4326),ST_Transform(geom,4326)) is true`
+    );
+  }
 
   return filters.join(" AND \n");
 }
