@@ -1,23 +1,19 @@
 """
 download_erddap regroup a set of tool used by CEDA to download ERDDAP datasets.
 """
+import io
+import os
+import sys
 from urllib.parse import urlparse
 
-from erddapy import ERDDAP
-import shapely.wkt
-from shapely.geometry import Point
-from erddap_scraper.utils import eov_to_standard_names
-
+import erddap_scraper.ERDDAP as erddap_scraper
 import pandas as pd
 import requests
-
-
-import os
-import io
-import sys
-
-import erddap_scraper.ERDDAP as erddap_scraper
+import shapely.wkt
 from erddap_downloader.download_pdf import download_pdf
+from erddap_scraper.utils import eov_to_standard_names
+from erddapy import ERDDAP
+from shapely.geometry import Point
 
 ONE_MB = 10 ** 6
 DATASET_SIZE_LIMIT = 10 * ONE_MB

@@ -4,16 +4,15 @@ import os
 import sys
 import threading
 import uuid
+
 import numpy as np
-
 import pandas as pd
-from erddap_scraper.ckan.create_ckan_erddap_link import get_ckan_records
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
-
+from erddap_scraper.ckan.create_ckan_erddap_link import get_ckan_records
 from erddap_scraper.scrape_erddap import scrape_erddap
-from erddap_scraper.utils import outersection, supported_standard_names
-from erddap_scraper.utils import get_df_eov_to_standard_names
+from erddap_scraper.utils import (get_df_eov_to_standard_names, outersection,
+                                  supported_standard_names)
+from sqlalchemy import create_engine
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
