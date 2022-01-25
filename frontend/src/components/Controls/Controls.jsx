@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import { Container, Row, Col } from 'react-bootstrap'
 import _ from 'lodash'
 
-import SelectionPanel from './SelectionPanel/SelectionPanel.jsx'
 import Filter from './Filter/Filter.jsx'
 import MultiCheckboxFilter from './Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx'
 import TimeSelector from './Filter/TimeSelector/TimeSelector.jsx'
@@ -16,7 +15,7 @@ import { ArrowsExpand, Building, CalendarWeek, Water } from 'react-bootstrap-ico
 import './styles.css'
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from '../config.js'
 
-export default function Controls({ setQuery, downloadButton, children }) {
+export default function Controls({ setQuery, children }) {
 
   // Making changes to context within context consumers (ie. passing mutable state down to children to manipulate)
   //https://stackoverflow.com/questions/41030361/how-to-update-react-context-from-inside-a-child-component
@@ -67,12 +66,14 @@ export default function Controls({ setQuery, downloadButton, children }) {
     })
   }, [startDate, endDate, startDepth, endDepth, eovsSelected, orgsSelected])
 
+  const childrenArray = React.Children.toArray(children)
+
   return (
     <div>
       <div className='controls'>
         <Container fluid>
           <Row>
-            {children}
+            {childrenArray.length === 2 && childrenArray[0]}
             <Col className='controlColumn' >
               <Filter
                 badgeTitle={eovsBadgeTitle}
@@ -136,7 +137,7 @@ export default function Controls({ setQuery, downloadButton, children }) {
                   setEndDepth={setEndDepth}
                 />
               </Filter>
-              {downloadButton}
+              {childrenArray.length === 2 ? childrenArray[1] : childrenArray[0]}
             </Col>
           </Row>
         </Container>

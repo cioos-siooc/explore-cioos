@@ -48,18 +48,15 @@ export default function App() {
       <DataDownloadModal
         disabled={_.isEmpty(selectedPointPKs)}
       >
-        {/* <SelectionPanel> */}
         <SelectionDetails
           pointPKs={pointsToDownload}
           setPointsToDownload={setPointsToDownload}
-          downloadButton={<button onClick={() => console.log('download')}>Submit Request</button>}
-        />
-        {/* </SelectionPanel> */}
-      </DataDownloadModal>
+        >
+          <button className='submitRequestButton' onClick={() => console.log('download')}>Submit Request</button>
+        </SelectionDetails>
+      </DataDownloadModal >
     )
   }
-
-  // console.log('polygon', polygon)
 
   return (
     <div>
@@ -70,20 +67,20 @@ export default function App() {
       />
       <Controls
         setQuery={setQuery}
-        downloadButton={DownloadButton()}
       >
-        {console.log('selectedPointPKs', selectedPointPKs)}
         {selectedPointPKs && (
           <Col xs='auto' className='selectionPanelColumn'>
             <SelectionPanel>
               <SelectionDetails
                 pointPKs={selectedPointPKs}
                 setPointsToDownload={setPointsToDownload}
-                downloadButton={DownloadButton()}
-              />
+              >
+                {DownloadButton()}
+              </SelectionDetails>
             </SelectionPanel>
           </Col>
         )}
+        {DownloadButton()}
       </Controls>
       <a title='Return to CIOOS pacific homepage' className='logo' href='https://cioospacific.ca/' />
     </div>

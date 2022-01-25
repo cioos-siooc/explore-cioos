@@ -10,7 +10,7 @@ import { server } from '../../../config'
 import './styles.css'
 
 // Note: datasets and points are exchangable terminology
-export default function SelectionDetails({ pointPKs, setPointsToDownload, downloadButton }) {
+export default function SelectionDetails({ pointPKs, setPointsToDownload, downloadButton, children }) {
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState([])
   const [inspectDataset, setInspectDataset] = useState()
@@ -125,7 +125,8 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, downlo
               />
             </div>
           </div>
-          {downloadButton}
+          {children}
+          {/* {downloadButton} */}
           {/* <button className='downloadButton'>Download</button> */}
         </div>
       </div>
