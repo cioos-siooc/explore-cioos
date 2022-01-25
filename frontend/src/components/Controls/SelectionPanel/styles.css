@@ -1,7 +1,14 @@
 .selectionPanel {
   pointer-events: all;
-  /* position: absolute; */
   display: flex;
+  height: 98vh;
+}
+
+@media all and (max-height: 400px) {
+  .panelContents {
+    height: 400px;
+    position: absolute;
+  }
 }
 
 /* .sidePanelOpen {
