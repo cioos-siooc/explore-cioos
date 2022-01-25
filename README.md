@@ -101,7 +101,7 @@ From the production server,
 - Scrape data:
 
   ```sh
-  source virtualenv/bin/activate
+  source venv/bin/activate
   pip install -e ./scraper
   sh data_loader.sh
   ```
