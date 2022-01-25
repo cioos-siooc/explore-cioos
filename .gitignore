@@ -25,3 +25,4 @@ venv
 *.ipynb
 erddap_scraper_dc
 venv
+build
