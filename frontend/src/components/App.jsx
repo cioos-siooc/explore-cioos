@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import * as Sentry from "@sentry/react";
 import { Integrations } from "@sentry/tracing";
-import { Col } from 'react-bootstrap'
+import { Col, Spinner } from 'react-bootstrap'
+import { CheckCircle, XCircle } from 'react-bootstrap-icons';
 
 import Controls from "./Controls/Controls.jsx";
 import Map from "./Map/Map.js";
@@ -15,6 +16,8 @@ import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndD
 import "bootstrap/dist/css/bootstrap.min.css";
 
 import "./styles.css";
+import { createDataFilterQueryString, validateEmail } from '../utilities.js';
+import { server } from '../config.js';
 
 if (process.env.NODE_ENV === "production") {
   Sentry.init({
@@ -33,6 +36,10 @@ export default function App() {
   const [pointsToDownload, setPointsToDownload] = useState()
   const [selectedPointPKs, setSelectedPointPKs] = useState()
   const [polygon, setPolygon] = useState()
+  const [email, setEmail] = useState()
+  const [emailValid, setEmailValid] = useState()
+  const [submissionState, setSubmissionState] = useState()
+  const [submissionIcon, setSubmissionIcon] = useState()
 
   const [query, setQuery] = useState({
     startDate: defaultStartDate,
@@ -43,16 +50,79 @@ export default function App() {
     orgsSelected: defaultOrgsSelected
   })
 
+  function handleEmailChange(value) {
+    setEmailValid(validateEmail(value))
+    setEmail(value)
+    setSubmissionState()
+  }
+
+  function handleSubmission() {
+    setSubmissionState('submitted')
+  }
+
+  useEffect(() => {
+    switch (submissionState) {
+      case 'submitted':
+        submitRequest()
+        setSubmissionIcon(
+          <Spinner
+            className='text-warning'
+            as="span"
+            animation="border"
+            size={30}
+            role="status"
+            aria-hidden="true"
+          />
+        )
+        break;
+
+      case 'successful':
+        setSubmissionIcon(
+          <CheckCircle
+            className='text-success'
+            size={30}
+          />
+        )
+        break;
+
+      case 'failed':
+        setSubmissionIcon(
+          <XCircle
+            className='text-danger'
+            size={30}
+          />
+        )
+        break;
+
+      default:
+        setSubmissionIcon()
+        break;
+    }
+  }, [submissionState])
+
+  function submitRequest() {
+    // console.log(JSON.stringify(polygon)) //&polygon=${JSON.stringify(polygon)}
+    fetch(`${server}/download?${createDataFilterQueryString(query)}&polygon=${JSON.stringify(polygon)}&email=${email}`).then((response) => {
+      if (response.ok) {
+        setSubmissionState('success')
+      } else {
+        setSubmissionState('failed')
+      }
+    })
+  }
+
   function DownloadButton() {
     return (
       <DataDownloadModal
         disabled={_.isEmpty(selectedPointPKs)}
       >
         <SelectionDetails
-          pointPKs={pointsToDownload}
+          pointPKs={selectedPointPKs}
           setPointsToDownload={setPointsToDownload}
         >
-          <button className='submitRequestButton' onClick={() => console.log('download')}>Submit Request</button>
+          <input className='emailAddress' type='email' placeholder='email@email.com' onChange={e => handleEmailChange(e.target.value)} />
+          <button className='submitRequestButton' disabled={!emailValid} onClick={() => handleSubmission()}>Submit Request</button>
+          {submissionIcon}
         </SelectionDetails>
       </DataDownloadModal >
     )

@@ -10,7 +10,7 @@ import { server } from '../../../config'
 import './styles.css'
 
 // Note: datasets and points are exchangable terminology
-export default function SelectionDetails({ pointPKs, setPointsToDownload, downloadButton, children }) {
+export default function SelectionDetails({ pointPKs, setPointsToDownload, children }) {
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState([])
   const [inspectDataset, setInspectDataset] = useState()
@@ -32,6 +32,7 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, downlo
 
   useEffect(() => {
     if (pointPKs && pointPKs.length !== 0) {
+      console.log(pointPKs)
       fetch(`${server}/pointQuery?pointPKs=${pointPKs.join(',')}`).then(response => {
         if (response.ok) {
           response.json().then(data => {
@@ -71,7 +72,8 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, downlo
     setSelectAll(!selectAll)
   }
 
-  // console.log(pointsData)
+  const childrenArray = React.Children.toArray(children)
+
   return (
     <div className='pointDetails'>
       <div className='pointDetailsInfoRow'>
@@ -126,8 +128,6 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, downlo
             </div>
           </div>
           {children}
-          {/* {downloadButton} */}
-          {/* <button className='downloadButton'>Download</button> */}
         </div>
       </div>
     </div >
