@@ -78,9 +78,11 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
                 else:
 
                     # only write dataset/metadata/profile if there are some profiles
-                    df_profiles_all = df_profiles_all.append(df_profiles)
-                    df_datasets_all = df_datasets_all.append(dataset.df)
-                    df_variables_all = df_variables_all.append(dataset.df_variables)
+                    df_profiles_all = pd.concat([df_profiles_all, df_profiles])
+                    df_datasets_all = pd.concat([df_datasets_all, dataset.df])
+                    df_variables_all = pd.concat(
+                        [df_variables_all, dataset.df_variables]
+                    )
                     dataset_was_added = True
                     dataset_logger.info("complete")
 

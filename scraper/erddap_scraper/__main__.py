@@ -10,8 +10,11 @@ import pandas as pd
 from dotenv import load_dotenv
 from erddap_scraper.ckan.create_ckan_erddap_link import get_ckan_records
 from erddap_scraper.scrape_erddap import scrape_erddap
-from erddap_scraper.utils import (get_df_eov_to_standard_names, outersection,
-                                  supported_standard_names)
+from erddap_scraper.utils import (
+    get_df_eov_to_standard_names,
+    outersection,
+    supported_standard_names,
+)
 from sqlalchemy import create_engine
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -75,15 +78,16 @@ def main(erddap_urls, csv_only, cache_requests):
     datasets_not_added_total = []
 
     for [profile, dataset, datasets_not_added, variable] in result:
-        profiles = pd.concat([profiles,profile])
-        datasets = pd.concat([datasets,dataset])
+        profiles = pd.concat([profiles, profile])
+        datasets = pd.concat([datasets, dataset])
         datasets_not_added_total = datasets_not_added_total + datasets_not_added
-        variables = pd.concat([variables,variable])
+        variables = pd.concat([variables, variable])
 
     uuid_suffix = str(uuid.uuid4())[0:6]
     datasets_file = f"datasets_{uuid_suffix}.csv"
     profiles_file = f"profiles_{uuid_suffix}.csv"
     variables_file = f"variables_{uuid_suffix}.csv"
+    ckan_file = f"ckan_{uuid_suffix}.csv"
 
     if datasets.empty:
         print("No datasets scraped")
@@ -103,7 +107,7 @@ def main(erddap_urls, csv_only, cache_requests):
     df_ckan = get_ckan_records(datasets["dataset_id"].to_list(), cache=cache_requests)
     datasets = (
         datasets.set_index(["erddap_url", "dataset_id"])
-        .join(df_ckan.set_index(["erddap_url", "dataset_id"]))
+        .join(df_ckan.set_index(["erddap_url", "dataset_id"]), how="left")
         .reset_index()
     )
 
@@ -123,7 +127,8 @@ def main(erddap_urls, csv_only, cache_requests):
         datasets.to_csv(datasets_file, index=False)
         profiles.to_csv(profiles_file, index=False)
         variables.to_csv(variables_file, index=False)
-        print("Wrote", datasets_file, profiles_file, variables_file)
+        df_ckan.to_csv(ckan_file, index=False)
+        print("Wrote", datasets_file, profiles_file, variables_file, ckan_file)
     else:
         schema = "cioos_api"
         with engine.begin() as transaction:

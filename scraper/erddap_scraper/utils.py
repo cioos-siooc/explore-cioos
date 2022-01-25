@@ -16,7 +16,10 @@ def get_df_eov_to_standard_names():
     df = pd.DataFrame()
     for eov, names in eov_to_standard_names.items():
         for name in names:
-            df = df.append({"eov": eov, "standard_name": name}, ignore_index=True)
+            df = pd.concat(
+                [df, pd.DataFrame({"eov": eov, "standard_name": name})],
+                ignore_index=True,
+            )
     return df
 
 

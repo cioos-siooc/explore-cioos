@@ -102,6 +102,9 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
 
     df = pd.DataFrame(line)
 
+    if not df.empty:
+        df = df.drop_duplicates(subset="dataset_id")
+
     return df
 
 
@@ -144,4 +147,5 @@ def list_ckan_records_with_erddap_urls(cache_requests):
         row_start += row_page_limit
 
     print("Found", len(records_total), " CKAN records")
+
     return records_total
