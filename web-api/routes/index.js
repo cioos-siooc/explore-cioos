@@ -70,6 +70,7 @@ router.get("/pointQuery", async function (req, res, next) {
   SELECT 
         d.pk,
         d.dataset_id,
+        d.cdm_data_type,
         d.title title,
         eovs,
         organizations,
