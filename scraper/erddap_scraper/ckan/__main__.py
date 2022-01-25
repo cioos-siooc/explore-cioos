@@ -1,7 +1,6 @@
 import argparse
 
-from erddap_scraper.ckan_scraper.create_ckan_erddap_link import \
-    get_ckan_records
+from erddap_scraper.ckan.create_ckan_erddap_link import get_ckan_records
 
 output_file = "erddap_ckan_mapping.csv"
 
