@@ -14,6 +14,7 @@ import requests
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 from erddap_scraper.dataset import Dataset
 
+
 class ERDDAP(object):
     "Stores the ERDDAP server URL and functions related to querying it"
 
@@ -30,10 +31,10 @@ class ERDDAP(object):
                 cull_limit=0,
             )
             print("Cache stats:")
-            print("eviction_policy",self.cache.eviction_policy)
-            print("count",self.cache.count)
-            print("volume()",self.cache.volume())
-            print("size_limit",self.cache.size_limit)
+            print("eviction_policy", self.cache.eviction_policy)
+            print("count", self.cache.count)
+            print("volume()", self.cache.volume())
+            print("size_limit", self.cache.size_limit)
 
         self.url = erddap_url
         self.domain = urlparse(erddap_url).netloc
