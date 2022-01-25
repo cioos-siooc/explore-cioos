@@ -75,10 +75,10 @@ def main(erddap_urls, csv_only, cache_requests):
     datasets_not_added_total = []
 
     for [profile, dataset, datasets_not_added, variable] in result:
-        profiles = profiles.append(profile)
-        datasets = datasets.append(dataset)
+        profiles = pd.concat([profiles,profile])
+        datasets = pd.concat([datasets,dataset])
         datasets_not_added_total = datasets_not_added_total + datasets_not_added
-        variables = variables.append(variable)
+        variables = pd.concat([variables,variable])
 
     uuid_suffix = str(uuid.uuid4())[0:6]
     datasets_file = f"datasets_{uuid_suffix}.csv"
