@@ -49,7 +49,7 @@ export function validateEmail(email) {
   return re.test(String(email).toLowerCase());
 }
 
-export function createDataFilterQueryString(query) {
+export function createDataFilterQueryString(query, organizations) {
   let eovsArray = [], orgsArray = []
   Object.keys(query.eovsSelected).forEach((eov) => {
     if(query.eovsSelected[eov]) {
@@ -77,4 +77,19 @@ export function createDataFilterQueryString(query) {
   }
   apiMappedQuery.dataType = 'casts,fixedStations'
   return Object.entries(apiMappedQuery).map(([k, v]) => `${k}=${v}`).join("&")
+}
+
+export function bytesToMemorySizeString(bytes) {
+  let num = parseFloat(bytes)
+  if(num < 1000000) {
+    return `${(num/1000).toFixed(2)}kb`
+  } else if(num < 1000000000) {
+    return `${(num/1000000).toFixed(2)}MB`
+  } else if(num < 1000000000000) {
+    return `${(num/1000000000).toFixed(2)}GB`
+  } else if(num < 1000000000000000) {
+    return `${(num/1000000000000).toFixed(2)}TB`
+  } else {
+    return '>1TB'
+  }
 }

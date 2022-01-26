@@ -1,12 +1,13 @@
 import classNames from 'classnames'
 import * as React from 'react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronCompactLeft, ChevronCompactRight } from 'react-bootstrap-icons'
 
 import './styles.css'
 
 export default function SelectionPanel({ children }) {
   const [open, setOpen] = useState(true)
+
   let selectionPanelClassName = classNames('selectionPanel', { open: open })
   return (
     <div className={selectionPanelClassName}>

@@ -33,7 +33,17 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
     }
   }
   const drawPolygon = new MapboxDraw(drawControlOptions)
-  const [mapSetupComplete, setMapSetupComplete] = useState(false)
+  const [organizations, setOrganizations] = useState()
+
+  useEffect(() => {
+    fetch(`${server}/organizations`).then(response => response.json()).then(data => {
+      let orgsReturned = {}
+      data.forEach(elem => {
+        orgsReturned[elem.name] = elem.pk
+      })
+      setOrganizations(orgsReturned)
+    }).catch(error => { throw error })
+  }, [])
 
   function polygonSelection() {
     // Ensure there are only one polygons on the map at a time
@@ -88,7 +98,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
   useEffect(() => {
     if(map && map.current && map.current.loaded()){
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${createDataFilterQueryString(query)}`
+      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${createDataFilterQueryString(query, organizations)}`
   
       map.current.getSource("points").tiles = [tileQuery]
       map.current.getSource("hexes").tiles = [tileQuery]
@@ -306,12 +316,10 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
     })
 
     map.current.on('draw.create', e => {
-      console.log('draw.create', e) 
       polygonSelection()
     })
 
     map.current.on('draw.update', e => {
-      console.log('draw.update', e)
       polygonSelection()
     })
 
@@ -320,8 +328,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
       setSelectedPointPKs()
       setPolygon()
     })
-
-    // setMapSetupComplete(true)
   })
 
   return (

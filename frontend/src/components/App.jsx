@@ -101,7 +101,6 @@ export default function App() {
   }, [submissionState])
 
   function submitRequest() {
-    // console.log(JSON.stringify(polygon)) //&polygon=${JSON.stringify(polygon)}
     fetch(`${server}/download?${createDataFilterQueryString(query)}&polygon=${JSON.stringify(polygon)}&email=${email}`).then((response) => {
       if (response.ok) {
         setSubmissionState('success')
@@ -141,12 +140,14 @@ export default function App() {
         {selectedPointPKs && (
           <Col xs='auto' className='selectionPanelColumn'>
             <SelectionPanel>
+              {/* {selectedPointPKs && */}
               <SelectionDetails
                 pointPKs={selectedPointPKs}
                 setPointsToDownload={setPointsToDownload}
               >
                 {DownloadButton()}
               </SelectionDetails>
+              {/* } */}
             </SelectionPanel>
           </Col>
         )}

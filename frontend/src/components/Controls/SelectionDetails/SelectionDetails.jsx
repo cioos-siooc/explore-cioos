@@ -16,18 +16,15 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, childr
   const [inspectDataset, setInspectDataset] = useState()
   const [dataTotal, setDataTotal] = useState(0)
 
-  console.log('pointPKs', pointPKs)
-  console.log('children', children)
-
   useEffect(() => {
     if (pointsData) {
       let total = 0
       pointsData.forEach((point) => {
         if (point.selected) {
-          total += Math.floor(point.profiles.length)
+          total += point.size
         }
       })
-      setDataTotal(total)
+      setDataTotal((total / 1000000).toFixed(2))
       setPointsToDownload(pointsData.filter(point => point.selected))//.map(point => point.pk))
     }
   }, [pointsData])
@@ -110,8 +107,8 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, childr
                   striped
                   className='past100'
                   variant='warning'
-                  now={dataTotal > 100 ? dataTotal - 100 : 0}
-                  label={dataTotal > 100 ? dataTotal - 100 : 0}
+                  now={dataTotal > 100 ? (dataTotal - 100).toFixed(2) : 0}
+                  label={dataTotal > 100 ? (dataTotal - 100).toFixed(2) : 0}
                   key={2}
                 />
               }
