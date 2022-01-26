@@ -343,7 +343,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
         # Generate report for each download
         # Return download report
         if download_status in [COMPLETED, PARTIAL]:
-            if create_pdf:
+            if create_pdf and dataset["ckan_url"]:
                 ckan_url = dataset["ckan_url"] + dataset["ckan_id"]
                 pdf_filename = get_file_name_output(dataset, output_path, "pdf")
                 download_pdf(ckan_url, pdf_filename)
