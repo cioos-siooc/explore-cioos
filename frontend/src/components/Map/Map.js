@@ -7,6 +7,7 @@ import * as turf from '@turf/turf'
 import './styles.css'
 
 import {server} from '../../config'
+import { createDataFilterQueryString } from "../../utilities"
 
 const config = {
   fillOpacity: 0.8,
@@ -20,66 +21,69 @@ const config = {
 export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
   const mapContainer = useRef(null)
   const map = useRef(null)
+  const drawControlOptions = {
+    displayControlsDefault: false,
+    controls: {
+      point: false, 
+      line_string: false,
+      polygon: true, 
+      trash: true,
+      combine_features: false,
+      uncombine_features: false
+    }
+  }
+  const drawPolygon = new MapboxDraw(drawControlOptions)
   const [mapSetupComplete, setMapSetupComplete] = useState(false)
-  const [organizations, setOrganizations] = useState()
-  const [zoom, setZoom] = useState(2)
-  const [pointFilter, setPointFilter] = useState()
 
-  const popup= new Popup({
+  function polygonSelection() {
+    // Ensure there are only one polygons on the map at a time
+    if(drawPolygon.getAll().features.length > 1) {
+      drawPolygon.delete(drawPolygon.getAll().features[0].id)
+    }
+    
+    const newPolygon = drawPolygon.getAll().features[0].geometry.coordinates[0]
+    
+    var features = map.current.queryRenderedFeatures({layers: ['points']}).map(point => {
+      return {
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          // Note order: longitude, latitude.
+          coordinates: point.geometry.coordinates
+        },
+        properties: {...point.properties}
+      }
+    })
+
+    const featureCollection = {type: 'FeatureCollection', features: features}
+    var searchWithin = turf.polygon([newPolygon]);
+    var pointsWithinPolygon = turf.pointsWithinPolygon(featureCollection, searchWithin);
+    
+    // Filter points layer to show the points that have been selected
+    var filter = pointsWithinPolygon.features.reduce(
+      function (memo, feature) {
+        memo.push(feature.properties.pk)
+        return memo
+      },
+      ['in', 'pk']
+    )
+
+    setSelectedPointPKs(pointsWithinPolygon.features.map(point => point.properties.pk))
+    map.current.setFilter('points-highlighted', filter)
+    
+    //set selected PKs and polygon
+    setPolygon(newPolygon)
+  }
+
+  const popup = new Popup({
     closeButton: false,
     closeOnClick: true,
     maxWidth: '400px'
   })
 
   useEffect(() => {
-    if(mapSetupComplete){
-      map.current.setFilter('points-highlighted', pointFilter)
-    }
-  }, [pointFilter])
-
-  useEffect(() => {
     setSelectedPointPKs()
   }, [query])
-
-  useEffect(() => {
-    fetch(`${server}/organizations`).then(response => response.json()).then(data => {
-      let orgsReturned = {}
-      data.forEach(elem => {
-        orgsReturned[elem.name] = elem.pk
-      })
-      setOrganizations(orgsReturned)
-    }).catch(error => { throw error })
-  }, [])
-
-  function createDataFilterQueryString(query) {
-    let eovsArray = [], orgsArray = []
-    Object.keys(query.eovsSelected).forEach((eov) => {
-      if(query.eovsSelected[eov]) {
-        eovsArray.push(eov)
-      }
-    })
-    Object.keys(query.orgsSelected).forEach((org) => {
-      if(query.orgsSelected[org]) {
-        orgsArray.push(organizations[org])
-      }
-    })
-    let apiMappedQuery = {
-      timeMin: query.startDate,
-      timeMax: query.endDate,
-      depthMin: query.startDepth,
-      depthMax: query.endDepth,
-    }
-    if(eovsArray.length === 0) {
-      apiMappedQuery.eovs = "carbon,currents,nutrients,salinity,temperature"
-    } else {
-      apiMappedQuery.eovs = eovsArray
-    }
-    if(orgsArray.length !== 0) {
-      apiMappedQuery.organizations = orgsArray
-    }
-    apiMappedQuery.dataType = 'casts,fixedStations'
-    return Object.entries(apiMappedQuery).map(([k, v]) => `${k}=${v}`).join("&")
-  }
 
   useEffect(() => {
     if(map && map.current && map.current.loaded()){
@@ -128,22 +132,8 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
         ],
       },
       center: [-125, 49], // starting position
-      zoom: zoom, // starting zoom
+      zoom: 2, // starting zoom
     })
-
-    // Add controls
-    const drawControlOptions = {
-      displayControlsDefault: false,
-      controls: {
-        point: false, 
-        line_string: false,
-        polygon: true, 
-        trash: true,
-        combine_features: false,
-        uncombine_features: false
-      }
-    }
-    const drawPolygon = new MapboxDraw(drawControlOptions)
 
     // Called order determines stacking order
     map.current.addControl(new NavigationControl(), "bottom-right")
@@ -244,10 +234,10 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
     })
 
     map.current.on('click', e => {
-      map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-      console.log('click', e)
-      // setSelectedPointPKs()
-      setPolygon()
+      if(drawPolygon.getAll().features.length === 0) {
+        map.current.setFilter('points-highlighted', ['in', 'pk', ''])
+        setSelectedPointPKs()
+      }
     })
 
     map.current.on('click', 'points', e => {
@@ -272,13 +262,12 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
         ['in', 'pk']
         )
 
-      console.log('click filter', filter)
-      setPointFilter(filter)
-      // map.current.setFilter('points-highlighted', filter)
+      map.current.setFilter('points-highlighted', filter)
+
       if(drawPolygon.getAll().features.length !== 0) {
         drawPolygon.delete(drawPolygon.getAll().features[0].id)
       }
-      setPolygon(bbox)
+      // setPolygon(bbox)
     })
 
     map.current.on('click', 'hexes', e => {
@@ -316,60 +305,23 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
         popup.remove()
     })
 
-    map.current.on('draw.create', e => { 
-      // Ensure there are only one polygons on the map at a time
-      if(drawPolygon.getAll().features.length > 1) {
-        drawPolygon.delete(drawPolygon.getAll().features[0].id)
-      }
-      
-      const newPolygon = drawPolygon.getAll().features[0].geometry.coordinates[0]
-      
-      var features = map.current.queryRenderedFeatures({layers: ['points']}).map(point => {
-        return {
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            // Note order: longitude, latitude.
-            coordinates: point.geometry.coordinates
-          },
-          properties: {...point.properties}
-        }
-      })
-
-      const featureCollection = {type: 'FeatureCollection', features: features}
-      var searchWithin = turf.polygon([newPolygon]);
-      var pointsWithinPolygon = turf.pointsWithinPolygon(featureCollection, searchWithin);
-      console.log('points that are within the polygon', pointsWithinPolygon)
-      
-      // Filter points layer to show the points that have been selected
-      var filter = pointsWithinPolygon.features.reduce(
-        function (memo, feature) {
-          memo.push(feature.properties.pk)
-          return memo
-        },
-        ['in', 'pk']
-      )
-
-      setPointFilter(filter)
-      // map.current.setFilter('points-highlighted', filter)
-      
-      //set selected PKs and polygon
-      console.log('pointsWithinPolygon point pks', pointsWithinPolygon.features.map(point => point.properties.pk))
-      setSelectedPointPKs(pointsWithinPolygon.features.map(point => point.properties.pk))
-      console.log('polygon', newPolygon)
-      setPolygon(newPolygon)
+    map.current.on('draw.create', e => {
+      console.log('draw.create', e) 
+      polygonSelection()
     })
 
     map.current.on('draw.update', e => {
-      console.log('update polygon', e.features[0].geometry.coordinates[0])
-      setPolygon(e.features[0].geometry.coordinates[0])
+      console.log('draw.update', e)
+      polygonSelection()
     })
 
     map.current.on('draw.delete', e => {
+      map.current.setFilter('points-highlighted', ['in', 'pk', ''])
+      setSelectedPointPKs()
       setPolygon()
     })
 
-    setMapSetupComplete(true)
+    // setMapSetupComplete(true)
   })
 
   return (

@@ -75,6 +75,6 @@ export function createDataFilterQueryString(query) {
   if(orgsArray.length !== 0) {
     apiMappedQuery.organizations = orgsArray
   }
-  // apiMappedQuery.dataType = 'casts,fixedStations'
+  apiMappedQuery.dataType = 'casts,fixedStations'
   return Object.entries(apiMappedQuery).map(([k, v]) => `${k}=${v}`).join("&")
 }
