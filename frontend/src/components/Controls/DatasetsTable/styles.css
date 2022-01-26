@@ -22,7 +22,7 @@
 
 .datasetsTable tbody {
   height:calc(100vh - 140px);
-  max-height: 50vh;
+  /* max-height: 50vh; */
   display:block;
   overflow: auto;
 }
@@ -33,7 +33,7 @@
 
 .datasetsTable .inspectButton {
   text-align: center;
-  margin: 10px 10px 10px 10px;
+  margin: 10px 5px 10px 5px;
   border: 2px solid darkgrey;
   border-radius: 10px;
   width: 40px;
