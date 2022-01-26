@@ -48,25 +48,15 @@ def get_variable_list(df_variables, eovs: list):
     mandatory_variables = ["time", "latitude", "longitude", "depth"]
 
     eov_variables = []
-    print("eovs", eovs)
+
     for eov in eovs:
         if eov in eov_to_standard_names:
             eov_variables += eov_to_standard_names[eov]
 
-    print("eov_to_standard_names")
-    print(eov_to_standard_names)
-
-    print("eov_variables")
-    print(eov_variables)
-
-    print("mandatory_variables")
-    print(mandatory_variables)
-
-    print(df_variables.to_csv("a.csv"))
     variables_to_download = df_variables.query(
-        "name in @mandatory_variables or standard_name in @eov_variables or not cf_role.isnull()"
+        "(name in @mandatory_variables) or (standard_name in @eov_variables) or (cf_role != '')"
     )["name"].to_list()
-    print("variables_to_download", variables_to_download)
+
     return variables_to_download
 
 
