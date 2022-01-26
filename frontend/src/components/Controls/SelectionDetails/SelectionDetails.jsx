@@ -16,6 +16,9 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, childr
   const [inspectDataset, setInspectDataset] = useState()
   const [dataTotal, setDataTotal] = useState(0)
 
+  console.log('pointPKs', pointPKs)
+  console.log('children', children)
+
   useEffect(() => {
     if (pointsData) {
       let total = 0
@@ -25,18 +28,15 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, childr
         }
       })
       setDataTotal(total)
-      console.log('updating points to download', pointsData)
       setPointsToDownload(pointsData.filter(point => point.selected))//.map(point => point.pk))
     }
   }, [pointsData])
 
   useEffect(() => {
     if (pointPKs && pointPKs.length !== 0) {
-      console.log(pointPKs)
       fetch(`${server}/pointQuery?pointPKs=${pointPKs.join(',')}`).then(response => {
         if (response.ok) {
           response.json().then(data => {
-            console.log('pointQuery data', data)
             setPointsData(data.map(point => {
               return {
                 ...point,
@@ -71,8 +71,6 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, childr
     }))
     setSelectAll(!selectAll)
   }
-
-  const childrenArray = React.Children.toArray(children)
 
   return (
     <div className='pointDetails'>
