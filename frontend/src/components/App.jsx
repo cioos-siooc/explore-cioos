@@ -11,6 +11,7 @@ import Map from "./Map/Map.js";
 import SelectionPanel from './Controls/SelectionPanel/SelectionPanel.jsx'
 import SelectionDetails from './Controls/SelectionDetails/SelectionDetails.jsx'
 import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx';
+import Loading from './Controls/Loading/Loading.jsx';
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from './config.js';
 
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -40,6 +41,7 @@ export default function App() {
   const [emailValid, setEmailValid] = useState()
   const [submissionState, setSubmissionState] = useState()
   const [submissionIcon, setSubmissionIcon] = useState()
+  const [loading, setLoading] = useState(true)
 
   const [query, setQuery] = useState({
     startDate: defaultStartDate,
@@ -127,20 +129,24 @@ export default function App() {
     )
   }
 
+  console.log('loading', loading)
+
   return (
     <div>
+      {loading && <Loading />}
       <Map
         setPolygon={setPolygon}
         setSelectedPointPKs={setSelectedPointPKs}
+        setLoading={setLoading}
         query={query}
       />
       <Controls
         setQuery={setQuery}
+        setLoading={setLoading}
       >
         {selectedPointPKs && (
           <Col xs='auto' className='selectionPanelColumn'>
             <SelectionPanel>
-              {/* {selectedPointPKs && */}
               <SelectionDetails
                 pointPKs={selectedPointPKs}
                 setPointsToDownload={setPointsToDownload}
@@ -148,7 +154,6 @@ export default function App() {
               >
                 {DownloadButton()}
               </SelectionDetails>
-              {/* } */}
             </SelectionPanel>
           </Col>
         )}
