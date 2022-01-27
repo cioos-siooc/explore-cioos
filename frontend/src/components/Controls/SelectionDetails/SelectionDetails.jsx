@@ -5,6 +5,7 @@ import { ProgressBar } from 'react-bootstrap'
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
+import Loading from '../Loading/Loading.jsx'
 import { server } from '../../../config'
 
 import './styles.css'
@@ -15,6 +16,7 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
   const [pointsData, setPointsData] = useState([])
   const [inspectDataset, setInspectDataset] = useState()
   const [dataTotal, setDataTotal] = useState(0)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (pointsData) {
@@ -43,13 +45,12 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
       } else {
         eovString = eovsArray.join(',')
       }
-
-      console.log('eovsSelected', eovsArray, eovString)
-
+      setLoading(true)
       fetch(`${server}/pointQuery?pointPKs=${pointPKs.join(',')}&eovs=${eovsArray}`).then(response => {
         if (response.ok) {
           response.json().then(data => {
             setPointsData(data.map(point => {
+              setLoading(false)
               return {
                 ...point,
                 selected: true
@@ -87,8 +88,11 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
   return (
     <div className='pointDetails'>
       <div className='pointDetailsInfoRow'>
-        {
-          inspectDataset ?
+        {loading ?
+          (
+            <Loading />
+          ) :
+          (inspectDataset ?
             <DatasetInspector
               dataset={inspectDataset}
               setInspectDataset={setInspectDataset}
@@ -100,6 +104,7 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
               selectAll={selectAll}
               datasets={pointsData}
             />
+          )
         }
       </div>
       <div className='pointDetailsControls'>
