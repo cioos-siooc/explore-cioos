@@ -2,6 +2,7 @@ const { eovGrouping } = require("./grouping");
 // this is used by the tiler and the downloader routes
 const unique = (arr) => [...new Set(arr)];
 const IMPOSSIBLE_FILTER = "1=0";
+
 function createDBFilter({
   timeMin,
   timeMax,
@@ -16,11 +17,10 @@ function createDBFilter({
   // These are comma separated lists
   eovs,
   organizations,
-  dataType,
   datasetPKs,
   pointPKs,
 }) {
-  if ((!dataType || !eovs) && !pointPKs && !polygon) return IMPOSSIBLE_FILTER;
+  if (!eovs && !pointPKs && !polygon) return IMPOSSIBLE_FILTER;
 
   const filters = [];
 
