@@ -18,9 +18,11 @@ const config = {
 }
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
+export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setLoading}) {
   const mapContainer = useRef(null)
   const map = useRef(null)
+  // const [zooming, setZooming] = useState(false)
+
   const drawControlOptions = {
     displayControlsDefault: false,
     controls: {
@@ -28,7 +30,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
       line_string: false,
       polygon: true, 
       trash: true,
-      // boxSelect: true,
       combine_features: false,
       uncombine_features: false
     }
@@ -84,7 +85,10 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
     }
 
     map.current.setFilter('points-highlighted', filter)
-    setSelectedPointPKs(pointsWithinPolygon.features.map(point => point.properties.pk))
+
+    if(pointsWithinPolygon.features.map(point => point.properties.pk).length > 0){
+      setSelectedPointPKs(pointsWithinPolygon.features.map(point => point.properties.pk))
+    }
     
     //set selected PKs and polygon
     setPolygon(newPolygon)
@@ -95,12 +99,9 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
     closeOnClick: true,
     maxWidth: '400px'
   })
-
+  
   useEffect(() => {
     setSelectedPointPKs()
-  }, [query])
-
-  useEffect(() => {
     if(map && map.current && map.current.loaded()){
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
       const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${createDataFilterQueryString(query, organizations)}`
@@ -118,6 +119,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
   
       // Force a repaint, so that the map will be repainted without you having to touch the map
       map.current.triggerRepaint()
+      setLoading(true)
     }
   }, [query])
 
@@ -157,13 +159,13 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
     //
     map.current.on("load", () => {
       const query = {
-      timeMin: "1900-01-01",
-      timeMax: new Date().toLocaleDateString(),
-      depthMin: 0,
-      depthMax: 12000,
-      eovs: ["carbon", "currents", "nutrients", "salinity", "temperature"],
-      dataType: ["casts", "fixedStations"],
-    }
+        timeMin: "1900-01-01",
+        timeMax: new Date().toLocaleDateString(),
+        depthMin: 0,
+        depthMax: 12000,
+        eovs: ["carbon", "currents", "nutrients", "salinity", "temperature"],
+        dataType: ["casts", "fixedStations"],
+      }
       const queryString = Object.entries(query)
         .map(([k, v]) => `${k}=${v}`)
         .join("&")
@@ -321,10 +323,12 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
     })
 
     map.current.on('draw.create', e => {
+      setLoading(true)
       polygonSelection()
     })
 
     map.current.on('draw.update', e => {
+      setLoading(true)
       polygonSelection()
     })
 
@@ -332,6 +336,25 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
       setSelectedPointPKs()
       setPolygon()
+    })
+
+    map.current.on('idle', e => {
+      setLoading(false)
+      if(drawPolygon && drawPolygon.getAll().features.length > 0) {
+        polygonSelection()
+      }
+    })
+
+    map.current.on('zoomend', e => {
+      if(drawPolygon.getAll().features.length > 0) {
+        setSelectedPointPKs()
+        if(map.current.getZoom() >= 7){
+          setTimeout(() => {
+            setLoading(true)
+            polygonSelection()
+          }, 250)
+        }
+      }
     })
   })
 
