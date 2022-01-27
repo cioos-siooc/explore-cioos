@@ -43,7 +43,7 @@ services:
         API_URL: $API_URL
     expose:
       - "80"
-    depends_on:
-      - web-api
+    # depends_on:
+    #   - web-api
 volumes:
   postgres-data:
