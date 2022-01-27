@@ -120,6 +120,7 @@ export default function App() {
         <SelectionDetails
           pointPKs={selectedPointPKs}
           setPointsToDownload={setPointsToDownload}
+          query={query}
         >
           <input className='emailAddress' type='email' placeholder='email@email.com' onChange={e => handleEmailChange(e.target.value)} />
           <button className='submitRequestButton' disabled={!emailValid} onClick={() => handleSubmission()}>Submit Request</button>
@@ -128,8 +129,6 @@ export default function App() {
       </DataDownloadModal >
     )
   }
-
-  console.log('loading', loading)
 
   return (
     <div>

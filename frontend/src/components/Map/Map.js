@@ -52,10 +52,10 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     if(boxSelectStartCoords && boxSelectEndCoords) {
       const lineString = turf.lineString([boxSelectStartCoords, boxSelectEndCoords])
       const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
-      setLoading(true)
-      polygonSelection(bboxPolygon.geometry.coordinates[0])
       setBoxSelectEndCoords()
       setBoxSelectStartCoords()
+      setLoading(true)
+      polygonSelection(bboxPolygon.geometry.coordinates[0])
     }
   }, [boxSelectEndCoords])
 
@@ -289,7 +289,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       if(drawPolygon.getAll().features.length !== 0) {
         drawPolygon.delete(drawPolygon.getAll().features[0].id)
       }
-      // setPolygon(bbox)
     })
 
     map.current.on('click', 'hexes', e => {
@@ -354,10 +353,8 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       if(drawPolygon.getAll().features.length > 0) {
         setSelectedPointPKs()
         if(map.current.getZoom() >= 7){
-          setTimeout(() => {
-            setLoading(true)
-            polygonSelection()
-          }, 250)
+          setLoading(true)
+          polygonSelection(drawPolygon.getAll().features[0].geometry.coordinates[0])
         }
       }
     })

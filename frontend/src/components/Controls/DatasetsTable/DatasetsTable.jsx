@@ -32,7 +32,6 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
         </thead>
         <tbody>
           {datasets.map((point, index) => {
-            // { console.log('dataset size, bytes', point.size, point) }
             return (
               <tr key={index}>
                 <td style={{ width: `${checkColWidth}px`, maxWidth: `${checkColWidth}px`, wordWrap: 'break-word' }} onClick={() => handleSelectDataset(point)} title='Select dataset for download'>{point.selected ? <CheckSquare /> : <Square />}</td>
