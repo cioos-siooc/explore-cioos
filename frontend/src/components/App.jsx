@@ -144,6 +144,7 @@ export default function App() {
               <SelectionDetails
                 pointPKs={selectedPointPKs}
                 setPointsToDownload={setPointsToDownload}
+                query={query}
               >
                 {DownloadButton()}
               </SelectionDetails>
