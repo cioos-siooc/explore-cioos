@@ -29,19 +29,13 @@
         "ocean_mass_content_of_dissolved_inorganic_carbon",
         "partial_pressure_of_carbon_dioxide_in_sea_water"
     ],
-    "invertebrateAbundanceAndDistributionEmerging": [],
+    "invertebrateAbundanceAndDistribution": [],
     "macroalgalCanopyCoverAndComposition": [],
     "mangroveCoverAndComposition": [],
-    "marineDebrisEmerging": [],
+    "marineDebris": [],
     "marineTurtlesBirdsMammalsAbundanceAndDistribution": [],
-    "microbeBiomassAndDiversityEmerging": [],
-    "nitrate": [
-        "mole_concentration_of_nitrate_in_sea_water",
-        "moles_of_nitrate_per_unit_mass_in_sea_water",
-        "mole_concentration_of_nitrate_and_nitrite_in_sea_water",
-        "moles_of_nitrate_and_nitrite_per_unit_mass_in_sea_water"
-    ],
-    "nitrusOxide": [],
+    "microbeBiomassAndDiversity": [],
+    "nitrousOxide": [],
     "nutrients": [
         "mass_concentration_of_silicate_in_sea_water",
         "mole_concentration_of_silicate_in_sea_water",
@@ -52,7 +46,17 @@
         "mole_concentration_of_nitrate_in_sea_water",
         "moles_of_nitrate_per_unit_mass_in_sea_water",
         "mole_concentration_of_nitrate_and_nitrite_in_sea_water",
-        "moles_of_nitrate_and_nitrite_per_unit_mass_in_sea_water"
+        "moles_of_nitrate_and_nitrite_per_unit_mass_in_sea_water",
+        "mole_concentration_of_nitrate_in_sea_water",
+        "moles_of_nitrate_per_unit_mass_in_sea_water",
+        "mole_concentration_of_nitrate_and_nitrite_in_sea_water",
+        "moles_of_nitrate_and_nitrite_per_unit_mass_in_sea_water",
+        "mass_concentration_of_phosphate_in_sea_water",
+        "mole_concentration_of_phosphate_in_sea_water",
+        "moles_of_phosphate_per_unit_mass_in_sea_water",
+        "mass_concentration_of_silicate_in_sea_water",
+        "mole_concentration_of_silicate_in_sea_water",
+        "moles_of_silicate_per_unit_mass_in_sea_water"
     ],
     "oceanColour": [
         "concentration_of_colored_dissolved_organic_matter_in_sea_water_expressed_as_equivalent_mass_fraction_of_quinine_sulfate_dihydrate"
@@ -165,18 +169,11 @@
         "volume_fraction_of_oxygen_in_sea_water",
         "fractional_saturation_of_oxygen_in_sea_water"
     ],
-    "particulateMatter": [
-        "sea_water_turbidity"
-    ],
-    "phosphate": [
-        "mass_concentration_of_phosphate_in_sea_water",
-        "mole_concentration_of_phosphate_in_sea_water",
-        "moles_of_phosphate_per_unit_mass_in_sea_water"
-    ],
+    "particulateMatter": ["sea_water_turbidity"],
+
     "phytoplanktonBiomassAndDiversity": [],
-    "potentialDensity": [
-        "sea_water_potential_density"
-    ],
+
+    "potentialDensity": ["sea_water_potential_density"],
     "potentialTemperature": [
         "sea_water_potential_temperature",
         "sea_water_potential_temperature_at_sea_floor"
@@ -186,10 +183,7 @@
         "sea_water_pressure_due_to_sea_water",
         "sea_water_pressure_at_sea_floor"
     ],
-    "seaIce": [
-        "sea_ice_draft",
-        "sea_ice_thickness"
-    ],
+    "seaIce": ["sea_ice_draft", "sea_ice_thickness"],
     "seaState": [],
     "seaSurfaceHeight": [
         "sea_surface_height",
@@ -198,9 +192,7 @@
         "sea_surface_height_above_mean_sea_level",
         "sea_surface_height_above_reference_ellipsoid"
     ],
-    "seaSurfaceSalinity": [
-        "sea_surface_salinity"
-    ],
+    "seaSurfaceSalinity": ["sea_surface_salinity"],
     "seaSurfaceTemperature": [
         "sea_surface_skin_temperature",
         "sea_surface_subskin_temperature"
@@ -212,27 +204,16 @@
         "sea_floor_depth_below_geopotential_datum",
         "sea_floor_depth_below_sea_surface"
     ],
-    "seaFloorPressure": [
-        "sea_water_pressure_at_sea_floor"
-    ],
+    "seaFloorPressure": ["sea_water_pressure_at_sea_floor"],
     "seagrassCoverAndComposition": [],
     "seawaterDensity": [
         "sea_water_density",
         "sea_water_potential_density",
         "sea_water_sigma_t"
     ],
-    "silicate": [
-        "mass_concentration_of_silicate_in_sea_water",
-        "mole_concentration_of_silicate_in_sea_water",
-        "moles_of_silicate_per_unit_mass_in_sea_water"
-    ],
-    "speedOfSound": [
-        "speed_of_sound_in_sea_water"
-    ],
+
     "stableCarbonIsotopes": [],
-    "subSurfaceConductivity": [
-        "sea_water_electrical_conductivity"
-    ],
+    "subSurfaceConductivity": ["sea_water_electrical_conductivity"],
     "subSurfaceCurrents": [
         "sea_water_speed",
         "sea_water_velocity_from_direction",
