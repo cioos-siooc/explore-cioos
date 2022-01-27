@@ -21,7 +21,8 @@ const config = {
 export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setLoading}) {
   const mapContainer = useRef(null)
   const map = useRef(null)
-  // const [zooming, setZooming] = useState(false)
+  const [boxSelectStartCoords, setBoxSelectStartCoords] = useState()
+  const [boxSelectEndCoords, setBoxSelectEndCoords] = useState()
 
   const drawControlOptions = {
     displayControlsDefault: false,
@@ -47,14 +48,18 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     }).catch(error => { throw error })
   }, [])
 
-  function polygonSelection() {
-    // Ensure there are only one polygons on the map at a time
-    if(drawPolygon.getAll().features.length > 1) {
-      drawPolygon.delete(drawPolygon.getAll().features[0].id)
+  useEffect(() => {
+    if(boxSelectStartCoords && boxSelectEndCoords) {
+      const lineString = turf.lineString([boxSelectStartCoords, boxSelectEndCoords])
+      const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
+      setLoading(true)
+      polygonSelection(bboxPolygon.geometry.coordinates[0])
+      setBoxSelectEndCoords()
+      setBoxSelectStartCoords()
     }
-    
-    const newPolygon = drawPolygon.getAll().features[0].geometry.coordinates[0]
-    
+  }, [boxSelectEndCoords])
+
+  function polygonSelection(polygon) {
     var features = map.current.queryRenderedFeatures({layers: ['points']}).map(point => {
       return {
         type: 'Feature',
@@ -68,7 +73,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     })
 
     const featureCollection = {type: 'FeatureCollection', features: features}
-    var searchWithin = turf.polygon([newPolygon]);
+    var searchWithin = turf.polygon([polygon]);
     var pointsWithinPolygon = turf.pointsWithinPolygon(featureCollection, searchWithin);
     
     // Filter points layer to show the points that have been selected
@@ -91,7 +96,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     }
     
     //set selected PKs and polygon
-    setPolygon(newPolygon)
+    setPolygon(polygon)
   }
 
   const popup = new Popup({
@@ -324,12 +329,15 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
 
     map.current.on('draw.create', e => {
       setLoading(true)
-      polygonSelection()
+      if(drawPolygon.getAll().features.length > 1) {
+        drawPolygon.delete(drawPolygon.getAll().features[0].id)
+      }
+      polygonSelection(drawPolygon.getAll().features[0].geometry.coordinates[0])
     })
 
     map.current.on('draw.update', e => {
       setLoading(true)
-      polygonSelection()
+      polygonSelection(drawPolygon.getAll().features[0].geometry.coordinates[0])
     })
 
     map.current.on('draw.delete', e => {
@@ -340,9 +348,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
 
     map.current.on('idle', e => {
       setLoading(false)
-      // if(drawPolygon && drawPolygon.getAll().features.length > 0) {
-      //   polygonSelection()
-      // }
     })
 
     map.current.on('zoomend', e => {
@@ -355,6 +360,16 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
           }, 250)
         }
       }
+    })
+
+    map.current.on('mousedown', e => {
+      if(e.originalEvent.shiftKey) {
+        setBoxSelectStartCoords([e.lngLat.lng, e.lngLat.lat])
+      }
+    })
+
+    map.current.on('mouseup', e => {
+      setBoxSelectEndCoords([e.lngLat.lng, e.lngLat.lat])
     })
   })
 
