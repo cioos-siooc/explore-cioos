@@ -307,7 +307,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
             df_temp = filter_polygon_region(df_temp, polygon_region)
 
             # Append data to previously downloaded one
-            df = df.append(df_temp)
+            df = pd.concat([df, df_temp])
 
         # If download status hasn't changed, download was successfully completed
         if download_status == DOWNLOADING:
