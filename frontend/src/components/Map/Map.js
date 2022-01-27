@@ -119,7 +119,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
   
       // Force a repaint, so that the map will be repainted without you having to touch the map
       map.current.triggerRepaint()
-      setLoading(true)
+      // setLoading(true)
     }
   }, [query])
 
@@ -340,9 +340,9 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
 
     map.current.on('idle', e => {
       setLoading(false)
-      if(drawPolygon && drawPolygon.getAll().features.length > 0) {
-        polygonSelection()
-      }
+      // if(drawPolygon && drawPolygon.getAll().features.length > 0) {
+      //   polygonSelection()
+      // }
     })
 
     map.current.on('zoomend', e => {
