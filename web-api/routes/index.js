@@ -73,14 +73,13 @@ router.get("/pointQuery", async function (req, res, next) {
         d.cdm_data_type,
         d.title title,
         eovs,
-        p.records_per_day,
         organizations,
         d.erddap_url,
         sum(coalesce(nullif(date_part('days',least(${
           timeMax ? "'timeMax'," : ""
         }p.time_max)-greatest(${
     timeMin ? "'timeMin'," : ""
-  }p.time_min)),0),1)) as days,
+  }p.time_min)),0),1) * p.records_per_day) as records_count,
         
   
      (select count(*) from cioos_api.erddap_variables 
@@ -110,13 +109,12 @@ router.get("/pointQuery", async function (req, res, next) {
         -- AND ckan_record IS NOT NULL
         GROUP BY d.dataset_id,
         d.pk,
-        p.records_per_day,
         d.title,
         -- ckan_record,
         eovs,
         organizations,
         d.erddap_url)
-        select *,${adder} + days * records_per_day * eov_cols * ${multiplier} as size from sub`;
+        select *,${adder} + records_count * eov_cols * ${multiplier} as size from sub`;
 
   console.log(sql);
 
