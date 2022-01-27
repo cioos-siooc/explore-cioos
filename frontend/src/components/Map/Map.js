@@ -28,6 +28,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
       line_string: false,
       polygon: true, 
       trash: true,
+      // boxSelect: true,
       combine_features: false,
       uncombine_features: false
     }
@@ -77,9 +78,13 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon}) {
       },
       ['in', 'pk']
     )
+    
+    if(filter.length > 1000) {
+      return window.alert('Please select 1000 or fewer features')
+    }
 
-    setSelectedPointPKs(pointsWithinPolygon.features.map(point => point.properties.pk))
     map.current.setFilter('points-highlighted', filter)
+    setSelectedPointPKs(pointsWithinPolygon.features.map(point => point.properties.pk))
     
     //set selected PKs and polygon
     setPolygon(newPolygon)

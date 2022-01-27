@@ -10,7 +10,7 @@ import { server } from '../../../config'
 import './styles.css'
 
 // Note: datasets and points are exchangable terminology
-export default function SelectionDetails({ pointPKs, setPointsToDownload, children }) {
+export default function SelectionDetails({ pointPKs, setPointsToDownload, query, children }) {
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState([])
   const [inspectDataset, setInspectDataset] = useState()
@@ -31,7 +31,22 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, childr
 
   useEffect(() => {
     if (pointPKs && pointPKs.length !== 0) {
-      fetch(`${server}/pointQuery?pointPKs=${pointPKs.join(',')}`).then(response => {
+      let eovsArray = []
+      let eovString
+      Object.keys(query.eovsSelected).forEach(eov => {
+        if (query.eovsSelected[eov]) {
+          eovsArray.push(eov)
+        }
+      })
+      if (eovsArray.length === 0) {
+        eovString = "carbon,currents,nutrients,salinity,temperature"
+      } else {
+        eovString = eovsArray.join(',')
+      }
+
+      console.log('eovsSelected', eovsArray, eovString)
+
+      fetch(`${server}/pointQuery?pointPKs=${pointPKs.join(',')}&eovs=${eovsArray}`).then(response => {
         if (response.ok) {
           response.json().then(data => {
             setPointsData(data.map(point => {
