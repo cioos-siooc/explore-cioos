@@ -282,7 +282,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
         .setLngLat(coordinates)
         .setHTML(
           ` <div>
-              ${e.features[0].properties.count} points. Click for details
+              ${e.features[0].properties.count} records. Click for details
             </div> 
           `
         )
@@ -299,7 +299,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
          
         popup
         .setLngLat(coordinates)
-        .setHTML(description + " points")
+        .setHTML(description + " records. Click to zoom")
         .addTo(map.current)
     })
 
