@@ -21,9 +21,6 @@ const config = {
 export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setLoading}) {
   const mapContainer = useRef(null)
   const map = useRef(null)
-  const [boxSelectStartCoords, setBoxSelectStartCoords] = useState()
-  const [boxSelectEndCoords, setBoxSelectEndCoords] = useState()
-
   const drawControlOptions = {
     displayControlsDefault: false,
     controls: {
@@ -35,8 +32,10 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       uncombine_features: false
     }
   }
-  const drawPolygon = new MapboxDraw(drawControlOptions)
+  const drawPolygon = useRef(new MapboxDraw(drawControlOptions))
   const [organizations, setOrganizations] = useState()
+  const [boxSelectStartCoords, setBoxSelectStartCoords] = useState()
+  const [boxSelectEndCoords, setBoxSelectEndCoords] = useState()
 
   useEffect(() => {
     fetch(`${server}/organizations`).then(response => response.json()).then(data => {
@@ -50,6 +49,10 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
 
   useEffect(() => {
     if(boxSelectStartCoords && boxSelectEndCoords) {
+      // console.log(map.current)
+      if(drawPolygon.current.getAll().features.length > 0) {
+        drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
+      }
       const lineString = turf.lineString([boxSelectStartCoords, boxSelectEndCoords])
       const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
       setBoxSelectEndCoords()
@@ -58,8 +61,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       polygonSelection(bboxPolygon.geometry.coordinates[0])
     }
   }, [boxSelectEndCoords])
-
-  // function applyPolygon
 
   function polygonSelection(polygon) {
     var features = map.current.queryRenderedFeatures({layers: ['points']}).map(point => {
@@ -126,7 +127,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
   
       // Force a repaint, so that the map will be repainted without you having to touch the map
       map.current.triggerRepaint()
-      // setLoading(true)
+      setLoading(true)
     }
   }, [query])
 
@@ -161,7 +162,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
 
     // Called order determines stacking order
     map.current.addControl(new NavigationControl(), "bottom-right")
-    map.current.addControl(drawPolygon, "bottom-right")
+    map.current.addControl(drawPolygon.current, "bottom-right")
 
     //
     map.current.on("load", () => {
@@ -258,7 +259,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     })
 
     map.current.on('click', e => {
-      if(drawPolygon.getAll().features.length === 0) {
+      if(drawPolygon.current.getAll().features.length === 0) {
         map.current.setFilter('points-highlighted', ['in', 'pk', ''])
         setSelectedPointPKs()
       }
@@ -288,8 +289,8 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
 
       map.current.setFilter('points-highlighted', filter)
 
-      if(drawPolygon.getAll().features.length !== 0) {
-        drawPolygon.delete(drawPolygon.getAll().features[0].id)
+      if(drawPolygon.current.getAll().features.length !== 0) {
+        drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
       }
     })
 
@@ -329,16 +330,17 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     })
 
     map.current.on('draw.create', e => {
+      setSelectedPointPKs()
       setLoading(true)
-      if(drawPolygon.getAll().features.length > 1) {
-        drawPolygon.delete(drawPolygon.getAll().features[0].id)
+      if(drawPolygon.current.getAll().features.length > 1) {
+        drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
       }
-      polygonSelection(drawPolygon.getAll().features[0].geometry.coordinates[0])
+      polygonSelection(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
     })
 
     map.current.on('draw.update', e => {
       setLoading(true)
-      polygonSelection(drawPolygon.getAll().features[0].geometry.coordinates[0])
+      polygonSelection(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
     })
 
     map.current.on('draw.delete', e => {
@@ -352,11 +354,11 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     })
 
     map.current.on('zoomend', e => {
-      if(drawPolygon.getAll().features.length > 0) {
+      if(drawPolygon.current.getAll().features.length > 0) {
         setSelectedPointPKs()
         if(map.current.getZoom() >= 7){
           setLoading(true)
-          polygonSelection(drawPolygon.getAll().features[0].geometry.coordinates[0])
+          polygonSelection(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
         }
       }
     })
