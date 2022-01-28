@@ -1,9 +1,43 @@
-const eovGrouping = {
+UI EOV grouping:
+
+{
   carbon: ["inorganicCarbon", "dissolvedOrganicCarbon"],
   currents: ["subSurfaceCurrents", "surfaceCurrents"],
-  nutrients: ["nitrate", "phosphate", "sulphate", "silicate"],
+  nutrients: ["nutrients"],
   salinity: ["seaSurfaceSalinity", "subSurfaceSalinity"],
   temperature: ["seaSurfaceTemperature", "subSurfaceTemperature"],
-};
+}
 
-module.exports = { eovGrouping };
+The actual EOVS:
+
+dissolvedOrganicCarbon;
+fishAbundanceAndDistribution;
+hardCoralCoverAndComposition;
+inorganicCarbon;
+invertebrateAbundanceAndDistribution;
+macroalgalCanopyCoverAndComposition;
+marineDebris;
+marineTurtlesBirdsMammalsAbundanceAndDistribution;
+microbeBiomassAndDiversity;
+nitrousOxide;
+nutrients;
+oceanColour;
+oceanSound;
+oceanSurfaceHeatFlux;
+oceanSurfaceStress;
+oxygen;
+particulateMatter;
+phytoplanktonBiomassAndDiversity;
+seagrassCoverAndComposition;
+seaIce;
+seaState;
+seaSurfaceHeight;
+seaSurfaceSalinity;
+seaSurfaceTemperature;
+stableCarbonIsotopes;
+subSurfaceCurrents;
+subSurfaceSalinity;
+subSurfaceTemperature;
+surfaceCurrents;
+transientTracers;
+zooplanktonBiomassAndDiversity;
