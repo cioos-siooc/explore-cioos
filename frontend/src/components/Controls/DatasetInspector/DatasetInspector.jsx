@@ -26,7 +26,7 @@ export default function DatasetInspector({ dataset, setInspectDataset }) {
             Organizations
           </h6>
           <div>
-            {dataset.parties}
+            {dataset.organizations}
           </div>
           <hr />
           <h6>

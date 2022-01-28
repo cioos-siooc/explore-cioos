@@ -42,6 +42,17 @@ export default function App() {
   const [submissionState, setSubmissionState] = useState()
   const [submissionIcon, setSubmissionIcon] = useState()
   const [loading, setLoading] = useState(true)
+  const [organizations, setOrganizations] = useState()
+
+  useEffect(() => {
+    fetch(`${server}/organizations`).then(response => response.json()).then(data => {
+      let orgsReturned = {}
+      data.forEach(elem => {
+        orgsReturned[elem.name] = elem.pk
+      })
+      setOrganizations(orgsReturned)
+    }).catch(error => { throw error })
+  }, [])
 
   const [query, setQuery] = useState({
     startDate: defaultStartDate,
@@ -121,6 +132,8 @@ export default function App() {
           pointPKs={selectedPointPKs}
           setPointsToDownload={setPointsToDownload}
           query={query}
+          polygon={polygon}
+          organizations={organizations}
         >
           <input className='emailAddress' type='email' placeholder='email@email.com' onChange={e => handleEmailChange(e.target.value)} />
           <button className='submitRequestButton' disabled={!emailValid} onClick={() => handleSubmission()}>Submit Request</button>
@@ -138,6 +151,8 @@ export default function App() {
         setSelectedPointPKs={setSelectedPointPKs}
         setLoading={setLoading}
         query={query}
+        polygon={polygon}
+        organizations={organizations}
       />
       <Controls
         setQuery={setQuery}
@@ -150,6 +165,8 @@ export default function App() {
                 pointPKs={selectedPointPKs}
                 setPointsToDownload={setPointsToDownload}
                 query={query}
+                polygon={polygon}
+                organizations={organizations}
               >
                 {DownloadButton()}
               </SelectionDetails>

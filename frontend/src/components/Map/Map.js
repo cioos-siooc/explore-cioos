@@ -18,7 +18,7 @@ const config = {
 }
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setLoading}) {
+export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setLoading, organizations}) {
   const mapContainer = useRef(null)
   const map = useRef(null)
   const drawControlOptions = {
@@ -33,19 +33,8 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     }
   }
   const drawPolygon = useRef(new MapboxDraw(drawControlOptions))
-  const [organizations, setOrganizations] = useState()
   const [boxSelectStartCoords, setBoxSelectStartCoords] = useState()
   const [boxSelectEndCoords, setBoxSelectEndCoords] = useState()
-
-  useEffect(() => {
-    fetch(`${server}/organizations`).then(response => response.json()).then(data => {
-      let orgsReturned = {}
-      data.forEach(elem => {
-        orgsReturned[elem.name] = elem.pk
-      })
-      setOrganizations(orgsReturned)
-    }).catch(error => { throw error })
-  }, [])
 
   useEffect(() => {
     if(boxSelectStartCoords && boxSelectEndCoords) {
@@ -99,6 +88,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     }
     
     //set selected PKs and polygon
+    console.log(polygon)
     setPolygon(polygon)
   }
 
@@ -292,6 +282,14 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       if(drawPolygon.current.getAll().features.length !== 0) {
         drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
       }
+      setPolygon()
+      // const clickLngLatBBox = [
+      //   [e.lngLat.lng + 0.001, e.lngLat.lat + 0.001],
+      //   [e.lngLat.lng - 0.001, e.lngLat.lat - 0.001]
+      // ]
+      // const lineString = turf.lineString(clickLngLatBBox)
+      // const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
+      // setPolygon(bboxPolygon.geometry.coordinates[0])
     })
 
     map.current.on('click', 'hexes', e => {
