@@ -215,11 +215,6 @@
         "sea_surface_subskin_temperature"
     ],
     "seagrassCoverAndComposition": [],
-    "seawaterDensity": [
-        "sea_water_density",
-        "sea_water_potential_density",
-        "sea_water_sigma_t"
-    ],
     "stableCarbonIsotopes": [],
     "subSurfaceCurrents": [
         "sea_water_speed",
@@ -244,7 +239,10 @@
         "sea_water_practical_salinity",
         "sea_water_salinity",
         "sea_water_potential_density",
-        "sea_water_electrical_conductivity"
+        "sea_water_electrical_conductivity",
+        "sea_water_density",
+        "sea_water_potential_density",
+        "sea_water_sigma_t"
     ],
     "subSurfaceTemperature": [
         "sea_surface_temperature",
@@ -254,7 +252,10 @@
         "sea_water_potential_temperature",
         "sea_water_potential_temperature_at_sea_floor",
         "sea_water_potential_density",
-        "sea_water_electrical_conductivity"
+        "sea_water_electrical_conductivity",
+        "sea_water_density",
+        "sea_water_potential_density",
+        "sea_water_sigma_t"
     ],
     "surfaceCurrents": [
         "surface_eastward_sea_water_velocity",
