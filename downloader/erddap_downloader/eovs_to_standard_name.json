@@ -1,23 +1,4 @@
 {
-    "chlorophyll": [
-        "chlorophyll_concentration_in_sea_water",
-        "concentration_of_chlorophyll-a_in_water_body",
-        "chlorophyll_concentration_in_sea_water",
-        "concentration_of_chlorophyll_in_sea_water",
-        "mass_concentration_of_chlorophyll_in_sea_water",
-        "mass_concentration_of_diatoms_expressed_as_chlorophyll_in_sea_water",
-        "mass_concentration_of_microphytoplankton_expressed_as_chlorophyll_in_sea_water",
-        "mass_concentration_of_miscellaneous_phytoplankton_expressed_as_chlorophyll_in_sea_water",
-        "mass_concentration_of_nanophytoplankton_expressed_as_chlorophyll_in_sea_water",
-        "mass_concentration_of_phytoplankton_expressed_as_chlorophyll_in_sea_water",
-        "mass_concentration_of_picophytoplankton_expressed_as_chlorophyll_in_sea_water",
-        "mass_fraction_of_chlorophyll_a_in_sea_water",
-        "mass_concentration_of_chlorophyll_in_sea_water",
-        "mass_concentration_of_diatoms_expressed_as_chlorophyll_in_sea_water",
-        "mass_concentration_of_microphytoplankton_expressed_as_chlorophyll_in_sea_water",
-        "mass_concentration_of_miscellaneous_phytoplankton_expressed_as_chlorophyll_in_sea_water",
-        "mass_concentration_of_nanophytoplankton_expressed_as_chlorophyll_in_sea_water"
-    ],
     "dissolvedOrganicCarbon": [
         "mole_concentration_of_dissolved_organic_carbon_in_sea_water",
         "ocean_mass_content_of_dissolved_organic_carbon"
@@ -173,7 +154,25 @@
     "particulateMatter": [
         "sea_water_turbidity"
     ],
-    "phytoplanktonBiomassAndDiversity": [],
+    "phytoplanktonBiomassAndDiversity": [
+        "chlorophyll_concentration_in_sea_water",
+        "concentration_of_chlorophyll-a_in_water_body",
+        "chlorophyll_concentration_in_sea_water",
+        "concentration_of_chlorophyll_in_sea_water",
+        "mass_concentration_of_chlorophyll_in_sea_water",
+        "mass_concentration_of_diatoms_expressed_as_chlorophyll_in_sea_water",
+        "mass_concentration_of_microphytoplankton_expressed_as_chlorophyll_in_sea_water",
+        "mass_concentration_of_miscellaneous_phytoplankton_expressed_as_chlorophyll_in_sea_water",
+        "mass_concentration_of_nanophytoplankton_expressed_as_chlorophyll_in_sea_water",
+        "mass_concentration_of_phytoplankton_expressed_as_chlorophyll_in_sea_water",
+        "mass_concentration_of_picophytoplankton_expressed_as_chlorophyll_in_sea_water",
+        "mass_fraction_of_chlorophyll_a_in_sea_water",
+        "mass_concentration_of_chlorophyll_in_sea_water",
+        "mass_concentration_of_diatoms_expressed_as_chlorophyll_in_sea_water",
+        "mass_concentration_of_microphytoplankton_expressed_as_chlorophyll_in_sea_water",
+        "mass_concentration_of_miscellaneous_phytoplankton_expressed_as_chlorophyll_in_sea_water",
+        "mass_concentration_of_nanophytoplankton_expressed_as_chlorophyll_in_sea_water"
+    ],
     "seaIce": [
         "sea_ice_draft",
         "sea_ice_thickness"
