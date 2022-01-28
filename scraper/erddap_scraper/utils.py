@@ -35,9 +35,13 @@ def flatten(t):
     return [item for sublist in t for item in sublist]
 
 
-def outersection(a: list, b: list):
-    return list(set(a) ^ set(b))
-
+cf_standard_names = (
+    pd.read_xml(
+        "https://cfconventions.org/Data/cf-standard-names/78/src/cf-standard-name-table.xml"
+    )
+    .sort_values(by="id")["id"]
+    .unique()
+)
 
 eov_to_standard_names = get_eov_to_standard_names()
 supported_standard_names = flatten(list(eov_to_standard_names.values()))

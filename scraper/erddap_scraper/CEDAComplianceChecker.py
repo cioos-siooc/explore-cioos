@@ -1,4 +1,9 @@
-from erddap_scraper.utils import eov_to_standard_names, flatten, intersection
+from erddap_scraper.utils import (
+    eov_to_standard_names,
+    flatten,
+    intersection,
+    cf_standard_names,
+)
 
 
 class CEDAComplianceChecker(object):
@@ -25,8 +30,18 @@ class CEDAComplianceChecker(object):
 
     def check_supported_cf_name(self):
         supported_standard_names = flatten(list(eov_to_standard_names.values()))
-        standard_names_in_dataset = self.dataset.df_variables["standard_name"].to_list()
-
+        standard_names_in_dataset = (
+            self.dataset.df_variables.query("standard_name != ''")["standard_name"]
+            .unique()
+            .tolist()
+        )
+        non_standard_names = [
+            x for x in standard_names_in_dataset if x not in cf_standard_names
+        ]
+        if non_standard_names:
+            self.logger.warn(
+                "Found unstandard standard_name:" + str(non_standard_names)
+            )
         supported_variables = intersection(
             supported_standard_names,
             standard_names_in_dataset,

@@ -10,8 +10,11 @@ import pandas as pd
 from dotenv import load_dotenv
 from erddap_scraper.ckan.create_ckan_erddap_link import get_ckan_records
 from erddap_scraper.scrape_erddap import scrape_erddap
-from erddap_scraper.utils import (get_df_eov_to_standard_names, outersection,
-                                  supported_standard_names)
+from erddap_scraper.utils import (
+    get_df_eov_to_standard_names,
+    supported_standard_names,
+    cf_standard_names,
+)
 from sqlalchemy import create_engine
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -91,14 +94,30 @@ def main(erddap_urls, csv_only, cache_requests):
         return
 
     # see what standard names arent covered by our EOVs:
-    standard_names_harvested = variables["standard_name"].to_list()
-    standard_names_not_harvested = outersection(
-        standard_names_harvested, supported_standard_names
+    standard_names_harvested = (
+        variables.query("not standard_name.isnull()")["standard_name"].unique().tolist()
     )
-    print(
-        "Found these standard_names that CEDA doesnt support yet:\n",
-        standard_names_not_harvested,
-    )
+
+    llat_variables = ["latitude", "longitude", "time", "depth", ""]
+
+    # this gets a list of all the standard names
+
+    standard_names_not_harvested = [
+        x
+        for x in standard_names_harvested
+        if x not in supported_standard_names + llat_variables
+    ]
+
+    standard_names_not_harvested_that_are_real = [
+        x for x in standard_names_not_harvested if x in cf_standard_names
+    ]
+
+    if standard_names_not_harvested_that_are_real:
+        print(
+            "Found these standard_names that CEDA doesnt support yet:\n",
+            standard_names_not_harvested_that_are_real,
+        )
+
     # query CKAN national for more metadata related to the ERDDAP datsets we have so far
     print("Gathering CKAN data")
     df_ckan = get_ckan_records(datasets["dataset_id"].to_list(), cache=cache_requests)
