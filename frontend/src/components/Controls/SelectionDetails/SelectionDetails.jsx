@@ -39,9 +39,10 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
       let urlString
       if (polygon !== undefined) {
         urlString = `${server}/pointQuery?polygon=${JSON.stringify(polygon)}&${createDataFilterQueryString(query, organizations)}`
-      } else if (false) {
-        urlString = `${server}/pointQuery?pointPKs=${pointPKs.join(',')}&${createDataFilterQueryString(query, organizations)}`
       }
+      // else if (false) {
+      //   urlString = `${server}/pointQuery?pointPKs=${pointPKs.join(',')}&${createDataFilterQueryString(query, organizations)}`
+      // }
       fetch(urlString).then(response => {
         if (response.ok) {
           response.json().then(data => {
