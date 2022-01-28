@@ -33,13 +33,13 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
   }, [pointsData])
 
   useEffect(() => {
-    if (pointPKs && pointPKs.length !== 0 || polygon !== undefined) {
+    if (polygon !== undefined && !loading) {
       setInspectDataset()
       setLoading(true)
       let urlString
       if (polygon !== undefined) {
         urlString = `${server}/pointQuery?polygon=${JSON.stringify(polygon)}&${createDataFilterQueryString(query, organizations)}`
-      } else if (pointPKs && pointPKs.length !== 0) {
+      } else if (false) {
         urlString = `${server}/pointQuery?pointPKs=${pointPKs.join(',')}&${createDataFilterQueryString(query, organizations)}`
       }
       fetch(urlString).then(response => {
@@ -56,7 +56,7 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
         }
       })
     }
-  }, [pointPKs, polygon])
+  }, [polygon])
 
   function handleSelectDataset(point) {
     let dataset = pointsData.filter((p) => p.dataset_id === point.dataset_id)[0]
