@@ -7,7 +7,7 @@ import './styles.css'
 export default function DataDownloadModal({ disabled, children }) {
   const [showModal, setShowModal] = useState(false)
   return (
-    <div>
+    <div className='dataDownloadModal'>
       <Modal
         show={showModal}
         size='lg'
@@ -20,7 +20,7 @@ export default function DataDownloadModal({ disabled, children }) {
             Request data
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body >
+        <Modal.Body>
           {children}
         </Modal.Body>
       </Modal>
