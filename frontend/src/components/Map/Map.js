@@ -59,6 +59,8 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     }
   }, [boxSelectEndCoords])
 
+  // function applyPolygon
+
   function polygonSelection(polygon) {
     var features = map.current.queryRenderedFeatures({layers: ['points']}).map(point => {
       return {

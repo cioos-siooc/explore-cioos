@@ -19,3 +19,53 @@
   height: 40px;
   text-align: center;
 }
+
+.modal-content {
+  height: 70vh;
+}
+
+.modal-content .pointDetailsInfoRow {
+  height: calc(70vh - 170px)
+}
+
+.modal-content .modal-body {
+  height: calc(70vh - 70px)
+}
+
+.modal-content .pointDetails {
+  height: calc(70vh - 170px);
+  overflow-y: auto;
+}
+
+.modal-content .datasetsTable tbody{
+  height: auto;
+}
+
+.modal-content .pointDetails .datasetInspector {
+  height: auto;
+}
+/*
+.modal-body {
+  /* background-color: red; 
+  padding: 0px;
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.modal-body .pointDetailsControls{
+  position: absolute;
+  bottom: 0px;
+  left:0px;
+  /* height:  
+}
+
+.modal-body .datasetsTable tbody{
+  height: 50vh;
+  margin-bottom: 100px;
+  /* overflow-y: auto; 
+}
+
+.modal-body .datasetInspector {
+  height: 50vh;
+  margin-bottom: 100px;
+}*/
