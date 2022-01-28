@@ -37,7 +37,7 @@ export default function DatasetInspector({ dataset, setInspectDataset }) {
           </div>
           <hr />
           <h6>
-            Points ({dataset && dataset.profiles && dataset.profiles.length} points)
+            Records ({dataset && dataset.profiles && dataset.profiles.length} records)
           </h6>
         </Container>
         <Table className='inspectorTable' striped bordered size="sm">

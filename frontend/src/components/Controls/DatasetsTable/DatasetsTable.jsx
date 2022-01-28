@@ -12,9 +12,9 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
 
   const checkColWidth = 40
   const titleColWidth = 145
-  const typeColWidth = 150
-  const pointsColWidth = 65
-  const sizeColWidth = 80
+  const typeColWidth = 115
+  const recordsColWidth = 80
+  const sizeColWidth = 100
   const openButtonColWidth = 70
 
   return (
@@ -25,7 +25,7 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
             <th style={{ width: `${checkColWidth}px`, maxWidth: `${checkColWidth}px` }} title='Select all' onClick={() => handleSelectAllDatasets()}>{selectAll ? <CheckSquare /> : <Square />}</th>
             <th style={{ width: `${titleColWidth}px`, maxWidth: `${titleColWidth}px` }} title='Sort by dataset title'>Title</th>
             <th style={{ width: `${typeColWidth}px`, maxWidth: `${typeColWidth}px` }} title='Sort by dataset type'>Type</th>
-            <th style={{ width: `${pointsColWidth}px`, maxWidth: `${pointsColWidth}px` }} title='Sort by number of points in dataset'>Points</th>
+            <th style={{ width: `${recordsColWidth}px`, maxWidth: `${recordsColWidth}px` }} title='Sort by number of records in dataset'>Records</th>
             <th style={{ width: `${sizeColWidth}px`, maxWidth: `${sizeColWidth}px` }} title='Sort by approximate dataset size in megabytes'>Size</th>
             <th style={{ width: `${openButtonColWidth}px`, maxWidth: `${openButtonColWidth}px` }} title='Open dataset details'>Details</th>
           </tr>
@@ -37,7 +37,7 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                 <td style={{ width: `${checkColWidth}px`, maxWidth: `${checkColWidth}px`, wordWrap: 'break-word' }} onClick={() => handleSelectDataset(point)} title='Select dataset for download'>{point.selected ? <CheckSquare /> : <Square />}</td>
                 <td style={{ width: `${titleColWidth}px`, maxWidth: `${titleColWidth}px`, wordWrap: 'break-word' }} title={point.title}>{abbreviateString(point.title, 40)}</td>
                 <td style={{ width: `${typeColWidth}px`, maxWidth: `${typeColWidth}px`, wordWrap: 'break-word' }} title='Dataset type'>{point.cdm_data_type}</td>
-                <td style={{ width: `${pointsColWidth}px`, maxWidth: `${pointsColWidth}px`, wordWrap: 'break-word' }} title='Number of points in dataset'>{point.profiles.length}</td>
+                <td style={{ width: `${recordsColWidth}px`, maxWidth: `${recordsColWidth}px`, wordWrap: 'break-word' }} title='Number of records in dataset'>{point.profiles.length}</td>
                 <td style={{ width: `${sizeColWidth}px`, maxWidth: `${sizeColWidth}px`, wordWrap: 'break-word' }} title='Approximate dataset size in megabytes'>{bytesToMemorySizeString(point.size)}</td>
                 <td style={{ width: `${openButtonColWidth}px`, maxWidth: `${openButtonColWidth}px`, wordWrap: 'break-word' }} onClick={() => setInspectDataset(point)} title='Open dataset details'>
                   <div className='inspectButton'><ChevronCompactRight /></div>
