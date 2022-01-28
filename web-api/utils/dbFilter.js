@@ -15,7 +15,7 @@ function createDBFilter({
   polygon,
 
   // These are comma separated lists
-  eovs,
+  eovs = "carbon,currents,nutrients,salinity,temperature",
   organizations,
   datasetPKs,
   pointPKs,
