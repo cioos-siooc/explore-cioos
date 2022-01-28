@@ -38,7 +38,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
 
   useEffect(() => {
     if(boxSelectStartCoords && boxSelectEndCoords) {
-      // console.log(map.current)
       if(drawPolygon.current.getAll().features.length > 0) {
         drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
       }
@@ -77,9 +76,9 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       ['in', 'pk']
     )
     
-    if(filter.length > 1000) {
-      return window.alert('Please select 1000 or fewer features')
-    }
+    // if(filter.length > 1000) {
+    //   return window.alert('Please select 1000 or fewer features')
+    // }
 
     map.current.setFilter('points-highlighted', filter)
 
@@ -88,7 +87,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     }
     
     //set selected PKs and polygon
-    console.log(polygon)
     setPolygon(polygon)
   }
 
@@ -257,39 +255,21 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
 
     map.current.on('click', 'points', e => {
       map.current.flyTo({center: [e.lngLat.lng, e.lngLat.lat]})
-      setSelectedPointPKs(e.features.map(point => point.properties.pk))
+      const height = 10
+      const width = 10
       var bbox = [
-        [e.point.x, e.point.y],
-        [e.point.x, e.point.y]
+        [e.point.x - width / 2, e.point.y - height / 2],
+        [e.point.x + width / 2, e.point.y + height / 2]
       ]
-      var features = map.current.queryRenderedFeatures(bbox, {
-        layers: ['points']
-      })
-      
-      // Run through the selected features and set a filter
-      // to match features with unique ids to activate
-      // the `points-selected' layer.
-      var filter = features.reduce(
-        function (memo, feature) {
-          memo.push(feature.properties.pk)
-          return memo
-        },
-        ['in', 'pk']
-        )
-
-      map.current.setFilter('points-highlighted', filter)
-
-      if(drawPolygon.current.getAll().features.length !== 0) {
-        drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
-      }
-      setPolygon()
-      // const clickLngLatBBox = [
-      //   [e.lngLat.lng + 0.001, e.lngLat.lat + 0.001],
-      //   [e.lngLat.lng - 0.001, e.lngLat.lat - 0.001]
-      // ]
-      // const lineString = turf.lineString(clickLngLatBBox)
-      // const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
-      // setPolygon(bboxPolygon.geometry.coordinates[0])
+      const cornerA = map.current.unproject(bbox[0])
+      const cornerB = map.current.unproject(bbox[1])
+      const clickLngLatBBox = [
+        [cornerA.lng, cornerA.lat],
+        [cornerB.lng, cornerB.lat]
+      ]
+      const lineString = turf.lineString(clickLngLatBBox)
+      const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
+      polygonSelection(bboxPolygon.geometry.coordinates[0])
     })
 
     map.current.on('click', 'hexes', e => {
