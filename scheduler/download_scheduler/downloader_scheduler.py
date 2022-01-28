@@ -141,7 +141,10 @@ def run_download(row):
             },
         )
     else:
-        if downloader_output.get("zip_file_size") == "0":
+        # these probably dont both need to be here
+        if downloader_output.get("zip_file_size") == 0 or downloader_output.get(
+            "empty_download"
+        ):
             status = "no-data"
 
         if downloader_output.get("over_limit"):

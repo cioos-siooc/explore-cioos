@@ -64,7 +64,7 @@ router.get("/pointQuery", async function (req, res, next) {
   }
 
   const adder = 0;
-  const multiplier = 1000;
+  const multiplier = 10;
 
   const sql = `WITH sub as (
   SELECT 
@@ -76,9 +76,9 @@ router.get("/pointQuery", async function (req, res, next) {
         organizations,
         d.erddap_url,
         sum(coalesce(nullif(date_part('days',least(${
-          timeMax ? "'timeMax'," : ""
+          timeMax ? `'${timeMax}',` : ""
         }p.time_max)-greatest(${
-    timeMin ? "'timeMin'," : ""
+    timeMin ? `'${timeMin}',` : ""
   }p.time_min)),0),1) * p.records_per_day) as records_count,
         
   
