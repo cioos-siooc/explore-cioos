@@ -1,3 +1,7 @@
+.pointDetails {
+  width: 100%;
+}
+
 .pointDetailsControls {
   border-top: 1px solid darkgrey;
   background-color: #f7f7f7;

@@ -9,9 +9,10 @@ import Loading from '../Loading/Loading.jsx'
 import { server } from '../../../config'
 
 import './styles.css'
+import { createDataFilterQueryString } from '../../../utilities.js'
 
 // Note: datasets and points are exchangable terminology
-export default function SelectionDetails({ pointPKs, setPointsToDownload, query, children }) {
+export default function SelectionDetails({ pointPKs, setPointsToDownload, query, polygon, organizations, children }) {
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState([])
   const [inspectDataset, setInspectDataset] = useState()
@@ -32,21 +33,16 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
   }, [pointsData])
 
   useEffect(() => {
-    if (pointPKs && pointPKs.length !== 0) {
-      let eovsArray = []
-      let eovString
-      Object.keys(query.eovsSelected).forEach(eov => {
-        if (query.eovsSelected[eov]) {
-          eovsArray.push(eov)
-        }
-      })
-      if (eovsArray.length === 0) {
-        eovString = "carbon,currents,nutrients,salinity,temperature"
-      } else {
-        eovString = eovsArray.join(',')
-      }
+    if (pointPKs && pointPKs.length !== 0 || polygon !== undefined) {
+      setInspectDataset()
       setLoading(true)
-      fetch(`${server}/pointQuery?pointPKs=${pointPKs.join(',')}&eovs=${eovsArray}`).then(response => {
+      let urlString
+      if (polygon !== undefined) {
+        urlString = `${server}/pointQuery?polygon=${JSON.stringify(polygon)}&${createDataFilterQueryString(query, organizations)}`
+      } else if (pointPKs && pointPKs.length !== 0) {
+        urlString = `${server}/pointQuery?pointPKs=${pointPKs.join(',')}&${createDataFilterQueryString(query, organizations)}`
+      }
+      fetch(urlString).then(response => {
         if (response.ok) {
           response.json().then(data => {
             setPointsData(data.map(point => {
@@ -60,7 +56,7 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
         }
       })
     }
-  }, [pointPKs])
+  }, [pointPKs, polygon])
 
   function handleSelectDataset(point) {
     let dataset = pointsData.filter((p) => p.dataset_id === point.dataset_id)[0]
