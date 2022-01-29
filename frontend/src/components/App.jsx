@@ -116,7 +116,7 @@ export default function App() {
   function submitRequest() {
     fetch(`${server}/download?${createDataFilterQueryString(query, organizations)}&polygon=${JSON.stringify(polygon)}&email=${email}`).then((response) => {
       if (response.ok) {
-        setSubmissionState('success')
+        setSubmissionState('successful')
       } else {
         setSubmissionState('failed')
       }
