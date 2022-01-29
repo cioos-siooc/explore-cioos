@@ -15,7 +15,11 @@ export default function TimeSelector(props) {
           type="date"
           value={props.startDate}
           max={props.endDate}
-          onChange={(e) => props.setStartDate(e.target.value)}
+          onChange={(e) => {
+            if (new Date(e.target.value) < new Date(props.endDate)) {
+              props.setStartDate(e.target.value)
+            }
+          }}
         />
       </div>
       <div className='date'>
@@ -26,7 +30,11 @@ export default function TimeSelector(props) {
           type="date"
           value={props.endDate}
           min={props.startDate}
-          onChange={(e) => props.setEndDate(e.target.value)}
+          onChange={(e) => {
+            if (new Date(e.target.value) > new Date(props.startDate)) {
+              props.setEndDate(e.target.value)
+            }
+          }}
         />
       </div>
 
