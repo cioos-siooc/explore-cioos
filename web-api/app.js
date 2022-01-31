@@ -4,9 +4,15 @@ var path = require("path");
 var cookieParser = require("cookie-parser");
 var logger = require("morgan");
 var cors = require("cors");
-var indexRouter = require("./routes/index");
-var tilesRouter = require("./routes/tiles");
+
 var downloadRouter = require("./routes/download");
+var indexRouter = require("./routes/index");
+var jobsRouter = require("./routes/jobs");
+var legendRouter = require("./routes/legend");
+var organizationsRouter = require("./routes/organizations");
+var pointQueryRouter = require("./routes/pointQuery");
+var tilesRouter = require("./routes/tiles");
+
 const Sentry = require("@sentry/node");
 // Importing @sentry/tracing patches the global hub for tracing to work.
 const Tracing = require("@sentry/tracing");
@@ -41,8 +47,12 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 
 app.use("/", indexRouter);
-app.use("/tiles", tilesRouter);
 app.use("/download", downloadRouter);
+app.use("/jobs", jobsRouter);
+app.use("/legend", legendRouter);
+app.use("/organizations", organizationsRouter);
+app.use("/pointQuery", pointQueryRouter);
+app.use("/tiles", tilesRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
