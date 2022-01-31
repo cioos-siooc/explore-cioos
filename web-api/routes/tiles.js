@@ -3,13 +3,17 @@ var express = require("express");
 var router = express.Router();
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
+
 console.log("Connecting to redis at", process.env.REDIS_HOST);
+
 var cache = require("express-redis-cache")({
   host: process.env.REDIS_HOST,
 });
+
 cache.on("connected", function (message) {
   console.log(message);
 });
+
 cache.on("message", function (message) {
   console.log(message);
 });
@@ -26,6 +30,7 @@ cache.on("error", function (error) {
     });
   }
 });
+
 /* GET /tiles/:z/:x/:y.mvt */
 /* Retreive a vector tile by tileid */
 router.get("/:z/:x/:y.mvt", cache.route({ binary: true }), async (req, res) => {
@@ -33,6 +38,7 @@ router.get("/:z/:x/:y.mvt", cache.route({ binary: true }), async (req, res) => {
 
   const filters = createDBFilter(req.query);
 
+  // zoom levels: 0-4,5-6,7+
   const isHexGrid = z < 7;
   const zoomColumn = z < 5 ? "hex_zoom_0" : "hex_zoom_1";
 
@@ -42,7 +48,7 @@ router.get("/:z/:x/:y.mvt", cache.route({ binary: true }), async (req, res) => {
     // if its a zoom level where hexes are show, return the hex shapes, otherwise return a point
     geom_column: isHexGrid ? zoomColumn : "geom",
   };
-
+  // not joining to cioos_api.points to get hexagons as that could be slower
   const SQL = `
   with relevent_points as (
         SELECT count(p.*) count, ${isHexGrid ? "" : `point_pk as pk,`} p.${
