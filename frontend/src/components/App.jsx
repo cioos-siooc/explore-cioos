@@ -215,7 +215,10 @@ export default function App() {
             </SelectionPanel>
           </Col>
         )}
+        <div>
         {DownloadButton()}
+        <button className='downloadButton' id='boxQueryButton'>Box Query</button>
+        </div>
       </Controls>
       <a title='Return to CIOOS pacific homepage' className='logo' href='https://cioospacific.ca/' />
       {currentRangeLevel && <Legend currentRangeLevel={currentRangeLevel} />}
