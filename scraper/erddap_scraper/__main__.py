@@ -5,13 +5,17 @@ import sys
 import threading
 import uuid
 
+import numpy as np
 import pandas as pd
-from ckan_scraper.create_ckan_erddap_link import get_ckan_records
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
-
+from erddap_scraper.ckan.create_ckan_erddap_link import get_ckan_records
 from erddap_scraper.scrape_erddap import scrape_erddap
-from erddap_scraper.utils import outersection, supported_standard_names
+from erddap_scraper.utils import (
+    get_df_eov_to_standard_names,
+    supported_standard_names,
+    cf_standard_names,
+)
+from sqlalchemy import create_engine
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -74,35 +78,52 @@ def main(erddap_urls, csv_only, cache_requests):
     datasets_not_added_total = []
 
     for [profile, dataset, datasets_not_added, variable] in result:
-        profiles = profiles.append(profile)
-        datasets = datasets.append(dataset)
+        profiles = pd.concat([profiles, profile])
+        datasets = pd.concat([datasets, dataset])
         datasets_not_added_total = datasets_not_added_total + datasets_not_added
-        variables = variables.append(variable)
+        variables = pd.concat([variables, variable])
 
     uuid_suffix = str(uuid.uuid4())[0:6]
     datasets_file = f"datasets_{uuid_suffix}.csv"
     profiles_file = f"profiles_{uuid_suffix}.csv"
     variables_file = f"variables_{uuid_suffix}.csv"
+    ckan_file = f"ckan_{uuid_suffix}.csv"
 
     if datasets.empty:
         print("No datasets scraped")
         return
 
     # see what standard names arent covered by our EOVs:
-    standard_names_harvested = variables["standard_name"].to_list()
-    standard_names_not_harvested = outersection(
-        standard_names_harvested, supported_standard_names
+    standard_names_harvested = (
+        variables.query("not standard_name.isnull()")["standard_name"].unique().tolist()
     )
-    print(
-        "Found these standard_names that CEDA doesnt support yet:\n",
-        standard_names_not_harvested,
-    )
+
+    llat_variables = ["latitude", "longitude", "time", "depth", ""]
+
+    # this gets a list of all the standard names
+
+    standard_names_not_harvested = [
+        x
+        for x in standard_names_harvested
+        if x not in supported_standard_names + llat_variables
+    ]
+
+    standard_names_not_harvested_that_are_real = [
+        x for x in standard_names_not_harvested if x in cf_standard_names
+    ]
+
+    if standard_names_not_harvested_that_are_real:
+        print(
+            "Found these standard_names that CEDA doesnt support yet:\n",
+            standard_names_not_harvested_that_are_real,
+        )
+
     # query CKAN national for more metadata related to the ERDDAP datsets we have so far
     print("Gathering CKAN data")
     df_ckan = get_ckan_records(datasets["dataset_id"].to_list(), cache=cache_requests)
     datasets = (
         datasets.set_index(["erddap_url", "dataset_id"])
-        .join(df_ckan.set_index(["erddap_url", "dataset_id"]))
+        .join(df_ckan.set_index(["erddap_url", "dataset_id"]), how="left")
         .reset_index()
     )
 
@@ -122,13 +143,17 @@ def main(erddap_urls, csv_only, cache_requests):
         datasets.to_csv(datasets_file, index=False)
         profiles.to_csv(profiles_file, index=False)
         variables.to_csv(variables_file, index=False)
-        print("Wrote", datasets_file, profiles_file, variables_file)
+        df_ckan.to_csv(ckan_file, index=False)
+        print("Wrote", datasets_file, profiles_file, variables_file, ckan_file)
     else:
         schema = "cioos_api"
         with engine.begin() as transaction:
             print("Writing to DB:")
             print("Clearing tables")
             transaction.execute("SELECT remove_all_data();")
+
+            print("Writing datasets")
+
             datasets.to_sql(
                 "datasets",
                 con=transaction,
@@ -137,6 +162,10 @@ def main(erddap_urls, csv_only, cache_requests):
                 index=False,
             )
 
+            profiles["profile_id"] = profiles["profile_id"].replace("", np.NaN)
+
+            print("Writing profiles")
+
             profiles.to_sql(
                 "profiles",
                 con=transaction,
@@ -144,7 +173,9 @@ def main(erddap_urls, csv_only, cache_requests):
                 schema=schema,
                 index=False,
             )
+            variables = variables.replace("", np.NaN)
 
+            print("Writing erddap_variables")
             variables.to_sql(
                 "erddap_variables",
                 con=transaction,
@@ -152,9 +183,21 @@ def main(erddap_urls, csv_only, cache_requests):
                 schema=schema,
                 index=False,
             )
+
+            print("Writing eov_to_standard_name")
+            get_df_eov_to_standard_names().to_sql(
+                "eov_to_standard_name",
+                con=transaction,
+                if_exists="append",
+                schema=schema,
+                index=False,
+            )
+
             print("Processing new records")
             transaction.execute("SELECT profile_process();")
             transaction.execute("SELECT ckan_process();")
+
+            print("Creating hexes")
             transaction.execute("SELECT create_hexes();")
 
         print("Wrote to db:", f"{schema}.datasets")

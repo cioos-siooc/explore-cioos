@@ -1,7 +1,8 @@
-import pdfkit
-import warnings
-import traceback
 import os
+import traceback
+import warnings
+
+import pdfkit
 
 
 def download_pdf(url, filename):

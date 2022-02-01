@@ -68,10 +68,8 @@ docker volume rm ceda_postgres-data
 docker-compose up -d db
 ```
 
-
 Redis CLI:
 `docker exec -it ceda_redis_1 redis-cli`
-
 
 Flush redis tile cache:
 `docker exec -it ceda_redis_1 redis-cli FLUSHALL`
@@ -101,7 +99,7 @@ From the production server,
 - Scrape data:
 
   ```sh
-  source virtualenv/bin/activate
+  source venv/bin/activate
   pip install -e ./scraper
   sh data_loader.sh
   ```

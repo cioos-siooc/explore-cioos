@@ -1,5 +1,6 @@
-import zipfile
 import os
+import zipfile
+
 
 # From https://stackoverflow.com/questions/1855095/how-to-create-a-zip-archive-of-a-directory
 def zip_folder(path, zip_full_path):

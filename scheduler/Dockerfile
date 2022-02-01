@@ -14,6 +14,7 @@ COPY . .
 RUN pip install ./downloader
 RUN pip install ./scheduler
 RUN pip install ./scraper
+RUN pip install ./erddap_estimate
 
 # -u seems to be needed to get it to print to stdout
 CMD [ "python", "-u","-m","download_scheduler" ]

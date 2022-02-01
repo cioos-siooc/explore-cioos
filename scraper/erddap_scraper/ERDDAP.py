@@ -30,6 +30,11 @@ class ERDDAP(object):
                 size_limit=10000000000,
                 cull_limit=0,
             )
+            print("Cache stats:")
+            print("eviction_policy", self.cache.eviction_policy)
+            print("count", self.cache.count)
+            print("volume()", self.cache.volume())
+            print("size_limit", self.cache.size_limit)
 
         self.url = erddap_url
         self.domain = urlparse(erddap_url).netloc
