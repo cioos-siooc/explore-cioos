@@ -6,19 +6,21 @@ import * as turf from '@turf/turf'
 
 import './styles.css'
 
-import {server} from '../../config'
+import { server}  from '../../config'
 import { createDataFilterQueryString } from "../../utilities"
+import { colorScale } from "../config"
+import { set } from "lodash"
 
 const config = {
   fillOpacity: 0.8,
   // colorScale: ["#DDF3DF",  "#B0E1C8" , "#85CDC4" , "#5CA2B8" , "#4B719B", "#3B487E", "#302B5F"],
   // colorScale: ["#D2F4F0","#BDE7E2","#A7DAD4","#92CEC6","#7DC1B7","#67B4A9", "#52A79B"]
   // colorScale: ["#bbddd8","#9fd0c9","#76bcb2","#52a79b","#4a968c","#3d7b73", "#2f6059"]
-  colorScale: ["#52A79B","#4A968C","#3D7B73","#2F6059","#224440","#1B3733", "#142926"]
+  colorScale: colorScale
 }
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setLoading, organizations}) {
+export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setLoading, organizations, zoom, setZoom}) {
   const mapContainer = useRef(null)
   const map = useRef(null)
   const drawControlOptions = {
@@ -145,7 +147,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
         ],
       },
       center: [-125, 49], // starting position
-      zoom: 2, // starting zoom
+      zoom: zoom, // starting zoom
     })
 
     // Called order determines stacking order
@@ -180,20 +182,13 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
             'interpolate',
             ['linear'],
             ['get', 'count'],
-            1,
-            config.colorScale[0],
-            3,
-            config.colorScale[1],
-            9,
-            config.colorScale[2],
-            27,
-            config.colorScale[3],
-            81,
-            config.colorScale[4],
-            243,
-            config.colorScale[5],
-            729,
-            config.colorScale[6],
+            1, config.colorScale[0],
+            3, config.colorScale[1],
+            9, config.colorScale[2],
+            27, config.colorScale[3],
+            81, config.colorScale[4],
+            243, config.colorScale[5],
+            729, config.colorScale[6],
           ],
 
         },
@@ -349,6 +344,11 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
 
     map.current.on('mouseup', e => {
       setBoxSelectEndCoords([e.lngLat.lng, e.lngLat.lat])
+    })
+
+    map.current.on('zoomend', e => {
+      console.log('zoom ended')
+      setZoom(map.current.getZoom())
     })
   })
 

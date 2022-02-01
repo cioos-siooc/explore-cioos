@@ -1,24 +1,27 @@
 import React from 'react'
 import { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom'
-import * as Sentry from "@sentry/react";
-import { Integrations } from "@sentry/tracing";
+import * as Sentry from "@sentry/react"
+import { Integrations } from "@sentry/tracing"
 import { Col, Spinner } from 'react-bootstrap'
-import { CheckCircle, XCircle } from 'react-bootstrap-icons';
+import { CheckCircle, XCircle } from 'react-bootstrap-icons'
 
-import Controls from "./Controls/Controls.jsx";
-import Map from "./Map/Map.js";
+import Controls from "./Controls/Controls.jsx"
+import Map from "./Map/Map.js"
 import SelectionPanel from './Controls/SelectionPanel/SelectionPanel.jsx'
 import SelectionDetails from './Controls/SelectionDetails/SelectionDetails.jsx'
-import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx';
-import Loading from './Controls/Loading/Loading.jsx';
-import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from './config.js';
+import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx'
+import Loading from './Controls/Loading/Loading.jsx'
+import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from './config.js'
 
-import "bootstrap/dist/css/bootstrap.min.css";
+import "bootstrap/dist/css/bootstrap.min.css"
 
-import "./styles.css";
-import { createDataFilterQueryString, validateEmail } from '../utilities.js';
-import { server } from '../config.js';
+import "./styles.css"
+import { createDataFilterQueryString, validateEmail } from '../utilities.js'
+import { server } from '../config.js'
+import { colorScale } from './config.js'
+import _ from 'lodash'
+import Legend from './Controls/Legend/Legend.jsx'
 
 if (process.env.NODE_ENV === "production") {
   Sentry.init({
@@ -43,17 +46,9 @@ export default function App() {
   const [submissionIcon, setSubmissionIcon] = useState()
   const [loading, setLoading] = useState(true)
   const [organizations, setOrganizations] = useState()
-
-  useEffect(() => {
-    fetch(`${server}/organizations`).then(response => response.json()).then(data => {
-      let orgsReturned = {}
-      data.forEach(elem => {
-        orgsReturned[elem.name] = elem.pk
-      })
-      setOrganizations(orgsReturned)
-    }).catch(error => { throw error })
-  }, [])
-
+  const [zoom, setZoom] = useState(2)
+  const [legendLevels, setLegendLevels] = useState()
+  const [legendLevel, setLegendLevel] = useState()
   const [query, setQuery] = useState({
     startDate: defaultStartDate,
     endDate: defaultEndDate,
@@ -63,15 +58,40 @@ export default function App() {
     orgsSelected: defaultOrgsSelected
   })
 
-  function handleEmailChange(value) {
-    setEmailValid(validateEmail(value))
-    setEmail(value)
-    setSubmissionState()
+  function fetchLegend() {
+    fetch(`${server}/legend?${createDataFilterQueryString(query)}`).then(response => response.json()).then(legend => {
+      if (legend) {
+        console.log(legend)
+        setLegendLevels(legend.recordsCount)
+        setLegendLevel(getLegendLevel())
+      } else {
+        console.log('legend query failed')
+      }
+    })
   }
 
-  function handleSubmission() {
-    setSubmissionState('submitted')
-  }
+  // useEffect(() => {
+  //   fetchLegend()
+  // }, [])
+
+  useEffect(() => {
+    fetchLegend()
+  }, [query])
+
+  useEffect(() => {
+    console.log('points to download', pointsToDownload)
+  }, [pointsToDownload])
+
+  useEffect(() => {
+    fetch(`${server}/organizations`).then(response => response.json()).then(data => {
+      let orgsReturned = {}
+      data.forEach(elem => {
+        orgsReturned[elem.name] = elem.pk
+      })
+      setOrganizations(orgsReturned)
+    }).catch(error => { throw error })
+    fetchLegend()
+  }, [])
 
   useEffect(() => {
     switch (submissionState) {
@@ -113,6 +133,16 @@ export default function App() {
     }
   }, [submissionState])
 
+  function handleEmailChange(value) {
+    setEmailValid(validateEmail(value))
+    setEmail(value)
+    setSubmissionState()
+  }
+
+  function handleSubmission() {
+    setSubmissionState('submitted')
+  }
+
   function submitRequest() {
     fetch(`${server}/download?${createDataFilterQueryString(query, organizations)}&polygon=${JSON.stringify(polygon)}&email=${email}`).then((response) => {
       if (response.ok) {
@@ -129,20 +159,35 @@ export default function App() {
         disabled={_.isEmpty(selectedPointPKs)}
       >
         <SelectionDetails
-          pointPKs={selectedPointPKs}
+          pointPKs={pointsToDownload && pointsToDownload.map(point => point.pk)}
           setPointsToDownload={setPointsToDownload}
           query={query}
           polygon={polygon}
           organizations={organizations}
+          width={740}
         >
           <input className='emailAddress' type='email' placeholder='email@email.com' onChange={e => handleEmailChange(e.target.value)} />
-          <button className='submitRequestButton' disabled={!emailValid} onClick={() => handleSubmission()}>Submit Request</button>
+          <button className='submitRequestButton' disabled={!emailValid || _.isEmpty(pointsToDownload)} onClick={() => handleSubmission()}>Submit Request</button>
           {submissionIcon}
         </SelectionDetails>
       </DataDownloadModal >
     )
   }
 
+  function getLegendLevel() {
+    console.log(zoom)
+    switch (zoom) {
+      case 0 <= zoom < 5:
+        return legendLevels['zoom0']
+      case 5 <= zoom < 7:
+        return legendLevels['zoom1']
+      case 7 <= zoom:
+        return legendLevels['zoom2']
+      default:
+        break;
+    }
+  }
+  console.log('loading', loading)
   return (
     <div>
       {loading && <Loading />}
@@ -153,6 +198,8 @@ export default function App() {
         query={query}
         polygon={polygon}
         organizations={organizations}
+        zoom={zoom}
+        setZoom={setZoom}
       />
       <Controls
         setQuery={setQuery}
@@ -167,6 +214,7 @@ export default function App() {
                 query={query}
                 polygon={polygon}
                 organizations={organizations}
+                width={550}
               >
                 {DownloadButton()}
               </SelectionDetails>
@@ -176,6 +224,7 @@ export default function App() {
         {DownloadButton()}
       </Controls>
       <a title='Return to CIOOS pacific homepage' className='logo' href='https://cioospacific.ca/' />
+      <Legend colorScale={colorScale} legendLevel={legendLevel} />
     </div>
   );
 }

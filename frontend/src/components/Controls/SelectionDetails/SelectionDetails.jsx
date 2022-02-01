@@ -12,7 +12,7 @@ import './styles.css'
 import { createDataFilterQueryString } from '../../../utilities.js'
 
 // Note: datasets and points are exchangable terminology
-export default function SelectionDetails({ pointPKs, setPointsToDownload, query, polygon, organizations, children }) {
+export default function SelectionDetails({ pointPKs, setPointsToDownload, query, polygon, organizations, width, children }) {
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState([])
   const [inspectDataset, setInspectDataset] = useState()
@@ -100,6 +100,7 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
               setInspectDataset={setInspectDataset}
               selectAll={selectAll}
               datasets={pointsData}
+              width={width}
             />
           )
         }
