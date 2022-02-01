@@ -1,8 +1,8 @@
 .legend {
   position: absolute;
   bottom: 10px;
-  left: calc(50% - 150px);
-  width: 300px;
+  left: calc(50% - 175px);
+  width: 350px;
   height: 30px;
   background-color: #f7f7f7;
   border-radius: 30px;

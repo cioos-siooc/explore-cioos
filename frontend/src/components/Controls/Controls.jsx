@@ -15,7 +15,7 @@ import { ArrowsExpand, Building, CalendarWeek, Water } from 'react-bootstrap-ico
 import './styles.css'
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from '../config.js'
 
-export default function Controls({ setQuery, children }) {
+export default function Controls({ setQuery, organizations, children }) {
 
   // Making changes to context within context consumers (ie. passing mutable state down to children to manipulate)
   //https://stackoverflow.com/questions/41030361/how-to-update-react-context-from-inside-a-child-component
@@ -27,15 +27,15 @@ export default function Controls({ setQuery, children }) {
 
   // Organization filter initial values from API and state
   const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected)
-  useEffect(() => {
-    fetch(`${server}/organizations`).then(response => response.json()).then(data => {
-      let orgsReturned = {}
-      data.forEach(elem => {
-        orgsReturned[elem.name] = false
-      })
-      setOrgsSelected(orgsReturned)
-    }).catch(error => { throw error })
-  }, [])
+  // useEffect(() => {
+  //   fetch(`${server}/organizations`).then(response => response.json()).then(data => {
+  //     let orgsReturned = {}
+  //     data.forEach(elem => {
+  //       orgsReturned[elem.name] = false
+  //     })
+  //     setOrgsSelected(orgsReturned)
+  //   }).catch(error => { throw error })
+  // }, [])
   const orgsFilterName = 'Organizations'
   const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterName, orgsSelected)
 

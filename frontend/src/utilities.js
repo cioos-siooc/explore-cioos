@@ -1,4 +1,5 @@
 import * as _ from 'lodash'
+import * as d3 from 'd3'
 
 export function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
@@ -94,6 +95,13 @@ export function bytesToMemorySizeString(bytes) {
   }
 }
 
-export function generateColorScale(colorScale, range) {
-  
+// returns an array of {stop: num, color: string} objects
+export function generateColorStops(colorScale, range) {
+  const scale = d3.scalePow().exponent(10).domain([0, colorScale.length - 1]).range(range)
+  return colorScale.map((color, index) => {
+    return {
+      stop: Math.floor(scale(index)),
+      color: color
+    }
+  })
 }

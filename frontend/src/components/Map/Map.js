@@ -11,13 +11,13 @@ import { createDataFilterQueryString } from "../../utilities"
 import { colorScale } from "../config"
 import { set } from "lodash"
 
-const config = {
-  fillOpacity: 0.8,
-  // colorScale: ["#DDF3DF",  "#B0E1C8" , "#85CDC4" , "#5CA2B8" , "#4B719B", "#3B487E", "#302B5F"],
-  // colorScale: ["#D2F4F0","#BDE7E2","#A7DAD4","#92CEC6","#7DC1B7","#67B4A9", "#52A79B"]
-  // colorScale: ["#bbddd8","#9fd0c9","#76bcb2","#52a79b","#4a968c","#3d7b73", "#2f6059"]
-  colorScale: colorScale
-}
+// const config = {
+//   fillOpacity: 0.8,
+//   // colorScale: ["#DDF3DF",  "#B0E1C8" , "#85CDC4" , "#5CA2B8" , "#4B719B", "#3B487E", "#302B5F"],
+//   // colorScale: ["#D2F4F0","#BDE7E2","#A7DAD4","#92CEC6","#7DC1B7","#67B4A9", "#52A79B"]
+//   // colorScale: ["#bbddd8","#9fd0c9","#76bcb2","#52a79b","#4a968c","#3d7b73", "#2f6059"]
+//   colorScale: colorScale
+// }
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
 export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setLoading, organizations, zoom, setZoom}) {
@@ -182,13 +182,13 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
             'interpolate',
             ['linear'],
             ['get', 'count'],
-            1, config.colorScale[0],
-            3, config.colorScale[1],
-            9, config.colorScale[2],
-            27, config.colorScale[3],
-            81, config.colorScale[4],
-            243, config.colorScale[5],
-            729, config.colorScale[6],
+            1, colorScale[0],
+            3, colorScale[1],
+            9, colorScale[2],
+            27, colorScale[3],
+            81, colorScale[4],
+            243, colorScale[5],
+            729, colorScale[6],
           ],
 
         },
@@ -208,18 +208,19 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
 
         paint: {
           "fill-opacity": 0.7,
-          "fill-color": {
-            property: "count",
-            stops: [
-              [1, config.colorScale[0]],
-              [3, config.colorScale[1]],
-              [9, config.colorScale[2]],
-              [27, config.colorScale[3]],
-              [81, config.colorScale[4]],
-              [243, config.colorScale[5]],
-              [729, config.colorScale[6]],
-            ],
-          },
+          "fill-color": 
+          [
+            'interpolate',
+            ['linear'],
+            ['get', 'count'],
+            1, colorScale[0],
+            3, colorScale[1],
+            9, colorScale[2],
+            27, colorScale[3],
+            81, colorScale[4],
+            243, colorScale[5],
+            729, colorScale[6],
+          ],
         },
       })
 
