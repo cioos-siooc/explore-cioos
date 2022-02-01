@@ -6,10 +6,15 @@ import pandas as pd
 
 def get_eov_to_standard_names():
     dir = os.path.dirname(os.path.realpath(__file__))
+    supported_eovs = pd.read_csv(dir + "/supported_eovs.csv")["goos_eov"].to_list()
 
     with open(dir + "/eovs_to_standard_name.json") as f:
         eov_to_standard_names = json.loads(f.read())
-        return eov_to_standard_names
+        return {
+            k: eov_to_standard_names[k]
+            for k in eov_to_standard_names
+            if k in supported_eovs
+        }
 
 
 def get_df_eov_to_standard_names():
@@ -45,3 +50,19 @@ cf_standard_names = (
 
 eov_to_standard_names = get_eov_to_standard_names()
 supported_standard_names = flatten(list(eov_to_standard_names.values()))
+
+
+def get_ceda_eov_map():
+    dir = os.path.dirname(os.path.realpath(__file__))
+    return pd.read_csv(dir + "/supported_eovs.csv").set_index("goos_eov")
+
+
+ceda_eov_map = get_ceda_eov_map()
+
+
+def eovs_to_ceda_eovs(lst):
+    print("lst", lst)
+    out = []
+    for eov in lst:
+        out += [ceda_eov_map.loc[eov]["ceda_eov"]]
+    return out

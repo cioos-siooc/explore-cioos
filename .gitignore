@@ -26,3 +26,4 @@ venv
 erddap_scraper_dc
 venv
 build
+!scraper/**/*.csv

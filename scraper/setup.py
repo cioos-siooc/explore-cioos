@@ -9,7 +9,7 @@ setup(
     url="",
     packages=["erddap_scraper"],
     include_package_data=True,
-    package_data={"": ["eovs_to_standard_name.json"]},
+    package_data={"": ["eovs_to_standard_name.json", "supported_eovs.csv"]},
     install_requires=[
         "pandas",
         "erddapy",
@@ -18,5 +18,6 @@ setup(
         "psycopg2-binary",
         "python-dotenv",
         "diskcache",
+        "lxml",
     ],
 )
