@@ -19,7 +19,6 @@ import "bootstrap/dist/css/bootstrap.min.css"
 import "./styles.css"
 import { createDataFilterQueryString, validateEmail } from '../utilities.js'
 import { server } from '../config.js'
-import { colorScale } from './config.js'
 import _ from 'lodash'
 import Legend from './Controls/Legend/Legend.jsx'
 
@@ -47,8 +46,6 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [organizations, setOrganizations] = useState()
   const [zoom, setZoom] = useState(2)
-  const [legendLevels, setLegendLevels] = useState()
-  const [legendLevel, setLegendLevel] = useState()
   const [query, setQuery] = useState({
     startDate: defaultStartDate,
     endDate: defaultEndDate,
@@ -57,26 +54,6 @@ export default function App() {
     eovsSelected: defaultEovsSelected,
     orgsSelected: defaultOrgsSelected
   })
-
-  function fetchLegend() {
-    fetch(`${server}/legend?${createDataFilterQueryString(query)}`).then(response => response.json()).then(legend => {
-      if (legend) {
-        console.log(legend)
-        setLegendLevels(legend.recordsCount)
-        setLegendLevel(getLegendLevel())
-      } else {
-        console.log('legend query failed')
-      }
-    })
-  }
-
-  // useEffect(() => {
-  //   fetchLegend()
-  // }, [])
-
-  useEffect(() => {
-    fetchLegend()
-  }, [query])
 
   useEffect(() => {
     console.log('points to download', pointsToDownload)
@@ -90,7 +67,6 @@ export default function App() {
       })
       setOrganizations(orgsReturned)
     }).catch(error => { throw error })
-    fetchLegend()
   }, [])
 
   useEffect(() => {
@@ -174,20 +150,7 @@ export default function App() {
     )
   }
 
-  function getLegendLevel() {
-    console.log(zoom)
-    switch (zoom) {
-      case 0 <= zoom < 5:
-        return legendLevels['zoom0']
-      case 5 <= zoom < 7:
-        return legendLevels['zoom1']
-      case 7 <= zoom:
-        return legendLevels['zoom2']
-      default:
-        break;
-    }
-  }
-  console.log('loading', loading)
+
   return (
     <div>
       {loading && <Loading />}
@@ -204,6 +167,7 @@ export default function App() {
       <Controls
         setQuery={setQuery}
         setLoading={setLoading}
+        organizations={organizations}
       >
         {selectedPointPKs && (
           <Col xs='auto' className='selectionPanelColumn'>
@@ -224,7 +188,7 @@ export default function App() {
         {DownloadButton()}
       </Controls>
       <a title='Return to CIOOS pacific homepage' className='logo' href='https://cioospacific.ca/' />
-      <Legend colorScale={colorScale} legendLevel={legendLevel} />
+      <Legend zoom={zoom} query={query} />
     </div>
   );
 }
