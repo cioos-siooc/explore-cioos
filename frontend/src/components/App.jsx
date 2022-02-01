@@ -112,7 +112,7 @@ export default function App() {
   }, [submissionState])
 
   useEffect(() => {
-    fetch(`${server}/legend?${createDataFilterQueryString(query)}`).then(response => response.json()).then(legend => {
+    fetch(`${server}/legend?${createDataFilterQueryString(query, organizations)}`).then(response => response.json()).then(legend => {
       if (legend) {
         setRangeLevels(legend.recordsCount)
       } else {
