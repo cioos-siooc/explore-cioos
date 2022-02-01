@@ -3,6 +3,7 @@ import maplibreGl, { NavigationControl, Popup } from "maplibre-gl"
 import MapboxDraw from "@mapbox/mapbox-gl-draw"
 import { useState, useEffect, useRef } from "react"
 import * as turf from '@turf/turf'
+import DrawRectangle from 'mapbox-gl-draw-rectangle-mode';
 
 import './styles.css'
 
@@ -31,10 +32,16 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       polygon: true, 
       trash: true,
       combine_features: false,
-      uncombine_features: false
+      uncombine_features: false,
+      modes: Object.assign(MapboxDraw.modes, {
+    draw_rectangle: DrawRectangle,
+  }),
     }
   }
-  const drawPolygon = useRef(new MapboxDraw(drawControlOptions))
+
+  const draw = new MapboxDraw(drawControlOptions)
+  const drawPolygon = useRef(draw)
+
   const [boxSelectStartCoords, setBoxSelectStartCoords] = useState()
   const [boxSelectEndCoords, setBoxSelectEndCoords] = useState()
 
@@ -156,6 +163,9 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
 
     //
     map.current.on("load", () => {
+      const boxQueryElement = document.getElementById('boxQueryButton');
+      boxQueryElement.onclick=()=>draw.changeMode('draw_rectangle');
+    
       const query = {
         timeMin: "1900-01-01",
         timeMax: new Date().toLocaleDateString(),
