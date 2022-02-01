@@ -27,15 +27,15 @@ export default function Controls({ setQuery, organizations, children }) {
 
   // Organization filter initial values from API and state
   const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected)
-  // useEffect(() => {
-  //   fetch(`${server}/organizations`).then(response => response.json()).then(data => {
-  //     let orgsReturned = {}
-  //     data.forEach(elem => {
-  //       orgsReturned[elem.name] = false
-  //     })
-  //     setOrgsSelected(orgsReturned)
-  //   }).catch(error => { throw error })
-  // }, [])
+  useEffect(() => {
+    fetch(`${server}/organizations`).then(response => response.json()).then(data => {
+      let orgsReturned = {}
+      data.forEach(elem => {
+        orgsReturned[elem.name] = false
+      })
+      setOrgsSelected(orgsReturned)
+    }).catch(error => { throw error })
+  }, [])
   const orgsFilterName = 'Organizations'
   const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterName, orgsSelected)
 

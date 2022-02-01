@@ -1,7 +1,8 @@
 .legend {
   position: absolute;
   bottom: 10px;
-  left: calc(50% - 175px);
+  left: 50%;
+  transform: translate(-50%, 0); 
   width: fit-content;
   height: 30px;
   background-color: #f7f7f7;
