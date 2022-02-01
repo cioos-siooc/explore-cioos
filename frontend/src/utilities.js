@@ -1,5 +1,6 @@
 import * as _ from 'lodash'
 import * as d3 from 'd3'
+import {useState, useEffect} from 'react'
 
 export function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
@@ -97,11 +98,51 @@ export function bytesToMemorySizeString(bytes) {
 
 // returns an array of {stop: num, color: string} objects
 export function generateColorStops(colorScale, range) {
-  const scale = d3.scalePow().exponent(10).domain([0, colorScale.length - 1]).range(range)
-  return colorScale.map((color, index) => {
+  //check if fewer points than colors
+  const exponent = 5
+  let colors
+  let scale
+  if(range[1] <= colorScale.length * 2) {
+    colors = colorScale.slice(0, range[1])
+    scale = d3.scaleLinear().domain([0, colors.length - 1]).range(range)
+  } else {
+    colors = colorScale
+    scale = d3.scalePow().exponent(exponent).domain([0, colors.length - 1]).range(range)
+  }
+  let colorStops = colors.map((color, index) => {
     return {
       stop: Math.floor(scale(index)),
       color: color
     }
   })
+  const result = []
+  const map = new Map()
+  colorStops.map(colorStop => { // ensure there aren't duplicates
+    if(!map.has(colorStop.stop)) {
+      map.set(colorStop.stop, true)
+      result.push(colorStop)
+    } 
+  })
+  return result 
+}
+
+export function useDebounce(value, delay) {
+  // State and setters for debounced value
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(
+    () => {
+      // Update debounced value after delay
+      const handler = setTimeout(() => {
+        setDebouncedValue(value);
+      }, delay);
+      // Cancel the timeout if value changes (also on delay change or unmount)
+      // This is how we prevent debounced value from updating if value is changed ...
+      // .. within the delay period. Timeout gets cleared and restarted.
+      return () => {
+        clearTimeout(handler);
+      };
+    },
+    [value, delay] // Only re-call effect if value or delay changes
+  );
+  return debouncedValue;
 }
