@@ -1,0 +1,27 @@
+.multiCheckboxFilter {
+  white-space: nowrap;
+  max-height: 30vh;
+  overflow: auto;
+}
+
+.multiCheckboxFilter label{
+  height: 30px;
+}
+
+.multiCheckboxFilter > * {
+  margin: 0px 10px 10px 10px;
+}
+
+.optionName {
+  margin-left: 10px;
+} 
+
+.optionButton {
+  cursor: pointer;
+  line-height: 30px;
+  padding-right: 15px;
+}
+
+.optionButton:hover {
+  background-color: lightgray;
+}

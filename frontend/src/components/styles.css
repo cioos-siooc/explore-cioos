@@ -1,17 +1,39 @@
-#map {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 100%;
-  margin: 0px;
-  min-height: 900px;
-  overflow-y: auto;
-}
 .mapboxgl-ctrl-group > button {
   width: 42px;
   height: 42px;
 }
-html {
-  
-  max-height: 300px;
+
+.row > .selectionPanelColumn {
+  padding-left: 0px;
+  padding-right: 0px;
+}
+
+.logo {
+  width: 153px;
+  height: 60px;
+  border: 2px solid transparent;
+  pointer-events: all;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-image: url(./Images/CIOOSNationalLogoBlack.svg);
+  background-color: transparent;
+  background-repeat: no-repeat;
+  border-radius: 10px;
+  background-size: 148px 55px;
+}
+
+.logo:hover {
+  background-color: #f7f7f7;
+  border: 2px solid lightgray;
+}
+
+@media all and (max-width: 900px) {
+  .logo {
+    left: calc(900px - 163px);
+  }
+}
+
+.emailAddress {
+  height: 40px;
 }

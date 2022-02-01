@@ -1,0 +1,52 @@
+.filter {
+  pointer-events: none;
+  position:relative;
+  /* margin-left: 10px; */
+}
+
+.filterHeader:hover {
+  background-color: lightgray;
+}
+
+.filterHeader {
+  pointer-events: all;
+  background-color: #f7f7f7;
+  display: inline-flex;
+  text-align: center;
+  border-radius: 30px;
+  padding: 5px;
+  cursor: pointer;
+}
+
+.filterHeader > *{
+  margin: 0px 5px;
+  height: 30px;
+}
+
+.filterHeader button {
+  border-radius: 10px;
+}
+
+.filterOptions {
+  pointer-events: all;
+  position:absolute;
+  top: 45px;
+  left: 0px;
+  z-index: 10;
+  background-color: #f7f7f7;
+  border-radius: 10px;
+  padding: 10px;
+  max-width: fit-content;
+}
+
+.filterOptions button {
+  background-color: #f7f7f7;
+  border: solid 2px darkgrey;
+  border-radius: 10px;
+  margin: 5px 5px;
+  height: 30px;
+}
+
+.filterOptions button:hover {
+  background-color: lightgray;
+}

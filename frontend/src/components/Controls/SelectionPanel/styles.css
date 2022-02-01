@@ -1,0 +1,55 @@
+.selectionPanel {
+  pointer-events: all;
+  display: flex;
+  height: 98vh;
+}
+
+@media all and (max-height: 400px) {
+  .panelContents {
+    height: 400px;
+    position: absolute;
+  }
+}
+
+/* .sidePanelOpen {
+  width: 500px;
+} */
+
+.panelContents {
+  background-color: #f7f7f7;
+  position: relative;
+  top: -10px;
+  left: 0px;
+  /* z-index: 10; */
+  width: 560px;
+  height: 100vh;
+  /* overflow-y: hidden; */
+}
+
+.panelContents.open {
+  width:400px
+}
+
+.panelHandle {
+  background-color: #f7f7f7;
+  position: relative;
+  top: 0px;
+  left: 0px;
+  z-index: 10;
+  width: 20px;
+  height: 40px;
+  border-radius: 0px 10px 10px 0px;
+  border-top: 2px solid darkgrey;
+  border-right: 2px solid darkgrey;
+  border-bottom: 2px solid darkgrey;
+
+}
+
+.panelHandle:hover {
+  background-color: lightgray;
+}
+
+.panelHandle svg {
+  margin-top: 10px;
+}
+
