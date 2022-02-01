@@ -46,6 +46,8 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [organizations, setOrganizations] = useState()
   const [zoom, setZoom] = useState(2)
+  const [legendLevels, setLegendLevels] = useState()
+  const [legendLevel, setLegendLevel] = useState()
   const [query, setQuery] = useState({
     startDate: defaultStartDate,
     endDate: defaultEndDate,
@@ -108,6 +110,34 @@ export default function App() {
         break;
     }
   }, [submissionState])
+
+  useEffect(() => {
+    fetch(`${server}/legend?${createDataFilterQueryString(query)}`).then(response => response.json()).then(legend => {
+      if (legend) {
+        setLegendLevels(legend.recordsCount)
+      } else {
+        console.log('legend query failed')
+      }
+    })
+  }, [query])
+
+  useEffect(() => {
+    if (legendLevels) {
+      switch (true) {
+        case zoom < 5:
+          setLegendLevel(legendLevels['zoom0'])
+          break;
+        case zoom >= 5 && zoom < 7:
+          setLegendLevel(legendLevels['zoom1'])
+          break;
+        case zoom >= 7:
+          setLegendLevel(legendLevels['zoom2'])
+          break;
+        default:
+          console.log('no match in zoom switch case')
+      }
+    }
+  }, [legendLevels, zoom])
 
   function handleEmailChange(value) {
     setEmailValid(validateEmail(value))
@@ -188,7 +218,7 @@ export default function App() {
         {DownloadButton()}
       </Controls>
       <a title='Return to CIOOS pacific homepage' className='logo' href='https://cioospacific.ca/' />
-      <Legend zoom={zoom} query={query} />
+      {legendLevel && <Legend legendLevel={legendLevel} />}
     </div>
   );
 }
