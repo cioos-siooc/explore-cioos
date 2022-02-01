@@ -4,16 +4,16 @@ import { colorScale } from '../../config.js'
 
 import './styles.css'
 
-export default function Legend({ legendLevel }) {
-  const colorStops = generateColorStops(colorScale, legendLevel)
+export default function Legend({ currentRangeLevel }) {
+  const colorStops = generateColorStops(colorScale, currentRangeLevel)
   return (
     <div className='legend' >
-      Legend: ({legendLevel && legendLevel[0]})
+      Legend: ({currentRangeLevel[0]})
       {colorStops && colorStops.map((colorStop, index) => {
         return (
           <div className='colorStop' key={index} style={{ 'backgroundColor': colorStop.color }} title={`${colorStop.stop} record(s)`} />
         )
-      })} ({legendLevel && legendLevel[1]})
+      })} ({currentRangeLevel[1]})
     </div>
   )
 }

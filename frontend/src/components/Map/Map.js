@@ -7,7 +7,7 @@ import * as turf from '@turf/turf'
 import './styles.css'
 
 import { server}  from '../../config'
-import { createDataFilterQueryString } from "../../utilities"
+import { createDataFilterQueryString, generateColorStops } from "../../utilities"
 import { colorScale } from "../config"
 import { set } from "lodash"
 
@@ -20,7 +20,7 @@ import { set } from "lodash"
 // }
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setLoading, organizations, zoom, setZoom}) {
+export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setLoading, organizations, zoom, setZoom, currentRangeLevel }) {
   const mapContainer = useRef(null)
   const map = useRef(null)
   const drawControlOptions = {
@@ -168,6 +168,12 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
         .map(([k, v]) => `${k}=${v}`)
         .join("&")
 
+      let colorStops = []
+      generateColorStops(colorScale, currentRangeLevel).map(colorStop => {
+        colorStops.push(colorStop.stop)
+        colorStops.push(colorStop.color)
+      })
+
       map.current.addLayer({
         id: "points",
         type: "circle",
@@ -182,15 +188,8 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
             'interpolate',
             ['linear'],
             ['get', 'count'],
-            1, colorScale[0],
-            3, colorScale[1],
-            9, colorScale[2],
-            27, colorScale[3],
-            81, colorScale[4],
-            243, colorScale[5],
-            729, colorScale[6],
+            ...colorStops
           ],
-
         },
       })
 
@@ -207,19 +206,13 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
         "source-layer": "internal-layer-name",
 
         paint: {
-          "fill-opacity": 0.7,
+          "fill-opacity": 0.8,
           "fill-color": 
           [
             'interpolate',
             ['linear'],
             ['get', 'count'],
-            1, colorScale[0],
-            3, colorScale[1],
-            9, colorScale[2],
-            27, colorScale[3],
-            81, colorScale[4],
-            243, colorScale[5],
-            729, colorScale[6],
+            ...colorStops
           ],
         },
       })
@@ -348,7 +341,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     })
 
     map.current.on('zoomend', e => {
-      console.log('zoom ended')
       setZoom(map.current.getZoom())
     })
   })

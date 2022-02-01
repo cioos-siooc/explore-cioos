@@ -46,8 +46,8 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [organizations, setOrganizations] = useState()
   const [zoom, setZoom] = useState(2)
-  const [legendLevels, setLegendLevels] = useState()
-  const [legendLevel, setLegendLevel] = useState()
+  const [rangeLevels, setRangeLevels] = useState()
+  const [currentRangeLevel, setCurrentRangeLevel] = useState()
   const [query, setQuery] = useState({
     startDate: defaultStartDate,
     endDate: defaultEndDate,
@@ -114,7 +114,7 @@ export default function App() {
   useEffect(() => {
     fetch(`${server}/legend?${createDataFilterQueryString(query)}`).then(response => response.json()).then(legend => {
       if (legend) {
-        setLegendLevels(legend.recordsCount)
+        setRangeLevels(legend.recordsCount)
       } else {
         console.log('legend query failed')
       }
@@ -122,22 +122,22 @@ export default function App() {
   }, [query])
 
   useEffect(() => {
-    if (legendLevels) {
+    if (rangeLevels) {
       switch (true) {
         case zoom < 5:
-          setLegendLevel(legendLevels['zoom0'])
+          setCurrentRangeLevel(rangeLevels['zoom0'])
           break;
         case zoom >= 5 && zoom < 7:
-          setLegendLevel(legendLevels['zoom1'])
+          setCurrentRangeLevel(rangeLevels['zoom1'])
           break;
         case zoom >= 7:
-          setLegendLevel(legendLevels['zoom2'])
+          setCurrentRangeLevel(rangeLevels['zoom2'])
           break;
         default:
           console.log('no match in zoom switch case')
       }
     }
-  }, [legendLevels, zoom])
+  }, [rangeLevels, zoom])
 
   function handleEmailChange(value) {
     setEmailValid(validateEmail(value))
@@ -180,11 +180,10 @@ export default function App() {
     )
   }
 
-
   return (
     <div>
       {loading && <Loading />}
-      <Map
+      {currentRangeLevel && <Map
         setPolygon={setPolygon}
         setSelectedPointPKs={setSelectedPointPKs}
         setLoading={setLoading}
@@ -193,7 +192,8 @@ export default function App() {
         organizations={organizations}
         zoom={zoom}
         setZoom={setZoom}
-      />
+        currentRangeLevel={currentRangeLevel}
+      />}
       <Controls
         setQuery={setQuery}
         setLoading={setLoading}
@@ -218,7 +218,7 @@ export default function App() {
         {DownloadButton()}
       </Controls>
       <a title='Return to CIOOS pacific homepage' className='logo' href='https://cioospacific.ca/' />
-      {legendLevel && <Legend legendLevel={legendLevel} />}
+      {currentRangeLevel && <Legend currentRangeLevel={currentRangeLevel} />}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import Filter from './Filter/Filter.jsx'
 import MultiCheckboxFilter from './Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx'
 import TimeSelector from './Filter/TimeSelector/TimeSelector.jsx'
 import DepthSelector from './Filter/DepthSelector/DepthSelector.jsx'
-import { generateMultipleSelectBadgeTitle, generateRangeSelectBadgeTitle } from '../../utilities.js'
+import { generateMultipleSelectBadgeTitle, generateRangeSelectBadgeTitle, useDebounce } from '../../utilities.js'
 import { server } from '../../config'
 
 import { ArrowsExpand, Building, CalendarWeek, Water } from 'react-bootstrap-icons'
@@ -47,7 +47,9 @@ export default function Controls({ setQuery, organizations, children }) {
 
   // Depth filter initial values and state
   const [startDepth, setStartDepth] = useState(defaultStartDepth)
+  const debouncedStartDepth = useDebounce(startDepth, 500)
   const [endDepth, setEndDepth] = useState(defaultEndDepth)
+  const debouncedEndDepth = useDebounce(endDepth, 500)
   const depthRangeFilterName = 'Depth Range (m)'
   const depthRangeBadgeTitle = generateRangeSelectBadgeTitle(depthRangeFilterName, [startDepth, endDepth], [defaultStartDepth, defaultEndDepth], '(m)')
 
@@ -64,7 +66,7 @@ export default function Controls({ setQuery, organizations, children }) {
       eovsSelected: eovsSelected,
       orgsSelected: orgsSelected
     })
-  }, [startDate, endDate, startDepth, endDepth, eovsSelected, orgsSelected])
+  }, [startDate, endDate, debouncedStartDepth, debouncedEndDepth, eovsSelected, orgsSelected])
 
   const childrenArray = React.Children.toArray(children)
 
