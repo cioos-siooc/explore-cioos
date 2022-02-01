@@ -1,8 +1,6 @@
 import argparse
 
-
-from ckan_scraper.create_ckan_erddap_link import (
-    get_ckan_records)
+from erddap_scraper.ckan.create_ckan_erddap_link import get_ckan_records
 
 output_file = "erddap_ckan_mapping.csv"
 
@@ -12,10 +10,10 @@ def main(cache):
 
     # query CKAN national for all erddap datsets
     print("Gathering list of records that link to an erddap")
-    
+
     print("Querying each record")
-    
-    df = get_ckan_records(limit,cache=cache)
+
+    df = get_ckan_records(limit, cache=cache)
     df.to_csv(output_file)
 
     print("Wrote ", output_file)

@@ -1,0 +1,10 @@
+goos_eov,ceda_eov
+dissolvedOrganicCarbon,carbon
+nutrients,nutrients
+subSurfaceSalinity,salinity
+subSurfaceTemperature,temperature
+surfaceCurrents,currents
+inorganicCarbon,carbon
+seaSurfaceSalinity,salinity
+seaSurfaceTemperature,temperature
+subSurfaceCurrents,currents

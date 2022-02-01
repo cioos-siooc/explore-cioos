@@ -24,3 +24,6 @@ venv
 *.csv
 *.ipynb
 erddap_scraper_dc
+venv
+build
+!scraper/**/*.csv

@@ -4,11 +4,9 @@
 
 import json
 
+import diskcache as dc
 import pandas as pd
 import requests
-import diskcache as dc
-
-
 
 # National CKAN has all the regions' records
 CKAN_API_URL = "https://catalogue.cioos.ca/api/3"
@@ -36,23 +34,23 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
     """
     records = list_ckan_records_with_erddap_urls(cache)
     # just used for testing
-    
+
     if limit:
         records = records[0:limit]
     out = []
-    for i,record_full in enumerate(records):
-        resources = record_full['resources']
-        erddap_url=""
+    for i, record_full in enumerate(records):
+        resources = record_full["resources"]
+        erddap_url = ""
         for resource in resources:
-            
-            if "tabledap" in resource['url']:
-                erddap_url=resource['url']
+
+            if "tabledap" in resource["url"]:
+                erddap_url = resource["url"]
                 continue
         if not erddap_url:
             continue
 
         (erddap_host, dataset_id) = split_erddap_url(erddap_url)
-        
+
         if dataset_ids and dataset_id not in dataset_ids:
             continue
 
@@ -77,7 +75,6 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
             if len(cited_responsible_party):
                 for contact in cited_responsible_party:
                     if "organisation-name" in contact or "organization-name" in contact:
-                        print(contact)
                         organizations += [contact.get("organisation-name")]
 
         # remove duplicates, empty strings
@@ -93,7 +90,6 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
                 ckan_record_text,
             ],
         )
-        # print(out)
         # compile a dataframe
 
     line = {
@@ -101,27 +97,31 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         "dataset_id": [x[1] for x in out],
         "ckan_id": [x[2] for x in out],
         "ckan_organizations": [x[3] for x in out],
-        "ckan_title": [x[4]['title'] for x in out],
+        "ckan_title": [x[4]["title"] for x in out],
     }
 
     df = pd.DataFrame(line)
+
+    if not df.empty:
+        df = df.drop_duplicates(subset="dataset_id")
 
     return df
 
 
 def list_ckan_records_with_erddap_urls(cache_requests):
     row_page_limit = 1000
-    row_start=0
+    row_start = 0
     # count total records avaiable, but we will have to page queries to get all results
     # 1000 records per query (or as defined on the server)
-    records_remaining=1
-    records_total=[]
+    records_remaining = 1
+    records_total = []
     while records_remaining:
         erddap_datasets_query = (
-            CKAN_API_URL + f"/action/package_search?rows={row_page_limit}&start={row_start}&q=erddap"
+            CKAN_API_URL
+            + f"/action/package_search?rows={row_page_limit}&start={row_start}&q=erddap"
         )
         print(erddap_datasets_query)
-        
+
         if cache_requests:
             # limit cache to 10gb
             cache = dc.Cache(
@@ -139,12 +139,13 @@ def list_ckan_records_with_erddap_urls(cache_requests):
             result = requests.get(erddap_datasets_query).json()["result"]
 
         # count of total records, regardless of paging
-        count_total = result['count']
+        count_total = result["count"]
         # count of records in this page, eg < 1000
-        records_total+=result['results']
+        records_total += result["results"]
         count_page = len(records_total)
-        records_remaining=count_total-count_page
-        row_start+=row_page_limit
+        records_remaining = count_total - count_page
+        row_start += row_page_limit
 
-    print("Found",len(records_total)," CKAN records")
+    print("Found", len(records_total), " CKAN records")
+
     return records_total

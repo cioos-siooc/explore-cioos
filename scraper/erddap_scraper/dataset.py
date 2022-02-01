@@ -3,9 +3,8 @@ from datetime import datetime
 
 import pandas as pd
 import requests
+from erddap_scraper.utils import eov_to_standard_names, intersection, eovs_to_ceda_eovs
 from requests.exceptions import HTTPError
-
-from erddap_scraper.utils import eov_to_standard_names, intersection
 
 
 class Dataset(object):
@@ -17,11 +16,13 @@ class Dataset(object):
         self.erddap_url = erddap_server.url
         self.erddap_csv_to_df = erddap_server.erddap_csv_to_df
         self.cdm_data_type = ""
-        self.profile_ids = []
         self.globals = {}
         self.df_variables = None
         self.variables_list = []
+        self.profile_variable_list = []
+
         self.get_metadata()
+        self.profile_ids = self.get_profile_ids()
 
         self.df = pd.DataFrame(
             {
@@ -33,7 +34,10 @@ class Dataset(object):
                 "dataset_id": [self.id],
                 "cdm_data_type": [self.cdm_data_type],
                 "eovs": [self.eovs],
+                "ceda_eovs": [eovs_to_ceda_eovs(self.eovs)],
                 "organizations": [self.organizations],
+                "n_profiles": [len(self.profile_ids)],
+                "profile_variables": [self.profile_variable_list],
             }
         )
 
@@ -52,10 +56,30 @@ class Dataset(object):
         )
         return self.dataset_tabledap_query(url)
 
-    def get_profile_ids(self, profile_variable):
-        if not profile_variable:
+    def get_profile_ids(self):
+        df_variables = self.df_variables
+
+        # Organize dataset variables by their cf_roles
+        # eg profile_variable={'profile_id': 'hakai_id', 'timeseries_id': 'station'}
+        profile_variables = (
+            df_variables.set_index("cf_role", drop=False)
+            .query('cf_role != ""')[["cf_role", "name"]]["name"]
+            .to_dict()
+        )
+        profile_variable_list = list(profile_variables.values())
+
+        # sorting so the url is consistent every time for query caching
+        profile_variable_list.sort()
+
+        self.profile_variables = profile_variables
+        self.profile_variable_list = profile_variable_list
+
+        if not profile_variables:
             return []
-        profile_ids = self.dataset_tabledap_query(f"{profile_variable}&distinct()")
+        profile_ids = self.dataset_tabledap_query(
+            f"{','.join(profile_variable_list)}&distinct()"
+        )
+
         self.profile_ids = profile_ids
         return profile_ids
 
@@ -72,7 +96,7 @@ class Dataset(object):
             time_max = datetime.now().isoformat()
         days_in_dataset = (pd.to_datetime(time_max) - pd.to_datetime(time_min)).days
 
-        extraplolation_days = 10
+        extraplolation_days = 30
         skip_full_count = (
             days_in_dataset >= extraplolation_days and len(self.profile_ids) == 1
         )
@@ -82,7 +106,6 @@ class Dataset(object):
             end_date = (
                 pd.to_datetime(time_min) + pd.Timedelta(days=extraplolation_days)
             ).date()
-            print("the dates", start_date, end_date)
 
             time_query = f"&time>={start_date}&time<={end_date}"
 
@@ -102,7 +125,7 @@ class Dataset(object):
         if skip_full_count and not df_count.empty:
             count = df_count[["time"]].time[0]
             extrapolated_count = (int(count) / extraplolation_days) * days_in_dataset
-            # print(extrapolated_count)
+
             df_count.loc[0, "time"] = extrapolated_count
 
         return df_count

@@ -1,23 +1,19 @@
 """
 download_erddap regroup a set of tool used by CEDA to download ERDDAP datasets.
 """
+import io
+import os
+import sys
 from urllib.parse import urlparse
 
-from erddapy import ERDDAP
-import shapely.wkt
-from shapely.geometry import Point
-from erddap_scraper.utils import eov_to_standard_names, flatten
-
+import erddap_scraper.ERDDAP as erddap_scraper
 import pandas as pd
 import requests
-
-
-import os
-import io
-import sys
-
-import erddap_scraper.ERDDAP as erddap_scraper
+import shapely.wkt
 from erddap_downloader.download_pdf import download_pdf
+from erddap_scraper.utils import eov_to_standard_names
+from erddapy import ERDDAP
+from shapely.geometry import Point
 
 ONE_MB = 10 ** 6
 DATASET_SIZE_LIMIT = 10 * ONE_MB
@@ -29,6 +25,7 @@ PARTIAL = "PARTIAL"
 FAILED = "FAILED"
 EMPTY = "EMPTY"
 IGNORED = "IGNORED"
+
 
 def erddap_server_to_name(server):
     """
@@ -51,11 +48,14 @@ def get_variable_list(df_variables, eovs: list):
     mandatory_variables = ["time", "latitude", "longitude", "depth"]
 
     eov_variables = []
+
     for eov in eovs:
         if eov in eov_to_standard_names:
             eov_variables += eov_to_standard_names[eov]
-            
-    variables_to_download =  df_variables.query("name in @mandatory_variables or standard_name in @eov_variables or not cf_role.isnull()")['name'].to_list()
+
+    variables_to_download = df_variables.query(
+        "(name in @mandatory_variables) or (standard_name in @eov_variables) or (cf_role != '')"
+    )["name"].to_list()
 
     return variables_to_download
 
@@ -64,7 +64,7 @@ def get_erddap_download_url(
     dataset_info: dict,
     user_constraint: dict,
     variables_list: list,
-    polygon_region, 
+    polygon_region,
     response: str = "csv",
 ):
     """
@@ -228,10 +228,8 @@ def get_datasets(json_query, output_path="", create_pdf=False):
 
             scrape_erddap = erddap_scraper.ERDDAP(dataset["erddap_url"])
 
-            scraper_dataset = scrape_erddap.get_dataset(
-                dataset["dataset_id"]
-            )
-            
+            scraper_dataset = scrape_erddap.get_dataset(dataset["dataset_id"])
+
             dataset["erddap_metadata"] = scraper_dataset.df_variables
 
         # Get variable list to download
@@ -309,7 +307,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
             df_temp = filter_polygon_region(df_temp, polygon_region)
 
             # Append data to previously downloaded one
-            df = df.append(df_temp)
+            df = pd.concat([df, df_temp])
 
         # If download status hasn't changed, download was successfully completed
         if download_status == DOWNLOADING:
@@ -335,7 +333,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
         # Generate report for each download
         # Return download report
         if download_status in [COMPLETED, PARTIAL]:
-            if create_pdf:
+            if create_pdf and dataset["ckan_url"] and dataset["ckan_id"]:
                 ckan_url = dataset["ckan_url"] + dataset["ckan_id"]
                 pdf_filename = get_file_name_output(dataset, output_path, "pdf")
                 download_pdf(ckan_url, pdf_filename)
