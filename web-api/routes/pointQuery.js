@@ -35,7 +35,7 @@ router.get("/", async function (req, res, next) {
         d.dataset_id,
         d.cdm_data_type,
         d.title title,
-        eovs,
+        d.ceda_eovs eovs,
         organizations,
         d.erddap_url,
         sum(coalesce(nullif(date_part('days',least(${

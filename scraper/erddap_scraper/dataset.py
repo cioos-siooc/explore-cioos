@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pandas as pd
 import requests
-from erddap_scraper.utils import eov_to_standard_names, intersection
+from erddap_scraper.utils import eov_to_standard_names, intersection, eovs_to_ceda_eovs
 from requests.exceptions import HTTPError
 
 
@@ -34,6 +34,7 @@ class Dataset(object):
                 "dataset_id": [self.id],
                 "cdm_data_type": [self.cdm_data_type],
                 "eovs": [self.eovs],
+                "ceda_eovs": [eovs_to_ceda_eovs(self.eovs)],
                 "organizations": [self.organizations],
                 "n_profiles": [len(self.profile_ids)],
                 "profile_variables": [self.profile_variable_list],

@@ -26,6 +26,7 @@ CREATE TABLE cioos_api.datasets (
     profile_variable text,
     ckan_url text,
     eovs text[],
+    ceda_eovs text[],
     ckan_id text,
     organization_pks INTEGER[],
     n_profiles integer,
@@ -85,6 +86,7 @@ CREATE INDEX
 
 
 -- One record per unique lat/long
+-- this table is mostly used to build hexes, its not queried by the API
 DROP TABLE IF EXISTS cioos_api.points;
 CREATE TABLE cioos_api.points (
     pk serial PRIMARY KEY,
