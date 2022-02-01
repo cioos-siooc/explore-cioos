@@ -1,0 +1,47 @@
+.datasetsTable {
+  table-layout: fixed;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.datasetsTable th{
+  cursor: pointer;
+}
+
+.datasetsTable th:hover {
+  background-color: lightgray;
+}
+
+.datasetsTable td{
+  cursor: pointer;
+}
+
+.datasetsTable td:hover{
+  /* background-color: lightgray; */
+}
+
+.datasetsTable tbody {
+  height:calc(100vh - 140px);
+  /* max-height: 50vh; */
+  display:block;
+  overflow: auto;
+}
+
+.datasetsTable thead tr {
+  display: block;
+}
+
+.datasetsTable .inspectButton {
+  text-align: center;
+  margin: 10px 5px 10px 5px;
+  border: 2px solid darkgrey;
+  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  /* justify-content: space-between; */
+  padding: 5px;
+}
+
+.datasetsTable .inspectButton:hover {
+  background-color: lightgray;
+}

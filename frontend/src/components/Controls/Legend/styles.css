@@ -1,0 +1,20 @@
+.legend {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translate(-50%, 0); 
+  width: fit-content;
+  height: 30px;
+  background-color: #f7f7f7;
+  border-radius: 30px;
+  text-align: center;
+  vertical-align: middle;
+  display: flex;
+  padding: 2.5px 5px 2.5px 5px;
+}
+
+.colorStop {
+  width: 20px;
+  height: 20px;
+  margin: 2.5px;
+}
