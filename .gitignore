@@ -20,3 +20,7 @@ ceda_download*
 venv
 *.rdb
 *.env
+.ipynb_checkpoints
+*.csv
+*.ipynb
+erddap_scraper_dc

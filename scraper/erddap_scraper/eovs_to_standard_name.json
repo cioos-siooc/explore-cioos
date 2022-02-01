@@ -1,0 +1,126 @@
+{
+  "pressure": [
+    "sea_water_pressure",
+    "sea_water_pressure_due_to_sea_water",
+    "sea_water_pressure_at_sea_floor"
+  ],
+  "seaSurfaceHeight": [
+    "sea_surface_height",
+    "sea_surface_height_above_geoid",
+    "sea_surface_height_above_geopotential_datum",
+    "sea_surface_height_above_mean_sea_level",
+    "sea_surface_height_above_reference_ellipsoid"
+  ],
+  "sea_floor_depth": [
+    "sea_floor_depth",
+    "sea_floor_depth_below_geoid",
+    "sea_floor_depth_below_reference_ellipsoid",
+    "sea_floor_depth_below_geopotential_datum",
+    "sea_floor_depth_below_sea_surface"
+  ],
+  "sea_floor_pressure": ["sea_water_pressure_at_sea_floor"],
+  "subSurfaceTemperature": [
+    "sea_surface_temperature",
+    "sea_water_temperature",
+    "sea_water_temperature_anomaly",
+    "sea_water_temperature_at_sea_floor"
+  ],
+  "seaSurfaceTemperature": [
+    "sea_surface_skin_temperature",
+    "sea_surface_subskin_temperature"
+  ],
+  "potentialTemperature": [
+    "sea_water_potential_temperature",
+    "sea_water_potential_temperature_at_sea_floor"
+  ],
+  "subSurfaceConductivity": ["sea_water_electrical_conductivity"],
+  "subSurfaceSalinity": [
+    "sea_surface_practical_salinity",
+    "sea_surface_salinity",
+    "sea_water_practical_salinity",
+    "sea_water_salinity"
+  ],
+  "seaSurfaceSalinity": ["sea_surface_salinity"],
+  "oxygen": [
+    "mass_concentration_of_oxygen_in_sea_water",
+    "mole_concentration_of_dissolved_molecular_oxygen_in_sea_water",
+    "moles_of_oxygen_per_unit_mass_in_sea_water",
+    "volume_fraction_of_oxygen_in_sea_water"
+  ],
+  "chlorophyll": [
+    "chlorophyll_concentration_in_sea_water",
+    "concentration_of_chlorophyll_in_sea_water",
+    "mass_concentration_of_chlorophyll_in_sea_water",
+    "mass_concentration_of_diatoms_expressed_as_chlorophyll_in_sea_water",
+    "mass_concentration_of_microphytoplankton_expressed_as_chlorophyll_in_sea_water",
+    "mass_concentration_of_miscellaneous_phytoplankton_expressed_as_chlorophyll_in_sea_water",
+    "mass_concentration_of_nanophytoplankton_expressed_as_chlorophyll_in_sea_water",
+    "mass_concentration_of_phytoplankton_expressed_as_chlorophyll_in_sea_water",
+    "mass_concentration_of_picophytoplankton_expressed_as_chlorophyll_in_sea_water",
+    "mass_fraction_of_chlorophyll_a_in_sea_water"
+  ],
+  "silicate": [
+    "mass_concentration_of_silicate_in_sea_water",
+    "mole_concentration_of_silicate_in_sea_water",
+    "moles_of_silicate_per_unit_mass_in_sea_water"
+  ],
+  "phosphate": [
+    "mass_concentration_of_phosphate_in_sea_water",
+    "mole_concentration_of_phosphate_in_sea_water",
+    "moles_of_phosphate_per_unit_mass_in_sea_water"
+  ],
+  "nitrate": [
+    "mole_concentration_of_nitrate_in_sea_water",
+    "moles_of_nitrate_per_unit_mass_in_sea_water",
+    "mole_concentration_of_nitrate_and_nitrite_in_sea_water",
+    "moles_of_nitrate_and_nitrite_per_unit_mass_in_sea_water"
+  ],
+  "nutrients": [
+    "mass_concentration_of_silicate_in_sea_water",
+    "mole_concentration_of_silicate_in_sea_water",
+    "moles_of_silicate_per_unit_mass_in_sea_water",
+    "mass_concentration_of_phosphate_in_sea_water",
+    "mole_concentration_of_phosphate_in_sea_water",
+    "moles_of_phosphate_per_unit_mass_in_sea_water",
+    "mole_concentration_of_nitrate_in_sea_water",
+    "moles_of_nitrate_per_unit_mass_in_sea_water",
+    "mole_concentration_of_nitrate_and_nitrite_in_sea_water",
+    "moles_of_nitrate_and_nitrite_per_unit_mass_in_sea_water"
+  ],
+  "subSurfaceCurrents": [
+    "sea_water_speed",
+    "sea_water_velocity_from_direction",
+    "sea_water_velocity_to_direction",
+    "sea_water_speed_due_to_tides",
+    "sea_water_velocity_to_direction_due_to_tides",
+    "sea_water_speed_at_sea_floor",
+    "sea_water_velocity_to_direction_at_sea_floor",
+    "eastward_sea_water_velocity",
+    "northward_sea_water_velocity",
+    "eastward_sea_water_velocity_assuming_no_tide",
+    "eastward_sea_water_velocity_due_to_tides",
+    "eastward_sea_water_velocity_at_sea_floor",
+    "northward_sea_water_velocity_assuming_no_tide",
+    "northward_sea_water_velocity_due_to_tides",
+    "northward_sea_water_velocity_at_sea_floor",
+    "upward_sea_water_velocity"
+  ],
+  "inorganicCarbon": [
+    "mole_concentration_of_dissolved_inorganic_carbon_in_sea_water",
+    "ocean_mass_content_of_dissolved_inorganic_carbon",
+    "partial_pressure_of_carbon_dioxide_in_sea_water"
+  ],
+  "speedOfSound": ["speed_of_sound_in_sea_water"],
+  "seaIce": ["sea_ice_draft", "sea_ice_thickness"],
+  "seawaterDensity": ["sea_water_density"],
+  "potentialDensity": ["sea_water_potential_density"],
+  "dissolvedOrganicCarbon": [
+    "mole_concentration_of_dissolved_organic_carbon_in_sea_water",
+    "ocean_mass_content_of_dissolved_organic_carbon"
+  ],
+  "surfaceCurrents": [
+    "surface_eastward_sea_water_velocity",
+    "surface_northward_sea_water_velocity"
+  ],
+  "seaState": []
+}
