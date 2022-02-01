@@ -33,12 +33,10 @@ router.get("/", async (req, res, next) => {
 
   const SQL = `
         with profiles_subset as (
-        select d.erddap_url, d.dataset_id,d.profile_variable,d.cdm_data_type, d.ckan_id ckan_id, 'https://catalogue.cioos.ca/dataset/' ckan_url  FROM cioos_api.profiles p
+        select d.erddap_url, d.dataset_id,d.title,d.profile_variable,d.cdm_data_type, d.ckan_id ckan_id, 'https://catalogue.cioos.ca/dataset/' ckan_url  FROM cioos_api.profiles p
         JOIN cioos_api.datasets d ON p.dataset_pk =d.pk
         where
-        ${filters ? filters + " AND " : ""} 
-
-        ST_Contains(ST_GeomFromText('${wktPolygon}',4326),ST_Transform(geom,4326)) is true
+        ${filters ? filters : ""} 
         group by d.pk)
       select json_agg(t) from profiles_subset t;`;
 

@@ -2,35 +2,44 @@
 
 # The ERDDAP class contains functions relating to querying the ERDDAP server
 
+import logging
 import re
+from io import StringIO
+from urllib.parse import unquote, urlparse
 
+import diskcache as dc
+import pandas as pd
 import requests
 
-from .setup_logging import setup_logging
-
-logger = setup_logging()
-
-
-def erddap_json_to_dict_list(json):
-    "turns ERDDAP style JSON output into list of dicts. See test for example"
-    data = []
-    for i, dataset in enumerate(json["table"]["rows"]):
-        out = {}
-        for j, field in enumerate(json["table"]["columnNames"]):
-            out[field] = dataset[j]
-        data.append(out)
-    return data
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+from erddap_scraper.dataset import Dataset
 
 
 class ERDDAP(object):
     "Stores the ERDDAP server URL and functions related to querying it"
 
-    def __init__(self, erddap_url):
+    def __init__(self, erddap_url, cache_requests=False):
         super(ERDDAP, self).__init__()
+        self.cache_requests = cache_requests
 
-        # remove trailing '/' from erddap url
-        if erddap_url.endswith("/"):
-            erddap_url = erddap_url[:-1]
+        if cache_requests:
+            # limit cache to 10gb
+            self.cache = dc.Cache(
+                "erddap_scraper_dc",
+                eviction_policy="none",
+                size_limit=10000000000,
+                cull_limit=0,
+            )
+
+        self.url = erddap_url
+        self.domain = urlparse(erddap_url).netloc
+        self.session = requests.Session()
+
+        self.logger = self.get_logger()
+        self.df_all_datasets = None
+        logger = self.logger
+
+        erddap_url = erddap_url.rstrip("/")
 
         if not re.search("^https?://", erddap_url):
             raise RuntimeError("URL Must start wih http or https")
@@ -38,79 +47,93 @@ class ERDDAP(object):
         if not erddap_url.endswith("/erddap"):
             # ERDDAP URL almost always ends in /erddap
             logger.warning("URL doesn't end in /erddap, trying anyway")
+        self.get_all_datasets()
 
-        self.url = erddap_url
-        self.session = requests.Session()
-
-    def get_session(self):
-        "get the TCP session so it can be reused"
-        return self.session
-
-    def get_json_from_url(self, url):
-        "fetches json from url using http(s)"
-        url_complete = self.url + url
-        logger.debug("Fetching " + url_complete)
-        try:
-            response = self.session.get(url_complete)
-            response.raise_for_status()
-        except Exception as err:
-            print(url_complete)
-            raise err
-
-        a = response.json()
-        return a
-
-    def get_dataset_ids(self):
+    def get_all_datasets(self):
         "Get a string list of dataset IDs from the ERDDAP server"
         # allDatasets indexes table and grid datasets
-        datasets_json = self.get_json_from_url(
-            '/tabledap/allDatasets.json?datasetID&accessible="public"'
+        df = self.erddap_csv_to_df(
+            '/tabledap/allDatasets.csv?&accessible="public"', skiprows=[1, 2]
         )
+        self.df_all_datasets = df
 
-        # parse ERDDAP output
-        datasets = list(map(lambda x: x[0], datasets_json["table"]["rows"]))
+    def parse_erddap_date(s):
+        """ERDDAP dates come either as timestamps or ISO 8601 datetimes"""
+        is_timestamp = s.startswith("1.")
 
-        # remove 'allDatasets' dataset, which is used to query datasets
-        datasets.remove("allDatasets")
-        return datasets
+        if is_timestamp:
+            return pd.to_datetime(s, unit="s")
 
-    def get_metadata_for_dataset(self, dataset_id):
-        "get all the global and variable metadata for a dataset"
-        url = "/info/" + dataset_id + "/index.json"
-        # Get JSON representation of this dataset's metadata
-        try:
-            metadata_json = self.get_json_from_url(url)
-        except Exception as err:
-            raise err
+        return pd.to_datetime(s, errors="coerce")
 
-        # transform this JSON to an easier to use format
-        metadata = erddap_json_to_dict_list(metadata_json)
-        vars = {}
-        var_type = {}
+    def parse_erddap_dates(series):
+        """ERDDAP dates come either as timestamps or ISO 8601 datetimes"""
+        is_timestamp = str(series.tolist()[0]).strip().startswith("1.")
 
-        # data contains a mix of globals and variable attributes
-        # group by variable first
-        for var in metadata:
+        if is_timestamp:
+            return pd.to_datetime(series, unit="s")
 
-            varname = var["Variable Name"]
-            if varname not in vars.keys():
-                vars[varname] = {}
+        return pd.to_datetime(series, errors="coerce")
 
-            attr = var["Attribute Name"]
-            val = var["Value"]
+    def erddap_csv_to_df(self, url, skiprows=[1], logger=None):
+        """If theres an error in the request, this raises up to the dataset loop, so this dataset gets skipped"""
+        if not logger:
+            logger = self.logger
 
-            # values are all strings
-            if len(val) > 0:
-                vars[varname][attr] = val
+        url_combined = self.url + url
+        logger.debug(unquote(url_combined))
 
-            # Retrieve variable type
-            if var["Row Type"] == "variable":
-                var_type[varname] = var["Data Type"]
+        # response = self.session.get(url_combined)
 
-        # Separate globals versus variables
-        metadata = {
-            "globals": vars.pop("NC_GLOBAL"),
-            "variables": vars,
-            "type": var_type,
-        }
-        return metadata
+        response = None
+        if self.cache_requests:
+            cache = self.cache
+            if url_combined in self.cache:
+                response = cache[url_combined]
+            else:
+                logger.debug("CACHE MISS")
+                response = self.session.get(url_combined)
+                cache[url_combined] = response
+        else:
+            response = self.session.get(url_combined)
+
+        no_data = False
+        # Newer erddaps respond with 404 for no data
+        if response.status_code == 404:
+            no_data = True
+        elif (
+            response.status_code == 500
+            and "Query error: No operator found in constraint=&quot;orderByCount"
+            in response.text
+        ):
+            logger.error("OrderByCount not available within this ERDDAP Version")
+            no_data = True
+        elif (
+            # Older erddaps respond with 500 for no data
+            response.status_code == 500
+            and "Your query produced no matching results" in response.text
+        ):
+            no_data = True
+
+        elif (
+            response.status_code == 500
+            and "You are requesting too much data." in response.text
+        ):
+            logger.error("Query too big for the server")
+            no_data = True
+        elif response.status_code != 200:
+            # Report if not All OK
+            response.raise_for_status()
+        else:
+            # skip units line
+            return pd.read_csv(StringIO(response.text), skiprows=skiprows)
+        if no_data:
+            logger.error("Empty response")
+            return pd.DataFrame()
+
+    def get_dataset(self, dataset_id):
+        return Dataset(self, dataset_id)
+
+    def get_logger(self):
+        logger = logging.getLogger(self.domain)
+        return logger
