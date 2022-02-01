@@ -21,6 +21,7 @@
 }
 
 .modal-content {
+  min-width: 800px;
   height: 70vh;
 }
 

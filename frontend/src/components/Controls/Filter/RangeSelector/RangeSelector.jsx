@@ -38,7 +38,7 @@ export default class RangeSelector extends React.Component {
       <div className='rangeSelector'>
         <Range
           key={this.state.dynamicKey}
-          min={0}
+          min={-100}
           max={12000}
           value={[this.props.startDepth, this.props.endDepth]}
           onChange={this.onSliderChange}
@@ -57,7 +57,8 @@ export default class RangeSelector extends React.Component {
             background: "none"
           }}
           marks={{
-            0: '0m',
+            "-100": '-100',
+            // 0: '0m',
             // 1000: '1000m',
             2000: '2000m',
             // 3000: '3000m',

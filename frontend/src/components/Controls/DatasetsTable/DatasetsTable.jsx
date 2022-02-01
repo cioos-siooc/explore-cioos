@@ -6,19 +6,19 @@ import { abbreviateString, bytesToMemorySizeString } from '../../../utilities'
 
 import './styles.css'
 
-export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDataset, datasets, selectAll, setInspectDataset }) {
+export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDataset, datasets, selectAll, setInspectDataset, width }) {
 
   const totalWidth = 560
 
-  const checkColWidth = 40
-  const titleColWidth = 145
-  const typeColWidth = 115
-  const recordsColWidth = 80
-  const sizeColWidth = 100
-  const openButtonColWidth = 70
+  const checkColWidth = 0.072 * width        // 40      // 0.072
+  const titleColWidth = 0.263 * width       // 145     // 0.263
+  const typeColWidth = 0.205 * width        // 115      // 0.205
+  const recordsColWidth = 0.209 * width     // 80    // 0.209
+  const sizeColWidth = 0.181 * width        // 100      // 0.181
+  const openButtonColWidth = 0.127 * width  // 70 // 0.127
 
   return (
-    <div className='datasetsTable' style={{ width: `${totalWidth}px` }}>
+    <div className='datasetsTable' style={{ width: `${width + 10}px` }}>
       <Table striped hover>
         <thead>
           <tr>

@@ -15,7 +15,7 @@ import { ArrowsExpand, Building, CalendarWeek, Water } from 'react-bootstrap-ico
 import './styles.css'
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from '../config.js'
 
-export default function Controls({ setQuery, setLoading, children }) {
+export default function Controls({ setQuery, children }) {
 
   // Making changes to context within context consumers (ie. passing mutable state down to children to manipulate)
   //https://stackoverflow.com/questions/41030361/how-to-update-react-context-from-inside-a-child-component
@@ -64,7 +64,6 @@ export default function Controls({ setQuery, setLoading, children }) {
       eovsSelected: eovsSelected,
       orgsSelected: orgsSelected
     })
-    // setLoading(true)
   }, [startDate, endDate, startDepth, endDepth, eovsSelected, orgsSelected])
 
   const childrenArray = React.Children.toArray(children)

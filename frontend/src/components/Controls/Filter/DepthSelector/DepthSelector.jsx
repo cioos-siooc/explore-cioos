@@ -18,7 +18,7 @@ export default function DepthSelector(props) {
             value={props.startDepth}
             type="number"
             max={12000}
-            min={0}
+            min={-100}
             onChange={(e) => {
               if (e.target.value * 1.0 < props.endDepth) {
                 props.setStartDepth(e.target.value * 1.0) // Force type-conversion to number
@@ -34,7 +34,7 @@ export default function DepthSelector(props) {
             value={props.endDepth}
             type="number"
             max={12000}
-            min={0}
+            min={-100}
             onChange={(e) => {
               if (e.target.value * 1.0 > props.startDepth) {
                 props.setEndDepth(e.target.value * 1.0) // Force type-conversion to number

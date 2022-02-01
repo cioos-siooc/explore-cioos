@@ -93,3 +93,7 @@ export function bytesToMemorySizeString(bytes) {
     return '>1TB'
   }
 }
+
+export function generateColorScale(colorScale, range) {
+  
+}
