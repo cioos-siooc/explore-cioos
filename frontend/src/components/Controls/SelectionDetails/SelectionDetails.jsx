@@ -9,7 +9,7 @@ import Loading from '../Loading/Loading.jsx'
 import { server } from '../../../config'
 
 import './styles.css'
-import { createDataFilterQueryString } from '../../../utilities.js'
+import { bytesToMemorySizeString, createDataFilterQueryString } from '../../../utilities.js'
 
 // Note: datasets and points are exchangable terminology
 export default function SelectionDetails({ pointPKs, setPointsToDownload, query, polygon, organizations, width, children }) {
@@ -18,6 +18,7 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
   const [inspectDataset, setInspectDataset] = useState()
   const [dataTotal, setDataTotal] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [dataTotalString, setDataTotalString] = useState()
 
   useEffect(() => {
     if (pointsData) {
@@ -27,7 +28,8 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
           total += point.size
         }
       })
-      setDataTotal((total / 1000000).toFixed(2))
+      setDataTotal((total / 1000000))
+      setDataTotalString(bytesToMemorySizeString(total))
       setPointsToDownload(pointsData.filter(point => point.selected))//.map(point => point.pk))
       setLoading(false)
     }
@@ -113,7 +115,7 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
                 className='upTo100'
                 variant='success'
                 now={dataTotal < 100 ? dataTotal : 100}
-                label={dataTotal < 100 ? dataTotal : 100}
+                label={dataTotal < 100 ? bytesToMemorySizeString(dataTotal * 1000000) : `100 MB`}
                 key={1}
               />
               {dataTotal > 100 &&
@@ -122,13 +124,13 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
                   className='past100'
                   variant='warning'
                   now={dataTotal > 100 ? (dataTotal - 100).toFixed(2) : 0}
-                  label={dataTotal > 100 ? (dataTotal - 100).toFixed(2) : 0}
+                  label={dataTotal > 100 ? bytesToMemorySizeString((dataTotal - 100).toFixed(2) * 1000000) : 0}
                   key={2}
                 />
               }
             </ProgressBar>
             <div className='dataTotalRatio'>
-              {dataTotal}MB of 100MB Max
+              {bytesToMemorySizeString(dataTotal * 1000000)} of 100MB Max
               <QuestionIconTooltip
                 tooltipText={'Downloads are limited to 100MB.'}
                 size={20}
