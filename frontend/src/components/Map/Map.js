@@ -15,6 +15,7 @@ import { colorScale } from "../config"
 export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setLoading, organizations, zoom, setZoom, rangeLevels }) {
   const mapContainer = useRef(null)
   const map = useRef(null)
+  const creatingRectangle = useRef(false)
   const drawControlOptions = {
     displayControlsDefault: false,
     controls: {
@@ -30,10 +31,20 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     }
   }
 
-  const draw = new MapboxDraw(drawControlOptions)
+  const draw = new MapboxDraw(drawControlOptions) 
   const drawPolygon = useRef(draw)
   const doFinalCheck = useRef(false)
   const colorStops = useRef([])
+
+  const [boxSelectStartCoords, setBoxSelectStartCoords] = useState()
+  const [boxSelectEndCoords, setBoxSelectEndCoords] = useState()
+
+  const popup = new Popup({
+    closeButton: false,
+    closeOnClick: true,
+    maxWidth: '400px'
+  })
+  
 
   useEffect(() => {
     doFinalCheck.current = true
@@ -42,6 +53,21 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
   useEffect(() => {
     setColorStops()
   }, [rangeLevels])
+
+  useEffect(() => {
+    if(boxSelectStartCoords && boxSelectEndCoords) {
+      if(drawPolygon.current.getAll().features.length > 0) {
+        drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
+      }
+      const lineString = turf.lineString([boxSelectStartCoords, boxSelectEndCoords])
+      const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
+      setBoxSelectEndCoords()
+      setBoxSelectStartCoords()
+      setLoading(true)
+      polygonSelection(bboxPolygon.geometry.coordinates[0])
+      setPolygon(bboxPolygon.geometry.coordinates[0])
+    }
+  }, [boxSelectEndCoords])
 
   function setColorStops() {
     if(map.current) {
@@ -61,24 +87,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       }
     }
   }
-
-  const [boxSelectStartCoords, setBoxSelectStartCoords] = useState()
-  const [boxSelectEndCoords, setBoxSelectEndCoords] = useState()
-
-  useEffect(() => {
-    if(boxSelectStartCoords && boxSelectEndCoords) {
-      if(drawPolygon.current.getAll().features.length > 0) {
-        drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
-      }
-      const lineString = turf.lineString([boxSelectStartCoords, boxSelectEndCoords])
-      const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
-      setBoxSelectEndCoords()
-      setBoxSelectStartCoords()
-      setLoading(true)
-      polygonSelection(bboxPolygon.geometry.coordinates[0])
-      setPolygon(bboxPolygon.geometry.coordinates[0])
-    }
-  }, [boxSelectEndCoords])
 
   function polygonSelection(polygon) {
     var features = map.current.queryRenderedFeatures({layers: ['points']}).map(point => {
@@ -113,12 +121,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     }    
   }
 
-  const popup = new Popup({
-    closeButton: false,
-    closeOnClick: true,
-    maxWidth: '400px'
-  })
-  
   useEffect(() => {
     setSelectedPointPKs()
     if(map && map.current && map.current.loaded()){
@@ -174,7 +176,10 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     map.current.on("load", () => {
       const boxQueryElement = document.getElementById('boxQueryButton');
       if(boxQueryElement) {
-        boxQueryElement.onclick=()=>draw.changeMode('draw_rectangle');
+        boxQueryElement.onclick=()=>{
+          creatingRectangle.current = true
+          draw.changeMode('draw_rectangle');
+        }
       }
     
       const query = {
@@ -208,8 +213,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
           }
         },
       })
-
-      console.log(colorStops.current)
 
       map.current.addLayer({
         id: "hexes",
@@ -259,31 +262,43 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       if(drawPolygon.current.getAll().features.length === 0) {
         map.current.setFilter('points-highlighted', ['in', 'pk', ''])
         setSelectedPointPKs()
+        setPolygon()
       }
     })
 
     map.current.on('click', 'points', e => {
-      map.current.flyTo({center: [e.lngLat.lng, e.lngLat.lat]})
-      const height = 10
-      const width = 10
-      var bbox = [
-        [e.point.x - width / 2, e.point.y - height / 2],
-        [e.point.x + width / 2, e.point.y + height / 2]
-      ]
-      const cornerA = map.current.unproject(bbox[0])
-      const cornerB = map.current.unproject(bbox[1])
-      const clickLngLatBBox = [
-        [cornerA.lng, cornerA.lat],
-        [cornerB.lng, cornerB.lat]
-      ]
-      const lineString = turf.lineString(clickLngLatBBox)
-      const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
-      polygonSelection(bboxPolygon.geometry.coordinates[0])
-      setPolygon(bboxPolygon.geometry.coordinates[0])
+      if(draw.getMode() !== 'draw_polygon' && !creatingRectangle.current){
+        map.current.flyTo({center: [e.lngLat.lng, e.lngLat.lat]})
+        const height = 10
+        const width = 10
+        var bbox = [
+          [e.point.x - width / 2, e.point.y - height / 2],
+          [e.point.x + width / 2, e.point.y + height / 2]
+        ]
+        const cornerA = map.current.unproject(bbox[0])
+        const cornerB = map.current.unproject(bbox[1])
+        const clickLngLatBBox = [
+          [cornerA.lng, cornerA.lat],
+          [cornerB.lng, cornerB.lat]
+        ]
+        const lineString = turf.lineString(clickLngLatBBox)
+        const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
+        polygonSelection(bboxPolygon.geometry.coordinates[0])
+        setPolygon(bboxPolygon.geometry.coordinates[0])
+      }
+      if(creatingRectangle.current) {
+        creatingRectangle.current = false
+      }
     })
 
     map.current.on('click', 'hexes', e => {
-      map.current.flyTo({center: [e.lngLat.lng, e.lngLat.lat], zoom: 7})
+      console.log(drawPolygon.current.getMode())
+      if(draw.getMode() !== 'draw_polygon' && !creatingRectangle.current){
+        map.current.flyTo({center: [e.lngLat.lng, e.lngLat.lat], zoom: 7})
+      } 
+      if(creatingRectangle.current) {
+        creatingRectangle.current = false
+      }
     })
 
     map.current.on('mousemove', 'points', e => {
@@ -359,10 +374,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
         }
       }
     })
-
-    // map.current.on('zoom', e => {
-    //   // setColorStops()
-    // })
 
     map.current.on('zoomend', e => {
       doFinalCheck.current = true

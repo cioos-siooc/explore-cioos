@@ -150,7 +150,7 @@ export default function App() {
   function DownloadButton() {
     return (
       <DataDownloadModal
-        disabled={_.isEmpty(selectedPointPKs)}
+        disabled={_.isEmpty(pointsToDownload)}
       >
         <SelectionDetails
           pointPKs={pointsToDownload && pointsToDownload.map(point => point.pk)}
@@ -187,7 +187,7 @@ export default function App() {
         setLoading={setLoading}
         organizations={organizations}
       >
-        {selectedPointPKs && (
+        {polygon && (
           <Col xs='auto' className='selectionPanelColumn'>
             <SelectionPanel>
               <SelectionDetails
