@@ -170,10 +170,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       center: [-125, 49], // starting position
       zoom: zoom, // starting zoom
     })
-    
-    // Called order determines stacking order
-    map.current.addControl(new NavigationControl(), "bottom-right")
-    map.current.addControl(drawPolygon.current, "bottom-right")
   
     map.current.on("load", () => {
       const boxQueryElement = document.getElementById('boxQueryButton');
@@ -254,6 +250,10 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       })
 
     })
+
+    // Called order determines stacking order
+    map.current.addControl(new NavigationControl(), "bottom-right")
+    map.current.addControl(drawPolygon.current, "bottom-right")
 
     map.current.on('click', e => {
       if(drawPolygon.current.getAll().features.length === 0) {
