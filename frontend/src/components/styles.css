@@ -37,3 +37,34 @@
 .emailAddress {
   height: 40px;
 }
+
+.boxQueryButton {
+  position: absolute;
+  right: 10px;
+  bottom: 250px;
+  width: 42px;
+  height: 42px;
+  border-radius: 4px 4px 0px 0px;
+  border: 0px;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  background-color: #fff;
+  padding: 5px;
+  z-index: 2;
+}
+
+.rectangleIcon {
+  width: 42px;
+  height: 42px;
+  background-image: url(./Images/rectangleIcon.png);
+  background-color: transparent;
+  background-repeat: space;
+  background-size: 30px 30px;
+}
+
+.boxQueryButton:hover {
+  background-color: #f3f3f3;
+}
+
+.mapboxgl-ctrl-group {
+  border-radius: 0px 0px 4px 4px;
+}

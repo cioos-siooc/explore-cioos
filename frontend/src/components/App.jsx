@@ -215,10 +215,13 @@ export default function App() {
             </SelectionPanel>
           </Col>
         )}
-        {DownloadButton()}
+        <div>
+          {DownloadButton()}
+        </div>
       </Controls>
       <a title='Return to CIOOS pacific homepage' className='logo' href='https://cioospacific.ca/' />
       {currentRangeLevel && <Legend currentRangeLevel={currentRangeLevel} />}
+      {<button className='boxQueryButton' id='boxQueryButton' title='Rectangle tool'><div className='rectangleIcon' /></button>}
     </div>
   );
 }
