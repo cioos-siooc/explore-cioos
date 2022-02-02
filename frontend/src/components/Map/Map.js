@@ -8,11 +8,11 @@ import DrawRectangle from 'mapbox-gl-draw-rectangle-mode';
 import './styles.css'
 
 import { server}  from '../../config'
-import { createDataFilterQueryString, generateColorStops } from "../../utilities"
+import { createDataFilterQueryString, generateColorStops, getCurrentRangeLevel } from "../../utilities"
 import { colorScale } from "../config"
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setLoading, organizations, zoom, setZoom, currentRangeLevel }) {
+export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setLoading, organizations, zoom, setZoom, rangeLevels }) {
   const mapContainer = useRef(null)
   const map = useRef(null)
   const drawControlOptions = {
@@ -33,10 +33,34 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
   const draw = new MapboxDraw(drawControlOptions)
   const drawPolygon = useRef(draw)
   const doFinalCheck = useRef(false)
+  const colorStops = useRef([])
 
   useEffect(() => {
     doFinalCheck.current = true
   }, [query])
+
+  useEffect(() => {
+    setColorStops()
+  }, [rangeLevels])
+
+  function setColorStops() {
+    if(map.current) {
+      colorStops.current = generateColorStops(colorScale, getCurrentRangeLevel(rangeLevels, map.current.getZoom())).map(colorStop => {
+        return [colorStop.stop, colorStop.color]
+      })
+      if(map.current.getZoom() >= 7 && map.current.getLayer('points')){
+        map.current.setPaintProperty('points', 'circle-color', {
+          property: 'count',
+          stops: colorStops.current
+        })
+      } else if (map.current.getZoom() < 7 && map.current.getLayer('hexes')) {
+        map.current.setPaintProperty('hexes', 'fill-color', {
+          property: 'count',
+          stops: colorStops.current
+        })
+      }
+    }
+  }
 
   const [boxSelectStartCoords, setBoxSelectStartCoords] = useState()
   const [boxSelectEndCoords, setBoxSelectEndCoords] = useState()
@@ -169,11 +193,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
         .map(([k, v]) => `${k}=${v}`)
         .join("&")
 
-      let colorStops = []
-      generateColorStops(colorScale, currentRangeLevel).map(colorStop => {
-        colorStops.push(colorStop.stop)
-        colorStops.push(colorStop.color)
-      })
+      setColorStops()
 
       map.current.addLayer({
         id: "points",
@@ -185,14 +205,15 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
         },
         "source-layer": "internal-layer-name",
         paint: {
-          "circle-color":  [
-            'interpolate',
-            ['linear'],
-            ['get', 'count'],
-            ...colorStops
-          ],
+          'circle-opacity': 1,
+          "circle-color":  {
+            property: 'count',
+            stops: colorStops.current
+          }
         },
       })
+
+      console.log(colorStops.current)
 
       map.current.addLayer({
         id: "hexes",
@@ -207,14 +228,12 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
         "source-layer": "internal-layer-name",
 
         paint: {
-          "fill-opacity": 0.8,
+          "fill-opacity": 0.9,
           "fill-color": 
-          [
-            'interpolate',
-            ['linear'],
-            ['get', 'count'],
-            ...colorStops
-          ],
+          {
+            property: 'count',
+            stops: colorStops.current
+          }
         },
       })
 
@@ -229,7 +248,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
         "source-layer": "internal-layer-name",
         paint: {
           "circle-color":  "red",
-          "circle-opacity": 1.0,
+          "circle-opacity": 1,
         },
         filter: ['in', 'pk', '']
       })
@@ -327,6 +346,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
         polygonSelection(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
       }
       doFinalCheck.current = false
+      // setColorStops()
       setLoading(false)
     })
 
@@ -339,6 +359,10 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
         }
       }
     })
+
+    // map.current.on('zoom', e => {
+    //   // setColorStops()
+    // })
 
     map.current.on('zoomend', e => {
       doFinalCheck.current = true
@@ -364,7 +388,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     map.current.on('zoomend', e => {
       setZoom(map.current.getZoom())
     })
-  })
+  }, [])
 
   return (
     <div ref={mapContainer} className="map" />

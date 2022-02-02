@@ -146,3 +146,16 @@ export function useDebounce(value, delay) {
   );
   return debouncedValue;
 }
+
+export function getCurrentRangeLevel(rangeLevels, zoom) {
+  switch (true) {
+    case zoom < 5:
+      return(rangeLevels['zoom0'])
+    case zoom >= 5 && zoom < 7:
+      return(rangeLevels['zoom1'])
+    case zoom >= 7:
+      return(rangeLevels['zoom2'])
+    default:
+      console.log('no match in zoom switch case')
+  }
+}
