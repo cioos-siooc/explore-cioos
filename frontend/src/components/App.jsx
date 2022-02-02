@@ -17,7 +17,7 @@ import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndD
 import "bootstrap/dist/css/bootstrap.min.css"
 
 import "./styles.css"
-import { createDataFilterQueryString, validateEmail } from '../utilities.js'
+import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel } from '../utilities.js'
 import { server } from '../config.js'
 import _ from 'lodash'
 import Legend from './Controls/Legend/Legend.jsx'
@@ -123,19 +123,7 @@ export default function App() {
 
   useEffect(() => {
     if (rangeLevels) {
-      switch (true) {
-        case zoom < 5:
-          setCurrentRangeLevel(rangeLevels['zoom0'])
-          break;
-        case zoom >= 5 && zoom < 7:
-          setCurrentRangeLevel(rangeLevels['zoom1'])
-          break;
-        case zoom >= 7:
-          setCurrentRangeLevel(rangeLevels['zoom2'])
-          break;
-        default:
-          console.log('no match in zoom switch case')
-      }
+      setCurrentRangeLevel(getCurrentRangeLevel(rangeLevels, zoom))
     }
   }, [rangeLevels, zoom])
 
@@ -183,7 +171,7 @@ export default function App() {
   return (
     <div>
       {loading && <Loading />}
-      {currentRangeLevel && <Map
+      {rangeLevels && <Map
         setPolygon={setPolygon}
         setSelectedPointPKs={setSelectedPointPKs}
         setLoading={setLoading}
@@ -192,7 +180,7 @@ export default function App() {
         organizations={organizations}
         zoom={zoom}
         setZoom={setZoom}
-        currentRangeLevel={currentRangeLevel}
+        rangeLevels={rangeLevels}
       />}
       <Controls
         setQuery={setQuery}
