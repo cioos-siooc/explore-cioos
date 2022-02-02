@@ -7,6 +7,10 @@
   text-align: center;
 }
 
+.downloadButton:disabled:hover {
+  background-color: #f7f7f7 ;
+}
+
 .downloadButton:hover {
   background-color: lightgray;
 }

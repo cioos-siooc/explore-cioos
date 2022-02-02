@@ -29,6 +29,7 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
       })
       setDataTotal((total / 1000000).toFixed(2))
       setPointsToDownload(pointsData.filter(point => point.selected))//.map(point => point.pk))
+      setLoading(false)
     }
   }, [pointsData])
 
@@ -36,24 +37,19 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
     if (polygon !== undefined && !loading) {
       setInspectDataset()
       setLoading(true)
-      let urlString
-      if (polygon !== undefined) {
-        urlString = `${server}/pointQuery?polygon=${JSON.stringify(polygon)}&${createDataFilterQueryString(query, organizations)}`
-      }
-      // else if (false) {
-      //   urlString = `${server}/pointQuery?pointPKs=${pointPKs.join(',')}&${createDataFilterQueryString(query, organizations)}`
-      // }
+      let urlString = `${server}/pointQuery?polygon=${JSON.stringify(polygon)}&${createDataFilterQueryString(query, organizations)}`
       fetch(urlString).then(response => {
         if (response.ok) {
           response.json().then(data => {
             setPointsData(data.map(point => {
-              setLoading(false)
               return {
                 ...point,
                 selected: true
               }
             }))
           })
+        } else {
+          setPointsData([])
         }
       })
     }
