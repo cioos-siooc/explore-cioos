@@ -3,21 +3,13 @@ import maplibreGl, { NavigationControl, Popup } from "maplibre-gl"
 import MapboxDraw from "@mapbox/mapbox-gl-draw"
 import { useState, useEffect, useRef } from "react"
 import * as turf from '@turf/turf'
+import DrawRectangle from 'mapbox-gl-draw-rectangle-mode';
 
 import './styles.css'
 
 import { server}  from '../../config'
 import { createDataFilterQueryString, generateColorStops } from "../../utilities"
 import { colorScale } from "../config"
-import { set } from "lodash"
-
-// const config = {
-//   fillOpacity: 0.8,
-//   // colorScale: ["#DDF3DF",  "#B0E1C8" , "#85CDC4" , "#5CA2B8" , "#4B719B", "#3B487E", "#302B5F"],
-//   // colorScale: ["#D2F4F0","#BDE7E2","#A7DAD4","#92CEC6","#7DC1B7","#67B4A9", "#52A79B"]
-//   // colorScale: ["#bbddd8","#9fd0c9","#76bcb2","#52a79b","#4a968c","#3d7b73", "#2f6059"]
-//   colorScale: colorScale
-// }
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
 export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setLoading, organizations, zoom, setZoom, currentRangeLevel }) {
@@ -31,10 +23,21 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       polygon: true, 
       trash: true,
       combine_features: false,
-      uncombine_features: false
+      uncombine_features: false,
+      modes: Object.assign(MapboxDraw.modes, {
+        draw_rectangle: DrawRectangle,
+      }),
     }
   }
-  const drawPolygon = useRef(new MapboxDraw(drawControlOptions))
+
+  const draw = new MapboxDraw(drawControlOptions)
+  const drawPolygon = useRef(draw)
+  const doFinalCheck = useRef(false)
+
+  useEffect(() => {
+    doFinalCheck.current = true
+  }, [query])
+
   const [boxSelectStartCoords, setBoxSelectStartCoords] = useState()
   const [boxSelectEndCoords, setBoxSelectEndCoords] = useState()
 
@@ -49,6 +52,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       setBoxSelectStartCoords()
       setLoading(true)
       polygonSelection(bboxPolygon.geometry.coordinates[0])
+      setPolygon(bboxPolygon.geometry.coordinates[0])
     }
   }, [boxSelectEndCoords])
 
@@ -78,18 +82,11 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       ['in', 'pk']
     )
     
-    // if(filter.length > 1000) {
-    //   return window.alert('Please select 1000 or fewer features')
-    // }
-
     map.current.setFilter('points-highlighted', filter)
 
     if(pointsWithinPolygon.features.map(point => point.properties.pk).length > 0){
       setSelectedPointPKs(pointsWithinPolygon.features.map(point => point.properties.pk))
-    }
-    
-    //set selected PKs and polygon
-    setPolygon(polygon)
+    }    
   }
 
   const popup = new Popup({
@@ -149,13 +146,17 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       center: [-125, 49], // starting position
       zoom: zoom, // starting zoom
     })
-
+    
     // Called order determines stacking order
     map.current.addControl(new NavigationControl(), "bottom-right")
     map.current.addControl(drawPolygon.current, "bottom-right")
-
-    //
+  
     map.current.on("load", () => {
+      const boxQueryElement = document.getElementById('boxQueryButton');
+      if(boxQueryElement) {
+        boxQueryElement.onclick=()=>draw.changeMode('draw_rectangle');
+      }
+    
       const query = {
         timeMin: "1900-01-01",
         timeMax: new Date().toLocaleDateString(),
@@ -259,6 +260,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       const lineString = turf.lineString(clickLngLatBBox)
       const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
       polygonSelection(bboxPolygon.geometry.coordinates[0])
+      setPolygon(bboxPolygon.geometry.coordinates[0])
     })
 
     map.current.on('click', 'hexes', e => {
@@ -303,11 +305,13 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
         drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
       }
       polygonSelection(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+      setPolygon(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
     })
 
     map.current.on('draw.update', e => {
       setLoading(true)
       polygonSelection(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+      setPolygon(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
     })
 
     map.current.on('draw.delete', e => {
@@ -317,10 +321,27 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     })
 
     map.current.on('idle', e => {
+      if(doFinalCheck.current && drawPolygon.current.getAll().features.length > 0 && map.current.getZoom() >= 7) {
+        setSelectedPointPKs()
+        setLoading(true)
+        polygonSelection(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+      }
+      doFinalCheck.current = false
       setLoading(false)
     })
 
+    map.current.on('dragend', e => {
+      if(drawPolygon.current.getAll().features.length > 0) {
+        setSelectedPointPKs()
+        if(map.current.getZoom() >= 7){
+          setLoading(true)
+          polygonSelection(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+        }
+      }
+    })
+
     map.current.on('zoomend', e => {
+      doFinalCheck.current = true
       if(drawPolygon.current.getAll().features.length > 0) {
         setSelectedPointPKs()
         if(map.current.getZoom() >= 7){

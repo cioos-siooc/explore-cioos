@@ -17,6 +17,7 @@
     "jquery": "^3.6.0",
     "lodash": "^4.17.21",
     "mapbox-gl": "^2.6.1",
+    "mapbox-gl-draw-rectangle-mode": "^1.0.4",
     "maplibre-gl": ">=2.0.0",
     "prop-types": "^15.8.1",
     "rc-slider": "^9.7.5",
