@@ -44,11 +44,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     closeOnClick: true,
     maxWidth: '400px'
   })
-  
-
-  // useEffect(() => {
-    
-  // }, [query])
 
   useEffect(() => {
     setColorStops()
@@ -274,6 +269,9 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
 
     map.current.on('click', 'points', e => {
       if(draw.getMode() !== 'draw_polygon' && !creatingRectangle.current){
+        if(drawPolygon.current.getAll().features.length > 0) {
+          drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
+        }
         map.current.flyTo({center: [e.lngLat.lng, e.lngLat.lat]})
         const height = 10
         const width = 10
