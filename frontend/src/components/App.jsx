@@ -17,7 +17,7 @@ import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndD
 import "bootstrap/dist/css/bootstrap.min.css"
 
 import "./styles.css"
-import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel } from '../utilities.js'
+import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel, getPointsDataSize } from '../utilities.js'
 import { server } from '../config.js'
 import _ from 'lodash'
 import Legend from './Controls/Legend/Legend.jsx'
@@ -116,7 +116,7 @@ export default function App() {
       if (legend) {
         setRangeLevels(legend.recordsCount)
       } else {
-        console.log('legend query failed')
+        // console.log('legend query failed')
       }
     })
   }, [query])
@@ -161,7 +161,7 @@ export default function App() {
           width={740}
         >
           <input className='emailAddress' type='email' placeholder='email@email.com' onChange={e => handleEmailChange(e.target.value)} />
-          <button className='submitRequestButton' disabled={!emailValid || _.isEmpty(pointsToDownload)} onClick={() => handleSubmission()}>Submit Request</button>
+          <button className='submitRequestButton' disabled={!emailValid || _.isEmpty(pointsToDownload) || getPointsDataSize(pointsToDownload) / 1000000 > 100} onClick={() => handleSubmission()}>Submit Request</button>
           {submissionIcon}
         </SelectionDetails>
       </DataDownloadModal >

@@ -9,7 +9,7 @@ import Loading from '../Loading/Loading.jsx'
 import { server } from '../../../config'
 
 import './styles.css'
-import { bytesToMemorySizeString, createDataFilterQueryString } from '../../../utilities.js'
+import { bytesToMemorySizeString, createDataFilterQueryString, getPointsDataSize } from '../../../utilities.js'
 
 // Note: datasets and points are exchangable terminology
 export default function SelectionDetails({ pointPKs, setPointsToDownload, query, polygon, organizations, width, children }) {
@@ -18,21 +18,14 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
   const [inspectDataset, setInspectDataset] = useState()
   const [dataTotal, setDataTotal] = useState(0)
   const [loading, setLoading] = useState(false)
-  const [dataTotalString, setDataTotalString] = useState()
 
   useEffect(() => {
-    if (pointsData) {
-      let total = 0
-      pointsData.forEach((point) => {
-        if (point.selected) {
-          total += point.size
-        }
-      })
-      setDataTotal((total / 1000000))
-      setDataTotalString(bytesToMemorySizeString(total))
+    if (!_.isEmpty(pointsData)) {
+      const total = getPointsDataSize(pointsData)
+      setDataTotal(total / 1000000)
       setPointsToDownload(pointsData.filter(point => point.selected))//.map(point => point.pk))
-      setLoading(false)
     }
+    setLoading(false)
   }, [pointsData])
 
   useEffect(() => {
