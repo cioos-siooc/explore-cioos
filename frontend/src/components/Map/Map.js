@@ -123,6 +123,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
 
   useEffect(() => {
     setSelectedPointPKs()
+    setPolygon()
     if(map && map.current && map.current.loaded()){
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
       const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${createDataFilterQueryString(query, organizations)}`
