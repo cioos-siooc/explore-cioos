@@ -8,6 +8,7 @@ import "rc-slider/assets/index.css";
 import './styles.css'
 
 export default function DepthSelector(props) {
+
   return (
     <div className='depthSelector'>
       <div className='inputs'>
@@ -18,7 +19,7 @@ export default function DepthSelector(props) {
             value={props.startDepth}
             type="number"
             max={12000}
-            min={-100}
+            min={0}
             onChange={(e) => {
               if (e.target.value * 1.0 < props.endDepth) {
                 props.setStartDepth(e.target.value * 1.0) // Force type-conversion to number
@@ -34,7 +35,7 @@ export default function DepthSelector(props) {
             value={props.endDepth}
             type="number"
             max={12000}
-            min={-100}
+            min={0}
             onChange={(e) => {
               if (e.target.value * 1.0 > props.startDepth) {
                 props.setEndDepth(e.target.value * 1.0) // Force type-conversion to number

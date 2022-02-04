@@ -292,7 +292,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     })
 
     map.current.on('click', 'hexes', e => {
-      console.log(drawPolygon.current.getMode())
       if(draw.getMode() !== 'draw_polygon' && !creatingRectangle.current){
         map.current.flyTo({center: [e.lngLat.lng, e.lngLat.lat], zoom: 7})
       } 

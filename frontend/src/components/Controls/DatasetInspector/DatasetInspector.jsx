@@ -50,6 +50,7 @@ export default function DatasetInspector({ dataset, setInspectDataset }) {
           </thead>
           <tbody>
             {dataset.profiles.map((profile, index) => {
+              { console.log(profile) }
               return (
                 <tr key={index}>
                   <td>{profile.profile_id}</td>

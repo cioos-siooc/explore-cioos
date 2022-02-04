@@ -83,16 +83,22 @@ export function createDataFilterQueryString(query, organizations) {
 
 export function bytesToMemorySizeString(bytes) {
   let num = parseFloat(bytes)
-  if(num < 1000000) {
-    return `${(num/1000).toFixed(2)}kb`
+  // console.log('num', num, bytes)
+  // if(_.isEmpty(bytes)) return '---'
+  if(num === NaN || num === 'NaN' || bytes === null) {
+    return 'NaN'
+  } else if(num < 1000000) {
+    return `${(num/1000).toFixed(2)}KB`
   } else if(num < 1000000000) {
     return `${(num/1000000).toFixed(2)}MB`
   } else if(num < 1000000000000) {
     return `${(num/1000000000).toFixed(2)}GB`
   } else if(num < 1000000000000000) {
     return `${(num/1000000000000).toFixed(2)}TB`
+  } else if(num < 1000000000000000000) {
+    return `${(num/1000000000000000).toFixed(2)}PB`
   } else {
-    return '>1TB'
+    return '>1PB'
   }
 }
 
@@ -158,4 +164,14 @@ export function getCurrentRangeLevel(rangeLevels, zoom) {
     default:
       console.log('no match in zoom switch case')
   }
+}
+
+export function getPointsDataSize(pointsData) {
+  let total = 0
+  pointsData.forEach((point) => {
+    if (point.selected && point.size !== 'NaN' && point.size !== null) {
+      total += point.size
+    }
+  })
+  return total
 }
