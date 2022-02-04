@@ -46,9 +46,9 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
   })
   
 
-  useEffect(() => {
-    doFinalCheck.current = true
-  }, [query])
+  // useEffect(() => {
+    
+  // }, [query])
 
   useEffect(() => {
     setColorStops()
@@ -141,6 +141,11 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       // Force a repaint, so that the map will be repainted without you having to touch the map
       map.current.triggerRepaint()
       setLoading(true)
+      doFinalCheck.current = true
+      if(drawPolygon.current.getAll().features.length > 0) {
+        polygonSelection(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+        setPolygon(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+      }
     }
   }, [query])
 
