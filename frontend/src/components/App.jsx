@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom'
 import * as Sentry from "@sentry/react"
 import { Integrations } from "@sentry/tracing"
 import { Col, Spinner } from 'react-bootstrap'
-import { CheckCircle, XCircle } from 'react-bootstrap-icons'
+import { Chat, ChatDots, ChatSquareText, CheckCircle, XCircle } from 'react-bootstrap-icons'
 
 import Controls from "./Controls/Controls.jsx"
 import Map from "./Map/Map.js"
@@ -203,7 +203,10 @@ export default function App() {
       </Controls>
       <a title='Return to CIOOS pacific homepage' className='logo' href='https://cioospacific.ca/' />
       {currentRangeLevel && <Legend currentRangeLevel={currentRangeLevel} />}
-      {<button className='boxQueryButton' id='boxQueryButton' title='Rectangle tool'><div className='rectangleIcon' /></button>}
+      <button className='boxQueryButton' id='boxQueryButton' title='Rectangle tool'><div className='rectangleIcon' /></button>
+      <a className='feedbackButton' title='Please provide feedback on your experience using CIOOS Data Explorer!' href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit' target='_blank'>
+        <ChatDots size='30px' />
+      </a>
     </div>
   );
 }
