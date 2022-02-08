@@ -43,7 +43,7 @@
 }
 
 .modal-content .datasetsTable tbody{
-  height: auto;
+  height: calc(70vh - 220px);
 }
 
 .modal-content .pointDetails .datasetInspector {
