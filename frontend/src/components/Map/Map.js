@@ -44,11 +44,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     closeOnClick: true,
     maxWidth: '400px'
   })
-  
-
-  useEffect(() => {
-    doFinalCheck.current = true
-  }, [query])
 
   useEffect(() => {
     setColorStops()
@@ -74,16 +69,18 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       colorStops.current = generateColorStops(colorScale, getCurrentRangeLevel(rangeLevels, map.current.getZoom())).map(colorStop => {
         return [colorStop.stop, colorStop.color]
       })
-      if(map.current.getZoom() >= 7 && map.current.getLayer('points')){
-        map.current.setPaintProperty('points', 'circle-color', {
-          property: 'count',
-          stops: colorStops.current
-        })
-      } else if (map.current.getZoom() < 7 && map.current.getLayer('hexes')) {
-        map.current.setPaintProperty('hexes', 'fill-color', {
-          property: 'count',
-          stops: colorStops.current
-        })
+      if(colorStops.current.length > 0) {
+        if(map.current.getZoom() >= 7 && map.current.getLayer('points')){
+          map.current.setPaintProperty('points', 'circle-color', {
+            property: 'count',
+            stops: colorStops.current
+          })
+        } else if (map.current.getZoom() < 7 && map.current.getLayer('hexes')) {
+          map.current.setPaintProperty('hexes', 'fill-color', {
+            property: 'count',
+            stops: colorStops.current
+          })
+        }
       }
     }
   }
@@ -123,6 +120,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
 
   useEffect(() => {
     setSelectedPointPKs()
+    setPolygon()
     if(map && map.current && map.current.loaded()){
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
       const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${createDataFilterQueryString(query, organizations)}`
@@ -141,6 +139,11 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       // Force a repaint, so that the map will be repainted without you having to touch the map
       map.current.triggerRepaint()
       setLoading(true)
+      doFinalCheck.current = true
+      if(drawPolygon.current.getAll().features.length > 0) {
+        polygonSelection(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+        setPolygon(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+      }
     }
   }, [query])
 
@@ -268,6 +271,9 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
 
     map.current.on('click', 'points', e => {
       if(draw.getMode() !== 'draw_polygon' && !creatingRectangle.current){
+        if(drawPolygon.current.getAll().features.length > 0) {
+          drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
+        }
         map.current.flyTo({center: [e.lngLat.lng, e.lngLat.lat]})
         const height = 10
         const width = 10
@@ -292,7 +298,6 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     })
 
     map.current.on('click', 'hexes', e => {
-      console.log(drawPolygon.current.getMode())
       if(draw.getMode() !== 'draw_polygon' && !creatingRectangle.current){
         map.current.flyTo({center: [e.lngLat.lng, e.lngLat.lat], zoom: 7})
       } 

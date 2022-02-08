@@ -10,6 +10,7 @@ import Controls from "./Controls/Controls.jsx"
 import Map from "./Map/Map.js"
 import SelectionPanel from './Controls/SelectionPanel/SelectionPanel.jsx'
 import SelectionDetails from './Controls/SelectionDetails/SelectionDetails.jsx'
+import DownloadDetails from './Controls/DownloadDetails/DownloadDetails.jsx'
 import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx'
 import Loading from './Controls/Loading/Loading.jsx'
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from './config.js'
@@ -17,7 +18,7 @@ import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndD
 import "bootstrap/dist/css/bootstrap.min.css"
 
 import "./styles.css"
-import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel } from '../utilities.js'
+import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel, getPointsDataSize } from '../utilities.js'
 import { server } from '../config.js'
 import _ from 'lodash'
 import Legend from './Controls/Legend/Legend.jsx'
@@ -35,8 +36,8 @@ if (process.env.NODE_ENV === "production") {
 }
 
 export default function App() {
-
   const [pointsToDownload, setPointsToDownload] = useState()
+  const [pointsToReview, setPointsToReview] = useState()
   const [selectedPointPKs, setSelectedPointPKs] = useState()
   const [polygon, setPolygon] = useState()
   const [email, setEmail] = useState()
@@ -56,10 +57,6 @@ export default function App() {
     eovsSelected: defaultEovsSelected,
     orgsSelected: defaultOrgsSelected
   })
-
-  useEffect(() => {
-    console.log('points to download', pointsToDownload)
-  }, [pointsToDownload])
 
   useEffect(() => {
     fetch(`${server}/organizations`).then(response => response.json()).then(data => {
@@ -115,8 +112,6 @@ export default function App() {
     fetch(`${server}/legend?${createDataFilterQueryString(query, organizations)}`).then(response => response.json()).then(legend => {
       if (legend) {
         setRangeLevels(legend.recordsCount)
-      } else {
-        console.log('legend query failed')
       }
     })
   }, [query])
@@ -138,7 +133,7 @@ export default function App() {
   }
 
   function submitRequest() {
-    fetch(`${server}/download?${createDataFilterQueryString(query, organizations)}&polygon=${JSON.stringify(polygon)}&email=${email}`).then((response) => {
+    fetch(`${server}/download?${createDataFilterQueryString(query, organizations)}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload.map(point => point.pk).join(',')}&email=${email}`).then((response) => {
       if (response.ok) {
         setSubmissionState('successful')
       } else {
@@ -150,20 +145,17 @@ export default function App() {
   function DownloadButton() {
     return (
       <DataDownloadModal
-        disabled={_.isEmpty(pointsToDownload)}
+        disabled={_.isEmpty(pointsToReview)}
       >
-        <SelectionDetails
-          pointPKs={pointsToDownload && pointsToDownload.map(point => point.pk)}
-          setPointsToDownload={setPointsToDownload}
-          query={query}
-          polygon={polygon}
-          organizations={organizations}
+        <DownloadDetails
           width={740}
+          pointsToReview={pointsToReview}
+          setPointsToDownload={setPointsToDownload}
         >
           <input className='emailAddress' type='email' placeholder='email@email.com' onChange={e => handleEmailChange(e.target.value)} />
-          <button className='submitRequestButton' disabled={!emailValid || _.isEmpty(pointsToDownload)} onClick={() => handleSubmission()}>Submit Request</button>
+          <button className='submitRequestButton' disabled={!emailValid || _.isEmpty(pointsToReview) || getPointsDataSize(pointsToReview) / 1000000 > 100} onClick={() => handleSubmission()}>Submit Request</button>
           {submissionIcon}
-        </SelectionDetails>
+        </DownloadDetails>
       </DataDownloadModal >
     )
   }
@@ -171,17 +163,19 @@ export default function App() {
   return (
     <div>
       {loading && <Loading />}
-      {rangeLevels && <Map
-        setPolygon={setPolygon}
-        setSelectedPointPKs={setSelectedPointPKs}
-        setLoading={setLoading}
-        query={query}
-        polygon={polygon}
-        organizations={organizations}
-        zoom={zoom}
-        setZoom={setZoom}
-        rangeLevels={rangeLevels}
-      />}
+      {rangeLevels &&
+        <Map
+          setPolygon={setPolygon}
+          setSelectedPointPKs={setSelectedPointPKs}
+          setLoading={setLoading}
+          query={query}
+          polygon={polygon}
+          organizations={organizations}
+          zoom={zoom}
+          setZoom={setZoom}
+          rangeLevels={rangeLevels}
+        />
+      }
       <Controls
         setQuery={setQuery}
         setLoading={setLoading}
@@ -191,8 +185,8 @@ export default function App() {
           <Col xs='auto' className='selectionPanelColumn'>
             <SelectionPanel>
               <SelectionDetails
-                pointPKs={selectedPointPKs}
-                setPointsToDownload={setPointsToDownload}
+                pointsToReview={pointsToReview}
+                setPointsToReview={setPointsToReview}
                 query={query}
                 polygon={polygon}
                 organizations={organizations}
