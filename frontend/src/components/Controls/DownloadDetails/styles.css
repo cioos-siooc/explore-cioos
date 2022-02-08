@@ -1,0 +1,46 @@
+.downloadDetails {
+  width: 100%;
+}
+
+.downloadDetailsControls {
+  border-top: 1px solid darkgrey;
+  background-color: #f7f7f7;
+  position: absolute;
+  bottom: 0px;
+  left: 0px;
+  width:100%;
+}
+
+.downloadDetailsControlRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 10px 10px 10px;
+}
+
+.emailInput {
+  width: 100%;
+  margin-right: 10px;
+}
+
+.dataTotalRatio svg{
+  margin-left: 5px;
+}
+
+.dataTotalBar {
+  height: 40px;
+  width: 325px;
+  margin-right: 10px;
+}
+
+.dataTotalBar.progress{
+  margin: 5px 0px 0px 0px;
+  height: 30px;
+}
+
+.progress .upTo100 {
+  color: white;
+}
+
+.progress .past100 {
+  color: black;
+}
