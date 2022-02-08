@@ -83,7 +83,6 @@ export function createDataFilterQueryString(query, organizations) {
 
 export function bytesToMemorySizeString(bytes) {
   let num = parseFloat(bytes)
-  // console.log('num', num, bytes)
   // if(_.isEmpty(bytes)) return '---'
   if(num === NaN || num === 'NaN' || bytes === null) {
     return 'NaN'
@@ -161,8 +160,6 @@ export function getCurrentRangeLevel(rangeLevels, zoom) {
       return(rangeLevels['zoom1'])
     case zoom >= 7:
       return(rangeLevels['zoom2'])
-    default:
-      console.log('no match in zoom switch case')
   }
 }
 

@@ -112,8 +112,6 @@ export default function App() {
     fetch(`${server}/legend?${createDataFilterQueryString(query, organizations)}`).then(response => response.json()).then(legend => {
       if (legend) {
         setRangeLevels(legend.recordsCount)
-      } else {
-        // console.log('legend query failed')
       }
     })
   }, [query])
