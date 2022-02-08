@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom'
 import * as Sentry from "@sentry/react"
 import { Integrations } from "@sentry/tracing"
 import { Col, Spinner } from 'react-bootstrap'
-import { Chat, ChatDots, ChatSquareText, CheckCircle, XCircle } from 'react-bootstrap-icons'
+import { ChatDots, CheckCircle, XCircle } from 'react-bootstrap-icons'
 
 import Controls from "./Controls/Controls.jsx"
 import Map from "./Map/Map.js"
