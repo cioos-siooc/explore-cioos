@@ -4,6 +4,10 @@
   text-align: left;
 }
 
+.datasetsTable table {
+  table-layout: fixed;
+}
+
 .datasetsTable th{
   cursor: pointer;
 }
@@ -44,4 +48,8 @@
 
 .datasetsTable .inspectButton:hover {
   background-color: lightgray;
+}
+
+.selectAllHeader{
+  display: flex
 }

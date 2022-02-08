@@ -5,53 +5,26 @@ import { ProgressBar } from 'react-bootstrap'
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
-import Loading from '../Loading/Loading.jsx'
-import { server } from '../../../config'
 
 import './styles.css'
-import { bytesToMemorySizeString, createDataFilterQueryString, getPointsDataSize } from '../../../utilities.js'
+import { bytesToMemorySizeString, getPointsDataSize } from '../../../utilities.js'
 
 // Note: datasets and points are exchangable terminology
-export default function SelectionDetails({ pointsToReview, setPointsToReview, query, polygon, organizations, width, children }) {
+export default function DownloadDetails({ pointsToReview, setPointsToDownload, width, children }) {
 
   const [selectAll, setSelectAll] = useState(true)
-  const [pointsData, setPointsData] = useState([])
+  const [pointsData, setPointsData] = useState(pointsToReview)
   const [inspectDataset, setInspectDataset] = useState()
   const [dataTotal, setDataTotal] = useState(0)
-  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    setDataTotal(0)
     if (!_.isEmpty(pointsData)) {
       const total = getPointsDataSize(pointsData)
       setDataTotal(total / 1000000)
-      setPointsToReview(pointsData.filter(point => point.selected))//.map(point => point.pk))
+      setPointsToDownload(pointsData.filter(point => point.selected))//.map(point => point.pk))
     }
-    setLoading(false)
   }, [pointsData])
 
-  useEffect(() => {
-    setDataTotal(0)
-    if (polygon !== undefined && !loading) {
-      setInspectDataset()
-      setLoading(true)
-      let urlString = `${server}/pointQuery?polygon=${JSON.stringify(polygon)}&${createDataFilterQueryString(query, organizations)}`
-      fetch(urlString).then(response => {
-        if (response.ok) {
-          response.json().then(data => {
-            setPointsData(data.map(point => {
-              return {
-                ...point,
-                selected: true
-              }
-            }))
-          })
-        } else {
-          setPointsData([])
-        }
-      })
-    }
-  }, [polygon])
 
   function handleSelectDataset(point) {
     let dataset = pointsData.filter((p) => p.dataset_id === point.dataset_id)[0]
@@ -77,31 +50,26 @@ export default function SelectionDetails({ pointsToReview, setPointsToReview, qu
   }
 
   return (
-    <div className='pointDetails'>
-      <div className='pointDetailsInfoRow'>
-        {loading ?
-          (
-            <Loading />
-          ) :
-          (inspectDataset ?
-            <DatasetInspector
-              dataset={inspectDataset}
-              setInspectDataset={setInspectDataset}
-            /> :
-            <DatasetsTable
-              handleSelectAllDatasets={handleSelectAllDatasets}
-              handleSelectDataset={handleSelectDataset}
-              setInspectDataset={setInspectDataset}
-              selectAll={selectAll}
-              setDatasets={setPointsData}
-              datasets={pointsData}
-              width={width}
-            />
-          )
+    <div className='downloadDetails'>
+      <div className='downloadDetailsInfoRow'>
+        {inspectDataset ?
+          <DatasetInspector
+            dataset={inspectDataset}
+            setInspectDataset={setInspectDataset}
+          /> :
+          <DatasetsTable
+            handleSelectAllDatasets={handleSelectAllDatasets}
+            handleSelectDataset={handleSelectDataset}
+            setInspectDataset={setInspectDataset}
+            selectAll={selectAll}
+            setDatasets={setPointsData}
+            datasets={pointsData}
+            width={width}
+          />
         }
       </div>
-      <div className='pointDetailsControls'>
-        <div className='pointDetailsControlRow'>
+      <div className='downloadDetailsControls'>
+        <div className='downloadDetailsControlRow'>
           <div>
             <ProgressBar
               className='dataTotalBar'
