@@ -29,8 +29,6 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
   const sizeColWidth = 0.181 * width        // 100      // 0.181
   const openButtonColWidth = 0.127 * width  // 70 // 0.127
 
-  // console.log('width of 1.000', (checkColWidth + titleColWidth + typeColWidth + recordsColWidth + sizeColWidth + openButtonColWidth) / width)
-
   function sortByProperty(prop) {
     let data = datasets
     if (prop === sortProp) {

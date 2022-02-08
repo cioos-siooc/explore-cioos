@@ -21,10 +21,6 @@ export default function SelectionDetails({ pointsToReview, setPointsToReview, qu
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    console.log('updating points to download', pointsToReview)
-  }, [pointsToReview])
-
-  useEffect(() => {
     setDataTotal(0)
     if (!_.isEmpty(pointsData)) {
       const total = getPointsDataSize(pointsData)
