@@ -90,6 +90,7 @@ export default function SelectionDetails({ pointPKs, setPointsToDownload, query,
               handleSelectDataset={handleSelectDataset}
               setInspectDataset={setInspectDataset}
               selectAll={selectAll}
+              setDatasets={setPointsData}
               datasets={pointsData}
               width={width}
             />
