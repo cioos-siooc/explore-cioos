@@ -69,16 +69,18 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       colorStops.current = generateColorStops(colorScale, getCurrentRangeLevel(rangeLevels, map.current.getZoom())).map(colorStop => {
         return [colorStop.stop, colorStop.color]
       })
-      if(map.current.getZoom() >= 7 && map.current.getLayer('points')){
-        map.current.setPaintProperty('points', 'circle-color', {
-          property: 'count',
-          stops: colorStops.current
-        })
-      } else if (map.current.getZoom() < 7 && map.current.getLayer('hexes')) {
-        map.current.setPaintProperty('hexes', 'fill-color', {
-          property: 'count',
-          stops: colorStops.current
-        })
+      if(colorStops.current.length > 0) {
+        if(map.current.getZoom() >= 7 && map.current.getLayer('points')){
+          map.current.setPaintProperty('points', 'circle-color', {
+            property: 'count',
+            stops: colorStops.current
+          })
+        } else if (map.current.getZoom() < 7 && map.current.getLayer('hexes')) {
+          map.current.setPaintProperty('hexes', 'fill-color', {
+            property: 'count',
+            stops: colorStops.current
+          })
+        }
       }
     }
   }

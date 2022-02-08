@@ -2,28 +2,23 @@ import _, { size, toInteger } from 'lodash'
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { Table } from 'react-bootstrap'
-import { ArrowDown, ArrowUp, CheckSquare, ChevronCompactRight, SortAlphaDown, SortAlphaUp, SortDown, SortNumericDown, SortNumericUp, SortUp, Square } from 'react-bootstrap-icons'
+import { ArrowDown, ArrowUp, CheckSquare, ChevronCompactRight, SortAlphaDown, SortAlphaUp, SortNumericDown, SortNumericUp, Square } from 'react-bootstrap-icons'
 import { abbreviateString, bytesToMemorySizeString } from '../../../utilities'
 
 import './styles.css'
 
-export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDataset, datasets, selectAll, setInspectDataset, width }) {
+export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDataset, datasets, setDatasets, selectAll, setInspectDataset, width }) {
   const [sortedData, setSortedData] = useState(datasets)
   const [sortProp, setSortProp] = useState('title')
   const [ascending, setAscending] = useState(false)
 
   useEffect(() => {
-    sortByProperty(sortProp)
-  }, [])
+    setSortedData(datasets)
+  }, [datasets])
 
   useEffect(() => {
-    setSortedData(sortedData.map(datum => {
-      return {
-        ...datum,
-        selected: selectAll
-      }
-    }))
-  }, [selectAll])
+    handleSortByProperty(sortProp)
+  }, [])
 
   const totalWidth = 560
 
@@ -37,16 +32,24 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
   // console.log('width of 1.000', (checkColWidth + titleColWidth + typeColWidth + recordsColWidth + sizeColWidth + openButtonColWidth) / width)
 
   function sortByProperty(prop) {
+    let data = datasets
+    if (prop === sortProp) {
+      ascending ? data.sort((a, b) => _.get(a, prop) > _.get(b, prop) ? -1 : _.get(a, prop) < _.get(b, prop) ? 1 : 0) : data.sort((a, b) => _.get(a, prop) > _.get(b, prop) ? 1 : _.get(a, prop) < _.get(b, prop) ? -1 : 0)
+
+    } else {
+      data.sort((a, b) => _.get(a, prop) > _.get(b, prop) ? 1 : _.get(a, prop) < _.get(b, prop) ? -1 : 0)
+    }
+    return data
+  }
+
+  function handleSortByProperty(prop) {
     if (datasets) {
-      let data = datasets
+      setDatasets(sortByProperty(prop))
       if (prop === sortProp) {
-        ascending ? data.sort((a, b) => _.get(a, prop) > _.get(b, prop) ? -1 : _.get(a, prop) < _.get(b, prop) ? 1 : 0) : data.sort((a, b) => _.get(a, prop) > _.get(b, prop) ? 1 : _.get(a, prop) < _.get(b, prop) ? -1 : 0)
         setAscending(!ascending)
       } else {
-        data.sort((a, b) => _.get(a, prop) > _.get(b, prop) ? 1 : _.get(a, prop) < _.get(b, prop) ? -1 : 0)
         setAscending(true)
       }
-      setSortedData(data)
       setSortProp(prop)
     }
   }
@@ -57,7 +60,7 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
         <thead>
           <tr>
             <th style={{ width: `${checkColWidth}px`, maxWidth: `${checkColWidth}px`, minWidth: `${checkColWidth}px` }} title='Select all' onClick={(e) => {
-              sortByProperty('selected')
+              handleSortByProperty('selected')
               e.stopPropagation()
             }}
             >
@@ -78,16 +81,16 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                 {sortProp === 'selected' && (ascending ? <ArrowDown /> : <ArrowUp />)}
               </div>
             </th>
-            <th style={{ width: `${titleColWidth}px`, maxWidth: `${titleColWidth}px`, minWidth: `${titleColWidth}px` }} title='Sort by dataset title' onClick={() => sortByProperty('title')}>
+            <th style={{ width: `${titleColWidth}px`, maxWidth: `${titleColWidth}px`, minWidth: `${titleColWidth}px` }} title='Sort by dataset title' onClick={() => handleSortByProperty('title')}>
               Title {sortProp === 'title' && (ascending ? <SortAlphaDown /> : <SortAlphaUp />)}
             </th>
-            <th style={{ width: `${typeColWidth}px`, maxWidth: `${typeColWidth}px`, minWidth: `${typeColWidth}px` }} title='Sort by dataset type' onClick={() => sortByProperty('cdm_data_type')}>
+            <th style={{ width: `${typeColWidth}px`, maxWidth: `${typeColWidth}px`, minWidth: `${typeColWidth}px` }} title='Sort by dataset type' onClick={() => handleSortByProperty('cdm_data_type')}>
               Type {sortProp === 'cdm_data_type' && (ascending ? <SortAlphaDown /> : <SortAlphaUp />)}
             </th>
-            <th style={{ width: `${recordsColWidth}px`, maxWidth: `${recordsColWidth}px`, minWidth: `${recordsColWidth}px` }} title='Sort by number of records in dataset' onClick={() => sortByProperty('profiles.length')}>
+            <th style={{ width: `${recordsColWidth}px`, maxWidth: `${recordsColWidth}px`, minWidth: `${recordsColWidth}px` }} title='Sort by number of records in dataset' onClick={() => handleSortByProperty('profiles.length')}>
               Records {sortProp === 'profiles.length' && (ascending ? <SortNumericDown /> : <SortNumericUp />)}
             </th>
-            <th style={{ width: `${sizeColWidth}px`, maxWidth: `${sizeColWidth}px`, minWidth: `${sizeColWidth}px` }} title='Sort by approximate dataset size in megabytes' onClick={() => sortByProperty('size')}>
+            <th style={{ width: `${sizeColWidth}px`, maxWidth: `${sizeColWidth}px`, minWidth: `${sizeColWidth}px` }} title='Sort by approximate dataset size in megabytes' onClick={() => handleSortByProperty('size')}>
               Size  {sortProp === 'size' && (ascending ? <SortNumericDown /> : <SortNumericUp />)}
             </th>
             <th style={{ width: `${openButtonColWidth}px`, maxWidth: `${openButtonColWidth}px`, minWidth: `${openButtonColWidth}px` }} title='Open dataset details'>

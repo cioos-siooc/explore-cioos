@@ -58,7 +58,7 @@ export default function App() {
   })
 
   useEffect(() => {
-    console.log('points to download', pointsToDownload)
+    console.log('updating points to download', pointsToDownload)
   }, [pointsToDownload])
 
   useEffect(() => {
@@ -138,6 +138,8 @@ export default function App() {
   }
 
   function submitRequest() {
+    console.log('pointsToDownload', pointsToDownload)
+    // &datasetPKs=${pointsToDownload}
     fetch(`${server}/download?${createDataFilterQueryString(query, organizations)}&polygon=${JSON.stringify(polygon)}&email=${email}`).then((response) => {
       if (response.ok) {
         setSubmissionState('successful')
@@ -152,6 +154,7 @@ export default function App() {
       <DataDownloadModal
         disabled={_.isEmpty(pointsToDownload)}
       >
+        {/* {console.log(pointsToDownload)} */}
         <SelectionDetails
           pointPKs={pointsToDownload && pointsToDownload.map(point => point.pk)}
           setPointsToDownload={setPointsToDownload}
