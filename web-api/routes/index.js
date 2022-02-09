@@ -1,9 +1,15 @@
 var express = require("express");
 var router = express.Router();
 
-// /* GET home page. */
+/*
+ * /
+ *
+ * The index page has no purpose, just to check if the API is running
+ *
+ */
+
 router.get("/", function (req, res, next) {
-  res.render("index", { title: "Express" });
+  res.render("index", { title: "CDE API" });
 });
 
 module.exports = router;
