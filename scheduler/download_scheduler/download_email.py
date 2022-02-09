@@ -15,7 +15,7 @@ def send_email(mail_to, mail_message_body, mail_subject):
     if "GMAIL_USER" not in envs:
         print("GMAIL auth not configured")
         return
-
+    print("Emailing", mail_to)
     gmail_user = envs["GMAIL_USER"]
     if not gmail_user:
         return
