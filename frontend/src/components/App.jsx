@@ -208,7 +208,7 @@ export default function App() {
       <a className='feedbackButton' title='Please provide feedback on your experience using CIOOS Data Explorer!' href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit' target='_blank'>
         <ChatDots size='30px' />
       </a>
-      <IntroModal />
+      <IntroModal intialOpenState={true} />
     </div>
   );
 }
