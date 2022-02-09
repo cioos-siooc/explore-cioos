@@ -10,22 +10,23 @@
 
 .logo {
   width: 153px;
-  height: 60px;
+  height: 50px;
   border: 2px solid transparent;
   pointer-events: all;
   position: absolute;
   top: 10px;
   right: 10px;
   background-image: url(./Images/CIOOSNationalLogoBlack.svg);
-  background-color: transparent;
+  background-color: #fff;
   background-repeat: no-repeat;
   border-radius: 10px;
-  background-size: 148px 55px;
+  background-size: 148px 50px;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
 }
 
 .logo:hover {
   background-color: #f7f7f7;
-  border: 2px solid lightgray;
+  /* border: 2px solid lightgray; */
 }
 
 @media all and (max-width: 900px) {
@@ -67,4 +68,21 @@
 
 .mapboxgl-ctrl-group {
   border-radius: 0px 0px 4px 4px;
+}
+
+.feedbackButton {
+  position: absolute;
+  right: 10px;
+  top: 70px;
+  background-color: #fff;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  border-radius: 40px;
+  width: 42px;
+  height: 42px;
+  z-index: 100;
+  padding: 5.5px;
+}
+
+.feedbackButton:hover {
+  background-color: #f3f3f3;
 }
