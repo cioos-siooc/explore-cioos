@@ -7,7 +7,6 @@ var cors = require("cors");
 
 var downloadRouter = require("./routes/download");
 var indexRouter = require("./routes/index");
-var jobsRouter = require("./routes/jobs");
 var legendRouter = require("./routes/legend");
 var organizationsRouter = require("./routes/organizations");
 var pointQueryRouter = require("./routes/pointQuery");
@@ -48,7 +47,6 @@ app.use(express.static(path.join(__dirname, "public")));
 
 app.use("/", indexRouter);
 app.use("/download", downloadRouter);
-app.use("/jobs", jobsRouter);
 app.use("/legend", legendRouter);
 app.use("/organizations", organizationsRouter);
 app.use("/pointQuery", pointQueryRouter);

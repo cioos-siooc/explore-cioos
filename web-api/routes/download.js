@@ -5,95 +5,111 @@ var express = require("express");
 var router = express.Router();
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
+const { getShapeQuery } = require("../utils/shapeQuery");
+const { polygonJSONToWKT } = require("../utils/polygon");
 const { eovGrouping } = require("../utils/grouping");
+const { requiredShapeMiddleware } = require("../utils/validatorMiddlewares");
+const { check } = require("express-validator");
 
-router.get("/", async (req, res, next) => {
-  const {
-    timeMin,
-    timeMax,
-    latMin,
-    latMax,
-    depthMin,
-    depthMax,
-    lonMin,
-    lonMax,
-    eovs,
-    email,
-    polygon,
-  } = req.query;
+/**
+ * /download
+ * Requires a shape (either polygon or latMin/Max) and email
+ */
 
-  const filters = createDBFilter(req.query);
-  // const wkt
-  const wktPolygon =
-    "POLYGON((" +
-    JSON.parse(polygon)
-      .map(([lat, lon]) => `${lat} ${lon}`)
-      .join() +
-    "))";
+router.get(
+  "/",
+  requiredShapeMiddleware(),
+  check("email").isEmail(),
+  async (req, res, next) => {
+    const {
+      timeMin,
+      timeMax,
+      latMin,
+      latMax,
+      depthMin,
+      depthMax,
+      lonMin,
+      lonMax,
+      eovs,
+      email,
+      polygon,
+    } = req.query;
 
-  const SQL = `
-        with profiles_subset as (
-        select d.erddap_url, d.dataset_id,d.title,d.profile_variable,d.cdm_data_type, d.ckan_id ckan_id, 'https://catalogue.cioos.ca/dataset/' ckan_url
+    const shapeQueryResponse = await getShapeQuery(req.query);
+    const estimateTotalSize = shapeQueryResponse.reduce(
+      (partialSum, { size }) => partialSum + size,
+      0
+    );
+
+    const filters = createDBFilter(req.query);
+
+    const wktPolygon = polygonJSONToWKT(polygon);
+
+    const SQL = `
+        WITH profiles_subset AS (
+        SELECT d.erddap_url,
+               d.dataset_id,
+               d.title,
+               d.profile_variable,
+               d.cdm_data_type,
+               d.ckan_id ckan_id,
+               'https://catalogue.cioos.ca/dataset/' ckan_url
         FROM cioos_api.profiles p
         JOIN cioos_api.datasets d ON p.dataset_pk =d.pk
-        where
+        WHERE
         ${filters ? filters : ""} 
-        group by d.pk)
-        select json_agg(t) from profiles_subset t;      
+        GROUP BY d.pk)
+        SELECT json_agg(t) FROM profiles_subset t;      
       `;
 
-  console.log(SQL);
-  let count = 0;
+    console.log(SQL);
 
-  // Make sure they are a registered user
-  if (process.env.BETA_MODE) {
-    const allowedUsers = (await db("cioos_api.allowed_users")).map(
-      (e) => e.email
-    );
-    if (!allowedUsers.includes(email)) {
-      res.send(403);
-      return next();
-    }
-  }
+    try {
+      const tileRaw = await db.raw(SQL);
+      const tile = tileRaw.rows[0];
+      if (tile.json_agg && tile.json_agg.length) {
+        const jobID = uuidv4().substr(0, 6);
+        const downloaderInput = {
+          user_query: {
+            time_min: timeMin,
+            time_max: timeMax,
+            lat_min: Number.parseFloat(latMin),
+            lat_max: Number.parseFloat(latMax),
+            lon_min: Number.parseFloat(lonMin),
+            lon_max: Number.parseFloat(lonMax),
+            depth_min: Number.parseFloat(depthMin),
+            depth_max: Number.parseFloat(depthMax),
+            polygon_region: wktPolygon,
+            eovs: eovs
+              .split(",")
+              .map((eov) => eovGrouping[eov])
+              .flat(),
+            email,
+            job_id: jobID,
+          },
+          cache_filtered: tile.json_agg,
+        };
+        // add to the jobs queue
 
-  try {
-    const tileRaw = await db.raw(SQL);
-    const tile = tileRaw.rows[0];
-    if (tile.json_agg && tile.json_agg.length) {
-      const downloaderInput = {
-        user_query: {
-          time_min: timeMin,
-          time_max: timeMax,
-          lat_min: Number.parseFloat(latMin),
-          lat_max: Number.parseFloat(latMax),
-          lon_min: Number.parseFloat(lonMin),
-          lon_max: Number.parseFloat(lonMax),
-          depth_min: Number.parseFloat(depthMin),
-          depth_max: Number.parseFloat(depthMax),
-          polygon_region: wktPolygon,
-          eovs: eovs
-            .split(",")
-            .map((eov) => eovGrouping[eov])
-            .flat(),
-          email,
-          zip_filename: `ceda_download_${uuidv4().substr(0, 6)}.zip`,
-        },
-        cache_filtered: tile.json_agg,
-      };
-      // add to the jobs queue
+        const downloadJobEntry = {
+          job_id: jobID,
+          email: email,
+          downloader_input: downloaderInput,
+          estimate_details: JSON.stringify(shapeQueryResponse),
+          estimate_size: estimateTotalSize,
+        };
+        console.log(downloadJobEntry);
+        await db("cioos_api.download_jobs").insert(downloadJobEntry);
 
-      await db("cioos_api.download_jobs").insert({
-        email: email,
-        downloader_input: downloaderInput,
+        count = tile.json_agg.length;
+      }
+      res.send({ count });
+    } catch (e) {
+      res.status(404).send({
+        error: e.toString(),
       });
-      count = tile.json_agg.length;
     }
-    res.send({ count });
-  } catch (e) {
-    res.status(404).send({
-      error: e.toString(),
-    });
   }
-});
+);
 
 module.exports = router;
