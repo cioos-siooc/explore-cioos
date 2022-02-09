@@ -16,8 +16,8 @@ from erddapy import ERDDAP
 from shapely.geometry import Point
 
 ONE_MB = 10 ** 6
-DATASET_SIZE_LIMIT = 10 * ONE_MB
-QUERY_SIZE_LIMIT = 100 * ONE_MB
+DATASET_SIZE_LIMIT = 100 * ONE_MB
+QUERY_SIZE_LIMIT = 5000 * ONE_MB
 
 DOWNLOADING = "DOWNLOADING"
 COMPLETED = "COMPLETED"
@@ -340,6 +340,8 @@ def get_datasets(json_query, output_path="", create_pdf=False):
 
             # Retrieve metadata
             save_erddap_metadata(dataset, output_path=output_path)
+        
+        report["total_size"] += file_size
 
         dataset_report = {
             "dataset_id": dataset["dataset_id"],
@@ -355,6 +357,6 @@ def get_datasets(json_query, output_path="", create_pdf=False):
         }
 
         report["erddap_report"] += [dataset_report]
-        report["total_size"] += file_size
+
 
     return report
