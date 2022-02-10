@@ -22,6 +22,7 @@ import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel, getPo
 import { server } from '../config.js'
 import _ from 'lodash'
 import Legend from './Controls/Legend/Legend.jsx'
+import IntroModal from './Controls/IntroModal/IntroModal.jsx'
 
 if (process.env.NODE_ENV === "production") {
   Sentry.init({
@@ -38,7 +39,6 @@ if (process.env.NODE_ENV === "production") {
 export default function App() {
   const [pointsToDownload, setPointsToDownload] = useState()
   const [pointsToReview, setPointsToReview] = useState()
-  const [selectedPointPKs, setSelectedPointPKs] = useState()
   const [polygon, setPolygon] = useState()
   const [email, setEmail] = useState()
   const [emailValid, setEmailValid] = useState()
@@ -57,6 +57,12 @@ export default function App() {
     eovsSelected: defaultEovsSelected,
     orgsSelected: defaultOrgsSelected
   })
+
+  useEffect(() => {
+    if (_.isEmpty(pointsToReview)) {
+      setPointsToDownload()
+    }
+  }, [pointsToReview])
 
   useEffect(() => {
     fetch(`${server}/organizations`).then(response => response.json()).then(data => {
@@ -166,7 +172,7 @@ export default function App() {
       {rangeLevels &&
         <Map
           setPolygon={setPolygon}
-          setSelectedPointPKs={setSelectedPointPKs}
+          setPointsToReview={setPointsToReview}
           setLoading={setLoading}
           query={query}
           polygon={polygon}
@@ -207,6 +213,7 @@ export default function App() {
       <a className='feedbackButton' title='Please provide feedback on your experience using CIOOS Data Explorer!' href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit' target='_blank'>
         <ChatDots size='30px' />
       </a>
+      <IntroModal intialOpenState={true} />
     </div>
   );
 }
