@@ -12,7 +12,7 @@ import { createDataFilterQueryString, generateColorStops, getCurrentRangeLevel }
 import { colorScale } from "../config"
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setLoading, organizations, zoom, setZoom, rangeLevels }) {
+export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, organizations, zoom, setZoom, rangeLevels }) {
   const mapContainer = useRef(null)
   const map = useRef(null)
   const creatingRectangle = useRef(false)
@@ -59,7 +59,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       setBoxSelectEndCoords()
       setBoxSelectStartCoords()
       setLoading(true)
-      polygonSelection(bboxPolygon.geometry.coordinates[0])
+      highlightPoints(bboxPolygon.geometry.coordinates[0])
       setPolygon(bboxPolygon.geometry.coordinates[0])
     }
   }, [boxSelectEndCoords])
@@ -85,7 +85,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     }
   }
 
-  function polygonSelection(polygon) {
+  function highlightPoints(polygon) {
     var features = map.current.queryRenderedFeatures({layers: ['points']}).map(point => {
       return {
         type: 'Feature',
@@ -112,14 +112,10 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     )
     
     map.current.setFilter('points-highlighted', filter)
-
-    if(pointsWithinPolygon.features.map(point => point.properties.pk).length > 0){
-      setSelectedPointPKs(pointsWithinPolygon.features.map(point => point.properties.pk))
-    }    
   }
 
   useEffect(() => {
-    setSelectedPointPKs()
+    setPointsToReview()
     setPolygon()
     if(map && map.current && map.current.loaded()){
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
@@ -141,7 +137,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
       setLoading(true)
       doFinalCheck.current = true
       if(drawPolygon.current.getAll().features.length > 0) {
-        polygonSelection(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+        highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
         setPolygon(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
       }
     }
@@ -264,7 +260,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     map.current.on('click', e => {
       if(drawPolygon.current.getAll().features.length === 0) {
         map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-        setSelectedPointPKs()
+        setPointsToReview()
         setPolygon()
       }
     })
@@ -289,7 +285,7 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
         ]
         const lineString = turf.lineString(clickLngLatBBox)
         const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
-        polygonSelection(bboxPolygon.geometry.coordinates[0])
+        highlightPoints(bboxPolygon.geometry.coordinates[0])
         setPolygon(bboxPolygon.geometry.coordinates[0])
       }
       if(creatingRectangle.current) {
@@ -338,32 +334,32 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     })
 
     map.current.on('draw.create', e => {
-      setSelectedPointPKs()
+      setPointsToReview()
       setLoading(true)
       if(drawPolygon.current.getAll().features.length > 1) {
         drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
       }
-      polygonSelection(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+      highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
       setPolygon(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
     })
 
     map.current.on('draw.update', e => {
       setLoading(true)
-      polygonSelection(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+      highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
       setPolygon(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
     })
 
     map.current.on('draw.delete', e => {
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-      setSelectedPointPKs()
+      setPointsToReview()
       setPolygon()
     })
 
     map.current.on('idle', e => {
       if(doFinalCheck.current && drawPolygon.current.getAll().features.length > 0 && map.current.getZoom() >= 7) {
-        setSelectedPointPKs()
+        setPointsToReview()
         setLoading(true)
-        polygonSelection(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+        highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
       }
       doFinalCheck.current = false
       // setColorStops()
@@ -372,10 +368,10 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
 
     map.current.on('dragend', e => {
       if(drawPolygon.current.getAll().features.length > 0) {
-        setSelectedPointPKs()
+        setPointsToReview()
         if(map.current.getZoom() >= 7){
           setLoading(true)
-          polygonSelection(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+          highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
         }
       }
     })
@@ -383,10 +379,10 @@ export default function CreateMap({ query, setSelectedPointPKs, setPolygon, setL
     map.current.on('zoomend', e => {
       doFinalCheck.current = true
       if(drawPolygon.current.getAll().features.length > 0) {
-        setSelectedPointPKs()
+        setPointsToReview()
         if(map.current.getZoom() >= 7){
           setLoading(true)
-          polygonSelection(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+          highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
         }
       }
     })
