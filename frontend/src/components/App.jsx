@@ -39,7 +39,6 @@ if (process.env.NODE_ENV === "production") {
 export default function App() {
   const [pointsToDownload, setPointsToDownload] = useState()
   const [pointsToReview, setPointsToReview] = useState()
-  const [selectedPointPKs, setSelectedPointPKs] = useState()
   const [polygon, setPolygon] = useState()
   const [email, setEmail] = useState()
   const [emailValid, setEmailValid] = useState()
@@ -58,6 +57,12 @@ export default function App() {
     eovsSelected: defaultEovsSelected,
     orgsSelected: defaultOrgsSelected
   })
+
+  useEffect(() => {
+    if (_.isEmpty(pointsToReview)) {
+      setPointsToDownload()
+    }
+  }, [pointsToReview])
 
   useEffect(() => {
     fetch(`${server}/organizations`).then(response => response.json()).then(data => {
@@ -167,7 +172,7 @@ export default function App() {
       {rangeLevels &&
         <Map
           setPolygon={setPolygon}
-          setSelectedPointPKs={setSelectedPointPKs}
+          setPointsToReview={setPointsToReview}
           setLoading={setLoading}
           query={query}
           polygon={polygon}

@@ -26,7 +26,7 @@ export default function DepthSelector(props) {
 
   function handleSetStartDepth(value) {
     setStartDepth(value * 1.0)
-    if (value * 1.0 < endDepth && value * 1.0 >= 0 && value * 1.0 <= 12000) {
+    if (value * 1.0 <= endDepth && value * 1.0 >= 0 && value * 1.0 <= 12000) {
       setDepthValid(true)
       props.setStartDepth(value * 1.0)
       props.setEndDepth(endDepth)
@@ -37,7 +37,7 @@ export default function DepthSelector(props) {
 
   function handleSetEndDepth(value) {
     setEndDepth(value * 1.0)
-    if (value * 1.0 > startDepth && value * 1.0 >= 0 && value * 1.0 <= 12000) {
+    if (value * 1.0 >= startDepth && value * 1.0 >= 0 && value * 1.0 <= 12000) {
       setDepthValid(true)
       props.setEndDepth(value * 1.0)
       props.setStartDepth(startDepth)
