@@ -86,3 +86,9 @@
 .feedbackButton:hover {
   background-color: #f3f3f3;
 }
+
+@media all and (max-height: 465px) {
+  .boxQueryButton {
+    top: 173px;
+  }
+}

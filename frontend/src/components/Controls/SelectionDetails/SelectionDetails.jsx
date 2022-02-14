@@ -63,7 +63,6 @@ export default function SelectionDetails({ pointsToReview, setPointsToReview, qu
         return p
       }
     })
-    console.log(pointsData, result, pointsData === result)
     setPointsData(result)
   }
 

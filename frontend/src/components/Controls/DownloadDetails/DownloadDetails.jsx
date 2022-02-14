@@ -72,7 +72,7 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, w
             }
           </div>
         </Col>
-        <Col>
+        <Col className='downloadHelp'>
           <div className='downloadQuote'>
             <i >
               "Use the CIOOS Data Explorer to get exactly the data you want."

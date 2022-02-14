@@ -48,3 +48,8 @@
 .downloadQuote {
   text-align: center;
 }
+
+.downloadHelp {
+  height: calc(60vh - 100px);
+  overflow-y: auto;
+}
