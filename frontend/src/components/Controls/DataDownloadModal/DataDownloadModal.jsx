@@ -10,14 +10,14 @@ export default function DataDownloadModal({ disabled, children }) {
     <div className='dataDownloadModal'>
       <Modal
         show={showModal}
-        size='lg'
+        size='xl'
         centered
         aria-labelledby='contained-modal-title-vcenter'
         onHide={() => setShowModal(false)}
       >
         <Modal.Header closeButton>
           <Modal.Title id='contained-modal-title-vcenter'>
-            Request data
+            Download Data from CIOOS Data Explorer
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>

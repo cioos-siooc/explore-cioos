@@ -4,10 +4,10 @@ import { Container, Table } from 'react-bootstrap'
 
 import './styles.css'
 
-export default function DatasetInspector({ dataset, setInspectDataset }) {
+export default function DatasetInspector({ dataset, setInspectDataset, width }) {
 
   return (
-    <div className='datasetInspector'>
+    <div className='datasetInspector' style={{ width: `${width + 10}px` }}>
       <div className='backButton' onClick={() => setInspectDataset()} title='Return to dataset list'>
         <ChevronCompactLeft />
         Back

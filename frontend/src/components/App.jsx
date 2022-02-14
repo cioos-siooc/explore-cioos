@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import * as Sentry from "@sentry/react"
 import { Integrations } from "@sentry/tracing"
-import { Col, Spinner } from 'react-bootstrap'
+import { Row, Col, Spinner } from 'react-bootstrap'
 import { ChatDots, CheckCircle, XCircle } from 'react-bootstrap-icons'
 
 import Controls from "./Controls/Controls.jsx"
@@ -43,7 +43,7 @@ export default function App() {
   const [email, setEmail] = useState()
   const [emailValid, setEmailValid] = useState()
   const [submissionState, setSubmissionState] = useState()
-  const [submissionIcon, setSubmissionIcon] = useState()
+  const [submissionFeedback, setSubmissionFeedback] = useState()
   const [loading, setLoading] = useState(true)
   const [organizations, setOrganizations] = useState()
   const [zoom, setZoom] = useState(2)
@@ -78,38 +78,46 @@ export default function App() {
     switch (submissionState) {
       case 'submitted':
         submitRequest()
-        setSubmissionIcon(
-          <Spinner
-            className='text-warning'
-            as="span"
-            animation="border"
-            size={30}
-            role="status"
-            aria-hidden="true"
-          />
-        )
+        setSubmissionFeedback({
+          icon: (
+            <Spinner
+              className='text-warning'
+              as="span"
+              animation="border"
+              size={30}
+              role="status"
+              aria-hidden="true"
+            />
+          ),
+          text: 'Submitting...'
+        })
         break;
 
       case 'successful':
-        setSubmissionIcon(
-          <CheckCircle
-            className='text-success'
-            size={30}
-          />
-        )
+        setSubmissionFeedback({
+          icon: (
+            <CheckCircle
+              className='text-success'
+              size={30}
+            />),
+          text: 'Request submitted'
+        })
         break;
 
       case 'failed':
-        setSubmissionIcon(
-          <XCircle
-            className='text-danger'
-            size={30}
-          />
-        )
+        setSubmissionFeedback({
+          icon: (
+            <XCircle
+              className='text-danger'
+              size={30}
+            />
+          ),
+          text: 'Request failed.'
+        })
         break;
 
       default:
-        setSubmissionIcon()
+        setSubmissionFeedback()
         break;
     }
   }, [submissionState])
@@ -154,13 +162,26 @@ export default function App() {
         disabled={_.isEmpty(pointsToReview)}
       >
         <DownloadDetails
-          width={740}
+          width={770}
           pointsToReview={pointsToReview}
           setPointsToDownload={setPointsToDownload}
         >
-          <input className='emailAddress' type='email' placeholder='email@email.com' onChange={e => handleEmailChange(e.target.value)} />
-          <button className='submitRequestButton' disabled={!emailValid || _.isEmpty(pointsToReview) || getPointsDataSize(pointsToReview) / 1000000 > 100} onClick={() => handleSubmission()}>Submit Request</button>
-          {submissionIcon}
+          <Col>
+            <input className='emailAddress' type='email' placeholder='email@email.com' onChange={e => handleEmailChange(e.target.value)} />
+          </Col>
+          <Col style={{ maxWidth: '155px' }}>
+            <button className='submitRequestButton' disabled={!emailValid || _.isEmpty(pointsToDownload) || getPointsDataSize(pointsToDownload) / 1000000 > 100} onClick={() => handleSubmission()}>Submit Request</button>
+          </Col>
+          <Col>
+            <Row>
+              <Col xs='auto'>
+                {submissionFeedback && submissionFeedback.icon}
+              </Col>
+              <Col xs='auto'>
+                {submissionFeedback && submissionFeedback.text}
+              </Col>
+            </Row>
+          </Col>
         </DownloadDetails>
       </DataDownloadModal >
     )
