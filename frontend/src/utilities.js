@@ -1,6 +1,7 @@
 import * as _ from 'lodash'
 import * as d3 from 'd3'
 import {useState, useEffect} from 'react'
+import { defaultQuery } from './components/config.js'
 
 export function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
@@ -52,33 +53,43 @@ export function validateEmail(email) {
 }
 
 export function createDataFilterQueryString(query, organizations) {
-  let eovsArray = [], orgsArray = []
-  Object.keys(query.eovsSelected).forEach((eov) => {
-    if(query.eovsSelected[eov]) {
-      eovsArray.push(eov)
-    }
-  })
-  Object.keys(query.orgsSelected).forEach((org) => {
-    if(query.orgsSelected[org]) {
-      orgsArray.push(organizations[org])
-    }
-  })
-  let apiMappedQuery = {
-    timeMin: query.startDate,
-    timeMax: query.endDate,
-    depthMin: query.startDepth,
-    depthMax: query.endDepth,
-  }
-  if(eovsArray.length === 0) {
-    apiMappedQuery.eovs = "carbon,currents,nutrients,salinity,temperature"
-  } else {
-    apiMappedQuery.eovs = eovsArray
-  }
-  if(orgsArray.length !== 0) {
-    apiMappedQuery.organizations = orgsArray
-  }
-  apiMappedQuery.dataType = 'casts,fixedStations'
-  return Object.entries(apiMappedQuery).map(([k, v]) => `${k}=${v}`).join("&")
+  const { orgsSelected, eovsSelected } = query;
+
+  const queryWithoutDefaults = Object.keys(defaultQuery).reduce(
+    (acc, field) => {
+      if (query[field] !== defaultQuery[field]) {
+        acc[field] = query[field];
+      }
+      return acc;
+    },
+    {}
+  );
+
+  const eovs = Object.keys(eovsSelected)
+    .filter((eov) => eovsSelected[eov])
+    .join();
+
+  const orgPKsSelected = Object.keys(orgsSelected)
+    .filter((org) => orgsSelected[org])
+    .map((org) => organizations[org])
+    .join();
+  
+  const {startDepth,endDepth,startDate,endDate} = queryWithoutDefaults
+  
+  const apiMappedQuery = {
+    eovs,
+    organizations: orgPKsSelected,
+    timeMin: startDate,
+    timeMax: endDate,
+    depthMin: startDepth,
+    depthMax: endDepth,
+  };
+
+
+  return Object.entries(apiMappedQuery)
+    .filter(([k, v]) => v != null && v !== "")
+    .map(([k, v]) => `${k}=${v}`)
+    .join("&");
 }
 
 export function bytesToMemorySizeString(bytes) {
