@@ -1,10 +1,7 @@
 var express = require("express");
 var router = express.Router();
 const { getShapeQuery } = require("../utils/shapeQuery");
-const {
-  validatorMiddleware,
-  requiredShapeMiddleware,
-} = require("../utils/validatorMiddlewares");
+const { requiredShapeMiddleware } = require("../utils/validatorMiddlewares");
 
 /**
  * /pointQuery
@@ -22,6 +19,14 @@ router.get("/", requiredShapeMiddleware(), async function (req, res, next) {
    * (number of columns in final CSV) * multiplier
    */
   const rows = await getShapeQuery(req.query);
-  res.send(rows);
+
+  // limiting # of profiles per dataset to 1000. otherwise one dataset could
+  // return 75k profiles and crash the browser
+  const rowsLimitedProfiles = rows.map((dataset) => ({
+    ...dataset,
+    profiles: dataset.profiles.slice(0, 1000),
+  }));
+
+  res.send(rowsLimitedProfiles);
 });
 module.exports = router;
