@@ -27,11 +27,11 @@ function shapeFiltersMiddleware() {
   return [
     check("polygon")
       .matches(/^[-.0-9,\[\]]+$/)
-      .isJSON(),
+      .isJSON()
+      .optional(),
 
-    // check(["latMin", "latMax", "lonMin", "lonMax"])
-    //   .isFloat({ min: -90, max: -90 })
-    //   .optional(),
+    check(["latMin", "latMax"]).isFloat({ min: -90, max: 90 }).optional(),
+    check(["lonMin", "lonMax"]).isFloat({ min: -180, max: 180 }).optional(),
     async function checkValidShape(req, res, next) {
       const { latMin, latMax, lonMin, lonMax, polygon } = req.query;
       // this has already

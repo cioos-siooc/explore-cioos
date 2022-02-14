@@ -1,9 +1,5 @@
 const { eovGrouping } = require("./grouping");
-const {
-  polygonIsRectangle,
-  polygonToMaxMins,
-  polygonJSONToWKT,
-} = require("./polygon");
+const { polygonJSONToWKT } = require("./polygon");
 
 // this is used by the tiler and the downloader routes
 const unique = (arr) => [...new Set(arr)];
@@ -28,17 +24,6 @@ function createDBFilter(request) {
   } = request;
 
   const filters = [];
-
-  if (polygon) {
-    const polygonArr = JSON.parse(polygon);
-
-    if (polygonIsRectangle(polygonArr)) {
-      console.log("POLYGON IS RECTANGLE");
-      const res = polygonToMaxMins(polygonArr);
-      ({ latMin, lonMin, latMax, lonMax } = res);
-      polygon = undefined;
-    }
-  }
 
   if (eovs) {
     const eovsCommaSeparatedString = unique(
