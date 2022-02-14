@@ -181,17 +181,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         }
       }
     
-      const query = {
-        timeMin: "1900-01-01",
-        timeMax: new Date().toLocaleDateString(),
-        depthMin: 0,
-        depthMax: 12000,
-        eovs: ["carbon", "currents", "nutrients", "salinity", "temperature"],
-        dataType: ["casts", "fixedStations"],
-      }
-      const queryString = Object.entries(query)
-        .map(([k, v]) => `${k}=${v}`)
-        .join("&")
+      
 
       setColorStops()
 
@@ -201,7 +191,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         minzoom: 7,
         source: {
           type: "vector",
-          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt?${queryString}`],
+          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`],
         },
         "source-layer": "internal-layer-name",
         paint: {
@@ -221,7 +211,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
 
         source: {
           type: "vector",
-          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt?${queryString}`],
+          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`],
         },
         "source-layer": "internal-layer-name",
 
@@ -241,7 +231,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         minzoom: 7,
         source: {
           type: "vector",
-          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt?${queryString}`],
+          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`],
         },
         "source-layer": "internal-layer-name",
         paint: {
