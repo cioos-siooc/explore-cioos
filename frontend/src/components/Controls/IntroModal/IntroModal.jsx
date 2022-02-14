@@ -12,7 +12,6 @@ export default function IntroModal({ intialOpenState }) {
   // Potential idea for cut through transparency to highligh controls: https://ishadeed.com/article/thinking-about-the-cut-out-effect/
 
   function generateInfo() {
-    console.log(hoveredStep)
     switch (hoveredStep) {
       case 'filter':
         return (

@@ -44,3 +44,7 @@
 .progress .past100 {
   color: black;
 }
+
+.downloadQuote {
+  text-align: center;
+}

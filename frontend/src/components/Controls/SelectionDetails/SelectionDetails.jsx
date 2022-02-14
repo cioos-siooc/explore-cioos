@@ -54,15 +54,16 @@ export default function SelectionDetails({ pointsToReview, setPointsToReview, qu
   }, [polygon])
 
   function handleSelectDataset(point) {
-    let dataset = pointsData.filter((p) => p.dataset_id === point.dataset_id)[0]
+    let dataset = pointsData.filter((p) => p.pk === point.pk)[0]
     dataset.selected = !point.selected
     const result = pointsData.map((p) => {
-      if (p.dataset_id === point.dataset_id) {
+      if (p.pk === point.pk) {
         return dataset
       } else {
         return p
       }
     })
+    console.log(pointsData, result, pointsData === result)
     setPointsData(result)
   }
 
