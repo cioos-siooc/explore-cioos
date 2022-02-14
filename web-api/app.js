@@ -16,7 +16,8 @@ const Sentry = require("@sentry/node");
 // Importing @sentry/tracing patches the global hub for tracing to work.
 const Tracing = require("@sentry/tracing");
 
-if (process.env.NODE_ENV === "production") {
+if (process.env.ENVIRONMENT === "production") {
+  console.log("Using sentry");
   Sentry.init({
     dsn: "https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595",
 

@@ -234,8 +234,8 @@ def get_profiles(dataset):
 
     profiles_bad_geom_query = f"""((latitude_min <= -90) or (latitude_max >= 90) or  \
                                 (longitude_min <= -180) or (longitude_max >= 180) or  \
-                                (depth_max > 15000) or (depth_min < -100))
-
+                                (depth_max > 15000) or (depth_min < -100)) or \
+                                records_per_day.isnull()
                               """
     #    or \
     # time_min > '{datetime.now(pytz.utc)}' or \
