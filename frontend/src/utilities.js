@@ -52,6 +52,14 @@ export function validateEmail(email) {
   return re.test(String(email).toLowerCase());
 }
 
+// create a URL query string from an object
+function objectToURL(obj) {
+  return Object.entries(obj)
+    .filter(([k, v]) => k && v != null && v !== "")
+    .map(([k, v]) => `${k}=${v}`)
+    .join("&");
+}
+
 export function createDataFilterQueryString(query, organizations) {
   const { orgsSelected, eovsSelected } = query;
 
@@ -85,11 +93,8 @@ export function createDataFilterQueryString(query, organizations) {
     depthMax: endDepth,
   };
 
-
-  return Object.entries(apiMappedQuery)
-    .filter(([k, v]) => v != null && v !== "")
-    .map(([k, v]) => `${k}=${v}`)
-    .join("&");
+  return objectToURL(apiMappedQuery);
+  
 }
 
 export function bytesToMemorySizeString(bytes) {
@@ -216,9 +221,7 @@ export function createSelectionQueryString(polygon) {
     // res = { latMin, lonMin, latMax, lonMax }  
     const res = polygonToMaxMins(polygon);
       
-  return Object.entries(res)
-    .map(([k, v]) => `${k}=${v}`)
-    .join("&");
+  return objectToURL(res);
   }
   return "polygon="+JSON.stringify(polygon);
 }

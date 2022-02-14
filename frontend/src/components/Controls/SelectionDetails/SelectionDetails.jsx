@@ -38,11 +38,14 @@ export default function SelectionDetails({ pointsToReview, setPointsToReview, qu
   useEffect(() => {
     setDataTotal(0)
     if (polygon !== undefined && !loading) {
+      const filtersQuery = createDataFilterQueryString(query, organizations);
+      const shapeQuery = createSelectionQueryString(
+        polygon
+      );
+      const combinedQueries = [filtersQuery, shapeQuery].filter(e=>e).join("&");
       setInspectDataset()
       setLoading(true)
-      let urlString = `${server}/pointQuery?${createSelectionQueryString(
-        polygon
-      )}&${createDataFilterQueryString(query, organizations)}`;
+      let urlString = `${server}/pointQuery?${combinedQueries}`;
       fetch(urlString).then(response => {
         if (response.ok) {
           response.json().then(data => {
