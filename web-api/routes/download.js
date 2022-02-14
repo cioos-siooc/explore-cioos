@@ -80,10 +80,10 @@ router.get(
             depth_min: Number.parseFloat(depthMin),
             depth_max: Number.parseFloat(depthMax),
             polygon_region: wktPolygon,
-            eovs: eovs
-              .split(",")
+            eovs: eovs ? 
+              eovs.split(",")
               .map((eov) => eovGrouping[eov])
-              .flat(),
+              .flat() : Object.keys(eovGrouping).join(","),
             email,
             job_id: jobID,
           },

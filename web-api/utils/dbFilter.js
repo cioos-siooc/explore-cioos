@@ -21,7 +21,7 @@ function createDBFilter(request) {
     polygon,
 
     // These are comma separated lists
-    eovs = Object.keys(eovGrouping).join(","),
+    eovs,
     organizations,
     datasetPKs,
     pointPKs,

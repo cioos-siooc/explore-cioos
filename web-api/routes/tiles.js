@@ -26,7 +26,7 @@ cache.on("message", function (message) {
 });
 
 cache.on("error", function (error) {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.ENVIRONMENT === "production") {
     console.log(error);
   } else {
     cache.on("error", function (error) {
@@ -85,9 +85,10 @@ router.get(
         relevent_points, te
       WHERE relevent_points.geom && tile_envelope
     )
-    SELECT ST_AsMVT(mvtgeom.*, 'cde-features-layer', 4096, 'geom') AS st_asmvt from mvtgeom;
+    SELECT ST_AsMVT(mvtgeom.*, 'internal-layer-name', 4096, 'geom') AS st_asmvt from mvtgeom;
   `;
 
+  
     try {
       const tileRaw = await db.raw(SQL);
 
