@@ -12,6 +12,8 @@ var organizationsRouter = require("./routes/organizations");
 var pointQueryRouter = require("./routes/pointQuery");
 var tilesRouter = require("./routes/tiles");
 
+var app = express();
+
 const Sentry = require("@sentry/node");
 // Importing @sentry/tracing patches the global hub for tracing to work.
 const Tracing = require("@sentry/tracing");
@@ -25,6 +27,7 @@ if (process.env.ENVIRONMENT === "production") {
     // for finer control
     tracesSampleRate: 1.0,
   });
+  app.use(Sentry.Handlers.requestHandler());
 }
 
 // if environement variables are set via docker, leave them
@@ -33,7 +36,6 @@ if (!process.env.DB_USER) require("dotenv").config();
 
 const compression = require("compression");
 
-var app = express();
 app.use(compression());
 app.use(cors());
 // view engine setup
@@ -53,6 +55,11 @@ app.use("/organizations", organizationsRouter);
 app.use("/pointQuery", pointQueryRouter);
 app.use("/tiles", tilesRouter);
 
+
+app.use(
+  Sentry.Handlers.errorHandler()
+);
+  
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
   next(createError(404));
