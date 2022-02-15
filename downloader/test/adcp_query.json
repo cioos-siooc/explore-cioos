@@ -1,39 +1,36 @@
 {
-    "user_query": {
-        "time_min": "1900-01-01",
-        "time_max": "2021-07-14",
-        "lat_min": null,
-        "lat_max": null,
-        "lon_min": null,
-        "lon_max": null,
-        "depth_min": null,
-        "depth_max": 12000,
-        "polygon_region": "POLYGON((-126.19516907984212 45.53883516180028,-126.1951645536144 45.538835396636586,-126.19516421833828 45.53883163926059,-126.195168744566 45.538831991514456,-126.19516907984212 45.53883516180028))",
-        "eovs": [
-            "inorganicCarbon",
-            "dissolvedOrganicCarbon",
-            "subSurfaceCurrents",
-            "surfaceCurrents",
-            "nitrate",
-            "phosphate",
-            "sulphate",
-            "silicate",
-            "seaSurfaceSalinity",
-            "subSurfaceSalinity",
-            "seaSurfaceTemperature",
-            "subSurfaceTemperature"
-        ],
-        "email": "unknown@test.org",
-        "zip_filename": "ceda_download_54cfa9.zip"
-    },
-    "cache_filtered": [
-        {
-            "erddap_url": "https://pac-dev2.cioos.org/erddap",
-            "dataset_id": "IOS_ADCP_Moorings",
-            "profile_variable": "profile_variable",
-            "cdm_data_type": "TimeSeries",
-            "ckan_id": "7f753093-09be-49cd-a930-41a557ae7755",
-            "ckan_url": "https://catalogue.cioos.ca/dataset/"
-        }
-    ]
+  "user_query": {
+    "time_min": "1900-01-01",
+    "time_max": "2022-02-10",
+    "lat_min": null,
+    "lat_max": null,
+    "lon_min": null,
+    "lon_max": null,
+    "depth_min": 0,
+    "depth_max": 10,
+    "polygon_region": "POLYGON((-125.52734375000045 55.3462909172126,-133.96484375000045 55.3462909172126,-133.96484375000045 50.47669407439406,-125.52734375000045 50.47669407439406,-125.52734375000045 55.3462909172126))",
+    "eovs": [
+      "inorganicCarbon",
+      "dissolvedOrganicCarbon",
+      "subSurfaceCurrents",
+      "surfaceCurrents",
+      "nutrients",
+      "seaSurfaceSalinity",
+      "subSurfaceSalinity",
+      "seaSurfaceTemperature",
+      "subSurfaceTemperature"
+    ],
+    "email": "test@example.com",
+    "job_id": "04e288"
+  },
+  "cache_filtered": [
+    {
+      "erddap_url": "https://data.cioospacific.ca/erddap",
+      "dataset_id": "IOS_ADCP_Moorings",
+      "title": "Moored ADCP profile data archived in Institute of Ocean Sciences (Sidney, BC),  1992 to present",
+      "cdm_data_type": "TimeSeriesProfile",
+      "ckan_id": "7f753093-09be-49cd-a930-41a557ae7755",
+      "ckan_url": "https://catalogue.cioos.ca/dataset/"
+    }
+  ]
 }

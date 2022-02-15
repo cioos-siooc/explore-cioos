@@ -1,25 +1,36 @@
 {
   "user_query": {
-    "time_min": "2000-01-01",
-    "time_max": "2021-06-22",
+    "time_min": "1900-01-01",
+    "time_max": "2022-02-04",
     "lat_min": null,
     "lat_max": null,
     "lon_min": null,
     "lon_max": null,
-    "depth_min": null,
-    "depth_max": 10,
-    "polygon_region": "POLYGON((-152.72416638370902 56.918656095640614,-118.44682263370862 56.82258618074391,-116.86479138370876 41.076118469691096,-152.72416638370902 42.90501896757061,-152.72416638370902 56.918656095640614))",
-    "eovs": ["nitrate", "phosphate", "sulphate", "silicate"],
-    "email": "nobody@example.com",
-    "zip_filename": "ceda_download_56e38d.zip"
+    "depth_min": -100,
+    "depth_max": 12000,
+    "polygon_region": "POLYGON((-112.49206542968875 24.17927234688237,-112.43713378906371 24.17927234688237,-112.43713378906371 24.229374899704794,-112.49206542968875 24.229374899704794,-112.49206542968875 24.17927234688237))",
+    "eovs": [
+      "inorganicCarbon",
+      "dissolvedOrganicCarbon",
+      "subSurfaceCurrents",
+      "surfaceCurrents",
+      "nutrients",
+      "seaSurfaceSalinity",
+      "subSurfaceSalinity",
+      "seaSurfaceTemperature",
+      "subSurfaceTemperature"
+    ],
+    "email": "test@example.com",
+    "job_id": "632065"
   },
   "cache_filtered": [
     {
-      "erddap_url": "https://pac-dev2.cioos.org/erddap",
+      "erddap_url": "https://data.cioospacific.ca/erddap",
       "dataset_id": "IOS_BOT_Profiles",
-      "profile_variable": "profile_variable",
+      "title": "Rosette bottle data archived in Institute of Ocean Sciences (Sidney, BC), 1965 to present ",
+      "profile_variable": null,
       "cdm_data_type": "Profile",
-      "ckan_id": "0bd1190b-c1fd-4e42-9d87-7c49430c476f",
+      "ckan_id": "bf0ad274-c085-4fe0-b739-2821235464f1",
       "ckan_url": "https://catalogue.cioos.ca/dataset/"
     }
   ]

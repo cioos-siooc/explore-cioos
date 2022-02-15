@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-import numpy as np
+from datetime import datetime
+import pytz
 import pandas as pd
 from erddap_scraper.ERDDAP import ERDDAP
 
@@ -14,6 +15,8 @@ dtypes = {
     "longitude_max": float,
     "latitude_min": float,
     "latitude_max": float,
+    "depth_min": float,
+    "depth_max": float,
 }
 
 # ,timeseries_id,latitude_min,latitude_max,longitude_min,longitude_max,time_min,time_max,n_records,dataset_id,erddap_url,depth_min,depth_max
@@ -45,12 +48,12 @@ def get_profiles(dataset):
         x for x in llat_variables if x in dataset.variables_list
     ]
 
+    # profiles=pd.DataFrame(columns=profile_columns.keys())
+    profiles = dataset.get_profile_ids()
+
     # Organize dataset variables by their cf_roles
     # eg profile_variable={'profile_id': 'hakai_id', 'timeseries_id': 'station'}
     profile_variables = dataset.profile_variables
-
-    # profiles=pd.DataFrame(columns=profile_columns.keys())
-    profiles = dataset.profile_ids
 
     # Profile Variable List - list of dataset variables that have cf_roles attached to them
     profile_variable_list = dataset.profile_variable_list
@@ -96,6 +99,11 @@ def get_profiles(dataset):
             logger.debug(f"Using dataset actual_range for {llat_variable}")
 
             [min, max] = df_variables.loc[llat_variable]["actual_range"].split(",")
+
+            # For ongoing datasets
+            if "NaN" in max:
+                max = datetime.utcnow().isoformat()
+
             profiles[llat_variable + "_min"] = min
             profiles[llat_variable + "_max"] = max
             continue
@@ -132,25 +140,27 @@ def get_profiles(dataset):
     logger.debug("Get record Count")
     count_variables = profile_variable_list.copy()
 
-    if "time" not in count_variables:
-        count_variables.append("time")
-    if (
-        dataset.cdm_data_type == "TimeSeriesProfile"
-        and "depth" in dataset.variables_list
-        and "depth" not in count_variables
-    ):
+    count_variables.append("time")
+    # if (
+    #     dataset.cdm_data_type == "TimeSeriesProfile"
+    #     and "depth" in dataset.variables_list
+    #     and "depth" not in count_variables
+    # ):
+    if "depth" in dataset.variables_list:
         count_variables.append("depth")
 
     # If time and depth are used as cf_roles grab the last variable
-    if count_variables == profile_variable_list:
-        count_variables.append(dataset.variables_list)[-1]
+    # if (
+    #     set(count_variables) == set(profile_variable_list)
+    #     and dataset.variables_list[-1] not in count_variables
+    # ):
+    #     count_variables.append(dataset.variables_list[-1])
 
     # Retrieve Count value per profile
     time_min = ERDDAP.parse_erddap_date(profiles["time_min"].min())
     time_max = ERDDAP.parse_erddap_date(profiles["time_max"].max())
 
-    count_variables = list(set(count_variables))
-    count_variables.sort()
+    count_variables = sorted(list(set(count_variables)))
 
     profile_count = dataset.get_count(
         count_variables, profile_variable_list, time_min, time_max
@@ -162,6 +172,13 @@ def get_profiles(dataset):
         )
     if not "n_records" in profiles:
         profiles["n_records"] = None
+
+    # something went wrong with counting records
+    profiles = profiles.query("not n_records.isnull()")
+
+    if profiles.empty:
+        logger.error("Error counting records")
+        return profiles
 
     # Rename cf_role variables as cf_role and drop from index.
     # Eg rename 'station_id' to 'timeseries_id'
@@ -215,12 +232,24 @@ def get_profiles(dataset):
     profiles = profiles.astype(dtypes)
     profiles = profiles.round(4)
 
-    profiles_bad_geom_query = "((latitude_min <= -90) or (latitude_max >= 90) or (longitude_min <= -180) or (longitude_max >= 180))"
+    profiles_bad_geom_query = f"""((latitude_min <= -90) or (latitude_max >= 90) or  \
+                                (longitude_min <= -180) or (longitude_max >= 180) or  \
+                                (depth_max > 15000) or (depth_min < -100)) or \
+                                records_per_day.isnull()
+                              """
+    #    or \
+    # time_min > '{datetime.now(pytz.utc)}' or \
+    # time_max > '{datetime.now(pytz.utc)}')
     profiles_bad_geom = profiles.query(profiles_bad_geom_query)
 
     if not profiles_bad_geom.empty:
-        logger.warn("These profiles with bad lat/long values will be removed:")
-        print(profiles_bad_geom.to_csv(None))
+        logger.warn(
+            "These profiles with bad lat/long/depth/time values will be removed:"
+        )
+        # TODO this could use record_id if it existed
+        logger.warn(set(profiles_bad_geom["profile_id"].to_list()))
+        logger.warn(set(profiles_bad_geom["timeseries_id"].to_list()))
+
         profiles = profiles.query("not " + profiles_bad_geom_query)
 
     return profiles

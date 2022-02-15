@@ -22,8 +22,8 @@ class Dataset(object):
         self.profile_variable_list = []
 
         self.get_metadata()
-        self.profile_ids = self.get_profile_ids()
 
+    def get_df(self):
         self.df = pd.DataFrame(
             {
                 "title": [self.globals["title"]],
@@ -40,6 +40,7 @@ class Dataset(object):
                 "profile_variables": [self.profile_variable_list],
             }
         )
+        return self.df
 
     def dataset_tabledap_query(self, url):
         return self.erddap_server.erddap_csv_to_df(
@@ -66,10 +67,8 @@ class Dataset(object):
             .query('cf_role != ""')[["cf_role", "name"]]["name"]
             .to_dict()
         )
-        profile_variable_list = list(profile_variables.values())
-
         # sorting so the url is consistent every time for query caching
-        profile_variable_list.sort()
+        profile_variable_list = sorted(list(profile_variables.values()))
 
         self.profile_variables = profile_variables
         self.profile_variable_list = profile_variable_list

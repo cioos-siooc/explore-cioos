@@ -1,12 +1,11 @@
 import os
-import uuid
 
 from erddap_downloader import download_erddap
 from erddap_downloader.zip_folder import zip_folder
 
 
 def run_download_query(download_query, output_folder, create_pdf=False):
-    temp_folder = "ceda_download_" + str(uuid.uuid4())[0:6]
+    temp_folder = "ceda_download_" + download_query["user_query"]["job_id"]
 
     # create the temporary folder
     os.makedirs(temp_folder)
@@ -24,7 +23,7 @@ def run_download_query(download_query, output_folder, create_pdf=False):
         return query_report
 
     # Zip the download
-    zip_filename = download_query["user_query"]["zip_filename"]
+    zip_filename = temp_folder + ".zip"
     zip_full_path = os.path.join(output_folder, zip_filename)
 
     zip_folder(temp_folder, zip_full_path)

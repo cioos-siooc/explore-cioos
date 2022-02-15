@@ -131,7 +131,9 @@ class ERDDAP(object):
             response.raise_for_status()
         else:
             # skip units line
-            return pd.read_csv(StringIO(response.text), skiprows=skiprows)
+            return pd.read_csv(
+                StringIO(response.text), skiprows=skiprows, encoding="unicode_escape"
+            )
         if no_data:
             logger.error("Empty response")
             return pd.DataFrame()

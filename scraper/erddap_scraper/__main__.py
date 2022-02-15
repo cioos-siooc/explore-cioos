@@ -162,7 +162,7 @@ def main(erddap_urls, csv_only, cache_requests):
                 index=False,
             )
 
-            profiles["profile_id"] = profiles["profile_id"].replace("", np.NaN)
+            profiles = profiles.replace("", np.NaN)
 
             print("Writing profiles")
 

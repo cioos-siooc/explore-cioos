@@ -31,7 +31,7 @@ if envs["ENVIRONMENT"] == "production":
 
 
 database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
-print("Connecting to", database_link)
+print("Connecting to", envs["DB_HOST"])
 engine = create_engine(database_link)
 
 create_pdf = False
@@ -105,7 +105,7 @@ def run_download(row):
     user_query = downloader_input["user_query"]
 
     email = user_query["email"]
-    zip_filename = user_query["zip_filename"]
+    zip_filename = "ceda_download_" + user_query["job_id"] + ".zip"
     downloader_output = ""
     downloader_error = ""
 
@@ -116,7 +116,7 @@ def run_download(row):
             output_folder=output_folder,
             create_pdf=create_pdf,
         )
-        print(downloader_output)
+
         # Download Completed. Update Status
         status = "completed"
 
@@ -159,7 +159,7 @@ def run_download(row):
             .replace("%", "")
             .replace("'", ""),
             "time_complete": "NOW()",
-            "download_size": str(downloader_output.get("zip_file_size")),
+            "download_size": str(downloader_output.get("total_size")),
         }
         update_download_jobs(
             pk,

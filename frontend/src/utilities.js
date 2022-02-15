@@ -209,10 +209,10 @@ function polygonToMaxMins(polygon) {
   const lats = unique(p.map((e) => e[1]));
 
   return {
-    latMin: Math.min(...lats),
-    lonMin: Math.min(...lons),
-    latMax: Math.max(...lats),
-    lonMax: Math.max(...lons),
+    latMin: Math.min(...lats).toFixed(4),
+    lonMin: Math.min(...lons).toFixed(4),
+    latMax: Math.max(...lats).toFixed(4),
+    lonMax: Math.max(...lons).toFixed(4),
   };
 }
 
@@ -221,7 +221,7 @@ export function createSelectionQueryString(polygon) {
     // res = { latMin, lonMin, latMax, lonMax }  
     const res = polygonToMaxMins(polygon);
       
-  return objectToURL(res);
+    return objectToURL(res);
   }
   return "polygon="+JSON.stringify(polygon);
 }

@@ -7,17 +7,19 @@ var cors = require("cors");
 
 var downloadRouter = require("./routes/download");
 var indexRouter = require("./routes/index");
-var jobsRouter = require("./routes/jobs");
 var legendRouter = require("./routes/legend");
 var organizationsRouter = require("./routes/organizations");
 var pointQueryRouter = require("./routes/pointQuery");
 var tilesRouter = require("./routes/tiles");
 
+var app = express();
+
 const Sentry = require("@sentry/node");
 // Importing @sentry/tracing patches the global hub for tracing to work.
 const Tracing = require("@sentry/tracing");
 
-if (process.env.NODE_ENV === "production") {
+if (process.env.ENVIRONMENT === "production") {
+  console.log("Using sentry");
   Sentry.init({
     dsn: "https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595",
 
@@ -25,6 +27,7 @@ if (process.env.NODE_ENV === "production") {
     // for finer control
     tracesSampleRate: 1.0,
   });
+  app.use(Sentry.Handlers.requestHandler());
 }
 
 // if environement variables are set via docker, leave them
@@ -33,7 +36,6 @@ if (!process.env.DB_USER) require("dotenv").config();
 
 const compression = require("compression");
 
-var app = express();
 app.use(compression());
 app.use(cors());
 // view engine setup
@@ -48,12 +50,16 @@ app.use(express.static(path.join(__dirname, "public")));
 
 app.use("/", indexRouter);
 app.use("/download", downloadRouter);
-app.use("/jobs", jobsRouter);
 app.use("/legend", legendRouter);
 app.use("/organizations", organizationsRouter);
 app.use("/pointQuery", pointQueryRouter);
 app.use("/tiles", tilesRouter);
 
+
+app.use(
+  Sentry.Handlers.errorHandler()
+);
+  
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
   next(createError(404));

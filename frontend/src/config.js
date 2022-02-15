@@ -1,3 +1,3 @@
-const server = 'https://pac-dev2.cioos.org/ceda/api'; //process.env.API_URL || "http://localhost:5000";
+const server = process.env.API_URL || "https://pac-dev2.cioos.org/ceda/api";
 
 module.exports = { server };
