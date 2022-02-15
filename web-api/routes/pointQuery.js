@@ -24,6 +24,7 @@ router.get("/", requiredShapeMiddleware(), async function (req, res, next) {
   // return 75k profiles and crash the browser
   const rowsLimitedProfiles = rows.map((dataset) => ({
     ...dataset,
+    profiles_count: dataset.profiles.length,
     profiles: dataset.profiles.slice(0, 1000),
   }));
 
