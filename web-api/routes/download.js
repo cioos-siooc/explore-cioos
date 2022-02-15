@@ -83,7 +83,7 @@ router.get(
             eovs: eovs ? 
               eovs.split(",")
               .map((eov) => eovGrouping[eov])
-              .flat() : Object.keys(eovGrouping).join(","),
+              .flat() : Object.keys(eovGrouping),
             email,
             job_id: jobID,
           },
