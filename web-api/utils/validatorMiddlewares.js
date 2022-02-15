@@ -31,7 +31,8 @@ function shapeFiltersMiddleware() {
       .optional(),
 
     check(["latMin", "latMax"]).isFloat({ min: -90, max: 90 }).optional(),
-    check(["lonMin", "lonMax"]).isFloat({ min: -180, max: 180 }).optional(),
+    // 360 to accomodate mapbox world copies
+    check(["lonMin", "lonMax"]).isFloat({ min: -360, max: 360 }).optional(),
     async function checkValidShape(req, res, next) {
       const { latMin, latMax, lonMin, lonMax, polygon } = req.query;
       // this has already
