@@ -1,39 +1,66 @@
 {
-    "user_query": {
-        "time_min": "2021-02-01",
-        "time_max": "2021-06-22",
-        "lat_min": null,
-        "lat_max": null,
-        "lon_min": null,
-        "lon_max": null,
-        "depth_min": 0,
-        "depth_max": 78,
-        "polygon_region": "POLYGON((-125.24851552403352 50.10962228316157,-125.22379628575227 50.16595520073122,-124.99788991368196 50.13163522369748,-124.97660390293977 50.0527821433049,-125.09127370274446 50.00955620803819,-125.18191090977571 50.03778979786507,-125.24851552403352 50.10962228316157))",
-        "eovs": [
-            "seaSurfaceSalinity",
-            "subSurfaceSalinity",
-            "seaSurfaceTemperature",
-            "subSurfaceTemperature"
-        ],
-        "email": "nobody@example.com",
-        "zip_filename": "ceda_download_8edf38.zip"
+  "user_query": {
+    "time_min": "1900-01-01",
+    "time_max": "2022-02-09",
+    "lat_min": null,
+    "lat_max": null,
+    "lon_min": null,
+    "lon_max": null,
+    "depth_min": 0,
+    "depth_max": 10,
+    "polygon_region": "POLYGON((-124.26707293223252 49.916824086808106,-125.60136413662903 49.916824086808106,-125.60136413662903 50.157554370931194,-124.26707293223252 50.157554370931194,-124.26707293223252 49.916824086808106))",
+    "eovs": ["seaSurfaceTemperature", "subSurfaceTemperature"],
+    "email": "test@example.com",
+    "job_id": "a7b33f"
+  },
+  "cache_filtered": [
+    {
+      "erddap_url": "https://catalogue.hakai.org/erddap",
+      "dataset_id": "HakaiWaterPropertiesInstrumentProfileProvisional",
+      "title": "Hakai Water Properties Vertical Profile Data Measured by Oceanographic Profilers, Provisional",
+      "cdm_data_type": "TimeSeriesProfile",
+      "ckan_id": "f239e86c-38d1-4fb2-8b17-acaed794221c",
+      "ckan_url": "https://catalogue.cioos.ca/dataset/"
     },
-    "cache_filtered": [
-        {
-            "erddap_url": "https://catalogue.hakai.org/erddap",
-            "dataset_id": "HakaiWaterPropertiesInstrumentProfileProvisional",
-            "profile_variable": "profile_variable",
-            "cdm_data_type": "Profile",
-            "ckan_id": "7adc4ad0-7841-4839-a91f-6d14edf4000f",
-            "ckan_url": "https://catalogue.cioos.ca/dataset/"
-        },
-        {
-            "erddap_url": "https://catalogue.hakai.org/erddap",
-            "dataset_id": "HakaiWaterPropertiesInstrumentProfileResearch",
-            "profile_variable": "profile_variable",
-            "cdm_data_type": "Profile",
-            "ckan_id": "0bd1190b-c1fd-4e42-9d87-7c49430c476f",
-            "ckan_url": "https://catalogue.cioos.ca/dataset/"
-        }
-    ]
+    {
+      "erddap_url": "https://catalogue.hakai.org/erddap",
+      "dataset_id": "HakaiWaterPropertiesInstrumentProfileResearch",
+      "title": "Hakai Water Properties Vertical Profiles Measured by Oceanographic Profilers, Research",
+      "cdm_data_type": "TimeSeriesProfile",
+      "ckan_id": null,
+      "ckan_url": "https://catalogue.cioos.ca/dataset/"
+    },
+    {
+      "erddap_url": "https://catalogue.hakai.org/erddap",
+      "dataset_id": "HakaiQuadraBoLResearch",
+      "title": "High-Resolution Record of Surface Seawater Carbon Dioxide (CO2) Content Collected From Hakai Institute Quadra Island Field Station in Hyacinthe Bay, British Columbia, Canada",
+      "cdm_data_type": "TimeSeries",
+      "ckan_id": "8e21b61a-e04e-424d-b0a0-b8f56b50cfe1",
+      "ckan_url": "https://catalogue.cioos.ca/dataset/"
+    },
+    {
+      "erddap_url": "https://catalogue.hakai.org/erddap",
+      "dataset_id": "HakaiQuadraLimpet5min",
+      "title": "Provisional Real-Time Hakai Seafloor Observatory in Hyacinthe Bay, Quadra Island, British Columbia, Canada",
+      "cdm_data_type": "TimeSeries",
+      "ckan_id": "a61f7975-44f4-457b-9be2-9927cc9a5b2c",
+      "ckan_url": "https://catalogue.cioos.ca/dataset/"
+    },
+    {
+      "erddap_url": "https://catalogue.hakai.org/erddap",
+      "dataset_id": "HakaiQU5MMooringProvisional",
+      "title": "QU5M Oceanographic Mooring in Hyacinthe Bay, Quadra Island, Provisional Dataset",
+      "cdm_data_type": "TimeSeriesProfile",
+      "ckan_id": null,
+      "ckan_url": "https://catalogue.cioos.ca/dataset/"
+    },
+    {
+      "erddap_url": "https://catalogue.hakai.org/erddap",
+      "dataset_id": "HakaiQuadraBoL5min",
+      "title": "Real-Time Provisional High-Resolution Record of Surface Seawater Carbon Dioxide (CO2) Content Collected from Hakai Institute Quadra Island Field Station in Hyacinthe Bay, British Columbia, Canada",
+      "cdm_data_type": "TimeSeries",
+      "ckan_id": "4181cce1-4804-4ffc-85d1-e2617b49ff7b",
+      "ckan_url": "https://catalogue.cioos.ca/dataset/"
+    }
+  ]
 }

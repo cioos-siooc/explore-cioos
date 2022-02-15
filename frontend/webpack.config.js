@@ -17,6 +17,7 @@ module.exports = {
       "mapbox-gl": "maplibre-gl",
     },
   },
+  devtool: "source-map",
   mode: "development",
   module: {
     rules: [
@@ -52,7 +53,7 @@ module.exports = {
         test: /\.(png|jpe?g|gif|svg)$/i,
         use: [
           {
-            loader: 'file-loader',
+            loader: "file-loader",
           },
         ],
       },
