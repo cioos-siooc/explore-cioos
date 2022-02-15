@@ -9,7 +9,12 @@ import Loading from '../Loading/Loading.jsx'
 import { server } from '../../../config'
 
 import './styles.css'
-import { bytesToMemorySizeString, createDataFilterQueryString, getPointsDataSize } from '../../../utilities.js'
+import {
+  bytesToMemorySizeString,
+  createDataFilterQueryString,
+  getPointsDataSize,
+  createSelectionQueryString,
+} from "../../../utilities.js";
 
 // Note: datasets and points are exchangable terminology
 export default function SelectionDetails({ pointsToReview, setPointsToReview, query, polygon, organizations, width, children }) {
@@ -33,9 +38,14 @@ export default function SelectionDetails({ pointsToReview, setPointsToReview, qu
   useEffect(() => {
     setDataTotal(0)
     if (polygon !== undefined && !loading) {
+      const filtersQuery = createDataFilterQueryString(query, organizations);
+      const shapeQuery = createSelectionQueryString(
+        polygon
+      );
+      const combinedQueries = [filtersQuery, shapeQuery].filter(e=>e).join("&");
       setInspectDataset()
       setLoading(true)
-      let urlString = `${server}/pointQuery?polygon=${JSON.stringify(polygon)}&${createDataFilterQueryString(query, organizations)}`
+      let urlString = `${server}/pointQuery?${combinedQueries}`;
       fetch(urlString).then(response => {
         if (response.ok) {
           response.json().then(data => {
