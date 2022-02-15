@@ -4,7 +4,7 @@ require("pg-parse-float")(pg);
 require("dotenv").config();
 const { DB_USER, DB_PASSWORD, DB_HOST, DB_NAME, DB_PORT } = process.env;
 
-console.log(DB_USER, DB_PASSWORD, DB_HOST, DB_NAME, DB_PORT);
+console.log('Connected to ', DB_HOST, DB_NAME, DB_PORT);
 
 const db = require("knex")({
   client: "pg",
