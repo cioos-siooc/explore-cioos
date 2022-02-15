@@ -51,8 +51,8 @@ async function getShapeQuery(query) {
      eov_cols,
         json_agg(json_build_object(
                 'profile_id',coalesce(p.profile_id, p.timeseries_id),
-                'time_min',p.time_min,
-                'time_max',p.time_max,
+                'time_min',p.time_min::date,
+                'time_max',p.time_max::date,
                 'depth_min',p.depth_min,
                 'depth_max',p.depth_max
         ) ORDER BY time_min DESC
