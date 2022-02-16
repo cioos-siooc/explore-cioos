@@ -1,4 +1,4 @@
-# this version adds Redis (tile cache) and replicas (4x api, 4x downloader)
+# this version adds Redis (tile cache) and replicas (2x api, 2x downloader)
 version: "3.3"
 services:
   redis:
@@ -30,7 +30,7 @@ services:
       - db
       - redis
     deploy:
-      replicas: 4
+      replicas: 2
     restart: always
   nginx:
     image: nginx:latest
@@ -48,7 +48,7 @@ services:
     depends_on:
       - db
     deploy:
-      replicas: 4
+      replicas: 2
     env_file:
       - .env
     volumes:
