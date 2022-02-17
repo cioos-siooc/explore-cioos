@@ -29,10 +29,13 @@ export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
     switch (badgeTitle) {
       case 'Ocean Variables':
         newBadge = count + ' variables'
-        case 'Organizations':
+        break;
+      case 'Organizations':
         newBadge = count + ' organizations'
-        case 'Datasets':
+        break;
+      case 'Datasets':
         newBadge =  count + ' datasets'
+        break;
     }
   }
   return newBadge
