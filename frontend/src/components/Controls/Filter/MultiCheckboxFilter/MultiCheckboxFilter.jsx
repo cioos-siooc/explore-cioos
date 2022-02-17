@@ -7,7 +7,7 @@ import './styles.css'
 export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected }) {
   return (
     <div className='multiCheckboxFilter'>
-      {Object.keys(optionsSelected).length > 0 && Object.keys(optionsSelected).map(option => (
+      {Object.keys(optionsSelected).length > 0 ? Object.keys(optionsSelected).map(option => (
         <div className='optionButton' key={option} title={option}
           onClick={() => setOptionsSelected({
             ...optionsSelected,
@@ -20,6 +20,9 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
           </span>
         </div>
       ))
+        : (
+          <div>No filter options</div>
+        )
       }
     </div>
   )

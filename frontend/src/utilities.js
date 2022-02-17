@@ -26,7 +26,14 @@ export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
       }
     })
   } else if (count > 1) {
-    newBadge = badgeTitle === 'Ocean Variables' ? count + ' variables' : count + ' organizations'
+    switch (badgeTitle) {
+      case 'Ocean Variables':
+        newBadge = count + ' variables'
+        case 'Organizations':
+        newBadge = count + ' organizations'
+        case 'Datasets':
+        newBadge =  count + ' datasets'
+    }
   }
   return newBadge
 }
@@ -224,4 +231,14 @@ export function createSelectionQueryString(polygon) {
   return objectToURL(res);
   }
   return "polygon="+JSON.stringify(polygon);
+}
+
+export function filterObjectPropertyByPropertyList(objectToFilter, allowedProperties) {
+  const result =  Object.keys(objectToFilter)
+  .filter(key => allowedProperties.includes(key))
+  .reduce((obj, key) => {
+    obj[key] = objectToFilter[key];
+    return obj;
+  }, {});
+  return result
 }
