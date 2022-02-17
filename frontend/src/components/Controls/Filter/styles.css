@@ -55,3 +55,15 @@
   width: 100%;
   margin-bottom: 5px;
 }
+
+.clearFilter {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  border-radius: 30px;
+}
+
+.clearFilter:hover {
+  background-color: lightgray;
+  cursor: pointer;
+}
