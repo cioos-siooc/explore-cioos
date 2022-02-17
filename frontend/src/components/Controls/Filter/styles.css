@@ -50,3 +50,8 @@
 .filterOptions button:hover {
   background-color: lightgray;
 }
+
+.filterSearch {
+  width: 100%;
+  margin-bottom: 5px;
+}

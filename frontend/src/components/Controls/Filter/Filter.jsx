@@ -5,10 +5,11 @@ import { ChevronCompactDown, ChevronCompactUp } from 'react-bootstrap-icons'
 
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
 import { abbreviateString } from '../../../utilities'
+import { defaultDatatsetsSelected } from '../../config.js'
 
 import './styles.css'
 
-export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected, tooltip, icon, controlled, openFilter, setOpenFilter, filterName, children }) {
+export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected, tooltip, icon, controlled, openFilter, setOpenFilter, filterName, searchable, setSearchTerms, searchPlaceholder, children }) {
   // Open/Closed state for filter dropdown
   const [filterOpen, setFilterOpen] = useState(controlled ? openFilter : false)
 
@@ -45,6 +46,9 @@ export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected
       </div>
       {(controlled ? filterOpen && openFilter : filterOpen) &&
         <div className='filterOptions'>
+          {searchable &&
+            <input className='filterSearch' onChange={(e) => setSearchTerms(e.target.value)} placeholder={searchPlaceholder} />
+          }
           {children}
           <button onClick={() => resetDefaults(optionsSelected, setOptionsSelected)}>
             Reset
