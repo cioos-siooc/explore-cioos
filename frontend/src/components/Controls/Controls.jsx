@@ -25,6 +25,7 @@ export default function Controls({ setQuery, organizations, children }) {
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
   const eovsFilterName = 'Ocean Variables'
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(eovsFilterName, eovsSelected)
+  const [eovsSearchTerms, setEovsSearchTerms] = useState()
 
   // Organization filter initial values from API and state
   const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected)
@@ -39,6 +40,7 @@ export default function Controls({ setQuery, organizations, children }) {
   }, [])
   const orgsFilterName = 'Organizations'
   const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterName, orgsSelected)
+  const [orgsSearchTerms, setOrgsSearchTerms] = useState()
 
   // Dataset filter initial values and state
   const [datasetsSelected, setDatasetsSelected] = useState(defaultDatatsetsSelected)
@@ -77,19 +79,19 @@ export default function Controls({ setQuery, organizations, children }) {
 
   const childrenArray = React.Children.toArray(children)
 
-  function createDatasetSubset() {
+  function createOptionSubset(searchTerms, allOptions) {
     // If there are search terms
-    if (datasetSearchTerms) {
+    if (searchTerms) {
       // Get a list of the allowed datasets
-      const allowedDatasets = Object.keys(datasetsSelected).filter(datasetName => datasetName.toLowerCase().includes(datasetSearchTerms.toString().toLowerCase()))
+      const allowedOptions = Object.keys(allOptions).filter(optionName => optionName.toLowerCase().includes(searchTerms.toString().toLowerCase()))
       // Generate the subset of datasets
-      const filteredDatasets = filterObjectPropertyByPropertyList(datasetsSelected, allowedDatasets)
+      const filteredOptions = filterObjectPropertyByPropertyList(allOptions, allowedOptions)
       // Set the subset of datasets
       // console.log('filtered', filteredDatasets, 'allowed', allowedDatasets, 'searchTerms', datasetSearchTerms, 'lowerCaseSearch', datasetSearchTerms.toString().toLowerCase())
-      return { ...filteredDatasets }
+      return { ...filteredOptions }
     } else { // Else if there aren't search terms, set the subset to the whole set
-      console.log('all', datasetsSelected)
-      return { ...datasetsSelected }
+      // console.log('all', datasetsSelected)
+      return { ...allOptions }
     }
   }
 
@@ -100,6 +102,38 @@ export default function Controls({ setQuery, organizations, children }) {
           <Row>
             {childrenArray.length === 2 && childrenArray[0]}
             <Col className='controlColumn' >
+              <Filter
+                badgeTitle={eovsBadgeTitle}
+                optionsSelected={eovsSelected}
+                setOptionsSelected={setEovsSelected}
+                tooltip='Filter data by ocean variable name. Selection works as logical OR operation.'
+                icon={<Water />}
+                controlled
+                searchable
+                setSearchTerms={setEovsSearchTerms}
+                searchPlaceholder='Search for ocean variable name...'
+                filterName={eovsFilterName}
+                openFilter={openFilter === eovsFilterName}
+                setOpenFilter={setOpenFilter}
+              >
+                <MultiCheckboxFilter optionsSelected={createOptionSubset(eovsSearchTerms, eovsSelected)} setOptionsSelected={setEovsSelected} searchable allOptions={eovsSelected} />
+              </Filter>
+              <Filter
+                badgeTitle={orgsBadgeTitle}
+                optionsSelected={orgsSelected}
+                setOptionsSelected={setOrgsSelected}
+                tooltip='Filter data by responsible organisation name. Selection works as logical OR operation.'
+                icon={<Building />}
+                controlled
+                searchable
+                setSearchTerms={setOrgsSearchTerms}
+                searchPlaceholder='Search for organization name...'
+                filterName={orgsFilterName}
+                openFilter={openFilter === orgsFilterName}
+                setOpenFilter={setOpenFilter}
+              >
+                <MultiCheckboxFilter optionsSelected={createOptionSubset(orgsSearchTerms, orgsSelected)} setOptionsSelected={setOrgsSelected} searchable allOptions={orgsSelected} />
+              </Filter>
               <Filter
                 badgeTitle={datasetsBadgeTitle}
                 optionsSelected={datasetsSelected}
@@ -114,33 +148,7 @@ export default function Controls({ setQuery, organizations, children }) {
                 openFilter={openFilter === datasetsFilterName}
                 setOpenFilter={setOpenFilter}
               >
-                <MultiCheckboxFilter optionsSelected={createDatasetSubset()} setOptionsSelected={setDatasetsSelected} searchable allOptions={datasetsSelected} />
-              </Filter>
-              <Filter
-                badgeTitle={eovsBadgeTitle}
-                optionsSelected={eovsSelected}
-                setOptionsSelected={setEovsSelected}
-                tooltip='Filter data by ocean variable name. Selection works as logical OR operation.'
-                icon={<Water />}
-                controlled
-                filterName={eovsFilterName}
-                openFilter={openFilter === eovsFilterName}
-                setOpenFilter={setOpenFilter}
-              >
-                <MultiCheckboxFilter optionsSelected={eovsSelected} setOptionsSelected={setEovsSelected} />
-              </Filter>
-              <Filter
-                badgeTitle={orgsBadgeTitle}
-                optionsSelected={orgsSelected}
-                setOptionsSelected={setOrgsSelected}
-                tooltip='Filter data by responsible organisation name. Selection works as logical OR operation.'
-                icon={<Building />}
-                controlled
-                filterName={orgsFilterName}
-                openFilter={openFilter === orgsFilterName}
-                setOpenFilter={setOpenFilter}
-              >
-                <MultiCheckboxFilter optionsSelected={orgsSelected} setOptionsSelected={setOrgsSelected} />
+                <MultiCheckboxFilter optionsSelected={createOptionSubset(datasetSearchTerms, datasetsSelected)} setOptionsSelected={setDatasetsSelected} searchable allOptions={datasetsSelected} />
               </Filter>
               <Filter
                 badgeTitle={timeframesBadgeTitle}
