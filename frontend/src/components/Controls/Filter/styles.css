@@ -1,7 +1,6 @@
 .filter {
   pointer-events: none;
   position:relative;
-  /* margin-left: 10px; */
 }
 
 .filterHeader:hover {
@@ -37,6 +36,7 @@
   border-radius: 10px;
   padding: 10px;
   max-width: fit-content;
+  min-width: 275px;
 }
 
 .filterOptions button {
