@@ -14,9 +14,8 @@ import { ArrowsExpand, Building, CalendarWeek, FileEarmarkSpreadsheet, Water } f
 
 import './styles.css'
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected } from '../config.js'
-import { useLayoutEffect } from 'react'
 
-export default function Controls({ setQuery, organizations, children }) {
+export default function Controls({ setQuery, children }) {
 
   // Making changes to context within context consumers (ie. passing mutable state down to children to manipulate)
   //https://stackoverflow.com/questions/41030361/how-to-update-react-context-from-inside-a-child-component
@@ -73,9 +72,10 @@ export default function Controls({ setQuery, organizations, children }) {
       startDepth: startDepth,
       endDepth: endDepth,
       eovsSelected: eovsSelected,
-      orgsSelected: orgsSelected
+      orgsSelected: orgsSelected,
+      datasetsSelected: datasetsSelected
     })
-  }, [startDate, endDate, debouncedStartDepth, debouncedEndDepth, eovsSelected, orgsSelected])
+  }, [startDate, endDate, debouncedStartDepth, debouncedEndDepth, eovsSelected, orgsSelected, datasetsSelected])
 
   const childrenArray = React.Children.toArray(children)
 
