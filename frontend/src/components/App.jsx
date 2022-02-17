@@ -13,7 +13,7 @@ import SelectionDetails from './Controls/SelectionDetails/SelectionDetails.jsx'
 import DownloadDetails from './Controls/DownloadDetails/DownloadDetails.jsx'
 import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx'
 import Loading from './Controls/Loading/Loading.jsx'
-import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from './config.js'
+import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected } from './config.js'
 
 import "bootstrap/dist/css/bootstrap.min.css"
 
@@ -55,7 +55,8 @@ export default function App() {
     startDepth: defaultStartDepth,
     endDepth: defaultEndDepth,
     eovsSelected: defaultEovsSelected,
-    orgsSelected: defaultOrgsSelected
+    orgsSelected: defaultOrgsSelected,
+    datasetsSelected: defaultDatatsetsSelected
   })
 
   useEffect(() => {
@@ -206,7 +207,6 @@ export default function App() {
       <Controls
         setQuery={setQuery}
         setLoading={setLoading}
-        organizations={organizations}
       >
         {polygon && (
           <Col xs='auto' className='selectionPanelColumn'>
