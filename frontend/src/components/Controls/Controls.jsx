@@ -110,6 +110,7 @@ export default function Controls({ setQuery, organizations, children }) {
                 icon={<Water />}
                 controlled
                 searchable
+                searchTerms={eovsSearchTerms}
                 setSearchTerms={setEovsSearchTerms}
                 searchPlaceholder='Search for ocean variable name...'
                 filterName={eovsFilterName}
@@ -126,6 +127,7 @@ export default function Controls({ setQuery, organizations, children }) {
                 icon={<Building />}
                 controlled
                 searchable
+                searchTerms={orgsSearchTerms}
                 setSearchTerms={setOrgsSearchTerms}
                 searchPlaceholder='Search for organization name...'
                 filterName={orgsFilterName}
@@ -142,6 +144,7 @@ export default function Controls({ setQuery, organizations, children }) {
                 icon={<FileEarmarkSpreadsheet />}
                 controlled
                 searchable
+                searchTerms={datasetSearchTerms}
                 setSearchTerms={setDatasetSearchTerms}
                 searchPlaceholder='Search for dataset name...'
                 filterName={datasetsFilterName}
