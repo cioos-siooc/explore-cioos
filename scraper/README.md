@@ -24,8 +24,3 @@ The erddap scraper also calls the CKAN scraper
 Only used for testing as it is called by the erddap scraper
 
 - `python -m erddap_scraper.ckan`
-
-## ERDDAP estimate
-
-- `python erddap_estimate path/to/ceda_query.json`
-- `python erddap_estimate {ceda_query_json_string}`
