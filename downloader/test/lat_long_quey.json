@@ -1,0 +1,31 @@
+{
+    "user_query": {
+        "lat_min": 19.3396,
+        "lat_max": 22.1339,
+        "lon_min": -120.5176,
+        "lon_max": -95.0293,
+        "depth_min": null,
+        "depth_max": null,
+        "polygon_region": false,
+        "eovs": [
+            "carbon",
+            "currents",
+            "nutrients",
+            "salinity",
+            "temperature"
+        ],
+        "email": "test@example.com",
+        "job_id": "e55da5"
+    },
+    "cache_filtered": [
+        {
+            "erddap_url": "https://data.cioospacific.ca/erddap/",
+            "dataset_id": "IOS_BOT_Profiles",
+            "title": "IOS Rosette Bottle Data",
+            "profile_variable": null,
+            "cdm_data_type": "Profile",
+            "ckan_id": null,
+            "ckan_url": "https://catalogue.cioos.ca/dataset/"
+        }
+    ]
+}
