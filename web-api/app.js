@@ -9,6 +9,7 @@ var downloadRouter = require("./routes/download");
 var indexRouter = require("./routes/index");
 var legendRouter = require("./routes/legend");
 var organizationsRouter = require("./routes/organizations");
+var datasetsRouter = require("./routes/datasets");
 var pointQueryRouter = require("./routes/pointQuery");
 var tilesRouter = require("./routes/tiles");
 
@@ -52,6 +53,7 @@ app.use("/", indexRouter);
 app.use("/download", downloadRouter);
 app.use("/legend", legendRouter);
 app.use("/organizations", organizationsRouter);
+app.use("/datasets", datasetsRouter);
 app.use("/pointQuery", pointQueryRouter);
 app.use("/tiles", tilesRouter);
 
