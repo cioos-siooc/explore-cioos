@@ -5,7 +5,6 @@ import { Container, Table } from 'react-bootstrap'
 import './styles.css'
 
 export default function DatasetInspector({ dataset, setInspectDataset, width }) {
-  console.log(dataset)
   return (
     <div className='datasetInspector' style={{ width: `${width + 10}px` }}>
       <div className='backButton' onClick={() => setInspectDataset()} title='Return to dataset list'>
