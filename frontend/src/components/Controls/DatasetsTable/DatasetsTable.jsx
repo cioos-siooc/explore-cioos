@@ -85,8 +85,8 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
             <th style={{ width: `${typeColWidth}px`, maxWidth: `${typeColWidth}px`, minWidth: `${typeColWidth}px` }} title='Sort by dataset type' onClick={() => handleSortByProperty('cdm_data_type')}>
               Type {sortProp === 'cdm_data_type' && (ascending ? <SortAlphaDown /> : <SortAlphaUp />)}
             </th>
-            <th style={{ width: `${recordsColWidth}px`, maxWidth: `${recordsColWidth}px`, minWidth: `${recordsColWidth}px` }} title='Sort by number of records in dataset' onClick={() => handleSortByProperty('profiles.length')}>
-              Records {sortProp === 'profiles.length' && (ascending ? <SortNumericDown /> : <SortNumericUp />)}
+            <th style={{ width: `${recordsColWidth}px`, maxWidth: `${recordsColWidth}px`, minWidth: `${recordsColWidth}px` }} title='Sort by number of records in dataset' onClick={() => handleSortByProperty('profiles_count')}>
+              Records {sortProp === 'profiles_count' && (ascending ? <SortNumericDown /> : <SortNumericUp />)}
             </th>
             <th style={{ width: `${sizeColWidth}px`, maxWidth: `${sizeColWidth}px`, minWidth: `${sizeColWidth}px` }} title='Sort by approximate dataset size in megabytes' onClick={() => handleSortByProperty('size')}>
               Size  {sortProp === 'size' && (ascending ? <SortNumericDown /> : <SortNumericUp />)}
@@ -122,7 +122,7 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                   style={{ width: `${recordsColWidth}px`, maxWidth: `${recordsColWidth}px`, minWidth: `${recordsColWidth}px`, wordWrap: 'break-word' }}
                   title='Number of records in dataset'
                 >
-                  {toInteger(point.profiles.length)}
+                  {toInteger(point.profiles_count)}
                 </td>
                 <td
                   style={{ width: `${sizeColWidth}px`, maxWidth: `${sizeColWidth}px`, minWidth: `${sizeColWidth}px`, wordWrap: 'break-word' }}
