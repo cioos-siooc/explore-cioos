@@ -9,6 +9,7 @@ notforrepo
 .vscode
 out
 ceda_download*
+cde_download*
 venv
 *.rdb
 *.env
