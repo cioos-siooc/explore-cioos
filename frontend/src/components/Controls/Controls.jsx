@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { Container, Row, Col } from 'react-bootstrap'
-import _ from 'lodash'
+import _, { orderBy } from 'lodash'
 
 import Filter from './Filter/Filter.jsx'
 import MultiCheckboxFilter from './Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx'
@@ -14,6 +14,7 @@ import { ArrowsExpand, Building, CalendarWeek, FileEarmarkSpreadsheet, Water } f
 
 import './styles.css'
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected } from '../config.js'
+import HeirarchicalMultiCheckboxFilter from './Filter/HeirarchicalMultiCheckboxFilter/HeirarchicalMultiCheckboxFilter.jsx'
 
 export default function Controls({ setQuery, children }) {
 
@@ -28,14 +29,29 @@ export default function Controls({ setQuery, children }) {
 
   // Organization filter initial values from API and state
   const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected)
+  const [orgsFullList, setOrgsFullList] = useState()
   useEffect(() => {
-    fetch(`${server}/organizations`).then(response => response.json()).then(data => {
+    fetch(`${server}/organizations`).then(response => response.json()).then(orgData => {
       let orgsReturned = {}
-      data.forEach(elem => {
+      orgData.forEach(elem => {
         orgsReturned[elem.name] = false
       })
       setOrgsSelected(orgsReturned)
-    }).catch(error => { throw error })
+      setOrgsFullList(orgData)
+      fetch(`${server}/datasets`).then(response => response.json()).then(datasetData => {
+        console.log('data', datasetData)
+        let datasetsReturned = []
+        datasetData.forEach(dataset => {
+          datasetsReturned.push({
+            ...dataset,
+            selected: false,
+            orgTitles: orgData.filter(org => dataset.organization_pks.includes(org.pk))
+          })
+        })
+        console.log('datasetsReturned', datasetsReturned)
+        setDatasetsSelected(datasetsReturned)
+      }).catch(error => { throw error })
+    })
   }, [])
   const orgsFilterName = 'Organizations'
   const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterName, orgsSelected)
@@ -95,6 +111,14 @@ export default function Controls({ setQuery, children }) {
     }
   }
 
+  function createHeirarchicalOptionSubset(searchTerms, allOptions) {
+    if (searchTerms) {
+      return allOptions.filter(option => option.title.toString().toLowerCase().includes(searchTerms.toString().toLowerCase()))
+    } else {
+      return allOptions
+    }
+  }
+
   return (
     <div>
       <div className='controls'>
@@ -117,7 +141,12 @@ export default function Controls({ setQuery, children }) {
                 openFilter={openFilter === eovsFilterName}
                 setOpenFilter={setOpenFilter}
               >
-                <MultiCheckboxFilter optionsSelected={createOptionSubset(eovsSearchTerms, eovsSelected)} setOptionsSelected={setEovsSelected} searchable allOptions={eovsSelected} />
+                <MultiCheckboxFilter
+                  optionsSelected={createOptionSubset(eovsSearchTerms, eovsSelected)}
+                  setOptionsSelected={setEovsSelected}
+                  searchable
+                  allOptions={eovsSelected}
+                />
               </Filter>
               <Filter
                 badgeTitle={orgsBadgeTitle}
@@ -134,7 +163,12 @@ export default function Controls({ setQuery, children }) {
                 openFilter={openFilter === orgsFilterName}
                 setOpenFilter={setOpenFilter}
               >
-                <MultiCheckboxFilter optionsSelected={createOptionSubset(orgsSearchTerms, orgsSelected)} setOptionsSelected={setOrgsSelected} searchable allOptions={orgsSelected} />
+                <MultiCheckboxFilter
+                  optionsSelected={createOptionSubset(orgsSearchTerms, orgsSelected)}
+                  setOptionsSelected={setOrgsSelected}
+                  searchable
+                  allOptions={orgsSelected}
+                />
               </Filter>
               <Filter
                 badgeTitle={datasetsBadgeTitle}
@@ -151,7 +185,13 @@ export default function Controls({ setQuery, children }) {
                 openFilter={openFilter === datasetsFilterName}
                 setOpenFilter={setOpenFilter}
               >
-                <MultiCheckboxFilter optionsSelected={createOptionSubset(datasetSearchTerms, datasetsSelected)} setOptionsSelected={setDatasetsSelected} searchable allOptions={datasetsSelected} />
+                <HeirarchicalMultiCheckboxFilter
+                  optionsSelected={createHeirarchicalOptionSubset(datasetSearchTerms, datasetsSelected)}
+                  setOptionsSelected={setDatasetsSelected}
+                  searchable
+                  allOptions={datasetsSelected}
+                  parentOptions={orgsFullList}
+                />
               </Filter>
               <Filter
                 badgeTitle={timeframesBadgeTitle}

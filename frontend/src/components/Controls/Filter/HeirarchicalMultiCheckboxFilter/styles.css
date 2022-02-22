@@ -1,0 +1,27 @@
+.heirarchicalMultiCheckboxFilter {
+  white-space: nowrap;
+  max-height: 30vh;
+  overflow: auto;
+}
+
+.heirarchicalMultiCheckboxFilter label{
+  height: 30px;
+}
+
+.heirarchicalMultiCheckboxFilter > * {
+  margin: 0px 10px 10px 10px;
+}
+
+.heirarchicalMultiCheckboxFilter .optionName {
+  margin-left: 10px;
+} 
+
+.heirarchicalMultiCheckboxFilter .optionButton {
+  cursor: pointer;
+  line-height: 30px;
+  padding-right: 15px;
+}
+
+.heirarchicalMultiCheckboxFilter .optionButton:hover {
+  background-color: lightgray;
+}
