@@ -5,7 +5,6 @@ import { Container, Table } from 'react-bootstrap'
 import './styles.css'
 
 export default function DatasetInspector({ dataset, setInspectDataset, width }) {
-
   return (
     <div className='datasetInspector' style={{ width: `${width + 10}px` }}>
       <div className='backButton' onClick={() => setInspectDataset()} title='Return to dataset list'>
@@ -26,7 +25,7 @@ export default function DatasetInspector({ dataset, setInspectDataset, width }) 
             Organizations
           </h6>
           <div>
-            {dataset.organizations}
+            {dataset.organizations.join(', ')}
           </div>
           <hr />
           <h6>
@@ -37,7 +36,7 @@ export default function DatasetInspector({ dataset, setInspectDataset, width }) 
           </div>
           <hr />
           <h6>
-            Records ({dataset && dataset.profiles && dataset.profiles.length})
+            Records ({dataset && dataset.profiles_count > 1000 ? `${dataset.profiles_count} records total, 1000 shown` : dataset.profiles_count})
           </h6>
         </Container>
         <Table className='inspectorTable' striped bordered size="sm">
@@ -58,10 +57,17 @@ export default function DatasetInspector({ dataset, setInspectDataset, width }) 
                 </tr>
               )
             })}
+            {dataset.profiles_count > 1000 && (
+              <tr key={1001}>
+                <td>{`1000/${dataset.profiles_count} records shown...`}</td>
+                <td />
+                <td />
+              </tr>
+            )}
           </tbody>
         </Table>
-      </div>
-    </div>
+      </div >
+    </div >
   )
 
 }
