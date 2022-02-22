@@ -26,7 +26,7 @@ export default function DatasetInspector({ dataset, setInspectDataset, width }) 
             Organizations
           </h6>
           <div>
-            {dataset.organizations}
+            {dataset.organizations.join(', ')}
           </div>
           <hr />
           <h6>
