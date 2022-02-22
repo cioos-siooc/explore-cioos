@@ -23,6 +23,8 @@ def split_erddap_url(url):
     dataset_id = f.split(".html")[0]
     return (erddap_host, dataset_id)
 
+def unescape_ascii(x):
+    return bytes(x,'ascii').decode('unicode-escape')
 
 def get_ckan_records(dataset_ids, limit=None, cache=False):
     """
@@ -56,7 +58,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
 
         # retreive the data for each record
         ckan_record_text = {
-            "title": record_full.get("title"),
+            "title": unescape_ascii(record_full.get("title")),
         }
 
         partiesRaw = [
@@ -70,7 +72,8 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         if len(partiesRaw):
             partiesRaw2 = json.loads(partiesRaw[0])
             organizations = [x["name"] for x in partiesRaw2]
-        else:
+        
+        if record_full.get("cited-responsible-party"):
             cited_responsible_party = json.loads(record_full["cited-responsible-party"])
             if len(cited_responsible_party):
                 for contact in cited_responsible_party:
@@ -78,8 +81,8 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
                         organizations += [contact.get("organisation-name")]
 
         # remove duplicates, empty strings
-        organizations = list(filter(None, organizations))
-        organizations = list(set(organizations))
+        organizations = list(filter(None, set(organizations)))
+        organizations = [unescape_ascii(x) for x in organizations]
 
         out.append(
             [

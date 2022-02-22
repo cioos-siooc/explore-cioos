@@ -8,7 +8,7 @@ import uuid
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
-from erddap_scraper.ckan.create_ckan_erddap_link import get_ckan_records
+from erddap_scraper.ckan.create_ckan_erddap_link import get_ckan_records, unescape_ascii
 from erddap_scraper.scrape_erddap import scrape_erddap
 from erddap_scraper.utils import (
     get_df_eov_to_standard_names,
@@ -127,13 +127,17 @@ def main(erddap_urls, csv_only, cache_requests):
         .reset_index()
     )
 
-    # TODO make scraper prioritize with organizations from CKAN and then pull ERDDAP if needed
-    datasets["ckan_organizations"].fillna(datasets["organizations"], inplace=True)
+    print("Cleaning up data")
+    datasets=datasets.replace(np.nan, None)
     datasets["ckan_title"].fillna(datasets["title"], inplace=True)
+
+    # prioritize with organizations from CKAN and then pull ERDDAP if needed
+    datasets['organizations']=datasets.apply(lambda x:x['ckan_organizations'] or x['organizations'],axis=1)
     del datasets["title"]
-    del datasets["organizations"]
+    del datasets["ckan_organizations"]
     datasets.rename(columns={"ckan_title": "title"}, inplace=True)
-    datasets.rename(columns={"ckan_organizations": "organizations"}, inplace=True)
+    datasets['title']=datasets['title'].apply(lambda x:unescape_ascii(x))
+    datasets['summary']=datasets['summary'].apply(lambda x:unescape_ascii(x))
 
     profiles["depth_min"] = profiles["depth_min"].fillna(0)
     profiles["depth_max"] = profiles["depth_max"].fillna(0)
