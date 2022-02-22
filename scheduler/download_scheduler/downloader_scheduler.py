@@ -74,20 +74,20 @@ def email_user(email, status, zip_filename):
     download_url = envs["DOWNLOAD_WAF_URL"] + zip_filename
     messages = {
         "completed": {
-            "subject": "Your CEDA data query was successful",
-            "body": f"Your CEDA download is available at {download_url}",
+            "subject": "Your CDE data query was successful",
+            "body": f"Your CDE download is available at {download_url}",
         },
         "over-limit": {
-            "subject": "Your CEDA data query completed but found too much data.",
-            "body": f"Your CEDA download is available at {download_url}. It has been cut off to return less data. If needed, please try again with a smaller polygon or fewer filters.",
+            "subject": "Your CDE data query completed but found too much data.",
+            "body": f"Your CDE download is available at {download_url}. It has been cut off to return less data. If needed, please try again with a smaller polygon or fewer filters.",
         },
         "no-data": {
-            "subject": "Your CEDA data query was successful",
-            "body": f"Your CEDA query didn't find any data.  Please try again with a larger polygon or different filters",
+            "subject": "Your CDE data query was successful",
+            "body": f"Your CDE query didn't find any data.  Please try again with a larger polygon or different filters",
         },
         "failed": {
-            "subject": "Your CEDA data query failed",
-            "body": f"Your CEDA download failed. We are aware of the failed query and are working to resolve it",
+            "subject": "Your CDE data query failed",
+            "body": f"Your CDE download failed. We are aware of the failed query and are working to resolve it",
         },
     }
 
@@ -105,7 +105,7 @@ def run_download(row):
     user_query = downloader_input["user_query"]
 
     email = user_query["email"]
-    zip_filename = "ceda_download_" + user_query["job_id"] + ".zip"
+    zip_filename = "cde_download_" + user_query["job_id"] + ".zip"
     downloader_output = ""
     downloader_error = ""
 

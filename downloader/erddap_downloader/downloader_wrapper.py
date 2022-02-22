@@ -5,7 +5,7 @@ from erddap_downloader.zip_folder import zip_folder
 
 
 def run_download_query(download_query, output_folder, create_pdf=False):
-    temp_folder = "ceda_download_" + download_query["user_query"]["job_id"]
+    temp_folder = "cde_download_" + download_query["user_query"]["job_id"]
 
     # create the temporary folder
     os.makedirs(temp_folder)
