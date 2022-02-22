@@ -5,7 +5,6 @@ import { ChevronCompactDown, ChevronCompactUp, X } from 'react-bootstrap-icons'
 
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
 import { abbreviateString } from '../../../utilities'
-import { defaultDatatsetsSelected } from '../../config.js'
 
 import './styles.css'
 
