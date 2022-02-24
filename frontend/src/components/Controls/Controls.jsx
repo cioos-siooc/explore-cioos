@@ -39,7 +39,6 @@ export default function Controls({ setQuery, children }) {
       setOrgsSelected(orgsReturned)
       setOrgsFullList(orgData)
       fetch(`${server}/datasets`).then(response => response.json()).then(datasetData => {
-        console.log('data', datasetData)
         let datasetsReturned = []
         datasetData.forEach(dataset => {
           datasetsReturned.push({
@@ -48,7 +47,6 @@ export default function Controls({ setQuery, children }) {
             orgTitles: orgData.filter(org => dataset.organization_pks.includes(org.pk))
           })
         })
-        console.log('datasetsReturned', datasetsReturned)
         setDatasetsSelected(datasetsReturned)
       }).catch(error => { throw error })
     })
@@ -103,10 +101,8 @@ export default function Controls({ setQuery, children }) {
       // Generate the subset of datasets
       const filteredOptions = filterObjectPropertyByPropertyList(allOptions, allowedOptions)
       // Set the subset of datasets
-      // console.log('filtered', filteredDatasets, 'allowed', allowedDatasets, 'searchTerms', datasetSearchTerms, 'lowerCaseSearch', datasetSearchTerms.toString().toLowerCase())
       return { ...filteredOptions }
     } else { // Else if there aren't search terms, set the subset to the whole set
-      // console.log('all', datasetsSelected)
       return { ...allOptions }
     }
   }

@@ -14,10 +14,8 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
               let tempData = { ...allOptions }
               // Go through each of the elements in the subset
               // Find the corresponding element in the total set and set its selection status
-              console.log(tempData)
               tempData[option] = !optionsSelected[option]
               // Set the total set 
-              console.log(tempData)
               setOptionsSelected(tempData)
             } else {
               setOptionsSelected({
