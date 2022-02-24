@@ -5,8 +5,6 @@ import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
 import './styles.css'
 
 export default function HeirarchicalMultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions }) {
-
-  console.log(optionsSelected, allOptions)
   return (
     <div className='heirarchicalMultiCheckboxFilter'>
       {optionsSelected.length > 0 ? optionsSelected.map((option, index) => (
@@ -37,7 +35,6 @@ export default function HeirarchicalMultiCheckboxFilter({ optionsSelected, setOp
         >
           {option.selected ? <CheckSquare /> : <Square />}
           <span className='optionName'>
-            {/* {console.log('option', option)} */}
             {capitalizeFirstLetter(abbreviateString(option.title, 30))}
           </span>
         </div>
