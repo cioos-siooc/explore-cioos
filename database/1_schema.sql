@@ -99,7 +99,7 @@ CREATE INDEX
  
 
 --
-DROP TABLE cioos_api.download_jobs;
+DROP TABLE IF EXISTS cioos_api.download_jobs;
 CREATE TABLE cioos_api.download_jobs (
     pk SERIAL PRIMARY KEY,
     time timestamp with time zone DEFAULT now(),
@@ -146,7 +146,7 @@ CREATE OR REPLACE VIEW cioos_api.dataset_to_eov AS
      JOIN cioos_api.erddap_variables v ON v.dataset_pk =  d.pk
      JOIN cioos_api.eov_to_standard_name ets ON ets.standard_name = v.standard_name;
 
-DROP FUNCTION range_intersection_length( numrange, numrange );
+DROP FUNCTION IF EXISTS range_intersection_length( numrange, numrange );
 CREATE OR REPLACE FUNCTION range_intersection_length(a numrange,b numrange )
    RETURNS numeric 
    LANGUAGE plpgsql
@@ -158,7 +158,7 @@ RETURN upper(a*b)-lower(a*b);
 END;
 $$;
 
-DROP FUNCTION range_intersection_length( tstzrange, tstzrange );
+DROP FUNCTION IF EXISTS range_intersection_length( tstzrange, tstzrange );
 CREATE OR REPLACE FUNCTION range_intersection_length(a tstzrange,b tstzrange )
    RETURNS interval 
    LANGUAGE plpgsql
