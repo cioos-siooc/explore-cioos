@@ -5,4 +5,5 @@ source venv/bin/activate
 sh data_loader.sh
 
 sudo docker exec -t ceda_redis_1 redis-cli FLUSHALL
+sh ceda_refresh_cache.sh
 date
