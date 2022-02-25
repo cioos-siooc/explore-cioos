@@ -1,5 +1,5 @@
 """
-download_erddap regroup a set of tool used by CEDA to download ERDDAP datasets.
+download_erddap regroup a set of tool used by CDE to download ERDDAP datasets.
 """
 import io
 import os
@@ -187,8 +187,8 @@ def filter_polygon_region(data, polygone):
 
 def get_datasets(json_query, output_path="", create_pdf=False):
     """
-    General method use to retrieve erddap datasets from a ceda query.
-    :param json_query: JSON CEDA query
+    General method use to retrieve erddap datasets from a CDE query.
+    :param json_query: JSON CDE query
     :param output_path: path where to save the downloaded data.
     """
 
