@@ -1,6 +1,7 @@
 var express = require("express");
 var router = express.Router();
 const db = require("../db");
+const cache = require("../utils/cache");
 
 /**
  * /organizations
@@ -9,8 +10,8 @@ const db = require("../db");
  *
  * */
 
-router.get("/", async function (req, res, next) {
-  res.send(await db("cioos_api.organizations").orderByRaw('UPPER(name)'));
+router.get("/", cache.route(), async function (req, res, next) {
+  res.send(await db("cioos_api.organizations").orderByRaw("UPPER(name)"));
 });
 
 module.exports = router;

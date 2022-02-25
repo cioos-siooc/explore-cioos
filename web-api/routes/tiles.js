@@ -4,39 +4,13 @@ var router = express.Router();
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { validatorMiddleware } = require("../utils/validatorMiddlewares");
+const cache = require("../utils/cache");
 /**
  * /tiles/z/x/y/.mvt
  *
  * Tile generator - returns the hex shapes or points with some data attached
  * Takes all the filters
  */
-
-console.log("Connecting to redis at", process.env.REDIS_HOST);
-
-var cache = require("express-redis-cache")({
-  host: process.env.REDIS_HOST,
-});
-
-cache.on("connected", function (message) {
-  console.log(message);
-});
-
-cache.on("message", function (message) {
-  console.log(message);
-});
-
-cache.on("error", function (error) {
-  if (process.env.ENVIRONMENT === "production") {
-    console.log(error);
-  } else {
-    cache.on("error", function (error) {
-      console.error("Running without Redis, that's ok");
-      cache.removeAllListeners();
-      // hide more error messages
-      cache.on("error", () => {});
-    });
-  }
-});
 
 /* GET /tiles/:z/:x/:y.mvt */
 /* Retreive a vector tile by tileid */
@@ -88,7 +62,6 @@ router.get(
     SELECT ST_AsMVT(mvtgeom.*, 'internal-layer-name', 4096, 'geom') AS st_asmvt from mvtgeom;
   `;
 
-  
     try {
       const tileRaw = await db.raw(SQL);
 
