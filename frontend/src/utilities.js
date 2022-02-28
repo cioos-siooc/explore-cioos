@@ -87,7 +87,7 @@ export function createDataFilterQueryString(query, organizations) {
     .filter((eov) => eovsSelected[eov])
     .join()
 
-  const datasets = Object.keys(datasetsSelected)
+  const datasetPKs = Object.keys(datasetsSelected)
     .filter((dataset) => datasetsSelected[dataset])
     .join()
 
@@ -100,7 +100,7 @@ export function createDataFilterQueryString(query, organizations) {
   
   const apiMappedQuery = {
     eovs,
-    datasets,
+    datasetPKs,
     organizations: orgPKsSelected,
     timeMin: startDate,
     timeMax: endDate,
@@ -109,7 +109,6 @@ export function createDataFilterQueryString(query, organizations) {
   };
 
   return objectToURL(apiMappedQuery);
-  
 }
 
 export function bytesToMemorySizeString(bytes) {
