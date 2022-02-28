@@ -157,6 +157,7 @@ def get_profiles(dataset):
     #     count_variables.append(dataset.variables_list[-1])
 
     # Retrieve Count value per profile
+    profiles=profiles.query("(not time_min.isnull()) and not (time_max.isnull())")
     time_min = ERDDAP.parse_erddap_date(profiles["time_min"].min())
     time_max = ERDDAP.parse_erddap_date(profiles["time_max"].max())
 

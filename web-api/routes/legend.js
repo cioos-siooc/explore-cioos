@@ -2,6 +2,7 @@ var express = require("express");
 var router = express.Router();
 const db = require("../db");
 const { validatorMiddleware } = require("../utils/validatorMiddlewares");
+const cache = require("../utils/cache");
 
 const createDBFilter = require("../utils/dbFilter");
 
@@ -14,10 +15,14 @@ const createDBFilter = require("../utils/dbFilter");
  * Takes all the filters, returns a number range for each of the 3 major zoom levels
  */
 
-router.get("/", validatorMiddleware(), async function (req, res, next) {
-  const filters = createDBFilter(req.query);
+router.get(
+  "/",
+  cache.route(),
+  validatorMiddleware(),
+  async function (req, res, next) {
+    const filters = createDBFilter(req.query);
 
-  const sql = `
+    const sql = `
         WITH records AS (
         SELECT hex_zoom_0, hex_zoom_1, point_pk
         FROM cioos_api.profiles p
@@ -33,9 +38,10 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
         SELECT * from sub1,sub2,sub3
         `;
 
-  const rows = await db.raw(sql);
+    const rows = await db.raw(sql);
 
-  res.send(rows && { recordsCount: rows.rows[0] });
-});
+    res.send(rows && { recordsCount: rows.rows[0] });
+  }
+);
 
 module.exports = router;
