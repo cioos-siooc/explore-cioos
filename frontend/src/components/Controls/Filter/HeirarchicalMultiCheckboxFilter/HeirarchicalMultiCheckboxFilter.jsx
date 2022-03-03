@@ -5,8 +5,13 @@ import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
 import './styles.css'
 
 export default function HeirarchicalMultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions }) {
+
+
   return (
     <div className='heirarchicalMultiCheckboxFilter'>
+      <div>
+
+      </div>
       {Object.keys(optionsSelected).length > 0 ? Object.keys(optionsSelected).map((option, index) => (
         < div className='optionButton' key={index} title={option}
           onClick={() => {
