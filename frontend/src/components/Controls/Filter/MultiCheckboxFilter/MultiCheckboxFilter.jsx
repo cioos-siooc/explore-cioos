@@ -7,8 +7,8 @@ import './styles.css'
 export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions }) {
   return (
     <div className='multiCheckboxFilter'>
-      {Object.keys(optionsSelected).length > 0 ? Object.keys(optionsSelected).map(option => (
-        <div className='optionButton' key={option} title={option}
+      {Object.keys(optionsSelected).length > 0 ? Object.keys(optionsSelected).map((option, index) => (
+        <div className='optionButton' key={index} title={option}
           onClick={() => {
             if (searchable) {
               let tempData = { ...allOptions }

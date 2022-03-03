@@ -12,7 +12,7 @@ import { createDataFilterQueryString, generateColorStops, getCurrentRangeLevel }
 import { colorScale } from "../config"
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, organizations, zoom, setZoom, rangeLevels }) {
+export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, organizations, datasets, zoom, setZoom, rangeLevels }) {
   const mapContainer = useRef(null)
   const map = useRef(null)
   const creatingRectangle = useRef(false)
@@ -119,7 +119,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     setPolygon()
     if(map && map.current && map.current.loaded()){
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${createDataFilterQueryString(query, organizations)}`
+      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${createDataFilterQueryString(query, organizations, datasets)}`
   
       map.current.getSource("points").tiles = [tileQuery]
       map.current.getSource("hexes").tiles = [tileQuery]
