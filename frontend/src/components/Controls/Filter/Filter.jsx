@@ -12,9 +12,18 @@ export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected
   // Open/Closed state for filter dropdown
   const [filterOpen, setFilterOpen] = useState(controlled ? openFilter : false)
 
-  function resetDefaults(optionsSelected, setOptionsSelected) {
+  function resetDefaults() {
     let copyOfOptionsSelected = { ...optionsSelected }
     Object.keys(optionsSelected).forEach(option => copyOfOptionsSelected[option] = false)
+    setOptionsSelected(copyOfOptionsSelected)
+    // if (searchable) {
+    //   setSearchTerms('')
+    // }
+  }
+
+  function selectAll() {
+    let copyOfOptionsSelected = { ...optionsSelected }
+    Object.keys(optionsSelected).forEach(option => copyOfOptionsSelected[option] = true)
     setOptionsSelected(copyOfOptionsSelected)
   }
 
@@ -53,7 +62,10 @@ export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected
           )
           }
           {children}
-          <button onClick={() => resetDefaults(optionsSelected, setOptionsSelected)}>
+          <button onClick={() => selectAll()}>
+            Select All
+          </button>
+          <button onClick={() => resetDefaults()}>
             Reset
           </button>
           <button onClick={() => setFilterOpen(false)}>

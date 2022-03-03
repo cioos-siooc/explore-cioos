@@ -29,20 +29,24 @@ export default function Controls({ setQuery, children }) {
 
   // Organization filter initial values from API and state
   const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected)
-  const [orgsFullList, setOrgsFullList] = useState()
   useEffect(() => {
     fetch(`${server}/organizations`).then(response => response.json()).then(orgData => {
       let orgsReturned = {}
       orgData.forEach(elem => {
         orgsReturned[elem.name] = false
       })
-      fetch(`${server}/datasets`).then(response => response.json()).then(datasetData => {
+      fetch(`${server}/datasets`).then(response => response.json()).then(datasetsData => {
         let datasetsReturned = {}
-        datasetData.forEach(dataset => {
+        datasetsData.forEach(dataset => {
           datasetsReturned[dataset.title] = false
         })
         setOrgsSelected(orgsReturned)
-        setOrgsFullList(orgData)
+        setDatasetsFullList(datasetsData.map(dataset => {
+          return {
+            ...dataset,
+            orgTitles: orgData.filter(org => dataset.organization_pks.includes(org.pk)).map(org => org.name)
+          }
+        }))
         setDatasetsSelected(datasetsReturned)
       }).catch(error => { throw error })
     })
@@ -56,6 +60,7 @@ export default function Controls({ setQuery, children }) {
   const datasetsFilterName = 'Datasets'
   const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(datasetsFilterName, datasetsSelected)
   const [datasetSearchTerms, setDatasetSearchTerms] = useState()
+  const [datasetsFullList, setDatasetsFullList] = useState()
 
   // Timeframe filter initial values and state
   const [startDate, setStartDate] = useState(defaultStartDate);
@@ -182,11 +187,12 @@ export default function Controls({ setQuery, children }) {
                 openFilter={openFilter === datasetsFilterName}
                 setOpenFilter={setOpenFilter}
               >
-                <MultiCheckboxFilter
+                <HeirarchicalMultiCheckboxFilter
                   optionsSelected={createOptionSubset(datasetSearchTerms, datasetsSelected)}
                   setOptionsSelected={handleSetDatasetsSelected}
                   searchable
                   allOptions={datasetsSelected}
+                  hierachicalData={datasetsFullList}
                 />
               </Filter>
               <Filter
