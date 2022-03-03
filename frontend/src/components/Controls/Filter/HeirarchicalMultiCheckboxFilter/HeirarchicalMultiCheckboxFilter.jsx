@@ -7,24 +7,13 @@ import './styles.css'
 export default function HeirarchicalMultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions }) {
   return (
     <div className='heirarchicalMultiCheckboxFilter'>
-      {optionsSelected.length > 0 ? optionsSelected.map((option, index) => (
-        < div className='optionButton' key={index} title={option.title}
+      {Object.keys(optionsSelected).length > 0 ? Object.keys(optionsSelected).map((option, index) => (
+        < div className='optionButton' key={index} title={option}
           onClick={() => {
             if (searchable) {
-              let tempData = [...allOptions]
-              setOptionsSelected(tempData.map(opt => {
-                if (opt.pk === option.pk) {
-                  return {
-                    ...opt,
-                    selected: !option.selected
-                  }
-                } else {
-                  return {
-                    ...opt
-                  }
-                }
-              }
-              ))
+              let tempData = { ...allOptions }
+              tempData[option] = !optionsSelected[option]
+              setOptionsSelected(tempData)
             } else {
               setOptionsSelected({
                 ...optionsSelected,
@@ -33,9 +22,9 @@ export default function HeirarchicalMultiCheckboxFilter({ optionsSelected, setOp
             }
           }}
         >
-          {option.selected ? <CheckSquare /> : <Square />}
+          {optionsSelected[option] ? <CheckSquare /> : <Square />}
           <span className='optionName'>
-            {capitalizeFirstLetter(abbreviateString(option.title, 30))}
+            {capitalizeFirstLetter(abbreviateString(option, 30))}
           </span>
         </div>
       ))

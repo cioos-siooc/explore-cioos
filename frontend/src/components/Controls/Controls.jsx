@@ -36,17 +36,13 @@ export default function Controls({ setQuery, children }) {
       orgData.forEach(elem => {
         orgsReturned[elem.name] = false
       })
-      setOrgsSelected(orgsReturned)
-      setOrgsFullList(orgData)
       fetch(`${server}/datasets`).then(response => response.json()).then(datasetData => {
-        let datasetsReturned = []
+        let datasetsReturned = {}
         datasetData.forEach(dataset => {
-          datasetsReturned.push({
-            ...dataset,
-            selected: false,
-            orgTitles: orgData.filter(org => dataset.organization_pks.includes(org.pk))
-          })
+          datasetsReturned[dataset.title] = false
         })
+        setOrgsSelected(orgsReturned)
+        setOrgsFullList(orgData)
         setDatasetsSelected(datasetsReturned)
       }).catch(error => { throw error })
     })
@@ -115,6 +111,11 @@ export default function Controls({ setQuery, children }) {
     }
   }
 
+  function handleSetDatasetsSelected(selection) {
+    setDatasetsSelected(selection)
+
+  }
+
   return (
     <div>
       <div className='controls'>
@@ -181,12 +182,11 @@ export default function Controls({ setQuery, children }) {
                 openFilter={openFilter === datasetsFilterName}
                 setOpenFilter={setOpenFilter}
               >
-                <HeirarchicalMultiCheckboxFilter
-                  optionsSelected={createHeirarchicalOptionSubset(datasetSearchTerms, datasetsSelected)}
-                  setOptionsSelected={setDatasetsSelected}
+                <MultiCheckboxFilter
+                  optionsSelected={createOptionSubset(datasetSearchTerms, datasetsSelected)}
+                  setOptionsSelected={handleSetDatasetsSelected}
                   searchable
                   allOptions={datasetsSelected}
-                  parentOptions={orgsFullList}
                 />
               </Filter>
               <Filter

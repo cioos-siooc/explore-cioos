@@ -70,7 +70,7 @@ function objectToURL(obj) {
     .join("&");
 }
 
-export function createDataFilterQueryString(query, organizations) {
+export function createDataFilterQueryString(query, organizations, datasets) {
   const { orgsSelected, eovsSelected, datasetsSelected } = query;
 
   const queryWithoutDefaults = Object.keys(defaultQuery).reduce(
@@ -89,6 +89,7 @@ export function createDataFilterQueryString(query, organizations) {
 
   const datasetPKs = Object.keys(datasetsSelected)
     .filter((dataset) => datasetsSelected[dataset])
+    .map((dataset) => datasets[dataset])
     .join()
 
   const orgPKsSelected = Object.keys(orgsSelected)
@@ -100,7 +101,7 @@ export function createDataFilterQueryString(query, organizations) {
   
   const apiMappedQuery = {
     eovs,
-    datasetPKs,
+    datasetPKs: datasetPKs,
     organizations: orgPKsSelected,
     timeMin: startDate,
     timeMax: endDate,
