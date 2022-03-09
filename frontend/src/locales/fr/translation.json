@@ -1,0 +1,4 @@
+{
+    "welcome_to_react": "Beinvenue en React e react-i18next",
+    "test": "french test: {{test}}"
+}

@@ -3,10 +3,12 @@ import { useEffect } from 'react'
 import { useState } from 'react'
 import { Container, Modal, Col, Row } from 'react-bootstrap'
 import { InfoSquare } from 'react-bootstrap-icons'
+import { useTranslation } from 'react-i18next'
 
 import './styles.css'
 
 export default function IntroModal({ intialOpenState }) {
+  const { t } = useTranslation()
   const [showModal, setShowModal] = useState(intialOpenState)
   const [hoveredStep, setHoveredStep] = useState()
   // Potential idea for cut through transparency to highligh controls: https://ishadeed.com/article/thinking-about-the-cut-out-effect/
@@ -88,7 +90,7 @@ export default function IntroModal({ intialOpenState }) {
         )
     }
   }
-
+  const test = 3
   return (
     <div>
       <Modal
@@ -108,6 +110,7 @@ export default function IntroModal({ intialOpenState }) {
         </Modal.Header>
         <Modal.Body>
           <Container fluid>
+            {t('test', { test })}
             <div className='tagLine'>
               "Your access point for research-quality ocean data from Canada, around the world."
             </div>
