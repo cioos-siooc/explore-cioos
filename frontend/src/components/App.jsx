@@ -1,6 +1,5 @@
 import React from 'react'
 import { useState, useEffect } from 'react'
-import ReactDOM from 'react-dom'
 import * as Sentry from "@sentry/react"
 import { Integrations } from "@sentry/tracing"
 import { Row, Col, Spinner } from 'react-bootstrap'
@@ -57,6 +56,7 @@ export default function App() {
     eovsSelected: defaultEovsSelected,
     orgsSelected: defaultOrgsSelected
   })
+
 
   useEffect(() => {
     if (_.isEmpty(pointsToReview)) {
@@ -187,6 +187,7 @@ export default function App() {
     )
   }
 
+
   return (
     <div>
       {loading && <Loading />}
@@ -238,8 +239,3 @@ export default function App() {
     </div>
   );
 }
-
-
-// This is where react reaches into the DOM, finds the <div id="chart"> element, and replaces it with the content of ReactD3Viz's render function JSX.
-const domContainer = document.querySelector('#app')
-ReactDOM.render(<App />, domContainer)
