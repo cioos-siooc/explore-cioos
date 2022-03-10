@@ -12,7 +12,8 @@ import SelectionDetails from './Controls/SelectionDetails/SelectionDetails.jsx'
 import DownloadDetails from './Controls/DownloadDetails/DownloadDetails.jsx'
 import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx'
 import Loading from './Controls/Loading/Loading.jsx'
-import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from './config.js'
+import LanguageSelector from './Controls/LanguageSelector/LanguageSelector.jsx'
+import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, languages } from './config.js'
 
 import "bootstrap/dist/css/bootstrap.min.css"
 
@@ -187,7 +188,6 @@ export default function App() {
     )
   }
 
-
   return (
     <div>
       {loading && <Loading />}
@@ -236,6 +236,7 @@ export default function App() {
         <ChatDots size='30px' />
       </a>
       <IntroModal intialOpenState={true} />
+      <LanguageSelector />
     </div>
   );
 }

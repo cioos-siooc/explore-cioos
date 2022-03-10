@@ -20,4 +20,15 @@ export const defaultQuery = {
   endDepth: defaultEndDepth,
 };
 
-export const colorScale = ["#52A79B","#4A968C","#3D7B73","#2F6059","#224440","#1B3733", "#142926"]
+export const colorScale = ["#52A79B", "#4A968C", "#3D7B73", "#2F6059", "#224440", "#1B3733", "#142926"]
+
+export const languages = [
+  {
+    code: 'en',
+    name: 'English'
+  },
+  {
+    code: 'fr',
+    name: 'Français'
+  }
+]
