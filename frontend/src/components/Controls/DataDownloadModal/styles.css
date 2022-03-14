@@ -24,7 +24,7 @@
   text-align: center;
 }
 
-.modal-content {
+.downloadButton .modal-content {
   min-width: 800px;
   height: 70vh;
 }

@@ -18,7 +18,7 @@
 }
 
 .introModal .modalHeader {
-  padding: 0px 60px 0px 0px;
+  padding: 0px 160px 0px 0px;
 }
 
 .introLogo {
@@ -67,6 +67,20 @@
   background-repeat: no-repeat;
   background-size: 250px 250px;
   background-position: bottom;
+}
+
+@media (max-width: 1200px) {
+  .stepImage {
+    height: 210px;
+    background-size: 180px 180px;
+  }
+}
+
+@media (max-width: 992px) {
+  .stepImage {
+    height: 140px;
+    background-size: 110px 110px;
+  }
 }
 
 .stepImage.filterStep { 
