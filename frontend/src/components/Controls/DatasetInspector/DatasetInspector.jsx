@@ -22,6 +22,13 @@ export default function DatasetInspector({ dataset, setInspectDataset, width }) 
           </div>
           <hr />
           <h6>
+            Dataset URL
+          </h6>
+          <div>
+            <a href={dataset.erddap_url} target='_blank'>{dataset.erddap_url}</a>
+          </div>
+          <hr />
+          <h6>
             Organizations
           </h6>
           <div>
