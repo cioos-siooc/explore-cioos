@@ -59,6 +59,12 @@ export default function App() {
   })
 
   useEffect(() => {
+    if (_.isEmpty(pointsToDownload)) {
+      setSubmissionFeedback()
+    }
+  }, [pointsToDownload])
+
+  useEffect(() => {
     if (_.isEmpty(pointsToReview)) {
       setPointsToDownload()
     }
@@ -100,7 +106,7 @@ export default function App() {
               className='text-success'
               size={30}
             />),
-          text: 'Request submitted'
+          text: 'Request successful'
         })
         break;
 
@@ -112,7 +118,7 @@ export default function App() {
               size={30}
             />
           ),
-          text: 'Request failed.'
+          text: 'Request failed'
         })
         break;
 
@@ -169,8 +175,18 @@ export default function App() {
           <Col>
             <input className='emailAddress' type='email' placeholder='email@email.com' onChange={e => handleEmailChange(e.target.value)} />
           </Col>
-          <Col style={{ maxWidth: '155px' }}>
-            <button className='submitRequestButton' disabled={!emailValid || _.isEmpty(pointsToDownload) || getPointsDataSize(pointsToDownload) / 1000000 > 100} onClick={() => handleSubmission()}>Submit Request</button>
+          <Col style={{ maxWidth: '170px' }}>
+            <button
+              className='submitRequestButton'
+              disabled={!emailValid || _.isEmpty(pointsToDownload) || getPointsDataSize(pointsToDownload) / 1000000 > 100 || submissionState === 'submitted'}
+              onClick={() => handleSubmission()}
+            >
+              {
+                (!_.isEmpty(pointsToDownload) && submissionFeedback && submissionFeedback.text !== 'submitted' && 'Resubmit Request') ||
+                (_.isEmpty(pointsToDownload) && 'Select Data') ||
+                'Submit Request'
+              }
+            </button>
           </Col>
           <Col>
             <Row>
