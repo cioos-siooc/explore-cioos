@@ -29,7 +29,8 @@ async function getShapeQuery(query) {
         d.title title,
         d.ceda_eovs eovs,
         organizations,
-        d.erddap_url,
+        d.erddap_url || '/tabledap/' || d.dataset_id || '.html' as erddap_url,
+        'https://catalogue.cioos.ca/dataset/' || ckan_id as ckan_url,
         -- replace '0 days' with '1 day' when its a single day profile
         -- query records count = sum((number of days covered by the query that are in the profile) * profile records per day * fraction of the depth range that profile covers)
             sum(
