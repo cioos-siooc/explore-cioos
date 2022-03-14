@@ -22,10 +22,17 @@ export default function DatasetInspector({ dataset, setInspectDataset, width }) 
           </div>
           <hr />
           <h6>
-            Dataset URL
+            Dataset URLs
           </h6>
           <div>
-            <a href={dataset.erddap_url} target='_blank'>{dataset.erddap_url}</a>
+            <ul style={{ "listStyleType": 'none' }}>
+              <li>
+                ERDAP: <a href={dataset.erddap_url} target='_blank'>{dataset.erddap_url ? dataset.erddap_url : 'unavailable'}</a>
+              </li>
+              <li>
+                CKAN: <a href={dataset.ckan_url} target='_blank'>{dataset.ckan_url ? dataset.ckan_url : 'unavailable'}</a>
+              </li>
+            </ul>
           </div>
           <hr />
           <h6>
