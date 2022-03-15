@@ -8,10 +8,6 @@
   height: 30px;
 }
 
-.heirarchicalMultiCheckboxFilter > * {
-  margin: 0px 10px 10px 10px;
-}
-
 .heirarchicalMultiCheckboxFilter .optionName {
   margin-left: 10px;
 } 
@@ -20,8 +16,13 @@
   cursor: pointer;
   line-height: 30px;
   padding-right: 15px;
+  margin: 0px 10px 10px 10px;
 }
 
 .heirarchicalMultiCheckboxFilter .optionButton:hover {
   background-color: lightgray;
+}
+
+.filterCount {
+  margin-left: 5px;
 }

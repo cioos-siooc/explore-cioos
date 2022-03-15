@@ -217,7 +217,7 @@ export default function Controls({ setQuery, children }) {
                 badgeTitle={depthRangeBadgeTitle}
                 optionsSelected={startDepth, endDepth}
                 setOptionsSelected={() => { setStartDepth(0); setEndDepth(12000) }}
-                tooltip='Filter data by depth. Selection works as inclusive range, and negative values are meters above ocean surface.'
+                tooltip='Filter data by depth. Selection works as inclusive range.'
                 icon={<ArrowsExpand />}
                 controlled
                 filterName={depthRangeFilterName}
