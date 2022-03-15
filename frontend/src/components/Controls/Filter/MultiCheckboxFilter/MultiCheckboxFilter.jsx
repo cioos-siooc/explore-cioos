@@ -7,6 +7,9 @@ import './styles.css'
 export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions }) {
   return (
     <div className='multiCheckboxFilter'>
+      <div className="filterCount">
+        ({Object.keys(optionsSelected).length})
+      </div>
       {Object.keys(optionsSelected).length > 0 ? Object.keys(optionsSelected).map((option, index) => (
         <div className='optionButton' key={index} title={option}
           onClick={() => {

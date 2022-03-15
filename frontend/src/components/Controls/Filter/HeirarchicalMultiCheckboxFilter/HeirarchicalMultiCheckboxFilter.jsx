@@ -9,8 +9,8 @@ export default function HeirarchicalMultiCheckboxFilter({ optionsSelected, setOp
 
   return (
     <div className='heirarchicalMultiCheckboxFilter'>
-      <div>
-
+      <div className="filterCount">
+        ({Object.keys(optionsSelected).length})
       </div>
       {Object.keys(optionsSelected).length > 0 ? Object.keys(optionsSelected).map((option, index) => (
         < div className='optionButton' key={index} title={option}
