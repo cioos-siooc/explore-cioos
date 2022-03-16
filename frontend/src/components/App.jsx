@@ -13,7 +13,7 @@ import SelectionDetails from './Controls/SelectionDetails/SelectionDetails.jsx'
 import DownloadDetails from './Controls/DownloadDetails/DownloadDetails.jsx'
 import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx'
 import Loading from './Controls/Loading/Loading.jsx'
-import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from './config.js'
+import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected } from './config.js'
 
 import "bootstrap/dist/css/bootstrap.min.css"
 
@@ -46,6 +46,7 @@ export default function App() {
   const [submissionFeedback, setSubmissionFeedback] = useState()
   const [loading, setLoading] = useState(true)
   const [organizations, setOrganizations] = useState()
+  const [datasets, setDatasets] = useState()
   const [zoom, setZoom] = useState(2)
   const [rangeLevels, setRangeLevels] = useState()
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
@@ -55,7 +56,8 @@ export default function App() {
     startDepth: defaultStartDepth,
     endDepth: defaultEndDepth,
     eovsSelected: defaultEovsSelected,
-    orgsSelected: defaultOrgsSelected
+    orgsSelected: defaultOrgsSelected,
+    datasetsSelected: defaultDatatsetsSelected
   })
 
   useEffect(() => {
@@ -70,7 +72,14 @@ export default function App() {
       data.forEach(elem => {
         orgsReturned[elem.name] = elem.pk
       })
-      setOrganizations(orgsReturned)
+      fetch(`${server}/datasets`).then(response => response.json()).then(datasetData => {
+        let datasetsReturned = {}
+        datasetData.forEach(dataset => {
+          datasetsReturned[dataset.title] = dataset.pk
+        })
+        setDatasets(datasetsReturned)
+        setOrganizations(orgsReturned)
+      })
     }).catch(error => { throw error })
   }, [])
 
@@ -123,7 +132,7 @@ export default function App() {
   }, [submissionState])
 
   useEffect(() => {
-    fetch(`${server}/legend?${createDataFilterQueryString(query, organizations)}`).then(response => response.json()).then(legend => {
+    fetch(`${server}/legend?${createDataFilterQueryString(query, organizations, datasets)}`).then(response => response.json()).then(legend => {
       if (legend) {
         setRangeLevels(legend.recordsCount)
       }
@@ -147,7 +156,7 @@ export default function App() {
   }
 
   function submitRequest() {
-    fetch(`${server}/download?${createDataFilterQueryString(query, organizations)}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload.map(point => point.pk).join(',')}&email=${email}`).then((response) => {
+    fetch(`${server}/download?${createDataFilterQueryString(query, organizations, datasets)}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload.map(point => point.pk).join(',')}&email=${email}`).then((response) => {
       if (response.ok) {
         setSubmissionState('successful')
       } else {
@@ -198,6 +207,7 @@ export default function App() {
           query={query}
           polygon={polygon}
           organizations={organizations}
+          datasets={datasets}
           zoom={zoom}
           setZoom={setZoom}
           rangeLevels={rangeLevels}
@@ -206,7 +216,6 @@ export default function App() {
       <Controls
         setQuery={setQuery}
         setLoading={setLoading}
-        organizations={organizations}
       >
         {polygon && (
           <Col xs='auto' className='selectionPanelColumn'>
@@ -217,6 +226,7 @@ export default function App() {
                 query={query}
                 polygon={polygon}
                 organizations={organizations}
+                datasets={datasets}
                 width={550}
               >
                 {DownloadButton()}

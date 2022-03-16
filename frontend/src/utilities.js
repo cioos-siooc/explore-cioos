@@ -26,7 +26,17 @@ export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
       }
     })
   } else if (count > 1) {
-    newBadge = badgeTitle === 'Ocean Variables' ? count + ' variables' : count + ' organizations'
+    switch (badgeTitle) {
+      case 'Ocean Variables':
+        newBadge = count + ' variables'
+        break;
+      case 'Organizations':
+        newBadge = count + ' organizations'
+        break;
+      case 'Datasets':
+        newBadge =  count + ' datasets'
+        break;
+    }
   }
   return newBadge
 }
@@ -60,8 +70,8 @@ function objectToURL(obj) {
     .join("&");
 }
 
-export function createDataFilterQueryString(query, organizations) {
-  const { orgsSelected, eovsSelected } = query;
+export function createDataFilterQueryString(query, organizations, datasets) {
+  const { orgsSelected, eovsSelected, datasetsSelected } = query;
 
   const queryWithoutDefaults = Object.keys(defaultQuery).reduce(
     (acc, field) => {
@@ -75,17 +85,23 @@ export function createDataFilterQueryString(query, organizations) {
 
   const eovs = Object.keys(eovsSelected)
     .filter((eov) => eovsSelected[eov])
-    .join();
+    .join()
+
+  const datasetPKs = Object.keys(datasetsSelected)
+    .filter((dataset) => datasetsSelected[dataset])
+    .map((dataset) => datasets[dataset])
+    .join()
 
   const orgPKsSelected = Object.keys(orgsSelected)
     .filter((org) => orgsSelected[org])
     .map((org) => organizations[org])
-    .join();
+    .join()
   
   const {startDepth,endDepth,startDate,endDate} = queryWithoutDefaults
   
   const apiMappedQuery = {
     eovs,
+    datasetPKs: datasetPKs,
     organizations: orgPKsSelected,
     timeMin: startDate,
     timeMax: endDate,
@@ -94,7 +110,6 @@ export function createDataFilterQueryString(query, organizations) {
   };
 
   return objectToURL(apiMappedQuery);
-  
 }
 
 export function bytesToMemorySizeString(bytes) {
@@ -224,4 +239,14 @@ export function createSelectionQueryString(polygon) {
     return objectToURL(res);
   }
   return "polygon="+JSON.stringify(polygon);
+}
+
+export function filterObjectPropertyByPropertyList(objectToFilter, allowedProperties) {
+  const result =  Object.keys(objectToFilter)
+  .filter(key => allowedProperties.includes(key))
+  .reduce((obj, key) => {
+    obj[key] = objectToFilter[key];
+    return obj;
+  }, {});
+  return result
 }

@@ -2,16 +2,18 @@
   // Use IntelliSense to learn about possible attributes.
   // Hover to view descriptions of existing attributes.
   // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+
+
+  // Video explaining debugging https://www.youtube.com/watch?v=68wO-sl5vXg
+  // Article on debugging https://blogs.windows.com/msedgedev/2021/07/16/easier-debugging-developer-tools-in-visual-studio-code/
   "version": "0.2.0",
   "configurations": [
     {
-      "type": "node",
+      "type": "pwa-chrome",
       "request": "launch",
-      "name": "Launch Program",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
-      "program": "${workspaceFolder}"
+      "name": "Launch Chrome against localhost",
+      "url": "http://localhost:8000",
+      "webRoot": "${workspaceFolder}"
     }
   ]
 }
