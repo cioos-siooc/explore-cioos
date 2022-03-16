@@ -1,7 +1,6 @@
 .filter {
   pointer-events: none;
   position:relative;
-  /* margin-left: 10px; */
 }
 
 .filterHeader:hover {
@@ -37,6 +36,7 @@
   border-radius: 10px;
   padding: 10px;
   max-width: fit-content;
+  min-width: 275px;
 }
 
 .filterOptions button {
@@ -49,4 +49,21 @@
 
 .filterOptions button:hover {
   background-color: lightgray;
+}
+
+.filterSearch {
+  width: 100%;
+  margin-bottom: 5px;
+}
+
+.clearFilter {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  border-radius: 30px;
+}
+
+.clearFilter:hover {
+  background-color: lightgray;
+  cursor: pointer;
 }
