@@ -247,7 +247,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     map.current.addControl(new NavigationControl(), "bottom-right")
     map.current.addControl(drawPolygon.current, "bottom-right")
 
-    const mapOnClickHandler = e => {
+    const handleMapOnClick = e => {
       if(drawPolygon.current.getAll().features.length === 0) {
         map.current.setFilter('points-highlighted', ['in', 'pk', ''])
         setPointsToReview()
@@ -255,7 +255,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       }
     };
 
-    const mapPointsOnClick = e => {
+    const handleMapPointsOnClick = e => {
       if(draw.getMode() !== 'draw_polygon' && !creatingRectangle.current){
         if(drawPolygon.current.getAll().features.length > 0) {
           drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
@@ -283,7 +283,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       }
     };
 
-    const mapHexesOnClick = e => {
+    const handleMapHexesOnClick = e => {
       if(draw.getMode() !== 'draw_polygon' && !creatingRectangle.current){
         map.current.flyTo({center: [e.lngLat.lng, e.lngLat.lat], zoom: 7})
       } 
@@ -394,14 +394,14 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     
     // Workaround for https://github.com/mapbox/mapbox-gl-draw/issues/617
 
-    map.current.on('click', mapOnClickHandler);
-    // mobile seems better without mapOnClickHandler enabled for touch
+    map.current.on('click', handleMapOnClick);
+    // mobile seems better without handleMapOnClick enabled for touch
 
-    map.current.on('click', 'points', mapPointsOnClick);
-    map.current.on('touchend', 'points', mapPointsOnClick);
+    map.current.on('click', 'points', handleMapPointsOnClick);
+    map.current.on('touchend', 'points', handleMapPointsOnClick);
 
-    map.current.on('click', 'hexes', mapHexesOnClick);
-    map.current.on('touchend', 'hexes', mapHexesOnClick);
+    map.current.on('click', 'hexes', handleMapHexesOnClick);
+    map.current.on('touchend', 'hexes', handleMapHexesOnClick);
 
   }, [])
 
