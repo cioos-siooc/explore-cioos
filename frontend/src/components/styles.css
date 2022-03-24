@@ -28,12 +28,6 @@
   /* border: 2px solid lightgray; */
 }
 
-@media all and (max-width: 900px) {
-  .logo {
-    left: calc(900px - 163px);
-  }
-}
-
 .emailAddress {
   height: 40px;
   width: 300px;
@@ -85,6 +79,21 @@
 
 .feedbackButton:hover {
   background-color: #f3f3f3;
+}
+
+@media all and (max-width: 900px) {
+  .logo {
+    left: calc(900px - 140px);
+  }
+  .feedbackButton {
+    left: 848px;
+  }
+  .boxQueryButton {
+    left: 848px;
+  }
+  .introButton {
+    left: 848px;
+  }
 }
 
 @media all and (max-height: 465px) {
