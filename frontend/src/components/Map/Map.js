@@ -12,7 +12,7 @@ import { createDataFilterQueryString, generateColorStops, getCurrentRangeLevel }
 import { colorScale } from "../config"
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, organizations, zoom, setZoom, rangeLevels }) {
+export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, organizations, datasets, zoom, setZoom, rangeLevels }) {
   const mapContainer = useRef(null)
   const map = useRef(null)
   const creatingRectangle = useRef(false)
@@ -119,7 +119,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     setPolygon()
     if(map && map.current && map.current.loaded()){
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${createDataFilterQueryString(query, organizations)}`
+      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt?${createDataFilterQueryString(query, organizations, datasets)}`
   
       map.current.getSource("points").tiles = [tileQuery]
       map.current.getSource("hexes").tiles = [tileQuery]
@@ -247,15 +247,15 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     map.current.addControl(new NavigationControl(), "bottom-right")
     map.current.addControl(drawPolygon.current, "bottom-right")
 
-    map.current.on('click', e => {
+    const handleMapOnClick = e => {
       if(drawPolygon.current.getAll().features.length === 0) {
         map.current.setFilter('points-highlighted', ['in', 'pk', ''])
         setPointsToReview()
         setPolygon()
       }
-    })
+    };
 
-    map.current.on('click', 'points', e => {
+    const handleMapPointsOnClick = e => {
       if(draw.getMode() !== 'draw_polygon' && !creatingRectangle.current){
         if(drawPolygon.current.getAll().features.length > 0) {
           drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
@@ -281,16 +281,16 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       if(creatingRectangle.current) {
         creatingRectangle.current = false
       }
-    })
+    };
 
-    map.current.on('click', 'hexes', e => {
+    const handleMapHexesOnClick = e => {
       if(draw.getMode() !== 'draw_polygon' && !creatingRectangle.current){
         map.current.flyTo({center: [e.lngLat.lng, e.lngLat.lat], zoom: 7})
       } 
       if(creatingRectangle.current) {
         creatingRectangle.current = false
       }
-    })
+    };
 
     map.current.on('mousemove', 'points', e => {
       var coordinates = e.features[0].geometry.coordinates.slice()
@@ -391,6 +391,18 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     map.current.on('zoomend', e => {
       setZoom(map.current.getZoom())
     })
+    
+    // Workaround for https://github.com/mapbox/mapbox-gl-draw/issues/617
+
+    map.current.on('click', handleMapOnClick);
+    // mobile seems better without handleMapOnClick enabled for touch
+
+    map.current.on('click', 'points', handleMapPointsOnClick);
+    map.current.on('touchend', 'points', handleMapPointsOnClick);
+
+    map.current.on('click', 'hexes', handleMapHexesOnClick);
+    map.current.on('touchend', 'hexes', handleMapHexesOnClick);
+
   }, [])
 
   return (

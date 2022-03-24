@@ -8,7 +8,7 @@
   height: 30px;
 }
 
-.multiCheckboxFilter > * {
+.multiCheckboxFilter .optionButton {
   margin: 0px 10px 10px 10px;
 }
 
@@ -24,4 +24,8 @@
 
 .optionButton:hover {
   background-color: lightgray;
+}
+
+.filterCount {
+  margin-left: 5px;
 }
