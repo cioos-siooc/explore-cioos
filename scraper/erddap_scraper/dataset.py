@@ -28,7 +28,7 @@ class Dataset(object):
             {
                 "title": [self.globals["title"]],
                 # "title_fr": [self.globals.get("title_fr")],
-                "summary": [self.globals["title"]],
+                "summary": [self.globals["summary"]],
                 # "summary_fr": [self.globals.get("abstract_fr")],
                 "erddap_url": [self.erddap_url],
                 "dataset_id": [self.id],
