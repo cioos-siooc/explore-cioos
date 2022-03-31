@@ -30,7 +30,7 @@ export default function SelectionDetails({ pointsToReview, setPointsToReview, qu
     if (!_.isEmpty(pointsData)) {
       const total = getPointsDataSize(pointsData)
       setDataTotal(total / 1000000)
-      setPointsToReview(pointsData.filter(point => point.selected))//.map(point => point.pk))
+      setPointsToReview(pointsData.filter(point => point.selected))
     }
     setLoading(false)
   }, [pointsData])
