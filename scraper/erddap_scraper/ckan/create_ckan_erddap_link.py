@@ -2,8 +2,6 @@
 # coding: utf-8
 
 
-import json
-
 import diskcache as dc
 import pandas as pd
 import requests
@@ -24,7 +22,10 @@ def split_erddap_url(url):
     return (erddap_host, dataset_id)
 
 def unescape_ascii(x):
-    return bytes(x,'ascii').decode('unicode-escape')
+    try:
+        return bytes(x,'ascii').decode('unicode-escape')
+    except Exception:
+        return x
 
 def get_ckan_records(dataset_ids, limit=None, cache=False):
     """
@@ -35,8 +36,8 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
     dataset_ids are the list of datasets IDs that have been scraped
     """
     records = list_ckan_records_with_erddap_urls(cache)
-    # just used for testing
 
+    # just used for testing
     if limit:
         records = records[0:limit]
     out = []
@@ -52,37 +53,41 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
             continue
 
         (erddap_host, dataset_id) = split_erddap_url(erddap_url)
-
+        
+        # dataset_ids could be None if user wants all
         if dataset_ids and dataset_id not in dataset_ids:
             continue
 
         # retreive the data for each record
+
+        title_translated = record_full.get("title_translated")
+        notes_translated = record_full.get("notes_translated")
+
+        def remove_newlines(s):
+            # not sure why all these are needed but they seem to be
+            s = s.replace('\r', "")
+            s = s.replace('\n', "")
+            s = s.replace('\\n', "")
+            s = s.replace('\\r', "")
+            return s
+
         ckan_record_text = {
-            "title": unescape_ascii(record_full.get("title")),
+            "title": title_translated.get("en"),
+            "title_fr": title_translated.get("fr"),
+            "ckan_summary": notes_translated.get("en"),
+            "ckan_summary_fr": notes_translated.get("fr"),
         }
 
-        partiesRaw = [
-            x["value"] for x in record_full["extras"] if x["key"] == "responsible-party"
-        ]
-        # remove empties
-        partiesRaw = list(filter(None, partiesRaw))
-
+        for k,v in ckan_record_text.items():
+            ckan_record_text[k]=remove_newlines(unescape_ascii(v))
+    
         organizations = []
 
-        if len(partiesRaw):
-            partiesRaw2 = json.loads(partiesRaw[0])
-            organizations = [x["name"] for x in partiesRaw2]
-        
-        if record_full.get("cited-responsible-party"):
-            cited_responsible_party = json.loads(record_full["cited-responsible-party"])
-            if len(cited_responsible_party):
-                for contact in cited_responsible_party:
-                    if "organisation-name" in contact or "organization-name" in contact:
-                        organizations += [contact.get("organisation-name")]
+        for contact in record_full.get("cited-responsible-party",[]):
+            organizations += [unescape_ascii(contact.get("organisation-name"))]
 
         # remove duplicates, empty strings
         organizations = list(filter(None, set(organizations)))
-        organizations = [unescape_ascii(x) for x in organizations]
 
         out.append(
             [
@@ -101,7 +106,11 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         "ckan_id": [x[2] for x in out],
         "ckan_organizations": [x[3] for x in out],
         "ckan_title": [x[4]["title"] for x in out],
+        "title_fr": [x[4]["title_fr"] for x in out],
+        "ckan_summary": [x[4]["ckan_summary"] for x in out],
+        "ckan_summary_fr": [x[4]["ckan_summary_fr"] for x in out],
     }
+    
 
     df = pd.DataFrame(line)
 
@@ -128,7 +137,7 @@ def list_ckan_records_with_erddap_urls(cache_requests):
         if cache_requests:
             # limit cache to 10gb
             cache = dc.Cache(
-                "erddap_scraper_dc",
+                "ckan_harvester_cache",
                 eviction_policy="none",
                 size_limit=10000000000,
                 cull_limit=0,
