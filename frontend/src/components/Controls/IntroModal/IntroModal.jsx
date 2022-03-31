@@ -109,7 +109,7 @@ export default function IntroModal({ intialOpenState }) {
               CIOOS Data Explorer
             </span>
             <span className='tagLine'> "Ocean Data For Our Ocean Future" </span>
-            <a title='Return to CIOOS pacific homepage' className='introLogo' href='https://cioospacific.ca/' />
+            <a title='Go to CIOOS homepage' className='introLogo' href='https://cioos.ca/' target='_blank' />
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>

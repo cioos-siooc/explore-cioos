@@ -7,7 +7,7 @@ import './styles.css'
 export default function DataDownloadModal({ disabled, children }) {
   const [showModal, setShowModal] = useState(false)
   return (
-    <div className='dataDownloadModal'>
+    <div>
       <Modal
         show={showModal}
         size='xl'
