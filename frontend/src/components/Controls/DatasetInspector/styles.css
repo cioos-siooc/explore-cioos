@@ -15,10 +15,9 @@
 }
 
 .datasetInspector .backButton:hover {
-  background-color: lightgray;
+  background-color: #c6e3df;
 }
 
 .datasetInspector .backButton svg {
   margin-right: 5px;
 }
-

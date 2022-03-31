@@ -8,7 +8,7 @@
 }
 
 .downloadButton:disabled:hover {
-  background-color: #f7f7f7 ;
+  background-color: #f7f7f7;
 }
 
 .downloadButton:hover {
@@ -42,13 +42,14 @@
   overflow-y: auto;
 }
 
-.modal-content .datasetsTable tbody{
+.modal-content .datasetsTable tbody {
   height: calc(70vh - 220px);
 }
 
 .modal-content .pointDetails .datasetInspector {
   height: auto;
 }
+
 /*
 .modal-body {
   /* background-color: red; 
