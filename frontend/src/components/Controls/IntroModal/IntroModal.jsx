@@ -31,9 +31,6 @@ export default function IntroModal({ intialOpenState }) {
               There are four ways to select data:
               <ul>
                 <li>
-                  Click + shift and drag at any zoom level,
-                </li>
-                <li>
                   Creating a rectangle at any zoom level:
                   Click and hold shift while dragging the cursor at any zoom level or use the rectangle tool (insert icon).
                   With the tool selected, click on the map to start drawing the rectangle.
