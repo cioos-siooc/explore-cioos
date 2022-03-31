@@ -53,6 +53,7 @@
 
 .panelHandle:hover {
   background-color: #c6e3df;
+  cursor: pointer;
 }
 
 .panelHandle svg {

@@ -16,32 +16,39 @@ export default function IntroModal({ intialOpenState }) {
       case 'filter':
         return (
           <div className='stepInfo'>
-            Filtering
+            Filter
             <div className='stepInfoContent'>
-              Filters are at the top of the screen.
-              When no filters are selected all datasets are visible.
-              Only valid filter values change the available data.
+              By default, the Data Explorer displays all available datasets.
+              Use the filters at the top of the screen to narrow down your selections
             </div>
           </div>
         )
       case 'select':
         return (
           <div className='stepInfo'>
-            Selecting
+            Select
             <div className='stepInfoContent'>
               There are four ways to select data:
               <ul>
                 <li>
-                  Creating a rectangle at any zoom level,
-                </li>
-                <li>
-                  Creating a polygon at any zoom level,
-                </li>
-                <li>
                   Click + shift and drag at any zoom level,
                 </li>
                 <li>
-                  Selecting points at the points zoom level
+                  Creating a rectangle at any zoom level:
+                  Click and hold shift while dragging the cursor at any zoom level or use the rectangle tool (insert icon).
+                  With the tool selected, click on the map to start drawing the rectangle.
+                  Drag to the opposing corner and click again.
+                  Note that you can only have one rectangle selection active at a time.
+                </li>
+                <li>
+                  Creating a polygon at any zoom level:
+                  For an irregular shape use the polygon tool (insert icon).
+                  With the tool selected, click on the map to start drawing the polygon.
+                  When you\'ve finished drawing the search area, finish your search area by clicking on the first point again.
+                </li>
+                <li>
+                  Selecting points at the points zoom level:
+                  At the points zoom level, click to directly select.
                 </li>
               </ul>
             </div>
@@ -50,26 +57,25 @@ export default function IntroModal({ intialOpenState }) {
       case 'inspect':
         return (
           <div className='stepInfo'>
-            Inspecting
+            Inspect
             <div className='stepInfoContent'>
-              Inspect datasets and their records by making a selection.
-              Datasets that satisfy filter parameters and your selection show in a panel to the left.
-              View a dataset in more detail by clicking on its detail button.
-              Sort datasets by clicking on the table header in the datasets panel.
-              Note: only selected datasets are available in the download view to choose from.
+              After making a selection, a summary of the selected dataset(s) will appear in a panel to the left.
+              Click the table headers to sort results alphabetically by title, type of dataset, or numerically by number of records and estimated size.
+              You can view each dataset in more detail by clicking the arrow button next to the estimated dataset size.
+              <i> Note: Only selected datasets will be available to download.</i>
             </div>
           </div>
         )
       case 'download':
         return (
           <div className='stepInfo'>
-            Downloading
+            Download
             <div className='stepInfoContent'>
-              Datasets that have been selected can be downloaded.
-              Please provide an email address for the data download link to be sent to.
-              Your selected filter parameters are applied to the downloaded data.
-              Note: A 100MB limit applies to download sizes.
-              Note: Dataset sizes are estimates only. Downloads that are inadvertantly more than 100MB will be cut off at 100MB.
+              To download the data, click the Download link at the bottom of the panel or top of the page.
+              This page allows the user to confirm their data order by verifying dataset titles, records, the size of the download, and inspect dataset details.
+              Enter your email address and submit to confirm your order.
+              An email providing the direct download link will be sent shortly.
+              <i> Note: Filters that have been applied in the search will also be applied to the data download. A 100MB size limit applies to all orders; downloads that are more than 100MB will be cut off at 100MB. Check the bar at the bottom of the panel to verify the order does not exceed the maximum. If the size is over 100MB, please submit multiple orders of smaller sizes.</i>
             </div>
           </div>
         )
@@ -102,15 +108,15 @@ export default function IntroModal({ intialOpenState }) {
       >
         <Modal.Header closeButton>
           <Modal.Title className='modalHeader' id='contained-modal-title-vcenter'>
-            Canadian Integrated Ocean Observing System (CIOOS) Data Explorer
+            <span>
+              CIOOS Data Explorer
+            </span>
+            <span className='tagLine'> "Ocean Data For Our Ocean Future" </span>
             <a title='Return to CIOOS pacific homepage' className='introLogo' href='https://cioospacific.ca/' />
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Container fluid>
-            <div className='tagLine'>
-              "Your access point for research-quality ocean data from Canada, around the world."
-            </div>
             <Row>
               <div
                 className='steps'
