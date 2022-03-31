@@ -8,7 +8,7 @@
   table-layout: fixed;
 }
 
-.datasetsTable th{
+.datasetsTable th {
   cursor: pointer;
 }
 
@@ -16,18 +16,18 @@
   background-color: lightgray;
 }
 
-.datasetsTable td{
+.datasetsTable td {
   cursor: pointer;
 }
 
-.datasetsTable td:hover{
+.datasetsTable td:hover {
   /* background-color: lightgray; */
 }
 
 .datasetsTable tbody {
-  height:calc(100vh - 140px);
+  height: calc(100vh - 140px);
   /* max-height: 50vh; */
-  display:block;
+  display: block;
   overflow: auto;
 }
 
@@ -47,9 +47,9 @@
 }
 
 .datasetsTable .inspectButton:hover {
-  background-color: lightgray;
+  background-color: #c6e3df;
 }
 
-.selectAllHeader{
+.selectAllHeader {
   display: flex
 }

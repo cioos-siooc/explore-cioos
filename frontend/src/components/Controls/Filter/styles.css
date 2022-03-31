@@ -1,10 +1,10 @@
 .filter {
   pointer-events: none;
-  position:relative;
+  position: relative;
 }
 
 .filterHeader:hover {
-  background-color: lightgray;
+  background-color: #c6e3df;
 }
 
 .filterHeader {
@@ -17,9 +17,9 @@
   cursor: pointer;
 }
 
-.filterHeader > *{
+.filterHeader>* {
   margin: 0px 5px;
-  height: 30px;
+  height: 28px;
 }
 
 .filterHeader button {
@@ -28,7 +28,7 @@
 
 .filterOptions {
   pointer-events: all;
-  position:absolute;
+  position: absolute;
   top: 45px;
   left: 0px;
   z-index: 10;
@@ -40,7 +40,7 @@
 }
 
 .filterOptions button {
-  background-color: #f7f7f7;
+  background-color: #c6e3df;
   border: solid 2px darkgrey;
   border-radius: 10px;
   margin: 5px 5px;
@@ -48,7 +48,8 @@
 }
 
 .filterOptions button:hover {
-  background-color: lightgray;
+  background-color: #52a79b;
+  color: #f7f7f7
 }
 
 .filterSearch {
@@ -66,4 +67,13 @@
 .clearFilter:hover {
   background-color: lightgray;
   cursor: pointer;
+}
+
+.submissionFeedback span {
+  vertical-align: middle;
+}
+
+.submissionFeedback svg,
+.submissionFeedback span {
+  margin-right: 5px;
 }

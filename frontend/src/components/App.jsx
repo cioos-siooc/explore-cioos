@@ -115,7 +115,7 @@ export default function App() {
               className='text-success'
               size={30}
             />),
-          text: 'Request successful'
+          text: 'Request successful. Download link will be sent to email.'
         })
         break;
 
@@ -199,11 +199,11 @@ export default function App() {
           </Col>
           <Col>
             <Row>
-              <Col xs='auto'>
+              <Col xs='auto' className='submissionFeedback'>
                 {submissionFeedback && submissionFeedback.icon}
+                {submissionFeedback && submissionFeedback.text}
               </Col>
               <Col xs='auto'>
-                {submissionFeedback && submissionFeedback.text}
               </Col>
             </Row>
           </Col>

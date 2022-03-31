@@ -2,21 +2,23 @@ import classNames from 'classnames'
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { ChevronCompactLeft, ChevronCompactRight } from 'react-bootstrap-icons'
+// import 'animate.css'
 
 import './styles.css'
 
 export default function SelectionPanel({ children }) {
   const [open, setOpen] = useState(true)
-
-  let selectionPanelClassName = classNames('selectionPanel', { open: open })
+  let selectionPanelClassName = classNames('selectionPanel', { closed: !open })
+  let panelContentsClassName = classNames('panelContents', { closed: !open }) // animate__animated', { animate__slideInLeft: open, animate__slideOutLeft: !open, closed: !open })
+  let panelHandleClassName = classNames('panelHandle', { closed: !open })
   return (
     <div className={selectionPanelClassName}>
-      <div className='panelContents' style={{ 'display': open ? 'inherit' : 'none' }}>
+      <div className={panelContentsClassName}>
         {children}
       </div>
       {children &&
         (
-          <div className='panelHandle' title={`${open ? 'Close' : 'Open'} selection panel`} onClick={() => setOpen(!open)}>
+          <div className={panelHandleClassName} title={`${open ? 'Close' : 'Open'} selection panel`} onClick={() => setOpen(!open)}>
             {open ? <ChevronCompactLeft /> : <ChevronCompactRight />}
           </div>
         )

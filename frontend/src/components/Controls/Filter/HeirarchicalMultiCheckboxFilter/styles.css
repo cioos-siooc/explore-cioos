@@ -4,13 +4,13 @@
   overflow: auto;
 }
 
-.heirarchicalMultiCheckboxFilter label{
+.heirarchicalMultiCheckboxFilter label {
   height: 30px;
 }
 
 .heirarchicalMultiCheckboxFilter .optionName {
   margin-left: 10px;
-} 
+}
 
 .heirarchicalMultiCheckboxFilter .optionButton {
   cursor: pointer;
@@ -20,7 +20,8 @@
 }
 
 .heirarchicalMultiCheckboxFilter .optionButton:hover {
-  background-color: lightgray;
+  background-color: #52a79b;
+  color: #f7f7f7
 }
 
 .filterCount {
