@@ -51,6 +51,17 @@ class CEDAComplianceChecker(object):
             return False
         return True
 
+    def cde_ingest_flag(self):
+        """
+        ERDDAP Admins can prevent a dataset from ingestion into CDE with cde_ingest=False
+        """
+        cde_ingest = self.dataset.globals.get("cde_ingest", "")
+
+        if cde_ingest.lower() == "false":
+            self.failed_error("cde_ingest=False")
+            return False
+        return True
+
     def check_only_one_depth(self):
         if (
             "depth" in self.dataset.variables_list
@@ -62,7 +73,8 @@ class CEDAComplianceChecker(object):
 
     def passes_all_checks(self):
         return (
-            self.check_required_variables()
+            self.cde_ingest_flag()
+            and self.check_required_variables()
             and self.check_supported_cf_name()
             and self.check_only_one_depth()
         )
