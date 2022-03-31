@@ -105,7 +105,7 @@ export default function SelectionDetails({ pointsToReview, setPointsToReview, qu
               selectAll={selectAll}
               setDatasets={setPointsData}
               datasets={pointsData}
-              width={width}
+              width={550}
             />
           )
         }

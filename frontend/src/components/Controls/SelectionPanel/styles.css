@@ -2,6 +2,26 @@
   pointer-events: all;
   display: flex;
   height: 98vh;
+  width: 580px;
+  transition: all 1s;
+}
+
+.selectionPanel.closed {
+  width: 20px;
+}
+
+.panelContents {
+  background-color: #f7f7f7;
+  position: relative;
+  top: -10px;
+  left: 0px;
+  width: 560px;
+  height: 100vh;
+  transition: all 1s;
+}
+
+.panelContents.closed {
+  left: -560px;
 }
 
 @media all and (max-height: 400px) {
@@ -9,25 +29,6 @@
     height: 400px;
     position: absolute;
   }
-}
-
-/* .sidePanelOpen {
-  width: 500px;
-} */
-
-.panelContents {
-  background-color: #f7f7f7;
-  position: relative;
-  top: -10px;
-  left: 0px;
-  /* z-index: 10; */
-  width: 560px;
-  height: 100vh;
-  /* overflow-y: hidden; */
-}
-
-.panelContents.open {
-  width:400px
 }
 
 .panelHandle {
@@ -42,14 +43,18 @@
   border-top: 2px solid darkgrey;
   border-right: 2px solid darkgrey;
   border-bottom: 2px solid darkgrey;
+  transition: left 1s;
+}
 
+.panelHandle.closed {
+  /* position: absolute; */
+  left: -560px;
 }
 
 .panelHandle:hover {
-  background-color: lightgray;
+  background-color: #c6e3df;
 }
 
 .panelHandle svg {
   margin-top: 10px;
 }
-
