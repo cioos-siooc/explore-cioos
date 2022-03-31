@@ -1,7 +1,6 @@
 body {
   font-family: "Montserrat", Sans-serif;
-  font-weight: 300;
-  line-height: 2em;
+  line-height: 21pt;
 }
 
 .mapboxgl-ctrl-group>button {

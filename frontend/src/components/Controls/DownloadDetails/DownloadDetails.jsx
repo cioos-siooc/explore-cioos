@@ -52,26 +52,6 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, w
   return (
     <div className='downloadDetails'>
       <Row>
-        <Col>
-          <div className='downloadDetailsInfoRow'>
-            {inspectDataset ?
-              <DatasetInspector
-                dataset={inspectDataset}
-                setInspectDataset={setInspectDataset}
-                width={width}
-              /> :
-              <DatasetsTable
-                handleSelectAllDatasets={handleSelectAllDatasets}
-                handleSelectDataset={handleSelectDataset}
-                setInspectDataset={setInspectDataset}
-                selectAll={selectAll}
-                setDatasets={setPointsData}
-                datasets={pointsData}
-                width={width}
-              />
-            }
-          </div>
-        </Col>
         <Col className='downloadHelp'>
           <div className='downloadQuote'>
             <i >
@@ -97,10 +77,28 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, w
             </ul>
           </div>
           <i>Note:</i> Filters applied in the CIOOS Data Explorer also apply to dataset downloads.
+          <hr />
+        </Col>
+        <Col>
+          {inspectDataset ?
+            <DatasetInspector
+              dataset={inspectDataset}
+              setInspectDataset={setInspectDataset}
+              width={width}
+            /> :
+            <DatasetsTable
+              handleSelectAllDatasets={handleSelectAllDatasets}
+              handleSelectDataset={handleSelectDataset}
+              setInspectDataset={setInspectDataset}
+              selectAll={selectAll}
+              setDatasets={setPointsData}
+              datasets={pointsData}
+              width={width}
+            />
+          }
         </Col>
       </Row>
       <Row>
-
         <div className='downloadDetailsControls'>
           <Row className='downloadDetailsControlRow'>
             <Col>

@@ -1,5 +1,8 @@
 .downloadDetails {
-  width: 100%;
+  overflow: auto;
+  min-height: 100%;
+  max-height: calc(60vh - 140px);
+  min-width: 100%;
 }
 
 .downloadDetailsControls {
@@ -8,13 +11,13 @@
   position: absolute;
   bottom: 0px;
   left: 0px;
-  width:100%;
+  width: 100%;
 }
 
 .downloadDetailsControlRow {
   display: flex;
   justify-content: space-between;
-  padding: 10px 10px 10px 10px;
+  padding: 10px;
 }
 
 .emailInput {
@@ -22,7 +25,7 @@
   margin-right: 10px;
 }
 
-.dataTotalRatio svg{
+.dataTotalRatio svg {
   margin-left: 5px;
 }
 
@@ -32,7 +35,7 @@
   margin-right: 10px;
 }
 
-.dataTotalBar.progress{
+.dataTotalBar.progress {
   margin: 5px 0px 0px 0px;
   height: 30px;
 }
@@ -47,9 +50,4 @@
 
 .downloadQuote {
   text-align: center;
-}
-
-.downloadHelp {
-  height: calc(60vh - 100px);
-  overflow-y: auto;
 }

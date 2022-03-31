@@ -254,7 +254,7 @@ export default function App() {
           {DownloadButton()}
         </div>
       </Controls>
-      <a title='Return to CIOOS pacific homepage' className='logo' href='https://cioospacific.ca/' />
+      <a title='Go to CIOOS homepage' className='logo' href='https://cioos.ca/' target='_blank' />
       {currentRangeLevel && <Legend currentRangeLevel={currentRangeLevel} />}
       <button className='boxQueryButton' id='boxQueryButton' title='Rectangle tool'><div className='rectangleIcon' /></button>
       <a className='feedbackButton' title='Please provide feedback on your experience using CIOOS Data Explorer!' href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit' target='_blank'>
