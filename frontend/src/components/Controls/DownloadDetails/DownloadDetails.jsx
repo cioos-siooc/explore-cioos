@@ -93,7 +93,7 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, w
               selectAll={selectAll}
               setDatasets={setPointsData}
               datasets={pointsData}
-              width={width}
+              width={740}
             />
           }
         </Col>

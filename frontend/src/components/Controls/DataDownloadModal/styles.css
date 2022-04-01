@@ -22,6 +22,7 @@
   border-radius: 10px;
   height: 40px;
   text-align: center;
+  min-width: 120px;
 }
 
 .downloadButton .modal-content {
@@ -33,45 +34,20 @@
   height: calc(70vh - 170px)
 }
 
-.modal-content .modal-body {
-  height: calc(70vh - 70px)
+.dataDownloadModal .modal-body {
+  padding: 1rem 0rem 1rem 1rem;
+  height: calc(70vh)
 }
 
 .modal-content .pointDetails {
-  height: calc(70vh - 170px);
-  overflow-y: auto;
+  /* height: calc(60vh - 170px); */
+  /* overflow-y: auto; */
 }
 
 .modal-content .datasetsTable tbody {
-  height: calc(70vh - 220px);
+  /* height: calc(60vh - 220px); */
 }
 
 .modal-content .pointDetails .datasetInspector {
-  height: auto;
+  /* height: auto; */
 }
-
-/*
-.modal-body {
-  /* background-color: red; 
-  padding: 0px;
-  max-height: 70vh;
-  overflow: auto;
-}
-
-.modal-body .pointDetailsControls{
-  position: absolute;
-  bottom: 0px;
-  left:0px;
-  /* height:  
-}
-
-.modal-body .datasetsTable tbody{
-  height: 50vh;
-  margin-bottom: 100px;
-  /* overflow-y: auto; 
-}
-
-.modal-body .datasetInspector {
-  height: 50vh;
-  margin-bottom: 100px;
-}*/
