@@ -1,7 +1,8 @@
 .downloadDetails {
-  overflow: auto;
-  min-height: 100%;
-  max-height: calc(60vh - 140px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* min-height: 100%; */
+  max-height: calc(60vh - 40px);
   min-width: 100%;
 }
 
