@@ -9,6 +9,7 @@ export default function DataDownloadModal({ disabled, children }) {
   return (
     <div>
       <Modal
+        contentClassName='dataDownloadModal'
         show={showModal}
         size='xl'
         centered

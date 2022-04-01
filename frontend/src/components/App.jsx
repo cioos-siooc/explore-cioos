@@ -177,7 +177,7 @@ export default function App() {
         disabled={_.isEmpty(pointsToReview)}
       >
         <DownloadDetails
-          width={770}
+          width={650}
           pointsToReview={pointsToReview}
           setPointsToDownload={setPointsToDownload}
         >
