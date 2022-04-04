@@ -4,7 +4,7 @@ import { Modal } from 'react-bootstrap'
 
 import './styles.css'
 
-export default function DataDownloadModal({ disabled, children }) {
+export default function DataDownloadModal({ disabled, children, setEmail, setSubmissionState }) {
   const [showModal, setShowModal] = useState(false)
   return (
     <div>
@@ -14,7 +14,12 @@ export default function DataDownloadModal({ disabled, children }) {
         size='xl'
         centered
         aria-labelledby='contained-modal-title-vcenter'
-        onHide={() => setShowModal(false)}
+        onHide={() => {
+          setEmail()
+          setSubmissionState()
+          setShowModal(false)
+        }
+        }
       >
         <Modal.Header closeButton>
           <Modal.Title id='contained-modal-title-vcenter'>

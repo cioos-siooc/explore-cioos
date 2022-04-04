@@ -41,7 +41,7 @@ export default function App() {
   const [pointsToReview, setPointsToReview] = useState()
   const [polygon, setPolygon] = useState()
   const [email, setEmail] = useState()
-  const [emailValid, setEmailValid] = useState()
+  const [emailValid, setEmailValid] = useState(false)
   const [submissionState, setSubmissionState] = useState()
   const [submissionFeedback, setSubmissionFeedback] = useState()
   const [loading, setLoading] = useState(true)
@@ -115,7 +115,7 @@ export default function App() {
               className='text-success'
               size={30}
             />),
-          text: 'Request successful. Download link will be sent to email.'
+          text: 'Request successful. Download link will be sent to: ' + email
         })
         break;
 
@@ -151,10 +151,13 @@ export default function App() {
     }
   }, [rangeLevels, zoom])
 
-  function handleEmailChange(value) {
-    setEmailValid(validateEmail(value))
-    setEmail(value)
+  useEffect(() => {
+    setEmailValid(validateEmail(email))
     setSubmissionState()
+  }, [email])
+
+  function handleEmailChange(value) {
+    setEmail(value)
   }
 
   function handleSubmission() {
@@ -168,6 +171,9 @@ export default function App() {
       } else {
         setSubmissionState('failed')
       }
+    }).catch(err => {
+      console.log(err)
+      setSubmissionState('failed')
     })
   }
 
@@ -175,6 +181,8 @@ export default function App() {
     return (
       <DataDownloadModal
         disabled={_.isEmpty(pointsToReview)}
+        setEmail={setEmail}
+        setSubmissionState={setSubmissionState}
       >
         <DownloadDetails
           width={650}
@@ -182,7 +190,7 @@ export default function App() {
           setPointsToDownload={setPointsToDownload}
         >
           <Col>
-            <input className='emailAddress' type='email' placeholder='email@email.com' onChange={e => handleEmailChange(e.target.value)} />
+            <input disabled={submissionState === 'submitted'} className='emailAddress' type='email' placeholder='email@email.com' onInput={e => handleEmailChange(e.target.value)} />
           </Col>
           <Col style={{ maxWidth: '170px' }}>
             <button
@@ -191,7 +199,7 @@ export default function App() {
               onClick={() => handleSubmission()}
             >
               {
-                (!_.isEmpty(pointsToDownload) && submissionFeedback && submissionFeedback.text !== 'submitted' && 'Resubmit Request') ||
+                (!_.isEmpty(pointsToDownload) && submissionFeedback && submissionState !== 'submitted' && 'Resubmit Request') ||
                 (_.isEmpty(pointsToDownload) && 'Select Data') ||
                 'Submit Request'
               }
