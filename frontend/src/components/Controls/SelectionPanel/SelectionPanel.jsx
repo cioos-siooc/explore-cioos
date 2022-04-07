@@ -8,7 +8,7 @@ import './styles.css'
 export default function SelectionPanel({ children }) {
   const [open, setOpen] = useState(true)
   let selectionPanelClassName = classNames('selectionPanel', { closed: !open, open: open })
-  let panelContentsClassName = classNames('panelContents', { closed: !open }) // animate__animated', { animate__slideInLeft: open, animate__slideOutLeft: !open, closed: !open })
+  let panelContentsClassName = classNames('panelContents', { closed: !open })
   let panelHandleClassName = classNames('panelHandle', { closed: !open })
   return (
     <div className={selectionPanelClassName}>
