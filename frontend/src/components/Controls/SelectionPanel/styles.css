@@ -15,13 +15,13 @@
   position: relative;
   top: -10px;
   left: 0px;
-  width: 560px;
+  min-width: 560px;
   height: 100vh;
   transition: left 1s;
 }
 
 .panelContents.closed {
-  left: -550px;
+  left: -560px;
 }
 
 @media (max-height: 400px) {
@@ -47,7 +47,7 @@
 }
 
 .panelHandle.closed {
-  left: -550px;
+  left: -560px;
 }
 
 .panelHandle:hover {
