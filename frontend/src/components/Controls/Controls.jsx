@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { Container, Row, Col } from 'react-bootstrap'
-import _, { orderBy } from 'lodash'
 
 import Filter from './Filter/Filter.jsx'
 import MultiCheckboxFilter from './Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx'
@@ -25,7 +24,7 @@ export default function Controls({ setQuery, children }) {
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
   const eovsFilterName = 'Ocean Variables'
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(eovsFilterName, eovsSelected)
-  const [eovsSearchTerms, setEovsSearchTerms] = useState()
+  const [eovsSearchTerms, setEovsSearchTerms] = useState('')
 
   // Organization filter initial values from API and state
   const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected)
@@ -53,13 +52,13 @@ export default function Controls({ setQuery, children }) {
   }, [])
   const orgsFilterName = 'Organizations'
   const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterName, orgsSelected)
-  const [orgsSearchTerms, setOrgsSearchTerms] = useState()
+  const [orgsSearchTerms, setOrgsSearchTerms] = useState('')
 
   // Dataset filter initial values and state
   const [datasetsSelected, setDatasetsSelected] = useState(defaultDatatsetsSelected)
   const datasetsFilterName = 'Datasets'
   const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(datasetsFilterName, datasetsSelected)
-  const [datasetSearchTerms, setDatasetSearchTerms] = useState()
+  const [datasetSearchTerms, setDatasetSearchTerms] = useState('')
   const [datasetsFullList, setDatasetsFullList] = useState()
 
   // Timeframe filter initial values and state

@@ -5,16 +5,8 @@
   z-index: 2;
 }
 
-/* .controls .col-auto {
-  
-} */
-
 .controls .controlColumn.col>div {
   margin: 0px 0px 0px 10px;
-  /* display: flex; */
-  /* flex-direction: row; */
-  /* flex-wrap: wrap;  */
-  /* flex-flow: column wrap; */
 }
 
 .controlColumn.col {
