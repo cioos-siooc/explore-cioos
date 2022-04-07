@@ -84,7 +84,7 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, w
       </Row>
       <hr />
       <Row>
-        <Col>
+        <Col >
           <ProgressBar
             className='dataTotalBar'
             title='Amount of download size used'
