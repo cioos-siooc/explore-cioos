@@ -7,7 +7,7 @@ import './styles.css'
 
 export default function SelectionPanel({ children }) {
   const [open, setOpen] = useState(true)
-  let selectionPanelClassName = classNames('selectionPanel', { closed: !open, open: open })
+  let selectionPanelClassName = classNames('selectionPanel', { closed: !open })
   let panelContentsClassName = classNames('panelContents', { closed: !open })
   let panelHandleClassName = classNames('panelHandle', { closed: !open })
   return (
