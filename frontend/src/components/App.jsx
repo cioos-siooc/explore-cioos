@@ -190,7 +190,13 @@ export default function App() {
           setPointsToDownload={setPointsToDownload}
         >
           <Col>
-            <input disabled={submissionState === 'submitted'} className='emailAddress' type='email' placeholder='email@email.com' onInput={e => handleEmailChange(e.target.value)} />
+            <input
+              disabled={submissionState === 'submitted'}
+              className='emailAddress'
+              type='email'
+              placeholder='email@email.com'
+              onInput={e => handleEmailChange(e.target.value)}
+            />
           </Col>
           <Col style={{ maxWidth: '170px' }}>
             <button
