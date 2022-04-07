@@ -1,4 +1,8 @@
 .datasetsTable {
+  /* max-height: calc(100vh - 80px); */
+  /* min-height: 395px; */
+  min-width: 560px;
+  /* overflow-y: auto; */
   table-layout: fixed;
   border-collapse: collapse;
   text-align: left;
@@ -25,8 +29,6 @@
 }
 
 .datasetsTable tbody {
-  height: calc(100vh - 140px);
-  /* max-height: 50vh; */
   display: block;
   overflow: auto;
 }
