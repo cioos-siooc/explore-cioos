@@ -198,7 +198,7 @@ export default function App() {
               onInput={e => handleEmailChange(e.target.value)}
             />
           </Col>
-          <Col>
+          <Col xs='auto'>
             <button
               className='submitRequestButton'
               disabled={!emailValid || _.isEmpty(pointsToDownload) || getPointsDataSize(pointsToDownload) / 1000000 > 100 || submissionState === 'submitted'}
