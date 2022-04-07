@@ -30,7 +30,7 @@ export default function SelectionDetails({ pointsToReview, setPointsToReview, qu
     if (!_.isEmpty(pointsData)) {
       const total = getPointsDataSize(pointsData)
       setDataTotal(total / 1000000)
-      setPointsToReview(pointsData.filter(point => point.selected))//.map(point => point.pk))
+      setPointsToReview(pointsData.filter(point => point.selected))
     }
     setLoading(false)
   }, [pointsData])
@@ -98,16 +98,25 @@ export default function SelectionDetails({ pointsToReview, setPointsToReview, qu
               dataset={inspectDataset}
               setInspectDataset={setInspectDataset}
             /> :
-            <DatasetsTable
-              handleSelectAllDatasets={handleSelectAllDatasets}
-              handleSelectDataset={handleSelectDataset}
-              setInspectDataset={setInspectDataset}
-              selectAll={selectAll}
-              setDatasets={setPointsData}
-              datasets={pointsData}
-              width={width}
-            />
+            (
+              pointsData && pointsData.length > 0 &&
+              <DatasetsTable
+                handleSelectAllDatasets={handleSelectAllDatasets}
+                handleSelectDataset={handleSelectDataset}
+                setInspectDataset={setInspectDataset}
+                selectAll={selectAll}
+                setDatasets={setPointsData}
+                datasets={pointsData}
+                width={550}
+              />
+            ) || (
+              pointsData && pointsData.length === 0 &&
+              <div className="noDataNotice">
+                No Data. Modify filters or change selection on map.
+              </div>
+            )
           )
+
         }
       </div>
       <div className='pointDetailsControls'>

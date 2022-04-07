@@ -4,7 +4,7 @@
   overflow: auto;
 }
 
-.multiCheckboxFilter label{
+.multiCheckboxFilter label {
   height: 30px;
 }
 
@@ -14,7 +14,7 @@
 
 .optionName {
   margin-left: 10px;
-} 
+}
 
 .optionButton {
   cursor: pointer;
@@ -23,7 +23,8 @@
 }
 
 .optionButton:hover {
-  background-color: lightgray;
+  background-color: #52a79b;
+  color: #f7f7f7
 }
 
 .filterCount {

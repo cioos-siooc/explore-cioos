@@ -2,13 +2,19 @@
   width: 100%;
 }
 
+.pointDetailsInfoRow {
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .pointDetailsControls {
   border-top: 1px solid darkgrey;
   background-color: #f7f7f7;
   position: absolute;
   bottom: 0px;
   left: 0px;
-  width:100%;
+  width: 100%;
 }
 
 .pointDetailsControlRow {
@@ -22,7 +28,7 @@
   margin-right: 10px;
 }
 
-.dataTotalRatio svg{
+.dataTotalRatio svg {
   margin-left: 5px;
 }
 
@@ -32,7 +38,7 @@
   margin-right: 10px;
 }
 
-.dataTotalBar.progress{
+.dataTotalBar.progress {
   margin: 5px 0px 0px 0px;
   height: 30px;
 }
@@ -43,4 +49,9 @@
 
 .progress .past100 {
   color: black;
+}
+
+.noDataNotice {
+  text-align: center;
+  margin-top: 100px;
 }
