@@ -13,7 +13,7 @@ import DownloadDetails from './Controls/DownloadDetails/DownloadDetails.jsx'
 import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx'
 import Loading from './Controls/Loading/Loading.jsx'
 import LanguageSelector from './Controls/LanguageSelector/LanguageSelector.jsx'
-import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, languages } from './config.js'
+import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected, languages } from './config.js'
 
 import "bootstrap/dist/css/bootstrap.min.css"
 
@@ -41,11 +41,12 @@ export default function App() {
   const [pointsToReview, setPointsToReview] = useState()
   const [polygon, setPolygon] = useState()
   const [email, setEmail] = useState()
-  const [emailValid, setEmailValid] = useState()
+  const [emailValid, setEmailValid] = useState(false)
   const [submissionState, setSubmissionState] = useState()
   const [submissionFeedback, setSubmissionFeedback] = useState()
   const [loading, setLoading] = useState(true)
   const [organizations, setOrganizations] = useState()
+  const [datasets, setDatasets] = useState()
   const [zoom, setZoom] = useState(2)
   const [rangeLevels, setRangeLevels] = useState()
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
@@ -55,9 +56,16 @@ export default function App() {
     startDepth: defaultStartDepth,
     endDepth: defaultEndDepth,
     eovsSelected: defaultEovsSelected,
-    orgsSelected: defaultOrgsSelected
+    orgsSelected: defaultOrgsSelected,
+    datasetsSelected: defaultDatatsetsSelected
   })
 
+
+  useEffect(() => {
+    if (_.isEmpty(pointsToDownload)) {
+      setSubmissionFeedback()
+    }
+  }, [pointsToDownload])
 
   useEffect(() => {
     if (_.isEmpty(pointsToReview)) {
@@ -71,7 +79,14 @@ export default function App() {
       data.forEach(elem => {
         orgsReturned[elem.name] = elem.pk
       })
-      setOrganizations(orgsReturned)
+      fetch(`${server}/datasets`).then(response => response.json()).then(datasetData => {
+        let datasetsReturned = {}
+        datasetData.forEach(dataset => {
+          datasetsReturned[dataset.title] = dataset.pk
+        })
+        setDatasets(datasetsReturned)
+        setOrganizations(orgsReturned)
+      })
     }).catch(error => { throw error })
   }, [])
 
@@ -101,7 +116,7 @@ export default function App() {
               className='text-success'
               size={30}
             />),
-          text: 'Request submitted'
+          text: 'Request successful. Download link will be sent to: ' + email
         })
         break;
 
@@ -113,7 +128,7 @@ export default function App() {
               size={30}
             />
           ),
-          text: 'Request failed.'
+          text: 'Request failed'
         })
         break;
 
@@ -124,7 +139,7 @@ export default function App() {
   }, [submissionState])
 
   useEffect(() => {
-    fetch(`${server}/legend?${createDataFilterQueryString(query, organizations)}`).then(response => response.json()).then(legend => {
+    fetch(`${server}/legend?${createDataFilterQueryString(query, organizations, datasets)}`).then(response => response.json()).then(legend => {
       if (legend) {
         setRangeLevels(legend.recordsCount)
       }
@@ -137,10 +152,13 @@ export default function App() {
     }
   }, [rangeLevels, zoom])
 
-  function handleEmailChange(value) {
-    setEmailValid(validateEmail(value))
-    setEmail(value)
+  useEffect(() => {
+    setEmailValid(validateEmail(email))
     setSubmissionState()
+  }, [email])
+
+  function handleEmailChange(value) {
+    setEmail(value)
   }
 
   function handleSubmission() {
@@ -148,12 +166,15 @@ export default function App() {
   }
 
   function submitRequest() {
-    fetch(`${server}/download?${createDataFilterQueryString(query, organizations)}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload.map(point => point.pk).join(',')}&email=${email}`).then((response) => {
+    fetch(`${server}/download?${createDataFilterQueryString(query, organizations, datasets)}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload.map(point => point.pk).join(',')}&email=${email}`).then((response) => {
       if (response.ok) {
         setSubmissionState('successful')
       } else {
         setSubmissionState('failed')
       }
+    }).catch(err => {
+      console.log(err)
+      setSubmissionState('failed')
     })
   }
 
@@ -161,27 +182,39 @@ export default function App() {
     return (
       <DataDownloadModal
         disabled={_.isEmpty(pointsToReview)}
+        setEmail={setEmail}
+        setSubmissionState={setSubmissionState}
       >
         <DownloadDetails
-          width={770}
+          width={650}
           pointsToReview={pointsToReview}
           setPointsToDownload={setPointsToDownload}
         >
           <Col>
-            <input className='emailAddress' type='email' placeholder='email@email.com' onChange={e => handleEmailChange(e.target.value)} />
+            <input
+              disabled={submissionState === 'submitted'}
+              className='emailAddress'
+              type='email'
+              placeholder='email@email.com'
+              onInput={e => handleEmailChange(e.target.value)}
+            />
           </Col>
-          <Col style={{ maxWidth: '155px' }}>
-            <button className='submitRequestButton' disabled={!emailValid || _.isEmpty(pointsToDownload) || getPointsDataSize(pointsToDownload) / 1000000 > 100} onClick={() => handleSubmission()}>Submit Request</button>
+          <Col xs='auto'>
+            <button
+              className='submitRequestButton'
+              disabled={!emailValid || _.isEmpty(pointsToDownload) || getPointsDataSize(pointsToDownload) / 1000000 > 100 || submissionState === 'submitted'}
+              onClick={() => handleSubmission()}
+            >
+              {
+                (!_.isEmpty(pointsToDownload) && submissionFeedback && submissionState !== 'submitted' && 'Resubmit Request') ||
+                (_.isEmpty(pointsToDownload) && 'Select Data') ||
+                'Submit Request'
+              }
+            </button>
           </Col>
-          <Col>
-            <Row>
-              <Col xs='auto'>
-                {submissionFeedback && submissionFeedback.icon}
-              </Col>
-              <Col xs='auto'>
-                {submissionFeedback && submissionFeedback.text}
-              </Col>
-            </Row>
+          <Col className='submissionFeedback'>
+            {submissionFeedback && submissionFeedback.icon}
+            {submissionFeedback && submissionFeedback.text}
           </Col>
         </DownloadDetails>
       </DataDownloadModal >
@@ -199,6 +232,7 @@ export default function App() {
           query={query}
           polygon={polygon}
           organizations={organizations}
+          datasets={datasets}
           zoom={zoom}
           setZoom={setZoom}
           rangeLevels={rangeLevels}
@@ -207,7 +241,6 @@ export default function App() {
       <Controls
         setQuery={setQuery}
         setLoading={setLoading}
-        organizations={organizations}
       >
         {polygon && (
           <Col xs='auto' className='selectionPanelColumn'>
@@ -218,6 +251,7 @@ export default function App() {
                 query={query}
                 polygon={polygon}
                 organizations={organizations}
+                datasets={datasets}
                 width={550}
               >
                 {DownloadButton()}
@@ -229,7 +263,7 @@ export default function App() {
           {DownloadButton()}
         </div>
       </Controls>
-      <a title='Return to CIOOS pacific homepage' className='logo' href='https://cioospacific.ca/' />
+      <a title='Go to CIOOS homepage' className='logo' href='https://cioos.ca/' target='_blank' />
       {currentRangeLevel && <Legend currentRangeLevel={currentRangeLevel} />}
       <button className='boxQueryButton' id='boxQueryButton' title='Rectangle tool'><div className='rectangleIcon' /></button>
       <a className='feedbackButton' title='Please provide feedback on your experience using CIOOS Data Explorer!' href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit' target='_blank'>

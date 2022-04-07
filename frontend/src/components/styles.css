@@ -1,9 +1,14 @@
-.mapboxgl-ctrl-group > button {
+body {
+  font-family: "Montserrat", Sans-serif;
+  line-height: 21pt;
+}
+
+.mapboxgl-ctrl-group>button {
   width: 42px;
   height: 42px;
 }
 
-.row > .selectionPanelColumn {
+.row>.selectionPanelColumn {
   padding-left: 0px;
   padding-right: 0px;
 }
@@ -16,9 +21,10 @@
   position: absolute;
   top: 10px;
   right: 10px;
-  background-image: url(./Images/CIOOSNationalLogoBlack.svg);
+  background-image: url(./Images/NationalLogo.png);
   background-color: #fff;
   background-repeat: no-repeat;
+  background-size: contain;
   border-radius: 10px;
   box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
 }
@@ -26,12 +32,6 @@
 .logo:hover {
   background-color: #f3f3f3;
   /* border: 2px solid lightgray; */
-}
-
-@media all and (max-width: 900px) {
-  .logo {
-    left: calc(900px - 163px);
-  }
 }
 
 .emailAddress {
@@ -85,6 +85,33 @@
 
 .feedbackButton:hover {
   background-color: #f3f3f3;
+}
+
+.submissionFeedback span {
+  vertical-align: middle;
+}
+
+.submissionFeedback svg,
+.submissionFeedback span {
+  margin-right: 5px;
+}
+
+@media all and (max-width: 900px) {
+  .logo {
+    left: calc(900px - 140px);
+  }
+
+  .feedbackButton {
+    left: 848px;
+  }
+
+  .boxQueryButton {
+    left: 848px;
+  }
+
+  .introButton {
+    left: 848px;
+  }
 }
 
 @media all and (max-height: 465px) {

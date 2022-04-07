@@ -1,8 +1,3 @@
-.datasetInspector {
-  overflow-y: auto;
-  height: calc(100vh - 100px)
-}
-
 .datasetInspector .backButton {
   text-align: center;
   margin: 10px 10px 10px 10px;
@@ -15,10 +10,10 @@
 }
 
 .datasetInspector .backButton:hover {
-  background-color: lightgray;
+  background-color: #c6e3df;
+  cursor: pointer;
 }
 
 .datasetInspector .backButton svg {
   margin-right: 5px;
 }
-
