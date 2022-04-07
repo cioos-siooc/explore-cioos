@@ -6,7 +6,7 @@ import './styles.css'
 
 export default function DatasetInspector({ dataset, setInspectDataset, width }) {
   return (
-    <div className='datasetInspector' style={{ width: `${width + 10}px` }}>
+    <div className='datasetInspector'>
       <div className='backButton' onClick={() => setInspectDataset()} title='Return to dataset list'>
         <ChevronCompactLeft />
         Back
@@ -19,6 +19,20 @@ export default function DatasetInspector({ dataset, setInspectDataset, width }) 
           </h6>
           <div>
             {dataset.title}
+          </div>
+          <hr />
+          <h6>
+            Dataset URLs
+          </h6>
+          <div>
+            <ul style={{ "listStyleType": 'none' }}>
+              <li>
+                ERDAP: <a href={dataset.erddap_url} target='_blank'>{dataset.erddap_url ? dataset.erddap_url : 'unavailable'}</a>
+              </li>
+              <li>
+                CKAN: <a href={dataset.ckan_url} target='_blank'>{dataset.ckan_url ? dataset.ckan_url : 'unavailable'}</a>
+              </li>
+            </ul>
           </div>
           <hr />
           <h6>

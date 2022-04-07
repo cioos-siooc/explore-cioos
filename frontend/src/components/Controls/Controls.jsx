@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { Container, Row, Col } from 'react-bootstrap'
-import _, { orderBy } from 'lodash'
 
 import Filter from './Filter/Filter.jsx'
 import MultiCheckboxFilter from './Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx'
@@ -25,7 +24,7 @@ export default function Controls({ setQuery, children }) {
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
   const eovsFilterName = 'Ocean Variables'
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(eovsFilterName, eovsSelected)
-  const [eovsSearchTerms, setEovsSearchTerms] = useState()
+  const [eovsSearchTerms, setEovsSearchTerms] = useState('')
 
   // Organization filter initial values from API and state
   const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected)
@@ -53,13 +52,13 @@ export default function Controls({ setQuery, children }) {
   }, [])
   const orgsFilterName = 'Organizations'
   const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterName, orgsSelected)
-  const [orgsSearchTerms, setOrgsSearchTerms] = useState()
+  const [orgsSearchTerms, setOrgsSearchTerms] = useState('')
 
   // Dataset filter initial values and state
   const [datasetsSelected, setDatasetsSelected] = useState(defaultDatatsetsSelected)
   const datasetsFilterName = 'Datasets'
   const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(datasetsFilterName, datasetsSelected)
-  const [datasetSearchTerms, setDatasetSearchTerms] = useState()
+  const [datasetSearchTerms, setDatasetSearchTerms] = useState('')
   const [datasetsFullList, setDatasetsFullList] = useState()
 
   // Timeframe filter initial values and state
@@ -122,120 +121,118 @@ export default function Controls({ setQuery, children }) {
   }
 
   return (
-    <div>
-      <div className='controls'>
-        <Container fluid>
-          <Row>
-            {childrenArray.length === 2 && childrenArray[0]}
-            <Col className='controlColumn' >
-              <Filter
-                badgeTitle={eovsBadgeTitle}
-                optionsSelected={eovsSelected}
+    <div className='controls'>
+      <Container fluid>
+        <Row>
+          {childrenArray.length === 2 && childrenArray[0]}
+          <Col className='controlColumn' >
+            <Filter
+              badgeTitle={eovsBadgeTitle}
+              optionsSelected={eovsSelected}
+              setOptionsSelected={setEovsSelected}
+              tooltip='Filter data by ocean variable name. Selection works as logical OR operation.'
+              icon={<Water />}
+              controlled
+              searchable
+              searchTerms={eovsSearchTerms}
+              setSearchTerms={setEovsSearchTerms}
+              searchPlaceholder='Search for ocean variable name...'
+              filterName={eovsFilterName}
+              openFilter={openFilter === eovsFilterName}
+              setOpenFilter={setOpenFilter}
+            >
+              <MultiCheckboxFilter
+                optionsSelected={createOptionSubset(eovsSearchTerms, eovsSelected)}
                 setOptionsSelected={setEovsSelected}
-                tooltip='Filter data by ocean variable name. Selection works as logical OR operation.'
-                icon={<Water />}
-                controlled
                 searchable
-                searchTerms={eovsSearchTerms}
-                setSearchTerms={setEovsSearchTerms}
-                searchPlaceholder='Search for ocean variable name...'
-                filterName={eovsFilterName}
-                openFilter={openFilter === eovsFilterName}
-                setOpenFilter={setOpenFilter}
-              >
-                <MultiCheckboxFilter
-                  optionsSelected={createOptionSubset(eovsSearchTerms, eovsSelected)}
-                  setOptionsSelected={setEovsSelected}
-                  searchable
-                  allOptions={eovsSelected}
-                />
-              </Filter>
-              <Filter
-                badgeTitle={orgsBadgeTitle}
-                optionsSelected={orgsSelected}
+                allOptions={eovsSelected}
+              />
+            </Filter>
+            <Filter
+              badgeTitle={orgsBadgeTitle}
+              optionsSelected={orgsSelected}
+              setOptionsSelected={setOrgsSelected}
+              tooltip='Filter data by responsible organisation name. Selection works as logical OR operation.'
+              icon={<Building />}
+              controlled
+              searchable
+              searchTerms={orgsSearchTerms}
+              setSearchTerms={setOrgsSearchTerms}
+              searchPlaceholder='Search for organization name...'
+              filterName={orgsFilterName}
+              openFilter={openFilter === orgsFilterName}
+              setOpenFilter={setOpenFilter}
+            >
+              <MultiCheckboxFilter
+                optionsSelected={createOptionSubset(orgsSearchTerms, orgsSelected)}
                 setOptionsSelected={setOrgsSelected}
-                tooltip='Filter data by responsible organisation name. Selection works as logical OR operation.'
-                icon={<Building />}
-                controlled
                 searchable
-                searchTerms={orgsSearchTerms}
-                setSearchTerms={setOrgsSearchTerms}
-                searchPlaceholder='Search for organization name...'
-                filterName={orgsFilterName}
-                openFilter={openFilter === orgsFilterName}
-                setOpenFilter={setOpenFilter}
-              >
-                <MultiCheckboxFilter
-                  optionsSelected={createOptionSubset(orgsSearchTerms, orgsSelected)}
-                  setOptionsSelected={setOrgsSelected}
-                  searchable
-                  allOptions={orgsSelected}
-                />
-              </Filter>
-              <Filter
-                badgeTitle={datasetsBadgeTitle}
-                optionsSelected={datasetsSelected}
-                setOptionsSelected={setDatasetsSelected}
-                tooltip='Filter data by dataset name. Selection works as logical OR operation.'
-                icon={<FileEarmarkSpreadsheet />}
-                controlled
+                allOptions={orgsSelected}
+              />
+            </Filter>
+            <Filter
+              badgeTitle={datasetsBadgeTitle}
+              optionsSelected={datasetsSelected}
+              setOptionsSelected={setDatasetsSelected}
+              tooltip='Filter data by dataset name. Selection works as logical OR operation.'
+              icon={<FileEarmarkSpreadsheet />}
+              controlled
+              searchable
+              searchTerms={datasetSearchTerms}
+              setSearchTerms={setDatasetSearchTerms}
+              searchPlaceholder='Search for dataset name...'
+              filterName={datasetsFilterName}
+              openFilter={openFilter === datasetsFilterName}
+              setOpenFilter={setOpenFilter}
+            >
+              <HeirarchicalMultiCheckboxFilter
+                optionsSelected={createOptionSubset(datasetSearchTerms, datasetsSelected)}
+                setOptionsSelected={handleSetDatasetsSelected}
                 searchable
-                searchTerms={datasetSearchTerms}
-                setSearchTerms={setDatasetSearchTerms}
-                searchPlaceholder='Search for dataset name...'
-                filterName={datasetsFilterName}
-                openFilter={openFilter === datasetsFilterName}
-                setOpenFilter={setOpenFilter}
-              >
-                <HeirarchicalMultiCheckboxFilter
-                  optionsSelected={createOptionSubset(datasetSearchTerms, datasetsSelected)}
-                  setOptionsSelected={handleSetDatasetsSelected}
-                  searchable
-                  allOptions={datasetsSelected}
-                  hierachicalData={datasetsFullList}
-                />
-              </Filter>
-              <Filter
-                badgeTitle={timeframesBadgeTitle}
-                optionsSelected={startDate, endDate}
-                setOptionsSelected={() => { setStartDate('1900-01-01'); setEndDate(new Date().toISOString().split('T')[0]) }}
-                tooltip='Filter data by timeframe. Selection works as inclusive range.'
-                icon={<CalendarWeek />}
-                controlled
-                filterName={timeframesFilterName}
-                openFilter={openFilter === timeframesFilterName}
-                setOpenFilter={setOpenFilter}
-              >
-                <TimeSelector
-                  startDate={startDate}
-                  setStartDate={setStartDate}
-                  endDate={endDate}
-                  setEndDate={setEndDate}
-                />
-              </Filter>
-              <Filter
-                badgeTitle={depthRangeBadgeTitle}
-                optionsSelected={startDepth, endDepth}
-                setOptionsSelected={() => { setStartDepth(0); setEndDepth(12000) }}
-                tooltip='Filter data by depth. Selection works as inclusive range.'
-                icon={<ArrowsExpand />}
-                controlled
-                filterName={depthRangeFilterName}
-                openFilter={openFilter === depthRangeFilterName}
-                setOpenFilter={setOpenFilter}
-              >
-                < DepthSelector
-                  startDepth={startDepth}
-                  setStartDepth={setStartDepth}
-                  endDepth={endDepth}
-                  setEndDepth={setEndDepth}
-                />
-              </Filter>
-              {childrenArray.length === 2 ? childrenArray[1] : childrenArray[0]}
-            </Col>
-          </Row>
-        </Container>
-      </div >
+                allOptions={datasetsSelected}
+                hierachicalData={datasetsFullList}
+              />
+            </Filter>
+            <Filter
+              badgeTitle={timeframesBadgeTitle}
+              optionsSelected={startDate, endDate}
+              setOptionsSelected={() => { setStartDate('1900-01-01'); setEndDate(new Date().toISOString().split('T')[0]) }}
+              tooltip='Filter data by timeframe. Selection works as inclusive range.'
+              icon={<CalendarWeek />}
+              controlled
+              filterName={timeframesFilterName}
+              openFilter={openFilter === timeframesFilterName}
+              setOpenFilter={setOpenFilter}
+            >
+              <TimeSelector
+                startDate={startDate}
+                setStartDate={setStartDate}
+                endDate={endDate}
+                setEndDate={setEndDate}
+              />
+            </Filter>
+            <Filter
+              badgeTitle={depthRangeBadgeTitle}
+              optionsSelected={startDepth, endDepth}
+              setOptionsSelected={() => { setStartDepth(0); setEndDepth(12000) }}
+              tooltip='Filter data by depth. Selection works as inclusive range.'
+              icon={<ArrowsExpand />}
+              controlled
+              filterName={depthRangeFilterName}
+              openFilter={openFilter === depthRangeFilterName}
+              setOpenFilter={setOpenFilter}
+            >
+              < DepthSelector
+                startDepth={startDepth}
+                setStartDepth={setStartDepth}
+                endDepth={endDepth}
+                setEndDepth={setEndDepth}
+              />
+            </Filter>
+            {childrenArray.length === 2 ? childrenArray[1] : childrenArray[0]}
+          </Col>
+        </Row>
+      </Container>
     </div >
   )
 }

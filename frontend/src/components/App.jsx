@@ -41,7 +41,7 @@ export default function App() {
   const [pointsToReview, setPointsToReview] = useState()
   const [polygon, setPolygon] = useState()
   const [email, setEmail] = useState()
-  const [emailValid, setEmailValid] = useState()
+  const [emailValid, setEmailValid] = useState(false)
   const [submissionState, setSubmissionState] = useState()
   const [submissionFeedback, setSubmissionFeedback] = useState()
   const [loading, setLoading] = useState(true)
@@ -59,6 +59,12 @@ export default function App() {
     orgsSelected: defaultOrgsSelected,
     datasetsSelected: defaultDatatsetsSelected
   })
+
+  useEffect(() => {
+    if (_.isEmpty(pointsToDownload)) {
+      setSubmissionFeedback()
+    }
+  }, [pointsToDownload])
 
   useEffect(() => {
     if (_.isEmpty(pointsToReview)) {
@@ -109,7 +115,7 @@ export default function App() {
               className='text-success'
               size={30}
             />),
-          text: 'Request submitted'
+          text: 'Request successful. Download link will be sent to: ' + email
         })
         break;
 
@@ -121,7 +127,7 @@ export default function App() {
               size={30}
             />
           ),
-          text: 'Request failed.'
+          text: 'Request failed'
         })
         break;
 
@@ -145,10 +151,13 @@ export default function App() {
     }
   }, [rangeLevels, zoom])
 
-  function handleEmailChange(value) {
-    setEmailValid(validateEmail(value))
-    setEmail(value)
+  useEffect(() => {
+    setEmailValid(validateEmail(email))
     setSubmissionState()
+  }, [email])
+
+  function handleEmailChange(value) {
+    setEmail(value)
   }
 
   function handleSubmission() {
@@ -162,6 +171,9 @@ export default function App() {
       } else {
         setSubmissionState('failed')
       }
+    }).catch(err => {
+      console.log(err)
+      setSubmissionState('failed')
     })
   }
 
@@ -169,27 +181,39 @@ export default function App() {
     return (
       <DataDownloadModal
         disabled={_.isEmpty(pointsToReview)}
+        setEmail={setEmail}
+        setSubmissionState={setSubmissionState}
       >
         <DownloadDetails
-          width={770}
+          width={650}
           pointsToReview={pointsToReview}
           setPointsToDownload={setPointsToDownload}
         >
           <Col>
-            <input className='emailAddress' type='email' placeholder='email@email.com' onChange={e => handleEmailChange(e.target.value)} />
+            <input
+              disabled={submissionState === 'submitted'}
+              className='emailAddress'
+              type='email'
+              placeholder='email@email.com'
+              onInput={e => handleEmailChange(e.target.value)}
+            />
           </Col>
-          <Col style={{ maxWidth: '155px' }}>
-            <button className='submitRequestButton' disabled={!emailValid || _.isEmpty(pointsToDownload) || getPointsDataSize(pointsToDownload) / 1000000 > 100} onClick={() => handleSubmission()}>Submit Request</button>
+          <Col xs='auto'>
+            <button
+              className='submitRequestButton'
+              disabled={!emailValid || _.isEmpty(pointsToDownload) || getPointsDataSize(pointsToDownload) / 1000000 > 100 || submissionState === 'submitted'}
+              onClick={() => handleSubmission()}
+            >
+              {
+                (!_.isEmpty(pointsToDownload) && submissionFeedback && submissionState !== 'submitted' && 'Resubmit Request') ||
+                (_.isEmpty(pointsToDownload) && 'Select Data') ||
+                'Submit Request'
+              }
+            </button>
           </Col>
-          <Col>
-            <Row>
-              <Col xs='auto'>
-                {submissionFeedback && submissionFeedback.icon}
-              </Col>
-              <Col xs='auto'>
-                {submissionFeedback && submissionFeedback.text}
-              </Col>
-            </Row>
+          <Col className='submissionFeedback'>
+            {submissionFeedback && submissionFeedback.icon}
+            {submissionFeedback && submissionFeedback.text}
           </Col>
         </DownloadDetails>
       </DataDownloadModal >
@@ -238,7 +262,7 @@ export default function App() {
           {DownloadButton()}
         </div>
       </Controls>
-      <a title='Return to CIOOS pacific homepage' className='logo' href='https://cioospacific.ca/' />
+      <a title='Go to CIOOS homepage' className='logo' href='https://cioos.ca/' target='_blank' />
       {currentRangeLevel && <Legend currentRangeLevel={currentRangeLevel} />}
       <button className='boxQueryButton' id='boxQueryButton' title='Rectangle tool'><div className='rectangleIcon' /></button>
       <a className='feedbackButton' title='Please provide feedback on your experience using CIOOS Data Explorer!' href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit' target='_blank'>

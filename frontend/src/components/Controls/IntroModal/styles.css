@@ -18,7 +18,7 @@
 }
 
 .introModal .modalHeader {
-  padding: 0px 60px 0px 0px;
+  padding: 0px 160px 0px 0px;
 }
 
 .introLogo {
@@ -29,9 +29,10 @@
   position: absolute;
   top: 10px;
   right: 10px;
-  background-image: url(../../Images/CIOOSNationalLogoBlack.svg);
+  background-image: url(../../Images/NationalLogo.png);
   background-color: #fff;
   background-repeat: no-repeat;
+  background-size: contain;
   border-radius: 10px;
   box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
   margin: 5px 40px auto auto;
@@ -54,22 +55,36 @@
   text-align: center;
   font-size: large;
   font-weight: bold;
-  flex-grow: 1;
+  /* flex-grow: 1; */
   flex-shrink: 1;
   flex-wrap: nowrap;
-  width: 276.5px;
-  height: 276.5px;
+  width: 250px;
+  height: 250px;
   border-radius: 10px;
   /* border: 1px solid lightgray; */
   padding: 2px;
   margin: 2px;
   background-color: #abd3df;
   background-repeat: no-repeat;
-  background-size: 250px 250px;
+  background-size: 200px 200px;
   background-position: bottom;
 }
 
-.stepImage.filterStep { 
+@media (max-width: 1200px) {
+  .stepImage {
+    height: 210px;
+    background-size: 180px 180px;
+  }
+}
+
+@media (max-width: 992px) {
+  .stepImage {
+    height: 140px;
+    background-size: 110px 110px;
+  }
+}
+
+.stepImage.filterStep {
   background-image: url(../../Images/filtersImage.png);
 }
 
@@ -88,6 +103,7 @@
 .stepImage:hover {
   /* border: 4px solid #52A79B; */
   box-shadow: 0 0 0 4px #52A79B;
+  cursor: pointer;
 }
 
 .stepInfo {
@@ -95,7 +111,7 @@
   text-align: center;
   font-size: large;
   font-style: oblique;
-  min-height: 170px;
+  min-height: 250px;
 }
 
 .stepInfoContent {
@@ -106,14 +122,17 @@
 
 .tipInfo {
   margin-top: 15px;
-  min-height: 170px;
+  /* min-height: 275px; */
 }
 
 .tagLine {
-  text-align: center;
-  font-size: larger;
+  display: inline;
+  margin: auto;
   font-style: italic;
-  margin: 0px 0px 15px 0px;
+  /* text-align: center; */
+  font-size: smaller;
+  width: 100%;
+  /* margin: 0px 0px 15px 0px; */
 }
 
 .tipInfo img {
@@ -133,13 +152,12 @@
   background-image: url(../../Images/infoButton.png);
 }
 
-.modal-body .datasetInspector {
-  overflow-y: auto;
-  height: calc(60vh - 100px)
-}
-
 @media all and (max-height: 465px) {
   .introButton {
     top: 123px;
   }
+}
+
+.infoBox {
+  min-height: 275px;
 }
