@@ -1,15 +1,5 @@
 .datasetsTable {
-  /* max-height: calc(100vh - 80px); */
-  /* min-height: 395px; */
-  min-width: 560px;
-  /* overflow-y: auto; */
-  table-layout: fixed;
-  border-collapse: collapse;
   text-align: left;
-}
-
-.datasetsTable table {
-  table-layout: fixed;
 }
 
 .datasetsTable th {
@@ -24,19 +14,6 @@
   cursor: pointer;
 }
 
-.datasetsTable td:hover {
-  /* background-color: lightgray; */
-}
-
-.datasetsTable tbody {
-  display: block;
-  overflow: auto;
-}
-
-.datasetsTable thead tr {
-  display: block;
-}
-
 .datasetsTable .inspectButton {
   text-align: center;
   margin: 10px 5px 10px 5px;
@@ -44,7 +21,6 @@
   border-radius: 10px;
   width: 40px;
   height: 40px;
-  /* justify-content: space-between; */
   padding: 5px;
 }
 
