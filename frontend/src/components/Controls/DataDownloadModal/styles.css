@@ -1,3 +1,11 @@
+.dataDownloadModal .modal-header {
+  padding: 5px;
+}
+
+.dataDownloadModal .modal-body {
+  padding: 0px;
+}
+
 .downloadButton {
   pointer-events: all;
   background-color: #f7f7f7;
@@ -16,38 +24,10 @@
 }
 
 .submitRequestButton {
-  /* pointer-events: all; */
   background-color: #f7f7f7;
   border: solid 2px darkgrey;
   border-radius: 10px;
   height: 40px;
   text-align: center;
-  min-width: 120px;
-}
-
-.downloadButton .modal-content {
-  min-width: 800px;
-  height: 70vh;
-}
-
-.modal-content .pointDetailsInfoRow {
-  height: calc(70vh - 170px)
-}
-
-.dataDownloadModal .modal-body {
-  padding: 1rem 0rem 1rem 1rem;
-  height: calc(70vh)
-}
-
-.modal-content .pointDetails {
-  /* height: calc(60vh - 170px); */
-  /* overflow-y: auto; */
-}
-
-.modal-content .datasetsTable tbody {
-  /* height: calc(60vh - 220px); */
-}
-
-.modal-content .pointDetails .datasetInspector {
-  /* height: auto; */
+  min-width: 10em;
 }

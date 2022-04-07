@@ -198,7 +198,7 @@ export default function App() {
               onInput={e => handleEmailChange(e.target.value)}
             />
           </Col>
-          <Col style={{ maxWidth: '170px' }}>
+          <Col>
             <button
               className='submitRequestButton'
               disabled={!emailValid || _.isEmpty(pointsToDownload) || getPointsDataSize(pointsToDownload) / 1000000 > 100 || submissionState === 'submitted'}
@@ -211,15 +211,9 @@ export default function App() {
               }
             </button>
           </Col>
-          <Col>
-            <Row>
-              <Col xs='auto' className='submissionFeedback'>
-                {submissionFeedback && submissionFeedback.icon}
-                {submissionFeedback && submissionFeedback.text}
-              </Col>
-              <Col xs='auto'>
-              </Col>
-            </Row>
+          <Col className='submissionFeedback'>
+            {submissionFeedback && submissionFeedback.icon}
+            {submissionFeedback && submissionFeedback.text}
           </Col>
         </DownloadDetails>
       </DataDownloadModal >

@@ -68,12 +68,3 @@
   background-color: lightgray;
   cursor: pointer;
 }
-
-.submissionFeedback span {
-  vertical-align: middle;
-}
-
-.submissionFeedback svg,
-.submissionFeedback span {
-  margin-right: 5px;
-}
