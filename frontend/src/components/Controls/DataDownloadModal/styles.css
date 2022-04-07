@@ -6,6 +6,10 @@
   padding: 0px;
 }
 
+.dataDownloadModal .modal-header .btn-close {
+  margin-right: 5px;
+}
+
 .downloadButton {
   pointer-events: all;
   background-color: #f7f7f7;
