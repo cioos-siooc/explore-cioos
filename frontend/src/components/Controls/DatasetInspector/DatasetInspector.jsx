@@ -6,7 +6,7 @@ import './styles.css'
 
 export default function DatasetInspector({ dataset, setInspectDataset, width }) {
   return (
-    <div className='datasetInspector' style={{ width: `${width + 10}px` }}>
+    <div className='datasetInspector'>
       <div className='backButton' onClick={() => setInspectDataset()} title='Return to dataset list'>
         <ChevronCompactLeft />
         Back
