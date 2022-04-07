@@ -128,16 +128,33 @@ def main(erddap_urls, csv_only, cache_requests):
     )
 
     print("Cleaning up data")
-    datasets=datasets.replace(np.nan, None)
+    datasets = datasets.replace(np.nan, None)
+
+    datasets["summary"] = datasets["summary"].apply(lambda x: unescape_ascii(x))
+    datasets["title"] = datasets["title"].apply(lambda x: unescape_ascii(x))
+
     datasets["ckan_title"].fillna(datasets["title"], inplace=True)
+    datasets["ckan_summary"].fillna(datasets["summary"], inplace=True)
 
     # prioritize with organizations from CKAN and then pull ERDDAP if needed
-    datasets['organizations']=datasets.apply(lambda x:x['ckan_organizations'] or x['organizations'],axis=1)
+    datasets["organizations"] = datasets.apply(
+        lambda x: x["ckan_organizations"] or x["organizations"], axis=1
+    )
     del datasets["title"]
+    del datasets["summary"]
     del datasets["ckan_organizations"]
-    datasets.rename(columns={"ckan_title": "title"}, inplace=True)
-    datasets['title']=datasets['title'].apply(lambda x:unescape_ascii(x))
-    datasets['summary']=datasets['summary'].apply(lambda x:unescape_ascii(x))
+
+    datasets.rename(
+        columns={
+            "ckan_title": "title",
+            "ckan_title_fr": "title_fr",
+            "ckan_summary": "summary",
+            "ckan_summary_fr": "summary_fr",
+        },
+        inplace=True,
+    )
+
+    datasets = datasets.replace(r"\n", " ", regex=True)
 
     profiles["depth_min"] = profiles["depth_min"].fillna(0)
     profiles["depth_max"] = profiles["depth_max"].fillna(0)
