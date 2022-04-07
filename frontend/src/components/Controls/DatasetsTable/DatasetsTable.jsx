@@ -100,31 +100,35 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                 <td
                   style={{ wordWrap: 'break-word' }}
                   title={point.title}
+                  onClick={() => setInspectDataset(point)}
                 >
                   {abbreviateString(point.title, 40)}
                 </td>
                 <td
                   style={{ wordWrap: 'break-word' }}
                   title='Dataset type'
+                  onClick={() => setInspectDataset(point)}
                 >
                   {point.cdm_data_type}
                 </td>
                 <td
                   style={{ wordWrap: 'break-word' }}
                   title='Number of records in dataset'
+                  onClick={() => setInspectDataset(point)}
                 >
                   {toInteger(point.profiles_count)}
                 </td>
                 <td
                   style={{ wordWrap: 'break-word' }}
                   title='Approximate dataset size in megabytes'
+                  onClick={() => setInspectDataset(point)}
                 >
                   {bytesToMemorySizeString(point.size)}
                 </td>
                 <td
                   style={{ wordWrap: 'break-word' }}
-                  onClick={() => setInspectDataset(point)}
                   title='Open dataset details'
+                  onClick={() => setInspectDataset(point)}
                 >
                   <div className='inspectButton'><ChevronCompactRight /></div>
                 </td>
