@@ -122,7 +122,7 @@
 
 .tipInfo {
   margin-top: 15px;
-  min-height: 275px;
+  /* min-height: 275px; */
 }
 
 .tagLine {
@@ -152,13 +152,12 @@
   background-image: url(../../Images/infoButton.png);
 }
 
-.modal-body .datasetInspector {
-  overflow-y: auto;
-  height: calc(60vh - 100px)
-}
-
 @media all and (max-height: 465px) {
   .introButton {
     top: 123px;
   }
+}
+
+.infoBox {
+  min-height: 275px;
 }

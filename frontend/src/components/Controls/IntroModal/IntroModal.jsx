@@ -100,8 +100,9 @@ export default function IntroModal({ intialOpenState }) {
         centered
         aria-labelledby='contained-modal-title-vcenter'
         onHide={() => setShowModal(false)}
+        scrollable
         className='introModal'
-        dialogClassName="modal-90w"
+      // dialogClassName="modal-90w"
       >
         <Modal.Header closeButton>
           <Modal.Title className='modalHeader' id='contained-modal-title-vcenter'>
@@ -145,7 +146,7 @@ export default function IntroModal({ intialOpenState }) {
                 </div>
               </div>
             </Row>
-            <Row>
+            <Row className='infoBox'>
               {generateInfo()}
             </Row>
           </Container>
