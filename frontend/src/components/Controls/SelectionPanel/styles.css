@@ -21,7 +21,7 @@
 }
 
 .panelContents.closed {
-  left: -560px;
+  left: -550px;
 }
 
 @media (max-height: 400px) {
@@ -47,8 +47,7 @@
 }
 
 .panelHandle.closed {
-  /* position: absolute; */
-  left: -560px;
+  left: -550px;
 }
 
 .panelHandle:hover {
