@@ -49,7 +49,7 @@ export default function DepthSelector(props) {
   return (
     <div className='depthSelector'>
       <div className='inputs'>
-        <div className='depth' title={!depthValid && 'Start depth must be less than end depth, and be 0 to 12000m.'}>
+        <div className='depth' title={!depthValid ? 'Start depth must be less than end depth, and be 0 to 12000m.' : undefined}>
           <span>Start Depth (m):</span>
           <input
             className="startDepth"
@@ -61,7 +61,7 @@ export default function DepthSelector(props) {
             size={"6"}
           />
         </div>
-        <div className='depth' title={!depthValid && 'End depth must be more than start depth, and be 0 to 12000m'}>
+        <div className='depth' title={!depthValid ? 'End depth must be more than start depth, and be 0 to 12000m' : undefined}>
           <span>End Depth (m):</span>
           <input
             className="endDepth"
