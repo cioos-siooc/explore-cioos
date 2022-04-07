@@ -4,6 +4,7 @@ const { CleanWebpackPlugin } = require("clean-webpack-plugin");
 const { DefinePlugin } = require("webpack");
 
 module.exports = {
+  devtool: 'inline-source-map',
   devServer: {
     port: 8000,
   },

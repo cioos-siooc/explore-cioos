@@ -2,32 +2,33 @@
   pointer-events: all;
   display: flex;
   height: 98vh;
+  width: 580px;
+  transition: width 1s;
 }
 
-@media all and (max-height: 400px) {
-  .panelContents {
-    height: 400px;
-    position: absolute;
-  }
+.selectionPanel.closed {
+  width: 20px;
 }
-
-/* .sidePanelOpen {
-  width: 500px;
-} */
 
 .panelContents {
   background-color: #f7f7f7;
   position: relative;
   top: -10px;
   left: 0px;
-  /* z-index: 10; */
-  width: 560px;
+  min-width: 560px;
   height: 100vh;
-  /* overflow-y: hidden; */
+  transition: left 1s;
 }
 
-.panelContents.open {
-  width:400px
+.panelContents.closed {
+  left: -560px;
+}
+
+@media (max-height: 400px) {
+  .panelContents {
+    height: 400px;
+    position: absolute;
+  }
 }
 
 .panelHandle {
@@ -42,14 +43,18 @@
   border-top: 2px solid darkgrey;
   border-right: 2px solid darkgrey;
   border-bottom: 2px solid darkgrey;
+  transition: left 1s;
+}
 
+.panelHandle.closed {
+  left: -560px;
 }
 
 .panelHandle:hover {
-  background-color: lightgray;
+  background-color: #c6e3df;
+  cursor: pointer;
 }
 
 .panelHandle svg {
   margin-top: 10px;
 }
-

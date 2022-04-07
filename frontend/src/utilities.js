@@ -1,6 +1,6 @@
 import * as _ from 'lodash'
 import * as d3 from 'd3'
-import {useState, useEffect} from 'react'
+import { useState, useEffect } from 'react'
 import { defaultQuery } from './components/config.js'
 
 export function capitalizeFirstLetter(string) {
@@ -26,20 +26,30 @@ export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
       }
     })
   } else if (count > 1) {
-    newBadge = badgeTitle === 'Ocean Variables' ? count + ' variables' : count + ' organizations'
+    switch (badgeTitle) {
+      case 'Ocean Variables':
+        newBadge = count + ' variables'
+        break;
+      case 'Organizations':
+        newBadge = count + ' organizations'
+        break;
+      case 'Datasets':
+        newBadge = count + ' datasets'
+        break;
+    }
   }
   return newBadge
 }
 
 export function generateRangeSelectBadgeTitle(badgeTitle, optionsSelected, defaults, units) {
-  return optionsSelected[0] === defaults[0] && optionsSelected[1] === defaults[1] 
-  ? badgeTitle
-  : `${optionsSelected[0]} - ${optionsSelected[1]}` + (!_.isEmpty(units) ? ' ' + units : '')
+  return optionsSelected[0] === defaults[0] && optionsSelected[1] === defaults[1]
+    ? badgeTitle
+    : `${optionsSelected[0]} - ${optionsSelected[1]}` + (!_.isEmpty(units) ? ' ' + units : '')
 }
 
 export function abbreviateString(text, maxLength) {
-  if(text) {
-    if(text.length > maxLength) {
+  if (text) {
+    if (text.length > maxLength) {
       return `${text.slice(0, maxLength)}...`
     } else {
       return text
@@ -60,8 +70,8 @@ function objectToURL(obj) {
     .join("&");
 }
 
-export function createDataFilterQueryString(query, organizations) {
-  const { orgsSelected, eovsSelected } = query;
+export function createDataFilterQueryString(query, organizations, datasets) {
+  const { orgsSelected, eovsSelected, datasetsSelected } = query;
 
   const queryWithoutDefaults = Object.keys(defaultQuery).reduce(
     (acc, field) => {
@@ -75,17 +85,23 @@ export function createDataFilterQueryString(query, organizations) {
 
   const eovs = Object.keys(eovsSelected)
     .filter((eov) => eovsSelected[eov])
-    .join();
+    .join()
+
+  const datasetPKs = Object.keys(datasetsSelected)
+    .filter((dataset) => datasetsSelected[dataset])
+    .map((dataset) => datasets[dataset])
+    .join()
 
   const orgPKsSelected = Object.keys(orgsSelected)
     .filter((org) => orgsSelected[org])
     .map((org) => organizations[org])
-    .join();
-  
-  const {startDepth,endDepth,startDate,endDate} = queryWithoutDefaults
-  
+    .join()
+
+  const { startDepth, endDepth, startDate, endDate } = queryWithoutDefaults
+
   const apiMappedQuery = {
     eovs,
+    datasetPKs: datasetPKs,
     organizations: orgPKsSelected,
     timeMin: startDate,
     timeMax: endDate,
@@ -94,24 +110,23 @@ export function createDataFilterQueryString(query, organizations) {
   };
 
   return objectToURL(apiMappedQuery);
-  
 }
 
 export function bytesToMemorySizeString(bytes) {
   let num = parseFloat(bytes)
   // if(_.isEmpty(bytes)) return '---'
-  if(num === NaN || num === 'NaN' || bytes === null) {
+  if (num === NaN || num === 'NaN' || bytes === null) {
     return 'NaN'
-  } else if(num < 1000000) {
-    return `${(num/1000).toFixed(2)}KB`
-  } else if(num < 1000000000) {
-    return `${(num/1000000).toFixed(2)}MB`
-  } else if(num < 1000000000000) {
-    return `${(num/1000000000).toFixed(2)}GB`
-  } else if(num < 1000000000000000) {
-    return `${(num/1000000000000).toFixed(2)}TB`
-  } else if(num < 1000000000000000000) {
-    return `${(num/1000000000000000).toFixed(2)}PB`
+  } else if (num < 1000000) {
+    return `${(num / 1000).toFixed(2)}KB`
+  } else if (num < 1000000000) {
+    return `${(num / 1000000).toFixed(2)}MB`
+  } else if (num < 1000000000000) {
+    return `${(num / 1000000000).toFixed(2)}GB`
+  } else if (num < 1000000000000000) {
+    return `${(num / 1000000000000).toFixed(2)}TB`
+  } else if (num < 1000000000000000000) {
+    return `${(num / 1000000000000000).toFixed(2)}PB`
   } else {
     return '>1PB'
   }
@@ -123,7 +138,7 @@ export function generateColorStops(colorScale, range) {
   const exponent = 5
   let colors
   let scale
-  if(range[1] <= colorScale.length * 2) {
+  if (range[1] <= colorScale.length * 2) {
     colors = colorScale.slice(0, range[1])
     scale = d3.scaleLinear().domain([0, colors.length - 1]).range(range)
   } else {
@@ -139,12 +154,12 @@ export function generateColorStops(colorScale, range) {
   const result = []
   const map = new Map()
   colorStops.map(colorStop => { // ensure there aren't duplicates
-    if(!map.has(colorStop.stop)) {
+    if (!map.has(colorStop.stop)) {
       map.set(colorStop.stop, true)
       result.push(colorStop)
-    } 
+    }
   })
-  return result 
+  return result
 }
 
 export function useDebounce(value, delay) {
@@ -171,11 +186,11 @@ export function useDebounce(value, delay) {
 export function getCurrentRangeLevel(rangeLevels, zoom) {
   switch (true) {
     case zoom < 5:
-      return(rangeLevels['zoom0'])
+      return (rangeLevels['zoom0'])
     case zoom >= 5 && zoom < 7:
-      return(rangeLevels['zoom1'])
+      return (rangeLevels['zoom1'])
     case zoom >= 7:
-      return(rangeLevels['zoom2'])
+      return (rangeLevels['zoom2'])
   }
 }
 
@@ -220,8 +235,38 @@ export function createSelectionQueryString(polygon) {
   if (polygonIsRectangle(polygon)) {
     // res = { latMin, lonMin, latMax, lonMax }  
     const res = polygonToMaxMins(polygon);
-      
+
     return objectToURL(res);
   }
-  return "polygon="+JSON.stringify(polygon);
+  return "polygon=" + JSON.stringify(polygon);
+}
+
+export function filterObjectPropertyByPropertyList(objectToFilter, allowedProperties) {
+  const result = Object.keys(objectToFilter)
+    .filter(key => allowedProperties.includes(key))
+    .reduce((obj, key) => {
+      obj[key] = objectToFilter[key];
+      return obj;
+    }, {});
+  return result
+}
+
+// https://stackoverflow.com/questions/32553158/detect-click-outside-react-component
+export function useOutsideAlerter(ref, callback, value) {
+  useEffect(() => {
+    /**
+     * Alert if clicked on outside of element
+     */
+    function handleClickOutside(event) {
+      if (ref.current && !ref.current.contains(event.target)) {
+        callback(value)
+      }
+    }
+    // Bind the event listener
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      // Unbind the event listener on clean up
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [ref]);
 }

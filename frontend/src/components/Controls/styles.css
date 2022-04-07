@@ -5,23 +5,16 @@
   z-index: 2;
 }
 
-/* .controls .col-auto {
-  
-} */
-
-.controls .controlColumn.col > div{
+.controls .controlColumn.col>div {
   margin: 0px 0px 0px 10px;
-  /* display: flex; */
-  /* flex-direction: row; */
-  /* flex-wrap: wrap;  */
-  /* flex-flow: column wrap; */
 }
+
 .controlColumn.col {
   display: flex;
   flex-wrap: wrap;
   height: min-content;
   padding-right: 150px;
-  padding-left: 0px;;
+  padding-left: 0px;
   min-width: 400px;
 }
 
