@@ -1,18 +1,17 @@
-.downloadDetails {
+.downloadDetails .row {
+  padding: 5px 0px;
+}
+
+.downloadDataRow {
+  max-height: 40vh;
   overflow-y: auto;
-  overflow-x: hidden;
-  /* min-height: 100%; */
-  max-height: calc(60vh - 40px);
-  min-width: 100%;
 }
 
 .downloadDetailsControls {
   border-top: 1px solid darkgrey;
   background-color: #f7f7f7;
-  position: absolute;
-  bottom: 0px;
-  left: 0px;
-  width: 100%;
+  padding: 10px;
+  overflow-x: hidden;
 }
 
 .downloadDetailsControlRow {

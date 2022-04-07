@@ -87,6 +87,15 @@ body {
   background-color: #f3f3f3;
 }
 
+.submissionFeedback span {
+  vertical-align: middle;
+}
+
+.submissionFeedback svg,
+.submissionFeedback span {
+  margin-right: 5px;
+}
+
 @media all and (max-width: 900px) {
   .logo {
     left: calc(900px - 140px);

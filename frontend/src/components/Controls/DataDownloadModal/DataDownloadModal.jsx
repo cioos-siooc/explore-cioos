@@ -9,7 +9,7 @@ export default function DataDownloadModal({ disabled, children, setEmail, setSub
   return (
     <div>
       <Modal
-        contentClassName='dataDownloadModal'
+        dialogClassName='dataDownloadModal'
         show={showModal}
         size='xl'
         centered
@@ -38,6 +38,6 @@ export default function DataDownloadModal({ disabled, children, setEmail, setSub
       >
         Download
       </button>
-    </div>
+    </div >
   )
 }
