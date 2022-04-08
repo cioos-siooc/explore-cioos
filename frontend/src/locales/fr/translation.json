@@ -1,4 +1,21 @@
 {
-    "welcome_to_react": "Beinvenue en React e react-i18next",
-    "test": "french test: {{test}}"
+  "welcome_to_react": "Beinvenue en React e react-i18next",
+  "test": "french test: {{test}}",
+  "stepInfoFilter": "Filtre",
+  "stepInfoSelect": "Trier",
+  "stepInfoInspect": "Inspecter",
+  "stepInfoDownload": "Télécharger",
+  "stepInfoFilterText": "Par défaut, l'explorateur de données affiche tous les ensembles de données disponibles. Utilisez les filtres en haut de l'écran pour affiner vos sélections.",
+  "stepInfoSelectTextA": "Il existe quatre façons de sélectionner des données:",
+  "stepInfoSelectTextB": "Création d'un rectangle à n'importe quel niveau de zoom : Cliquez et maintenez la touche Maj enfoncée tout en faisant glisser le curseur à n'importe quel niveau de zoom ou utilisez l'outil rectangle (icône d'insertion). Avec l'outil sélectionné, cliquez sur la carte pour commencer à dessiner le rectangle. Faites glisser vers le coin opposé et cliquez à nouveau. Notez que vous ne pouvez avoir qu'une seule sélection de rectangle active à la fois.",
+  "stepInfoSelectTextC": "Création d'un polygone à n'importe quel niveau de zoom: pour une forme irrégulière, utilisez l'outil polygone (icône d'insertion). Avec l'outil sélectionné, cliquez sur la carte pour commencer à dessiner le polygone. Lorsque vous avez fini de dessiner la zone de recherche, terminez votre zone de recherche en cliquant à nouveau sur le premier point.",
+  "stepInfoSelectTextD": "Sélection de points au niveau de zoom des points : Au niveau de zoom des points, cliquez pour sélectionner directement.",
+  "stepInfoInspectText": "Après avoir effectué une sélection, un résumé du ou des ensembles de données sélectionnés apparaîtra dans un panneau à gauche. Cliquez sur les en-têtes de tableau pour trier les résultats par ordre alphabétique par titre, type de jeu de données ou numériquement par nombre d'enregistrements et taille estimée. Vous pouvez afficher chaque ensemble de données plus en détail en cliquant sur le bouton fléché à côté de la taille estimée de l'ensemble de données.",
+  "stepInfoDownloadText": "Pour télécharger les données, cliquez sur le lien Télécharger en bas du panneau ou en haut de la page. Cette page permet à l'utilisateur de confirmer l'ordre de ses données en vérifiant les titres des ensembles de données, les enregistrements, la taille du téléchargement et en inspectant les détails de l'ensemble de données. Entrez votre adresse e-mail et validez pour confirmer votre commande. Un e-mail contenant le lien de téléchargement direct sera envoyé sous peu.",
+  "tipInfoFeedback": "Veuillez répondre à notre enquête de satisfaction des utilisateurs! Cela permet d'améliorer cette interface et de trouver des bugs.",
+  "tipInfoReopen": "Cliquez sur le bouton d'informations pour rouvrir ce panneau d'informations.",
+  "CIOOSDataExplorer": "CIOOS Explorateur de Données",
+  "CIOOSQuote": "\"Des Données Océaniques pour Notre Avenir Océanique\"",
+  "CIOOSLogoButtonTitle": "Accéder à la page d'accueil du CIOOS",
+  "introReopenTitle": "Rouvrir l'introduction"
 }
