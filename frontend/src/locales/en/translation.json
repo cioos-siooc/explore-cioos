@@ -61,5 +61,21 @@
   "selectionDetailsNoDataWarning": "No Data. Modify filters or change selection on map.",
   "selectionDetailsProgressBarTitle": "Amount of download size used",
   "selectionDetailsMaxRatio": "of 100MB Max",
-  "selectionDetailsQuestionTooltipText": "Downloads are limited to 100MB."
+  "selectionDetailsQuestionTooltipText": "Downloads are limited to 100MB.",
+  "datasetsTableHeaderSelectAllTitle": "Select all",
+  "datasetsTableHeaderTitleTitle": "Sort by dataset title",
+  "datasetsTableHeaderTitleText": "Title",
+  "datasetsTableHeaderTypeTitle": "Sort by dataset type",
+  "datasetsTableHeaderTypeText": "Type",
+  "datasetsTableHeaderRecordsTitle": "Sort by number of records in dataset",
+  "datasetsTableHeaderRecordsText": "Records",
+  "datasetsTableHeaderSizeTitle": "Sort by approximate dataset size in megabytes",
+  "datasetsTableHeaderSizeText": "Size",
+  "datasetsTableHeaderDetailsTitle": "Open dataset details",
+  "datasetsTableHeaderDetailsText": "Details",
+  "datasetsTableSelectTitle": "Select dataset for download",
+  "datasetsTableTypeTitle": "Dataset type",
+  "datasetsTableRecordsTitle": "Number of records in dataset",
+  "datasetsTableSizeTitle": "Approximate dataset size in megabytes",
+  "datasetsTableDetailsTitle": "Open dataset details"
 }
