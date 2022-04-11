@@ -57,5 +57,9 @@
   "timeSelectorEndDate": "End Date: ",
   "selectionPanelHandleTitleClose": "Close",
   "selectionPanelHandleTitleOpen": "Open",
-  "selectionPanelHandleTitleText": "selection panel"
+  "selectionPanelHandleTitleText": "selection panel",
+  "selectionDetailsNoDataWarning": "No Data. Modify filters or change selection on map.",
+  "selectionDetailsProgressBarTitle": "Amount of download size used",
+  "selectionDetailsMaxRatio": "of 100MB Max",
+  "selectionDetailsQuestionTooltipText": "Downloads are limited to 100MB."
 }
