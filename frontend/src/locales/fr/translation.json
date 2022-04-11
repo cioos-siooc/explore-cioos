@@ -60,5 +60,22 @@
   "selectionPanelHandleTitleText": "panneau de sélection",
   "selectionDetailsNoDataWarning": "Pas de données. Modifier les filtres ou changer la sélection sur la carte.",
   "selectionDetailsMaxRatio": "sur 100MB Max",
-  "selectionDetailsQuestionTooltipText": "Les téléchargements sont limités à 100MB."
+  "selectionDetailsProgressBarTitle": "Quantité de taille de téléchargement utilisée",
+  "selectionDetailsQuestionTooltipText": "Les téléchargements sont limités à 100MB.",
+  "datasetsTableHeaderSelectAllTitle": "Tout sélectionner",
+  "datasetsTableHeaderTitleTitle": "Trier par titre de jeu de données",
+  "datasetsTableHeaderTitleText": "Titre",
+  "datasetsTableHeaderTypeTitle": "Trier par type de jeu de données",
+  "datasetsTableHeaderTypeText": "Genre",
+  "datasetsTableHeaderRecordsTitle": "Trier par nombre d'enregistrements dans l'ensemble de données",
+  "datasetsTableHeaderRecordsText": "Archives",
+  "datasetsTableHeaderSizeTitle": "Trier par taille approximative de jeu de données en mégaoctets",
+  "datasetsTableHeaderSizeText": "Taille",
+  "datasetsTableHeaderDetailsTitle": "Ouvrir les détails de l'ensemble de données",
+  "datasetsTableHeaderDetailsText": "Détails",
+  "datasetsTableSelectTitle": "Sélectionnez le jeu de données à télécharger",
+  "datasetsTableTypeTitle": "Type d'ensemble de données",
+  "datasetsTableRecordsTitle": "Nombre d'enregistrements dans l'ensemble de données",
+  "datasetsTableSizeTitle": "Taille approximative de l'ensemble de données en mégaoctets",
+  "datasetsTableDetailsTitle": "Ouvrir les détails de l'ensemble de données"
 }
