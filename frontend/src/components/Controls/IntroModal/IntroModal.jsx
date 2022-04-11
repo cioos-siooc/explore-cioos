@@ -1,5 +1,4 @@
 import * as React from 'react'
-import { useEffect } from 'react'
 import { useState } from 'react'
 import { Container, Modal, Col, Row } from 'react-bootstrap'
 import { InfoSquare } from 'react-bootstrap-icons'
@@ -102,7 +101,7 @@ export default function IntroModal({ intialOpenState }) {
         )
     }
   }
-  const test = 3
+
   return (
     <div>
       <Modal
