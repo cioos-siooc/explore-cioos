@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/react"
 import { Integrations } from "@sentry/tracing"
 import { Row, Col, Spinner } from 'react-bootstrap'
 import { ChatDots, CheckCircle, XCircle } from 'react-bootstrap-icons'
+import { useTranslation } from 'react-i18next'
 
 import Controls from "./Controls/Controls.jsx"
 import Map from "./Map/Map.js"
@@ -37,6 +38,7 @@ if (process.env.NODE_ENV === "production") {
 }
 
 export default function App() {
+  const { t } = useTranslation()
   const [pointsToDownload, setPointsToDownload] = useState()
   const [pointsToReview, setPointsToReview] = useState()
   const [polygon, setPolygon] = useState()
@@ -105,7 +107,7 @@ export default function App() {
               aria-hidden="true"
             />
           ),
-          text: 'Submitting...'
+          text: t('submissionStateTextSubmitting') //'Submitting...'
         })
         break;
 
@@ -116,7 +118,7 @@ export default function App() {
               className='text-success'
               size={30}
             />),
-          text: 'Request successful. Download link will be sent to: ' + email
+          text: t('submissionStateTextSuccess', email) //Request successful. Download link will be sent to: ' + email
         })
         break;
 
@@ -128,7 +130,7 @@ export default function App() {
               size={30}
             />
           ),
-          text: 'Request failed'
+          text: t('submissionStateTextFailed') //'Request failed'
         })
         break;
 
@@ -206,9 +208,9 @@ export default function App() {
               onClick={() => handleSubmission()}
             >
               {
-                (!_.isEmpty(pointsToDownload) && submissionFeedback && submissionState !== 'submitted' && 'Resubmit Request') ||
-                (_.isEmpty(pointsToDownload) && 'Select Data') ||
-                'Submit Request'
+                (!_.isEmpty(pointsToDownload) && submissionFeedback && submissionState !== 'submitted' && t('submitRequestButtonResubmitText')) ||
+                (_.isEmpty(pointsToDownload) && t('submitRequestButtonSelectDataText')) ||
+                t('submitRequestButtonSubmitText') //'Submit Request'
               }
             </button>
           </Col>
@@ -263,14 +265,14 @@ export default function App() {
           {DownloadButton()}
         </div>
       </Controls>
-      <a title='Go to CIOOS homepage' className='logo' href='https://cioos.ca/' target='_blank' />
+      <a title={t('CIOOSLogoButtonTitle')} className='logo' href='https://cioos.ca/' target='_blank' />
       {currentRangeLevel && <Legend currentRangeLevel={currentRangeLevel} />}
-      <button className='boxQueryButton' id='boxQueryButton' title='Rectangle tool'><div className='rectangleIcon' /></button>
-      <a className='feedbackButton' title='Please provide feedback on your experience using CIOOS Data Explorer!' href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit' target='_blank'>
+      <button className='boxQueryButton' id='boxQueryButton' title={t('rectangleToolTitle')}><div className='rectangleIcon' /></button>
+      <a className='feedbackButton' title={t('feedbackButtonTitle')} href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit' target='_blank'>
         <ChatDots size='30px' />
       </a>
-      <IntroModal intialOpenState={true} />
+      <IntroModal intialOpenState={false} />
       <LanguageSelector />
-    </div>
+    </div >
   );
 }

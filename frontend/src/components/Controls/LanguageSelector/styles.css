@@ -1,7 +1,7 @@
 .languageSelector {
   position: absolute;
   bottom: 10px;
-  left: 10px;
+  right: 60px;
   pointer-events: all;
   z-index: 3;
 }
@@ -14,7 +14,7 @@
   width: 24px;
   height: 24px;
   padding: 0px;
-} 
+}
 
 .languageSelector button:hover {
   background-color: #f3f3f3;
@@ -38,5 +38,5 @@
 }
 
 .languageSelector .dropdown-toggle::after {
-  display: none !important; 
+  display: none !important;
 }

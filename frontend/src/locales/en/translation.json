@@ -17,5 +17,13 @@
   "CIOOSDataExplorer": "CIOOS Data Explorer",
   "CIOOSQuote": "\"Ocean Data For Our Ocean Future\"",
   "CIOOSLogoButtonTitle": "Go to the CIOOS homepage",
-  "introReopenTitle": "Re-open introduction"
+  "introReopenTitle": "Re-open introduction",
+  "submissionStateTextSubmitting": "Submitting...",
+  "submissionStateTextSuccess": "Request successful. Download link will be sent to: {{email}}",
+  "submissionStateTextFailed": "Request failed",
+  "submitRequestButtonSubmitText": "Submit Request",
+  "submitRequestButtonSelectDataText": "Select Data",
+  "submitRequestButtonResubmitText": "Resubmit Request",
+  "rectangleToolTitle": "Rectangle tool",
+  "feedbackButtonTitle": "Please provide feedback on your experience using CIOOS Data Explorer"
 }
