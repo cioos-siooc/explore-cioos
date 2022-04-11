@@ -90,5 +90,8 @@
   "datasetInspectorTimeframeText": "Timeframe",
   "datasetInspectorDepthRangeText": "Depth Range",
   "datasetInspectorDepthTooLargeWarningText": "too big",
-  "datasetInspectorRecordsShownText": "records shown..."
+  "datasetInspectorRecordsShownText": "records shown...",
+  "downloadModalTitleText": "Download Data from CIOOS Data Explorer",
+  "downloadModalButtonTitle": "Download selected data",
+  "downloadModalButtonText": "Download"
 }
