@@ -4,9 +4,9 @@
 }
 
 .date span {
-  width: 100px;
+  min-width: 100px;
 }
 
 .date input {
-  width: 150px;
+  min-width: 150px;
 }

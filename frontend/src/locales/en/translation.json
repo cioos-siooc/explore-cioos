@@ -52,5 +52,7 @@
   "depthFilterEndDepth": "End Depth (m)",
   "depthFilterInvalidWarning": "Depth filter not applied, invalid values.",
   "heirarchicalMultiCheckboxFilterNoFilterWarning": "No filter options",
-  "multiCheckboxFilterNoFilterWarning": "No filter options"
+  "multiCheckboxFilterNoFilterWarning": "No filter options",
+  "timeSelectorStartDate": "Start Date: ",
+  "timeSelectorEndDate": "End Date: "
 }
