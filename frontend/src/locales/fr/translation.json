@@ -57,5 +57,8 @@
   "timeSelectorEndDate": "Date de fin: ",
   "selectionPanelHandleTitleClose": "Fermer",
   "selectionPanelHandleTitleOpen": "Ouvrir",
-  "selectionPanelHandleTitleText": "panneau de sélection"
+  "selectionPanelHandleTitleText": "panneau de sélection",
+  "selectionDetailsNoDataWarning": "Pas de données. Modifier les filtres ou changer la sélection sur la carte.",
+  "selectionDetailsMaxRatio": "sur 100MB Max",
+  "selectionDetailsQuestionTooltipText": "Les téléchargements sont limités à 100MB."
 }
