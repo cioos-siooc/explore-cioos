@@ -41,5 +41,9 @@
   "datasetFilterTooltip": "Filter data by dataset name. Selection works as logical OR operation.",
   "datasetSearchPlaceholder": "Search for dataset name...",
   "timeframeFilterTooltip": "Filter data by timeframe. Selection works as inclusive range.",
-  "depthrangeFilterTooltip": "Filter data by depth. Selection works as inclusive range."
+  "depthrangeFilterTooltip": "Filter data by depth. Selection works as inclusive range.",
+  "filterClearSearchTitle": "Clear search terms",
+  "selectAllButtonText": "Select All",
+  "resetButtonText": "Reset",
+  "closeButtonText": "Close"
 }

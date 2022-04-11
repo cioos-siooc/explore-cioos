@@ -3,6 +3,7 @@ import { useRef } from 'react'
 import * as _ from 'lodash'
 import { useState, useEffect } from 'react'
 import { ChevronCompactDown, ChevronCompactUp, X } from 'react-bootstrap-icons'
+import { useTranslation } from 'react-i18next'
 
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
 import { abbreviateString, useOutsideAlerter } from '../../../utilities'
@@ -10,6 +11,8 @@ import { abbreviateString, useOutsideAlerter } from '../../../utilities'
 import './styles.css'
 
 export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected, tooltip, icon, controlled, openFilter, setOpenFilter, filterName, searchable, searchTerms, setSearchTerms, searchPlaceholder, children }) {
+  const { t } = useTranslation()
+
   // Open/Closed state for filter dropdown
   const [filterOpen, setFilterOpen] = useState(controlled ? openFilter : false)
   const wrapperRef = useRef(null);
@@ -57,20 +60,37 @@ export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected
           <div className='filterOptions'>
             {searchable && (
               <div>
-                <input autoFocus className='filterSearch' type='text' value={searchTerms} onChange={(e) => setSearchTerms(e.target.value)} placeholder={searchPlaceholder} />
-                {searchTerms && <X size='25px' color='darkgrey' className='clearFilter' onClick={() => setSearchTerms('')} title='Clear search terms' />}
+                <input
+                  autoFocus
+                  className='filterSearch'
+                  type='text'
+                  value={searchTerms}
+                  onChange={(e) => setSearchTerms(e.target.value)}
+                  placeholder={searchPlaceholder}
+                />
+                {searchTerms &&
+                  <X
+                    size='25px'
+                    color='darkgrey'
+                    className='clearFilter'
+                    onClick={() => setSearchTerms('')}
+                    title={t('filterClearSearchTitle')} //'Clear search terms' 
+                  />}
               </div>
             )
             }
             {children}
             <button onClick={() => selectAll()}>
-              Select All
+              {t('selectAllButtonText')}
+              {/* Select All */}
             </button>
             <button onClick={() => resetDefaults()}>
-              Reset
+              {t('resetButtonText')}
+              {/* Reset */}
             </button>
             <button onClick={() => setFilterOpen(false)}>
-              Close
+              {t('closeButtonText')}
+              {/* Close */}
             </button>
           </div>
         }
