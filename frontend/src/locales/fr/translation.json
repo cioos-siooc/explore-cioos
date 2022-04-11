@@ -41,5 +41,9 @@
   "datasetFilterTooltip": "Filtrer les données par nom de jeu de données. La sélection fonctionne comme une opération OU logique.",
   "datasetSearchPlaceholder": "Rechercher le nom de l'ensemble de données...",
   "timeframeFilterTooltip": "Filtrer les données par période. La sélection fonctionne comme une plage inclusive.",
-  "depthrangeFilterTooltip": "Filtrer les données par profondeur. La sélection fonctionne comme une plage inclusive."
+  "depthrangeFilterTooltip": "Filtrer les données par profondeur. La sélection fonctionne comme une plage inclusive.",
+  "filterClearSearchTitle": "Effacer les termes de recherche",
+  "selectAllButtonText": "Tout sélectionner",
+  "resetButtonText": "Réinitialiser",
+  "closeButtonText": "Fermer"
 }
