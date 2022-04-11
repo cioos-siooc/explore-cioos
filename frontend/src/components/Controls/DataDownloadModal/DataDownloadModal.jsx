@@ -1,10 +1,12 @@
 import * as React from 'react'
 import { useState } from 'react'
 import { Modal } from 'react-bootstrap'
+import { useTranslation } from 'react-i18next'
 
 import './styles.css'
 
 export default function DataDownloadModal({ disabled, children, setEmail, setSubmissionState }) {
+  const { t } = useTranslation()
   const [showModal, setShowModal] = useState(false)
   return (
     <div>
@@ -23,7 +25,8 @@ export default function DataDownloadModal({ disabled, children, setEmail, setSub
       >
         <Modal.Header closeButton>
           <Modal.Title id='contained-modal-title-vcenter'>
-            Download Data from CIOOS Data Explorer
+            {t('downloadModalTitleText')}
+            {/* Download Data from CIOOS Data Explorer */}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -34,9 +37,10 @@ export default function DataDownloadModal({ disabled, children, setEmail, setSub
         className='downloadButton'
         onClick={() => setShowModal(true)}
         disabled={disabled}
-        title='Download selected data'
+        title={t('downloadModalButtonTitle')} //'Download selected data'
       >
-        Download
+        {t('downloadModalButtonText')}
+        {/* Download */}
       </button>
     </div >
   )
