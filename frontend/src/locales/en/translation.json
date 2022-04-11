@@ -54,5 +54,8 @@
   "heirarchicalMultiCheckboxFilterNoFilterWarning": "No filter options",
   "multiCheckboxFilterNoFilterWarning": "No filter options",
   "timeSelectorStartDate": "Start Date: ",
-  "timeSelectorEndDate": "End Date: "
+  "timeSelectorEndDate": "End Date: ",
+  "selectionPanelHandleTitleClose": "Close",
+  "selectionPanelHandleTitleOpen": "Open",
+  "selectionPanelHandleTitleText": "selection panel"
 }
