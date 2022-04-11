@@ -45,5 +45,10 @@
   "filterClearSearchTitle": "Effacer les termes de recherche",
   "selectAllButtonText": "Tout sélectionner",
   "resetButtonText": "Réinitialiser",
-  "closeButtonText": "Fermer"
+  "closeButtonText": "Fermer",
+  "depthFilterStartInvalidTitle": "La profondeur de départ doit être inférieure à la profondeur de fin et comprise entre 0 et 12000m.",
+  "depthFilterStartDepth": "Profondeur de départ (m):",
+  "depthFilterEndInvalidTitle": "La profondeur de fin doit être supérieure à la profondeur de départ et comprise entre 0 et 12000m",
+  "depthFilterEndDepth": "Profondeur finale (m)",
+  "depthFilterInvalidWarning": "Filtre de profondeur non appliqué, valeurs invalides."
 }

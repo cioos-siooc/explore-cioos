@@ -45,5 +45,10 @@
   "filterClearSearchTitle": "Clear search terms",
   "selectAllButtonText": "Select All",
   "resetButtonText": "Reset",
-  "closeButtonText": "Close"
+  "closeButtonText": "Close",
+  "depthFilterStartInvalidTitle": "Start depth must be less than end depth, and be 0 to 12000m.",
+  "depthFilterStartDepth": "Start Depth (m):",
+  "depthFilterEndInvalidTitle": "End depth must be more than start depth, and be 0 to 12000m",
+  "depthFilterEndDepth": "End Depth (m)",
+  "depthFilterInvalidWarning": "Depth filter not applied, invalid values."
 }
