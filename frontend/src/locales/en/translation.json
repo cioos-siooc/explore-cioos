@@ -25,5 +25,21 @@
   "submitRequestButtonSelectDataText": "Select Data",
   "submitRequestButtonResubmitText": "Resubmit Request",
   "rectangleToolTitle": "Rectangle tool",
-  "feedbackButtonTitle": "Please provide feedback on your experience using CIOOS Data Explorer"
+  "feedbackButtonTitle": "Please provide feedback on your experience using CIOOS Data Explorer",
+  "oceanVariablesFiltername": "Ocean Variables",
+  "oceanVariablesMulit": " variables",
+  "organizationFilterName": "Organizations",
+  "organizationMulti": " organizations",
+  "datasetsFilterName": "Datasets",
+  "datasetsMulti": " datasets",
+  "timeframeFilterName": "Timeframe",
+  "depthRangeFilterName": "Depth Range (m)",
+  "oceanVariableFilterTooltip": "Filter data by ocean variable name. Selection works as logical OR operation.",
+  "oceanVariableFilterSeachPlaceholder": "Search for ocean variable name...",
+  "organizationFilterTooltip": "Filter data by responsible organisation name. Selection works as logical OR operation.",
+  "organizationFilterSearchPlaceholder": "Search for organization name...",
+  "datasetFilterTooltip": "Filter data by dataset name. Selection works as logical OR operation.",
+  "datasetSearchPlaceholder": "Search for dataset name...",
+  "timeframeFilterTooltip": "Filter data by timeframe. Selection works as inclusive range.",
+  "depthrangeFilterTooltip": "Filter data by depth. Selection works as inclusive range."
 }
