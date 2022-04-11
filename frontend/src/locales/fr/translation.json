@@ -25,5 +25,21 @@
   "submitRequestButtonSelectDataText": "Sélectionnez les données",
   "submitRequestButtonResubmitText": "Resoumettre la demande",
   "rectangleToolTitle": "Outil Rectangle",
-  "feedbackButtonTitle": "Veuillez fournir des commentaires sur votre expérience d'utilisation de CIOOS Data Explorer"
+  "feedbackButtonTitle": "Veuillez fournir des commentaires sur votre expérience d'utilisation de CIOOS Data Explorer",
+  "oceanVariablesFiltername": "Variables océaniques",
+  "oceanVariablesMulit": " variables",
+  "organizationFilterName": "Organisations",
+  "organizationMulti": " organisations",
+  "datasetsFilterName": "Ensembles de données",
+  "datasetsMulti": " ensembles de données",
+  "timeframeFilterName": "Intervalle de temps",
+  "depthRangeFilterName": "Plage de profondeur (m)",
+  "oceanVariableFilterTooltip": "Filtrer les données par nom de variable océanique. La sélection fonctionne comme une opération OU logique.",
+  "oceanVariableFilterSeachPlaceholder": "Rechercher le nom de la variable océanique...",
+  "organizationFilterTooltip": "Filtrer les données par nom d'organisation responsable. La sélection fonctionne comme une opération OU logique.",
+  "organizationFilterSearchPlaceholder": "Rechercher le nom de l'organisation...",
+  "datasetFilterTooltip": "Filtrer les données par nom de jeu de données. La sélection fonctionne comme une opération OU logique.",
+  "datasetSearchPlaceholder": "Rechercher le nom de l'ensemble de données...",
+  "timeframeFilterTooltip": "Filtrer les données par période. La sélection fonctionne comme une plage inclusive.",
+  "depthrangeFilterTooltip": "Filtrer les données par profondeur. La sélection fonctionne comme une plage inclusive."
 }
