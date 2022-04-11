@@ -50,5 +50,6 @@
   "depthFilterStartDepth": "Start Depth (m):",
   "depthFilterEndInvalidTitle": "End depth must be more than start depth, and be 0 to 12000m",
   "depthFilterEndDepth": "End Depth (m)",
-  "depthFilterInvalidWarning": "Depth filter not applied, invalid values."
+  "depthFilterInvalidWarning": "Depth filter not applied, invalid values.",
+  "heirarchicalMultiCheckboxFilterNoFilterWarning": "No filter options"
 }
