@@ -77,5 +77,18 @@
   "datasetsTableTypeTitle": "Dataset type",
   "datasetsTableRecordsTitle": "Number of records in dataset",
   "datasetsTableSizeTitle": "Approximate dataset size in megabytes",
-  "datasetsTableDetailsTitle": "Open dataset details"
+  "datasetsTableDetailsTitle": "Open dataset details",
+  "datasetInspectorBackButtonTitle": "Return to dataset list",
+  "datasetInspectorBackButtonText": "Back",
+  "datasetInspectorTitleText": "Title",
+  "datasetInspectorURLText": "Dataset URLs",
+  "datasetInspectorOrganizationText": "Organizations",
+  "datasetInspectorOceanVariablesText": "Ocean Variables",
+  "datasetInspectorRecordsText": "Records",
+  "datasetInspectorRecordsOverflowText": " records total, 1000 shown",
+  "datasetInspectorRecordIDText": "Record ID",
+  "datasetInspectorTimeframeText": "Timeframe",
+  "datasetInspectorDepthRangeText": "Depth Range",
+  "datasetInspectorDepthTooLargeWarningText": "too big",
+  "datasetInspectorRecordsShownText": "records shown..."
 }

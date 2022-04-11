@@ -77,5 +77,18 @@
   "datasetsTableTypeTitle": "Type d'ensemble de données",
   "datasetsTableRecordsTitle": "Nombre d'enregistrements dans l'ensemble de données",
   "datasetsTableSizeTitle": "Taille approximative de l'ensemble de données en mégaoctets",
-  "datasetsTableDetailsTitle": "Ouvrir les détails de l'ensemble de données"
+  "datasetsTableDetailsTitle": "Ouvrir les détails de l'ensemble de données",
+  "datasetInspectorBackButtonTitle": "Retour à la liste des ensembles de données",
+  "datasetInspectorBackButtonText": "Verso",
+  "datasetInspectorTitleText": "Titre",
+  "datasetInspectorURLText": "URL des ensembles de données",
+  "datasetInspectorOrganizationText": "Organisations",
+  "datasetInspectorOceanVariablesText": "Variables océaniques",
+  "datasetInspectorRecordsText": "Actes",
+  "datasetInspectorRecordsOverflowText": " enregistrements au total, 1000 affichés",
+  "datasetInspectorRecordIDText": "ID d'enregistrement",
+  "datasetInspectorTimeframeText": "Intervalle de temps",
+  "datasetInspectorDepthRangeText": "Plage de profondeur",
+  "datasetInspectorDepthTooLargeWarningText": "trop grand",
+  "datasetInspectorRecordsShownText": " enregistrements affichés..."
 }
