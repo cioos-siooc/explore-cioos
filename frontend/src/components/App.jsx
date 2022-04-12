@@ -38,7 +38,7 @@ if (process.env.NODE_ENV === "production") {
 }
 
 export default function App() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [pointsToDownload, setPointsToDownload] = useState()
   const [pointsToReview, setPointsToReview] = useState()
   const [polygon, setPolygon] = useState()
@@ -265,10 +265,32 @@ export default function App() {
           {DownloadButton()}
         </div>
       </Controls>
-      <a title={t('CIOOSLogoButtonTitle')} className='logo' href='https://cioos.ca/' target='_blank' />
+      {i18n.language === 'en' ?
+        <a
+          title={t('CIOOSLogoButtonTitle')}
+          className='logo english'
+          href='https://cioos.ca/'
+          target='_blank'
+        /> :
+        <a
+          title={t('CIOOSLogoButtonTitle')}
+          className='logo french'
+          href='https://cioos.ca/'
+          target='_blank'
+        />
+      }
       {currentRangeLevel && <Legend currentRangeLevel={currentRangeLevel} />}
-      <button className='boxQueryButton' id='boxQueryButton' title={t('rectangleToolTitle')}><div className='rectangleIcon' /></button>
-      <a className='feedbackButton' title={t('feedbackButtonTitle')} href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit' target='_blank'>
+      <button
+        className='boxQueryButton'
+        id='boxQueryButton'
+        title={t('rectangleToolTitle')}>
+        <div className='rectangleIcon' />
+      </button>
+      <a
+        className='feedbackButton'
+        title={t('feedbackButtonTitle')}
+        href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit'
+        target='_blank'>
         <ChatDots size='30px' />
       </a>
       <IntroModal intialOpenState={false} />

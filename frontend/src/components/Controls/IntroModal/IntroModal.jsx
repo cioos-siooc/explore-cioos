@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import './styles.css'
 
 export default function IntroModal({ intialOpenState }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [showModal, setShowModal] = useState(intialOpenState)
   const [hoveredStep, setHoveredStep] = useState()
   // Potential idea for cut through transparency to highligh controls: https://ishadeed.com/article/thinking-about-the-cut-out-effect/
@@ -116,14 +116,28 @@ export default function IntroModal({ intialOpenState }) {
         <Modal.Header closeButton>
           <Modal.Title className='modalHeader' id='contained-modal-title-vcenter'>
             <span>
-              {t('CIOOSDataExplorer')}
+              {t('CIOOSDataExplorer') + ' '}
               {/* CIOOS Data Explorer */}
             </span>
             <span className='tagLine'>
               {t('CIOOSQuote')}
               {/* "Ocean Data For Our Ocean Future" */}
             </span>
-            <a title={t('CIOOSLogoButtonTitle')} className='introLogo' href='https://cioos.ca/' target='_blank' />
+            {i18n.language === 'en' ?
+              <a
+                title={t('CIOOSLogoButtonTitle')}
+                className='introLogo english'
+                href='https://cioos.ca/'
+                target='_blank'
+              />
+              :
+              <a
+                title={t('CIOOSLogoButtonTitle')}
+                className='introLogo french'
+                href='https://cioos.ca/'
+                target='_blank'
+              />
+            }
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
