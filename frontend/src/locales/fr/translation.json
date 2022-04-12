@@ -101,5 +101,7 @@
   "downloadDetailsDownloadDataBoldText": "Télécharger les données ",
   "downloadDetailsDownloadDataStepsText": "1) Finaliser les sélections de jeux de données, 2) Assurez-vous que les sélections ne dépassent pas la limite de 100MB, 3) Indiquez une adresse e-mail pour recevoir le lien de téléchargement, et, 4) Envoyez la demande de téléchargement. Les filtres appliqués dans l'explorateur de données SIOOC s'appliquent également aux téléchargements d'ensembles de données.",
   "downloadDetailsProgressTitle": "Quantité de taille de téléchargement utilisée",
-  "downloadDetailsProgressTooltipText": "Les téléchargements sont limités à 100MB"
+  "downloadDetailsProgressTooltipText": "Les téléchargements sont limités à 100MB",
+  "mapPointHoverTooltip": " enregistrements. Cliquer pour les détails",
+  "mapHexHoverTooltip": " enregistrements. Cliquez pour zoomer"
 }
