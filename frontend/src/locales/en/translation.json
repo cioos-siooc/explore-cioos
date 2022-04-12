@@ -101,5 +101,7 @@
   "downloadDetailsDownloadDataBoldText": "Download Data ",
   "downloadDetailsDownloadDataStepsText": "1) Finalize dataset selections, 2) Ensure selections are within the 100MB limit, 3) Provide an email address to receive the download link, and, 4) Submit the download request. Filters applied in the CIOOS Data Explorer also apply to dataset downloads.",
   "downloadDetailsProgressTitle": "Amount of download size used",
-  "downloadDetailsProgressTooltipText": "Downloads are limited to 100MB"
+  "downloadDetailsProgressTooltipText": "Downloads are limited to 100MB",
+  "mapPointHoverTooltip": " records. Click for details",
+  "mapHexHoverTooltip": " records. Click to zoom"
 }
