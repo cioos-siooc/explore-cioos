@@ -1,11 +1,17 @@
 import * as React from 'react'
 import { Spinner } from 'react-bootstrap'
+import { useTranslation } from 'react-i18next'
 import './styles.css'
 
 export default function Loading() {
+  const { i18n } = useTranslation()
+
   return (
     <div className='loading'>
-      <a className='spinnerLogo' />
+      {i18n.language === 'en' ?
+        <a className={'spinnerLogo englishLogo'} /> :
+        <a className={'spinnerLogo frenchLogo'} />
+      }
       <Spinner
         className='spinner'
         as="span"
