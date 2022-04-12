@@ -21,7 +21,7 @@
   padding: 0px 160px 0px 0px;
 }
 
-.introLogo {
+.introLogo.english {
   width: 130px;
   height: 40px;
   border: 2px solid transparent;
@@ -29,7 +29,24 @@
   position: absolute;
   top: 10px;
   right: 10px;
-  background-image: url(../../Images/NationalLogo.png);
+  background-image: url(../../Images/NationalLogoEnglish.png);
+  background-color: #fff;
+  background-repeat: no-repeat;
+  background-size: contain;
+  border-radius: 10px;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  margin: 5px 40px auto auto;
+}
+
+.introLogo.french {
+  width: 130px;
+  height: 40px;
+  border: 2px solid transparent;
+  pointer-events: all;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-image: url(../../Images/NationalLogoFrench.png);
   background-color: #fff;
   background-repeat: no-repeat;
   background-size: contain;
