@@ -93,5 +93,9 @@
   "datasetInspectorRecordsShownText": "records shown...",
   "downloadModalTitleText": "Download Data from CIOOS Data Explorer",
   "downloadModalButtonTitle": "Download selected data",
-  "downloadModalButtonText": "Download"
+  "downloadModalButtonText": "Download",
+  "legendTitleText": "record",
+  "legendTitleTextPlural": "records",
+  "legendNoDataWarningTitle": "Choose less restrictive filters to see data",
+  "legendNoDataWarningText": "No Data"
 }

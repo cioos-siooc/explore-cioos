@@ -93,5 +93,9 @@
   "datasetInspectorRecordsShownText": " enregistrements affichés...",
   "downloadModalTitleText": "Télécharger des données à partir de l'explorateur de données CIOOS",
   "downloadModalButtonTitle": "Télécharger les données sélectionnées",
-  "downloadModalButtonText": "Télécharger"
+  "downloadModalButtonText": "Télécharger",
+  "legendTitleText": "enregistrement",
+  "legendTitleTextPlural": "enregistrements",
+  "legendNoDataWarningTitle": "Choisissez des filtres moins restrictifs pour voir les données",
+  "legendNoDataWarningText": "Pas de données"
 }
