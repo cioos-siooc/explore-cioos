@@ -1,9 +1,15 @@
 .languageSelector {
   position: absolute;
-  bottom: 10px;
-  right: 60px;
+  top: 110px;
+  right: 10px;
   pointer-events: all;
   z-index: 3;
+}
+
+@media (max-width: 900px) {
+  .languageSelector {
+    left: 865px;
+  }
 }
 
 .languageSelector button {
