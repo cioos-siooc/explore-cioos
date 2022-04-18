@@ -13,7 +13,7 @@ export default function LanguageSelector() {
   return (
     <div className='languageSelector'>
       <Dropdown
-        drop='up'
+        drop='left'
       >
         <Dropdown.Toggle >
           {selectedLanguage.toLocaleUpperCase()}
