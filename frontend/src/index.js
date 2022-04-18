@@ -7,6 +7,7 @@ import i18n from "i18next"
 import { initReactI18next } from "react-i18next"
 import LanguageDetector from 'i18next-browser-languagedetector'
 import HttpApi from 'i18next-http-backend'
+import Loading from './components/Controls/Loading/Loading.jsx'
 
 import App from './components/App.jsx'
 
@@ -35,7 +36,7 @@ i18n
 // This is where react reaches into the DOM, finds the <div id="app"> element, and replaces it with the content of ReactD3Viz's render function JSX.
 const domContainer = document.querySelector('#app')
 ReactDOM.render(
-  <Suspense fallback={<div>Loading...</div>}>
+  <Suspense fallback={<Loading />}>
     <App />
   </Suspense>
   , domContainer)
