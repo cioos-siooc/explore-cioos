@@ -3,12 +3,14 @@ import { useState } from 'react'
 import { Dropdown } from 'react-bootstrap'
 import { Check } from 'react-bootstrap-icons'
 import i18next from 'i18next'
+import { useTranslation } from 'react-i18next'
 
 import { languages } from '../../config'
 import './styles.css'
 
 export default function LanguageSelector() {
-  const [selectedLanguage, setSelectedLanguage] = useState('en')
+  const { i18n } = useTranslation()
+  const [selectedLanguage, setSelectedLanguage] = useState(i18n.language || 'en')
 
   return (
     <div className='languageSelector'>
@@ -26,6 +28,10 @@ export default function LanguageSelector() {
                 onClick={() => {
                   setSelectedLanguage(code)
                   i18next.changeLanguage(code)
+                  // change URL lang parameter
+                  let url = new URL(window.location.href)
+                  url.searchParams.set('lang', code)
+                  history.replaceState(null, '', url)
                 }}
                 disabled={selectedLanguage === code}
               >

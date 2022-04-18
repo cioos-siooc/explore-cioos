@@ -33,6 +33,7 @@
     "react-dom": "^16.14.0",
     "react-i18next": "^11.15.6",
     "react-map-gl": "^6.1.19",
+    "react-router-dom": "^6.3.0",
     "svg-inline-loader": "^0.8.2"
   },
   "devDependencies": {
