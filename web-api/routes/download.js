@@ -33,6 +33,7 @@ router.get(
       eovs,
       email,
       polygon,
+      language = "en",
     } = req.query;
 
     const shapeQueryResponse = await getShapeQuery(req.query);
@@ -71,6 +72,7 @@ router.get(
         const jobID = uuidv4().substr(0, 6);
         const downloaderInput = {
           user_query: {
+            language,
             time_min: timeMin,
             time_max: timeMax,
             lat_min: Number.parseFloat(latMin),
@@ -80,10 +82,12 @@ router.get(
             depth_min: Number.parseFloat(depthMin),
             depth_max: Number.parseFloat(depthMax),
             polygon_region: wktPolygon,
-            eovs: eovs ? 
-              eovs.split(",")
-              .map((eov) => eovGrouping[eov])
-              .flat() : Object.values(eovGrouping).flat(),
+            eovs: eovs
+              ? eovs
+                  .split(",")
+                  .map((eov) => eovGrouping[eov])
+                  .flat()
+              : Object.values(eovGrouping).flat(),
             email,
             job_id: jobID,
           },

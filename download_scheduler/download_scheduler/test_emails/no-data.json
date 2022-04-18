@@ -1,0 +1,18 @@
+[
+  {
+    "time_complete": "2022-04-13 19:18:41.287386+00",
+    "download_size": 0,
+    "time_start": "2022-04-13 19:18:38.603681+00",
+    "erddap_report": "{\"erddap_report\": [{\"dataset_id\": \"IOS_CUR_Moorings\", \"download_url_list\": [\"https://data.cioospacific.ca/erddap/tabledap/IOS_CUR_Moorings.csv?profile,latitude,longitude,time,depth,LCEWEL01,LCNSEL01,LRZASP01,LCSAEL01,LCDAEL01&latitude>=5.266010424504344&latitude<=12.382930831579188&longitude>=-133.70117187499915&longitude<=-124.03320312499912\"], \"status\": \"EMPTY\", \"file_size\": 0, \"bytes_downloaded\": 0, \"no_data\": true, \"dataset_limit_hit\": false, \"query_limit_hit\": false, \"erddap_error\": \"Error {\\n    code=404;\\n    message=\\\"Not Found: Your query produced no matching results. (nRows = 0)\\\";\\n}\\n\", \"total_size_so_far\": 0}], \"over_limit\": false, \"total_size\": 0, \"empty_download\": true, \"zip_file_size\": 0}",
+    "downloader_input": "{\"user_query\":{\"lat_min\":null,\"lat_max\":null,\"lon_min\":null,\"lon_max\":null,\"depth_min\":null,\"depth_max\":null,\"polygon_region\":\"POLYGON((-133.70117187499915 5.266010424504344,-124.03320312499912 5.266010424504344,-124.03320312499912 12.382930831579188,-133.70117187499915 12.382930831579188,-133.70117187499915 5.266010424504344))\",\"eovs\":[\"inorganicCarbon\",\"dissolvedOrganicCarbon\",\"subSurfaceCurrents\",\"surfaceCurrents\",\"nutrients\",\"seaSurfaceSalinity\",\"subSurfaceSalinity\",\"seaSurfaceTemperature\",\"subSurfaceTemperature\"],\"email\":\"nobody@example.com\",\"job_id\":\"f186e9\"},\"cache_filtered\":[{\"erddap_url\":\"https://data.cioospacific.ca/erddap\",\"dataset_id\":\"IOS_CUR_Moorings\",\"title\":\"Time series of moored current meter measurements archived in the Institute of Ocean Sciences database, 1965 to present\",\"profile_variable\":null,\"cdm_data_type\":\"TimeSeries\",\"ckan_id\":\"29915a7a-d29a-46e2-88ee-44456d7fb7dc\",\"ckan_url\":\"https://catalogue.cioos.ca/dataset/\"}]}",
+    "time": "2022-04-13 19:18:38.50231+00",
+    "downloader_output": "",
+    "job_id": "f186e9",
+    "pk": 153,
+    "estimate_details": "[{\"pk\":70211,\"dataset_id\":\"IOS_CUR_Moorings\",\"cdm_data_type\":\"TimeSeries\",\"title\":\"Time series of moored current meter measurements archived in the Institute of Ocean Sciences database, 1965 to present\",\"eovs\":[\"currents\"],\"organizations\":[\"Fisheries and Oceans Canada (DFO)\"],\"erddap_url\":\"https://data.cioospacific.ca/erddap\",\"records_count\":214260.8022,\"eov_cols\":\"10\",\"profiles\":[{\"profile_id\":\"n/a-0001\",\"time_min\":\"1997-04-19\",\"time_max\":\"2014-07-01\",\"depth_min\":0,\"depth_max\":0}],\"size\":21426080}]",
+    "estimate_size": 21426080,
+    "email": "nobody@example.com",
+    "status": "no-data",
+    "time_total": "00:00:02.785076"
+  }
+]

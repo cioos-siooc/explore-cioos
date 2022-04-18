@@ -30,7 +30,7 @@ services:
   scheduler:
     build:
       context: .
-      dockerfile: ./scheduler/Dockerfile
+      dockerfile: ./download_scheduler/Dockerfile
     depends_on:
       - db
     env_file:
