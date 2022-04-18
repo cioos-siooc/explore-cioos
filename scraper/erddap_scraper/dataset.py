@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-
+import numpy as np
 import pandas as pd
 import requests
 from erddap_scraper.utils import eov_to_standard_names, intersection, eovs_to_ceda_eovs
@@ -94,6 +94,18 @@ class Dataset(object):
         if str(time_max) == "NaT":
             time_max = datetime.now().isoformat()
         days_in_dataset = (pd.to_datetime(time_max) - pd.to_datetime(time_min)).days
+        
+        # Estimate records count per profile using time_coverage_resolution
+        # For now this is only used with single-profile datasets
+        # TODO use each profile's min/max time and then it can be used for any
+        # dataset using time_coverage_resolution
+        if  len(self.profile_ids) == 1 and 'time_coverage_resolution' in self.globals:
+            print("Using time_coverage_resolution for count")
+            df_profile_ids=self.profile_ids.copy()
+            readings_per_day=np.timedelta64(1, 'D')/pd.Timedelta("PT1S")
+            total_records=readings_per_day*days_in_dataset
+            df_profile_ids['time']=total_records
+            return df_profile_ids
 
         extraplolation_days = 30
         skip_full_count = (
