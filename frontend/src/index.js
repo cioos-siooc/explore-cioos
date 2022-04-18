@@ -2,12 +2,15 @@
 // eslint-disable-next-line no-unused-vars
 import React from 'react'
 import ReactDOM from 'react-dom'
+import { Suspense } from 'react'
 import i18n from "i18next"
 import { initReactI18next } from "react-i18next"
 import LanguageDetector from 'i18next-browser-languagedetector'
-import HttpApi from 'i18next-http-backend';
+import HttpApi from 'i18next-http-backend'
 
 import App from './components/App.jsx'
+
+const urlLanguage = new URL(window.location.href).searchParams.get('lang')
 
 // Tutorial for setting up translations using the i18next npm module (and related npm modules)
 // https://www.youtube.com/watch?v=w04LXKlusCQ
@@ -17,17 +20,22 @@ i18n
   .use(HttpApi)
   .init({
     supportedLngs: ['en', 'fr'],
+    lng: urlLanguage,
     fallbackLng: "en",
     detection: {
-      order: ['cookie', 'htmlTag', 'localStorage', 'path', 'subdomain'],
+      order: ['path', 'cookie', 'htmlTag', 'localStorage'],
       caches: ['cookie']
     },
     backend: {
       loadPath: 'src/locales/{{lng}}/translation.json',
     },
-    react: { useSuspense: false }
+    react: { useSuspense: true }
   })
 
 // This is where react reaches into the DOM, finds the <div id="app"> element, and replaces it with the content of ReactD3Viz's render function JSX.
 const domContainer = document.querySelector('#app')
-ReactDOM.render(<App />, domContainer)
+ReactDOM.render(
+  <Suspense fallback={<div>Loading...</div>}>
+    <App />
+  </Suspense>
+  , domContainer)

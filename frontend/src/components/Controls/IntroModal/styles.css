@@ -169,9 +169,9 @@
   background-image: url(../../Images/infoButton.png);
 }
 
-@media all and (max-height: 465px) {
+@media all and (max-height: 500px) {
   .introButton {
-    top: 123px;
+    top: 157px;
   }
 }
 

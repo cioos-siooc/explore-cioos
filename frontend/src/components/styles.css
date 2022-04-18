@@ -130,8 +130,8 @@ body {
   }
 }
 
-@media all and (max-height: 465px) {
+@media all and (max-height: 500px) {
   .boxQueryButton {
-    top: 173px;
+    top: 210px;
   }
 }
