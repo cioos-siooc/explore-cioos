@@ -11,6 +11,15 @@ from erddap_downloader import downloader_wrapper
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from jinja2 import Environment, PackageLoader, select_autoescape, FileSystemLoader
+import pathlib
+
+this_directory = pathlib.Path(__file__).parent.absolute()
+schema_path = os.path.join(this_directory, "templates")
+
+template_loader = FileSystemLoader(searchpath=schema_path)
+template_env = Environment(loader=template_loader)
+
 # check if docker has set env variables, if not load from .env
 envs = os.environ
 
@@ -66,32 +75,79 @@ def get_a_download_job():
     return row
 
 
-def email_user(email, status, zip_filename):
+def email_user(email, status, zip_filename, downloader_output, language):
     """
     Send the user a success/failed message
     """
 
+    dataset_urls = []
+    if downloader_output:
+        for dataset in downloader_output["erddap_report"]:
+            erddap_metadata_url = (
+                dataset["erddap_url"] + "/info/" + dataset["dataset_id"] + "/index.html"
+            )
+            out = {}
+            out["erddap_metadata_url"] = erddap_metadata_url
+
+            if dataset["ckan_id"]:
+                out["ckan_url"] = (
+                    "https://catalogue.cioos.ca/dataset/" + dataset["ckan_id"]
+                )
+
+            dataset_urls += [out]
+
     download_url = envs["DOWNLOAD_WAF_URL"] + zip_filename
-    messages = {
+
+    email_subject = {
         "completed": {
-            "subject": "Your CDE data query was successful",
-            "body": f"Your CDE download is available at {download_url}",
+            "en": "Your CIOOS Data Explorer query was successful",
+            "fr": "Votre requête dans l'Explorateur de données du CIOOS a réussi",
         },
         "over-limit": {
-            "subject": "Your CDE data query completed but found too much data.",
-            "body": f"Your CDE download is available at {download_url}. It has been cut off to return less data. If needed, please try again with a smaller polygon or fewer filters.",
+            "en": "Your CIOOS Data Explorer data query completed but found too much data.",
+            "fr": "Votre requête de données CIOOS Data Explorer est terminée mais a trouvé trop de données.",
         },
         "no-data": {
-            "subject": "Your CDE data query was successful",
-            "body": f"Your CDE query didn't find any data.  Please try again with a larger polygon or different filters",
+            "en": "Your CIOOS Data Explorer data query failed.",
+            "fr": "La requête de données de l'Explorateur de données CIOOS a échoué.",
         },
         "failed": {
-            "subject": "Your CDE data query failed",
-            "body": f"Your CDE download failed. We are aware of the failed query and are working to resolve it",
+            "en": "Your CIOOS Data Explorer data query failed.",
+            "fr": "La requête de données de l'Explorateur de données CIOOS a échoué.",
         },
     }
 
-    send_email(email, messages[status]["body"], messages[status]["subject"])
+    if status == "over-limit":
+        template_name = "completed"
+    else:
+        template_name = status
+
+    if language == "en":
+        language_list = ["en", "fr"]
+    else:
+        language_list = ["fr", "en"]
+
+    subject = []
+    body = []
+
+    for language_option in language_list:
+        template = template_env.get_template(f"{template_name}-{language_option}.j2")
+
+        body += [
+            template.render(
+                dataset_urls=dataset_urls, download_url=download_url, status=status
+            )
+        ]
+        subject += [email_subject[status][language_option]]
+
+    template = template_env.get_template("footer.j2")
+    footer = template.render()
+
+    language_divider = "\n\n================================\n\n"
+    body_text = language_divider.join(body) + footer
+    subject_text = " / ".join(subject)
+
+    send_email(email, body_text, subject_text)
 
 
 def run_download(row):
@@ -165,7 +221,14 @@ def run_download(row):
             pk,
             update,
         )
-    email_user(email, status, zip_filename)
+
+    email_user(
+        email,
+        status,
+        zip_filename,
+        downloader_output,
+        downloader_input["user_query"]["language"],
+    )
 
 
 def update_download_jobs(pk, row, session=engine):
