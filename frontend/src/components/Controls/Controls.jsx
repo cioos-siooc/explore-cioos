@@ -141,6 +141,7 @@ export default function Controls({ setQuery, children }) {
               filterName={eovsFilterName}
               openFilter={openFilter === eovsFilterName}
               setOpenFilter={setOpenFilter}
+              selectAllButton
             >
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(eovsSearchTerms, eovsSelected)}
@@ -163,6 +164,7 @@ export default function Controls({ setQuery, children }) {
               filterName={orgsFilterName}
               openFilter={openFilter === orgsFilterName}
               setOpenFilter={setOpenFilter}
+              selectAllButton
             >
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(orgsSearchTerms, orgsSelected)}
@@ -185,6 +187,7 @@ export default function Controls({ setQuery, children }) {
               filterName={datasetsFilterName}
               openFilter={openFilter === datasetsFilterName}
               setOpenFilter={setOpenFilter}
+              selectAllButton
             >
               <HeirarchicalMultiCheckboxFilter
                 optionsSelected={createOptionSubset(datasetSearchTerms, datasetsSelected)}
