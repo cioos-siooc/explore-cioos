@@ -19,7 +19,7 @@ import {
 
 // Note: datasets and points are exchangable terminology
 export default function SelectionDetails({ setPointsToReview, query, polygon, organizations, datasets, children }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState([])
   const [inspectDataset, setInspectDataset] = useState()
@@ -51,6 +51,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, or
             setPointsData(data.map(point => {
               return {
                 ...point,
+                title: point.title_translated[i18n.language] || point.title,
                 selected: true
               }
             }))
@@ -60,7 +61,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, or
         }
       })
     }
-  }, [polygon])
+  }, [polygon, i18n.language])
 
   function handleSelectDataset(point) {
     let dataset = pointsData.filter((p) => p.pk === point.pk)[0]
