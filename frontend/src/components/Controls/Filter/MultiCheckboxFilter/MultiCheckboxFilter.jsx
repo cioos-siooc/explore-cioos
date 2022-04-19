@@ -6,7 +6,7 @@ import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
 import './styles.css'
 
 export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions }) {
-  const { t } = useTranslation
+  const { t } = useTranslation()
 
   return (
     <div className='multiCheckboxFilter'>
