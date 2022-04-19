@@ -115,7 +115,6 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
             return (
               <tr key={index}>
                 <td
-                  style={{ wordWrap: 'break-word' }}
                   onClick={() => handleSelectDataset(point)}
                   title={t('datasetsTableSelectTitle')}
                 //'Select dataset for download'
@@ -123,14 +122,14 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                   {point.selected ? <CheckSquare /> : <Square />}
                 </td>
                 <td
-                  style={{ wordWrap: 'break-word' }}
+                  className='datasetsTableTitleCell'
                   title={point.title}
                   onClick={() => setInspectDataset(point)}
                 >
                   {abbreviateString(point.title, 35)}
                 </td>
                 <td
-                  style={{ wordWrap: 'break-word' }}
+                  style={{ wordBreak: point.cdm_data_type === 'TimeSeriesProfile' && 'break-word' }}
                   title={t('datasetsTableTypeTitle')}
                   //'Dataset type'
                   onClick={() => setInspectDataset(point)}
@@ -138,7 +137,6 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                   {point.cdm_data_type}
                 </td>
                 <td
-                  style={{ wordWrap: 'break-word' }}
                   title={t('datasetsTableRecordsTitle')}
                   //'Number of records in dataset'
                   onClick={() => setInspectDataset(point)}
@@ -146,7 +144,6 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                   {toInteger(point.profiles_count)}
                 </td>
                 <td
-                  style={{ wordWrap: 'break-word' }}
                   title={t('datasetsTableSizeTitle')}
                   //'Approximate dataset size in megabytes'
                   onClick={() => setInspectDataset(point)}
@@ -154,7 +151,6 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                   {bytesToMemorySizeString(point.size)}
                 </td>
                 <td
-                  style={{ wordWrap: 'break-word' }}
                   title={t('datasetsTableDetailsTitle')}
                   //'Open dataset details'
                   onClick={() => setInspectDataset(point)}
