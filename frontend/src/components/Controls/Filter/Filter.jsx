@@ -52,7 +52,7 @@ export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected
           }
           {icon}
           <div className='badgeTitle' title={badgeTitle}>
-            {abbreviateString(badgeTitle, 40)}
+            {abbreviateString(badgeTitle, 35)}
           </div>
           {filterOpen ? <ChevronCompactUp /> : <ChevronCompactDown />}
         </div>
