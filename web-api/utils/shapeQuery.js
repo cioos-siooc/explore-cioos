@@ -28,6 +28,7 @@ async function getShapeQuery(query) {
         d.cdm_data_type,
         d.title title,
         json_build_object('en',title,'fr',title_fr) title_translated,
+        json_build_object('en',summary,'fr',summary_fr) summary_translated,
         d.ceda_eovs eovs,
         organizations,
         d.erddap_url || '/tabledap/' || d.dataset_id || '.html' as erddap_url,
