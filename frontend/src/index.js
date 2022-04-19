@@ -34,6 +34,10 @@ i18n
     supportedLngs: ['en', 'fr'],
     lng: urlLanguage,
     fallbackLng: "en",
+    detection: {
+      order: ['path', 'cookie', 'htmlTag', 'localStorage'],
+      caches: ['cookie']
+    },
     react: { useSuspense: true }
   })  
 
