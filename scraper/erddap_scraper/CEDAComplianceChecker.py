@@ -4,7 +4,7 @@ from erddap_scraper.utils import (
     intersection,
     cf_standard_names,
 )
-from erddap_scraper.scrape_erddap import (
+from erddap_scraper.scraper_errors import (
     MISSING_REQUIRED_VARS,
     NO_SUPPORTED_VARIABLES,
     INGEST_FLAG_FALSE,
