@@ -11,7 +11,7 @@ import './styles.css'
 import { bytesToMemorySizeString, getPointsDataSize } from '../../../utilities.js'
 
 // Note: datasets and points are exchangable terminology
-export default function DownloadDetails({ pointsToReview, setPointsToDownload, width, children }) {
+export default function DownloadDetails({ pointsToReview, setPointsToDownload, children }) {
   const { t } = useTranslation()
 
   const [selectAll, setSelectAll] = useState(true)
@@ -74,7 +74,6 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, w
             <DatasetInspector
               dataset={inspectDataset}
               setInspectDataset={setInspectDataset}
-              width={width}
             /> :
             <DatasetsTable
               handleSelectAllDatasets={handleSelectAllDatasets}
@@ -83,7 +82,6 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, w
               selectAll={selectAll}
               setDatasets={setPointsData}
               datasets={pointsData}
-              width={740}
             />
           }
         </Col>

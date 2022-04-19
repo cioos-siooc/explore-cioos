@@ -14,7 +14,7 @@ import DownloadDetails from './Controls/DownloadDetails/DownloadDetails.jsx'
 import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx'
 import Loading from './Controls/Loading/Loading.jsx'
 import LanguageSelector from './Controls/LanguageSelector/LanguageSelector.jsx'
-import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected, languages } from './config.js'
+import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected } from './config.js'
 
 import "bootstrap/dist/css/bootstrap.min.css"
 
@@ -254,7 +254,6 @@ export default function App() {
                 polygon={polygon}
                 organizations={organizations}
                 datasets={datasets}
-                width={550}
               >
                 {DownloadButton()}
               </SelectionDetails>
