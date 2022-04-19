@@ -130,6 +130,13 @@ CREATE TABLE cioos_api.erddap_variables (
     standard_name text
 );
 
+DROP TABLE IF EXISTS cioos_api.skipped_datasets;
+CREATE TABLE cioos_api.skipped_datasets (
+    erddap_url text NOT NULL,
+    dataset_id text NOT NULL,
+    reason_code text NOT NULL
+);
+
 
 DROP TABLE IF EXISTS cioos_api.eov_to_standard_name;
 CREATE TABLE cioos_api.eov_to_standard_name (
