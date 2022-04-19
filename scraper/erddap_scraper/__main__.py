@@ -76,12 +76,9 @@ def main(erddap_urls, csv_only, cache_requests):
     variables = pd.DataFrame()
     skipped_datasets = pd.DataFrame()
 
-    datasets_not_added_total = []
-
-    for [profile, dataset, datasets_not_added, variable, skipped_dataset] in result:
+    for [profile, dataset, variable, skipped_dataset] in result:
         profiles = pd.concat([profiles, profile])
         datasets = pd.concat([datasets, dataset])
-        datasets_not_added_total = datasets_not_added_total + datasets_not_added
         variables = pd.concat([variables, variable])
         skipped_datasets = pd.concat([skipped_datasets, skipped_dataset])
 
@@ -246,7 +243,8 @@ def main(erddap_urls, csv_only, cache_requests):
         print("Wrote to db:", f"{schema}.erddap_variables")
 
     print(
-        f"skipped {len(datasets_not_added_total)} datasets:", datasets_not_added_total
+        f"skipped {len(skipped_datasets)} datasets:",
+        skipped_datasets["dataset_id"].to_list(),
     )
 
 
