@@ -7,10 +7,12 @@ from erddap_scraper.CEDAComplianceChecker import CEDAComplianceChecker
 from erddap_scraper.ERDDAP import ERDDAP
 from erddap_scraper.profiles import get_profiles
 from requests.exceptions import HTTPError
+from erddap_scraper.scrape_erddap import (
+    CDM_DATA_TYPE_UNSUPPORTED,
+    HTTP_ERROR,
+)
 
 # TIMEOUT = 30
-
-CDM_DATA_TYPE_UNSUPPORTED = "CDM_DATA_TYPE_UNSUPPORTED"
 
 
 def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=False):
@@ -103,6 +105,7 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
             dataset_logger.error(
                 f"HTTP ERROR: {response.status_code} {response.reason}"
             )
+            skipped_datasets_reasons += [[erddap.domain, dataset_id, HTTP_ERROR]]
 
         except Exception as e:
             print(traceback.format_exc())

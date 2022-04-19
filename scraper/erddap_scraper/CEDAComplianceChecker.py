@@ -4,11 +4,12 @@ from erddap_scraper.utils import (
     intersection,
     cf_standard_names,
 )
-
-MISSING_REQUIRED_VARS = "MISSING_REQUIRED_VARS"
-NO_SUPPORTED_VARIABLES = "NO_SUPPORTED_VARIABLES"
-INGEST_FLAG_FALSE = "INGEST_FLAG_FALSE"
-DEPTH_AND_ALTITUDE = "DEPTH_AND_ALTITUDE"
+from erddap_scraper.scrape_erddap import (
+    MISSING_REQUIRED_VARS,
+    NO_SUPPORTED_VARIABLES,
+    INGEST_FLAG_FALSE,
+    DEPTH_AND_ALTITUDE,
+)
 
 
 class CEDAComplianceChecker(object):
