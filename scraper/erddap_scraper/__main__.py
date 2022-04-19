@@ -74,19 +74,22 @@ def main(erddap_urls, csv_only, cache_requests):
     profiles = pd.DataFrame()
     datasets = pd.DataFrame()
     variables = pd.DataFrame()
+    skipped_datasets = pd.DataFrame()
 
     datasets_not_added_total = []
 
-    for [profile, dataset, datasets_not_added, variable] in result:
+    for [profile, dataset, datasets_not_added, variable, skipped_dataset] in result:
         profiles = pd.concat([profiles, profile])
         datasets = pd.concat([datasets, dataset])
         datasets_not_added_total = datasets_not_added_total + datasets_not_added
         variables = pd.concat([variables, variable])
+        skipped_datasets = pd.concat([skipped_datasets, skipped_dataset])
 
     uuid_suffix = str(uuid.uuid4())[0:6]
     datasets_file = f"datasets_{uuid_suffix}.csv"
     profiles_file = f"profiles_{uuid_suffix}.csv"
     variables_file = f"variables_{uuid_suffix}.csv"
+    skipped_datasets_file = f"skipped_{uuid_suffix}.csv"
     ckan_file = f"ckan_{uuid_suffix}.csv"
 
     if datasets.empty:
@@ -165,7 +168,15 @@ def main(erddap_urls, csv_only, cache_requests):
         profiles.to_csv(profiles_file, index=False)
         variables.to_csv(variables_file, index=False)
         df_ckan.to_csv(ckan_file, index=False)
-        print("Wrote", datasets_file, profiles_file, variables_file, ckan_file)
+        skipped_datasets.to_csv(skipped_datasets_file, index=False)
+        print(
+            "Wrote",
+            datasets_file,
+            profiles_file,
+            variables_file,
+            ckan_file,
+            skipped_datasets_file,
+        )
     else:
         schema = "cioos_api"
         with engine.begin() as transaction:
@@ -199,6 +210,15 @@ def main(erddap_urls, csv_only, cache_requests):
             print("Writing erddap_variables")
             variables.to_sql(
                 "erddap_variables",
+                con=transaction,
+                if_exists="append",
+                schema=schema,
+                index=False,
+            )
+
+            print("Writing skipped_datasets")
+            variables.to_sql(
+                "skipped_datasets",
                 con=transaction,
                 if_exists="append",
                 schema=schema,

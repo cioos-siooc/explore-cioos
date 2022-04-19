@@ -10,10 +10,13 @@ from requests.exceptions import HTTPError
 
 # TIMEOUT = 30
 
+CDM_DATA_TYPE_UNSUPPORTED = "CDM_DATA_TYPE_UNSUPPORTED"
+
 
 def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=False):
     # """ """
     datasets_not_added = []
+    skipped_datasets_reasons = []
 
     df_profiles_all = pd.DataFrame()
 
@@ -50,9 +53,14 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
 
     unsupported_datasets = df_all_datasets.query(f"not ({cdm_data_type_test})")
     if not unsupported_datasets.empty:
+        unsupported_datasets_list = unsupported_datasets["datasetID"].to_list()
         logger.warn(
-            f"Skipping datasets because cdm_data_type is not {str(cdm_data_types_supported)}: {unsupported_datasets['datasetID'].to_list()}"
+            f"Skipping datasets because cdm_data_type is not {str(cdm_data_types_supported)}: {unsupported_datasets_list}"
         )
+        for dataset_id in unsupported_datasets_list:
+            skipped_datasets_reasons += [
+                [erddap.domain, dataset_id, CDM_DATA_TYPE_UNSUPPORTED]
+            ]
 
     df_all_datasets = df_all_datasets.query(cdm_data_type_test)
 
@@ -66,8 +74,8 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
             logger.info(f"Querying dataset: {dataset_id} {i+1}/{len(df_all_datasets)}")
             dataset = erddap.get_dataset(dataset_id)
             dataset_logger = dataset.logger
-
-            passes_checks = CEDAComplianceChecker(dataset).passes_all_checks()
+            compliance_checker = CEDAComplianceChecker(dataset)
+            passes_checks = compliance_checker.passes_all_checks()
 
             # these are the variables we are pulling max/min values for
             if passes_checks:
@@ -85,7 +93,10 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
                     )
                     dataset_was_added = True
                     dataset_logger.info("complete")
-
+            else:
+                skipped_datasets_reasons += [
+                    [erddap.domain, dataset_id, compliance_checker.failure_reason_code]
+                ]
         except HTTPError as e:
             response = e.response
             # dataset_logger.error(response.text)
@@ -102,7 +113,21 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
     # logger.info(record_count)
     logger.info(f"skipped : {len(datasets_not_added)} datasets: {datasets_not_added}")
 
+    df_skipped_datasets = pd.DataFrame()
+
+    if skipped_datasets_reasons:
+        df_skipped_datasets = pd.DataFrame(
+            skipped_datasets_reasons,
+            columns=["erddap_url", "dataset_id", "reason_code"],
+        )
+
     # using 'result' to return data from each thread
     result.append(
-        [df_profiles_all, df_datasets_all, datasets_not_added, df_variables_all]
+        [
+            df_profiles_all,
+            df_datasets_all,
+            datasets_not_added,
+            df_variables_all,
+            df_skipped_datasets,
+        ]
     )
