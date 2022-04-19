@@ -127,7 +127,7 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                   title={point.title}
                   onClick={() => setInspectDataset(point)}
                 >
-                  {abbreviateString(point.title, 40)}
+                  {abbreviateString(point.title, 35)}
                 </td>
                 <td
                   style={{ wordWrap: 'break-word' }}
