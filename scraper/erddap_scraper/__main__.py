@@ -214,7 +214,7 @@ def main(erddap_urls, csv_only, cache_requests):
             )
 
             print("Writing skipped_datasets")
-            variables.to_sql(
+            skipped_datasets.to_sql(
                 "skipped_datasets",
                 con=transaction,
                 if_exists="append",
