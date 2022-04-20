@@ -67,7 +67,8 @@ def get_a_download_job():
 
     if row:
         pk = row["pk"]
-        print("Starting job:", pk)
+        job_id = row["job_id"]
+        print("Starting job:", pk, job_id)
         update_download_jobs(
             pk, {"status": "downloading", "time_start": "NOW()"}, session
         )
