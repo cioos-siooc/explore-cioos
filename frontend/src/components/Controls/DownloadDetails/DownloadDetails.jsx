@@ -58,12 +58,26 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, c
           <span>
             <b>{t('downloadDetailsDownloadDataBoldText')}</b>
             {/* Download Data */}
-            {t('downloadDetailsDownloadDataStepsText')}
+            {/* {t('downloadDetailsDownloadDataStepsText')} */}
             {/* 1) Finalize dataset selections,
             2) Ensure selections are within the 100MB limit,
             3) Provide an email address to receive the download link, and,
             4) Submit the download request.
             Filters applied in the CIOOS Data Explorer also apply to dataset downloads. */}
+            <ol>
+              <li>
+                {t('downloadDetailsDownloadDataSteps1')}
+              </li>
+              <li>
+                {t('downloadDetailsDownloadDataSteps2')}
+              </li>
+              <li>
+                {t('downloadDetailsDownloadDataSteps3')}
+              </li>
+              <li>
+                {t('downloadDetailsDownloadDataSteps4')}
+              </li>
+            </ol>
           </span>
         </Col>
       </Row>

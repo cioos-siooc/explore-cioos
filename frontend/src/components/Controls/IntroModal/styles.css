@@ -105,6 +105,10 @@
   background-image: url(../../Images/filtersImage.png);
 }
 
+.stepImage.filterStep.fr {
+  background-image: url(../../Images/filtersImage_FR.png);
+}
+
 .stepImage.selectStep {
   background-image: url(../../Images/selectionImage.png);
 }
@@ -113,8 +117,16 @@
   background-image: url(../../Images/inspectImage.png);
 }
 
+.stepImage.inspectStep.fr {
+  background-image: url(../../Images/inspectImage_FR.png);
+}
+
 .stepImage.downloadStep {
   background-image: url(../../Images/downloadImage.png);
+}
+
+.stepImage.downloadStep.fr {
+  background-image: url(../../Images/downloadImage_FR.png);
 }
 
 .stepImage:hover {
