@@ -168,7 +168,7 @@ export default function App() {
   }
 
   function submitRequest() {
-    fetch(`${server}/download?${createDataFilterQueryString(query, organizations, datasets)}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload.map(point => point.pk).join(',')}&email=${email}`).then((response) => {
+    fetch(`${server}/download?${createDataFilterQueryString(query, organizations, datasets)}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload.map(point => point.pk).join(',')}&email=${email}&lang=${i18n.language}`).then((response) => {
       if (response.ok) {
         setSubmissionState('successful')
       } else {
