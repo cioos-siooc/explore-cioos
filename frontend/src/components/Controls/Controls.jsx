@@ -17,7 +17,7 @@ import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndD
 import HeirarchicalMultiCheckboxFilter from './Filter/HeirarchicalMultiCheckboxFilter/HeirarchicalMultiCheckboxFilter.jsx'
 
 export default function Controls({ setQuery, children }) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
 
   // Making changes to context within context consumers (ie. passing mutable state down to children to manipulate)
   //https://stackoverflow.com/questions/41030361/how-to-update-react-context-from-inside-a-child-component

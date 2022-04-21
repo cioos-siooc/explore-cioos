@@ -106,5 +106,10 @@
   "downloadDetailsProgressTitle": "Taille de téléchargement utilisée",
   "downloadDetailsProgressTooltipText": "Les téléchargements sont limités à 100MB",
   "mapPointHoverTooltip": " enregistrements. Cliquer pour les détails",
-  "mapHexHoverTooltip": " enregistrements. Cliquez pour zoomer"
+  "mapHexHoverTooltip": " enregistrements. Cliquez pour zoomer",
+  "mapPolygonToolTitle": "Outil Polygon",
+  "mapDeleteToolTitle": "Effacer",
+  "mapZoomInToolTitle": "Zoom avant",
+  "mapZoomOutToolTitle": "Zoom arrière",
+  "mapCompassToolTitle": "Remettre l'orientation vers le nord"
 }

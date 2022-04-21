@@ -106,5 +106,10 @@
   "downloadDetailsProgressTitle": "Amount of download size used",
   "downloadDetailsProgressTooltipText": "Downloads are limited to 100MB",
   "mapPointHoverTooltip": " records. Click for details",
-  "mapHexHoverTooltip": " records. Click to zoom"
+  "mapHexHoverTooltip": " records. Click to zoom",
+  "mapPolygonToolTitle": "Polygon Tool (p)",
+  "mapDeleteToolTitle": "Delete",
+  "mapZoomInToolTitle": "Zoom In",
+  "mapZoomOutToolTitle": "Zoom Out",
+  "mapCompassToolTitle": "Reset bearing to North"
 }
