@@ -1,12 +1,18 @@
 import logging
 from datetime import datetime
-
+import numpy as np
 import pandas as pd
 import requests
 from erddap_scraper.utils import eov_to_standard_names, intersection, eovs_to_ceda_eovs
 from requests.exceptions import HTTPError
 
-
+def is_valid_duration(duration):
+    try:
+        pd.Timedelta(duration)
+        return True
+    except:
+        return False
+        
 class Dataset(object):
     def __init__(self, erddap_server, id):
         self.id = id
@@ -89,15 +95,30 @@ class Dataset(object):
     # def get_count(self, vars, groupby):
     def get_count(self, vars, groupby, time_min, time_max):
         time_query = ""
+        is_single_profile_dataset = len(self.profile_ids) == 1
         if str(time_min) == "NaT":
             time_min = datetime.now().isoformat()
         if str(time_max) == "NaT":
             time_max = datetime.now().isoformat()
         days_in_dataset = (pd.to_datetime(time_max) - pd.to_datetime(time_min)).days
+        
+        # Estimate records count per profile using time_coverage_resolution
+        # For now this is only used with single-profile datasets
+        # TODO use each profile's min/max time and then it can be used for any
+        # dataset using time_coverage_resolution
+        time_coverage_resolution=self.globals.get('time_coverage_resolution')
+
+        if  is_single_profile_dataset and time_coverage_resolution and is_valid_duration(time_coverage_resolution):
+            print("Using time_coverage_resolution for count")
+            df_profile_ids=self.profile_ids.copy()
+            readings_per_day=np.timedelta64(1, 'D')/pd.Timedelta(time_coverage_resolution)
+            total_records=readings_per_day*days_in_dataset
+            df_profile_ids['time']=total_records
+            return df_profile_ids
 
         extraplolation_days = 30
         skip_full_count = (
-            days_in_dataset >= extraplolation_days and len(self.profile_ids) == 1
+            days_in_dataset >= extraplolation_days and is_single_profile_dataset
         )
 
         if skip_full_count:
