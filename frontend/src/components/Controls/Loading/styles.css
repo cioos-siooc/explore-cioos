@@ -3,7 +3,7 @@
   background-color: lightgray;
   opacity: 50%;
   position: absolute;
-  top:0;
+  top: 0;
   left: 0;
   width: 100%;
   height: 100%;
@@ -17,7 +17,7 @@
   top: 50%;
 }
 
-.spinnerLogo {
+.spinnerLogo.englishLogo {
   opacity: 100%;
   width: 153px;
   height: 60px;
@@ -26,5 +26,17 @@
   left: calc(50% - 65px);
   background-color: transparent;
   background-repeat: no-repeat;
-  background-image: url(../../Images/CIOOSNationalLogoBlack.svg);
+  background-image: url(../../Images/CIOOSNationalLogoBlackEnglish.svg);
+}
+
+.spinnerLogo.frenchLogo {
+  opacity: 100%;
+  width: 153px;
+  height: 60px;
+  position: absolute;
+  top: calc(50% - 70px);
+  left: calc(50% - 65px);
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-image: url(../../Images/CIOOSNationalLogoBlackFrench.svg);
 }

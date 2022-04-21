@@ -1,0 +1,48 @@
+.languageSelector {
+  position: absolute;
+  top: 110px;
+  right: 10px;
+  pointer-events: all;
+  z-index: 3;
+}
+
+@media (max-width: 900px) {
+  .languageSelector {
+    left: 865px;
+  }
+}
+
+.languageSelector button {
+  color: black;
+  background-color: white;
+  border: none;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  width: 24px;
+  height: 24px;
+  padding: 0px;
+}
+
+.languageSelector button:hover {
+  background-color: #f3f3f3;
+  color: black;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  border: none;
+}
+
+.languageSelector button:focus {
+  background-color: #f3f3f3;
+  color: black;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  border: none;
+}
+
+.languageSelector .dropdown-toggle[aria-expanded="true"] {
+  background-color: #f3f3f3 !important;
+  color: black !important;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%) !important;
+  border: none !important;
+}
+
+.languageSelector .dropdown-toggle::after {
+  display: none !important;
+}
