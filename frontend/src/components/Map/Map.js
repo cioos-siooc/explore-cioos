@@ -410,6 +410,20 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     map.current.on('click', 'hexes', handleMapHexesOnClick);
     map.current.on('touchend', 'hexes', handleMapHexesOnClick);
 
+    let polygonToolDiv = document.getElementsByClassName('mapbox-gl-draw_polygon')
+    polygonToolDiv[0].title = t('mapPolygonToolTitle')
+
+    let deleteToolDiv = document.getElementsByClassName('mapbox-gl-draw_trash')
+    deleteToolDiv[0].title = t('mapDeleteToolTitle')
+
+    let zoomInToolDiv = document.getElementsByClassName('mapboxgl-ctrl-zoom-in')
+    zoomInToolDiv[0].title = t('mapZoomInToolTitle')
+
+    let zoomOutToolDiv = document.getElementsByClassName('mapboxgl-ctrl-zoom-out')
+    zoomOutToolDiv[0].title = t('mapZoomOutToolTitle')
+    
+    let orientNorthToolDiv = document.getElementsByClassName('mapboxgl-ctrl-compass')
+    orientNorthToolDiv[0].title = t('mapCompassToolTitle')
   }, [])
 
   return (
