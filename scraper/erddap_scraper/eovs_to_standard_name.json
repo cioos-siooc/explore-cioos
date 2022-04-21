@@ -38,7 +38,7 @@
     "sound_intensity_in_water",
     "sound_pressure_in_water",
     "sound_pressure_level_in_water",
-    "sped_of_sound_in_sea_water"
+    "speed_of_sound_in_sea_water"
   ],
   "oceanSurfaceHeatFlux": [
     "basal_downward_heat_flux_in_sea_ice",
@@ -73,7 +73,7 @@
     "surface_upward_heat_flux_due_to_anthropogenic_energy_consumption",
     "surface_upward_heat_flux_in_air",
     "surface_upward_latent_heat_flux_due_to_sublimation",
-    "surface_upward_latent_heat_fluxhfls",
+    "surface_upward_latent_heat_flux",
     "surface_upward_sensible_heat_flux",
     "temperature_flux_due_to_evaporation_expressed_as_heat_flux_out_of_sea_water",
     "temperature_flux_due_to_rainfall_expressed_as_heat_flux_into_sea_water",
@@ -144,7 +144,7 @@
   "particulateMatter": ["sea_water_turbidity"],
   "phytoplanktonBiomassAndDiversity": [
     "chlorophyll_concentration_in_sea_water",
-    "concentration_of_chlorophyll-a_in_water_body",
+    "concentration_of_chlorophyll",
     "concentration_of_chlorophyll_in_sea_water",
     "mass_concentration_of_chlorophyll_in_sea_water",
     "mass_concentration_of_diatoms_expressed_as_chlorophyll_in_sea_water",
