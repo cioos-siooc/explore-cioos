@@ -106,7 +106,7 @@ def email_user(email, status, zip_filename, downloader_output, language):
         },
         "over-limit": {
             "en": "Your CIOOS Data Explorer data query completed but found too much data.",
-            "fr": "Votre requête à l'Explorateyr de Données du SIOOC est terminée mais a atteint la limite de téléchargement.",
+            "fr": "Votre requête à l'Explorateur de Données du SIOOC est terminée mais a atteint la limite de téléchargement.",
         },
         "no-data": {
             "en": "Your CIOOS Data Explorer data query failed.",
