@@ -3,8 +3,8 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE schema cioos_api;
 
 -- The scraper will skip datasets in this table
-DROP TABLE IF EXISTS cioos_api.skip_datasets;
-CREATE TABLE cioos_api.skip_datasets (
+DROP TABLE IF EXISTS cioos_api.skipped_datasets;
+CREATE TABLE cioos_api.skipped_datasets (
     pk serial PRIMARY KEY,
     dataset_id text,
     erddap_url text
@@ -128,6 +128,13 @@ CREATE TABLE cioos_api.erddap_variables (
     actual_range text,
     cf_role text,
     standard_name text
+);
+
+DROP TABLE IF EXISTS cioos_api.skipped_datasets;
+CREATE TABLE cioos_api.skipped_datasets (
+    erddap_url text NOT NULL,
+    dataset_id text NOT NULL,
+    reason_code text NOT NULL
 );
 
 

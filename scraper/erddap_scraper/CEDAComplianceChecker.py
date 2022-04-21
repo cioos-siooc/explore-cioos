@@ -4,15 +4,23 @@ from erddap_scraper.utils import (
     intersection,
     cf_standard_names,
 )
+from erddap_scraper.scraper_errors import (
+    MISSING_REQUIRED_VARS,
+    NO_SUPPORTED_VARIABLES,
+    INGEST_FLAG_FALSE,
+    DEPTH_AND_ALTITUDE,
+)
 
 
 class CEDAComplianceChecker(object):
     def __init__(self, dataset):
         self.dataset = dataset
         self.logger = dataset.logger
+        self.failure_reason_code = ""
 
-    def failed_error(self, msg):
+    def failed_error(self, msg, failure_reason_code):
         self.logger.error("Skipping dataset:" + msg)
+        self.failure_reason_code = failure_reason_code
 
     def check_required_variables(self):
         # make sure LLAT variables exist. Depth/Altitude is assumed to be 0 if it doesnt exist
@@ -24,7 +32,10 @@ class CEDAComplianceChecker(object):
         ]
 
         if missing_required_vars:
-            self.failed_error(f"Can't find required variable: {missing_required_vars}")
+            self.failed_error(
+                f"Can't find required variable: {missing_required_vars}",
+                MISSING_REQUIRED_VARS,
+            )
             return False
         return True
 
@@ -47,7 +58,7 @@ class CEDAComplianceChecker(object):
             standard_names_in_dataset,
         )
         if not supported_variables:
-            self.failed_error("No supported variables found")
+            self.failed_error("No supported variables found", NO_SUPPORTED_VARIABLES)
             return False
         return True
 
@@ -58,7 +69,7 @@ class CEDAComplianceChecker(object):
         cde_ingest = self.dataset.globals.get("cde_ingest", "")
 
         if cde_ingest.lower() == "false":
-            self.failed_error("cde_ingest=False")
+            self.failed_error("cde_ingest=False", INGEST_FLAG_FALSE)
             return False
         return True
 
@@ -67,7 +78,7 @@ class CEDAComplianceChecker(object):
             "depth" in self.dataset.variables_list
             and "altitude" in self.dataset.variables_list
         ):
-            self.failed_error("Found both depth and altitude")
+            self.failed_error("Found both depth and altitude", DEPTH_AND_ALTITUDE)
             return False
         return True
 

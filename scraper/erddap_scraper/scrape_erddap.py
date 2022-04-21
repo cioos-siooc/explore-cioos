@@ -7,13 +7,21 @@ from erddap_scraper.CEDAComplianceChecker import CEDAComplianceChecker
 from erddap_scraper.ERDDAP import ERDDAP
 from erddap_scraper.profiles import get_profiles
 from requests.exceptions import HTTPError
+from erddap_scraper.scraper_errors import (
+    CDM_DATA_TYPE_UNSUPPORTED,
+    HTTP_ERROR,
+    UNKNOWN_ERROR,
+)
 
 # TIMEOUT = 30
 
 
 def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=False):
     # """ """
-    datasets_not_added = []
+    skipped_datasets_reasons = []
+
+    def skipped_reason(code):
+        return [[erddap.domain, dataset_id, code]]
 
     df_profiles_all = pd.DataFrame()
 
@@ -50,9 +58,14 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
 
     unsupported_datasets = df_all_datasets.query(f"not ({cdm_data_type_test})")
     if not unsupported_datasets.empty:
+        unsupported_datasets_list = unsupported_datasets["datasetID"].to_list()
         logger.warn(
-            f"Skipping datasets because cdm_data_type is not {str(cdm_data_types_supported)}: {unsupported_datasets['datasetID'].to_list()}"
+            f"Skipping datasets because cdm_data_type is not {str(cdm_data_types_supported)}: {unsupported_datasets_list}"
         )
+        for dataset_id in unsupported_datasets_list:
+            skipped_datasets_reasons += [
+                [erddap.domain, dataset_id, CDM_DATA_TYPE_UNSUPPORTED]
+            ]
 
     df_all_datasets = df_all_datasets.query(cdm_data_type_test)
 
@@ -61,13 +74,13 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
     # loop through each dataset to be processed
     for i, df_dataset_row in df_all_datasets.iterrows():
         dataset_id = df_dataset_row["datasetID"]
-        dataset_was_added = False
+
         try:
             logger.info(f"Querying dataset: {dataset_id} {i+1}/{len(df_all_datasets)}")
             dataset = erddap.get_dataset(dataset_id)
             dataset_logger = dataset.logger
-
-            passes_checks = CEDAComplianceChecker(dataset).passes_all_checks()
+            compliance_checker = CEDAComplianceChecker(dataset)
+            passes_checks = compliance_checker.passes_all_checks()
 
             # these are the variables we are pulling max/min values for
             if passes_checks:
@@ -83,26 +96,42 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
                     df_variables_all = pd.concat(
                         [df_variables_all, dataset.df_variables]
                     )
-                    dataset_was_added = True
                     dataset_logger.info("complete")
-
+            else:
+                skipped_datasets_reasons += skipped_reason(
+                    compliance_checker.failure_reason_code
+                )
         except HTTPError as e:
             response = e.response
             # dataset_logger.error(response.text)
             dataset_logger.error(
                 f"HTTP ERROR: {response.status_code} {response.reason}"
             )
+            skipped_datasets_reasons += skipped_reason(HTTP_ERROR)
 
         except Exception as e:
             print(traceback.format_exc())
+            skipped_datasets_reasons += skipped_reason(UNKNOWN_ERROR)
 
-        if not dataset_was_added:
-            datasets_not_added.append(dataset.get_data_access_form_url())
+    df_skipped_datasets = pd.DataFrame()
+
+    if skipped_datasets_reasons:
+        df_skipped_datasets = pd.DataFrame(
+            skipped_datasets_reasons,
+            columns=["erddap_url", "dataset_id", "reason_code"],
+        )
 
     # logger.info(record_count)
-    logger.info(f"skipped : {len(datasets_not_added)} datasets: {datasets_not_added}")
+    logger.info(
+        f"skipped: {len(df_skipped_datasets)} datasets: {df_skipped_datasets['dataset_id'].to_list()}"
+    )
 
     # using 'result' to return data from each thread
     result.append(
-        [df_profiles_all, df_datasets_all, datasets_not_added, df_variables_all]
+        [
+            df_profiles_all,
+            df_datasets_all,
+            df_variables_all,
+            df_skipped_datasets,
+        ]
     )

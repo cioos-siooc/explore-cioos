@@ -12,6 +12,7 @@ DELETE FROM cioos_api.datasets;
 DELETE FROM cioos_api.organizations;
 DELETE FROM cioos_api.points;
 DELETE FROM cioos_api.eov_to_standard_name;
+DELETE FROM cioos_api.skipped_datasets;
 
 -- These ones cant be recreated:
 -- DELETE FROM cioos_api.download_jobs;
