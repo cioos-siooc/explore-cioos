@@ -33,7 +33,7 @@ router.get(
       eovs,
       email,
       polygon,
-      language = "en",
+      lang = "en",
     } = req.query;
 
     const shapeQueryResponse = await getShapeQuery(req.query);
@@ -72,7 +72,7 @@ router.get(
         const jobID = uuidv4().substr(0, 6);
         const downloaderInput = {
           user_query: {
-            language,
+            language:lang,
             time_min: timeMin,
             time_max: timeMax,
             lat_min: Number.parseFloat(latMin),
