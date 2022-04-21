@@ -6,7 +6,7 @@ export default function Loading() {
   const urlLanguage = new URL(window.location.href).searchParams.get('lang')
   return (
     <div className='loading'>
-      {urlLanguage && urlLanguage === 'en' ?
+      {!urlLanguage || urlLanguage === 'en' ?
         <a className={'spinnerLogo englishLogo'} /> :
         <a className={'spinnerLogo frenchLogo'} />
       }
