@@ -149,25 +149,25 @@ export default function IntroModal({ intialOpenState }) {
                 onMouseOut={() => setHoveredStep()}
               >
                 <div
-                  className='stepImage filterStep'
+                  className={`stepImage filterStep ${i18n.language}`}
                   onMouseOver={() => setHoveredStep('filter')}
                 >
                   {t('stepInfoFilter')}
                 </div>
                 <div
-                  className='stepImage selectStep'
+                  className={`stepImage selectStep ${i18n.language}`}
                   onMouseOver={() => setHoveredStep('select')}
                 >
                   {t('stepInfoSelect')}
                 </div>
                 <div
-                  className='stepImage inspectStep'
+                  className={`stepImage inspectStep ${i18n.language}`}
                   onMouseOver={() => setHoveredStep('inspect')}
                 >
                   {t('stepInfoInspect')}
                 </div>
                 <div
-                  className='stepImage downloadStep'
+                  className={`stepImage downloadStep ${i18n.language}`}
                   onMouseOver={() => setHoveredStep('download')}
                 >
                   {t('stepInfoDownload')}
