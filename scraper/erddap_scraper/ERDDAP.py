@@ -36,7 +36,6 @@ class ERDDAP(object):
             print("volume()", self.cache.volume())
             print("size_limit", self.cache.size_limit)
 
-        self.url = erddap_url
         self.domain = urlparse(erddap_url).netloc
         self.session = requests.Session()
 
@@ -45,6 +44,7 @@ class ERDDAP(object):
         logger = self.logger
 
         erddap_url = erddap_url.rstrip("/")
+        self.url = erddap_url
 
         if not re.search("^https?://", erddap_url):
             raise RuntimeError("URL Must start wih http or https")
