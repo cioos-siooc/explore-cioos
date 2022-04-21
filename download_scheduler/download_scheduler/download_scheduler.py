@@ -102,19 +102,19 @@ def email_user(email, status, zip_filename, downloader_output, language):
     email_subject = {
         "completed": {
             "en": "Your CIOOS Data Explorer query was successful",
-            "fr": "Votre requête dans l'Explorateur de données du CIOOS a réussi",
+            "fr": "Votre requête à l'Explorateur de Données du SIOOC fût complétée avec succès.",
         },
         "over-limit": {
             "en": "Your CIOOS Data Explorer data query completed but found too much data.",
-            "fr": "Votre requête de données CIOOS Data Explorer est terminée mais a trouvé trop de données.",
+            "fr": "Votre requête à l'Explorateyr de Données du SIOOC est terminée mais a atteint la limite de téléchargement.",
         },
         "no-data": {
             "en": "Your CIOOS Data Explorer data query failed.",
-            "fr": "La requête de données de l'Explorateur de données CIOOS a échoué.",
+            "fr": "La requête de données à l'Explorateur de Données du SIOOC a échoué.",
         },
         "failed": {
             "en": "Your CIOOS Data Explorer data query failed.",
-            "fr": "La requête de données de l'Explorateur de données CIOOS a échoué.",
+            "fr": "La requête de données à l'Explorateur de Données du SIOOC a échoué.",
         },
     }
 
