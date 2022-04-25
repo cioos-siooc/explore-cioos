@@ -17,6 +17,8 @@ services:
       - "PGPORT=${DB_PORT:-5432}"
       - "POSTGRES_DB=$DB_NAME"
       - "POSTGRES_PASSWORD=$DB_PASSWORD"
+      - "POSTGRES_USER=$DB_USER"
+
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./database:/docker-entrypoint-initdb.d
