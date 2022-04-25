@@ -3,11 +3,13 @@ import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { Table } from 'react-bootstrap'
 import { ArrowDown, ArrowUp, CheckSquare, ChevronCompactRight, SortAlphaDown, SortAlphaUp, SortNumericDown, SortNumericUp, Square } from 'react-bootstrap-icons'
+import { useTranslation } from 'react-i18next'
 import { abbreviateString, bytesToMemorySizeString } from '../../../utilities'
 
 import './styles.css'
 
 export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDataset, datasets, setDatasets, selectAll, setInspectDataset }) {
+  const { t } = useTranslation()
   const [sortedData, setSortedData] = useState(datasets)
   const [sortProp, setSortProp] = useState('title')
   const [ascending, setAscending] = useState(false)
@@ -48,10 +50,12 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
       <Table striped hover>
         <thead>
           <tr>
-            <th title='Select all' onClick={(e) => {
-              handleSortByProperty('selected')
-              e.stopPropagation()
-            }}
+            <th title={t('datasetsTableHeaderSelectAllTitle')}
+              // Select all
+              onClick={(e) => {
+                handleSortByProperty('selected')
+                e.stopPropagation()
+              }}
             >
               <div className='selectAllHeader'>
                 {selectAll ?
@@ -70,20 +74,39 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                 {sortProp === 'selected' && (ascending ? <ArrowDown /> : <ArrowUp />)}
               </div>
             </th>
-            <th title='Sort by dataset title' onClick={() => handleSortByProperty('title')}>
-              Title {sortProp === 'title' && (ascending ? <SortAlphaDown /> : <SortAlphaUp />)}
+            <th
+              title={t('datasetsTableHeaderTitleTitle')}
+              // 'Sort by dataset title' 
+              onClick={() => handleSortByProperty('title')}
+            >
+              {t('datasetsTableHeaderTitleText')} {sortProp === 'title' && (ascending ? <SortAlphaDown /> : <SortAlphaUp />)}
             </th>
-            <th title='Sort by dataset type' onClick={() => handleSortByProperty('cdm_data_type')}>
-              Type {sortProp === 'cdm_data_type' && (ascending ? <SortAlphaDown /> : <SortAlphaUp />)}
+            <th
+              title={t('datasetsTableHeaderTypeTitle')}
+              //'Sort by dataset type' 
+              onClick={() => handleSortByProperty('cdm_data_type')}
+            >
+              {t('datasetsTableHeaderTypeText')} {sortProp === 'cdm_data_type' && (ascending ? <SortAlphaDown /> : <SortAlphaUp />)}
             </th>
-            <th title='Sort by number of records in dataset' onClick={() => handleSortByProperty('profiles_count')}>
-              Records {sortProp === 'profiles_count' && (ascending ? <SortNumericDown /> : <SortNumericUp />)}
+            <th
+              title={t('datasetsTableHeaderRecordsTitle')}
+              //'Sort by number of records in dataset' 
+              onClick={() => handleSortByProperty('profiles_count')}
+            >
+              {t('datasetsTableHeaderRecordsText')} {sortProp === 'profiles_count' && (ascending ? <SortNumericDown /> : <SortNumericUp />)}
             </th>
-            <th title='Sort by approximate dataset size in megabytes' onClick={() => handleSortByProperty('size')}>
-              Size  {sortProp === 'size' && (ascending ? <SortNumericDown /> : <SortNumericUp />)}
+            <th
+              title={t('datasetsTableHeaderSizeTitle')}
+              // 'Sort by approximate dataset size in megabytes'
+              onClick={() => handleSortByProperty('size')}
+            >
+              {t('datasetsTableHeaderSizeText')} {sortProp === 'size' && (ascending ? <SortNumericDown /> : <SortNumericUp />)}
             </th>
-            <th title='Open dataset details'>
-              Details
+            <th
+              title={t('datasetsTableHeaderDetailsTitle')}
+            //'Open dataset details'
+            >
+              {t('datasetsTableHeaderDetailsText')}
             </th>
           </tr>
         </thead>
@@ -92,42 +115,44 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
             return (
               <tr key={index}>
                 <td
-                  style={{ wordWrap: 'break-word' }}
-                  onClick={() => handleSelectDataset(point)} title='Select dataset for download'
+                  onClick={() => handleSelectDataset(point)}
+                  title={t('datasetsTableSelectTitle')}
+                //'Select dataset for download'
                 >
                   {point.selected ? <CheckSquare /> : <Square />}
                 </td>
                 <td
-                  style={{ wordWrap: 'break-word' }}
+                  className='datasetsTableTitleCell'
                   title={point.title}
                   onClick={() => setInspectDataset(point)}
                 >
-                  {abbreviateString(point.title, 40)}
+                  {abbreviateString(point.title, 35)}
                 </td>
                 <td
-                  style={{ wordWrap: 'break-word' }}
-                  title='Dataset type'
+                  style={{ wordBreak: point.cdm_data_type === 'TimeSeriesProfile' && 'break-word' }}
+                  title={t('datasetsTableTypeTitle')}
+                  //'Dataset type'
                   onClick={() => setInspectDataset(point)}
                 >
                   {point.cdm_data_type}
                 </td>
                 <td
-                  style={{ wordWrap: 'break-word' }}
-                  title='Number of records in dataset'
+                  title={t('datasetsTableRecordsTitle')}
+                  //'Number of records in dataset'
                   onClick={() => setInspectDataset(point)}
                 >
                   {toInteger(point.profiles_count)}
                 </td>
                 <td
-                  style={{ wordWrap: 'break-word' }}
-                  title='Approximate dataset size in megabytes'
+                  title={t('datasetsTableSizeTitle')}
+                  //'Approximate dataset size in megabytes'
                   onClick={() => setInspectDataset(point)}
                 >
                   {bytesToMemorySizeString(point.size)}
                 </td>
                 <td
-                  style={{ wordWrap: 'break-word' }}
-                  title='Open dataset details'
+                  title={t('datasetsTableDetailsTitle')}
+                  //'Open dataset details'
                   onClick={() => setInspectDataset(point)}
                 >
                   <div className='inspectButton'><ChevronCompactRight /></div>

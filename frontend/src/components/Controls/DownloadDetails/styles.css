@@ -2,6 +2,10 @@
   padding: 5px 0px;
 }
 
+.downloadDetails>hr{
+  margin:0px;
+}
+
 .downloadDataRow {
   max-height: 40vh;
   overflow-y: auto;

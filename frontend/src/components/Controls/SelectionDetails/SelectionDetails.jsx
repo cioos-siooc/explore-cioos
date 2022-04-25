@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { ProgressBar } from 'react-bootstrap'
+import { useTranslation } from 'react-i18next'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
@@ -17,8 +18,8 @@ import {
 } from "../../../utilities.js";
 
 // Note: datasets and points are exchangable terminology
-export default function SelectionDetails({ pointsToReview, setPointsToReview, query, polygon, organizations, datasets, width, children }) {
-
+export default function SelectionDetails({ setPointsToReview, query, polygon, organizations, datasets, children }) {
+  const { t, i18n } = useTranslation()
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState([])
   const [inspectDataset, setInspectDataset] = useState()
@@ -39,9 +40,7 @@ export default function SelectionDetails({ pointsToReview, setPointsToReview, qu
     setDataTotal(0)
     if (polygon !== undefined && !loading) {
       const filtersQuery = createDataFilterQueryString(query, organizations, datasets);
-      const shapeQuery = createSelectionQueryString(
-        polygon
-      );
+      const shapeQuery = createSelectionQueryString(polygon)
       const combinedQueries = [filtersQuery, shapeQuery].filter(e => e).join("&");
       setInspectDataset()
       setLoading(true)
@@ -52,6 +51,7 @@ export default function SelectionDetails({ pointsToReview, setPointsToReview, qu
             setPointsData(data.map(point => {
               return {
                 ...point,
+                title: point.title_translated[i18n.language] || point.title,
                 selected: true
               }
             }))
@@ -61,7 +61,7 @@ export default function SelectionDetails({ pointsToReview, setPointsToReview, qu
         }
       })
     }
-  }, [polygon])
+  }, [polygon, i18n.language])
 
   function handleSelectDataset(point) {
     let dataset = pointsData.filter((p) => p.pk === point.pk)[0]
@@ -107,12 +107,12 @@ export default function SelectionDetails({ pointsToReview, setPointsToReview, qu
                 selectAll={selectAll}
                 setDatasets={setPointsData}
                 datasets={pointsData}
-                width={550}
               />
             ) || (
               pointsData && pointsData.length === 0 &&
               <div className="noDataNotice">
-                No Data. Modify filters or change selection on map.
+                {t('selectionDetailsNoDataWarning')}
+                {/* No Data. Modify filters or change selection on map. */}
               </div>
             )
           )
@@ -124,7 +124,7 @@ export default function SelectionDetails({ pointsToReview, setPointsToReview, qu
           <div>
             <ProgressBar
               className='dataTotalBar'
-              title='Amount of download size used'
+              title={t('selectionDetailsProgressBarTitle')}
             >
               <ProgressBar
                 striped
@@ -146,9 +146,10 @@ export default function SelectionDetails({ pointsToReview, setPointsToReview, qu
               }
             </ProgressBar>
             <div className='dataTotalRatio'>
-              {bytesToMemorySizeString(dataTotal * 1000000)} of 100MB Max
+              {bytesToMemorySizeString(dataTotal * 1000000)} {t('selectionDetailsMaxRatio')}
+              {/* of 100MB Max */}
               <QuestionIconTooltip
-                tooltipText={'Downloads are limited to 100MB.'}
+                tooltipText={t('selectionDetailsQuestionTooltipText')} //'Downloads are limited to 100MB.'}
                 size={20}
                 tooltipPlacement={'top'}
               />

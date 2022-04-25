@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { ProgressBar, Row, Col, Container } from 'react-bootstrap'
+import { useTranslation } from 'react-i18next'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
@@ -10,7 +11,8 @@ import './styles.css'
 import { bytesToMemorySizeString, getPointsDataSize } from '../../../utilities.js'
 
 // Note: datasets and points are exchangable terminology
-export default function DownloadDetails({ pointsToReview, setPointsToDownload, width, children }) {
+export default function DownloadDetails({ pointsToReview, setPointsToDownload, children }) {
+  const { t } = useTranslation()
 
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState(pointsToReview)
@@ -54,10 +56,28 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, w
       <Row>
         <Col>
           <span>
-            <b>Download Data:</b> 1) Finalize dataset selections,
+            <b>{t('downloadDetailsDownloadDataBoldText')}</b>
+            {/* Download Data */}
+            {/* {t('downloadDetailsDownloadDataStepsText')} */}
+            {/* 1) Finalize dataset selections,
             2) Ensure selections are within the 100MB limit,
             3) Provide an email address to receive the download link, and,
-            4) Submit the download request. <i>Note:</i> Filters applied in the CIOOS Data Explorer also apply to dataset downloads.
+            4) Submit the download request.
+            Filters applied in the CIOOS Data Explorer also apply to dataset downloads. */}
+            <ol>
+              <li>
+                {t('downloadDetailsDownloadDataSteps1')}
+              </li>
+              <li>
+                {t('downloadDetailsDownloadDataSteps2')}
+              </li>
+              <li>
+                {t('downloadDetailsDownloadDataSteps3')}
+              </li>
+              <li>
+                {t('downloadDetailsDownloadDataSteps4')}
+              </li>
+            </ol>
           </span>
         </Col>
       </Row>
@@ -68,7 +88,6 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, w
             <DatasetInspector
               dataset={inspectDataset}
               setInspectDataset={setInspectDataset}
-              width={width}
             /> :
             <DatasetsTable
               handleSelectAllDatasets={handleSelectAllDatasets}
@@ -77,7 +96,6 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, w
               selectAll={selectAll}
               setDatasets={setPointsData}
               datasets={pointsData}
-              width={740}
             />
           }
         </Col>
@@ -87,7 +105,7 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, w
         <Col >
           <ProgressBar
             className='dataTotalBar'
-            title='Amount of download size used'
+            title={t('downloadDetailsProgressTitle')} //'Amount of download size used'
           >
             <ProgressBar
               striped
@@ -111,7 +129,7 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, w
           <div className='dataTotalRatio'>
             {bytesToMemorySizeString(dataTotal * 1000000)} of 100MB Max
             <QuestionIconTooltip
-              tooltipText={'Downloads are limited to 100MB.'}
+              tooltipText={'downloadDetailsProgressTooltipText'} // 'Downloads are limited to 100MB.'
               size={20}
               tooltipPlacement={'top'}
             />

@@ -1,11 +1,12 @@
 import * as React from 'react'
 import { CheckSquare, Square } from 'react-bootstrap-icons'
+import { useTranslation } from 'react-i18next'
 import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
 
 import './styles.css'
 
 export default function HeirarchicalMultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions }) {
-
+  const { t } = useTranslation()
 
   return (
     <div className='heirarchicalMultiCheckboxFilter'>
@@ -34,7 +35,7 @@ export default function HeirarchicalMultiCheckboxFilter({ optionsSelected, setOp
         </div>
       ))
         : (
-          <div>No filter options</div>
+          <div>{t('heirarchicalMultiCheckboxFilterNoFilterWarning')}</div>
         )
       }
     </div >

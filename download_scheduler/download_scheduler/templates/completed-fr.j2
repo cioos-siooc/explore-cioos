@@ -1,0 +1,15 @@
+{% import 'datasets_list.j2' as datasets_list with context%}
+
+{% if status=="over-limit" %}
+La limite de téléchargement de l'Explorateur de Données du SIOOC a été a atteinte. Si nécessaire, veuillez réessayer avec une zone de sélection plus petite ou des filtres plus sélectifs.
+{% else %}
+Le téléchargement par l'Explorateur de Données du SIOOC s'est terminé correctement.
+{% endif %}
+
+Votre téléchargement est disponible sur {{download_url}}
+
+Remarque : les données incluses dans ce fichier zip comprennent des observations qui ont été téléchargées à partir d'ensembles de données hébergés sur des serveurs ERDDAP en libre accès et des catalogues CKAN. Les liens vers les sources sont inclus dans cet e-mail. Veuillez vous référer aux métadonnées incluses dans les serveurs ERDDAP ainsi que les catalogues CKAN pour identifier les licences applicables et la manière correcte de citer ces ressources.
+
+Veuillez consulter les sites Web suivants pour trouver les dernières informations sur la manière de citer correctement ces ressources :
+
+{{ datasets_list }}

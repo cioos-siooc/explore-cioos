@@ -1,10 +1,13 @@
 import * as React from 'react'
 import { CheckSquare, Square } from 'react-bootstrap-icons'
+import { useTranslation } from 'react-i18next'
 import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
 
 import './styles.css'
 
 export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions }) {
+  const { t } = useTranslation()
+
   return (
     <div className='multiCheckboxFilter'>
       <div className="filterCount">
@@ -35,7 +38,7 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
         </div>
       ))
         : (
-          <div>No filter options</div>
+          <div>{t('multiCheckboxFilterNoFilterWarning')}No filter options</div>
         )
       }
     </div>
