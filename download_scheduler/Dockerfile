@@ -12,7 +12,7 @@ WORKDIR /usr/src/app
 COPY . .
 
 RUN pip install ./downloader
-RUN pip install ./scheduler
+RUN pip install ./download_scheduler
 RUN pip install ./scraper
 
 # -u seems to be needed to get it to print to stdout

@@ -13,7 +13,7 @@ body {
   padding-right: 0px;
 }
 
-.logo {
+.logo.english {
   width: 130px;
   height: 40px;
   border: 2px solid transparent;
@@ -21,7 +21,23 @@ body {
   position: absolute;
   top: 10px;
   right: 10px;
-  background-image: url(./Images/NationalLogo.png);
+  background-image: url(./Images/NationalLogoEnglish.png);
+  background-color: #fff;
+  background-repeat: no-repeat;
+  background-size: contain;
+  border-radius: 10px;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+}
+
+.logo.french {
+  width: 130px;
+  height: 40px;
+  border: 2px solid transparent;
+  pointer-events: all;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-image: url(./Images/NationalLogoFrench.png);
   background-color: #fff;
   background-repeat: no-repeat;
   background-size: contain;
@@ -114,8 +130,8 @@ body {
   }
 }
 
-@media all and (max-height: 465px) {
+@media all and (max-height: 500px) {
   .boxQueryButton {
-    top: 173px;
+    top: 210px;
   }
 }

@@ -13,7 +13,7 @@
   ```sh
   python3 -m venv venv
   source venv/bin/activate
-  pip install -e ./downloader ./scheduler ./scraper
+  pip install -e ./downloader ./download_scheduler ./scraper
   ```
 
 - Start the API:
@@ -105,3 +105,9 @@ From the production server,
   ```
 
 - Add a crontab entry for the scheduler to run nightly.
+
+- deploy frontend to Gitpages
+
+  ```sh
+  API_URL=https://pac-dev2.cioos.org/ceda/api npm run deploy
+  ```

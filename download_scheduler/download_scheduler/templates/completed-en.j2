@@ -1,0 +1,16 @@
+{% import 'datasets_list.j2' as datasets_list with context%}
+
+{% if status=="over-limit" %}
+Your CIOOS Data Explorer download has been cut off to return less data. If needed, please try again with a smaller selection area or more selective filters.
+{% else %}
+Your CIOOS Data Explorer download has completed successfully.
+{% endif %}
+
+Your download is available at {{download_url}}
+
+
+Note: The data included in this zip file includes observations that have been downloaded from data hosted on open-access ERDDAP servers and CKAN catalogues. The links to the sources are included in this email. Please refer to metadata included in the ERDDAP servers and CKAN catalogues to identify the applicable licenses and correct way to cite these resources.
+
+Please visit the following websites to find the latest information on how to correctly cite these resources:
+
+{{ datasets_list }}

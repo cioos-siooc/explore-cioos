@@ -44,7 +44,7 @@ services:
     build:
       # Scheduler needs context ., see the dockerfile
       context: .
-      dockerfile: ./scheduler/Dockerfile
+      dockerfile: ./download_scheduler/Dockerfile
     depends_on:
       - db
     deploy:

@@ -2,12 +2,14 @@ import * as _ from 'lodash'
 import * as d3 from 'd3'
 import { useState, useEffect } from 'react'
 import { defaultQuery } from './components/config.js'
+import { useTranslation } from 'react-i18next'
 
 export function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
 export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
+  const { t } = useTranslation()
   let count = 0
   let newBadge
   if (!_.isEmpty(optionsSelected)) {
@@ -27,14 +29,14 @@ export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
     })
   } else if (count > 1) {
     switch (badgeTitle) {
-      case 'Ocean Variables':
-        newBadge = count + ' variables'
+      case t('oceanVariablesFiltername'): // 'Ocean Variables'
+        newBadge = count + t('oceanVariablesMulit') //' variables'
         break;
-      case 'Organizations':
-        newBadge = count + ' organizations'
+      case t('organizationFilterName'): //'Organizations':
+        newBadge = count + t('organizationMulti') //' organizations'
         break;
-      case 'Datasets':
-        newBadge = count + ' datasets'
+      case t('datasetsFilterName'): //'Datasets':
+        newBadge = count + t('datasetsMulti') //' datasets'
         break;
     }
   }
