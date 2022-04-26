@@ -19,7 +19,7 @@ import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndD
 import "bootstrap/dist/css/bootstrap.min.css"
 
 import "./styles.css"
-import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel, getPointsDataSize } from '../utilities.js'
+import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel, getPointsDataSize, getCookieValue } from '../utilities.js'
 import { server } from '../config.js'
 import _ from 'lodash'
 import Legend from './Controls/Legend/Legend.jsx'
@@ -276,7 +276,7 @@ export default function App() {
         target='_blank'>
         <ChatDots size='30px' />
       </a>
-      <IntroModal intialOpenState={false} />
+      <IntroModal initialOpenState={true} />
       <LanguageSelector />
     </div >
   );

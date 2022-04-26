@@ -62,9 +62,9 @@ CREATE TABLE cioos_api.profiles (
     longitude_max double precision,
     depth_min double precision,
     depth_max double precision,
-    n_records integer,
+    n_records bigint,
     records_per_day float,
-    n_profiles integer,
+    n_profiles bigint,
     -- hex polygon that this point is in for zoom 0 (zoomed out)
     hex_zoom_0 geometry(polygon,3857),
     hex_zoom_1 geometry(polygon,3857),
