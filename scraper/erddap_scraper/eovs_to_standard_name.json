@@ -9,7 +9,11 @@
     "mole_concentration_of_dissolved_inorganic_carbon_in_sea_water",
     "ocean_mass_content_of_dissolved_inorganic_carbon",
     "partial_pressure_of_carbon_dioxide_in_sea_water",
-    "sea_water_ph_reported_on_total_scale"
+    "sea_water_ph_reported_on_total_scale",
+    "dry_atmosphere_mole_fraction_of_carbon_dioxide",
+    "fugacity_of_carbon_dioxide_in_sea_water",
+    "surface_partial_pressure_of_carbon_dioxide_in_air",
+    "surface_partial_pressure_of_carbon_dioxide_in_sea_water"
   ],
   "invertebrateAbundanceAndDistribution": [],
   "macroalgalCanopyCoverAndComposition": [],
@@ -28,10 +32,16 @@
     "moles_of_nitrate_and_nitrite_per_unit_mass_in_sea_water",
     "mole_concentration_of_nitrate_in_sea_water",
     "moles_of_nitrate_per_unit_mass_in_sea_water",
-    "moles_of_silicate_per_unit_mass_in_sea_water"
+    "moles_of_silicate_per_unit_mass_in_sea_water",
+    "mole_concentration_of_dissolved_inorganic_nitrogen_in_sea_water",
+    "mole_concentration_of_nitrite_in_sea_water"
   ],
   "oceanColour": [
-    "concentration_of_colored_dissolved_organic_matter_in_sea_water_expressed_as_equivalent_mass_fraction_of_quinine_sulfate_dihydrate"
+    "concentration_of_colored_dissolved_organic_matter_in_sea_water_expressed_as_equivalent_mass_fraction_of_quinine_sulfate_dihydrate",
+    "surface_downwelling_photosynthetic_photon_flux_in_air",
+    "surface_downwelling_photosynthetic_photon_flux_in_sea_water",
+    "surface_downwelling_shortwave_flux_in_air",
+    "downwelling_photosynthetic_photon_spherical_irradiance_in_sea_water"
   ],
   "oceanSound": [
     "sound_frequency",
@@ -132,7 +142,10 @@
     "upward_eastward_stress_at_sea_ice_base",
     "upward_northward_stress_at_sea_ice_base",
     "upward_x_stress_at_sea_ice_base",
-    "upward_y_stress_at_sea_ice_base"
+    "upward_y_stress_at_sea_ice_base",
+    "sea_surface_wave_directional_spread",
+    "sea_surface_wave_from_direction",
+    "sea_surface_wave_maximum_period"
   ],
   "oxygen": [
     "mass_concentration_of_oxygen_in_sea_water",
@@ -141,7 +154,9 @@
     "volume_fraction_of_oxygen_in_sea_water",
     "fractional_saturation_of_oxygen_in_sea_water"
   ],
-  "particulateMatter": ["sea_water_turbidity"],
+  "particulateMatter": [
+    "sea_water_turbidity"
+  ],
   "phytoplanktonBiomassAndDiversity": [
     "chlorophyll_concentration_in_sea_water",
     "concentration_of_chlorophyll",
@@ -155,7 +170,10 @@
     "mass_concentration_of_picophytoplankton_expressed_as_chlorophyll_in_sea_water",
     "mass_fraction_of_chlorophyll_a_in_sea_water"
   ],
-  "seaIce": ["sea_ice_draft", "sea_ice_thickness"],
+  "seaIce": [
+    "sea_ice_draft",
+    "sea_ice_thickness"
+  ],
   "seaState": [
     "sea_surface_swell_wave_period",
     "sea_surface_wave_directional_spread_at_variance_spectral_density_maximum",
@@ -186,7 +204,9 @@
     "sea_floor_depth_below_sea_surface",
     "sea_water_pressure_at_sea_floor"
   ],
-  "seaSurfaceSalinity": ["sea_surface_salinity"],
+  "seaSurfaceSalinity": [
+    "sea_surface_salinity"
+  ],
   "seaSurfaceTemperature": [
     "sea_surface_skin_temperature",
     "sea_surface_subskin_temperature"
@@ -209,7 +229,9 @@
     "northward_sea_water_velocity_assuming_no_tide",
     "northward_sea_water_velocity_due_to_tides",
     "northward_sea_water_velocity_at_sea_floor",
-    "upward_sea_water_velocity"
+    "upward_sea_water_velocity",
+    "sea_water_x_velocity",
+    "sea_water_y_velocity"
   ],
   "subSurfaceSalinity": [
     "sea_surface_salinity",
@@ -230,7 +252,8 @@
     "sea_water_potential_density",
     "sea_water_electrical_conductivity",
     "sea_water_density",
-    "sea_water_sigma_t"
+    "sea_water_sigma_t",
+    "sea_water_sigma_theta"
   ],
   "surfaceCurrents": [
     "surface_eastward_sea_water_velocity",
