@@ -1,15 +1,24 @@
 import * as React from 'react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Container, Modal, Col, Row } from 'react-bootstrap'
 import { InfoSquare } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
+import { getCookieValue } from '../../../utilities'
 import './styles.css'
 
-export default function IntroModal({ intialOpenState }) {
+export default function IntroModal({ initialOpenState }) {
   const { t, i18n } = useTranslation()
-  const [showModal, setShowModal] = useState(intialOpenState)
+  const introOpenCookie = !!!getCookieValue('introModalOpen')
+  const [showModal, setShowModal] = useState(introOpenCookie !== undefined ? introOpenCookie : initialOpenState)
+
   const [hoveredStep, setHoveredStep] = useState()
   // Potential idea for cut through transparency to highligh controls: https://ishadeed.com/article/thinking-about-the-cut-out-effect/
+
+  useEffect(() => {
+    if (showModal === false) {
+      document.cookie = `introModalOpen=${showModal}; Secure; max-age=${60 * 60 * 24 * 31}`
+    }
+  }, [showModal])
 
   function generateInfo() {
     switch (hoveredStep) {
