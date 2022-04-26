@@ -5,7 +5,7 @@ import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
 
 import './styles.css'
 
-export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions }) {
+export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions, titles={} }) {
   const { t } = useTranslation()
 
   return (
@@ -33,7 +33,7 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
         >
           {optionsSelected[option] ? <CheckSquare /> : <Square />}
           <span className='optionName'>
-            {capitalizeFirstLetter(abbreviateString(option, 30))}
+            {titles[option] || capitalizeFirstLetter(abbreviateString(option, 30))}
           </span>
         </div>
       ))

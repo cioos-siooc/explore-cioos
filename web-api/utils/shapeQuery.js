@@ -1,5 +1,4 @@
 const db = require("../db");
-const { oceanVariablesToGOOS } = require("../utils/grouping");
 
 const createDBFilter = require("../utils/dbFilter");
 
@@ -9,7 +8,7 @@ async function getShapeQuery(query) {
   let { eovs, timeMin, timeMax, depthMin, depthMax } = query;
 
   const eovsQuery = eovs
-    ? `where eov = any(array[${oceanVariablesToGOOS(eovs)}])`
+    ? `where ceda_eovs = any(array[${eovs}])`
     : "";
 
   const adder = 0;
