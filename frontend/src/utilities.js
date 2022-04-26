@@ -272,3 +272,12 @@ export function useOutsideAlerter(ref, callback, value) {
     };
   }, [ref]);
 }
+
+export function getCookieValue(cookieName) {
+  if (document.cookie.includes(cookieName)) {
+    return document.cookie
+      .split('; ')
+      .find(row => row.startsWith(cookieName + '='))
+      .split('=')[1]
+  }
+}
