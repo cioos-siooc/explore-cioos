@@ -36,10 +36,20 @@ export default function DatasetInspector({ dataset, setInspectDataset }) {
           <div>
             <ul style={{ "listStyleType": 'none' }}>
               <li>
-                <a href={dataset.erddap_url} target='_blank' title={dataset.erddap_url ? dataset.erddap_url : 'unavailable'}>ERDDAP</a>
+                <a
+                  href={dataset.ckan_url}
+                  target='_blank'
+                  title={dataset.ckan_url ? dataset.ckan_url : 'unavailable'}>
+                  {t('datasetInspectorCKANURL')} (CKAN)
+                </a>
               </li>
               <li>
-                <a href={dataset.ckan_url} target='_blank' title={dataset.ckan_url ? dataset.ckan_url : 'unavailable'}>CKAN</a>
+                <a
+                  href={dataset.erddap_url}
+                  target='_blank'
+                  title={dataset.erddap_url ? dataset.erddap_url : 'unavailable'}>
+                  {t('datasetInspectorERDDAPURL')} (ERDDAP)
+                </a>
               </li>
             </ul>
           </div>
