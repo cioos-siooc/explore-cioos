@@ -31,6 +31,11 @@ export default function Controls({ setQuery, children }) {
   // Organization filter initial values from API and state
   const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected)
   useEffect(() => {
+    fetch(`${server}/oceanVariables`).then(response => response.json()).then(oceanVariablesReturned => {
+        const eovsSelectedNew={}
+        oceanVariablesReturned.forEach(eov=>eovsSelectedNew[eov]=false);
+        setEovsSelected(eovsSelectedNew)
+    })
     fetch(`${server}/organizations`).then(response => response.json()).then(orgData => {
       let orgsReturned = {}
       orgData.forEach(elem => {
@@ -120,7 +125,11 @@ export default function Controls({ setQuery, children }) {
   function handleSetDatasetsSelected(selection) {
     setDatasetsSelected(selection)
   }
-
+  console.log(eovsSelected);
+  const titles={}
+  Object.keys(eovsSelected).forEach(k=>titles[k]=t('EOV'+k));
+  console.log(titles);
+  
   return (
     <div className='controls'>
       <Container fluid>
@@ -146,6 +155,7 @@ export default function Controls({ setQuery, children }) {
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(eovsSearchTerms, eovsSelected)}
                 setOptionsSelected={setEovsSelected}
+                titles={titles}
                 searchable
                 allOptions={eovsSelected}
               />
