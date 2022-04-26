@@ -1,15 +1,19 @@
 const db = require("../db");
 
 const createDBFilter = require("../utils/dbFilter");
+const unique = (arr) => [...new Set(arr)];
 
 async function getShapeQuery(query) {
   const filters = createDBFilter(query);
 
   let { eovs, timeMin, timeMax, depthMin, depthMax } = query;
-
-  const eovsQuery = eovs
-    ? `where ceda_eovs = any(array[${eovs}])`
-    : "";
+  let eovsQuery = "";
+  if (eovs) {
+    const eovsCommaSeparatedString = unique(eovs.split(","))
+      .map((eov) => `'${eov}'`)
+      .join();
+    eovsQuery = `where ceda_eovs && array[${eovsCommaSeparatedString}]`;
+  }
 
   const adder = 0;
   const multiplier = 10;
