@@ -69,8 +69,10 @@ export default function Controls({ setQuery, children }) {
   const [datasetsFullList, setDatasetsFullList] = useState()
 
   // Timeframe filter initial values and state
-  const [startDate, setStartDate] = useState(defaultStartDate);
-  const [endDate, setEndDate] = useState(defaultEndDate);
+  const [startDate, setStartDate] = useState(defaultStartDate)
+  const debouncedStartDate = useDebounce(startDate, 500)
+  const [endDate, setEndDate] = useState(defaultEndDate)
+  const debouncedEndDate = useDebounce(endDate, 500)
   const timeframesFilterName = t('timeframeFilterName') //'Timeframe'
   const timeframesBadgeTitle = generateRangeSelectBadgeTitle(timeframesFilterName, [startDate, endDate], [defaultStartDate, defaultEndDate])
 
@@ -96,7 +98,7 @@ export default function Controls({ setQuery, children }) {
       orgsSelected: orgsSelected,
       datasetsSelected: datasetsSelected
     })
-  }, [startDate, endDate, debouncedStartDepth, debouncedEndDepth, eovsSelected, orgsSelected, datasetsSelected])
+  }, [debouncedStartDate, debouncedEndDate, debouncedStartDepth, debouncedEndDepth, eovsSelected, orgsSelected, datasetsSelected])
 
   const childrenArray = React.Children.toArray(children)
 
