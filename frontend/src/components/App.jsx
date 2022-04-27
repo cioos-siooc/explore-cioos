@@ -242,7 +242,8 @@ export default function App() {
       }
       <Controls
         setQuery={setQuery}
-        setLoading={setLoading}
+        // setLoading={setLoading}
+        loading={loading}
       >
         {polygon && (
           <Col xs='auto' className='selectionPanelColumn'>

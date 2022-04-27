@@ -16,7 +16,7 @@ import './styles.css'
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected } from '../config.js'
 import HeirarchicalMultiCheckboxFilter from './Filter/HeirarchicalMultiCheckboxFilter/HeirarchicalMultiCheckboxFilter.jsx'
 
-export default function Controls({ setQuery, children }) {
+export default function Controls({ setQuery, loading, children }) {
   const { t } = useTranslation()
 
   // Making changes to context within context consumers (ie. passing mutable state down to children to manipulate)
@@ -124,7 +124,7 @@ export default function Controls({ setQuery, children }) {
   }
 
   return (
-    <div className='controls'>
+    <div className={`controls ${loading === true && 'disabled'}`}>
       <Container fluid>
         <Row>
           {childrenArray.length === 2 && childrenArray[0]}
