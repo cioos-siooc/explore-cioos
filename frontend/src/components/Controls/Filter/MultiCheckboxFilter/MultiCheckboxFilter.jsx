@@ -7,8 +7,6 @@ import './styles.css'
 
 export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions, titles={} }) {
   const { t , i18n} = useTranslation()
-  
-console.log( Object.entries(optionsSelected));
 
 const optionsSelectedSorted = Object.entries(optionsSelected)
   .sort((a, b) => t(a[0]).localeCompare(t(b[0]),i18n.language))
