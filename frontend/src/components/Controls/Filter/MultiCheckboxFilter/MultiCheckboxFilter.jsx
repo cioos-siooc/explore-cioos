@@ -6,14 +6,19 @@ import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
 import './styles.css'
 
 export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions, titles={} }) {
-  const { t } = useTranslation()
+  const { t , i18n} = useTranslation()
+  
+
+const optionsSelectedSorted = Object.entries(optionsSelected)
+  .sort(([a, ], [b, ]) => t(a).localeCompare(t(b),i18n.language))
+  .reduce((r, [k, v]) => ({ ...r, [k]: v }), {});
 
   return (
     <div className='multiCheckboxFilter'>
       <div className="filterCount">
         ({Object.keys(optionsSelected).length})
       </div>
-      {Object.keys(optionsSelected).length > 0 ? Object.keys(optionsSelected).map((option, index) => (
+      {Object.keys(optionsSelected).length > 0 ? Object.keys(optionsSelectedSorted).map((option, index) => (
         <div className='optionButton' key={index} title={option}
           onClick={() => {
             if (searchable) {

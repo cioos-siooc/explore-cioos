@@ -24,8 +24,17 @@ export default function Controls({ setQuery, children }) {
 
   // EOV filter initial values and state
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
-  const eovsFilterName = t('oceanVariablesFiltername') //'Ocean Variables'
-  const eovsBadgeTitle = generateMultipleSelectBadgeTitle(eovsFilterName, eovsSelected)
+  const eovsFilterName = 'oceanVariablesFiltername'
+  
+  const eovsSelectedRenamed = Object.keys(eovsSelected).reduce((acc, cur) => {
+    acc["EOV" + cur] = eovsSelected[cur];
+    return acc;
+  }, {});
+  
+  const eovsBadgeTitle = generateMultipleSelectBadgeTitle(
+    eovsFilterName,
+    eovsSelectedRenamed
+  );
   const [eovsSearchTerms, setEovsSearchTerms] = useState('')
 
   // Organization filter initial values from API and state
@@ -57,13 +66,13 @@ export default function Controls({ setQuery, children }) {
       }).catch(error => { throw error })
     })
   }, [])
-  const orgsFilterName = t("organizationFilterName") //'Organizations'
+  const orgsFilterName = "organizationFilterName" //'Organizations'
   const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterName, orgsSelected)
   const [orgsSearchTerms, setOrgsSearchTerms] = useState('')
 
   // Dataset filter initial values and state
   const [datasetsSelected, setDatasetsSelected] = useState(defaultDatatsetsSelected)
-  const datasetsFilterName = t('datasetsFilterName')//'Datasets'
+  const datasetsFilterName = 'datasetsFilterName' //'Datasets'
   const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(datasetsFilterName, datasetsSelected)
   const [datasetSearchTerms, setDatasetSearchTerms] = useState('')
   const [datasetsFullList, setDatasetsFullList] = useState()
