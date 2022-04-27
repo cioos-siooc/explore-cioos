@@ -9,7 +9,6 @@ export function capitalizeFirstLetter(string) {
 }
 export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
   const { t } = useTranslation();
-  console.log("optionsSelected", optionsSelected);
   
   // get text array of items selected
   const optionSelectedText = Object.entries(optionsSelected)

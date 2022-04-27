@@ -136,10 +136,8 @@ export default function Controls({ setQuery, children }) {
   function handleSetDatasetsSelected(selection) {
     setDatasetsSelected(selection)
   }
-  console.log(eovsSelected);
   const titles={}
   Object.keys(eovsSelected).forEach(k=>titles[k]=t('EOV'+k));
-  console.log(titles);
   
   return (
     <div className='controls'>
