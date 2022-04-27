@@ -5,6 +5,12 @@
   z-index: 2;
 }
 
+.controls.disabled .filterHeader,
+.controls.disabled .filterOptions {
+  pointer-events: none !important;
+  background-color: lightgrey;
+}
+
 .controls .controlColumn.col>div {
   margin: 0px 0px 0px 10px;
 }
