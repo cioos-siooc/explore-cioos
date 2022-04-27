@@ -24,12 +24,14 @@ export default function Controls({ setQuery, loading, children }) {
 
   // EOV filter initial values and state
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
+  const debouncedEovsSelected = useDebounce(eovsSelected, 500)
   const eovsFilterName = t('oceanVariablesFiltername') //'Ocean Variables'
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(eovsFilterName, eovsSelected)
   const [eovsSearchTerms, setEovsSearchTerms] = useState('')
 
   // Organization filter initial values from API and state
   const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected)
+  const debouncedOrgsSelected = useDebounce(orgsSelected, 500)
   useEffect(() => {
     fetch(`${server}/organizations`).then(response => response.json()).then(orgData => {
       let orgsReturned = {}
@@ -58,6 +60,7 @@ export default function Controls({ setQuery, loading, children }) {
 
   // Dataset filter initial values and state
   const [datasetsSelected, setDatasetsSelected] = useState(defaultDatatsetsSelected)
+  const debouncedDatasetsSelected = useDebounce(datasetsSelected, 500)
   const datasetsFilterName = t('datasetsFilterName')//'Datasets'
   const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(datasetsFilterName, datasetsSelected)
   const [datasetSearchTerms, setDatasetSearchTerms] = useState('')
@@ -93,7 +96,7 @@ export default function Controls({ setQuery, loading, children }) {
       orgsSelected: orgsSelected,
       datasetsSelected: datasetsSelected
     })
-  }, [debouncedStartDate, debouncedEndDate, debouncedStartDepth, debouncedEndDepth, eovsSelected, orgsSelected, datasetsSelected])
+  }, [debouncedStartDate, debouncedEndDate, debouncedStartDepth, debouncedEndDepth, debouncedEovsSelected, debouncedOrgsSelected, debouncedDatasetsSelected])
 
   const childrenArray = React.Children.toArray(children)
 
