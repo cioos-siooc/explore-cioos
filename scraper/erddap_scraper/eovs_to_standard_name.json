@@ -162,6 +162,7 @@
     "concentration_of_chlorophyll",
     "concentration_of_chlorophyll_in_sea_water",
     "mass_concentration_of_chlorophyll_in_sea_water",
+    "mass_concentration_of_chlorophyll_a_in_sea_water",
     "mass_concentration_of_diatoms_expressed_as_chlorophyll_in_sea_water",
     "mass_concentration_of_microphytoplankton_expressed_as_chlorophyll_in_sea_water",
     "mass_concentration_of_miscellaneous_phytoplankton_expressed_as_chlorophyll_in_sea_water",

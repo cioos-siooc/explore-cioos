@@ -24,16 +24,11 @@ export default function Controls({ setQuery, children }) {
 
   // EOV filter initial values and state
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
-  const eovsFilterName = 'oceanVariablesFiltername'
-  
-  const eovsSelectedRenamed = Object.keys(eovsSelected).reduce((acc, cur) => {
-    acc["EOV" + cur] = eovsSelected[cur];
-    return acc;
-  }, {});
+  const eovsFilterTranslationKey = 'oceanVariablesFiltername'
   
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(
-    eovsFilterName,
-    eovsSelectedRenamed
+    eovsFilterTranslationKey,
+    eovsSelected
   );
   const [eovsSearchTerms, setEovsSearchTerms] = useState('')
 
@@ -66,14 +61,14 @@ export default function Controls({ setQuery, children }) {
       }).catch(error => { throw error })
     })
   }, [])
-  const orgsFilterName = "organizationFilterName" //'Organizations'
-  const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterName, orgsSelected)
+  const orgsFilterTranslationKey = "organizationFilterName" //'Organizations'
+  const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterTranslationKey, orgsSelected)
   const [orgsSearchTerms, setOrgsSearchTerms] = useState('')
 
   // Dataset filter initial values and state
   const [datasetsSelected, setDatasetsSelected] = useState(defaultDatatsetsSelected)
-  const datasetsFilterName = 'datasetsFilterName' //'Datasets'
-  const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(datasetsFilterName, datasetsSelected)
+  const datasetsFilterTranslationKey = 'datasetsFilterName' //'Datasets'
+  const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(datasetsFilterTranslationKey, datasetsSelected)
   const [datasetSearchTerms, setDatasetSearchTerms] = useState('')
   const [datasetsFullList, setDatasetsFullList] = useState()
 
@@ -137,7 +132,7 @@ export default function Controls({ setQuery, children }) {
     setDatasetsSelected(selection)
   }
   const titles={}
-  Object.keys(eovsSelected).forEach(k=>titles[k]=t('EOV'+k));
+  Object.keys(eovsSelected).forEach(k=>titles[k]=t(k));
   
   return (
     <div className='controls'>
@@ -156,8 +151,8 @@ export default function Controls({ setQuery, children }) {
               searchTerms={eovsSearchTerms}
               setSearchTerms={setEovsSearchTerms}
               searchPlaceholder={t('oceanVariableFilterSeachPlaceholder')} //'Search for ocean variable name...'
-              filterName={eovsFilterName}
-              openFilter={openFilter === eovsFilterName}
+              filterName={eovsFilterTranslationKey}
+              openFilter={openFilter === eovsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
               selectAllButton
             >
@@ -180,8 +175,8 @@ export default function Controls({ setQuery, children }) {
               searchTerms={orgsSearchTerms}
               setSearchTerms={setOrgsSearchTerms}
               searchPlaceholder={t('organizationFilterSearchPlaceholder')} //'Search for organization name...'
-              filterName={orgsFilterName}
-              openFilter={openFilter === orgsFilterName}
+              filterName={orgsFilterTranslationKey}
+              openFilter={openFilter === orgsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
               selectAllButton
             >
@@ -203,8 +198,8 @@ export default function Controls({ setQuery, children }) {
               searchTerms={datasetSearchTerms}
               setSearchTerms={setDatasetSearchTerms}
               searchPlaceholder={t('datasetSearchPlaceholder')} // 'Search for dataset name...'
-              filterName={datasetsFilterName}
-              openFilter={openFilter === datasetsFilterName}
+              filterName={datasetsFilterTranslationKey}
+              openFilter={openFilter === datasetsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
               selectAllButton
             >
