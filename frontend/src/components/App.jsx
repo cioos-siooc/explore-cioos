@@ -75,6 +75,22 @@ export default function App() {
     }
   }, [pointsToReview])
 
+  useEffect(() => {
+    fetch(`${server}/organizations`).then(response => response.json()).then(data => {
+      let orgsReturned = {}
+      data.forEach(elem => {
+        orgsReturned[elem.name] = elem.pk
+      })
+      fetch(`${server}/datasets`).then(response => response.json()).then(datasetData => {
+        let datasetsReturned = {}
+        datasetData.forEach(dataset => {
+          datasetsReturned[dataset.title] = dataset.pk
+        })
+        setDatasets(datasetsReturned)
+        setOrganizations(orgsReturned)
+      })
+    }).catch(error => { throw error })
+  }, [])
 
   useEffect(() => {
     switch (submissionState) {
