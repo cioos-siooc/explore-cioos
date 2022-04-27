@@ -19,8 +19,9 @@ export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
   const count = optionSelectedText.length;
   
   if (count == 0) return t(badgeTitle);
-  if (count == 1) return capitalizeFirstLetter(t(firstOptionSelected));
-  if (count > 1) {
+  else if (count == 1) return capitalizeFirstLetter(t(firstOptionSelected));
+  // count > 1
+  else {
     const mapping = {
       oceanVariablesFiltername: "oceanVariablesMulit",
       organizationFilterName: "organizationMulti",
