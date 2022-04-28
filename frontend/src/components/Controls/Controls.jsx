@@ -26,11 +26,11 @@ export default function Controls({ setQuery, loading, children }) {
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
   const debouncedEovsSelected = useDebounce(eovsSelected, 500)
   const eovsFilterTranslationKey = 'oceanVariablesFiltername'
-  
+
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(
     eovsFilterTranslationKey,
     eovsSelected
-  );
+  )
   const [eovsSearchTerms, setEovsSearchTerms] = useState('')
 
   // Organization filter initial values from API and state
@@ -38,9 +38,9 @@ export default function Controls({ setQuery, loading, children }) {
   const debouncedOrgsSelected = useDebounce(orgsSelected, 500)
   useEffect(() => {
     fetch(`${server}/oceanVariables`).then(response => response.json()).then(oceanVariablesReturned => {
-        const eovsSelectedNew={}
-        oceanVariablesReturned.forEach(eov=>eovsSelectedNew[eov]=false);
-        setEovsSelected(eovsSelectedNew)
+      const eovsSelectedNew = {}
+      oceanVariablesReturned.forEach(eov => eovsSelectedNew[eov] = false);
+      setEovsSelected(eovsSelectedNew)
     })
     fetch(`${server}/organizations`).then(response => response.json()).then(orgData => {
       let orgsReturned = {}
@@ -64,14 +64,14 @@ export default function Controls({ setQuery, loading, children }) {
     })
   }, [])
   const orgsFilterTranslationKey = "organizationFilterName" //'Organizations'
-  const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterTranslationKey, orgsSelected, false)
+  const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterTranslationKey, orgsSelected)
   const [orgsSearchTerms, setOrgsSearchTerms] = useState('')
 
   // Dataset filter initial values and state
   const [datasetsSelected, setDatasetsSelected] = useState(defaultDatatsetsSelected)
   const debouncedDatasetsSelected = useDebounce(datasetsSelected, 500)
   const datasetsFilterTranslationKey = 'datasetsFilterName' //'Datasets'
-  const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(datasetsFilterTranslationKey, datasetsSelected, false)
+  const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(datasetsFilterTranslationKey, datasetsSelected)
   const [datasetSearchTerms, setDatasetSearchTerms] = useState('')
   const [datasetsFullList, setDatasetsFullList] = useState()
 
@@ -134,9 +134,7 @@ export default function Controls({ setQuery, loading, children }) {
   function handleSetDatasetsSelected(selection) {
     setDatasetsSelected(selection)
   }
-  const titles={}
-  Object.keys(eovsSelected).forEach(k=>titles[k]=t(k));
-  
+
   return (
     <div className={`controls ${loading === true && 'disabled'}`}>
       <Container fluid>
@@ -162,7 +160,6 @@ export default function Controls({ setQuery, loading, children }) {
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(eovsSearchTerms, eovsSelected)}
                 setOptionsSelected={setEovsSelected}
-                titles={titles}
                 searchable
                 allOptions={eovsSelected}
               />

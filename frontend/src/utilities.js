@@ -7,19 +7,19 @@ import { useTranslation } from 'react-i18next'
 export function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
-export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected, translateSingleItem=true) {
-  const { t } = useTranslation();
-  
+export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
+  const { t } = useTranslation()
+
   // get text array of items selected
   const optionSelectedText = Object.entries(optionsSelected)
     .filter(([k, isSelected]) => isSelected)
-    .map((e) => e[0]);
+    .map((e) => e[0])
 
-  const firstOptionSelected = optionSelectedText && optionSelectedText[0];
-  const count = optionSelectedText.length;
-  
+  const firstOptionSelected = optionSelectedText && optionSelectedText[0]
+  const count = optionSelectedText.length
+
   if (count == 0) return t(badgeTitle)
-  else if (count == 1) return capitalizeFirstLetter(translateSingleItem? t(firstOptionSelected) : firstOptionSelected);
+  else if (count == 1) return capitalizeFirstLetter(t(firstOptionSelected))
   // count > 1
   else {
     const mapping = {
@@ -27,7 +27,7 @@ export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected, tr
       organizationFilterName: "organizationMulti",
       datasetsFilterName: "datasetsMulti",
     };
-    return count + t(mapping[badgeTitle]);
+    return count + t(mapping[badgeTitle])
   }
 }
 
@@ -61,17 +61,17 @@ function objectToURL(obj) {
 }
 
 export function createDataFilterQueryString(query, organizations, datasets) {
-  const { orgsSelected, eovsSelected, datasetsSelected } = query;
+  const { orgsSelected, eovsSelected, datasetsSelected } = query
 
   const queryWithoutDefaults = Object.keys(defaultQuery).reduce(
     (acc, field) => {
       if (query[field] !== defaultQuery[field]) {
-        acc[field] = query[field];
+        acc[field] = query[field]
       }
-      return acc;
+      return acc
     },
     {}
-  );
+  )
 
   const eovs = Object.keys(eovsSelected)
     .filter((eov) => eovsSelected[eov])
@@ -97,7 +97,7 @@ export function createDataFilterQueryString(query, organizations, datasets) {
     timeMax: endDate,
     depthMin: startDepth,
     depthMax: endDepth,
-  };
+  }
 
   return objectToURL(apiMappedQuery);
 }
