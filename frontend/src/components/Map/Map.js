@@ -13,7 +13,7 @@ import { createDataFilterQueryString, generateColorStops, getCurrentRangeLevel }
 import { colorScale } from "../config"
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, organizations, datasets, zoom, setZoom, rangeLevels }) {
+export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, organizations, datasets, zoom, setZoom, offsetFlyTo, rangeLevels }) {
   const { t } = useTranslation()
   const mapContainer = useRef(null)
   const map = useRef(null)
@@ -50,6 +50,12 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
   useEffect(() => {
     setColorStops()
   }, [rangeLevels])
+
+  useEffect(() => {
+    if (map.current) {
+      map.current.offsetFlyTo = offsetFlyTo
+    }
+  }, [offsetFlyTo])
 
   useEffect(() => {
     if (boxSelectStartCoords && boxSelectEndCoords) {
@@ -267,7 +273,10 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         if (drawPolygon.current.getAll().features.length > 0) {
           drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
         }
-        map.current.flyTo({ center: [e.lngLat.lng, e.lngLat.lat] })
+        if (map.current.offsetFlyTo === undefined) {
+          map.current.offsetFlyTo = true
+        }
+        map.current.flyTo({ center: [e.lngLat.lng, e.lngLat.lat], padding: map.current.offsetFlyTo ? { top: 0, bottom: 0, left: 500, right: 0 } : 0 })
         const height = 10
         const width = 10
         var bbox = [
@@ -292,7 +301,10 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
 
     const handleMapHexesOnClick = e => {
       if (draw.getMode() !== 'draw_polygon' && !creatingRectangle.current) {
-        map.current.flyTo({ center: [e.lngLat.lng, e.lngLat.lat], zoom: 7 })
+        if (map.current.offsetFlyTo === undefined) {
+          map.current.offsetFlyTo = true
+        }
+        map.current.flyTo({ center: [e.lngLat.lng, e.lngLat.lat], zoom: 7, padding: map.current.offsetFlyTo ? { top: 0, bottom: 0, left: 500, right: 0 } : 0 })
       }
       if (creatingRectangle.current) {
         creatingRectangle.current = false
@@ -421,7 +433,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
 
     let zoomOutToolDiv = document.getElementsByClassName('mapboxgl-ctrl-zoom-out')
     zoomOutToolDiv[0].title = t('mapZoomOutToolTitle')
-    
+
     let orientNorthToolDiv = document.getElementsByClassName('mapboxgl-ctrl-compass')
     orientNorthToolDiv[0].title = t('mapCompassToolTitle')
   }, [])
