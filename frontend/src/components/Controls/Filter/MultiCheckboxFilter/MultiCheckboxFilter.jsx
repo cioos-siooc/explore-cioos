@@ -5,16 +5,20 @@ import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
 
 import './styles.css'
 
-export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions }) {
-  const { t } = useTranslation()
+export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions, titles={} }) {
+  const { t , i18n} = useTranslation()
+
+const optionsSelectedSorted = Object.entries(optionsSelected)
+  .sort((a, b) => t(a[0]).localeCompare(t(b[0]),i18n.language))
+  .reduce((r, [k, v]) => ({ ...r, [k]: v }), {});
 
   return (
     <div className='multiCheckboxFilter'>
       <div className="filterCount">
         ({Object.keys(optionsSelected).length})
       </div>
-      {Object.keys(optionsSelected).length > 0 ? Object.keys(optionsSelected).map((option, index) => (
-        <div className='optionButton' key={index} title={option}
+      {Object.keys(optionsSelected).length > 0 ? Object.keys(optionsSelectedSorted).map((option, index) => (
+        <div className='optionButton' key={index} title={t(option)}
           onClick={() => {
             if (searchable) {
               let tempData = { ...allOptions }
@@ -33,7 +37,7 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
         >
           {optionsSelected[option] ? <CheckSquare /> : <Square />}
           <span className='optionName'>
-            {capitalizeFirstLetter(abbreviateString(option, 30))}
+            {titles[option] || capitalizeFirstLetter(abbreviateString(option, 30))}
           </span>
         </div>
       ))

@@ -67,7 +67,7 @@ export default function DatasetInspector({ dataset, setInspectDataset }) {
             {/* Ocean Variables */}
           </h6>
           <div>
-            {dataset.eovs.map((eov, index) => ' ' + eov).join(',')}
+            {dataset.eovs.map((eov, index) => ' ' + t(eov)).join(',')}
           </div>
           <hr />
           <h6>

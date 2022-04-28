@@ -1,7 +1,4 @@
-const { eovGrouping } = require("./grouping");
 const { polygonJSONToWKT } = require("./polygon");
-
-// this is used by the tiler and the downloader routes
 const unique = (arr) => [...new Set(arr)];
 
 function createDBFilter(request) {
@@ -28,13 +25,10 @@ function createDBFilter(request) {
   if (eovs) {
     const eovsCommaSeparatedString = unique(
       eovs
-        .split(",")
-        .map((eov) => eovGrouping[eov])
-        .flat()
-        .map((eov) => `'${eov}'`)
-    ).join();
+        .split(","))
+        .map((eov) => `'${eov}'`).join();
 
-    filters.push(`eovs && array[${eovsCommaSeparatedString}]`);
+    filters.push(`ceda_eovs && array[${eovsCommaSeparatedString}]`);
   }
 
   if (timeMin) filters.push(`time_max >= '${timeMin}'::timestamptz`);

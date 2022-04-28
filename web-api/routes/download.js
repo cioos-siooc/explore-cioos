@@ -7,7 +7,6 @@ const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { getShapeQuery } = require("../utils/shapeQuery");
 const { polygonJSONToWKT } = require("../utils/polygon");
-const { eovGrouping } = require("../utils/grouping");
 const { requiredShapeMiddleware } = require("../utils/validatorMiddlewares");
 const { check } = require("express-validator");
 
@@ -82,12 +81,7 @@ router.get(
             depth_min: Number.parseFloat(depthMin),
             depth_max: Number.parseFloat(depthMax),
             polygon_region: wktPolygon,
-            eovs: eovs
-              ? eovs
-                  .split(",")
-                  .map((eov) => eovGrouping[eov])
-                  .flat()
-              : Object.values(eovGrouping).flat(),
+            eovs: eovs ? eovs.split(",") : [],
             email,
             job_id: jobID,
           },
