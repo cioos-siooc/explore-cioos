@@ -56,17 +56,15 @@ services:
     volumes:
       - $DOWNLOADS_FOLDER:/usr/src/app/downloads
     restart: always
-  # This would get used if/when we stop hosting Gitpages
-
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     args:
-  #       API_URL: $API_URL
-  #   expose:
-  #     - "80"
-  #   depends_on:
-  #     - web-api
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        API_URL: $API_URL
+    expose:
+      - "80"
+    depends_on:
+      - web-api
 volumes:
   postgres-data:
   redis-data:

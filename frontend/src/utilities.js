@@ -7,40 +7,28 @@ import { useTranslation } from 'react-i18next'
 export function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
-
 export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
-  const { t } = useTranslation()
-  let count = 0
-  let newBadge
-  if (!_.isEmpty(optionsSelected)) {
-    Object.keys(optionsSelected).forEach(key => {
-      if (optionsSelected[key] === true) {
-        count++
-      }
-    })
+  const { t } = useTranslation();
+  
+  // get text array of items selected
+  const optionSelectedText = Object.entries(optionsSelected)
+    .filter(([k, isSelected]) => isSelected)
+    .map((e) => e[0]);
+
+  const firstOptionSelected = optionSelectedText && optionSelectedText[0];
+  const count = optionSelectedText.length;
+  
+  if (count == 0) return t(badgeTitle);
+  else if (count == 1) return capitalizeFirstLetter(t(firstOptionSelected));
+  // count > 1
+  else {
+    const mapping = {
+      oceanVariablesFiltername: "oceanVariablesMulit",
+      organizationFilterName: "organizationMulti",
+      datasetsFilterName: "datasetsMulti",
+    };
+    return count + t(mapping[badgeTitle]);
   }
-  if (count === 0) {
-    newBadge = badgeTitle
-  } else if (count === 1) {
-    Object.keys(optionsSelected).forEach(key => {
-      if (optionsSelected[key]) {
-        newBadge = capitalizeFirstLetter(key)
-      }
-    })
-  } else if (count > 1) {
-    switch (badgeTitle) {
-      case t('oceanVariablesFiltername'): // 'Ocean Variables'
-        newBadge = count + t('oceanVariablesMulit') //' variables'
-        break;
-      case t('organizationFilterName'): //'Organizations':
-        newBadge = count + t('organizationMulti') //' organizations'
-        break;
-      case t('datasetsFilterName'): //'Datasets':
-        newBadge = count + t('datasetsMulti') //' datasets'
-        break;
-    }
-  }
-  return newBadge
 }
 
 export function generateRangeSelectBadgeTitle(badgeTitle, optionsSelected, defaults, units) {
