@@ -41,7 +41,19 @@
     "surface_downwelling_photosynthetic_photon_flux_in_air",
     "surface_downwelling_photosynthetic_photon_flux_in_sea_water",
     "surface_downwelling_shortwave_flux_in_air",
-    "downwelling_photosynthetic_photon_spherical_irradiance_in_sea_water"
+    "downwelling_photosynthetic_photon_spherical_irradiance_in_sea_water",
+    "chlorophyll_concentration_in_sea_water",
+    "concentration_of_chlorophyll",
+    "concentration_of_chlorophyll_in_sea_water",
+    "mass_concentration_of_chlorophyll_in_sea_water",
+    "mass_concentration_of_chlorophyll_a_in_sea_water",
+    "mass_concentration_of_diatoms_expressed_as_chlorophyll_in_sea_water",
+    "mass_concentration_of_microphytoplankton_expressed_as_chlorophyll_in_sea_water",
+    "mass_concentration_of_miscellaneous_phytoplankton_expressed_as_chlorophyll_in_sea_water",
+    "mass_concentration_of_nanophytoplankton_expressed_as_chlorophyll_in_sea_water",
+    "mass_concentration_of_phytoplankton_expressed_as_chlorophyll_in_sea_water",
+    "mass_concentration_of_picophytoplankton_expressed_as_chlorophyll_in_sea_water",
+    "mass_fraction_of_chlorophyll_a_in_sea_water"
   ],
   "oceanSound": [
     "sound_frequency",
