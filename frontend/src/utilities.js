@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 export function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
-export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
+export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected, translateSingleItem=true) {
   const { t } = useTranslation();
   
   // get text array of items selected
@@ -18,8 +18,8 @@ export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
   const firstOptionSelected = optionSelectedText && optionSelectedText[0];
   const count = optionSelectedText.length;
   
-  if (count == 0) return t(badgeTitle);
-  else if (count == 1) return capitalizeFirstLetter(t(firstOptionSelected));
+  if (count == 0) return t(badgeTitle)
+  else if (count == 1) return capitalizeFirstLetter(translateSingleItem? t(firstOptionSelected) : firstOptionSelected);
   // count > 1
   else {
     const mapping = {

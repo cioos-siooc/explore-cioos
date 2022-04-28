@@ -18,7 +18,7 @@ const optionsSelectedSorted = Object.entries(optionsSelected)
         ({Object.keys(optionsSelected).length})
       </div>
       {Object.keys(optionsSelected).length > 0 ? Object.keys(optionsSelectedSorted).map((option, index) => (
-        <div className='optionButton' key={index} title={t(option)}
+        <div className='optionButton' key={index} title={titles[option] || option}
           onClick={() => {
             if (searchable) {
               let tempData = { ...allOptions }
