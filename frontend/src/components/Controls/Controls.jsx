@@ -64,14 +64,14 @@ export default function Controls({ setQuery, loading, children }) {
     })
   }, [])
   const orgsFilterTranslationKey = "organizationFilterName" //'Organizations'
-  const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterTranslationKey, orgsSelected)
+  const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterTranslationKey, orgsSelected, false)
   const [orgsSearchTerms, setOrgsSearchTerms] = useState('')
 
   // Dataset filter initial values and state
   const [datasetsSelected, setDatasetsSelected] = useState(defaultDatatsetsSelected)
   const debouncedDatasetsSelected = useDebounce(datasetsSelected, 500)
   const datasetsFilterTranslationKey = 'datasetsFilterName' //'Datasets'
-  const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(datasetsFilterTranslationKey, datasetsSelected)
+  const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(datasetsFilterTranslationKey, datasetsSelected, false)
   const [datasetSearchTerms, setDatasetSearchTerms] = useState('')
   const [datasetsFullList, setDatasetsFullList] = useState()
 
