@@ -1,6 +1,4 @@
 {
-  "welcome_to_react": "Bienvenue sur React et react-i18next",
-  "test": "french test: {{test}}",
   "stepInfoFilter": "Filtres",
   "stepInfoSelect": "Sélection",
   "stepInfoInspect": "Inspection",
