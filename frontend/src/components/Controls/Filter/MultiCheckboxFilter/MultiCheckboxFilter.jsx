@@ -5,12 +5,12 @@ import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
 
 import './styles.css'
 
-export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions, titles={} }) {
-  const { t , i18n} = useTranslation()
+export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions }) {
+  const { t, i18n } = useTranslation()
 
-const optionsSelectedSorted = Object.entries(optionsSelected)
-  .sort((a, b) => t(a[0]).localeCompare(t(b[0]),i18n.language))
-  .reduce((r, [k, v]) => ({ ...r, [k]: v }), {});
+  const optionsSelectedSorted = Object.entries(optionsSelected)
+    .sort((a, b) => t(a[0]).localeCompare(t(b[0]), i18n.language))
+    .reduce((r, [k, v]) => ({ ...r, [k]: v }), {});
 
   return (
     <div className='multiCheckboxFilter'>
@@ -37,7 +37,7 @@ const optionsSelectedSorted = Object.entries(optionsSelected)
         >
           {optionsSelected[option] ? <CheckSquare /> : <Square />}
           <span className='optionName'>
-            {titles[option] || capitalizeFirstLetter(abbreviateString(option, 30))}
+            {capitalizeFirstLetter(abbreviateString(t(option), 30))}
           </span>
         </div>
       ))
