@@ -264,7 +264,6 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     map.current.addControl(drawPolygon.current, "bottom-right")
 
     const handleMapOnClick = e => {
-      const z = map.current.getZoom()
       // Clear highlighted points if looking at points level and clicking off of the points
       if (drawPolygon.current.getAll().features.length === 0 && map.current.getZoom() >= 7) {
         map.current.setFilter('points-highlighted', ['in', 'pk', ''])
@@ -397,7 +396,6 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     map.current.on('zoomend', e => {
       doFinalCheck.current = true
       if (drawPolygon.current.getAll().features.length > 0) {
-        // setPointsToReview()
         if (map.current.getZoom() >= 7) {
           setLoading(true)
           highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
@@ -425,7 +423,6 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     // Workaround for https://github.com/mapbox/mapbox-gl-draw/issues/617
 
     map.current.on('click', handleMapOnClick);
-    // map.current.on('click', handleMapOnClick);
     // mobile seems better without handleMapOnClick enabled for touch
 
     map.current.on('click', 'points', handleMapPointsOnClick);
