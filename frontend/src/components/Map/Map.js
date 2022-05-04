@@ -13,11 +13,11 @@ import { createDataFilterQueryString, generateColorStops, getCurrentRangeLevel }
 import { colorScale } from "../config"
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, organizations, datasets, zoom, setZoom, rangeLevels }) {
+export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, organizations, datasets, zoom, setZoom, offsetFlyTo, rangeLevels }) {
   const { t } = useTranslation()
   const mapContainer = useRef(null)
   const map = useRef(null)
-  const creatingRectangle = useRef(false)
+  const creatingPolygon = useRef(false)
   const drawControlOptions = {
     displayControlsDefault: false,
     controls: {
@@ -50,6 +50,12 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
   useEffect(() => {
     setColorStops()
   }, [rangeLevels])
+
+  useEffect(() => {
+    if (map.current) {
+      map.current.offsetFlyTo = offsetFlyTo
+    }
+  }, [offsetFlyTo])
 
   useEffect(() => {
     if (boxSelectStartCoords && boxSelectEndCoords) {
@@ -121,6 +127,9 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     )
 
     map.current.setFilter('points-highlighted', filter)
+    if (map.current.offsetFlyTo === undefined) {
+      map.current.offsetFlyTo = true
+    }
   }
 
   useEffect(() => {
@@ -185,7 +194,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       const boxQueryElement = document.getElementById('boxQueryButton');
       if (boxQueryElement) {
         boxQueryElement.onclick = () => {
-          creatingRectangle.current = true
+          creatingPolygon.current = true
           draw.changeMode('draw_rectangle');
         }
       }
@@ -255,7 +264,8 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     map.current.addControl(drawPolygon.current, "bottom-right")
 
     const handleMapOnClick = e => {
-      if (drawPolygon.current.getAll().features.length === 0) {
+      // Clear highlighted points if looking at points level and clicking off of the points
+      if (drawPolygon.current.getAll().features.length === 0 && map.current.getZoom() >= 7) {
         map.current.setFilter('points-highlighted', ['in', 'pk', ''])
         setPointsToReview()
         setPolygon()
@@ -263,11 +273,19 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     };
 
     const handleMapPointsOnClick = e => {
-      if (draw.getMode() !== 'draw_polygon' && !creatingRectangle.current) {
+      if (!creatingPolygon.current) {
         if (drawPolygon.current.getAll().features.length > 0) {
           drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
         }
-        map.current.flyTo({ center: [e.lngLat.lng, e.lngLat.lat] })
+        if (map.current.offsetFlyTo === undefined) {
+          map.current.offsetFlyTo = true
+        }
+        map.current.flyTo({
+          center: [e.lngLat.lng, e.lngLat.lat],
+          padding: map.current.offsetFlyTo ?
+            { top: 0, bottom: 0, left: 500, right: 0 } :
+            { top: 0, bottom: 0, left: 0, right: 0 }
+        })
         const height = 10
         const width = 10
         var bbox = [
@@ -284,18 +302,21 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
         highlightPoints(bboxPolygon.geometry.coordinates[0])
         setPolygon(bboxPolygon.geometry.coordinates[0])
-      }
-      if (creatingRectangle.current) {
-        creatingRectangle.current = false
+      } else if (draw.getMode() === 'simple_select' && creatingPolygon.current) {
+        creatingPolygon.current = false
       }
     };
 
     const handleMapHexesOnClick = e => {
-      if (draw.getMode() !== 'draw_polygon' && !creatingRectangle.current) {
-        map.current.flyTo({ center: [e.lngLat.lng, e.lngLat.lat], zoom: 7 })
-      }
-      if (creatingRectangle.current) {
-        creatingRectangle.current = false
+      if (!creatingPolygon.current) {
+        map.current.flyTo({
+          center: [e.lngLat.lng, e.lngLat.lat], zoom: 7,
+          padding: map.current.offsetFlyTo ?
+            { top: 0, bottom: 0, left: 500, right: 0 } :
+            { top: 0, bottom: 0, left: 0, right: 0 }
+        })
+      } else if (draw.getMode() === 'simple_select' && creatingPolygon.current) {
+        creatingPolygon.current = false
       }
     };
 
@@ -338,7 +359,6 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       }
       highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
       setPolygon(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
-      creatingRectangle.current = false
     })
 
     map.current.on('draw.update', e => {
@@ -360,7 +380,6 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
       }
       doFinalCheck.current = false
-      // setColorStops()
       setLoading(false)
     })
 
@@ -377,12 +396,12 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     map.current.on('zoomend', e => {
       doFinalCheck.current = true
       if (drawPolygon.current.getAll().features.length > 0) {
-        setPointsToReview()
         if (map.current.getZoom() >= 7) {
           setLoading(true)
           highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
         }
       }
+      setZoom(map.current.getZoom())
     })
 
     map.current.on('mousedown', e => {
@@ -392,11 +411,13 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     })
 
     map.current.on('mouseup', e => {
+      const mode = draw.getMode()
+      if (mode === 'draw_rectangle' || mode === 'draw_polygon') {
+        creatingPolygon.current = true
+      } else if (mode === 'simple_select') {
+        creatingPolygon.current = false
+      }
       setBoxSelectEndCoords([e.lngLat.lng, e.lngLat.lat])
-    })
-
-    map.current.on('zoomend', e => {
-      setZoom(map.current.getZoom())
     })
 
     // Workaround for https://github.com/mapbox/mapbox-gl-draw/issues/617
@@ -421,7 +442,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
 
     let zoomOutToolDiv = document.getElementsByClassName('mapboxgl-ctrl-zoom-out')
     zoomOutToolDiv[0].title = t('mapZoomOutToolTitle')
-    
+
     let orientNorthToolDiv = document.getElementsByClassName('mapboxgl-ctrl-compass')
     orientNorthToolDiv[0].title = t('mapCompassToolTitle')
   }, [])
