@@ -127,6 +127,9 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     )
 
     map.current.setFilter('points-highlighted', filter)
+    if (map.current.offsetFlyTo === undefined) {
+      map.current.offsetFlyTo = true
+    }
   }
 
   useEffect(() => {
@@ -261,7 +264,9 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     map.current.addControl(drawPolygon.current, "bottom-right")
 
     const handleMapOnClick = e => {
-      if (drawPolygon.current.getAll().features.length === 0) {
+      const z = map.current.getZoom()
+      // Clear highlighted points if looking at points level and clicking off of the points
+      if (drawPolygon.current.getAll().features.length === 0 && map.current.getZoom() >= 7) {
         map.current.setFilter('points-highlighted', ['in', 'pk', ''])
         setPointsToReview()
         setPolygon()
@@ -269,14 +274,19 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     };
 
     const handleMapPointsOnClick = e => {
-      if (draw.getMode() !== 'draw_polygon' && !creatingRectangle.current) {
+      if (!creatingRectangle.current) {
         if (drawPolygon.current.getAll().features.length > 0) {
           drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
         }
         if (map.current.offsetFlyTo === undefined) {
           map.current.offsetFlyTo = true
         }
-        map.current.flyTo({ center: [e.lngLat.lng, e.lngLat.lat], padding: map.current.offsetFlyTo ? { top: 0, bottom: 0, left: 500, right: 0 } : 0 })
+        map.current.flyTo({
+          center: [e.lngLat.lng, e.lngLat.lat],
+          padding: map.current.offsetFlyTo ?
+            { top: 0, bottom: 0, left: 500, right: 0 } :
+            { top: 0, bottom: 0, left: 0, right: 0 }
+        })
         const height = 10
         const width = 10
         var bbox = [
@@ -293,20 +303,20 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
         highlightPoints(bboxPolygon.geometry.coordinates[0])
         setPolygon(bboxPolygon.geometry.coordinates[0])
-      }
-      if (creatingRectangle.current) {
+      } else if (draw.getMode() === 'simple_select' && creatingRectangle.current) {
         creatingRectangle.current = false
       }
     };
 
     const handleMapHexesOnClick = e => {
-      if (draw.getMode() !== 'draw_polygon' && !creatingRectangle.current) {
-        if (map.current.offsetFlyTo === undefined) {
-          map.current.offsetFlyTo = true
-        }
-        map.current.flyTo({ center: [e.lngLat.lng, e.lngLat.lat], zoom: 7, padding: map.current.offsetFlyTo ? { top: 0, bottom: 0, left: 500, right: 0 } : 0 })
-      }
-      if (creatingRectangle.current) {
+      if (!creatingRectangle.current) {
+        map.current.flyTo({
+          center: [e.lngLat.lng, e.lngLat.lat], zoom: 7,
+          padding: map.current.offsetFlyTo ?
+            { top: 0, bottom: 0, left: 500, right: 0 } :
+            { top: 0, bottom: 0, left: 0, right: 0 }
+        })
+      } else if (draw.getMode() === 'simple_select' && creatingRectangle.current) {
         creatingRectangle.current = false
       }
     };
@@ -350,7 +360,6 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       }
       highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
       setPolygon(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
-      creatingRectangle.current = false
     })
 
     map.current.on('draw.update', e => {
@@ -372,7 +381,6 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
       }
       doFinalCheck.current = false
-      // setColorStops()
       setLoading(false)
     })
 
@@ -389,12 +397,13 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     map.current.on('zoomend', e => {
       doFinalCheck.current = true
       if (drawPolygon.current.getAll().features.length > 0) {
-        setPointsToReview()
+        // setPointsToReview()
         if (map.current.getZoom() >= 7) {
           setLoading(true)
           highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
         }
       }
+      setZoom(map.current.getZoom())
     })
 
     map.current.on('mousedown', e => {
@@ -404,16 +413,19 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     })
 
     map.current.on('mouseup', e => {
+      const mode = draw.getMode()
+      if (mode === 'draw_rectangle' || mode === 'draw_polygon') {
+        creatingRectangle.current = true
+      } else if (mode === 'simple_select') {
+        creatingRectangle.current = false
+      }
       setBoxSelectEndCoords([e.lngLat.lng, e.lngLat.lat])
-    })
-
-    map.current.on('zoomend', e => {
-      setZoom(map.current.getZoom())
     })
 
     // Workaround for https://github.com/mapbox/mapbox-gl-draw/issues/617
 
     map.current.on('click', handleMapOnClick);
+    // map.current.on('click', handleMapOnClick);
     // mobile seems better without handleMapOnClick enabled for touch
 
     map.current.on('click', 'points', handleMapPointsOnClick);

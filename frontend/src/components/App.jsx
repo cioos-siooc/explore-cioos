@@ -244,7 +244,6 @@ export default function App() {
       }
       <Controls
         setQuery={setQuery}
-        // setLoading={setLoading}
         loading={loading}
       >
         {polygon && (
