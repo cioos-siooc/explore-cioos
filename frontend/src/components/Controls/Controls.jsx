@@ -25,44 +25,13 @@ export default function Controls({ setQuery, loading, children }) {
   // EOV filter initial values and state
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
   const debouncedEovsSelected = useDebounce(eovsSelected, 500)
-  const eovsFilterTranslationKey = 'oceanVariablesFiltername'
-
-  const eovsBadgeTitle = generateMultipleSelectBadgeTitle(
-    eovsFilterTranslationKey,
-    eovsSelected
-  )
+  const eovsFilterTranslationKey = 'oceanVariablesFiltername' //'Ocean Variables'
+  const eovsBadgeTitle = generateMultipleSelectBadgeTitle(eovsFilterTranslationKey, eovsSelected)
   const [eovsSearchTerms, setEovsSearchTerms] = useState('')
 
   // Organization filter initial values from API and state
   const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected)
   const debouncedOrgsSelected = useDebounce(orgsSelected, 500)
-  useEffect(() => {
-    fetch(`${server}/oceanVariables`).then(response => response.json()).then(oceanVariablesReturned => {
-      const eovsSelectedNew = {}
-      oceanVariablesReturned.forEach(eov => eovsSelectedNew[eov] = false);
-      setEovsSelected(eovsSelectedNew)
-    })
-    fetch(`${server}/organizations`).then(response => response.json()).then(orgData => {
-      let orgsReturned = {}
-      orgData.forEach(elem => {
-        orgsReturned[elem.name] = false
-      })
-      fetch(`${server}/datasets`).then(response => response.json()).then(datasetsData => {
-        let datasetsReturned = {}
-        datasetsData.forEach(dataset => {
-          datasetsReturned[dataset.title] = false
-        })
-        setOrgsSelected(orgsReturned)
-        setDatasetsFullList(datasetsData.map(dataset => {
-          return {
-            ...dataset,
-            orgTitles: orgData.filter(org => dataset.organization_pks.includes(org.pk)).map(org => org.name)
-          }
-        }))
-        setDatasetsSelected(datasetsReturned)
-      }).catch(error => { throw error })
-    })
-  }, [])
   const orgsFilterTranslationKey = "organizationFilterName" //'Organizations'
   const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterTranslationKey, orgsSelected)
   const [orgsSearchTerms, setOrgsSearchTerms] = useState('')
@@ -73,7 +42,6 @@ export default function Controls({ setQuery, loading, children }) {
   const datasetsFilterTranslationKey = 'datasetsFilterName' //'Datasets'
   const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(datasetsFilterTranslationKey, datasetsSelected)
   const [datasetSearchTerms, setDatasetSearchTerms] = useState('')
-  const [datasetsFullList, setDatasetsFullList] = useState()
 
   // Timeframe filter initial values and state
   const [startDate, setStartDate] = useState(defaultStartDate)
@@ -93,6 +61,25 @@ export default function Controls({ setQuery, loading, children }) {
 
   // Filter open state
   const [openFilter, setOpenFilter] = useState()
+
+  // Gather filter options
+  useEffect(() => {
+    fetch(`${server}/oceanVariables`).then(response => response.json()).then(oceanVariablesReturned => {
+      const eovsSelectedNew = {}
+      oceanVariablesReturned.forEach(eov => eovsSelectedNew[eov] = false);
+      setEovsSelected(eovsSelectedNew)
+    }).catch(error => { throw error })
+    fetch(`${server}/organizations`).then(response => response.json()).then(orgData => {
+      let orgsReturned = {}
+      orgData.forEach(elem => orgsReturned[elem.name] = false)
+      setOrgsSelected(orgsReturned)
+    }).catch(error => { throw error })
+    fetch(`${server}/datasets`).then(response => response.json()).then(datasetsData => {
+      let datasetsReturned = {}
+      datasetsData.forEach(dataset => datasetsReturned[dataset.title] = false)
+      setDatasetsSelected(datasetsReturned)
+    }).catch(error => { throw error })
+  }, [])
 
   // Update query 
   useEffect(() => {
@@ -123,18 +110,7 @@ export default function Controls({ setQuery, loading, children }) {
     }
   }
 
-  function createHeirarchicalOptionSubset(searchTerms, allOptions) {
-    if (searchTerms) {
-      return allOptions.filter(option => option.title.toString().toLowerCase().includes(searchTerms.toString().toLowerCase()))
-    } else {
-      return allOptions
-    }
-  }
-
-  function handleSetDatasetsSelected(selection) {
-    setDatasetsSelected(selection)
-  }
-
+  console.log(datasetsSelected)
   return (
     <div className={`controls ${loading === true && 'disabled'}`}>
       <Container fluid>
@@ -203,12 +179,11 @@ export default function Controls({ setQuery, loading, children }) {
               setOpenFilter={setOpenFilter}
               selectAllButton
             >
-              <HeirarchicalMultiCheckboxFilter
+              <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(datasetSearchTerms, datasetsSelected)}
-                setOptionsSelected={handleSetDatasetsSelected}
+                setOptionsSelected={setDatasetsSelected}
                 searchable
                 allOptions={datasetsSelected}
-                hierachicalData={datasetsFullList}
               />
             </Filter>
             <Filter
