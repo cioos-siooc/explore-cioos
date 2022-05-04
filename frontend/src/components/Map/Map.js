@@ -17,7 +17,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
   const { t } = useTranslation()
   const mapContainer = useRef(null)
   const map = useRef(null)
-  const creatingRectangle = useRef(false)
+  const creatingPolygon = useRef(false)
   const drawControlOptions = {
     displayControlsDefault: false,
     controls: {
@@ -194,7 +194,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       const boxQueryElement = document.getElementById('boxQueryButton');
       if (boxQueryElement) {
         boxQueryElement.onclick = () => {
-          creatingRectangle.current = true
+          creatingPolygon.current = true
           draw.changeMode('draw_rectangle');
         }
       }
@@ -274,7 +274,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     };
 
     const handleMapPointsOnClick = e => {
-      if (!creatingRectangle.current) {
+      if (!creatingPolygon.current) {
         if (drawPolygon.current.getAll().features.length > 0) {
           drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
         }
@@ -303,21 +303,21 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
         highlightPoints(bboxPolygon.geometry.coordinates[0])
         setPolygon(bboxPolygon.geometry.coordinates[0])
-      } else if (draw.getMode() === 'simple_select' && creatingRectangle.current) {
-        creatingRectangle.current = false
+      } else if (draw.getMode() === 'simple_select' && creatingPolygon.current) {
+        creatingPolygon.current = false
       }
     };
 
     const handleMapHexesOnClick = e => {
-      if (!creatingRectangle.current) {
+      if (!creatingPolygon.current) {
         map.current.flyTo({
           center: [e.lngLat.lng, e.lngLat.lat], zoom: 7,
           padding: map.current.offsetFlyTo ?
             { top: 0, bottom: 0, left: 500, right: 0 } :
             { top: 0, bottom: 0, left: 0, right: 0 }
         })
-      } else if (draw.getMode() === 'simple_select' && creatingRectangle.current) {
-        creatingRectangle.current = false
+      } else if (draw.getMode() === 'simple_select' && creatingPolygon.current) {
+        creatingPolygon.current = false
       }
     };
 
@@ -415,9 +415,9 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     map.current.on('mouseup', e => {
       const mode = draw.getMode()
       if (mode === 'draw_rectangle' || mode === 'draw_polygon') {
-        creatingRectangle.current = true
+        creatingPolygon.current = true
       } else if (mode === 'simple_select') {
-        creatingRectangle.current = false
+        creatingPolygon.current = false
       }
       setBoxSelectEndCoords([e.lngLat.lng, e.lngLat.lat])
     })
