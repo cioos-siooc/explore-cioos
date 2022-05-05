@@ -19,7 +19,7 @@ import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndD
 import "bootstrap/dist/css/bootstrap.min.css"
 
 import "./styles.css"
-import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel, getPointsDataSize, getCookieValue } from '../utilities.js'
+import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel, getPointsDataSize } from '../utilities.js'
 import { server } from '../config.js'
 import _ from 'lodash'
 import Legend from './Controls/Legend/Legend.jsx'
@@ -39,6 +39,7 @@ if (process.env.NODE_ENV === "production") {
 
 export default function App() {
   const { t, i18n } = useTranslation()
+  const [selectionPanelOpen, setSelectionPanelOpen] = useState()
   const [pointsToDownload, setPointsToDownload] = useState()
   const [pointsToReview, setPointsToReview] = useState()
   const [polygon, setPolygon] = useState()
@@ -234,16 +235,19 @@ export default function App() {
           zoom={zoom}
           setZoom={setZoom}
           rangeLevels={rangeLevels}
+          offsetFlyTo={selectionPanelOpen}
         />
       }
       <Controls
         setQuery={setQuery}
-        // setLoading={setLoading}
         loading={loading}
       >
         {polygon && (
           <Col xs='auto' className='selectionPanelColumn'>
-            <SelectionPanel>
+            <SelectionPanel
+              open={selectionPanelOpen}
+              setOpen={setSelectionPanelOpen}
+            >
               <SelectionDetails
                 pointsToReview={pointsToReview}
                 setPointsToReview={setPointsToReview}
