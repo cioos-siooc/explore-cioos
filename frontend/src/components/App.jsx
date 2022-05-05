@@ -76,19 +76,15 @@ export default function App() {
   }, [pointsToReview])
 
   useEffect(() => {
-    fetch(`${server}/organizations`).then(response => response.json()).then(data => {
+    fetch(`${server}/organizations`).then(response => response.json()).then(orgData => {
       let orgsReturned = {}
-      data.forEach(elem => {
-        orgsReturned[elem.name] = elem.pk
-      })
-      fetch(`${server}/datasets`).then(response => response.json()).then(datasetData => {
-        let datasetsReturned = {}
-        datasetData.forEach(dataset => {
-          datasetsReturned[dataset.title] = dataset.pk
-        })
-        setDatasets(datasetsReturned)
-        setOrganizations(orgsReturned)
-      })
+      orgData.forEach(elem => orgsReturned[elem.name] = elem.pk)
+      setOrganizations(orgsReturned)
+    }).catch(error => { throw error })
+    fetch(`${server}/datasets`).then(response => response.json()).then(datasetData => {
+      let datasetsReturned = {}
+      datasetData.forEach(dataset => datasetsReturned[dataset.title] = dataset.pk)
+      setDatasets(datasetsReturned)
     }).catch(error => { throw error })
   }, [])
 
@@ -174,9 +170,9 @@ export default function App() {
       } else {
         setSubmissionState('failed')
       }
-    }).catch(err => {
-      console.log(err)
+    }).catch(error => {
       setSubmissionState('failed')
+      throw error
     })
   }
 

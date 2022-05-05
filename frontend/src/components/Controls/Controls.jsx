@@ -17,7 +17,7 @@ import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndD
 import HeirarchicalMultiCheckboxFilter from './Filter/HeirarchicalMultiCheckboxFilter/HeirarchicalMultiCheckboxFilter.jsx'
 
 export default function Controls({ setQuery, loading, children }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   // Making changes to context within context consumers (ie. passing mutable state down to children to manipulate)
   //https://stackoverflow.com/questions/41030361/how-to-update-react-context-from-inside-a-child-component
@@ -65,7 +65,7 @@ export default function Controls({ setQuery, loading, children }) {
   // Gather filter options
   useEffect(() => {
     fetch(`${server}/oceanVariables`).then(response => response.json()).then(oceanVariablesReturned => {
-      const eovsSelectedNew = {}
+      let eovsSelectedNew = {}
       oceanVariablesReturned.forEach(eov => eovsSelectedNew[eov] = false);
       setEovsSelected(eovsSelectedNew)
     }).catch(error => { throw error })
@@ -110,7 +110,6 @@ export default function Controls({ setQuery, loading, children }) {
     }
   }
 
-  console.log(datasetsSelected)
   return (
     <div className={`controls ${loading === true && 'disabled'}`}>
       <Container fluid>
