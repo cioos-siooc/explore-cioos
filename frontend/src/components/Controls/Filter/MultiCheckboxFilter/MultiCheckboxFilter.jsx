@@ -32,7 +32,7 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
         <>
           <div className="searchResultsButton" onClick={() => selectAllSearchResultsToggle()}>
             {Object.values(optionsSelected).every(option => option) ? <CheckSquare /> : <Square />}
-            {t('multiCheckboxFilterSelectSearchResults', { results: Object.keys(optionsSelected).length })}
+            {t('multiCheckboxFilterSelectSearchResults')}
             <hr />
           </div>
         </>
