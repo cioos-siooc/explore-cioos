@@ -14,7 +14,6 @@ import { ArrowsExpand, Building, CalendarWeek, FileEarmarkSpreadsheet, Water } f
 
 import './styles.css'
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected } from '../config.js'
-import HeirarchicalMultiCheckboxFilter from './Filter/HeirarchicalMultiCheckboxFilter/HeirarchicalMultiCheckboxFilter.jsx'
 
 export default function Controls({ setQuery, loading, children }) {
   const { t } = useTranslation()
@@ -123,14 +122,6 @@ export default function Controls({ setQuery, loading, children }) {
     }
   }
 
-  function createHeirarchicalOptionSubset(searchTerms, allOptions) {
-    if (searchTerms) {
-      return allOptions.filter(option => option.title.toString().toLowerCase().includes(searchTerms.toString().toLowerCase()))
-    } else {
-      return allOptions
-    }
-  }
-
   function handleSetDatasetsSelected(selection) {
     setDatasetsSelected(selection)
   }
@@ -152,10 +143,10 @@ export default function Controls({ setQuery, loading, children }) {
               searchTerms={eovsSearchTerms}
               setSearchTerms={setEovsSearchTerms}
               searchPlaceholder={t('oceanVariableFilterSeachPlaceholder')} //'Search for ocean variable name...'
+              searchResults={createOptionSubset(eovsSearchTerms, eovsSelected)}
               filterName={eovsFilterTranslationKey}
               openFilter={openFilter === eovsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
-              selectAllButton
             >
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(eovsSearchTerms, eovsSelected)}
@@ -175,10 +166,10 @@ export default function Controls({ setQuery, loading, children }) {
               searchTerms={orgsSearchTerms}
               setSearchTerms={setOrgsSearchTerms}
               searchPlaceholder={t('organizationFilterSearchPlaceholder')} //'Search for organization name...'
+              searchResults={createOptionSubset(orgsSearchTerms, orgsSelected)}
               filterName={orgsFilterTranslationKey}
               openFilter={openFilter === orgsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
-              selectAllButton
             >
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(orgsSearchTerms, orgsSelected)}
@@ -198,17 +189,17 @@ export default function Controls({ setQuery, loading, children }) {
               searchTerms={datasetSearchTerms}
               setSearchTerms={setDatasetSearchTerms}
               searchPlaceholder={t('datasetSearchPlaceholder')} // 'Search for dataset name...'
+              searchResults={createOptionSubset(datasetSearchTerms, datasetsSelected)}
               filterName={datasetsFilterTranslationKey}
               openFilter={openFilter === datasetsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
-              selectAllButton
             >
-              <HeirarchicalMultiCheckboxFilter
+              <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(datasetSearchTerms, datasetsSelected)}
                 setOptionsSelected={handleSetDatasetsSelected}
                 searchable
                 allOptions={datasetsSelected}
-                hierachicalData={datasetsFullList}
+              // hierachicalData={datasetsFullList}
               />
             </Filter>
             <Filter
