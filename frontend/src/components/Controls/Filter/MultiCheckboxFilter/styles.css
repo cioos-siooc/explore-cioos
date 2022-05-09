@@ -12,21 +12,41 @@
   margin: 0px 10px 10px 10px;
 }
 
-.optionName {
+.multiCheckboxFilter .optionName {
   margin-left: 10px;
 }
 
-.optionButton {
+.multiCheckboxFilter .optionButton {
   cursor: pointer;
   line-height: 30px;
-  padding-right: 15px;
 }
 
-.optionButton:hover {
+.multiCheckboxFilter .optionButton:hover {
   background-color: #52a79b;
-  color: #f7f7f7
+  color: #f7f7f7;
 }
 
-.filterCount {
-  margin-left: 5px;
+.multiCheckboxFilter .searchResultsButton {
+  background-color: #f7f7f7;
+  margin-left: 10px;
+  position: sticky;
+  top: 0px;
+}
+
+.disabled .multiCheckboxFilter .searchResultsButton {
+  background-color: lightgrey;
+}
+
+.multiCheckboxFilter .searchResultsButton svg {
+  margin-right: 10px;
+}
+
+.multiCheckboxFilter .searchResultsButton hr {
+  margin: 5px 0px;
+}
+
+.multiCheckboxFilter .searchResultsButton:hover {
+  cursor: pointer;
+  background-color: #52a79b;
+  color: #f7f7f7;
 }
