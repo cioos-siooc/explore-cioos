@@ -12,11 +12,31 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
     .sort((a, b) => t(a[0]).localeCompare(t(b[0]), i18n.language))
     .reduce((r, [k, v]) => ({ ...r, [k]: v }), {});
 
+
+  function selectAllSearchResultsToggle() {
+    let copyOfAllOptions = { ...allOptions }
+    let copyOfOptionsSelected = { ...optionsSelected }
+    const options = Object.keys(optionsSelected)
+    if (Object.values(optionsSelected).every(option => option)) {
+      options.forEach(option => copyOfOptionsSelected[option] = false)
+    } else {
+      options.forEach(option => copyOfOptionsSelected[option] = true)
+    }
+    options.forEach(option => copyOfAllOptions[option] = copyOfOptionsSelected[option])
+    setOptionsSelected(copyOfAllOptions)
+  }
+  const searchResultsExist = Object.keys(optionsSelected).length !== Object.keys(allOptions).length && Object.keys(optionsSelected).length > 0
   return (
-    <div className='multiCheckboxFilter'>
-      <div className="filterCount">
-        ({Object.keys(optionsSelected).length})
-      </div>
+    <div className={`multiCheckboxFilter`}>
+      {searchResultsExist &&
+        <>
+          <div className="searchResultsButton" onClick={() => selectAllSearchResultsToggle()}>
+            {Object.values(optionsSelected).every(option => option) ? <CheckSquare /> : <Square />}
+            {t('multiCheckboxFilterSelectSearchResults')}
+            <hr />
+          </div>
+        </>
+      }
       {Object.keys(optionsSelected).length > 0 ? Object.keys(optionsSelectedSorted).map((option, index) => (
         <div className='optionButton' key={index} title={t(option)}
           onClick={() => {
