@@ -6,7 +6,7 @@ import { ChevronCompactDown, ChevronCompactUp, X } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
-import { abbreviateString, useOutsideAlerter } from '../../../utilities'
+import { abbreviateString, useOutsideAlerter, setAllOptionsIsSelectedTo } from '../../../utilities'
 
 import './styles.css'
 
@@ -24,7 +24,6 @@ export default function Filter({
   searchTerms,
   setSearchTerms,
   searchPlaceholder,
-  searchResults,
   children }) {
 
   const { t } = useTranslation()
@@ -33,18 +32,6 @@ export default function Filter({
   const [filterOpen, setFilterOpen] = useState(controlled ? openFilter : false)
   const wrapperRef = useRef(null);
   useOutsideAlerter(wrapperRef, setFilterOpen, false);
-
-  function resetDefaults() {
-    let copyOfOptionsSelected = { ...optionsSelected }
-    Object.keys(optionsSelected).forEach(option => copyOfOptionsSelected[option] = false)
-    setOptionsSelected(copyOfOptionsSelected)
-  }
-
-  function selectAll() {
-    let copyOfOptionsSelected = { ...optionsSelected }
-    Object.keys(optionsSelected).forEach(option => copyOfOptionsSelected[option] = true)
-    setOptionsSelected(copyOfOptionsSelected)
-  }
 
   useEffect(() => {
     controlled ? setFilterOpen(openFilter) : _.noop()
@@ -94,11 +81,11 @@ export default function Filter({
             </div>
           )}
           {children}
-          <button onClick={() => selectAll()}>
+          <button onClick={() => setAllOptionsIsSelectedTo(true, optionsSelected, setOptionsSelected)}>
             {t('selectAllButtonText')}
             {/* Select All */}
           </button>
-          <button onClick={() => resetDefaults()}>
+          <button onClick={() => setAllOptionsIsSelectedTo(false, optionsSelected, setOptionsSelected)}>
             {t('resetButtonText')}
             {/* Reset */}
           </button>

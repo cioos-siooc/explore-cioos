@@ -7,7 +7,7 @@ import Filter from './Filter/Filter.jsx'
 import MultiCheckboxFilter from './Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx'
 import TimeSelector from './Filter/TimeSelector/TimeSelector.jsx'
 import DepthSelector from './Filter/DepthSelector/DepthSelector.jsx'
-import { filterObjectPropertyByPropertyList, generateMultipleSelectBadgeTitle, generateRangeSelectBadgeTitle, useDebounce } from '../../utilities.js'
+import { generateMultipleSelectBadgeTitle, generateRangeSelectBadgeTitle, useDebounce } from '../../utilities.js'
 import { server } from '../../config'
 
 import { ArrowsExpand, Building, CalendarWeek, FileEarmarkSpreadsheet, Water } from 'react-bootstrap-icons'
@@ -60,23 +60,75 @@ export default function Controls({ setQuery, loading, children }) {
 
   // Filter open state
   const [openFilter, setOpenFilter] = useState()
-
-  // Gather filter options
+  // Goal A: Get filters showing the options
+  // Goal B: Get map to show data
+  // Goal C: Get filters to select data like they have been
+  // Filter option data structure: 
+  /*
+  [{
+    title: 'abc',
+    isSelected: boolean,
+    titleTranslated: {
+      en: 'abc',
+      fr: 'def'
+    },
+    pk: 123
+  }]
+  */
   useEffect(() => {
-    fetch(`${server}/oceanVariables`).then(response => response.json()).then(oceanVariablesReturned => {
-      let eovsSelectedNew = {}
-      oceanVariablesReturned.forEach(eov => eovsSelectedNew[eov] = false);
-      setEovsSelected(eovsSelectedNew)
+    /* /oceanVariables returns array of variable names: 
+      ['abc', 'def', ...] 
+    */
+    fetch(`${server}/oceanVariables`).then(response => response.json()).then(eovs => {
+      setEovsSelected(eovs.map(eov => {
+        return {
+          title: eov,
+          isSelected: false
+        }
+      }))
     }).catch(error => { throw error })
-    fetch(`${server}/organizations`).then(response => response.json()).then(orgData => {
-      let orgsReturned = {}
-      orgData.forEach(elem => orgsReturned[elem.name] = false)
-      setOrgsSelected(orgsReturned)
+
+    /* /organizations returns array of org objects: 
+      [
+        {
+          color:null, 
+          name:'abc', 
+          pk_text:null
+          pk:87, 
+        },
+        ...
+      ] 
+    */
+    fetch(`${server}/organizations`).then(response => response.json()).then(orgs => {
+      setOrgsSelected(orgs.map(org => {
+        return {
+          title: org.name,
+          isSelected: false,
+        }
+      }))
     }).catch(error => { throw error })
-    fetch(`${server}/datasets`).then(response => response.json()).then(datasetsData => {
-      let datasetsReturned = {}
-      datasetsData.forEach(dataset => datasetsReturned[dataset.title] = false)
-      setDatasetsSelected(datasetsReturned)
+
+    /* /datasets returns array of dataset objects 
+      [
+        {
+          title:'abc', 
+          title_translated:
+            {
+              en: 'abc', 
+              fr: 'def'
+            }
+          organization_pks: [54, ...], 
+          pk: 86923, 
+        }
+      ]
+    */
+    fetch(`${server}/datasets`).then(response => response.json()).then(datasets => {
+      setDatasetsSelected(datasets.map(dataset => {
+        return {
+          title: dataset.title,
+          isSelected: false
+        }
+      }))
     }).catch(error => { throw error })
   }, [])
 
@@ -96,21 +148,11 @@ export default function Controls({ setQuery, loading, children }) {
   const childrenArray = React.Children.toArray(children)
 
   function createOptionSubset(searchTerms, allOptions) {
-    // If there are search terms
     if (searchTerms) {
-      // Get a list of the allowed datasets
-      const allowedOptions = Object.keys(allOptions).filter(optionName => optionName.toLowerCase().includes(searchTerms.toString().toLowerCase()))
-      // Generate the subset of datasets
-      const filteredOptions = filterObjectPropertyByPropertyList(allOptions, allowedOptions)
-      // Set the subset of datasets
-      return { ...filteredOptions }
-    } else { // Else if there aren't search terms, set the subset to the whole set
-      return { ...allOptions }
+      return allOptions.filter(option => option.title.toLowerCase().includes(searchTerms.toString().toLowerCase()))
+    } else {
+      return allOptions
     }
-  }
-
-  function handleSetDatasetsSelected(selection) {
-    setDatasetsSelected(selection)
   }
 
   return (
