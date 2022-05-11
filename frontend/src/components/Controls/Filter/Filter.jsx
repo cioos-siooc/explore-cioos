@@ -10,7 +10,23 @@ import { abbreviateString, useOutsideAlerter } from '../../../utilities'
 
 import './styles.css'
 
-export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected, tooltip, icon, controlled, openFilter, setOpenFilter, filterName, searchable, searchTerms, setSearchTerms, searchPlaceholder, selectAllButton, children }) {
+export default function Filter({
+  badgeTitle,
+  optionsSelected,
+  setOptionsSelected,
+  tooltip,
+  icon,
+  controlled,
+  openFilter,
+  setOpenFilter,
+  filterName,
+  searchable,
+  searchTerms,
+  setSearchTerms,
+  searchPlaceholder,
+  searchResults,
+  children }) {
+
   const { t } = useTranslation()
 
   // Open/Closed state for filter dropdown
@@ -78,14 +94,10 @@ export default function Filter({ badgeTitle, optionsSelected, setOptionsSelected
             </div>
           )}
           {children}
-          {selectAllButton &&
-            (
-              <button onClick={() => selectAll()}>
-                {t('selectAllButtonText')}
-                {/* Select All */}
-              </button>
-            )
-          }
+          <button onClick={() => selectAll()}>
+            {t('selectAllButtonText')}
+            {/* Select All */}
+          </button>
           <button onClick={() => resetDefaults()}>
             {t('resetButtonText')}
             {/* Reset */}
