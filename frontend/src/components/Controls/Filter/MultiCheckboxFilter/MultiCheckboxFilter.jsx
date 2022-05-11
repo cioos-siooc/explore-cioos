@@ -1,63 +1,64 @@
 import * as React from 'react'
 import { CheckSquare, Square } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
-import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
+import { capitalizeFirstLetter, abbreviateString, setAllOptionsIsSelectedTo } from '../../../../utilities'
 
 import './styles.css'
 
 export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions }) {
   const { t, i18n } = useTranslation()
 
-  const optionsSelectedSorted = Object.entries(optionsSelected)
-    .sort((a, b) => t(a[0]).localeCompare(t(b[0]), i18n.language))
-    .reduce((r, [k, v]) => ({ ...r, [k]: v }), {});
-
+  const optionsSelectedSorted = optionsSelected.sort((a, b) => t(a.title).localeCompare(t(b.title), i18n.language))
 
   function selectAllSearchResultsToggle() {
-    let copyOfAllOptions = { ...allOptions }
-    let copyOfOptionsSelected = { ...optionsSelected }
-    const options = Object.keys(optionsSelected)
-    if (Object.values(optionsSelected).every(option => option)) {
-      options.forEach(option => copyOfOptionsSelected[option] = false)
+    // Set all isSelected to false if all isSelected === true
+    if (optionsSelected.every(option => option.isSelected)) {
+      setAllOptionsIsSelectedTo(false, optionsSelected, setOptionsSelected)
     } else {
-      options.forEach(option => copyOfOptionsSelected[option] = true)
+      setAllOptionsIsSelectedTo(true, optionsSelected, setOptionsSelected)
     }
-    options.forEach(option => copyOfAllOptions[option] = copyOfOptionsSelected[option])
-    setOptionsSelected(copyOfAllOptions)
   }
-  const searchResultsExist = Object.keys(optionsSelected).length !== Object.keys(allOptions).length && Object.keys(optionsSelected).length > 0
+
+  const searchResultsExist = optionsSelected.length !== allOptions.length && optionsSelected.length > 0
+
   return (
     <div className={`multiCheckboxFilter`}>
       {searchResultsExist &&
         <>
           <div className="searchResultsButton" onClick={() => selectAllSearchResultsToggle()}>
-            {Object.values(optionsSelected).every(option => option) ? <CheckSquare /> : <Square />}
+            {optionsSelected.every(option => option.isSelected) ? <CheckSquare /> : <Square />}
             {t('multiCheckboxFilterSelectSearchResults')}
             <hr />
           </div>
         </>
       }
-      {Object.keys(optionsSelected).length > 0 ? Object.keys(optionsSelectedSorted).map((option, index) => (
-        <div className='optionButton' key={index} title={t(option)}
+      {optionsSelected.length > 0 ? optionsSelectedSorted.map((option, index) => (
+        <div className='optionButton' key={index} title={t(option.title)}
           onClick={() => {
             if (searchable) {
-              let tempData = { ...allOptions }
-              // Go through each of the elements in the subset
-              // Find the corresponding element in the total set and set its selection status
-              tempData[option] = !optionsSelected[option]
-              // Set the total set 
-              setOptionsSelected(tempData)
+              setOptionsSelected(allOptions.map(opt => {
+                if (opt.title === option.title) {
+                  return {
+                    ...opt,
+                    isSelected: !opt.isSelected
+                  }
+                } else return opt
+              }))
             } else {
-              setOptionsSelected({
-                ...optionsSelected,
-                [option]: !optionsSelected[option]
-              })
+              setOptionsSelected(optionsSelected.map(opt => {
+                if (opt.title === option.title) {
+                  return {
+                    ...opt,
+                    isSelected: !opt.isSelected
+                  }
+                } else return opt
+              }))
             }
           }}
         >
-          {optionsSelected[option] ? <CheckSquare /> : <Square />}
+          {option.isSelected ? <CheckSquare /> : <Square />}
           <span className='optionName'>
-            {capitalizeFirstLetter(abbreviateString(t(option), 30))}
+            {capitalizeFirstLetter(abbreviateString(t(option.title), 30))}
           </span>
         </div>
       ))

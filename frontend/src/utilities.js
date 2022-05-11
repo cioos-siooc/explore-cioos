@@ -4,30 +4,36 @@ import { useState, useEffect } from 'react'
 import { defaultQuery } from './components/config.js'
 import { useTranslation } from 'react-i18next'
 
+export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
+  setOptions(options.map(option => {
+    return {
+      ...option,
+      isSelected: isSelected
+    }
+  }))
+}
+
 export function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
+
 export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
   const { t } = useTranslation()
 
-  // get text array of items selected
-  const optionSelectedText = Object.entries(optionsSelected)
-    .filter(([k, isSelected]) => isSelected)
-    .map((e) => e[0])
-
-  const firstOptionSelected = optionSelectedText && optionSelectedText[0]
-  const count = optionSelectedText.length
-
-  if (count == 0) return t(badgeTitle)
-  else if (count == 1) return capitalizeFirstLetter(t(firstOptionSelected))
-  // count > 1
-  else {
-    const mapping = {
-      oceanVariablesFiltername: "oceanVariablesMulit",
-      organizationFilterName: "organizationMulti",
-      datasetsFilterName: "datasetsMulti",
-    };
-    return count + t(mapping[badgeTitle])
+  if (optionsSelected) {
+    const optionsSelectedFiltered = optionsSelected.filter(option => option.isSelected)
+    if (optionsSelectedFiltered.length === 0) {
+      return t(badgeTitle)
+    } else if (optionsSelectedFiltered.length === 1) {
+      return capitalizeFirstLetter(t(optionsSelectedFiltered[0].title))
+    } else { // More than 0 or 1 options are selected
+      const mapping = {
+        oceanVariablesFiltername: "oceanVariablesMulti",
+        organizationFilterName: "organizationMulti",
+        datasetsFilterName: "datasetsMulti",
+      }
+      return optionsSelectedFiltered.length + t(mapping[badgeTitle])
+    }
   }
 }
 
