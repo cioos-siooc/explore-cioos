@@ -60,9 +60,14 @@ export default function Controls({ setQuery, loading, children }) {
 
   // Filter open state
   const [openFilter, setOpenFilter] = useState()
-  // Goal A: Get filters showing the options
-  // Goal B: Get map to show data
-  // Goal C: Get filters to select data like they have been
+
+  // TODO: consider adding a 'searched' property to the options to indicate whether they satisfy the search terms, 
+  // and removing the extra concept of 'allOptions' vs 'selectedOptions'
+
+  // TODO: consider moving the retrival of filter options into App.jsx, and pass them in as properties to Controls
+
+  // TODO: 
+
   // Filter option data structure: 
   /*
   [{
