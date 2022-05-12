@@ -2,10 +2,12 @@ import React from 'react'
 import { useState, useEffect } from 'react'
 import * as Sentry from "@sentry/react"
 import { Integrations } from "@sentry/tracing"
-import { Row, Col, Spinner } from 'react-bootstrap'
+import { Col, Spinner } from 'react-bootstrap'
 import { ChatDots, CheckCircle, XCircle } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
+import _ from 'lodash'
 
+import { server } from '../config.js'
 import Controls from "./Controls/Controls.jsx"
 import Map from "./Map/Map.js"
 import SelectionPanel from './Controls/SelectionPanel/SelectionPanel.jsx'
@@ -14,16 +16,13 @@ import DownloadDetails from './Controls/DownloadDetails/DownloadDetails.jsx'
 import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx'
 import Loading from './Controls/Loading/Loading.jsx'
 import LanguageSelector from './Controls/LanguageSelector/LanguageSelector.jsx'
-import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected } from './config.js'
-
-import "bootstrap/dist/css/bootstrap.min.css"
-
-import "./styles.css"
-import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel, getPointsDataSize } from '../utilities.js'
-import { server } from '../config.js'
-import _ from 'lodash'
 import Legend from './Controls/Legend/Legend.jsx'
 import IntroModal from './Controls/IntroModal/IntroModal.jsx'
+import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected } from './config.js'
+import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel, getPointsDataSize } from '../utilities.js'
+
+import "bootstrap/dist/css/bootstrap.min.css"
+import "./styles.css"
 
 if (process.env.NODE_ENV === "production") {
   Sentry.init({
@@ -63,7 +62,6 @@ export default function App() {
     datasetsSelected: defaultDatatsetsSelected
   })
 
-
   useEffect(() => {
     if (_.isEmpty(pointsToDownload)) {
       setSubmissionFeedback()
@@ -75,6 +73,8 @@ export default function App() {
       setPointsToDownload()
     }
   }, [pointsToReview])
+
+  // TODO: instead of running these retrivals for org and dataset pks, add as properties to the options lists.
 
   useEffect(() => {
     fetch(`${server}/organizations`).then(response => response.json()).then(orgData => {
@@ -283,14 +283,16 @@ export default function App() {
       <button
         className='boxQueryButton'
         id='boxQueryButton'
-        title={t('rectangleToolTitle')}>
+        title={t('rectangleToolTitle')}
+      >
         <div className='rectangleIcon' />
       </button>
       <a
         className='feedbackButton'
         title={t('feedbackButtonTitle')}
         href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit'
-        target='_blank'>
+        target='_blank'
+      >
         <ChatDots size='30px' />
       </a>
       <IntroModal initialOpenState={true} />
