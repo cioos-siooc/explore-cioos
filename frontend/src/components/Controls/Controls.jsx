@@ -13,30 +13,30 @@ import { server } from '../../config'
 import { ArrowsExpand, Building, CalendarWeek, FileEarmarkSpreadsheet, Water } from 'react-bootstrap-icons'
 
 import './styles.css'
-import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected } from '../config.js'
+import { defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from '../config.js'
 
-export default function Controls({ setQuery, loading, children }) {
+export default function Controls({ eovs, orgs, datasets, setQuery, loading, children }) {
   const { t, i18n } = useTranslation()
 
   // Making changes to context within context consumers (ie. passing mutable state down to children to manipulate)
   //https://stackoverflow.com/questions/41030361/how-to-update-react-context-from-inside-a-child-component
 
   // EOV filter initial values and state
-  const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
+  const [eovsSelected, setEovsSelected] = useState(eovs)
   const debouncedEovsSelected = useDebounce(eovsSelected, 500)
   const eovsFilterTranslationKey = 'oceanVariablesFiltername' //'Ocean Variables'
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(eovsFilterTranslationKey, eovsSelected)
   const [eovsSearchTerms, setEovsSearchTerms] = useState('')
 
   // Organization filter initial values from API and state
-  const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected)
+  const [orgsSelected, setOrgsSelected] = useState(orgs)
   const debouncedOrgsSelected = useDebounce(orgsSelected, 500)
   const orgsFilterTranslationKey = "organizationFilterName" //'Organizations'
   const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterTranslationKey, orgsSelected)
   const [orgsSearchTerms, setOrgsSearchTerms] = useState('')
 
   // Dataset filter initial values and state
-  const [datasetsSelected, setDatasetsSelected] = useState(defaultDatatsetsSelected)
+  const [datasetsSelected, setDatasetsSelected] = useState(datasets)
   const debouncedDatasetsSelected = useDebounce(datasetsSelected, 500)
   const datasetsFilterTranslationKey = 'datasetsFilterName' //'Datasets'
   const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(datasetsFilterTranslationKey, datasetsSelected)
@@ -66,76 +66,11 @@ export default function Controls({ setQuery, loading, children }) {
 
   // TODO: consider moving the retrival of filter options into App.jsx, and pass them in as properties to Controls
 
-  // TODO: 
-
-  // Filter option data structure: 
-  /*
-  [{
-    title: 'abc',
-    isSelected: boolean,
-    titleTranslated: {
-      en: 'abc',
-      fr: 'def'
-    },
-    pk: 123
-  }]
-  */
   useEffect(() => {
-    /* /oceanVariables returns array of variable names: 
-      ['abc', 'def', ...] 
-    */
-    fetch(`${server}/oceanVariables`).then(response => response.json()).then(eovs => {
-      setEovsSelected(eovs.map(eov => {
-        return {
-          title: eov,
-          isSelected: false
-        }
-      }))
-    }).catch(error => { throw error })
-
-    /* /organizations returns array of org objects: 
-      [
-        {
-          color:null, 
-          name:'abc', 
-          pk_text:null
-          pk:87, 
-        },
-        ...
-      ] 
-    */
-    fetch(`${server}/organizations`).then(response => response.json()).then(orgs => {
-      setOrgsSelected(orgs.map(org => {
-        return {
-          title: org.name,
-          isSelected: false,
-        }
-      }))
-    }).catch(error => { throw error })
-
-    /* /datasets returns array of dataset objects 
-      [
-        {
-          title:'abc', 
-          title_translated:
-            {
-              en: 'abc', 
-              fr: 'def'
-            }
-          organization_pks: [54, ...], 
-          pk: 86923, 
-        }
-      ]
-    */
-    fetch(`${server}/datasets`).then(response => response.json()).then(datasets => {
-      setDatasetsSelected(datasets.map(dataset => {
-        return {
-          title: dataset.title,
-          isSelected: false
-        }
-      }))
-    }).catch(error => { throw error })
-  }, [])
+    setEovsSelected(eovs)
+    setDatasetsSelected(datasets)
+    setOrgsSelected(orgs)
+  }, [eovs, datasets, orgs])
 
   // Update query 
   useEffect(() => {

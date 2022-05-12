@@ -79,7 +79,7 @@ export function createDataFilterQueryString(query, organizationNamesAndPKs, data
     },
     {}
   )
-  console.log(queryWithoutDefaults)
+  // console.log(queryWithoutDefaults)
   // Goal of these is to get a list of PKs for each of the variables. 
   // TODO: these PKs should just be found within the abcSelected variables
 
@@ -109,7 +109,7 @@ export function createDataFilterQueryString(query, organizationNamesAndPKs, data
     depthMin: startDepth,
     depthMax: endDepth,
   }
-  console.log('url', objectToURL(apiMappedQuery))
+  // console.log('url', objectToURL(apiMappedQuery))
   return objectToURL(apiMappedQuery)
 }
 
