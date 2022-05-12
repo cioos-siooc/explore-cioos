@@ -66,22 +66,19 @@ function objectToURL(obj) {
     .join("&")
 }
 
-export function createDataFilterQueryString(query, organizationNamesAndPKs, datasetNamesAndPKs) {
+export function createDataFilterQueryString(query) {
   const { orgsSelected, eovsSelected, datasetsSelected } = query
 
   // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
   const queryWithoutDefaults = Object.keys(defaultQuery).reduce( // going through each 
-    (acc, field) => {
+    (accumulatorObject, field) => {
       if (query[field] !== defaultQuery[field]) { // checking that the value of each property in the query object has been changed in order to include those values in the url
-        acc[field] = query[field]
+        accumulatorObject[field] = query[field]
       } // otherwise properties are left at their defaults, and excluded from the url.
-      return acc
+      return accumulatorObject
     },
     {}
   )
-  // console.log(queryWithoutDefaults)
-  // Goal of these is to get a list of PKs for each of the variables. 
-  // TODO: these PKs should just be found within the abcSelected variables
 
   const eovs = eovsSelected
     .filter((eov) => eov.isSelected) // pulling the selected eov names out (these don't have pks)
@@ -90,12 +87,12 @@ export function createDataFilterQueryString(query, organizationNamesAndPKs, data
 
   const datasetPKs = datasetsSelected
     .filter((dataset) => dataset.isSelected) // getting the selected datasets out
-    .map((dataset) => datasetNamesAndPKs[dataset]) // getting the pks of the selected datasets using the dataset title to access the pk
+    .map((dataset) => dataset.pk) // getting the pks of the selected datasets using the dataset title to access the pk
     .join() // create the comma delimited list of dataset pks
 
-  const orgPKsSelected = orgsSelected
+  const orgPKs = orgsSelected
     .filter((org) => org.isSelected) // getting the selected orgs out
-    .map((org) => organizationNamesAndPKs[org]) // getting the pks of the selected organizations using the orgs title to access the pk 
+    .map((org) => org.pk) // getting the pks of the selected organizations using the orgs title to access the pk 
     .join() // create the comma delimited list of org pks
 
   const { startDepth, endDepth, startDate, endDate } = queryWithoutDefaults
@@ -103,13 +100,13 @@ export function createDataFilterQueryString(query, organizationNamesAndPKs, data
   const apiMappedQuery = {
     eovs,
     datasetPKs: datasetPKs,
-    organizations: orgPKsSelected,
+    organizations: orgPKs,
     timeMin: startDate,
     timeMax: endDate,
     depthMin: startDepth,
     depthMax: endDepth,
   }
-  // console.log('url', objectToURL(apiMappedQuery))
+
   return objectToURL(apiMappedQuery)
 }
 
