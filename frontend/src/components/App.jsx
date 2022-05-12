@@ -19,7 +19,7 @@ import LanguageSelector from './Controls/LanguageSelector/LanguageSelector.jsx'
 import Legend from './Controls/Legend/Legend.jsx'
 import IntroModal from './Controls/IntroModal/IntroModal.jsx'
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected } from './config.js'
-import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel, getPointsDataSize } from '../utilities.js'
+import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel, getPointsDataSize, abbreviateString } from '../utilities.js'
 
 import "bootstrap/dist/css/bootstrap.min.css"
 import "./styles.css"
@@ -38,6 +38,9 @@ if (process.env.NODE_ENV === "production") {
 
 export default function App() {
   const { t, i18n } = useTranslation()
+  const [eovs, setEovs] = useState(defaultEovsSelected)
+  const [orgs, setOrgs] = useState(defaultOrgsSelected)
+  const [datasets, setDatasets] = useState(defaultDatatsetsSelected)
   const [selectionPanelOpen, setSelectionPanelOpen] = useState()
   const [pointsToDownload, setPointsToDownload] = useState()
   const [pointsToReview, setPointsToReview] = useState()
@@ -47,8 +50,8 @@ export default function App() {
   const [submissionState, setSubmissionState] = useState()
   const [submissionFeedback, setSubmissionFeedback] = useState()
   const [loading, setLoading] = useState(true)
-  const [organizations, setOrganizations] = useState()
-  const [datasets, setDatasets] = useState()
+  const [organizationPKs, setOrganizationPKs] = useState()
+  const [datasetPKs, setDatasetPKs] = useState()
   const [zoom, setZoom] = useState(2)
   const [rangeLevels, setRangeLevels] = useState()
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
@@ -76,18 +79,85 @@ export default function App() {
 
   // TODO: instead of running these retrivals for org and dataset pks, add as properties to the options lists.
 
+  // Filter option data structure: 
+  /*
+  [{
+    title: 'abc',
+    isSelected: boolean,
+    titleTranslated: {
+      en: 'abc',
+      fr: 'def'
+    },
+    pk: 123
+  }]
+  */
   useEffect(() => {
-    fetch(`${server}/organizations`).then(response => response.json()).then(orgData => {
-      let orgsReturned = {}
-      orgData.forEach(elem => orgsReturned[elem.name] = elem.pk)
-      setOrganizations(orgsReturned)
+    /* /oceanVariables returns array of variable names: 
+      ['abc', 'def', ...] 
+    */
+    fetch(`${server}/oceanVariables`).then(response => response.json()).then(eovs => {
+      setEovs(eovs.map(eov => {
+        return {
+          title: eov,
+          isSelected: false
+        }
+      }))
     }).catch(error => { throw error })
-    fetch(`${server}/datasets`).then(response => response.json()).then(datasetData => {
-      let datasetsReturned = {}
-      datasetData.forEach(dataset => datasetsReturned[dataset.title] = dataset.pk)
-      setDatasets(datasetsReturned)
+
+    /* /organizations returns array of org objects: 
+      [
+        {
+          color:null, 
+          name:'abc', 
+          pk_text:null
+          pk:87, 
+        },
+        ...
+      ] 
+    */
+    fetch(`${server}/organizations`).then(response => response.json()).then(orgsR => {
+      setOrgs(orgsR.map(org => {
+        return {
+          title: org.name,
+          isSelected: false,
+          pk: org.pk
+        }
+      }))
+      setOrganizationPKs(orgsR.reduce((accumulationObject, org) => {
+        accumulationObject[org.name] = org.pk
+        return accumulationObject
+      }, {}))
+    }).catch(error => { throw error })
+
+    /* /datasets returns array of dataset objects 
+      [
+        {
+          title:'abc', 
+          title_translated:
+            {
+              en: 'abc', 
+              fr: 'def'
+            }
+          organization_pks: [54, ...], 
+          pk: 86923, 
+        }
+      ]
+    */
+    fetch(`${server}/datasets`).then(response => response.json()).then(datasetsR => {
+      setDatasets(datasetsR.map(dataset => {
+        return {
+          title: dataset.title,
+          isSelected: false,
+          pk: dataset.pk
+        }
+      }))
+      setDatasetPKs(datasetsR.reduce((accumulationObject, dataset) => {
+        accumulationObject[dataset.title.slice(0, 1)] = dataset.pk
+        return accumulationObject
+      }, {}))
     }).catch(error => { throw error })
   }, [])
+
 
   useEffect(() => {
     switch (submissionState) {
@@ -138,7 +208,7 @@ export default function App() {
   }, [submissionState])
 
   useEffect(() => {
-    fetch(`${server}/legend?${createDataFilterQueryString(query, organizations, datasets)}`).then(response => response.json()).then(legend => {
+    fetch(`${server}/legend?${createDataFilterQueryString(query, organizationPKs, datasetPKs)}`).then(response => response.json()).then(legend => {
       if (legend) {
         setRangeLevels(legend.recordsCount)
       }
@@ -165,7 +235,7 @@ export default function App() {
   }
 
   function submitRequest() {
-    fetch(`${server}/download?${createDataFilterQueryString(query, organizations, datasets)}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload.map(point => point.pk).join(',')}&email=${email}&lang=${i18n.language}`).then((response) => {
+    fetch(`${server}/download?${createDataFilterQueryString(query, organizationPKs, datasetPKs)}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload.map(point => point.pk).join(',')}&email=${email}&lang=${i18n.language}`).then((response) => {
       if (response.ok) {
         setSubmissionState('successful')
       } else {
@@ -230,8 +300,8 @@ export default function App() {
           setLoading={setLoading}
           query={query}
           polygon={polygon}
-          organizations={organizations}
-          datasets={datasets}
+          organizations={organizationPKs}
+          datasets={datasetPKs}
           zoom={zoom}
           setZoom={setZoom}
           rangeLevels={rangeLevels}
@@ -239,6 +309,9 @@ export default function App() {
         />
       }
       <Controls
+        eovs={eovs}
+        orgs={orgs}
+        datasets={datasets}
         setQuery={setQuery}
         loading={loading}
       >
@@ -253,8 +326,8 @@ export default function App() {
                 setPointsToReview={setPointsToReview}
                 query={query}
                 polygon={polygon}
-                organizations={organizations}
-                datasets={datasets}
+                organizations={organizationPKs}
+                datasets={datasetPKs}
               >
                 {DownloadButton()}
               </SelectionDetails>
