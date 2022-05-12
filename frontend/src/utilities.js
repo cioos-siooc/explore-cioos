@@ -97,7 +97,7 @@ export function createDataFilterQueryString(query) {
 
   const { startDepth, endDepth, startDate, endDate } = queryWithoutDefaults
 
-  const apiMappedQuery = {
+  const apiMappedQuery = { // These properties are specified by the API's schema
     eovs,
     datasetPKs: datasetPKs,
     organizations: orgPKs,
