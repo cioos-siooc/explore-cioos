@@ -8,7 +8,6 @@ import MultiCheckboxFilter from './Filter/MultiCheckboxFilter/MultiCheckboxFilte
 import TimeSelector from './Filter/TimeSelector/TimeSelector.jsx'
 import DepthSelector from './Filter/DepthSelector/DepthSelector.jsx'
 import { generateMultipleSelectBadgeTitle, generateRangeSelectBadgeTitle, useDebounce } from '../../utilities.js'
-import { server } from '../../config'
 
 import { ArrowsExpand, Building, CalendarWeek, FileEarmarkSpreadsheet, Water } from 'react-bootstrap-icons'
 
@@ -16,7 +15,7 @@ import './styles.css'
 import { defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth } from '../config.js'
 
 export default function Controls({ eovs, orgs, datasets, setQuery, loading, children }) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
 
   // Making changes to context within context consumers (ie. passing mutable state down to children to manipulate)
   //https://stackoverflow.com/questions/41030361/how-to-update-react-context-from-inside-a-child-component
@@ -63,8 +62,6 @@ export default function Controls({ eovs, orgs, datasets, setQuery, loading, chil
 
   // TODO: consider adding a 'searched' property to the options to indicate whether they satisfy the search terms, 
   // and removing the extra concept of 'allOptions' vs 'selectedOptions'
-
-  // TODO: consider moving the retrival of filter options into App.jsx, and pass them in as properties to Controls
 
   useEffect(() => {
     setEovsSelected(eovs)

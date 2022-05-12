@@ -50,8 +50,6 @@ export default function App() {
   const [submissionState, setSubmissionState] = useState()
   const [submissionFeedback, setSubmissionFeedback] = useState()
   const [loading, setLoading] = useState(true)
-  const [organizationPKs, setOrganizationPKs] = useState()
-  const [datasetPKs, setDatasetPKs] = useState()
   const [zoom, setZoom] = useState(2)
   const [rangeLevels, setRangeLevels] = useState()
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
@@ -123,10 +121,6 @@ export default function App() {
           pk: org.pk
         }
       }))
-      setOrganizationPKs(orgsR.reduce((accumulationObject, org) => {
-        accumulationObject[org.name] = org.pk
-        return accumulationObject
-      }, {}))
     }).catch(error => { throw error })
 
     /* /datasets returns array of dataset objects 
@@ -151,10 +145,6 @@ export default function App() {
           pk: dataset.pk
         }
       }))
-      setDatasetPKs(datasetsR.reduce((accumulationObject, dataset) => {
-        accumulationObject[dataset.title.slice(0, 1)] = dataset.pk
-        return accumulationObject
-      }, {}))
     }).catch(error => { throw error })
   }, [])
 
@@ -208,7 +198,7 @@ export default function App() {
   }, [submissionState])
 
   useEffect(() => {
-    fetch(`${server}/legend?${createDataFilterQueryString(query, organizationPKs, datasetPKs)}`).then(response => response.json()).then(legend => {
+    fetch(`${server}/legend?${createDataFilterQueryString(query)}`).then(response => response.json()).then(legend => {
       if (legend) {
         setRangeLevels(legend.recordsCount)
       }
@@ -235,7 +225,7 @@ export default function App() {
   }
 
   function submitRequest() {
-    fetch(`${server}/download?${createDataFilterQueryString(query, organizationPKs, datasetPKs)}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload.map(point => point.pk).join(',')}&email=${email}&lang=${i18n.language}`).then((response) => {
+    fetch(`${server}/download?${createDataFilterQueryString(query)}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload.map(point => point.pk).join(',')}&email=${email}&lang=${i18n.language}`).then((response) => {
       if (response.ok) {
         setSubmissionState('successful')
       } else {
@@ -300,8 +290,6 @@ export default function App() {
           setLoading={setLoading}
           query={query}
           polygon={polygon}
-          organizations={organizationPKs}
-          datasets={datasetPKs}
           zoom={zoom}
           setZoom={setZoom}
           rangeLevels={rangeLevels}
@@ -326,8 +314,6 @@ export default function App() {
                 setPointsToReview={setPointsToReview}
                 query={query}
                 polygon={polygon}
-                organizations={organizationPKs}
-                datasets={datasetPKs}
               >
                 {DownloadButton()}
               </SelectionDetails>
