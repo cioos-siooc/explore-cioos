@@ -12,8 +12,6 @@ import './styles.css'
 
 export default function Filter({
   badgeTitle,
-  optionsSelected,
-  setOptionsSelected,
   tooltip,
   icon,
   controlled,
@@ -24,6 +22,9 @@ export default function Filter({
   searchTerms,
   setSearchTerms,
   searchPlaceholder,
+  resetButton,
+  selectAllButton,
+  numberOfOptions,
   children }) {
 
   const { t } = useTranslation()
@@ -81,17 +82,18 @@ export default function Filter({
             </div>
           )}
           {children}
-          <button onClick={() => setAllOptionsIsSelectedTo(true, optionsSelected, setOptionsSelected)}>
-            {t('selectAllButtonText')}
-            {/* Select All */}
-          </button>
-          <button onClick={() => setAllOptionsIsSelectedTo(false, optionsSelected, setOptionsSelected)}>
-            {t('resetButtonText')}
-            {/* Reset */}
-          </button>
+          {selectAllButton &&
+            <button onClick={() => selectAllButton()}>
+              {t('selectAllButtonText', { total: numberOfOptions })}
+            </button>
+          }
+          {resetButton &&
+            <button onClick={() => resetButton()}>
+              {t('resetButtonText')}
+            </button>
+          }
           <button onClick={() => setFilterOpen(false)}>
             {t('closeButtonText')}
-            {/* Close */}
           </button>
         </div>
       }
