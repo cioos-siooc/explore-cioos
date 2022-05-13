@@ -204,6 +204,7 @@ export default function App() {
       setDatasetsSelected(datasetsR.map(dataset => {
         return {
           title: dataset.title,
+          titleTranslated: dataset.title_translated,
           isSelected: false,
           pk: dataset.pk
         }
@@ -452,6 +453,7 @@ export default function App() {
             setOptionsSelected={setDatasetsSelected}
             searchable
             allOptions={datasetsSelected}
+            translatable
           />
         </Filter>
         <Filter

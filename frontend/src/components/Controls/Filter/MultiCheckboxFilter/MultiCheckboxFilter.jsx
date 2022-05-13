@@ -5,7 +5,7 @@ import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
 
 import './styles.css'
 
-export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions }) {
+export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, translatable, allOptions }) {
   const { t, i18n } = useTranslation()
 
   const optionsSelectedSorted = optionsSelected.sort((a, b) => t(a.title).localeCompare(t(b.title), i18n.language))
@@ -49,36 +49,53 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
           </div>
         </>
       }
-      {optionsSelected.length > 0 ? optionsSelectedSorted.map((option, index) => (
-        <div className='optionButton' key={index} title={t(option.title)}
-          onClick={() => {
-            if (searchable) {
-              setOptionsSelected(allOptions.map(opt => {
-                if (opt.title === option.title) {
-                  return {
-                    ...opt,
-                    isSelected: !opt.isSelected
-                  }
-                } else return opt
-              }))
-            } else {
-              setOptionsSelected(optionsSelected.map(opt => {
-                if (opt.title === option.title) {
-                  return {
-                    ...opt,
-                    isSelected: !opt.isSelected
-                  }
-                } else return opt
-              }))
-            }
-          }}
-        >
-          {option.isSelected ? <CheckSquare /> : <Square />}
-          <span className='optionName'>
-            {capitalizeFirstLetter(abbreviateString(t(option.title), 30))}
-          </span>
-        </div>
-      ))
+      {optionsSelected.length > 0 ? optionsSelectedSorted.map((option, index) => {
+        let title
+        if (translatable) {
+          // Translation in title_translation
+          if (option.titleTranslated && option.titleTranslated[i18n.languages[0]] && option.titleTranslated[i18n.languages[1]]) {
+            title = option.titleTranslated[i18n.language]
+          } else if (t(option.title)) { // Translation in t(title)
+            title = t(option.title)
+          } else {
+            title = option.title // this shouldn't really happen
+          }
+        } else {
+          title = option.title
+        }
+
+        // No translation
+        return (
+          <div className='optionButton' key={index} title={t(option.title)}
+            onClick={() => {
+              if (searchable) {
+                setOptionsSelected(allOptions.map(opt => {
+                  if (opt.title === option.title) {
+                    return {
+                      ...opt,
+                      isSelected: !opt.isSelected
+                    }
+                  } else return opt
+                }))
+              } else {
+                setOptionsSelected(optionsSelected.map(opt => {
+                  if (opt.title === option.title) {
+                    return {
+                      ...opt,
+                      isSelected: !opt.isSelected
+                    }
+                  } else return opt
+                }))
+              }
+            }}
+          >
+            {option.isSelected ? <CheckSquare /> : <Square />}
+            <span className='optionName'>
+              {capitalizeFirstLetter(abbreviateString(title, 30))}
+            </span>
+          </div>
+        )
+      })
         : (
           <div>{t('multiCheckboxFilterNoFilterWarning')}</div>
         )

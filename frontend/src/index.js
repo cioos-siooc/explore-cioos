@@ -33,13 +33,13 @@ i18n
     resources,
     supportedLngs: ['en', 'fr'],
     lng: urlLanguage,
-    fallbackLng: "en",
+    fallbackLng: ['en', 'fr'],
     detection: {
       order: ['path', 'cookie', 'htmlTag', 'localStorage'],
       caches: ['cookie']
     },
     react: { useSuspense: true }
-  })  
+  })
 
 // This is where react reaches into the DOM, finds the <div id="app"> element, and replaces it with the content of ReactD3Viz's render function JSX.
 const domContainer = document.querySelector('#app')
