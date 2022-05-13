@@ -210,6 +210,13 @@ export default function App() {
         }
       }))
     }).catch(error => { throw error })
+
+    /** Get initial legend values */
+    fetch(`${server}/legend?${createDataFilterQueryString(query)}`).then(response => response.json()).then(legend => {
+      if (legend) {
+        setRangeLevels(legend.recordsCount)
+      }
+    }).catch(error => { throw error })
   }, [])
 
 
@@ -262,11 +269,13 @@ export default function App() {
   }, [submissionState])
 
   useEffect(() => {
-    fetch(`${server}/legend?${createDataFilterQueryString(query)}`).then(response => response.json()).then(legend => {
-      if (legend) {
-        setRangeLevels(legend.recordsCount)
-      }
-    })
+    if (!loading && !_.isEmpty(rangeLevels)) {
+      fetch(`${server}/legend?${createDataFilterQueryString(query)}`).then(response => response.json()).then(legend => {
+        if (legend) {
+          setRangeLevels(legend.recordsCount)
+        }
+      })
+    }
   }, [query])
 
   useEffect(() => {
