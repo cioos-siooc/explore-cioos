@@ -157,10 +157,11 @@ export default function App() {
       ['abc', 'def', ...] 
     */
     fetch(`${server}/oceanVariables`).then(response => response.json()).then(eovs => {
-      setEovsSelected(eovs.map(eov => {
+      setEovsSelected(eovs.map((eov, index) => {
         return {
           title: eov,
-          isSelected: false
+          isSelected: false,
+          pk: index
         }
       }))
     }).catch(error => { throw error })
