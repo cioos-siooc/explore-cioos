@@ -13,7 +13,7 @@ import { createDataFilterQueryString, generateColorStops, getCurrentRangeLevel }
 import { colorScale, defaultQuery } from "../config"
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, organizations, datasets, zoom, setZoom, offsetFlyTo, rangeLevels }) {
+export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, zoom, setZoom, offsetFlyTo, rangeLevels }) {
   const { t } = useTranslation()
   const mapContainer = useRef(null)
   const map = useRef(null)

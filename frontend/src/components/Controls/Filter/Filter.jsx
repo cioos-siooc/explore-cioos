@@ -6,14 +6,12 @@ import { ChevronCompactDown, ChevronCompactUp, X } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
-import { abbreviateString, useOutsideAlerter } from '../../../utilities'
+import { abbreviateString, useOutsideAlerter, setAllOptionsIsSelectedTo } from '../../../utilities'
 
 import './styles.css'
 
 export default function Filter({
   badgeTitle,
-  optionsSelected,
-  setOptionsSelected,
   tooltip,
   icon,
   controlled,
@@ -24,7 +22,9 @@ export default function Filter({
   searchTerms,
   setSearchTerms,
   searchPlaceholder,
-  searchResults,
+  resetButton,
+  selectAllButton,
+  numberOfOptions,
   children }) {
 
   const { t } = useTranslation()
@@ -33,18 +33,6 @@ export default function Filter({
   const [filterOpen, setFilterOpen] = useState(controlled ? openFilter : false)
   const wrapperRef = useRef(null);
   useOutsideAlerter(wrapperRef, setFilterOpen, false);
-
-  function resetDefaults() {
-    let copyOfOptionsSelected = { ...optionsSelected }
-    Object.keys(optionsSelected).forEach(option => copyOfOptionsSelected[option] = false)
-    setOptionsSelected(copyOfOptionsSelected)
-  }
-
-  function selectAll() {
-    let copyOfOptionsSelected = { ...optionsSelected }
-    Object.keys(optionsSelected).forEach(option => copyOfOptionsSelected[option] = true)
-    setOptionsSelected(copyOfOptionsSelected)
-  }
 
   useEffect(() => {
     controlled ? setFilterOpen(openFilter) : _.noop()
@@ -94,17 +82,18 @@ export default function Filter({
             </div>
           )}
           {children}
-          <button onClick={() => selectAll()}>
-            {t('selectAllButtonText')}
-            {/* Select All */}
-          </button>
-          <button onClick={() => resetDefaults()}>
-            {t('resetButtonText')}
-            {/* Reset */}
-          </button>
+          {selectAllButton &&
+            <button onClick={() => selectAllButton()}>
+              {t('selectAllButtonText', { total: numberOfOptions })}
+            </button>
+          }
+          {resetButton &&
+            <button onClick={() => resetButton()}>
+              {t('resetButtonText')}
+            </button>
+          }
           <button onClick={() => setFilterOpen(false)}>
             {t('closeButtonText')}
-            {/* Close */}
           </button>
         </div>
       }
