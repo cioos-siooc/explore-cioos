@@ -10,9 +10,9 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
 
   const optionsSelectedSorted = optionsSelected.sort((a, b) => t(a.title).localeCompare(t(b.title), i18n.language))
 
-  function setIsSelectedTo(isSelected, allOptions, listOfTitles) {
+  function setIsSelectedTo(isSelected, allOptions, listOfPKs) {
     return allOptions.map(option => {
-      if (listOfTitles.includes(option.title)) {
+      if (listOfPKs.includes(option.pk)) {
         return {
           ...option,
           isSelected: isSelected
@@ -24,17 +24,17 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
   }
 
   function selectAllSearchResultsToggle() {
-    // Get a list of all the titles in the optionsSelected subset of allOptions
-    const listOfTitles = optionsSelected.reduce((accumulatedTitles, currentOption) => {
-      accumulatedTitles.push(currentOption.title)
-      return accumulatedTitles
+    // Get a list of all the pks in the optionsSelected subset of allOptions
+    const listOfPKs = optionsSelected.reduce((accumulatedPKs, currentOption) => {
+      accumulatedPKs.push(currentOption.pk)
+      return accumulatedPKs
     }, [])
 
     // Set all isSelected to false if all isSelected === true
     if (optionsSelected.every(option => option.isSelected)) {
-      setOptionsSelected(setIsSelectedTo(false, allOptions, listOfTitles))
+      setOptionsSelected(setIsSelectedTo(false, allOptions, listOfPKs))
     } else { // Set all isSelected to true if some isSelected === false
-      setOptionsSelected(setIsSelectedTo(true, allOptions, listOfTitles))
+      setOptionsSelected(setIsSelectedTo(true, allOptions, listOfPKs))
     }
   }
 
@@ -66,11 +66,11 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
 
         // No translation
         return (
-          <div className='optionButton' key={index} title={t(option.title)}
+          <div className='optionButton' key={index} title={t(title)}
             onClick={() => {
               if (searchable) {
                 setOptionsSelected(allOptions.map(opt => {
-                  if (opt.title === option.title) {
+                  if (opt.pk === option.pk) {
                     return {
                       ...opt,
                       isSelected: !opt.isSelected
@@ -79,7 +79,7 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
                 }))
               } else {
                 setOptionsSelected(optionsSelected.map(opt => {
-                  if (opt.title === option.title) {
+                  if (opt.pk === option.pk) {
                     return {
                       ...opt,
                       isSelected: !opt.isSelected
