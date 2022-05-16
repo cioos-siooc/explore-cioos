@@ -161,6 +161,10 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     }
   }, [query])
 
+  const mapZoom = new URL(window.location.href).searchParams.get('zoom')
+  const mapLongitude = new URL(window.location.href).searchParams.get('lon')
+  const mapLatitude = new URL(window.location.href).searchParams.get('lat')
+
   useEffect(() => {
     // If already created don't proceed
     if (map.current) return
@@ -186,8 +190,8 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
           },
         ],
       },
-      center: [-125, 49], // starting position
-      zoom: zoom, // starting zoom
+      center: [mapLongitude || -100, mapLatitude || 60], // starting position
+      zoom: mapZoom || zoom, // starting zoom
     })
 
     map.current.on("load", () => {
