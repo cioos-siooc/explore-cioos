@@ -4,30 +4,36 @@ import { useState, useEffect } from 'react'
 import { defaultQuery } from './components/config.js'
 import { useTranslation } from 'react-i18next'
 
+export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
+  setOptions(options.map(option => {
+    return {
+      ...option,
+      isSelected: isSelected
+    }
+  }))
+}
+
 export function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
+
 export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
   const { t } = useTranslation()
 
-  // get text array of items selected
-  const optionSelectedText = Object.entries(optionsSelected)
-    .filter(([k, isSelected]) => isSelected)
-    .map((e) => e[0])
-
-  const firstOptionSelected = optionSelectedText && optionSelectedText[0]
-  const count = optionSelectedText.length
-
-  if (count == 0) return t(badgeTitle)
-  else if (count == 1) return capitalizeFirstLetter(t(firstOptionSelected))
-  // count > 1
-  else {
-    const mapping = {
-      oceanVariablesFiltername: "oceanVariablesMulit",
-      organizationFilterName: "organizationMulti",
-      datasetsFilterName: "datasetsMulti",
-    };
-    return count + t(mapping[badgeTitle])
+  if (optionsSelected) {
+    const optionsSelectedFiltered = optionsSelected.filter(option => option.isSelected)
+    if (optionsSelectedFiltered.length === 0) {
+      return t(badgeTitle)
+    } else if (optionsSelectedFiltered.length === 1) {
+      return capitalizeFirstLetter(t(optionsSelectedFiltered[0].title))
+    } else { // More than 0 or 1 options are selected
+      const mapping = {
+        oceanVariablesFiltername: "oceanVariablesMulti",
+        organizationFilterName: "organizationMulti",
+        datasetsFilterName: "datasetsMulti",
+      }
+      return optionsSelectedFiltered.length + t(mapping[badgeTitle])
+    }
   }
 }
 
@@ -57,49 +63,51 @@ function objectToURL(obj) {
   return Object.entries(obj)
     .filter(([k, v]) => k && v != null && v !== "")
     .map(([k, v]) => `${k}=${v}`)
-    .join("&");
+    .join("&")
 }
 
-export function createDataFilterQueryString(query, organizations, datasets) {
+export function createDataFilterQueryString(query) {
   const { orgsSelected, eovsSelected, datasetsSelected } = query
 
-  const queryWithoutDefaults = Object.keys(defaultQuery).reduce(
-    (acc, field) => {
-      if (query[field] !== defaultQuery[field]) {
-        acc[field] = query[field]
-      }
-      return acc
+  // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
+  const queryWithoutDefaults = Object.keys(defaultQuery).reduce( // going through each 
+    (accumulatorObject, field) => {
+      if (query[field] !== defaultQuery[field]) { // checking that the value of each property in the query object has been changed in order to include those values in the url
+        accumulatorObject[field] = query[field]
+      } // otherwise properties are left at their defaults, and excluded from the url.
+      return accumulatorObject
     },
     {}
   )
 
-  const eovs = Object.keys(eovsSelected)
-    .filter((eov) => eovsSelected[eov])
-    .join()
+  const eovs = eovsSelected
+    .filter((eov) => eov.isSelected) // pulling the selected eov names out (these don't have pks)
+    .map(eov => eov.title)
+    .join() // create the comma delimited list of eovs
 
-  const datasetPKs = Object.keys(datasetsSelected)
-    .filter((dataset) => datasetsSelected[dataset])
-    .map((dataset) => datasets[dataset])
-    .join()
+  const datasetPKs = datasetsSelected
+    .filter((dataset) => dataset.isSelected) // getting the selected datasets out
+    .map((dataset) => dataset.pk) // getting the pks of the selected datasets using the dataset title to access the pk
+    .join() // create the comma delimited list of dataset pks
 
-  const orgPKsSelected = Object.keys(orgsSelected)
-    .filter((org) => orgsSelected[org])
-    .map((org) => organizations[org])
-    .join()
+  const orgPKs = orgsSelected
+    .filter((org) => org.isSelected) // getting the selected orgs out
+    .map((org) => org.pk) // getting the pks of the selected organizations using the orgs title to access the pk 
+    .join() // create the comma delimited list of org pks
 
   const { startDepth, endDepth, startDate, endDate } = queryWithoutDefaults
 
-  const apiMappedQuery = {
+  const apiMappedQuery = { // These properties are specified by the API's schema
     eovs,
     datasetPKs: datasetPKs,
-    organizations: orgPKsSelected,
+    organizations: orgPKs,
     timeMin: startDate,
     timeMax: endDate,
     depthMin: startDepth,
     depthMax: endDepth,
   }
 
-  return objectToURL(apiMappedQuery);
+  return objectToURL(apiMappedQuery)
 }
 
 export function bytesToMemorySizeString(bytes) {

@@ -5,64 +5,99 @@ import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
 
 import './styles.css'
 
-export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, allOptions }) {
+export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, translatable, allOptions }) {
   const { t, i18n } = useTranslation()
 
-  const optionsSelectedSorted = Object.entries(optionsSelected)
-    .sort((a, b) => t(a[0]).localeCompare(t(b[0]), i18n.language))
-    .reduce((r, [k, v]) => ({ ...r, [k]: v }), {});
+  const optionsSelectedSorted = optionsSelected.sort((a, b) => t(a.title).localeCompare(t(b.title), i18n.language))
 
+  function setIsSelectedTo(isSelected, allOptions, listOfPKs) {
+    return allOptions.map(option => {
+      if (listOfPKs.includes(option.pk)) {
+        return {
+          ...option,
+          isSelected: isSelected
+        }
+      } else {
+        return option
+      }
+    })
+  }
 
   function selectAllSearchResultsToggle() {
-    let copyOfAllOptions = { ...allOptions }
-    let copyOfOptionsSelected = { ...optionsSelected }
-    const options = Object.keys(optionsSelected)
-    if (Object.values(optionsSelected).every(option => option)) {
-      options.forEach(option => copyOfOptionsSelected[option] = false)
-    } else {
-      options.forEach(option => copyOfOptionsSelected[option] = true)
+    // Get a list of all the pks in the optionsSelected subset of allOptions
+    const listOfPKs = optionsSelected.reduce((accumulatedPKs, currentOption) => {
+      accumulatedPKs.push(currentOption.pk)
+      return accumulatedPKs
+    }, [])
+
+    // Set all isSelected to false if all isSelected === true
+    if (optionsSelected.every(option => option.isSelected)) {
+      setOptionsSelected(setIsSelectedTo(false, allOptions, listOfPKs))
+    } else { // Set all isSelected to true if some isSelected === false
+      setOptionsSelected(setIsSelectedTo(true, allOptions, listOfPKs))
     }
-    options.forEach(option => copyOfAllOptions[option] = copyOfOptionsSelected[option])
-    setOptionsSelected(copyOfAllOptions)
   }
-  const searchResultsExist = Object.keys(optionsSelected).length !== Object.keys(allOptions).length && Object.keys(optionsSelected).length > 0
+
   return (
     <div className={`multiCheckboxFilter`}>
-      {searchResultsExist &&
+      {optionsSelected.length > 0 && optionsSelected.length !== allOptions.length && // search results exist
         <>
           <div className="searchResultsButton" onClick={() => selectAllSearchResultsToggle()}>
-            {Object.values(optionsSelected).every(option => option) ? <CheckSquare /> : <Square />}
-            {t('multiCheckboxFilterSelectSearchResults')}
+            {optionsSelected.every(option => option.isSelected) ? <CheckSquare /> : <Square />}
+            {t('multiCheckboxFilterSelectSearchResults')} {`(${optionsSelected.length})`}
             <hr />
           </div>
         </>
       }
-      {Object.keys(optionsSelected).length > 0 ? Object.keys(optionsSelectedSorted).map((option, index) => (
-        <div className='optionButton' key={index} title={t(option)}
-          onClick={() => {
-            if (searchable) {
-              let tempData = { ...allOptions }
-              // Go through each of the elements in the subset
-              // Find the corresponding element in the total set and set its selection status
-              tempData[option] = !optionsSelected[option]
-              // Set the total set 
-              setOptionsSelected(tempData)
-            } else {
-              setOptionsSelected({
-                ...optionsSelected,
-                [option]: !optionsSelected[option]
-              })
-            }
-          }}
-        >
-          {optionsSelected[option] ? <CheckSquare /> : <Square />}
-          <span className='optionName'>
-            {capitalizeFirstLetter(abbreviateString(t(option), 30))}
-          </span>
-        </div>
-      ))
+      {optionsSelected.length > 0 ? optionsSelectedSorted.map((option, index) => {
+        let title
+        if (translatable) {
+          // Translation in title_translation
+          if (option.titleTranslated && option.titleTranslated[i18n.languages[0]] && option.titleTranslated[i18n.languages[1]]) {
+            title = option.titleTranslated[i18n.language]
+          } else if (t(option.title)) { // Translation in t(title)
+            title = t(option.title)
+          } else {
+            title = option.title // this shouldn't really happen
+          }
+        } else {
+          title = option.title
+        }
+
+        // No translation
+        return (
+          <div className='optionButton' key={index} title={t(title)}
+            onClick={() => {
+              if (searchable) {
+                setOptionsSelected(allOptions.map(opt => {
+                  if (opt.pk === option.pk) {
+                    return {
+                      ...opt,
+                      isSelected: !opt.isSelected
+                    }
+                  } else return opt
+                }))
+              } else {
+                setOptionsSelected(optionsSelected.map(opt => {
+                  if (opt.pk === option.pk) {
+                    return {
+                      ...opt,
+                      isSelected: !opt.isSelected
+                    }
+                  } else return opt
+                }))
+              }
+            }}
+          >
+            {option.isSelected ? <CheckSquare /> : <Square />}
+            <span className='optionName'>
+              {capitalizeFirstLetter(abbreviateString(title, 30))}
+            </span>
+          </div>
+        )
+      })
         : (
-          <div>{t('multiCheckboxFilterNoFilterWarning')}No filter options</div>
+          <div>{t('multiCheckboxFilterNoFilterWarning')}</div>
         )
       }
     </div>

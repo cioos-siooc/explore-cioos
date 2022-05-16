@@ -18,7 +18,7 @@ import {
 } from "../../../utilities.js";
 
 // Note: datasets and points are exchangable terminology
-export default function SelectionDetails({ setPointsToReview, query, polygon, organizations, datasets, children }) {
+export default function SelectionDetails({ setPointsToReview, query, polygon, children }) {
   const { t, i18n } = useTranslation()
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState([])
@@ -39,7 +39,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, or
   useEffect(() => {
     setDataTotal(0)
     if (polygon !== undefined && !loading) {
-      const filtersQuery = createDataFilterQueryString(query, organizations, datasets);
+      const filtersQuery = createDataFilterQueryString(query)
       const shapeQuery = createSelectionQueryString(polygon)
       const combinedQueries = [filtersQuery, shapeQuery].filter(e => e).join("&");
       setInspectDataset()
