@@ -24,16 +24,16 @@ router.get(
 
     const sql = `
         WITH records AS (
-        SELECT hex_zoom_0, hex_zoom_1, point_pk
+        SELECT hex_zoom_0, hex_zoom_1, point_pk, days
         FROM cioos_api.profiles p
         JOIN cioos_api.datasets d
         ON p.dataset_pk = d.pk
         ${filters ? "WHERE " + filters : ""}
         ),
 
-        sub1 AS (SELECT json_build_array(min(count),max(count)) zoom0 FROM (SELECT count(*) FROM records GROUP BY hex_zoom_0) s),
-        sub2 AS (SELECT json_build_array(min(count),max(count)) zoom1 FROM (SELECT count(*) FROM records GROUP BY hex_zoom_1) s),
-        sub3 AS (SELECT json_build_array(min(count),max(count)) zoom2 FROM (SELECT count(*) FROM records GROUP BY point_pk) s)
+        sub1 AS (SELECT json_build_array(min(count),max(count)) zoom0 FROM (SELECT count(distinct records.point_pk) count FROM records GROUP BY hex_zoom_0) s),
+        sub2 AS (SELECT json_build_array(min(count),max(count)) zoom1 FROM (SELECT count(distinct records.point_pk) count FROM records GROUP BY hex_zoom_1) s),
+        sub3 AS (SELECT json_build_array(min(count),max(count)) zoom2 FROM (SELECT count(distinct records.point_pk) count FROM records GROUP BY point_pk) s)
         
         SELECT * from sub1,sub2,sub3
         `;
