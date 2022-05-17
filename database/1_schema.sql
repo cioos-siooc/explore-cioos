@@ -31,6 +31,8 @@ CREATE TABLE cioos_api.datasets (
     organization_pks INTEGER[],
     n_profiles integer,
     profile_variables text[],
+    l06_platform_code text,
+    platform_type text,
     UNIQUE(dataset_id, erddap_url)
 );
 
