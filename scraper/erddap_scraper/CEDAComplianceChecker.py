@@ -56,17 +56,6 @@ class CEDAComplianceChecker(object):
             self.logger.warn(
                 "Found unstandard standard_name:" + str(non_standard_names)
             )
-        # Find unmapped, legit standard names
-        # unsupported_dataset_cf_names = [
-        #     x
-        #     for x in standard_names_in_dataset
-        #     if x in cf_standard_names and x not in supported_standard_names
-        # ]
-        # if unsupported_dataset_cf_names:
-        #     self.dataset.unsupported_dataset_cf_names += [unsupported_dataset_cf_names]
-        #     self.logger.warn(
-        #         "Found unsupported standard name:" + str(unsupported_dataset_cf_names)
-        #     )
 
         #  This dataset has at least one standard name mapped to GOOS
         supported_variables = intersection(
