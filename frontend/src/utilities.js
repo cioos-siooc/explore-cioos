@@ -29,6 +29,7 @@ export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
     } else { // More than 0 or 1 options are selected
       const mapping = {
         oceanVariablesFiltername: "oceanVariablesMulti",
+        platformsFilterName: "platformsMulti",
         organizationFilterName: "organizationMulti",
         datasetsFilterName: "datasetsMulti",
       }
