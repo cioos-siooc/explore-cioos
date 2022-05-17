@@ -68,5 +68,5 @@ WHERE
   END;
 $$ LANGUAGE plpgsql;
 
-
+UPDATE cioos_api.profiles set days=date_part('days',time_max-time_min)+1;
 

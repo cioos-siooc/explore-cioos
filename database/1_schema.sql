@@ -69,6 +69,7 @@ CREATE TABLE cioos_api.profiles (
     hex_zoom_0 geometry(polygon,3857),
     hex_zoom_1 geometry(polygon,3857),
     point_pk INTEGER,
+    days bigint,
     UNIQUE(erddap_url,dataset_id,timeseries_id,profile_id)
 );
 

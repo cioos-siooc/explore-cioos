@@ -216,10 +216,29 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         "source-layer": "internal-layer-name",
         paint: {
           'circle-opacity': 1,
-          "circle-color": {
-            property: 'count',
-            stops: colorStops.current
-          }
+          "circle-radius": ["get", "size"],
+          'circle-color': [
+            'match',
+            ['get', 'platform'],
+            /** More distinct colors: #ba55d3, #00ffff, #0000ff, #f08080, #ff00ff, #1e90ff, #eee8aa, #ffff54, #dda0dd, #ff1493, #87cefa*/
+            '17',
+            '#f08080',
+            '33',
+            '#2e8b57',
+            '48',
+            '#e55e5e',
+            '0',
+            '#808000',
+            '30',
+            '#52a79b',
+            '14',
+            '#ff4500',
+            '41',
+            '#ffa500',
+            '',
+            '#7fff00',
+            /* other */ '#000000'
+            ]
         },
       })
 
