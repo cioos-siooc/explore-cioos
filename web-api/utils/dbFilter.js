@@ -12,6 +12,7 @@ function createDBFilter(request) {
     lonMin,
     lonMax,
     polygon,
+    platforms,
 
     // These are comma separated lists
     eovs,
@@ -31,6 +32,15 @@ function createDBFilter(request) {
     filters.push(`ceda_eovs && array[${eovsCommaSeparatedString}]`);
   }
 
+  if (platforms) {
+    const platformsCommaSeparatedString = unique(
+      platforms
+        .split(","))
+        .map((platform) => `'${platform}'`).join();
+
+    filters.push(`platform_type = any(array[${platformsCommaSeparatedString}])`);
+  }
+
   if (timeMin) filters.push(`time_max >= '${timeMin}'::timestamptz`);
   if (timeMax) filters.push(`time_min <= '${timeMax}'::timestamptz`);
 
@@ -44,7 +54,7 @@ function createDBFilter(request) {
   // disabled until we get depth data into the database
   if (depthMin) filters.push(`depth_max >= '${depthMin}'::integer`);
   if (depthMax) filters.push(`depth_min <= '${depthMax}'::integer`);
-
+  
   if (datasetPKs) {
     filters.push(`d.pk = ANY ('{${datasetPKs}}')`);
   }
