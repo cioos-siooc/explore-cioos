@@ -42,7 +42,7 @@ def get_variable_list(df_variables, eovs: list):
      user and the mandatory variables required.
     :param erddap_metadata: erddap dataset attributes dataframe
     :param eovs: eov list requested by the query
-    :return: list of variables to download from erddap
+    :return: list of variables to download from erddap 
     """
     # Get a list of mandatory variables to be present if available
     mandatory_variables = ["time", "latitude", "longitude", "depth"]
