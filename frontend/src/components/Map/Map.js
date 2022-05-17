@@ -10,7 +10,7 @@ import './styles.css'
 
 import { server } from '../../config'
 import { createDataFilterQueryString, generateColorStops, getCurrentRangeLevel } from "../../utilities"
-import { colorScale, defaultQuery } from "../config"
+import { colorScale, defaultQuery, platformColors } from "../config"
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
 export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, zoom, setZoom, offsetFlyTo, rangeLevels }) {
@@ -46,6 +46,16 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     closeOnClick: true,
     maxWidth: '400px'
   })
+
+  let colors = ['match',
+    ['get', 'platform'],
+  ]
+  platformColors.reduce((accumulatedPlatformColors, platformColor) => {
+    accumulatedPlatformColors.push(platformColor.platformId)
+    accumulatedPlatformColors.push(platformColor.platformColor)
+    return accumulatedPlatformColors
+  }, colors)
+  colors.push('#000000')
 
   useEffect(() => {
     setColorStops()
@@ -86,10 +96,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       })
       if (colorStops.current.length > 0) {
         if (map.current.getZoom() >= 7 && map.current.getLayer('points')) {
-          map.current.setPaintProperty('points', 'circle-color', {
-            property: 'count',
-            stops: colorStops.current
-          })
+          map.current.setPaintProperty('points', 'circle-color', colors)
         } else if (map.current.getZoom() < 7 && map.current.getLayer('hexes')) {
           map.current.setPaintProperty('hexes', 'fill-color', {
             property: 'count',
@@ -217,30 +224,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         paint: {
           'circle-opacity': 1,
           "circle-radius": ["get", "size"],
-          'circle-color': [
-            'match',
-            ['get', 'platform'],
-            /** More distinct colors: #ba55d3, #00ffff, #0000ff, #f08080, #ff00ff, #1e90ff, #eee8aa, #ffff54, #dda0dd, #ff1493, #87cefa*/
-            '43',
-            '#0000ff',
-            '11',
-            '#ba55d3',
-            '17',
-            '#f08080',
-            '33',
-            '#2e8b57',
-            '48',
-            '#e55e5e',
-            '30',
-            '#52a79b',
-            '14',
-            '#ff4500',
-            '41',
-            '#ffa500',
-            '',
-            '#7fff00',
-            /* other */ '#000000'
-            ]
+          'circle-color': colors
         },
       })
 
@@ -276,12 +260,13 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         },
         "source-layer": "internal-layer-name",
         paint: {
-          "circle-color": "red",
+          "circle-color": "white",
           "circle-opacity": 1,
+          "circle-stroke-color": "black",
+          "circle-stroke-width": 1
         },
         filter: ['in', 'pk', '']
       })
-
     })
 
     // Called order determines stacking order
