@@ -67,7 +67,7 @@ function objectToURL(obj) {
 }
 
 export function createDataFilterQueryString(query) {
-  const { orgsSelected, eovsSelected, datasetsSelected } = query
+  const { orgsSelected, eovsSelected, platformsSelected, datasetsSelected } = query
 
   // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
   const queryWithoutDefaults = Object.keys(defaultQuery).reduce( // going through each 
@@ -85,6 +85,11 @@ export function createDataFilterQueryString(query) {
     .map(eov => eov.title)
     .join() // create the comma delimited list of eovs
 
+  const platforms = platformsSelected
+    .filter((platform) => platform.isSelected)
+    .map(platform => platform.title)
+    .join()
+
   const datasetPKs = datasetsSelected
     .filter((dataset) => dataset.isSelected) // getting the selected datasets out
     .map((dataset) => dataset.pk) // getting the pks of the selected datasets using the dataset title to access the pk
@@ -99,6 +104,7 @@ export function createDataFilterQueryString(query) {
 
   const apiMappedQuery = { // These properties are specified by the API's schema
     eovs,
+    platforms,
     datasetPKs: datasetPKs,
     organizations: orgPKs,
     timeMin: startDate,

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import * as Sentry from "@sentry/react"
 import { Integrations } from "@sentry/tracing"
 import { Col, Spinner } from 'react-bootstrap'
-import { ChatDots, CheckCircle, XCircle, ArrowsExpand, Building, CalendarWeek, FileEarmarkSpreadsheet, Water } from 'react-bootstrap-icons'
+import { ChatDots, CheckCircle, XCircle, ArrowsExpand, Building, CalendarWeek, FileEarmarkSpreadsheet, Water, BroadcastPin } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import _ from 'lodash'
 
@@ -22,7 +22,7 @@ import Filter from './Controls/Filter/Filter.jsx'
 import MultiCheckboxFilter from './Controls/Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx'
 import TimeSelector from './Controls/Filter/TimeSelector/TimeSelector.jsx'
 import DepthSelector from './Controls/Filter/DepthSelector/DepthSelector.jsx'
-import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected } from './config.js'
+import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected, defaultPlatformsSelected } from './config.js'
 import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel, getPointsDataSize, generateMultipleSelectBadgeTitle, generateRangeSelectBadgeTitle, useDebounce, setAllOptionsIsSelectedTo } from '../utilities.js'
 
 import "bootstrap/dist/css/bootstrap.min.css"
@@ -61,7 +61,8 @@ export default function App() {
     endDepth: defaultEndDepth,
     eovsSelected: defaultEovsSelected,
     orgsSelected: defaultOrgsSelected,
-    datasetsSelected: defaultDatatsetsSelected
+    datasetsSelected: defaultDatatsetsSelected,
+    platformsSelected: defaultPlatformsSelected
   })
 
   // EOV filter initial values and state
@@ -84,6 +85,13 @@ export default function App() {
   const datasetsFilterTranslationKey = 'datasetsFilterName' //'Datasets'
   const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(datasetsFilterTranslationKey, datasetsSelected)
   const [datasetSearchTerms, setDatasetSearchTerms] = useState('')
+
+  // Dataset filter initial values and state
+  const [platformsSelected, setPlatformsSelected] = useState(defaultPlatformsSelected)
+  const debouncedPlatformsSelected = useDebounce(platformsSelected, 500)
+  const platformsFilterTranslationKey = 'platformsFilterName' //'Datasets'
+  const platformsBadgeTitle = generateMultipleSelectBadgeTitle(platformsFilterTranslationKey, platformsSelected)
+  const [platformsSearchTerms, setPlatformsSearchTerms] = useState('')
 
   // Timeframe filter initial values and state
   const [startDate, setStartDate] = useState(defaultStartDate)
@@ -116,9 +124,10 @@ export default function App() {
       endDepth: endDepth,
       eovsSelected: eovsSelected,
       orgsSelected: orgsSelected,
-      datasetsSelected: datasetsSelected
+      datasetsSelected: datasetsSelected,
+      platformsSelected: platformsSelected
     })
-  }, [debouncedStartDate, debouncedEndDate, debouncedStartDepth, debouncedEndDepth, debouncedEovsSelected, debouncedOrgsSelected, debouncedDatasetsSelected])
+  }, [debouncedStartDate, debouncedEndDate, debouncedStartDepth, debouncedEndDepth, debouncedEovsSelected, debouncedOrgsSelected, debouncedDatasetsSelected, debouncedPlatformsSelected])
 
   function createOptionSubset(searchTerms, allOptions) {
     if (searchTerms) {
@@ -153,6 +162,19 @@ export default function App() {
   }]
   */
   useEffect(() => {
+    /* /platforms returns array of platform names: 
+      ['abc', 'def', ...] 
+    */
+    fetch(`${server}/platforms`).then(response => response.json()).then(platforms => {
+      setPlatformsSelected(platforms.map((platform, index) => {
+        return {
+          title: platform,
+          isSelected: false,
+          pk: index
+        }
+      }))
+    }).catch(error => { throw error })
+
     /* /oceanVariables returns array of variable names: 
       ['abc', 'def', ...] 
     */
@@ -413,6 +435,31 @@ export default function App() {
             setOptionsSelected={setEovsSelected}
             searchable
             allOptions={eovsSelected}
+          />
+        </Filter>
+        <Filter
+          badgeTitle={platformsBadgeTitle}
+          optionsSelected={platformsSelected}
+          setOptionsSelected={setPlatformsSelected}
+          tooltip={t('platformFilterTooltip')} //'Filter data by ocean variable name. Selection works as logical OR operation.'
+          icon={<BroadcastPin />}
+          controlled
+          searchable
+          searchTerms={platformsSearchTerms}
+          setSearchTerms={setPlatformsSearchTerms}
+          searchPlaceholder={t('platformsFilterSeachPlaceholder')} //'Search for ocean variable name...'
+          filterName={platformsFilterTranslationKey}
+          openFilter={openFilter === platformsFilterTranslationKey}
+          setOpenFilter={setOpenFilter}
+          selectAllButton={() => setAllOptionsIsSelectedTo(true, platformsSelected, setPlatformsSelected)}
+          resetButton={() => setAllOptionsIsSelectedTo(false, platformsSelected, setPlatformsSelected)}
+          numberOfOptions={platformsSelected.length}
+        >
+          <MultiCheckboxFilter
+            optionsSelected={createOptionSubset(platformsSearchTerms, platformsSelected)}
+            setOptionsSelected={setPlatformsSelected}
+            searchable
+            allOptions={platformsSelected}
           />
         </Filter>
         <Filter
