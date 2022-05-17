@@ -3,7 +3,7 @@
 import traceback
 
 import pandas as pd
-from erddap_scraper.CEDAComplianceChecker import CEDAComplianceChecker
+from erddap_scraper.CDEComplianceChecker import CDEComplianceChecker
 from erddap_scraper.ERDDAP import ERDDAP
 from erddap_scraper.profiles import get_profiles
 from requests.exceptions import HTTPError
@@ -79,7 +79,7 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
             logger.info(f"Querying dataset: {dataset_id} {i+1}/{len(df_all_datasets)}")
             dataset = erddap.get_dataset(dataset_id)
             dataset_logger = dataset.logger
-            compliance_checker = CEDAComplianceChecker(dataset)
+            compliance_checker = CDEComplianceChecker(dataset)
             passes_checks = compliance_checker.passes_all_checks()
 
             # these are the variables we are pulling max/min values for
@@ -121,10 +121,10 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
             columns=["erddap_url", "dataset_id", "reason_code"],
         )
 
-    # logger.info(record_count)
-    logger.info(
-        f"skipped: {len(df_skipped_datasets)} datasets: {df_skipped_datasets['dataset_id'].to_list()}"
-    )
+        # logger.info(record_count)
+        logger.info(
+            f"skipped: {len(df_skipped_datasets)} datasets: {df_skipped_datasets['dataset_id'].to_list()}"
+        )
 
     # using 'result' to return data from each thread
     result.append(

@@ -4,28 +4,44 @@ import os
 import pandas as pd
 
 
-def get_eov_to_standard_names():
+def get_cde_eov_to_standard_name():
+    # get a dictionary with CDE EOVs as keys and a list of standard names under each
+    # this hides the GOOS layer
     dir = os.path.dirname(os.path.realpath(__file__))
-    supported_eovs = pd.read_csv(dir + "/supported_eovs.csv")["goos_eov"].to_list()
 
-    with open(dir + "/eovs_to_standard_name.json") as f:
-        eov_to_standard_names = json.loads(f.read())
-        return {
-            k: eov_to_standard_names[k]
-            for k in eov_to_standard_names
-            if k in supported_eovs
-        }
+    with open(dir + "/cde_to_goos_eov.json") as f:
+        cde_to_goos_eov = json.loads(f.read())
 
+    with open(dir + "/goos_eov_to_standard_name.json") as f:
+        goos_eov_to_standard_name = json.loads(f.read())
 
-def get_df_eov_to_standard_names():
-    df = pd.DataFrame()
-    for eov, names in eov_to_standard_names.items():
-        for name in names:
-            df = pd.concat(
-                [df, pd.DataFrame({"eov": [eov], "standard_name": [name]})],
-                ignore_index=True,
+    res = {}
+    for cde_eov, goos_eovs in cde_to_goos_eov.items():
+        res[cde_eov] = []
+        for goos_variable in goos_eovs:
+            res[cde_eov] = list(
+                set(res[cde_eov] + goos_eov_to_standard_name[goos_variable])
             )
-    return df
+    return res
+
+
+# dictionary mapping from CDE ocean variables to standard names
+cde_eov_to_standard_name = get_cde_eov_to_standard_name()
+
+
+def get_df_cde_eov_to_standard_name(cde_eov_to_standard_name):
+    # this is just a dataframe version of get_cde_eov_to_standard_name
+    res = []
+    for cde_eov, standard_names in cde_eov_to_standard_name.items():
+        for standard_name in standard_names:
+            res += [[cde_eov, standard_name]]
+    return pd.DataFrame(res, columns=["eov", "standard_name"])
+
+
+# dataframe mapping of CDE ocean variables to standard names
+df_cde_eov_to_standard_name = get_df_cde_eov_to_standard_name(
+    cde_eov_to_standard_name
+)
 
 
 def intersection(lst1, lst2):
@@ -48,21 +64,5 @@ cf_standard_names = (
     .unique()
 )
 
-eov_to_standard_names = get_eov_to_standard_names()
-supported_standard_names = flatten(list(eov_to_standard_names.values()))
-
-
-def get_ceda_eov_map():
-    dir = os.path.dirname(os.path.realpath(__file__))
-    return pd.read_csv(dir + "/supported_eovs.csv").set_index("goos_eov")
-
-
-ceda_eov_map = get_ceda_eov_map()
-
-
-def eovs_to_ceda_eovs(lst):
-    print("lst", lst)
-    out = []
-    for eov in lst:
-        out += [ceda_eov_map.loc[eov]["ceda_eov"]]
-    return out
+# list of standard names that are supported by CDE
+supported_standard_names = flatten(cde_eov_to_standard_name.values())

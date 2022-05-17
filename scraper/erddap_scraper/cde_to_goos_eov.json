@@ -1,0 +1,36 @@
+{
+  "currents": ["subSurfaceCurrents", "surfaceCurrents"],
+  "dissolvedOrganicCarbon": ["dissolvedOrganicCarbon"],
+  "fishAbundanceAndDistribution": ["fishAbundanceAndDistribution"],
+  "hardCoralCoverAndComposition": ["hardCoralCoverAndComposition"],
+  "inorganicCarbon": ["inorganicCarbon"],
+  "invertebrateAbundanceAndDistribution": [
+    "invertebrateAbundanceAndDistribution"
+  ],
+  "macroalgalCanopyCoverAndComposition": [
+    "macroalgalCanopyCoverAndComposition"
+  ],
+  "marineDebris": ["marineDebris"],
+  "marineTurtlesBirdsMammalsAbundanceAndDistribution": [
+    "marineTurtlesBirdsMammalsAbundanceAndDistribution"
+  ],
+  "microbeBiomassAndDiversity": ["microbeBiomassAndDiversity"],
+  "nitrousOxide": ["nitrousOxide"],
+  "nutrients": ["nutrients"],
+  "oceanColour": ["oceanColour"],
+  "oceanSound": ["oceanSound"],
+  "oceanSurfaceHeatFlux": ["oceanSurfaceHeatFlux"],
+  "oceanSurfaceStress": ["oceanSurfaceStress"],
+  "oxygen": ["oxygen"],
+  "particulateMatter": ["particulateMatter"],
+  "phytoplanktonBiomassAndDiversity": ["phytoplanktonBiomassAndDiversity"],
+  "salinity": ["seaSurfaceSalinity", "subSurfaceSalinity"],
+  "seagrassCoverAndComposition": ["seagrassCoverAndComposition"],
+  "seaIce": ["seaIce"],
+  "seaState": ["seaState"],
+  "seaSurfaceHeight": ["seaSurfaceHeight"],
+  "stableCarbonIsotopes": ["stableCarbonIsotopes"],
+  "temperature": ["seaSurfaceTemperature", "subSurfaceTemperature"],
+  "transientTracers": ["transientTracers"],
+  "zooplanktonBiomassAndDiversity": ["zooplanktonBiomassAndDiversity"]
+}
