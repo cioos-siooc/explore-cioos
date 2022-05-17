@@ -11,7 +11,7 @@ const cache = require("../utils/cache");
  * */
 
 router.get("/", cache.route(), async function (req, res, next) {
-  res.send((await db.raw("SELECT DISTINCT platform_type from cioos_api.datasets WHERE platform_type IS NOT NULL")).rows.map(e=>e.platform_type));
+  res.send((await db.raw("SELECT DISTINCT l06_platform_code pk,platform_type from cioos_api.datasets WHERE platform_type IS NOT NULL")).rows);
 });
 
 module.exports = router;
