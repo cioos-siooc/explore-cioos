@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from erddap_scraper.ckan.create_ckan_erddap_link import get_ckan_records, unescape_ascii
 from erddap_scraper.scrape_erddap import scrape_erddap
 from erddap_scraper.utils import (
-    get_df_eov_to_standard_names,
+    df_ceda_eov_to_standard_name,
     supported_standard_names,
     cf_standard_names,
 )
@@ -166,6 +166,9 @@ def main(erddap_urls, csv_only, cache_requests):
         variables.to_csv(variables_file, index=False)
         df_ckan.to_csv(ckan_file, index=False)
         skipped_datasets.to_csv(skipped_datasets_file, index=False)
+        df_ceda_eov_to_standard_name.to_csv(
+            "df_ceda_eov_to_standard_name.csv", index=False
+        )
         print(
             "Wrote",
             datasets_file,
@@ -223,7 +226,7 @@ def main(erddap_urls, csv_only, cache_requests):
             )
 
             print("Writing eov_to_standard_name")
-            get_df_eov_to_standard_names().to_sql(
+            df_ceda_eov_to_standard_name.to_sql(
                 "eov_to_standard_name",
                 con=transaction,
                 if_exists="append",
@@ -242,10 +245,11 @@ def main(erddap_urls, csv_only, cache_requests):
         print("Wrote to db:", f"{schema}.profiles")
         print("Wrote to db:", f"{schema}.erddap_variables")
 
-    print(
-        f"skipped {len(skipped_datasets)} datasets:",
-        skipped_datasets["dataset_id"].to_list(),
-    )
+    if not skipped_datasets.empty:
+        print(
+            f"skipped {len(skipped_datasets)} datasets:",
+            skipped_datasets["dataset_id"].to_list(),
+        )
 
 
 if __name__ == "__main__":

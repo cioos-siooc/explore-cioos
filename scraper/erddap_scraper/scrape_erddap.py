@@ -121,10 +121,10 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
             columns=["erddap_url", "dataset_id", "reason_code"],
         )
 
-    # logger.info(record_count)
-    logger.info(
-        f"skipped: {len(df_skipped_datasets)} datasets: {df_skipped_datasets['dataset_id'].to_list()}"
-    )
+        # logger.info(record_count)
+        logger.info(
+            f"skipped: {len(df_skipped_datasets)} datasets: {df_skipped_datasets['dataset_id'].to_list()}"
+        )
 
     # using 'result' to return data from each thread
     result.append(
