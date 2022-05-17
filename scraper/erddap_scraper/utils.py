@@ -4,7 +4,7 @@ import os
 import pandas as pd
 
 
-def get_ocean_variables_to_standard_names():
+def get_cde_eov_to_standard_name():
     # get a dictionary with CDE EOVs as keys and a list of standard names under each
     # this hides the GOOS layer
     dir = os.path.dirname(os.path.realpath(__file__))
@@ -16,25 +16,25 @@ def get_ocean_variables_to_standard_names():
         goos_eov_to_standard_name = json.loads(f.read())
 
     res = {}
-    for ocean_variable, goos_variables in cde_to_goos_eov.items():
-        res[ocean_variable] = []
-        for goos_variable in goos_variables:
-            res[ocean_variable] = list(
-                set(res[ocean_variable] + goos_eov_to_standard_name[goos_variable])
+    for cde_eov, goos_eovs in cde_to_goos_eov.items():
+        res[cde_eov] = []
+        for goos_variable in goos_eovs:
+            res[cde_eov] = list(
+                set(res[cde_eov] + goos_eov_to_standard_name[goos_variable])
             )
     return res
 
 
 # dictionary mapping from CDE ocean variables to standard names
-cde_eov_to_standard_name = get_ocean_variables_to_standard_names()
+cde_eov_to_standard_name = get_cde_eov_to_standard_name()
 
 
-def get_df_cde_eov_to_standard_name(ocean_variable_to_standard_names):
-    # this is just a dataframe version of get_ocean_variables_to_standard_names
+def get_df_cde_eov_to_standard_name(cde_eov_to_standard_name):
+    # this is just a dataframe version of get_cde_eov_to_standard_name
     res = []
-    for ocean_variable, standard_names in ocean_variable_to_standard_names.items():
+    for cde_eov, standard_names in cde_eov_to_standard_name.items():
         for standard_name in standard_names:
-            res += [[ocean_variable, standard_name]]
+            res += [[cde_eov, standard_name]]
     return pd.DataFrame(res, columns=["eov", "standard_name"])
 
 
