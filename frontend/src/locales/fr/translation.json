@@ -26,6 +26,8 @@
   "feedbackButtonTitle": "Veuillez nous fournir des commentaires sur votre expérience d'utilisation de l'explorateur de données du SIOOC",
   "oceanVariablesFiltername": "Variables océaniques",
   "oceanVariablesMulti": " variables",
+  "platformsFilterName": "Platforms",
+  "platformsMulti": "platforms",
   "organizationFilterName": "Organisations",
   "organizationMulti": " organisations",
   "datasetsFilterName": "Jeux de données",

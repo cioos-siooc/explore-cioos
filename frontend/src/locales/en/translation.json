@@ -26,6 +26,8 @@
   "feedbackButtonTitle": "Please provide feedback on your experience using CIOOS Data Explorer",
   "oceanVariablesFiltername": "Ocean Variables",
   "oceanVariablesMulti": " variables",
+  "platformsFilterName": "Platforms",
+  "platformsMulti": "platforms",
   "organizationFilterName": "Organizations",
   "organizationMulti": " organizations",
   "datasetsFilterName": "Datasets",

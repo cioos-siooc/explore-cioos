@@ -1,4 +1,5 @@
 export const defaultEovsSelected = []
+export const defaultPlatformsSelected = []
 export const defaultOrgsSelected = []
 export const defaultDatatsetsSelected = []
 export const defaultStartDate = '1900-01-01'
