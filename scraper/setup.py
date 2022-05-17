@@ -9,7 +9,7 @@ setup(
     url="",
     packages=["erddap_scraper"],
     include_package_data=True,
-    package_data={"": ["eovs_to_standard_name.json", "supported_eovs.csv"]},
+    package_data={"": ["cde_to_goos_eov.json", "goos_eov_to_standard_name.json"]},
     install_requires=[
         "pandas",
         "erddapy",

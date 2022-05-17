@@ -3,8 +3,9 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import requests
-from erddap_scraper.utils import eov_to_standard_names, intersection, eovs_to_ceda_eovs
+from erddap_scraper.utils import cde_eov_to_standard_name, intersection
 from requests.exceptions import HTTPError
+
 
 def is_valid_duration(duration):
     try:
@@ -12,7 +13,8 @@ def is_valid_duration(duration):
         return True
     except:
         return False
-        
+
+
 class Dataset(object):
     def __init__(self, erddap_server, id):
         self.id = id
@@ -40,7 +42,6 @@ class Dataset(object):
                 "dataset_id": [self.id],
                 "cdm_data_type": [self.cdm_data_type],
                 "eovs": [self.eovs],
-                "ceda_eovs": [eovs_to_ceda_eovs(self.eovs)],
                 "organizations": [self.organizations],
                 "n_profiles": [len(self.profile_ids)],
                 "profile_variables": [self.profile_variable_list],
@@ -101,19 +102,25 @@ class Dataset(object):
         if str(time_max) == "NaT":
             time_max = datetime.now().isoformat()
         days_in_dataset = (pd.to_datetime(time_max) - pd.to_datetime(time_min)).days
-        
+
         # Estimate records count per profile using time_coverage_resolution
         # For now this is only used with single-profile datasets
         # TODO use each profile's min/max time and then it can be used for any
         # dataset using time_coverage_resolution
-        time_coverage_resolution=self.globals.get('time_coverage_resolution')
+        time_coverage_resolution = self.globals.get("time_coverage_resolution")
 
-        if  is_single_profile_dataset and time_coverage_resolution and is_valid_duration(time_coverage_resolution):
+        if (
+            is_single_profile_dataset
+            and time_coverage_resolution
+            and is_valid_duration(time_coverage_resolution)
+        ):
             print("Using time_coverage_resolution for count")
-            df_profile_ids=self.profile_ids.copy()
-            readings_per_day=np.timedelta64(1, 'D')/pd.Timedelta(time_coverage_resolution)
-            total_records=readings_per_day*days_in_dataset
-            df_profile_ids['time']=total_records
+            df_profile_ids = self.profile_ids.copy()
+            readings_per_day = np.timedelta64(1, "D") / pd.Timedelta(
+                time_coverage_resolution
+            )
+            total_records = readings_per_day * days_in_dataset
+            df_profile_ids["time"] = total_records
             return df_profile_ids
 
         extraplolation_days = 30
@@ -156,8 +163,8 @@ class Dataset(object):
     def get_eovs(self):
         eovs = []
         dataset_standard_names = self.df_variables["standard_name"].to_list()
-        for eov in eov_to_standard_names:
-            if intersection(dataset_standard_names, eov_to_standard_names[eov]):
+        for eov in cde_eov_to_standard_name:
+            if intersection(dataset_standard_names, cde_eov_to_standard_name[eov]):
                 eovs.append(eov)
         return eovs
 

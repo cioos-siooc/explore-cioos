@@ -1,9 +1,11 @@
 #!/bin/sh
-cd ~/ceda
+cd ~/cde
 date
-source venv/bin/activate
 sh data_loader.sh
 
-sudo docker exec -t ceda_redis_1 redis-cli FLUSHALL
-sh ceda_refresh_cache.sh
+sudo docker exec -t cde_redis_1 redis-cli FLUSHALL
+sh cde_refresh_cache.sh
+sudo docker exec -t cde_redis_1 redis-cli INFO | grep used_memory_human
+sudo docker exec -t cde_redis_1 redis-cli DBSIZE
+
 date
