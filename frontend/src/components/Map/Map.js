@@ -260,8 +260,9 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         },
         "source-layer": "internal-layer-name",
         paint: {
-          "circle-color": "white",
+          "circle-color": colors,
           "circle-opacity": 1,
+          "circle-radius": ["get", "size"],
           "circle-stroke-color": "black",
           "circle-stroke-width": 1
         },
