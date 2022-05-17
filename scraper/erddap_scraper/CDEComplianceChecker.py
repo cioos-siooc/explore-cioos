@@ -11,7 +11,7 @@ from erddap_scraper.scraper_errors import (
 )
 
 
-class CEDAComplianceChecker(object):
+class CDEComplianceChecker(object):
     def __init__(self, dataset):
         self.dataset = dataset
         self.logger = dataset.logger

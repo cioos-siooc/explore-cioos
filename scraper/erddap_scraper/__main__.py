@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from erddap_scraper.ckan.create_ckan_erddap_link import get_ckan_records, unescape_ascii
 from erddap_scraper.scrape_erddap import scrape_erddap
 from erddap_scraper.utils import (
-    df_ceda_eov_to_standard_name,
+    df_cde_eov_to_standard_name,
     supported_standard_names,
     cf_standard_names,
 )
@@ -114,7 +114,7 @@ def main(erddap_urls, csv_only, cache_requests):
 
     if standard_names_not_harvested_that_are_real:
         print(
-            "Found these standard_names that CEDA doesnt support yet:\n",
+            "Found these standard_names that CDE doesnt support yet:\n",
             standard_names_not_harvested_that_are_real,
         )
 
@@ -166,8 +166,8 @@ def main(erddap_urls, csv_only, cache_requests):
         variables.to_csv(variables_file, index=False)
         df_ckan.to_csv(ckan_file, index=False)
         skipped_datasets.to_csv(skipped_datasets_file, index=False)
-        df_ceda_eov_to_standard_name.to_csv(
-            "df_ceda_eov_to_standard_name.csv", index=False
+        df_cde_eov_to_standard_name.to_csv(
+            "df_cde_eov_to_standard_name.csv", index=False
         )
         print(
             "Wrote",
@@ -226,7 +226,7 @@ def main(erddap_urls, csv_only, cache_requests):
             )
 
             print("Writing eov_to_standard_name")
-            df_ceda_eov_to_standard_name.to_sql(
+            df_cde_eov_to_standard_name.to_sql(
                 "eov_to_standard_name",
                 con=transaction,
                 if_exists="append",

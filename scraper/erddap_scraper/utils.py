@@ -9,27 +9,27 @@ def get_ocean_variables_to_standard_names():
     # this hides the GOOS layer
     dir = os.path.dirname(os.path.realpath(__file__))
 
-    with open(dir + "/ocean_variables_to_goos.json") as f:
-        ocean_variables_to_goos = json.loads(f.read())
+    with open(dir + "/cde_to_goos_eov.json") as f:
+        cde_to_goos_eov = json.loads(f.read())
 
-    with open(dir + "/goos_to_standard_name.json") as f:
-        goos_to_standard_names = json.loads(f.read())
+    with open(dir + "/goos_eov_to_standard_name.json") as f:
+        goos_eov_to_standard_name = json.loads(f.read())
 
     res = {}
-    for ocean_variable, goos_variables in ocean_variables_to_goos.items():
+    for ocean_variable, goos_variables in cde_to_goos_eov.items():
         res[ocean_variable] = []
         for goos_variable in goos_variables:
             res[ocean_variable] = list(
-                set(res[ocean_variable] + goos_to_standard_names[goos_variable])
+                set(res[ocean_variable] + goos_eov_to_standard_name[goos_variable])
             )
     return res
 
 
 # dictionary mapping from CDE ocean variables to standard names
-ceda_eovs_to_standard_names = get_ocean_variables_to_standard_names()
+cde_eov_to_standard_name = get_ocean_variables_to_standard_names()
 
 
-def get_df_ceda_eov_to_standard_name(ocean_variable_to_standard_names):
+def get_df_cde_eov_to_standard_name(ocean_variable_to_standard_names):
     # this is just a dataframe version of get_ocean_variables_to_standard_names
     res = []
     for ocean_variable, standard_names in ocean_variable_to_standard_names.items():
@@ -39,8 +39,8 @@ def get_df_ceda_eov_to_standard_name(ocean_variable_to_standard_names):
 
 
 # dataframe mapping of CDE ocean variables to standard names
-df_ceda_eov_to_standard_name = get_df_ceda_eov_to_standard_name(
-    ceda_eovs_to_standard_names
+df_cde_eov_to_standard_name = get_df_cde_eov_to_standard_name(
+    cde_eov_to_standard_name
 )
 
 
@@ -65,4 +65,4 @@ cf_standard_names = (
 )
 
 # list of standard names that are supported by CDE
-supported_standard_names = flatten(ceda_eovs_to_standard_names.values())
+supported_standard_names = flatten(cde_eov_to_standard_name.values())

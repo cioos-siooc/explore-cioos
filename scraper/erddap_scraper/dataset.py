@@ -3,7 +3,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import requests
-from erddap_scraper.utils import ceda_eovs_to_standard_names, intersection
+from erddap_scraper.utils import cde_eov_to_standard_name, intersection
 from requests.exceptions import HTTPError
 
 
@@ -163,8 +163,8 @@ class Dataset(object):
     def get_eovs(self):
         eovs = []
         dataset_standard_names = self.df_variables["standard_name"].to_list()
-        for eov in ceda_eovs_to_standard_names:
-            if intersection(dataset_standard_names, ceda_eovs_to_standard_names[eov]):
+        for eov in cde_eov_to_standard_name:
+            if intersection(dataset_standard_names, cde_eov_to_standard_name[eov]):
                 eovs.append(eov)
         return eovs
 
