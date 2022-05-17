@@ -1,6 +1,5 @@
 from erddap_scraper.utils import (
-    eov_to_standard_names,
-    flatten,
+    supported_standard_names,
     intersection,
     cf_standard_names,
 )
@@ -40,12 +39,16 @@ class CEDAComplianceChecker(object):
         return True
 
     def check_supported_cf_name(self):
-        supported_standard_names = flatten(list(eov_to_standard_names.values()))
+        """Check if there are any supported (mapped to GOOS) CF standard names in
+        the dataset."""
+
         standard_names_in_dataset = (
             self.dataset.df_variables.query("standard_name != ''")["standard_name"]
             .unique()
             .tolist()
         )
+
+        #  List non-CF standard names
         non_standard_names = [
             x for x in standard_names_in_dataset if x not in cf_standard_names
         ]
@@ -53,6 +56,19 @@ class CEDAComplianceChecker(object):
             self.logger.warn(
                 "Found unstandard standard_name:" + str(non_standard_names)
             )
+        # Find unmapped, legit standard names
+        # unsupported_dataset_cf_names = [
+        #     x
+        #     for x in standard_names_in_dataset
+        #     if x in cf_standard_names and x not in supported_standard_names
+        # ]
+        # if unsupported_dataset_cf_names:
+        #     self.dataset.unsupported_dataset_cf_names += [unsupported_dataset_cf_names]
+        #     self.logger.warn(
+        #         "Found unsupported standard name:" + str(unsupported_dataset_cf_names)
+        #     )
+
+        #  This dataset has at least one standard name mapped to GOOS
         supported_variables = intersection(
             supported_standard_names,
             standard_names_in_dataset,

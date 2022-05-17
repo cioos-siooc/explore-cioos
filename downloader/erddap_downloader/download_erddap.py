@@ -11,7 +11,7 @@ import pandas as pd
 import requests
 import shapely.wkt
 from erddap_downloader.download_pdf import download_pdf
-from erddap_scraper.utils import eov_to_standard_names
+from erddap_scraper.utils import ceda_eovs_to_standard_names
 from erddapy import ERDDAP
 from shapely.geometry import Point
 
@@ -50,8 +50,8 @@ def get_variable_list(df_variables, eovs: list):
     eov_variables = []
 
     for eov in eovs:
-        if eov in eov_to_standard_names:
-            eov_variables += eov_to_standard_names[eov]
+        if eov in ceda_eovs_to_standard_names:
+            eov_variables += ceda_eovs_to_standard_names[eov]
 
     variables_to_download = df_variables.query(
         "(name in @mandatory_variables) or (standard_name in @eov_variables) or (cf_role != '')"
@@ -328,7 +328,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
 
                 # Write Data
                 df.to_csv(f, mode="a", header=False, index=False, line_terminator="\n")
-            
+
             file_size = os.stat(output_file_path).st_size
         # Generate report for each download
         # Return download report
@@ -340,7 +340,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
 
             # Retrieve metadata
             save_erddap_metadata(dataset, output_path=output_path)
-        
+
         report["total_size"] += file_size
 
         dataset_report = {
@@ -359,6 +359,5 @@ def get_datasets(json_query, output_path="", create_pdf=False):
         }
 
         report["erddap_report"] += [dataset_report]
-
 
     return report
