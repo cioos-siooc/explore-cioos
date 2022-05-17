@@ -1,8 +1,8 @@
-# CEDA - CIOOS Exploration and Data Discovery
+# CDE - CIOOS Exploration and Data Discovery
 
 ## Development
 
-- To run CEDA locally, you will need Docker, Python and Node and a few terminal windows
+- To run CDE locally, you will need Docker, Python and Node and a few terminal windows
 
 - Rename .env.sample from the root directory to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
 
@@ -48,7 +48,7 @@
 
 ## Handy docker commands
 
-See which CEDA services are running:
+See which cde services are running:
 `docker-compose ps`
 
 Start all containers, the first time this runs it will build containers:
@@ -64,15 +64,15 @@ Rebuild database: (this will erase all your data)
 
 ```sh
 docker-compose stop db
-docker volume rm ceda_postgres-data
+docker volume rm cde_postgres-data
 docker-compose up -d db
 ```
 
 Redis CLI:
-`docker exec -it ceda_redis_1 redis-cli`
+`docker exec -it cde_redis_1 redis-cli`
 
 Flush redis tile cache:
-`docker exec -it ceda_redis_1 redis-cli FLUSHALL`
+`docker exec -it cde_redis_1 redis-cli FLUSHALL`
 
 ## Starting using docker
 
@@ -91,7 +91,7 @@ From the production server,
 - rename `.env.sample` to `production.env` and configure.
 
 - Delete old redis and postgres data (if needed):
-  `sudo docker volume rm ceda_postgres-data ceda_redis-data`
+  `sudo docker volume rm cde_postgres-data cde_redis-data`
 
 - Start all services:
   `sudo docker-compose -f docker-compose.production.yaml up -d --build`
@@ -109,5 +109,5 @@ From the production server,
 - deploy frontend to Gitpages
 
   ```sh
-  API_URL=https://pac-dev2.cioos.org/ceda/api npm run deploy
+  API_URL=https://explore.cioos.ca/api npm run deploy
   ```
