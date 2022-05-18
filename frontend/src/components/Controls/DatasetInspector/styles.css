@@ -17,3 +17,8 @@
 .datasetInspector .backButton svg {
   margin-right: 5px;
 }
+
+.datasetInspector .optionColorCircle {
+  margin-right: 5px;
+  margin-bottom: 5px;
+}

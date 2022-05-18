@@ -228,6 +228,7 @@ export default function App() {
         return {
           title: dataset.title,
           titleTranslated: dataset.title_translated,
+          platformType: dataset.platform_type,
           isSelected: false,
           pk: dataset.pk
         }

@@ -36,6 +36,8 @@
   "depthRangeFilterName": "Profondeur",
   "oceanVariableFilterTooltip": "Filtrer les données par nom de variable océanique. La sélection fonctionne comme une opération OU logique.",
   "oceanVariableFilterSeachPlaceholder": "Rechercher le nom de la variable océanique...",
+  "platformFilterTooltip": "Filtrer les données plate-forme. La sélection fonctionne comme une opération OU logique.",
+  "platformsFilterSeachPlaceholder": "Rechercher la plate-forme...",
   "organizationFilterTooltip": "Filtrer les données par nom d'organisation responsable. La sélection fonctionne comme une opération OU logique.",
   "organizationFilterSearchPlaceholder": "Rechercher le nom de l'organisation...",
   "datasetFilterTooltip": "Filtrer les données par nom de jeu de données. La sélection fonctionne comme une opération OU logique.",
