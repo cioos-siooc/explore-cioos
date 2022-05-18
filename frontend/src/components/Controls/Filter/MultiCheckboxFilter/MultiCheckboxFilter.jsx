@@ -1,11 +1,12 @@
 import * as React from 'react'
-import { CheckSquare, Square } from 'react-bootstrap-icons'
+import { CheckSquare, CircleFill, Square } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
+import { platformColors } from '../../../config.js'
 
 import './styles.css'
 
-export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, translatable, allOptions }) {
+export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, translatable, colored, allOptions }) {
   const { t, i18n } = useTranslation()
 
   const optionsSelectedSorted = optionsSelected.sort((a, b) => t(a.title).localeCompare(t(b.title), i18n.language))
@@ -64,6 +65,15 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
           title = option.title
         }
 
+        let platformColor
+        if (colored) {
+          platformColor = platformColors.filter(pc => pc.platformId === option.pk)
+          if (colored && _.isEmpty(platformColor)) {
+            platformColor = '#000000'
+          } else {
+            platformColor = platformColor[0].platformColor
+          }
+        }
         // No translation
         return (
           <div className='optionButton' key={index} title={t(title)}
@@ -93,6 +103,7 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
             <span className='optionName'>
               {capitalizeFirstLetter(abbreviateString(title, 30))}
             </span>
+            {colored && <CircleFill className='optionColorCircle' fill={platformColor} size='15' />}
           </div>
         )
       })

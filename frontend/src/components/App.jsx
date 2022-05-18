@@ -168,9 +168,9 @@ export default function App() {
     fetch(`${server}/platforms`).then(response => response.json()).then(platforms => {
       setPlatformsSelected(platforms.map((platform, index) => {
         return {
-          title: platform,
+          title: platform.platform_type,
           isSelected: false,
-          pk: index
+          pk: platform.pk
         }
       }))
     }).catch(error => { throw error })
@@ -459,6 +459,7 @@ export default function App() {
             optionsSelected={createOptionSubset(platformsSearchTerms, platformsSelected)}
             setOptionsSelected={setPlatformsSelected}
             searchable
+            colored
             allOptions={platformsSelected}
           />
         </Filter>

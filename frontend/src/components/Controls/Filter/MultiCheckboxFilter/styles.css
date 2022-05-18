@@ -50,3 +50,7 @@
   background-color: #52a79b;
   color: #f7f7f7;
 }
+
+.multiCheckboxFilter .optionColorCircle {
+  margin-left: 10px;
+}
