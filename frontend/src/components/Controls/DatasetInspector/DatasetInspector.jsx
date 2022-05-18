@@ -1,12 +1,14 @@
 import * as React from 'react'
-import { ChevronCompactLeft } from 'react-bootstrap-icons'
+import { ChevronCompactLeft, CircleFill } from 'react-bootstrap-icons'
 import { Container, Table } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 
+import { platformColors } from '../../config'
 import './styles.css'
 
 export default function DatasetInspector({ dataset, setInspectDataset }) {
   const { t } = useTranslation()
+  let platformColor = platformColors.filter(pc => pc.platformId === dataset.platform_code)
   return (
     <div className='datasetInspector'>
       <div
@@ -26,6 +28,10 @@ export default function DatasetInspector({ dataset, setInspectDataset }) {
             {/* Title */}
           </h6>
           <div>
+            <CircleFill className='optionColorCircle'
+              size='15'
+              fill={!_.isEmpty(platformColor) ? platformColor[0].platformColor : '#000000'}
+            />
             {dataset.title}
           </div>
           <hr />

@@ -36,6 +36,8 @@
   "depthRangeFilterName": "Depth",
   "oceanVariableFilterTooltip": "Filter data by ocean variable name. Selection works as logical OR operation.",
   "oceanVariableFilterSeachPlaceholder": "Search for ocean variable name...",
+  "platformFilterTooltip": "Filter data by platform type. Selection works as logical OR operation.",
+  "platformsFilterSeachPlaceholder": "Search for platform type...",
   "organizationFilterTooltip": "Filter data by responsible organisation name. Selection works as logical OR operation.",
   "organizationFilterSearchPlaceholder": "Search for organization name...",
   "datasetFilterTooltip": "Filter data by dataset name. Selection works as logical OR operation.",

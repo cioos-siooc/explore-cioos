@@ -36,3 +36,7 @@
 .selectAllHeader {
   display: flex
 }
+
+.datasetsTable .optionColorCircle {
+  margin-right: 5px;
+}
