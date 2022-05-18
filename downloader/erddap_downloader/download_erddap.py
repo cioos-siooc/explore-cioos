@@ -41,7 +41,7 @@ def get_variable_list(df_variables, cde_eovs: list):
     Retrieve the list of variables needed within an ERDDAP dataset based on the eovs list provided by the
      user and the mandatory variables required.
     :param erddap_metadata: erddap dataset attributes dataframe
-    :param eovs: ceda eov list requested by the query
+    :param cde_eovs: ocean variable list requested by the query
     :return: list of variables to download from erddap 
     """
     # Get a list of mandatory variables to be present if available
