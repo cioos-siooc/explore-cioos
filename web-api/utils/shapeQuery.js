@@ -30,6 +30,8 @@ async function getShapeQuery(query) {
         d.dataset_id,
         d.cdm_data_type,
         d.title title,
+        d.platform_type,
+        d.l06_platform_code platform_code,
         json_build_object('en',title,'fr',title_fr) title_translated,
         json_build_object('en',summary,'fr',summary_fr) summary_translated,
         d.ceda_eovs eovs,
