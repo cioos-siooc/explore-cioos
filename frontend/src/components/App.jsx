@@ -571,7 +571,7 @@ export default function App() {
           target='_blank'
         />
       }
-      {currentRangeLevel && <Legend currentRangeLevel={currentRangeLevel} />}
+      {currentRangeLevel && <Legend currentRangeLevel={currentRangeLevel} zoom={zoom} />}
       <button
         className='boxQueryButton'
         id='boxQueryButton'
