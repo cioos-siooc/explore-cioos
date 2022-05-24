@@ -16,7 +16,6 @@
 
 .datasetsTable .datasetsTableTitleCell {
   min-width: 150px;
-  word-break: break-all;
 }
 
 .datasetsTable .inspectButton {

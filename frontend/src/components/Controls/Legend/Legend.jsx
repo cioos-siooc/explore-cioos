@@ -1,73 +1,111 @@
-import * as React from 'react'
-import { useState } from 'react'
+import React, { useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ChevronCompactDown, ChevronCompactUp, CircleFill, HexagonFill } from 'react-bootstrap-icons'
 import * as _ from 'lodash'
 
-import { capitalizeFirstLetter, generateColorStops } from '../../../utilities.js'
+import { capitalizeFirstLetter, useOutsideAlerter, generateColorStops } from '../../../utilities.js'
 import { colorScale, platformColors } from '../../config.js'
 
 import './styles.css'
-import { ChevronCompactDown, ChevronCompactUp, CircleFill } from 'react-bootstrap-icons'
+import LegendElement from './LegendElement.jsx/LegendElement.jsx'
 
 export default function Legend({ currentRangeLevel, zoom }) {
   const { t } = useTranslation()
   const [legendOpen, setLegendOpen] = useState(false)
-  const colorStops = generateColorStops(colorScale, currentRangeLevel)
-  return (
-    <div className={`legend ${legendOpen && 'open'}`} >
-      {currentRangeLevel[0] !== null && currentRangeLevel[1] !== null ?
-        zoom < 7 ?
-          <>
-            {currentRangeLevel[0]}
-            {colorStops &&
-              colorStops.map((colorStop, index) => {
-                return (
-                  <div
-                    className='colorStop'
-                    key={index}
-                    style={{ 'backgroundColor': colorStop.color }}
-                    title={`${colorStop.stop === 1 ? `${colorStop.stop} ${t('legendTitleText')}` : `${colorStop.stop} ${t('legendTitleTextPlural')}`}`}
-                  />
-                )
-              })
-            }
-            {colorStops.length > 1 && currentRangeLevel[1]}
-          </>
-          :
-          <div className='legendElementRow'>
-            <div className='legendElement' title='One day of data or less'>
-              {legendOpen && <div className='circleLabel'>One day of data or less</div>}
-              <CircleFill size={2} className='legendPlatformCircle pointSize' fill='white' />
-            </div>
-            <div className='legendElement' title='More than one day of data'>
-              {legendOpen && <div className='circleLabel'>More than one day of data</div>}
-              <CircleFill size={15} className='legendPlatformCircle pointSize' fill='white' />
-            </div>
-            |
-            {platformColors.map(pc => {
-              return (
-                <div className='legendElement' title={capitalizeFirstLetter(pc.platformType)}>
-                  {legendOpen && <div className='circleLabel'>{pc.platformType}</div>}
-                  <CircleFill size={15} className='legendPlatformCircle' fill={pc.platformColor} />
-                </div>
-              )
-            })}
-          </div>
-        :
+  const [legendType, setLegendType] = useState('No Data')
+  const wrapperRef = useRef(null)
+  useOutsideAlerter(wrapperRef, setLegendOpen, false)
+
+  useEffect(() => {
+    if (_.isEmpty(currentRangeLevel)) {
+      setLegendType('No Data')
+    } else {
+      if (zoom < 7) {
+        setLegendType('Points per hexagon')
+      } else {
+        setLegendType('Platform type')
+      }
+    }
+  }, [currentRangeLevel, zoom])
+
+  function generateLegendElements() {
+    if (_.isEmpty(currentRangeLevel)) { // No Data
+      return (
         <div
           title={t('legendNoDataWarningTitle')} //'Choose less restrictive filters to see data'
         >
           {t('legendNoDataWarningText')}
           {/* No Data */}
         </div>
-      }
-      <div className='legendToggle' title={legendOpen ? 'Close legend' : 'Open legend'} onClick={() => setLegendOpen(!legendOpen)}>
+      )
+    } else if (zoom < 7) { // Hexes
+      const colorStops = generateColorStops(colorScale, currentRangeLevel)
+      return (
+        <>
+          {colorStops && colorStops.map((colorStop, index) => {
+            const pointCount = `${colorStop.stop}` //`${colorStop.stop === 1 ? `${colorStop.stop} ${t('legendTitleText')}` : `${colorStop.stop} ${t('legendTitleTextPlural')}`}`
+            return (
+              <LegendElement
+                key={index}
+                title={pointCount}
+                open={legendOpen}
+              >
+                <HexagonFill title={pointCount} size={15} fill={colorStop.color} />
+              </LegendElement>
+            )
+          })
+          }
+        </>
+      )
+    } else if (zoom >= 7) { // Points
+      return (
+        <>
+          <LegendElement
+            title='One day of data or less'
+            open={legendOpen}
+          >
+            <CircleFill size={2} fill='white' style={{ border: '1px solid black', borderRadius: '15px' }} />
+          </LegendElement>
+          <LegendElement
+            title='More than one day of data'
+            open={legendOpen}
+          >
+            <CircleFill size={15} fill='white' style={{ border: '1px solid black', borderRadius: '15px' }} />
+          </LegendElement>
+          |
+          {platformColors.map(pc => {
+            return (
+              <LegendElement
+                title={capitalizeFirstLetter(pc.platformType)}
+                open={legendOpen}
+              >
+                <CircleFill size={15} fill={pc.platformColor} />
+              </LegendElement>
+            )
+          })}
+        </>
+      )
+    }
+  }
+
+  return (
+    <div
+      className='legend'
+      ref={wrapperRef}
+      onClick={() => setLegendOpen(!legendOpen)}
+    >
+      {generateLegendElements()}
+      <LegendElement
+        // title={legendType}
+        open={legendOpen}
+      >
         {legendOpen ?
           <ChevronCompactDown />
           :
           <ChevronCompactUp />
         }
-      </div>
-    </div >
+      </LegendElement>
+    </div>
   )
 }
