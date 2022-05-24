@@ -31,8 +31,8 @@ export default function Filter({
 
   // Open/Closed state for filter dropdown
   const [filterOpen, setFilterOpen] = useState(controlled ? openFilter : false)
-  const wrapperRef = useRef(null);
-  useOutsideAlerter(wrapperRef, setFilterOpen, false);
+  const wrapperRef = useRef(null)
+  useOutsideAlerter(wrapperRef, setFilterOpen, false)
 
   useEffect(() => {
     controlled ? setFilterOpen(openFilter) : _.noop()
