@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 
 import './styles.css'
 
-export default function SelectionPanel({ open = true, setOpen, children }) {
+export default function SelectionPanel({ open, setOpen, children }) {
   const { t } = useTranslation()
   let selectionPanelClassName = classNames('selectionPanel', { closed: !open })
   let panelContentsClassName = classNames('panelContents', { closed: !open })

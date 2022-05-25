@@ -42,7 +42,7 @@ if (process.env.NODE_ENV === "production") {
 
 export default function App() {
   const { t, i18n } = useTranslation()
-  const [selectionPanelOpen, setSelectionPanelOpen] = useState()
+  const [selectionPanelOpen, setSelectionPanelOpen] = useState(true)
   const [pointsToDownload, setPointsToDownload] = useState()
   const [pointsToReview, setPointsToReview] = useState()
   const [polygon, setPolygon] = useState()
@@ -571,7 +571,9 @@ export default function App() {
           target='_blank'
         />
       }
-      {currentRangeLevel && <Legend currentRangeLevel={currentRangeLevel} zoom={zoom} />}
+      {currentRangeLevel &&
+        <Legend currentRangeLevel={currentRangeLevel} zoom={zoom} selectionPanelOpen={polygon && selectionPanelOpen} />
+      }
       <button
         className='boxQueryButton'
         id='boxQueryButton'

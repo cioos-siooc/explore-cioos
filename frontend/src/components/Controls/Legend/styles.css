@@ -1,12 +1,23 @@
 .legend {
   position: absolute;
   bottom: 10px;
-  left: 50%;
-  transform: translate(-50%, 0);
+  left: 10px;
   background-color: #f7f7f7;
   border-radius: 15px;
   display: flex;
+  flex-direction: column;
   padding: 2.5px 5px 2.5px 5px;
   overflow: visible;
-  justify-content: center;
+  /* justify-content: center; */
+  transition: left 1s;
+}
+
+.panelOpen {
+  position: absolute;
+  left: 570px;
+  bottom: 10px;
+}
+
+.legendHover {
+  background-color: #c6e3df;
 }
