@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronCompactDown, ChevronCompactUp, CircleFill, HexagonFill } from 'react-bootstrap-icons'
+import { ChevronCompactDown, ChevronCompactLeft, ChevronCompactRight, ChevronCompactUp, CircleFill, HexagonFill } from 'react-bootstrap-icons'
 import * as _ from 'lodash'
 
 import { capitalizeFirstLetter, useOutsideAlerter, generateColorStops } from '../../../utilities.js'
@@ -9,10 +9,12 @@ import { colorScale, platformColors } from '../../config.js'
 
 import './styles.css'
 import LegendElement from './LegendElement.jsx/LegendElement.jsx'
+import classNames from 'classnames'
 
-export default function Legend({ currentRangeLevel, zoom }) {
+export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) {
   const { t } = useTranslation()
-  const [legendOpen, setLegendOpen] = useState(false)
+  const [legendOpen, setLegendOpen] = useState(true)
+  const [legendHover, setLegendHover] = useState(false)
   const [legendType, setLegendType] = useState('No Data')
   const wrapperRef = useRef(null)
   useOutsideAlerter(wrapperRef, setLegendOpen, false)
@@ -73,7 +75,7 @@ export default function Legend({ currentRangeLevel, zoom }) {
           >
             <CircleFill size={15} fill='white' style={{ border: '1px solid black', borderRadius: '15px' }} />
           </LegendElement>
-          |
+          <hr />
           {platformColors.map(pc => {
             return (
               <LegendElement
@@ -88,22 +90,25 @@ export default function Legend({ currentRangeLevel, zoom }) {
       )
     }
   }
+  const className = classNames('legend', { panelOpen: selectionPanelOpen, legendHover: legendHover })
 
   return (
     <div
-      className='legend'
+      className={className}
       ref={wrapperRef}
       onClick={() => setLegendOpen(!legendOpen)}
+      onMouseEnter={() => setLegendHover(true)}
+      onMouseLeave={() => setLegendHover(false)}
     >
       {generateLegendElements()}
       <LegendElement
         // title={legendType}
-        open={legendOpen}
+        open={legendOpen ? true : legendHover}
       >
         {legendOpen ?
-          <ChevronCompactDown />
+          <ChevronCompactLeft />
           :
-          <ChevronCompactUp />
+          <ChevronCompactRight />
         }
       </LegendElement>
     </div>

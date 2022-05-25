@@ -1,14 +1,14 @@
 .legendElement {
   display: flex;
-  flex-direction: column;
-  justify-content: end;
+  flex-direction: row;
+  justify-content: start;
   margin: 2px;
+  line-height: 11px;
 }
 
 .legendElement .legendElementLabel {
-  transform: rotate(180deg);
-  writing-mode: vertical-lr;
+  /* transform: rotate(180deg); */
+  /* writing-mode: vertical-lr; */
   white-space: nowrap;
-  line-height: 15px;
   margin: 2px 0px;
 }
