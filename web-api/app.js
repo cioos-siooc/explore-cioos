@@ -36,9 +36,6 @@ if (process.env.ENVIRONMENT === "production") {
 // otherwise load from .env
 if (!process.env.DB_USER) require("dotenv").config();
 
-const compression = require("compression");
-
-app.use(compression());
 app.use(cors());
 // view engine setup
 app.set("views", path.join(__dirname, "views"));
@@ -59,11 +56,8 @@ app.use("/pointQuery", pointQueryRouter);
 app.use("/tiles", tilesRouter);
 app.use("/oceanVariables", oceanVariablesRouter);
 
+app.use(Sentry.Handlers.errorHandler());
 
-app.use(
-  Sentry.Handlers.errorHandler()
-);
-  
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
   next(createError(404));
