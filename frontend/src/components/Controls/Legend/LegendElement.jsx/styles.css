@@ -6,9 +6,6 @@
   line-height: 11px;
 }
 
-.legendElement .legendElementLabel {
-  /* transform: rotate(180deg); */
-  /* writing-mode: vertical-lr; */
-  white-space: nowrap;
-  margin: 2px 0px;
+.legendElement svg {
+  transform-origin: center;
 }

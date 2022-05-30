@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronCompactDown, ChevronCompactLeft, ChevronCompactRight, ChevronCompactUp, CircleFill, HexagonFill } from 'react-bootstrap-icons'
+import { ChevronCompactLeft, ChevronCompactRight, CircleFill, HexagonFill } from 'react-bootstrap-icons'
 import * as _ from 'lodash'
 
 import { capitalizeFirstLetter, useOutsideAlerter, generateColorStops } from '../../../utilities.js'
@@ -14,22 +14,8 @@ import classNames from 'classnames'
 export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) {
   const { t } = useTranslation()
   const [legendOpen, setLegendOpen] = useState(true)
-  const [legendHover, setLegendHover] = useState(false)
-  const [legendType, setLegendType] = useState('No Data')
   const wrapperRef = useRef(null)
   useOutsideAlerter(wrapperRef, setLegendOpen, false)
-
-  useEffect(() => {
-    if (_.isEmpty(currentRangeLevel)) {
-      setLegendType('No Data')
-    } else {
-      if (zoom < 7) {
-        setLegendType('Points per hexagon')
-      } else {
-        setLegendType('Platform type')
-      }
-    }
-  }, [currentRangeLevel, zoom])
 
   function generateLegendElements() {
     if (_.isEmpty(currentRangeLevel)) { // No Data
@@ -45,8 +31,14 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) 
       const colorStops = generateColorStops(colorScale, currentRangeLevel)
       return (
         <>
+          <LegendElement
+            title='Points per hexagon'
+            open={legendOpen}
+          >
+            Color
+          </LegendElement>
           {colorStops && colorStops.map((colorStop, index) => {
-            const pointCount = `${colorStop.stop}` //`${colorStop.stop === 1 ? `${colorStop.stop} ${t('legendTitleText')}` : `${colorStop.stop} ${t('legendTitleTextPlural')}`}`
+            const pointCount = `${colorStop.stop}`
             return (
               <LegendElement
                 key={index}
@@ -64,10 +56,16 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) 
       return (
         <>
           <LegendElement
+            title='Days of data'
+            open={legendOpen}
+          >
+            Size
+          </LegendElement>
+          <LegendElement
             title='One day of data or less'
             open={legendOpen}
           >
-            <CircleFill size={2} fill='white' style={{ border: '1px solid black', borderRadius: '15px' }} />
+            <CircleFill size={4} fill='white' style={{ border: '1px solid black', borderRadius: '15px', margin: '5.5px' }} />
           </LegendElement>
           <LegendElement
             title='More than one day of data'
@@ -76,11 +74,18 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) 
             <CircleFill size={15} fill='white' style={{ border: '1px solid black', borderRadius: '15px' }} />
           </LegendElement>
           <hr />
-          {platformColors.map(pc => {
+          <LegendElement
+            title='Platform type'
+            open={legendOpen}
+          >
+            Color
+          </LegendElement>
+          {platformColors.map((pc, index) => {
             return (
               <LegendElement
                 title={capitalizeFirstLetter(pc.platformType)}
                 open={legendOpen}
+                key={index}
               >
                 <CircleFill size={15} fill={pc.platformColor} />
               </LegendElement>
@@ -90,26 +95,25 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) 
       )
     }
   }
-  const className = classNames('legend', { panelOpen: selectionPanelOpen, legendHover: legendHover })
+  const className = classNames('legend', { panelOpen: selectionPanelOpen })
 
   return (
     <div
       className={className}
       ref={wrapperRef}
       onClick={() => setLegendOpen(!legendOpen)}
-      onMouseEnter={() => setLegendHover(true)}
-      onMouseLeave={() => setLegendHover(false)}
     >
       {generateLegendElements()}
       <LegendElement
-        // title={legendType}
-        open={legendOpen ? true : legendHover}
+        open={legendOpen}
       >
-        {legendOpen ?
-          <ChevronCompactLeft />
-          :
-          <ChevronCompactRight />
-        }
+        <div className='legendToggleButton' title={legendOpen ? 'Close legend' : 'Open legend'}>
+          {legendOpen ?
+            <ChevronCompactLeft />
+            :
+            <ChevronCompactRight />
+          }
+        </div>
       </LegendElement>
     </div>
   )
