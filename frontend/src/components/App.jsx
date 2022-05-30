@@ -436,6 +436,7 @@ export default function App() {
             setOptionsSelected={setEovsSelected}
             searchable
             allOptions={eovsSelected}
+            translatable
           />
         </Filter>
         <Filter

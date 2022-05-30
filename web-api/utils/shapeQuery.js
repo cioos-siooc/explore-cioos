@@ -12,7 +12,7 @@ async function getShapeQuery(query) {
     const eovsCommaSeparatedString = unique(eovs.split(","))
       .map((eov) => `'${eov}'`)
       .join();
-    eovsQuery = `where ceda_eovs && array[${eovsCommaSeparatedString}]`;
+    eovsQuery = `where eovs && array[${eovsCommaSeparatedString}]`;
   }
 
   const adder = 0;
@@ -34,7 +34,7 @@ async function getShapeQuery(query) {
         d.l06_platform_code platform_code,
         json_build_object('en',title,'fr',title_fr) title_translated,
         json_build_object('en',summary,'fr',summary_fr) summary_translated,
-        d.ceda_eovs eovs,
+        d.eovs eovs,
         organizations,
         d.erddap_url || '/tabledap/' || d.dataset_id || '.html' as erddap_url,
         'https://catalogue.cioos.ca/dataset/' || ckan_id as ckan_url,
