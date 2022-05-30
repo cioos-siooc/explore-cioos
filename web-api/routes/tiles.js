@@ -63,7 +63,6 @@ router.get(
   `;
 
     try {
-      // console.log(SQL);
       const tileRaw = await db.raw(SQL);
 
       const tile = tileRaw.rows[0];
