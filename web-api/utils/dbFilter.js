@@ -23,12 +23,11 @@ function createDBFilter(request) {
   const filters = [];
 
   if (eovs) {
-    const eovsCommaSeparatedString = unique(
-      eovs
-        .split(","))
-        .map((eov) => `'${eov}'`).join();
+    const eovsCommaSeparatedString = unique(eovs.split(","))
+      .map((eov) => `'${eov}'`)
+      .join();
 
-    filters.push(`ceda_eovs && array[${eovsCommaSeparatedString}]`);
+    filters.push(`eovs && array[${eovsCommaSeparatedString}]`);
   }
 
   if (timeMin) filters.push(`time_max >= '${timeMin}'::timestamptz`);
