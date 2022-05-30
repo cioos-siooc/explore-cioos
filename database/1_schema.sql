@@ -26,7 +26,7 @@ CREATE TABLE cioos_api.datasets (
     profile_variable text,
     ckan_url text,
     eovs text[],
-    ceda_eovs text[],
+    eovs text[],
     ckan_id text,
     organization_pks INTEGER[],
     n_profiles integer,

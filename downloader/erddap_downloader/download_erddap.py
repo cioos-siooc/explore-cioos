@@ -36,25 +36,29 @@ def erddap_server_to_name(server):
     return urlparse(server).netloc.replace(".", "_")
 
 
-def get_variable_list(df_variables, eovs: list):
+def get_variable_list(df_variables, cde_eovs: list):
     """
     Retrieve the list of variables needed within an ERDDAP dataset based on the eovs list provided by the
      user and the mandatory variables required.
     :param erddap_metadata: erddap dataset attributes dataframe
-    :param eovs: eov list requested by the query
+    :param cde_eovs: ocean variable list requested by the query
     :return: list of variables to download from erddap 
     """
     # Get a list of mandatory variables to be present if available
     mandatory_variables = ["time", "latitude", "longitude", "depth"]
 
-    eov_variables = []
+    standard_names_to_download = []
 
-    for eov in eovs:
+    # if no eovs given, download all of them
+    if not cde_eovs:
+        cde_eovs=cde_eov_to_standard_name.keys()
+
+    for eov in cde_eovs:
         if eov in cde_eov_to_standard_name:
-            eov_variables += cde_eov_to_standard_name[eov]
+            standard_names_to_download += cde_eov_to_standard_name[eov]
 
     variables_to_download = df_variables.query(
-        "(name in @mandatory_variables) or (standard_name in @eov_variables) or (cf_role != '')"
+        "(name in @mandatory_variables) or (standard_name in @standard_names_to_download) or (cf_role != '')"
     )["name"].to_list()
 
     return variables_to_download

@@ -9,17 +9,7 @@
     "depth_min": 0,
     "depth_max": 10,
     "polygon_region": "POLYGON((-125.52734375000045 55.3462909172126,-133.96484375000045 55.3462909172126,-133.96484375000045 50.47669407439406,-125.52734375000045 50.47669407439406,-125.52734375000045 55.3462909172126))",
-    "eovs": [
-      "inorganicCarbon",
-      "dissolvedOrganicCarbon",
-      "subSurfaceCurrents",
-      "surfaceCurrents",
-      "nutrients",
-      "seaSurfaceSalinity",
-      "subSurfaceSalinity",
-      "seaSurfaceTemperature",
-      "subSurfaceTemperature"
-    ],
+    "eovs": [],
     "email": "test@example.com",
     "job_id": "04e288"
   },
