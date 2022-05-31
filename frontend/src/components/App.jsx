@@ -464,6 +464,7 @@ export default function App() {
             setOptionsSelected={setPlatformsSelected}
             searchable
             colored
+            translatable
             allOptions={platformsSelected}
           />
         </Filter>

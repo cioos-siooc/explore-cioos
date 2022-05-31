@@ -59,7 +59,7 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
           } else if (t(option.title)) { // Translation in t(title)
             title = t(option.title)
           } else {
-            title = option.title // this shouldn't really happen
+            title = option.title // this shouldn't really happen, but its a catch-all fallback
           }
         } else {
           title = option.title

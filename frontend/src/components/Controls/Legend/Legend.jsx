@@ -30,10 +30,12 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) 
       return (
         <>
           <LegendElement
-            title='- Points per hexagon'
+            title={t('legendSectionTitlePointsPerHex')}
+            // title='- Points per hexagon'
             open={legendOpen}
           >
-            Color
+            {t('legendSectionColor')}
+            {/* Color */}
           </LegendElement>
           {colorStops && colorStops.map((colorStop, index) => {
             const pointCount = `${colorStop.stop}`
@@ -54,34 +56,40 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) 
       return (
         <>
           <LegendElement
-            title='- Days of data'
+            title={t('legendSectionTitleDaysOfData')}
+            // title='- Days of data'
             open={legendOpen}
           >
-            Size
+            {t('legendSectionSize')}
+            {/* Size */}
           </LegendElement>
           <LegendElement
-            title='One day of data or less'
+            title={t('legendSectionTitleLessOneDayOfData')}
+            // title='One day of data or less'
             open={legendOpen}
           >
             <CircleFill size={4} fill='white' style={{ border: '1px solid black', borderRadius: '15px', margin: '5.5px' }} />
           </LegendElement>
           <LegendElement
-            title='More than one day of data'
+            title={t('legendSectionTitleMoreOneDayOfData')}
+            // title='More than one day of data'
             open={legendOpen}
           >
             <CircleFill size={15} fill='white' style={{ border: '1px solid black', borderRadius: '15px' }} />
           </LegendElement>
           <hr />
           <LegendElement
-            title='- Platform type'
+            title={t('legendSectionTitlePlatformType')}
+            // title='- Platform type'
             open={legendOpen}
           >
-            Color
+            {t('legendSectionColor')}
+            {/* Color */}
           </LegendElement>
           {platformColors.map((pc, index) => {
             return (
               <LegendElement
-                title={capitalizeFirstLetter(pc.platformType)}
+                title={capitalizeFirstLetter(t(pc.platformType))}
                 open={legendOpen}
                 key={index}
               >
@@ -104,7 +112,7 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) 
       <LegendElement
         open={legendOpen}
       >
-        <div className='legendToggleButton' title={legendOpen ? 'Close legend' : 'Open legend'}>
+        <div className='legendToggleButton' title={legendOpen ? t('closeLegendTooltip') : t('openLegendTooltip')}> {/*'Close legend' 'Open legend'*/}
           {legendOpen ?
             <ChevronCompactLeft />
             :
