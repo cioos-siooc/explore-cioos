@@ -11,9 +11,13 @@ const cache = require("../utils/cache");
  * */
 
 router.get("/", cache.route(), async function (req, res, next) {
-  res.send((await db.raw("SELECT DISTINCT UNNEST(ceda_eovs) ocean_variables FROM cioos_api.datasets")).rows.map(e=>e.ocean_variables));
+  res.send(
+    (
+      await db.raw(
+        "SELECT DISTINCT UNNEST(eovs) ocean_variables FROM cioos_api.datasets"
+      )
+    ).rows.map((e) => e.ocean_variables)
+  );
 });
 
 module.exports = router;
-
-
