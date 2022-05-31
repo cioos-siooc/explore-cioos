@@ -446,7 +446,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
 
     let attribution = new AttributionControl({
       customAttribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.',
-      compact: true
+      // compact: true
     })
     map.current.addControl(attribution, 'bottom-left')
 
