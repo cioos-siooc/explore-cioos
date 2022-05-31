@@ -284,3 +284,21 @@ export function getCookieValue(cookieName) {
       .split('=')[1]
   }
 }
+
+export function updateMapToolTitleLanguage(t) {
+  // const { t } = useTranslation()
+  let polygonToolDiv = document.getElementsByClassName('mapbox-gl-draw_polygon')
+  polygonToolDiv[0].title = t('mapPolygonToolTitle')
+
+  let deleteToolDiv = document.getElementsByClassName('mapbox-gl-draw_trash')
+  deleteToolDiv[0].title = t('mapDeleteToolTitle')
+
+  let zoomInToolDiv = document.getElementsByClassName('mapboxgl-ctrl-zoom-in')
+  zoomInToolDiv[0].title = t('mapZoomInToolTitle')
+
+  let zoomOutToolDiv = document.getElementsByClassName('mapboxgl-ctrl-zoom-out')
+  zoomOutToolDiv[0].title = t('mapZoomOutToolTitle')
+
+  let orientNorthToolDiv = document.getElementsByClassName('mapboxgl-ctrl-compass')
+  orientNorthToolDiv[0].title = t('mapCompassToolTitle')
+}

@@ -86,22 +86,7 @@ body {
   border-radius: 0px 0px 4px 4px;
 }
 
-.feedbackButton {
-  position: absolute;
-  right: 10px;
-  top: 60px;
-  background-color: #fff;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
-  border-radius: 40px;
-  width: 42px;
-  height: 42px;
-  z-index: 100;
-  padding: 5.5px;
-}
 
-.feedbackButton:hover {
-  background-color: #f3f3f3;
-}
 
 .submissionFeedback span {
   vertical-align: middle;

@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
-import { Container, Modal, Col, Row } from 'react-bootstrap'
-import { InfoSquare } from 'react-bootstrap-icons'
+import { Container, Modal, Row } from 'react-bootstrap'
+import { InfoSquare, ChatDots } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import { getCookieValue } from '../../../utilities'
 import './styles.css'
@@ -97,7 +97,14 @@ export default function IntroModal({ initialOpenState }) {
         return (
           <div className='tipInfo'>
             <p>
-              <img className='feedbackButtonImage' />
+              <a
+                className='feedbackButton'
+                title={t('feedbackButtonTitle')}
+                href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit'
+                target='_blank'
+              >
+                <ChatDots size='30px' />
+              </a>
               {t('tipInfoFeedback')}
               {/* Please fill out our user feedback survey! It helps improve this interface and find bugs. */}
             </p>
