@@ -1,25 +1,27 @@
 .legend {
   position: absolute;
-  bottom: 10px;
+  bottom: 40px;
   left: 10px;
   background-color: #f7f7f7;
-  border-radius: 15px;
+  border-radius: 10px;
   display: flex;
   flex-direction: column;
   padding: 2.5px 5px 2.5px 5px;
   overflow: visible;
   transition: left 1s;
   font-size: small;
+  max-height: max-content;
 }
 
 .legend:hover {
   background-color: #c6e3df;
+  cursor: pointer;
 }
 
-.panelOpen {
+.legend.panelOpen {
   position: absolute;
   left: 570px;
-  bottom: 10px;
+  bottom: 40px;
 }
 
 .legend hr {
@@ -28,10 +30,10 @@
 }
 
 .legendToggleButton {
-  border-radius: 5px;
+  border-radius: 10px;
   min-height: 20px;
   min-width: 30px;
-  background-color: lightgray;
+  background-color: #d3d3d3;
   padding: 3px;
 }
 
@@ -41,5 +43,10 @@
 }
 
 .legendToggleButton:hover {
-  background-color: gray;
+  background-color: #c4c4c4;
+  cursor: pointer;
+}
+
+@media (max-height: 500px) {
+  .legend {}
 }

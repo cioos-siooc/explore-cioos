@@ -24,10 +24,10 @@
   left: -560px;
 }
 
-@media (max-height: 400px) {
+@media (max-height: 500px) {
   .panelContents {
-    height: 400px;
-    position: absolute;
+    min-height: 500px;
+    /* position: absolute; */
   }
 }
 
