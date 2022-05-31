@@ -17,9 +17,6 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
 
   useEffect(() => {
     setSortedData(datasets)
-    if (datasets.length === 1) {
-      setInspectDataset(datasets[0])
-    }
   }, [datasets])
 
   useEffect(() => {

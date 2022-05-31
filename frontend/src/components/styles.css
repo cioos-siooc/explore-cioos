@@ -58,7 +58,7 @@ body {
 .boxQueryButton {
   position: absolute;
   right: 10px;
-  bottom: 250px;
+  bottom: 262px;
   width: 42px;
   height: 42px;
   border-radius: 4px 4px 0px 0px;
@@ -132,6 +132,6 @@ body {
 
 @media all and (max-height: 500px) {
   .boxQueryButton {
-    top: 210px;
+    top: 196px;
   }
 }

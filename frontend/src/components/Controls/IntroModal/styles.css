@@ -1,6 +1,6 @@
 .introButton {
   position: absolute;
-  bottom: 300px;
+  bottom: 312px;
   right: 10px;
   pointer-events: all;
   background-color: #fff;
@@ -183,7 +183,7 @@
 
 @media all and (max-height: 500px) {
   .introButton {
-    top: 157px;
+    top: 145px;
   }
 }
 

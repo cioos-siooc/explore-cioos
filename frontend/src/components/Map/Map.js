@@ -1,5 +1,5 @@
 import * as React from "react"
-import maplibreGl, { NavigationControl, Popup, ScaleControl } from "maplibre-gl"
+import maplibreGl, { AttributionControl, NavigationControl, Popup, ScaleControl } from "maplibre-gl"
 import MapboxDraw from "@mapbox/mapbox-gl-draw"
 import { useState, useEffect, useRef } from "react"
 import * as turf from '@turf/turf'
@@ -185,7 +185,6 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
             type: "raster",
             tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
             tileSize: 256,
-            attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.',
           },
         },
         layers: [
@@ -269,9 +268,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       })
     })
 
-    // Called order determines stacking order
-    map.current.addControl(new NavigationControl(), "bottom-right")
-    map.current.addControl(drawPolygon.current, "bottom-right")
+
 
     const handleMapOnClick = e => {
       // Clear highlighted points if looking at points level and clicking off of the points
@@ -441,6 +438,22 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     map.current.on('click', 'hexes', handleMapHexesOnClick);
     map.current.on('touchend', 'hexes', handleMapHexesOnClick);
 
+    let scale = new ScaleControl({
+      maxWidth: 150,
+      unit: 'metric',
+    })
+    map.current.addControl(scale, 'bottom-right')
+
+    let attribution = new AttributionControl({
+      customAttribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.',
+      compact: true
+    })
+    map.current.addControl(attribution, 'bottom-left')
+
+    // Called order determines stacking order
+    map.current.addControl(new NavigationControl(), "bottom-right")
+    map.current.addControl(drawPolygon.current, "bottom-right")
+
     let polygonToolDiv = document.getElementsByClassName('mapbox-gl-draw_polygon')
     polygonToolDiv[0].title = t('mapPolygonToolTitle')
 
@@ -455,13 +468,6 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
 
     let orientNorthToolDiv = document.getElementsByClassName('mapboxgl-ctrl-compass')
     orientNorthToolDiv[0].title = t('mapCompassToolTitle')
-
-    let scale = new ScaleControl({
-      maxWidth: 150,
-      unit: 'metric',
-    })
-    map.current.addControl(scale)
-
   }, [])
 
   return (

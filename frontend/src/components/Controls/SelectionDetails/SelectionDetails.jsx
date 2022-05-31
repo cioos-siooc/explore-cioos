@@ -34,6 +34,9 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, ch
       setPointsToReview(pointsData.filter(point => point.selected))
     }
     setLoading(false)
+    if (pointsData.length === 1) {
+      setInspectDataset(pointsData[0])
+    }
   }, [pointsData])
 
   useEffect(() => {
