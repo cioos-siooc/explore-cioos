@@ -154,6 +154,14 @@
   /* min-height: 275px; */
 }
 
+.tipInfo p {
+  margin: 15px 0px;
+}
+
+.tipInfo a {
+  margin-right: 15px;
+}
+
 .tagLine {
   display: inline;
   margin: auto;
