@@ -190,3 +190,17 @@
 .infoBox {
   min-height: 300px;
 }
+
+.feedbackButton {
+  background-color: #fff;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  border-radius: 40px;
+  width: 42px;
+  height: 42px;
+  z-index: 100;
+  padding: 5.5px;
+}
+
+.feedbackButton:hover {
+  background-color: #f3f3f3;
+}

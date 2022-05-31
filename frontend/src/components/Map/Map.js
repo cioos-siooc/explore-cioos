@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next'
 import './styles.css'
 
 import { server } from '../../config'
-import { createDataFilterQueryString, generateColorStops, getCurrentRangeLevel } from "../../utilities"
+import { createDataFilterQueryString, generateColorStops, getCurrentRangeLevel, updateMapToolTitleLanguage } from "../../utilities"
 import { colorScale, defaultQuery, platformColors } from "../config"
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
@@ -454,20 +454,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     map.current.addControl(new NavigationControl(), "bottom-right")
     map.current.addControl(drawPolygon.current, "bottom-right")
 
-    let polygonToolDiv = document.getElementsByClassName('mapbox-gl-draw_polygon')
-    polygonToolDiv[0].title = t('mapPolygonToolTitle')
-
-    let deleteToolDiv = document.getElementsByClassName('mapbox-gl-draw_trash')
-    deleteToolDiv[0].title = t('mapDeleteToolTitle')
-
-    let zoomInToolDiv = document.getElementsByClassName('mapboxgl-ctrl-zoom-in')
-    zoomInToolDiv[0].title = t('mapZoomInToolTitle')
-
-    let zoomOutToolDiv = document.getElementsByClassName('mapboxgl-ctrl-zoom-out')
-    zoomOutToolDiv[0].title = t('mapZoomOutToolTitle')
-
-    let orientNorthToolDiv = document.getElementsByClassName('mapboxgl-ctrl-compass')
-    orientNorthToolDiv[0].title = t('mapCompassToolTitle')
+    updateMapToolTitleLanguage(t)
   }, [])
 
   return (

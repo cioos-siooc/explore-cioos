@@ -22,6 +22,7 @@
   "submitRequestButtonSubmitText": "Submit Request",
   "submitRequestButtonSelectDataText": "Select Data",
   "submitRequestButtonResubmitText": "Resubmit Request",
+  "languageSelectorTitle": "Change language",
   "rectangleToolTitle": "Rectangle tool",
   "feedbackButtonTitle": "Please provide feedback on your experience using CIOOS Data Explorer",
   "oceanVariablesFiltername": "Ocean Variables",

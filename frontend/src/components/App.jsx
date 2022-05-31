@@ -560,7 +560,7 @@ export default function App() {
           {DownloadButton()}
         </div>
       </Controls>
-      {i18n.language === 'en' ?
+      {/* {i18n.language === 'en' ?
         <a
           title={t('CIOOSLogoButtonTitle')}
           className='logo english'
@@ -573,7 +573,7 @@ export default function App() {
           href='https://cioos.ca/'
           target='_blank'
         />
-      }
+      } */}
       {currentRangeLevel &&
         <Legend currentRangeLevel={currentRangeLevel} zoom={zoom} selectionPanelOpen={polygon && selectionPanelOpen} />
       }
@@ -584,14 +584,14 @@ export default function App() {
       >
         <div className='rectangleIcon' />
       </button>
-      <a
+      {/* <a
         className='feedbackButton'
         title={t('feedbackButtonTitle')}
         href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit'
         target='_blank'
       >
         <ChatDots size='30px' />
-      </a>
+      </a> */}
       <IntroModal initialOpenState={true} />
       <LanguageSelector />
     </div >
