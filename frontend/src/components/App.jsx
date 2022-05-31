@@ -560,7 +560,7 @@ export default function App() {
           {DownloadButton()}
         </div>
       </Controls>
-      {/* {i18n.language === 'en' ?
+      {i18n.language === 'en' ?
         <a
           title={t('CIOOSLogoButtonTitle')}
           className='logo english'
@@ -570,10 +570,10 @@ export default function App() {
         <a
           title={t('CIOOSLogoButtonTitle')}
           className='logo french'
-          href='https://cioos.ca/'
+          href='https://siooc.ca/'
           target='_blank'
         />
-      } */}
+      }
       {currentRangeLevel &&
         <Legend currentRangeLevel={currentRangeLevel} zoom={zoom} selectionPanelOpen={polygon && selectionPanelOpen} />
       }
