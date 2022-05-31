@@ -8,6 +8,12 @@
   overflow-x: hidden;
 }
 
+@media (max-height: 500px) {
+  .pointDetailsInfoRow {
+    max-height: 420px;
+  }
+}
+
 .pointDetailsControls {
   border-top: 1px solid darkgrey;
   background-color: #f7f7f7;

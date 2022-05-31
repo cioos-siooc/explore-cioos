@@ -147,6 +147,7 @@ export default function App() {
     if (_.isEmpty(pointsToReview)) {
       setPointsToDownload()
     }
+    setSelectionPanelOpen(true)
   }, [pointsToReview])
 
   // Filter option data structure: 
@@ -435,6 +436,7 @@ export default function App() {
             optionsSelected={createOptionSubset(eovsSearchTerms, eovsSelected)}
             setOptionsSelected={setEovsSelected}
             searchable
+            translatable
             allOptions={eovsSelected}
           />
         </Filter>

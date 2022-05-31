@@ -14,8 +14,6 @@ import classNames from 'classnames'
 export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) {
   const { t } = useTranslation()
   const [legendOpen, setLegendOpen] = useState(true)
-  const wrapperRef = useRef(null)
-  useOutsideAlerter(wrapperRef, setLegendOpen, false)
 
   function generateLegendElements() {
     if (_.isEmpty(currentRangeLevel)) { // No Data
@@ -32,7 +30,7 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) 
       return (
         <>
           <LegendElement
-            title='Points per hexagon'
+            title='- Points per hexagon'
             open={legendOpen}
           >
             Color
@@ -56,7 +54,7 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) 
       return (
         <>
           <LegendElement
-            title='Days of data'
+            title='- Days of data'
             open={legendOpen}
           >
             Size
@@ -75,7 +73,7 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) 
           </LegendElement>
           <hr />
           <LegendElement
-            title='Platform type'
+            title='- Platform type'
             open={legendOpen}
           >
             Color
@@ -100,7 +98,6 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) 
   return (
     <div
       className={className}
-      ref={wrapperRef}
       onClick={() => setLegendOpen(!legendOpen)}
     >
       {generateLegendElements()}

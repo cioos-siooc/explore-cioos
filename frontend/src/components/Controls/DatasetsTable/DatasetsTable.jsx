@@ -1,4 +1,4 @@
-import _, { size, toInteger } from 'lodash'
+import _, { toInteger } from 'lodash'
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { Table } from 'react-bootstrap'
@@ -17,6 +17,9 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
 
   useEffect(() => {
     setSortedData(datasets)
+    if (datasets.length === 1) {
+      setInspectDataset(datasets[0])
+    }
   }, [datasets])
 
   useEffect(() => {

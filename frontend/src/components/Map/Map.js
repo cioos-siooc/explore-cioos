@@ -1,5 +1,5 @@
 import * as React from "react"
-import maplibreGl, { NavigationControl, Popup } from "maplibre-gl"
+import maplibreGl, { NavigationControl, Popup, ScaleControl } from "maplibre-gl"
 import MapboxDraw from "@mapbox/mapbox-gl-draw"
 import { useState, useEffect, useRef } from "react"
 import * as turf from '@turf/turf'
@@ -185,8 +185,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
             type: "raster",
             tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
             tileSize: 256,
-            attribution:
-              'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.',
+            attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.',
           },
         },
         layers: [
@@ -456,6 +455,13 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
 
     let orientNorthToolDiv = document.getElementsByClassName('mapboxgl-ctrl-compass')
     orientNorthToolDiv[0].title = t('mapCompassToolTitle')
+
+    let scale = new ScaleControl({
+      maxWidth: 150,
+      unit: 'metric',
+    })
+    map.current.addControl(scale)
+
   }, [])
 
   return (
