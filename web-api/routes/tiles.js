@@ -37,9 +37,7 @@ router.get(
     const SQL = `
   with relevent_points as (
     ${isHexGrid ? " SELECT count(distinct point_pk) count," : " SELECT sum(p.days)::bigint count,array_to_json(array_agg(distinct dataset_pk)) datasets, "}    
-       
-        case when sum(p.days)<=1 then 2.2::float else 5 end as size,
-         ${isHexGrid ? "" : `d.l06_platform_code as platform,`} p.${
+      ${isHexGrid ? "" : `d.l06_platform_code as platform,point_pk AS pk,`} p.${
       sqlQuery.geom_column
     } AS geom FROM cioos_api.profiles p
         -- used for organizations filtering
@@ -49,12 +47,12 @@ router.get(
         ${
           isHexGrid
             ? `GROUP BY ${sqlQuery.geom_column}`
-            : "GROUP BY geom, d.l06_platform_code"
+            : "GROUP BY point_pk, geom, d.l06_platform_code"
         } ),
     te AS (select ST_TileEnvelope(${z}, ${x}, ${y}) tile_envelope ),
     mvtgeom AS (
-      SELECT count, size, 
-       ${isHexGrid ? "" : "platform,datasets,"}
+      SELECT count, 
+       ${isHexGrid ? "" : "pk,platform,datasets,"}
         ST_AsMVTGeom (
           relevent_points.geom,
           tile_envelope
