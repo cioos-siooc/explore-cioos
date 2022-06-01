@@ -36,7 +36,7 @@ router.get(
     // not joining to cioos_api.points to get hexagons as that could be slower
     const SQL = `
   with relevent_points as (
-    ${isHexGrid ? " SELECT count(distinct point_pk) count," : " SELECT sum(p.days)::bigint count,array_agg(distinct dataset_pk) datasets, "}    
+    ${isHexGrid ? " SELECT count(distinct point_pk) count," : " SELECT sum(p.days)::bigint count,array_to_json(array_agg(distinct dataset_pk)) datasets, "}    
        
         case when sum(p.days)<=1 then 2.2::float else 5 end as size,
          ${isHexGrid ? "" : `d.l06_platform_code as platform,`} p.${
