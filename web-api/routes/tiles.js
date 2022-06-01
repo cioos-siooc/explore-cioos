@@ -36,7 +36,7 @@ router.get(
     // not joining to cioos_api.points to get hexagons as that could be slower
     const SQL = `
   with relevent_points as (
-    ${isHexGrid ? " SELECT count(distinct point_pk) count," : " SELECT sum(p.days)::bigint count,array_to_json(array_agg(distinct dataset_pk)) datasets, "}    
+    ${isHexGrid ? " SELECT count(distinct point_pk) count," : " SELECT sum(p.days)::bigint count,"} array_to_json(array_agg(distinct dataset_pk)) datasets,     
       ${isHexGrid ? "" : `d.l06_platform_code as platform,point_pk AS pk,`} p.${
       sqlQuery.geom_column
     } AS geom FROM cioos_api.profiles p
@@ -52,7 +52,7 @@ router.get(
     te AS (select ST_TileEnvelope(${z}, ${x}, ${y}) tile_envelope ),
     mvtgeom AS (
       SELECT count, 
-       ${isHexGrid ? "" : "pk,platform,datasets,"}
+       ${isHexGrid ? "" : "pk,platform,"} datasets,
         ST_AsMVTGeom (
           relevent_points.geom,
           tile_envelope
