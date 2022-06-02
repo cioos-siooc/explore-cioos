@@ -9,7 +9,7 @@ import { platformColors } from '../../config'
 
 import './styles.css'
 
-export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDataset, datasets, setDatasets, selectAll, setInspectDataset }) {
+export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDataset, datasets, setDatasets, selectAll, setInspectDataset, setHoveredDataset }) {
   const { t } = useTranslation()
   const [sortedData, setSortedData] = useState(datasets)
   const [sortProp, setSortProp] = useState('title')
@@ -115,9 +115,15 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
           {sortedData.map((point, index) => {
             let platformColor = platformColors.filter(pc => pc.platformId === point.platform_code)
             return (
-              <tr key={index}>
+              <tr key={index}
+                onMouseEnter={() => setHoveredDataset(point)}
+                onMouseLeave={() => setHoveredDataset()}
+              >
                 <td
-                  onClick={() => handleSelectDataset(point)}
+                  onClick={() => {
+                    setHoveredDataset()
+                    handleSelectDataset(point)
+                  }}
                   title={t('datasetsTableSelectTitle')}
                 //'Select dataset for download'
                 >

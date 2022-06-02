@@ -54,6 +54,7 @@ export default function App() {
   const [zoom, setZoom] = useState(2)
   const [rangeLevels, setRangeLevels] = useState()
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
+  const [hoveredDataset, setHoveredDataset] = useState()
   const [query, setQuery] = useState({
     startDate: defaultStartDate,
     endDate: defaultEndDate,
@@ -392,6 +393,7 @@ export default function App() {
           setZoom={setZoom}
           rangeLevels={rangeLevels}
           offsetFlyTo={selectionPanelOpen}
+          hoveredDataset={hoveredDataset}
         />
       }
       <Controls
@@ -407,6 +409,7 @@ export default function App() {
                 setPointsToReview={setPointsToReview}
                 query={query}
                 polygon={polygon}
+                setHoveredDataset={setHoveredDataset}
               >
                 {DownloadButton()}
               </SelectionDetails>
