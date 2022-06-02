@@ -13,7 +13,7 @@ import { createDataFilterQueryString, generateColorStops, getCurrentRangeLevel, 
 import { colorScale, defaultQuery, platformColors } from "../config"
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, zoom, setZoom, offsetFlyTo, rangeLevels }) {
+export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, zoom, setZoom, offsetFlyTo, rangeLevels, hoveredDataset }) {
   const { t } = useTranslation()
   const mapContainer = useRef(null)
   const map = useRef(null)
@@ -106,6 +106,48 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       }
     }
   }
+
+  function hoverHighlightPoints(pk) {
+    if (map.current && pk) {
+      if (zoom >= 7) {
+        map.current.setPaintProperty('points', 'circle-color', 'lightgrey')
+        map.current.setPaintProperty('points-highlighted', 'circle-color', 'lightgrey')
+        map.current.setPaintProperty('points-highlighted', 'circle-stroke-width', 0)
+
+        const features = map.current.queryRenderedFeatures({ layers: ['points'] })
+        const pointsInDataset = features.filter(feature => {
+          const featureDatasetPKs = JSON.parse(feature.properties.datasets)
+          return featureDatasetPKs.includes(pk)
+        }).map(feature => feature.properties.pk)
+        map.current.setFilter('points-hovered', ['in', 'pk', ...pointsInDataset])
+      } else {
+        map.current.setPaintProperty('hexes', 'fill-color', 'lightgrey')
+        const features = map.current.queryRenderedFeatures({ layers: ['hexes'] })
+        const hexesInDataset = features.filter(feature => JSON.parse(feature.properties.datasets).includes(pk)).map(feature => feature.properties.pk)
+        map.current.setFilter('hexes-hovered', ['in', 'pk', ...hexesInDataset])
+      }
+    } else {
+      map.current.setFilter('points-hovered', ['in', 'pk', ''])
+      map.current.setPaintProperty('points', 'circle-color', colors)
+      map.current.setPaintProperty('points-highlighted', 'circle-color', colors)
+      map.current.setPaintProperty('points-highlighted', 'circle-stroke-width', 1)
+      map.current.setFilter('hexes-hovered', ['in', 'pk', ''])
+      map.current.setPaintProperty('hexes', 'fill-color', {
+        property: 'count',
+        stops: colorStops.current
+      })
+    }
+  }
+
+  useEffect(() => {
+    if (map.current) {
+      if (!_.isEmpty(hoveredDataset)) {
+        hoverHighlightPoints(hoveredDataset.pk)
+      } else {
+        hoverHighlightPoints()
+      }
+    }
+  }, [hoveredDataset])
 
   function highlightPoints(polygon) {
     var features = map.current.queryRenderedFeatures({ layers: ['points'] }).map(point => {
@@ -221,7 +263,14 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         "source-layer": "internal-layer-name",
         paint: {
           'circle-opacity': 1,
-          "circle-radius": ["get", "size"],
+          "circle-radius": [
+            'case',
+            ['<=', ['get', 'count'], 2],
+            2.5,
+            ['>', ['get', 'count'], 2],
+            5,
+            5
+          ],
           'circle-color': colors
         },
       })
@@ -249,6 +298,29 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       })
 
       map.current.addLayer({
+        id: "hexes-hovered",
+        type: "fill",
+        minzoom: 0,
+        maxzoom: 7,
+
+        source: {
+          type: "vector",
+          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`],
+        },
+        "source-layer": "internal-layer-name",
+
+        paint: {
+          "fill-opacity": 0.9,
+          "fill-color":
+          {
+            property: 'count',
+            stops: colorStops.current
+          }
+        },
+        filter: ['in', 'pk', '']
+      })
+
+      map.current.addLayer({
         id: "points-highlighted",
         type: "circle",
         minzoom: 7,
@@ -260,15 +332,46 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         paint: {
           "circle-color": colors,
           "circle-opacity": 1,
-          "circle-radius": ["get", "size"],
-          "circle-stroke-color": "black",
-          "circle-stroke-width": 1
+          "circle-radius": [
+            'case',
+            ['<=', ['get', 'count'], 2],
+            2.5,
+            ['>', ['get', 'count'], 2],
+            5,
+            5
+          ],
+          "circle-stroke-color": 'black',
+          "circle-stroke-width": 0.75
+        },
+        filter: ['in', 'pk', '']
+      })
+
+      map.current.addLayer({
+        id: 'points-hovered',
+        type: "circle",
+        minzoom: 7,
+        source: {
+          type: "vector",
+          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`],
+        },
+        "source-layer": "internal-layer-name",
+        paint: {
+          "circle-color": colors,
+          "circle-opacity": 1,
+          "circle-radius": [
+            'case',
+            ['<=', ['get', 'count'], 2],
+            2,
+            ['>', ['get', 'count'], 2],
+            5,
+            5
+          ],
+          // "circle-stroke-color": "black",
+          // "circle-stroke-width": 1
         },
         filter: ['in', 'pk', '']
       })
     })
-
-
 
     const handleMapOnClick = e => {
       // Clear highlighted points if looking at points level and clicking off of the points

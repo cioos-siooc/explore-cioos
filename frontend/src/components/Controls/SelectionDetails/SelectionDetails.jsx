@@ -18,7 +18,7 @@ import {
 } from "../../../utilities.js";
 
 // Note: datasets and points are exchangable terminology
-export default function SelectionDetails({ setPointsToReview, query, polygon, children }) {
+export default function SelectionDetails({ setPointsToReview, query, polygon, setHoveredDataset, children }) {
   const { t, i18n } = useTranslation()
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState([])
@@ -110,6 +110,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, ch
                 selectAll={selectAll}
                 setDatasets={setPointsData}
                 datasets={pointsData}
+                setHoveredDataset={setHoveredDataset}
               />
             ) || (
               pointsData && pointsData.length === 0 &&
