@@ -1,10 +1,13 @@
 import logging
 from datetime import datetime
+
 import numpy as np
 import pandas as pd
 import requests
-from erddap_scraper.utils import cde_eov_to_standard_name, intersection
 from requests.exceptions import HTTPError
+
+from erddap_scraper.platform_ioos_to_l06 import platforms_nerc_ioos
+from erddap_scraper.utils import cde_eov_to_standard_name, intersection
 
 
 def is_valid_duration(duration):
@@ -25,6 +28,7 @@ class Dataset(object):
         self.erddap_csv_to_df = erddap_server.erddap_csv_to_df
         self.cdm_data_type = ""
         self.globals = {}
+        self.platform = ""
         self.df_variables = None
         self.variables_list = []
         self.profile_variable_list = []
@@ -35,12 +39,11 @@ class Dataset(object):
         self.df = pd.DataFrame(
             {
                 "title": [self.globals["title"]],
-                # "title_fr": [self.globals.get("title_fr")],
                 "summary": [self.globals["summary"]],
-                # "summary_fr": [self.globals.get("abstract_fr")],
                 "erddap_url": [self.erddap_url],
                 "dataset_id": [self.id],
                 "cdm_data_type": [self.cdm_data_type],
+                "platform": [self.platform],
                 "eovs": [self.eovs],
                 "organizations": [self.organizations],
                 "n_profiles": [len(self.profile_ids)],
@@ -54,15 +57,38 @@ class Dataset(object):
             "/tabledap/" + self.id + ".csv?" + url, logger=self.logger
         )
 
-    def get_max_min(self, vars, max_min):
-        """Get max/min values for each of certain variables, in each profile
-        usually time,lat,long,depth
+    def get_max_min(self, vars):
+        """
+        Get max/min values for each of certain variables, in each profile
+        usually time,depth (lat/long are handle differently since the min of lat,lon might not be a point in the dataset)
         """
 
         url = f"{','.join(vars)}" + requests.utils.quote(
-            f'&orderBy{max_min}("{",".join(vars)}")'
+            f'&orderByMinMax("{",".join(vars)}")'
         )
-        return self.dataset_tabledap_query(url)
+
+        df = self.dataset_tabledap_query(url)
+
+        # something went wrong
+        if df.empty:
+            return df
+
+        # first_var = vars[0]
+        last_var = vars[-1]
+        index_vars = vars[0:-1]
+        df["maxmin"] = ""
+        min_column = last_var + "_min"
+        max_column = last_var + "_max"
+        df.iloc[::2, df.columns.get_loc("maxmin")] = max_column
+        df.loc[df.maxmin != max_column, "maxmin"] = min_column
+
+        df_min_max = df.pivot(
+            index=index_vars, columns=["maxmin"], values=[last_var]
+        ).reset_index()
+        df_min_max.columns = index_vars + [min_column, max_column]
+        df_min_max.set_index(index_vars, inplace=True)
+
+        return df_min_max
 
     def get_profile_ids(self):
         df_variables = self.df_variables
@@ -74,27 +100,32 @@ class Dataset(object):
             .query('cf_role != ""')[["cf_role", "name"]]["name"]
             .to_dict()
         )
+        lat_lng = ["latitude", "longitude"]
+
         # sorting so the url is consistent every time for query caching
         profile_variable_list = sorted(list(profile_variables.values()))
-
         self.profile_variables = profile_variables
         self.profile_variable_list = profile_variable_list
 
         if not profile_variables:
             return []
+
         profile_ids = self.dataset_tabledap_query(
-            f"{','.join(profile_variable_list)}&distinct()"
+            f"{','.join(profile_variable_list + lat_lng)}&distinct()"
         )
 
+        profile_ids = profile_ids.drop_duplicates(profile_variable_list)
         self.profile_ids = profile_ids
         return profile_ids
 
-    # Get count for each of certain variables, in each profile
-    # counting for a single day and extrapolating, otherwise this takes forever on high frequency datasets
-    # if its a single profile, get a single day. If its multple profiles it could be hard to pick a day that
-    # each profile has data for, and the profiles could be sequential with no time overlap
-    # def get_count(self, vars, groupby):
     def get_count(self, vars, groupby, time_min, time_max):
+        """
+        Get count for each of certain variables, in each profile
+        counting for a single day and extrapolating, otherwise this takes forever on high frequency datasets
+        if its a single profile, get a single day. If its multple profiles it could be hard to pick a day that
+        each profile has data for, and the profiles could be sequential with no time overlap
+        def get_count(self, vars, groupby):
+        """
         time_query = ""
         is_single_profile_dataset = len(self.profile_ids) == 1
         if str(time_min) == "NaT":
@@ -114,7 +145,7 @@ class Dataset(object):
             and time_coverage_resolution
             and is_valid_duration(time_coverage_resolution)
         ):
-            print("Using time_coverage_resolution for count")
+            self.logger.debug(f"Using time_coverage_resolution for count")
             df_profile_ids = self.profile_ids.copy()
             readings_per_day = np.timedelta64(1, "D") / pd.Timedelta(
                 time_coverage_resolution
@@ -168,6 +199,30 @@ class Dataset(object):
                 eovs.append(eov)
         return eovs
 
+    def get_platform_code(self):
+        platform = self.globals["platform"]
+        platform_vocabulary = self.globals.get("platform_vocabulary")
+
+        if not (platform and platform_vocabulary):
+            return None
+
+        if "ioos" in platform_vocabulary:
+            try:
+                l06_platform_label = platforms_nerc_ioos.query(
+                    f"ioos_label=='{platform}'"
+                )["l06_label"].item()
+
+                return l06_platform_label
+
+            except ValueError:
+                self.logger.debug("Found unsupported IOOS platform:", platform)
+
+        if "L06" in platform_vocabulary:
+            if platform in list(platforms_nerc_ioos["l06_label"]):
+                return platform
+            else:
+                self.logger.debug("Found unsupported L06 platform:", platform)
+
     def get_metadata(self):
         "get all the global and variable metadata for a dataset"
 
@@ -207,6 +262,7 @@ class Dataset(object):
         self.variables_list = df_variables["name"].to_list()
         self.cdm_data_type = globals_dict["cdm_data_type"]
         self.globals = globals_dict
+
         if not "standard_name" in df_variables:
             df_variables["standard_name"] = None
         df_variables.set_index("name", drop=False, inplace=True)
@@ -231,6 +287,9 @@ class Dataset(object):
         self.organizations = list(
             filter(None, set([globals_dict.get(x) for x in organization_fields]))
         )
+
+        if self.globals.get("platform"):
+            self.platform = self.get_platform_code()
 
     def get_logger(self):
         logger = logging.getLogger(f"{self.erddap_server.domain} - {self.id}")
