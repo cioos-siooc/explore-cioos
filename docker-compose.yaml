@@ -12,6 +12,11 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./database:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-q", "-d", "${DB_NAME}", "-U", "${DB_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   web-api:
     build: ./web-api
     env_file:
@@ -27,7 +32,7 @@ services:
     depends_on:
       - web-api
     ports:
-      - "5050:4000"
+      - "8098:4000"
   scheduler:
     build:
       context: .

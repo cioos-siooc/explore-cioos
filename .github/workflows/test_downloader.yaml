@@ -19,8 +19,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install downloader and scraper
         run: |
-          pip install ./scraper
-          pip install ./downloader
+          pip install -q ./scraper
+          pip install -q ./downloader
 
       - name: Run downloader test files
         working-directory: ./downloader
