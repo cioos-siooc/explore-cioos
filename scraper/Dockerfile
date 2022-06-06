@@ -4,6 +4,6 @@ WORKDIR /usr/src/app
 
 COPY . .
 
-RUN pip install ./scraper
+RUN pip install -q ./scraper
 
 CMD [ "sh","./scraper/run.sh" ]

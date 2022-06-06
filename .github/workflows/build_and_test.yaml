@@ -1,0 +1,50 @@
+name: Test
+
+on:
+  pull_request:
+    branches:
+    - master
+
+jobs:
+  docker:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9]
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Start containers
+      run: |
+        mv .env.sample .env
+        docker-compose -f "docker-compose.production.yaml" up -d --build --quiet-pull
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install ERDDAP harvester
+      run: pip install -q ./scraper
+
+    - name: Run ERDDAP harvester on sample dataset
+      run: python -m erddap_scraper https://data.cioospacific.ca/erddap/ --dataset_ids DFO_MEDS_BUOYS
+
+    - name: Install node
+      uses: actions/setup-node@v3
+      with:
+        node-version: 16.x
+
+    - name: Install dependencies
+      working-directory: ./test
+      run: npm install
+
+    - name: Test frontend loads without errors
+      working-directory: ./test
+      run: node frontend_loads_without_errors.js
+
+    - name: Stop containers
+      if: always()
+      run: docker-compose -f "docker-compose.production.yaml" down

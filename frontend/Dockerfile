@@ -6,7 +6,7 @@ ARG API_URL
 ENV API_URL $API_URL
 
 COPY . .
-RUN npm install
+RUN npm install --quiet
 RUN npm run build
 
 # Stage 2 - the production environment
