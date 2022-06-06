@@ -16,6 +16,7 @@ CREATE TABLE cioos_api.datasets (
     pk serial PRIMARY KEY,
     dataset_id text,
     erddap_url text,
+    platform text,
     title TEXT,
     title_fr TEXT,
     summary TEXT,
