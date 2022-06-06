@@ -27,7 +27,6 @@ CREATE TABLE cioos_api.datasets (
     profile_variable text,
     ckan_url text,
     eovs text[],
-    eovs text[],
     ckan_id text,
     organization_pks INTEGER[],
     n_profiles integer,
@@ -57,10 +56,8 @@ CREATE TABLE cioos_api.profiles (
     profile_id text,
     time_min timestamptz,
     time_max timestamptz,
-    latitude_min double precision,
-    latitude_max double precision,
-    longitude_min double precision,
-    longitude_max double precision,
+    latitude double precision,
+    longitude double precision,
     depth_min double precision,
     depth_max double precision,
     n_records bigint,
@@ -76,10 +73,8 @@ CREATE TABLE cioos_api.profiles (
 CREATE INDEX ON cioos_api.profiles USING GIST (geom);
 CREATE INDEX ON cioos_api.profiles USING GIST (hex_zoom_0);
 CREATE INDEX ON cioos_api.profiles USING GIST (hex_zoom_1);
-CREATE INDEX ON cioos_api.profiles(latitude_min);
-CREATE INDEX ON cioos_api.profiles(latitude_max);
-CREATE INDEX ON cioos_api.profiles(longitude_min);
-CREATE INDEX ON cioos_api.profiles(longitude_max);
+CREATE INDEX ON cioos_api.profiles(latitude);
+CREATE INDEX ON cioos_api.profiles(latitude);
 
 
 -- One record per unique lat/long
