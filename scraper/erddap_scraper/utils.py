@@ -39,9 +39,7 @@ def get_df_cde_eov_to_standard_name(cde_eov_to_standard_name):
 
 
 # dataframe mapping of CDE ocean variables to standard names
-df_cde_eov_to_standard_name = get_df_cde_eov_to_standard_name(
-    cde_eov_to_standard_name
-)
+df_cde_eov_to_standard_name = get_df_cde_eov_to_standard_name(cde_eov_to_standard_name)
 
 
 def intersection(lst1, lst2):

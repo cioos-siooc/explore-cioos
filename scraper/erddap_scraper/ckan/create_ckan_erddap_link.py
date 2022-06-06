@@ -21,11 +21,13 @@ def split_erddap_url(url):
     dataset_id = f.split(".html")[0]
     return (erddap_host, dataset_id)
 
+
 def unescape_ascii(x):
     try:
-        return bytes(x,'ascii').decode('unicode-escape')
+        return bytes(x, "ascii").decode("unicode-escape")
     except Exception:
         return x
+
 
 def get_ckan_records(dataset_ids, limit=None, cache=False):
     """
@@ -53,7 +55,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
             continue
 
         (erddap_host, dataset_id) = split_erddap_url(erddap_url)
-        
+
         # dataset_ids could be None if user wants all
         if dataset_ids and dataset_id not in dataset_ids:
             continue
@@ -65,10 +67,10 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
 
         def remove_newlines(s):
             # not sure why all these are needed but they seem to be
-            s = s.replace('\r', "")
-            s = s.replace('\n', "")
-            s = s.replace('\\n', "")
-            s = s.replace('\\r', "")
+            s = s.replace("\r", "")
+            s = s.replace("\n", "")
+            s = s.replace("\\n", "")
+            s = s.replace("\\r", "")
             return s
 
         ckan_record_text = {
@@ -78,12 +80,12 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
             "ckan_summary_fr": notes_translated.get("fr"),
         }
 
-        for k,v in ckan_record_text.items():
-            ckan_record_text[k]=remove_newlines(unescape_ascii(v))
-    
+        for k, v in ckan_record_text.items():
+            ckan_record_text[k] = remove_newlines(unescape_ascii(v))
+
         organizations = []
 
-        for contact in record_full.get("cited-responsible-party",[]):
+        for contact in record_full.get("cited-responsible-party", []):
             organizations += [unescape_ascii(contact.get("organisation-name"))]
 
         # remove duplicates, empty strings
@@ -110,7 +112,6 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         "ckan_summary": [x[4]["ckan_summary"] for x in out],
         "ckan_summary_fr": [x[4]["ckan_summary_fr"] for x in out],
     }
-    
 
     df = pd.DataFrame(line)
 
