@@ -8,14 +8,15 @@ import uuid
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
+from sqlalchemy import create_engine
+
 from erddap_scraper.ckan.create_ckan_erddap_link import get_ckan_records, unescape_ascii
 from erddap_scraper.scrape_erddap import scrape_erddap
 from erddap_scraper.utils import (
+    cf_standard_names,
     df_cde_eov_to_standard_name,
     supported_standard_names,
-    cf_standard_names,
 )
-from sqlalchemy import create_engine
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
