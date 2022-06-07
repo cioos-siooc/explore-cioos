@@ -3,10 +3,11 @@
 import traceback
 
 import pandas as pd
+from requests.exceptions import HTTPError
+
 from erddap_scraper.CDEComplianceChecker import CDEComplianceChecker
 from erddap_scraper.ERDDAP import ERDDAP
 from erddap_scraper.profiles import get_profiles
-from requests.exceptions import HTTPError
 from erddap_scraper.scraper_errors import (
     CDM_DATA_TYPE_UNSUPPORTED,
     HTTP_ERROR,
@@ -26,7 +27,7 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
     df_profiles_all = pd.DataFrame()
 
     df_datasets_all = pd.DataFrame(
-        columns=["erddap_url", "dataset_id", "cdm_data_type"]
+        columns=["erddap_url", "dataset_id", "cdm_data_type", "platform"]
     )
     df_variables_all = pd.DataFrame(
         columns=[
@@ -111,6 +112,7 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
 
         except Exception as e:
             print(traceback.format_exc())
+            print("Error occurred at ", erddap_url, dataset_id)
             skipped_datasets_reasons += skipped_reason(UNKNOWN_ERROR)
 
     df_skipped_datasets = pd.DataFrame()
