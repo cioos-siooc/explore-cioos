@@ -1,25 +1,23 @@
 #!/usr/bin/env python3
 
 from datetime import datetime
-import pytz
+
 import pandas as pd
+
 from erddap_scraper.ERDDAP import ERDDAP
 
 dtypes = {
     "erddap_url": str,
     "dataset_id": str,
-    # "timeseries_profile_id": str,
     "timeseries_id": str,
     "profile_id": str,
-    "longitude_min": float,
-    "longitude_max": float,
-    "latitude_min": float,
-    "latitude_max": float,
+    "latitude": float,
+    "longitude": float,
     "depth_min": float,
     "depth_max": float,
 }
 
-# ,timeseries_id,latitude_min,latitude_max,longitude_min,longitude_max,time_min,time_max,n_records,dataset_id,erddap_url,depth_min,depth_max
+
 def get_profiles(dataset):
     """
     Get max/min stats for each profile in a dataset
@@ -35,11 +33,11 @@ def get_profiles(dataset):
 
 
     """
+
     df_variables = dataset.df_variables
 
+    # lat,lon not in this list. They have to be treated differently as getting the min of the lat and lon could create a point not in the dataset
     llat_variables = [
-        "latitude",
-        "longitude",
         "depth",
         "altitude",
         "time",
@@ -48,8 +46,14 @@ def get_profiles(dataset):
         x for x in llat_variables if x in dataset.variables_list
     ]
 
-    # profiles=pd.DataFrame(columns=profile_columns.keys())
-    profiles = dataset.get_profile_ids()
+    profiles_with_lat_lon = dataset.get_profile_ids()
+
+    if profiles_with_lat_lon.empty:
+        return profiles_with_lat_lon
+
+    profiles = profiles_with_lat_lon[
+        profiles_with_lat_lon.columns.difference(["latitude", "longitude"])
+    ].drop_duplicates()
 
     # Organize dataset variables by their cf_roles
     # eg profile_variable={'profile_id': 'hakai_id', 'timeseries_id': 'station'}
@@ -66,32 +70,46 @@ def get_profiles(dataset):
     # If TimeSeriesProfiles review how many profiles per timeseries exist
     if dataset.cdm_data_type == "TimeSeriesProfile":
         # Review if there's a enough samples to group by timeseries only
-        profiles_per_timeseries = profiles.groupby(
+
+        profiles_per_timeseries = profiles_with_lat_lon.groupby(
             profile_variables["timeseries_id"]
         ).agg("count")[profile_variables["profile_id"]]
 
-        if (profiles_per_timeseries > 2000).any():
+        if len(profiles_per_timeseries > 2000):
             # If too many profiles per timeseries just group by timeseries_id
+            # In this case we will drop the profile ID column and remove the
+            # duplicates this creates.
+
+            dropping_column = profile_variables["profile_id"]
+
             profile_variables.pop("profile_id")
             profile_variable_list = list(profile_variables.values())
-            profiles = profiles_per_timeseries.to_frame(name="n_profiles").reset_index()
+
+            profiles_with_lat_lon = profiles_with_lat_lon.drop(
+                dropping_column, axis=1
+            ).drop_duplicates()
+
+            timeseries_id_with_count = profiles_per_timeseries.to_frame(
+                name="n_profiles"
+            )
+            profiles_with_lat_lon.set_index(profile_variable_list, inplace=True)
+            profiles_with_lat_lon = profiles_with_lat_lon.join(timeseries_id_with_count)
+            profiles_with_lat_lon.reset_index(inplace=True)
 
     if "profile_id" in profile_variables:
         # if subseted by profile_id there's only one per profile
-        profiles["n_profiles"] = 1
+        profiles_with_lat_lon["n_profiles"] = 1
 
     # Start profiles table
-    profiles = profiles.set_index(profile_variable_list)
+    profiles_with_lat_lon = profiles_with_lat_lon.set_index(profile_variable_list)
 
     for llat_variable in llat_variables_in_dataset:
+        # lat,lon have been removed. They are treated differently as it doesn't work to treat lat and lon separately
         if llat_variable in profile_variable_list:
             # If this variable is already use to distinqguish individual profiles just copy their values
-            profiles[llat_variable + "_min"] = profiles.index.get_level_values(
-                llat_variable
-            )
-            profiles[llat_variable + "_max"] = profiles.index.get_level_values(
-                llat_variable
-            )
+            val = profiles_with_lat_lon.index.get_level_values(llat_variable)
+            profiles_with_lat_lon[llat_variable + "_min"] = val
+            profiles_with_lat_lon[llat_variable + "_max"] = val
             continue
         # if this dataset is a single profile and actual_range is set, use that
         elif len(profiles) == 1 and df_variables.loc[llat_variable].get("actual_range"):
@@ -104,36 +122,21 @@ def get_profiles(dataset):
             if "NaN" in max:
                 max = datetime.utcnow().isoformat()
 
-            profiles[llat_variable + "_min"] = min
-            profiles[llat_variable + "_max"] = max
+            profiles_with_lat_lon[llat_variable + "_min"] = min
+            profiles_with_lat_lon[llat_variable + "_max"] = max
             continue
         else:
             variables = profile_variable_list + [llat_variable]
-
-            # Get the min max values from erddap
-            profile_min = dataset.get_max_min(variables, "Min")
-            profile_max = dataset.get_max_min(variables, "Max")
+            profile_min_max = dataset.get_max_min(variables)
 
             # Something went wrong
-            if profile_min.empty or profile_max.empty:
+            if profile_min_max.empty:
                 logger.error(f"No data found for  {dataset.id}")
-                # return empty df
-                return pd.DataFrame()
+                return profile_min_max
 
-        # setting same index so they can be joined more easily
-        profile_max.set_index(profile_variable_list, inplace=True)
-        profile_min.set_index(profile_variable_list, inplace=True)
+        profiles_with_lat_lon = profiles_with_lat_lon.join(profile_min_max)
 
-        # join this field's max and min
-        field_max_min = profile_min.join(
-            profile_max,
-            how="left",
-            lsuffix="_min",
-            rsuffix="_max",
-        )
-
-        # join the different max/min fields within the dataset
-        profiles = profiles.join(field_max_min)
+    profiles = profiles_with_lat_lon
 
     # Get Count for each dataset
     # First identify variables to use
@@ -141,23 +144,15 @@ def get_profiles(dataset):
     count_variables = profile_variable_list.copy()
 
     count_variables.append("time")
-    # if (
-    #     dataset.cdm_data_type == "TimeSeriesProfile"
-    #     and "depth" in dataset.variables_list
-    #     and "depth" not in count_variables
-    # ):
+
     if "depth" in dataset.variables_list:
         count_variables.append("depth")
 
-    # If time and depth are used as cf_roles grab the last variable
-    # if (
-    #     set(count_variables) == set(profile_variable_list)
-    #     and dataset.variables_list[-1] not in count_variables
-    # ):
-    #     count_variables.append(dataset.variables_list[-1])
-
     # Retrieve Count value per profile
-    profiles=profiles.query("(not time_min.isnull()) and not (time_max.isnull())")
+    profiles = profiles.query(
+        "(not time_min.isnull()) and not (time_max.isnull())"
+    ).copy()
+
     time_min = ERDDAP.parse_erddap_date(profiles["time_min"].min())
     time_max = ERDDAP.parse_erddap_date(profiles["time_max"].max())
 
@@ -166,7 +161,6 @@ def get_profiles(dataset):
     profile_count = dataset.get_count(
         count_variables, profile_variable_list, time_min, time_max
     )
-
     if not profile_count.empty:
         profiles["n_records"] = profile_count.set_index(profile_variable_list).max(
             axis="columns"
@@ -181,15 +175,16 @@ def get_profiles(dataset):
         logger.error("Error counting records")
         return profiles
 
+    profiles = profiles.reset_index(drop=False).copy()
+
     # Rename cf_role variables as cf_role and drop from index.
     # Eg rename 'station_id' to 'timeseries_id'
-    profiles.reset_index(drop=False, inplace=True)
-
+    # del profiles["STN_ID"]
     profiles.rename(
         columns={value: key for key, value in profile_variables.items()}, inplace=True
     )
 
-    # Convert time variables and add dataset_id
+    # Convert time variables and add dataset_id so the records can be linked to dataset in the DB
     profiles["time_min"] = ERDDAP.parse_erddap_dates(profiles["time_min"])
     profiles["time_max"] = ERDDAP.parse_erddap_dates(profiles["time_max"])
     profiles["dataset_id"] = dataset.id
@@ -216,15 +211,18 @@ def get_profiles(dataset):
 
     if not "profile_id" in profiles:
         profiles["profile_id"] = ""
+
     if not "timeseries_id" in profiles:
         profiles["timeseries_id"] = ""
 
-    cols_to_convert = ["latitude_min", "latitude_max", "longitude_min", "longitude_max"]
+    cols_to_convert = ["latitude", "longitude"]
+
     profiles[cols_to_convert] = profiles[cols_to_convert].apply(
         pd.to_numeric, errors="coerce"
     )
     # calculate records_per_day
     days = (profiles["time_max"] - profiles["time_min"]).dt.days
+
     # if the start and end date is same day
     days = days.replace(0, 1)
 
@@ -233,8 +231,8 @@ def get_profiles(dataset):
     profiles = profiles.astype(dtypes)
     profiles = profiles.round(4)
 
-    profiles_bad_geom_query = f"""((latitude_min <= -90) or (latitude_max >= 90) or  \
-                                (longitude_min <= -180) or (longitude_max >= 180) or  \
+    profiles_bad_geom_query = f"""((latitude <= -90) or (latitude >= 90) or  \
+                                (longitude <= -180) or (longitude >= 180) or  \
                                 (depth_max > 15000) or (depth_min < -100)) or \
                                 records_per_day.isnull()
                               """

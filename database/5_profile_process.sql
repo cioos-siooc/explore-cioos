@@ -11,7 +11,7 @@ update
         cioos_api.profiles
 set
         geom = st_transform(
-                ST_SetSRID(ST_MakePoint(longitude_min, latitude_min), 4326),
+                ST_SetSRID(ST_MakePoint(longitude, latitude), 4326),
                 3857
         )
 WHERE
