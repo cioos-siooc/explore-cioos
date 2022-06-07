@@ -7,7 +7,7 @@ setup(
     version="0.1",
     description="",
     url="",
-    packages=["erddap_scraper"],
+    packages=["erddap_scraper","erddap_scraper.ckan"],
     include_package_data=True,
     package_data={"": ["cde_to_goos_eov.json", "goos_eov_to_standard_name.json"]},
     install_requires=[
