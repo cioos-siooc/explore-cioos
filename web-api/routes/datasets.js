@@ -7,7 +7,7 @@ router.get("/", cache.route(), async function (req, res, next) {
   const SQL = `SELECT title, 
                       pk,
                       organization_pks,
-                      platform_type,
+                      platform,
                       json_build_object('en', title, 'fr', title_fr) title_translated
                       FROM cioos_api.datasets
                       ORDER BY UPPER(title)`

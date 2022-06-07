@@ -89,7 +89,7 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) 
           {platformColors.map((pc, index) => {
             return (
               <LegendElement
-                title={capitalizeFirstLetter(t(pc.platformType))}
+                title={capitalizeFirstLetter(t(pc.platform))}
                 open={legendOpen}
                 key={index}
               >

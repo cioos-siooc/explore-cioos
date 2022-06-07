@@ -26,6 +26,7 @@ router.get(
     // zoom levels: 0-4,5-6,7+
     const isHexGrid = z < 7;
     const zoomColumn = z < 5 ? "hex_zoom_0" : "hex_zoom_1";
+    const zoomPKColumn = z < 5 ? "hex_0_pk" : "hex_1_pk";
 
     // calculate the bounding polygon for this tile
     const sqlQuery = {
@@ -36,22 +37,20 @@ router.get(
     // not joining to cioos_api.points to get hexagons as that could be slower
     const SQL = `
   with relevent_points as (
-    ${isHexGrid ? " SELECT count(distinct point_pk) count," : " SELECT sum(p.days)::bigint count,"} array_to_json(array_agg(distinct dataset_pk)) datasets,     
-      ${isHexGrid ? "" : `d.l06_platform_code as platform,`} p.${
-      sqlQuery.geom_column
-    } AS geom FROM cioos_api.profiles p
+    ${isHexGrid ? `SELECT ${zoomPKColumn} pk,count(distinct point_pk) count,` : "SELECT point_pk pk, d.platform as platform,sum(p.days)::bigint count,"} array_to_json(array_agg(distinct dataset_pk)) datasets,     
+      p.${sqlQuery.geom_column} AS geom FROM cioos_api.profiles p
         -- used for organizations filtering
         JOIN cioos_api.datasets d
         ON p.dataset_pk = d.pk 
        ${filters ? "WHERE " + filters : ""}
         ${
           isHexGrid
-            ? `GROUP BY ${sqlQuery.geom_column}`
-            : "GROUP BY geom, d.l06_platform_code"
+            ? `GROUP BY ${zoomPKColumn},p.${sqlQuery.geom_column}`
+            : "GROUP BY geom,point_pk,platform"
         } ),
     te AS (select ST_TileEnvelope(${z}, ${x}, ${y}) tile_envelope ),
     mvtgeom AS (
-      SELECT row_number() over () pk,count, 
+      SELECT pk,count, 
        ${isHexGrid ? "" : "platform,"} datasets,
         ST_AsMVTGeom (
           relevent_points.geom,

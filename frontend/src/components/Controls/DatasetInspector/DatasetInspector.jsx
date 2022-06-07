@@ -8,7 +8,7 @@ import './styles.css'
 
 export default function DatasetInspector({ dataset, setInspectDataset }) {
   const { t } = useTranslation()
-  let platformColor = platformColors.filter(pc => pc.platformId === dataset.platform_code)
+  let platformColor = platformColors.filter(pc => pc.platform === dataset.platform)
   return (
     <div className='datasetInspector'>
       <div

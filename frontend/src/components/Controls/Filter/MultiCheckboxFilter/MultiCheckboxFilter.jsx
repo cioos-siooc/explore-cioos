@@ -67,7 +67,7 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
 
         let platformColor
         if (colored) {
-          platformColor = platformColors.filter(pc => pc.platformId === option.pk)
+          platformColor = platformColors.filter(pc => pc.platform === option.title)
           if (colored && _.isEmpty(platformColor)) {
             platformColor = '#000000'
           } else {
