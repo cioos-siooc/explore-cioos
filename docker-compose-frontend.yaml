@@ -5,7 +5,7 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
-      - "5050:4000"
+      - "8098:4000"
   frontend:
     build:
       context: ./frontend
