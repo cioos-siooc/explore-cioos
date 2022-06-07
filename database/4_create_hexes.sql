@@ -5,20 +5,23 @@ CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
 
   -- create tables to store the hex polygons. Once they are joined with cioos_api.points
   -- the polygons are copied over to that table
-  DROP TABLE IF EXISTS cioos_api.hexes_zoom_0;
-  CREATE TABLE cioos_api.hexes_zoom_0 AS SELECT geom from ST_HexagonGrid(
+ 
+
+  INSERT INTO cioos_api.hexes_zoom_0 (geom)  SELECT geom from ST_HexagonGrid(
           100000,
           st_setsrid(ST_EstimatedExtent('cioos_api','points', 'geom'),3857)
       ); 
+
   CREATE INDEX
     ON cioos_api.hexes_zoom_0
     USING GIST (geom);
 
-  DROP TABLE IF EXISTS cioos_api.hexes_zoom_1;
-  CREATE TABLE cioos_api.hexes_zoom_1 AS SELECT geom from ST_HexagonGrid(
+
+  INSERT INTO cioos_api.hexes_zoom_1 (geom) SELECT geom from ST_HexagonGrid(
           10000,
           st_setsrid(ST_EstimatedExtent('cioos_api','points', 'geom'),3857)
       ); 
+
   CREATE INDEX
     ON cioos_api.hexes_zoom_1
     USING GIST (geom);
@@ -34,29 +37,29 @@ CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
 
   -- takes a few mins, most zoomed out level
   with zoom as (
-  select p.pk,hexes.geom from cioos_api.hexes_zoom_0 AS hexes
+  select p.pk,hexes.geom, hexes.pk hex_pk from cioos_api.hexes_zoom_0 AS hexes
       inner JOIN cioos_api.points p
       ON ST_Intersects(p.geom, hexes.geom)
       )
   UPDATE cioos_api.points p
-  SET hex_zoom_0 = z.geom
+  SET hex_zoom_0 = z.geom, hex_0_pk=z.hex_pk
   FROM zoom AS z
   WHERE z.pk = p.pk  AND hex_zoom_0 is null;
 
   with zoom as ( 
-  select p.pk,hexes.geom from cioos_api.hexes_zoom_1 as hexes
+  select p.pk,hexes.geom,hexes.pk hex_pk from cioos_api.hexes_zoom_1 as hexes
       
       inner JOIN cioos_api.points p
       ON ST_Intersects(p.geom, hexes.geom)
       )
   UPDATE cioos_api.points p
-  SET hex_zoom_1 = z.geom
+  SET hex_zoom_1 = z.geom, hex_1_pk=z.hex_pk
   FROM zoom AS z
   WHERE z.pk = p.pk  AND hex_zoom_1 is null;     
 
   -- update the profiles table, this is denormalized for speed
   UPDATE cioos_api.profiles
-  SET hex_zoom_0=points.hex_zoom_0, hex_zoom_1=points.hex_zoom_1
+  SET hex_zoom_0=points.hex_zoom_0, hex_zoom_1=points.hex_zoom_1, hex_0_pk=points.hex_0_pk, hex_1_pk=points.hex_1_pk
   FROM cioos_api.points
   WHERE profiles.point_pk=points.pk;
 

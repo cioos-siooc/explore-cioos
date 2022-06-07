@@ -170,9 +170,8 @@ export default function App() {
     fetch(`${server}/platforms`).then(response => response.json()).then(platforms => {
       setPlatformsSelected(platforms.map((platform, index) => {
         return {
-          title: platform.platform_type,
+          title: platform,
           isSelected: false,
-          pk: platform.pk
         }
       }))
     }).catch(error => { throw error })
@@ -230,7 +229,7 @@ export default function App() {
         return {
           title: dataset.title,
           titleTranslated: dataset.title_translated,
-          platformType: dataset.platform_type,
+          platform: dataset.platform,
           isSelected: false,
           pk: dataset.pk
         }

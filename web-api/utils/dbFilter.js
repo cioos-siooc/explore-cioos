@@ -37,7 +37,7 @@ function createDBFilter(request) {
         .split(","))
         .map((platform) => `'${platform}'`).join();
 
-    filters.push(`platform_type = any(array[${platformsCommaSeparatedString}])`);
+    filters.push(`platform = any(array[${platformsCommaSeparatedString}])`);
   }
 
   if (timeMin) filters.push(`time_max >= '${timeMin}'::timestamptz`);

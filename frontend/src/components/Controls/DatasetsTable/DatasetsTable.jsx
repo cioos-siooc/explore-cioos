@@ -113,7 +113,7 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
         </thead>
         <tbody>
           {sortedData.map((point, index) => {
-            let platformColor = platformColors.filter(pc => pc.platformId === point.platform_code)
+            let platformColor = platformColors.filter(pc => pc.platform === point.platform)
             return (
               <tr key={index}
                 onMouseEnter={() => setHoveredDataset(point)}

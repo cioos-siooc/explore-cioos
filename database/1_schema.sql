@@ -2,6 +2,19 @@
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE schema cioos_api;
 
+ DROP TABLE IF EXISTS cioos_api.hexes_zoom_0;
+  CREATE TABLE cioos_api.hexes_zoom_0 (
+    pk serial PRIMARY KEY,
+    geom geometry(Polygon,3857)
+);  
+  DROP TABLE IF EXISTS cioos_api.hexes_zoom_1;
+
+CREATE TABLE cioos_api.hexes_zoom_1 (
+    pk serial PRIMARY KEY,
+    geom geometry(Polygon,3857)
+  );
+
+
 -- The scraper will skip datasets in this table
 DROP TABLE IF EXISTS cioos_api.skipped_datasets;
 CREATE TABLE cioos_api.skipped_datasets (
@@ -31,7 +44,6 @@ CREATE TABLE cioos_api.datasets (
     organization_pks INTEGER[],
     n_profiles integer,
     profile_variables text[],
-    l06_platform_code text,
     platform_type text,
     UNIQUE(dataset_id, erddap_url)
 );
@@ -43,6 +55,28 @@ CREATE TABLE cioos_api.organizations (
     name text UNIQUE,
     color text
 );
+
+
+
+-- One record per unique lat/long
+-- this table is mostly used to build hexes, its not queried by the API
+DROP TABLE IF EXISTS cioos_api.points;
+CREATE TABLE cioos_api.points (
+    pk serial PRIMARY KEY,
+    geom geometry(Point,3857),
+    -- these values are copied back into cioos_api.profiles
+    hex_zoom_0 geometry(Polygon,3857),
+    hex_zoom_1 geometry(Polygon,3857),
+    hex_0_pk integer REFERENCES cioos_api.hexes_zoom_0(pk),
+    hex_1_pk integer REFERENCES cioos_api.hexes_zoom_1(pk)
+);
+
+CREATE INDEX
+  ON cioos_api.points
+  USING GIST (geom);
+
+ 
+
 
 -- profiles/timeseries per dataset
 -- data comes via cioos_api.profiles_data_loader
@@ -68,6 +102,8 @@ CREATE TABLE cioos_api.profiles (
     -- hex polygon that this point is in for zoom 0 (zoomed out)
     hex_zoom_0 geometry(polygon,3857),
     hex_zoom_1 geometry(polygon,3857),
+    hex_0_pk integer references cioos_api.hexes_zoom_0(pk),
+    hex_1_pk integer references cioos_api.hexes_zoom_1(pk),
     point_pk INTEGER,
     days bigint,
     UNIQUE(erddap_url,dataset_id,timeseries_id,profile_id)
@@ -77,25 +113,10 @@ CREATE INDEX ON cioos_api.profiles USING GIST (geom);
 CREATE INDEX ON cioos_api.profiles USING GIST (hex_zoom_0);
 CREATE INDEX ON cioos_api.profiles USING GIST (hex_zoom_1);
 CREATE INDEX ON cioos_api.profiles(latitude);
-CREATE INDEX ON cioos_api.profiles(latitude);
+CREATE INDEX ON cioos_api.profiles(longitude);
 
 
--- One record per unique lat/long
--- this table is mostly used to build hexes, its not queried by the API
-DROP TABLE IF EXISTS cioos_api.points;
-CREATE TABLE cioos_api.points (
-    pk serial PRIMARY KEY,
-    geom geometry(Point,3857),
-    -- these values are copied back into cioos_api.profiles
-    hex_zoom_0 geometry(Polygon,3857),
-    hex_zoom_1 geometry(Polygon,3857)
-);
 
-CREATE INDEX
-  ON cioos_api.points
-  USING GIST (geom);
-
- 
 
 --
 DROP TABLE IF EXISTS cioos_api.download_jobs;
