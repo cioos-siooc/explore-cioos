@@ -44,11 +44,11 @@ function createDBFilter(request) {
   if (timeMax) filters.push(`time_min <= '${timeMax}'::timestamptz`);
 
   // This would be used if there was a rectangle selection for download
-  if (latMin) filters.push(`latitude_min >= '${latMin}'::double precision`);
-  if (latMax) filters.push(`latitude_min <= '${latMax}'::double precision`);
+  if (latMin) filters.push(`latitude >= '${latMin}'::double precision`);
+  if (latMax) filters.push(`latitude <= '${latMax}'::double precision`);
 
-  if (lonMin) filters.push(`longitude_min >= '${lonMin}'::double precision`);
-  if (lonMax) filters.push(`longitude_min <= '${lonMax}'::double precision`);
+  if (lonMin) filters.push(`longitude >= '${lonMin}'::double precision`);
+  if (lonMax) filters.push(`longitude <= '${lonMax}'::double precision`);
 
   // disabled until we get depth data into the database
   if (depthMin) filters.push(`depth_max >= '${depthMin}'::integer`);
