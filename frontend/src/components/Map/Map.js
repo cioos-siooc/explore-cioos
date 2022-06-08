@@ -10,7 +10,8 @@ import './styles.css'
 
 import { server } from '../../config'
 import { createDataFilterQueryString, generateColorStops, getCurrentRangeLevel, updateMapToolTitleLanguage } from "../../utilities"
-import { colorScale, defaultQuery, platformColors } from "../config"
+import { colorScale, defaultQuery } from "../config"
+import platformColors from '../../components/platformColors'
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
 export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, zoom, setZoom, offsetFlyTo, rangeLevels, hoveredDataset }) {
@@ -51,8 +52,10 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     ['get', 'platform'],
   ]
   platformColors.reduce((accumulatedPlatformColors, platformColor) => {
-    accumulatedPlatformColors.push(platformColor.platform)
-    accumulatedPlatformColors.push(platformColor.platformColor)
+    if(platformColor.color) {
+      accumulatedPlatformColors.push(platformColor.platform)
+      accumulatedPlatformColors.push(platformColor.color)
+    }
     return accumulatedPlatformColors
   }, colors)
   colors.push('#000000')

@@ -578,7 +578,7 @@ export default function App() {
         />
       }
       {currentRangeLevel &&
-        <Legend currentRangeLevel={currentRangeLevel} zoom={zoom} selectionPanelOpen={polygon && selectionPanelOpen} />
+        <Legend currentRangeLevel={currentRangeLevel} zoom={zoom} selectionPanelOpen={polygon && selectionPanelOpen} platformsInView={platformsSelected.map(e=>e.title)}/>
       }
       <button
         className='boxQueryButton'
