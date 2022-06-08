@@ -29,7 +29,7 @@ CREATE TABLE cioos_api.datasets (
     pk serial PRIMARY KEY,
     dataset_id text,
     erddap_url text,
-    platform text,
+    platform text NOT NULL,
     title TEXT,
     title_fr TEXT,
     summary TEXT,
@@ -44,7 +44,6 @@ CREATE TABLE cioos_api.datasets (
     organization_pks INTEGER[],
     n_profiles integer,
     profile_variables text[],
-    platform_type text,
     UNIQUE(dataset_id, erddap_url)
 );
 
@@ -173,26 +172,3 @@ CREATE OR REPLACE VIEW cioos_api.dataset_to_eov AS
      JOIN cioos_api.erddap_variables v ON v.dataset_pk =  d.pk
      JOIN cioos_api.eov_to_standard_name ets ON ets.standard_name = v.standard_name;
 
-DROP FUNCTION IF EXISTS range_intersection_length( numrange, numrange );
-CREATE OR REPLACE FUNCTION range_intersection_length(a numrange,b numrange )
-   RETURNS numeric 
-   LANGUAGE plpgsql
-  AS
-$$
-DECLARE 
-BEGIN
-RETURN upper(a*b)-lower(a*b);
-END;
-$$;
-
-DROP FUNCTION IF EXISTS range_intersection_length( tstzrange, tstzrange );
-CREATE OR REPLACE FUNCTION range_intersection_length(a tstzrange,b tstzrange )
-   RETURNS interval 
-   LANGUAGE plpgsql
-  as
-$$
-DECLARE 
-BEGIN
-RETURN upper(a*b)-lower(a*b);
-END;
-$$;
