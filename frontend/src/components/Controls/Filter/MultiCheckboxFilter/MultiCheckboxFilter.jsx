@@ -2,8 +2,7 @@ import * as React from 'react'
 import { CheckSquare, CircleFill, Square } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
-import { platformColors } from '../../../config.js'
-
+import platformColors from '../../../platformColors'
 import './styles.css'
 
 export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, translatable, colored, allOptions }) {
@@ -71,7 +70,7 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
           if (colored && _.isEmpty(platformColor)) {
             platformColor = '#000000'
           } else {
-            platformColor = platformColor[0].platformColor
+            platformColor = platformColor[0].color
           }
         }
         // No translation

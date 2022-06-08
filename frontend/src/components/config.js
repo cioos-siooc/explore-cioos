@@ -15,44 +15,6 @@ export const defaultQuery = {
 };
 
 export const colorScale = ["#52A79B", "#4A968C", "#3D7B73", "#2F6059", "#224440", "#1B3733", "#142926"]
-export const platformColors = [
-  {
-    platform: 'coastal structure',
-    platformColor: '#f08080'
-  },
-  {
-    platform: 'fixed benthic node',
-    platformColor: '#ba55d3'
-  },
-  {
-    platform: 'land/onshore structure',
-    platformColor: '#ff4500'
-  },
-  {
-    platform: 'moored surface buoy',
-    platformColor: '#ffa500'
-  },
-  {
-    platform: 'mooring',
-    platformColor: '#e55e5e'
-  },
-  {
-    platform: 'self-propelled small boat',
-    platformColor: '#2e8b57'
-  },
-  {
-    platform: 'ship',
-    platformColor: '#52a79b'
-  },
-  {
-    platform: 'subsurface mooring',
-    platformColor: '#0000ff'
-  },
-  {
-    platform: 'unknown',
-    platformColor: '#000000'
-  }
-]
 
 export const languages = [
   {

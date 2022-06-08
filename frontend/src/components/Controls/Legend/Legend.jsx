@@ -5,13 +5,14 @@ import { ChevronCompactLeft, ChevronCompactRight, CircleFill, HexagonFill } from
 import * as _ from 'lodash'
 
 import { capitalizeFirstLetter, useOutsideAlerter, generateColorStops } from '../../../utilities.js'
-import { colorScale, platformColors } from '../../config.js'
+import { colorScale } from '../../config.js'
+import platformColors from '../../platformColors'
 
 import './styles.css'
 import LegendElement from './LegendElement.jsx/LegendElement.jsx'
 import classNames from 'classnames'
 
-export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) {
+export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen, platformsInView }) {
   const { t } = useTranslation()
   const [legendOpen, setLegendOpen] = useState(true)
 
@@ -86,16 +87,16 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen }) 
             {t('legendSectionColor')}
             {/* Color */}
           </LegendElement>
-          {platformColors.map((pc, index) => {
-            return (
-              <LegendElement
-                title={capitalizeFirstLetter(t(pc.platform))}
-                open={legendOpen}
-                key={index}
-              >
-                <CircleFill size={15} fill={pc.platformColor} />
-              </LegendElement>
-            )
+          {platformColors.filter(pc=>platformsInView.includes(pc.platform)).map(pc => {
+              return (
+                <LegendElement
+                  title={capitalizeFirstLetter(t(pc.platform))}
+                  open={legendOpen}
+                  key={pc.platform}
+                >
+                  <CircleFill size={15} fill={pc.color} />
+                </LegendElement>
+              )
           })}
         </>
       )

@@ -3,7 +3,7 @@ import { ChevronCompactLeft, CircleFill } from 'react-bootstrap-icons'
 import { Container, Table } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 
-import { platformColors } from '../../config'
+import platformColors from '../../platformColors'
 import './styles.css'
 
 export default function DatasetInspector({ dataset, setInspectDataset }) {
@@ -30,7 +30,7 @@ export default function DatasetInspector({ dataset, setInspectDataset }) {
           <div>
             <CircleFill className='optionColorCircle'
               size='15'
-              fill={!_.isEmpty(platformColor) ? platformColor[0].platformColor : '#000000'}
+              fill={!_.isEmpty(platformColor) ? platformColor[0].color : '#000000'}
             />
             {dataset.title}
           </div>

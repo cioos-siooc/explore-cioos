@@ -5,8 +5,7 @@ import { Table } from 'react-bootstrap'
 import { ArrowDown, ArrowUp, CheckSquare, ChevronCompactRight, CircleFill, SortAlphaDown, SortAlphaUp, SortNumericDown, SortNumericUp, Square } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import { abbreviateString, bytesToMemorySizeString } from '../../../utilities'
-import { platformColors } from '../../config'
-
+import platformColors from '../../platformColors'
 import './styles.css'
 
 export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDataset, datasets, setDatasets, selectAll, setInspectDataset, setHoveredDataset }) {
@@ -134,7 +133,7 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                   title={point.title}
                   onClick={() => setInspectDataset(point)}
                 >
-                  {<CircleFill className='optionColorCircle' fill={!_.isEmpty(platformColor) ? platformColor[0].platformColor : '#000000'} size='15' />}
+                  {<CircleFill className='optionColorCircle' fill={!_.isEmpty(platformColor) ? platformColor[0].color : '#000000'} size='15' />}
                   {abbreviateString(point.title, 35)}
                 </td>
                 <td
