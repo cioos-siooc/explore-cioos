@@ -77,6 +77,14 @@ export default function DatasetInspector({ dataset, setInspectDataset }) {
           </div>
           <hr />
           <h6>
+            {t('datasetInspectorPlatformText')}
+            {/* Platform */}
+          </h6>
+          <div>
+            {t(dataset.platform)}
+          </div>
+          <hr />
+          <h6>
             {/* Records ... records total, 1000 shown*/}
             {t('datasetInspectorRecordsText')} ({dataset && dataset.profiles_count > 1000 ? `${dataset.profiles_count} ${t('datasetInspectorRecordsOverflowText')}` : dataset.profiles_count})
           </h6>

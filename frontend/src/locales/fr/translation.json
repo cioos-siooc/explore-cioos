@@ -90,6 +90,7 @@
   "datasetInspectorCKANURL": "Métadonnées",
   "datasetInspectorOrganizationText": "Organisations",
   "datasetInspectorOceanVariablesText": "Variables océaniques",
+  "datasetInspectorPlatformText": "Plate-forme",
   "datasetInspectorRecordsText": "enregistrements",
   "datasetInspectorRecordsOverflowText": " enregistrements au total, 1000 affichés",
   "datasetInspectorRecordIDText": "Identifiant d'enregistrement",

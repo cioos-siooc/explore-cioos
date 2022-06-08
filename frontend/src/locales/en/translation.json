@@ -90,6 +90,7 @@
   "datasetInspectorCKANURL": "Metadata",
   "datasetInspectorOrganizationText": "Organizations",
   "datasetInspectorOceanVariablesText": "Ocean Variables",
+  "datasetInspectorPlatformText": "Platform",
   "datasetInspectorRecordsText": "Records",
   "datasetInspectorRecordsOverflowText": " records total, 1000 shown",
   "datasetInspectorRecordIDText": "Record ID",
