@@ -171,6 +171,7 @@ export default function App() {
       setPlatformsSelected(platforms.map((platform, index) => {
         return {
           title: platform,
+          pk: platform,
           isSelected: false,
         }
       }))
