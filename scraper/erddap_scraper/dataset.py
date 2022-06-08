@@ -28,7 +28,7 @@ class Dataset(object):
         self.erddap_csv_to_df = erddap_server.erddap_csv_to_df
         self.cdm_data_type = ""
         self.globals = {}
-        self.platform = ""
+        self.platform = "unknown"
         self.df_variables = None
         self.variables_list = []
         self.profile_variable_list = []
