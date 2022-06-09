@@ -79,10 +79,10 @@ Flush redis tile cache:
 1. Install [Docker](https://docs.docker.com/get-docker/) and [Docker compose](https://docs.docker.com/compose/install/). New versions of Docker include `docker-compose`
 1. Rename .env.sample to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
 1. `docker-compose up -d` to start all services. This will take a few minute to download, build, create the database schema.
-1. Start your python3 environment, eg `python3 -m venv venv && source venv/bin/activate`
-1. Run scraper to load data. From this directory, run:
-   `sh data_loader.sh` to load all data or `sh data_loader_test.sh` to just load one dataset for testing purposes
-1. See website at <http://localhost:5050>
+1. Start your python 3.9 or greater environment, eg `python3 -m venv venv && source venv/bin/activate`
+1. `pip install -e ./scraper`
+1. Run scraper to load data. From this directory, run: `sh data_loader_test.sh` to just load one dataset for testing purposes
+1. See website at <http://localhost:8098>
 
 ## Production deployment
 
