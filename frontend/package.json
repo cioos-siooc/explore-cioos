@@ -17,7 +17,6 @@
     "i18next-browser-languagedetector": "^6.1.4",
     "i18next-http-backend": "^1.4.1",
     "lodash": "^4.17.21",
-    "mapbox-gl": "^2.8.2",
     "mapbox-gl-draw-rectangle-mode": "^1.0.4",
     "maplibre-gl": "^2.1.9",
     "prop-types": "^15.8.1",
