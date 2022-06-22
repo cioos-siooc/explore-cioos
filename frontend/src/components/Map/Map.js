@@ -433,6 +433,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     };
 
     map.current.on('mousemove', 'points', e => {
+      map.current.getCanvas().style.cursor = 'pointer'
       var coordinates = e.features[0].geometry.coordinates.slice()
       popup
         .setLngLat(coordinates)
@@ -446,10 +447,12 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     })
 
     map.current.on('mouseleave', 'points', () => {
+      map.current.getCanvas().style.cursor = 'grab'
       popup.remove()
     })
 
     map.current.on('mousemove', "hexes", e => {
+      map.current.getCanvas().style.cursor = 'pointer'
       var coordinates = [e.lngLat.lng, e.lngLat.lat]
       var description = e.features[0].properties.count
 
@@ -460,6 +463,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     })
 
     map.current.on('mouseleave', 'hexes', () => {
+      map.current.getCanvas().style.cursor = 'grab'
       popup.remove()
     })
 
