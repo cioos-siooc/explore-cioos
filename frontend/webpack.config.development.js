@@ -1,4 +1,3 @@
-const path = require("path");
 const HtmlWebPackPlugin = require("html-webpack-plugin");
 const { CleanWebpackPlugin } = require("clean-webpack-plugin");
 const { DefinePlugin } = require("webpack");
@@ -8,17 +7,12 @@ module.exports = {
   devServer: {
     port: 8000,
   },
-  entry: "./src/",
-  output: {
-    // filename: 'main.js',
-    path: path.resolve(__dirname, "dist"),
-  },
+  entry:  './src/',
   resolve: {
     alias: {
       "mapbox-gl": "maplibre-gl",
     },
   },
-  devtool: "source-map",
   mode: "development",
   module: {
     rules: [
@@ -30,38 +24,9 @@ module.exports = {
         },
       },
       {
-        test: /\.html$/,
-        use: [
-          {
-            loader: "html-loader",
-          },
-        ],
-      },
-      {
         test: /\.css$/i,
         use: ["style-loader", "css-loader"],
       },
-      {
-        test: /\.(csv|tsv)$/,
-        loader: "csv-loader",
-        options: {
-          dynamicTyping: true,
-          header: true,
-          skipEmptyLines: true,
-        },
-      },
-      {
-        test: /\.(png|jpe?g|gif|svg)$/i,
-        use: [
-          {
-            loader: "file-loader",
-          },
-        ],
-      },
-      // {
-      //   test: /\.svg$/,
-      //   loader: 'svg-inline-loader'
-      // }
     ],
   },
   plugins: [
@@ -69,6 +34,7 @@ module.exports = {
     new HtmlWebPackPlugin({
       template: "./src/index.html",
       filename: "./index.html",
+      favicon: "./public/ICON_color_dark_bkg.svg"
     }),
     new DefinePlugin({
       "process.env.API_URL": JSON.stringify(process.env.API_URL),
