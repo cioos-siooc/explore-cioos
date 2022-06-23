@@ -46,11 +46,7 @@ def main(folder):
     variables = pd.read_csv(variables_file)
     skipped_datasets = pd.read_csv(skipped_datasets_file)
 
-    profiles["hex_zoom_0"] = None
-    profiles["hex_zoom_1"] = None
-
     datasets["eovs"] = datasets["eovs"].apply(ast.literal_eval)
-    datasets["organization_pks"] = None
     datasets["organizations"] = datasets["organizations"].apply(ast.literal_eval)
     datasets["profile_variables"] = datasets["profile_variables"].apply(
         ast.literal_eval

@@ -36,7 +36,7 @@ def setup_logging(log_time):
     root.addHandler(handler)
 
 
-def main(erddap_urls, cache_requests):
+def main(erddap_urls, cache_requests, folder):
     erddap_urls = args.erddap_urls.split(",")
     limit_dataset_ids = None
     if args.dataset_ids:
@@ -67,9 +67,9 @@ def main(erddap_urls, cache_requests):
         variables = pd.concat([variables, variable])
         skipped_datasets = pd.concat([skipped_datasets, skipped_dataset])
 
-    uuid_suffix = str(uuid.uuid4())[0:6]
-    folder = "harvest_" + uuid_suffix
-    os.makedirs(folder)
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
     datasets_file = f"{folder}/datasets.csv"
     profiles_file = f"{folder}/profiles.csv"
     variables_file = f"{folder}/variables.csv"
@@ -183,6 +183,12 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--folder",
+        help="Folder to save harvested data to",
+        default="harvest_",
+    )
+
+    parser.add_argument(
         "--log-level",
         default="debug",
         help="Provide logging level. Example --loglevel debug, default=debug",
@@ -194,4 +200,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     setup_logging(args.log_time)
 
-    main(args.erddap_urls, args.cache)
+    main(args.erddap_urls, args.cache, args.folder)
