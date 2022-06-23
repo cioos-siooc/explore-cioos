@@ -47,12 +47,8 @@ export default class RangeSelector extends React.Component {
             height: 2
           }}
           handleStyle={{
-            height: 28,
-            width: 28,
-            marginLeft: -14,
-            marginTop: -14,
-            // backgroundColor: "red",
-            border: 0
+            height: 15,
+            width: 15
           }}
           trackStyle={{
             background: "none"
