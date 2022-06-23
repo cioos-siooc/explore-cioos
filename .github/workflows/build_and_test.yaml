@@ -32,6 +32,9 @@ jobs:
 
     - name: Run ERDDAP harvester on sample dataset
       run: python -m erddap_scraper https://data.cioospacific.ca/erddap/ --dataset_ids DFO_MEDS_BUOYS
+    
+    - name: Load harvested data into the DB
+      run: python -m cde_db_loader harvest_*
 
     - name: Install node
       uses: actions/setup-node@v3
