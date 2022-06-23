@@ -115,18 +115,20 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
             print("Error occurred at ", erddap_url, dataset_id)
             skipped_datasets_reasons += skipped_reason(UNKNOWN_ERROR)
 
-    df_skipped_datasets = pd.DataFrame()
+    skipped_datasets_columns = ["erddap_url", "dataset_id", "reason_code"]
 
     if skipped_datasets_reasons:
         df_skipped_datasets = pd.DataFrame(
             skipped_datasets_reasons,
-            columns=["erddap_url", "dataset_id", "reason_code"],
+            columns=skipped_datasets_columns,
         )
 
         # logger.info(record_count)
         logger.info(
             f"skipped: {len(df_skipped_datasets)} datasets: {df_skipped_datasets['dataset_id'].to_list()}"
         )
+    else:
+        df_skipped_datasets = pd.DataFrame(columns=skipped_datasets_columns)
 
     # using 'result' to return data from each thread
     result.append(
