@@ -2,6 +2,7 @@ import React from "react";
 import PropTypes from 'prop-types'
 import Slider from "rc-slider";
 import 'rc-slider/assets/index.css';
+
 import './styles.css'
 
 export default class RangeSelector extends React.Component {
@@ -54,19 +55,12 @@ export default class RangeSelector extends React.Component {
             background: "none"
           }}
           marks={{
-            // "-100": '-100',
             0: '0m',
-            // 1000: '1000m',
             2000: '2000m',
-            // 3000: '3000m',
             4000: '4000m',
-            // 5000: '5000m',
             6000: '6000m',
-            // 7000: '7000m',
             8000: '8000m',
-            // 9000: '9000m',
             10000: '10000m',
-            // 11000: '11000m',
             12000: '12000m'
           }}
         />
