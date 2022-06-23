@@ -14,7 +14,7 @@ The erddap scraper also calls the CKAN scraper
   `python -m erddap_scraper https://catalogue.hakai.org/erddap --dataset_ids HakaiQuadraBoLResearch`
 
 - Create CSVs only, dont write to DB:
-  `python -m erddap_scraper https://catalogue.hakai.org/erddap --csv-only`
+  `python -m erddap_scraper https://catalogue.hakai.org/erddap`
 
 - Use request caching, when this is run twice the second one should use cached responses
   `python -m erddap_scraper https://catalogue.hakai.org/erddap --cache`
