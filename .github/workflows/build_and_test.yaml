@@ -27,8 +27,8 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     
-    - name: Install ERDDAP harvester
-      run: pip install -q ./scraper
+    - name: Install ERDDAP harvester and db loader
+      run: pip install -q ./scraper ./db-loader
 
     - name: Run ERDDAP harvester on sample dataset
       run: python -m erddap_scraper https://data.cioospacific.ca/erddap/ --dataset_ids DFO_MEDS_BUOYS --folder erddap_harvest
