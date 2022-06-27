@@ -7,7 +7,7 @@ module.exports = {
   devServer: {
     port: 8000,
   },
-  entry:  './src/',
+  entry: './src/',
   resolve: {
     alias: {
       "mapbox-gl": "maplibre-gl",
@@ -26,6 +26,14 @@ module.exports = {
       {
         test: /\.css$/i,
         use: ["style-loader", "css-loader"],
+      },
+      {
+        test: /\.(png|jpe?g|gif|svg)$/i,
+        use: [
+          {
+            loader: "file-loader",
+          },
+        ],
       },
     ],
   },
