@@ -27,7 +27,7 @@ def get_profiles(dataset):
     For ONC we can't get max min values for profiles but we can get it for the entire dataset. This works because
     they only use one profile per dataset
 
-    llat_variables_in_dataset is any of latitude/longitude/time/depth variables that exist in this dataset
+    llat_variables_in_dataset is any of time, depth variables that exist in this dataset
 
     Example of profile_variable is: {'profile_id': 'hakai_id', 'timeseries_id': 'station'}
 
@@ -54,7 +54,6 @@ def get_profiles(dataset):
     profiles = profiles_with_lat_lon[
         profiles_with_lat_lon.columns.difference(["latitude", "longitude"])
     ].drop_duplicates()
-
     # Organize dataset variables by their cf_roles
     # eg profile_variable={'profile_id': 'hakai_id', 'timeseries_id': 'station'}
     profile_variables = dataset.profile_variables
