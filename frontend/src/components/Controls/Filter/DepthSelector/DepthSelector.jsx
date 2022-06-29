@@ -1,14 +1,11 @@
 import * as React from "react"
 import { useState, useEffect } from "react"
 import PropTypes from "prop-types"
-import RangeSelector from "../RangeSelector/RangeSelector.jsx"
 import { useTranslation } from "react-i18next"
-
-import "react-bootstrap-range-slider/dist/react-bootstrap-range-slider.css"
-import "rc-slider/assets/index.css"
-
-import './styles.css'
 import { X } from "react-bootstrap-icons"
+
+import RangeSelector from "../RangeSelector/RangeSelector.jsx"
+import './styles.css'
 
 export default function DepthSelector(props) {
   const { t } = useTranslation()
