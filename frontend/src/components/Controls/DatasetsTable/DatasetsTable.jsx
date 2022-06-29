@@ -8,7 +8,7 @@ import { abbreviateString, bytesToMemorySizeString } from '../../../utilities'
 import platformColors from '../../platformColors'
 import './styles.css'
 
-export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDataset, datasets, setDatasets, selectAll, setInspectDataset, setHoveredDataset }) {
+export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDataset, datasets, setDatasets, selectAll, setInspectDataset, setHoveredDataset = () => { } }) {
   const { t } = useTranslation()
   const [sortedData, setSortedData] = useState(datasets)
   const [sortProp, setSortProp] = useState('title')
@@ -115,8 +115,8 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
             let platformColor = platformColors.filter(pc => pc.platform === point.platform)
             return (
               <tr key={index}
-                // onMouseEnter={() => setHoveredDataset(point)}
-                // onMouseLeave={() => setHoveredDataset()}
+                onMouseEnter={() => setHoveredDataset(point)}
+                onMouseLeave={() => setHoveredDataset()}
               >
                 <td
                   onClick={() => {

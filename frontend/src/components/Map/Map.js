@@ -52,7 +52,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     ['get', 'platform'],
   ]
   platformColors.reduce((accumulatedPlatformColors, platformColor) => {
-    if(platformColor.color) {
+    if (platformColor.color) {
       accumulatedPlatformColors.push(platformColor.platform)
       accumulatedPlatformColors.push(platformColor.color)
     }
@@ -141,15 +141,15 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     }
   }
 
-  // useEffect(() => {
-  //   if (map.current) {
-  //     if (!_.isEmpty(hoveredDataset)) {
-  //       hoverHighlightPoints(hoveredDataset.pk)
-  //     } else {
-  //       hoverHighlightPoints()
-  //     }
-  //   }
-  // }, [hoveredDataset])
+  useEffect(() => {
+    if (map.current) {
+      if (!_.isEmpty(hoveredDataset)) {
+        hoverHighlightPoints(hoveredDataset.pk)
+      } else {
+        hoverHighlightPoints()
+      }
+    }
+  }, [hoveredDataset])
 
   function highlightPoints(polygon) {
     var features = map.current.queryRenderedFeatures({ layers: ['points'] }).map(point => {
