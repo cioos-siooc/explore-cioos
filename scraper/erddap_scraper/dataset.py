@@ -114,7 +114,27 @@ class Dataset(object):
             f"{','.join(profile_variable_list + lat_lng)}&distinct()"
         )
 
+        profile_ids["latlon"] = (
+            profile_ids["latitude"].astype(str)
+            + ","
+            + profile_ids["longitude"].astype(str)
+        )
+        profiles_with_multiple_locations = (
+            profile_ids.groupby(profile_variable_list)
+            .count()[["latlon"]]
+            .query("latlon>1")
+            .index.to_list()
+        )
+        del profile_ids["latlon"]
+
         profile_ids = profile_ids.drop_duplicates(profile_variable_list)
+
+        if profiles_with_multiple_locations:
+            self.logger.warn(
+                "Non unique lat/lon found within profiles:"
+                + str(profiles_with_multiple_locations)
+            )
+
         self.profile_ids = profile_ids
         return profile_ids
 
