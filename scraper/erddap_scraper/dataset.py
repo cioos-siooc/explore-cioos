@@ -40,7 +40,7 @@ class Dataset(object):
             {
                 "title": [self.globals["title"]],
                 "summary": [self.globals["summary"]],
-                "erddap_url": [self.erddap_url],
+                "erddap_url": [self.erddap_server.url],
                 "dataset_id": [self.id],
                 "cdm_data_type": [self.cdm_data_type],
                 "platform": [self.platform],
@@ -189,7 +189,7 @@ class Dataset(object):
         return df_count
 
     def get_data_access_form_url(self):
-        return self.erddap_url + "/tabledap/" + self.id + ".html"
+        return self.erddap_server.url + "/tabledap/" + self.id + ".html"
 
     def get_eovs(self):
         eovs = []
@@ -252,7 +252,7 @@ class Dataset(object):
             }
         )
 
-        df_variables["erddap_url"] = self.erddap_url
+        df_variables["erddap_url"] = self.erddap_server.url
         df_variables["dataset_id"] = self.id
         df_global = df.query('`Variable Name`=="NC_GLOBAL"')[
             ["Attribute Name", "Value"]
