@@ -3,7 +3,6 @@ import logging
 import os
 import sys
 import threading
-import uuid
 
 import numpy as np
 import pandas as pd
@@ -74,7 +73,7 @@ def main(erddap_urls, cache_requests, folder):
     profiles_file = f"{folder}/profiles.csv"
     variables_file = f"{folder}/variables.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
-    ckan_file = f"ckan.csv"
+    ckan_file = f"{folder}/ckan.csv"
 
     if datasets.empty:
         print("No datasets scraped")
@@ -185,7 +184,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--folder",
         help="Folder to save harvested data to",
-        default="harvest_",
+        default="harvest",
     )
 
     parser.add_argument(
