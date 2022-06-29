@@ -45,6 +45,10 @@ jobs:
       working-directory: ./test
       run: npm ci --quiet
 
+    - name: Test API endpoints
+      working-directory: ./test
+      run: node frontend_loads_without_errors.js
+
     - name: Test frontend loads without errors
       working-directory: ./test
       run: node frontend_loads_without_errors.js
