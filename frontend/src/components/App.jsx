@@ -441,7 +441,6 @@ export default function App() {
             searchable
             translatable
             allOptions={eovsSelected}
-            translatable
           />
         </Filter>
         <Filter
@@ -579,7 +578,7 @@ export default function App() {
         />
       }
       {currentRangeLevel &&
-        <Legend currentRangeLevel={currentRangeLevel} zoom={zoom} selectionPanelOpen={polygon && selectionPanelOpen} platformsInView={platformsSelected.map(e=>e.title)}/>
+        <Legend currentRangeLevel={currentRangeLevel} zoom={zoom} selectionPanelOpen={polygon && selectionPanelOpen} platformsInView={platformsSelected.map(e => e.title)} />
       }
       <button
         className='boxQueryButton'
