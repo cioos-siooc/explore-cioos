@@ -7,19 +7,19 @@ module.exports = {
   entry: {
     main: './src/',
     vendor: [
-          "@sentry/react",
-          "@turf/turf",
-          "bootstrap",
-          "lodash",
-          "maplibre-gl",
-          "react-bootstrap-icons",
-          "react-dom",
-        ]
-     },
- output: {
-  path: path.resolve(__dirname, 'dist'),
-   filename: "[name].[chunkhash].js",
-   },
+      "@sentry/react",
+      "@turf/turf",
+      "bootstrap",
+      "lodash",
+      "maplibre-gl",
+      "react-bootstrap-icons",
+      "react-dom",
+    ]
+  },
+  output: {
+    path: path.resolve(__dirname, 'dist'),
+    filename: "[name].[chunkhash].js",
+  },
 
   resolve: {
     alias: {
@@ -39,6 +39,10 @@ module.exports = {
       {
         test: /\.css$/i,
         use: ["style-loader", "css-loader"],
+      },
+      {
+        test: /\.(png|jpe?g|gif|svg)$/i,
+        type: "asset/resource",
       },
     ],
   },
