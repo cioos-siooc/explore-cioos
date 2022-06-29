@@ -91,8 +91,6 @@ class ERDDAP(object):
         url_combined = self.url + url
         logger.debug(unquote(url_combined))
 
-        # response = self.session.get(url_combined)
-
         response = None
         if self.cache_requests:
             cache = self.cache
@@ -104,6 +102,15 @@ class ERDDAP(object):
                 cache[url_combined] = response
         else:
             response = self.session.get(url_combined)
+            original_hostname = urlparse(url_combined).hostname
+            actual_hostname = urlparse(response.url).hostname
+
+            if original_hostname != actual_hostname:
+                # redirect due to EDDTableFromErddap
+                self.url = response.url.split("/erddap")[0] + "/erddap"
+                self.logger.debug(
+                    "Redirecting " + original_hostname + "to" + actual_hostname
+                )
 
         no_data = False
         # Newer erddaps respond with 404 for no data
