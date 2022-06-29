@@ -7,7 +7,6 @@ import './styles.css'
 
 export default function Controls({ selectionPanel, loading, children }) {
   const childrenArray = React.Children.toArray(children)
-
   return (
     <div className={`controls ${loading === true && 'disabled'}`}>
       <Container fluid>

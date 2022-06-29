@@ -140,5 +140,6 @@
   "stableCarbonIsotopes": "Isotopes stables du carbone",
   "temperature": "Température",
   "transientTracers": "Traceurs transitoires",
-  "zooplanktonBiomassAndDiversity": "Zooplancton"
+  "zooplanktonBiomassAndDiversity": "Zooplancton",
+  "errorBoundaryMessage": "Erreur. Recharger la demande."
 }
