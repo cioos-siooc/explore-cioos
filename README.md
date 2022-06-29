@@ -8,7 +8,7 @@
 1. Rename .env.sample to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
 1. `docker-compose up -d` to start all services. This will take a few minute to download, build, create the database schema.
 1. Start your python 3.9 or greater environment, eg `python3 -m venv venv && source venv/bin/activate`
-1. `pip install -e ./scraper`
+1. `pip install -e ./scraper ./db-loader`
 1. Run scraper to load data. From this directory, run: `sh data_loader_test.sh` to just load one dataset for testing purposes
 1. See website at <http://localhost:8098>
 
@@ -25,7 +25,7 @@
   ```sh
   python3 -m venv venv
   source venv/bin/activate
-  pip install -e ./downloader ./download_scheduler ./scraper
+  pip install -e ./downloader ./download_scheduler ./scraper ./db-loader
   ```
 
 - Start the API:
@@ -102,7 +102,7 @@ From the production server,
 
   ```sh
   source venv/bin/activate
-  pip install -e ./scraper
+  pip install -e ./scraper./db-loader
   sh data_loader.sh
   ```
 

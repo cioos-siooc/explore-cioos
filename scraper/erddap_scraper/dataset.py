@@ -40,7 +40,7 @@ class Dataset(object):
             {
                 "title": [self.globals["title"]],
                 "summary": [self.globals["summary"]],
-                "erddap_url": [self.erddap_url],
+                "erddap_url": [self.erddap_server.url],
                 "dataset_id": [self.id],
                 "cdm_data_type": [self.cdm_data_type],
                 "platform": [self.platform],
@@ -114,7 +114,27 @@ class Dataset(object):
             f"{','.join(profile_variable_list + lat_lng)}&distinct()"
         )
 
+        profile_ids["latlon"] = (
+            profile_ids["latitude"].astype(str)
+            + ","
+            + profile_ids["longitude"].astype(str)
+        )
+        profiles_with_multiple_locations = (
+            profile_ids.groupby(profile_variable_list)
+            .count()[["latlon"]]
+            .query("latlon>1")
+            .index.to_list()
+        )
+        del profile_ids["latlon"]
+
         profile_ids = profile_ids.drop_duplicates(profile_variable_list)
+
+        if profiles_with_multiple_locations:
+            self.logger.warn(
+                "Non unique lat/lon found within profiles:"
+                + str(profiles_with_multiple_locations)
+            )
+
         self.profile_ids = profile_ids
         return profile_ids
 
@@ -189,7 +209,7 @@ class Dataset(object):
         return df_count
 
     def get_data_access_form_url(self):
-        return self.erddap_url + "/tabledap/" + self.id + ".html"
+        return self.erddap_server.url + "/tabledap/" + self.id + ".html"
 
     def get_eovs(self):
         eovs = []
@@ -252,7 +272,7 @@ class Dataset(object):
             }
         )
 
-        df_variables["erddap_url"] = self.erddap_url
+        df_variables["erddap_url"] = self.erddap_server.url
         df_variables["dataset_id"] = self.id
         df_global = df.query('`Variable Name`=="NC_GLOBAL"')[
             ["Attribute Name", "Value"]
