@@ -1,4 +1,4 @@
-const puppeteer = require("puppeteer");
+import puppeteer from "puppeteer";
 const errors = [];
 
 /***
@@ -8,7 +8,7 @@ const errors = [];
  */
 
 // url of frontend
-url = "http://localhost:8098";
+const url = "http://localhost:8098";
 
 (async () => {
   const browser = await puppeteer.launch();
