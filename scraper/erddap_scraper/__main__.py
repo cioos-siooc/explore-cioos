@@ -147,12 +147,17 @@ def main(erddap_urls, cache_requests, folder):
 
     print("Adding", len(datasets), "datasets and", len(profiles), "profiles")
 
-    datasets.to_csv(datasets_file, index=False)
-    profiles.to_csv(profiles_file, index=False)
-    variables.to_csv(variables_file, index=False)
+    # drop duplicates caused by EDDTableFromErddap redirects
+    datasets.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
+        datasets_file, index=False
+    )
+    profiles.drop_duplicates().to_csv(profiles_file, index=False)
+    variables.drop_duplicates().to_csv(variables_file, index=False)
     df_ckan.to_csv(ckan_file, index=False)
-    skipped_datasets.to_csv(skipped_datasets_file, index=False)
-    df_cde_eov_to_standard_name.to_csv("df_cde_eov_to_standard_name.csv", index=False)
+    skipped_datasets.drop_duplicates().to_csv(skipped_datasets_file, index=False)
+    df_cde_eov_to_standard_name.drop_duplicates().to_csv(
+        "df_cde_eov_to_standard_name.csv", index=False
+    )
     print(
         "Wrote",
         datasets_file,
