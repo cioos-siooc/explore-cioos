@@ -236,5 +236,6 @@
   "drifting subsurface float":"Drifting subsurface float",
   "rocket":"Rocket",
   "propelled manned submersible":"Propelled manned submersible",
-  "research aeroplane":"Research aeroplane"
+  "research aeroplane":"Research aeroplane",
+  "errorBoundaryMessage": "Error. Reload Application."
 }

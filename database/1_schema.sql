@@ -27,18 +27,15 @@ CREATE TABLE cioos_api.skipped_datasets (
 DROP TABLE IF EXISTS cioos_api.datasets;
 CREATE TABLE cioos_api.datasets (
     pk serial PRIMARY KEY,
-    dataset_id text,
-    erddap_url text,
-    platform text NOT NULL,
+    dataset_id TEXT,
+    erddap_url TEXT,
+    platform TEXT,
     title TEXT,
     title_fr TEXT,
     summary TEXT,
     summary_fr TEXT,
     cdm_data_type text,
     organizations text[],
-    ckan_record jsonb,
-    profile_variable text,
-    ckan_url text,
     eovs text[],
     ckan_id text,
     organization_pks INTEGER[],
@@ -51,8 +48,8 @@ CREATE TABLE cioos_api.datasets (
 DROP TABLE IF EXISTS cioos_api.organizations;
 CREATE TABLE cioos_api.organizations (
     pk SERIAL PRIMARY KEY,
-    name text UNIQUE,
-    color text
+    name TEXT UNIQUE,
+    color TEXT
 );
 
 
@@ -78,7 +75,6 @@ CREATE INDEX
 
 
 -- profiles/timeseries per dataset
--- data comes via cioos_api.profiles_data_loader
 DROP TABLE IF EXISTS cioos_api.profiles;
 CREATE TABLE cioos_api.profiles (
     pk serial PRIMARY KEY,
@@ -86,7 +82,6 @@ CREATE TABLE cioos_api.profiles (
     dataset_pk integer REFERENCES cioos_api.datasets(pk),
     erddap_url text,
     dataset_id text,
-    timeseries_profile_id text,
     timeseries_id text,
     profile_id text,
     time_min timestamptz,
@@ -140,10 +135,10 @@ CREATE TABLE cioos_api.download_jobs (
 DROP TABLE IF EXISTS cioos_api.erddap_variables;
 CREATE TABLE cioos_api.erddap_variables (
     dataset_pk integer REFERENCES cioos_api.datasets(pk),
-    erddap_url text NOT NULL,
-    dataset_id text NOT NULL,
-    "name" text NOT NULL,
-    "type" text NOT NULL,
+    erddap_url text,
+    dataset_id text,
+    "name" text,
+    "type" text,
     actual_range text,
     cf_role text,
     standard_name text
@@ -151,9 +146,9 @@ CREATE TABLE cioos_api.erddap_variables (
 
 DROP TABLE IF EXISTS cioos_api.skipped_datasets;
 CREATE TABLE cioos_api.skipped_datasets (
-    erddap_url text NOT NULL,
-    dataset_id text NOT NULL,
-    reason_code text NOT NULL
+    erddap_url text,
+    dataset_id text,
+    reason_code text
 );
 
 
