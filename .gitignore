@@ -20,3 +20,4 @@ ckan_harvester_cache
 build
 *.csv
 !scraper/**/*.csv
+harvest

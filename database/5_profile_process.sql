@@ -1,12 +1,9 @@
-
--- This takes the data in temporary tables- ckan_data_loader,datasets_data_loader, and profiles_data_loader
--- and inserts records into tables datasets,profiles,points
-
 CREATE OR REPLACE FUNCTION profile_process() RETURNS VOID AS $$
 BEGIN
 
 
 -- AFTER LOADING PROFILE DATA:
+
 update
         cioos_api.profiles
 set

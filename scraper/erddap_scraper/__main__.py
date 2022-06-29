@@ -3,12 +3,9 @@ import logging
 import os
 import sys
 import threading
-import uuid
 
 import numpy as np
 import pandas as pd
-from dotenv import load_dotenv
-from sqlalchemy import create_engine
 
 from erddap_scraper.ckan.create_ckan_erddap_link import get_ckan_records, unescape_ascii
 from erddap_scraper.scrape_erddap import scrape_erddap
@@ -38,21 +35,7 @@ def setup_logging(log_time):
     root.addHandler(handler)
 
 
-def main(erddap_urls, csv_only, cache_requests):
-    # setup database connection
-    # This is only run from outside docker
-    if not csv_only:
-        load_dotenv(os.getcwd() + "/.env")
-
-        envs = os.environ
-
-        database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST_EXTERNAL']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
-
-        engine = create_engine(database_link)
-        # test connection
-        engine.connect()
-        print("Connected to ", envs["DB_HOST_EXTERNAL"])
-
+def main(erddap_urls, cache_requests, folder):
     erddap_urls = args.erddap_urls.split(",")
     limit_dataset_ids = None
     if args.dataset_ids:
@@ -83,12 +66,14 @@ def main(erddap_urls, csv_only, cache_requests):
         variables = pd.concat([variables, variable])
         skipped_datasets = pd.concat([skipped_datasets, skipped_dataset])
 
-    uuid_suffix = str(uuid.uuid4())[0:6]
-    datasets_file = f"datasets_{uuid_suffix}.csv"
-    profiles_file = f"profiles_{uuid_suffix}.csv"
-    variables_file = f"variables_{uuid_suffix}.csv"
-    skipped_datasets_file = f"skipped_{uuid_suffix}.csv"
-    ckan_file = f"ckan_{uuid_suffix}.csv"
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+    datasets_file = f"{folder}/datasets.csv"
+    profiles_file = f"{folder}/profiles.csv"
+    variables_file = f"{folder}/variables.csv"
+    skipped_datasets_file = f"{folder}/skipped.csv"
+    ckan_file = f"{folder}/ckan.csv"
 
     if datasets.empty:
         print("No datasets scraped")
@@ -161,90 +146,21 @@ def main(erddap_urls, csv_only, cache_requests):
     profiles["depth_max"] = profiles["depth_max"].fillna(0)
 
     print("Adding", len(datasets), "datasets and", len(profiles), "profiles")
-    if csv_only:
-        datasets.to_csv(datasets_file, index=False)
-        profiles.to_csv(profiles_file, index=False)
-        variables.to_csv(variables_file, index=False)
-        df_ckan.to_csv(ckan_file, index=False)
-        skipped_datasets.to_csv(skipped_datasets_file, index=False)
-        df_cde_eov_to_standard_name.to_csv(
-            "df_cde_eov_to_standard_name.csv", index=False
-        )
-        print(
-            "Wrote",
-            datasets_file,
-            profiles_file,
-            variables_file,
-            ckan_file,
-            skipped_datasets_file,
-        )
-    else:
-        schema = "cioos_api"
-        with engine.begin() as transaction:
-            print("Writing to DB:")
-            print("Clearing tables")
-            transaction.execute("SELECT remove_all_data();")
 
-            print("Writing datasets")
-
-            datasets.to_sql(
-                "datasets",
-                con=transaction,
-                if_exists="append",
-                schema=schema,
-                index=False,
-            )
-
-            profiles = profiles.replace("", np.NaN)
-
-            print("Writing profiles")
-
-            profiles.to_sql(
-                "profiles",
-                con=transaction,
-                if_exists="append",
-                schema=schema,
-                index=False,
-            )
-            variables = variables.replace("", np.NaN)
-
-            print("Writing erddap_variables")
-            variables.to_sql(
-                "erddap_variables",
-                con=transaction,
-                if_exists="append",
-                schema=schema,
-                index=False,
-            )
-
-            print("Writing skipped_datasets")
-            skipped_datasets.to_sql(
-                "skipped_datasets",
-                con=transaction,
-                if_exists="append",
-                schema=schema,
-                index=False,
-            )
-
-            print("Writing eov_to_standard_name")
-            df_cde_eov_to_standard_name.to_sql(
-                "eov_to_standard_name",
-                con=transaction,
-                if_exists="append",
-                schema=schema,
-                index=False,
-            )
-
-            print("Processing new records")
-            transaction.execute("SELECT profile_process();")
-            transaction.execute("SELECT ckan_process();")
-
-            print("Creating hexes")
-            transaction.execute("SELECT create_hexes();")
-
-        print("Wrote to db:", f"{schema}.datasets")
-        print("Wrote to db:", f"{schema}.profiles")
-        print("Wrote to db:", f"{schema}.erddap_variables")
+    datasets.to_csv(datasets_file, index=False)
+    profiles.to_csv(profiles_file, index=False)
+    variables.to_csv(variables_file, index=False)
+    df_ckan.to_csv(ckan_file, index=False)
+    skipped_datasets.to_csv(skipped_datasets_file, index=False)
+    df_cde_eov_to_standard_name.to_csv("df_cde_eov_to_standard_name.csv", index=False)
+    print(
+        "Wrote",
+        datasets_file,
+        profiles_file,
+        variables_file,
+        ckan_file,
+        skipped_datasets_file,
+    )
 
     if not skipped_datasets.empty:
         print(
@@ -260,11 +176,15 @@ if __name__ == "__main__":
         "--dataset_ids",
         help="only scrape these dataset IDs. Comma separated list",
     )
-    parser.add_argument(
-        "--csv-only", help="Skip writing to the DB", action="store_true"
-    )
+
     parser.add_argument(
         "--cache", help="Cache requests, for testing only", action="store_true"
+    )
+
+    parser.add_argument(
+        "--folder",
+        help="Folder to save harvested data to",
+        default="harvest",
     )
 
     parser.add_argument(
@@ -279,4 +199,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     setup_logging(args.log_time)
 
-    main(args.erddap_urls, args.csv_only, args.cache)
+    main(args.erddap_urls, args.cache, args.folder)
