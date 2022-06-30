@@ -1,10 +1,11 @@
 import React from 'react'
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronCompactLeft, ChevronCompactRight, CircleFill, HexagonFill } from 'react-bootstrap-icons'
+import * as chroma from "chroma-js"
 import * as _ from 'lodash'
 
-import { capitalizeFirstLetter, useOutsideAlerter, generateColorStops } from '../../../utilities.js'
+import { capitalizeFirstLetter, generateColorStops } from '../../../utilities.js'
 import { colorScale } from '../../config.js'
 import platformColors from '../../platformColors'
 
@@ -87,29 +88,44 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen, pl
             {t('legendSectionColor')}
             {/* Color */}
           </LegendElement>
-          {platformColors.filter(pc=>platformsInView.includes(pc.platform)).map(pc => {
-              return (
-                <LegendElement
-                  title={capitalizeFirstLetter(t(pc.platform))}
-                  open={legendOpen}
-                  key={pc.platform}
-                >
-                  <CircleFill size={15} fill={pc.color} />
-                </LegendElement>
-              )
+          {platformColors.filter(pc => platformsInView.includes(pc.platform)).map(pc => {
+            return (
+              <LegendElement
+                title={capitalizeFirstLetter(t(pc.platform))}
+                open={legendOpen}
+                key={pc.platform}
+              >
+                <CircleFill size={15} fill={pc.color} />
+              </LegendElement>
+            )
           })}
         </>
       )
     }
   }
   const className = classNames('legend', { panelOpen: selectionPanelOpen })
-
+  const colors = chroma.scale('greys').mode('lab').colors(7).slice(1)
+  colors.push(...chroma.scale('reds').mode('lab').colors(7).slice(1))
+  colors.push(...chroma.scale('blues').mode('lab').colors(7).slice(1))
+  colors.push(...chroma.scale('greens').mode('lab').colors(7).slice(1))
+  colors.push(...chroma.scale('purples').mode('lab').colors(7).slice(1))
   return (
     <div
       className={className}
       onClick={() => setLegendOpen(!legendOpen)}
     >
-      {generateLegendElements()}
+      {colors.map((color, index) => {
+        return (
+          <LegendElement
+            key={index}
+            title={color}
+            open={legendOpen}
+          >
+            <CircleFill size={15} fill={color} />
+          </LegendElement>
+        )
+      })}
+      {/* {generateLegendElements()} */}
       <LegendElement
         open={legendOpen}
       >
