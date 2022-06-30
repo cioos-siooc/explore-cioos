@@ -44,7 +44,7 @@ CREATE TABLE cioos_api.datasets (
     UNIQUE(dataset_id, erddap_url)
 );
 
--- List of organizations to show in CEDA, from CKAN, can be many per dataset
+-- List of organizations to show in CDE, from CKAN, can be many per dataset
 DROP TABLE IF EXISTS cioos_api.organizations;
 CREATE TABLE cioos_api.organizations (
     pk SERIAL PRIMARY KEY,
