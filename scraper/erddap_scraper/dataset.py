@@ -113,6 +113,8 @@ class Dataset(object):
         profile_ids = self.dataset_tabledap_query(
             f"{','.join(profile_variable_list + lat_lng)}&distinct()"
         )
+        if profile_ids.empty:
+            return profile_ids
 
         profile_ids["latlon"] = (
             profile_ids["latitude"].astype(str)
