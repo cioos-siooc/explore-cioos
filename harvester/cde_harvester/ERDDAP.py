@@ -12,7 +12,7 @@ import pandas as pd
 import requests
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
-from erddap_scraper.dataset import Dataset
+from cde_harvester.dataset import Dataset
 
 
 class ERDDAP(object):
@@ -25,7 +25,7 @@ class ERDDAP(object):
         if cache_requests:
             # limit cache to 10gb
             self.cache = dc.Cache(
-                "erddap_scraper_dc",
+                "harvester_cache",
                 eviction_policy="none",
                 size_limit=10000000000,
                 cull_limit=0,
@@ -61,7 +61,8 @@ class ERDDAP(object):
         "Get a string list of dataset IDs from the ERDDAP server"
         # allDatasets indexes table and grid datasets
         df = self.erddap_csv_to_df(
-            '/tabledap/allDatasets.csv?&accessible="public"', skiprows=[1, 2]
+            '/tabledap/allDatasets.csv?&accessible="public"&dataStructure="table"',
+            skiprows=[1, 2],
         )
         return df
 

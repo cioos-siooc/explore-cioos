@@ -54,8 +54,8 @@ router.get(
                d.cdm_data_type,
                d.ckan_id ckan_id,
                'https://catalogue.cioos.ca/dataset/' ckan_url
-        FROM cioos_api.profiles p
-        JOIN cioos_api.datasets d ON p.dataset_pk =d.pk
+        FROM cde.profiles p
+        JOIN cde.datasets d ON p.dataset_pk =d.pk
         WHERE
         ${filters ? filters : ""} 
         GROUP BY d.pk)
@@ -71,7 +71,7 @@ router.get(
         const jobID = uuidv4().substr(0, 6);
         const downloaderInput = {
           user_query: {
-            language:lang,
+            language: lang,
             time_min: timeMin,
             time_max: timeMax,
             lat_min: Number.parseFloat(latMin),
@@ -97,7 +97,7 @@ router.get(
           estimate_size: estimateTotalSize,
         };
         console.log(downloadJobEntry);
-        await db("cioos_api.download_jobs").insert(downloadJobEntry);
+        await db("cde.download_jobs").insert(downloadJobEntry);
 
         count = tile.json_agg.length;
       }

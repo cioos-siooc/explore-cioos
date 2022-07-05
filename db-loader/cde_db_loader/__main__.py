@@ -8,7 +8,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.dialects.postgresql import ARRAY, TEXT, INTEGER
-from erddap_scraper.utils import (
+from cde_harvester.utils import (
     df_cde_eov_to_standard_name,
 )
 
@@ -60,7 +60,7 @@ def main(folder):
 
     # this gets a list of all the standard names
 
-    schema = "cioos_api"
+    schema = "cde"
     with engine.begin() as transaction:
         print("Writing to DB:")
 

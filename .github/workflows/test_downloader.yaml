@@ -17,9 +17,9 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install downloader and scraper
+      - name: Install downloader and harvester
         run: |
-          pip install -q ./scraper
+          pip install -q ./harvester
           pip install -q ./downloader
 
       - name: Run downloader test files
