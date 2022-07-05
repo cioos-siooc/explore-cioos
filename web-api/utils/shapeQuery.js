@@ -46,9 +46,9 @@ async function getShapeQuery(query) {
 		coalesce(nullif(range_intersection_length(numrange(${depthMin},${depthMax}),numrange(p.depth_min::numeric,p.depth_max::numeric)),0),1) / (coalesce(nullif(p.depth_max-p.depth_min,0),1))
         ) as records_count,
 
-     (select count(*) from cioos_api.erddap_variables 
+     (select count(*) from cde.erddap_variables 
         where d.pk=dataset_pk and (
-		standard_name = any((select standard_name from cioos_api.eov_to_standard_name
+		standard_name = any((select standard_name from cde.eov_to_standard_name
         ${eovsQuery} )) 
        or
 		cf_role is not null or
@@ -63,8 +63,8 @@ async function getShapeQuery(query) {
                 'depth_max',p.depth_max
         ) ORDER BY time_min DESC
         ) as profiles
-        FROM cioos_api.profiles p
-        JOIN cioos_api.datasets d
+        FROM cde.profiles p
+        JOIN cde.datasets d
         ON p.dataset_pk =d.pk
         WHERE ${filters}
         -- AND ckan_record IS NOT NULL

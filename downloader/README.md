@@ -10,7 +10,7 @@ Substitute `pip3` for `pip` if required
    pip install -e .
    ```
 
-1. Go to the scraper directory and install the scraper package and Run the same command:
+1. Go to the harvester directory and install the harvester package and Run the same command:
 
    ```python
    pip install -e .

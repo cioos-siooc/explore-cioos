@@ -1,10 +1,10 @@
-from erddap_scraper.scraper_errors import (
+from cde_harvester.harvest_errors import (
     DEPTH_AND_ALTITUDE,
     INGEST_FLAG_FALSE,
     MISSING_REQUIRED_VARS,
     NO_SUPPORTED_VARIABLES,
 )
-from erddap_scraper.utils import (
+from cde_harvester.utils import (
     cf_standard_names,
     intersection,
     supported_standard_names,
