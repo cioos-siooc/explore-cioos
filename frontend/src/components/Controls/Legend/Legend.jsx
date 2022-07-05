@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronCompactLeft, ChevronCompactRight, CircleFill, HexagonFill } from 'react-bootstrap-icons'
 import * as chroma from "chroma-js"
+import * as d3 from 'd3-scale-chromatic'
 import * as _ from 'lodash'
 
 import { capitalizeFirstLetter, generateColorStops } from '../../../utilities.js'
@@ -104,13 +105,16 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen, pl
     }
   }
   const className = classNames('legend', { panelOpen: selectionPanelOpen })
-  const colors = chroma.scale('greys').gamma(0.5).mode('lab').colors(7).slice(1)
-  colors.push(...chroma.scale('reds').gamma(0.5).mode('lab').colors(7).slice(1))
-  colors.push(...chroma.scale('blues').gamma(0.5).mode('lab').colors(7).slice(1))
-  colors.push(...chroma.scale('greens').gamma(0.5).mode('lab').colors(7).slice(1))
-  colors.push(...chroma.scale('purples').gamma(0.5).mode('lab').colors(7).slice(1))
-  // colors.push(...chroma.scale('yellows').gamma(0.5).mode('lab').colors(7).slice(1))
-  colors.push(...chroma.scale(['#f6dbf6', '#ff03ff']).mode('lab').colors(7).slice(1))
+  // const colors = chroma.scale('greys').gamma(0.5).mode('lab').colors(7).slice(1)
+  // colors.push(...chroma.scale('reds').gamma(0.5).mode('lab').colors(7).slice(1))
+  // colors.push(...chroma.scale('blues').gamma(0.5).mode('lab').colors(7).slice(1))
+  // colors.push(...chroma.scale('greens').gamma(0.5).mode('lab').colors(7).slice(1))
+  // colors.push(...chroma.scale('purples').gamma(0.5).mode('lab').colors(7).slice(1))
+  // colors.push(...chroma.scale(['#f6dbf6', '#ff03ff']).mode('lab').colors(7).slice(1))
+  // // colors.push(...chroma.scale('yellows').gamma(0.5).mode('lab').colors(7).slice(1))
+
+  const colors = d3.schemeCategory10
+
   return (
     <div
       className={className}
