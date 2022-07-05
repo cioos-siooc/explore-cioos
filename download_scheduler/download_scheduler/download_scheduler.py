@@ -11,7 +11,7 @@ from erddap_downloader import downloader_wrapper
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from jinja2 import Environment, PackageLoader, select_autoescape, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader
 import pathlib
 
 this_directory = pathlib.Path(__file__).parent.absolute()
@@ -61,7 +61,7 @@ def get_a_download_job():
     session = Session(engine)
 
     rs = session.execute(
-        "SELECT * FROM cioos_api.download_jobs WHERE status='open' ORDER BY time ASC LIMIT 1 FOR UPDATE SKIP LOCKED"
+        "SELECT * FROM cde.download_jobs WHERE status='open' ORDER BY time ASC LIMIT 1 FOR UPDATE SKIP LOCKED"
     )
     row = rs.fetchone()
 
@@ -234,5 +234,5 @@ def run_download(row):
 
 def update_download_jobs(pk, row, session=engine):
     params = ",".join([f"{key}='{value}'" for key, value in row.items()])
-    sql = f"UPDATE cioos_api.download_jobs SET {params} WHERE PK={pk}"
+    sql = f"UPDATE cde.download_jobs SET {params} WHERE PK={pk}"
     session.execute(sql)

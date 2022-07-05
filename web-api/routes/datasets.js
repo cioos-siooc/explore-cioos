@@ -8,12 +8,10 @@ router.get("/", cache.route(), async function (req, res, next) {
                       pk,
                       organization_pks,
                       json_build_object('en', title, 'fr', title_fr) title_translated
-                      FROM cioos_api.datasets
-                      ORDER BY UPPER(title)`
-  
-  res.send(
-    (await db.raw(SQL)).rows
-  );
+                      FROM cde.datasets
+                      ORDER BY UPPER(title)`;
+
+  res.send((await db.raw(SQL)).rows);
 });
 
 module.exports = router;

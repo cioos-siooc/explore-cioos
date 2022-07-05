@@ -3,11 +3,11 @@
 from distutils.core import setup
 
 setup(
-    name="erddap_scraper",
+    name="cde_harvester",
     version="0.1",
     description="",
     url="",
-    packages=["erddap_scraper","erddap_scraper.ckan"],
+    packages=["cde_harvester", "cde_harvester.ckan"],
     include_package_data=True,
     package_data={"": ["cde_to_goos_eov.json", "goos_eov_to_standard_name.json"]},
     install_requires=[
@@ -20,5 +20,6 @@ setup(
         "diskcache",
         "lxml",
         "numpy",
+        "pyyaml",
     ],
 )

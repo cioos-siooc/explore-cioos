@@ -1,12 +1,12 @@
 import argparse
 
-from erddap_scraper.ckan.create_ckan_erddap_link import get_ckan_records
+from cde_harvester.ckan.create_ckan_erddap_link import get_ckan_records
 
 output_file = "erddap_ckan_mapping.csv"
 
 
 def main(cache):
-    """Run the CKAN scraper on CIOOS National (cioos.ca)"""
+    """Run the CKAN harvester on CIOOS National (cioos.ca)"""
 
     # query CKAN national for all erddap datsets
     print("Gathering list of records that link to an erddap")

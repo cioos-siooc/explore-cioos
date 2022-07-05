@@ -14,9 +14,7 @@ WORKDIR /usr/src/app
 
 COPY . .
 
-RUN pip install -q ./downloader
-RUN pip install -q ./download_scheduler
-RUN pip install -q ./scraper
+RUN pip install -q ./downloader ./download_scheduler ./harvester
 
 # -u seems to be needed to get it to print to stdout
 CMD [ "python", "-u","-m","download_scheduler" ]
