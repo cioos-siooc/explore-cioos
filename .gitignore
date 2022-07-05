@@ -6,7 +6,7 @@ dist
 __pycache__
 node_modules
 notforrepo
-.vscode
+.vscode_
 out
 cde_download*
 venv
@@ -14,9 +14,9 @@ venv
 *.env
 .ipynb_checkpoints
 *.ipynb
-erddap_scraper_dc
+harvester_cache
 ckan_harvester_cache
 build
 *.csv
-!scraper/**/*.csv
+!harvester/**/*.csv
 harvest

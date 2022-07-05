@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from erddap_scraper.ERDDAP import ERDDAP
+from cde_harvester.ERDDAP import ERDDAP
 
 dtypes = {
     "erddap_url": str,

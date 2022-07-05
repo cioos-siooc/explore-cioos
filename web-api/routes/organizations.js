@@ -11,7 +11,7 @@ const cache = require("../utils/cache");
  * */
 
 router.get("/", cache.route(), async function (req, res, next) {
-  res.send(await db("cioos_api.organizations").orderByRaw("UPPER(name)"));
+  res.send(await db("cde.organizations").orderByRaw("UPPER(name)"));
 });
 
 module.exports = router;

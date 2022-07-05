@@ -5,10 +5,10 @@ import traceback
 import pandas as pd
 from requests.exceptions import HTTPError
 
-from erddap_scraper.CDEComplianceChecker import CDEComplianceChecker
-from erddap_scraper.ERDDAP import ERDDAP
-from erddap_scraper.profiles import get_profiles
-from erddap_scraper.scraper_errors import (
+from cde_harvester.CDEComplianceChecker import CDEComplianceChecker
+from cde_harvester.ERDDAP import ERDDAP
+from cde_harvester.profiles import get_profiles
+from cde_harvester.harvest_errors import (
     CDM_DATA_TYPE_UNSUPPORTED,
     HTTP_ERROR,
     UNKNOWN_ERROR,
@@ -17,7 +17,7 @@ from erddap_scraper.scraper_errors import (
 # TIMEOUT = 30
 
 
-def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=False):
+def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=False):
     # """ """
     skipped_datasets_reasons = []
 
