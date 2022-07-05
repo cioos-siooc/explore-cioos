@@ -6,8 +6,8 @@ import pandas as pd
 import requests
 from requests.exceptions import HTTPError
 
-from erddap_scraper.platform_ioos_to_l06 import platforms_nerc_ioos
-from erddap_scraper.utils import cde_eov_to_standard_name, intersection
+from cde_harvester.platform_ioos_to_l06 import platforms_nerc_ioos
+from cde_harvester.utils import cde_eov_to_standard_name, intersection
 
 
 def is_valid_duration(duration):

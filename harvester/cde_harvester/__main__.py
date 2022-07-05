@@ -1,3 +1,4 @@
+import yaml
 import argparse
 import logging
 import os
@@ -7,9 +8,9 @@ import threading
 import numpy as np
 import pandas as pd
 
-from erddap_scraper.ckan.create_ckan_erddap_link import get_ckan_records, unescape_ascii
-from erddap_scraper.scrape_erddap import scrape_erddap
-from erddap_scraper.utils import (
+from cde_harvester.ckan.create_ckan_erddap_link import get_ckan_records, unescape_ascii
+from cde_harvester.harvest_erddap import harvest_erddap
+from cde_harvester.utils import (
     cf_standard_names,
     df_cde_eov_to_standard_name,
     supported_standard_names,
@@ -35,18 +36,18 @@ def setup_logging(log_time):
     root.addHandler(handler)
 
 
-def main(erddap_urls, cache_requests, folder):
-    erddap_urls = args.erddap_urls.split(",")
+def main(erddap_urls, cache_requests, folder, dataset_ids):
+    erddap_urls = erddap_urls.split(",")
     limit_dataset_ids = None
-    if args.dataset_ids:
-        limit_dataset_ids = args.dataset_ids.split(",")
+    if dataset_ids:
+        limit_dataset_ids = dataset_ids.split(",")
 
     threads = []
     result = []
 
     for erddap_url in erddap_urls:
         scraping_thread = threading.Thread(
-            target=scrape_erddap,
+            target=harvest_erddap,
             args=(erddap_url, result, limit_dataset_ids, cache_requests),
         )
         scraping_thread.start()
@@ -174,34 +175,70 @@ def main(erddap_urls, cache_requests, folder):
         )
 
 
+def load_config():
+    # get config settings from harvest_config.yaml
+    config_file = "harvest_config.yaml"
+
+    config_file_exists = os.path.exists(config_file)
+    if not config_file_exists:
+        return False
+    with open(config_file, "r") as stream:
+        try:
+            config = yaml.safe_load(stream)
+            return config
+
+        except yaml.YAMLError as exc:
+            print(exc)
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("erddap_urls")
-    parser.add_argument(
-        "--dataset_ids",
-        help="only scrape these dataset IDs. Comma separated list",
-    )
+    if len(sys.argv) > 2:
+        parser = argparse.ArgumentParser()
+        parser.add_argument("erddap_urls")
+        parser.add_argument(
+            "--dataset_ids",
+            help="only scrape these dataset IDs. Comma separated list",
+        )
 
-    parser.add_argument(
-        "--cache", help="Cache requests, for testing only", action="store_true"
-    )
+        parser.add_argument(
+            "--cache", help="Cache requests, for testing only", action="store_true"
+        )
 
-    parser.add_argument(
-        "--folder",
-        help="Folder to save harvested data to",
-        default="harvest",
-    )
+        parser.add_argument(
+            "--folder",
+            help="Folder to save harvested data to",
+            default="harvest",
+        )
 
-    parser.add_argument(
-        "--log-level",
-        default="debug",
-        help="Provide logging level. Example --loglevel debug, default=debug",
-    )
-    parser.add_argument(
-        "--log-time", type=bool, default=False, nargs="?", help="add time to logs"
-    )
+        parser.add_argument(
+            "--log-level",
+            default="debug",
+            help="Provide logging level. Example --loglevel debug, default=debug",
+        )
+        parser.add_argument(
+            "--log-time", type=bool, default=False, nargs="?", help="add time to logs"
+        )
 
-    args = parser.parse_args()
-    setup_logging(args.log_time)
+        args = parser.parse_args()
 
-    main(args.erddap_urls, args.cache, args.folder)
+        log_time = args.log_time
+        erddap_urls = args.erddap_urls
+        cache = args.cache
+        dataset_ids = args.dataset_ids
+        folder = args.folder
+    else:
+        # print(sys.argv)
+        config = load_config()
+        if config:
+            print(
+                "Using config from harvest_config.yaml, ignoring command line arguments"
+            )
+            erddap_urls = ",".join(config["erddap_urls"])
+            cache = config.get("cache")
+            folder = config.get("folder")
+            dataset_ids = config.get("dataset_ids")
+            log_time = config.get("log_time")
+
+    setup_logging(log_time)
+    print(erddap_urls, cache, folder, dataset_ids)
+    main(erddap_urls, cache, folder or "harvest", dataset_ids)
