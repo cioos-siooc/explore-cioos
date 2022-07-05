@@ -14,7 +14,7 @@ router.get("/", cache.route(), async function (req, res, next) {
   res.send(
     (
       await db.raw(
-        "SELECT DISTINCT UNNEST(eovs) ocean_variables FROM cioos_api.datasets"
+        "SELECT DISTINCT UNNEST(eovs) ocean_variables FROM cde.datasets"
       )
     ).rows.map((e) => e.ocean_variables)
   );

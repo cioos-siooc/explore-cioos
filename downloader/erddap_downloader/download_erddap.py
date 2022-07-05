@@ -6,12 +6,12 @@ import os
 import sys
 from urllib.parse import urlparse
 
-import erddap_scraper.ERDDAP as erddap_scraper
+import cde_harvester.ERDDAP as cde_harvester
 import pandas as pd
 import requests
 import shapely.wkt
 from erddap_downloader.download_pdf import download_pdf
-from erddap_scraper.utils import cde_eov_to_standard_name
+from cde_harvester.utils import cde_eov_to_standard_name
 from erddapy import ERDDAP
 from shapely.geometry import Point
 
@@ -42,7 +42,7 @@ def get_variable_list(df_variables, cde_eovs: list):
      user and the mandatory variables required.
     :param erddap_metadata: erddap dataset attributes dataframe
     :param cde_eovs: ocean variable list requested by the query
-    :return: list of variables to download from erddap 
+    :return: list of variables to download from erddap
     """
     # Get a list of mandatory variables to be present if available
     mandatory_variables = ["time", "latitude", "longitude", "depth"]
@@ -51,7 +51,7 @@ def get_variable_list(df_variables, cde_eovs: list):
 
     # if no eovs given, download all of them
     if not cde_eovs:
-        cde_eovs=cde_eov_to_standard_name.keys()
+        cde_eovs = cde_eov_to_standard_name.keys()
 
     for eov in cde_eovs:
         if eov in cde_eov_to_standard_name:
@@ -230,11 +230,11 @@ def get_datasets(json_query, output_path="", create_pdf=False):
             or dataset["erddap_metadata"]["variables"] == []
         ):
 
-            scrape_erddap = erddap_scraper.ERDDAP(dataset["erddap_url"])
+            harvest_erddap = cde_harvester.ERDDAP(dataset["erddap_url"])
 
-            scraper_dataset = scrape_erddap.get_dataset(dataset["dataset_id"])
+            harvester_dataset = harvest_erddap.get_dataset(dataset["dataset_id"])
 
-            dataset["erddap_metadata"] = scraper_dataset.df_variables
+            dataset["erddap_metadata"] = harvester_dataset.df_variables
 
         # Get variable list to download
         variable_list = get_variable_list(
