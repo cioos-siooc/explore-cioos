@@ -52,7 +52,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     ['get', 'platform'],
   ]
   platformColors.reduce((accumulatedPlatformColors, platformColor) => {
-    if(platformColor.color) {
+    if (platformColor.color) {
       accumulatedPlatformColors.push(platformColor.platform)
       accumulatedPlatformColors.push(platformColor.color)
     }
@@ -222,7 +222,8 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     // Create map
     map.current = new maplibreGl.Map({
       container: mapContainer.current,
-      style: {
+      style:
+      {
         version: 8,
         sources: {
           osm: {
