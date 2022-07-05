@@ -25,8 +25,8 @@ router.get(
     const sql = `
         WITH records AS (
         SELECT hex_zoom_0, hex_zoom_1, point_pk, days
-        FROM cioos_api.profiles p
-        JOIN cioos_api.datasets d
+        FROM cde.profiles p
+        JOIN cde.datasets d
         ON p.dataset_pk = d.pk
         ${filters ? "WHERE " + filters : ""}
         ),

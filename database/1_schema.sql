@@ -8,23 +8,24 @@
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE schema cde;
 
- DROP TABLE IF EXISTS cioos_api.hexes_zoom_0;
-  CREATE TABLE cioos_api.hexes_zoom_0 (
+SET search_path TO cde, public;
+
+ DROP TABLE IF EXISTS hexes_zoom_0;
+  CREATE TABLE hexes_zoom_0 (
     pk serial PRIMARY KEY,
     geom geometry(Polygon,3857)
 );  
-  DROP TABLE IF EXISTS cioos_api.hexes_zoom_1;
+  DROP TABLE IF EXISTS hexes_zoom_1;
 
-CREATE TABLE cioos_api.hexes_zoom_1 (
+CREATE TABLE hexes_zoom_1 (
     pk serial PRIMARY KEY,
     geom geometry(Polygon,3857)
   );
 
 
 -- The scraper will skip datasets in this table
-DROP TABLE IF EXISTS cioos_api.skipped_datasets;
-CREATE TABLE cioos_api.skipped_datasets (
-SET search_path TO cde, public;
+DROP TABLE IF EXISTS skipped_datasets;
+CREATE TABLE skipped_datasets (
     pk serial PRIMARY KEY,
     dataset_id text,
     erddap_url text
@@ -63,19 +64,19 @@ CREATE TABLE organizations (
 
 -- One record per unique lat/long
 -- this table is mostly used to build hexes, its not queried by the API
-DROP TABLE IF EXISTS cioos_api.points;
-CREATE TABLE cioos_api.points (
+DROP TABLE IF EXISTS points;
+CREATE TABLE points (
     pk serial PRIMARY KEY,
     geom geometry(Point,3857),
-    -- these values are copied back into cioos_api.profiles
+    -- these values are copied back into profiles
     hex_zoom_0 geometry(Polygon,3857),
     hex_zoom_1 geometry(Polygon,3857),
-    hex_0_pk integer REFERENCES cioos_api.hexes_zoom_0(pk),
-    hex_1_pk integer REFERENCES cioos_api.hexes_zoom_1(pk)
+    hex_0_pk integer REFERENCES hexes_zoom_0(pk),
+    hex_1_pk integer REFERENCES hexes_zoom_1(pk)
 );
 
 CREATE INDEX
-  ON cioos_api.points
+  ON points
   USING GIST (geom);
 
  
@@ -103,17 +104,17 @@ CREATE TABLE profiles (
     -- hex polygon that this point is in for zoom 0 (zoomed out)
     hex_zoom_0 geometry(polygon,3857),
     hex_zoom_1 geometry(polygon,3857),
-    hex_0_pk integer references cioos_api.hexes_zoom_0(pk),
-    hex_1_pk integer references cioos_api.hexes_zoom_1(pk),
+    hex_0_pk integer references hexes_zoom_0(pk),
+    hex_1_pk integer references hexes_zoom_1(pk),
     point_pk INTEGER,
     days bigint,
     UNIQUE(erddap_url,dataset_id,timeseries_id,profile_id)
 );
 
-CREATE INDEX ON cioos_api.profiles USING GIST (geom);
-CREATE INDEX ON cioos_api.profiles USING GIST (hex_zoom_0);
-CREATE INDEX ON cioos_api.profiles USING GIST (hex_zoom_1);
-CREATE INDEX ON cioos_api.profiles(latitude);
+CREATE INDEX ON profiles USING GIST (geom);
+CREATE INDEX ON profiles USING GIST (hex_zoom_0);
+CREATE INDEX ON profiles USING GIST (hex_zoom_1);
+CREATE INDEX ON profiles(latitude);
 CREATE INDEX ON profiles(longitude);
 
 
