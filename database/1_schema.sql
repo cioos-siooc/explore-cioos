@@ -1,6 +1,12 @@
+/* 
+    Create the tables
+ 
+ */
+
+
 -- We are using features from PostGIS 3
 CREATE EXTENSION IF NOT EXISTS postgis;
-CREATE schema cioos_api;
+CREATE schema cde;
 
  DROP TABLE IF EXISTS cioos_api.hexes_zoom_0;
   CREATE TABLE cioos_api.hexes_zoom_0 (
@@ -18,14 +24,15 @@ CREATE TABLE cioos_api.hexes_zoom_1 (
 -- The scraper will skip datasets in this table
 DROP TABLE IF EXISTS cioos_api.skipped_datasets;
 CREATE TABLE cioos_api.skipped_datasets (
+SET search_path TO cde, public;
     pk serial PRIMARY KEY,
     dataset_id text,
     erddap_url text
 );
 
 -- ERDDAP Datasets
-DROP TABLE IF EXISTS cioos_api.datasets;
-CREATE TABLE cioos_api.datasets (
+DROP TABLE IF EXISTS datasets;
+CREATE TABLE datasets (
     pk serial PRIMARY KEY,
     dataset_id TEXT,
     erddap_url TEXT,
@@ -45,8 +52,8 @@ CREATE TABLE cioos_api.datasets (
 );
 
 -- List of organizations to show in CDE, from CKAN, can be many per dataset
-DROP TABLE IF EXISTS cioos_api.organizations;
-CREATE TABLE cioos_api.organizations (
+DROP TABLE IF EXISTS organizations;
+CREATE TABLE organizations (
     pk SERIAL PRIMARY KEY,
     name TEXT UNIQUE,
     color TEXT
@@ -75,11 +82,11 @@ CREATE INDEX
 
 
 -- profiles/timeseries per dataset
-DROP TABLE IF EXISTS cioos_api.profiles;
-CREATE TABLE cioos_api.profiles (
+DROP TABLE IF EXISTS profiles;
+CREATE TABLE profiles (
     pk serial PRIMARY KEY,
     geom geometry(Point,3857),
-    dataset_pk integer REFERENCES cioos_api.datasets(pk),
+    dataset_pk integer REFERENCES datasets(pk),
     erddap_url text,
     dataset_id text,
     timeseries_id text,
@@ -107,14 +114,14 @@ CREATE INDEX ON cioos_api.profiles USING GIST (geom);
 CREATE INDEX ON cioos_api.profiles USING GIST (hex_zoom_0);
 CREATE INDEX ON cioos_api.profiles USING GIST (hex_zoom_1);
 CREATE INDEX ON cioos_api.profiles(latitude);
-CREATE INDEX ON cioos_api.profiles(longitude);
+CREATE INDEX ON profiles(longitude);
 
 
 
 
 --
-DROP TABLE IF EXISTS cioos_api.download_jobs;
-CREATE TABLE cioos_api.download_jobs (
+DROP TABLE IF EXISTS download_jobs;
+CREATE TABLE download_jobs (
     pk SERIAL PRIMARY KEY,
     time timestamp with time zone DEFAULT now(),
     job_id text,
@@ -132,9 +139,9 @@ CREATE TABLE cioos_api.download_jobs (
 );
 
 
-DROP TABLE IF EXISTS cioos_api.erddap_variables;
-CREATE TABLE cioos_api.erddap_variables (
-    dataset_pk integer REFERENCES cioos_api.datasets(pk),
+DROP TABLE IF EXISTS erddap_variables;
+CREATE TABLE erddap_variables (
+    dataset_pk integer REFERENCES datasets(pk),
     erddap_url text,
     dataset_id text,
     "name" text,
@@ -144,26 +151,26 @@ CREATE TABLE cioos_api.erddap_variables (
     standard_name text
 );
 
-DROP TABLE IF EXISTS cioos_api.skipped_datasets;
-CREATE TABLE cioos_api.skipped_datasets (
+DROP TABLE IF EXISTS skipped_datasets;
+CREATE TABLE skipped_datasets (
     erddap_url text,
     dataset_id text,
     reason_code text
 );
 
 
-DROP TABLE IF EXISTS cioos_api.eov_to_standard_name;
-CREATE TABLE cioos_api.eov_to_standard_name (
+DROP TABLE IF EXISTS eov_to_standard_name;
+CREATE TABLE eov_to_standard_name (
     pk SERIAL PRIMARY KEY,
     eov text,
     standard_name text,
     UNIQUE(eov,standard_name)
 );
 
--- DROP VIEW cioos_api.dataset_to_eov;
-CREATE OR REPLACE VIEW cioos_api.dataset_to_eov AS
+-- DROP VIEW dataset_to_eov;
+CREATE OR REPLACE VIEW dataset_to_eov AS
  SELECT d.pk, eov,v.standard_name
-   FROM cioos_api.datasets d
-     JOIN cioos_api.erddap_variables v ON v.dataset_pk =  d.pk
-     JOIN cioos_api.eov_to_standard_name ets ON ets.standard_name = v.standard_name;
+   FROM datasets d
+     JOIN erddap_variables v ON v.dataset_pk =  d.pk
+     JOIN eov_to_standard_name ets ON ets.standard_name = v.standard_name;
 

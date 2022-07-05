@@ -1,7 +1,17 @@
+/* 
+ 
+ set_constraints()
+ drop_constraints()
+
+ Constraints on datasets,profiles tables are dropped temporarily when data is being ingested
+
+ */
+
+ 
 CREATE OR REPLACE FUNCTION set_constraints() RETURNS VOID AS $$
 BEGIN
 
-ALTER TABLE cioos_api.datasets 
+ALTER TABLE cde.datasets 
     ALTER COLUMN dataset_id SET NOT NULL,
     ALTER COLUMN erddap_url SET NOT NULL,
     ALTER COLUMN cdm_data_type SET NOT NULL,
@@ -13,7 +23,7 @@ ALTER TABLE cioos_api.datasets
     ALTER COLUMN platform SET NOT NULL,
     ALTER COLUMN organization_pks SET NOT NULL;
 
-ALTER TABLE cioos_api.profiles 
+ALTER TABLE cde.profiles 
     ALTER COLUMN geom SET NOT NULL,
     ALTER COLUMN dataset_pk SET NOT NULL,
     ALTER COLUMN erddap_url SET NOT NULL,
@@ -37,7 +47,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION drop_constraints() RETURNS VOID AS $$
 BEGIN
 
-ALTER TABLE cioos_api.datasets 
+ALTER TABLE cde.datasets 
     ALTER COLUMN dataset_id DROP NOT NULL,
     ALTER COLUMN erddap_url DROP NOT NULL,
     ALTER COLUMN cdm_data_type DROP NOT NULL,
@@ -49,7 +59,7 @@ ALTER TABLE cioos_api.datasets
     ALTER COLUMN platform DROP NOT NULL,
     ALTER COLUMN organization_pks DROP NOT NULL;
 
-ALTER TABLE cioos_api.profiles 
+ALTER TABLE cde.profiles 
     ALTER COLUMN geom DROP NOT NULL,
     ALTER COLUMN dataset_pk DROP NOT NULL,
     ALTER COLUMN erddap_url DROP NOT NULL,
