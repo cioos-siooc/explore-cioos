@@ -34,7 +34,7 @@ jobs:
       run: python -m erddap_scraper https://data.cioospacific.ca/erddap/ --dataset_ids DFO_MEDS_BUOYS --folder erddap_harvest
     
     - name: Load harvested data into the DB
-      run: python -m cde_db_loader erddap_harvest
+      run: python -m cde_db_loader --folder erddap_harvest
 
     - name: Install node
       uses: actions/setup-node@v3
