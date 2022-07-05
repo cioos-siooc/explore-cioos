@@ -25,6 +25,8 @@ services:
       - "5000"
     depends_on:
       - db
+    deploy:
+      replicas: 2
   nginx:
     image: nginx:latest
     volumes:
@@ -32,7 +34,7 @@ services:
     depends_on:
       - web-api
     ports:
-      - "8098:4000"
+      - "$NGINX_PORT:4000"
   scheduler:
     build:
       context: .
@@ -52,5 +54,23 @@ services:
       - "80"
     # depends_on:
     #   - web-api
+
+  harvester:
+    build:
+      context: .
+      dockerfile: ./harvester/Dockerfile
+    profiles:
+      - tools
+    depends_on:
+      - db
+    volumes:
+      - ./harvest_config.yaml:/usr/src/app/harvest_config.yaml
+      - ./harvester_cache:/usr/src/app/harvester_cache
+    environment:
+      - "DB_HOST_EXTERNAL=db"
+
+    env_file:
+      - .env
+
 volumes:
   postgres-data:

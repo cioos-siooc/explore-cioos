@@ -145,7 +145,12 @@ def main(folder):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("folder")
+    parser.add_argument(
+        "--folder",
+        required=False,
+        default="harvest",
+        help="folder with the CSV output files from harvesting",
+    )
 
     parser.add_argument(
         "--log-level",
