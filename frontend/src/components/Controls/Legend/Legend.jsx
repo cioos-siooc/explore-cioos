@@ -104,11 +104,13 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen, pl
     }
   }
   const className = classNames('legend', { panelOpen: selectionPanelOpen })
-  const colors = chroma.scale('greys').mode('lab').colors(7).slice(1)
-  colors.push(...chroma.scale('reds').mode('lab').colors(7).slice(1))
-  colors.push(...chroma.scale('blues').mode('lab').colors(7).slice(1))
-  colors.push(...chroma.scale('greens').mode('lab').colors(7).slice(1))
-  colors.push(...chroma.scale('purples').mode('lab').colors(7).slice(1))
+  const colors = chroma.scale('greys').gamma(0.5).mode('lab').colors(7).slice(1)
+  colors.push(...chroma.scale('reds').gamma(0.5).mode('lab').colors(7).slice(1))
+  colors.push(...chroma.scale('blues').gamma(0.5).mode('lab').colors(7).slice(1))
+  colors.push(...chroma.scale('greens').gamma(0.5).mode('lab').colors(7).slice(1))
+  colors.push(...chroma.scale('purples').gamma(0.5).mode('lab').colors(7).slice(1))
+  // colors.push(...chroma.scale('yellows').gamma(0.5).mode('lab').colors(7).slice(1))
+  colors.push(...chroma.scale(['#f6dbf6', '#ff03ff']).mode('lab').colors(7).slice(1))
   return (
     <div
       className={className}
