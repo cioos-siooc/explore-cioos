@@ -113,8 +113,25 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen, pl
   // colors.push(...chroma.scale(['#f6dbf6', '#ff03ff']).mode('lab').colors(7).slice(1))
   // // colors.push(...chroma.scale('yellows').gamma(0.5).mode('lab').colors(7).slice(1))
 
-  const colors = d3.schemeCategory10
+  // const colors = d3.schemeCategory10
+  // colors.push('#000000')
 
+  // https://observablehq.com/@camerongarrett/c-labs-color-palette
+  // const colors = ["#c73174", "#433acb", "#009976", "#ffd000", "#eb5846", "#a0179f", "#005fbb", "#00b14e", "#ff8e10", "#7918c1", "#96c31e", "#007e9b", "#000000"]
+  const colors = ["#52a79b", "#c73174", "#0050c4", "#00b545", "#f1613d", "#9914a7", "#0078a2", "#c3c900", "#6724c8", "#ffa700", "#000000"]
+  /*
+  Fixed (6)
+  Boats (14)
+  Buoys (11)
+  Submersible (7)
+  Ice (5)
+  Animals (8)
+  Vehicles (7)
+  Gliders (3)
+  Space (6)
+  Air (12)
+  Uknown/ungrouped (2)
+  */
   return (
     <div
       className={className}
