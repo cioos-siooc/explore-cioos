@@ -110,9 +110,11 @@ class Dataset(object):
         if not profile_variables:
             return []
 
+        # dropna - for when there are nulls in the lat/lon column leading to a second profile created
         profile_ids = self.dataset_tabledap_query(
             f"{','.join(profile_variable_list + lat_lng)}&distinct()"
-        )
+        ).dropna(subset=["latitude", "longitude"])
+
         if profile_ids.empty:
             return profile_ids
 
@@ -127,6 +129,7 @@ class Dataset(object):
             .query("latlon>1")
             .index.to_list()
         )
+
         del profile_ids["latlon"]
 
         profile_ids = profile_ids.drop_duplicates(profile_variable_list)

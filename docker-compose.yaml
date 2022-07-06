@@ -64,6 +64,7 @@ services:
     volumes:
       - ./harvest_config.yaml:/usr/src/app/harvest_config.yaml
       - ./harvester_cache:/usr/src/app/harvester_cache
+      - ./harvest:/usr/src/app/harvest
     environment:
       - "DB_HOST_EXTERNAL=db"
 

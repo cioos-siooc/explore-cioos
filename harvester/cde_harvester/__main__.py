@@ -1,3 +1,4 @@
+from distutils.log import error
 import yaml
 import argparse
 import logging
@@ -78,7 +79,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids):
 
     if datasets.empty:
         print("No datasets scraped")
-        return
+        sys.exit(1)
 
     # see what standard names arent covered by our EOVs:
     standard_names_harvested = (
@@ -233,12 +234,12 @@ if __name__ == "__main__":
             print(
                 "Using config from harvest_config.yaml, ignoring command line arguments"
             )
-            erddap_urls = ",".join(config["erddap_urls"])
+            erddap_urls = ",".join(config.get("erddap_urls") or [])
             cache = config.get("cache")
             folder = config.get("folder")
-            dataset_ids = config.get("dataset_ids")
+            dataset_ids = ",".join(config.get("dataset_ids"))
             log_time = config.get("log_time")
 
     setup_logging(log_time)
-    print(erddap_urls, cache, folder, dataset_ids)
+
     main(erddap_urls, cache, folder or "harvest", dataset_ids)
