@@ -136,6 +136,7 @@ def main(folder):
         transaction.execute("SELECT create_hexes();")
 
         # This ensures that all fields were set successfully
+        print("Setting constraints")
         transaction.execute("SELECT set_constraints();")
 
         print("Wrote to db:", f"{schema}.datasets")
