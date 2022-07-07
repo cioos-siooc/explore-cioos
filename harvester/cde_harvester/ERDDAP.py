@@ -84,12 +84,18 @@ class ERDDAP(object):
 
         return pd.to_datetime(series, errors="coerce")
 
-    def erddap_csv_to_df(self, url, skiprows=[1], logger=None):
+    def erddap_csv_to_df(self, url, skiprows=[1], dataset=None):
         """If theres an error in the request, this raises up to the dataset loop, so this dataset gets skipped"""
-        if not logger:
-            logger = self.logger
+        if dataset:
+            logger = dataset.logger
+            erddap_url = dataset.erddap_url
 
-        url_combined = self.url + url
+        else:
+            logger = self.logger
+            erddap_url = self.url
+
+        url_combined = erddap_url + url
+
         logger.debug(unquote(url_combined))
 
         response = None
@@ -103,15 +109,17 @@ class ERDDAP(object):
                 cache[url_combined] = response
         else:
             response = self.session.get(url_combined)
-            original_hostname = urlparse(url_combined).hostname
-            actual_hostname = urlparse(response.url).hostname
 
-            if original_hostname != actual_hostname:
-                # redirect due to EDDTableFromErddap
-                self.url = response.url.split("/erddap")[0] + "/erddap"
-                self.logger.debug(
-                    "Redirecting " + original_hostname + "to" + actual_hostname
+        original_hostname = urlparse(url_combined).hostname
+        actual_hostname = urlparse(response.url).hostname
+
+        if original_hostname != actual_hostname:
+            # redirect due to EDDTableFromErddap
+            if dataset:
+                logger.debug(
+                    "Redirecting " + original_hostname + " to " + actual_hostname
                 )
+                dataset.erddap_url = response.url.split("/erddap")[0] + "/erddap"
 
         no_data = False
         # Newer erddaps respond with 404 for no data
