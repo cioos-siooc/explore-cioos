@@ -40,7 +40,7 @@ class Dataset(object):
             {
                 "title": [self.globals["title"]],
                 "summary": [self.globals["summary"]],
-                "erddap_url": [self.erddap_server.url],
+                "erddap_url": [self.erddap_url],
                 "dataset_id": [self.id],
                 "cdm_data_type": [self.cdm_data_type],
                 "platform": [self.platform],
@@ -53,8 +53,8 @@ class Dataset(object):
         return self.df
 
     def dataset_tabledap_query(self, url):
-        return self.erddap_server.erddap_csv_to_df(
-            "/tabledap/" + self.id + ".csv?" + url, logger=self.logger
+        return self.erddap_csv_to_df(
+            "/tabledap/" + self.id + ".csv?" + url, dataset=self
         )
 
     def get_max_min(self, vars):
@@ -254,7 +254,11 @@ class Dataset(object):
         # transform this JSON to an easier to use format
         url = "/info/" + self.id + "/index.csv"
         # erddap_csv_to_df's skiprows defaults to [1]
-        df = self.erddap_csv_to_df(url, skiprows=[], logger=self.logger).fillna("")
+        df = self.erddap_csv_to_df(url, skiprows=[], dataset=self).fillna("")
+
+        if df.empty:
+            self.logger.error("Dataset metadata not found")
+            return df
 
         considered_attributes = ["cf_role", "standard_name", "actual_range"]
 
