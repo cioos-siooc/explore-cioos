@@ -8,7 +8,13 @@ setup(
     description="",
     url="",
     packages=["download_scheduler"],
-    package_data={'download_scheduler': ['templates/*.j2']},
+    package_data={"download_scheduler": ["templates/*.j2"]},
     include_package_data=True,
-    install_requires=["sqlalchemy", "psycopg2-binary", "sentry-sdk", "python-dotenv","Jinja2"],
+    install_requires=[
+        "sqlalchemy",
+        "psycopg2-binary",
+        "sentry-sdk",
+        "python-dotenv",
+        "Jinja2",
+    ],
 )

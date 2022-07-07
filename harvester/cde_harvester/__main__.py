@@ -7,7 +7,6 @@ import threading
 import numpy as np
 import pandas as pd
 import yaml
-
 from cde_harvester.ckan.create_ckan_erddap_link import (get_ckan_records,
                                                         unescape_ascii)
 from cde_harvester.harvest_erddap import harvest_erddap
@@ -77,7 +76,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids):
 
     if datasets.empty:
         print("No datasets scraped")
-        return
+        sys.exit(1)
 
     # see what standard names arent covered by our EOVs:
     standard_names_harvested = (
