@@ -85,6 +85,8 @@ services:
       - ./harvest:/usr/src/app/harvest
     environment:
       - "DB_HOST_EXTERNAL=db"
+    env_file:
+      - .env
 volumes:
   postgres-data:
   redis-data:
