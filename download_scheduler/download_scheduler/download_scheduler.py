@@ -1,18 +1,18 @@
 # from sqlalchemy import JSON, Text
 import json
 import os
+import pathlib
 import traceback
 from re import L
 
 import sentry_sdk
 from dotenv import load_dotenv
-from download_scheduler.download_email import send_email
 from erddap_downloader import downloader_wrapper
+from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from jinja2 import Environment, FileSystemLoader
-import pathlib
+from download_scheduler.download_email import send_email
 
 this_directory = pathlib.Path(__file__).parent.absolute()
 schema_path = os.path.join(this_directory, "templates")
