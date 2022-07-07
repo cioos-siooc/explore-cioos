@@ -4,10 +4,9 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import requests
-from requests.exceptions import HTTPError
-
 from cde_harvester.platform_ioos_to_l06 import platforms_nerc_ioos
 from cde_harvester.utils import cde_eov_to_standard_name, intersection
+from requests.exceptions import HTTPError
 
 
 def is_valid_duration(duration):
@@ -213,9 +212,6 @@ class Dataset(object):
 
         return df_count
 
-    def get_data_access_form_url(self):
-        return self.erddap_server.url + "/tabledap/" + self.id + ".html"
-
     def get_eovs(self):
         eovs = []
         dataset_standard_names = self.df_variables["standard_name"].to_list()
@@ -281,7 +277,7 @@ class Dataset(object):
             }
         )
 
-        df_variables["erddap_url"] = self.erddap_server.url
+        df_variables["erddap_url"] = self.erddap_url
         df_variables["dataset_id"] = self.id
         df_global = df.query('`Variable Name`=="NC_GLOBAL"')[
             ["Attribute Name", "Value"]

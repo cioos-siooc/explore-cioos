@@ -9,7 +9,6 @@ import threading
 import numpy as np
 import pandas as pd
 import yaml
-
 from cde_harvester.ckan.create_ckan_erddap_link import (get_ckan_records,
                                                         unescape_ascii)
 from cde_harvester.harvest_erddap import harvest_erddap
