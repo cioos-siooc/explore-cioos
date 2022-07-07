@@ -10,8 +10,8 @@ import cde_harvester.ERDDAP as cde_harvester
 import pandas as pd
 import requests
 import shapely.wkt
-from erddap_downloader.download_pdf import download_pdf
 from cde_harvester.utils import cde_eov_to_standard_name
+from erddap_downloader.download_pdf import download_pdf
 from erddapy import ERDDAP
 from shapely.geometry import Point
 

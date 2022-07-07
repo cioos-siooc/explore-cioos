@@ -1,16 +1,15 @@
 import argparse
+import ast
 import logging
 import os
-import ast
+import sys
 
 import numpy as np
 import pandas as pd
+from cde_harvester.utils import df_cde_eov_to_standard_name
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sqlalchemy.dialects.postgresql import ARRAY, TEXT, INTEGER
-from cde_harvester.utils import (
-    df_cde_eov_to_standard_name,
-)
+from sqlalchemy.dialects.postgresql import ARRAY, INTEGER, TEXT
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -55,8 +54,8 @@ def main(folder):
     # ckan = pd.read_csv(ckan_file)
 
     if datasets.empty:
-        print("No datasets scraped")
-        return
+        print("No datasets found")
+        sys.exit(1)
 
     # this gets a list of all the standard names
 
