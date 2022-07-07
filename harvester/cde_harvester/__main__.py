@@ -1,4 +1,3 @@
-import yaml
 import argparse
 import logging
 import os
@@ -7,14 +6,14 @@ import threading
 
 import numpy as np
 import pandas as pd
+import yaml
 
-from cde_harvester.ckan.create_ckan_erddap_link import get_ckan_records, unescape_ascii
+from cde_harvester.ckan.create_ckan_erddap_link import (get_ckan_records,
+                                                        unescape_ascii)
 from cde_harvester.harvest_erddap import harvest_erddap
-from cde_harvester.utils import (
-    cf_standard_names,
-    df_cde_eov_to_standard_name,
-    supported_standard_names,
-)
+from cde_harvester.utils import (cf_standard_names,
+                                 df_cde_eov_to_standard_name,
+                                 supported_standard_names)
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -192,7 +191,7 @@ def load_config():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 2:
+    if len(sys.argv) > 1:
         parser = argparse.ArgumentParser()
         parser.add_argument("erddap_urls")
         parser.add_argument(

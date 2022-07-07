@@ -7,12 +7,9 @@ from requests.exceptions import HTTPError
 
 from cde_harvester.CDEComplianceChecker import CDEComplianceChecker
 from cde_harvester.ERDDAP import ERDDAP
+from cde_harvester.harvest_errors import (CDM_DATA_TYPE_UNSUPPORTED,
+                                          HTTP_ERROR, UNKNOWN_ERROR)
 from cde_harvester.profiles import get_profiles
-from cde_harvester.harvest_errors import (
-    CDM_DATA_TYPE_UNSUPPORTED,
-    HTTP_ERROR,
-    UNKNOWN_ERROR,
-)
 
 # TIMEOUT = 30
 
