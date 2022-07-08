@@ -1,4 +1,3 @@
-import yaml
 import argparse
 import logging
 import os
@@ -7,14 +6,13 @@ import threading
 
 import numpy as np
 import pandas as pd
-
-from cde_harvester.ckan.create_ckan_erddap_link import get_ckan_records, unescape_ascii
+import yaml
+from cde_harvester.ckan.create_ckan_erddap_link import (get_ckan_records,
+                                                        unescape_ascii)
 from cde_harvester.harvest_erddap import harvest_erddap
-from cde_harvester.utils import (
-    cf_standard_names,
-    df_cde_eov_to_standard_name,
-    supported_standard_names,
-)
+from cde_harvester.utils import (cf_standard_names,
+                                 df_cde_eov_to_standard_name,
+                                 supported_standard_names)
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -78,7 +76,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids):
 
     if datasets.empty:
         print("No datasets scraped")
-        return
+        sys.exit(1)
 
     # see what standard names arent covered by our EOVs:
     standard_names_harvested = (
@@ -192,7 +190,7 @@ def load_config():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 2:
+    if len(sys.argv) > 1:
         parser = argparse.ArgumentParser()
         parser.add_argument("erddap_urls")
         parser.add_argument(

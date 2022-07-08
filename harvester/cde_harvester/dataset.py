@@ -4,10 +4,9 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import requests
-from requests.exceptions import HTTPError
-
 from cde_harvester.platform_ioos_to_l06 import platforms_nerc_ioos
 from cde_harvester.utils import cde_eov_to_standard_name, intersection
+from requests.exceptions import HTTPError
 
 
 def is_valid_duration(duration):
@@ -40,7 +39,7 @@ class Dataset(object):
             {
                 "title": [self.globals["title"]],
                 "summary": [self.globals["summary"]],
-                "erddap_url": [self.erddap_server.url],
+                "erddap_url": [self.erddap_url],
                 "dataset_id": [self.id],
                 "cdm_data_type": [self.cdm_data_type],
                 "platform": [self.platform],
@@ -53,8 +52,8 @@ class Dataset(object):
         return self.df
 
     def dataset_tabledap_query(self, url):
-        return self.erddap_server.erddap_csv_to_df(
-            "/tabledap/" + self.id + ".csv?" + url, logger=self.logger
+        return self.erddap_csv_to_df(
+            "/tabledap/" + self.id + ".csv?" + url, dataset=self
         )
 
     def get_max_min(self, vars):
@@ -112,7 +111,8 @@ class Dataset(object):
 
         profile_ids = self.dataset_tabledap_query(
             f"{','.join(profile_variable_list + lat_lng)}&distinct()"
-        )
+        ).dropna(subset=["latitude", "longitude"])
+
         if profile_ids.empty:
             return profile_ids
 
@@ -210,9 +210,6 @@ class Dataset(object):
 
         return df_count
 
-    def get_data_access_form_url(self):
-        return self.erddap_server.url + "/tabledap/" + self.id + ".html"
-
     def get_eovs(self):
         eovs = []
         dataset_standard_names = self.df_variables["standard_name"].to_list()
@@ -251,7 +248,11 @@ class Dataset(object):
         # transform this JSON to an easier to use format
         url = "/info/" + self.id + "/index.csv"
         # erddap_csv_to_df's skiprows defaults to [1]
-        df = self.erddap_csv_to_df(url, skiprows=[], logger=self.logger).fillna("")
+        df = self.erddap_csv_to_df(url, skiprows=[], dataset=self).fillna("")
+
+        if df.empty:
+            self.logger.error("Dataset metadata not found")
+            return df
 
         considered_attributes = ["cf_role", "standard_name", "actual_range"]
 
@@ -274,7 +275,7 @@ class Dataset(object):
             }
         )
 
-        df_variables["erddap_url"] = self.erddap_server.url
+        df_variables["erddap_url"] = self.erddap_url
         df_variables["dataset_id"] = self.id
         df_global = df.query('`Variable Name`=="NC_GLOBAL"')[
             ["Attribute Name", "Value"]
