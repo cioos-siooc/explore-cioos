@@ -229,7 +229,7 @@ class Dataset(object):
             try:
                 l06_platform_label = platforms_nerc_ioos.query(
                     f"ioos_label=='{platform}'"
-                )["l06_label"].item()
+                )["category"].item()
 
                 return l06_platform_label
 
@@ -237,10 +237,16 @@ class Dataset(object):
                 self.logger.debug("Found unsupported IOOS platform:", platform)
 
         if "L06" in platform_vocabulary:
+            platforms_nerc_ioos_no_duplicates = platforms_nerc_ioos.drop_duplicates(
+                subset=["l06_label"]
+            )
+
             if platform in list(platforms_nerc_ioos["l06_label"]):
-                return platform
+                return platforms_nerc_ioos_no_duplicates.query(
+                    f"l06_label=='{platform}'"
+                )["category"].item()
             else:
-                self.logger.debug("Found unsupported L06 platform:", platform)
+                self.logger.debug("Found unsupported L06 platform: " + platform)
 
     def get_metadata(self):
         "get all the global and variable metadata for a dataset"
