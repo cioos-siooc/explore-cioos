@@ -16,7 +16,6 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 def main(folder):
     # setup database connection
-    # This is only run from outside docker
 
     load_dotenv(os.getcwd() + "/.env")
 
@@ -141,6 +140,8 @@ def main(folder):
         print("Wrote to db:", f"{schema}.datasets")
         print("Wrote to db:", f"{schema}.profiles")
         print("Wrote to db:", f"{schema}.erddap_variables")
+        print("Wrote to db:", f"{schema}.skipped_datasets")
+        print("Wrote to db:", f"{schema}.eov_to_standard_name")
 
 
 if __name__ == "__main__":
@@ -150,12 +151,6 @@ if __name__ == "__main__":
         required=False,
         default="harvest",
         help="folder with the CSV output files from harvesting",
-    )
-
-    parser.add_argument(
-        "--log-level",
-        default="debug",
-        help="Provide logging level. Example --loglevel debug, default=debug",
     )
 
     args = parser.parse_args()
