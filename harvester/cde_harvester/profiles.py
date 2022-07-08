@@ -3,7 +3,6 @@
 from datetime import datetime
 
 import pandas as pd
-
 from cde_harvester.ERDDAP import ERDDAP
 
 dtypes = {
@@ -187,7 +186,7 @@ def get_profiles(dataset):
     profiles["time_min"] = ERDDAP.parse_erddap_dates(profiles["time_min"])
     profiles["time_max"] = ERDDAP.parse_erddap_dates(profiles["time_max"])
     profiles["dataset_id"] = dataset.id
-    profiles["erddap_url"] = dataset.erddap_server.url
+    profiles["erddap_url"] = dataset.erddap_url
 
     # special case
     if "altitude" in dataset.variables_list:
