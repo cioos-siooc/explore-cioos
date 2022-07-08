@@ -1,4 +1,5 @@
 from distutils.log import error
+from multiprocessing.sharedctypes import Value
 import yaml
 import argparse
 import logging
@@ -9,20 +10,22 @@ import threading
 import numpy as np
 import pandas as pd
 import yaml
-from cde_harvester.ckan.create_ckan_erddap_link import (get_ckan_records,
-                                                        unescape_ascii)
+from cde_harvester.ckan.create_ckan_erddap_link import get_ckan_records, unescape_ascii
 from cde_harvester.harvest_erddap import harvest_erddap
-from cde_harvester.utils import (cf_standard_names,
-                                 df_cde_eov_to_standard_name,
-                                 supported_standard_names)
+from cde_harvester.utils import (
+    cf_standard_names,
+    supported_standard_names,
+)
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
-def setup_logging(log_time):
+def setup_logging(log_time, log_level):
     # setup logging
+    print(log_time, log_level)
     root = logging.getLogger()
-    root.setLevel(logging.DEBUG)
+
+    root.setLevel(getattr(logging, log_level.upper() or "DEBUG"))
     handler = logging.StreamHandler(sys.stdout)
 
     if log_time:
@@ -156,9 +159,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids):
     variables.drop_duplicates().to_csv(variables_file, index=False)
     df_ckan.to_csv(ckan_file, index=False)
     skipped_datasets.drop_duplicates().to_csv(skipped_datasets_file, index=False)
-    df_cde_eov_to_standard_name.drop_duplicates().to_csv(
-        "df_cde_eov_to_standard_name.csv", index=False
-    )
+
     print(
         "Wrote",
         datasets_file,
@@ -213,15 +214,19 @@ if __name__ == "__main__":
         parser.add_argument(
             "--log-level",
             default="debug",
-            help="Provide logging level. Example --loglevel debug, default=debug",
+            help="Provide logging level. Example --log-level debug, default=debug",
         )
         parser.add_argument(
-            "--log-time", type=bool, default=False, nargs="?", help="add time to logs"
+            "--log-time",
+            default=False,
+            help="add time to logs",
+            action="store_true",
         )
 
         args = parser.parse_args()
-
+        print(args)
         log_time = args.log_time
+        log_level = args.log_level
         erddap_urls = args.erddap_urls
         cache = args.cache
         dataset_ids = args.dataset_ids
@@ -238,7 +243,8 @@ if __name__ == "__main__":
             folder = config.get("folder")
             dataset_ids = ",".join(config.get("dataset_ids"))
             log_time = config.get("log_time")
+            log_level = config.get("log_level")
 
-    setup_logging(log_time)
+    setup_logging(log_time, log_level)
 
     main(erddap_urls, cache, folder or "harvest", dataset_ids)
