@@ -27,17 +27,21 @@ def get_l06_codes_and_labels():
         label = platform["prefLabel"]["@value"]
         broader = platform.get("broader", [])
         id = platform["@id"]
-
+        found_parent_platform = False
         for url in broader:
             if "L06" in url:
                 platforms_parsed[id] = {"broader_L06_url": url, "l06_label": label}
+                found_parent_platform = True
+                continue
+        if not found_parent_platform:
+            # this must be a platform category
+            platforms_parsed[id] = {"broader_L06_url": id, "l06_label": label}
         l06Lookup[id] = label
 
     for l06_url_code, item in platforms_parsed.items():
         broaderL06 = item["broader_L06_url"]
         res = l06Lookup[broaderL06]
         platforms_parsed[l06_url_code]["category"] = res
-
     df = pd.DataFrame.from_dict(platforms_parsed, orient="index")
     del df["broader_L06_url"]
     df.index = df.index.str.split("/").str[-2]
@@ -88,3 +92,5 @@ ioos_to_l06_mapping = get_ioos_to_l06_mapping()
 platforms_nerc_ioos = (
     l06_codes_and_labels.join(ioos_to_l06_mapping).reset_index().fillna("")
 )
+platforms_nerc_ioos.to_csv("/Users/nate.rosenstock/dev/ceda/platforms99.csv")
+l06_codes_and_labels.to_csv("/Users/nate.rosenstock/dev/ceda/l06_codes_and_labels.csv")
