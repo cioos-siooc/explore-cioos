@@ -92,5 +92,3 @@ ioos_to_l06_mapping = get_ioos_to_l06_mapping()
 platforms_nerc_ioos = (
     l06_codes_and_labels.join(ioos_to_l06_mapping).reset_index().fillna("")
 )
-platforms_nerc_ioos.to_csv("/Users/nate.rosenstock/dev/ceda/platforms99.csv")
-l06_codes_and_labels.to_csv("/Users/nate.rosenstock/dev/ceda/l06_codes_and_labels.csv")
