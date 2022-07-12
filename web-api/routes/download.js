@@ -50,7 +50,7 @@ router.get(
         SELECT d.erddap_url,
                d.dataset_id,
                d.title,
-               d.profile_variable,
+               d.profile_variables,
                d.cdm_data_type,
                d.ckan_id ckan_id,
                'https://catalogue.cioos.ca/dataset/' ckan_url
