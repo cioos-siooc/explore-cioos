@@ -244,7 +244,7 @@ if __name__ == "__main__":
         urls = ",".join(config.get("erddap_urls") or [])
         cache = config.get("cache")
         folder = config.get("folder")
-        dataset_ids = ",".join(config.get("dataset_ids"))
+        dataset_ids = ",".join(config.get("dataset_ids") or [])
         log_time = config.get("log_time")
         log_level = config.get("log_level")
         
