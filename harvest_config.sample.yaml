@@ -1,16 +1,17 @@
 # list of erddap URLs. Should end in /erddap
 erddap_urls:
-  - https://catalogue.hakai.org/erddap
+  - https://data.cioospacific.ca/erddap
 
 # set to true to test with caching. Not available in production docker compose file
 # defaults to false
-cache:
+cache: true
 
 # defaults to 'harvest'
-folder: 
+folder:
 
 # use to test select datasets, eg: dataset_one,dataset_two
-dataset_ids:  
+dataset_ids:
+  - ECCC_MSC_BUOYS
 
 # defaults to false
-log_time:  
+log_time:
