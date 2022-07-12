@@ -1,2 +1,2 @@
 #!/bin/sh
-python -m cde_harvester && python -m cde_db_loader
+python -m cde_harvester -f harvest_config.yaml && python -m cde_db_loader

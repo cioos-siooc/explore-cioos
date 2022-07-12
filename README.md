@@ -2,6 +2,15 @@
 
 [![Test](https://github.com/HakaiInstitute/cde/actions/workflows/build_and_test.yaml/badge.svg)](https://github.com/HakaiInstitute/cde/actions/workflows/build_and_test.yaml)
 
+## Testing a dataset
+
+If you just want to see how a dataset is harvested by CDE:
+
+1. Start your python environment environment, `conda create -n cde python=3.10;conda activate cde`
+1. `pip install -e ./harvester`
+1. `python -m cde_harvester --urls https://data.cioospacific.ca/erddap --dataset_ids ECCC_MSC_BUOYS`
+1. See files in `harvest` folder
+
 ## Starting using docker
 
 1. Install [Docker](https://docs.docker.com/get-docker/) and [Docker compose](https://docs.docker.com/compose/install/). New versions of Docker include `docker-compose`
