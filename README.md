@@ -8,7 +8,7 @@ If you just want to see how a dataset is harvested by CDE:
 
 1. Start your python environment environment, `conda create -n cde python=3.10;conda activate cde`
 1. `pip install -e ./harvester`
-1. `python -m cde_harvester https://data.cioospacific.ca/erddap --dataset_ids ECCC_MSC_BUOYS`
+1. `python -m cde_harvester --urls https://data.cioospacific.ca/erddap --dataset_ids ECCC_MSC_BUOYS`
 1. See files in `harvest` folder
 
 ## Starting using docker
