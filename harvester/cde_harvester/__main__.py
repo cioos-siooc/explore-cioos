@@ -178,9 +178,6 @@ def main(erddap_urls, cache_requests, folder, dataset_ids):
 
 def load_config(config_file):
     # get config settings from file, eg harvest_config.yaml
-    config_file_exists = os.path.exists(config_file)
-    if not config_file_exists:
-        return False
     with open(config_file, "r") as stream:
         try:
             config = yaml.safe_load(stream)
