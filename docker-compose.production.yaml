@@ -3,8 +3,8 @@ version: "3.3"
 services:
   redis:
     image: "redis:alpine"
-    ports:
-      - "6379:6379"
+    expose:
+      - "6379"
     command: redis-server /usr/local/etc/redis/redis.conf
     volumes:
       - redis-data:/var/lib/redis
@@ -46,7 +46,7 @@ services:
     depends_on:
       - web-api
     ports:
-      - "8098:4000"
+      - "$NGINX_PORT:4000"
   scheduler:
     build:
       # Scheduler needs context ., see the dockerfile
@@ -70,6 +70,23 @@ services:
       - "80"
     depends_on:
       - web-api
+
+  harvester:
+    build:
+      context: .
+      dockerfile: ./harvester/Dockerfile
+    profiles:
+      - tools
+    depends_on:
+      - db
+    volumes:
+      - ./harvest_config.yaml:/usr/src/app/harvest_config.yaml
+      - ./harvester_cache:/usr/src/app/harvester_cache
+      - ./harvest:/usr/src/app/harvest
+    environment:
+      - "DB_HOST_EXTERNAL=db"
+    env_file:
+      - .env
 volumes:
   postgres-data:
   redis-data:
