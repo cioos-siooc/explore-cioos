@@ -13,45 +13,45 @@ jobs:
       matrix:
         python-version: [3.9]
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
-    - name: Start containers
-      run: |
-        mv .env.sample .env
-        docker-compose -f "docker-compose.production.yaml" up -d --build --quiet-pull
+      - name: Start containers
+        run: |
+          mv .env.sample .env
+          docker-compose -f "docker-compose.production.yaml" up -d --build --quiet-pull
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-    
-    - name: Install ERDDAP harvester and db loader
-      run: pip install -q ./harvester ./db-loader
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Run ERDDAP harvester on sample dataset
-      run: python -m cde_harvester https://data.cioospacific.ca/erddap/ --dataset_ids DFO_MEDS_BUOYS --folder erddap_harvest
-    
-    - name: Load harvested data into the DB
-      run: python -m cde_db_loader erddap_harvest
+      - name: Install ERDDAP harvester and db loader
+        run: pip install -q ./harvester ./db-loader
 
-    - name: Install node
-      uses: actions/setup-node@v3
-      with:
-        node-version: 16.x
+      - name: Run ERDDAP harvester on sample dataset
+        run: python -m cde_harvester --urls https://data.cioospacific.ca/erddap/ --dataset_ids DFO_MEDS_BUOYS --folder erddap_harvest
 
-    - name: Install dependencies
-      working-directory: ./test
-      run: npm ci --quiet
+      - name: Load harvested data into the DB
+        run: python -m cde_db_loader --folder erddap_harvest
 
-    - name: Test API endpoints
-      working-directory: ./test
-      run: node frontend_loads_without_errors.js
+      - name: Install node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.x
 
-    - name: Test frontend loads without errors
-      working-directory: ./test
-      run: node frontend_loads_without_errors.js
+      - name: Install dependencies
+        working-directory: ./test
+        run: npm ci --quiet
 
-    - name: Stop containers
-      if: always()
-      run: docker-compose -f "docker-compose.production.yaml" down
+      - name: Test API endpoints
+        working-directory: ./test
+        run: node frontend_loads_without_errors.js
+
+      - name: Test frontend loads without errors
+        working-directory: ./test
+        run: node frontend_loads_without_errors.js
+
+      - name: Stop containers
+        if: always()
+        run: docker-compose -f "docker-compose.production.yaml" down

@@ -1,3 +1,6 @@
+from distutils.log import error
+from multiprocessing.sharedctypes import Value
+import yaml
 import argparse
 import logging
 import os
@@ -7,20 +10,22 @@ import threading
 import numpy as np
 import pandas as pd
 import yaml
-from cde_harvester.ckan.create_ckan_erddap_link import (get_ckan_records,
-                                                        unescape_ascii)
+from cde_harvester.ckan.create_ckan_erddap_link import get_ckan_records, unescape_ascii
 from cde_harvester.harvest_erddap import harvest_erddap
-from cde_harvester.utils import (cf_standard_names,
-                                 df_cde_eov_to_standard_name,
-                                 supported_standard_names)
+from cde_harvester.utils import (
+    cf_standard_names,
+    supported_standard_names,
+)
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
-def setup_logging(log_time):
+def setup_logging(log_time, log_level):
     # setup logging
+    print(log_time, log_level)
     root = logging.getLogger()
-    root.setLevel(logging.DEBUG)
+
+    root.setLevel(getattr(logging, (log_level or "DEBUG").upper()))
     handler = logging.StreamHandler(sys.stdout)
 
     if log_time:
@@ -154,9 +159,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids):
     variables.drop_duplicates().to_csv(variables_file, index=False)
     df_ckan.to_csv(ckan_file, index=False)
     skipped_datasets.drop_duplicates().to_csv(skipped_datasets_file, index=False)
-    df_cde_eov_to_standard_name.drop_duplicates().to_csv(
-        "df_cde_eov_to_standard_name.csv", index=False
-    )
+
     print(
         "Wrote",
         datasets_file,
@@ -173,13 +176,8 @@ def main(erddap_urls, cache_requests, folder, dataset_ids):
         )
 
 
-def load_config():
-    # get config settings from harvest_config.yaml
-    config_file = "harvest_config.yaml"
-
-    config_file_exists = os.path.exists(config_file)
-    if not config_file_exists:
-        return False
+def load_config(config_file):
+    # get config settings from file, eg harvest_config.yaml
     with open(config_file, "r") as stream:
         try:
             config = yaml.safe_load(stream)
@@ -190,53 +188,67 @@ def load_config():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        parser = argparse.ArgumentParser()
-        parser.add_argument("erddap_urls")
-        parser.add_argument(
-            "--dataset_ids",
-            help="only scrape these dataset IDs. Comma separated list",
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--urls",
+        help="harvest from these erddap servers, comme separated",
+    )
+    parser.add_argument(
+        "--dataset_ids",
+        help="only scrape these dataset IDs. Comma separated list",
+    )
+
+    parser.add_argument(
+        "--cache", help="Cache requests, for testing only", action="store_true"
+    )
+
+    parser.add_argument(
+        "--folder",
+        help="Folder to save harvested data to",
+        default="harvest",
+    )
+
+    parser.add_argument(
+        "--log-level",
+        default="debug",
+        help="Provide logging level. Example --log-level debug, default=debug",
+    )
+    parser.add_argument(
+        "--log-time",
+        default=False,
+        help="add time to logs",
+        action="store_true",
+    )
+
+    parser.add_argument(
+        "-f",
+        "--file",
+        help="get these options from a config file instead",
+    )
+
+    args = parser.parse_args()
+    
+    log_time = args.log_time
+    log_level = args.log_level
+    urls = args.urls
+    cache = args.cache
+    dataset_ids = args.dataset_ids
+    folder = args.folder
+
+    config_file=args.file
+    if config_file:
+        config = load_config(config_file)
+        print(
+            "Using config from harvest_config.yaml, ignoring command line arguments"
         )
+        urls = ",".join(config.get("erddap_urls") or [])
+        cache = config.get("cache")
+        folder = config.get("folder")
+        dataset_ids = ",".join(config.get("dataset_ids") or [])
+        log_time = config.get("log_time")
+        log_level = config.get("log_level")
+        
 
-        parser.add_argument(
-            "--cache", help="Cache requests, for testing only", action="store_true"
-        )
+    setup_logging(log_time, log_level)
 
-        parser.add_argument(
-            "--folder",
-            help="Folder to save harvested data to",
-            default="harvest",
-        )
-
-        parser.add_argument(
-            "--log-level",
-            default="debug",
-            help="Provide logging level. Example --loglevel debug, default=debug",
-        )
-        parser.add_argument(
-            "--log-time", type=bool, default=False, nargs="?", help="add time to logs"
-        )
-
-        args = parser.parse_args()
-
-        log_time = args.log_time
-        erddap_urls = args.erddap_urls
-        cache = args.cache
-        dataset_ids = args.dataset_ids
-        folder = args.folder
-    else:
-        # print(sys.argv)
-        config = load_config()
-        if config:
-            print(
-                "Using config from harvest_config.yaml, ignoring command line arguments"
-            )
-            erddap_urls = ",".join(config["erddap_urls"])
-            cache = config.get("cache")
-            folder = config.get("folder")
-            dataset_ids = config.get("dataset_ids")
-            log_time = config.get("log_time")
-
-    setup_logging(log_time)
-    print(erddap_urls, cache, folder, dataset_ids)
-    main(erddap_urls, cache, folder or "harvest", dataset_ids)
+    main(urls, cache, folder or "harvest", dataset_ids)
