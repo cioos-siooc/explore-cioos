@@ -2,8 +2,6 @@ import React from 'react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronCompactLeft, ChevronCompactRight, CircleFill, HexagonFill } from 'react-bootstrap-icons'
-import * as chroma from "chroma-js"
-import * as d3 from 'd3-scale-chromatic'
 import * as _ from 'lodash'
 
 import { capitalizeFirstLetter, generateColorStops } from '../../../utilities.js'

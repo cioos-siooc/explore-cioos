@@ -97,7 +97,7 @@ export default function Filter({
             {t('closeButtonText')}
           </button>
           {infoButton &&
-            <a className='filterInfoButton' href={infoButton} target='_blank' title={t('Learn more about the filter here')} >
+            <a className='filterInfoButton' href={infoButton} target='_blank' title={t('filterInfoButtonTitle')} >
               <BoxArrowUpRight color='#007bff' size={17.5} />
             </a>
           }

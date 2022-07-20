@@ -9,10 +9,8 @@
   padding: 2.5px 5px 2.5px 5px;
   overflow-y: auto;
   transition: left 1s;
-  /* transition: height 1s; */
   font-size: small;
   max-height: max-content;
-  /* min-width: max-content; */
 }
 
 .legend:hover {
@@ -48,14 +46,6 @@
   background-color: #c4c4c4;
   cursor: pointer;
 }
-
-/* @media (max-height: 650px) and (max-width:900px) {
-  .legend.panelOpen {
-    max-height: 100px;
-    overflow-y: auto;
-    bottom: 10px;
-  }
-} */
 
 @media (max-height: 650px) and (max-width:900px) {
   .legend {
