@@ -460,6 +460,7 @@ export default function App() {
           selectAllButton={() => setAllOptionsIsSelectedTo(true, platformsSelected, setPlatformsSelected)}
           resetButton={() => setAllOptionsIsSelectedTo(false, platformsSelected, setPlatformsSelected)}
           numberOfOptions={platformsSelected.length}
+          infoButton='http://vocab.nerc.ac.uk/collection/L06/current/'
         >
           <MultiCheckboxFilter
             optionsSelected={createOptionSubset(platformsSearchTerms, platformsSelected)}

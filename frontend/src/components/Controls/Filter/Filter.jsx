@@ -2,11 +2,11 @@ import * as React from 'react'
 import { useRef } from 'react'
 import * as _ from 'lodash'
 import { useState, useEffect } from 'react'
-import { ChevronCompactDown, ChevronCompactUp, X } from 'react-bootstrap-icons'
+import { ChevronCompactDown, ChevronCompactUp, X, QuestionCircle, BoxArrowUpRight } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
-import { abbreviateString, useOutsideAlerter, setAllOptionsIsSelectedTo } from '../../../utilities'
+import { abbreviateString, useOutsideAlerter } from '../../../utilities'
 
 import './styles.css'
 
@@ -25,6 +25,7 @@ export default function Filter({
   resetButton,
   selectAllButton,
   numberOfOptions,
+  infoButton,
   children }) {
 
   const { t } = useTranslation()
@@ -95,8 +96,13 @@ export default function Filter({
           <button onClick={() => setFilterOpen(false)}>
             {t('closeButtonText')}
           </button>
+          {infoButton &&
+            <a className='filterInfoButton' href={infoButton} target='_blank' title={t('Learn more about the filter here')} >
+              <BoxArrowUpRight color='#007bff' size={17.5} />
+            </a>
+          }
         </div>
       }
-    </div>
+    </div >
   )
 }

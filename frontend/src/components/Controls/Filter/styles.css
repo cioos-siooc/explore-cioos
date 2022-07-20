@@ -68,3 +68,21 @@
   background-color: lightgray;
   cursor: pointer;
 }
+
+.filterInfoButton {
+  position: absolute;
+  /* float: right; */
+  border-radius: 5px;
+  height: 30px;
+  width: 30px;
+  bottom: 16px;
+  right: 8px;
+}
+
+.filterInfoButton:hover {
+  background-color: lightgrey;
+}
+
+.filterInfoButton svg {
+  margin: 6px 7px 7px 7px;
+}
