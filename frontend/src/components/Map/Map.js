@@ -33,6 +33,12 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       }),
     }
   }
+  const smallCircleSize = 2.75
+  const largeCircleSize = 6
+  const circleOpacity = 0.6
+  const hexOpacity = 0.85
+  const hexMinZoom = 0
+  const hexMaxZoom = 7
 
   const draw = new MapboxDraw(drawControlOptions)
   const drawPolygon = useRef(draw)
@@ -227,10 +233,8 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         version: 8,
         sources: {
           osm: {
-            type: "raster", // https://stamen-tiles-d.a.ssl.fastly.net/terrain/9/72/163.png
-            tiles: ["https://stamen-tiles-d.a.ssl.fastly.net/terrain/{z}/{x}/{y}.png"],
-            // tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-            // tiles: ["https://tiles.emodnet-bathymetry.eu/2020/baselayer/web_mercator/{z}/{x}/{y}.png"],
+            type: "raster",
+            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
             tileSize: 256,
           },
         },
@@ -260,20 +264,20 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       map.current.addLayer({
         id: "points",
         type: "circle",
-        minzoom: 7,
+        minzoom: hexMaxZoom,
         source: {
           type: "vector",
           tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`],
         },
         "source-layer": "internal-layer-name",
         paint: {
-          'circle-opacity': 1,
+          'circle-opacity': circleOpacity,
           "circle-radius": [
             'case',
             ['<=', ['get', 'count'], 2],
-            2.5,
+            smallCircleSize,
             ['>', ['get', 'count'], 2],
-            5,
+            largeCircleSize,
             5
           ],
           'circle-color': colors
@@ -283,8 +287,8 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       map.current.addLayer({
         id: "hexes",
         type: "fill",
-        minzoom: 0,
-        maxzoom: 7,
+        minzoom: hexMinZoom,
+        maxzoom: hexMaxZoom,
 
         source: {
           type: "vector",
@@ -293,7 +297,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         "source-layer": "internal-layer-name",
 
         paint: {
-          "fill-opacity": 0.9,
+          "fill-opacity": hexOpacity,
           "fill-color":
           {
             property: 'count',
@@ -305,8 +309,8 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       map.current.addLayer({
         id: "hexes-hovered",
         type: "fill",
-        minzoom: 0,
-        maxzoom: 7,
+        minzoom: hexMinZoom,
+        maxzoom: hexMaxZoom,
 
         source: {
           type: "vector",
@@ -315,7 +319,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         "source-layer": "internal-layer-name",
 
         paint: {
-          "fill-opacity": 0.9,
+          "fill-opacity": hexOpacity,
           "fill-color":
           {
             property: 'count',
@@ -328,7 +332,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       map.current.addLayer({
         id: "points-highlighted",
         type: "circle",
-        minzoom: 7,
+        minzoom: hexMaxZoom,
         source: {
           type: "vector",
           tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`],
@@ -336,13 +340,13 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         "source-layer": "internal-layer-name",
         paint: {
           "circle-color": colors,
-          "circle-opacity": 1,
+          "circle-opacity": circleOpacity,
           "circle-radius": [
             'case',
             ['<=', ['get', 'count'], 2],
-            2.5,
+            smallCircleSize,
             ['>', ['get', 'count'], 2],
-            5,
+            largeCircleSize,
             5
           ],
           "circle-stroke-color": 'black',
@@ -354,7 +358,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       map.current.addLayer({
         id: 'points-hovered',
         type: "circle",
-        minzoom: 7,
+        minzoom: hexMaxZoom,
         source: {
           type: "vector",
           tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`],
@@ -362,17 +366,15 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         "source-layer": "internal-layer-name",
         paint: {
           "circle-color": colors,
-          "circle-opacity": 1,
+          "circle-opacity": circleOpacity,
           "circle-radius": [
             'case',
             ['<=', ['get', 'count'], 2],
-            2,
+            smallCircleSize,
             ['>', ['get', 'count'], 2],
-            5,
+            largeCircleSize,
             5
           ],
-          // "circle-stroke-color": "black",
-          // "circle-stroke-width": 1
         },
         filter: ['in', 'pk', '']
       })

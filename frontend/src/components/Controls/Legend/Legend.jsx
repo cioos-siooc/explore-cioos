@@ -105,54 +105,11 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen, pl
     }
   }
   const className = classNames('legend', { panelOpen: selectionPanelOpen })
-  // const colors = chroma.scale('greys').gamma(0.5).mode('lab').colors(7).slice(1)
-  // colors.push(...chroma.scale('reds').gamma(0.5).mode('lab').colors(7).slice(1))
-  // colors.push(...chroma.scale('blues').gamma(0.5).mode('lab').colors(7).slice(1))
-  // colors.push(...chroma.scale('greens').gamma(0.5).mode('lab').colors(7).slice(1))
-  // colors.push(...chroma.scale('purples').gamma(0.5).mode('lab').colors(7).slice(1))
-  // colors.push(...chroma.scale(['#f6dbf6', '#ff03ff']).mode('lab').colors(7).slice(1))
-  // // colors.push(...chroma.scale('yellows').gamma(0.5).mode('lab').colors(7).slice(1))
-
-  // const colors = d3.schemeCategory10
-  // colors.push('#000000')
-
-  // https://observablehq.com/@camerongarrett/c-labs-color-palette
-  // const colors = ["#c73174", "#433acb", "#009976", "#ffd000", "#eb5846", "#a0179f", "#005fbb", "#00b14e", "#ff8e10", "#7918c1", "#96c31e", "#007e9b", "#000000"]
-  // const colors = ["#52a79b", "#c73174", "#0050c4", "#00b545", "#f1613d", "#9914a7", "#0078a2", "#c3c900", "#6724c8", "#ffa700", "#000000"]
-
-  /*
-  Fixed (6)
-  Boats (14)
-  Buoys (11)
-  Submersible (7)
-  Ice (5)
-  Animals (8)
-  Vehicles (7)
-  Gliders (3)
-  Space (6)
-  Air (12)
-  Uknown/ungrouped (2)
-  */
-
-  // http://vrl.cs.brown.edu/color
-  //const colors = ["#50a79b", "#7ce5e6", "#1d686e", "#7feb90", "#1d8a20", "#c9dd87", "#6a7f2f", "#e6bfa2", "#863c2c", "#db6f8a", "#000000"]
-  const colors = ["#50a79b", "#bb0749", "#fdc7cc", "#6404b7", "#cd6ad8", "#e38744", "#1b4dab", "#76480d", "#2a6b2a", "#e23209", "#3693f2", "#ea3ffc", "#8fca40", "#f7d153", "#000000"]
   return (
     <div
       className={className}
       onClick={() => setLegendOpen(!legendOpen)}
     >
-      {/* {colors.map((color, index) => {
-        return (
-          <LegendElement
-            key={index}
-            title={color}
-            open={legendOpen}
-          >
-            <CircleFill size={15} fill={color} />
-          </LegendElement>
-        )
-      })} */}
       {generateLegendElements()}
       <LegendElement
         open={legendOpen}
