@@ -142,7 +142,7 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen, pl
       className={className}
       onClick={() => setLegendOpen(!legendOpen)}
     >
-      {colors.map((color, index) => {
+      {/* {colors.map((color, index) => {
         return (
           <LegendElement
             key={index}
@@ -152,8 +152,8 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen, pl
             <CircleFill size={15} fill={color} />
           </LegendElement>
         )
-      })}
-      {/* {generateLegendElements()} */}
+      })} */}
+      {generateLegendElements()}
       <LegendElement
         open={legendOpen}
       >

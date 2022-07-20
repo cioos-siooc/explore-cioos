@@ -115,8 +115,8 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
             let platformColor = platformColors.filter(pc => pc.platform === point.platform)
             return (
               <tr key={index}
-                // onMouseEnter={() => setHoveredDataset(point)}
-                // onMouseLeave={() => setHoveredDataset()}
+                onMouseEnter={() => setHoveredDataset(point)}
+                onMouseLeave={() => setHoveredDataset()}
               >
                 <td
                   onClick={() => {

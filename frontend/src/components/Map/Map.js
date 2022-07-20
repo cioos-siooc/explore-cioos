@@ -141,15 +141,15 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     }
   }
 
-  // useEffect(() => {
-  //   if (map.current) {
-  //     if (!_.isEmpty(hoveredDataset)) {
-  //       hoverHighlightPoints(hoveredDataset.pk)
-  //     } else {
-  //       hoverHighlightPoints()
-  //     }
-  //   }
-  // }, [hoveredDataset])
+  useEffect(() => {
+    if (map.current) {
+      if (!_.isEmpty(hoveredDataset)) {
+        hoverHighlightPoints(hoveredDataset.pk)
+      } else {
+        hoverHighlightPoints()
+      }
+    }
+  }, [hoveredDataset])
 
   function highlightPoints(polygon) {
     var features = map.current.queryRenderedFeatures({ layers: ['points'] }).map(point => {
@@ -227,8 +227,10 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         version: 8,
         sources: {
           osm: {
-            type: "raster",
-            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+            type: "raster", // https://stamen-tiles-d.a.ssl.fastly.net/terrain/9/72/163.png
+            tiles: ["https://stamen-tiles-d.a.ssl.fastly.net/terrain/{z}/{x}/{y}.png"],
+            // tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+            // tiles: ["https://tiles.emodnet-bathymetry.eu/2020/baselayer/web_mercator/{z}/{x}/{y}.png"],
             tileSize: 256,
           },
         },
