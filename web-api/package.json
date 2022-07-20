@@ -9,6 +9,7 @@
     "@mapbox/sphericalmercator": "^1.1.0",
     "@sentry/node": "^6.17.8",
     "@sentry/tracing": "^6.17.8",
+    "axios": "^0.27.2",
     "clusterbuster": "^2.9.0",
     "cookie-parser": "~1.4.4",
     "cors": "^2.8.5",
