@@ -4,10 +4,9 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import requests
+from cde_harvester.platform_ioos_to_l06 import platforms_nerc_ioos
+from cde_harvester.utils import cde_eov_to_standard_name, intersection
 from requests.exceptions import HTTPError
-
-from erddap_scraper.platform_ioos_to_l06 import platforms_nerc_ioos
-from erddap_scraper.utils import cde_eov_to_standard_name, intersection
 
 
 def is_valid_duration(duration):
@@ -53,8 +52,8 @@ class Dataset(object):
         return self.df
 
     def dataset_tabledap_query(self, url):
-        return self.erddap_server.erddap_csv_to_df(
-            "/tabledap/" + self.id + ".csv?" + url, logger=self.logger
+        return self.erddap_csv_to_df(
+            "/tabledap/" + self.id + ".csv?" + url, dataset=self
         )
 
     def get_max_min(self, vars):
@@ -110,11 +109,38 @@ class Dataset(object):
         if not profile_variables:
             return []
 
+        # dropna - for when there are nulls in the lat/lon column leading to a second profile created
         profile_ids = self.dataset_tabledap_query(
             f"{','.join(profile_variable_list + lat_lng)}&distinct()"
         )
 
+        if profile_ids.empty:
+            return profile_ids
+
+        profile_ids = profile_ids.dropna(subset=["latitude", "longitude"])
+
+        profile_ids["latlon"] = (
+            profile_ids["latitude"].astype(str)
+            + ","
+            + profile_ids["longitude"].astype(str)
+        )
+        profiles_with_multiple_locations = (
+            profile_ids.groupby(profile_variable_list)
+            .count()[["latlon"]]
+            .query("latlon>1")
+            .index.to_list()
+        )
+
+        del profile_ids["latlon"]
+
         profile_ids = profile_ids.drop_duplicates(profile_variable_list)
+
+        if profiles_with_multiple_locations:
+            self.logger.warn(
+                "Non unique lat/lon found within profiles:"
+                + str(profiles_with_multiple_locations)
+            )
+
         self.profile_ids = profile_ids
         return profile_ids
 
@@ -188,9 +214,6 @@ class Dataset(object):
 
         return df_count
 
-    def get_data_access_form_url(self):
-        return self.erddap_url + "/tabledap/" + self.id + ".html"
-
     def get_eovs(self):
         eovs = []
         dataset_standard_names = self.df_variables["standard_name"].to_list()
@@ -210,7 +233,7 @@ class Dataset(object):
             try:
                 l06_platform_label = platforms_nerc_ioos.query(
                     f"ioos_label=='{platform}'"
-                )["l06_label"].item()
+                )["category"].item()
 
                 return l06_platform_label
 
@@ -218,10 +241,16 @@ class Dataset(object):
                 self.logger.debug("Found unsupported IOOS platform:", platform)
 
         if "L06" in platform_vocabulary:
+            platforms_nerc_ioos_no_duplicates = platforms_nerc_ioos.drop_duplicates(
+                subset=["l06_label"]
+            )
+
             if platform in list(platforms_nerc_ioos["l06_label"]):
-                return platform
+                return platforms_nerc_ioos_no_duplicates.query(
+                    f"l06_label=='{platform}'"
+                )["category"].item()
             else:
-                self.logger.debug("Found unsupported L06 platform:", platform)
+                self.logger.debug("Found unsupported L06 platform: " + platform)
 
     def get_metadata(self):
         "get all the global and variable metadata for a dataset"
@@ -229,7 +258,11 @@ class Dataset(object):
         # transform this JSON to an easier to use format
         url = "/info/" + self.id + "/index.csv"
         # erddap_csv_to_df's skiprows defaults to [1]
-        df = self.erddap_csv_to_df(url, skiprows=[], logger=self.logger).fillna("")
+        df = self.erddap_csv_to_df(url, skiprows=[], dataset=self).fillna("")
+
+        if df.empty:
+            self.logger.error("Dataset metadata not found")
+            return df
 
         considered_attributes = ["cf_role", "standard_name", "actual_range"]
 

@@ -1,15 +1,23 @@
+/* 
 
--- This takes the data in temporary tables- ckan_data_loader,datasets_data_loader, and profiles_data_loader
--- and inserts records into tables datasets,profiles,points
+profile_process() 
+
+ - set profiles columns: geom, dataset_pk, point_pk
+ - set erddap_variables columns: dataset_pk 
+ - recreate the points table
+ 
+ */
+
 
 CREATE OR REPLACE FUNCTION profile_process() RETURNS VOID AS $$
 BEGIN
 
 
 -- AFTER LOADING PROFILE DATA:
-update
-        cioos_api.profiles
-set
+
+UPDATE
+        cde.profiles
+SET
         geom = st_transform(
                 ST_SetSRID(ST_MakePoint(longitude, latitude), 4326),
                 3857
@@ -19,53 +27,52 @@ WHERE
 
 -- links profiles to datasets via PK
 UPDATE
-        cioos_api.profiles p
+        cde.profiles p
 SET
         dataset_pk = d.pk
 FROM
-        cioos_api.datasets d
+        cde.datasets d
 WHERE
         p.dataset_id = d.dataset_id
         AND p.erddap_url = d.erddap_url;
 
 UPDATE
-        cioos_api.erddap_variables v
+        cde.erddap_variables v
 SET
         dataset_pk = d.pk
 FROM
-        cioos_api.datasets d
+        cde.datasets d
 WHERE
         v.dataset_id = d.dataset_id
         AND v.erddap_url = d.erddap_url;
 
 -- point PKs
 DELETE FROM
-        cioos_api.points;
+        cde.points;
 
--- with pp as (select distinct geom,hex_zoom_0,hex_zoom_1 from cioos_api.profiles)
-with pp as (
+WITH pp as (
         select
                 distinct geom
         from
-                cioos_api.profiles
+                cde.profiles
 )
-insert into
-        cioos_api.points (geom)
-select
+INSERT INTO
+        cde.points (geom)
+SELECT
         geom
-from
+FROM
         pp;
 
 UPDATE
-        cioos_api.profiles
+        cde.profiles
 SET
         point_pk = points.pk
 FROM
-        cioos_api.points
+        cde.points
 WHERE
         points.geom = profiles.geom;
 
-UPDATE cioos_api.profiles set days=date_part('days',time_max-time_min)+1;
+UPDATE cde.profiles set days=date_part('days',time_max-time_min)+1;
 
   END;
 $$ LANGUAGE plpgsql;

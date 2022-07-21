@@ -12,12 +12,40 @@ CDE converts IOOS to L06 using a mapping found here:  https://mmisw.org/ont?iri=
 
 
 def get_l06_codes_and_labels():
-    # parse NERC L06 to verify platform labels and map to IOOS
-    url = "http://vocab.nerc.ac.uk/collection/L06/current/?_profile=dd&_mediatype=application/json"
-    df = pd.read_json(url)
-    df["l06_code"] = df.apply(lambda x: x["uri"].split("/")[-2], axis=1)
-    df = df[["l06_code", "prefLabel"]].set_index("l06_code")
-    df.rename(columns={"prefLabel": "l06_label"}, inplace=True)
+
+    url = "http://vocab.nerc.ac.uk/collection/L06/current/?_profile=nvs&_mediatype=application/ld+json"
+    platforms = requests.get(url).json()["@graph"]
+
+    platforms_parsed = {}
+    l06Lookup = {}
+
+    for platform in platforms:
+        # first entry describes the vocabulary, skip it
+        if not "identifier" in platform:
+            continue
+
+        label = platform["prefLabel"]["@value"]
+        broader = platform.get("broader", [])
+        id = platform["@id"]
+        found_parent_platform = False
+        for url in broader:
+            if "L06" in url:
+                platforms_parsed[id] = {"broader_L06_url": url, "l06_label": label}
+                found_parent_platform = True
+                continue
+        if not found_parent_platform:
+            # this must be a platform category
+            platforms_parsed[id] = {"broader_L06_url": id, "l06_label": label}
+        l06Lookup[id] = label
+
+    for l06_url_code, item in platforms_parsed.items():
+        broaderL06 = item["broader_L06_url"]
+        res = l06Lookup[broaderL06]
+        platforms_parsed[l06_url_code]["category"] = res
+    df = pd.DataFrame.from_dict(platforms_parsed, orient="index")
+    del df["broader_L06_url"]
+    df.index = df.index.str.split("/").str[-2]
+    df.index.names = ["l06_code"]
     return df
 
 

@@ -14,11 +14,8 @@ venv
 *.env
 .ipynb_checkpoints
 *.ipynb
-harvester_cache
 ckan_harvester_cache
 build
 *.csv
 !harvester/**/*.csv
 harvest
-harvester_cache
-harvest_config.yaml

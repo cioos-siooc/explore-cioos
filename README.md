@@ -2,14 +2,23 @@
 
 [![Test](https://github.com/HakaiInstitute/cde/actions/workflows/build_and_test.yaml/badge.svg)](https://github.com/HakaiInstitute/cde/actions/workflows/build_and_test.yaml)
 
+## Testing a dataset
+
+If you just want to see how a dataset is harvested by CDE:
+
+1. Start your python environment environment, `conda create -n cde python=3.10;conda activate cde`
+1. `pip install -e ./harvester`
+1. `python -m cde_harvester --urls https://data.cioospacific.ca/erddap --dataset_ids ECCC_MSC_BUOYS`
+1. See files in `harvest` folder
+
 ## Starting using docker
 
 1. Install [Docker](https://docs.docker.com/get-docker/) and [Docker compose](https://docs.docker.com/compose/install/). New versions of Docker include `docker-compose`
 1. Rename .env.sample to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
 1. `docker-compose up -d` to start all services. This will take a few minute to download, build, create the database schema.
-1. Start your python 3.9 or greater environment, eg `python3 -m venv venv && source venv/bin/activate`
-1. `pip install -e ./scraper`
-1. Run scraper to load data. From this directory, run: `sh data_loader_test.sh` to just load one dataset for testing purposes
+1. Start your python 3.10 or greater environment, eg `conda create -n cde python=3.10;conda activate cde`
+1. `pip install -e ./harvester -e ./db-loader`
+1. Run harvester to load data. From this directory, run: `sh data_loader_test.sh` to just load one dataset for testing purposes
 1. See website at <http://localhost:8098>
 
 ## Development
@@ -23,9 +32,9 @@
 - Setup Python virtual env and install Python modules:
 
   ```sh
-  python3 -m venv venv
-  source venv/bin/activate
-  pip install -e ./downloader ./download_scheduler ./scraper
+  conda create -n cde python=3.10
+  conda activate cde
+  pip install -e ./downloader -e ./download_scheduler -e ./harvester -e ./db-loader
   ```
 
 - Start the API:
@@ -101,8 +110,9 @@ From the production server,
 - Scrape data:
 
   ```sh
-  source venv/bin/activate
-  pip install -e ./scraper
+  conda create -n cde python=3.10
+  conda activate cde
+  pip install -e ./harvester -e ./db-loader
   sh data_loader.sh
   ```
 

@@ -12,7 +12,7 @@ import pandas as pd
 import requests
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
-from erddap_scraper.dataset import Dataset
+from cde_harvester.dataset import Dataset
 
 
 class ERDDAP(object):
@@ -25,7 +25,7 @@ class ERDDAP(object):
         if cache_requests:
             # limit cache to 10gb
             self.cache = dc.Cache(
-                "erddap_scraper_dc",
+                "harvester_cache",
                 eviction_policy="none",
                 size_limit=10000000000,
                 cull_limit=0,
@@ -61,7 +61,8 @@ class ERDDAP(object):
         "Get a string list of dataset IDs from the ERDDAP server"
         # allDatasets indexes table and grid datasets
         df = self.erddap_csv_to_df(
-            '/tabledap/allDatasets.csv?&accessible="public"', skiprows=[1, 2]
+            '/tabledap/allDatasets.csv?&accessible="public"&dataStructure="table"',
+            skiprows=[1, 2],
         )
         return df
 
@@ -83,15 +84,19 @@ class ERDDAP(object):
 
         return pd.to_datetime(series, errors="coerce")
 
-    def erddap_csv_to_df(self, url, skiprows=[1], logger=None):
+    def erddap_csv_to_df(self, url, skiprows=[1], dataset=None):
         """If theres an error in the request, this raises up to the dataset loop, so this dataset gets skipped"""
-        if not logger:
+        if dataset:
+            logger = dataset.logger
+            erddap_url = dataset.erddap_url
+
+        else:
             logger = self.logger
+            erddap_url = self.url
 
-        url_combined = self.url + url
+        url_combined = erddap_url + url
+
         logger.debug(unquote(url_combined))
-
-        # response = self.session.get(url_combined)
 
         response = None
         if self.cache_requests:
@@ -104,6 +109,17 @@ class ERDDAP(object):
                 cache[url_combined] = response
         else:
             response = self.session.get(url_combined)
+
+        original_hostname = urlparse(url_combined).hostname
+        actual_hostname = urlparse(response.url).hostname
+
+        if original_hostname != actual_hostname:
+            # redirect due to EDDTableFromErddap
+            if dataset:
+                logger.debug(
+                    "Redirecting " + original_hostname + " to " + actual_hostname
+                )
+                dataset.erddap_url = response.url.split("/erddap")[0] + "/erddap"
 
         no_data = False
         # Newer erddaps respond with 404 for no data

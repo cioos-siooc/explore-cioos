@@ -3,8 +3,7 @@
 from datetime import datetime
 
 import pandas as pd
-
-from erddap_scraper.ERDDAP import ERDDAP
+from cde_harvester.ERDDAP import ERDDAP
 
 dtypes = {
     "erddap_url": str,
@@ -27,7 +26,7 @@ def get_profiles(dataset):
     For ONC we can't get max min values for profiles but we can get it for the entire dataset. This works because
     they only use one profile per dataset
 
-    llat_variables_in_dataset is any of latitude/longitude/time/depth variables that exist in this dataset
+    llat_variables_in_dataset is any of time, depth variables that exist in this dataset
 
     Example of profile_variable is: {'profile_id': 'hakai_id', 'timeseries_id': 'station'}
 
@@ -54,7 +53,6 @@ def get_profiles(dataset):
     profiles = profiles_with_lat_lon[
         profiles_with_lat_lon.columns.difference(["latitude", "longitude"])
     ].drop_duplicates()
-
     # Organize dataset variables by their cf_roles
     # eg profile_variable={'profile_id': 'hakai_id', 'timeseries_id': 'station'}
     profile_variables = dataset.profile_variables
@@ -188,7 +186,7 @@ def get_profiles(dataset):
     profiles["time_min"] = ERDDAP.parse_erddap_dates(profiles["time_min"])
     profiles["time_max"] = ERDDAP.parse_erddap_dates(profiles["time_max"])
     profiles["dataset_id"] = dataset.id
-    profiles["erddap_url"] = dataset.erddap_server.url
+    profiles["erddap_url"] = dataset.erddap_url
 
     # special case
     if "altitude" in dataset.variables_list:
