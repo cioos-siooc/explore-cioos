@@ -35,8 +35,8 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
   }
   const smallCircleSize = 2.75
   const largeCircleSize = 6
-  const circleOpacity = 0.6
-  const hexOpacity = 0.85
+  const circleOpacity = 0.7
+  const hexOpacity = 0.8
   const hexMinZoom = 0
   const hexMaxZoom = 7
 
@@ -506,7 +506,6 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
 
     map.current.on('dragend', e => {
       if (drawPolygon.current.getAll().features.length > 0) {
-        setPointsToReview()
         if (map.current.getZoom() >= 7) {
           setLoading(true)
           highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])

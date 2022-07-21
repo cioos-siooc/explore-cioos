@@ -23,11 +23,11 @@
 
 .multiCheckboxFilter .optionButton:hover {
   background-color: #52a79b;
-  color: #f7f7f7;
+  color: white;
 }
 
 .multiCheckboxFilter .searchResultsButton {
-  background-color: #f7f7f7;
+  background-color: white;
   margin-left: 10px;
   position: sticky;
   top: 0px;
@@ -48,7 +48,7 @@
 .multiCheckboxFilter .searchResultsButton:hover {
   cursor: pointer;
   background-color: #52a79b;
-  color: #f7f7f7;
+  color: white;
 }
 
 .multiCheckboxFilter .optionColorCircle {

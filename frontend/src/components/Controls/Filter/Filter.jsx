@@ -98,7 +98,7 @@ export default function Filter({
           </button>
           {infoButton &&
             <a className='filterInfoButton' href={infoButton} target='_blank' title={t('filterInfoButtonTitle')} >
-              <BoxArrowUpRight color='#007bff' size={17.5} />
+              Info&nbsp;<BoxArrowUpRight color='#007bff' size={17.5} />
             </a>
           }
         </div>

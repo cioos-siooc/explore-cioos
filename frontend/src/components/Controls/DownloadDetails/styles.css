@@ -2,8 +2,8 @@
   padding: 5px 0px;
 }
 
-.downloadDetails>hr{
-  margin:0px;
+.downloadDetails>hr {
+  margin: 0px;
 }
 
 .downloadDataRow {
@@ -13,7 +13,7 @@
 
 .downloadDetailsControls {
   border-top: 1px solid darkgrey;
-  background-color: #f7f7f7;
+  background-color: white;
   padding: 10px;
   overflow-x: hidden;
 }
