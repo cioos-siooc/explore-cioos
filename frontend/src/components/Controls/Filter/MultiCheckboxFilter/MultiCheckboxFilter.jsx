@@ -100,7 +100,7 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
           >
             {option.isSelected ? <CheckSquare /> : <Square />}
             <span className='optionName'>
-              {capitalizeFirstLetter(abbreviateString(title, 30))}
+              {capitalizeFirstLetter(title)}
             </span>
             {colored && <CircleFill className='optionColorCircle' fill={platformColor} size='15' />}
           </div>
