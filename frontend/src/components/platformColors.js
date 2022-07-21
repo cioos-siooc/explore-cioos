@@ -9,7 +9,7 @@ const platformColors = [
   },
   {
     platform: "surface vessel",
-    color: "#4ea53f",
+    color: "#179f00",//"#4ea53f",
   },
   {
     platform: "cryosphere",
