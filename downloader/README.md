@@ -4,13 +4,13 @@
 
 Substitute `pip3` for `pip` if required
 
-1. Go the the downloader directory of the ceda package and Run the following command in a command shell:
+1. Go the the downloader directory of the CDE package and Run the following command in a command shell:
 
    ```python
    pip install -e .
    ```
 
-1. Go to the scraper directory and install the scraper package and Run the same command:
+1. Go to the harvester directory and install the harvester package and Run the same command:
 
    ```python
    pip install -e .
@@ -20,7 +20,7 @@ Substitute `pip3` for `pip` if required
 
 ## Description
 
-The CEDA downloader uses an CEDA json query (ex: downloader/test/\*.json ) to retrieve matching data
+The CDE downloader uses a json query (ex: downloader/test/\*.json ) to retrieve matching data
 form multiple CIOOS datasets. Downloader will for each datasets :
 
 1. Retrieve a pdf copy of the CKAN page dataset

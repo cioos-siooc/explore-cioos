@@ -3,21 +3,17 @@
 import traceback
 
 import pandas as pd
+from cde_harvester.CDEComplianceChecker import CDEComplianceChecker
+from cde_harvester.ERDDAP import ERDDAP
+from cde_harvester.harvest_errors import (CDM_DATA_TYPE_UNSUPPORTED,
+                                          HTTP_ERROR, UNKNOWN_ERROR)
+from cde_harvester.profiles import get_profiles
 from requests.exceptions import HTTPError
-
-from erddap_scraper.CDEComplianceChecker import CDEComplianceChecker
-from erddap_scraper.ERDDAP import ERDDAP
-from erddap_scraper.profiles import get_profiles
-from erddap_scraper.scraper_errors import (
-    CDM_DATA_TYPE_UNSUPPORTED,
-    HTTP_ERROR,
-    UNKNOWN_ERROR,
-)
 
 # TIMEOUT = 30
 
 
-def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=False):
+def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=False):
     # """ """
     skipped_datasets_reasons = []
 
@@ -115,18 +111,20 @@ def scrape_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fal
             print("Error occurred at ", erddap_url, dataset_id)
             skipped_datasets_reasons += skipped_reason(UNKNOWN_ERROR)
 
-    df_skipped_datasets = pd.DataFrame()
+    skipped_datasets_columns = ["erddap_url", "dataset_id", "reason_code"]
 
     if skipped_datasets_reasons:
         df_skipped_datasets = pd.DataFrame(
             skipped_datasets_reasons,
-            columns=["erddap_url", "dataset_id", "reason_code"],
+            columns=skipped_datasets_columns,
         )
 
         # logger.info(record_count)
         logger.info(
             f"skipped: {len(df_skipped_datasets)} datasets: {df_skipped_datasets['dataset_id'].to_list()}"
         )
+    else:
+        df_skipped_datasets = pd.DataFrame(columns=skipped_datasets_columns)
 
     # using 'result' to return data from each thread
     result.append(

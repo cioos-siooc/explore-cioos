@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "private": true,
-  "homepage": "https://hakaiinstitute.github.io/ceda/",
+  "homepage": "https://explore.cioos.ca/",
   "dependencies": {
     "@mapbox/mapbox-gl-draw": "^1.3.0",
     "@sentry/react": "^7.0.0",

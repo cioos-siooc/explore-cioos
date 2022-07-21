@@ -3,18 +3,16 @@
 from distutils.core import setup
 
 setup(
-    name="download_scheduler",
+    name="cde_db_loader",
     version="0.1",
     description="",
     url="",
-    packages=["download_scheduler"],
-    package_data={"download_scheduler": ["templates/*.j2"]},
-    include_package_data=True,
+    packages=["cde_db_loader"],
     install_requires=[
+        "pandas",
         "sqlalchemy",
         "psycopg2-binary",
-        "sentry-sdk",
         "python-dotenv",
-        "Jinja2",
+        "numpy",
     ],
 )

@@ -22,6 +22,9 @@ import Filter from './Controls/Filter/Filter.jsx'
 import MultiCheckboxFilter from './Controls/Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx'
 import TimeSelector from './Controls/Filter/TimeSelector/TimeSelector.jsx'
 import DepthSelector from './Controls/Filter/DepthSelector/DepthSelector.jsx'
+import ErrorBoundary from './ErrorBoundary/ErrorBoundary.jsx'
+import EnglishLogo from './Images/CIOOSNationalLogoBlackEnglish.svg'
+import FrenchLogo from './Images/CIOOSNationalLogoBlackFrench.svg'
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected, defaultPlatformsSelected } from './config.js'
 import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel, getPointsDataSize, generateMultipleSelectBadgeTitle, generateRangeSelectBadgeTitle, useDebounce, setAllOptionsIsSelectedTo } from '../utilities.js'
 
@@ -380,7 +383,13 @@ export default function App() {
   }
 
   return (
-    <div>
+    <ErrorBoundary
+      errorBoundaryMessage={t('errorBoundaryMessage')}
+      logoSource={i18n.language === 'en' ?
+        EnglishLogo :
+        FrenchLogo
+      }
+    >
       {loading && <Loading />}
       {rangeLevels &&
         <Map
@@ -598,6 +607,6 @@ export default function App() {
       </a> */}
       <IntroModal initialOpenState={true} />
       <LanguageSelector />
-    </div >
+    </ErrorBoundary>
   );
 }

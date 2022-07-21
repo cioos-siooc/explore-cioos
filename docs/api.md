@@ -1,4 +1,4 @@
-# CEDA API Endpoints
+# CDE API Endpoints
 
 ## /pointQuery
 

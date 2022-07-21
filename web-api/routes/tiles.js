@@ -30,17 +30,17 @@ router.get(
 
     // calculate the bounding polygon for this tile
     const sqlQuery = {
-      table: "cioos_api.profiles",
+      table: "cde.profiles",
       // if its a zoom level where hexes are show, return the hex shapes, otherwise return a point
       geom_column: isHexGrid ? zoomColumn : "geom",
     };
-    // not joining to cioos_api.points to get hexagons as that could be slower
+    // not joining to cde.points to get hexagons as that could be slower
     const SQL = `
   with relevent_points as (
     ${isHexGrid ? `SELECT ${zoomPKColumn} pk,count(distinct point_pk) count,` : "SELECT point_pk pk, d.platform as platform,sum(p.days)::bigint count,"} array_to_json(array_agg(distinct dataset_pk)) datasets,     
-      p.${sqlQuery.geom_column} AS geom FROM cioos_api.profiles p
+      p.${sqlQuery.geom_column} AS geom FROM cde.profiles p
         -- used for organizations filtering
-        JOIN cioos_api.datasets d
+        JOIN cde.datasets d
         ON p.dataset_pk = d.pk 
        ${filters ? "WHERE " + filters : ""}
         ${
