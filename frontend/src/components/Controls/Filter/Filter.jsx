@@ -63,7 +63,7 @@ export default function Filter({
       {(controlled ? filterOpen && openFilter : filterOpen) &&
         <div className='filterOptions'>
           {searchable && (
-            <div>
+            <>
               <input
                 autoFocus
                 className='filterSearch'
@@ -80,7 +80,7 @@ export default function Filter({
                   onClick={() => setSearchTerms('')}
                   title={t('filterClearSearchTitle')} //'Clear search terms' 
                 />}
-            </div>
+            </>
           )}
           {children}
           {selectAllButton &&

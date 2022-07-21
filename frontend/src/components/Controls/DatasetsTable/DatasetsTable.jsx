@@ -13,6 +13,7 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
   const [sortedData, setSortedData] = useState(datasets)
   const [sortProp, setSortProp] = useState('title')
   const [ascending, setAscending] = useState(false)
+  const [hoveredTableRow, setHoveredTableRow] = useState()
 
   useEffect(() => {
     setSortedData(datasets)
@@ -47,11 +48,12 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
 
   return (
     <div className='datasetsTable'>
-      <Table striped hover>
+      <Table>
         <thead>
           <tr>
             <th title={t('datasetsTableHeaderSelectAllTitle')}
               // Select all
+              className='selectDatasetColumn'
               onClick={(e) => {
                 handleSortByProperty('selected')
                 e.stopPropagation()
@@ -89,24 +91,12 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
               {t('datasetsTableHeaderTypeText')} {sortProp === 'cdm_data_type' && (ascending ? <SortAlphaDown /> : <SortAlphaUp />)}
             </th>
             <th
-              title={t('datasetsTableHeaderRecordsTitle')}
-              //'Sort by number of records in dataset' 
+              className='locationColumn'
+              title={t('datasetsTableHeaderLocationsTitle')}
+              //'Sort by number of locations in dataset' 
               onClick={() => handleSortByProperty('profiles_count')}
             >
-              {t('datasetsTableHeaderRecordsText')} {sortProp === 'profiles_count' && (ascending ? <SortNumericDown /> : <SortNumericUp />)}
-            </th>
-            <th
-              title={t('datasetsTableHeaderSizeTitle')}
-              // 'Sort by approximate dataset size in megabytes'
-              onClick={() => handleSortByProperty('size')}
-            >
-              {t('datasetsTableHeaderSizeText')} {sortProp === 'size' && (ascending ? <SortNumericDown /> : <SortNumericUp />)}
-            </th>
-            <th
-              title={t('datasetsTableHeaderDetailsTitle')}
-            //'Open dataset details'
-            >
-              {t('datasetsTableHeaderDetailsText')}
+              {t('datasetsTableHeaderLocationsText')} {sortProp === 'profiles_count' && (ascending ? <SortNumericDown /> : <SortNumericUp />)}
             </th>
           </tr>
         </thead>
@@ -115,12 +105,17 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
             let platformColor = platformColors.filter(pc => pc.platform === point.platform)
             return (
               <tr key={index}
-                onMouseEnter={() => setHoveredDataset(point)}
-                onMouseLeave={() => setHoveredDataset()}
+                onMouseEnter={() => {
+                  setHoveredDataset(point)
+                  setHoveredTableRow(index)
+                }}
+                onMouseLeave={() => {
+                  setHoveredDataset()
+                  setHoveredTableRow()
+                }}
               >
                 <td
                   onClick={() => {
-                    // setHoveredDataset()
                     handleSelectDataset(point)
                   }}
                   title={t('datasetsTableSelectTitle')}
@@ -134,7 +129,7 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                   onClick={() => setInspectDataset(point)}
                 >
                   {<CircleFill className='optionColorCircle' fill={!_.isEmpty(platformColor) ? platformColor[0].color : '#000000'} size='15' />}
-                  {abbreviateString(point.title, 35)}
+                  {point.title}
                 </td>
                 <td
                   style={{ wordBreak: point.cdm_data_type === 'TimeSeriesProfile' && 'break-word' }}
@@ -145,25 +140,12 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                   {point.cdm_data_type}
                 </td>
                 <td
-                  title={t('datasetsTableRecordsTitle')}
-                  //'Number of records in dataset'
+                  className='datasetTableLocationsCell'
+                  title={t('datasetsTableLocationsTitle')}
+                  //'Number of locations in dataset'
                   onClick={() => setInspectDataset(point)}
                 >
-                  {toInteger(point.profiles_count)}
-                </td>
-                <td
-                  title={t('datasetsTableSizeTitle')}
-                  //'Approximate dataset size in megabytes'
-                  onClick={() => setInspectDataset(point)}
-                >
-                  {bytesToMemorySizeString(point.size)}
-                </td>
-                <td
-                  title={t('datasetsTableDetailsTitle')}
-                  //'Open dataset details'
-                  onClick={() => setInspectDataset(point)}
-                >
-                  <div className='inspectButton'><ChevronCompactRight /></div>
+                  {toInteger(point.profiles_count)} {hoveredTableRow === index && <ChevronCompactRight size={25} title='view dataset details' />}
                 </td>
               </tr>
             )
