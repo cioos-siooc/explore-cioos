@@ -100,6 +100,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
             <DatasetInspector
               dataset={inspectDataset}
               setInspectDataset={setInspectDataset}
+              setHoveredDataset={setHoveredDataset}
             /> :
             (
               pointsData && pointsData.length > 0 &&
