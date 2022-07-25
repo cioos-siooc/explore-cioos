@@ -33,6 +33,12 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       }),
     }
   }
+  const smallCircleSize = 2.75
+  const largeCircleSize = 6
+  const circleOpacity = 0.7
+  const hexOpacity = 0.8
+  const hexMinZoom = 0
+  const hexMaxZoom = 7
 
   const draw = new MapboxDraw(drawControlOptions)
   const drawPolygon = useRef(draw)
@@ -222,7 +228,8 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     // Create map
     map.current = new maplibreGl.Map({
       container: mapContainer.current,
-      style: {
+      style:
+      {
         version: 8,
         sources: {
           osm: {
@@ -257,20 +264,20 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       map.current.addLayer({
         id: "points",
         type: "circle",
-        minzoom: 7,
+        minzoom: hexMaxZoom,
         source: {
           type: "vector",
           tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`],
         },
         "source-layer": "internal-layer-name",
         paint: {
-          'circle-opacity': 1,
+          'circle-opacity': circleOpacity,
           "circle-radius": [
             'case',
             ['<=', ['get', 'count'], 2],
-            2.5,
+            smallCircleSize,
             ['>', ['get', 'count'], 2],
-            5,
+            largeCircleSize,
             5
           ],
           'circle-color': colors
@@ -280,8 +287,8 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       map.current.addLayer({
         id: "hexes",
         type: "fill",
-        minzoom: 0,
-        maxzoom: 7,
+        minzoom: hexMinZoom,
+        maxzoom: hexMaxZoom,
 
         source: {
           type: "vector",
@@ -290,7 +297,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         "source-layer": "internal-layer-name",
 
         paint: {
-          "fill-opacity": 0.9,
+          "fill-opacity": hexOpacity,
           "fill-color":
           {
             property: 'count',
@@ -302,8 +309,8 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       map.current.addLayer({
         id: "hexes-hovered",
         type: "fill",
-        minzoom: 0,
-        maxzoom: 7,
+        minzoom: hexMinZoom,
+        maxzoom: hexMaxZoom,
 
         source: {
           type: "vector",
@@ -312,7 +319,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         "source-layer": "internal-layer-name",
 
         paint: {
-          "fill-opacity": 0.9,
+          "fill-opacity": hexOpacity,
           "fill-color":
           {
             property: 'count',
@@ -325,7 +332,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       map.current.addLayer({
         id: "points-highlighted",
         type: "circle",
-        minzoom: 7,
+        minzoom: hexMaxZoom,
         source: {
           type: "vector",
           tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`],
@@ -333,13 +340,13 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         "source-layer": "internal-layer-name",
         paint: {
           "circle-color": colors,
-          "circle-opacity": 1,
+          "circle-opacity": circleOpacity,
           "circle-radius": [
             'case',
             ['<=', ['get', 'count'], 2],
-            2.5,
+            smallCircleSize,
             ['>', ['get', 'count'], 2],
-            5,
+            largeCircleSize,
             5
           ],
           "circle-stroke-color": 'black',
@@ -351,7 +358,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       map.current.addLayer({
         id: 'points-hovered',
         type: "circle",
-        minzoom: 7,
+        minzoom: hexMaxZoom,
         source: {
           type: "vector",
           tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`],
@@ -359,17 +366,15 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         "source-layer": "internal-layer-name",
         paint: {
           "circle-color": colors,
-          "circle-opacity": 1,
+          "circle-opacity": circleOpacity,
           "circle-radius": [
             'case',
             ['<=', ['get', 'count'], 2],
-            2,
+            smallCircleSize,
             ['>', ['get', 'count'], 2],
-            5,
+            largeCircleSize,
             5
           ],
-          // "circle-stroke-color": "black",
-          // "circle-stroke-width": 1
         },
         filter: ['in', 'pk', '']
       })
@@ -430,7 +435,15 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       } else if (draw.getMode() === 'simple_select' && creatingPolygon.current) {
         creatingPolygon.current = false
       }
-    };
+    }
+
+    map.current.on('dragstart', e => {
+      map.current.getCanvas().style.cursor = 'grabbing'
+    })
+
+    map.current.on('dragend', e => {
+      map.current.getCanvas().style.cursor = 'grab'
+    })
 
     map.current.on('mousemove', 'points', e => {
       map.current.getCanvas().style.cursor = 'pointer'
@@ -501,7 +514,6 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
 
     map.current.on('dragend', e => {
       if (drawPolygon.current.getAll().features.length > 0) {
-        setPointsToReview()
         if (map.current.getZoom() >= 7) {
           setLoading(true)
           highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
@@ -529,9 +541,13 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     map.current.on('mouseup', e => {
       const mode = draw.getMode()
       if (mode === 'draw_rectangle' || mode === 'draw_polygon') {
+        map.current.getCanvas().style.cursor = 'pointer'
         creatingPolygon.current = true
       } else if (mode === 'simple_select') {
+        map.current.getCanvas().style.cursor = 'grab'
         creatingPolygon.current = false
+      } else {
+        map.current.getCanvas().style.cursor = 'grab'
       }
       setBoxSelectEndCoords([e.lngLat.lng, e.lngLat.lat])
     })

@@ -3,18 +3,21 @@
   position: relative;
 }
 
-.filterHeader:hover {
-  background-color: #c6e3df;
-}
 
 .filterHeader {
   pointer-events: all;
-  background-color: #f7f7f7;
+  background-color: white;
   display: inline-flex;
   text-align: center;
   border-radius: 30px;
   padding: 5px;
   cursor: pointer;
+  border: 1px solid white;
+}
+
+.filterHeader:hover {
+  background-color: #c6e3df;
+  border: 1px solid darkgrey;
 }
 
 .filterHeader>* {
@@ -32,7 +35,7 @@
   top: 45px;
   left: 0px;
   z-index: 10;
-  background-color: #f7f7f7;
+  background-color: white;
   border-radius: 10px;
   padding: 10px;
   max-width: fit-content;
@@ -49,7 +52,7 @@
 
 .filterOptions button:hover {
   background-color: #52a79b;
-  color: #f7f7f7
+  color: white;
 }
 
 .filterSearch {
@@ -67,4 +70,21 @@
 .clearFilter:hover {
   background-color: lightgray;
   cursor: pointer;
+}
+
+.filterInfoButton {
+  position: absolute;
+  border-radius: 5px;
+  height: 30px;
+  width: 60;
+  bottom: 16px;
+  right: 8px;
+}
+
+.filterInfoButton:hover {
+  background-color: lightgrey;
+}
+
+.filterInfoButton svg {
+  margin: 6px 7px 7px 7px;
 }

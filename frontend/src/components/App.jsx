@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import * as Sentry from "@sentry/react"
 import { Integrations } from "@sentry/tracing"
 import { Col, Spinner } from 'react-bootstrap'
-import { ChatDots, CheckCircle, XCircle, ArrowsExpand, Building, CalendarWeek, FileEarmarkSpreadsheet, Water, BroadcastPin } from 'react-bootstrap-icons'
+import { CheckCircle, XCircle, ArrowsExpand, Building, CalendarWeek, FileEarmarkSpreadsheet, Water, BroadcastPin } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import _ from 'lodash'
 
@@ -469,6 +469,7 @@ export default function App() {
           selectAllButton={() => setAllOptionsIsSelectedTo(true, platformsSelected, setPlatformsSelected)}
           resetButton={() => setAllOptionsIsSelectedTo(false, platformsSelected, setPlatformsSelected)}
           numberOfOptions={platformsSelected.length}
+          infoButton='http://vocab.nerc.ac.uk/collection/L06/current/'
         >
           <MultiCheckboxFilter
             optionsSelected={createOptionSubset(platformsSearchTerms, platformsSelected)}

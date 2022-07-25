@@ -2,12 +2,30 @@
   text-align: left;
 }
 
+.datasetsTable .selectDatasetColumn {
+  width: 50px;
+}
+
 .datasetsTable th {
   cursor: pointer;
 }
 
-.datasetsTable th:hover {
+.datasetsTable thead th {
+  background-color: white;
+}
+
+.datasetsTable tr {
+  border: 2px solid transparent;
+  margin: -2px;
+  overflow-wrap: break-word;
+}
+
+.datasetsTable thead th:hover {
   background-color: lightgray;
+}
+
+.datasetsTable tr:hover {
+  background-color: #c6e3df;
 }
 
 .datasetsTable td {
@@ -36,6 +54,14 @@
   display: flex
 }
 
+.selectAllHeader svg {
+  margin-bottom: 5px;
+}
+
 .datasetsTable .optionColorCircle {
   margin-right: 5px;
+}
+
+.datasetsTable .datasetTableLocationsCell svg {
+  float: right;
 }

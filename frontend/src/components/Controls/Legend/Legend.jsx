@@ -1,10 +1,10 @@
 import React from 'react'
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronCompactLeft, ChevronCompactRight, CircleFill, HexagonFill } from 'react-bootstrap-icons'
 import * as _ from 'lodash'
 
-import { capitalizeFirstLetter, useOutsideAlerter, generateColorStops } from '../../../utilities.js'
+import { capitalizeFirstLetter, generateColorStops } from '../../../utilities.js'
 import { colorScale } from '../../config.js'
 import platformColors from '../../platformColors'
 
@@ -87,23 +87,22 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen, pl
             {t('legendSectionColor')}
             {/* Color */}
           </LegendElement>
-          {platformColors.filter(pc=>platformsInView.includes(pc.platform)).map(pc => {
-              return (
-                <LegendElement
-                  title={capitalizeFirstLetter(t(pc.platform))}
-                  open={legendOpen}
-                  key={pc.platform}
-                >
-                  <CircleFill size={15} fill={pc.color} />
-                </LegendElement>
-              )
+          {platformColors.filter(pc => platformsInView.includes(pc.platform)).map(pc => {
+            return (
+              <LegendElement
+                title={capitalizeFirstLetter(t(pc.platform))}
+                open={legendOpen}
+                key={pc.platform}
+              >
+                <CircleFill size={15} fill={pc.color} />
+              </LegendElement>
+            )
           })}
         </>
       )
     }
   }
   const className = classNames('legend', { panelOpen: selectionPanelOpen })
-
   return (
     <div
       className={className}

@@ -1,15 +1,11 @@
 .multiCheckboxFilter {
-  white-space: nowrap;
   max-height: 350px;
   overflow: auto;
+  margin-right: -10px;
 }
 
 .multiCheckboxFilter label {
   height: 30px;
-}
-
-.multiCheckboxFilter .optionButton {
-  margin: 0px 10px 10px 10px;
 }
 
 .multiCheckboxFilter .optionName {
@@ -17,17 +13,18 @@
 }
 
 .multiCheckboxFilter .optionButton {
+  padding-left: 5px;
+  margin: 0px 0px 10px 0px;
   cursor: pointer;
   line-height: 30px;
 }
 
 .multiCheckboxFilter .optionButton:hover {
-  background-color: #52a79b;
-  color: #f7f7f7;
+  background-color: #c6e3df;
 }
 
 .multiCheckboxFilter .searchResultsButton {
-  background-color: #f7f7f7;
+  background-color: white;
   margin-left: 10px;
   position: sticky;
   top: 0px;
@@ -48,7 +45,7 @@
 .multiCheckboxFilter .searchResultsButton:hover {
   cursor: pointer;
   background-color: #52a79b;
-  color: #f7f7f7;
+  color: white;
 }
 
 .multiCheckboxFilter .optionColorCircle {

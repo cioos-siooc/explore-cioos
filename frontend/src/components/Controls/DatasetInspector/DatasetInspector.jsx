@@ -6,11 +6,14 @@ import { useTranslation } from 'react-i18next'
 import platformColors from '../../platformColors'
 import './styles.css'
 
-export default function DatasetInspector({ dataset, setInspectDataset }) {
+export default function DatasetInspector({ dataset, setInspectDataset, setHoveredDataset }) {
   const { t } = useTranslation()
   let platformColor = platformColors.filter(pc => pc.platform === dataset.platform)
   return (
-    <div className='datasetInspector'>
+    <div className='datasetInspector'
+      onMouseEnter={() => setHoveredDataset(dataset)}
+      onMouseLeave={() => setHoveredDataset()}
+    >
       <div
         className='backButton'
         onClick={() => setInspectDataset()}
