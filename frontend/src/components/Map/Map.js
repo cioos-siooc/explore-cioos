@@ -435,7 +435,15 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       } else if (draw.getMode() === 'simple_select' && creatingPolygon.current) {
         creatingPolygon.current = false
       }
-    };
+    }
+
+    map.current.on('dragstart', e => {
+      map.current.getCanvas().style.cursor = 'grabbing'
+    })
+
+    map.current.on('dragend', e => {
+      map.current.getCanvas().style.cursor = 'grab'
+    })
 
     map.current.on('mousemove', 'points', e => {
       map.current.getCanvas().style.cursor = 'pointer'
@@ -533,9 +541,13 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     map.current.on('mouseup', e => {
       const mode = draw.getMode()
       if (mode === 'draw_rectangle' || mode === 'draw_polygon') {
+        map.current.getCanvas().style.cursor = 'pointer'
         creatingPolygon.current = true
       } else if (mode === 'simple_select') {
+        map.current.getCanvas().style.cursor = 'grab'
         creatingPolygon.current = false
+      } else {
+        map.current.getCanvas().style.cursor = 'grab'
       }
       setBoxSelectEndCoords([e.lngLat.lng, e.lngLat.lat])
     })
