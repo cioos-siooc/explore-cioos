@@ -14,7 +14,6 @@ const axios = require("axios");
  */
 
 router.get("/", validatorMiddleware(), async function (req, res, next) {
-  const NUM_RECORDS = 1000;
   const { dataset, profile } = req.query;
   const sql = `
                 WITH step1 AS
@@ -25,7 +24,7 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
                               COALESCE(profile_id, timeseries_id) profile_id,
                               time_min,
                               time_max,
-                              CEIL(${NUM_RECORDS}/(records_per_day/24)) num_hours_needed
+                              CEIL(:NUM_RECORDS/(records_per_day/24)) num_hours_needed
                       FROM   cde.profiles), step2 AS
                 (
                       SELECT *,
@@ -34,12 +33,13 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
                 SELECT *,
                       time_max::text,
                       new_start_time::text,
-                      new_start_time<=time_min OR n_records<=${NUM_RECORDS} use_whole_profile
+                      new_start_time<=time_min OR n_records<=:NUM_RECORDS: use_whole_profile
                 FROM   step2
-                WHERE  profile_id='${profile}'
-                AND    dataset_id='${dataset}'`;
+                WHERE  profile_id=:profile
+                AND    dataset_id=:dataset
+                LIMIT 1`;
 
-  const rows = await db.raw(sql);
+  const rows = await db.raw(sql, { profile, dataset, NUM_RECORDS: 1000 });
 
   if (!rows.rows?.length) {
     throw new Error("No datasets found");
