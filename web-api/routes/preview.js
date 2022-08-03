@@ -1,35 +1,50 @@
 var express = require("express");
+// helps with async error handling in express < v5
+require("express-async-errors");
 var router = express.Router();
 const db = require("../db");
 const { validatorMiddleware } = require("../utils/validatorMiddlewares");
 const axios = require("axios");
 
 /*
- * /legend
+ * /preview
  *
- * Get the range of counts for the hexes/points to set the color and legend text
- * in the front end
- *
- * Takes all the filters, returns a number range for each of the 3 major zoom levels
+ * Gets ~1000 records from an erddap dataset, given a dataset ID and a timeseries ID
+ * TODO: How will this work with timeseries profiles?
  */
-function getERDDAPData(query) {
-  // TODO use erddap4js?
-}
+
 router.get("/", validatorMiddleware(), async function (req, res, next) {
+  const NUM_RECORDS = 1000;
   const { dataset, profile } = req.query;
   const sql = `
-       with abc as (
-        select dataset_id,n_records,erddap_url,coalesce(profile_id, timeseries_id) profile_id, time_min,time_max,COALESCE(NULLIF(DATE_PART('hours',time_max-time_min),0),1) hours_available, ceil(1000/(records_per_day*24)) num_hours_needed from cde.profiles),
-        def as (select *,time_max - (interval '1 hour' * hours_available) new_start_time from abc)
-        select dataset_id,erddap_url,profile_id,time_max::text,new_start_time::text,
-          new_start_time<=time_min or n_records<=1000 use_whole_profile from def
-        where profile_id='${profile}'
-        AND dataset_id='${dataset}';
-        `;
+                WITH step1 AS
+                (
+                      SELECT dataset_id,
+                              n_records,
+                              erddap_url,
+                              COALESCE(profile_id, timeseries_id) profile_id,
+                              time_min,
+                              time_max,
+                              CEIL(${NUM_RECORDS}/(records_per_day/24)) num_hours_needed
+                      FROM   cde.profiles), step2 AS
+                (
+                      SELECT *,
+                             time_max - (interval '1 hour' * num_hours_needed) new_start_time
+                      FROM   step1)
+                SELECT *,
+                      time_max::text,
+                      new_start_time::text,
+                      new_start_time<=time_min OR n_records<=${NUM_RECORDS} use_whole_profile
+                FROM   step2
+                WHERE  profile_id='${profile}'
+                AND    dataset_id='${dataset}'`;
 
   const rows = await db.raw(sql);
-  console.log(sql);
-  // console.log(rows.rows);
+
+  if (!rows.rows?.length) {
+    throw new Error("No datasets found");
+  }
+
   const {
     dataset_id,
     erddap_url,
@@ -40,14 +55,14 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
   } = rows.rows[0];
 
   let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.dataTable?&profile=~"${profile_id}"`;
-  // TODO this doesnt work cause hours_available isnt calculated right
   if (!use_whole_profile) {
     // putting timeMax in case many new records were added since the profile was harvested
     erddapQuery += `&time>${new_start_time}&time<${time_max}`;
   }
-  console.log(erddapQuery);
-  // const erddapData = await axios.get(erddapQuery);
-  // res.send(erddapData);
+
+  const { data } = await axios.get(erddapQuery);
+  console.log("FOUND ", data.rows.length, " ROWS", erddapQuery);
+  res.send(data);
 });
 
 module.exports = router;
