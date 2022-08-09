@@ -158,34 +158,37 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
   }, [hoveredDataset])
 
   function highlightPoints(polygon) {
-    var features = map.current.queryRenderedFeatures({ layers: ['points'] }).map(point => {
-      return {
-        type: 'Feature',
-        geometry: {
-          type: 'Point',
-          // Note order: longitude, latitude.
-          coordinates: point.geometry.coordinates
+    if (polygon && polygon.length >= 4) {
+
+      var features = map.current.queryRenderedFeatures({ layers: ['points'] }).map(point => {
+        return {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            // Note order: longitude, latitude.
+            coordinates: point.geometry.coordinates
+          },
+          properties: { ...point.properties }
+        }
+      })
+
+      const featureCollection = { type: 'FeatureCollection', features: features }
+      var searchWithin = turf.polygon([polygon]);
+      var pointsWithinPolygon = turf.pointsWithinPolygon(featureCollection, searchWithin);
+
+      // Filter points layer to show the points that have been selected
+      var filter = pointsWithinPolygon.features.reduce(
+        function (memo, feature) {
+          memo.push(feature.properties.pk)
+          return memo
         },
-        properties: { ...point.properties }
+        ['in', 'pk']
+      )
+
+      map.current.setFilter('points-highlighted', filter)
+      if (map.current.offsetFlyTo === undefined) {
+        map.current.offsetFlyTo = true
       }
-    })
-
-    const featureCollection = { type: 'FeatureCollection', features: features }
-    var searchWithin = turf.polygon([polygon]);
-    var pointsWithinPolygon = turf.pointsWithinPolygon(featureCollection, searchWithin);
-
-    // Filter points layer to show the points that have been selected
-    var filter = pointsWithinPolygon.features.reduce(
-      function (memo, feature) {
-        memo.push(feature.properties.pk)
-        return memo
-      },
-      ['in', 'pk']
-    )
-
-    map.current.setFilter('points-highlighted', filter)
-    if (map.current.offsetFlyTo === undefined) {
-      map.current.offsetFlyTo = true
     }
   }
 
