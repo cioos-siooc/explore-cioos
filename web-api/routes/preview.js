@@ -43,7 +43,6 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
                 WHERE  profile=:profile
                 AND    dataset_id=:dataset`;
 
-  // console.log(sql);
   const q = db.raw(sql, { profile, dataset, NUM_RECORDS });
   const rows = await q;
 
