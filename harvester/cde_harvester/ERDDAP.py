@@ -68,7 +68,7 @@ class ERDDAP(object):
 
     def parse_erddap_date(s):
         """ERDDAP dates come either as timestamps or ISO 8601 datetimes"""
-        is_timestamp = s.startswith("1.")
+        is_timestamp = s.startswith("1.") or s.startswith("-1.")
 
         if is_timestamp:
             return pd.to_datetime(s, unit="s")
@@ -77,7 +77,8 @@ class ERDDAP(object):
 
     def parse_erddap_dates(series):
         """ERDDAP dates come either as timestamps or ISO 8601 datetimes"""
-        is_timestamp = str(series.tolist()[0]).strip().startswith("1.")
+        time = str(series.tolist()[0]).strip()
+        is_timestamp = time.startswith("1.") or time.startswith("-1.")
 
         if is_timestamp:
             return pd.to_datetime(series, unit="s")
