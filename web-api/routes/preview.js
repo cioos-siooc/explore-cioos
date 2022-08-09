@@ -14,6 +14,7 @@ const axios = require("axios");
  */
 
 router.get("/", validatorMiddleware(), async function (req, res, next) {
+  const NUM_RECORDS = 1000;
   const { dataset, profile } = req.query;
   const sql = `WITH step1 AS (
                SELECT d.dataset_id,
