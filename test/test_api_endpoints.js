@@ -22,6 +22,9 @@ const cdeQuery = (url) => fetch(API_URL + url).then((res) => res.json());
   const pointQuery = await cdeQuery(
     "/pointQuery?latMin=49.3194&lonMin=-123.7531&latMax=49.3552&lonMax=-123.6982"
   );
+  const preview = await cdeQuery(
+    "/preview?profile=C44131&dataset=DFO_MEDS_BUOYS"
+  );
 
   assert(datasets.length == 1, "datasets");
   assert(Object.values(legend.recordsCount).length == 3, "legend");
@@ -29,4 +32,5 @@ const cdeQuery = (url) => fetch(API_URL + url).then((res) => res.json());
   assert(oceanVariables.length == 1), "oceanVariables";
   assert(pointQuery.length == 1), "pointQuery";
   assert(tiles.byteLength > 2000), "tiles";
+  assert(preview.rows.length > 100), "preview";
 })();

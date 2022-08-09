@@ -31,6 +31,9 @@ class Dataset(object):
         self.df_variables = None
         self.variables_list = []
         self.profile_variable_list = []
+        self.timeseries_id_variable = ""
+        self.profile_id_variable = ""
+        self.trajectory_id_variable = ""
 
         self.get_metadata()
 
@@ -47,6 +50,9 @@ class Dataset(object):
                 "organizations": [self.organizations],
                 "n_profiles": [len(self.profile_ids)],
                 "profile_variables": [self.profile_variable_list],
+                "timeseries_id_variable": self.timeseries_id_variable,
+                "profile_id_variable": self.profile_id_variable,
+                "trajectory_id_variable":self.trajectory_id_variable,
             }
         )
         return self.df
@@ -104,6 +110,11 @@ class Dataset(object):
         # sorting so the url is consistent every time for query caching
         profile_variable_list = sorted(list(profile_variables.values()))
         self.profile_variables = profile_variables
+        
+        self.timeseries_id_variable=profile_variables.get('timeseries_id')
+        self.profile_id_variable=profile_variables.get('profile_id')
+        self.trajectory_id_variable=profile_variables.get('trajectory_id')
+
         self.profile_variable_list = profile_variable_list
 
         if not profile_variables:
