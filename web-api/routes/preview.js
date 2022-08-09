@@ -42,7 +42,6 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
                 FROM   step2
                 WHERE  profile=:profile
                 AND    dataset_id=:dataset`;
-
   const q = db.raw(sql, { profile, dataset, NUM_RECORDS });
   const rows = await q;
 
@@ -60,7 +59,7 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
     use_whole_profile,
   } = rows.rows[0];
 
-  let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.dataTable?&${profile_variable}=~"${profile_id}"`;
+  let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?&${profile_variable}=~"${profile_id}"`;
   if (!use_whole_profile) {
     // putting timeMax in case many new records were added since the profile was harvested
     erddapQuery += `&time>${new_start_time}&time<${time_max}`;
@@ -69,7 +68,7 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
   console.log("Fetching preview from ", erddapQuery);
   try {
     const { data } = await axios.get(erddapQuery);
-    console.log("FOUND ", data.rows.length, " ROWS", erddapQuery);
+    console.log("FOUND ", data.table?.rows?.length, " ROWS", erddapQuery);
     res.send(data);
   } catch (error) {
     if (error.response) {
