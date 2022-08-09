@@ -26,7 +26,7 @@ const cdeQuery = (url) => fetch(API_URL + url).then((res) => res.json());
     "/preview?profile=C44131&dataset=DFO_MEDS_BUOYS"
   );
 
-  http: assert(datasets.length == 1, "datasets");
+  assert(datasets.length == 1, "datasets");
   assert(Object.values(legend.recordsCount).length == 3, "legend");
   assert(organizations.length == 1, "organizations");
   assert(oceanVariables.length == 1), "oceanVariables";
