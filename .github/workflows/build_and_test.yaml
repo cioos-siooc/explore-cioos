@@ -46,7 +46,7 @@ jobs:
 
       - name: Test API endpoints
         working-directory: ./test
-        run: node frontend_loads_without_errors.js
+        run: node test_api_endpoints.js
 
       - name: Test frontend loads without errors
         working-directory: ./test
