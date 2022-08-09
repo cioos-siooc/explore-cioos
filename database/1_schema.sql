@@ -36,7 +36,6 @@ CREATE TABLE datasets (
     timeseries_id_variable text,
     profile_id_variable text,
     trajectory_id_variable text,
-    ckan_id text,
     organization_pks INTEGER[],
     n_profiles integer,
     profile_variables text[],
