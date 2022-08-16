@@ -22,6 +22,7 @@ router.get(
     const { z, x, y } = req.params;
 
     const filters = createDBFilter(req.query);
+    const hasFilter = filters.toSQL().sql;
 
     // zoom levels: 0-4,5-6,7+
     const isHexGrid = z < 7;
@@ -37,18 +38,22 @@ router.get(
     // not joining to cde.points to get hexagons as that could be slower
     const SQL = `
   with relevent_points as (
-    ${isHexGrid ? `SELECT ${zoomPKColumn} pk,count(distinct point_pk) count,` : "SELECT point_pk pk, d.platform as platform,sum(p.days)::bigint count,"} array_to_json(array_agg(distinct dataset_pk)) datasets,     
-      p.${sqlQuery.geom_column} AS geom FROM cde.profiles p
+    ${
+      isHexGrid
+        ? `SELECT :zoomPKColumn pk,count(distinct point_pk) count,`
+        : "SELECT point_pk pk, d.platform as platform,sum(p.days)::bigint count,"
+    } array_to_json(array_agg(distinct dataset_pk)) datasets,     
+      p.:geom_column: AS geom FROM cde.profiles p
         -- used for organizations filtering
         JOIN cde.datasets d
         ON p.dataset_pk = d.pk 
-       ${filters ? "WHERE " + filters : ""}
+       ${hasFilter ? "WHERE :filters" : ""}
         ${
           isHexGrid
-            ? `GROUP BY ${zoomPKColumn},p.${sqlQuery.geom_column}`
+            ? `GROUP BY :zoomPKColumn:,p.:geom_column:`
             : "GROUP BY geom,point_pk,platform"
         } ),
-    te AS (select ST_TileEnvelope(${z}, ${x}, ${y}) tile_envelope ),
+    te AS (select ST_TileEnvelope(:z, :x, :y) tile_envelope ),
     mvtgeom AS (
       SELECT pk,count, 
        ${isHexGrid ? "" : "platform,"} datasets,
@@ -65,7 +70,14 @@ router.get(
 
     try {
       console.log(SQL);
-      const tileRaw = await db.raw(SQL);
+      const tileRaw = await db.raw(SQL, {
+        filters,
+        zoomPKColumn,
+        geom_column: sqlQuery.geom_column,
+        z,
+        x,
+        y,
+      });
 
       const tile = tileRaw.rows[0];
 
