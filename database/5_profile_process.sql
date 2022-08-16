@@ -74,6 +74,19 @@ WHERE
 
 UPDATE cde.profiles set days=date_part('days',time_max-time_min)+1;
 
+-- Set number of profiles per dataset
+WITH profiles_per_dataset
+     AS (SELECT d.pk,
+                COUNT(p.pk)
+         FROM   cde.datasets d
+                JOIN cde.profiles p
+                  ON p.dataset_pk = d.pk
+         GROUP  BY d.pk)
+UPDATE cde.datasets d
+SET    n_profiles = profiles_per_dataset.count
+FROM   profiles_per_dataset
+WHERE  profiles_per_dataset.pk = d.pk;  
+
   END;
 $$ LANGUAGE plpgsql;
 
