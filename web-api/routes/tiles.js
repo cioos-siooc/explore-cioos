@@ -22,6 +22,7 @@ router.get(
     const { z, x, y } = req.params;
 
     const filters = createDBFilter(req.query);
+    const hasFilter = filters.toSQL().sql;
 
     // zoom levels: 0-4,5-6,7+
     const isHexGrid = z < 7;
@@ -36,18 +37,13 @@ router.get(
     // not joining to cde.points to get hexagons as that could be slower
     const SQL = `
   with relevent_points as (
-        SELECT count(p.*) count, ${isHexGrid ? "" : `point_pk AS pk,`} p.${
-      sqlQuery.geom_column
-    } AS geom FROM cde.profiles p
+        SELECT count(p.*) count, ${isHexGrid ? "" : "point_pk AS pk,"}
+        p.:geom_column: AS geom FROM cde.profiles p
         JOIN cde.datasets d
-        ON p.dataset_pk = d.pk 
-       ${filters ? "WHERE " + filters : ""}
-        ${
-          isHexGrid
-            ? `GROUP BY ${sqlQuery.geom_column}`
-            : "GROUP BY point_pk,geom"
-        } ),
-    te AS (select ST_TileEnvelope(${z}, ${x}, ${y}) tile_envelope ),
+        ON p.dataset_pk = d.pk
+       ${hasFilter ? "WHERE :filters" : ""}
+        ${isHexGrid ? `GROUP BY :geom_column:` : "GROUP BY point_pk,geom"} ),
+    te AS (select ST_TileEnvelope(:z, :x, :y) tile_envelope ),
     mvtgeom AS (
       SELECT count,
        ${isHexGrid ? "" : "pk,"}
@@ -63,7 +59,13 @@ router.get(
   `;
 
     try {
-      const tileRaw = await db.raw(SQL);
+      const tileRaw = await db.raw(SQL, {
+        filters,
+        geom_column: sqlQuery.geom_column,
+        z,
+        x,
+        y,
+      });
 
       const tile = tileRaw.rows[0];
 
