@@ -1,15 +1,13 @@
-from distutils.log import error
-from multiprocessing.sharedctypes import Value
 import yaml
 import argparse
 import logging
 import os
+import time
 import sys
 import threading
-
+import queue
 import numpy as np
 import pandas as pd
-import yaml
 from cde_harvester.ckan.create_ckan_erddap_link import get_ckan_records, unescape_ascii
 from cde_harvester.harvest_erddap import harvest_erddap
 from cde_harvester.utils import (
@@ -39,25 +37,34 @@ def setup_logging(log_time, log_level):
     root.addHandler(handler)
 
 
-def main(erddap_urls, cache_requests, folder, dataset_ids):
+def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     erddap_urls = erddap_urls.split(",")
     limit_dataset_ids = None
     if dataset_ids:
         limit_dataset_ids = dataset_ids.split(",")
 
-    threads = []
     result = []
 
-    for erddap_url in erddap_urls:
-        scraping_thread = threading.Thread(
-            target=harvest_erddap,
-            args=(erddap_url, result, limit_dataset_ids, cache_requests),
-        )
-        scraping_thread.start()
-        threads.append(scraping_thread)
+    q = queue.Queue()
+    def worker():
+        while True:
+            (erddap_url, result, limit_dataset_ids, cache_requests) = q.get()
+            harvest_erddap(erddap_url, result, limit_dataset_ids, cache_requests)
+            time.sleep(1)
+            q.task_done()
 
-    for thread in threads:
-        thread.join()
+    # Turn-on the worker thread.
+    for x in range(max_workers):
+        threading.Thread(target=worker, daemon=True).start()
+    
+    # Send thirty task requests to the worker.
+    
+    for erddap_url in erddap_urls:
+        print("Adding to queue",erddap_url)
+        q.put((erddap_url, result, limit_dataset_ids, cache_requests))
+
+    q.join()
+    print('All work completed')
 
     profiles = pd.DataFrame()
     datasets = pd.DataFrame()
@@ -219,6 +226,11 @@ if __name__ == "__main__":
         help="add time to logs",
         action="store_true",
     )
+    parser.add_argument(
+        "--max-workers",
+        default=1,
+        help="max threads that harvester will use",
+    )
 
     parser.add_argument(
         "-f",
@@ -233,6 +245,7 @@ if __name__ == "__main__":
     urls = args.urls
     cache = args.cache
     dataset_ids = args.dataset_ids
+    max_workers = args.max_workers
     folder = args.folder
 
     config_file=args.file
@@ -244,6 +257,7 @@ if __name__ == "__main__":
         urls = ",".join(config.get("erddap_urls") or [])
         cache = config.get("cache")
         folder = config.get("folder")
+        max_workers = config.get("max-workers",1)
         dataset_ids = ",".join(config.get("dataset_ids") or [])
         log_time = config.get("log_time")
         log_level = config.get("log_level")
@@ -251,4 +265,4 @@ if __name__ == "__main__":
 
     setup_logging(log_time, log_level)
 
-    main(urls, cache, folder or "harvest", dataset_ids)
+    main(urls, cache, folder or "harvest", dataset_ids,max_workers)
