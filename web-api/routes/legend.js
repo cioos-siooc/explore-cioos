@@ -21,6 +21,7 @@ router.get(
   validatorMiddleware(),
   async function (req, res, next) {
     const filters = createDBFilter(req.query);
+    const hasFilter = filters.toSQL().sql;
 
     const sql = `
         WITH records AS (
@@ -28,7 +29,7 @@ router.get(
         FROM cde.profiles p
         JOIN cde.datasets d
         ON p.dataset_pk = d.pk
-        ${filters ? "WHERE " + filters : ""}
+        ${hasFilter ? "WHERE :filters" : ""}
         ),
 
         sub1 AS (SELECT json_build_array(min(count),max(count)) zoom0 FROM (SELECT count(*) FROM records GROUP BY hex_zoom_0) s),
