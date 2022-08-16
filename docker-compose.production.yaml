@@ -84,7 +84,7 @@ services:
       - ./harvester_cache:/usr/src/app/harvester_cache
       - ./harvest:/usr/src/app/harvest
     environment:
-      - "DB_HOST_EXTERNAL=db"
+      - "DB_HOST_EXTERNAL=$DB_HOST_EXTERNAL"
     env_file:
       - .env
 volumes:
