@@ -1,5 +1,4 @@
-import React from 'react'
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronCompactLeft, ChevronCompactRight, CircleFill, HexagonFill } from 'react-bootstrap-icons'
 import * as _ from 'lodash'
@@ -12,15 +11,15 @@ import './styles.css'
 import LegendElement from './LegendElement.jsx/LegendElement.jsx'
 import classNames from 'classnames'
 
-export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen, platformsInView }) {
+export default function Legend ({ currentRangeLevel, zoom, selectionPanelOpen, platformsInView }) {
   const { t } = useTranslation()
   const [legendOpen, setLegendOpen] = useState(true)
 
-  function generateLegendElements() {
+  function generateLegendElements () {
     if (_.isEmpty(currentRangeLevel)) { // No Data
       return (
         <div
-          title={t('legendNoDataWarningTitle')} //'Choose less restrictive filters to see data'
+          title={t('legendNoDataWarningTitle')} // 'Choose less restrictive filters to see data'
         >
           {t('legendNoDataWarningText')}
           {/* No Data */}
@@ -112,11 +111,10 @@ export default function Legend({ currentRangeLevel, zoom, selectionPanelOpen, pl
       <LegendElement
         open={legendOpen}
       >
-        <div className='legendToggleButton' title={legendOpen ? t('closeLegendTooltip') : t('openLegendTooltip')}> {/*'Close legend' 'Open legend'*/}
-          {legendOpen ?
-            <ChevronCompactLeft />
-            :
-            <ChevronCompactRight />
+        <div className='legendToggleButton' title={legendOpen ? t('closeLegendTooltip') : t('openLegendTooltip')}> {/* 'Close legend' 'Open legend' */}
+          {legendOpen
+            ? <ChevronCompactLeft />
+            : <ChevronCompactRight />
           }
         </div>
       </LegendElement>

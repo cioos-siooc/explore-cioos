@@ -6,11 +6,11 @@ import { useTranslation } from 'react-i18next'
 
 import './styles.css'
 
-export default function SelectionPanel({ open, setOpen, children }) {
+export default function SelectionPanel ({ open, setOpen, children }) {
   const { t } = useTranslation()
-  let selectionPanelClassName = classNames('selectionPanel', { closed: !open })
-  let panelContentsClassName = classNames('panelContents', { closed: !open })
-  let panelHandleClassName = classNames('panelHandle', { closed: !open })
+  const selectionPanelClassName = classNames('selectionPanel', { closed: !open })
+  const panelContentsClassName = classNames('panelContents', { closed: !open })
+  const panelHandleClassName = classNames('panelHandle', { closed: !open })
   return (
     <div className={selectionPanelClassName}>
       <div className={panelContentsClassName}>
@@ -20,9 +20,9 @@ export default function SelectionPanel({ open, setOpen, children }) {
         (
           <div
             className={panelHandleClassName}
-            title={`${open ?
-              t('selectionPanelHandleTitleClose') :
-              t('selectionPanelHandleTitleOpen')} ${t('selectionPanelHandleTitleText')}`}
+            title={`${open
+              ? t('selectionPanelHandleTitleClose')
+              : t('selectionPanelHandleTitleOpen')} ${t('selectionPanelHandleTitleText')}`}
             onClick={() => setOpen(!open)}
           >
             {open ? <ChevronCompactLeft /> : <ChevronCompactRight />}

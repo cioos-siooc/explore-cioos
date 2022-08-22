@@ -1,7 +1,7 @@
-import * as React from "react"
-import maplibreGl, { AttributionControl, NavigationControl, Popup, ScaleControl } from "maplibre-gl"
-import MapboxDraw from "@mapbox/mapbox-gl-draw"
-import { useState, useEffect, useRef } from "react"
+import * as React from 'react'
+import maplibreGl, { AttributionControl, NavigationControl, Popup, ScaleControl } from 'maplibre-gl'
+import MapboxDraw from '@mapbox/mapbox-gl-draw'
+import { useState, useEffect, useRef } from 'react'
 import * as turf from '@turf/turf'
 import DrawRectangle from 'mapbox-gl-draw-rectangle-mode'
 import { useTranslation } from 'react-i18next'
@@ -9,12 +9,12 @@ import { useTranslation } from 'react-i18next'
 import './styles.css'
 
 import { server } from '../../config'
-import { createDataFilterQueryString, generateColorStops, getCurrentRangeLevel, updateMapToolTitleLanguage } from "../../utilities"
-import { colorScale, defaultQuery } from "../config"
+import { createDataFilterQueryString, generateColorStops, getCurrentRangeLevel, updateMapToolTitleLanguage } from '../../utilities'
+import { colorScale, defaultQuery } from '../config'
 import platformColors from '../../components/platformColors'
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, zoom, setZoom, offsetFlyTo, rangeLevels, hoveredDataset }) {
+export default function CreateMap ({ query, setPointsToReview, setPolygon, setLoading, zoom, setZoom, offsetFlyTo, rangeLevels, hoveredDataset }) {
   const { t } = useTranslation()
   const mapContainer = useRef(null)
   const map = useRef(null)
@@ -29,8 +29,8 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       combine_features: false,
       uncombine_features: false,
       modes: Object.assign(MapboxDraw.modes, {
-        draw_rectangle: DrawRectangle,
-      }),
+        draw_rectangle: DrawRectangle
+      })
     }
   }
   const smallCircleSize = 2.75
@@ -54,8 +54,8 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     maxWidth: '400px'
   })
 
-  let colors = ['match',
-    ['get', 'platform'],
+  const colors = ['match',
+    ['get', 'platform']
   ]
   platformColors.reduce((accumulatedPlatformColors, platformColor) => {
     if (platformColor.color) {
@@ -97,7 +97,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     }
   }, [boxSelectEndCoords])
 
-  function setColorStops() {
+  function setColorStops () {
     if (map.current) {
       colorStops.current = generateColorStops(colorScale, getCurrentRangeLevel(rangeLevels, map.current.getZoom())).map(colorStop => {
         return [colorStop.stop, colorStop.color]
@@ -115,7 +115,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     }
   }
 
-  function hoverHighlightPoints(pk) {
+  function hoverHighlightPoints (pk) {
     if (map.current && pk) {
       if (zoom >= 7) {
         map.current.setPaintProperty('points', 'circle-color', 'lightgrey')
@@ -157,10 +157,9 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     }
   }, [hoveredDataset])
 
-  function highlightPoints(polygon) {
+  function highlightPoints (polygon) {
     if (polygon && polygon.length >= 4) {
-
-      var features = map.current.queryRenderedFeatures({ layers: ['points'] }).map(point => {
+      const features = map.current.queryRenderedFeatures({ layers: ['points'] }).map(point => {
         return {
           type: 'Feature',
           geometry: {
@@ -172,12 +171,12 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         }
       })
 
-      const featureCollection = { type: 'FeatureCollection', features: features }
-      var searchWithin = turf.polygon([polygon]);
-      var pointsWithinPolygon = turf.pointsWithinPolygon(featureCollection, searchWithin);
+      const featureCollection = { type: 'FeatureCollection', features }
+      const searchWithin = turf.polygon([polygon])
+      const pointsWithinPolygon = turf.pointsWithinPolygon(featureCollection, searchWithin)
 
       // Filter points layer to show the points that have been selected
-      var filter = pointsWithinPolygon.features.reduce(
+      const filter = pointsWithinPolygon.features.reduce(
         function (memo, feature) {
           memo.push(feature.properties.pk)
           return memo
@@ -199,16 +198,16 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
       const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${query !== defaultQuery && `?${createDataFilterQueryString(query)}`}`
 
-      map.current.getSource("points").tiles = [tileQuery]
-      map.current.getSource("hexes").tiles = [tileQuery]
+      map.current.getSource('points').tiles = [tileQuery]
+      map.current.getSource('hexes').tiles = [tileQuery]
 
       // Remove the tiles for a particular source
-      map.current.style.sourceCaches["hexes"].clearTiles()
-      map.current.style.sourceCaches["points"].clearTiles()
+      map.current.style.sourceCaches.hexes.clearTiles()
+      map.current.style.sourceCaches.points.clearTiles()
 
       // Load the new tiles for the current viewport (map.transform -> viewport)
-      map.current.style.sourceCaches["hexes"].update(map.current.transform)
-      map.current.style.sourceCaches["points"].update(map.current.transform)
+      map.current.style.sourceCaches.hexes.update(map.current.transform)
+      map.current.style.sourceCaches.points.update(map.current.transform)
 
       // Force a repaint, so that the map will be repainted without you having to touch the map
       map.current.triggerRepaint()
@@ -236,46 +235,46 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         version: 8,
         sources: {
           osm: {
-            type: "raster",
-            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-            tileSize: 256,
-          },
+            type: 'raster',
+            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tileSize: 256
+          }
         },
         layers: [
           {
-            id: "osm",
-            type: "raster",
-            source: "osm",
-          },
-        ],
+            id: 'osm',
+            type: 'raster',
+            source: 'osm'
+          }
+        ]
       },
       center: [mapLongitude || -100, mapLatitude || 60], // starting position
-      zoom: mapZoom || zoom, // starting zoom
+      zoom: mapZoom || zoom // starting zoom
     })
 
-    map.current.on("load", () => {
-      const boxQueryElement = document.getElementById('boxQueryButton');
+    map.current.on('load', () => {
+      const boxQueryElement = document.getElementById('boxQueryButton')
       if (boxQueryElement) {
         boxQueryElement.onclick = () => {
           creatingPolygon.current = true
-          draw.changeMode('draw_rectangle');
+          draw.changeMode('draw_rectangle')
         }
       }
 
       setColorStops()
 
       map.current.addLayer({
-        id: "points",
-        type: "circle",
+        id: 'points',
+        type: 'circle',
         minzoom: hexMaxZoom,
         source: {
-          type: "vector",
-          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`],
+          type: 'vector',
+          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`]
         },
-        "source-layer": "internal-layer-name",
+        'source-layer': 'internal-layer-name',
         paint: {
           'circle-opacity': circleOpacity,
-          "circle-radius": [
+          'circle-radius': [
             'case',
             ['<=', ['get', 'count'], 2],
             smallCircleSize,
@@ -284,46 +283,46 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
             5
           ],
           'circle-color': colors
-        },
+        }
       })
 
       map.current.addLayer({
-        id: "hexes",
-        type: "fill",
+        id: 'hexes',
+        type: 'fill',
         minzoom: hexMinZoom,
         maxzoom: hexMaxZoom,
 
         source: {
-          type: "vector",
-          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`],
+          type: 'vector',
+          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`]
         },
-        "source-layer": "internal-layer-name",
+        'source-layer': 'internal-layer-name',
 
         paint: {
-          "fill-opacity": hexOpacity,
-          "fill-color":
+          'fill-opacity': hexOpacity,
+          'fill-color':
           {
             property: 'count',
             stops: colorStops.current
           }
-        },
+        }
       })
 
       map.current.addLayer({
-        id: "hexes-hovered",
-        type: "fill",
+        id: 'hexes-hovered',
+        type: 'fill',
         minzoom: hexMinZoom,
         maxzoom: hexMaxZoom,
 
         source: {
-          type: "vector",
-          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`],
+          type: 'vector',
+          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`]
         },
-        "source-layer": "internal-layer-name",
+        'source-layer': 'internal-layer-name',
 
         paint: {
-          "fill-opacity": hexOpacity,
-          "fill-color":
+          'fill-opacity': hexOpacity,
+          'fill-color':
           {
             property: 'count',
             stops: colorStops.current
@@ -333,18 +332,18 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       })
 
       map.current.addLayer({
-        id: "points-highlighted",
-        type: "circle",
+        id: 'points-highlighted',
+        type: 'circle',
         minzoom: hexMaxZoom,
         source: {
-          type: "vector",
-          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`],
+          type: 'vector',
+          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`]
         },
-        "source-layer": "internal-layer-name",
+        'source-layer': 'internal-layer-name',
         paint: {
-          "circle-color": colors,
-          "circle-opacity": circleOpacity,
-          "circle-radius": [
+          'circle-color': colors,
+          'circle-opacity': circleOpacity,
+          'circle-radius': [
             'case',
             ['<=', ['get', 'count'], 2],
             smallCircleSize,
@@ -352,32 +351,32 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
             largeCircleSize,
             5
           ],
-          "circle-stroke-color": 'black',
-          "circle-stroke-width": 0.75
+          'circle-stroke-color': 'black',
+          'circle-stroke-width': 0.75
         },
         filter: ['in', 'pk', '']
       })
 
       map.current.addLayer({
         id: 'points-hovered',
-        type: "circle",
+        type: 'circle',
         minzoom: hexMaxZoom,
         source: {
-          type: "vector",
-          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`],
+          type: 'vector',
+          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`]
         },
-        "source-layer": "internal-layer-name",
+        'source-layer': 'internal-layer-name',
         paint: {
-          "circle-color": colors,
-          "circle-opacity": circleOpacity,
-          "circle-radius": [
+          'circle-color': colors,
+          'circle-opacity': circleOpacity,
+          'circle-radius': [
             'case',
             ['<=', ['get', 'count'], 2],
             smallCircleSize,
             ['>', ['get', 'count'], 2],
             largeCircleSize,
             5
-          ],
+          ]
         },
         filter: ['in', 'pk', '']
       })
@@ -390,7 +389,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         setPointsToReview()
         setPolygon()
       }
-    };
+    }
 
     const handleMapPointsOnClick = e => {
       if (!creatingPolygon.current) {
@@ -402,13 +401,13 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         }
         map.current.flyTo({
           center: [e.lngLat.lng, e.lngLat.lat],
-          padding: map.current.offsetFlyTo ?
-            { top: 0, bottom: 0, left: 500, right: 0 } :
-            { top: 0, bottom: 0, left: 0, right: 0 }
+          padding: map.current.offsetFlyTo
+            ? { top: 0, bottom: 0, left: 500, right: 0 }
+            : { top: 0, bottom: 0, left: 0, right: 0 }
         })
         const height = 10
         const width = 10
-        var bbox = [
+        const bbox = [
           [e.point.x - width / 2, e.point.y - height / 2],
           [e.point.x + width / 2, e.point.y + height / 2]
         ]
@@ -425,15 +424,16 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       } else if (draw.getMode() === 'simple_select' && creatingPolygon.current) {
         creatingPolygon.current = false
       }
-    };
+    }
 
     const handleMapHexesOnClick = e => {
       if (!creatingPolygon.current) {
         map.current.flyTo({
-          center: [e.lngLat.lng, e.lngLat.lat], zoom: 7,
-          padding: map.current.offsetFlyTo ?
-            { top: 0, bottom: 0, left: 500, right: 0 } :
-            { top: 0, bottom: 0, left: 0, right: 0 }
+          center: [e.lngLat.lng, e.lngLat.lat],
+          zoom: 7,
+          padding: map.current.offsetFlyTo
+            ? { top: 0, bottom: 0, left: 500, right: 0 }
+            : { top: 0, bottom: 0, left: 0, right: 0 }
         })
       } else if (draw.getMode() === 'simple_select' && creatingPolygon.current) {
         creatingPolygon.current = false
@@ -450,7 +450,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
 
     map.current.on('mousemove', 'points', e => {
       map.current.getCanvas().style.cursor = 'pointer'
-      var coordinates = e.features[0].geometry.coordinates.slice()
+      const coordinates = e.features[0].geometry.coordinates.slice()
       popup
         .setLngLat(coordinates)
         .setHTML(
@@ -467,10 +467,10 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       popup.remove()
     })
 
-    map.current.on('mousemove', "hexes", e => {
+    map.current.on('mousemove', 'hexes', e => {
       map.current.getCanvas().style.cursor = 'pointer'
-      var coordinates = [e.lngLat.lng, e.lngLat.lat]
-      var description = e.features[0].properties.count
+      const coordinates = [e.lngLat.lng, e.lngLat.lat]
+      const description = e.features[0].properties.count
 
       popup
         .setLngLat(coordinates)
@@ -557,30 +557,30 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
 
     // Workaround for https://github.com/mapbox/mapbox-gl-draw/issues/617
 
-    map.current.on('click', handleMapOnClick);
+    map.current.on('click', handleMapOnClick)
     // mobile seems better without handleMapOnClick enabled for touch
 
-    map.current.on('click', 'points', handleMapPointsOnClick);
-    map.current.on('touchend', 'points', handleMapPointsOnClick);
+    map.current.on('click', 'points', handleMapPointsOnClick)
+    map.current.on('touchend', 'points', handleMapPointsOnClick)
 
-    map.current.on('click', 'hexes', handleMapHexesOnClick);
-    map.current.on('touchend', 'hexes', handleMapHexesOnClick);
+    map.current.on('click', 'hexes', handleMapHexesOnClick)
+    map.current.on('touchend', 'hexes', handleMapHexesOnClick)
 
-    let scale = new ScaleControl({
+    const scale = new ScaleControl({
       maxWidth: 150,
-      unit: 'metric',
+      unit: 'metric'
     })
     map.current.addControl(scale, 'bottom-right')
 
-    let attribution = new AttributionControl({
-      customAttribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.',
+    const attribution = new AttributionControl({
+      customAttribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.'
       // compact: true
     })
     map.current.addControl(attribution, 'bottom-left')
 
     // Called order determines stacking order
-    map.current.addControl(new NavigationControl(), "bottom-right")
-    map.current.addControl(drawPolygon.current, "bottom-right")
+    map.current.addControl(new NavigationControl(), 'bottom-right')
+    map.current.addControl(drawPolygon.current, 'bottom-right')
 
     updateMapToolTitleLanguage(t)
   }, [])
