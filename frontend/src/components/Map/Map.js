@@ -40,6 +40,9 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       combine_features: false,
       uncombine_features: false,
       modes,
+      pitchWithRotate: false,
+      dragRotate: false,
+      touchZoomRotate: false
     },
   };
   const smallCircleSize = 2.75
@@ -261,6 +264,13 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       center: [mapLongitude || -100, mapLatitude || 60], // starting position
       zoom: mapZoom || zoom, // starting zoom
     })
+
+        
+    // disable map rotation using right click + drag
+    map.current.dragRotate.disable()
+    
+    // disable map rotation using touch rotation gesture
+    map.current.touchZoomRotate.disableRotation()
 
     function deleteAllShapes() {
       if (drawPolygon.current?.getAll()?.features?.length > 0) {
