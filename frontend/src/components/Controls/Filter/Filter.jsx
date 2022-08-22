@@ -1,7 +1,6 @@
 import * as React from 'react'
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import * as _ from 'lodash'
-import { useState, useEffect } from 'react'
 import { ChevronCompactDown, ChevronCompactUp, X, QuestionCircle, BoxArrowUpRight } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 
@@ -10,7 +9,7 @@ import { abbreviateString, useOutsideAlerter } from '../../../utilities'
 
 import './styles.css'
 
-export default function Filter({
+export default function Filter ({
   badgeTitle,
   tooltip,
   icon,
@@ -26,8 +25,8 @@ export default function Filter({
   selectAllButton,
   numberOfOptions,
   infoButton,
-  children }) {
-
+  children
+}) {
   const { t } = useTranslation()
 
   // Open/Closed state for filter dropdown
@@ -78,7 +77,7 @@ export default function Filter({
                   color='darkgrey'
                   className='clearFilter'
                   onClick={() => setSearchTerms('')}
-                  title={t('filterClearSearchTitle')} //'Clear search terms' 
+                  title={t('filterClearSearchTitle')} // 'Clear search terms'
                 />}
             </>
           )}
@@ -97,7 +96,7 @@ export default function Filter({
             {t('closeButtonText')}
           </button>
           {infoButton &&
-            <a className='filterInfoButton' href={infoButton} target='_blank' title={t('filterInfoButtonTitle')} >
+            <a className='filterInfoButton' href={infoButton} target='_blank' title={t('filterInfoButtonTitle')} rel="noreferrer" >
               Info&nbsp;<BoxArrowUpRight color='#007bff' size={17.5} />
             </a>
           }

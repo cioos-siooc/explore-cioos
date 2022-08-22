@@ -1,13 +1,13 @@
-import * as React from "react"
+import * as React from 'react'
 import { useState, useEffect } from 'react'
-import PropTypes from "prop-types"
-import { useTranslation } from "react-i18next"
-import { X } from "react-bootstrap-icons"
+import PropTypes from 'prop-types'
+import { useTranslation } from 'react-i18next'
+import { X } from 'react-bootstrap-icons'
 
 import './styles.css'
 
 // Spacing elements out to the left and right using justify-content: space-between. https://medium.com/12-developer-labors/css-all-the-ways-to-align-elements-left-and-right-52ecce4a4af9
-export default function TimeSelector(props) {
+export default function TimeSelector (props) {
   const { t } = useTranslation()
 
   const [startDate, setStartDate] = useState(props.startDate)
@@ -24,7 +24,7 @@ export default function TimeSelector(props) {
     setDateValid(true)
   }, [props.endDate])
 
-  function handleSetStartDate(date) {
+  function handleSetStartDate (date) {
     const tempDate = new Date(date)
     setStartDate(date)
     if (tempDate <= new Date(endDate)) { // && tempDate >= new Date(defaultStartDate) && tempDate <= new Date(defaultEndDate)) {
@@ -36,10 +36,10 @@ export default function TimeSelector(props) {
     }
   }
 
-  function handleSetEndDate(date) {
+  function handleSetEndDate (date) {
     const tempDate = new Date(date)
     setEndDate(date)
-    if (tempDate >= new Date(startDate)) { //} && tempDate >= new Date(defaultStartDate) && tempDate <= new Date(defaultEndDate)) {
+    if (tempDate >= new Date(startDate)) { // } && tempDate >= new Date(defaultStartDate) && tempDate <= new Date(defaultEndDate)) {
       setDateValid(true)
       props.setEndDate(date)
       props.setStartDate(startDate)
@@ -85,5 +85,5 @@ TimeSelector.propTypes = {
   startDate: PropTypes.string.isRequired,
   endDate: PropTypes.string.isRequired,
   setStartDate: PropTypes.func.isRequired,
-  setEndDate: PropTypes.func.isRequired,
-};
+  setEndDate: PropTypes.func.isRequired
+}
