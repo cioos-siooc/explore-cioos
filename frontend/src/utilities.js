@@ -4,20 +4,20 @@ import { useState, useEffect } from 'react'
 import { defaultQuery } from './components/config.js'
 import { useTranslation } from 'react-i18next'
 
-export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
+export function setAllOptionsIsSelectedTo (isSelected, options, setOptions) {
   setOptions(options.map(option => {
     return {
       ...option,
-      isSelected: isSelected
+      isSelected
     }
   }))
 }
 
-export function capitalizeFirstLetter(string) {
-  return string.charAt(0).toUpperCase() + string.slice(1);
+export function capitalizeFirstLetter (string) {
+  return string.charAt(0).toUpperCase() + string.slice(1)
 }
 
-export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
+export function generateMultipleSelectBadgeTitle (badgeTitle, optionsSelected) {
   const { t } = useTranslation()
 
   if (optionsSelected) {
@@ -28,22 +28,22 @@ export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
       return capitalizeFirstLetter(t(optionsSelectedFiltered[0].title))
     } else { // More than 0 or 1 options are selected
       const mapping = {
-        oceanVariablesFiltername: "oceanVariablesMulti",
-        organizationFilterName: "organizationMulti",
-        datasetsFilterName: "datasetsMulti",
+        oceanVariablesFiltername: 'oceanVariablesMulti',
+        organizationFilterName: 'organizationMulti',
+        datasetsFilterName: 'datasetsMulti'
       }
       return optionsSelectedFiltered.length + t(mapping[badgeTitle])
     }
   }
 }
 
-export function generateRangeSelectBadgeTitle(badgeTitle, optionsSelected, defaults, units) {
+export function generateRangeSelectBadgeTitle (badgeTitle, optionsSelected, defaults, units) {
   return optionsSelected[0] === defaults[0] && optionsSelected[1] === defaults[1]
     ? badgeTitle
     : `${optionsSelected[0]} - ${optionsSelected[1]}` + (!_.isEmpty(units) ? ' ' + units : '')
 }
 
-export function abbreviateString(text, maxLength) {
+export function abbreviateString (text, maxLength) {
   if (text) {
     if (text.length > maxLength) {
       return `${text.slice(0, maxLength)}...`
@@ -53,24 +53,24 @@ export function abbreviateString(text, maxLength) {
   }
 }
 
-export function validateEmail(email) {
-  const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-  return re.test(String(email).toLowerCase());
+export function validateEmail (email) {
+  const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+  return re.test(String(email).toLowerCase())
 }
 
 // create a URL query string from an object
-function objectToURL(obj) {
+function objectToURL (obj) {
   return Object.entries(obj)
-    .filter(([k, v]) => k && v != null && v !== "")
+    .filter(([k, v]) => k && v != null && v !== '')
     .map(([k, v]) => `${k}=${v}`)
-    .join("&")
+    .join('&')
 }
 
-export function createDataFilterQueryString(query) {
+export function createDataFilterQueryString (query) {
   const { orgsSelected, eovsSelected, datasetsSelected } = query
 
   // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
-  const queryWithoutDefaults = Object.keys(defaultQuery).reduce( // going through each 
+  const queryWithoutDefaults = Object.keys(defaultQuery).reduce( // going through each
     (accumulatorObject, field) => {
       if (query[field] !== defaultQuery[field]) { // checking that the value of each property in the query object has been changed in order to include those values in the url
         accumulatorObject[field] = query[field]
@@ -92,26 +92,26 @@ export function createDataFilterQueryString(query) {
 
   const orgPKs = orgsSelected
     .filter((org) => org.isSelected) // getting the selected orgs out
-    .map((org) => org.pk) // getting the pks of the selected organizations using the orgs title to access the pk 
+    .map((org) => org.pk) // getting the pks of the selected organizations using the orgs title to access the pk
     .join() // create the comma delimited list of org pks
 
   const { startDepth, endDepth, startDate, endDate } = queryWithoutDefaults
 
   const apiMappedQuery = { // These properties are specified by the API's schema
     eovs,
-    datasetPKs: datasetPKs,
+    datasetPKs,
     organizations: orgPKs,
     timeMin: startDate,
     timeMax: endDate,
     depthMin: startDepth,
-    depthMax: endDepth,
+    depthMax: endDepth
   }
 
   return objectToURL(apiMappedQuery)
 }
 
-export function bytesToMemorySizeString(bytes) {
-  let num = parseFloat(bytes)
+export function bytesToMemorySizeString (bytes) {
+  const num = parseFloat(bytes)
   // if(_.isEmpty(bytes)) return '---'
   if (num === NaN || num === 'NaN' || bytes === null) {
     return 'NaN'
@@ -131,8 +131,8 @@ export function bytesToMemorySizeString(bytes) {
 }
 
 // returns an array of {stop: num, color: string} objects
-export function generateColorStops(colorScale, range) {
-  //check if fewer points than colors
+export function generateColorStops (colorScale, range) {
+  // check if fewer points than colors
   const exponent = 5
   let colors
   let scale
@@ -143,10 +143,10 @@ export function generateColorStops(colorScale, range) {
     colors = colorScale
     scale = d3.scalePow().exponent(exponent).domain([0, colors.length - 1]).range(range)
   }
-  let colorStops = colors.map((color, index) => {
+  const colorStops = colors.map((color, index) => {
     return {
       stop: Math.floor(scale(index)),
-      color: color
+      color
     }
   })
   const result = []
@@ -160,39 +160,39 @@ export function generateColorStops(colorScale, range) {
   return result
 }
 
-export function useDebounce(value, delay) {
+export function useDebounce (value, delay) {
   // State and setters for debounced value
-  const [debouncedValue, setDebouncedValue] = useState(value);
+  const [debouncedValue, setDebouncedValue] = useState(value)
   useEffect(
     () => {
       // Update debounced value after delay
       const handler = setTimeout(() => {
-        setDebouncedValue(value);
-      }, delay);
+        setDebouncedValue(value)
+      }, delay)
       // Cancel the timeout if value changes (also on delay change or unmount)
       // This is how we prevent debounced value from updating if value is changed ...
       // .. within the delay period. Timeout gets cleared and restarted.
       return () => {
-        clearTimeout(handler);
-      };
+        clearTimeout(handler)
+      }
     },
     [value, delay] // Only re-call effect if value or delay changes
-  );
-  return debouncedValue;
+  )
+  return debouncedValue
 }
 
-export function getCurrentRangeLevel(rangeLevels, zoom) {
+export function getCurrentRangeLevel (rangeLevels, zoom) {
   switch (true) {
     case zoom < 5:
-      return (rangeLevels['zoom0'])
+      return (rangeLevels.zoom0)
     case zoom >= 5 && zoom < 7:
-      return (rangeLevels['zoom1'])
+      return (rangeLevels.zoom1)
     case zoom >= 7:
-      return (rangeLevels['zoom2'])
+      return (rangeLevels.zoom2)
   }
 }
 
-export function getPointsDataSize(pointsData) {
+export function getPointsDataSize (pointsData) {
   let total = 0
   pointsData.forEach((point) => {
     if (point.selected && point.size !== 'NaN' && point.size !== null) {
@@ -203,73 +203,73 @@ export function getPointsDataSize(pointsData) {
 }
 
 // returns true for rectangles, false for rotated rectangles
-function polygonIsRectangle(polygon) {
-  if (polygon.length !== 5) return false;
-  const p = polygon.slice(0, 4);
+function polygonIsRectangle (polygon) {
+  if (polygon.length !== 5) return false
+  const p = polygon.slice(0, 4)
 
-  const lons = unique(p.map((e) => e[0]));
-  const lats = unique(p.map((e) => e[1]));
+  const lons = unique(p.map((e) => e[0]))
+  const lats = unique(p.map((e) => e[1]))
 
-  return lons.length == 2 && lats.length == 2;
+  return lons.length == 2 && lats.length == 2
 }
-const unique = (arr) => [...new Set(arr)];
+const unique = (arr) => [...new Set(arr)]
 
 // translate a rectangular polygon to a bounding box query using lat/long min/max
-function polygonToMaxMins(polygon) {
-  const p = polygon.slice(0, 4);
+function polygonToMaxMins (polygon) {
+  const p = polygon.slice(0, 4)
 
-  const lons = unique(p.map((e) => e[0]));
-  const lats = unique(p.map((e) => e[1]));
+  const lons = unique(p.map((e) => e[0]))
+  const lats = unique(p.map((e) => e[1]))
 
   return {
     latMin: Math.min(...lats).toFixed(4),
     lonMin: Math.min(...lons).toFixed(4),
     latMax: Math.max(...lats).toFixed(4),
-    lonMax: Math.max(...lons).toFixed(4),
-  };
-}
-
-export function createSelectionQueryString(polygon) {
-  if (polygonIsRectangle(polygon)) {
-    // res = { latMin, lonMin, latMax, lonMax }  
-    const res = polygonToMaxMins(polygon);
-
-    return objectToURL(res);
+    lonMax: Math.max(...lons).toFixed(4)
   }
-  return "polygon=" + JSON.stringify(polygon);
 }
 
-export function filterObjectPropertyByPropertyList(objectToFilter, allowedProperties) {
+export function createSelectionQueryString (polygon) {
+  if (polygonIsRectangle(polygon)) {
+    // res = { latMin, lonMin, latMax, lonMax }
+    const res = polygonToMaxMins(polygon)
+
+    return objectToURL(res)
+  }
+  return 'polygon=' + JSON.stringify(polygon)
+}
+
+export function filterObjectPropertyByPropertyList (objectToFilter, allowedProperties) {
   const result = Object.keys(objectToFilter)
     .filter(key => allowedProperties.includes(key))
     .reduce((obj, key) => {
-      obj[key] = objectToFilter[key];
-      return obj;
-    }, {});
+      obj[key] = objectToFilter[key]
+      return obj
+    }, {})
   return result
 }
 
 // https://stackoverflow.com/questions/32553158/detect-click-outside-react-component
-export function useOutsideAlerter(ref, callback, value) {
+export function useOutsideAlerter (ref, callback, value) {
   useEffect(() => {
     /**
      * Alert if clicked on outside of element
      */
-    function handleClickOutside(event) {
+    function handleClickOutside (event) {
       if (ref.current && !ref.current.contains(event.target)) {
         callback(value)
       }
     }
     // Bind the event listener
-    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside)
     return () => {
       // Unbind the event listener on clean up
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [ref]);
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [ref])
 }
 
-export function getCookieValue(cookieName) {
+export function getCookieValue (cookieName) {
   if (document.cookie.includes(cookieName)) {
     return document.cookie
       .split('; ')

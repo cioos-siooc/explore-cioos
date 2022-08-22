@@ -14,6 +14,11 @@ module.exports = {
     ecmaVersion: 2018
   },
   rules: {
-    semi: false
+    semi: [2, 'never']
+  },
+  settings: {
+    react: {
+      version: 'detect'
+    }
   }
 }
