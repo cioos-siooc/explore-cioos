@@ -11,7 +11,7 @@ import './styles.css'
 import { bytesToMemorySizeString, getPointsDataSize } from '../../../utilities.js'
 
 // Note: datasets and points are exchangable terminology
-export default function DownloadDetails({ pointsToReview, setPointsToDownload, children }) {
+export default function DownloadDetails ({ pointsToReview, setPointsToDownload, children }) {
   const { t } = useTranslation()
 
   const [selectAll, setSelectAll] = useState(true)
@@ -27,9 +27,8 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, c
     }
   }, [pointsData])
 
-
-  function handleSelectDataset(point) {
-    let dataset = pointsData.filter((p) => p.pk === point.pk)[0]
+  function handleSelectDataset (point) {
+    const dataset = pointsData.filter((p) => p.pk === point.pk)[0]
     dataset.selected = !point.selected
     const result = pointsData.map((p) => {
       if (p.pk === point.pk) {
@@ -41,7 +40,7 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, c
     setPointsData(result)
   }
 
-  function handleSelectAllDatasets() {
+  function handleSelectAllDatasets () {
     setPointsData(pointsData.map(p => {
       return {
         ...p,
@@ -84,12 +83,12 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, c
       <hr />
       <Row className='downloadDataRow'>
         <Col>
-          {inspectDataset ?
-            <DatasetInspector
+          {inspectDataset
+            ? <DatasetInspector
               dataset={inspectDataset}
               setInspectDataset={setInspectDataset}
-            /> :
-            <DatasetsTable
+            />
+            : <DatasetsTable
               handleSelectAllDatasets={handleSelectAllDatasets}
               handleSelectDataset={handleSelectDataset}
               setInspectDataset={setInspectDataset}
@@ -105,14 +104,14 @@ export default function DownloadDetails({ pointsToReview, setPointsToDownload, c
         <Col >
           <ProgressBar
             className='dataTotalBar'
-            title={t('downloadDetailsProgressTitle')} //'Amount of download size used'
+            title={t('downloadDetailsProgressTitle')} // 'Amount of download size used'
           >
             <ProgressBar
               striped
               className='upTo100'
               variant='success'
               now={dataTotal < 100 ? dataTotal : 100}
-              label={dataTotal < 100 ? bytesToMemorySizeString(dataTotal * 1000000) : `100 MB`}
+              label={dataTotal < 100 ? bytesToMemorySizeString(dataTotal * 1000000) : '100 MB'}
               key={1}
             />
             {dataTotal > 100 &&

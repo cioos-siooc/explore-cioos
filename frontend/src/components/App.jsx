@@ -1,15 +1,14 @@
-import React from 'react'
-import { useState, useEffect } from 'react'
-import * as Sentry from "@sentry/react"
-import { Integrations } from "@sentry/tracing"
+import React, { useState, useEffect } from 'react'
+import * as Sentry from '@sentry/react'
+import { Integrations } from '@sentry/tracing'
 import { Col, Spinner } from 'react-bootstrap'
 import { ChatDots, CheckCircle, XCircle, ArrowsExpand, Building, CalendarWeek, FileEarmarkSpreadsheet, Water } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import _ from 'lodash'
 
 import { server } from '../config.js'
-import Controls from "./Controls/Controls.jsx"
-import Map from "./Map/Map.js"
+import Controls from './Controls/Controls.jsx'
+import Map from './Map/Map.js'
 import SelectionPanel from './Controls/SelectionPanel/SelectionPanel.jsx'
 import SelectionDetails from './Controls/SelectionDetails/SelectionDetails.jsx'
 import DownloadDetails from './Controls/DownloadDetails/DownloadDetails.jsx'
@@ -28,22 +27,22 @@ import FrenchLogo from './Images/CIOOSNationalLogoBlackFrench.svg'
 import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected } from './config.js'
 import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel, getPointsDataSize, generateMultipleSelectBadgeTitle, generateRangeSelectBadgeTitle, useDebounce, setAllOptionsIsSelectedTo } from '../utilities.js'
 
-import "bootstrap/dist/css/bootstrap.min.css"
-import "./styles.css"
+import 'bootstrap/dist/css/bootstrap.min.css'
+import './styles.css'
 
-if (process.env.NODE_ENV === "production") {
+if (process.env.NODE_ENV === 'production') {
   Sentry.init({
-    dsn: "https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595",
+    dsn: 'https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595',
     integrations: [new Integrations.BrowserTracing()],
 
     // Set tracesSampleRate to 1.0 to capture 100%
     // of transactions for performance monitoring.
     // We recommend adjusting this value in production
-    tracesSampleRate: 1.0,
-  });
+    tracesSampleRate: 1.0
+  })
 }
 
-export default function App() {
+export default function App () {
   const { t, i18n } = useTranslation()
   const [selectionPanelOpen, setSelectionPanelOpen] = useState()
   const [pointsToDownload, setPointsToDownload] = useState()
@@ -70,21 +69,21 @@ export default function App() {
   // EOV filter initial values and state
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
   const debouncedEovsSelected = useDebounce(eovsSelected, 500)
-  const eovsFilterTranslationKey = 'oceanVariablesFiltername' //'Ocean Variables'
+  const eovsFilterTranslationKey = 'oceanVariablesFiltername' // 'Ocean Variables'
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(eovsFilterTranslationKey, eovsSelected)
   const [eovsSearchTerms, setEovsSearchTerms] = useState('')
 
   // Organization filter initial values from API and state
   const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected)
   const debouncedOrgsSelected = useDebounce(orgsSelected, 500)
-  const orgsFilterTranslationKey = "organizationFilterName" //'Organizations'
+  const orgsFilterTranslationKey = 'organizationFilterName' // 'Organizations'
   const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterTranslationKey, orgsSelected)
   const [orgsSearchTerms, setOrgsSearchTerms] = useState('')
 
   // Dataset filter initial values and state
   const [datasetsSelected, setDatasetsSelected] = useState(defaultDatatsetsSelected)
   const debouncedDatasetsSelected = useDebounce(datasetsSelected, 500)
-  const datasetsFilterTranslationKey = 'datasetsFilterName' //'Datasets'
+  const datasetsFilterTranslationKey = 'datasetsFilterName' // 'Datasets'
   const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(datasetsFilterTranslationKey, datasetsSelected)
   const [datasetSearchTerms, setDatasetSearchTerms] = useState('')
 
@@ -93,7 +92,7 @@ export default function App() {
   const debouncedStartDate = useDebounce(startDate, 500)
   const [endDate, setEndDate] = useState(defaultEndDate)
   const debouncedEndDate = useDebounce(endDate, 500)
-  const timeframesFilterName = t('timeframeFilterName') //'Timeframe'
+  const timeframesFilterName = t('timeframeFilterName') // 'Timeframe'
   const timeframesBadgeTitle = generateRangeSelectBadgeTitle(timeframesFilterName, [startDate, endDate], [defaultStartDate, defaultEndDate])
 
   // Depth filter initial values and state
@@ -101,29 +100,29 @@ export default function App() {
   const debouncedStartDepth = useDebounce(startDepth, 500)
   const [endDepth, setEndDepth] = useState(defaultEndDepth)
   const debouncedEndDepth = useDebounce(endDepth, 500)
-  const depthRangeFilterName = t('depthRangeFilterName') //'Depth Range (m)'
+  const depthRangeFilterName = t('depthRangeFilterName') // 'Depth Range (m)'
   const depthRangeBadgeTitle = generateRangeSelectBadgeTitle(depthRangeFilterName, [startDepth, endDepth], [defaultStartDepth, defaultEndDepth], '(m)')
 
   // Filter open state
   const [openFilter, setOpenFilter] = useState()
 
-  // TODO: consider adding a 'searched' property to the options to indicate whether they satisfy the search terms, 
+  // TODO: consider adding a 'searched' property to the options to indicate whether they satisfy the search terms,
   // and removing the extra concept of 'allOptions' vs 'selectedOptions'
 
-  // Update query 
+  // Update query
   useEffect(() => {
     setQuery({
-      startDate: startDate,
-      endDate: endDate,
-      startDepth: startDepth,
-      endDepth: endDepth,
-      eovsSelected: eovsSelected,
-      orgsSelected: orgsSelected,
-      datasetsSelected: datasetsSelected
+      startDate,
+      endDate,
+      startDepth,
+      endDepth,
+      eovsSelected,
+      orgsSelected,
+      datasetsSelected
     })
   }, [debouncedStartDate, debouncedEndDate, debouncedStartDepth, debouncedEndDepth, debouncedEovsSelected, debouncedOrgsSelected, debouncedDatasetsSelected])
 
-  function createOptionSubset(searchTerms, allOptions) {
+  function createOptionSubset (searchTerms, allOptions) {
     if (searchTerms) {
       return allOptions.filter(option => option.title.toLowerCase().includes(searchTerms.toString().toLowerCase()))
     } else {
@@ -143,7 +142,7 @@ export default function App() {
     }
   }, [pointsToReview])
 
-  // Filter option data structure: 
+  // Filter option data structure:
   /*
   [{
     title: 'abc',
@@ -156,8 +155,8 @@ export default function App() {
   }]
   */
   useEffect(() => {
-    /* /oceanVariables returns array of variable names: 
-      ['abc', 'def', ...] 
+    /* /oceanVariables returns array of variable names:
+      ['abc', 'def', ...]
     */
     fetch(`${server}/oceanVariables`).then(response => response.json()).then(eovs => {
       setEovsSelected(eovs.map((eov, index) => {
@@ -169,16 +168,16 @@ export default function App() {
       }))
     }).catch(error => { throw error })
 
-    /* /organizations returns array of org objects: 
+    /* /organizations returns array of org objects:
       [
         {
-          color:null, 
-          name:'abc', 
+          color:null,
+          name:'abc',
           pk_text:null
-          pk:87, 
+          pk:87,
         },
         ...
-      ] 
+      ]
     */
     fetch(`${server}/organizations`).then(response => response.json()).then(orgsR => {
       setOrgsSelected(orgsR.map(org => {
@@ -190,17 +189,17 @@ export default function App() {
       }))
     }).catch(error => { throw error })
 
-    /* /datasets returns array of dataset objects 
+    /* /datasets returns array of dataset objects
       [
         {
-          title:'abc', 
+          title:'abc',
           title_translated:
             {
-              en: 'abc', 
+              en: 'abc',
               fr: 'def'
             }
-          organization_pks: [54, ...], 
-          pk: 86923, 
+          organization_pks: [54, ...],
+          pk: 86923,
         }
       ]
     */
@@ -223,7 +222,6 @@ export default function App() {
     }).catch(error => { throw error })
   }, [])
 
-
   useEffect(() => {
     switch (submissionState) {
       case 'submitted':
@@ -239,9 +237,9 @@ export default function App() {
               aria-hidden="true"
             />
           ),
-          text: t('submissionStateTextSubmitting') //'Submitting...'
+          text: t('submissionStateTextSubmitting') // 'Submitting...'
         })
-        break;
+        break
 
       case 'successful':
         setSubmissionFeedback({
@@ -250,9 +248,9 @@ export default function App() {
               className='text-success'
               size={30}
             />),
-          text: t('submissionStateTextSuccess', { email }) //Request successful. Download link will be sent to: ' + email
+          text: t('submissionStateTextSuccess', { email }) // Request successful. Download link will be sent to: ' + email
         })
-        break;
+        break
 
       case 'failed':
         setSubmissionFeedback({
@@ -262,13 +260,13 @@ export default function App() {
               size={30}
             />
           ),
-          text: t('submissionStateTextFailed') //'Request failed'
+          text: t('submissionStateTextFailed') // 'Request failed'
         })
-        break;
+        break
 
       default:
         setSubmissionFeedback()
-        break;
+        break
     }
   }, [submissionState])
 
@@ -293,15 +291,15 @@ export default function App() {
     setSubmissionState()
   }, [email])
 
-  function handleEmailChange(value) {
+  function handleEmailChange (value) {
     setEmail(value)
   }
 
-  function handleSubmission() {
+  function handleSubmission () {
     setSubmissionState('submitted')
   }
 
-  function submitRequest() {
+  function submitRequest () {
     fetch(`${server}/download?${createDataFilterQueryString(query)}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload.map(point => point.pk).join(',')}&email=${email}&lang=${i18n.language}`).then((response) => {
       if (response.ok) {
         setSubmissionState('successful')
@@ -314,7 +312,7 @@ export default function App() {
     })
   }
 
-  function DownloadButton() {
+  function DownloadButton () {
     return (
       <DataDownloadModal
         disabled={_.isEmpty(pointsToReview)}
@@ -344,7 +342,7 @@ export default function App() {
               {
                 (!_.isEmpty(pointsToDownload) && submissionFeedback && submissionState !== 'submitted' && t('submitRequestButtonResubmitText')) ||
                 (_.isEmpty(pointsToDownload) && t('submitRequestButtonSelectDataText')) ||
-                t('submitRequestButtonSubmitText') //'Submit Request'
+                t('submitRequestButtonSubmitText') // 'Submit Request'
               }
             </button>
           </Col>
@@ -360,9 +358,9 @@ export default function App() {
   return (
     <ErrorBoundary
       errorBoundaryMessage={t('errorBoundaryMessage')}
-      logoSource={i18n.language === 'en' ?
-        EnglishLogo :
-        FrenchLogo
+      logoSource={i18n.language === 'en'
+        ? EnglishLogo
+        : FrenchLogo
       }
     >
       {loading && <Loading />}
@@ -403,13 +401,13 @@ export default function App() {
           badgeTitle={eovsBadgeTitle}
           optionsSelected={eovsSelected}
           setOptionsSelected={setEovsSelected}
-          tooltip={t('oceanVariableFilterTooltip')} //'Filter data by ocean variable name. Selection works as logical OR operation.'
+          tooltip={t('oceanVariableFilterTooltip')} // 'Filter data by ocean variable name. Selection works as logical OR operation.'
           icon={<Water />}
           controlled
           searchable
           searchTerms={eovsSearchTerms}
           setSearchTerms={setEovsSearchTerms}
-          searchPlaceholder={t('oceanVariableFilterSeachPlaceholder')} //'Search for ocean variable name...'
+          searchPlaceholder={t('oceanVariableFilterSeachPlaceholder')} // 'Search for ocean variable name...'
           filterName={eovsFilterTranslationKey}
           openFilter={openFilter === eovsFilterTranslationKey}
           setOpenFilter={setOpenFilter}
@@ -429,13 +427,13 @@ export default function App() {
           badgeTitle={orgsBadgeTitle}
           optionsSelected={orgsSelected}
           setOptionsSelected={setOrgsSelected}
-          tooltip={t('organizationFilterTooltip')} //'Filter data by responsible organisation name. Selection works as logical OR operation.'
+          tooltip={t('organizationFilterTooltip')} // 'Filter data by responsible organisation name. Selection works as logical OR operation.'
           icon={<Building />}
           controlled
           searchable
           searchTerms={orgsSearchTerms}
           setSearchTerms={setOrgsSearchTerms}
-          searchPlaceholder={t('organizationFilterSearchPlaceholder')} //'Search for organization name...'
+          searchPlaceholder={t('organizationFilterSearchPlaceholder')} // 'Search for organization name...'
           filterName={orgsFilterTranslationKey}
           openFilter={openFilter === orgsFilterTranslationKey}
           setOpenFilter={setOpenFilter}
@@ -454,7 +452,7 @@ export default function App() {
           badgeTitle={datasetsBadgeTitle}
           optionsSelected={datasetsSelected}
           setOptionsSelected={setDatasetsSelected}
-          tooltip={t('datasetFilterTooltip')} //'Filter data by dataset name. Selection works as logical OR operation.'
+          tooltip={t('datasetFilterTooltip')} // 'Filter data by dataset name. Selection works as logical OR operation.'
           icon={<FileEarmarkSpreadsheet />}
           controlled
           searchable
@@ -518,18 +516,18 @@ export default function App() {
           {DownloadButton()}
         </div>
       </Controls>
-      {i18n.language === 'en' ?
-        <a
+      {i18n.language === 'en'
+        ? <a
           title={t('CIOOSLogoButtonTitle')}
           className='logo english'
           href='https://cioos.ca/'
-          target='_blank'
-        /> :
-        <a
+          target='_blank' rel="noreferrer"
+        />
+        : <a
           title={t('CIOOSLogoButtonTitle')}
           className='logo french'
           href='https://cioos.ca/'
-          target='_blank'
+          target='_blank' rel="noreferrer"
         />
       }
       {currentRangeLevel && <Legend currentRangeLevel={currentRangeLevel} />}
@@ -544,12 +542,12 @@ export default function App() {
         className='feedbackButton'
         title={t('feedbackButtonTitle')}
         href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit'
-        target='_blank'
+        target='_blank' rel="noreferrer"
       >
         <ChatDots size='30px' />
       </a>
       <IntroModal initialOpenState={true} />
       <LanguageSelector />
     </ErrorBoundary>
-  );
+  )
 }

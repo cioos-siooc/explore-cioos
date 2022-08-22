@@ -63,7 +63,9 @@
     "start": "webpack-dev-server --open --config webpack.config.development.js",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
-    "build:analyze": "cd dist;webpack --config ../webpack.config.production.js --profile --json > stats.json;webpack-bundle-analyzer stats.json"
+    "build:analyze": "cd dist;webpack --config ../webpack.config.production.js --profile --json > stats.json;webpack-bundle-analyzer stats.json",
+    "lint": "eslint . --ext .js,.jsx --ignore-path .gitignore",
+    "lint:fix": "eslint --fix . --ext .js,.jsx --ignore-path .gitignore"
   },
   "author": "",
   "license": "ISC"
