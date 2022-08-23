@@ -6,9 +6,9 @@ import { useTranslation } from 'react-i18next'
 import { getCookieValue } from '../../../utilities'
 import './styles.css'
 
-export default function IntroModal({ initialOpenState }) {
+export default function IntroModal ({ initialOpenState }) {
   const { t, i18n } = useTranslation()
-  const introOpenCookie = !!!getCookieValue('introModalOpen')
+  const introOpenCookie = !getCookieValue('introModalOpen')
   const [showModal, setShowModal] = useState(introOpenCookie !== undefined ? introOpenCookie : initialOpenState)
 
   const [hoveredStep, setHoveredStep] = useState()
@@ -20,7 +20,7 @@ export default function IntroModal({ initialOpenState }) {
     }
   }, [showModal])
 
-  function generateInfo() {
+  function generateInfo () {
     switch (hoveredStep) {
       case 'filter':
         return (
@@ -132,19 +132,18 @@ export default function IntroModal({ initialOpenState }) {
               {t('CIOOSQuote')}
               {/* "Ocean Data For Our Ocean Future" */}
             </span>
-            {i18n.language === 'en' ?
-              <a
+            {i18n.language === 'en'
+              ? <a
                 title={t('CIOOSLogoButtonTitle')}
                 className='introLogo english'
                 href='https://cioos.ca/'
-                target='_blank'
+                target='_blank' rel="noreferrer"
               />
-              :
-              <a
+              : <a
                 title={t('CIOOSLogoButtonTitle')}
                 className='introLogo french'
                 href='https://cioos.ca/'
-                target='_blank'
+                target='_blank' rel="noreferrer"
               />
             }
           </Modal.Title>
@@ -192,7 +191,7 @@ export default function IntroModal({ initialOpenState }) {
       <button
         className='introButton'
         onClick={() => setShowModal(true)}
-        title={t('introReopenTitle')} //'Re-open introduction'
+        title={t('introReopenTitle')} // 'Re-open introduction'
       >
         <InfoSquare color='#007bff' size={'25px'} />
       </button>

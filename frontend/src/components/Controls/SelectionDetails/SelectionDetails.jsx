@@ -14,11 +14,11 @@ import {
   bytesToMemorySizeString,
   createDataFilterQueryString,
   getPointsDataSize,
-  createSelectionQueryString,
-} from "../../../utilities.js";
+  createSelectionQueryString
+} from '../../../utilities.js'
 
 // Note: datasets and points are exchangable terminology
-export default function SelectionDetails({ setPointsToReview, query, polygon, children }) {
+export default function SelectionDetails ({ setPointsToReview, query, polygon, children }) {
   const { t, i18n } = useTranslation()
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState([])
@@ -41,10 +41,10 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, ch
     if (polygon !== undefined && !loading) {
       const filtersQuery = createDataFilterQueryString(query)
       const shapeQuery = createSelectionQueryString(polygon)
-      const combinedQueries = [filtersQuery, shapeQuery].filter(e => e).join("&");
+      const combinedQueries = [filtersQuery, shapeQuery].filter(e => e).join('&')
       setInspectDataset()
       setLoading(true)
-      let urlString = `${server}/pointQuery?${combinedQueries}`;
+      const urlString = `${server}/pointQuery?${combinedQueries}`
       fetch(urlString).then(response => {
         if (response.ok) {
           response.json().then(data => {
@@ -63,8 +63,8 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, ch
     }
   }, [polygon, i18n.language])
 
-  function handleSelectDataset(point) {
-    let dataset = pointsData.filter((p) => p.pk === point.pk)[0]
+  function handleSelectDataset (point) {
+    const dataset = pointsData.filter((p) => p.pk === point.pk)[0]
     dataset.selected = !point.selected
     const result = pointsData.map((p) => {
       if (p.pk === point.pk) {
@@ -76,7 +76,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, ch
     setPointsData(result)
   }
 
-  function handleSelectAllDatasets() {
+  function handleSelectAllDatasets () {
     setPointsData(pointsData.map(p => {
       return {
         ...p,
@@ -89,17 +89,17 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, ch
   return (
     <div className='pointDetails'>
       <div className='pointDetailsInfoRow'>
-        {loading ?
-          (
+        {loading
+          ? (
             <Loading />
-          ) :
-          (inspectDataset ?
-            <DatasetInspector
+            )
+          : (inspectDataset
+              ? <DatasetInspector
               dataset={inspectDataset}
               setInspectDataset={setInspectDataset}
-            /> :
-            (
-              pointsData && pointsData.length > 0 &&
+            />
+              : (
+                  pointsData && pointsData.length > 0 &&
               <DatasetsTable
                 handleSelectAllDatasets={handleSelectAllDatasets}
                 handleSelectDataset={handleSelectDataset}
@@ -108,14 +108,14 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, ch
                 setDatasets={setPointsData}
                 datasets={pointsData}
               />
-            ) || (
-              pointsData && pointsData.length === 0 &&
+                ) || (
+                  pointsData && pointsData.length === 0 &&
               <div className="noDataNotice">
                 {t('selectionDetailsNoDataWarning')}
                 {/* No Data. Modify filters or change selection on map. */}
               </div>
+                )
             )
-          )
 
         }
       </div>
@@ -131,7 +131,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, ch
                 className='upTo100'
                 variant='success'
                 now={dataTotal < 100 ? dataTotal : 100}
-                label={dataTotal < 100 ? bytesToMemorySizeString(dataTotal * 1000000) : `100 MB`}
+                label={dataTotal < 100 ? bytesToMemorySizeString(dataTotal * 1000000) : '100 MB'}
                 key={1}
               />
               {dataTotal > 100 &&
@@ -149,7 +149,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, ch
               {bytesToMemorySizeString(dataTotal * 1000000)} {t('selectionDetailsMaxRatio')}
               {/* of 100MB Max */}
               <QuestionIconTooltip
-                tooltipText={t('selectionDetailsQuestionTooltipText')} //'Downloads are limited to 100MB.'}
+                tooltipText={t('selectionDetailsQuestionTooltipText')} // 'Downloads are limited to 100MB.'}
                 size={20}
                 tooltipPlacement={'top'}
               />
