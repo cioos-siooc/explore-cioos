@@ -283,15 +283,22 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       setPointsToReview();
       setPolygon();
     }
+    
+    // clone an element to remove it's events
+    function cloneElement(oldElement){
+      const newElement = oldElement.cloneNode(true);
+      oldElement.parentNode.replaceChild(newElement, oldElement);
+      return newElement;
+    }
 
     map.current.on("load", () => {
       const boxQueryElement = document.getElementById("boxQueryButton");
-      const trashQueryElement = document
+      const trashQueryElement = cloneElement(document
         .getElementsByClassName("mapbox-gl-draw_trash")
-        .item(0);
-      const polyQueryElement = document
+        .item(0));
+      const polyQueryElement = cloneElement(document
         .getElementsByClassName("mapbox-gl-draw_polygon")
-        .item(0);
+        .item(0));
 
       if (boxQueryElement) {
         boxQueryElement.onclick = (e) => {
@@ -302,7 +309,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         };
         }
       if (polyQueryElement) {
-        polyQueryElement.onclick = () => {
+        polyQueryElement.onclick= () => {
           map.current.getCanvas().style.cursor = "crosshair";
           deleteAllShapes();
           creatingPolygon.current = true;
