@@ -4,8 +4,7 @@ import MapboxDraw from '@mapbox/mapbox-gl-draw'
 import { useState, useEffect, useRef } from 'react'
 import * as turf from '@turf/turf'
 import DrawRectangle from 'mapbox-gl-draw-rectangle-mode'
-import { useTranslation } from 'react-i18next'
-
+import { useTranslation } from "react-i18next";
 import './styles.css'
 
 import { server } from '../../config'
@@ -19,6 +18,18 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
   const mapContainer = useRef(null)
   const map = useRef(null)
   const creatingPolygon = useRef(false)
+  
+  // disables edting of polygon/box vertices
+  const disabledEvent = function (state, geojson, display) {
+    display(geojson);
+  };
+
+  const modes = MapboxDraw.modes;
+  MapboxDraw.modes.direct_select.toDisplayFeatures = disabledEvent;
+  MapboxDraw.modes.simple_select.toDisplayFeatures = disabledEvent;
+
+  modes.draw_rectangle = DrawRectangle;
+  
   const drawControlOptions = {
     displayControlsDefault: false,
     controls: {
@@ -28,11 +39,12 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
       trash: true,
       combine_features: false,
       uncombine_features: false,
-      modes: Object.assign(MapboxDraw.modes, {
-        draw_rectangle: DrawRectangle
-      })
-    }
-  }
+      modes,
+      pitchWithRotate: false,
+      dragRotate: false,
+      touchZoomRotate: false
+    },
+  };
   const smallCircleSize = 2.75
   const largeCircleSize = 6
   const circleOpacity = 0.7
@@ -252,14 +264,65 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
       zoom: mapZoom || zoom // starting zoom
     })
 
-    map.current.on('load', () => {
-      const boxQueryElement = document.getElementById('boxQueryButton')
-      if (boxQueryElement) {
-        boxQueryElement.onclick = () => {
-          creatingPolygon.current = true
-          draw.changeMode('draw_rectangle')
-        }
+        
+    // disable map rotation using right click + drag
+    map.current.dragRotate.disable()
+    
+    // disable map rotation using touch rotation gesture
+    map.current.touchZoomRotate.disableRotation()
+
+    function deleteAllShapes() {
+      if (drawPolygon.current?.getAll()?.features?.length > 0) {
+        drawPolygon.current.delete(
+          drawPolygon.current.getAll().features[0].id
+        );
       }
+
+      map.current.setFilter("points-highlighted", ["in", "pk", ""]);
+      setPointsToReview();
+      setPolygon();
+    }
+    
+    // clone an element to remove it's events
+    function cloneElement(oldElement){
+      const newElement = oldElement.cloneNode(true);
+      oldElement.parentNode.replaceChild(newElement, oldElement);
+      return newElement;
+    }
+
+    map.current.on("load", () => {
+      const boxQueryElement = document.getElementById("boxQueryButton");
+      const trashQueryElement = cloneElement(document
+        .getElementsByClassName("mapbox-gl-draw_trash")
+        .item(0));
+      const polyQueryElement = cloneElement(document
+        .getElementsByClassName("mapbox-gl-draw_polygon")
+        .item(0));
+
+      if (boxQueryElement) {
+        boxQueryElement.onclick = (e) => {
+          map.current.getCanvas().style.cursor = "crosshair";
+          deleteAllShapes();
+          creatingPolygon.current = true;
+          draw.changeMode("draw_rectangle");
+        };
+        }
+      if (polyQueryElement) {
+        polyQueryElement.onclick= () => {
+          map.current.getCanvas().style.cursor = "crosshair";
+          deleteAllShapes();
+          creatingPolygon.current = true;
+          draw.changeMode("draw_polygon");
+        };
+      }
+      if (trashQueryElement)
+        trashQueryElement.onclick = () => {
+          creatingPolygon.current = false;
+          map.current.getCanvas().style.cursor = "unset";
+          deleteAllShapes();
+        };
+        
+      
 
       setColorStops()
 
@@ -440,37 +503,35 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
       }
     }
 
-    map.current.on('dragstart', e => {
-      map.current.getCanvas().style.cursor = 'grabbing'
-    })
 
-    map.current.on('dragend', e => {
-      map.current.getCanvas().style.cursor = 'grab'
-    })
 
-    map.current.on('mousemove', 'points', e => {
-      map.current.getCanvas().style.cursor = 'pointer'
-      const coordinates = e.features[0].geometry.coordinates.slice()
+    map.current.on("mousemove", "points", (e) => {
+      if (!creatingPolygon.current)
+        map.current.getCanvas().style.cursor = "pointer";
+      var coordinates = e.features[0].geometry.coordinates.slice();
       popup
         .setLngLat(coordinates)
         .setHTML(
           ` <div>
-              ${e.features[0].properties.count} ${t('mapPointHoverTooltip')}
+              ${e.features[0].properties.count} ${t("mapPointHoverTooltip")}
             </div> 
           `
         )
-        .addTo(map.current)
-    })
+        .addTo(map.current);
+    });
 
     map.current.on('mouseleave', 'points', () => {
-      map.current.getCanvas().style.cursor = 'grab'
+      if (!creatingPolygon.current)
+        map.current.getCanvas().style.cursor = "grab";
+      
       popup.remove()
     })
 
-    map.current.on('mousemove', 'hexes', e => {
-      map.current.getCanvas().style.cursor = 'pointer'
-      const coordinates = [e.lngLat.lng, e.lngLat.lat]
-      const description = e.features[0].properties.count
+    map.current.on('mousemove', "hexes", e => {
+      if (!creatingPolygon.current)
+        map.current.getCanvas().style.cursor = "pointer";
+      var coordinates = [e.lngLat.lng, e.lngLat.lat]
+      var description = e.features[0].properties.count
 
       popup
         .setLngLat(coordinates)
@@ -479,7 +540,9 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     })
 
     map.current.on('mouseleave', 'hexes', () => {
-      map.current.getCanvas().style.cursor = 'grab'
+      if (!creatingPolygon.current)
+        map.current.getCanvas().style.cursor = "grab";
+
       popup.remove()
     })
 
@@ -541,19 +604,11 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
       }
     })
 
-    map.current.on('mouseup', e => {
-      const mode = draw.getMode()
-      if (mode === 'draw_rectangle' || mode === 'draw_polygon') {
-        map.current.getCanvas().style.cursor = 'pointer'
-        creatingPolygon.current = true
-      } else if (mode === 'simple_select') {
-        map.current.getCanvas().style.cursor = 'grab'
-        creatingPolygon.current = false
-      } else {
-        map.current.getCanvas().style.cursor = 'grab'
-      }
-      setBoxSelectEndCoords([e.lngLat.lng, e.lngLat.lat])
-    })
+    map.current.on("mouseup", (e) => {
+      creatingPolygon.current = false;
+      setBoxSelectEndCoords([e.lngLat.lng, e.lngLat.lat]);
+      map.current.getCanvas().style.cursor = "unset";
+    });
 
     // Workaround for https://github.com/mapbox/mapbox-gl-draw/issues/617
 
