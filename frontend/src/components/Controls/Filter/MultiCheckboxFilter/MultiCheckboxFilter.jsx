@@ -5,17 +5,17 @@ import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
 import platformColors from '../../../platformColors'
 import './styles.css'
 
-export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelected, searchable, translatable, colored, allOptions }) {
+export default function MultiCheckboxFilter ({ optionsSelected, setOptionsSelected, searchable, translatable, colored, allOptions }) {
   const { t, i18n } = useTranslation()
 
   const optionsSelectedSorted = optionsSelected.sort((a, b) => t(a.title).localeCompare(t(b.title), i18n.language))
 
-  function setIsSelectedTo(isSelected, allOptions, listOfPKs) {
+  function setIsSelectedTo (isSelected, allOptions, listOfPKs) {
     return allOptions.map(option => {
       if (listOfPKs.includes(option.pk)) {
         return {
           ...option,
-          isSelected: isSelected
+          isSelected
         }
       } else {
         return option
@@ -23,7 +23,7 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
     })
   }
 
-  function selectAllSearchResultsToggle() {
+  function selectAllSearchResultsToggle () {
     // Get a list of all the pks in the optionsSelected subset of allOptions
     const listOfPKs = optionsSelected.reduce((accumulatedPKs, currentOption) => {
       accumulatedPKs.push(currentOption.pk)
@@ -39,7 +39,7 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
   }
 
   return (
-    <div className={`multiCheckboxFilter`}>
+    <div className={'multiCheckboxFilter'}>
       {optionsSelected.length > 0 && optionsSelected.length !== allOptions.length && // search results exist
         <>
           <div className="searchResultsButton" onClick={() => selectAllSearchResultsToggle()}>
@@ -108,7 +108,7 @@ export default function MultiCheckboxFilter({ optionsSelected, setOptionsSelecte
       })
         : (
           <div>{t('multiCheckboxFilterNoFilterWarning')}</div>
-        )
+          )
       }
     </div>
   )

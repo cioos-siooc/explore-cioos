@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import './styles.css'
 
-export default function DataDownloadModal({ disabled, children, setEmail, setSubmissionState }) {
+export default function DataDownloadModal ({ disabled, children, setEmail, setSubmissionState }) {
   const { t } = useTranslation()
   const [showModal, setShowModal] = useState(false)
   return (
@@ -37,7 +37,7 @@ export default function DataDownloadModal({ disabled, children, setEmail, setSub
         className='downloadButton'
         onClick={() => setShowModal(true)}
         disabled={disabled}
-        title={t('downloadModalButtonTitle')} //'Download selected data'
+        title={t('downloadModalButtonTitle')} // 'Download selected data'
       >
         {t('downloadModalButtonText')}
         {/* Download */}

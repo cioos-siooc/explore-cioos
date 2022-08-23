@@ -6,9 +6,9 @@ import { useTranslation } from 'react-i18next'
 import platformColors from '../../platformColors'
 import './styles.css'
 
-export default function DatasetInspector({ dataset, setInspectDataset, setHoveredDataset }) {
+export default function DatasetInspector ({ dataset, setInspectDataset, setHoveredDataset }) {
   const { t } = useTranslation()
-  let platformColor = platformColors.filter(pc => pc.platform === dataset.platform)
+  const platformColor = platformColors.filter(pc => pc.platform === dataset.platform)
   return (
     <div className='datasetInspector'
       onMouseEnter={() => setHoveredDataset(dataset)}
@@ -17,7 +17,7 @@ export default function DatasetInspector({ dataset, setInspectDataset, setHovere
       <div
         className='backButton'
         onClick={() => setInspectDataset()}
-        title={t('datasetInspectorBackButtonTitle')} //'Return to dataset list'
+        title={t('datasetInspectorBackButtonTitle')} // 'Return to dataset list'
       >
         <ChevronCompactLeft />
         {t('datasetInspectorBackButtonText')}
@@ -43,12 +43,12 @@ export default function DatasetInspector({ dataset, setInspectDataset, setHovere
             {/* Dataset URLs */}
           </h6>
           <div>
-            <ul style={{ "listStyleType": 'none' }}>
+            <ul style={{ listStyleType: 'none' }}>
               <li>
                 <a
                   href={dataset.ckan_url}
                   target='_blank'
-                  title={dataset.ckan_url ? dataset.ckan_url : 'unavailable'}>
+                  title={dataset.ckan_url ? dataset.ckan_url : 'unavailable'} rel="noreferrer">
                   {t('datasetInspectorCKANURL')} (CKAN)
                 </a>
               </li>
@@ -56,7 +56,7 @@ export default function DatasetInspector({ dataset, setInspectDataset, setHovere
                 <a
                   href={dataset.erddap_url}
                   target='_blank'
-                  title={dataset.erddap_url ? dataset.erddap_url : 'unavailable'}>
+                  title={dataset.erddap_url ? dataset.erddap_url : 'unavailable'} rel="noreferrer">
                   {t('datasetInspectorERDDAPURL')} (ERDDAP)
                 </a>
               </li>
@@ -88,7 +88,7 @@ export default function DatasetInspector({ dataset, setInspectDataset, setHovere
           </div>
           <hr />
           <h6>
-            {/* Records ... records total, 1000 shown*/}
+            {/* Records ... records total, 1000 shown */}
             {t('datasetInspectorRecordsText')} ({dataset && dataset.profiles_count > 1000 ? `${dataset.profiles_count} ${t('datasetInspectorRecordsOverflowText')}` : dataset.profiles_count})
           </h6>
         </Container>
@@ -122,5 +122,4 @@ export default function DatasetInspector({ dataset, setInspectDataset, setHovere
       </div >
     </div >
   )
-
 }
