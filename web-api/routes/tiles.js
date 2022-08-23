@@ -40,7 +40,7 @@ router.get(
   with relevent_points as (
     ${
       isHexGrid
-        ? `SELECT :zoomPKColumn pk,count(distinct point_pk) count,`
+        ? `SELECT :zoomPKColumn: pk,count(distinct point_pk) count,`
         : "SELECT point_pk pk, d.platform as platform,sum(p.days)::bigint count,"
     } array_to_json(array_agg(distinct dataset_pk)) datasets,     
       p.:geom_column: AS geom FROM cde.profiles p
