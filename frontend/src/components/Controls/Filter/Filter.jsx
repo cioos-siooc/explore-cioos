@@ -1,7 +1,6 @@
 import * as React from 'react'
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import * as _ from 'lodash'
-import { useState, useEffect } from 'react'
 import { ChevronCompactDown, ChevronCompactUp, X } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 
@@ -10,7 +9,7 @@ import { abbreviateString, useOutsideAlerter, setAllOptionsIsSelectedTo } from '
 
 import './styles.css'
 
-export default function Filter({
+export default function Filter ({
   badgeTitle,
   tooltip,
   icon,
@@ -25,14 +24,14 @@ export default function Filter({
   resetButton,
   selectAllButton,
   numberOfOptions,
-  children }) {
-
+  children
+}) {
   const { t } = useTranslation()
 
   // Open/Closed state for filter dropdown
   const [filterOpen, setFilterOpen] = useState(controlled ? openFilter : false)
-  const wrapperRef = useRef(null);
-  useOutsideAlerter(wrapperRef, setFilterOpen, false);
+  const wrapperRef = useRef(null)
+  useOutsideAlerter(wrapperRef, setFilterOpen, false)
 
   useEffect(() => {
     controlled ? setFilterOpen(openFilter) : _.noop()
@@ -77,7 +76,7 @@ export default function Filter({
                   color='darkgrey'
                   className='clearFilter'
                   onClick={() => setSearchTerms('')}
-                  title={t('filterClearSearchTitle')} //'Clear search terms' 
+                  title={t('filterClearSearchTitle')} // 'Clear search terms'
                 />}
             </div>
           )}
