@@ -18,6 +18,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
   const mapContainer = useRef(null)
   const map = useRef(null)
   const creatingPolygon = useRef(false)
+  const shiftBoxCreate = useRef(false)
   
   // disables edting of polygon/box vertices
   const disabledEvent = function (state, geojson, display) {
@@ -503,47 +504,49 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
       }
     }
 
-
-
-    map.current.on("mousemove", "points", (e) => {
-      if (!creatingPolygon.current)
-        map.current.getCanvas().style.cursor = "pointer";
-      var coordinates = e.features[0].geometry.coordinates.slice();
-      popup
-        .setLngLat(coordinates)
-        .setHTML(
-          ` <div>
-              ${e.features[0].properties.count} ${t("mapPointHoverTooltip")}
-            </div> 
-          `
-        )
-        .addTo(map.current);
-    });
-
-    map.current.on('mouseleave', 'points', () => {
-      if (!creatingPolygon.current)
-        map.current.getCanvas().style.cursor = "grab";
-      
-      popup.remove()
+    map.current.on('mousemove', 'points', (e) => {
+      if (!draw.getMode().includes('draw')) {
+        map.current.getCanvas().style.cursor = 'pointer'
+        const coordinates = e.features[0].geometry.coordinates.slice()
+        popup
+          .setLngLat(coordinates)
+          .setHTML(
+            ` <div>
+                  ${e.features[0].properties.count} ${t('mapPointHoverTooltip')}
+                </div> 
+              `
+          )
+          .addTo(map.current)
+      }
     })
 
-    map.current.on('mousemove', "hexes", e => {
-      if (!creatingPolygon.current)
-        map.current.getCanvas().style.cursor = "pointer";
-      var coordinates = [e.lngLat.lng, e.lngLat.lat]
-      var description = e.features[0].properties.count
+    map.current.on('mouseleave', 'points', () => {
+      if (!draw.getMode().includes('draw')) {
+        map.current.getCanvas().style.cursor = 'grab'
 
-      popup
-        .setLngLat(coordinates)
-        .setHTML(description + t('mapHexHoverTooltip'))
-        .addTo(map.current)
+        popup.remove()
+      }
+    })
+
+    map.current.on('mousemove', 'hexes', (e) => {
+      if (!draw.getMode().includes('draw')) {
+        map.current.getCanvas().style.cursor = 'pointer'
+        const coordinates = [e.lngLat.lng, e.lngLat.lat]
+        const description = e.features[0].properties.count
+
+        popup
+          .setLngLat(coordinates)
+          .setHTML(description + t('mapHexHoverTooltip'))
+          .addTo(map.current)
+      }
     })
 
     map.current.on('mouseleave', 'hexes', () => {
-      if (!creatingPolygon.current)
-        map.current.getCanvas().style.cursor = "grab";
+      if (!draw.getMode().includes('draw')) {
+        map.current.getCanvas().style.cursor = 'grab'
 
-      popup.remove()
+        popup.remove()
+      }
     })
 
     map.current.on('draw.create', e => {
@@ -556,18 +559,6 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
       setPolygon(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
     })
 
-    map.current.on('draw.update', e => {
-      setLoading(true)
-      highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
-      setPolygon(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
-    })
-
-    map.current.on('draw.delete', e => {
-      map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-      setPointsToReview()
-      setPolygon()
-    })
-
     map.current.on('idle', e => {
       if (doFinalCheck.current && drawPolygon.current.getAll().features.length > 0 && map.current.getZoom() >= 7) {
         setPointsToReview()
@@ -576,15 +567,6 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
       }
       doFinalCheck.current = false
       setLoading(false)
-    })
-
-    map.current.on('dragend', e => {
-      if (drawPolygon.current.getAll().features.length > 0) {
-        if (map.current.getZoom() >= 7) {
-          setLoading(true)
-          highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
-        }
-      }
     })
 
     map.current.on('zoomend', e => {
@@ -597,18 +579,21 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
       }
       setZoom(map.current.getZoom())
     })
-
-    map.current.on('mousedown', e => {
+    map.current.on('mousedown', (e) => {
       if (e.originalEvent.shiftKey) {
+        shiftBoxCreate.current = true
         setBoxSelectStartCoords([e.lngLat.lng, e.lngLat.lat])
       }
     })
 
-    map.current.on("mouseup", (e) => {
-      creatingPolygon.current = false;
-      setBoxSelectEndCoords([e.lngLat.lng, e.lngLat.lat]);
-      map.current.getCanvas().style.cursor = "unset";
-    });
+    map.current.on('mouseup', (e) => {
+      if (shiftBoxCreate.current) {
+        setBoxSelectEndCoords([e.lngLat.lng, e.lngLat.lat])
+        map.current.getCanvas().style.cursor = 'unset'
+        shiftBoxCreate.current = false
+      }
+    })
+
 
     // Workaround for https://github.com/mapbox/mapbox-gl-draw/issues/617
 
