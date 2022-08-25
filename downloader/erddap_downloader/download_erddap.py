@@ -16,7 +16,7 @@ from erddapy import ERDDAP
 from shapely.geometry import Point
 
 ONE_MB = 10 ** 6
-DATASET_SIZE_LIMIT = 100 * ONE_MB
+DATASET_SIZE_LIMIT = 1000 * ONE_MB
 QUERY_SIZE_LIMIT = 5000 * ONE_MB
 
 DOWNLOADING = "DOWNLOADING"
