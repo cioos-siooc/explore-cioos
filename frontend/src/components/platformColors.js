@@ -45,7 +45,7 @@ const platformColors = [
   },
   {
     platform: 'unknown',
-    color: '#000000'
+    color: '#575757'
   }
 ]
 
