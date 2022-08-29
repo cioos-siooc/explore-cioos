@@ -20,13 +20,15 @@
     "lodash": "^4.17.21",
     "mapbox-gl-draw-rectangle-mode": "^1.0.4",
     "maplibre-gl": "^2.1.9",
+    "plotly.js": "^2.14.0",
     "prop-types": "^15.8.1",
     "rc-slider": "^10.0.0",
     "react": "17",
     "react-bootstrap": "^2.4.0",
     "react-bootstrap-icons": "^1.8.2",
     "react-dom": "17",
-    "react-i18next": "^11.16.9"
+    "react-i18next": "^11.16.9",
+    "react-plotly.js": "^2.5.1"
   },
   "devDependencies": {
     "@babel/core": "^7.18.2",
