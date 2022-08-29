@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import platformColors from '../../platformColors'
 import './styles.css'
 
-export default function DatasetInspector ({ dataset, setInspectDataset, setHoveredDataset }) {
+export default function DatasetInspector({ dataset, setInspectDataset, setHoveredDataset, setInspectRecordID }) {
   const { t } = useTranslation()
   const platformColor = platformColors.filter(pc => pc.platform === dataset.platform)
   return (
@@ -103,7 +103,7 @@ export default function DatasetInspector ({ dataset, setInspectDataset, setHover
           <tbody>
             {dataset.profiles.map((profile, index) => {
               return (
-                <tr key={index}>
+                <tr key={index} onClick={() => setInspectRecordID(profile.profile_id)}>
                   <td>{profile.profile_id}</td>
                   <td>{`${new Date(profile.time_min).toLocaleDateString()} - ${new Date(profile.time_max).toLocaleDateString()}`}</td>
                   <td>{`${profile.depth_min < Number.EPSILON ? 0 : profile.depth_min > 15000 ? t('datasetInspectorDepthTooLargeWarningText') : profile.depth_min.toFixed(1)} - ${profile.depth_max < Number.EPSILON ? 0 : profile.depth_max > 15000 ? t('datasetInspectorDepthTooLargeWarningText') : profile.depth_max.toFixed(1)}`}</td>

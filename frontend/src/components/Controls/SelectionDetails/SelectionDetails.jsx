@@ -1,7 +1,8 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
-import { Modal, ProgressBar, Table } from 'react-bootstrap'
+import { Dropdown, DropdownButton, Modal, ProgressBar, Table } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
+import Plot from 'react-plotly.js'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
@@ -16,6 +17,7 @@ import {
   getPointsDataSize,
   createSelectionQueryString
 } from '../../../utilities.js'
+import { toInteger } from 'lodash'
 
 // Note: datasets and points are exchangable terminology
 export default function SelectionDetails({ setPointsToReview, query, polygon, setHoveredDataset, children }) {
@@ -25,7 +27,11 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
   const [inspectDataset, setInspectDataset] = useState()
   const [dataTotal, setDataTotal] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [inspectRecordID, setInspectRecordID] = useState()
   const [datasetPreview, setDatasetPreview] = useState()
+  const [plotXAxis, setPlotXAxis] = useState()
+  const [plotYAxis, setPlotYAxis] = useState()
+  const [showPlot, setShowPlot] = useState(false)
 
   useEffect(() => {
     setDataTotal(0)
@@ -35,9 +41,10 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
       setPointsToReview(pointsData.filter(point => point.selected))
     }
     setLoading(false)
-    if (pointsData.length === 1) {
-      setInspectDataset(pointsData[0])
-    }
+    // if (pointsData.length === 1) { // Auto load single selected dataset
+    //   setInspectDataset(pointsData[0])
+    //   // setLoading(true)
+    // }
   }, [pointsData])
 
   useEffect(() => {
@@ -92,11 +99,35 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
 
   useEffect(() => {
     if (inspectDataset) {
-      fetch(`${server}/preview?dataset=${inspectDataset.dataset_id}&profile=${inspectDataset.profiles[0].profile_id}`).then(response => response.json()).then(preview => {
-        setDatasetPreview(JSON.parse(preview))
-      }).catch(error => { throw error })
+      if (inspectRecordID) {
+        fetch(`${server}/preview?dataset=${inspectDataset.dataset_id}&profile=${inspectRecordID}`).then(response => response.json()).then(preview => {
+          setDatasetPreview(preview)
+          setLoading(false)
+        }).catch(error => { throw error })
+      }
+    } else {
+      setInspectRecordID()
     }
-  }, [inspectDataset])
+  }, [inspectRecordID])
+
+  function convertToType(element, type) {
+    switch (String(type).toLowerCase()) {
+      case 'string':
+        return element
+
+      case 'boolean':
+        return !!element
+
+      case 'float':
+        return 1.0 * element
+
+      case 'integer':
+        return toInteger(element)
+
+      default:
+        return element
+    }
+  }
 
   return (
     <div className='pointDetails'>
@@ -106,56 +137,96 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
             <Loading />
           )
           : (inspectDataset
-            ? <Modal
-              show={inspectDataset} fullscreen onHide={() => setInspectDataset(false)}
+            ?
+            <Modal
+              show={inspectDataset} fullscreen onHide={() => setInspectDataset()}
             >
               <Modal.Header closeButton>
                 <Modal.Title>Dataset Preview</Modal.Title>
               </Modal.Header>
-              {/* <Modal.Body>
-                {JSON.stringify(inspectDataset)}
-                {JSON.stringify(datasetPreview)}
-                <Table striped bordered hover>
-                  <thead>
-                    <tr>
-                      {datasetPreview.table.columnNames.map((columnName, columnIndex) => {
-                        return <th key={columnIndex}>A{columnName}</th>
-                      })}
-                    </tr>
-                    <tr>
-                      {datasetPreview?.table?.columnTypes.map((columnType, columnIndex) => {
-                        <th key={columnIndex}>{columnType}</th>
-                      })}
-                    </tr>
-                    <tr>
-                      {datasetPreview?.table?.columnUnits.map((columnUnits, columnIndex) => {
-                        <th key={columnIndex}>{columnUnits}</th>
-                      })}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {datasetPreview.table.rows.map((row, rowIndex) => {
-                      return <tr key={rowIndex}>
-                        {row.map((elem, elemKey) => {
-                          return <td key={elemKey}>B{elem}</td>
-                        })}
-                      </tr>
-                    })}
-                  </tbody>
-                </Table>
-              </Modal.Body> */}
+              <Modal.Body>
+                <DatasetInspector
+                  dataset={inspectDataset}
+                  setInspectDataset={setInspectDataset}
+                  setHoveredDataset={setHoveredDataset}
+                  setInspectRecordID={setInspectRecordID}
+                />
+                {datasetPreview &&
+                  <>
+                    <button onClick={() => setShowPlot(!showPlot)} >{showPlot ? 'Show Table' : 'Show Plot'}</button>
+                    <>
+                      {showPlot ?
+                        <>
+                          <DropdownButton title={'X-Axis'}>
+                            {datasetPreview.table.columnNames.map((columnName, index) => {
+                              return <Dropdown.Item key={index} onClick={() => setPlotXAxis(index)}>{columnName}</Dropdown.Item>
+                            })}
+                          </DropdownButton>
+                          <DropdownButton title={'Y-Axis'}>
+                            {datasetPreview.table.columnNames.map((columnName, index) => {
+                              return <Dropdown.Item key={index} onClick={() => setPlotYAxis(index)}>{columnName}</Dropdown.Item>
+                            })}
+                          </DropdownButton>
+                          {plotXAxis !== undefined && plotYAxis !== undefined &&
+                            <Plot
+                              data={[
+                                {
+                                  x: [...datasetPreview.table.rows.map((row, index) => {
+                                    return row[plotXAxis]//convertToType(row[plotXAxis], datasetPreview.table.columnTypes[plotXAxis])
+                                  })] || [],
+                                  y: [...datasetPreview.table.rows.map((row, index) => {
+                                    return row[plotYAxis]//convertToType(row[plotYAxis], datasetPreview.table.columnTypes[plotYAxis])
+                                  })] || [],
+                                  type: 'scatter',
+                                  mode: 'markers'
+                                }
+                              ]}
+                              layout={{ width: 500, height: 300 }}
+                            />
+                          }
+                        </>
+                        :
+                        <Table striped bordered hover>
+                          <thead>
+                            <tr>
+                              {datasetPreview.table.columnNames.map((columnName, columnIndex) => {
+                                return <th key={columnIndex}>{columnName}</th>
+                              })}
+                            </tr>
+                            <tr>
+                              {datasetPreview.table.columnTypes.map((columnType, columnIndex) => {
+                                return <th key={columnIndex}>{columnType}</th>
+                              })}
+                            </tr>
+                            <tr>
+                              {datasetPreview.table.columnUnits.map((columnUnits, columnIndex) => {
+                                return <th key={columnIndex}>{columnUnits}</th>
+                              })}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {datasetPreview.table.rows.map((row, rowIndex) => {
+                              return <tr key={rowIndex}>
+                                {row.map((elem, elemKey) => {
+                                  return <td key={elemKey}>{elem}</td>
+                                })}
+                              </tr>
+                            })}
+                          </tbody>
+                        </Table>
+                      }
+                    </>
+                  </>
+                }
+              </Modal.Body>
             </Modal>
-            //   <DatasetInspector
-            //   dataset={inspectDataset}
-            //   setInspectDataset={setInspectDataset}
-            //   setHoveredDataset={setHoveredDataset}
-            // />
             : (
               pointsData && pointsData.length > 0 &&
               <DatasetsTable
                 handleSelectAllDatasets={handleSelectAllDatasets}
                 handleSelectDataset={handleSelectDataset}
                 setInspectDataset={setInspectDataset}
+                setInspectRecordID={setInspectRecordID}
                 selectAll={selectAll}
                 setDatasets={setPointsData}
                 datasets={pointsData}
