@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
-import { Modal, ProgressBar } from 'react-bootstrap'
+import { Modal, ProgressBar, Table } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
@@ -93,7 +93,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
   useEffect(() => {
     if (inspectDataset) {
       fetch(`${server}/preview?dataset=${inspectDataset.dataset_id}&profile=${inspectDataset.profiles[0].profile_id}`).then(response => response.json()).then(preview => {
-        setDatasetPreview(preview)
+        setDatasetPreview(JSON.parse(preview))
       }).catch(error => { throw error })
     }
   }, [inspectDataset])
@@ -110,12 +110,40 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
               show={inspectDataset} fullscreen onHide={() => setInspectDataset(false)}
             >
               <Modal.Header closeButton>
-                <Modal.Title>Modal</Modal.Title>
+                <Modal.Title>Dataset Preview</Modal.Title>
               </Modal.Header>
-              <Modal.Body>
+              {/* <Modal.Body>
                 {JSON.stringify(inspectDataset)}
                 {JSON.stringify(datasetPreview)}
-              </Modal.Body>
+                <Table striped bordered hover>
+                  <thead>
+                    <tr>
+                      {datasetPreview.table.columnNames.map((columnName, columnIndex) => {
+                        return <th key={columnIndex}>A{columnName}</th>
+                      })}
+                    </tr>
+                    <tr>
+                      {datasetPreview?.table?.columnTypes.map((columnType, columnIndex) => {
+                        <th key={columnIndex}>{columnType}</th>
+                      })}
+                    </tr>
+                    <tr>
+                      {datasetPreview?.table?.columnUnits.map((columnUnits, columnIndex) => {
+                        <th key={columnIndex}>{columnUnits}</th>
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {datasetPreview.table.rows.map((row, rowIndex) => {
+                      return <tr key={rowIndex}>
+                        {row.map((elem, elemKey) => {
+                          return <td key={elemKey}>B{elem}</td>
+                        })}
+                      </tr>
+                    })}
+                  </tbody>
+                </Table>
+              </Modal.Body> */}
             </Modal>
             //   <DatasetInspector
             //   dataset={inspectDataset}
@@ -141,7 +169,6 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
               </div>
             )
           )
-
         }
       </div>
       <div className='pointDetailsControls'>
