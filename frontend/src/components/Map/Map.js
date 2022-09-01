@@ -13,13 +13,13 @@ import { colorScale, defaultQuery } from '../config'
 import platformColors from '../../components/platformColors'
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap ({ query, setPointsToReview, setPolygon, setLoading, zoom, setZoom, offsetFlyTo, rangeLevels, hoveredDataset }) {
+export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, zoom, setZoom, offsetFlyTo, rangeLevels, hoveredDataset }) {
   const { t } = useTranslation()
   const mapContainer = useRef(null)
   const map = useRef(null)
   const creatingPolygon = useRef(false)
   const shiftBoxCreate = useRef(false)
-  
+
   // disables edting of polygon/box vertices
   const disabledEvent = function (state, geojson, display) {
     display(geojson);
@@ -30,7 +30,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
   MapboxDraw.modes.simple_select.toDisplayFeatures = disabledEvent;
 
   modes.draw_rectangle = DrawRectangle;
-  
+
   const drawControlOptions = {
     displayControlsDefault: false,
     controls: {
@@ -110,7 +110,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     }
   }, [boxSelectEndCoords])
 
-  function setColorStops () {
+  function setColorStops() {
     if (map.current) {
       colorStops.current = generateColorStops(colorScale, getCurrentRangeLevel(rangeLevels, map.current.getZoom())).map(colorStop => {
         return [colorStop.stop, colorStop.color]
@@ -128,7 +128,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     }
   }
 
-  function hoverHighlightPoints (pk) {
+  function hoverHighlightPoints(pk) {
     if (map.current && pk) {
       if (zoom >= 7) {
         map.current.setPaintProperty('points', 'circle-color', 'lightgrey')
@@ -170,7 +170,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     }
   }, [hoveredDataset])
 
-  function highlightPoints (polygon) {
+  function highlightPoints(polygon) {
     if (polygon && polygon.length >= 4) {
       const features = map.current.queryRenderedFeatures({ layers: ['points'] }).map(point => {
         return {
@@ -265,10 +265,10 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
       zoom: mapZoom || zoom // starting zoom
     })
 
-        
+
     // disable map rotation using right click + drag
     map.current.dragRotate.disable()
-    
+
     // disable map rotation using touch rotation gesture
     map.current.touchZoomRotate.disableRotation()
 
@@ -283,9 +283,9 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
       setPointsToReview();
       setPolygon();
     }
-    
+
     // clone an element to remove it's events
-    function cloneElement(oldElement){
+    function cloneElement(oldElement) {
       const newElement = oldElement.cloneNode(true);
       oldElement.parentNode.replaceChild(newElement, oldElement);
       return newElement;
@@ -307,9 +307,9 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
           creatingPolygon.current = true;
           draw.changeMode("draw_rectangle");
         };
-        }
+      }
       if (polyQueryElement) {
-        polyQueryElement.onclick= () => {
+        polyQueryElement.onclick = () => {
           map.current.getCanvas().style.cursor = "crosshair";
           deleteAllShapes();
           creatingPolygon.current = true;
@@ -322,8 +322,8 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
           map.current.getCanvas().style.cursor = "unset";
           deleteAllShapes();
         };
-        
-      
+
+
 
       setColorStops()
 
@@ -346,7 +346,10 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
             largeCircleSize,
             5
           ],
-          'circle-color': colors
+          'circle-color': colors,
+          'circle-stroke-color': colors,
+          'circle-stroke-opacity': 0.001,
+          'circle-stroke-width': 10
         }
       })
 
@@ -469,8 +472,8 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
             ? { top: 0, bottom: 0, left: 500, right: 0 }
             : { top: 0, bottom: 0, left: 0, right: 0 }
         })
-        const height = 10
-        const width = 10
+        const height = 20
+        const width = 20
         const bbox = [
           [e.point.x - width / 2, e.point.y - height / 2],
           [e.point.x + width / 2, e.point.y + height / 2]
