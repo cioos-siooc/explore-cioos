@@ -10,7 +10,6 @@ import cde_harvester.ERDDAP as cde_harvester
 import pandas as pd
 import requests
 import shapely.wkt
-from cde_harvester.utils import cde_eov_to_standard_name
 from erddap_downloader.download_pdf import download_pdf
 from erddapy import ERDDAP
 from shapely.geometry import Point
@@ -36,29 +35,17 @@ def erddap_server_to_name(server):
     return urlparse(server).netloc.replace(".", "_")
 
 
-def get_variable_list(df_variables, cde_eovs: list):
+def get_variable_list(df_variables: list):
     """
-    Retrieve the list of variables needed within an ERDDAP dataset based on the eovs list provided by the
-     user and the mandatory variables required.
+    Retrieve the list of variables needed within an ERDDAP dataset based on the mandatory variables required.
     :param erddap_metadata: erddap dataset attributes dataframe
-    :param cde_eovs: ocean variable list requested by the query
     :return: list of variables to download from erddap
     """
     # Get a list of mandatory variables to be present if available
     mandatory_variables = ["time", "latitude", "longitude", "depth"]
 
-    standard_names_to_download = []
-
-    # if no eovs given, download all of them
-    if not cde_eovs:
-        cde_eovs = cde_eov_to_standard_name.keys()
-
-    for eov in cde_eovs:
-        if eov in cde_eov_to_standard_name:
-            standard_names_to_download += cde_eov_to_standard_name[eov]
-
     variables_to_download = df_variables.query(
-        "(name in @mandatory_variables) or (standard_name in @standard_names_to_download) or (cf_role != '')"
+        "(name in @mandatory_variables) or (cf_role != '')"
     )["name"].to_list()
 
     return variables_to_download
@@ -130,9 +117,6 @@ def get_erddap_download_url(
             e.constraints["depth>="] = user_constraint["depth_min"]
         if "depth_max" in user_constraint and user_constraint["depth_max"]:
             e.constraints["depth<="] = user_constraint["depth_max"]
-
-    # Add variable list to retrieve
-    e.variables = variables_list
 
     # Get Download Link
     return e.get_download_url()
@@ -238,9 +222,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
 
         # Get variable list to download
         variable_list = get_variable_list(
-            dataset["erddap_metadata"],
-            json_query["user_query"]["eovs"],
-        )
+            dataset["erddap_metadata"])
 
         # Try getting data
         df = pd.DataFrame()

@@ -117,15 +117,6 @@ def main(folder):
             index=False,
         )
 
-        print("Writing eov_to_standard_name")
-        df_cde_eov_to_standard_name.to_sql(
-            "eov_to_standard_name",
-            con=transaction,
-            if_exists="append",
-            schema=schema,
-            index=False,
-        )
-
         print("Processing new records")
         transaction.execute("SELECT profile_process();")
         transaction.execute("SELECT ckan_process();")
@@ -141,7 +132,6 @@ def main(folder):
         print("Wrote to db:", f"{schema}.profiles")
         print("Wrote to db:", f"{schema}.erddap_variables")
         print("Wrote to db:", f"{schema}.skipped_datasets")
-        print("Wrote to db:", f"{schema}.eov_to_standard_name")
 
 
 if __name__ == "__main__":

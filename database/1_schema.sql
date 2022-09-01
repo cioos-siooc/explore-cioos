@@ -52,6 +52,7 @@ CREATE TABLE datasets (
     organization_pks INTEGER[],
     n_profiles integer,
     profile_variables text[],
+    num_columns integer,
     UNIQUE(dataset_id, erddap_url)
 );
 
@@ -142,39 +143,9 @@ CREATE TABLE download_jobs (
     downloader_output text
 );
 
-
-DROP TABLE IF EXISTS erddap_variables;
-CREATE TABLE erddap_variables (
-    dataset_pk integer REFERENCES datasets(pk),
-    erddap_url text,
-    dataset_id text,
-    "name" text,
-    "type" text,
-    actual_range text,
-    cf_role text,
-    standard_name text
-);
-
 DROP TABLE IF EXISTS skipped_datasets;
 CREATE TABLE skipped_datasets (
     erddap_url text,
     dataset_id text,
     reason_code text
 );
-
-
-DROP TABLE IF EXISTS eov_to_standard_name;
-CREATE TABLE eov_to_standard_name (
-    pk SERIAL PRIMARY KEY,
-    eov text,
-    standard_name text,
-    UNIQUE(eov,standard_name)
-);
-
--- DROP VIEW dataset_to_eov;
-CREATE OR REPLACE VIEW dataset_to_eov AS
- SELECT d.pk, eov,v.standard_name
-   FROM datasets d
-     JOIN erddap_variables v ON v.dataset_pk =  d.pk
-     JOIN eov_to_standard_name ets ON ets.standard_name = v.standard_name;
-
