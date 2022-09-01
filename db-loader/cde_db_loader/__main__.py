@@ -30,18 +30,16 @@ def main(folder):
 
     datasets_file = f"{folder}/datasets.csv"
     profiles_file = f"{folder}/profiles.csv"
-    variables_file = f"{folder}/variables.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
 
     print(
-        "Reading", datasets_file, profiles_file, variables_file, skipped_datasets_file
+        "Reading", datasets_file, profiles_file, skipped_datasets_file
     )
 
     # ckan_file = f"ckan_{uuid_suffix}.csv"
 
     datasets = pd.read_csv(datasets_file)
     profiles = pd.read_csv(profiles_file)
-    variables = pd.read_csv(variables_file)
     skipped_datasets = pd.read_csv(skipped_datasets_file)
 
     datasets["eovs"] = datasets["eovs"].apply(ast.literal_eval)
@@ -49,8 +47,6 @@ def main(folder):
     datasets["profile_variables"] = datasets["profile_variables"].apply(
         ast.literal_eval
     )
-    datasets.to_csv("d.csv")
-    # ckan = pd.read_csv(ckan_file)
 
     if datasets.empty:
         print("No datasets found")
@@ -97,16 +93,6 @@ def main(folder):
             index=False,
             # method="multi",
         )
-        variables = variables.replace("", np.NaN)
-
-        print("Writing erddap_variables")
-        variables.to_sql(
-            "erddap_variables",
-            con=transaction,
-            if_exists="append",
-            schema=schema,
-            index=False,
-        )
 
         print("Writing skipped_datasets")
         skipped_datasets.to_sql(
@@ -130,7 +116,6 @@ def main(folder):
 
         print("Wrote to db:", f"{schema}.datasets")
         print("Wrote to db:", f"{schema}.profiles")
-        print("Wrote to db:", f"{schema}.erddap_variables")
         print("Wrote to db:", f"{schema}.skipped_datasets")
 
 
