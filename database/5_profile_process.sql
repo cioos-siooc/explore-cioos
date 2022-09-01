@@ -3,7 +3,6 @@
 profile_process() 
 
  - set profiles columns: geom, dataset_pk, point_pk
- - set erddap_variables columns: dataset_pk 
  - recreate the points table
  
  */
@@ -35,16 +34,6 @@ FROM
 WHERE
         p.dataset_id = d.dataset_id
         AND p.erddap_url = d.erddap_url;
-
-UPDATE
-        cde.erddap_variables v
-SET
-        dataset_pk = d.pk
-FROM
-        cde.datasets d
-WHERE
-        v.dataset_id = d.dataset_id
-        AND v.erddap_url = d.erddap_url;
 
 -- point PKs
 DELETE FROM
