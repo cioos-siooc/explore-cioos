@@ -1,24 +1,20 @@
-.datasetInspector .backButton {
-  text-align: center;
-  margin: 10px 10px 10px 10px;
-  border: 2px solid darkgrey;
-  border-radius: 10px;
-  max-width: fit-content;
-  /* height: 40px; */
-  justify-content: space-between;
-  padding: 5px;
-}
-
-.datasetInspector .backButton:hover {
-  background-color: #c6e3df;
-  cursor: pointer;
-}
-
-.datasetInspector .backButton svg {
-  margin-right: 5px;
-}
-
 .datasetInspector .optionColorCircle {
   margin-right: 5px;
   margin-bottom: 5px;
+}
+
+.datasetInspector {
+  display: flex;
+  max-height: 50%;
+  overflow: auto;
+}
+
+.datasetInspector .inspectorTable {
+  max-width: 50%;
+  min-width: 50%;
+}
+
+.datasetInspector .datasetMetadata {
+  max-width: 50%;
+  min-width: 50%;
 }

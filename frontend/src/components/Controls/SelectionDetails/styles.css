@@ -61,3 +61,36 @@
   text-align: center;
   margin-top: 100px;
 }
+
+.backButton {
+  text-align: center;
+  border: 2px solid darkgrey;
+  border-radius: 10px;
+  justify-content: space-between;
+  padding: 5px;
+  margin-right: 10px;
+  min-width: fit-content;
+}
+
+.backButton:hover {
+  background-color: #c6e3df;
+  cursor: pointer;
+}
+
+.backButton svg {
+  margin-right: 5px;
+}
+
+.dataPreviewModal .modal-header button {
+  margin: 0px 10px;
+}
+
+.datasetData {
+  display: flex;
+  overflow: auto;
+  max-height: 50%;
+}
+
+.dataPreviewModal .modal-body {
+  padding: 0px;
+}

@@ -238,5 +238,6 @@
   "propelled manned submersible": "Propelled manned submersible",
   "research aeroplane": "Research aeroplane",
   "errorBoundaryMessage": "Error. Reload Application.",
-  "filterInfoButtonTitle": "Learn more about the filter here"
+  "filterInfoButtonTitle": "Learn more about the filter here",
+  "datasetInspectorModalTitle": "Dataset Preview"
 }
