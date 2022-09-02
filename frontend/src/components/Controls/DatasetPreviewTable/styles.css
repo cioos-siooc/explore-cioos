@@ -1,0 +1,24 @@
+.datasetPreviewTable {
+  max-width: 50%;
+  min-width: 50%;
+}
+
+/* .datasetPreviewTable.top-scrollbars {
+  transform: rotateX(180deg);
+}
+
+.datasetPreviewTable.top-scrollbars * {
+  transform: rotateX(180deg);
+} */
+
+.previewRow {
+  display: flex;
+  padding: 10px 0px 0px 0px;
+  height: 50%;
+}
+
+.previewColumn {
+  min-width: 50%;
+  max-height: 100%;
+  overflow: auto;
+}
