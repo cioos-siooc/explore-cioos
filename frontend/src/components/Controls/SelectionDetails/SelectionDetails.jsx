@@ -143,11 +143,11 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
               </Modal.Header>
               <Modal.Body>
                 <div className='previewRow'>
-                  <div className='previewColumn'>
-                    <div>
+                  <div className='previewColumn metadata'>
+                    <h5>
                       {t('datasetInspectorURLText')}
                       {/* Dataset URLs */}
-                    </div>
+                    </h5>
                     <a
                       href={inspectDataset.ckan_url}
                       target='_blank'
@@ -160,31 +160,31 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
                       title={inspectDataset.erddap_url ? inspectDataset.erddap_url : 'unavailable'} rel="noreferrer">
                       {t('datasetInspectorERDDAPURL')} (ERDDAP)
                     </a>
-                    <div>
+                    <h5>
                       {t('datasetInspectorOrganizationText')}
                       {/* Organizations */}
-                    </div>
+                    </h5>
                     <div>
                       {inspectDataset.organizations.join(', ')}
                     </div>
-                    <div>
+                    <h5>
                       {t('datasetInspectorOceanVariablesText')}
                       {/* Ocean Variables */}
-                    </div>
+                    </h5>
                     <div>
                       {inspectDataset.eovs.map((eov, index) => ' ' + t(eov)).join(',')}
                     </div>
-                    <div>
+                    <h5>
                       {t('datasetInspectorPlatformText')}
                       {/* Platform */}
-                    </div>
+                    </h5>
                     <div>
                       {t(inspectDataset.platform)}
                     </div>
-                    <div>
+                    <h5>
                       {/* Records ... records total, 1000 shown */}
                       {t('datasetInspectorRecordsText')} ({inspectDataset && inspectDataset.profiles_count > 1000 ? `${inspectDataset.profiles_count} ${t('datasetInspectorRecordsOverflowText')}` : inspectDataset.profiles_count})
-                    </div>
+                    </h5>
                   </div>
                   <div className='previewColumn'>
                     <Table striped bordered size="sm">
@@ -224,26 +224,6 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
                     <DatasetPreviewTable datasetPreview={datasetPreview} />
                   </div>
                 </div>
-                {/* <DatasetInspector
-                  dataset={inspectDataset}
-                  setInspectDataset={setInspectDataset}
-                  setHoveredDataset={setHoveredDataset}
-                  setInspectRecordID={setInspectRecordID}
-                />
-                {datasetPreview &&
-                  <div className='datasetData'>
-                    <DatasetPreviewPlot datasetPreview={datasetPreview} plotXAxis={plotXAxis} setPlotXAxis={setPlotXAxis} plotYAxis={plotYAxis} setPlotYAxis={setPlotYAxis} />
-                    <DatasetPreviewTable datasetPreview={datasetPreview} />
-                  </div>
-                } */}
-                {/* <button onClick={() => setShowPlot(!showPlot)} >{showPlot ? 'Show Table' : 'Show Plot'}</button> */}
-                {/* <DropdownButton title={(plotType && `PlotType: ` + plotYAxis.columnName) || 'Select plot type'}>
-                  // Add plot types that will work with the kind of data we are working with
-                        {plotlyPlotTypes.map((plotType, index) => {
-                          return <Dropdown.Item key={index} onClick={() => setPlotType({ index, plotType })}>{plotType}</Dropdown.Item>
-                        })}
-                        </DropdownButton> */}
-
               </Modal.Body>
             </Modal>
             : (

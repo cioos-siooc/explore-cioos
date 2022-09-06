@@ -94,3 +94,19 @@
 .dataPreviewModal .modal-body {
   padding: 0px;
 }
+
+.previewRow {
+  display: flex;
+  padding: 10px 0px 0px 0px;
+  height: 50%;
+}
+
+.previewColumn {
+  min-width: 50%;
+  max-height: 100%;
+  overflow: auto;
+}
+
+.previewColumn.metadata {
+  display: flex;
+}
