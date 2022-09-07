@@ -9,7 +9,7 @@ export default function DatasetPreviewPlot({ datasetPreview, plotXAxis, setPlotX
       {datasetPreview
         ?
         <>
-          <DropdownButton title={(plotXAxis && `X axis: ` + plotXAxis.columnName) || 'Select X axis variable'}>
+          {/* <DropdownButton title={(plotXAxis && `X axis: ` + plotXAxis.columnName) || 'Select X axis variable'}>
             {datasetPreview && datasetPreview?.table?.columnNames.map((columnName, index) => {
               return <Dropdown.Item key={index} onClick={() => setPlotXAxis({ index, columnName })}>{columnName}</Dropdown.Item>
             })}
@@ -18,7 +18,7 @@ export default function DatasetPreviewPlot({ datasetPreview, plotXAxis, setPlotX
             {datasetPreview && datasetPreview?.table?.columnNames.map((columnName, index) => {
               return <Dropdown.Item key={index} onClick={() => setPlotYAxis({ index, columnName })}>{columnName}</Dropdown.Item>
             })}
-          </DropdownButton>
+          </DropdownButton> */}
           {/* <DropdownButton title={(plotType && `PlotType: ` + plotYAxis.columnName) || 'Select plot type'}>
       Add plot types that will work with the kind of data we are working with
           {plotlyPlotTypes.map((plotType, index) => {
@@ -39,7 +39,19 @@ export default function DatasetPreviewPlot({ datasetPreview, plotXAxis, setPlotX
                   mode: 'markers'
                 }
               ]}
-              layout={{ maxWidth: '50%', minWidth: '50%', maxHeight: '50%' }}
+              layout={{
+                autosize: false,
+                margin: { l: 0, t: 50, r: 0, b: 50 },
+                yaxis: {
+                  automargin: true
+                },
+                xaxis: {
+                  automargin: true
+                }
+              }}
+              config={{
+                responsive: true
+              }}
             />
           }
         </>
