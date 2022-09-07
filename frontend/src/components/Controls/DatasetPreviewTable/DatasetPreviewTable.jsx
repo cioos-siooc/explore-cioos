@@ -1,23 +1,13 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Table } from 'react-bootstrap'
 
 import './styles.css'
 
-export default function DatasetPreviewTable({ datasetPreview }) {
-  // =
-  // {
-  //   table: {
-  //     columnNames: ['columnA', 'columnB', 'columnC'],
-  //     columnTypes: ['typeA', 'typeB', 'typeC'],
-  //     columnUnits: ['boolean', 'string', 'float'],
-  //     rows: [
-  //       [true, 'CIOOS', 1234],
-  //       [false, 'CIOOS', 4567],
-  //       [true, 'CIOOS', -1]
-  //     ]
-  //   }
-  // }
-  // }) {
+export default function DatasetPreviewTable({ datasetPreview, setRecordLoading }) {
+  // useEffect(() => {
+  //   setRecordLoading(false)
+  // })
+
   return (
     <div className='datasetPreviewTable'>
       {datasetPreview
