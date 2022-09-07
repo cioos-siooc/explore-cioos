@@ -91,7 +91,7 @@
   max-height: 50%;
 }
 
-.dataPreviewModal .modal-body {
+/* .dataPreviewModal .modal-body {
   padding: 0px;
 }
 
@@ -109,4 +109,83 @@
 
 .previewColumn.metadata {
   display: flex;
+} */
+
+.previewFlexContainer {
+  display: flex;
+  /* flex: 1 1 auto; */
+  /* flex-wrap: wrap; */
+  height: 100%;
+}
+
+.recordIDTable {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.metadataGridContainer {
+  display: grid;
+  grid-template-columns: 198px 198px;
+  grid-auto-rows: minmax(66px, auto);
+  gap: 16.5px;
+}
+
+.metadataAndRecordIDTableGridContainer {
+  display: grid;
+}
+
+.tableAndPlotGridContainer {
+  display: grid;
+  grid-template-columns: minmax(495px 100%);
+  grid-template-rows: max-content 100%;
+  margin: 0px 16.5px;
+  gap: 16.5px;
+}
+
+.tableAndPlotGridContainer .toggleButton {
+  width: 66px;
+  height: 42px;
+  margin: 0px 16.5px;
+  background-color: white;
+  border-radius: 5px;
+  border: 2px solid darkgrey;
+  color: black;
+  line-height: 15px;
+}
+
+.toggleButton:hover {
+  background-color: #c6e3df;
+}
+
+.toggleButton.selected {
+  background-color: #52A79B;
+  color: white;
+}
+
+.deselectRecordButton {
+  height: 42px;
+  background-color: white;
+  border-radius: 5px;
+  border: 2px solid darkgrey;
+  color: black;
+  line-height: 15px;
+  margin: 0px 16.5px;
+}
+
+.deselectRecordButton:hover {
+  background-color: #c6e3df;
+}
+
+.metadataGridItem h5 {
+  font-weight: bolder;
+  line-height: 20px;
+}
+
+.selectedRecordID {
+  color: white;
+  background-color: #52A79B;
+}
+
+.selectedRecordID:hover {
+  color: white;
 }
