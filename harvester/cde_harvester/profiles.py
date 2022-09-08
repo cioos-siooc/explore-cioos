@@ -5,17 +5,6 @@ from datetime import datetime
 import pandas as pd
 from cde_harvester.ERDDAP import ERDDAP
 
-dtypes = {
-    "erddap_url": str,
-    "dataset_id": str,
-    "timeseries_id": str,
-    "profile_id": str,
-    "latitude": float,
-    "longitude": float,
-    "depth_min": float,
-    "depth_max": float,
-}
-
 
 def get_profiles(dataset):
     """
@@ -226,7 +215,6 @@ def get_profiles(dataset):
 
     profiles["records_per_day"] = profiles["n_records"] / (days)
 
-    profiles = profiles.astype(dtypes)
     profiles = profiles.round(4)
 
     profiles_bad_geom_query = f"""((latitude <= -90) or (latitude >= 90) or  \

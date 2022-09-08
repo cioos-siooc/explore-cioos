@@ -82,7 +82,6 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
 
     datasets_file = f"{folder}/datasets.csv"
     profiles_file = f"{folder}/profiles.csv"
-    variables_file = f"{folder}/variables.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
     ckan_file = f"{folder}/ckan.csv"
 
@@ -163,7 +162,6 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
         datasets_file, index=False
     )
     profiles.drop_duplicates().to_csv(profiles_file, index=False)
-    variables.drop_duplicates().to_csv(variables_file, index=False)
     df_ckan.to_csv(ckan_file, index=False)
     skipped_datasets.drop_duplicates().to_csv(skipped_datasets_file, index=False)
 
@@ -171,7 +169,6 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
         "Wrote",
         datasets_file,
         profiles_file,
-        variables_file,
         ckan_file,
         skipped_datasets_file,
     )
