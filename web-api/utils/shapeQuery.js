@@ -30,6 +30,7 @@ async function getShapeQuery(query) {
                   d.cdm_data_type,
                   d.title title,
                   d.platform,
+                  d.num_columns,
                   json_build_object('en',title,'fr',title_fr)     title_translated,
                   json_build_object('en',summary,'fr',summary_fr) summary_translated,
                   d.eovs                                          eovs,
@@ -47,19 +48,6 @@ async function getShapeQuery(query) {
                   coalesce(nullif(date_part('days',range_intersection_length(tstzrange(:timeMin,:timeMax),tstzrange(p.time_min,p.time_max))),0),1) * p.records_per_day *
                   -- depth multiplier - fraction of depth range that this query overlaps with profile depth range
                   coalesce(nullif(range_intersection_length(numrange(:depthMin,:depthMax),numrange(p.depth_min::NUMERIC,p.depth_max::NUMERIC)),0),1) / (coalesce(nullif(p.depth_max-p.depth_min,0),1)) ) AS records_count,
-                  (
-                         SELECT count(*)
-                         FROM   cde.erddap_variables
-                         WHERE  d.pk=dataset_pk
-                         AND    (
-                                       standard_name = ANY(
-                                       (
-                                              SELECT standard_name
-                                              FROM   cde.eov_to_standard_name ${
-                                                eovs ? "WHERE :eovsQuery" : ""
-                                              }))
-                                OR     cf_role IS NOT NULL
-                                OR     name = ANY(ARRAY['time', 'latitude', 'longitude', 'depth']) ) )                                                                                                                                       eov_cols,
                   json_agg(json_build_object( 'profile_id',coalesce(p.profile_id, p.timeseries_id), 'time_min',p.time_min::DATE, 'time_max',p.time_max::DATE, 'depth_min',p.depth_min, 'depth_max',p.depth_max ) ORDER BY time_min DESC ) AS profiles
          FROM     cde.profiles p
          JOIN     cde.datasets d
@@ -68,7 +56,7 @@ async function getShapeQuery(query) {
                   -- AND ckan_record IS NOT NULL
          GROUP BY d.pk)
 SELECT *,
-       round(:adder + records_count * eov_cols * :multiplier) AS SIZE
+       round(:adder + records_count * num_columns * :multiplier) AS SIZE
 FROM   sub`;
 
   const rows = await db.raw(sql, {
