@@ -129,7 +129,10 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
               <Modal.Header closeButton>
                 <div
                   className='backButton'
-                  onClick={() => setInspectDataset()}
+                  onClick={() => {
+                    setInspectDataset()
+                    setInspectRecordID()
+                  }}
                   title={t('datasetInspectorBackButtonTitle')} // 'Return to dataset list'
                 >
                   <ChevronCompactLeft />
