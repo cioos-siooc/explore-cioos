@@ -121,11 +121,32 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
           ? (
             <Loading />
           )
-          : (inspectDataset
-            ?
-            <Modal className='dataPreviewModal'
-              show={inspectDataset} fullscreen onHide={() => setInspectDataset()}
-            >
+          :
+          (pointsData && pointsData.length > 0 &&
+            <DatasetsTable
+              handleSelectAllDatasets={handleSelectAllDatasets}
+              handleSelectDataset={handleSelectDataset}
+              setInspectDataset={setInspectDataset}
+              setInspectRecordID={setInspectRecordID}
+              selectAll={selectAll}
+              setDatasets={setPointsData}
+              datasets={pointsData}
+              setHoveredDataset={setHoveredDataset}
+            />
+          ) || (pointsData && pointsData.length === 0 &&
+            (
+              <div className="noDataNotice">
+                {t('selectionDetailsNoDataWarning')}
+                {/* No Data. Modify filters or change selection on map. */}
+              </div>
+            )
+          )
+        }
+        <Modal className='dataPreviewModal'
+          show={inspectDataset} fullscreen onHide={() => setInspectDataset()}
+        >
+          {inspectDataset &&
+            <>
               <Modal.Header closeButton>
                 <div
                   className='backButton'
@@ -165,7 +186,14 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
                       </div>
                       <div className="metadataGridItem records">
                         <h5>{t('datasetInspectorRecordsText')}</h5>
-                        ({inspectDataset && inspectDataset.profiles_count > 1000 ? `${inspectDataset.profiles_count} ${t('datasetInspectorRecordsOverflowText')}` : inspectDataset.profiles_count})
+                        ({inspectDataset && `${inspectDataset.profiles_count} / ${inspectDataset.n_profiles}`})
+                        <button
+                          onClick={() => alert('selected all records from dataset')}
+                          disabled={inspectDataset.profiles_count === inspectDataset.n_profiles}
+                          title={t('datasetInspectorRecordsSelectAllButtonText')}
+                        >
+                          Select All
+                        </button>
                       </div>
                       <div className="metadataGridItem button ERDAP">
                         <a
@@ -264,11 +292,11 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
                                 })}
                               </DropdownButton>
                               {/* <DropdownButton title={(plotType && `PlotType: ` + plotYAxis.columnName) || 'Select plot type'}>
-                                  Add plot types that will work with the kind of data we are working with
-                                      {plotlyPlotTypes.map((plotType, index) => {
-                                        return <Dropdown.Item key={index} onClick={() => setPlotType({ index, plotType })}>{plotType}</Dropdown.Item>
-                                      })}
-                                  </DropdownButton> */}
+                                    Add plot types that will work with the kind of data we are working with
+                                        {plotlyPlotTypes.map((plotType, index) => {
+                                          return <Dropdown.Item key={index} onClick={() => setPlotType({ index, plotType })}>{plotType}</Dropdown.Item>
+                                        })}
+                                    </DropdownButton> */}
                               <DatasetPreviewPlot
                                 datasetPreview={datasetPreview}
                                 plotXAxis={plotXAxis}
@@ -285,28 +313,9 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
                   </div>
                 </div>
               </Modal.Body>
-            </Modal>
-            : (
-              pointsData && pointsData.length > 0 &&
-              <DatasetsTable
-                handleSelectAllDatasets={handleSelectAllDatasets}
-                handleSelectDataset={handleSelectDataset}
-                setInspectDataset={setInspectDataset}
-                setInspectRecordID={setInspectRecordID}
-                selectAll={selectAll}
-                setDatasets={setPointsData}
-                datasets={pointsData}
-                setHoveredDataset={setHoveredDataset}
-              />
-            ) || (
-              pointsData && pointsData.length === 0 &&
-              <div className="noDataNotice">
-                {t('selectionDetailsNoDataWarning')}
-                {/* No Data. Modify filters or change selection on map. */}
-              </div>
-            )
-          )
-        }
+            </>
+          }
+        </Modal>
       </div>
       <div className='pointDetailsControls'>
         <div className='pointDetailsControlRow'>
