@@ -24,6 +24,8 @@ def get_profiles(dataset):
 
     df_variables = dataset.df_variables
 
+    vertical_variables = ["depth", "altitude"]
+
     # lat,lon not in this list. They have to be treated differently as getting the min of the lat and lon could create a point not in the dataset
     llat_variables = [
         "depth",
@@ -108,6 +110,10 @@ def get_profiles(dataset):
             # For ongoing datasets
             if "NaN" in max:
                 max = datetime.utcnow().isoformat()
+
+            if llat_variable in vertical_variables:
+                min=float(min)
+                max=float(max)
 
             profiles_with_lat_lon[llat_variable + "_min"] = min
             profiles_with_lat_lon[llat_variable + "_max"] = max

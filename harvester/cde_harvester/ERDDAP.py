@@ -55,16 +55,20 @@ class ERDDAP(object):
         self.df_all_datasets = self.get_all_datasets()
 
         if self.df_all_datasets.empty:
-            raise Exception("No datasets found at:", self.url)
+            print("No datasets found at:", self.url)
 
     def get_all_datasets(self):
         "Get a string list of dataset IDs from the ERDDAP server"
         # allDatasets indexes table and grid datasets
-        df = self.erddap_csv_to_df(
-            '/tabledap/allDatasets.csv?&accessible="public"&dataStructure="table"',
-            skiprows=[1, 2],
-        )
-        return df
+        try:
+            df = self.erddap_csv_to_df(
+                '/tabledap/allDatasets.csv?&accessible="public"&dataStructure="table"',
+                skiprows=[1, 2],
+            )
+            return df
+        except requests.exceptions.HTTPError as e:
+            print(e)
+            return pd.DataFrame()
 
     def parse_erddap_date(s):
         """ERDDAP dates come either as timestamps or ISO 8601 datetimes"""

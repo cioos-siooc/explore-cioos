@@ -66,6 +66,9 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
     logger = erddap.get_logger()
     df_all_datasets = erddap.df_all_datasets
 
+    if df_all_datasets.empty:
+        return
+        
     cdm_data_types_supported = [
         # "Point",
         "TimeSeries",
