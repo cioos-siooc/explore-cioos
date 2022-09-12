@@ -121,6 +121,8 @@
 .recordIDTable {
   height: 100%;
   overflow-y: auto;
+  padding-right: 0px;
+  margin: 9px 0 9px 0px;
 }
 
 .metadataGridContainer {

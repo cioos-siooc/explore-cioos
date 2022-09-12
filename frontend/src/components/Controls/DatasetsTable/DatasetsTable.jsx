@@ -143,7 +143,7 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                   // 'Number of locations in dataset'
                   onClick={() => setInspectDataset(point)}
                 >
-                  {toInteger(point.profiles_count)} {hoveredTableRow === index && <ChevronCompactRight size={25} title='view dataset details' />}
+                  {`${toInteger(point.profiles_count)} / ${toInteger(point.n_profiles)}`} {hoveredTableRow === index && <ChevronCompactRight size={25} title='view dataset details' />}
                 </td>
               </tr>
             )
