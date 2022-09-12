@@ -1,13 +1,9 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import { Table } from 'react-bootstrap'
 
 import './styles.css'
 
-export default function DatasetPreviewTable({ datasetPreview, setRecordLoading }) {
-  // useEffect(() => {
-  //   setRecordLoading(false)
-  // })
-
+export default function DatasetPreviewTable({ datasetPreview }) {
   return (
     <div className='datasetPreviewTable'>
       {datasetPreview

@@ -1,12 +1,8 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import Plot from 'react-plotly.js'
 import './styles.css'
 
-export default function DatasetPreviewPlot({ datasetPreview, plotXAxis, plotYAxis, setRecordLoading, title }) {
-  // useEffect(() => {
-  //   setRecordLoading(false)
-  // })
-
+export default function DatasetPreviewPlot({ datasetPreview, plotXAxis, plotYAxis }) {
   return (
     <div className='datasetPreviewPlot'>
       {datasetPreview

@@ -134,12 +134,32 @@
   display: grid;
 }
 
+.metadataGridItem h5 {
+  font-weight: bolder;
+  line-height: 20px;
+}
+
+.selectedRecordID {
+  color: white;
+  background-color: #52A79B;
+}
+
+.selectedRecordID:hover {
+  color: white;
+}
+
 .tableAndPlotGridContainer {
   display: grid;
-  grid-template-columns: minmax(495px 100%);
-  grid-template-rows: max-content 100%;
+  height: 100%;
+  grid-template-columns: 100%;
+  grid-template-rows: max-content calc(100% - 76px);
   margin: 0px 16.5px;
   gap: 16.5px;
+}
+
+.tableAndPlotGridItem {
+  height: 100%;
+  overflow: auto;
 }
 
 .tableAndPlotGridContainer .toggleButton {
@@ -176,16 +196,6 @@
   background-color: #c6e3df;
 }
 
-.metadataGridItem h5 {
-  font-weight: bolder;
-  line-height: 20px;
-}
-
-.selectedRecordID {
-  color: white;
-  background-color: #52A79B;
-}
-
-.selectedRecordID:hover {
-  color: white;
+.tableAndPlot .dropdown {
+  display: inline;
 }
