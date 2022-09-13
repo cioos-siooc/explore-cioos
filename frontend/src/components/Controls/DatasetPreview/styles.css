@@ -1,67 +1,3 @@
-.pointDetails {
-  width: 100%;
-}
-
-.pointDetailsInfoRow {
-  max-height: calc(100vh - 80px);
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-@media (max-height: 500px) {
-  .pointDetailsInfoRow {
-    max-height: 420px;
-  }
-}
-
-.pointDetailsControls {
-  border-top: 1px solid darkgrey;
-  background-color: white;
-  position: absolute;
-  bottom: 0px;
-  left: 0px;
-  width: 100%;
-}
-
-.pointDetailsControlRow {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px 10px 10px 10px;
-}
-
-.emailInput {
-  width: 100%;
-  margin-right: 10px;
-}
-
-.dataTotalRatio svg {
-  margin-left: 5px;
-}
-
-.dataTotalBar {
-  height: 40px;
-  width: 325px;
-  margin-right: 10px;
-}
-
-.dataTotalBar.progress {
-  margin: 5px 0px 0px 0px;
-  height: 30px;
-}
-
-.progress .upTo100 {
-  color: white;
-}
-
-.progress .past100 {
-  color: black;
-}
-
-.noDataNotice {
-  text-align: center;
-  margin-top: 100px;
-}
-
 /* .backButton {
   text-align: center;
   border: 2px solid darkgrey;
@@ -79,39 +15,13 @@
 
 .backButton svg {
   margin-right: 5px;
-} */
+}
 
-/* .dataPreviewModal .modal-header button {
+.dataPreviewModal .modal-header button {
   margin: 0px 10px;
-} */
-
-/* .datasetData {
-  display: flex;
-  overflow: auto;
-  max-height: 50%;
-} */
-
-/* .dataPreviewModal .modal-body {
-  padding: 0px;
 }
 
-.previewRow {
-  display: flex;
-  padding: 10px 0px 0px 0px;
-  height: 50%;
-}
-
-.previewColumn {
-  min-width: 50%;
-  max-height: 100%;
-  overflow: auto;
-}
-
-.previewColumn.metadata {
-  display: flex;
-} */
-
-/* .previewFlexContainer {
+.previewFlexContainer {
   display: flex;
   height: 100%;
 }
