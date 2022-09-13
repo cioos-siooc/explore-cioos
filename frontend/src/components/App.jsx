@@ -42,7 +42,7 @@ if (process.env.NODE_ENV === 'production') {
   })
 }
 
-export default function App () {
+export default function App() {
   const { t, i18n } = useTranslation()
   const [selectionPanelOpen, setSelectionPanelOpen] = useState(true)
   const [pointsToDownload, setPointsToDownload] = useState()
@@ -132,7 +132,7 @@ export default function App () {
     })
   }, [debouncedStartDate, debouncedEndDate, debouncedStartDepth, debouncedEndDepth, debouncedEovsSelected, debouncedOrgsSelected, debouncedDatasetsSelected, debouncedPlatformsSelected])
 
-  function createOptionSubset (searchTerms, allOptions) {
+  function createOptionSubset(searchTerms, allOptions) {
     if (searchTerms) {
       return allOptions.filter(option => option.title.toLowerCase().includes(searchTerms.toString().toLowerCase()))
     } else {
@@ -316,15 +316,15 @@ export default function App () {
     setSubmissionState()
   }, [email])
 
-  function handleEmailChange (value) {
+  function handleEmailChange(value) {
     setEmail(value)
   }
 
-  function handleSubmission () {
+  function handleSubmission() {
     setSubmissionState('submitted')
   }
 
-  function submitRequest () {
+  function submitRequest() {
     fetch(`${server}/download?${createDataFilterQueryString(query)}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload.map(point => point.pk).join(',')}&email=${email}&lang=${i18n.language}`).then((response) => {
       if (response.ok) {
         setSubmissionState('successful')
@@ -337,7 +337,7 @@ export default function App () {
     })
   }
 
-  function DownloadButton () {
+  function DownloadButton() {
     return (
       <DataDownloadModal
         disabled={_.isEmpty(pointsToReview)}
