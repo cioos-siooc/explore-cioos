@@ -54,6 +54,7 @@ FROM   sub`;
       multiplier:10,
     }
   } else queryParams = filters
+
   const q = db.raw(sql, queryParams);
 
   const rows = await q;

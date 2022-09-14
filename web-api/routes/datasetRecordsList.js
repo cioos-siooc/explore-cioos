@@ -19,16 +19,16 @@ const { datasetDetailsMiddleware } = require("../utils/validatorMiddlewares");
 
 router.get("/", datasetDetailsMiddleware(),async function (req, res, next) {
     const { datasetPKs } = req.query;
-    const entireDatasetQuery = datasetPKs && Object.keys(req.query).length === 1
+    const isEntireDatasetQuery = datasetPKs && Object.keys(req.query).length === 1
 
     const data = (await getShapeQuery(req.query, true, true)).pop()
     
-    console.log({entireDatasetQuery});
-    if (!entireDatasetQuery) {
-        // also return size of entire dataset, without sending the rows again
-        data.totalDatasetSize = (await getShapeQuery({ datasetPKs }, true, false)).pop().size
-    }
-    else data.totalDatasetSize = data.size
+    if (!data) { res.send(); return; }
+
+    // if its the entire dataset then the estimate is for the full dataset
+    if (isEntireDatasetQuery) data.totalDatasetSize = data.size
+    // also return size of entire dataset, without sending the rows again
+    else data.totalDatasetSize = (await getShapeQuery({ datasetPKs }, true, false)).pop().size;    
     
     res.send(data)
 });
