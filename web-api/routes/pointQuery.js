@@ -18,16 +18,13 @@ router.get("/", requiredShapeMiddleware(), async function (req, res, next) {
    * (fraction of the profile's depth range that overlaps with query) *
    * (number of columns in final CSV) * multiplier
    */
-  const rows = await getShapeQuery(req.query);
+  const rows = await getShapeQuery(req.query,true,true);
 
-  // limiting # of profiles per dataset to 1000. otherwise one dataset could
-  // return 75k profiles and crash the browser
-  const rowsLimitedProfiles = rows.map((dataset) => ({
+  const rowsWithCount = rows.map((dataset) => ({
     ...dataset,
     profiles_count: dataset.profiles.length,
-    profiles: dataset.profiles.slice(0, 1000),
   }));
 
-  res.send(rowsLimitedProfiles);
+  res.send(rowsWithCount);
 });
 module.exports = router;

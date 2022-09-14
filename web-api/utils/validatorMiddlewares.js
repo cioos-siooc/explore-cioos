@@ -23,6 +23,14 @@ function generalFiltersMiddleWare() {
       .optional(),
   ];
 }
+function datasetDetailsMiddleware() {
+  return [
+    generalFiltersMiddleWare(),
+    check("datasetPKs").isInt(),
+    errorHandler,
+  ];
+  
+}
 function shapeFiltersMiddleware() {
   return [
     check("polygon")
@@ -77,4 +85,5 @@ module.exports = {
   validatorMiddleware,
   requiredShapeMiddleware,
   generalFiltersMiddleWare,
+  datasetDetailsMiddleware
 };

@@ -34,7 +34,7 @@ router.get(
       lang = "en",
     } = req.query;
 
-    const shapeQueryResponse = await getShapeQuery(req.query);
+    const shapeQueryResponse = await getShapeQuery(req.query,true,false);
     const estimateTotalSize = shapeQueryResponse.reduce(
       (partialSum, { size }) => partialSum + size,
       0
