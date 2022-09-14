@@ -2,12 +2,15 @@ import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { ProgressBar } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
+import { InfoSquare } from 'react-bootstrap-icons'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetPreview from '../DatasetPreview/DatasetPreview.jsx'
 import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
+import LanguageSelector from '../LanguageSelector/LanguageSelector.jsx'
 import Loading from '../Loading/Loading.jsx'
+import Logo from '../../Images/logo_FINAL.png'
 import { server } from '../../../config'
 import './styles.css'
 import {
@@ -117,6 +120,17 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
 
   return (
     <div className='pointDetails'>
+      <div className='pointDetailsHeader'>
+        <img className='pointDetailsHeaderLogo' src={Logo} />
+        <button
+          className='pointDetailsHeaderIntroButton'
+          onClick={() => alert('open intro modal')}
+          title={t('introReopenTitle')} // 'Re-open introduction'
+        >
+          <InfoSquare color='#007bff' size={'25px'} />
+        </button>
+        <LanguageSelector className='noPosition' />
+      </div>
       <div className='pointDetailsInfoRow'>
         {loading
           ? (
