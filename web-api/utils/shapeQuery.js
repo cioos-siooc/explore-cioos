@@ -19,7 +19,7 @@ async function getShapeQuery(query,doEstimate=true,getRecordsList=true) {
                   json_build_object('en',summary,'fr',summary_fr) summary_translated,
                   d.eovs                                          eovs,
                   organizations,
-                  count(p.*) profiles_count,
+                  count(p.*)::integer profiles_count,
                   d.erddap_url
                            || '/tabledap/'
                            || d.dataset_id
