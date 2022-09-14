@@ -571,7 +571,7 @@ export default function App() {
           {DownloadButton()}
         </div>
       </Controls>
-      {i18n.language === 'en'
+      {/* {i18n.language === 'en'
         ? <a
           title={t('CIOOSLogoButtonTitle')}
           className='logo english'
@@ -584,7 +584,7 @@ export default function App() {
           href='https://siooc.ca/'
           target='_blank' rel="noreferrer"
         />
-      }
+      } */}
       {currentRangeLevel &&
         <Legend currentRangeLevel={currentRangeLevel} zoom={zoom} selectionPanelOpen={polygon && selectionPanelOpen} platformsInView={platformsSelected.map(e => e.title)} />
       }
@@ -604,7 +604,7 @@ export default function App() {
         <ChatDots size='30px' />
       </a> */}
       <IntroModal initialOpenState={true} />
-      <LanguageSelector />
+      {/* <LanguageSelector /> */}
     </ErrorBoundary>
   )
 }
