@@ -32,6 +32,19 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
   const [showModal, setShowModal] = useState(false)
   const [recordLoading, setRecordLoading] = useState(false)
   const [datasetPreview, setDatasetPreview] = useState()
+  const [datasetTitleSearchText, setDatasetTitleSearchText] = useState()
+  const [datasetsSelected, setDatasetsSelected] = useState()
+  // useEffect(() => {
+
+  // }, [datasetTitleSearchText])
+
+  useEffect(() => {
+    let count = 0
+    pointsData.forEach((point) => {
+      if (point.selected) count++
+    })
+    setDatasetsSelected(count)
+  }, [pointsData])
 
   useEffect(() => {
     // if (inspectDataset) {
@@ -81,7 +94,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
         }
       })
     }
-  }, [polygon, i18n.language])
+  }, [query, polygon, i18n.language])
 
   function handleSelectDataset(point) {
     const dataset = pointsData.filter((p) => p.pk === point.pk)[0]
@@ -124,7 +137,6 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
   return (
     <div className='pointDetails'>
       <div className='pointDetailsHeader'>
-        <img className='pointDetailsHeaderLogo' src={Logo} />
         <button
           className='pointDetailsHeaderIntroButton'
           onClick={() => alert('open intro modal')}
@@ -132,7 +144,14 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
         >
           <InfoSquare color='#007bff' size={'25px'} />
         </button>
-        <LanguageSelector className='noPosition' />
+        <img
+          className='pointDetailsHeaderLogo'
+          src={Logo}
+          onClick={() => alert('reset application')}
+        />
+        <LanguageSelector
+          className='noPosition'
+        />
       </div>
       <div className='pointDetailsInfoRow'>
         {loading
@@ -148,7 +167,11 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
             // (pointsData && pointsData.length > 0 &&
             <>
               <div className="pointDetailsSearchBar">
-                <input value='Search for dataset title here' onChange={() => alert('searching for dataset title')} />
+                <input
+                  defaultValue='Search dataset titles here...'
+                  value={datasetTitleSearchText}
+                  onChange={(e) => setDatasetTitleSearchText(e.value)}
+                />
               </div>
               <DatasetsTable
                 handleSelectAllDatasets={handleSelectAllDatasets}
@@ -158,10 +181,19 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
                 selectAll={selectAll}
                 setDatasets={setPointsData}
                 datasets={pointsData}
+                //   .filter((dataset) => {
+                //   // console.log(datasetTitleSearchText)
+                //   if (!datasetTitleSearchText) return true
+                //   else {
+                //     return dataset.title.toLowerCase().contains(datasetTitleSearchText.toLowerCase())
+                //   }
+                // })}
                 setHoveredDataset={setHoveredDataset}
               />
               <div className='pointDetailsControls'>
                 <div className='pointDetailsControlRow'>
+                  <strong>Datasets selected:</strong> {pointsData.length}
+                  <strong>Downloading:</strong> {datasetsSelected}
                   {children}
                 </div>
               </div>
@@ -183,7 +215,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
         setDatasetPreview={setDatasetPreview}
         inspectDataset={inspectDataset}
         setInspectDataset={setInspectDataset}
-        showModal={setShowModal}
+        showModal={showModal}
         setShowModal={setShowModal}
         inspectRecordID={inspectRecordID}
         setInspectRecordID={setInspectRecordID}

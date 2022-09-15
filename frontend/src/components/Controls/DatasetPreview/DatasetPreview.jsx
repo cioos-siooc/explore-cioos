@@ -14,8 +14,15 @@ export default function DatasetPreview({ datasetPreview, inspectDataset, setInsp
   const [plotYAxis, setPlotYAxis] = useState([])
   const [selectedVis, setSelectedVis] = useState('table')
 
-  return <Modal className='dataPreviewModal'
-    show={false} fullscreen onHide={() => setInspectDataset()}
+  return <Modal
+    className='dataPreviewModal'
+    show={showModal}
+    // fullscreen
+    size='xl'
+    onHide={() => {
+      setInspectRecordID()
+      setShowModal(false)
+    }}
   >
     {inspectDataset && inspectRecordID &&
       <>
@@ -23,7 +30,7 @@ export default function DatasetPreview({ datasetPreview, inspectDataset, setInsp
           <div
             className='backButton'
             onClick={() => {
-              setInspectDataset()
+              // setInspectDataset()
               setInspectRecordID()
               setShowModal(false)
             }}
@@ -43,7 +50,7 @@ export default function DatasetPreview({ datasetPreview, inspectDataset, setInsp
         </Modal.Header>
         <Modal.Body>
           <div className="previewFlexContainer">
-            <div className="previewFlexItem metadataAndRecordIDTableGridContainer">
+            {/* <div className="previewFlexItem metadataAndRecordIDTableGridContainer">
               <div className="metadataGridContainer">
                 <div className="metadataGridItem organisation">
                   <h5>{t('datasetInspectorOrganizationText')}</h5>
@@ -118,16 +125,16 @@ export default function DatasetPreview({ datasetPreview, inspectDataset, setInsp
                   </tbody>
                 </Table>
               </div>
-            </div>
+            </div> */}
             <div className="previewFlexItem dataTableAndDataPlot">
               <div className="tableAndPlotGridContainer">
                 <div className="tableAndPlotGridItem">
                   <strong>Selected record ID:</strong>{` ${inspectRecordID}` || ' Please select a record ID'}
-                  {inspectRecordID &&
+                  {/* {inspectRecordID &&
                     <button className='deselectRecordButton' onClick={() => {
                       setDatasetPreview()
                       setInspectRecordID()
-                    }}>Unselect</button>}
+                    }}>Unselect</button>} */}
                   <button
                     className={`toggleButton ${selectedVis === 'table' && 'selected'}`}
                     onClick={() => {
