@@ -1,14 +1,27 @@
-import * as React from 'react'
+import React, { useState, useEffect } from 'react'
 import { ChevronCompactLeft, CircleFill } from 'react-bootstrap-icons'
 import { Container, Table } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 
 import platformColors from '../../platformColors'
+import { server } from '../../../config'
 import './styles.css'
 
 export default function DatasetInspector({ dataset, setInspectDataset, setHoveredDataset, setInspectRecordID }) {
   const { t } = useTranslation()
+  const [datasetRecords, setDatasetRecords] = useState()
   const platformColor = platformColors.filter(pc => pc.platform === dataset.platform)
+
+  useEffect(() => {
+    fetch(`${server}/datasetRecordsList?datasetPKs=${dataset.pk}`).then(response => {
+      if (response.ok) {
+        response.json().then(data => {
+          setDatasetRecords(data)
+        })
+      }
+    }).catch(error => console.log(error))
+  }, [])
+
   return (
     <div className='datasetInspector'
       onMouseEnter={() => setHoveredDataset(dataset)}
@@ -101,7 +114,7 @@ export default function DatasetInspector({ dataset, setInspectDataset, setHovere
             </tr>
           </thead>
           <tbody>
-            {dataset.profiles.map((profile, index) => {
+            {datasetRecords && datasetRecords.profiles.map((profile, index) => {
               return (
                 <tr key={index} onClick={() => setInspectRecordID(profile.profile_id)}>
                   <td>{profile.profile_id}</td>
@@ -110,9 +123,9 @@ export default function DatasetInspector({ dataset, setInspectDataset, setHovere
                 </tr>
               )
             })}
-            {dataset.profiles_count > 1000 && (
+            {datasetRecords && datasetRecords.profiles_count > 1000 && (
               <tr key={1001}>
-                <td>{`1000/${dataset.profiles_count} ${t('datasetInspectorRecordsShownText')}`}</td>
+                <td>{`1000/${datasetRecords.profiles_count} ${t('datasetInspectorRecordsShownText')}`}</td>
                 <td />
                 <td />
               </tr>

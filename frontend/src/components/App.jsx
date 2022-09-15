@@ -405,7 +405,7 @@ export default function App() {
       }
       <Controls
         loading={loading}
-        selectionPanel={polygon && (
+        selectionPanel={
           <Col xs='auto' className='selectionPanelColumn'>
             <SelectionPanel
               open={selectionPanelOpen}
@@ -422,7 +422,7 @@ export default function App() {
               </SelectionDetails>
             </SelectionPanel>
           </Col>
-        )}
+        }
       >
         <Filter
           badgeTitle={eovsBadgeTitle}
@@ -586,7 +586,7 @@ export default function App() {
         />
       } */}
       {currentRangeLevel &&
-        <Legend currentRangeLevel={currentRangeLevel} zoom={zoom} selectionPanelOpen={polygon && selectionPanelOpen} platformsInView={platformsSelected.map(e => e.title)} />
+        <Legend currentRangeLevel={currentRangeLevel} zoom={zoom} selectionPanelOpen={selectionPanelOpen} platformsInView={platformsSelected.map(e => e.title)} />
       }
       <button
         className='boxQueryButton'
