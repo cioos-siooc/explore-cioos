@@ -1,3 +1,7 @@
+.tableAndPlotGridItem {
+  height: 100%;
+  overflow: auto;
+}
 /* .backButton {
   text-align: center;
   border: 2px solid darkgrey;

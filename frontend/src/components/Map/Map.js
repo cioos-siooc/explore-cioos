@@ -261,7 +261,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
           }
         ]
       },
-      center: [mapLongitude || -100, mapLatitude || 60], // starting position
+      center: [mapLongitude || -150, mapLatitude || 60], // starting position
       zoom: mapZoom || zoom, // starting zoom,
     })
 

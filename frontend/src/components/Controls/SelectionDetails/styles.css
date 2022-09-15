@@ -69,11 +69,19 @@
 }
 
 .pointDetailsHeaderLogo {
+  margin: auto;
   height: 100%;
-  border-style: 5px;
+  /* border: 2px solid lightgrey;
+  border-radius: 4px; */
+}
+
+.pointDetailsHeaderLogo:hover {
+  background-color: #c6e3df;
+  padding: -2px;
 }
 
 .pointDetailsHeaderIntroButton {
+  margin: 10px;
   pointer-events: all;
   background-color: #fff;
   box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
@@ -85,18 +93,25 @@
   z-index: 3;
 }
 
+.pointDetailsHeaderIntroButton:hover {
+  background-color: #c6e3df;
+}
+
 .noPosition.languageSelector{
   position: inherit;
   top: inherit;
   right: inherit;
+  margin: 10px;
   pointer-events: all;
   z-index: 3;
-  width: 24px;
-  height: 24px;
+  width: 42px;
+  height: 42px;
   text-align: center;
-  margin: auto;
+  /* margin: auto; */
+  padding:5px;
   background-color: white;
-  border-radius: 5px;
+  border-radius: 4px;
+  border: 2px solid lightgrey;
 }
 
 .noPosition.languageSelector:hover {
