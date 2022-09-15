@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Table } from 'react-bootstrap'
 import { ArrowDown, ArrowUp, CheckSquare, ChevronCompactRight, CircleFill, SortAlphaDown, SortAlphaUp, SortNumericDown, SortNumericUp, Square } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
-import { abbreviateString, bytesToMemorySizeString } from '../../../utilities'
+// import { abbreviateString, bytesToMemorySizeString } from '../../../utilities'
 import platformColors from '../../platformColors'
 import './styles.css'
 

@@ -55,9 +55,12 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
 
   useEffect(() => {
     setDataTotal(0)
-    if (polygon !== undefined && !loading) {
+    if (!loading) {
       const filtersQuery = createDataFilterQueryString(query)
-      const shapeQuery = createSelectionQueryString(polygon)
+      let shapeQuery = []
+      if (polygon) {
+        shapeQuery = createSelectionQueryString(polygon)
+      }
       const combinedQueries = [filtersQuery, shapeQuery].filter(e => e).join('&')
       setInspectDataset()
       setLoading(true)
@@ -133,9 +136,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
       </div>
       <div className='pointDetailsInfoRow'>
         {loading
-          ? (
-            <Loading />
-          )
+          ? <Loading />
           : inspectDataset
             ? <DatasetInspector
               dataset={inspectDataset}
@@ -143,7 +144,12 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
               setInspectDataset={setInspectDataset}
               setInspectRecordID={setInspectRecordID}
             />
-            : (pointsData && pointsData.length > 0 &&
+            :
+            // (pointsData && pointsData.length > 0 &&
+            <>
+              <div className="pointDetailsSearchBar">
+                <input value='Search for dataset title here' onChange={() => alert('searching for dataset title')} />
+              </div>
               <DatasetsTable
                 handleSelectAllDatasets={handleSelectAllDatasets}
                 handleSelectDataset={handleSelectDataset}
@@ -154,14 +160,22 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
                 datasets={pointsData}
                 setHoveredDataset={setHoveredDataset}
               />
-            ) || (pointsData && pointsData.length === 0 &&
-              (
-                <div className="noDataNotice">
-                  {t('selectionDetailsNoDataWarning')}
-                  {/* No Data. Modify filters or change selection on map. */}
+              <div className='pointDetailsControls'>
+                <div className='pointDetailsControlRow'>
+                  {children}
                 </div>
-              )
-            )
+              </div>
+            </>
+          // )
+          // ||
+          // (pointsData && pointsData.length === 0 &&
+          //   (
+          //     <div className="noDataNotice">
+          //       {t('selectionDetailsNoDataWarning')}
+          //       {/* No Data. Modify filters or change selection on map. */}
+          //     </div>
+          //   )
+          // )
         }
       </div>
       <DatasetPreview
@@ -175,9 +189,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
         setInspectRecordID={setInspectRecordID}
         recordLoading={recordLoading}
       />
-      <div className='pointDetailsControls'>
-        <div className='pointDetailsControlRow'>
-          <div>
+      {/* <div>
             <ProgressBar
               className='dataTotalBar'
               title={t('selectionDetailsProgressBarTitle')}
@@ -202,18 +214,15 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
               }
             </ProgressBar>
             <div className='dataTotalRatio'>
-              {bytesToMemorySizeString(dataTotal * 1000000)} {t('selectionDetailsMaxRatio')}
-              {/* of 100MB Max */}
-              <QuestionIconTooltip
+              {bytesToMemorySizeString(dataTotal * 1000000)} {t('selectionDetailsMaxRatio')} */}
+      {/* of 100MB Max */}
+      {/* <QuestionIconTooltip
                 tooltipText={t('selectionDetailsQuestionTooltipText')} // 'Downloads are limited to 100MB.'}
                 size={20}
                 tooltipPlacement={'top'}
               />
             </div>
-          </div>
-          {children}
-        </div>
-      </div>
+          </div> */}
     </div >
   )
 }

@@ -3,7 +3,7 @@
 }
 
 .pointDetailsInfoRow {
-  max-height: calc(100vh - 80px);
+  max-height: calc(100vh - 127px);
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -103,6 +103,14 @@
   background-color: #c6e3df;
 }
 
+.pointDetailsSearchBar {
+  width: 100%;
+  padding:15px;
+}
+
+.pointDetailsSearchBar input {
+  width: 100%;
+}
 /* .backButton {
   text-align: center;
   border: 2px solid darkgrey;
