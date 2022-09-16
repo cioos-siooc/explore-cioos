@@ -42,7 +42,7 @@ export default function DatasetPreview({ datasetPreview, inspectDataset, setInsp
             </>
             {/* Back */}
           </div>
-          <h4>
+          <h4 className='datasetTitle'>
             {inspectDataset.title}
             {/* {t('datasetInspectorModalTitle')} */}
             {/* Dataset Preview */}
@@ -165,12 +165,16 @@ export default function DatasetPreview({ datasetPreview, inspectDataset, setInsp
                       />
                       :
                       <>
-                        <DropdownButton title={(plotXAxis && `X axis: ` + plotXAxis.columnName) || 'Select X axis variable'}>
+                        <DropdownButton
+                          title={(plotXAxis && `X axis: ` + plotXAxis.columnName) || 'Select X axis variable'}
+                        >
                           {datasetPreview && datasetPreview?.table?.columnNames.map((columnName, index) => {
                             return <Dropdown.Item key={index} onClick={() => setPlotXAxis({ index, columnName })}>{columnName}</Dropdown.Item>
                           })}
                         </DropdownButton>
-                        <DropdownButton title={(plotYAxis && `Y Axis: ` + plotYAxis.columnName) || 'Select Y axis variable'}>
+                        <DropdownButton
+                          title={(plotYAxis && `Y Axis: ` + plotYAxis.columnName) || 'Select Y axis variable'}
+                        >
                           {datasetPreview && datasetPreview?.table?.columnNames.map((columnName, index) => {
                             return <Dropdown.Item key={index} onClick={() => setPlotYAxis({ index, columnName })}>{columnName}</Dropdown.Item>
                           })}

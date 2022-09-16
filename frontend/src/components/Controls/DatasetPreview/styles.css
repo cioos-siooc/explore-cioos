@@ -2,7 +2,8 @@
   height: 100%;
   overflow: auto;
 }
-/* .backButton {
+
+ .backButton {
   text-align: center;
   border: 2px solid darkgrey;
   border-radius: 10px;
@@ -21,6 +22,39 @@
   margin-right: 5px;
 }
 
+.tableAndPlotGridItem {
+  margin-bottom: 15px;
+}
+
+.tableAndPlotGridContainer .toggleButton {
+  width: 66px;
+  height: 42px;
+  margin: 0px 16.5px;
+  background-color: white;
+  border-radius: 5px;
+  border: 2px solid darkgrey;
+  color: black;
+  line-height: 15px;
+}
+
+.toggleButton:hover {
+  background-color: #c6e3df;
+}
+
+.toggleButton.selected {
+  background-color: #52A79B;
+  color: white;
+}
+
+.dataPreviewModal .datasetTitle {
+  margin: 10px auto;
+}
+
+/* .tableAndPlot .dropDownButton {
+
+} */
+
+/*
 .dataPreviewModal .modal-header button {
   margin: 0px 10px;
 }
@@ -74,26 +108,6 @@
 .tableAndPlotGridItem {
   height: 100%;
   overflow: auto;
-}
-
-.tableAndPlotGridContainer .toggleButton {
-  width: 66px;
-  height: 42px;
-  margin: 0px 16.5px;
-  background-color: white;
-  border-radius: 5px;
-  border: 2px solid darkgrey;
-  color: black;
-  line-height: 15px;
-}
-
-.toggleButton:hover {
-  background-color: #c6e3df;
-}
-
-.toggleButton.selected {
-  background-color: #52A79B;
-  color: white;
 }
 
 .deselectRecordButton {
