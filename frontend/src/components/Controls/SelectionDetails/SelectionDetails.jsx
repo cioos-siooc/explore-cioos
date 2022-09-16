@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { ProgressBar } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
-import { InfoSquare } from 'react-bootstrap-icons'
+import { InfoSquare, X } from 'react-bootstrap-icons'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetPreview from '../DatasetPreview/DatasetPreview.jsx'
@@ -17,13 +17,15 @@ import {
   bytesToMemorySizeString,
   createDataFilterQueryString,
   getPointsDataSize,
-  createSelectionQueryString
+  createSelectionQueryString,
+  useDebounce
 } from '../../../utilities.js'
+import _ from 'lodash'
 
 // Note: datasets and points are exchangable terminology
 export default function SelectionDetails({ setPointsToReview, query, polygon, setHoveredDataset, children }) {
   const { t, i18n } = useTranslation()
-  const [selectAll, setSelectAll] = useState(true)
+  const [selectAll, setSelectAll] = useState(false)
   const [pointsData, setPointsData] = useState([])
   const [inspectDataset, setInspectDataset] = useState()
   const [dataTotal, setDataTotal] = useState(0)
@@ -32,11 +34,22 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
   const [showModal, setShowModal] = useState(false)
   const [recordLoading, setRecordLoading] = useState(false)
   const [datasetPreview, setDatasetPreview] = useState()
-  const [datasetTitleSearchText, setDatasetTitleSearchText] = useState()
+  const [datasetTitleSearchText, setDatasetTitleSearchText] = useState('')
+  const debouncedDatasetTitleSearchText = useDebounce(datasetTitleSearchText, 300)
   const [datasetsSelected, setDatasetsSelected] = useState()
-  // useEffect(() => {
+  const [filteredDatasets, setFilteredDatasets] = useState([])
 
-  // }, [datasetTitleSearchText])
+  useEffect(() => {
+    if (!_.isEmpty(debouncedDatasetTitleSearchText)) {
+      setFilteredDatasets(pointsData
+        .filter((dataset) => {
+          // console.log(datasetTitleSearchText)
+          return `${dataset.title}`.toLowerCase().includes(`${debouncedDatasetTitleSearchText}`.toLowerCase())
+        }))
+    } else {
+      setFilteredDatasets(pointsData)
+    }
+  }, [debouncedDatasetTitleSearchText])
 
   useEffect(() => {
     let count = 0
@@ -85,7 +98,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
               return {
                 ...point,
                 title: point.title_translated[i18n.language] || point.title,
-                selected: true
+                selected: false
               }
             }))
           })
@@ -163,15 +176,23 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
               setInspectDataset={setInspectDataset}
               setInspectRecordID={setInspectRecordID}
             />
-            :
-            // (pointsData && pointsData.length > 0 &&
-            <>
+            : <>
               <div className="pointDetailsSearchBar">
-                <input
-                  defaultValue='Search dataset titles here...'
-                  value={datasetTitleSearchText}
-                  onChange={(e) => setDatasetTitleSearchText(e.value)}
-                />
+                <div className='pointDetailsSearchBarContainer'>
+                  <input
+                    value={datasetTitleSearchText}
+                    onChange={(e) => setDatasetTitleSearchText(e.target.value)}
+                    placeholder='Search dataset titles here...'
+                  />
+                  {!_.isEmpty(datasetTitleSearchText) &&
+                    <X
+                      className='pointDetailsSearchBarClearSearchButton'
+                      color='darkgrey'
+                      size='25px'
+                      onClick={() => setDatasetTitleSearchText('')}
+                    />
+                  }
+                </div>
               </div>
               <DatasetsTable
                 handleSelectAllDatasets={handleSelectAllDatasets}
@@ -180,34 +201,23 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
                 setInspectRecordID={setInspectRecordID}
                 selectAll={selectAll}
                 setDatasets={setPointsData}
-                datasets={pointsData}
-                //   .filter((dataset) => {
-                //   // console.log(datasetTitleSearchText)
-                //   if (!datasetTitleSearchText) return true
-                //   else {
-                //     return dataset.title.toLowerCase().contains(datasetTitleSearchText.toLowerCase())
-                //   }
-                // })}
+                datasets={_.isEmpty(debouncedDatasetTitleSearchText) ? pointsData : filteredDatasets}
                 setHoveredDataset={setHoveredDataset}
               />
+              {/* {(!pointsData || pointsData.length === 0) &&
+                <div className="noDataNotice">
+                  {t('selectionDetailsNoDataWarning')} */}
+              {/* No Data. Modify filters or change selection on map. */}
+              {/* </div>
+              } */}
               <div className='pointDetailsControls'>
                 <div className='pointDetailsControlRow'>
                   <strong>Datasets selected:</strong> {pointsData.length}
-                  <strong>Downloading:</strong> {datasetsSelected}
+                  <strong>To download:</strong> {datasetsSelected}
                   {children}
                 </div>
               </div>
             </>
-          // )
-          // ||
-          // (pointsData && pointsData.length === 0 &&
-          //   (
-          //     <div className="noDataNotice">
-          //       {t('selectionDetailsNoDataWarning')}
-          //       {/* No Data. Modify filters or change selection on map. */}
-          //     </div>
-          //   )
-          // )
         }
       </div>
       <DatasetPreview
@@ -221,40 +231,6 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
         setInspectRecordID={setInspectRecordID}
         recordLoading={recordLoading}
       />
-      {/* <div>
-            <ProgressBar
-              className='dataTotalBar'
-              title={t('selectionDetailsProgressBarTitle')}
-            >
-              <ProgressBar
-                striped
-                className='upTo100'
-                variant='success'
-                now={dataTotal < 100 ? dataTotal : 100}
-                label={dataTotal < 100 ? bytesToMemorySizeString(dataTotal * 1000000) : '100 MB'}
-                key={1}
-              />
-              {dataTotal > 100 &&
-                <ProgressBar
-                  striped
-                  className='past100'
-                  variant='warning'
-                  now={dataTotal > 100 ? (dataTotal - 100).toFixed(2) : 0}
-                  label={dataTotal > 100 ? bytesToMemorySizeString((dataTotal - 100).toFixed(2) * 1000000) : 0}
-                  key={2}
-                />
-              }
-            </ProgressBar>
-            <div className='dataTotalRatio'>
-              {bytesToMemorySizeString(dataTotal * 1000000)} {t('selectionDetailsMaxRatio')} */}
-      {/* of 100MB Max */}
-      {/* <QuestionIconTooltip
-                tooltipText={t('selectionDetailsQuestionTooltipText')} // 'Downloads are limited to 100MB.'}
-                size={20}
-                tooltipPlacement={'top'}
-              />
-            </div>
-          </div> */}
-    </div >
+    </div>
   )
 }

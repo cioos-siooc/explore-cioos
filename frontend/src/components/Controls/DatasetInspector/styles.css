@@ -19,6 +19,10 @@
   margin-bottom: 5px;
 }
 
+.inspectorTable tbody tr:hover {
+  background-color: #c6e3df;
+}
+
 /* .datasetInspector {
   display: flex;
   max-height: 50%;

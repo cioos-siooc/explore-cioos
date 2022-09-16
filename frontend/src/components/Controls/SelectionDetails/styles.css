@@ -123,9 +123,26 @@
   padding:15px;
 }
 
+.pointDetailsSearchBarContainer {
+  position: relative;
+}
+
 .pointDetailsSearchBar input {
   width: 100%;
 }
+
+.pointDetailsSearchBarClearSearchButton {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  border-radius: 30px;
+}
+
+.pointDetailsSearchBarClearSearchButton:hover {
+  background-color: lightgray;
+  cursor: pointer;
+}
+
 /* .backButton {
   text-align: center;
   border: 2px solid darkgrey;
