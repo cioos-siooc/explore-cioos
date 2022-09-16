@@ -147,7 +147,10 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
   }, [inspectRecordID])
 
   return (
-    <div className='pointDetails'>
+    <div className='pointDetails'
+      onMouseEnter={() => setHoveredDataset(inspectDataset)}
+      onMouseLeave={() => setHoveredDataset()}
+    >
       <div className='pointDetailsHeader'>
         <button
           className='pointDetailsHeaderIntroButton'

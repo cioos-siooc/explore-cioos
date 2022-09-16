@@ -1,9 +1,10 @@
 .pointDetails {
+  height: 100%;
   width: 100%;
 }
 
 .pointDetailsInfoRow {
-  max-height: calc(100vh - 127px);
+  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -76,8 +77,9 @@
 }
 
 .pointDetailsHeaderLogo:hover {
+  cursor: pointer;
   background-color: #c6e3df;
-  padding: -2px;
+  /* padding: -2px; */
 }
 
 .pointDetailsHeaderIntroButton {
