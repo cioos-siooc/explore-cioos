@@ -14,7 +14,6 @@ import SelectionDetails from './Controls/SelectionDetails/SelectionDetails.jsx'
 import DownloadDetails from './Controls/DownloadDetails/DownloadDetails.jsx'
 import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx'
 import Loading from './Controls/Loading/Loading.jsx'
-import LanguageSelector from './Controls/LanguageSelector/LanguageSelector.jsx'
 import Legend from './Controls/Legend/Legend.jsx'
 import IntroModal from './Controls/IntroModal/IntroModal.jsx'
 import Filter from './Controls/Filter/Filter.jsx'
@@ -425,6 +424,7 @@ export default function App() {
         }
       >
         <Filter
+          active={eovsSelected.filter(eov => eov.isSelected).length !== 0}
           badgeTitle={eovsBadgeTitle}
           optionsSelected={eovsSelected}
           setOptionsSelected={setEovsSelected}
@@ -451,8 +451,8 @@ export default function App() {
           />
         </Filter>
         <Filter
+          active={platformsSelected.filter(eov => eov.isSelected).length !== 0}
           badgeTitle={platformsBadgeTitle}
-          optionsSelected={platformsSelected}
           setOptionsSelected={setPlatformsSelected}
           tooltip={t('platformFilterTooltip')} // 'Filter data by ocean variable name. Selection works as logical OR operation.'
           icon={<BroadcastPin />}
@@ -479,6 +479,7 @@ export default function App() {
           />
         </Filter>
         <Filter
+          active={orgsSelected.filter(eov => eov.isSelected).length !== 0}
           badgeTitle={orgsBadgeTitle}
           optionsSelected={orgsSelected}
           setOptionsSelected={setOrgsSelected}
@@ -504,6 +505,7 @@ export default function App() {
           />
         </Filter>
         <Filter
+          active={datasetsSelected.filter(eov => eov.isSelected).length !== 0}
           badgeTitle={datasetsBadgeTitle}
           optionsSelected={datasetsSelected}
           setOptionsSelected={setDatasetsSelected}
@@ -530,6 +532,7 @@ export default function App() {
           />
         </Filter>
         <Filter
+          active={startDate !== defaultStartDate || endDate !== defaultEndDate}
           badgeTitle={timeframesBadgeTitle}
           optionsSelected={startDate, endDate}
           setOptionsSelected={() => { setStartDate('1900-01-01'); setEndDate(new Date().toISOString().split('T')[0]) }}
@@ -549,6 +552,7 @@ export default function App() {
           />
         </Filter>
         <Filter
+          active={startDepth !== defaultStartDepth || endDepth !== defaultEndDepth}
           badgeTitle={depthRangeBadgeTitle}
           optionsSelected={startDepth, endDepth}
           setOptionsSelected={() => { setStartDepth(0); setEndDepth(12000) }}

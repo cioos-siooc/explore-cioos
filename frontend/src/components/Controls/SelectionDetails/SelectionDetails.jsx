@@ -43,7 +43,6 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
     if (!_.isEmpty(debouncedDatasetTitleSearchText)) {
       setFilteredDatasets(pointsData
         .filter((dataset) => {
-          // console.log(datasetTitleSearchText)
           return `${dataset.title}`.toLowerCase().includes(`${debouncedDatasetTitleSearchText}`.toLowerCase())
         }))
     } else {
