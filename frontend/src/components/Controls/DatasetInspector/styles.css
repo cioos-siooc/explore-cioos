@@ -30,6 +30,12 @@
   margin-bottom: 5px;
 }
 
+.datasetInspectorLoadingContainer{
+  position: absolute; 
+  height: 200px;
+  width: 100%;
+}
+
 .inspectorTable tbody tr:hover {
   background-color: #c6e3df;
   cursor: pointer;
