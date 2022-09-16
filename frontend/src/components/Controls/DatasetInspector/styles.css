@@ -1,3 +1,14 @@
+.datasetInspector {
+  height: 100%;
+  border: 2px solid transparent; 
+  padding: -2px;
+}
+
+.datasetInspector:hover{
+  border: 2px solid #c6e3df;
+}
+
+
 .datasetInspector .backButton {
   text-align: center;
   margin: 10px 10px 10px 10px;
@@ -21,6 +32,7 @@
 
 .inspectorTable tbody tr:hover {
   background-color: #c6e3df;
+  cursor: pointer;
 }
 
 /* .datasetInspector {
