@@ -3,7 +3,6 @@
   position: relative;
 }
 
-
 .filterHeader {
   pointer-events: all;
   background-color: white;
@@ -13,6 +12,10 @@
   padding: 5px;
   cursor: pointer;
   border: 1px solid white;
+}
+
+.filterHeader.active {
+  background-color: #c6e3df;
 }
 
 .filterHeader:hover {
