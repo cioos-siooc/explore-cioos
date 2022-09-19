@@ -58,7 +58,7 @@ body {
 .boxQueryButton {
   position: absolute;
   right: 10px;
-  bottom: 262px;
+  bottom: 282px;
   width: 42px;
   height: 42px;
   border-radius: 4px 4px 0px 0px;
@@ -97,26 +97,26 @@ body {
   margin-right: 5px;
 }
 
-@media all and (max-width: 900px) {
-  .logo {
+@media all and (max-width: 915px) {
+  /* .logo {
     left: calc(900px - 140px);
-  }
-
+  } */
+/* 
   .feedbackButton {
     left: 848px;
-  }
+  } */
 
   .boxQueryButton {
     left: 848px;
   }
 
-  .introButton {
+  /* .introButton {
     left: 848px;
-  }
+  } */
 }
 
 @media all and (max-height: 500px) {
   .boxQueryButton {
-    top: 196px;
+    top: 176px;
   }
 }

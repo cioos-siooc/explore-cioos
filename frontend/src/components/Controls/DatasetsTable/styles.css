@@ -66,3 +66,7 @@
 .datasetsTable .datasetTableLocationsCell svg {
   float: right;
 }
+
+.datasetsTable tbody tr td svg:hover {
+  background-color: lightgrey;
+}
