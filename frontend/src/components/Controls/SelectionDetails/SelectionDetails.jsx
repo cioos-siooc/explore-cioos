@@ -51,22 +51,13 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
   }, [debouncedDatasetTitleSearchText])
 
   useEffect(() => {
-    let count = 0
-    pointsData.forEach((point) => {
-      if (point.selected) count++
-    })
-    setDatasetsSelected(count)
-  }, [pointsData])
-
-  useEffect(() => {
-    // if (inspectDataset) {
-    //   setInspectRecordID(inspectDataset.profiles[0].profile_id)
-    // }
-  }, [inspectDataset])
-
-  useEffect(() => {
-    setDataTotal(0)
     if (!_.isEmpty(pointsData)) {
+      let count = 0
+      pointsData.forEach((point) => {
+        if (point.selected) count++
+      })
+      setDatasetsSelected(count)
+      setDataTotal(0)
       const total = getPointsDataSize(pointsData)
       setDataTotal(total / 1000000)
       setPointsToReview(pointsData.filter(point => point.selected))
@@ -78,6 +69,16 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
     // }
   }, [pointsData])
 
+  // useEffect(() => {
+  // if (inspectDataset) {
+  //   setInspectRecordID(inspectDataset.profiles[0].profile_id)
+  // }
+  // }, [inspectDataset])
+
+  // useEffect(() => {
+
+  // }, [pointsData])
+
   useEffect(() => {
     setDataTotal(0)
     if (!loading) {
@@ -86,10 +87,10 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
       if (polygon) {
         shapeQuery = createSelectionQueryString(polygon)
       }
-      const combinedQueries = [filtersQuery, shapeQuery].filter(e => e).join('&')
+      const combinedQueries = '?' + [filtersQuery, shapeQuery].filter(e => e).join('&')
       setInspectDataset()
       setLoading(true)
-      const urlString = `${server}/pointQuery?${combinedQueries}`
+      const urlString = `${server}/pointQuery${combinedQueries}`
       fetch(urlString).then(response => {
         if (response.ok) {
           response.json().then(data => {

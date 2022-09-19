@@ -47,6 +47,11 @@ export default function DatasetInspector({ dataset, setInspectDataset, setHovere
         <div className="previewFlexItem metadataAndRecordIDTableGridContainer">
           <div className="metadataGridContainer">
             <div className="metadataGridItem organisation">
+              <h5>{t('datasetInspectorTitleText')}</h5>
+              {/* {t(dataset.title)} */}
+              <button onClick={() => console.log('setting dataset filter to ', dataset.title)}>
+                {dataset.title}
+              </button>
               <h5>{t('datasetInspectorOrganizationText')}</h5>
               {dataset.organizations.map((org, index) => {
                 return <button key={index} onClick={() => console.log('setting org filter to ', org)}>{t(org)}</button>

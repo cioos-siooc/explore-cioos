@@ -453,7 +453,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
 
     const handleMapOnClick = e => {
       // Clear highlighted points if looking at points level and clicking off of the points
-      if (drawPolygon.current.getAll().features.length === 0 && map.current.getZoom() >= 7) {
+      if (drawPolygon.current.getAll().features.length === 0 && map.current.getZoom() >= 7 && !e.originalEvent.defaultPrevented) {
         map.current.setFilter('points-highlighted', ['in', 'pk', ''])
         setPointsToReview()
         setPolygon()
@@ -461,6 +461,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     }
 
     const handleMapPointsOnClick = e => {
+      e.originalEvent.preventDefault()
       if (!creatingPolygon.current) {
         if (drawPolygon.current.getAll().features.length > 0) {
           drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
@@ -496,6 +497,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     }
 
     const handleMapHexesOnClick = e => {
+      e.originalEvent.preventDefault()
       if (!creatingPolygon.current) {
         map.current.flyTo({
           center: [e.lngLat.lng, e.lngLat.lat],
@@ -601,28 +603,29 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     })
 
 
+    
+    
     // Workaround for https://github.com/mapbox/mapbox-gl-draw/issues/617
-
-    map.current.on('click', handleMapOnClick)
-    // mobile seems better without handleMapOnClick enabled for touch
-
     map.current.on('click', 'points', handleMapPointsOnClick)
     map.current.on('touchend', 'points', handleMapPointsOnClick)
-
+    
     map.current.on('click', 'hexes', handleMapHexesOnClick)
     map.current.on('touchend', 'hexes', handleMapHexesOnClick)
+    
+    map.current.on('click', handleMapOnClick)
+    // mobile seems better without handleMapOnClick enabled for touch
 
     const scale = new ScaleControl({
       maxWidth: 150,
       unit: 'metric'
     })
-    map.current.addControl(scale, 'bottom-right')
-
+    
     const attribution = new AttributionControl({
       customAttribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.'
       // compact: true
     })
-    map.current.addControl(attribution, 'bottom-left')
+    map.current.addControl(attribution, 'bottom-right')
+    map.current.addControl(scale, 'bottom-right')
 
     // Called order determines stacking order
     map.current.addControl(new NavigationControl(), 'bottom-right')
