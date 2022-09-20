@@ -13,13 +13,13 @@ import { colorScale, defaultQuery } from '../config'
 import platformColors from '../../components/platformColors'
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap ({ query, setPointsToReview, setPolygon, setLoading, zoom, setZoom, offsetFlyTo, rangeLevels, hoveredDataset }) {
+export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, zoom, setZoom, offsetFlyTo, rangeLevels, hoveredDataset }) {
   const { t } = useTranslation()
   const mapContainer = useRef(null)
   const map = useRef(null)
   const creatingPolygon = useRef(false)
   const shiftBoxCreate = useRef(false)
-  
+
   // disables edting of polygon/box vertices
   const disabledEvent = function (state, geojson, display) {
     display(geojson);
@@ -30,7 +30,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
   MapboxDraw.modes.simple_select.toDisplayFeatures = disabledEvent;
 
   modes.draw_rectangle = DrawRectangle;
-  
+
   const drawControlOptions = {
     displayControlsDefault: false,
     controls: {
@@ -110,7 +110,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     }
   }, [boxSelectEndCoords])
 
-  function setColorStops () {
+  function setColorStops() {
     if (map.current) {
       colorStops.current = generateColorStops(colorScale, getCurrentRangeLevel(rangeLevels, map.current.getZoom())).map(colorStop => {
         return [colorStop.stop, colorStop.color]
@@ -128,7 +128,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     }
   }
 
-  function hoverHighlightPoints (pk) {
+  function hoverHighlightPoints(pk) {
     if (map.current && pk) {
       if (zoom >= 7) {
         map.current.setPaintProperty('points', 'circle-color', 'lightgrey')
@@ -170,7 +170,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     }
   }, [hoveredDataset])
 
-  function highlightPoints (polygon) {
+  function highlightPoints(polygon) {
     if (polygon && polygon.length >= 4) {
       const features = map.current.queryRenderedFeatures({ layers: ['points'] }).map(point => {
         return {
@@ -249,6 +249,8 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
         sources: {
           osm: {
             type: 'raster',
+            // tiles: ['https://process.oceangns.com/img?id=20220915T170823-757_oceanmappy_374&field=SST&model=CIOPS&dir=CIOPS_SST_20220916_12&z=2&x=3&y=0&minOrg=-2&step=0.1&stop=-2&stop=0&stop=0.1&stop=10&stop=10.1&stop=20&stop=20.1&stop=30&stop=30.1&stop=35&color=cc00cc&color=ff99ff&color=0066cc&color=66ffcc&color=009933&color=ccff66&color=ffff00&color=ff9933&color=ff0000&color=ffcccc&dt=1663349145779'],
+            // tiles: ['https://process.oceangns.com/mapTiles/Bathymetry/SRTM/tiles/filledValue/{z}/{x}/{y}.png'],
             tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
             tileSize: 256
           }
@@ -261,14 +263,14 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
           }
         ]
       },
-      center: [mapLongitude || -100, mapLatitude || 60], // starting position
-      zoom: mapZoom || zoom // starting zoom
+      center: [mapLongitude || -150, mapLatitude || 60], // starting position
+      zoom: mapZoom || zoom, // starting zoom,
     })
 
-        
+
     // disable map rotation using right click + drag
     map.current.dragRotate.disable()
-    
+
     // disable map rotation using touch rotation gesture
     map.current.touchZoomRotate.disableRotation()
 
@@ -283,9 +285,9 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
       setPointsToReview();
       setPolygon();
     }
-    
+
     // clone an element to remove it's events
-    function cloneElement(oldElement){
+    function cloneElement(oldElement) {
       const newElement = oldElement.cloneNode(true);
       oldElement.parentNode.replaceChild(newElement, oldElement);
       return newElement;
@@ -307,9 +309,9 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
           creatingPolygon.current = true;
           draw.changeMode("draw_rectangle");
         };
-        }
+      }
       if (polyQueryElement) {
-        polyQueryElement.onclick= () => {
+        polyQueryElement.onclick = () => {
           map.current.getCanvas().style.cursor = "crosshair";
           deleteAllShapes();
           creatingPolygon.current = true;
@@ -322,8 +324,8 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
           map.current.getCanvas().style.cursor = "unset";
           deleteAllShapes();
         };
-        
-      
+
+
 
       setColorStops()
 
@@ -346,7 +348,10 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
             largeCircleSize,
             5
           ],
-          'circle-color': colors
+          'circle-color': colors,
+          'circle-stroke-color': colors,
+          'circle-stroke-opacity': 0.001,
+          'circle-stroke-width': 10
         }
       })
 
@@ -448,7 +453,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
 
     const handleMapOnClick = e => {
       // Clear highlighted points if looking at points level and clicking off of the points
-      if (drawPolygon.current.getAll().features.length === 0 && map.current.getZoom() >= 7) {
+      if (drawPolygon.current.getAll().features.length === 0 && map.current.getZoom() >= 7 && !e.originalEvent.defaultPrevented) {
         map.current.setFilter('points-highlighted', ['in', 'pk', ''])
         setPointsToReview()
         setPolygon()
@@ -456,6 +461,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     }
 
     const handleMapPointsOnClick = e => {
+      e.originalEvent.preventDefault()
       if (!creatingPolygon.current) {
         if (drawPolygon.current.getAll().features.length > 0) {
           drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
@@ -469,8 +475,8 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
             ? { top: 0, bottom: 0, left: 500, right: 0 }
             : { top: 0, bottom: 0, left: 0, right: 0 }
         })
-        const height = 10
-        const width = 10
+        const height = 20
+        const width = 20
         const bbox = [
           [e.point.x - width / 2, e.point.y - height / 2],
           [e.point.x + width / 2, e.point.y + height / 2]
@@ -491,6 +497,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     }
 
     const handleMapHexesOnClick = e => {
+      e.originalEvent.preventDefault()
       if (!creatingPolygon.current) {
         map.current.flyTo({
           center: [e.lngLat.lng, e.lngLat.lat],
@@ -598,28 +605,29 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     })
 
 
+    
+    
     // Workaround for https://github.com/mapbox/mapbox-gl-draw/issues/617
-
-    map.current.on('click', handleMapOnClick)
-    // mobile seems better without handleMapOnClick enabled for touch
-
     map.current.on('click', 'points', handleMapPointsOnClick)
     map.current.on('touchend', 'points', handleMapPointsOnClick)
-
+    
     map.current.on('click', 'hexes', handleMapHexesOnClick)
     map.current.on('touchend', 'hexes', handleMapHexesOnClick)
+    
+    map.current.on('click', handleMapOnClick)
+    // mobile seems better without handleMapOnClick enabled for touch
 
     const scale = new ScaleControl({
       maxWidth: 150,
       unit: 'metric'
     })
-    map.current.addControl(scale, 'bottom-right')
-
+    
     const attribution = new AttributionControl({
       customAttribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.'
       // compact: true
     })
-    map.current.addControl(attribution, 'bottom-left')
+    map.current.addControl(attribution, 'bottom-right')
+    map.current.addControl(scale, 'bottom-right')
 
     // Called order determines stacking order
     map.current.addControl(new NavigationControl(), 'bottom-right')

@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react'
 import { Table } from 'react-bootstrap'
 import { ArrowDown, ArrowUp, CheckSquare, ChevronCompactRight, CircleFill, SortAlphaDown, SortAlphaUp, SortNumericDown, SortNumericUp, Square } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
-import { abbreviateString, bytesToMemorySizeString } from '../../../utilities'
+// import { abbreviateString, bytesToMemorySizeString } from '../../../utilities'
 import platformColors from '../../platformColors'
 import './styles.css'
 
-export default function DatasetsTable ({ handleSelectAllDatasets, handleSelectDataset, datasets, setDatasets, selectAll, setInspectDataset, setHoveredDataset = () => { } }) {
+export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDataset, datasets, setDatasets, selectAll, setInspectDataset, setHoveredDataset = () => { } }) {
   const { t } = useTranslation()
   const [sortedData, setSortedData] = useState(datasets)
   const [sortProp, setSortProp] = useState('title')
@@ -23,7 +23,7 @@ export default function DatasetsTable ({ handleSelectAllDatasets, handleSelectDa
     handleSortByProperty(sortProp)
   }, [])
 
-  function sortByProperty (prop) {
+  function sortByProperty(prop) {
     const data = datasets
     if (prop === sortProp) {
       ascending ? data.sort((a, b) => _.get(a, prop) > _.get(b, prop) ? -1 : _.get(a, prop) < _.get(b, prop) ? 1 : 0) : data.sort((a, b) => _.get(a, prop) > _.get(b, prop) ? 1 : _.get(a, prop) < _.get(b, prop) ? -1 : 0)
@@ -33,7 +33,7 @@ export default function DatasetsTable ({ handleSelectAllDatasets, handleSelectDa
     return data
   }
 
-  function handleSortByProperty (prop) {
+  function handleSortByProperty(prop) {
     if (datasets) {
       setDatasets(sortByProperty(prop))
       if (prop === sortProp) {
@@ -143,7 +143,7 @@ export default function DatasetsTable ({ handleSelectAllDatasets, handleSelectDa
                   // 'Number of locations in dataset'
                   onClick={() => setInspectDataset(point)}
                 >
-                  {toInteger(point.profiles_count)} {hoveredTableRow === index && <ChevronCompactRight size={25} title='view dataset details' />}
+                  {toInteger(point.profiles_count) !== toInteger(point.n_profiles) ? `${toInteger(point.profiles_count)} / ${toInteger(point.n_profiles)}` : toInteger(point.n_profiles)} {hoveredTableRow === index && <ChevronCompactRight size={25} title='view dataset details' />}
                 </td>
               </tr>
             )
