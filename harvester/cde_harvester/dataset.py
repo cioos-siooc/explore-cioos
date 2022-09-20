@@ -34,10 +34,13 @@ class Dataset(object):
         self.timeseries_id_variable = ""
         self.profile_id_variable = ""
         self.trajectory_id_variable = ""
+        self.num_columns = 0
 
         self.get_metadata()
 
     def get_df(self):
+
+
         self.df = pd.DataFrame(
             {
                 "title": [self.globals["title"]],
@@ -53,8 +56,10 @@ class Dataset(object):
                 "timeseries_id_variable": self.timeseries_id_variable,
                 "profile_id_variable": self.profile_id_variable,
                 "trajectory_id_variable":self.trajectory_id_variable,
+                "num_columns":len(self.df_variables),
             }
         )
+        
         return self.df
 
     def dataset_tabledap_query(self, url):

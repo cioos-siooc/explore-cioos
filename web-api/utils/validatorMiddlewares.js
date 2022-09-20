@@ -23,6 +23,14 @@ function generalFiltersMiddleWare() {
       .optional(),
   ];
 }
+function datasetDetailsMiddleware() {
+  return [
+    generalFiltersMiddleWare(),
+    check("datasetPKs").isInt(),
+    errorHandler,
+  ];
+  
+}
 function shapeFiltersMiddleware() {
   return [
     check("polygon")
@@ -37,14 +45,21 @@ function shapeFiltersMiddleware() {
       const { latMin, latMax, lonMin, lonMax, polygon } = req.query;
       // this has already
       const isValidPolygon = Boolean(polygon && polygonJSONToWKT(polygon));
+      
       // these have already been checked for type and value range
+      const isBoundingBox =
+        latMin != undefined ||
+        latMax != undefined ||
+        lonMin != undefined ||
+        lonMax != undefined;
+      
       const isValidLatLongMaxMin =
         latMin != undefined &&
         latMax != undefined &&
         lonMin != undefined &&
         lonMax != undefined;
-
-      if (isValidPolygon || isValidLatLongMaxMin) {
+      
+      if ( (polygon && isValidPolygon) || (isBoundingBox && isValidLatLongMaxMin) || (!isBoundingBox && !polygon) ) {
         await next();
       } else {
         res.status(400).json({ errors: ["invalid shape"] });
@@ -77,4 +92,5 @@ module.exports = {
   validatorMiddleware,
   requiredShapeMiddleware,
   generalFiltersMiddleWare,
+  datasetDetailsMiddleware
 };

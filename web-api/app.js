@@ -15,6 +15,7 @@ var tilesRouter = require("./routes/tiles");
 var oceanVariablesRouter = require("./routes/oceanVariables");
 var previewRouter = require("./routes/preview");
 var platformsRouter = require("./routes/platforms");
+var datasetRecordsListRouter = require("./routes/datasetRecordsList");
 
 var app = express();
 
@@ -59,6 +60,7 @@ app.use("/tiles", tilesRouter);
 app.use("/oceanVariables", oceanVariablesRouter);
 app.use("/preview", previewRouter);
 app.use("/platforms", platformsRouter);
+app.use("/datasetRecordsList", datasetRecordsListRouter);
 
 app.use(Sentry.Handlers.errorHandler());
 

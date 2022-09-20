@@ -565,6 +565,8 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
       setPolygon(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
       map.current.getCanvas().style.cursor = 'unset'
+      creatingPolygon.current=false
+
     })
 
     map.current.on('idle', e => {
