@@ -253,7 +253,8 @@
     "sea_water_potential_density",
     "sea_water_electrical_conductivity",
     "sea_water_density",
-    "sea_water_sigma_t"
+    "sea_water_sigma_t",
+    "sea_water_absolute_salinity"
   ],
   "subSurfaceTemperature": [
     "sea_surface_temperature",
@@ -266,7 +267,8 @@
     "sea_water_electrical_conductivity",
     "sea_water_density",
     "sea_water_sigma_t",
-    "sea_water_sigma_theta"
+    "sea_water_sigma_theta",
+    "sea_water_conservative_temperature"
   ],
   "surfaceCurrents": [
     "surface_eastward_sea_water_velocity",

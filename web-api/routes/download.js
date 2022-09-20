@@ -29,13 +29,12 @@ router.get(
       depthMax,
       lonMin,
       lonMax,
-      eovs,
       email,
       polygon,
       lang = "en",
     } = req.query;
 
-    const shapeQueryResponse = await getShapeQuery(req.query);
+    const shapeQueryResponse = await getShapeQuery(req.query,true,false);
     const estimateTotalSize = shapeQueryResponse.reduce(
       (partialSum, { size }) => partialSum + size,
       0
@@ -81,7 +80,6 @@ router.get(
             depth_min: Number.parseFloat(depthMin),
             depth_max: Number.parseFloat(depthMax),
             polygon_region: wktPolygon,
-            eovs: eovs ? eovs.split(",") : [],
             email,
             job_id: jobID,
           },
