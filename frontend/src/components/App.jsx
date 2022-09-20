@@ -14,7 +14,6 @@ import SelectionDetails from './Controls/SelectionDetails/SelectionDetails.jsx'
 import DownloadDetails from './Controls/DownloadDetails/DownloadDetails.jsx'
 import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx'
 import Loading from './Controls/Loading/Loading.jsx'
-import LanguageSelector from './Controls/LanguageSelector/LanguageSelector.jsx'
 import Legend from './Controls/Legend/Legend.jsx'
 import IntroModal from './Controls/IntroModal/IntroModal.jsx'
 import Filter from './Controls/Filter/Filter.jsx'
@@ -42,7 +41,7 @@ if (process.env.NODE_ENV === 'production') {
   })
 }
 
-export default function App () {
+export default function App() {
   const { t, i18n } = useTranslation()
   const [selectionPanelOpen, setSelectionPanelOpen] = useState(true)
   const [pointsToDownload, setPointsToDownload] = useState()
@@ -132,7 +131,7 @@ export default function App () {
     })
   }, [debouncedStartDate, debouncedEndDate, debouncedStartDepth, debouncedEndDepth, debouncedEovsSelected, debouncedOrgsSelected, debouncedDatasetsSelected, debouncedPlatformsSelected])
 
-  function createOptionSubset (searchTerms, allOptions) {
+  function createOptionSubset(searchTerms, allOptions) {
     if (searchTerms) {
       return allOptions.filter(option => option.title.toLowerCase().includes(searchTerms.toString().toLowerCase()))
     } else {
@@ -316,15 +315,15 @@ export default function App () {
     setSubmissionState()
   }, [email])
 
-  function handleEmailChange (value) {
+  function handleEmailChange(value) {
     setEmail(value)
   }
 
-  function handleSubmission () {
+  function handleSubmission() {
     setSubmissionState('submitted')
   }
 
-  function submitRequest () {
+  function submitRequest() {
     fetch(`${server}/download?${createDataFilterQueryString(query)}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload.map(point => point.pk).join(',')}&email=${email}&lang=${i18n.language}`).then((response) => {
       if (response.ok) {
         setSubmissionState('successful')
@@ -337,7 +336,7 @@ export default function App () {
     })
   }
 
-  function DownloadButton () {
+  function DownloadButton() {
     return (
       <DataDownloadModal
         disabled={_.isEmpty(pointsToReview)}
@@ -405,7 +404,7 @@ export default function App () {
       }
       <Controls
         loading={loading}
-        selectionPanel={polygon && (
+        selectionPanel={
           <Col xs='auto' className='selectionPanelColumn'>
             <SelectionPanel
               open={selectionPanelOpen}
@@ -422,9 +421,10 @@ export default function App () {
               </SelectionDetails>
             </SelectionPanel>
           </Col>
-        )}
+        }
       >
         <Filter
+          active={eovsSelected.filter(eov => eov.isSelected).length !== 0}
           badgeTitle={eovsBadgeTitle}
           optionsSelected={eovsSelected}
           setOptionsSelected={setEovsSelected}
@@ -451,8 +451,8 @@ export default function App () {
           />
         </Filter>
         <Filter
+          active={platformsSelected.filter(eov => eov.isSelected).length !== 0}
           badgeTitle={platformsBadgeTitle}
-          optionsSelected={platformsSelected}
           setOptionsSelected={setPlatformsSelected}
           tooltip={t('platformFilterTooltip')} // 'Filter data by ocean variable name. Selection works as logical OR operation.'
           icon={<BroadcastPin />}
@@ -479,6 +479,7 @@ export default function App () {
           />
         </Filter>
         <Filter
+          active={orgsSelected.filter(eov => eov.isSelected).length !== 0}
           badgeTitle={orgsBadgeTitle}
           optionsSelected={orgsSelected}
           setOptionsSelected={setOrgsSelected}
@@ -504,6 +505,7 @@ export default function App () {
           />
         </Filter>
         <Filter
+          active={datasetsSelected.filter(eov => eov.isSelected).length !== 0}
           badgeTitle={datasetsBadgeTitle}
           optionsSelected={datasetsSelected}
           setOptionsSelected={setDatasetsSelected}
@@ -530,6 +532,7 @@ export default function App () {
           />
         </Filter>
         <Filter
+          active={startDate !== defaultStartDate || endDate !== defaultEndDate}
           badgeTitle={timeframesBadgeTitle}
           optionsSelected={startDate, endDate}
           setOptionsSelected={() => { setStartDate('1900-01-01'); setEndDate(new Date().toISOString().split('T')[0]) }}
@@ -549,6 +552,7 @@ export default function App () {
           />
         </Filter>
         <Filter
+          active={startDepth !== defaultStartDepth || endDepth !== defaultEndDepth}
           badgeTitle={depthRangeBadgeTitle}
           optionsSelected={startDepth, endDepth}
           setOptionsSelected={() => { setStartDepth(0); setEndDepth(12000) }}
@@ -571,7 +575,7 @@ export default function App () {
           {DownloadButton()}
         </div>
       </Controls>
-      {i18n.language === 'en'
+      {/* {i18n.language === 'en'
         ? <a
           title={t('CIOOSLogoButtonTitle')}
           className='logo english'
@@ -584,9 +588,9 @@ export default function App () {
           href='https://siooc.ca/'
           target='_blank' rel="noreferrer"
         />
-      }
+      } */}
       {currentRangeLevel &&
-        <Legend currentRangeLevel={currentRangeLevel} zoom={zoom} selectionPanelOpen={polygon && selectionPanelOpen} platformsInView={platformsSelected.map(e => e.title)} />
+        <Legend currentRangeLevel={currentRangeLevel} zoom={zoom} selectionPanelOpen={selectionPanelOpen} platformsInView={platformsSelected.map(e => e.title)} />
       }
       <button
         className='boxQueryButton'
@@ -604,7 +608,7 @@ export default function App () {
         <ChatDots size='30px' />
       </a> */}
       <IntroModal initialOpenState={true} />
-      <LanguageSelector />
+      {/* <LanguageSelector /> */}
     </ErrorBoundary>
   )
 }

@@ -26,6 +26,7 @@
 
 .datasetsTable tr:hover {
   background-color: #c6e3df;
+  cursor: pointer;
 }
 
 .datasetsTable td {
@@ -64,4 +65,8 @@
 
 .datasetsTable .datasetTableLocationsCell svg {
   float: right;
+}
+
+.datasetsTable tbody tr td svg:hover {
+  background-color: lightgrey;
 }

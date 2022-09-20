@@ -2,52 +2,95 @@ import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { ProgressBar } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
+import { InfoSquare, X } from 'react-bootstrap-icons'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
+import DatasetPreview from '../DatasetPreview/DatasetPreview.jsx'
 import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
+import LanguageSelector from '../LanguageSelector/LanguageSelector.jsx'
 import Loading from '../Loading/Loading.jsx'
+import Logo from '../../Images/logo_FINAL.png'
 import { server } from '../../../config'
-
 import './styles.css'
 import {
   bytesToMemorySizeString,
   createDataFilterQueryString,
   getPointsDataSize,
-  createSelectionQueryString
+  createSelectionQueryString,
+  useDebounce
 } from '../../../utilities.js'
+import _ from 'lodash'
 
 // Note: datasets and points are exchangable terminology
-export default function SelectionDetails ({ setPointsToReview, query, polygon, setHoveredDataset, children }) {
+export default function SelectionDetails({ setPointsToReview, query, polygon, setHoveredDataset, children }) {
   const { t, i18n } = useTranslation()
-  const [selectAll, setSelectAll] = useState(true)
+  const [selectAll, setSelectAll] = useState(false)
   const [pointsData, setPointsData] = useState([])
   const [inspectDataset, setInspectDataset] = useState()
   const [dataTotal, setDataTotal] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [inspectRecordID, setInspectRecordID] = useState()
+  const [showModal, setShowModal] = useState(false)
+  const [recordLoading, setRecordLoading] = useState(false)
+  const [datasetPreview, setDatasetPreview] = useState()
+  const [datasetTitleSearchText, setDatasetTitleSearchText] = useState('')
+  const debouncedDatasetTitleSearchText = useDebounce(datasetTitleSearchText, 300)
+  const [datasetsSelected, setDatasetsSelected] = useState()
+  const [filteredDatasets, setFilteredDatasets] = useState([])
 
   useEffect(() => {
-    setDataTotal(0)
+    if (!_.isEmpty(debouncedDatasetTitleSearchText)) {
+      setFilteredDatasets(pointsData
+        .filter((dataset) => {
+          return `${dataset.title}`.toLowerCase().includes(`${debouncedDatasetTitleSearchText}`.toLowerCase())
+        }))
+    } else {
+      setFilteredDatasets(pointsData)
+    }
+  }, [debouncedDatasetTitleSearchText])
+
+  useEffect(() => {
     if (!_.isEmpty(pointsData)) {
+      let count = 0
+      pointsData.forEach((point) => {
+        if (point.selected) count++
+      })
+      setDatasetsSelected(count)
+      setDataTotal(0)
       const total = getPointsDataSize(pointsData)
       setDataTotal(total / 1000000)
       setPointsToReview(pointsData.filter(point => point.selected))
     }
     setLoading(false)
-    if (pointsData.length === 1) {
-      setInspectDataset(pointsData[0])
-    }
+    // if (pointsData.length === 1) { // Auto load single selected dataset
+    //   setInspectDataset(pointsData[0])
+    //   // setLoading(true)
+    // }
   }, [pointsData])
+
+  // useEffect(() => {
+  // if (inspectDataset) {
+  //   setInspectRecordID(inspectDataset.profiles[0].profile_id)
+  // }
+  // }, [inspectDataset])
+
+  // useEffect(() => {
+
+  // }, [pointsData])
 
   useEffect(() => {
     setDataTotal(0)
-    if (polygon !== undefined && !loading) {
+    if (!loading) {
       const filtersQuery = createDataFilterQueryString(query)
-      const shapeQuery = createSelectionQueryString(polygon)
-      const combinedQueries = [filtersQuery, shapeQuery].filter(e => e).join('&')
+      let shapeQuery = []
+      if (polygon) {
+        shapeQuery = createSelectionQueryString(polygon)
+      }
+      const combinedQueries = '?' + [filtersQuery, shapeQuery].filter(e => e).join('&')
       setInspectDataset()
       setLoading(true)
-      const urlString = `${server}/pointQuery?${combinedQueries}`
+      const urlString = `${server}/pointQuery${combinedQueries}`
       fetch(urlString).then(response => {
         if (response.ok) {
           response.json().then(data => {
@@ -55,7 +98,7 @@ export default function SelectionDetails ({ setPointsToReview, query, polygon, s
               return {
                 ...point,
                 title: point.title_translated[i18n.language] || point.title,
-                selected: true
+                selected: false
               }
             }))
           })
@@ -64,9 +107,9 @@ export default function SelectionDetails ({ setPointsToReview, query, polygon, s
         }
       })
     }
-  }, [polygon, i18n.language])
+  }, [query, polygon, i18n.language])
 
-  function handleSelectDataset (point) {
+  function handleSelectDataset(point) {
     const dataset = pointsData.filter((p) => p.pk === point.pk)[0]
     dataset.selected = !point.selected
     const result = pointsData.map((p) => {
@@ -79,7 +122,7 @@ export default function SelectionDetails ({ setPointsToReview, query, polygon, s
     setPointsData(result)
   }
 
-  function handleSelectAllDatasets () {
+  function handleSelectAllDatasets() {
     setPointsData(pointsData.map(p => {
       return {
         ...p,
@@ -89,80 +132,108 @@ export default function SelectionDetails ({ setPointsToReview, query, polygon, s
     setSelectAll(!selectAll)
   }
 
+  useEffect(() => {
+    if (inspectDataset) {
+      if (inspectRecordID) {
+        setShowModal(true)
+        setRecordLoading(true)
+        fetch(`${server}/preview?dataset=${inspectDataset.dataset_id}&profile=${inspectRecordID}`).then(response => response.json()).then(preview => {
+          setDatasetPreview(preview)
+          setRecordLoading(false)
+        }).catch(error => { throw error })
+      }
+    } else {
+      setInspectRecordID()
+    }
+  }, [inspectRecordID])
+
   return (
-    <div className='pointDetails'>
+    <div className='pointDetails'
+      onMouseEnter={() => setHoveredDataset(inspectDataset)}
+      onMouseLeave={() => setHoveredDataset()}
+    >
+      <div className='pointDetailsHeader'>
+        <button
+          className='pointDetailsHeaderIntroButton'
+          onClick={() => alert('open intro modal')}
+          title={t('introReopenTitle')} // 'Re-open introduction'
+        >
+          <InfoSquare color='#007bff' size={'25px'} />
+        </button>
+        <img
+          className='pointDetailsHeaderLogo'
+          src={Logo}
+          onClick={() => alert('reset application')}
+        />
+        <LanguageSelector
+          className='noPosition'
+        />
+      </div>
       <div className='pointDetailsInfoRow'>
         {loading
-          ? (
-            <Loading />
-            )
-          : (inspectDataset
-              ? <DatasetInspector
+          ? <Loading />
+          : inspectDataset
+            ? <DatasetInspector
               dataset={inspectDataset}
-              setInspectDataset={setInspectDataset}
               setHoveredDataset={setHoveredDataset}
+              setInspectDataset={setInspectDataset}
+              setInspectRecordID={setInspectRecordID}
             />
-              : (
-                  pointsData && pointsData.length > 0 &&
+            : <>
+              <div className="pointDetailsSearchBar">
+                <div className='pointDetailsSearchBarContainer'>
+                  <input
+                    value={datasetTitleSearchText}
+                    onChange={(e) => setDatasetTitleSearchText(e.target.value)}
+                    placeholder='Search dataset titles here...'
+                  />
+                  {!_.isEmpty(datasetTitleSearchText) &&
+                    <X
+                      className='pointDetailsSearchBarClearSearchButton'
+                      color='darkgrey'
+                      size='25px'
+                      onClick={() => setDatasetTitleSearchText('')}
+                    />
+                  }
+                </div>
+              </div>
               <DatasetsTable
                 handleSelectAllDatasets={handleSelectAllDatasets}
                 handleSelectDataset={handleSelectDataset}
                 setInspectDataset={setInspectDataset}
+                setInspectRecordID={setInspectRecordID}
                 selectAll={selectAll}
                 setDatasets={setPointsData}
-                datasets={pointsData}
+                datasets={_.isEmpty(debouncedDatasetTitleSearchText) ? pointsData : filteredDatasets}
                 setHoveredDataset={setHoveredDataset}
               />
-                ) || (
-                  pointsData && pointsData.length === 0 &&
-              <div className="noDataNotice">
-                {t('selectionDetailsNoDataWarning')}
-                {/* No Data. Modify filters or change selection on map. */}
+              {/* {(!pointsData || pointsData.length === 0) &&
+                <div className="noDataNotice">
+                  {t('selectionDetailsNoDataWarning')} */}
+              {/* No Data. Modify filters or change selection on map. */}
+              {/* </div>
+              } */}
+              <div className='pointDetailsControls'>
+                <div className='pointDetailsControlRow'>
+                  <strong>Datasets selected:</strong> {pointsData.length}
+                  <strong>To download:</strong> {datasetsSelected}
+                  {children}
+                </div>
               </div>
-                )
-            )
-
+            </>
         }
       </div>
-      <div className='pointDetailsControls'>
-        <div className='pointDetailsControlRow'>
-          <div>
-            <ProgressBar
-              className='dataTotalBar'
-              title={t('selectionDetailsProgressBarTitle')}
-            >
-              <ProgressBar
-                striped
-                className='upTo100'
-                variant='success'
-                now={dataTotal < 100 ? dataTotal : 100}
-                label={dataTotal < 100 ? bytesToMemorySizeString(dataTotal * 1000000) : '100 MB'}
-                key={1}
-              />
-              {dataTotal > 100 &&
-                <ProgressBar
-                  striped
-                  className='past100'
-                  variant='warning'
-                  now={dataTotal > 100 ? (dataTotal - 100).toFixed(2) : 0}
-                  label={dataTotal > 100 ? bytesToMemorySizeString((dataTotal - 100).toFixed(2) * 1000000) : 0}
-                  key={2}
-                />
-              }
-            </ProgressBar>
-            <div className='dataTotalRatio'>
-              {bytesToMemorySizeString(dataTotal * 1000000)} {t('selectionDetailsMaxRatio')}
-              {/* of 100MB Max */}
-              <QuestionIconTooltip
-                tooltipText={t('selectionDetailsQuestionTooltipText')} // 'Downloads are limited to 100MB.'}
-                size={20}
-                tooltipPlacement={'top'}
-              />
-            </div>
-          </div>
-          {children}
-        </div>
-      </div>
-    </div >
+      <DatasetPreview
+        datasetPreview={datasetPreview}
+        setDatasetPreview={setDatasetPreview}
+        inspectDataset={inspectDataset}
+        setInspectDataset={setInspectDataset}
+        showModal={showModal}
+        setShowModal={setShowModal}
+        inspectRecordID={inspectRecordID}
+        setInspectRecordID={setInspectRecordID}
+        recordLoading={recordLoading}
+      />
+    </div>
   )
 }

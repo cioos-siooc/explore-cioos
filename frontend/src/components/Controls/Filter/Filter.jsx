@@ -9,7 +9,8 @@ import { abbreviateString, useOutsideAlerter } from '../../../utilities'
 
 import './styles.css'
 
-export default function Filter ({
+export default function Filter({
+  active,
   badgeTitle,
   tooltip,
   icon,
@@ -41,7 +42,7 @@ export default function Filter ({
   // Using tabIndex to enable onBlur() focus loss capturing: https://stackoverflow.com/a/37491578
   return (
     <div className='filter' ref={wrapperRef}>
-      <div className='filterHeader' onClick={() => {
+      <div className={`filterHeader ${active && 'active'}`} onClick={() => {
         setFilterOpen(!filterOpen)
         if (controlled) setOpenFilter(filterName)
       }}
