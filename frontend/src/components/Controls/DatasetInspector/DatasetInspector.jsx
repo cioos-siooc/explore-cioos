@@ -44,59 +44,59 @@ export default function DatasetInspector({ dataset, setInspectDataset, setHovere
         {/* Back */}
       </div>
       <div>
-        <div className="previewFlexItem metadataAndRecordIDTableGridContainer">
+        <div className="metadataAndRecordIDTableGridContainer">
+          <strong>{t('datasetInspectorTitleText')}</strong>
+          {/* {t(dataset.title)} */}
+          <button onClick={() => alert(`setting dataset filter to ${dataset.title}`)}>
+            {dataset.title}
+          </button>
           <div className="metadataGridContainer">
-            <div className="metadataGridItem organisation">
-              <h5>{t('datasetInspectorTitleText')}</h5>
-              {/* {t(dataset.title)} */}
-              <button onClick={() => console.log('setting dataset filter to ', dataset.title)}>
-                {dataset.title}
-              </button>
-              <h5>{t('datasetInspectorOrganizationText')}</h5>
+            <div className="metadataGridItem organization">
+              <strong>{t('datasetInspectorOrganizationText')}</strong>
               {dataset.organizations.map((org, index) => {
-                return <button key={index} onClick={() => console.log('setting org filter to ', org)}>{t(org)}</button>
+                return <button key={index} onClick={() => alert(`setting org filter to ${org}`)}>{t(org)}</button>
               })}
             </div>
             <div className="metadataGridItem variable">
-              <h5>{t('datasetInspectorOceanVariablesText')}</h5>
+              <strong>{t('datasetInspectorOceanVariablesText')}</strong>
               {dataset.eovs.map((eov, index) => {
-                return <button key={index} onClick={() => console.log('setting EOV filter to', eov)}>{t(eov)}</button>
+                return <button key={index} onClick={() => alert(`setting EOV filter to ${eov}`)}>{t(eov)}</button>
               })}
             </div>
             <div className="metadataGridItem platform">
-              <h5>{t('datasetInspectorPlatformText')}</h5>
+              <strong>{t('datasetInspectorPlatformText')}</strong>
               <button
-                onClick={() => console.log('setting platform filter to ', dataset.platform)}
+                onClick={() => alert(`setting platform filter to ${dataset.platform}`)}
               >
                 {t(dataset.platform)}
               </button>
             </div>
             <div className="metadataGridItem records">
-              <h5>{t('datasetInspectorRecordsText')}</h5>
+              <strong>{t('datasetInspectorRecordsText')}</strong>
               ({dataset && `${dataset.profiles_count} / ${dataset.n_profiles}`})
-              {/* <button
-                onClick={() => alert('selected all records from dataset')}
-                disabled={dataset.profiles_count === dataset.n_profiles}
-                title={t('datasetInspectorRecordsSelectAllButtonText')}
-              >
-                Select All
-              </button> */}
             </div>
-            <div className="metadataGridItem button ERDAP">
-              <a
-                href={dataset.erddap_url}
-                target='_blank'
-                title={dataset.erddap_url ? dataset.erddap_url : 'unavailable'} rel="noreferrer">
-                {t('datasetInspectorERDDAPURL')} (ERDDAP)
-              </a>
+            <div className="metadataGridItem ERDAP">
+              <strong>ERDAP URL</strong>
+              {dataset.erddap_url &&
+                <a
+                  className={!dataset.erddap_url && 'unavailable'}
+                  href={dataset.erddap_url}
+                  target='_blank'
+                  title={dataset.erddap_url ? dataset.erddap_url : 'unavailable'} rel="noreferrer">
+                  {t('datasetInspectorERDDAPURL')} (ERDDAP)
+                </a>}
             </div>
-            <div className="metadataGridItem button CKAN">
-              <a
-                href={dataset.ckan_url}
-                target='_blank'
-                title={dataset.ckan_url ? dataset.ckan_url : 'unavailable'} rel="noreferrer">
-                {t('datasetInspectorCKANURL')} (CKAN)
-              </a>
+            <div className="metadataGridItem CKAN">
+              <strong>CKAN URL</strong>
+              {dataset.ckan_url &&
+                <a
+                  className={!dataset.ckan_url && 'unavailable'}
+                  href={dataset.ckan_url}
+                  target='_blank'
+                  title={dataset.ckan_url ? dataset.ckan_url : 'unavailable'} rel="noreferrer">
+                  {t('datasetInspectorCKANURL')} (CKAN)
+                </a>
+              }
             </div>
           </div>
           {loading
@@ -114,7 +114,7 @@ export default function DatasetInspector({ dataset, setInspectDataset, setHovere
               <tbody>
                 {datasetRecords && datasetRecords.profiles.map((profile, index) => {
                   return (
-                    <tr key={index} onClick={() => setInspectRecordID(profile.profile_id)}>
+                    <tr key={index} onClick={() => setInspectRecordID(profile.profile_id)} title='Select a record to preview its data'>
                       <td>{profile.profile_id}</td>
                       <td>{`${new Date(profile.time_min).toLocaleDateString()} - ${new Date(profile.time_max).toLocaleDateString()}`}</td>
                       <td>{`${profile.depth_min < Number.EPSILON ? 0 : profile.depth_min > 15000 ? t('datasetInspectorDepthTooLargeWarningText') : profile.depth_min.toFixed(1)} - ${profile.depth_max < Number.EPSILON ? 0 : profile.depth_max > 15000 ? t('datasetInspectorDepthTooLargeWarningText') : profile.depth_max.toFixed(1)}`}</td>
@@ -123,7 +123,7 @@ export default function DatasetInspector({ dataset, setInspectDataset, setHovere
                 })}
                 {datasetRecords && datasetRecords.profiles_count > 1000 && (
                   <tr key={1001}>
-                    <td>{`1000/${datasetRecords.profiles_count} ${t('datasetInspectorRecordsShownText')}`}</td>
+                    <td>{`1000 / ${datasetRecords.profiles_count} ${t('datasetInspectorRecordsShownText')}`}</td>
                     <td />
                     <td />
                   </tr>

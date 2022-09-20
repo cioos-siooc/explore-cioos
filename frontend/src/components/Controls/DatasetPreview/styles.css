@@ -3,6 +3,10 @@
   overflow: auto;
 }
 
+.tableAndPlotGridItem.tableAndPlot {
+  min-height: 100px;
+}
+
  .backButton {
   text-align: center;
   border: 2px solid darkgrey;
@@ -20,10 +24,6 @@
 
 .backButton svg {
   margin-right: 5px;
-}
-
-.tableAndPlotGridItem {
-  margin-bottom: 15px;
 }
 
 .tableAndPlotGridContainer .toggleButton {
@@ -48,6 +48,23 @@
 
 .dataPreviewModal .datasetTitle {
   margin: 10px auto;
+}
+
+.tableAndPlotGridItem .dropdown{
+  display: inline;
+  margin-right: 10px;
+}
+
+.tableAndPlotGridItem .dropdown button {
+  background-color: #52A79B;
+}
+
+.tableAndPlotGridItem.tableAndPlot {
+  margin-top: 15px;
+}
+
+.tableAndPlotGridItem hr {
+  margin-top: 0px;
 }
 
 /* .tableAndPlot .dropDownButton {
