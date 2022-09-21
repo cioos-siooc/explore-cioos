@@ -131,8 +131,8 @@ export default function DownloadDetails({
                 label={
                   dataTotal > 100
                     ? bytesToMemorySizeString(
-                        (dataTotal - 100).toFixed(2) * 1000000
-                      )
+                      (dataTotal - 100).toFixed(2) * 1000000
+                    )
                     : 0
                 }
                 key={2}

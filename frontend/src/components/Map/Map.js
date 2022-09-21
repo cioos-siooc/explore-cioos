@@ -705,7 +705,10 @@ export default function CreateMap({
     map.current.addControl(scale, 'bottom-right')
 
     // Called order determines stacking order
-    map.current.addControl(new NavigationControl({ showCompass: false }), 'bottom-right')
+    map.current.addControl(
+      new NavigationControl({ showCompass: false }),
+      'bottom-right'
+    )
     map.current.addControl(drawPolygon.current, 'bottom-right')
 
     updateMapToolTitleLanguage(t)

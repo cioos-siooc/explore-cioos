@@ -12,10 +12,10 @@ module.exports = {
     ecmaVersion: 'latest'
   },
   rules: {
+    indent: ['error', 2],
     quotes: [2, 'single', { avoidEscape: true }],
     semi: [2, 'never'],
-    'jsx-quotes': [2, 'prefer-single'],
-    'prettier/prettier': 'error'
+    'jsx-quotes': [2, 'prefer-single']
   },
   plugins: ['prettier'],
   settings: {

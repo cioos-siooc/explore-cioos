@@ -11,7 +11,9 @@ export default function SelectionPanel({ open, setOpen, children }) {
   const selectionPanelClassName = classNames('selectionPanel', {
     closed: !open
   })
-  const panelContentsClassName = classNames('panelContents', { closed: !open })
+  const panelContentsClassName = classNames('panelContents', {
+    closed: !open
+  })
   const panelHandleClassName = classNames('panelHandle', { closed: !open })
   return (
     <div className={selectionPanelClassName}>

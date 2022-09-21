@@ -102,7 +102,10 @@ export default function Legend({
             <CircleFill
               size={15}
               fill='white'
-              style={{ border: '1px solid black', borderRadius: '15px' }}
+              style={{
+                border: '1px solid black',
+                borderRadius: '15px'
+              }}
             />
           </LegendElement>
           <hr />
