@@ -101,7 +101,7 @@ export default function IntroModal ({ initialOpenState }) {
                 className='feedbackButton'
                 title={t('feedbackButtonTitle')}
                 href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit'
-                target='_blank' rel="noreferrer"
+                target='_blank' rel='noreferrer'
               >
                 <ChatDots size='30px' />
               </a>
@@ -144,13 +144,13 @@ export default function IntroModal ({ initialOpenState }) {
                 title={t('CIOOSLogoButtonTitle')}
                 className='introLogo english'
                 href='https://cioos.ca/'
-                target='_blank' rel="noreferrer"
+                target='_blank' rel='noreferrer'
               />
               : <a
                 title={t('CIOOSLogoButtonTitle')}
                 className='introLogo french'
                 href='https://cioos.ca/'
-                target='_blank' rel="noreferrer"
+                target='_blank' rel='noreferrer'
               />
             }
           </Modal.Title>

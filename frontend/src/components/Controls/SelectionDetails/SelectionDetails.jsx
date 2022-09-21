@@ -180,7 +180,7 @@ export default function SelectionDetails ({ setPointsToReview, query, polygon, s
               setInspectRecordID={setInspectRecordID}
             />
             : <>
-              <div className="pointDetailsSearchBar">
+              <div className='pointDetailsSearchBar'>
                 <div className='pointDetailsSearchBarContainer'>
                   <input
                     value={datasetTitleSearchText}

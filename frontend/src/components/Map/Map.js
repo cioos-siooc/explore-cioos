@@ -4,7 +4,7 @@ import MapboxDraw from '@mapbox/mapbox-gl-draw'
 import { useState, useEffect, useRef } from 'react'
 import * as turf from '@turf/turf'
 import DrawRectangle from 'mapbox-gl-draw-rectangle-mode'
-import { useTranslation } from "react-i18next";
+import { useTranslation } from 'react-i18next'
 import './styles.css'
 
 import { server } from '../../config'
@@ -13,7 +13,7 @@ import { colorScale, defaultQuery } from '../config'
 import platformColors from '../../components/platformColors'
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap({ query, setPointsToReview, setPolygon, setLoading, zoom, setZoom, offsetFlyTo, rangeLevels, hoveredDataset }) {
+export default function CreateMap ({ query, setPointsToReview, setPolygon, setLoading, zoom, setZoom, offsetFlyTo, rangeLevels, hoveredDataset }) {
   const { t } = useTranslation()
   const mapContainer = useRef(null)
   const map = useRef(null)
@@ -22,14 +22,14 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
 
   // disables edting of polygon/box vertices
   const disabledEvent = function (state, geojson, display) {
-    display(geojson);
-  };
+    display(geojson)
+  }
 
-  const modes = MapboxDraw.modes;
-  MapboxDraw.modes.direct_select.toDisplayFeatures = disabledEvent;
-  MapboxDraw.modes.simple_select.toDisplayFeatures = disabledEvent;
+  const modes = MapboxDraw.modes
+  MapboxDraw.modes.direct_select.toDisplayFeatures = disabledEvent
+  MapboxDraw.modes.simple_select.toDisplayFeatures = disabledEvent
 
-  modes.draw_rectangle = DrawRectangle;
+  modes.draw_rectangle = DrawRectangle
 
   const drawControlOptions = {
     displayControlsDefault: false,
@@ -44,8 +44,8 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       pitchWithRotate: false,
       dragRotate: false,
       touchZoomRotate: false
-    },
-  };
+    }
+  }
   const smallCircleSize = 2.75
   const largeCircleSize = 6
   const circleOpacity = 0.7
@@ -110,7 +110,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     }
   }, [boxSelectEndCoords])
 
-  function setColorStops() {
+  function setColorStops () {
     if (map.current) {
       colorStops.current = generateColorStops(colorScale, getCurrentRangeLevel(rangeLevels, map.current.getZoom())).map(colorStop => {
         return [colorStop.stop, colorStop.color]
@@ -128,7 +128,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     }
   }
 
-  function hoverHighlightPoints(pk) {
+  function hoverHighlightPoints (pk) {
     if (map.current && pk) {
       if (zoom >= 7) {
         map.current.setPaintProperty('points', 'circle-color', 'lightgrey')
@@ -170,7 +170,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     }
   }, [hoveredDataset])
 
-  function highlightPoints(polygon) {
+  function highlightPoints (polygon) {
     if (polygon && polygon.length >= 4) {
       const features = map.current.queryRenderedFeatures({ layers: ['points'] }).map(point => {
         return {
@@ -264,9 +264,8 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
         ]
       },
       center: [mapLongitude || -150, mapLatitude || 60], // starting position
-      zoom: mapZoom || zoom, // starting zoom,
+      zoom: mapZoom || zoom // starting zoom,
     })
-
 
     // disable map rotation using right click + drag
     map.current.dragRotate.disable()
@@ -274,58 +273,57 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
     // disable map rotation using touch rotation gesture
     map.current.touchZoomRotate.disableRotation()
 
-    function deleteAllShapes() {
+    function deleteAllShapes () {
       if (drawPolygon.current?.getAll()?.features?.length > 0) {
         drawPolygon.current.delete(
           drawPolygon.current.getAll().features[0].id
-        );
+        )
       }
 
-      map.current.setFilter("points-highlighted", ["in", "pk", ""]);
-      setPointsToReview();
-      setPolygon();
+      map.current.setFilter('points-highlighted', ['in', 'pk', ''])
+      setPointsToReview()
+      setPolygon()
     }
 
     // clone an element to remove it's events
-    function cloneElement(oldElement) {
-      const newElement = oldElement.cloneNode(true);
-      oldElement.parentNode.replaceChild(newElement, oldElement);
-      return newElement;
+    function cloneElement (oldElement) {
+      const newElement = oldElement.cloneNode(true)
+      oldElement.parentNode.replaceChild(newElement, oldElement)
+      return newElement
     }
 
-    map.current.on("load", () => {
-      const boxQueryElement = document.getElementById("boxQueryButton");
+    map.current.on('load', () => {
+      const boxQueryElement = document.getElementById('boxQueryButton')
       const trashQueryElement = cloneElement(document
-        .getElementsByClassName("mapbox-gl-draw_trash")
-        .item(0));
+        .getElementsByClassName('mapbox-gl-draw_trash')
+        .item(0))
       const polyQueryElement = cloneElement(document
-        .getElementsByClassName("mapbox-gl-draw_polygon")
-        .item(0));
+        .getElementsByClassName('mapbox-gl-draw_polygon')
+        .item(0))
 
       if (boxQueryElement) {
         boxQueryElement.onclick = (e) => {
-          map.current.getCanvas().style.cursor = "crosshair";
-          deleteAllShapes();
-          creatingPolygon.current = true;
-          draw.changeMode("draw_rectangle");
-        };
+          map.current.getCanvas().style.cursor = 'crosshair'
+          deleteAllShapes()
+          creatingPolygon.current = true
+          draw.changeMode('draw_rectangle')
+        }
       }
       if (polyQueryElement) {
         polyQueryElement.onclick = () => {
-          map.current.getCanvas().style.cursor = "crosshair";
-          deleteAllShapes();
-          creatingPolygon.current = true;
-          draw.changeMode("draw_polygon");
-        };
+          map.current.getCanvas().style.cursor = 'crosshair'
+          deleteAllShapes()
+          creatingPolygon.current = true
+          draw.changeMode('draw_polygon')
+        }
       }
-      if (trashQueryElement)
+      if (trashQueryElement) {
         trashQueryElement.onclick = () => {
-          creatingPolygon.current = false;
-          map.current.getCanvas().style.cursor = "unset";
-          deleteAllShapes();
-        };
-
-
+          creatingPolygon.current = false
+          map.current.getCanvas().style.cursor = 'unset'
+          deleteAllShapes()
+        }
+      }
 
       setColorStops()
 
@@ -565,8 +563,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
       setPolygon(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
       map.current.getCanvas().style.cursor = 'unset'
-      creatingPolygon.current=false
-
+      creatingPolygon.current = false
     })
 
     map.current.on('idle', e => {
@@ -604,16 +601,13 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       }
     })
 
-
-    
-    
     // Workaround for https://github.com/mapbox/mapbox-gl-draw/issues/617
     map.current.on('click', 'points', handleMapPointsOnClick)
     map.current.on('touchend', 'points', handleMapPointsOnClick)
-    
+
     map.current.on('click', 'hexes', handleMapHexesOnClick)
     map.current.on('touchend', 'hexes', handleMapHexesOnClick)
-    
+
     map.current.on('click', handleMapOnClick)
     // mobile seems better without handleMapOnClick enabled for touch
 
@@ -621,7 +615,7 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
       maxWidth: 150,
       unit: 'metric'
     })
-    
+
     const attribution = new AttributionControl({
       customAttribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.'
       // compact: true
@@ -637,6 +631,6 @@ export default function CreateMap({ query, setPointsToReview, setPolygon, setLoa
   }, [])
 
   return (
-    <div ref={mapContainer} className="map" />
+    <div ref={mapContainer} className='map' />
   )
 }

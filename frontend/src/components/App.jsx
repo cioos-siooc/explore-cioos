@@ -254,11 +254,11 @@ export default function App () {
           icon: (
             <Spinner
               className='text-warning'
-              as="span"
-              animation="border"
+              as='span'
+              animation='border'
               size={30}
-              role="status"
-              aria-hidden="true"
+              role='status'
+              aria-hidden='true'
             />
           ),
           text: t('submissionStateTextSubmitting') // 'Submitting...'

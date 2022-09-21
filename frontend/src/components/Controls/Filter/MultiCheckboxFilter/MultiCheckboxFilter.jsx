@@ -42,7 +42,7 @@ export default function MultiCheckboxFilter ({ optionsSelected, setOptionsSelect
     <div className={'multiCheckboxFilter'}>
       {optionsSelected.length > 0 && optionsSelected.length !== allOptions.length && // search results exist
         <>
-          <div className="searchResultsButton" onClick={() => selectAllSearchResultsToggle()}>
+          <div className='searchResultsButton' onClick={() => selectAllSearchResultsToggle()}>
             {optionsSelected.every(option => option.isSelected) ? <CheckSquare /> : <Square />}
             {t('multiCheckboxFilterSelectSearchResults')} {`(${optionsSelected.length})`}
             <hr />

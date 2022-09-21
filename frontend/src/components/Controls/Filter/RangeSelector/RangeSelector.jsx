@@ -1,40 +1,40 @@
-import React from "react";
+import React from 'react'
 import PropTypes from 'prop-types'
-import Slider from "rc-slider";
-import 'rc-slider/assets/index.css';
+import Slider from 'rc-slider'
+import 'rc-slider/assets/index.css'
 
 import './styles.css'
 
 export default class RangeSelector extends React.Component {
-  constructor(props) {
-    super(props);
+  constructor (props) {
+    super(props)
     this.state = {
-      dynamicKey: Date.now(),
-    };
+      dynamicKey: Date.now()
+    }
   }
 
   onSliderChange = value => {
     this.props.setStartDepth(value[0])
     this.props.setEndDepth(value[1])
-  };
+  }
 
   onInputChange = (value, index) => {
     // When an input changes we set the dynamicKey
     this.setState({
       dynamicKey: Date.now()
-    });
+    })
 
     if (value >= this.state.min && value <= this.state.max) {
       this.setState(state => {
-        state.value[index] = Number(value);
+        state.value[index] = Number(value)
         return {
           value: state.value.sort((x, y) => x - y)
-        };
-      });
+        }
+      })
     }
-  };
+  }
 
-  render() {
+  render () {
     return (
       <div className='rangeSelector'>
         <Slider
@@ -52,7 +52,7 @@ export default class RangeSelector extends React.Component {
             width: 15
           }}
           trackStyle={{
-            background: "none"
+            background: 'none'
           }}
           marks={{
             0: '0m',
@@ -65,7 +65,7 @@ export default class RangeSelector extends React.Component {
           }}
         />
       </div>
-    );
+    )
   }
 }
 

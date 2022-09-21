@@ -52,9 +52,9 @@ export default function DepthSelector (props) {
         <div className='depth' title={!depthValid ? t('depthFilterStartInvalidTitle') : undefined}>
           <span>{t('depthFilterStartDepth')}</span>
           <input
-            className="startDepth"
+            className='startDepth'
             value={startDepth}
-            type="number"
+            type='number'
             max={12000}
             min={0}
             onChange={e => handleSetStartDepth(e.target.value)}
@@ -64,9 +64,9 @@ export default function DepthSelector (props) {
         <div className='depth' title={!depthValid ? t('depthFilterEndInvalidTitle') : undefined}>
           <span>{t('depthFilterEndDepth')}</span>
           <input
-            className="endDepth"
+            className='endDepth'
             value={endDepth}
-            type="number"
+            type='number'
             max={12000}
             min={0}
             onChange={e => handleSetEndDepth(e.target.value)}
