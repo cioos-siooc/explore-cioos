@@ -50,7 +50,6 @@ export default function DatasetPreview({ datasetPreview, inspectDataset, setInsp
           <div
             className='backButton'
             onClick={() => {
-              // setInspectDataset()
               setInspectRecordID()
               setShowModal(false)
               setPlotXAxis([])
@@ -83,7 +82,6 @@ export default function DatasetPreview({ datasetPreview, inspectDataset, setInsp
                     className={`toggleButton ${selectedVis === 'table' && 'selected'}`}
                     onClick={() => {
                       setSelectedVis('table')
-                      // setRecordLoading(true)
                     }}>
                     Table
                   </button>
@@ -91,7 +89,6 @@ export default function DatasetPreview({ datasetPreview, inspectDataset, setInsp
                     className={`toggleButton ${selectedVis === 'plot' && 'selected'}`}
                     onClick={() => {
                       setSelectedVis('plot')
-                      // setRecordLoading(true)
                     }}
                   >
                     Plot

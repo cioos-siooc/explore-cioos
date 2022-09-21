@@ -416,6 +416,12 @@ export default function App() {
                 query={query}
                 polygon={polygon}
                 setHoveredDataset={setHoveredDataset}
+                filterSet={{
+                  eovFilter: { eovsSelected, setEovsSelected },
+                  platformFilter: { platformsSelected, setPlatformsSelected },
+                  orgFilter: { orgsSelected, setOrgsSelected },
+                  datasetFilter: { datasetsSelected, setDatasetsSelected }
+                }}
               >
                 {DownloadButton()}
               </SelectionDetails>
@@ -575,20 +581,6 @@ export default function App() {
           {DownloadButton()}
         </div>
       </Controls>
-      {/* {i18n.language === 'en'
-        ? <a
-          title={t('CIOOSLogoButtonTitle')}
-          className='logo english'
-          href='https://cioos.ca/'
-          target='_blank' rel="noreferrer"
-        />
-        : <a
-          title={t('CIOOSLogoButtonTitle')}
-          className='logo french'
-          href='https://siooc.ca/'
-          target='_blank' rel="noreferrer"
-        />
-      } */}
       {currentRangeLevel &&
         <Legend currentRangeLevel={currentRangeLevel} zoom={zoom} selectionPanelOpen={selectionPanelOpen} platformsInView={platformsSelected.map(e => e.title)} />
       }
@@ -599,16 +591,7 @@ export default function App() {
       >
         <div className='rectangleIcon' />
       </button>
-      {/* <a
-        className='feedbackButton'
-        title={t('feedbackButtonTitle')}
-        href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit'
-        target='_blank'
-      >
-        <ChatDots size='30px' />
-      </a> */}
       <IntroModal initialOpenState={true} />
-      {/* <LanguageSelector /> */}
     </ErrorBoundary>
   )
 }
