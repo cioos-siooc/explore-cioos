@@ -91,7 +91,7 @@
   "datasetInspectorOrganizationText": "Organisations",
   "datasetInspectorOceanVariablesText": "Variables océaniques",
   "datasetInspectorPlatformText": "Plate-forme",
-  "datasetInspectorRecordsText": "Enregistrements",
+  "datasetInspectorRecordsText": "Emplacements",
   "datasetInspectorRecordsOverflowText": " enregistrements sélectionnés, 1000 affichés",
   "datasetInspectorRecordsSelectAllButtonText": "Sélectionner tous les enregistrements de l'ensemble de données",
   "datasetInspectorRecordIDText": "Identifiant d'enregistrement",

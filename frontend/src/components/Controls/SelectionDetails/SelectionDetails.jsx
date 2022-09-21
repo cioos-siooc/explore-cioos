@@ -23,7 +23,7 @@ import {
 import _ from 'lodash'
 
 // Note: datasets and points are exchangable terminology
-export default function SelectionDetails({ setPointsToReview, query, polygon, setHoveredDataset, children }) {
+export default function SelectionDetails({ setPointsToReview, query, polygon, setHoveredDataset, filterSet, children }) {
   const { t, i18n } = useTranslation()
   const [selectAll, setSelectAll] = useState(false)
   const [pointsData, setPointsData] = useState([])
@@ -63,21 +63,11 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
       setPointsToReview(pointsData.filter(point => point.selected))
     }
     setLoading(false)
-    // if (pointsData.length === 1) { // Auto load single selected dataset
-    //   setInspectDataset(pointsData[0])
-    //   // setLoading(true)
-    // }
+    if (pointsData.length === 1) { // Auto load single selected dataset
+      setInspectDataset(pointsData[0])
+      // setLoading(true)
+    }
   }, [pointsData])
-
-  // useEffect(() => {
-  // if (inspectDataset) {
-  //   setInspectRecordID(inspectDataset.profiles[0].profile_id)
-  // }
-  // }, [inspectDataset])
-
-  // useEffect(() => {
-
-  // }, [pointsData])
 
   useEffect(() => {
     setDataTotal(0)
@@ -178,6 +168,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
               setHoveredDataset={setHoveredDataset}
               setInspectDataset={setInspectDataset}
               setInspectRecordID={setInspectRecordID}
+              filterSet={filterSet}
             />
             : <>
               <div className="pointDetailsSearchBar">

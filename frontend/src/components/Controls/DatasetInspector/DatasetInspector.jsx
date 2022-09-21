@@ -8,7 +8,7 @@ import Loading from '../Loading/Loading.jsx'
 import { server } from '../../../config'
 import './styles.css'
 
-export default function DatasetInspector({ dataset, setInspectDataset, setHoveredDataset, setInspectRecordID }) {
+export default function DatasetInspector({ dataset, setInspectDataset, setHoveredDataset, setInspectRecordID, filterSet }) {
   const { t } = useTranslation()
   const [datasetRecords, setDatasetRecords] = useState()
   const [loading, setLoading] = useState(false)
@@ -28,6 +28,8 @@ export default function DatasetInspector({ dataset, setInspectDataset, setHovere
       setLoading(false)
     })
   }, [])
+
+  const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet
 
   return (
     <div className='datasetInspector'
@@ -51,10 +53,18 @@ export default function DatasetInspector({ dataset, setInspectDataset, setHovere
             {dataset.title}
           </button>
           <div className="metadataGridContainer">
-            <div className="metadataGridItem organization">
-              <strong>{t('datasetInspectorOrganizationText')}</strong>
+            <div className="metadataGridItem organisation">
+              <h5>{t('datasetInspectorTitleText')}</h5>
+              {/* {t(dataset.title)} */}
+              <button onClick={() => datasetFilter.setDatasetsSelected([...datasetFilter.datasetsSelected, { ...dataset, isSelected: true }])}>
+                {dataset.title}
+              </button>
+              <h5>{t('datasetInspectorOrganizationText')}</h5>
               {dataset.organizations.map((org, index) => {
-                return <button key={index} onClick={() => alert(`setting org filter to ${org}`)}>{t(org)}</button>
+                console.log(dataset, org, orgFilter)
+                return <button key={index}
+                  onClick={() => orgFilter.setOrgsSelected([...orgFilter.orgsSelected, { ...orgFilter.orgsSelected.filter(orgA => orgA.title === org), isSelected: true }])}
+                >{t(org)}</button>
               })}
             </div>
             <div className="metadataGridItem variable">
