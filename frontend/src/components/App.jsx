@@ -741,7 +741,6 @@ export default function App() {
             setEndDepth={setEndDepth}
           />
         </Filter>
-        <div>{DownloadButton()}</div>
       </Controls>
       {/* {i18n.language === 'en'
         ? <a
