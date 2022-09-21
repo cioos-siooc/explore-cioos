@@ -3,7 +3,7 @@ module.exports = {
     browser: true,
     es6: true
   },
-  extends: ['standard', 'plugin:react/recommended'],
+  extends: ['standard', 'plugin:react/recommended', 'prettier'],
   globals: {
     Atomics: 'readonly',
     SharedArrayBuffer: 'readonly'
@@ -14,8 +14,10 @@ module.exports = {
   rules: {
     quotes: [2, 'single', { avoidEscape: true }],
     semi: [2, 'never'],
-    'jsx-quotes': ['error', 'prefer-single']
+    'jsx-quotes': [2, 'prefer-single'],
+    'prettier/prettier': 'error'
   },
+  plugins: ['prettier'],
   settings: {
     react: {
       version: 'detect'

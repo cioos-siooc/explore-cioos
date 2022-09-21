@@ -2,7 +2,16 @@ import React, { useState, useEffect } from 'react'
 import * as Sentry from '@sentry/react'
 import { Integrations } from '@sentry/tracing'
 import { Col, Spinner } from 'react-bootstrap'
-import { CheckCircle, XCircle, ArrowsExpand, Building, CalendarWeek, FileEarmarkSpreadsheet, Water, BroadcastPin } from 'react-bootstrap-icons'
+import {
+  CheckCircle,
+  XCircle,
+  ArrowsExpand,
+  Building,
+  CalendarWeek,
+  FileEarmarkSpreadsheet,
+  Water,
+  BroadcastPin
+} from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import _ from 'lodash'
 
@@ -23,8 +32,26 @@ import DepthSelector from './Controls/Filter/DepthSelector/DepthSelector.jsx'
 import ErrorBoundary from './ErrorBoundary/ErrorBoundary.jsx'
 import EnglishLogo from './Images/CIOOSNationalLogoBlackEnglish.svg'
 import FrenchLogo from './Images/CIOOSNationalLogoBlackFrench.svg'
-import { defaultEovsSelected, defaultOrgsSelected, defaultStartDate, defaultEndDate, defaultStartDepth, defaultEndDepth, defaultDatatsetsSelected, defaultPlatformsSelected } from './config.js'
-import { createDataFilterQueryString, validateEmail, getCurrentRangeLevel, getPointsDataSize, generateMultipleSelectBadgeTitle, generateRangeSelectBadgeTitle, useDebounce, setAllOptionsIsSelectedTo } from '../utilities.js'
+import {
+  defaultEovsSelected,
+  defaultOrgsSelected,
+  defaultStartDate,
+  defaultEndDate,
+  defaultStartDepth,
+  defaultEndDepth,
+  defaultDatatsetsSelected,
+  defaultPlatformsSelected
+} from './config.js'
+import {
+  createDataFilterQueryString,
+  validateEmail,
+  getCurrentRangeLevel,
+  getPointsDataSize,
+  generateMultipleSelectBadgeTitle,
+  generateRangeSelectBadgeTitle,
+  useDebounce,
+  setAllOptionsIsSelectedTo
+} from '../utilities.js'
 
 import 'bootstrap/dist/css/bootstrap.min.css'
 import './styles.css'
@@ -41,7 +68,7 @@ if (process.env.NODE_ENV === 'production') {
   })
 }
 
-export default function App () {
+export default function App() {
   const { t, i18n } = useTranslation()
   const [selectionPanelOpen, setSelectionPanelOpen] = useState(true)
   const [pointsToDownload, setPointsToDownload] = useState()
@@ -71,28 +98,44 @@ export default function App () {
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
   const debouncedEovsSelected = useDebounce(eovsSelected, 500)
   const eovsFilterTranslationKey = 'oceanVariablesFiltername' // 'Ocean Variables'
-  const eovsBadgeTitle = generateMultipleSelectBadgeTitle(eovsFilterTranslationKey, eovsSelected)
+  const eovsBadgeTitle = generateMultipleSelectBadgeTitle(
+    eovsFilterTranslationKey,
+    eovsSelected
+  )
   const [eovsSearchTerms, setEovsSearchTerms] = useState('')
 
   // Organization filter initial values from API and state
   const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected)
   const debouncedOrgsSelected = useDebounce(orgsSelected, 500)
   const orgsFilterTranslationKey = 'organizationFilterName' // 'Organizations'
-  const orgsBadgeTitle = generateMultipleSelectBadgeTitle(orgsFilterTranslationKey, orgsSelected)
+  const orgsBadgeTitle = generateMultipleSelectBadgeTitle(
+    orgsFilterTranslationKey,
+    orgsSelected
+  )
   const [orgsSearchTerms, setOrgsSearchTerms] = useState('')
 
   // Dataset filter initial values and state
-  const [datasetsSelected, setDatasetsSelected] = useState(defaultDatatsetsSelected)
+  const [datasetsSelected, setDatasetsSelected] = useState(
+    defaultDatatsetsSelected
+  )
   const debouncedDatasetsSelected = useDebounce(datasetsSelected, 500)
   const datasetsFilterTranslationKey = 'datasetsFilterName' // 'Datasets'
-  const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(datasetsFilterTranslationKey, datasetsSelected)
+  const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(
+    datasetsFilterTranslationKey,
+    datasetsSelected
+  )
   const [datasetSearchTerms, setDatasetSearchTerms] = useState('')
 
   // Dataset filter initial values and state
-  const [platformsSelected, setPlatformsSelected] = useState(defaultPlatformsSelected)
+  const [platformsSelected, setPlatformsSelected] = useState(
+    defaultPlatformsSelected
+  )
   const debouncedPlatformsSelected = useDebounce(platformsSelected, 500)
   const platformsFilterTranslationKey = 'platformsFilterName' // 'Datasets'
-  const platformsBadgeTitle = generateMultipleSelectBadgeTitle(platformsFilterTranslationKey, platformsSelected)
+  const platformsBadgeTitle = generateMultipleSelectBadgeTitle(
+    platformsFilterTranslationKey,
+    platformsSelected
+  )
   const [platformsSearchTerms, setPlatformsSearchTerms] = useState('')
 
   // Timeframe filter initial values and state
@@ -101,7 +144,11 @@ export default function App () {
   const [endDate, setEndDate] = useState(defaultEndDate)
   const debouncedEndDate = useDebounce(endDate, 500)
   const timeframesFilterName = t('timeframeFilterName') // 'Timeframe'
-  const timeframesBadgeTitle = generateRangeSelectBadgeTitle(timeframesFilterName, [startDate, endDate], [defaultStartDate, defaultEndDate])
+  const timeframesBadgeTitle = generateRangeSelectBadgeTitle(
+    timeframesFilterName,
+    [startDate, endDate],
+    [defaultStartDate, defaultEndDate]
+  )
 
   // Depth filter initial values and state
   const [startDepth, setStartDepth] = useState(defaultStartDepth)
@@ -109,7 +156,12 @@ export default function App () {
   const [endDepth, setEndDepth] = useState(defaultEndDepth)
   const debouncedEndDepth = useDebounce(endDepth, 500)
   const depthRangeFilterName = t('depthRangeFilterName') // 'Depth Range (m)'
-  const depthRangeBadgeTitle = generateRangeSelectBadgeTitle(depthRangeFilterName, [startDepth, endDepth], [defaultStartDepth, defaultEndDepth], '(m)')
+  const depthRangeBadgeTitle = generateRangeSelectBadgeTitle(
+    depthRangeFilterName,
+    [startDepth, endDepth],
+    [defaultStartDepth, defaultEndDepth],
+    '(m)'
+  )
 
   // Filter open state
   const [openFilter, setOpenFilter] = useState()
@@ -129,11 +181,24 @@ export default function App () {
       datasetsSelected,
       platformsSelected
     })
-  }, [debouncedStartDate, debouncedEndDate, debouncedStartDepth, debouncedEndDepth, debouncedEovsSelected, debouncedOrgsSelected, debouncedDatasetsSelected, debouncedPlatformsSelected])
+  }, [
+    debouncedStartDate,
+    debouncedEndDate,
+    debouncedStartDepth,
+    debouncedEndDepth,
+    debouncedEovsSelected,
+    debouncedOrgsSelected,
+    debouncedDatasetsSelected,
+    debouncedPlatformsSelected
+  ])
 
-  function createOptionSubset (searchTerms, allOptions) {
+  function createOptionSubset(searchTerms, allOptions) {
     if (searchTerms) {
-      return allOptions.filter(option => option.title.toLowerCase().includes(searchTerms.toString().toLowerCase()))
+      return allOptions.filter((option) =>
+        option.title
+          .toLowerCase()
+          .includes(searchTerms.toString().toLowerCase())
+      )
     } else {
       return allOptions
     }
@@ -168,28 +233,42 @@ export default function App () {
     /* /platforms returns array of platform names:
       ['abc', 'def', ...]
     */
-    fetch(`${server}/platforms`).then(response => response.json()).then(platforms => {
-      setPlatformsSelected(platforms.map((platform, index) => {
-        return {
-          title: platform,
-          pk: platform,
-          isSelected: false
-        }
-      }))
-    }).catch(error => { throw error })
+    fetch(`${server}/platforms`)
+      .then((response) => response.json())
+      .then((platforms) => {
+        setPlatformsSelected(
+          platforms.map((platform, index) => {
+            return {
+              title: platform,
+              pk: platform,
+              isSelected: false
+            }
+          })
+        )
+      })
+      .catch((error) => {
+        throw error
+      })
 
     /* /oceanVariables returns array of variable names:
       ['abc', 'def', ...]
     */
-    fetch(`${server}/oceanVariables`).then(response => response.json()).then(eovs => {
-      setEovsSelected(eovs.map((eov, index) => {
-        return {
-          title: eov,
-          isSelected: false,
-          pk: index
-        }
-      }))
-    }).catch(error => { throw error })
+    fetch(`${server}/oceanVariables`)
+      .then((response) => response.json())
+      .then((eovs) => {
+        setEovsSelected(
+          eovs.map((eov, index) => {
+            return {
+              title: eov,
+              isSelected: false,
+              pk: index
+            }
+          })
+        )
+      })
+      .catch((error) => {
+        throw error
+      })
 
     /* /organizations returns array of org objects:
       [
@@ -202,15 +281,22 @@ export default function App () {
         ...
       ]
     */
-    fetch(`${server}/organizations`).then(response => response.json()).then(orgsR => {
-      setOrgsSelected(orgsR.map(org => {
-        return {
-          title: org.name,
-          isSelected: false,
-          pk: org.pk
-        }
-      }))
-    }).catch(error => { throw error })
+    fetch(`${server}/organizations`)
+      .then((response) => response.json())
+      .then((orgsR) => {
+        setOrgsSelected(
+          orgsR.map((org) => {
+            return {
+              title: org.name,
+              isSelected: false,
+              pk: org.pk
+            }
+          })
+        )
+      })
+      .catch((error) => {
+        throw error
+      })
 
     /* /datasets returns array of dataset objects
       [
@@ -226,24 +312,36 @@ export default function App () {
         }
       ]
     */
-    fetch(`${server}/datasets`).then(response => response.json()).then(datasetsR => {
-      setDatasetsSelected(datasetsR.map(dataset => {
-        return {
-          title: dataset.title,
-          titleTranslated: dataset.title_translated,
-          platform: dataset.platform,
-          isSelected: false,
-          pk: dataset.pk
-        }
-      }))
-    }).catch(error => { throw error })
+    fetch(`${server}/datasets`)
+      .then((response) => response.json())
+      .then((datasetsR) => {
+        setDatasetsSelected(
+          datasetsR.map((dataset) => {
+            return {
+              title: dataset.title,
+              titleTranslated: dataset.title_translated,
+              platform: dataset.platform,
+              isSelected: false,
+              pk: dataset.pk
+            }
+          })
+        )
+      })
+      .catch((error) => {
+        throw error
+      })
 
     /** Get initial legend values */
-    fetch(`${server}/legend?${createDataFilterQueryString(query)}`).then(response => response.json()).then(legend => {
-      if (legend) {
-        setRangeLevels(legend.recordsCount)
-      }
-    }).catch(error => { throw error })
+    fetch(`${server}/legend?${createDataFilterQueryString(query)}`)
+      .then((response) => response.json())
+      .then((legend) => {
+        if (legend) {
+          setRangeLevels(legend.recordsCount)
+        }
+      })
+      .catch((error) => {
+        throw error
+      })
   }, [])
 
   useEffect(() => {
@@ -267,23 +365,14 @@ export default function App () {
 
       case 'successful':
         setSubmissionFeedback({
-          icon: (
-            <CheckCircle
-              className='text-success'
-              size={30}
-            />),
+          icon: <CheckCircle className='text-success' size={30} />,
           text: t('submissionStateTextSuccess', { email }) // Request successful. Download link will be sent to: ' + email
         })
         break
 
       case 'failed':
         setSubmissionFeedback({
-          icon: (
-            <XCircle
-              className='text-danger'
-              size={30}
-            />
-          ),
+          icon: <XCircle className='text-danger' size={30} />,
           text: t('submissionStateTextFailed') // 'Request failed'
         })
         break
@@ -296,11 +385,13 @@ export default function App () {
 
   useEffect(() => {
     if (!loading && !_.isEmpty(rangeLevels)) {
-      fetch(`${server}/legend?${createDataFilterQueryString(query)}`).then(response => response.json()).then(legend => {
-        if (legend) {
-          setRangeLevels(legend.recordsCount)
-        }
-      })
+      fetch(`${server}/legend?${createDataFilterQueryString(query)}`)
+        .then((response) => response.json())
+        .then((legend) => {
+          if (legend) {
+            setRangeLevels(legend.recordsCount)
+          }
+        })
     }
   }, [query])
 
@@ -315,28 +406,36 @@ export default function App () {
     setSubmissionState()
   }, [email])
 
-  function handleEmailChange (value) {
+  function handleEmailChange(value) {
     setEmail(value)
   }
 
-  function handleSubmission () {
+  function handleSubmission() {
     setSubmissionState('submitted')
   }
 
-  function submitRequest () {
-    fetch(`${server}/download?${createDataFilterQueryString(query)}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload.map(point => point.pk).join(',')}&email=${email}&lang=${i18n.language}`).then((response) => {
-      if (response.ok) {
-        setSubmissionState('successful')
-      } else {
+  function submitRequest() {
+    fetch(
+      `${server}/download?${createDataFilterQueryString(
+        query
+      )}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload
+        .map((point) => point.pk)
+        .join(',')}&email=${email}&lang=${i18n.language}`
+    )
+      .then((response) => {
+        if (response.ok) {
+          setSubmissionState('successful')
+        } else {
+          setSubmissionState('failed')
+        }
+      })
+      .catch((error) => {
         setSubmissionState('failed')
-      }
-    }).catch(error => {
-      setSubmissionState('failed')
-      throw error
-    })
+        throw error
+      })
   }
 
-  function DownloadButton () {
+  function DownloadButton() {
     return (
       <DataDownloadModal
         disabled={_.isEmpty(pointsToReview)}
@@ -354,19 +453,28 @@ export default function App () {
               className='emailAddress'
               type='email'
               placeholder='email@email.com'
-              onInput={e => handleEmailChange(e.target.value)}
+              onInput={(e) => handleEmailChange(e.target.value)}
             />
           </Col>
           <Col xs='auto'>
             <button
               className='submitRequestButton'
-              disabled={!emailValid || _.isEmpty(pointsToDownload) || getPointsDataSize(pointsToDownload) / 1000000 > 100 || submissionState === 'submitted'}
+              disabled={
+                !emailValid ||
+                _.isEmpty(pointsToDownload) ||
+                getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
+                submissionState === 'submitted'
+              }
               onClick={() => handleSubmission()}
             >
               {
-                (!_.isEmpty(pointsToDownload) && submissionFeedback && submissionState !== 'submitted' && t('submitRequestButtonResubmitText')) ||
-                (_.isEmpty(pointsToDownload) && t('submitRequestButtonSelectDataText')) ||
-                t('submitRequestButtonSubmitText') // 'Submit Request'
+                (!_.isEmpty(pointsToDownload) &&
+                  submissionFeedback &&
+                  submissionState !== 'submitted' &&
+                  t('submitRequestButtonResubmitText')) ||
+                  (_.isEmpty(pointsToDownload) &&
+                    t('submitRequestButtonSelectDataText')) ||
+                  t('submitRequestButtonSubmitText') // 'Submit Request'
               }
             </button>
           </Col>
@@ -375,20 +483,17 @@ export default function App () {
             {submissionFeedback && submissionFeedback.text}
           </Col>
         </DownloadDetails>
-      </DataDownloadModal >
+      </DataDownloadModal>
     )
   }
 
   return (
     <ErrorBoundary
       errorBoundaryMessage={t('errorBoundaryMessage')}
-      logoSource={i18n.language === 'en'
-        ? EnglishLogo
-        : FrenchLogo
-      }
+      logoSource={i18n.language === 'en' ? EnglishLogo : FrenchLogo}
     >
       {loading && <Loading />}
-      {rangeLevels &&
+      {rangeLevels && (
         <Map
           setPolygon={setPolygon}
           setPointsToReview={setPointsToReview}
@@ -401,7 +506,7 @@ export default function App () {
           offsetFlyTo={selectionPanelOpen}
           hoveredDataset={hoveredDataset}
         />
-      }
+      )}
       <Controls
         loading={loading}
         selectionPanel={
@@ -424,7 +529,7 @@ export default function App () {
         }
       >
         <Filter
-          active={eovsSelected.filter(eov => eov.isSelected).length !== 0}
+          active={eovsSelected.filter((eov) => eov.isSelected).length !== 0}
           badgeTitle={eovsBadgeTitle}
           optionsSelected={eovsSelected}
           setOptionsSelected={setEovsSelected}
@@ -438,8 +543,12 @@ export default function App () {
           filterName={eovsFilterTranslationKey}
           openFilter={openFilter === eovsFilterTranslationKey}
           setOpenFilter={setOpenFilter}
-          selectAllButton={() => setAllOptionsIsSelectedTo(true, eovsSelected, setEovsSelected)}
-          resetButton={() => setAllOptionsIsSelectedTo(false, eovsSelected, setEovsSelected)}
+          selectAllButton={() =>
+            setAllOptionsIsSelectedTo(true, eovsSelected, setEovsSelected)
+          }
+          resetButton={() =>
+            setAllOptionsIsSelectedTo(false, eovsSelected, setEovsSelected)
+          }
           numberOfOptions={eovsSelected.length}
         >
           <MultiCheckboxFilter
@@ -451,7 +560,9 @@ export default function App () {
           />
         </Filter>
         <Filter
-          active={platformsSelected.filter(eov => eov.isSelected).length !== 0}
+          active={
+            platformsSelected.filter((eov) => eov.isSelected).length !== 0
+          }
           badgeTitle={platformsBadgeTitle}
           setOptionsSelected={setPlatformsSelected}
           tooltip={t('platformFilterTooltip')} // 'Filter data by ocean variable name. Selection works as logical OR operation.'
@@ -464,13 +575,28 @@ export default function App () {
           filterName={platformsFilterTranslationKey}
           openFilter={openFilter === platformsFilterTranslationKey}
           setOpenFilter={setOpenFilter}
-          selectAllButton={() => setAllOptionsIsSelectedTo(true, platformsSelected, setPlatformsSelected)}
-          resetButton={() => setAllOptionsIsSelectedTo(false, platformsSelected, setPlatformsSelected)}
+          selectAllButton={() =>
+            setAllOptionsIsSelectedTo(
+              true,
+              platformsSelected,
+              setPlatformsSelected
+            )
+          }
+          resetButton={() =>
+            setAllOptionsIsSelectedTo(
+              false,
+              platformsSelected,
+              setPlatformsSelected
+            )
+          }
           numberOfOptions={platformsSelected.length}
           infoButton='http://vocab.nerc.ac.uk/collection/L06/current/'
         >
           <MultiCheckboxFilter
-            optionsSelected={createOptionSubset(platformsSearchTerms, platformsSelected)}
+            optionsSelected={createOptionSubset(
+              platformsSearchTerms,
+              platformsSelected
+            )}
             setOptionsSelected={setPlatformsSelected}
             searchable
             colored
@@ -479,7 +605,7 @@ export default function App () {
           />
         </Filter>
         <Filter
-          active={orgsSelected.filter(eov => eov.isSelected).length !== 0}
+          active={orgsSelected.filter((eov) => eov.isSelected).length !== 0}
           badgeTitle={orgsBadgeTitle}
           optionsSelected={orgsSelected}
           setOptionsSelected={setOrgsSelected}
@@ -493,8 +619,12 @@ export default function App () {
           filterName={orgsFilterTranslationKey}
           openFilter={openFilter === orgsFilterTranslationKey}
           setOpenFilter={setOpenFilter}
-          selectAllButton={() => setAllOptionsIsSelectedTo(true, orgsSelected, setOrgsSelected)}
-          resetButton={() => setAllOptionsIsSelectedTo(false, orgsSelected, setOrgsSelected)}
+          selectAllButton={() =>
+            setAllOptionsIsSelectedTo(true, orgsSelected, setOrgsSelected)
+          }
+          resetButton={() =>
+            setAllOptionsIsSelectedTo(false, orgsSelected, setOrgsSelected)
+          }
           numberOfOptions={orgsSelected.length}
         >
           <MultiCheckboxFilter
@@ -505,7 +635,7 @@ export default function App () {
           />
         </Filter>
         <Filter
-          active={datasetsSelected.filter(eov => eov.isSelected).length !== 0}
+          active={datasetsSelected.filter((eov) => eov.isSelected).length !== 0}
           badgeTitle={datasetsBadgeTitle}
           optionsSelected={datasetsSelected}
           setOptionsSelected={setDatasetsSelected}
@@ -519,12 +649,27 @@ export default function App () {
           filterName={datasetsFilterTranslationKey}
           openFilter={openFilter === datasetsFilterTranslationKey}
           setOpenFilter={setOpenFilter}
-          selectAllButton={() => setAllOptionsIsSelectedTo(true, datasetsSelected, setDatasetsSelected)}
-          resetButton={() => setAllOptionsIsSelectedTo(false, datasetsSelected, setDatasetsSelected)}
+          selectAllButton={() =>
+            setAllOptionsIsSelectedTo(
+              true,
+              datasetsSelected,
+              setDatasetsSelected
+            )
+          }
+          resetButton={() =>
+            setAllOptionsIsSelectedTo(
+              false,
+              datasetsSelected,
+              setDatasetsSelected
+            )
+          }
           numberOfOptions={datasetsSelected.length}
         >
           <MultiCheckboxFilter
-            optionsSelected={createOptionSubset(datasetSearchTerms, datasetsSelected)}
+            optionsSelected={createOptionSubset(
+              datasetSearchTerms,
+              datasetsSelected
+            )}
             setOptionsSelected={setDatasetsSelected}
             searchable
             allOptions={datasetsSelected}
@@ -534,15 +679,21 @@ export default function App () {
         <Filter
           active={startDate !== defaultStartDate || endDate !== defaultEndDate}
           badgeTitle={timeframesBadgeTitle}
-          optionsSelected={startDate, endDate}
-          setOptionsSelected={() => { setStartDate('1900-01-01'); setEndDate(new Date().toISOString().split('T')[0]) }}
+          optionsSelected={(startDate, endDate)}
+          setOptionsSelected={() => {
+            setStartDate('1900-01-01')
+            setEndDate(new Date().toISOString().split('T')[0])
+          }}
           tooltip={t('timeframeFilterTooltip')} // 'Filter data by timeframe. Selection works as inclusive range.'
           icon={<CalendarWeek />}
           controlled
           filterName={timeframesFilterName}
           openFilter={openFilter === timeframesFilterName}
           setOpenFilter={setOpenFilter}
-          resetButton={() => { setStartDate('1900-01-01'); setEndDate(new Date().toISOString().split('T')[0]) }}
+          resetButton={() => {
+            setStartDate('1900-01-01')
+            setEndDate(new Date().toISOString().split('T')[0])
+          }}
         >
           <TimeSelector
             startDate={startDate}
@@ -552,28 +703,34 @@ export default function App () {
           />
         </Filter>
         <Filter
-          active={startDepth !== defaultStartDepth || endDepth !== defaultEndDepth}
+          active={
+            startDepth !== defaultStartDepth || endDepth !== defaultEndDepth
+          }
           badgeTitle={depthRangeBadgeTitle}
-          optionsSelected={startDepth, endDepth}
-          setOptionsSelected={() => { setStartDepth(0); setEndDepth(12000) }}
+          optionsSelected={(startDepth, endDepth)}
+          setOptionsSelected={() => {
+            setStartDepth(0)
+            setEndDepth(12000)
+          }}
           tooltip={t('depthrangeFilterTooltip')} // 'Filter data by depth. Selection works as inclusive range.'
           icon={<ArrowsExpand />}
           controlled
           filterName={depthRangeFilterName}
           openFilter={openFilter === depthRangeFilterName}
           setOpenFilter={setOpenFilter}
-          resetButton={() => { setStartDepth(0); setEndDepth(12000) }}
+          resetButton={() => {
+            setStartDepth(0)
+            setEndDepth(12000)
+          }}
         >
-          < DepthSelector
+          <DepthSelector
             startDepth={startDepth}
             setStartDepth={setStartDepth}
             endDepth={endDepth}
             setEndDepth={setEndDepth}
           />
         </Filter>
-        <div>
-          {DownloadButton()}
-        </div>
+        <div>{DownloadButton()}</div>
       </Controls>
       {/* {i18n.language === 'en'
         ? <a
@@ -589,9 +746,14 @@ export default function App () {
           target='_blank' rel="noreferrer"
         />
       } */}
-      {currentRangeLevel &&
-        <Legend currentRangeLevel={currentRangeLevel} zoom={zoom} selectionPanelOpen={selectionPanelOpen} platformsInView={platformsSelected.map(e => e.title)} />
-      }
+      {currentRangeLevel && (
+        <Legend
+          currentRangeLevel={currentRangeLevel}
+          zoom={zoom}
+          selectionPanelOpen={selectionPanelOpen}
+          platformsInView={platformsSelected.map((e) => e.title)}
+        />
+      )}
       <button
         className='boxQueryButton'
         id='boxQueryButton'

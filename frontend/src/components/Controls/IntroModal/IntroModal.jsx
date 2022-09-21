@@ -6,29 +6,31 @@ import { useTranslation } from 'react-i18next'
 import { getCookieValue } from '../../../utilities'
 import './styles.css'
 
-export default function IntroModal ({ initialOpenState }) {
+export default function IntroModal({ initialOpenState }) {
   const { t, i18n } = useTranslation()
   const introOpenCookie = !getCookieValue('introModalOpen')
-  const [showModal, setShowModal] = useState(introOpenCookie !== undefined ? introOpenCookie : initialOpenState)
+  const [showModal, setShowModal] = useState(
+    introOpenCookie !== undefined ? introOpenCookie : initialOpenState
+  )
 
   const [hoveredStep, setHoveredStep] = useState()
   // Potential idea for cut through transparency to highligh controls: https://ishadeed.com/article/thinking-about-the-cut-out-effect/
 
   useEffect(() => {
     if (showModal === false) {
-      document.cookie = `introModalOpen=${showModal}; Secure; max-age=${60 * 60 * 24 * 31}`
+      document.cookie = `introModalOpen=${showModal}; Secure; max-age=${
+        60 * 60 * 24 * 31
+      }`
     }
   }, [showModal])
 
-  function generateInfo () {
+  function generateInfo() {
     switch (hoveredStep) {
       case 'filter':
         return (
           <div className='stepInfo'>
             {t('stepInfoFilter')}
-            <div className='stepInfoContent'>
-              {t('stepInfoFilterText')}
-            </div>
+            <div className='stepInfoContent'>{t('stepInfoFilterText')}</div>
           </div>
         )
       case 'select':
@@ -101,7 +103,8 @@ export default function IntroModal ({ initialOpenState }) {
                 className='feedbackButton'
                 title={t('feedbackButtonTitle')}
                 href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit'
-                target='_blank' rel='noreferrer'
+                target='_blank'
+                rel='noreferrer'
               >
                 <ChatDots size='30px' />
               </a>
@@ -130,7 +133,10 @@ export default function IntroModal ({ initialOpenState }) {
         className='introModal'
       >
         <Modal.Header closeButton>
-          <Modal.Title className='modalHeader' id='contained-modal-title-vcenter'>
+          <Modal.Title
+            className='modalHeader'
+            id='contained-modal-title-vcenter'
+          >
             <span>
               {t('CIOOSDataExplorer') + ' '}
               {/* CIOOS Data Explorer */}
@@ -139,30 +145,30 @@ export default function IntroModal ({ initialOpenState }) {
               {t('CIOOSQuote')}
               {/* "Ocean Data For Our Ocean Future" */}
             </span>
-            {i18n.language === 'en'
-              ? <a
+            {i18n.language === 'en' ? (
+              <a
                 title={t('CIOOSLogoButtonTitle')}
                 className='introLogo english'
                 href='https://cioos.ca/'
-                target='_blank' rel='noreferrer'
+                target='_blank'
+                rel='noreferrer'
               />
-              : <a
+            ) : (
+              <a
                 title={t('CIOOSLogoButtonTitle')}
                 className='introLogo french'
                 href='https://cioos.ca/'
-                target='_blank' rel='noreferrer'
+                target='_blank'
+                rel='noreferrer'
               />
-            }
+            )}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Container fluid>
             {/* {t('test', { test })} */}
             <Row>
-              <div
-                className='steps'
-                onMouseOut={() => setHoveredStep()}
-              >
+              <div className='steps' onMouseOut={() => setHoveredStep()}>
                 <div
                   className={`stepImage filterStep ${i18n.language}`}
                   onMouseOver={() => setHoveredStep('filter')}
@@ -189,9 +195,7 @@ export default function IntroModal ({ initialOpenState }) {
                 </div>
               </div>
             </Row>
-            <Row className='infoBox'>
-              {generateInfo()}
-            </Row>
+            <Row className='infoBox'>{generateInfo()}</Row>
           </Container>
         </Modal.Body>
       </Modal>

@@ -7,7 +7,7 @@ import { X } from 'react-bootstrap-icons'
 import RangeSelector from '../RangeSelector/RangeSelector.jsx'
 import './styles.css'
 
-export default function DepthSelector (props) {
+export default function DepthSelector(props) {
   const { t } = useTranslation()
 
   const [startDepth, setStartDepth] = useState(props.startDepth)
@@ -24,7 +24,7 @@ export default function DepthSelector (props) {
     setDepthValid(true)
   }, [props.endDepth])
 
-  function handleSetStartDepth (value) {
+  function handleSetStartDepth(value) {
     setStartDepth(value * 1.0)
     if (value * 1.0 <= endDepth && value * 1.0 >= 0 && value * 1.0 <= 12000) {
       setDepthValid(true)
@@ -35,7 +35,7 @@ export default function DepthSelector (props) {
     }
   }
 
-  function handleSetEndDepth (value) {
+  function handleSetEndDepth(value) {
     setEndDepth(value * 1.0)
     if (value * 1.0 >= startDepth && value * 1.0 >= 0 && value * 1.0 <= 12000) {
       setDepthValid(true)
@@ -49,7 +49,10 @@ export default function DepthSelector (props) {
   return (
     <div className='depthSelector'>
       <div className='inputs'>
-        <div className='depth' title={!depthValid ? t('depthFilterStartInvalidTitle') : undefined}>
+        <div
+          className='depth'
+          title={!depthValid ? t('depthFilterStartInvalidTitle') : undefined}
+        >
           <span>{t('depthFilterStartDepth')}</span>
           <input
             className='startDepth'
@@ -57,11 +60,14 @@ export default function DepthSelector (props) {
             type='number'
             max={12000}
             min={0}
-            onChange={e => handleSetStartDepth(e.target.value)}
+            onChange={(e) => handleSetStartDepth(e.target.value)}
             size={'6'}
           />
         </div>
-        <div className='depth' title={!depthValid ? t('depthFilterEndInvalidTitle') : undefined}>
+        <div
+          className='depth'
+          title={!depthValid ? t('depthFilterEndInvalidTitle') : undefined}
+        >
           <span>{t('depthFilterEndDepth')}</span>
           <input
             className='endDepth'
@@ -69,7 +75,7 @@ export default function DepthSelector (props) {
             type='number'
             max={12000}
             min={0}
-            onChange={e => handleSetEndDepth(e.target.value)}
+            onChange={(e) => handleSetEndDepth(e.target.value)}
             size={'6'}
           />
         </div>
@@ -80,8 +86,13 @@ export default function DepthSelector (props) {
         setStartDepth={props.setStartDepth}
         setEndDepth={props.setEndDepth}
       />
-      {!depthValid && (<div> <X color='red' size={30} /> {t('depthFilterInvalidWarning')}</div>)}
-    </div >
+      {!depthValid && (
+        <div>
+          {' '}
+          <X color='red' size={30} /> {t('depthFilterInvalidWarning')}
+        </div>
+      )}
+    </div>
   )
 }
 

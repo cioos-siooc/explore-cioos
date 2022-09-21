@@ -8,10 +8,18 @@ import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
 
 import './styles.css'
-import { bytesToMemorySizeString, getPointsDataSize } from '../../../utilities.js'
+import {
+  bytesToMemorySizeString,
+  getPointsDataSize
+} from '../../../utilities.js'
 
 // Note: datasets and points are exchangable terminology
-export default function DownloadDetails ({ pointsToReview, setPointsToDownload, setHoveredDataset, children }) {
+export default function DownloadDetails({
+  pointsToReview,
+  setPointsToDownload,
+  setHoveredDataset,
+  children
+}) {
   const { t } = useTranslation()
 
   const [selectAll, setSelectAll] = useState(true)
@@ -23,11 +31,11 @@ export default function DownloadDetails ({ pointsToReview, setPointsToDownload, 
     if (!_.isEmpty(pointsData)) {
       const total = getPointsDataSize(pointsData)
       setDataTotal(total / 1000000)
-      setPointsToDownload(pointsData.filter(point => point.selected))
+      setPointsToDownload(pointsData.filter((point) => point.selected))
     }
   }, [pointsData])
 
-  function handleSelectDataset (point) {
+  function handleSelectDataset(point) {
     const dataset = pointsData.filter((p) => p.pk === point.pk)[0]
     dataset.selected = !point.selected
     const result = pointsData.map((p) => {
@@ -40,13 +48,15 @@ export default function DownloadDetails ({ pointsToReview, setPointsToDownload, 
     setPointsData(result)
   }
 
-  function handleSelectAllDatasets () {
-    setPointsData(pointsData.map(p => {
-      return {
-        ...p,
-        selected: !selectAll
-      }
-    }))
+  function handleSelectAllDatasets() {
+    setPointsData(
+      pointsData.map((p) => {
+        return {
+          ...p,
+          selected: !selectAll
+        }
+      })
+    )
     setSelectAll(!selectAll)
   }
 
@@ -64,18 +74,10 @@ export default function DownloadDetails ({ pointsToReview, setPointsToDownload, 
             4) Submit the download request.
             Filters applied in the CIOOS Data Explorer also apply to dataset downloads. */}
             <ol>
-              <li>
-                {t('downloadDetailsDownloadDataSteps1')}
-              </li>
-              <li>
-                {t('downloadDetailsDownloadDataSteps2')}
-              </li>
-              <li>
-                {t('downloadDetailsDownloadDataSteps3')}
-              </li>
-              <li>
-                {t('downloadDetailsDownloadDataSteps4')}
-              </li>
+              <li>{t('downloadDetailsDownloadDataSteps1')}</li>
+              <li>{t('downloadDetailsDownloadDataSteps2')}</li>
+              <li>{t('downloadDetailsDownloadDataSteps3')}</li>
+              <li>{t('downloadDetailsDownloadDataSteps4')}</li>
             </ol>
           </span>
         </Col>
@@ -83,12 +85,13 @@ export default function DownloadDetails ({ pointsToReview, setPointsToDownload, 
       <hr />
       <Row className='downloadDataRow'>
         <Col>
-          {inspectDataset
-            ? <DatasetInspector
+          {inspectDataset ? (
+            <DatasetInspector
               dataset={inspectDataset}
               setInspectDataset={setInspectDataset}
             />
-            : <DatasetsTable
+          ) : (
+            <DatasetsTable
               handleSelectAllDatasets={handleSelectAllDatasets}
               handleSelectDataset={handleSelectDataset}
               setInspectDataset={setInspectDataset}
@@ -97,12 +100,12 @@ export default function DownloadDetails ({ pointsToReview, setPointsToDownload, 
               datasets={pointsData}
               setHoveredDataset={setHoveredDataset}
             />
-          }
+          )}
         </Col>
       </Row>
       <hr />
       <Row>
-        <Col >
+        <Col>
           <ProgressBar
             className='dataTotalBar'
             title={t('downloadDetailsProgressTitle')} // 'Amount of download size used'
@@ -112,19 +115,29 @@ export default function DownloadDetails ({ pointsToReview, setPointsToDownload, 
               className='upTo100'
               variant='success'
               now={dataTotal < 100 ? dataTotal : 100}
-              label={dataTotal < 100 ? bytesToMemorySizeString(dataTotal * 1000000) : '100 MB'}
+              label={
+                dataTotal < 100
+                  ? bytesToMemorySizeString(dataTotal * 1000000)
+                  : '100 MB'
+              }
               key={1}
             />
-            {dataTotal > 100 &&
+            {dataTotal > 100 && (
               <ProgressBar
                 striped
                 className='past100'
                 variant='warning'
                 now={dataTotal > 100 ? (dataTotal - 100).toFixed(2) : 0}
-                label={dataTotal > 100 ? bytesToMemorySizeString((dataTotal - 100).toFixed(2) * 1000000) : 0}
+                label={
+                  dataTotal > 100
+                    ? bytesToMemorySizeString(
+                        (dataTotal - 100).toFixed(2) * 1000000
+                      )
+                    : 0
+                }
                 key={2}
               />
-            }
+            )}
           </ProgressBar>
           <div className='dataTotalRatio'>
             {bytesToMemorySizeString(dataTotal * 1000000)} of 100MB Max
@@ -137,6 +150,6 @@ export default function DownloadDetails ({ pointsToReview, setPointsToDownload, 
         </Col>
         {children}
       </Row>
-    </Container >
+    </Container>
   )
 }

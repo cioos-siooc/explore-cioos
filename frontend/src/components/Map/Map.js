@@ -1,5 +1,10 @@
 import * as React from 'react'
-import maplibreGl, { AttributionControl, NavigationControl, Popup, ScaleControl } from 'maplibre-gl'
+import maplibreGl, {
+  AttributionControl,
+  NavigationControl,
+  Popup,
+  ScaleControl
+} from 'maplibre-gl'
 import MapboxDraw from '@mapbox/mapbox-gl-draw'
 import { useState, useEffect, useRef } from 'react'
 import * as turf from '@turf/turf'
@@ -8,12 +13,27 @@ import { useTranslation } from 'react-i18next'
 import './styles.css'
 
 import { server } from '../../config'
-import { createDataFilterQueryString, generateColorStops, getCurrentRangeLevel, updateMapToolTitleLanguage } from '../../utilities'
+import {
+  createDataFilterQueryString,
+  generateColorStops,
+  getCurrentRangeLevel,
+  updateMapToolTitleLanguage
+} from '../../utilities'
 import { colorScale, defaultQuery } from '../config'
 import platformColors from '../../components/platformColors'
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
-export default function CreateMap ({ query, setPointsToReview, setPolygon, setLoading, zoom, setZoom, offsetFlyTo, rangeLevels, hoveredDataset }) {
+export default function CreateMap({
+  query,
+  setPointsToReview,
+  setPolygon,
+  setLoading,
+  zoom,
+  setZoom,
+  offsetFlyTo,
+  rangeLevels,
+  hoveredDataset
+}) {
   const { t } = useTranslation()
   const mapContainer = useRef(null)
   const map = useRef(null)
@@ -67,9 +87,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     maxWidth: '400px'
   })
 
-  const colors = ['match',
-    ['get', 'platform']
-  ]
+  const colors = ['match', ['get', 'platform']]
   platformColors.reduce((accumulatedPlatformColors, platformColor) => {
     if (platformColor.color) {
       accumulatedPlatformColors.push(platformColor.platform)
@@ -93,7 +111,10 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
       if (drawPolygon.current.getAll().features.length > 0) {
         drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
       }
-      const lineString = turf.lineString([boxSelectStartCoords, boxSelectEndCoords])
+      const lineString = turf.lineString([
+        boxSelectStartCoords,
+        boxSelectEndCoords
+      ])
       const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
       setBoxSelectEndCoords()
       setBoxSelectStartCoords()
@@ -110,9 +131,12 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     }
   }, [boxSelectEndCoords])
 
-  function setColorStops () {
+  function setColorStops() {
     if (map.current) {
-      colorStops.current = generateColorStops(colorScale, getCurrentRangeLevel(rangeLevels, map.current.getZoom())).map(colorStop => {
+      colorStops.current = generateColorStops(
+        colorScale,
+        getCurrentRangeLevel(rangeLevels, map.current.getZoom())
+      ).map((colorStop) => {
         return [colorStop.stop, colorStop.color]
       })
       if (colorStops.current.length > 0) {
@@ -128,30 +152,56 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     }
   }
 
-  function hoverHighlightPoints (pk) {
+  function hoverHighlightPoints(pk) {
     if (map.current && pk) {
       if (zoom >= 7) {
         map.current.setPaintProperty('points', 'circle-color', 'lightgrey')
-        map.current.setPaintProperty('points-highlighted', 'circle-color', 'lightgrey')
-        map.current.setPaintProperty('points-highlighted', 'circle-stroke-width', 0)
+        map.current.setPaintProperty(
+          'points-highlighted',
+          'circle-color',
+          'lightgrey'
+        )
+        map.current.setPaintProperty(
+          'points-highlighted',
+          'circle-stroke-width',
+          0
+        )
 
-        const features = map.current.queryRenderedFeatures({ layers: ['points'] })
-        const pointsInDataset = features.filter(feature => {
-          const featureDatasetPKs = JSON.parse(feature.properties.datasets)
-          return featureDatasetPKs.includes(pk)
-        }).map(feature => feature.properties.pk)
-        map.current.setFilter('points-hovered', ['in', 'pk', ...pointsInDataset])
+        const features = map.current.queryRenderedFeatures({
+          layers: ['points']
+        })
+        const pointsInDataset = features
+          .filter((feature) => {
+            const featureDatasetPKs = JSON.parse(feature.properties.datasets)
+            return featureDatasetPKs.includes(pk)
+          })
+          .map((feature) => feature.properties.pk)
+        map.current.setFilter('points-hovered', [
+          'in',
+          'pk',
+          ...pointsInDataset
+        ])
       } else {
         map.current.setPaintProperty('hexes', 'fill-color', 'lightgrey')
-        const features = map.current.queryRenderedFeatures({ layers: ['hexes'] })
-        const hexesInDataset = features.filter(feature => JSON.parse(feature.properties.datasets).includes(pk)).map(feature => feature.properties.pk)
+        const features = map.current.queryRenderedFeatures({
+          layers: ['hexes']
+        })
+        const hexesInDataset = features
+          .filter((feature) =>
+            JSON.parse(feature.properties.datasets).includes(pk)
+          )
+          .map((feature) => feature.properties.pk)
         map.current.setFilter('hexes-hovered', ['in', 'pk', ...hexesInDataset])
       }
     } else {
       map.current.setFilter('points-hovered', ['in', 'pk', ''])
       map.current.setPaintProperty('points', 'circle-color', colors)
       map.current.setPaintProperty('points-highlighted', 'circle-color', colors)
-      map.current.setPaintProperty('points-highlighted', 'circle-stroke-width', 1)
+      map.current.setPaintProperty(
+        'points-highlighted',
+        'circle-stroke-width',
+        1
+      )
       map.current.setFilter('hexes-hovered', ['in', 'pk', ''])
       map.current.setPaintProperty('hexes', 'fill-color', {
         property: 'count',
@@ -170,23 +220,28 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     }
   }, [hoveredDataset])
 
-  function highlightPoints (polygon) {
+  function highlightPoints(polygon) {
     if (polygon && polygon.length >= 4) {
-      const features = map.current.queryRenderedFeatures({ layers: ['points'] }).map(point => {
-        return {
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            // Note order: longitude, latitude.
-            coordinates: point.geometry.coordinates
-          },
-          properties: { ...point.properties }
-        }
-      })
+      const features = map.current
+        .queryRenderedFeatures({ layers: ['points'] })
+        .map((point) => {
+          return {
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              // Note order: longitude, latitude.
+              coordinates: point.geometry.coordinates
+            },
+            properties: { ...point.properties }
+          }
+        })
 
       const featureCollection = { type: 'FeatureCollection', features }
       const searchWithin = turf.polygon([polygon])
-      const pointsWithinPolygon = turf.pointsWithinPolygon(featureCollection, searchWithin)
+      const pointsWithinPolygon = turf.pointsWithinPolygon(
+        featureCollection,
+        searchWithin
+      )
 
       // Filter points layer to show the points that have been selected
       const filter = pointsWithinPolygon.features.reduce(
@@ -209,7 +264,9 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     setPolygon()
     if (map && map.current && map.current.loaded()) {
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${query !== defaultQuery && `?${createDataFilterQueryString(query)}`}`
+      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${
+        query !== defaultQuery && `?${createDataFilterQueryString(query)}`
+      }`
 
       map.current.getSource('points').tiles = [tileQuery]
       map.current.getSource('hexes').tiles = [tileQuery]
@@ -227,8 +284,12 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
       setLoading(true)
       doFinalCheck.current = true
       if (drawPolygon.current.getAll().features.length > 0) {
-        highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
-        setPolygon(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+        highlightPoints(
+          drawPolygon.current.getAll().features[0].geometry.coordinates[0]
+        )
+        setPolygon(
+          drawPolygon.current.getAll().features[0].geometry.coordinates[0]
+        )
       }
     }
   }, [query])
@@ -243,8 +304,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     // Create map
     map.current = new maplibreGl.Map({
       container: mapContainer.current,
-      style:
-      {
+      style: {
         version: 8,
         sources: {
           osm: {
@@ -273,11 +333,9 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     // disable map rotation using touch rotation gesture
     map.current.touchZoomRotate.disableRotation()
 
-    function deleteAllShapes () {
+    function deleteAllShapes() {
       if (drawPolygon.current?.getAll()?.features?.length > 0) {
-        drawPolygon.current.delete(
-          drawPolygon.current.getAll().features[0].id
-        )
+        drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
       }
 
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
@@ -286,7 +344,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     }
 
     // clone an element to remove it's events
-    function cloneElement (oldElement) {
+    function cloneElement(oldElement) {
       const newElement = oldElement.cloneNode(true)
       oldElement.parentNode.replaceChild(newElement, oldElement)
       return newElement
@@ -294,12 +352,12 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
 
     map.current.on('load', () => {
       const boxQueryElement = document.getElementById('boxQueryButton')
-      const trashQueryElement = cloneElement(document
-        .getElementsByClassName('mapbox-gl-draw_trash')
-        .item(0))
-      const polyQueryElement = cloneElement(document
-        .getElementsByClassName('mapbox-gl-draw_polygon')
-        .item(0))
+      const trashQueryElement = cloneElement(
+        document.getElementsByClassName('mapbox-gl-draw_trash').item(0)
+      )
+      const polyQueryElement = cloneElement(
+        document.getElementsByClassName('mapbox-gl-draw_polygon').item(0)
+      )
 
       if (boxQueryElement) {
         boxQueryElement.onclick = (e) => {
@@ -367,8 +425,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
 
         paint: {
           'fill-opacity': hexOpacity,
-          'fill-color':
-          {
+          'fill-color': {
             property: 'count',
             stops: colorStops.current
           }
@@ -389,8 +446,7 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
 
         paint: {
           'fill-opacity': hexOpacity,
-          'fill-color':
-          {
+          'fill-color': {
             property: 'count',
             stops: colorStops.current
           }
@@ -449,20 +505,26 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
       })
     })
 
-    const handleMapOnClick = e => {
+    const handleMapOnClick = (e) => {
       // Clear highlighted points if looking at points level and clicking off of the points
-      if (drawPolygon.current.getAll().features.length === 0 && map.current.getZoom() >= 7 && !e.originalEvent.defaultPrevented) {
+      if (
+        drawPolygon.current.getAll().features.length === 0 &&
+        map.current.getZoom() >= 7 &&
+        !e.originalEvent.defaultPrevented
+      ) {
         map.current.setFilter('points-highlighted', ['in', 'pk', ''])
         setPointsToReview()
         setPolygon()
       }
     }
 
-    const handleMapPointsOnClick = e => {
+    const handleMapPointsOnClick = (e) => {
       e.originalEvent.preventDefault()
       if (!creatingPolygon.current) {
         if (drawPolygon.current.getAll().features.length > 0) {
-          drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
+          drawPolygon.current.delete(
+            drawPolygon.current.getAll().features[0].id
+          )
         }
         if (map.current.offsetFlyTo === undefined) {
           map.current.offsetFlyTo = true
@@ -489,12 +551,15 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
         const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
         highlightPoints(bboxPolygon.geometry.coordinates[0])
         setPolygon(bboxPolygon.geometry.coordinates[0])
-      } else if (draw.getMode() === 'simple_select' && creatingPolygon.current) {
+      } else if (
+        draw.getMode() === 'simple_select' &&
+        creatingPolygon.current
+      ) {
         creatingPolygon.current = false
       }
     }
 
-    const handleMapHexesOnClick = e => {
+    const handleMapHexesOnClick = (e) => {
       e.originalEvent.preventDefault()
       if (!creatingPolygon.current) {
         map.current.flyTo({
@@ -504,7 +569,10 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
             ? { top: 0, bottom: 0, left: 500, right: 0 }
             : { top: 0, bottom: 0, left: 0, right: 0 }
         })
-      } else if (draw.getMode() === 'simple_select' && creatingPolygon.current) {
+      } else if (
+        draw.getMode() === 'simple_select' &&
+        creatingPolygon.current
+      ) {
         creatingPolygon.current = false
       }
     }
@@ -554,34 +622,46 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
       }
     })
 
-    map.current.on('draw.create', e => {
+    map.current.on('draw.create', (e) => {
       setPointsToReview()
       setLoading(true)
       if (drawPolygon.current.getAll().features.length > 1) {
         drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
       }
-      highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
-      setPolygon(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+      highlightPoints(
+        drawPolygon.current.getAll().features[0].geometry.coordinates[0]
+      )
+      setPolygon(
+        drawPolygon.current.getAll().features[0].geometry.coordinates[0]
+      )
       map.current.getCanvas().style.cursor = 'unset'
       creatingPolygon.current = false
     })
 
-    map.current.on('idle', e => {
-      if (doFinalCheck.current && drawPolygon.current.getAll().features.length > 0 && map.current.getZoom() >= 7) {
+    map.current.on('idle', (e) => {
+      if (
+        doFinalCheck.current &&
+        drawPolygon.current.getAll().features.length > 0 &&
+        map.current.getZoom() >= 7
+      ) {
         setPointsToReview()
         setLoading(true)
-        highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+        highlightPoints(
+          drawPolygon.current.getAll().features[0].geometry.coordinates[0]
+        )
       }
       doFinalCheck.current = false
       setLoading(false)
     })
 
-    map.current.on('zoomend', e => {
+    map.current.on('zoomend', (e) => {
       doFinalCheck.current = true
       if (drawPolygon.current.getAll().features.length > 0) {
         if (map.current.getZoom() >= 7) {
           setLoading(true)
-          highlightPoints(drawPolygon.current.getAll().features[0].geometry.coordinates[0])
+          highlightPoints(
+            drawPolygon.current.getAll().features[0].geometry.coordinates[0]
+          )
         }
       }
       setZoom(map.current.getZoom())
@@ -617,7 +697,8 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     })
 
     const attribution = new AttributionControl({
-      customAttribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.'
+      customAttribution:
+        'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.'
       // compact: true
     })
     map.current.addControl(attribution, 'bottom-right')
@@ -630,7 +711,5 @@ export default function CreateMap ({ query, setPointsToReview, setPolygon, setLo
     updateMapToolTitleLanguage(t)
   }, [])
 
-  return (
-    <div ref={mapContainer} className='map' />
-  )
+  return <div ref={mapContainer} className='map' />
 }
