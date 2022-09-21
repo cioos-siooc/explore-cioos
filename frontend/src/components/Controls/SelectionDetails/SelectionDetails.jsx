@@ -23,7 +23,13 @@ import {
 import _ from 'lodash'
 
 // Note: datasets and points are exchangable terminology
-export default function SelectionDetails ({ setPointsToReview, query, polygon, setHoveredDataset, children }) {
+export default function SelectionDetails({
+  setPointsToReview,
+  query,
+  polygon,
+  setHoveredDataset,
+  children
+}) {
   const { t, i18n } = useTranslation()
   const [selectAll, setSelectAll] = useState(false)
   const [pointsData, setPointsData] = useState([])
@@ -35,16 +41,22 @@ export default function SelectionDetails ({ setPointsToReview, query, polygon, s
   const [recordLoading, setRecordLoading] = useState(false)
   const [datasetPreview, setDatasetPreview] = useState()
   const [datasetTitleSearchText, setDatasetTitleSearchText] = useState('')
-  const debouncedDatasetTitleSearchText = useDebounce(datasetTitleSearchText, 300)
+  const debouncedDatasetTitleSearchText = useDebounce(
+    datasetTitleSearchText,
+    300
+  )
   const [datasetsSelected, setDatasetsSelected] = useState()
   const [filteredDatasets, setFilteredDatasets] = useState([])
 
   useEffect(() => {
     if (!_.isEmpty(debouncedDatasetTitleSearchText)) {
-      setFilteredDatasets(pointsData
-        .filter((dataset) => {
-          return `${dataset.title}`.toLowerCase().includes(`${debouncedDatasetTitleSearchText}`.toLowerCase())
-        }))
+      setFilteredDatasets(
+        pointsData.filter((dataset) => {
+          return `${dataset.title}`
+            .toLowerCase()
+            .includes(`${debouncedDatasetTitleSearchText}`.toLowerCase())
+        })
+      )
     } else {
       setFilteredDatasets(pointsData)
     }
@@ -60,7 +72,7 @@ export default function SelectionDetails ({ setPointsToReview, query, polygon, s
       setDataTotal(0)
       const total = getPointsDataSize(pointsData)
       setDataTotal(total / 1000000)
-      setPointsToReview(pointsData.filter(point => point.selected))
+      setPointsToReview(pointsData.filter((point) => point.selected))
     }
     setLoading(false)
     // if (pointsData.length === 1) { // Auto load single selected dataset
@@ -87,20 +99,23 @@ export default function SelectionDetails ({ setPointsToReview, query, polygon, s
       if (polygon) {
         shapeQuery = createSelectionQueryString(polygon)
       }
-      const combinedQueries = '?' + [filtersQuery, shapeQuery].filter(e => e).join('&')
+      const combinedQueries =
+        '?' + [filtersQuery, shapeQuery].filter((e) => e).join('&')
       setInspectDataset()
       setLoading(true)
       const urlString = `${server}/pointQuery${combinedQueries}`
-      fetch(urlString).then(response => {
+      fetch(urlString).then((response) => {
         if (response.ok) {
-          response.json().then(data => {
-            setPointsData(data.map(point => {
-              return {
-                ...point,
-                title: point.title_translated[i18n.language] || point.title,
-                selected: false
-              }
-            }))
+          response.json().then((data) => {
+            setPointsData(
+              data.map((point) => {
+                return {
+                  ...point,
+                  title: point.title_translated[i18n.language] || point.title,
+                  selected: false
+                }
+              })
+            )
           })
         } else {
           setPointsData([])
@@ -109,7 +124,7 @@ export default function SelectionDetails ({ setPointsToReview, query, polygon, s
     }
   }, [query, polygon, i18n.language])
 
-  function handleSelectDataset (point) {
+  function handleSelectDataset(point) {
     const dataset = pointsData.filter((p) => p.pk === point.pk)[0]
     dataset.selected = !point.selected
     const result = pointsData.map((p) => {
@@ -122,13 +137,15 @@ export default function SelectionDetails ({ setPointsToReview, query, polygon, s
     setPointsData(result)
   }
 
-  function handleSelectAllDatasets () {
-    setPointsData(pointsData.map(p => {
-      return {
-        ...p,
-        selected: !selectAll
-      }
-    }))
+  function handleSelectAllDatasets() {
+    setPointsData(
+      pointsData.map((p) => {
+        return {
+          ...p,
+          selected: !selectAll
+        }
+      })
+    )
     setSelectAll(!selectAll)
   }
 
@@ -137,10 +154,17 @@ export default function SelectionDetails ({ setPointsToReview, query, polygon, s
       if (inspectRecordID) {
         setShowModal(true)
         setRecordLoading(true)
-        fetch(`${server}/preview?dataset=${inspectDataset.dataset_id}&profile=${inspectRecordID}`).then(response => response.json()).then(preview => {
-          setDatasetPreview(preview)
-          setRecordLoading(false)
-        }).catch(error => { throw error })
+        fetch(
+          `${server}/preview?dataset=${inspectDataset.dataset_id}&profile=${inspectRecordID}`
+        )
+          .then((response) => response.json())
+          .then((preview) => {
+            setDatasetPreview(preview)
+            setRecordLoading(false)
+          })
+          .catch((error) => {
+            throw error
+          })
       }
     } else {
       setInspectRecordID()
@@ -148,7 +172,8 @@ export default function SelectionDetails ({ setPointsToReview, query, polygon, s
   }, [inspectRecordID])
 
   return (
-    <div className='pointDetails'
+    <div
+      className='pointDetails'
       onMouseEnter={() => setHoveredDataset(inspectDataset)}
       onMouseLeave={() => setHoveredDataset()}
     >
@@ -165,63 +190,66 @@ export default function SelectionDetails ({ setPointsToReview, query, polygon, s
           src={Logo}
           onClick={() => alert('reset application')}
         />
-        <LanguageSelector
-          className='noPosition'
-        />
+        <LanguageSelector className='noPosition' />
       </div>
       <div className='pointDetailsInfoRow'>
-        {loading
-          ? <Loading />
-          : inspectDataset
-            ? <DatasetInspector
-              dataset={inspectDataset}
-              setHoveredDataset={setHoveredDataset}
+        {loading ? (
+          <Loading />
+        ) : inspectDataset ? (
+          <DatasetInspector
+            dataset={inspectDataset}
+            setHoveredDataset={setHoveredDataset}
+            setInspectDataset={setInspectDataset}
+            setInspectRecordID={setInspectRecordID}
+          />
+        ) : (
+          <>
+            <div className='pointDetailsSearchBar'>
+              <div className='pointDetailsSearchBarContainer'>
+                <input
+                  value={datasetTitleSearchText}
+                  onChange={(e) => setDatasetTitleSearchText(e.target.value)}
+                  placeholder='Search dataset titles here...'
+                />
+                {!_.isEmpty(datasetTitleSearchText) && (
+                  <X
+                    className='pointDetailsSearchBarClearSearchButton'
+                    color='darkgrey'
+                    size='25px'
+                    onClick={() => setDatasetTitleSearchText('')}
+                  />
+                )}
+              </div>
+            </div>
+            <DatasetsTable
+              handleSelectAllDatasets={handleSelectAllDatasets}
+              handleSelectDataset={handleSelectDataset}
               setInspectDataset={setInspectDataset}
               setInspectRecordID={setInspectRecordID}
+              selectAll={selectAll}
+              setDatasets={setPointsData}
+              datasets={
+                _.isEmpty(debouncedDatasetTitleSearchText)
+                  ? pointsData
+                  : filteredDatasets
+              }
+              setHoveredDataset={setHoveredDataset}
             />
-            : <>
-              <div className='pointDetailsSearchBar'>
-                <div className='pointDetailsSearchBarContainer'>
-                  <input
-                    value={datasetTitleSearchText}
-                    onChange={(e) => setDatasetTitleSearchText(e.target.value)}
-                    placeholder='Search dataset titles here...'
-                  />
-                  {!_.isEmpty(datasetTitleSearchText) &&
-                    <X
-                      className='pointDetailsSearchBarClearSearchButton'
-                      color='darkgrey'
-                      size='25px'
-                      onClick={() => setDatasetTitleSearchText('')}
-                    />
-                  }
-                </div>
-              </div>
-              <DatasetsTable
-                handleSelectAllDatasets={handleSelectAllDatasets}
-                handleSelectDataset={handleSelectDataset}
-                setInspectDataset={setInspectDataset}
-                setInspectRecordID={setInspectRecordID}
-                selectAll={selectAll}
-                setDatasets={setPointsData}
-                datasets={_.isEmpty(debouncedDatasetTitleSearchText) ? pointsData : filteredDatasets}
-                setHoveredDataset={setHoveredDataset}
-              />
-              {/* {(!pointsData || pointsData.length === 0) &&
+            {/* {(!pointsData || pointsData.length === 0) &&
                 <div className="noDataNotice">
                   {t('selectionDetailsNoDataWarning')} */}
-              {/* No Data. Modify filters or change selection on map. */}
-              {/* </div>
+            {/* No Data. Modify filters or change selection on map. */}
+            {/* </div>
               } */}
-              <div className='pointDetailsControls'>
-                <div className='pointDetailsControlRow'>
-                  <strong>Datasets selected:</strong> {pointsData.length}
-                  <strong>To download:</strong> {datasetsSelected}
-                  {children}
-                </div>
+            <div className='pointDetailsControls'>
+              <div className='pointDetailsControlRow'>
+                <strong>Datasets selected:</strong> {pointsData.length}
+                <strong>To download:</strong> {datasetsSelected}
+                {children}
               </div>
-            </>
-        }
+            </div>
+          </>
+        )}
       </div>
       <DatasetPreview
         datasetPreview={datasetPreview}

@@ -4,29 +4,34 @@ import { useState, useEffect } from 'react'
 import { defaultQuery } from './components/config.js'
 import { useTranslation } from 'react-i18next'
 
-export function setAllOptionsIsSelectedTo (isSelected, options, setOptions) {
-  setOptions(options.map(option => {
-    return {
-      ...option,
-      isSelected
-    }
-  }))
+export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
+  setOptions(
+    options.map((option) => {
+      return {
+        ...option,
+        isSelected
+      }
+    })
+  )
 }
 
-export function capitalizeFirstLetter (string) {
+export function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1)
 }
 
-export function generateMultipleSelectBadgeTitle (badgeTitle, optionsSelected) {
+export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
   const { t } = useTranslation()
 
   if (optionsSelected) {
-    const optionsSelectedFiltered = optionsSelected.filter(option => option.isSelected)
+    const optionsSelectedFiltered = optionsSelected.filter(
+      (option) => option.isSelected
+    )
     if (optionsSelectedFiltered.length === 0) {
       return t(badgeTitle)
     } else if (optionsSelectedFiltered.length === 1) {
       return capitalizeFirstLetter(t(optionsSelectedFiltered[0].title))
-    } else { // More than 0 or 1 options are selected
+    } else {
+      // More than 0 or 1 options are selected
       const mapping = {
         oceanVariablesFiltername: 'oceanVariablesMulti',
         platformsFilterName: 'platformsMulti',
@@ -38,13 +43,20 @@ export function generateMultipleSelectBadgeTitle (badgeTitle, optionsSelected) {
   }
 }
 
-export function generateRangeSelectBadgeTitle (badgeTitle, optionsSelected, defaults, units) {
-  return optionsSelected[0] === defaults[0] && optionsSelected[1] === defaults[1]
+export function generateRangeSelectBadgeTitle(
+  badgeTitle,
+  optionsSelected,
+  defaults,
+  units
+) {
+  return optionsSelected[0] === defaults[0] &&
+    optionsSelected[1] === defaults[1]
     ? badgeTitle
-    : `${optionsSelected[0]} - ${optionsSelected[1]}` + (!_.isEmpty(units) ? ' ' + units : '')
+    : `${optionsSelected[0]} - ${optionsSelected[1]}` +
+        (!_.isEmpty(units) ? ' ' + units : '')
 }
 
-export function abbreviateString (text, maxLength) {
+export function abbreviateString(text, maxLength) {
   if (text) {
     if (text.length > maxLength) {
       return `${text.slice(0, maxLength)}...`
@@ -54,26 +66,30 @@ export function abbreviateString (text, maxLength) {
   }
 }
 
-export function validateEmail (email) {
-  const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+export function validateEmail(email) {
+  const re =
+    /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
   return re.test(String(email).toLowerCase())
 }
 
 // create a URL query string from an object
-function objectToURL (obj) {
+function objectToURL(obj) {
   return Object.entries(obj)
     .filter(([k, v]) => k && v != null && v !== '')
     .map(([k, v]) => `${k}=${v}`)
     .join('&')
 }
 
-export function createDataFilterQueryString (query) {
-  const { orgsSelected, eovsSelected, platformsSelected, datasetsSelected } = query
+export function createDataFilterQueryString(query) {
+  const { orgsSelected, eovsSelected, platformsSelected, datasetsSelected } =
+    query
 
   // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
-  const queryWithoutDefaults = Object.keys(defaultQuery).reduce( // going through each
+  const queryWithoutDefaults = Object.keys(defaultQuery).reduce(
+    // going through each
     (accumulatorObject, field) => {
-      if (query[field] !== defaultQuery[field]) { // checking that the value of each property in the query object has been changed in order to include those values in the url
+      if (query[field] !== defaultQuery[field]) {
+        // checking that the value of each property in the query object has been changed in order to include those values in the url
         accumulatorObject[field] = query[field]
       } // otherwise properties are left at their defaults, and excluded from the url.
       return accumulatorObject
@@ -83,12 +99,12 @@ export function createDataFilterQueryString (query) {
 
   const eovs = eovsSelected
     .filter((eov) => eov.isSelected) // pulling the selected eov names out (these don't have pks)
-    .map(eov => eov.title)
+    .map((eov) => eov.title)
     .join() // create the comma delimited list of eovs
 
   const platforms = platformsSelected
     .filter((platform) => platform.isSelected)
-    .map(platform => platform.title)
+    .map((platform) => platform.title)
     .join()
 
   const datasetPKs = datasetsSelected
@@ -103,7 +119,8 @@ export function createDataFilterQueryString (query) {
 
   const { startDepth, endDepth, startDate, endDate } = queryWithoutDefaults
 
-  const apiMappedQuery = { // These properties are specified by the API's schema
+  const apiMappedQuery = {
+    // These properties are specified by the API's schema
     eovs,
     platforms,
     datasetPKs,
@@ -117,7 +134,7 @@ export function createDataFilterQueryString (query) {
   return objectToURL(apiMappedQuery)
 }
 
-export function bytesToMemorySizeString (bytes) {
+export function bytesToMemorySizeString(bytes) {
   const num = parseFloat(bytes)
   // if(_.isEmpty(bytes)) return '---'
   if (num === NaN || num === 'NaN' || bytes === null) {
@@ -138,17 +155,24 @@ export function bytesToMemorySizeString (bytes) {
 }
 
 // returns an array of {stop: num, color: string} objects
-export function generateColorStops (colorScale, range) {
+export function generateColorStops(colorScale, range) {
   // check if fewer points than colors
   const exponent = 5
   let colors
   let scale
   if (range[1] <= colorScale.length * 2) {
     colors = colorScale.slice(0, range[1])
-    scale = d3.scaleLinear().domain([0, colors.length - 1]).range(range)
+    scale = d3
+      .scaleLinear()
+      .domain([0, colors.length - 1])
+      .range(range)
   } else {
     colors = colorScale
-    scale = d3.scalePow().exponent(exponent).domain([0, colors.length - 1]).range(range)
+    scale = d3
+      .scalePow()
+      .exponent(exponent)
+      .domain([0, colors.length - 1])
+      .range(range)
   }
   const colorStops = colors.map((color, index) => {
     return {
@@ -158,7 +182,8 @@ export function generateColorStops (colorScale, range) {
   })
   const result = []
   const map = new Map()
-  colorStops.map(colorStop => { // ensure there aren't duplicates
+  colorStops.map((colorStop) => {
+    // ensure there aren't duplicates
     if (!map.has(colorStop.stop)) {
       map.set(colorStop.stop, true)
       result.push(colorStop)
@@ -167,7 +192,7 @@ export function generateColorStops (colorScale, range) {
   return result
 }
 
-export function useDebounce (value, delay) {
+export function useDebounce(value, delay) {
   // State and setters for debounced value
   const [debouncedValue, setDebouncedValue] = useState(value)
   useEffect(
@@ -188,18 +213,18 @@ export function useDebounce (value, delay) {
   return debouncedValue
 }
 
-export function getCurrentRangeLevel (rangeLevels, zoom) {
+export function getCurrentRangeLevel(rangeLevels, zoom) {
   switch (true) {
     case zoom < 5:
-      return (rangeLevels.zoom0)
+      return rangeLevels.zoom0
     case zoom >= 5 && zoom < 7:
-      return (rangeLevels.zoom1)
+      return rangeLevels.zoom1
     case zoom >= 7:
-      return (rangeLevels.zoom2)
+      return rangeLevels.zoom2
   }
 }
 
-export function getPointsDataSize (pointsData) {
+export function getPointsDataSize(pointsData) {
   let total = 0
   pointsData.forEach((point) => {
     if (point.selected && point.size !== 'NaN' && point.size !== null) {
@@ -210,7 +235,7 @@ export function getPointsDataSize (pointsData) {
 }
 
 // returns true for rectangles, false for rotated rectangles
-function polygonIsRectangle (polygon) {
+function polygonIsRectangle(polygon) {
   if (polygon.length !== 5) return false
   const p = polygon.slice(0, 4)
 
@@ -222,7 +247,7 @@ function polygonIsRectangle (polygon) {
 const unique = (arr) => [...new Set(arr)]
 
 // translate a rectangular polygon to a bounding box query using lat/long min/max
-function polygonToMaxMins (polygon) {
+function polygonToMaxMins(polygon) {
   const p = polygon.slice(0, 4)
 
   const lons = unique(p.map((e) => e[0]))
@@ -236,7 +261,7 @@ function polygonToMaxMins (polygon) {
   }
 }
 
-export function createSelectionQueryString (polygon) {
+export function createSelectionQueryString(polygon) {
   if (polygonIsRectangle(polygon)) {
     // res = { latMin, lonMin, latMax, lonMax }
     const res = polygonToMaxMins(polygon)
@@ -246,9 +271,12 @@ export function createSelectionQueryString (polygon) {
   return 'polygon=' + JSON.stringify(polygon)
 }
 
-export function filterObjectPropertyByPropertyList (objectToFilter, allowedProperties) {
+export function filterObjectPropertyByPropertyList(
+  objectToFilter,
+  allowedProperties
+) {
   const result = Object.keys(objectToFilter)
-    .filter(key => allowedProperties.includes(key))
+    .filter((key) => allowedProperties.includes(key))
     .reduce((obj, key) => {
       obj[key] = objectToFilter[key]
       return obj
@@ -257,12 +285,12 @@ export function filterObjectPropertyByPropertyList (objectToFilter, allowedPrope
 }
 
 // https://stackoverflow.com/questions/32553158/detect-click-outside-react-component
-export function useOutsideAlerter (ref, callback, value) {
+export function useOutsideAlerter(ref, callback, value) {
   useEffect(() => {
     /**
      * Alert if clicked on outside of element
      */
-    function handleClickOutside (event) {
+    function handleClickOutside(event) {
       if (ref.current && !ref.current.contains(event.target)) {
         callback(value)
       }
@@ -276,18 +304,20 @@ export function useOutsideAlerter (ref, callback, value) {
   }, [ref])
 }
 
-export function getCookieValue (cookieName) {
+export function getCookieValue(cookieName) {
   if (document.cookie.includes(cookieName)) {
     return document.cookie
       .split('; ')
-      .find(row => row.startsWith(cookieName + '='))
+      .find((row) => row.startsWith(cookieName + '='))
       .split('=')[1]
   }
 }
 
-export function updateMapToolTitleLanguage (t) {
+export function updateMapToolTitleLanguage(t) {
   // const { t } = useTranslation()
-  const polygonToolDiv = document.getElementsByClassName('mapbox-gl-draw_polygon')
+  const polygonToolDiv = document.getElementsByClassName(
+    'mapbox-gl-draw_polygon'
+  )
   polygonToolDiv[0].title = t('mapPolygonToolTitle')
 
   const deleteToolDiv = document.getElementsByClassName('mapbox-gl-draw_trash')
@@ -296,6 +326,8 @@ export function updateMapToolTitleLanguage (t) {
   const zoomInToolDiv = document.getElementsByClassName('mapboxgl-ctrl-zoom-in')
   zoomInToolDiv[0].title = t('mapZoomInToolTitle')
 
-  const zoomOutToolDiv = document.getElementsByClassName('mapboxgl-ctrl-zoom-out')
+  const zoomOutToolDiv = document.getElementsByClassName(
+    'mapboxgl-ctrl-zoom-out'
+  )
   zoomOutToolDiv[0].title = t('mapZoomOutToolTitle')
 }

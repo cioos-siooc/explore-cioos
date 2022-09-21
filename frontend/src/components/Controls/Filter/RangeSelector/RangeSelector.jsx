@@ -6,14 +6,14 @@ import 'rc-slider/assets/index.css'
 import './styles.css'
 
 export default class RangeSelector extends React.Component {
-  constructor (props) {
+  constructor(props) {
     super(props)
     this.state = {
       dynamicKey: Date.now()
     }
   }
 
-  onSliderChange = value => {
+  onSliderChange = (value) => {
     this.props.setStartDepth(value[0])
     this.props.setEndDepth(value[1])
   }
@@ -25,7 +25,7 @@ export default class RangeSelector extends React.Component {
     })
 
     if (value >= this.state.min && value <= this.state.max) {
-      this.setState(state => {
+      this.setState((state) => {
         state.value[index] = Number(value)
         return {
           value: state.value.sort((x, y) => x - y)
@@ -34,7 +34,7 @@ export default class RangeSelector extends React.Component {
     }
   }
 
-  render () {
+  render() {
     return (
       <div className='rangeSelector'>
         <Slider
