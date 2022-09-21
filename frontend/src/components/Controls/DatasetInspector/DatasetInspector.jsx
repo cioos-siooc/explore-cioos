@@ -44,26 +44,26 @@ export default function DatasetInspector ({ dataset, setInspectDataset, setHover
         {/* Back */}
       </div>
       <div>
-        <div className="metadataAndRecordIDTableGridContainer">
+        <div className='metadataAndRecordIDTableGridContainer'>
           <strong>{t('datasetInspectorTitleText')}</strong>
           {/* {t(dataset.title)} */}
           <button onClick={() => alert(`setting dataset filter to ${dataset.title}`)}>
             {dataset.title}
           </button>
-          <div className="metadataGridContainer">
-            <div className="metadataGridItem organization">
+          <div className='metadataGridContainer'>
+            <div className='metadataGridItem organization'>
               <strong>{t('datasetInspectorOrganizationText')}</strong>
               {dataset.organizations.map((org, index) => {
                 return <button key={index} onClick={() => alert(`setting org filter to ${org}`)}>{t(org)}</button>
               })}
             </div>
-            <div className="metadataGridItem variable">
+            <div className='metadataGridItem variable'>
               <strong>{t('datasetInspectorOceanVariablesText')}</strong>
               {dataset.eovs.map((eov, index) => {
                 return <button key={index} onClick={() => alert(`setting EOV filter to ${eov}`)}>{t(eov)}</button>
               })}
             </div>
-            <div className="metadataGridItem platform">
+            <div className='metadataGridItem platform'>
               <strong>{t('datasetInspectorPlatformText')}</strong>
               <button
                 onClick={() => alert(`setting platform filter to ${dataset.platform}`)}
@@ -71,29 +71,29 @@ export default function DatasetInspector ({ dataset, setInspectDataset, setHover
                 {t(dataset.platform)}
               </button>
             </div>
-            <div className="metadataGridItem records">
+            <div className='metadataGridItem records'>
               <strong>{t('datasetInspectorRecordsText')}</strong>
               ({dataset && `${dataset.profiles_count} / ${dataset.n_profiles}`})
             </div>
-            <div className="metadataGridItem ERDAP">
+            <div className='metadataGridItem ERDAP'>
               <strong>ERDAP URL</strong>
               {dataset.erddap_url &&
                 <a
                   className={!dataset.erddap_url && 'unavailable'}
                   href={dataset.erddap_url}
                   target='_blank'
-                  title={dataset.erddap_url ? dataset.erddap_url : 'unavailable'} rel="noreferrer">
+                  title={dataset.erddap_url ? dataset.erddap_url : 'unavailable'} rel='noreferrer'>
                   {t('datasetInspectorERDDAPURL')} (ERDDAP)
                 </a>}
             </div>
-            <div className="metadataGridItem CKAN">
+            <div className='metadataGridItem CKAN'>
               <strong>CKAN URL</strong>
               {dataset.ckan_url &&
                 <a
                   className={!dataset.ckan_url && 'unavailable'}
                   href={dataset.ckan_url}
                   target='_blank'
-                  title={dataset.ckan_url ? dataset.ckan_url : 'unavailable'} rel="noreferrer">
+                  title={dataset.ckan_url ? dataset.ckan_url : 'unavailable'} rel='noreferrer'>
                   {t('datasetInspectorCKANURL')} (CKAN)
                 </a>
               }
@@ -103,7 +103,7 @@ export default function DatasetInspector ({ dataset, setInspectDataset, setHover
             ? <div className='datasetInspectorLoadingContainer'>
               <Loading />
             </div>
-            : <Table className='inspectorTable' striped bordered size="sm">
+            : <Table className='inspectorTable' striped bordered size='sm'>
               <thead>
                 <tr>
                   <th>{t('datasetInspectorRecordIDText')}</th>

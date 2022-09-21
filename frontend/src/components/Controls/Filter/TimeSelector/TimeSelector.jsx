@@ -56,10 +56,10 @@ export default function TimeSelector (props) {
           {/* Start Date: */}
         </span>
         <input
-          type="date"
+          type='date'
           value={startDate}
-          max="9999-12-31"
-          min="0000-01-01"
+          max='9999-12-31'
+          min='0000-01-01'
           onChange={(e) => handleSetStartDate(e.target.value)}
         />
       </div>
@@ -69,10 +69,10 @@ export default function TimeSelector (props) {
           {/* End Date: */}
         </span>
         <input
-          type="date"
+          type='date'
           value={endDate}
-          max="9999-12-31"
-          min="0000-01-01"
+          max='9999-12-31'
+          min='0000-01-01'
           onChange={(e) => handleSetEndDate(e.target.value)}
         />
       </div>

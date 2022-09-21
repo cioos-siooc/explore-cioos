@@ -12,11 +12,11 @@ export default function Loading () {
       }
       <Spinner
         className='spinner'
-        as="span"
-        animation="border"
+        as='span'
+        animation='border'
         size={70}
-        role="status"
-        aria-hidden="true"
+        role='status'
+        aria-hidden='true'
       />
     </div>
   )

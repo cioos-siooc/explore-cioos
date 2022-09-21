@@ -3,10 +3,10 @@ import { Table } from 'react-bootstrap'
 
 import './styles.css'
 
-export default function DatasetPreviewTable({ datasetPreview }) {
+export default function DatasetPreviewTable ({ datasetPreview }) {
   return (
     <div className='datasetPreviewTable'>
-      <Table striped bordered size="sm">
+      <Table striped bordered size='sm'>
         <thead>
           <tr>
             {datasetPreview?.table?.columnNames.map((columnName, columnIndex) => {

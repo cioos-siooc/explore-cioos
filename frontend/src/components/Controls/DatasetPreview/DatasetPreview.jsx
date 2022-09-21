@@ -8,7 +8,7 @@ import DatasetPreviewPlot from '../DatasetPreviewPlot/DatasetPreviewPlot.jsx'
 import DatasetPreviewTable from '../DatasetPreviewTable/DatasetPreviewTable.jsx'
 import './styles.css'
 
-export default function DatasetPreview({ datasetPreview, inspectDataset, setInspectDataset, inspectRecordID, setInspectRecordID, showModal, setShowModal, setDatasetPreview, recordLoading }) {
+export default function DatasetPreview ({ datasetPreview, inspectDataset, setInspectDataset, inspectRecordID, setInspectRecordID, showModal, setShowModal, setDatasetPreview, recordLoading }) {
   const { t, i18n } = useTranslation()
   const [plotXAxis, setPlotXAxis] = useState([])
   const [plotYAxis, setPlotYAxis] = useState([])
@@ -74,10 +74,10 @@ export default function DatasetPreview({ datasetPreview, inspectDataset, setInsp
           </h4>
         </Modal.Header>
         <Modal.Body>
-          <div className="previewFlexContainer">
-            <div className="previewFlexItem dataTableAndDataPlot">
-              <div className="tableAndPlotGridContainer">
-                <div className="tableAndPlotGridItem">
+          <div className='previewFlexContainer'>
+            <div className='previewFlexItem dataTableAndDataPlot'>
+              <div className='tableAndPlotGridContainer'>
+                <div className='tableAndPlotGridItem'>
                   <strong>Selected record ID:</strong> {` ${inspectRecordID} `}
                   <button
                     className={`toggleButton ${selectedVis === 'table' && 'selected'}`}
@@ -97,26 +97,24 @@ export default function DatasetPreview({ datasetPreview, inspectDataset, setInsp
                     Plot
                   </button>
                 </div>
-                <div className="tableAndPlotGridItem tableAndPlot">
+                <div className='tableAndPlotGridItem tableAndPlot'>
                   {recordLoading && <Loading />}
                   {!clear && selectedVis === 'table'
-                    ?
-                    <DatasetPreviewTable
+                    ? <DatasetPreviewTable
                       datasetPreview={datasetPreview}
                     // setRecordLoading={setRecordLoading}
                     />
-                    :
-                    <>
+                    : <>
                       <hr />
                       <DropdownButton
-                        title={(plotXAxis && `X axis: ` + plotXAxis.columnName) || 'Select X axis variable'}
+                        title={(plotXAxis && 'X axis: ' + plotXAxis.columnName) || 'Select X axis variable'}
                       >
                         {datasetPreview && datasetPreview?.table?.columnNames.map((columnName, index) => {
                           return <Dropdown.Item key={index} onClick={() => setPlotXAxis({ index, columnName })}>{columnName}</Dropdown.Item>
                         })}
                       </DropdownButton>
                       <DropdownButton
-                        title={(plotYAxis && `Y Axis: ` + plotYAxis.columnName) || 'Select Y axis variable'}
+                        title={(plotYAxis && 'Y Axis: ' + plotYAxis.columnName) || 'Select Y axis variable'}
                       >
                         {datasetPreview && datasetPreview?.table?.columnNames.map((columnName, index) => {
                           return <Dropdown.Item key={index} onClick={() => setPlotYAxis({ index, columnName })}>{columnName}</Dropdown.Item>
