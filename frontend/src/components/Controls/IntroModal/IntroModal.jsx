@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { getCookieValue } from '../../../utilities'
 import './styles.css'
 
-export default function IntroModal({ initialOpenState }) {
+export default function IntroModal ({ initialOpenState }) {
   const { t, i18n } = useTranslation()
   const introOpenCookie = !getCookieValue('introModalOpen')
   const [showModal, setShowModal] = useState(introOpenCookie !== undefined ? introOpenCookie : initialOpenState)
@@ -20,7 +20,7 @@ export default function IntroModal({ initialOpenState }) {
     }
   }, [showModal])
 
-  function generateInfo() {
+  function generateInfo () {
     switch (hoveredStep) {
       case 'filter':
         return (

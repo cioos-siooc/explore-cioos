@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { updateMapToolTitleLanguage } from '../../../utilities'
 import './styles.css'
 
-export default function LanguageSelector({ className }) {
+export default function LanguageSelector ({ className }) {
   const { t, i18n } = useTranslation()
   const otherLanguage = i18n.languages.filter(lang => lang !== i18n.language)
 
