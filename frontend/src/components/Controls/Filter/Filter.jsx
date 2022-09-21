@@ -9,7 +9,7 @@ import { abbreviateString, useOutsideAlerter } from '../../../utilities'
 
 import './styles.css'
 
-export default function Filter({
+export default function Filter ({
   active,
   badgeTitle,
   tooltip,

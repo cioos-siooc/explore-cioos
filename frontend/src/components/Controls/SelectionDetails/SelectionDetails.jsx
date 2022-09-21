@@ -23,7 +23,7 @@ import {
 import _ from 'lodash'
 
 // Note: datasets and points are exchangable terminology
-export default function SelectionDetails({ setPointsToReview, query, polygon, setHoveredDataset, children }) {
+export default function SelectionDetails ({ setPointsToReview, query, polygon, setHoveredDataset, children }) {
   const { t, i18n } = useTranslation()
   const [selectAll, setSelectAll] = useState(false)
   const [pointsData, setPointsData] = useState([])
@@ -109,7 +109,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
     }
   }, [query, polygon, i18n.language])
 
-  function handleSelectDataset(point) {
+  function handleSelectDataset (point) {
     const dataset = pointsData.filter((p) => p.pk === point.pk)[0]
     dataset.selected = !point.selected
     const result = pointsData.map((p) => {
@@ -122,7 +122,7 @@ export default function SelectionDetails({ setPointsToReview, query, polygon, se
     setPointsData(result)
   }
 
-  function handleSelectAllDatasets() {
+  function handleSelectAllDatasets () {
     setPointsData(pointsData.map(p => {
       return {
         ...p,

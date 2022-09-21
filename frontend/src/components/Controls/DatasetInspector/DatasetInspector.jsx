@@ -8,7 +8,7 @@ import Loading from '../Loading/Loading.jsx'
 import { server } from '../../../config'
 import './styles.css'
 
-export default function DatasetInspector({ dataset, setInspectDataset, setHoveredDataset, setInspectRecordID }) {
+export default function DatasetInspector ({ dataset, setInspectDataset, setHoveredDataset, setInspectRecordID }) {
   const { t } = useTranslation()
   const [datasetRecords, setDatasetRecords] = useState()
   const [loading, setLoading] = useState(false)
