@@ -357,40 +357,40 @@ export default function App() {
 
   useEffect(() => {
     switch (submissionState) {
-      case 'submitted':
-        submitRequest()
-        setSubmissionFeedback({
-          icon: (
-            <Spinner
-              className='text-warning'
-              as='span'
-              animation='border'
-              size={30}
-              role='status'
-              aria-hidden='true'
-            />
-          ),
-          text: t('submissionStateTextSubmitting') // 'Submitting...'
-        })
-        break
+    case 'submitted':
+      submitRequest()
+      setSubmissionFeedback({
+        icon: (
+          <Spinner
+            className='text-warning'
+            as='span'
+            animation='border'
+            size={30}
+            role='status'
+            aria-hidden='true'
+          />
+        ),
+        text: t('submissionStateTextSubmitting') // 'Submitting...'
+      })
+      break
 
-      case 'successful':
-        setSubmissionFeedback({
-          icon: <CheckCircle className='text-success' size={30} />,
-          text: t('submissionStateTextSuccess', { email }) // Request successful. Download link will be sent to: ' + email
-        })
-        break
+    case 'successful':
+      setSubmissionFeedback({
+        icon: <CheckCircle className='text-success' size={30} />,
+        text: t('submissionStateTextSuccess', { email }) // Request successful. Download link will be sent to: ' + email
+      })
+      break
 
-      case 'failed':
-        setSubmissionFeedback({
-          icon: <XCircle className='text-danger' size={30} />,
-          text: t('submissionStateTextFailed') // 'Request failed'
-        })
-        break
+    case 'failed':
+      setSubmissionFeedback({
+        icon: <XCircle className='text-danger' size={30} />,
+        text: t('submissionStateTextFailed') // 'Request failed'
+      })
+      break
 
-      default:
-        setSubmissionFeedback()
-        break
+    default:
+      setSubmissionFeedback()
+      break
     }
   }, [submissionState])
 

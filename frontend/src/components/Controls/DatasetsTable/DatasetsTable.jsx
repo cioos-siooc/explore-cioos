@@ -47,26 +47,26 @@ export default function DatasetsTable({
     if (prop === sortProp) {
       ascending
         ? data.sort((a, b) =>
-            _.get(a, prop) > _.get(b, prop)
-              ? -1
-              : _.get(a, prop) < _.get(b, prop)
+          _.get(a, prop) > _.get(b, prop)
+            ? -1
+            : _.get(a, prop) < _.get(b, prop)
               ? 1
               : 0
-          )
+        )
         : data.sort((a, b) =>
-            _.get(a, prop) > _.get(b, prop)
-              ? 1
-              : _.get(a, prop) < _.get(b, prop)
+          _.get(a, prop) > _.get(b, prop)
+            ? 1
+            : _.get(a, prop) < _.get(b, prop)
               ? -1
               : 0
-          )
+        )
     } else {
       data.sort((a, b) =>
         _.get(a, prop) > _.get(b, prop)
           ? 1
           : _.get(a, prop) < _.get(b, prop)
-          ? -1
-          : 0
+            ? -1
+            : 0
       )
     }
     return data
@@ -213,8 +213,8 @@ export default function DatasetsTable({
                   {toInteger(point.profiles_count) !==
                   toInteger(point.n_profiles)
                     ? `${toInteger(point.profiles_count)} / ${toInteger(
-                        point.n_profiles
-                      )}`
+                      point.n_profiles
+                    )}`
                     : toInteger(point.n_profiles)}{' '}
                   {hoveredTableRow === index && (
                     <ChevronCompactRight

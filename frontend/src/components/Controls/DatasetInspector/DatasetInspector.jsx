@@ -166,14 +166,14 @@ export default function DatasetInspector({
                           profile.depth_min < Number.EPSILON
                             ? 0
                             : profile.depth_min > 15000
-                            ? t('datasetInspectorDepthTooLargeWarningText')
-                            : profile.depth_min.toFixed(1)
+                              ? t('datasetInspectorDepthTooLargeWarningText')
+                              : profile.depth_min.toFixed(1)
                         } - ${
                           profile.depth_max < Number.EPSILON
                             ? 0
                             : profile.depth_max > 15000
-                            ? t('datasetInspectorDepthTooLargeWarningText')
-                            : profile.depth_max.toFixed(1)
+                              ? t('datasetInspectorDepthTooLargeWarningText')
+                              : profile.depth_max.toFixed(1)
                         }`}</td>
                       </tr>
                     )
