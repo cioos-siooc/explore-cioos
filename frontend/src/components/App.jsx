@@ -14,7 +14,8 @@ import {
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import _ from 'lodash'
-
+import platformsJSONfile from '../platforms.json'
+import eovsJSONfile from '../eovs.json'
 import { server } from '../config.js'
 import Controls from './Controls/Controls.jsx'
 import Map from './Map/Map.js'
@@ -238,10 +239,16 @@ export default function App() {
       .then((platforms) => {
         setPlatformsSelected(
           platforms.map((platform, index) => {
+            const platformMetadata = platformsJSONfile.find(
+              (p) => p.label_en === platform
+            )
+
             return {
               title: platform,
               pk: platform,
-              isSelected: false
+              isSelected: false,
+              hover_en: platformMetadata.definition_en,
+              hover_fr: platformMetadata.definition_fr
             }
           })
         )
@@ -258,10 +265,14 @@ export default function App() {
       .then((eovs) => {
         setEovsSelected(
           eovs.map((eov, index) => {
+            const eovMetadata = eovsJSONfile.eovs.find((e) => e.value === eov)
+
             return {
               title: eov,
               isSelected: false,
-              pk: index
+              pk: index,
+              hover_en: eovMetadata['definition EN'],
+              hover_fr: eovMetadata['definition FR']
             }
           })
         )
