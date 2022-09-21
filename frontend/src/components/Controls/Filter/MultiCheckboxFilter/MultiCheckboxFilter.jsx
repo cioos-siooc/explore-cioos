@@ -1,7 +1,11 @@
+/* eslint-disable react/prop-types */
+/* eslint-disable multiline-ternary */
+
 import * as React from 'react'
 import { CheckSquare, CircleFill, Square } from 'react-bootstrap-icons'
+import { Tooltip, OverlayTrigger } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
-import { capitalizeFirstLetter, abbreviateString } from '../../../../utilities'
+import { capitalizeFirstLetter } from '../../../../utilities'
 import platformColors from '../../../platformColors'
 import './styles.css'
 
@@ -103,48 +107,63 @@ export default function MultiCheckboxFilter({
               platformColor = platformColor[0].color
             }
           }
+          const hoverText = option[`hover_${i18n.language}`] || title
+
           // No translation
           return (
-            <div
-              className='optionButton'
+            <OverlayTrigger
               key={index}
-              title={t(title)}
-              onClick={() => {
-                if (searchable) {
-                  setOptionsSelected(
-                    allOptions.map((opt) => {
-                      if (opt.pk === option.pk) {
-                        return {
-                          ...opt,
-                          isSelected: !opt.isSelected
-                        }
-                      } else return opt
-                    })
-                  )
-                } else {
-                  setOptionsSelected(
-                    optionsSelected.map((opt) => {
-                      if (opt.pk === option.pk) {
-                        return {
-                          ...opt,
-                          isSelected: !opt.isSelected
-                        }
-                      } else return opt
-                    })
-                  )
-                }
-              }}
+              placement='bottom'
+              delay={{ show: 150, hide: 0 }}
+              overlay={
+                <Tooltip style={{ display: hoverText ? '' : 'none' }}>
+                  {hoverText}
+                </Tooltip>
+              }
             >
-              {option.isSelected ? <CheckSquare /> : <Square />}
-              <span className='optionName'>{capitalizeFirstLetter(title)}</span>
-              {colored && (
-                <CircleFill
-                  className='optionColorCircle'
-                  fill={platformColor}
-                  size='15'
-                />
-              )}
-            </div>
+              <div
+                className='optionButton'
+                key={index}
+                title={t(title)}
+                onClick={() => {
+                  if (searchable) {
+                    setOptionsSelected(
+                      allOptions.map((opt) => {
+                        if (opt.pk === option.pk) {
+                          return {
+                            ...opt,
+                            isSelected: !opt.isSelected
+                          }
+                        } else return opt
+                      })
+                    )
+                  } else {
+                    setOptionsSelected(
+                      optionsSelected.map((opt) => {
+                        if (opt.pk === option.pk) {
+                          return {
+                            ...opt,
+                            isSelected: !opt.isSelected
+                          }
+                        } else return opt
+                      })
+                    )
+                  }
+                }}
+              >
+                {option.isSelected ? <CheckSquare /> : <Square />}
+                <span className='optionName'>
+                  {capitalizeFirstLetter(title)}
+                </span>
+                {colored && (
+                  <CircleFill
+                    className='optionColorCircle'
+                    fill={platformColor}
+                    size='15'
+                  />
+                )}
+              </div>
+            </OverlayTrigger>
           )
         })
       ) : (
