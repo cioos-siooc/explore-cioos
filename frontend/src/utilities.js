@@ -298,7 +298,4 @@ export function updateMapToolTitleLanguage (t) {
 
   const zoomOutToolDiv = document.getElementsByClassName('mapboxgl-ctrl-zoom-out')
   zoomOutToolDiv[0].title = t('mapZoomOutToolTitle')
-
-  const orientNorthToolDiv = document.getElementsByClassName('mapboxgl-ctrl-compass')
-  orientNorthToolDiv[0].title = t('mapCompassToolTitle')
 }
