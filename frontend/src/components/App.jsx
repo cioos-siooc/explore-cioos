@@ -51,7 +51,8 @@ import {
   generateMultipleSelectBadgeTitle,
   generateRangeSelectBadgeTitle,
   useDebounce,
-  setAllOptionsIsSelectedTo
+  setAllOptionsIsSelectedTo,
+  polygonIsRectangle
 } from '../utilities.js'
 
 import 'bootstrap/dist/css/bootstrap.min.css'
@@ -757,7 +758,7 @@ export default function App() {
         />
       )}
       <button
-        className='boxQueryButton'
+        className={`boxQueryButton ${polygon && polygonIsRectangle(polygon) && 'active'}`}
         id='boxQueryButton'
         title={t('rectangleToolTitle')}
       >
