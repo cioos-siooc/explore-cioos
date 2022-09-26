@@ -51,7 +51,8 @@ import {
   generateMultipleSelectBadgeTitle,
   generateRangeSelectBadgeTitle,
   useDebounce,
-  setAllOptionsIsSelectedTo
+  setAllOptionsIsSelectedTo,
+  polygonIsRectangle
 } from '../utilities.js'
 
 import 'bootstrap/dist/css/bootstrap.min.css'
@@ -357,40 +358,40 @@ export default function App() {
 
   useEffect(() => {
     switch (submissionState) {
-    case 'submitted':
-      submitRequest()
-      setSubmissionFeedback({
-        icon: (
-          <Spinner
-            className='text-warning'
-            as='span'
-            animation='border'
-            size={30}
-            role='status'
-            aria-hidden='true'
-          />
-        ),
-        text: t('submissionStateTextSubmitting') // 'Submitting...'
-      })
-      break
+      case 'submitted':
+        submitRequest()
+        setSubmissionFeedback({
+          icon: (
+            <Spinner
+              className='text-warning'
+              as='span'
+              animation='border'
+              size={30}
+              role='status'
+              aria-hidden='true'
+            />
+          ),
+          text: t('submissionStateTextSubmitting') // 'Submitting...'
+        })
+        break
 
-    case 'successful':
-      setSubmissionFeedback({
-        icon: <CheckCircle className='text-success' size={30} />,
-        text: t('submissionStateTextSuccess', { email }) // Request successful. Download link will be sent to: ' + email
-      })
-      break
+      case 'successful':
+        setSubmissionFeedback({
+          icon: <CheckCircle className='text-success' size={30} />,
+          text: t('submissionStateTextSuccess', { email }) // Request successful. Download link will be sent to: ' + email
+        })
+        break
 
-    case 'failed':
-      setSubmissionFeedback({
-        icon: <XCircle className='text-danger' size={30} />,
-        text: t('submissionStateTextFailed') // 'Request failed'
-      })
-      break
+      case 'failed':
+        setSubmissionFeedback({
+          icon: <XCircle className='text-danger' size={30} />,
+          text: t('submissionStateTextFailed') // 'Request failed'
+        })
+        break
 
-    default:
-      setSubmissionFeedback()
-      break
+      default:
+        setSubmissionFeedback()
+        break
     }
   }, [submissionState])
 
@@ -483,9 +484,9 @@ export default function App() {
                   submissionFeedback &&
                   submissionState !== 'submitted' &&
                   t('submitRequestButtonResubmitText')) ||
-                  (_.isEmpty(pointsToDownload) &&
-                    t('submitRequestButtonSelectDataText')) ||
-                  t('submitRequestButtonSubmitText') // 'Submit Request'
+                (_.isEmpty(pointsToDownload) &&
+                  t('submitRequestButtonSelectDataText')) ||
+                t('submitRequestButtonSubmitText') // 'Submit Request'
               }
             </button>
           </Col>
@@ -532,6 +533,12 @@ export default function App() {
                 query={query}
                 polygon={polygon}
                 setHoveredDataset={setHoveredDataset}
+                filterSet={{
+                  eovFilter: { eovsSelected, setEovsSelected },
+                  platformFilter: { platformsSelected, setPlatformsSelected },
+                  orgFilter: { orgsSelected, setOrgsSelected },
+                  datasetFilter: { datasetsSelected, setDatasetsSelected }
+                }}
               >
                 {DownloadButton()}
               </SelectionDetails>
@@ -742,20 +749,6 @@ export default function App() {
           />
         </Filter>
       </Controls>
-      {/* {i18n.language === 'en'
-        ? <a
-          title={t('CIOOSLogoButtonTitle')}
-          className='logo english'
-          href='https://cioos.ca/'
-          target='_blank' rel="noreferrer"
-        />
-        : <a
-          title={t('CIOOSLogoButtonTitle')}
-          className='logo french'
-          href='https://siooc.ca/'
-          target='_blank' rel="noreferrer"
-        />
-      } */}
       {currentRangeLevel && (
         <Legend
           currentRangeLevel={currentRangeLevel}
@@ -765,22 +758,13 @@ export default function App() {
         />
       )}
       <button
-        className='boxQueryButton'
+        className={`boxQueryButton ${polygon && polygonIsRectangle(polygon) && 'active'}`}
         id='boxQueryButton'
         title={t('rectangleToolTitle')}
       >
         <div className='rectangleIcon' />
       </button>
-      {/* <a
-        className='feedbackButton'
-        title={t('feedbackButtonTitle')}
-        href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit'
-        target='_blank'
-      >
-        <ChatDots size='30px' />
-      </a> */}
       <IntroModal initialOpenState={true} />
-      {/* <LanguageSelector /> */}
     </ErrorBoundary>
   )
 }

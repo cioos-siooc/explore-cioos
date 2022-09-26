@@ -28,6 +28,7 @@ export default function SelectionDetails({
   query,
   polygon,
   setHoveredDataset,
+  filterSet,
   children
 }) {
   const { t, i18n } = useTranslation()
@@ -75,21 +76,11 @@ export default function SelectionDetails({
       setPointsToReview(pointsData.filter((point) => point.selected))
     }
     setLoading(false)
-    // if (pointsData.length === 1) { // Auto load single selected dataset
-    //   setInspectDataset(pointsData[0])
-    //   // setLoading(true)
-    // }
+    if (pointsData.length === 1) { // Auto load single selected dataset
+      setInspectDataset(pointsData[0])
+      // setLoading(true)
+    }
   }, [pointsData])
-
-  // useEffect(() => {
-  // if (inspectDataset) {
-  //   setInspectRecordID(inspectDataset.profiles[0].profile_id)
-  // }
-  // }, [inspectDataset])
-
-  // useEffect(() => {
-
-  // }, [pointsData])
 
   useEffect(() => {
     setDataTotal(0)
@@ -201,6 +192,7 @@ export default function SelectionDetails({
             setHoveredDataset={setHoveredDataset}
             setInspectDataset={setInspectDataset}
             setInspectRecordID={setInspectRecordID}
+            filterSet={filterSet}
           />
         ) : (
           <>
@@ -209,6 +201,7 @@ export default function SelectionDetails({
               handleSelectDataset={handleSelectDataset}
               setInspectDataset={setInspectDataset}
               setInspectRecordID={setInspectRecordID}
+              filterSet={filterSet}
               selectAll={selectAll}
               setDatasets={setPointsData}
               datasets={
