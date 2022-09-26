@@ -59,22 +59,22 @@ export default function MultiCheckboxFilter({
     <div className={'multiCheckboxFilter'}>
       {optionsSelected.length > 0 &&
         optionsSelected.length !== allOptions.length && ( // search results exist
-        <>
-          <div
-            className='searchResultsButton'
-            onClick={() => selectAllSearchResultsToggle()}
-          >
-            {optionsSelected.every((option) => option.isSelected) ? (
-              <CheckSquare />
-            ) : (
-              <Square />
-            )}
-            {t('multiCheckboxFilterSelectSearchResults')}{' '}
-            {`(${optionsSelected.length})`}
-            <hr />
-          </div>
-        </>
-      )}
+          <>
+            <div
+              className='searchResultsButton'
+              onClick={() => selectAllSearchResultsToggle()}
+            >
+              {optionsSelected.every((option) => option.isSelected) ? (
+                <CheckSquare />
+              ) : (
+                <Square />
+              )}
+              {t('multiCheckboxFilterSelectSearchResults')}{' '}
+              {`(${optionsSelected.length})`}
+              <hr />
+            </div>
+          </>
+        )}
       {optionsSelected.length > 0 ? (
         optionsSelectedSorted.map((option, index) => {
           let title
@@ -122,7 +122,7 @@ export default function MultiCheckboxFilter({
               }
             >
               <div
-                className='optionButton'
+                className={`optionButton ${option.isSelected && 'selected'}`}
                 key={index}
                 title={t(title)}
                 onClick={() => {

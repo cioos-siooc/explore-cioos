@@ -61,7 +61,7 @@
   display: block;
 }
 
-.metadataAndRecordIDTableGridContainer button:hover, a:hover {
+.metadataAndRecordIDTableGridContainer a:hover {
   background-color: #c6e3df;
 }
 

@@ -90,9 +90,8 @@ export default function DatasetPreview({
                     <strong>Selected record ID:</strong>{' '}
                     {` ${inspectRecordID} `}
                     <button
-                      className={`toggleButton ${
-                        selectedVis === 'table' && 'selected'
-                      }`}
+                      className={`toggleButton ${selectedVis === 'table' && 'selected'
+                        }`}
                       onClick={() => {
                         setSelectedVis('table')
                         // setRecordLoading(true)
@@ -101,9 +100,8 @@ export default function DatasetPreview({
                       Table
                     </button>
                     <button
-                      className={`toggleButton ${
-                        selectedVis === 'plot' && 'selected'
-                      }`}
+                      className={`toggleButton ${selectedVis === 'plot' && 'selected'
+                        }`}
                       onClick={() => {
                         setSelectedVis('plot')
                         // setRecordLoading(true)
@@ -117,7 +115,7 @@ export default function DatasetPreview({
                     {!clear && selectedVis === 'table' ? (
                       <DatasetPreviewTable
                         datasetPreview={datasetPreview}
-                        // setRecordLoading={setRecordLoading}
+                      // setRecordLoading={setRecordLoading}
                       />
                     ) : (
                       <>
@@ -183,7 +181,7 @@ export default function DatasetPreview({
                           plotXAxis={plotXAxis}
                           plotYAxis={plotYAxis}
                           title={inspectDataset.title}
-                          // setRecordLoading={setRecordLoading}
+                        // setRecordLoading={setRecordLoading}
                         />
                       </>
                     )}
