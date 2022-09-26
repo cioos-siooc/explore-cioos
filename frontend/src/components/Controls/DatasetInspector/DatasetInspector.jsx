@@ -151,8 +151,8 @@ export default function DatasetInspector({
               />
             </div>
             <div className='metadataGridItem records'>
-              <strong>{t('datasetInspectorRecordsText')}</strong>(
-              {dataset && `${dataset.profiles_count} / ${dataset.n_profiles}`})
+              <strong>{t('datasetInspectorRecordsText')}</strong>
+              {dataset.profiles_count !== dataset.n_profiles ? `${dataset.profiles_count} / ${dataset.n_profiles}` : dataset.profiles_count}
             </div>
             <div className='metadataGridItem ERDAP'>
               <strong>Dataset source URL</strong>
