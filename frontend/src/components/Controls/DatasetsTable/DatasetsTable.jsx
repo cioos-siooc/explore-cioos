@@ -57,7 +57,7 @@ export default function DatasetsTable({
     },
     {
       name: <div>Platform</div>,
-
+      compact: true,
       wrap: true,
 
       center: true,
@@ -76,7 +76,7 @@ export default function DatasetsTable({
           />
         )
       },
-      width: '80px',
+      width: '60px',
       sortable: true
     },
     {
@@ -88,7 +88,7 @@ export default function DatasetsTable({
     },
     {
       name: 'Type',
-      compact: true,
+
       selector: (row) =>
         row.cdm_data_type
           .replace('TimeSeriesProfile', 'Timeseries / Profile')
@@ -100,8 +100,9 @@ export default function DatasetsTable({
       name: 'Locations',
       selector: (row) => row.profiles_count,
       wrap: true,
+
       sortable: true,
-      width: '75px'
+      width: '120px'
     }
   ]
 
@@ -123,6 +124,7 @@ export default function DatasetsTable({
       >
         <DataTable
           striped
+          // dense
           columns={columns}
           data={data}
           onRowClicked={isDownloadModal ? undefined : setInspectDataset}
