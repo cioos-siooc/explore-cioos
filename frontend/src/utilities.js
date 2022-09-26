@@ -1,6 +1,6 @@
 import * as _ from 'lodash'
 import * as d3 from 'd3'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { defaultQuery } from './components/config.js'
 import { useTranslation } from 'react-i18next'
 
@@ -330,4 +330,16 @@ export function updateMapToolTitleLanguage(t) {
     'mapboxgl-ctrl-zoom-out'
   )
   zoomOutToolDiv[0].title = t('mapZoomOutToolTitle')
+}
+
+// make table column headers more readable
+export function splitLines(s) {
+  const split = s.split(' ')
+  return (
+    <span>
+      {split[0]}
+      <br />
+      {split.slice(1).join(' ')}
+    </span>
+  )
 }
