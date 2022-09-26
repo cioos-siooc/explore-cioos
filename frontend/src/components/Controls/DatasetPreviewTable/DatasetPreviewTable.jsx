@@ -29,6 +29,7 @@ export default function DatasetPreviewTable({ datasetPreview }) {
       colName + ' ' + (columnUnits[i] ? `(${columnUnits[i]})` : '')
     ),
     selector: (row) => row[colName],
+    reorder: true,
     wrap: true,
     sortable: true
   }))
