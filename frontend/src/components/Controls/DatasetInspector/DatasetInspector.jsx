@@ -109,8 +109,11 @@ export default function DatasetInspector({ dataset, setInspectDataset, setHovere
               }
             </div>
           </div>
-          {loading
-            ? <div className='datasetInspectorLoadingContainer'>
+          <div className='metadataGridItem recordTable'>
+            <strong>{t('datasetInspectorRecordTable')}</strong>
+          </div>
+          {loading ? (
+            <div className='datasetInspectorLoadingContainer'>
               <Loading />
             </div>
             : <Table className='inspectorTable' striped bordered size="sm">
