@@ -11,7 +11,11 @@ export default function DatasetPreviewTable({ datasetPreview }) {
 
   const { t } = useTranslation()
 
-  const { columnNames, columnUnits, rows } = datasetPreview.table
+  const {
+    columnNames,
+    columnUnits,
+    rows = []
+  } = datasetPreview.table || { rows: [], columnNames: [] }
 
   // reformat datasetPreview into array of objects
   const data = rows.map((row) => {
