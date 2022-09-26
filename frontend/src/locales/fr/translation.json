@@ -243,5 +243,7 @@
   "research aeroplane": "Avion de recherche",
   "errorBoundaryMessage": "Erreur. Recharger la demande.",
   "filterInfoButtonTitle": "En savoir plus sur le filtre ici",
-  "datasetInspectorModalTitle": "Aperçu de l'ensemble de données"
+  "datasetInspectorModalTitle": "Aperçu de l'ensemble de données",
+  "tableComponentRowsPerPage": "Lignes par page",
+  "tableComponentOf": "sur"
 }

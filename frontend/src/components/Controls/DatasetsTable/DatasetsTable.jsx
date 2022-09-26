@@ -102,7 +102,7 @@ export default function DatasetsTable({
       wrap: true,
 
       sortable: true,
-      width: '120px'
+      width: '100px'
     }
   ]
 
@@ -131,6 +131,14 @@ export default function DatasetsTable({
           onRowMouseEnter={setHoveredDataset}
           highlightOnHover={!isDownloadModal}
           pointerOnHover={!isDownloadModal}
+          pagination
+          paginationPerPage={100}
+          paginationRowsPerPageOptions={[100, 150, 200, 250]}
+          paginationComponentOptions={{
+            rowsPerPageText: t('tableComponentRowsPerPage'),
+            rangeSeparatorText: t('tableComponentOf'),
+            selectAllRowsItem: false
+          }}
         />
       </DataTableExtensions>
     </div>
