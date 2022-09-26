@@ -5,7 +5,12 @@ import { useTranslation } from 'react-i18next'
 
 import './styles.css'
 
-export default function DataDownloadModal ({ disabled, children, setEmail, setSubmissionState }) {
+export default function DataDownloadModal({
+  disabled,
+  children,
+  setEmail,
+  setSubmissionState
+}) {
   const { t } = useTranslation()
   const [showModal, setShowModal] = useState(false)
   return (
@@ -20,8 +25,7 @@ export default function DataDownloadModal ({ disabled, children, setEmail, setSu
           setEmail()
           setSubmissionState()
           setShowModal(false)
-        }
-        }
+        }}
       >
         <Modal.Header closeButton>
           <Modal.Title id='contained-modal-title-vcenter'>
@@ -29,9 +33,7 @@ export default function DataDownloadModal ({ disabled, children, setEmail, setSu
             {/* Download Data from CIOOS Data Explorer */}
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body>
-          {children}
-        </Modal.Body>
+        <Modal.Body>{children}</Modal.Body>
       </Modal>
       <button
         className='downloadButton'
@@ -42,6 +44,6 @@ export default function DataDownloadModal ({ disabled, children, setEmail, setSu
         {t('downloadModalButtonText')}
         {/* Download */}
       </button>
-    </div >
+    </div>
   )
 }

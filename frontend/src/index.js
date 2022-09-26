@@ -46,5 +46,6 @@ const domContainer = document.querySelector('#app')
 ReactDOM.render(
   <Suspense fallback={<Loading />}>
     <App />
-  </Suspense>
-  , domContainer)
+  </Suspense>,
+  domContainer
+)

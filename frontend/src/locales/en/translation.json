@@ -93,7 +93,6 @@
   "datasetInspectorPlatformText": "Platform",
   "datasetInspectorRecordsText": "Locations",
   "datasetInspectorRecordsSelectAllButtonText": "Select all records from dataset",
-  "datasetInspectorRecordsOverflowText": " records selected, 1000 shown",
   "datasetInspectorRecordIDText": "Record ID",
   "datasetInspectorTimeframeText": "Timeframe",
   "datasetInspectorDepthRangeText": "Depth Range",

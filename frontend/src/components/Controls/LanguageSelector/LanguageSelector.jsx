@@ -6,10 +6,11 @@ import './styles.css'
 
 export default function LanguageSelector({ className }) {
   const { t, i18n } = useTranslation()
-  const otherLanguage = i18n.languages.filter(lang => lang !== i18n.language)
+  const otherLanguage = i18n.languages.filter((lang) => lang !== i18n.language)
 
   return (
-    <div className={className + ' languageSelector'}
+    <div
+      className={className + ' languageSelector'}
       onClick={() => {
         i18next.changeLanguage(otherLanguage)
         // change URL lang parameter
@@ -21,6 +22,6 @@ export default function LanguageSelector({ className }) {
       title={t('languageSelectorTitle')}
     >
       {`${otherLanguage}`.toUpperCase()}
-    </div >
+    </div>
   )
 }

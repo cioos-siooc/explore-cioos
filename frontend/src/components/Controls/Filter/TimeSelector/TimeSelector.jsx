@@ -7,7 +7,7 @@ import { X } from 'react-bootstrap-icons'
 import './styles.css'
 
 // Spacing elements out to the left and right using justify-content: space-between. https://medium.com/12-developer-labors/css-all-the-ways-to-align-elements-left-and-right-52ecce4a4af9
-export default function TimeSelector (props) {
+export default function TimeSelector(props) {
   const { t } = useTranslation()
 
   const [startDate, setStartDate] = useState(props.startDate)
@@ -24,10 +24,11 @@ export default function TimeSelector (props) {
     setDateValid(true)
   }, [props.endDate])
 
-  function handleSetStartDate (date) {
+  function handleSetStartDate(date) {
     const tempDate = new Date(date)
     setStartDate(date)
-    if (tempDate <= new Date(endDate)) { // && tempDate >= new Date(defaultStartDate) && tempDate <= new Date(defaultEndDate)) {
+    if (tempDate <= new Date(endDate)) {
+      // && tempDate >= new Date(defaultStartDate) && tempDate <= new Date(defaultEndDate)) {
       setDateValid(true)
       props.setStartDate(date)
       props.setEndDate(endDate)
@@ -36,10 +37,11 @@ export default function TimeSelector (props) {
     }
   }
 
-  function handleSetEndDate (date) {
+  function handleSetEndDate(date) {
     const tempDate = new Date(date)
     setEndDate(date)
-    if (tempDate >= new Date(startDate)) { // } && tempDate >= new Date(defaultStartDate) && tempDate <= new Date(defaultEndDate)) {
+    if (tempDate >= new Date(startDate)) {
+      // } && tempDate >= new Date(defaultStartDate) && tempDate <= new Date(defaultEndDate)) {
       setDateValid(true)
       props.setEndDate(date)
       props.setStartDate(startDate)
@@ -56,10 +58,10 @@ export default function TimeSelector (props) {
           {/* Start Date: */}
         </span>
         <input
-          type="date"
+          type='date'
           value={startDate}
-          max="9999-12-31"
-          min="0000-01-01"
+          max='9999-12-31'
+          min='0000-01-01'
           onChange={(e) => handleSetStartDate(e.target.value)}
         />
       </div>
@@ -69,14 +71,19 @@ export default function TimeSelector (props) {
           {/* End Date: */}
         </span>
         <input
-          type="date"
+          type='date'
           value={endDate}
-          max="9999-12-31"
-          min="0000-01-01"
+          max='9999-12-31'
+          min='0000-01-01'
           onChange={(e) => handleSetEndDate(e.target.value)}
         />
       </div>
-      {!dateValid && (<div> <X color='red' size={30} /> {t('dateFilterInvalidWarning')}</div>)}
+      {!dateValid && (
+        <div>
+          {' '}
+          <X color='red' size={30} /> {t('dateFilterInvalidWarning')}
+        </div>
+      )}
     </div>
   )
 }
