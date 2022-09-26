@@ -9,6 +9,7 @@ import 'react-data-table-component-extensions/dist/index.css'
 import platformColors from '../../platformColors'
 import Loading from '../Loading/Loading.jsx'
 import { server } from '../../../config'
+import { splitLines } from '../../../utilities'
 import './styles.css'
 
 export default function DatasetInspector({
@@ -41,16 +42,6 @@ export default function DatasetInspector({
       })
   }, [])
 
-  function splitLines(s) {
-    const split = s.split(' ')
-    return (
-      <span>
-        {split[0]}
-        <br />
-        {split.slice(1).join(' ')}
-      </span>
-    )
-  }
   const dataColumnWith = '105px'
 
   const columns = [
