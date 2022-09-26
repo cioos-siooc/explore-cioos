@@ -55,6 +55,7 @@ export default function DatasetsTable({
       width: '60px',
       sortable: false
     },
+
     {
       name: <div>Platform</div>,
       compact: true,
@@ -69,7 +70,7 @@ export default function DatasetsTable({
 
         return (
           <CircleFill
-            title={point.platform}
+            title={t(point.platform)}
             className='optionColorCircle'
             fill={platformColor?.color || '#000000'}
             size={15}
@@ -107,6 +108,7 @@ export default function DatasetsTable({
   ]
 
   const data = datasets
+
   const tableData = {
     columns,
     data
@@ -117,10 +119,9 @@ export default function DatasetsTable({
       <DataTableExtensions
         {...tableData}
         print={false}
-        exportHeaders
+        export={false}
         filterPlaceholder={t('datasetInspectorFilterText')}
         filter={!isDownloadModal}
-        export={!isDownloadModal}
       >
         <DataTable
           striped

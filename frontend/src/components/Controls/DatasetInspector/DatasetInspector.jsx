@@ -124,7 +124,9 @@ export default function DatasetInspector({
                     key={index}
                     setOptionsSelected={orgFilter.setOrgsSelected}
                     optionsSelected={orgFilter.orgsSelected}
-                    option={orgFilter.orgsSelected.filter(o => org === o.title)[0]}
+                    option={
+                      orgFilter.orgsSelected.filter((o) => org === o.title)[0]
+                    }
                   />
                 )
               })}
@@ -137,7 +139,9 @@ export default function DatasetInspector({
                     key={index}
                     setOptionsSelected={eovFilter.setEovsSelected}
                     optionsSelected={eovFilter.eovsSelected}
-                    option={eovFilter.eovsSelected.filter(e => eov === e.title)[0]}
+                    option={
+                      eovFilter.eovsSelected.filter((e) => eov === e.title)[0]
+                    }
                   />
                 )
               })}
@@ -147,12 +151,18 @@ export default function DatasetInspector({
               <FilterButton
                 setOptionsSelected={platformFilter.setPlatformsSelected}
                 optionsSelected={platformFilter.platformsSelected}
-                option={platformFilter.platformsSelected.filter(p => dataset.platform === p.title)[0]}
+                option={
+                  platformFilter.platformsSelected.filter(
+                    (p) => dataset.platform === p.title
+                  )[0]
+                }
               />
             </div>
             <div className='metadataGridItem records'>
               <strong>{t('datasetInspectorRecordsText')}</strong>
-              {dataset.profiles_count !== dataset.n_profiles ? `${dataset.profiles_count} / ${dataset.n_profiles}` : dataset.profiles_count}
+              {dataset.profiles_count !== dataset.n_profiles
+                ? `${dataset.profiles_count} / ${dataset.n_profiles}`
+                : dataset.profiles_count}
             </div>
             <div className='metadataGridItem ERDAP'>
               <strong>Dataset source URL</strong>
@@ -198,8 +208,8 @@ export default function DatasetInspector({
               <DataTableExtensions
                 {...tableData}
                 print={false}
-                exportHeaders
                 filterPlaceholder={t('datasetInspectorFilterText')}
+                export={false}
               >
                 <DataTable
                   onRowClicked={(row) => setInspectRecordID(row.profile_id)}
@@ -215,8 +225,8 @@ export default function DatasetInspector({
               </DataTableExtensions>
             </div>
           )}
-        </div >
-      </div >
-    </div >
+        </div>
+      </div>
+    </div>
   )
 }
