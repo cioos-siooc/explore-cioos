@@ -192,6 +192,7 @@ export default function SelectionDetails({
             setHoveredDataset={setHoveredDataset}
             setInspectDataset={setInspectDataset}
             setInspectRecordID={setInspectRecordID}
+            filterSet={filterSet}
           />
         ) : (
           <>
