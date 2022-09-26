@@ -18,75 +18,115 @@ import { useTranslation } from 'react-i18next'
 // import { abbreviateString, bytesToMemorySizeString } from '../../../utilities'
 import platformColors from '../../platformColors'
 import './styles.css'
+import DataTable from 'react-data-table-component'
+import DataTableExtensions from 'react-data-table-component-extensions'
+import { ribbonArrow } from 'd3'
 
 export default function DatasetsTable({
   handleSelectAllDatasets,
   handleSelectDataset,
   datasets,
-  setDatasets,
   selectAll,
   setInspectDataset,
   setHoveredDataset = () => {}
 }) {
   const { t } = useTranslation()
-  const [sortedData, setSortedData] = useState(datasets)
-  const [sortProp, setSortProp] = useState('title')
-  const [ascending, setAscending] = useState(false)
-  const [hoveredTableRow, setHoveredTableRow] = useState()
 
-  useEffect(() => {
-    setSortedData(datasets)
-  }, [datasets])
-
-  useEffect(() => {
-    handleSortByProperty(sortProp)
-  }, [])
-
-  function sortByProperty(prop) {
-    const data = datasets
-    if (prop === sortProp) {
-      ascending
-        ? data.sort((a, b) =>
-          _.get(a, prop) > _.get(b, prop)
-            ? -1
-            : _.get(a, prop) < _.get(b, prop)
-              ? 1
-              : 0
-        )
-        : data.sort((a, b) =>
-          _.get(a, prop) > _.get(b, prop)
-            ? 1
-            : _.get(a, prop) < _.get(b, prop)
-              ? -1
-              : 0
-        )
-    } else {
-      data.sort((a, b) =>
-        _.get(a, prop) > _.get(b, prop)
-          ? 1
-          : _.get(a, prop) < _.get(b, prop)
-            ? -1
-            : 0
-      )
-    }
-    return data
+  const checkBoxOnclick = (point) => () => handleSelectDataset(point)
+  const selectAllOnclick = (e) => {
+    e.stopPropagation()
+    handleSelectAllDatasets()
   }
 
-  function handleSortByProperty(prop) {
-    if (datasets) {
-      setDatasets(sortByProperty(prop))
-      if (prop === sortProp) {
-        setAscending(!ascending)
-      } else {
-        setAscending(true)
-      }
-      setSortProp(prop)
+  const columns = [
+    {
+      name: selectAll ? (
+        <CheckSquare onClick={selectAllOnclick} />
+      ) : (
+        <Square onClick={selectAllOnclick} />
+      ),
+
+      selector: (row) => row.selected,
+      cell: (row) =>
+        row.selected || selectAll ? (
+          <CheckSquare onClick={checkBoxOnclick(row)} />
+        ) : (
+          <Square onClick={checkBoxOnclick(row)} />
+        ),
+      wrap: true,
+      width: '60px',
+      sortable: false
+    },
+    {
+      name: 'Platform',
+      selector: (row) => row.platform,
+
+      // selector: (row) => row.selected,
+      cell: (point) => {
+        const platformColor = platformColors.find(
+          (pc) => pc.platform === point.platform
+        )
+
+        return (
+          <CircleFill
+            title={point.platform}
+            className='optionColorCircle'
+            fill={platformColor?.color || '#000000'}
+            size={15}
+          />
+        )
+      },
+      width: '50px',
+      sortable: true
+    },
+    {
+      name: 'Title',
+      selector: (row) => row.title,
+      wrap: true,
+      width: '300px',
+      sortable: true
+    },
+    {
+      name: 'Type',
+      selector: (row) => row.cdm_data_type,
+      wrap: true,
+      sortable: true
+    },
+    {
+      name: 'Locations',
+      selector: (row) => row.profiles_count,
+      wrap: true,
+      sortable: true,
+      width: '75px'
     }
+  ]
+
+  const data = datasets
+  const tableData = {
+    columns,
+    data
   }
 
   return (
     <div className='datasetsTable'>
-      <Table>
+      <DataTableExtensions
+        {...tableData}
+        print={false}
+        exportHeaders
+        filterPlaceholder={t('datasetInspectorFilterText')}
+      >
+        <DataTable
+          striped
+          columns={columns}
+          data={data}
+          onRowClicked={setInspectDataset}
+          onRowMouseEnter={setHoveredDataset}
+          highlightOnHover
+          pointerOnHover
+        />
+      </DataTableExtensions>
+
+      {/* <Table>
         <thead>
           <tr>
             <th
@@ -227,7 +267,7 @@ export default function DatasetsTable({
             )
           })}
         </tbody>
-      </Table>
+      </Table> */}
     </div>
   )
 }
