@@ -17,6 +17,7 @@ import {
   createDataFilterQueryString,
   generateColorStops,
   getCurrentRangeLevel,
+  polygonIsRectangle,
   updateMapToolTitleLanguage
 } from '../../utilities'
 import { colorScale, defaultQuery } from '../config'
@@ -96,6 +97,7 @@ export default function CreateMap({
     return accumulatedPlatformColors
   }, colors)
   colors.push('#000000')
+
   useEffect(() => {
     setColorStops()
   }, [rangeLevels])
@@ -628,14 +630,16 @@ export default function CreateMap({
       if (drawPolygon.current.getAll().features.length > 1) {
         drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
       }
-      highlightPoints(
-        drawPolygon.current.getAll().features[0].geometry.coordinates[0]
-      )
-      setPolygon(
-        drawPolygon.current.getAll().features[0].geometry.coordinates[0]
-      )
+      const polygon = drawPolygon.current.getAll().features[0].geometry.coordinates[0]
+      highlightPoints(polygon) 
+      setPolygon(polygon)
       map.current.getCanvas().style.cursor = 'unset'
       creatingPolygon.current = false
+      // if(!polygonIsRectangle(polygon)){
+      //   // set className of polygon button to active
+      //   const polygonCreateButton = document.getElementsByClassName('mapbox-gl-draw_ctrl-draw-btn mapbox-gl-draw_polygon')
+      //   polygonCreateButton.setProperty('background-colour', '#c6e3df')
+      // }
     })
 
     map.current.on('idle', (e) => {
