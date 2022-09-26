@@ -47,32 +47,37 @@ export default function DatasetInspector({
   const columns = [
     {
       name: splitLines(t('datasetInspectorRecordIDText')),
-      selector: 'profile_id',
+      selector: (row) => row.profile_id,
       sortable: true,
+      wrap: true,
       width: '130px'
     },
     {
       name: splitLines(t('timeSelectorStartDate')),
-      selector: 'time_min',
+      selector: (row) => row.time_min,
       sortable: true,
+      wrap: true,
       width: dataColumnWith
     },
     {
       name: splitLines(t('timeSelectorEndDate')),
-      selector: 'time_max',
+      selector: (row) => row.time_max,
       sortable: true,
+      wrap: true,
       width: dataColumnWith
     },
     {
       name: splitLines(t('depthFilterStartDepth')),
-      selector: 'depth_min',
+      selector: (row) => row.depth_min,
       sortable: true,
+      wrap: true,
       width: dataColumnWith
     },
     {
       name: splitLines(t('depthFilterEndDepth')),
-      selector: 'depth_max',
+      selector: (row) => row.depth_max,
       sortable: true,
+      wrap: true,
       width: dataColumnWith
     }
   ]
@@ -152,7 +157,7 @@ export default function DatasetInspector({
               <strong>Dataset source URL</strong>
               {dataset.erddap_url && (
                 <a
-                  className={!dataset.erddap_url && 'unavailable'}
+                  className={dataset.erddap_url ? undefined : 'unavailable'}
                   href={dataset.erddap_url}
                   target='_blank'
                   title={
