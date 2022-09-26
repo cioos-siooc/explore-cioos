@@ -108,20 +108,12 @@ export default function DatasetInspector({
       <div>
         <div className='metadataAndRecordIDTableGridContainer'>
           <strong>{t('datasetInspectorTitleText')}</strong>
-          {/* {t(dataset.title)} */}
-          <button
-            onClick={() => alert(`setting dataset filter to ${dataset.title}`)}
-          >
+          <button onClick={() => datasetFilter.setDatasetsSelected([...datasetFilter.datasetsSelected, { ...dataset, isSelected: true }])}>
             {dataset.title}
           </button>
           <div className='metadataGridContainer'>
             <div className='metadataGridItem organisation'>
               <strong>{t('datasetInspectorOrganizationText')}</strong>
-              {/* {t(dataset.title)} */}
-              <button onClick={() => datasetFilter.setDatasetsSelected([...datasetFilter.datasetsSelected, { ...dataset, isSelected: true }])}>
-                {dataset.title}
-              </button>
-              <h5>{t('datasetInspectorOrganizationText')}</h5>
               {dataset.organizations.map((org, index) => {
                 console.log(dataset, org, orgFilter)
                 return <button key={index}
