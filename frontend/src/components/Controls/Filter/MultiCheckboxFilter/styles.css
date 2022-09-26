@@ -23,6 +23,10 @@
   background-color: #c6e3df;
 }
 
+.multiCheckboxFilter .optionButton.selected {
+  background-color: #c6e3df;
+}
+
 .multiCheckboxFilter .searchResultsButton {
   background-color: white;
   margin-left: 10px;

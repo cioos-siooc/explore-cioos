@@ -235,7 +235,7 @@ export function getPointsDataSize(pointsData) {
 }
 
 // returns true for rectangles, false for rotated rectangles
-function polygonIsRectangle(polygon) {
+export function polygonIsRectangle(polygon) {
   if (polygon.length !== 5) return false
   const p = polygon.slice(0, 4)
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { ChevronCompactLeft, CircleFill } from 'react-bootstrap-icons'
+import { ChevronCompactLeft, CircleFill, X } from 'react-bootstrap-icons'
 import { Container, Table } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 import DataTable from 'react-data-table-component'
@@ -10,13 +10,15 @@ import platformColors from '../../platformColors'
 import Loading from '../Loading/Loading.jsx'
 import { server } from '../../../config'
 import { splitLines } from '../../../utilities'
+import FilterButton from '../Filter/FilterButton/FilterButton.jsx'
 import './styles.css'
 
 export default function DatasetInspector({
   dataset,
   setInspectDataset,
   setHoveredDataset,
-  setInspectRecordID
+  setInspectRecordID,
+  filterSet
 }) {
   const { t } = useTranslation()
   const [datasetRecords, setDatasetRecords] = useState()
@@ -88,6 +90,8 @@ export default function DatasetInspector({
     data
   }
 
+  const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet
+
   return (
     <div
       className='datasetInspector'
@@ -106,23 +110,22 @@ export default function DatasetInspector({
       <div>
         <div className='metadataAndRecordIDTableGridContainer'>
           <strong>{t('datasetInspectorTitleText')}</strong>
-          {/* {t(dataset.title)} */}
-          <button
-            onClick={() => alert(`setting dataset filter to ${dataset.title}`)}
-          >
-            {dataset.title}
-          </button>
+          <FilterButton
+            setOptionsSelected={datasetFilter.setDatasetsSelected}
+            optionsSelected={datasetFilter.datasetsSelected}
+            option={dataset}
+          />
           <div className='metadataGridContainer'>
-            <div className='metadataGridItem organization'>
+            <div className='metadataGridItem organisation'>
               <strong>{t('datasetInspectorOrganizationText')}</strong>
               {dataset.organizations.map((org, index) => {
                 return (
-                  <button
+                  <FilterButton
                     key={index}
-                    onClick={() => alert(`setting org filter to ${org}`)}
-                  >
-                    {t(org)}
-                  </button>
+                    setOptionsSelected={orgFilter.setOrgsSelected}
+                    optionsSelected={orgFilter.orgsSelected}
+                    option={orgFilter.orgsSelected.filter(o => org === o.title)[0]}
+                  />
                 )
               })}
             </div>
@@ -130,28 +133,26 @@ export default function DatasetInspector({
               <strong>{t('datasetInspectorOceanVariablesText')}</strong>
               {dataset.eovs.map((eov, index) => {
                 return (
-                  <button
+                  <FilterButton
                     key={index}
-                    onClick={() => alert(`setting EOV filter to ${eov}`)}
-                  >
-                    {t(eov)}
-                  </button>
+                    setOptionsSelected={eovFilter.setEovsSelected}
+                    optionsSelected={eovFilter.eovsSelected}
+                    option={eovFilter.eovsSelected.filter(e => eov === e.title)[0]}
+                  />
                 )
               })}
             </div>
             <div className='metadataGridItem platform'>
               <strong>{t('datasetInspectorPlatformText')}</strong>
-              <button
-                onClick={() =>
-                  alert(`setting platform filter to ${dataset.platform}`)
-                }
-              >
-                {t(dataset.platform)}
-              </button>
+              <FilterButton
+                setOptionsSelected={platformFilter.setPlatformsSelected}
+                optionsSelected={platformFilter.platformsSelected}
+                option={platformFilter.platformsSelected.filter(p => dataset.platform === p.title)[0]}
+              />
             </div>
             <div className='metadataGridItem records'>
-              <strong>{t('datasetInspectorRecordsText')}</strong>(
-              {dataset && `${dataset.profiles_count} / ${dataset.n_profiles}`})
+              <strong>{t('datasetInspectorRecordsText')}</strong>
+              {dataset.profiles_count !== dataset.n_profiles ? `${dataset.profiles_count} / ${dataset.n_profiles}` : dataset.profiles_count}
             </div>
             <div className='metadataGridItem ERDAP'>
               <strong>Dataset source URL</strong>
@@ -184,6 +185,9 @@ export default function DatasetInspector({
               )}
             </div>
           </div>
+          <div className='metadataGridItem recordTable'>
+            <strong>{t('datasetInspectorRecordTable')}</strong>
+          </div>
           {loading ? (
             <div className='datasetInspectorLoadingContainer'>
               <Loading />
@@ -212,8 +216,8 @@ export default function DatasetInspector({
               </DataTableExtensions>
             </div>
           )}
-        </div>
-      </div>
-    </div>
+        </div >
+      </div >
+    </div >
   )
 }
