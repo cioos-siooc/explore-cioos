@@ -28,7 +28,8 @@ export default function DatasetPreviewTable({ datasetPreview }) {
     name: splitLines(
       colName + ' ' + (columnUnits[i] ? `(${columnUnits[i]})` : '')
     ),
-    selector: colName,
+    selector: (row) => row[colName],
+    wrap: true,
     sortable: true
   }))
 
