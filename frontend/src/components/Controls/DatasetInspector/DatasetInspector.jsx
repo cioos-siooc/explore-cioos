@@ -184,7 +184,7 @@ export default function DatasetInspector({
               <strong>Catalogue URL</strong>
               {dataset.ckan_url && (
                 <a
-                  className={!dataset.ckan_url && 'unavailable'}
+                  className={dataset.ckan_url ? undefined : 'unavailable'}
                   href={dataset.ckan_url}
                   target='_blank'
                   title={dataset.ckan_url ? dataset.ckan_url : 'unavailable'}
