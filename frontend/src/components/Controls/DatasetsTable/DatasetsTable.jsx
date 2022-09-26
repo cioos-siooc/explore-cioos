@@ -132,7 +132,9 @@ export default function DatasetsTable({
           onRowMouseEnter={setHoveredDataset}
           highlightOnHover={!isDownloadModal}
           pointerOnHover={!isDownloadModal}
-          pagination
+          paginationPerPage={100}
+          paginationRowsPerPageOptions={[100, 150, 200, 250]}
+          pagination={data?.length > 100}
           paginationPerPage={100}
           paginationRowsPerPageOptions={[100, 150, 200, 250]}
           paginationComponentOptions={{

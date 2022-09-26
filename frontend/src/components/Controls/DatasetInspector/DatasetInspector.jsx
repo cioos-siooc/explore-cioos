@@ -219,7 +219,14 @@ export default function DatasetInspector({
                   data={data}
                   defaultSortField='profile_id'
                   defaultSortAsc={false}
-                  pagination
+                  pagination={data?.length > 100}
+                  paginationPerPage={100}
+                  paginationRowsPerPageOptions={[100, 150, 200, 250]}
+                  paginationComponentOptions={{
+                    rowsPerPageText: t('tableComponentRowsPerPage'),
+                    rangeSeparatorText: t('tableComponentOf'),
+                    selectAllRowsItem: false
+                  }}
                   highlightOnHover
                 />
               </DataTableExtensions>
