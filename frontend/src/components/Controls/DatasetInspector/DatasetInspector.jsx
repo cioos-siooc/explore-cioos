@@ -40,47 +40,49 @@ export default function DatasetInspector({
         setLoading(false)
       })
   }, [])
-  console.log(datasetRecords)
+
   function splitLines(s) {
     const split = s.split(' ')
     return (
       <span>
         {split[0]}
         <br />
-        {split[1]}
+        {split.slice(1).join(' ')}
       </span>
     )
   }
+  const dataColumnWith = '105px'
+
   const columns = [
     {
-      name: t('datasetInspectorRecordIDText'),
+      name: splitLines(t('datasetInspectorRecordIDText')),
       selector: 'profile_id',
       sortable: true,
       width: '130px'
     },
     {
-      name: splitLines(t('datasetInspectorTimeMin')),
+      name: splitLines(t('timeSelectorStartDate')),
       selector: 'time_min',
       sortable: true,
-      width: '110px'
+      width: dataColumnWith
     },
     {
-      name: splitLines(t('datasetInspectorTimeMax')),
+      name: splitLines(t('timeSelectorEndDate')),
       selector: 'time_max',
       sortable: true,
-      width: '110px'
+      width: dataColumnWith
     },
     {
-      name: splitLines(t('datasetInspectorDepthMin')),
+      name: splitLines(t('depthFilterStartDepth')),
       selector: 'depth_min',
       sortable: true,
-      width: '110px'
+      width: dataColumnWith
     },
     {
-      name: splitLines(t('datasetInspectorDepthMax')),
+      name: splitLines(t('depthFilterEndDepth')),
       selector: 'depth_max',
       sortable: true,
-      width: '110px'
+      width: dataColumnWith
     }
   ]
   const data = datasetRecords?.profiles
@@ -192,12 +194,13 @@ export default function DatasetInspector({
             </div>
           ) : (
             <div className='main'>
-              <div>Click on a Record to get a data preview.</div>
+              <div>{t('datasetInspectorClickPreviewText')}</div>
               <DataTableExtensions
                 {...tableData}
                 print={false}
                 exportHeaders
                 highlightOnHover={false}
+                filterPlaceholder={t('datasetInspectorFilterText')}
               >
                 <DataTable
                   onRowClicked={(row) => setInspectRecordID(row.profile_id)}
