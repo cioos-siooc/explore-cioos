@@ -2,13 +2,32 @@ import _, { toInteger } from 'lodash'
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { Table } from 'react-bootstrap'
-import { ArrowDown, ArrowUp, CheckSquare, ChevronCompactRight, CircleFill, SortAlphaDown, SortAlphaUp, SortNumericDown, SortNumericUp, Square } from 'react-bootstrap-icons'
+import {
+  ArrowDown,
+  ArrowUp,
+  CheckSquare,
+  ChevronCompactRight,
+  CircleFill,
+  SortAlphaDown,
+  SortAlphaUp,
+  SortNumericDown,
+  SortNumericUp,
+  Square
+} from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 // import { abbreviateString, bytesToMemorySizeString } from '../../../utilities'
 import platformColors from '../../platformColors'
 import './styles.css'
 
-export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDataset, datasets, setDatasets, selectAll, setInspectDataset, setHoveredDataset = () => { } }) {
+export default function DatasetsTable({
+  handleSelectAllDatasets,
+  handleSelectDataset,
+  datasets,
+  setDatasets,
+  selectAll,
+  setInspectDataset,
+  setHoveredDataset = () => {}
+}) {
   const { t } = useTranslation()
   const [sortedData, setSortedData] = useState(datasets)
   const [sortProp, setSortProp] = useState('title')
@@ -26,9 +45,29 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
   function sortByProperty(prop) {
     const data = datasets
     if (prop === sortProp) {
-      ascending ? data.sort((a, b) => _.get(a, prop) > _.get(b, prop) ? -1 : _.get(a, prop) < _.get(b, prop) ? 1 : 0) : data.sort((a, b) => _.get(a, prop) > _.get(b, prop) ? 1 : _.get(a, prop) < _.get(b, prop) ? -1 : 0)
+      ascending
+        ? data.sort((a, b) =>
+          _.get(a, prop) > _.get(b, prop)
+            ? -1
+            : _.get(a, prop) < _.get(b, prop)
+              ? 1
+              : 0
+        )
+        : data.sort((a, b) =>
+          _.get(a, prop) > _.get(b, prop)
+            ? 1
+            : _.get(a, prop) < _.get(b, prop)
+              ? -1
+              : 0
+        )
     } else {
-      data.sort((a, b) => _.get(a, prop) > _.get(b, prop) ? 1 : _.get(a, prop) < _.get(b, prop) ? -1 : 0)
+      data.sort((a, b) =>
+        _.get(a, prop) > _.get(b, prop)
+          ? 1
+          : _.get(a, prop) < _.get(b, prop)
+            ? -1
+            : 0
+      )
     }
     return data
   }
@@ -50,7 +89,8 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
       <Table>
         <thead>
           <tr>
-            <th title={t('datasetsTableHeaderSelectAllTitle')}
+            <th
+              title={t('datasetsTableHeaderSelectAllTitle')}
               // Select all
               className='selectDatasetColumn'
               onClick={(e) => {
@@ -59,19 +99,23 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
               }}
             >
               <div className='selectAllHeader'>
-                {selectAll
-                  ? <CheckSquare onClick={(e) => {
-                    e.stopPropagation()
-                    handleSelectAllDatasets()
-                  }}
+                {selectAll ? (
+                  <CheckSquare
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleSelectAllDatasets()
+                    }}
                   />
-                  : <Square onClick={(e) => {
-                    e.stopPropagation()
-                    handleSelectAllDatasets()
-                  }}
+                ) : (
+                  <Square
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleSelectAllDatasets()
+                    }}
                   />
-                }
-                {sortProp === 'selected' && (ascending ? <ArrowDown /> : <ArrowUp />)}
+                )}
+                {sortProp === 'selected' &&
+                  (ascending ? <ArrowDown /> : <ArrowUp />)}
               </div>
             </th>
             <th
@@ -79,14 +123,18 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
               // 'Sort by dataset title'
               onClick={() => handleSortByProperty('title')}
             >
-              {t('datasetsTableHeaderTitleText')} {sortProp === 'title' && (ascending ? <SortAlphaDown /> : <SortAlphaUp />)}
+              {t('datasetsTableHeaderTitleText')}{' '}
+              {sortProp === 'title' &&
+                (ascending ? <SortAlphaDown /> : <SortAlphaUp />)}
             </th>
             <th
               title={t('datasetsTableHeaderTypeTitle')}
               // 'Sort by dataset type'
               onClick={() => handleSortByProperty('cdm_data_type')}
             >
-              {t('datasetsTableHeaderTypeText')} {sortProp === 'cdm_data_type' && (ascending ? <SortAlphaDown /> : <SortAlphaUp />)}
+              {t('datasetsTableHeaderTypeText')}{' '}
+              {sortProp === 'cdm_data_type' &&
+                (ascending ? <SortAlphaDown /> : <SortAlphaUp />)}
             </th>
             <th
               className='locationColumn'
@@ -94,15 +142,20 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
               // 'Sort by number of locations in dataset'
               onClick={() => handleSortByProperty('profiles_count')}
             >
-              {t('datasetsTableHeaderLocationsText')} {sortProp === 'profiles_count' && (ascending ? <SortNumericDown /> : <SortNumericUp />)}
+              {t('datasetsTableHeaderLocationsText')}{' '}
+              {sortProp === 'profiles_count' &&
+                (ascending ? <SortNumericDown /> : <SortNumericUp />)}
             </th>
           </tr>
         </thead>
         <tbody>
           {sortedData.map((point, index) => {
-            const platformColor = platformColors.filter(pc => pc.platform === point.platform)
+            const platformColor = platformColors.filter(
+              (pc) => pc.platform === point.platform
+            )
             return (
-              <tr key={index}
+              <tr
+                key={index}
                 onMouseEnter={() => {
                   setHoveredDataset(point)
                   setHoveredTableRow(index)
@@ -117,7 +170,7 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                     handleSelectDataset(point)
                   }}
                   title={t('datasetsTableSelectTitle')}
-                // 'Select dataset for download'
+                  // 'Select dataset for download'
                 >
                   {point.selected ? <CheckSquare /> : <Square />}
                 </td>
@@ -126,11 +179,25 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                   title={point.title}
                   onClick={() => setInspectDataset(point)}
                 >
-                  {<CircleFill className='optionColorCircle' fill={!_.isEmpty(platformColor) ? platformColor[0].color : '#000000'} size='15' />}
+                  {
+                    <CircleFill
+                      className='optionColorCircle'
+                      fill={
+                        !_.isEmpty(platformColor)
+                          ? platformColor[0].color
+                          : '#000000'
+                      }
+                      size='15'
+                    />
+                  }
                   {point.title}
                 </td>
                 <td
-                  style={{ wordBreak: point.cdm_data_type === 'TimeSeriesProfile' && 'break-word' }}
+                  style={{
+                    wordBreak:
+                      point.cdm_data_type === 'TimeSeriesProfile' &&
+                      'break-word'
+                  }}
                   title={t('datasetsTableTypeTitle')}
                   // 'Dataset type'
                   onClick={() => setInspectDataset(point)}
@@ -143,13 +210,24 @@ export default function DatasetsTable({ handleSelectAllDatasets, handleSelectDat
                   // 'Number of locations in dataset'
                   onClick={() => setInspectDataset(point)}
                 >
-                  {toInteger(point.profiles_count) !== toInteger(point.n_profiles) ? `${toInteger(point.profiles_count)} / ${toInteger(point.n_profiles)}` : toInteger(point.n_profiles)} {hoveredTableRow === index && <ChevronCompactRight size={25} title='view dataset details' />}
+                  {toInteger(point.profiles_count) !==
+                  toInteger(point.n_profiles)
+                    ? `${toInteger(point.profiles_count)} / ${toInteger(
+                      point.n_profiles
+                    )}`
+                    : toInteger(point.n_profiles)}{' '}
+                  {hoveredTableRow === index && (
+                    <ChevronCompactRight
+                      size={25}
+                      title='view dataset details'
+                    />
+                  )}
                 </td>
               </tr>
             )
           })}
         </tbody>
       </Table>
-    </div >
+    </div>
   )
 }
