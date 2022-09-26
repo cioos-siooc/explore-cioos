@@ -195,7 +195,6 @@ export default function DatasetInspector({
                 {...tableData}
                 print={false}
                 exportHeaders
-                highlightOnHover={false}
                 filterPlaceholder={t('datasetInspectorFilterText')}
               >
                 <DataTable
