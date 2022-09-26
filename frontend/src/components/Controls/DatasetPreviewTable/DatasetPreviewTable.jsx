@@ -43,7 +43,7 @@ export default function DatasetPreviewTable({ datasetPreview }) {
     <DataTableExtensions
       {...tableData}
       print={false}
-      exportHeaders
+      export={false}
       highlightOnHover={false}
       filterPlaceholder={t('datasetInspectorFilterText')}
     >
@@ -52,6 +52,7 @@ export default function DatasetPreviewTable({ datasetPreview }) {
         columns={columns}
         data={data}
         pagination
+        dense
         highlightOnHover
       />
     </DataTableExtensions>
