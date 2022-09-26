@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { ChevronCompactLeft, CircleFill } from 'react-bootstrap-icons'
+import { ChevronCompactLeft, CircleFill, X } from 'react-bootstrap-icons'
 import { Container, Table } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 import DataTable from 'react-data-table-component'
@@ -10,6 +10,7 @@ import platformColors from '../../platformColors'
 import Loading from '../Loading/Loading.jsx'
 import { server } from '../../../config'
 import { splitLines } from '../../../utilities'
+import FilterButton from '../Filter/FilterButton/FilterButton.jsx'
 import './styles.css'
 
 export default function DatasetInspector({
@@ -43,7 +44,6 @@ export default function DatasetInspector({
       })
   }, [])
 
-  const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet
   const dataColumnWith = '105px'
 
   const columns = [
@@ -90,6 +90,8 @@ export default function DatasetInspector({
     data
   }
 
+  const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet
+
   return (
     <div
       className='datasetInspector'
@@ -108,41 +110,45 @@ export default function DatasetInspector({
       <div>
         <div className='metadataAndRecordIDTableGridContainer'>
           <strong>{t('datasetInspectorTitleText')}</strong>
-          <button onClick={() => datasetFilter.setDatasetsSelected([...datasetFilter.datasetsSelected, { ...dataset, isSelected: true }])}>
-            {dataset.title}
-          </button>
+          <FilterButton
+            setOptionsSelected={datasetFilter.setDatasetsSelected}
+            optionsSelected={datasetFilter.datasetsSelected}
+            option={dataset}
+          />
           <div className='metadataGridContainer'>
             <div className='metadataGridItem organisation'>
               <strong>{t('datasetInspectorOrganizationText')}</strong>
               {dataset.organizations.map((org, index) => {
-                console.log(dataset, org, orgFilter)
-                return <button key={index}
-                  onClick={() => orgFilter.setOrgsSelected([...orgFilter.orgsSelected, { ...orgFilter.orgsSelected.filter(orgA => orgA.title === org), isSelected: true }])}
-                >{t(org)}</button>
+                return (
+                  <FilterButton
+                    key={index}
+                    setOptionsSelected={orgFilter.setOrgsSelected}
+                    optionsSelected={orgFilter.orgsSelected}
+                    option={orgFilter.orgsSelected.filter(o => org === o.title)[0]}
+                  />
+                )
               })}
             </div>
             <div className='metadataGridItem variable'>
               <strong>{t('datasetInspectorOceanVariablesText')}</strong>
               {dataset.eovs.map((eov, index) => {
                 return (
-                  <button
+                  <FilterButton
                     key={index}
-                    onClick={() => alert(`setting EOV filter to ${eov}`)}
-                  >
-                    {t(eov)}
-                  </button>
+                    setOptionsSelected={eovFilter.setEovsSelected}
+                    optionsSelected={eovFilter.eovsSelected}
+                    option={eovFilter.eovsSelected.filter(e => eov === e.title)[0]}
+                  />
                 )
               })}
             </div>
             <div className='metadataGridItem platform'>
               <strong>{t('datasetInspectorPlatformText')}</strong>
-              <button
-                onClick={() =>
-                  alert(`setting platform filter to ${dataset.platform}`)
-                }
-              >
-                {t(dataset.platform)}
-              </button>
+              <FilterButton
+                setOptionsSelected={platformFilter.setPlatformsSelected}
+                optionsSelected={platformFilter.platformsSelected}
+                option={platformFilter.platformsSelected.filter(p => dataset.platform === p.title)[0]}
+              />
             </div>
             <div className='metadataGridItem records'>
               <strong>{t('datasetInspectorRecordsText')}</strong>(
