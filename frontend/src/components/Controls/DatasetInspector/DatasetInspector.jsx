@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { ChevronCompactLeft, CircleFill } from 'react-bootstrap-icons'
 import { Container, Table } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
+import DataTable from 'react-data-table-component'
+import DataTableExtensions from 'react-data-table-component-extensions'
+import 'react-data-table-component-extensions/dist/index.css'
 
 import platformColors from '../../platformColors'
 import Loading from '../Loading/Loading.jsx'
@@ -37,6 +40,57 @@ export default function DatasetInspector({
         setLoading(false)
       })
   }, [])
+
+  function splitLines(s) {
+    const split = s.split(' ')
+    return (
+      <span>
+        {split[0]}
+        <br />
+        {split.slice(1).join(' ')}
+      </span>
+    )
+  }
+  const dataColumnWith = '105px'
+
+  const columns = [
+    {
+      name: splitLines(t('datasetInspectorRecordIDText')),
+      selector: 'profile_id',
+      sortable: true,
+      width: '130px'
+    },
+    {
+      name: splitLines(t('timeSelectorStartDate')),
+      selector: 'time_min',
+      sortable: true,
+      width: dataColumnWith
+    },
+    {
+      name: splitLines(t('timeSelectorEndDate')),
+      selector: 'time_max',
+      sortable: true,
+      width: dataColumnWith
+    },
+    {
+      name: splitLines(t('depthFilterStartDepth')),
+      selector: 'depth_min',
+      sortable: true,
+      width: dataColumnWith
+    },
+    {
+      name: splitLines(t('depthFilterEndDepth')),
+      selector: 'depth_max',
+      sortable: true,
+      width: dataColumnWith
+    }
+  ]
+  const data = datasetRecords?.profiles
+
+  const tableData = {
+    columns,
+    data
+  }
 
   return (
     <div
@@ -104,7 +158,7 @@ export default function DatasetInspector({
               {dataset && `${dataset.profiles_count} / ${dataset.n_profiles}`})
             </div>
             <div className='metadataGridItem ERDAP'>
-              <strong>ERDAP URL</strong>
+              <strong>Dataset source URL</strong>
               {dataset.erddap_url && (
                 <a
                   className={!dataset.erddap_url && 'unavailable'}
@@ -120,7 +174,7 @@ export default function DatasetInspector({
               )}
             </div>
             <div className='metadataGridItem CKAN'>
-              <strong>CKAN URL</strong>
+              <strong>Catalogue URL</strong>
               {dataset.ckan_url && (
                 <a
                   className={!dataset.ckan_url && 'unavailable'}
@@ -139,56 +193,28 @@ export default function DatasetInspector({
               <Loading />
             </div>
           ) : (
-            <Table className='inspectorTable' striped bordered size='sm'>
-              <thead>
-                <tr>
-                  <th>{t('datasetInspectorRecordIDText')}</th>
-                  <th>{t('datasetInspectorTimeframeText')}</th>
-                  <th>{t('datasetInspectorDepthRangeText')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {datasetRecords &&
-                  datasetRecords.profiles.map((profile, index) => {
-                    return (
-                      <tr
-                        key={index}
-                        onClick={() => setInspectRecordID(profile.profile_id)}
-                        title='Select a record to preview its data'
-                      >
-                        <td>{profile.profile_id}</td>
-                        <td>{`${new Date(
-                          profile.time_min
-                        ).toLocaleDateString()} - ${new Date(
-                          profile.time_max
-                        ).toLocaleDateString()}`}</td>
-                        <td>{`${
-                          profile.depth_min < Number.EPSILON
-                            ? 0
-                            : profile.depth_min > 15000
-                              ? t('datasetInspectorDepthTooLargeWarningText')
-                              : profile.depth_min.toFixed(1)
-                        } - ${
-                          profile.depth_max < Number.EPSILON
-                            ? 0
-                            : profile.depth_max > 15000
-                              ? t('datasetInspectorDepthTooLargeWarningText')
-                              : profile.depth_max.toFixed(1)
-                        }`}</td>
-                      </tr>
-                    )
-                  })}
-                {datasetRecords && datasetRecords.profiles_count > 1000 && (
-                  <tr key={1001}>
-                    <td>{`1000 / ${datasetRecords.profiles_count} ${t(
-                      'datasetInspectorRecordsShownText'
-                    )}`}</td>
-                    <td />
-                    <td />
-                  </tr>
-                )}
-              </tbody>
-            </Table>
+            <div className='main'>
+              <div>{t('datasetInspectorClickPreviewText')}</div>
+              <DataTableExtensions
+                {...tableData}
+                print={false}
+                exportHeaders
+                highlightOnHover={false}
+                filterPlaceholder={t('datasetInspectorFilterText')}
+              >
+                <DataTable
+                  onRowClicked={(row) => setInspectRecordID(row.profile_id)}
+                  striped
+                  pointerOnHover
+                  columns={columns}
+                  data={data}
+                  defaultSortField='profile_id'
+                  defaultSortAsc={false}
+                  pagination
+                  highlightOnHover
+                />
+              </DataTableExtensions>
+            </div>
           )}
         </div>
       </div>

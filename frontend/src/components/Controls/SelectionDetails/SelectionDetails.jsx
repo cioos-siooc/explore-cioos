@@ -209,7 +209,7 @@ export default function SelectionDetails({
                 <input
                   value={datasetTitleSearchText}
                   onChange={(e) => setDatasetTitleSearchText(e.target.value)}
-                  placeholder='Search dataset titles here...'
+                  placeholder={t('datasetSearchPlaceholder')}
                 />
                 {!_.isEmpty(datasetTitleSearchText) && (
                   <X
