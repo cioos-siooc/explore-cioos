@@ -37,7 +37,6 @@ export default function DatasetPreviewTable({ datasetPreview, data }) {
       {...tableData}
       print={false}
       export={false}
-      highlightOnHover={false}
       filterPlaceholder={t('datasetInspectorFilterText')}
     >
       <DataTable
@@ -53,7 +52,6 @@ export default function DatasetPreviewTable({ datasetPreview, data }) {
           selectAllRowsItem: false
         }}
         dense
-        highlightOnHover
       />
     </DataTableExtensions>
   )

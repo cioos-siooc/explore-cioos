@@ -42,7 +42,7 @@ export default function DatasetInspector({
         console.log(error)
         setLoading(false)
       })
-  }, [])
+  }, [dataset])
 
   const dataColumnWith = '105px'
 
