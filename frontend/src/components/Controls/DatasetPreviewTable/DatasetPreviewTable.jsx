@@ -55,9 +55,9 @@ export default function DatasetPreviewTable({ datasetPreview }) {
         striped
         columns={columns}
         data={data}
-        pagination={data?.length > 100}
-        paginationPerPage={100}
-        paginationRowsPerPageOptions={[100, 150, 200, 250]}
+        pagination={data?.length > 10}
+        paginationPerPage={10}
+        paginationRowsPerPageOptions={[10, 100, 150, 200, 250]}
         paginationComponentOptions={{
           rowsPerPageText: t('tableComponentRowsPerPage'),
           rangeSeparatorText: t('tableComponentOf'),
