@@ -35,6 +35,7 @@ class Dataset(object):
         self.profile_id_variable = ""
         self.trajectory_id_variable = ""
         self.num_columns = 0
+        self.first_eov_column = ""
 
         self.get_metadata()
 
@@ -44,7 +45,7 @@ class Dataset(object):
         self.df = pd.DataFrame(
             {
                 "title": [self.globals["title"]],
-                "summary": [self.globals["summary"]],
+                # "summary": [self.globals["summary"]],
                 "erddap_url": [self.erddap_url],
                 "dataset_id": [self.id],
                 "cdm_data_type": [self.cdm_data_type],
@@ -57,6 +58,7 @@ class Dataset(object):
                 "profile_id_variable": self.profile_id_variable,
                 "trajectory_id_variable":self.trajectory_id_variable,
                 "num_columns":len(self.df_variables),
+                "first_eov_column": self.first_eov_column,
             }
         )
         
@@ -233,8 +235,15 @@ class Dataset(object):
     def get_eovs(self):
         eovs = []
         dataset_standard_names = self.df_variables["standard_name"].to_list()
+
         for eov in cde_eov_to_standard_name:
-            if intersection(dataset_standard_names, cde_eov_to_standard_name[eov]):
+            overlap = intersection(dataset_standard_names, cde_eov_to_standard_name[eov])
+            if overlap:
+                # check if list of standard names in this EOV overlaps with list of standard names in this dataset
+                
+                # set first_eov_column, which is used to set default column in preview
+                first_standard_name = overlap[0]
+                self.first_eov_column=self.df_variables.query(f"standard_name=='{first_standard_name}'").head(1)['name'].item()
                 eovs.append(eov)
         return eovs
 

@@ -48,6 +48,7 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
             "profile_id_variable": str,
             "trajectory_id_variable": str,
             "num_columns": int,
+            "first_eov_column": str,
             }
     df_datasets_all = pd.DataFrame(dataset_variables,index=[])
    
