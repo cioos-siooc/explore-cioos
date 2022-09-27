@@ -245,5 +245,11 @@
   "filterInfoButtonTitle": "En savoir plus sur le filtre ici",
   "datasetInspectorModalTitle": "Aperçu de l'ensemble de données",
   "tableComponentRowsPerPage": "Lignes par page",
-  "tableComponentOf": "sur"
+  "tableComponentOf": "sur",
+  "pointDetailsControlRowDatasetsSelected": "Jeux de données sélectionnés",
+  "pointDetailsControlRowToDownload": "A télécharger",
+  "datasetPreviewPlotXAxisSelect": "Axe X",
+  "datasetPreviewPlotYAxisSelect": "Axe Y",
+  "datasetPreviewTableText": "Tableau",
+  "datasetPreviewPlotText": "Graphique"
 }

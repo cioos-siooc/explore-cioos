@@ -76,7 +76,8 @@ export default function SelectionDetails({
       setPointsToReview(pointsData.filter((point) => point.selected))
     }
     setLoading(false)
-    if (pointsData.length === 1) { // Auto load single selected dataset
+    if (pointsData.length === 1) {
+      // Auto load single selected dataset
       setInspectDataset(pointsData[0])
       // setLoading(true)
     }
@@ -219,8 +220,10 @@ export default function SelectionDetails({
               } */}
             <div className='pointDetailsControls'>
               <div className='pointDetailsControlRow'>
-                <strong>Datasets selected:</strong> {pointsData.length}
-                <strong>To download:</strong> {datasetsSelected}
+                <strong>{t('pointDetailsControlRowDatasetsSelected')}:</strong>{' '}
+                {pointsData.length}
+                <strong>{t('pointDetailsControlRowToDownload')}:</strong>{' '}
+                {datasetsSelected}
                 {children}
               </div>
             </div>
