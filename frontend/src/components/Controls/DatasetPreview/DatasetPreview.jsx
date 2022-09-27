@@ -50,14 +50,12 @@ export default function DatasetPreview({
       // fullscreen
       size='xl'
       onHide={() => {
-        console.log('onhide')
         setInspectRecordID()
         setShowModal(false)
         setAxes(clearAxes)
         setSelectedVis('table')
         setInspectRecordID()
         setData()
-        console.log('onhide')
       }}
       onExit={() => {
         setInspectRecordID()
