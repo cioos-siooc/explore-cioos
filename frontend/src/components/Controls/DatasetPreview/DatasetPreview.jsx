@@ -19,14 +19,38 @@ export default function DatasetPreview({
   setDatasetPreview,
   recordLoading
 }) {
+  if (!datasetPreview) return <></>
   const { t, i18n } = useTranslation()
-  const [plotXAxis, setPlotXAxis] = useState([])
-  const [plotYAxis, setPlotYAxis] = useState([])
+  const clearAxes = { x: null, y: null }
+  const [plotAxes, setAxes] = useState(clearAxes)
   const [selectedVis, setSelectedVis] = useState('table')
   const [clear, setClear] = useState(false)
+  const { columnNames, columnUnits, rows } = datasetPreview?.table
+
+  // reformat datasetPreview into array of objects
+  const data = rows.map((row) => {
+    const keys = columnNames
+    const values = row
+    const merged = keys.reduce(
+      (obj, key, index) => ({ ...obj, [key]: values[index] }),
+      {}
+    )
+    return merged
+  })
 
   useEffect(() => {
     setClear(false)
+    case 'Profile':
+    case 'TimeSeriesProfile':
+      setAxes({ x: inspectDataset.first_eov_column, y: 'depth' })
+      break
+    case 'TimeSeries':
+      setAxes({ x: 'time', y: inspectDataset.first_eov_column })
+      break
+
+    default:
+      break
+    }
   }, [inspectRecordID])
   return (
     <Modal
@@ -37,8 +61,7 @@ export default function DatasetPreview({
       onHide={() => {
         setInspectRecordID()
         setShowModal(false)
-        setPlotXAxis([])
-        setPlotYAxis([])
+        setAxes(clearAxes)
         setSelectedVis('table')
         setInspectRecordID()
         setClear(true)
@@ -46,8 +69,7 @@ export default function DatasetPreview({
       onExit={() => {
         setInspectRecordID()
         setShowModal(false)
-        setPlotXAxis([])
-        setPlotYAxis([])
+        setAxes(clearAxes)
         setSelectedVis('table')
         setInspectRecordID()
         setClear(true)
@@ -93,59 +115,52 @@ export default function DatasetPreview({
               {!clear && selectedVis === 'table' ? (
                 <DatasetPreviewTable
                   datasetPreview={datasetPreview}
+                  data={data}
                   // setRecordLoading={setRecordLoading}
                 />
               ) : (
                 <>
                   <DropdownButton
                     title={
-                      (plotXAxis && 'X axis: ' + plotXAxis.columnName) ||
-                      'Select X axis variable'
+                      plotAxes.x
+                        ? 'X axis: ' + plotAxes.x
+                        : 'Select X axis variable'
                     }
                   >
                     {datasetPreview &&
-                      datasetPreview?.table?.columnNames.map(
-                        (columnName, index) => {
-                          return (
-                            <Dropdown.Item
-                              key={index}
-                              onClick={() =>
-                                setPlotXAxis({
-                                  index,
-                                  columnName
-                                })
-                              }
-                            >
-                              {columnName}
-                            </Dropdown.Item>
-                          )
-                        }
-                      )}
+                      datasetPreview?.table?.columnNames.map((columnName) => {
+                        return (
+                          <Dropdown.Item
+                            key={columnName}
+                            onClick={() =>
+                              setAxes({ x: columnName, y: plotAxes.y })
+                            }
+                          >
+                            {columnName}
+                          </Dropdown.Item>
+                        )
+                      })}
                   </DropdownButton>
                   <DropdownButton
                     title={
-                      (plotYAxis && 'Y Axis: ' + plotYAxis.columnName) ||
-                      'Select Y axis variable'
+                      plotAxes.y
+                        ? 'Y Axis: ' + plotAxes.y
+                        : 'Select Y axis variable'
                     }
                   >
                     {datasetPreview &&
-                      datasetPreview?.table?.columnNames.map(
-                        (columnName, index) => {
-                          return (
-                            <Dropdown.Item
-                              key={index}
-                              onClick={() =>
-                                setPlotYAxis({
-                                  index,
-                                  columnName
-                                })
-                              }
-                            >
-                              {columnName}
-                            </Dropdown.Item>
-                          )
-                        }
-                      )}
+                      datasetPreview?.table?.columnNames.map((columnName) => {
+                        return (
+                          <Dropdown.Item
+                            key={columnName}
+                            onClick={() =>
+                              setAxes({ x: plotAxes.x, y: columnName })
+                            }
+                          >
+                            {columnName}
+                          </Dropdown.Item>
+                        )
+                      })}
                   </DropdownButton>
                   {/* <DropdownButton title={(plotType && `PlotType: ` + plotYAxis.columnName) || 'Select plot type'}>
                         Add plot types that will work with the kind of data we are working with
@@ -155,9 +170,12 @@ export default function DatasetPreview({
                       </DropdownButton> */}
                   <DatasetPreviewPlot
                     datasetPreview={datasetPreview}
-                    plotXAxis={plotXAxis}
-                    plotYAxis={plotYAxis}
+                    data={data}
+                    plotAxes={plotAxes}
                     title={inspectDataset.title}
+                    isProfile={inspectDataset.cdm_data_type
+                      .toLowerCase()
+                      .includes('profile')}
                     // setRecordLoading={setRecordLoading}
                   />
                 </>

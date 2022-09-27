@@ -6,7 +6,7 @@ import DataTableExtensions from 'react-data-table-component-extensions'
 import { useTranslation } from 'react-i18next'
 import { splitLines } from '../../../utilities'
 
-export default function DatasetPreviewTable({ datasetPreview }) {
+export default function DatasetPreviewTable({ datasetPreview, data }) {
   if (!datasetPreview) return <div />
 
   const { t } = useTranslation()
@@ -16,17 +16,6 @@ export default function DatasetPreviewTable({ datasetPreview }) {
     columnUnits,
     rows = []
   } = datasetPreview.table || { rows: [], columnNames: [] }
-
-  // reformat datasetPreview into array of objects
-  const data = rows.map((row) => {
-    const keys = columnNames
-    const values = row
-    const merged = keys.reduce(
-      (obj, key, index) => ({ ...obj, [key]: values[index] }),
-      {}
-    )
-    return merged
-  })
 
   const columns = columnNames.map((colName, i) => ({
     name: splitLines(

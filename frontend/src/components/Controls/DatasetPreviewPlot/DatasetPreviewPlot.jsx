@@ -2,30 +2,16 @@ import React from 'react'
 import Plot from 'react-plotly.js'
 import './styles.css'
 
-export default function DatasetPreviewPlot({
-  datasetPreview,
-  plotXAxis,
-  plotYAxis
-}) {
+export default function DatasetPreviewPlot({ data, plotAxes, isProfile }) {
   return (
     <div className='datasetPreviewPlot'>
       <>
-        {plotXAxis !== undefined && plotYAxis !== undefined && datasetPreview && (
+        {plotAxes.x !== undefined && plotAxes.y !== undefined && data && (
           <Plot
             data={[
               {
-                x:
-                  [
-                    ...datasetPreview?.table?.rows.map((row) => {
-                      return row[plotXAxis.index]
-                    })
-                  ] || [],
-                y:
-                  [
-                    ...datasetPreview?.table?.rows.map((row) => {
-                      return row[plotYAxis.index]
-                    })
-                  ] || [],
+                x: data.map((row) => row[plotAxes.x]) || [],
+                y: data.map((row) => row[plotAxes.y]) || [],
                 type: 'scatter',
                 mode: 'markers'
               }
@@ -34,7 +20,10 @@ export default function DatasetPreviewPlot({
               autosize: false,
               margin: { l: 0, t: 50, r: 0, b: 50 },
               yaxis: {
-                automargin: true
+                automargin: true,
+
+                side: isProfile ? 'top' : undefined,
+                autorange: isProfile ? 'reversed' : undefined
               },
               xaxis: {
                 automargin: true
