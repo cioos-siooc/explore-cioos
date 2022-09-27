@@ -39,6 +39,7 @@ export default function TimeSelector(props) {
   }
 
   function handleSetEndDate(date) {
+    console.log(date)
     const tempDate = new Date(date)
     setEndDate(date)
     if (tempDate >= new Date(startDate)) {
@@ -50,6 +51,13 @@ export default function TimeSelector(props) {
       setDateValid(false)
     }
   }
+
+  function onChange(value) {
+    handleSetEndDate(new Date(value[1]).toISOString().split('T')[0])
+    handleSetStartDate(new Date(value[0]).toISOString().split('T')[0])
+  }
+
+  const dateToday = new Date().getTime()
 
   return (
     <div className='timeSelector'>
@@ -85,7 +93,7 @@ export default function TimeSelector(props) {
           onClick={() => {
             const date = new Date()
             props.setEndDate(date.toISOString().split('T')[0])
-            props.setStartDate(new Date(date.getTime() - 3650 * 86400000).toISOString().split('T')[0])
+            props.setStartDate(new Date(date.getTime() - 3652 * 86400000).toISOString().split('T')[0])
           }}
         >
           1 decade
@@ -99,8 +107,8 @@ export default function TimeSelector(props) {
         <input
           type='date'
           value={startDate}
-          max='9999-12-31'
-          min='0000-01-01'
+          max={new Date().toISOString().split('T')[0]}
+          min='1900-01-01'
           onChange={(e) => handleSetStartDate(e.target.value)}
         />
       </div>
@@ -112,27 +120,33 @@ export default function TimeSelector(props) {
         <input
           type='date'
           value={endDate}
-          max='9999-12-31'
-          min='0000-01-01'
+          max={new Date().toISOString().split('T')[0]}
+          min='1900-01-01'
           onChange={(e) => handleSetEndDate(e.target.value)}
         />
       </div>
       <RangeSelector
-        start={props.startDate}
-        end={props.endDate}
-        setStart={props.setStartDate}
-        setEnd={props.setEndDate}
+        start={new Date(props.startDate).getTime()}
+        end={new Date(props.endDate).getTime()}
         marks={{
-          0: '0m',
-          2000: '2000m',
-          4000: '4000m',
-          6000: '6000m',
-          8000: '8000m',
-          10000: '10000m',
-          12000: '12000m'
+          '-2208960000000': '1900',
+          // '-1893427200000': '1910',
+          '-1577894400000': '1920',
+          // '-1262275200000': '1930',
+          '-946742400000': '1940',
+          // '-631123200000': '1950',
+          '-315590400000': '1960',
+          // '28800000': '1970',
+          '315561600000': '1980',
+          // '631180800000': '1990',
+          '946713600000': '2000',
+          // '1262332800000': '2010',
+          '1577865600000': '2020',
+          [dateToday]: '',
         }}
-        min={0}
-        max={12000}
+        min={-2208960000000}
+        max={dateToday}
+        onChange={onChange}
       />
       {!dateValid && (
         <div>

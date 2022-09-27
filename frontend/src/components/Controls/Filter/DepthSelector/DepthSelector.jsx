@@ -46,6 +46,11 @@ export default function DepthSelector(props) {
     }
   }
 
+  function onChange(value) {
+    props.setStartDepth(value[0])
+    props.setEndDepth(value[1])
+  }
+
   return (
     <div className='depthSelector'>
       <div className='inputs'>
@@ -117,8 +122,6 @@ export default function DepthSelector(props) {
       <RangeSelector
         start={props.startDepth}
         end={props.endDepth}
-        setStart={props.setStartDepth}
-        setEnd={props.setEndDepth}
         marks={{
           0: '0m',
           2000: '2000m',
@@ -130,6 +133,7 @@ export default function DepthSelector(props) {
         }}
         min={0}
         max={12000}
+        onChange={onChange}
       />
       {!depthValid && (
         <div>
