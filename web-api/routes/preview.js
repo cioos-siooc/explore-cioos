@@ -69,6 +69,7 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
   try {
     const { data } = await axios.get(erddapQuery);
     console.log("FOUND ", data.table?.rows?.length, " ROWS", erddapQuery);
+    data.table.rows=data.table.rows.slice(0,1000)
     res.send(data);
   } catch (error) {
     if (error.response) {
