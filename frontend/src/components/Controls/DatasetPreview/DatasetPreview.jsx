@@ -19,15 +19,46 @@ export default function DatasetPreview({
   setDatasetPreview,
   recordLoading
 }) {
+  if (!datasetPreview) return <></>
+
+  const columnNames = datasetPreview?.table?.columnNames || []
+  const columnUnits = datasetPreview?.table?.columnUnits || []
+  const rows = datasetPreview?.table?.rows || []
+
   const { t, i18n } = useTranslation()
-  const [plotXAxis, setPlotXAxis] = useState([])
-  const [plotYAxis, setPlotYAxis] = useState([])
+  const clearAxes = { x: null, y: null }
+  const [plotAxes, setAxes] = useState(clearAxes)
   const [selectedVis, setSelectedVis] = useState('table')
   const [clear, setClear] = useState(false)
 
+  // reformat datasetPreview into array of objects
+  const data = rows.map((row) => {
+    const keys = columnNames
+    const values = row
+    const merged = keys.reduce(
+      (obj, key, index) => ({ ...obj, [key]: values[index] }),
+      {}
+    )
+    return merged
+  })
+
   useEffect(() => {
     setClear(false)
+
+    switch (inspectDataset.cdm_data_type) {
+    case 'Profile':
+    case 'TimeSeriesProfile':
+      setAxes({ x: inspectDataset.first_eov_column, y: 'depth' })
+      break
+    case 'TimeSeries':
+      setAxes({ x: 'time', y: inspectDataset.first_eov_column })
+      break
+
+    default:
+      break
+    }
   }, [inspectRecordID])
+
   return (
     <Modal
       className='dataPreviewModal'
@@ -37,8 +68,7 @@ export default function DatasetPreview({
       onHide={() => {
         setInspectRecordID()
         setShowModal(false)
-        setPlotXAxis([])
-        setPlotYAxis([])
+        setAxes(clearAxes)
         setSelectedVis('table')
         setInspectRecordID()
         setClear(true)
@@ -46,8 +76,7 @@ export default function DatasetPreview({
       onExit={() => {
         setInspectRecordID()
         setShowModal(false)
-        setPlotXAxis([])
-        setPlotYAxis([])
+        setAxes(clearAxes)
         setSelectedVis('table')
         setInspectRecordID()
         setClear(true)
@@ -57,137 +86,107 @@ export default function DatasetPreview({
     >
       {inspectDataset && inspectRecordID && (
         <>
-          <Modal.Header closeButton>
-            <div
-              className='backButton'
+          <Modal.Header closeButton className='tableAndPlotGridContainer'>
+            <button
+              className={`toggleButton ${
+                selectedVis === 'table' && 'selected'
+              }`}
               onClick={() => {
-                // setInspectDataset()
-                setInspectRecordID()
-                setShowModal(false)
-                setPlotXAxis([])
-                setPlotYAxis([])
                 setSelectedVis('table')
-                setInspectRecordID()
-                setClear(true)
+                // setRecordLoading(true)
               }}
-              title={t('datasetInspectorBackButtonTitle')} // 'Return to dataset list'
             >
-              <ChevronCompactLeft />
-              <>{t('datasetInspectorBackButtonText')}</>
-              {/* Back */}
-            </div>
+              Table
+            </button>
+            <button
+              className={`toggleButton ${selectedVis === 'plot' && 'selected'}`}
+              onClick={() => {
+                setSelectedVis('plot')
+                // setRecordLoading(true)
+              }}
+            >
+              Plot
+            </button>
+
             <h4 className='datasetTitle'>
-              {inspectDataset.title}
+              {inspectDataset.title}: <i>{inspectRecordID}</i>
               {/* {t('datasetInspectorModalTitle')} */}
               {/* Dataset Preview */}
             </h4>
           </Modal.Header>
-          <Modal.Body>
-            <div className='previewFlexContainer'>
-              <div className='previewFlexItem dataTableAndDataPlot'>
-                <div className='tableAndPlotGridContainer'>
-                  <div className='tableAndPlotGridItem'>
-                    <strong>Selected record ID:</strong>{' '}
-                    {` ${inspectRecordID} `}
-                    <button
-                      className={`toggleButton ${selectedVis === 'table' && 'selected'
-                        }`}
-                      onClick={() => {
-                        setSelectedVis('table')
-                        // setRecordLoading(true)
-                      }}
-                    >
-                      Table
-                    </button>
-                    <button
-                      className={`toggleButton ${selectedVis === 'plot' && 'selected'
-                        }`}
-                      onClick={() => {
-                        setSelectedVis('plot')
-                        // setRecordLoading(true)
-                      }}
-                    >
-                      Plot
-                    </button>
-                  </div>
-                  <div className='tableAndPlotGridItem tableAndPlot'>
-                    {recordLoading && <Loading />}
-                    {!clear && selectedVis === 'table' ? (
-                      <DatasetPreviewTable
-                        datasetPreview={datasetPreview}
-                      // setRecordLoading={setRecordLoading}
-                      />
-                    ) : (
-                      <>
-                        <hr />
-                        <DropdownButton
-                          title={
-                            (plotXAxis && 'X axis: ' + plotXAxis.columnName) ||
-                            'Select X axis variable'
-                          }
-                        >
-                          {datasetPreview &&
-                            datasetPreview?.table?.columnNames.map(
-                              (columnName, index) => {
-                                return (
-                                  <Dropdown.Item
-                                    key={index}
-                                    onClick={() =>
-                                      setPlotXAxis({
-                                        index,
-                                        columnName
-                                      })
-                                    }
-                                  >
-                                    {columnName}
-                                  </Dropdown.Item>
-                                )
-                              }
-                            )}
-                        </DropdownButton>
-                        <DropdownButton
-                          title={
-                            (plotYAxis && 'Y Axis: ' + plotYAxis.columnName) ||
-                            'Select Y axis variable'
-                          }
-                        >
-                          {datasetPreview &&
-                            datasetPreview?.table?.columnNames.map(
-                              (columnName, index) => {
-                                return (
-                                  <Dropdown.Item
-                                    key={index}
-                                    onClick={() =>
-                                      setPlotYAxis({
-                                        index,
-                                        columnName
-                                      })
-                                    }
-                                  >
-                                    {columnName}
-                                  </Dropdown.Item>
-                                )
-                              }
-                            )}
-                        </DropdownButton>
-                        {/* <DropdownButton title={(plotType && `PlotType: ` + plotYAxis.columnName) || 'Select plot type'}>
+          <Modal.Body
+            style={selectedVis === 'table' ? { padding: 0 } : undefined}
+          >
+            <div className='tableAndPlotGridItem tableAndPlot'>
+              {recordLoading && <Loading />}
+              {!clear && selectedVis === 'table' ? (
+                <DatasetPreviewTable
+                  datasetPreview={datasetPreview}
+                  data={data}
+                  // setRecordLoading={setRecordLoading}
+                />
+              ) : (
+                <>
+                  <DropdownButton
+                    title={
+                      plotAxes.x
+                        ? 'X axis: ' + plotAxes.x
+                        : 'Select X axis variable'
+                    }
+                  >
+                    {datasetPreview &&
+                      datasetPreview?.table?.columnNames.map((columnName) => {
+                        return (
+                          <Dropdown.Item
+                            key={columnName}
+                            onClick={() =>
+                              setAxes({ x: columnName, y: plotAxes.y })
+                            }
+                          >
+                            {columnName}
+                          </Dropdown.Item>
+                        )
+                      })}
+                  </DropdownButton>
+                  <DropdownButton
+                    title={
+                      plotAxes.y
+                        ? 'Y Axis: ' + plotAxes.y
+                        : 'Select Y axis variable'
+                    }
+                  >
+                    {datasetPreview &&
+                      datasetPreview?.table?.columnNames.map((columnName) => {
+                        return (
+                          <Dropdown.Item
+                            key={columnName}
+                            onClick={() =>
+                              setAxes({ x: plotAxes.x, y: columnName })
+                            }
+                          >
+                            {columnName}
+                          </Dropdown.Item>
+                        )
+                      })}
+                  </DropdownButton>
+                  {/* <DropdownButton title={(plotType && `PlotType: ` + plotYAxis.columnName) || 'Select plot type'}>
                         Add plot types that will work with the kind of data we are working with
                         {plotlyPlotTypes.map((plotType, index) => {
                           return <Dropdown.Item key={index} onClick={() => setPlotType({ index, plotType })}>{plotType}</Dropdown.Item>
                         })}
                       </DropdownButton> */}
-                        <DatasetPreviewPlot
-                          datasetPreview={datasetPreview}
-                          plotXAxis={plotXAxis}
-                          plotYAxis={plotYAxis}
-                          title={inspectDataset.title}
-                        // setRecordLoading={setRecordLoading}
-                        />
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
+                  <DatasetPreviewPlot
+                    datasetPreview={datasetPreview}
+                    data={data}
+                    plotAxes={plotAxes}
+                    title={inspectDataset.title}
+                    isProfile={inspectDataset.cdm_data_type
+                      .toLowerCase()
+                      .includes('profile')}
+                    // setRecordLoading={setRecordLoading}
+                  />
+                </>
+              )}
             </div>
           </Modal.Body>
         </>

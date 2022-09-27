@@ -4,7 +4,7 @@
 }
 
 .pointDetailsInfoRow {
-  height: 100%;
+  height: calc(100% - 130px); 
   overflow-y: auto;
   overflow-x: hidden;
 }

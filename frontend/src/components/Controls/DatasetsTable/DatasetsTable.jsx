@@ -1,7 +1,4 @@
-import _, { toInteger } from 'lodash'
 import * as React from 'react'
-import { useState, useEffect } from 'react'
-import { Table } from 'react-bootstrap'
 import {
   ArrowDown,
   ArrowUp,
@@ -15,219 +12,137 @@ import {
   Square
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
-// import { abbreviateString, bytesToMemorySizeString } from '../../../utilities'
 import platformColors from '../../platformColors'
 import './styles.css'
+import DataTable from 'react-data-table-component'
+import DataTableExtensions from 'react-data-table-component-extensions'
+import { ribbonArrow } from 'd3'
 
 export default function DatasetsTable({
   handleSelectAllDatasets,
   handleSelectDataset,
   datasets,
-  setDatasets,
   selectAll,
   setInspectDataset,
+  isDownloadModal,
   setHoveredDataset = () => {}
 }) {
   const { t } = useTranslation()
-  const [sortedData, setSortedData] = useState(datasets)
-  const [sortProp, setSortProp] = useState('title')
-  const [ascending, setAscending] = useState(false)
-  const [hoveredTableRow, setHoveredTableRow] = useState()
 
-  useEffect(() => {
-    setSortedData(datasets)
-  }, [datasets])
-
-  useEffect(() => {
-    handleSortByProperty(sortProp)
-  }, [])
-
-  function sortByProperty(prop) {
-    const data = datasets
-    if (prop === sortProp) {
-      ascending
-        ? data.sort((a, b) =>
-          _.get(a, prop) > _.get(b, prop)
-            ? -1
-            : _.get(a, prop) < _.get(b, prop)
-              ? 1
-              : 0
-        )
-        : data.sort((a, b) =>
-          _.get(a, prop) > _.get(b, prop)
-            ? 1
-            : _.get(a, prop) < _.get(b, prop)
-              ? -1
-              : 0
-        )
-    } else {
-      data.sort((a, b) =>
-        _.get(a, prop) > _.get(b, prop)
-          ? 1
-          : _.get(a, prop) < _.get(b, prop)
-            ? -1
-            : 0
-      )
-    }
-    return data
+  const checkBoxOnclick = (point) => () => handleSelectDataset(point)
+  const selectAllOnclick = (e) => {
+    e.stopPropagation()
+    handleSelectAllDatasets()
   }
 
-  function handleSortByProperty(prop) {
-    if (datasets) {
-      setDatasets(sortByProperty(prop))
-      if (prop === sortProp) {
-        setAscending(!ascending)
-      } else {
-        setAscending(true)
-      }
-      setSortProp(prop)
+  const columns = [
+    {
+      name: selectAll ? (
+        <CheckSquare onClick={selectAllOnclick} />
+      ) : (
+        <Square onClick={selectAllOnclick} />
+      ),
+
+      selector: (row) => row.selected,
+      cell: (row) =>
+        row.selected ? (
+          <CheckSquare onClick={checkBoxOnclick(row)} />
+        ) : (
+          <Square onClick={checkBoxOnclick(row)} />
+        ),
+
+      ignoreRowClick: true,
+      width: '60px',
+      sortable: false
+    },
+
+    {
+      name: <div>{t('datasetInspectorPlatformText')}</div>,
+      compact: true,
+      wrap: true,
+
+      center: true,
+      selector: (row) => row.platform,
+      cell: (point) => {
+        const platformColor = platformColors.find(
+          (pc) => pc.platform === point.platform
+        )
+
+        return (
+          <CircleFill
+            title={t(point.platform)}
+            className='optionColorCircle'
+            fill={platformColor?.color || '#000000'}
+            size={15}
+          />
+        )
+      },
+      width: '60px',
+      sortable: true
+    },
+    {
+      name: t('datasetsTableHeaderTitleText'),
+      selector: (row) => row.title,
+      wrap: true,
+      width: '250px',
+      sortable: true
+    },
+    {
+      name: t('datasetsTableHeaderTypeText'),
+
+      selector: (row) =>
+        row.cdm_data_type
+          .replace('TimeSeriesProfile', 'Timeseries / Profile')
+          .replace('TimeSeries', 'Timeseries'),
+      wrap: true,
+      sortable: true
+    },
+    {
+      name: t('datasetsTableHeaderLocationsText'),
+      selector: (row) => row.profiles_count,
+      wrap: true,
+
+      sortable: true,
+      width: '100px'
     }
+  ]
+
+  const data = datasets
+
+  const tableData = {
+    columns,
+    data
   }
 
   return (
     <div className='datasetsTable'>
-      <Table>
-        <thead>
-          <tr>
-            <th
-              title={t('datasetsTableHeaderSelectAllTitle')}
-              // Select all
-              className='selectDatasetColumn'
-              onClick={(e) => {
-                handleSortByProperty('selected')
-                e.stopPropagation()
-              }}
-            >
-              <div className='selectAllHeader'>
-                {selectAll ? (
-                  <CheckSquare
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleSelectAllDatasets()
-                    }}
-                  />
-                ) : (
-                  <Square
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleSelectAllDatasets()
-                    }}
-                  />
-                )}
-                {sortProp === 'selected' &&
-                  (ascending ? <ArrowDown /> : <ArrowUp />)}
-              </div>
-            </th>
-            <th
-              title={t('datasetsTableHeaderTitleTitle')}
-              // 'Sort by dataset title'
-              onClick={() => handleSortByProperty('title')}
-            >
-              {t('datasetsTableHeaderTitleText')}{' '}
-              {sortProp === 'title' &&
-                (ascending ? <SortAlphaDown /> : <SortAlphaUp />)}
-            </th>
-            <th
-              title={t('datasetsTableHeaderTypeTitle')}
-              // 'Sort by dataset type'
-              onClick={() => handleSortByProperty('cdm_data_type')}
-            >
-              {t('datasetsTableHeaderTypeText')}{' '}
-              {sortProp === 'cdm_data_type' &&
-                (ascending ? <SortAlphaDown /> : <SortAlphaUp />)}
-            </th>
-            <th
-              className='locationColumn'
-              title={t('datasetsTableHeaderLocationsTitle')}
-              // 'Sort by number of locations in dataset'
-              onClick={() => handleSortByProperty('profiles_count')}
-            >
-              {t('datasetsTableHeaderLocationsText')}{' '}
-              {sortProp === 'profiles_count' &&
-                (ascending ? <SortNumericDown /> : <SortNumericUp />)}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedData.map((point, index) => {
-            const platformColor = platformColors.filter(
-              (pc) => pc.platform === point.platform
-            )
-            return (
-              <tr
-                key={index}
-                onMouseEnter={() => {
-                  setHoveredDataset(point)
-                  setHoveredTableRow(index)
-                }}
-                onMouseLeave={() => {
-                  setHoveredDataset()
-                  setHoveredTableRow()
-                }}
-              >
-                <td
-                  onClick={() => {
-                    handleSelectDataset(point)
-                  }}
-                  title={t('datasetsTableSelectTitle')}
-                  // 'Select dataset for download'
-                >
-                  {point.selected ? <CheckSquare /> : <Square />}
-                </td>
-                <td
-                  className='datasetsTableTitleCell'
-                  title={point.title}
-                  onClick={() => setInspectDataset(point)}
-                >
-                  {
-                    <CircleFill
-                      className='optionColorCircle'
-                      fill={
-                        !_.isEmpty(platformColor)
-                          ? platformColor[0].color
-                          : '#000000'
-                      }
-                      size='15'
-                    />
-                  }
-                  {point.title}
-                </td>
-                <td
-                  style={{
-                    wordBreak:
-                      point.cdm_data_type === 'TimeSeriesProfile' &&
-                      'break-word'
-                  }}
-                  title={t('datasetsTableTypeTitle')}
-                  // 'Dataset type'
-                  onClick={() => setInspectDataset(point)}
-                >
-                  {point.cdm_data_type}
-                </td>
-                <td
-                  className='datasetTableLocationsCell'
-                  title={t('datasetsTableLocationsTitle')}
-                  // 'Number of locations in dataset'
-                  onClick={() => setInspectDataset(point)}
-                >
-                  {toInteger(point.profiles_count) !==
-                  toInteger(point.n_profiles)
-                    ? `${toInteger(point.profiles_count)} / ${toInteger(
-                      point.n_profiles
-                    )}`
-                    : toInteger(point.n_profiles)}{' '}
-                  {hoveredTableRow === index && (
-                    <ChevronCompactRight
-                      size={25}
-                      title='view dataset details'
-                    />
-                  )}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </Table>
+      <DataTableExtensions
+        {...tableData}
+        print={false}
+        export={false}
+        filterPlaceholder={t('datasetInspectorFilterText')}
+        filter={!isDownloadModal}
+      >
+        <DataTable
+          striped
+          // dense
+          columns={columns}
+          data={data}
+          defaultSortFieldId={3}
+          onRowClicked={isDownloadModal ? undefined : setInspectDataset}
+          onRowMouseEnter={setHoveredDataset}
+          highlightOnHover={!isDownloadModal}
+          pointerOnHover={!isDownloadModal}
+          pagination={data?.length > 100}
+          paginationPerPage={50}
+          paginationRowsPerPageOptions={[50, 100, 150, 200]}
+          paginationComponentOptions={{
+            rowsPerPageText: t('tableComponentRowsPerPage'),
+            rangeSeparatorText: t('tableComponentOf'),
+            selectAllRowsItem: false
+          }}
+        />
+      </DataTableExtensions>
     </div>
   )
 }
