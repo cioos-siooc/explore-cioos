@@ -57,7 +57,7 @@ export default function DatasetsTable({
     },
 
     {
-      name: <div>Platform</div>,
+      name: <div>{t('datasetInspectorPlatformText')}</div>,
       compact: true,
       wrap: true,
 
@@ -81,14 +81,14 @@ export default function DatasetsTable({
       sortable: true
     },
     {
-      name: 'Title',
+      name: t('datasetsTableHeaderTitleText'),
       selector: (row) => row.title,
       wrap: true,
       width: '250px',
       sortable: true
     },
     {
-      name: 'Type',
+      name: t('datasetsTableHeaderTypeText'),
 
       selector: (row) =>
         row.cdm_data_type
@@ -98,7 +98,7 @@ export default function DatasetsTable({
       sortable: true
     },
     {
-      name: 'Locations',
+      name: t('datasetsTableHeaderLocationsText'),
       selector: (row) => row.profiles_count,
       wrap: true,
 
