@@ -40,6 +40,8 @@ export default function DatasetPreview({
 
   useEffect(() => {
     setClear(false)
+
+    switch (inspectDataset.cdm_data_type) {
     case 'Profile':
     case 'TimeSeriesProfile':
       setAxes({ x: inspectDataset.first_eov_column, y: 'depth' })
@@ -52,6 +54,7 @@ export default function DatasetPreview({
       break
     }
   }, [inspectRecordID])
+
   return (
     <Modal
       className='dataPreviewModal'
