@@ -58,7 +58,6 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
     time_max,
     new_start_time,
     use_whole_profile,
-    first_eov_column
   } = rows.rows[0];
 
   let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?&${profile_variable}=~"${profile_id}"`;
@@ -71,7 +70,7 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
   try {
     const { data } = await axios.get(erddapQuery);
     console.log("FOUND ", data.table?.rows?.length, " ROWS", erddapQuery);
-    res.send({first_eov_column,data});
+    res.send(data);
   } catch (error) {
     if (error.response) {
       console.error(error.response);
