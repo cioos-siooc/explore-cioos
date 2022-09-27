@@ -77,6 +77,7 @@ export default function CreateMap({
   const draw = new MapboxDraw(drawControlOptions)
   const drawPolygon = useRef(draw)
   const doFinalCheck = useRef(false)
+  const layersLoaded = useRef(false)
   const colorStops = useRef([])
 
   const [boxSelectStartCoords, setBoxSelectStartCoords] = useState()
@@ -155,7 +156,9 @@ export default function CreateMap({
   }
 
   function hoverHighlightPoints(pk) {
-    if (map.current && pk) {
+    if (!map.current || !layersLoaded.current) return
+
+    if (pk) {
       if (zoom >= 7) {
         map.current.setPaintProperty('points', 'circle-color', 'lightgrey')
         map.current.setPaintProperty(
@@ -511,7 +514,6 @@ export default function CreateMap({
       // Clear highlighted points if looking at points level and clicking off of the points
       if (
         drawPolygon.current.getAll().features.length === 0 &&
-        map.current.getZoom() >= 7 &&
         !e.originalEvent.defaultPrevented
       ) {
         map.current.setFilter('points-highlighted', ['in', 'pk', ''])
@@ -630,8 +632,9 @@ export default function CreateMap({
       if (drawPolygon.current.getAll().features.length > 1) {
         drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
       }
-      const polygon = drawPolygon.current.getAll().features[0].geometry.coordinates[0]
-      highlightPoints(polygon) 
+      const polygon =
+        drawPolygon.current.getAll().features[0].geometry.coordinates[0]
+      highlightPoints(polygon)
       setPolygon(polygon)
       map.current.getCanvas().style.cursor = 'unset'
       creatingPolygon.current = false
@@ -643,6 +646,7 @@ export default function CreateMap({
     })
 
     map.current.on('idle', (e) => {
+      layersLoaded.current = true
       if (
         doFinalCheck.current &&
         drawPolygon.current.getAll().features.length > 0 &&
