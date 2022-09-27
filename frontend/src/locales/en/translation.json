@@ -242,5 +242,7 @@
   "research aeroplane": "Research aeroplane",
   "errorBoundaryMessage": "Error. Reload Application.",
   "filterInfoButtonTitle": "Learn more about the filter here",
-  "datasetInspectorModalTitle": "Dataset Preview"
+  "datasetInspectorModalTitle": "Dataset Preview",
+  "tableComponentRowsPerPage": "Rows per page",
+  "tableComponentOf": "of"
 }

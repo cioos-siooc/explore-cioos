@@ -6,29 +6,23 @@ import DataTableExtensions from 'react-data-table-component-extensions'
 import { useTranslation } from 'react-i18next'
 import { splitLines } from '../../../utilities'
 
-export default function DatasetPreviewTable({ datasetPreview }) {
+export default function DatasetPreviewTable({ datasetPreview, data }) {
   if (!datasetPreview) return <div />
 
   const { t } = useTranslation()
 
-  const { columnNames, columnUnits, rows } = datasetPreview.table
-
-  // reformat datasetPreview into array of objects
-  const data = rows.map((row) => {
-    const keys = columnNames
-    const values = row
-    const merged = keys.reduce(
-      (obj, key, index) => ({ ...obj, [key]: values[index] }),
-      {}
-    )
-    return merged
-  })
+  const {
+    columnNames,
+    columnUnits,
+    rows = []
+  } = datasetPreview.table || { rows: [], columnNames: [] }
 
   const columns = columnNames.map((colName, i) => ({
     name: splitLines(
       colName + ' ' + (columnUnits[i] ? `(${columnUnits[i]})` : '')
     ),
     selector: (row) => row[colName],
+    reorder: true,
     wrap: true,
     sortable: true
   }))
@@ -42,7 +36,7 @@ export default function DatasetPreviewTable({ datasetPreview }) {
     <DataTableExtensions
       {...tableData}
       print={false}
-      exportHeaders
+      export={false}
       highlightOnHover={false}
       filterPlaceholder={t('datasetInspectorFilterText')}
     >
@@ -50,7 +44,15 @@ export default function DatasetPreviewTable({ datasetPreview }) {
         striped
         columns={columns}
         data={data}
-        pagination
+        pagination={data?.length > 10}
+        paginationPerPage={10}
+        paginationRowsPerPageOptions={[10, 100, 150, 200, 250]}
+        paginationComponentOptions={{
+          rowsPerPageText: t('tableComponentRowsPerPage'),
+          rangeSeparatorText: t('tableComponentOf'),
+          selectAllRowsItem: false
+        }}
+        dense
         highlightOnHover
       />
     </DataTableExtensions>

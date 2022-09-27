@@ -85,22 +85,16 @@ export default function DownloadDetails({
       <hr />
       <Row className='downloadDataRow'>
         <Col>
-          {inspectDataset ? (
-            <DatasetInspector
-              dataset={inspectDataset}
-              setInspectDataset={setInspectDataset}
-            />
-          ) : (
-            <DatasetsTable
-              handleSelectAllDatasets={handleSelectAllDatasets}
-              handleSelectDataset={handleSelectDataset}
-              setInspectDataset={setInspectDataset}
-              selectAll={selectAll}
-              setDatasets={setPointsData}
-              datasets={pointsData}
-              setHoveredDataset={setHoveredDataset}
-            />
-          )}
+          <DatasetsTable
+            isDownloadModal
+            handleSelectAllDatasets={handleSelectAllDatasets}
+            handleSelectDataset={handleSelectDataset}
+            setInspectDataset={setInspectDataset}
+            selectAll={selectAll}
+            setDatasets={setPointsData}
+            datasets={pointsData}
+            setHoveredDataset={setHoveredDataset}
+          />
         </Col>
       </Row>
       <hr />

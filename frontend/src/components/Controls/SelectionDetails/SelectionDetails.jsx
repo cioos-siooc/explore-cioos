@@ -196,23 +196,6 @@ export default function SelectionDetails({
           />
         ) : (
           <>
-            <div className='pointDetailsSearchBar'>
-              <div className='pointDetailsSearchBarContainer'>
-                <input
-                  value={datasetTitleSearchText}
-                  onChange={(e) => setDatasetTitleSearchText(e.target.value)}
-                  placeholder={t('datasetSearchPlaceholder')}
-                />
-                {!_.isEmpty(datasetTitleSearchText) && (
-                  <X
-                    className='pointDetailsSearchBarClearSearchButton'
-                    color='darkgrey'
-                    size='25px'
-                    onClick={() => setDatasetTitleSearchText('')}
-                  />
-                )}
-              </div>
-            </div>
             <DatasetsTable
               handleSelectAllDatasets={handleSelectAllDatasets}
               handleSelectDataset={handleSelectDataset}
