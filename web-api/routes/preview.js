@@ -18,6 +18,7 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
   const { dataset, profile } = req.query;
   const sql = `WITH step1 AS (
                SELECT d.dataset_id,
+                      d.first_eov_column,
                       COALESCE(d.timeseries_id_variable,d.profile_id_variable) profile_variable,
                       COALESCE(p.timeseries_id,p.profile_id) profile,
                       d.profile_id_variable,
@@ -57,6 +58,7 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
     time_max,
     new_start_time,
     use_whole_profile,
+    first_eov_column
   } = rows.rows[0];
 
   let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?&${profile_variable}=~"${profile_id}"`;
@@ -69,7 +71,7 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
   try {
     const { data } = await axios.get(erddapQuery);
     console.log("FOUND ", data.table?.rows?.length, " ROWS", erddapQuery);
-    res.send(data);
+    res.send({first_eov_column,data});
   } catch (error) {
     if (error.response) {
       console.error(error.response);
