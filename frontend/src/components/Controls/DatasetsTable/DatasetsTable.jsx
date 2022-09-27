@@ -128,6 +128,7 @@ export default function DatasetsTable({
           // dense
           columns={columns}
           data={data}
+          defaultSortFieldId={3}
           onRowClicked={isDownloadModal ? undefined : setInspectDataset}
           onRowMouseEnter={setHoveredDataset}
           highlightOnHover={!isDownloadModal}
