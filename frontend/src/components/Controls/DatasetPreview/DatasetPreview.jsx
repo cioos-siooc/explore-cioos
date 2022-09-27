@@ -19,13 +19,17 @@ export default function DatasetPreview({
   setDatasetPreview,
   recordLoading
 }) {
-  if (!datasetPreview?.table) return <></>
+  if (!datasetPreview) return <></>
+
+  const columnNames = datasetPreview?.table?.columnNames || []
+  const columnUnits = datasetPreview?.table?.columnUnits || []
+  const rows = datasetPreview?.table?.rows || []
+
   const { t, i18n } = useTranslation()
   const clearAxes = { x: null, y: null }
   const [plotAxes, setAxes] = useState(clearAxes)
   const [selectedVis, setSelectedVis] = useState('table')
   const [clear, setClear] = useState(false)
-  const { columnNames, columnUnits, rows } = datasetPreview?.table
 
   // reformat datasetPreview into array of objects
   const data = rows.map((row) => {
