@@ -53,6 +53,7 @@ CREATE TABLE datasets (
     n_profiles integer,
     profile_variables text[],
     num_columns integer,
+    first_eov_column TEXT,
     UNIQUE(dataset_id, erddap_url)
 );
 
