@@ -18,6 +18,7 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
   const { dataset, profile } = req.query;
   const sql = `WITH step1 AS (
                SELECT d.dataset_id,
+                      d.first_eov_column,
                       COALESCE(d.timeseries_id_variable,d.profile_id_variable) profile_variable,
                       COALESCE(p.timeseries_id,p.profile_id) profile,
                       d.profile_id_variable,
