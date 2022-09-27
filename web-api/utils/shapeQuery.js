@@ -15,6 +15,7 @@ async function getShapeQuery(query,doEstimate=true,getRecordsList=true) {
                   d.title title,
                   d.platform,
                   d.num_columns,
+                  d.first_eov_column,
                   json_build_object('en',title,'fr',title_fr)     title_translated,
                   d.eovs                                          eovs,
                   organizations,
