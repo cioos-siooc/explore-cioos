@@ -101,6 +101,8 @@
   "datasetInspectorFilterText": "Filter table",
   "datasetInspectorClickPreviewText": "Click on a Record to get a data preview.",
   "datasetInspectorRecordTable": "Record list",
+  "datasetInspectorERDDAPText": "Dataset source URL",
+  "datasetInspectorCKANText": "Catalogue URL",
   "downloadModalTitleText": "Download Data from CIOOS Data Explorer",
   "downloadModalButtonTitle": "Download selected data",
   "downloadModalButtonText": "Download",

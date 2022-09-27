@@ -102,6 +102,8 @@
   "datasetInspectorFilterText": "Filtrer le tableau",
   "datasetInspectorClickPreviewText": "Cliquez sur un enregistrement pour obtenir un aperçu des données.",
   "datasetInspectorRecordTable": "Liste d'enregistrements",
+  "datasetInspectorERDDAPText": "URL source de l'ensemble de données",
+  "datasetInspectorCKANText": "URL du catalogue",
   "downloadModalTitleText": "Télécharger les données à partir de l'explorateur de données du SIOOC",
   "downloadModalButtonTitle": "Télécharger les données sélectionnées",
   "downloadModalButtonText": "Télécharger",
