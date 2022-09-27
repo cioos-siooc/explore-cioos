@@ -76,8 +76,8 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         ckan_record_text = {
             "title": title_translated.get("en"),
             "title_fr": title_translated.get("fr"),
-            "ckan_summary": notes_translated.get("en"),
-            "ckan_summary_fr": notes_translated.get("fr"),
+            # "ckan_summary": notes_translated.get("en"),
+            # "ckan_summary_fr": notes_translated.get("fr"),
         }
 
         for k, v in ckan_record_text.items():
@@ -109,8 +109,8 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         "ckan_organizations": [x[3] for x in out],
         "ckan_title": [x[4]["title"] for x in out],
         "title_fr": [x[4]["title_fr"] for x in out],
-        "ckan_summary": [x[4]["ckan_summary"] for x in out],
-        "ckan_summary_fr": [x[4]["ckan_summary_fr"] for x in out],
+        # "ckan_summary": [x[4]["ckan_summary"] for x in out],
+        # "ckan_summary_fr": [x[4]["ckan_summary_fr"] for x in out],
     }
 
     df = pd.DataFrame(line)
