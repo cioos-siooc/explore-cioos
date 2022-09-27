@@ -165,7 +165,7 @@ export default function DatasetInspector({
                 : dataset.profiles_count}
             </div>
             <div className='metadataGridItem ERDAP'>
-              <strong>Dataset source URL</strong>
+              <strong>{t('datasetInspectorERDDAPText')}</strong>
               {dataset.erddap_url && (
                 <a
                   className={dataset.erddap_url ? undefined : 'unavailable'}
@@ -181,7 +181,7 @@ export default function DatasetInspector({
               )}
             </div>
             <div className='metadataGridItem CKAN'>
-              <strong>Catalogue URL</strong>
+              <strong>{t('datasetInspectorCKANText')}</strong>
               {dataset.ckan_url && (
                 <a
                   className={dataset.ckan_url ? undefined : 'unavailable'}
