@@ -86,7 +86,7 @@ export default function DatasetPreview({
     >
       {inspectDataset && inspectRecordID && (
         <>
-          <Modal.Header closeButton>
+          <Modal.Header closeButton className='tableAndPlotGridContainer'>
             <button
               className={`toggleButton ${
                 selectedVis === 'table' && 'selected'
