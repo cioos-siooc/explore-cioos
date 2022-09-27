@@ -19,7 +19,7 @@ export default function DatasetPreview({
   setDatasetPreview,
   recordLoading
 }) {
-  if (!datasetPreview) return <></>
+  if (!datasetPreview?.table) return <></>
   const { t, i18n } = useTranslation()
   const clearAxes = { x: null, y: null }
   const [plotAxes, setAxes] = useState(clearAxes)
