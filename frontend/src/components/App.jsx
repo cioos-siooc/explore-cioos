@@ -207,12 +207,10 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (polygon) {
-      if (!polygonIsRectangle(polygon)) {
-        const elem = document.querySelector('.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon')
-        if (elem) {
-          elem.style.backgroundColor = '#c6e3df'
-        }
+    if (polygon && !polygonIsRectangle(polygon)) {
+      const elem = document.querySelector('.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon')
+      if (elem) {
+        elem.style.backgroundColor = '#c6e3df'
       }
     } else {
       // remove colour from button
