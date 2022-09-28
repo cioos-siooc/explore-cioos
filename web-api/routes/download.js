@@ -1,14 +1,15 @@
 require("dotenv").config();
 
 const { v4: uuidv4 } = require("uuid");
-var express = require("express");
-var router = express.Router();
+const express = require("express");
+
+const router = express.Router();
+const { check } = require("express-validator");
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { getShapeQuery } = require("../utils/shapeQuery");
 const { polygonJSONToWKT } = require("../utils/polygon");
 const { requiredShapeMiddleware } = require("../utils/validatorMiddlewares");
-const { check } = require("express-validator");
 
 /**
  * /download
@@ -34,10 +35,10 @@ router.get(
       lang = "en",
     } = req.query;
 
-    const shapeQueryResponse = await getShapeQuery(req.query,true,false);
+    const shapeQueryResponse = await getShapeQuery(req.query, true, false);
     const estimateTotalSize = shapeQueryResponse.reduce(
       (partialSum, { size }) => partialSum + size,
-      0
+      0,
     );
 
     const filters = createDBFilter(req.query);
@@ -56,7 +57,7 @@ router.get(
         FROM cde.profiles p
         JOIN cde.datasets d ON p.dataset_pk =d.pk
         WHERE
-        ${filters ? filters : ""} 
+        ${filters || ""} 
         GROUP BY d.pk)
         SELECT json_agg(t) FROM profiles_subset t;      
       `;
@@ -89,7 +90,7 @@ router.get(
 
         const downloadJobEntry = {
           job_id: jobID,
-          email: email,
+          email,
           downloader_input: downloaderInput,
           estimate_details: JSON.stringify(shapeQueryResponse),
           estimate_size: estimateTotalSize,
@@ -105,7 +106,7 @@ router.get(
         error: e.toString(),
       });
     }
-  }
+  },
 );
 
 module.exports = router;
