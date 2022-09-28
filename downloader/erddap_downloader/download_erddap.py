@@ -84,7 +84,7 @@ def get_erddap_download_url(
 
     # Add constraint for lat/long range
     # If polygon given get the boundaries for erddap
-    if polygon_region:
+    if polygon_region!='all':
         (
             user_constraint["lon_min"],
             user_constraint["lat_min"],
@@ -92,24 +92,24 @@ def get_erddap_download_url(
             user_constraint["lat_max"],
         ) = polygon_region.bounds
 
-    if (
-        "lat_min" in user_constraint
-        and "lat_max" in user_constraint
-        and "lon_min" in user_constraint
-        and "lon_max" in user_constraint
-    ):
-        # Limit longitudes to [-180 to 180] range
-        if user_constraint["lon_min"] < -180:
-            user_constraint["lon_min"] = -180
+        if (
+            "lat_min" in user_constraint
+            and "lat_max" in user_constraint
+            and "lon_min" in user_constraint
+            and "lon_max" in user_constraint
+        ):
+            # Limit longitudes to [-180 to 180] range
+            if user_constraint["lon_min"] < -180:
+                user_constraint["lon_min"] = -180
 
-        if user_constraint["lon_max"] > 180:
-            user_constraint["lon_max"] = 180
+            if user_constraint["lon_max"] > 180:
+                user_constraint["lon_max"] = 180
 
-        e.constraints["latitude>="] = user_constraint["lat_min"]
-        e.constraints["latitude<="] = user_constraint["lat_max"]
+            e.constraints["latitude>="] = user_constraint["lat_min"]
+            e.constraints["latitude<="] = user_constraint["lat_max"]
 
-        e.constraints["longitude>="] = user_constraint["lon_min"]
-        e.constraints["longitude<="] = user_constraint["lon_max"]
+            e.constraints["longitude>="] = user_constraint["lon_min"]
+            e.constraints["longitude<="] = user_constraint["lon_max"]
 
     # Add depth filter
     if "depth" in variables_list:
@@ -122,7 +122,7 @@ def get_erddap_download_url(
     return e.get_download_url()
 
 
-def save_erddap_metadata(dataset, output_path, file_name="erddaps_metadata.csv"):
+def save_erddap_metadata(dataset, output_path, file_name="erddap_metadata.csv"):
     # Define ERDDAPy dataset connection
     e = ERDDAP(server=dataset["erddap_url"], protocol="tabledap", response="csv")
     e.dataset_id = dataset["dataset_id"]
@@ -187,19 +187,25 @@ def get_datasets(json_query, output_path="", create_pdf=False):
         "total_size": 0,
         "empty_download": True,
     }
-
+    
+    
     # Convert WKT polygon to shapely polygon object
-    if "polygon_region" in json_query["user_query"]:
+    polygon_region_wkt = json_query["user_query"].get("polygon_region")
+
+    if polygon_region_wkt:
         polygon_regions = [
-            shapely.wkt.loads(json_query["user_query"]["polygon_region"])
+            shapely.wkt.loads(polygon_region_wkt)
         ]
+    else:
+         polygon_regions = []
 
     # Duplicate polygon over -180 to 180 limit and generate multiple queries to match each side
-    if polygon_regions[0].bounds[0] < -180 or polygon_regions[0].bounds[2] > 180:
-        for shift in [-360, 360]:
-            new_region = shapely.affinity.translate(polygon_regions[0], xoff=shift)
-            if -180 < new_region.bounds[0] < 180 or -180 < new_region.bounds[2] < 180:
-                polygon_regions += [new_region]
+    if polygon_regions:
+        if polygon_regions[0].bounds[0] < -180 or polygon_regions[0].bounds[2] > 180:
+            for shift in [-360, 360]:
+                new_region = shapely.affinity.translate(polygon_regions[0], xoff=shift)
+                if -180 < new_region.bounds[0] < 180 or -180 < new_region.bounds[2] < 180:
+                    polygon_regions += [new_region]
 
     # Download file locally
     chunksize = 1024 ** 2  # 1MB
@@ -231,7 +237,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
         download_status = DOWNLOADING
         download_url_list = []
         erddap_error = ""
-        for polygon_region in polygon_regions:
+        for polygon_region in polygon_regions or ['all']:
 
             # Get download url
             download_url = get_erddap_download_url(
@@ -288,13 +294,13 @@ def get_datasets(json_query, output_path="", create_pdf=False):
             df_temp = pd.read_csv(io.BytesIO(data_downloaded), low_memory=False)
             units = df_temp.iloc[0].replace({pd.NA: ""}).astype(str)  # get units
             df_temp = df_temp.iloc[1:]
-
-            # Filter data to polygon
-            df_temp = filter_polygon_region(df_temp, polygon_region)
+            
+            if(polygon_region!='all'):
+                # Filter data to polygon
+                df_temp = filter_polygon_region(df_temp, polygon_region)
 
             # Append data to previously downloaded one
             df = pd.concat([df, df_temp])
-
         # If download status hasn't changed, download was successfully completed
         if download_status == DOWNLOADING:
             download_status = COMPLETED
