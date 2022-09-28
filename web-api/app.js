@@ -18,6 +18,7 @@ const oceanVariablesRouter = require("./routes/oceanVariables");
 const previewRouter = require("./routes/preview");
 const platformsRouter = require("./routes/platforms");
 const datasetRecordsListRouter = require("./routes/datasetRecordsList");
+const downloadEstimateRouter = require("./routes/downloadEstimate");
 
 const app = express();
 
@@ -61,6 +62,7 @@ app.use("/oceanVariables", oceanVariablesRouter);
 app.use("/preview", previewRouter);
 app.use("/platforms", platformsRouter);
 app.use("/datasetRecordsList", datasetRecordsListRouter);
+app.use("/downloadEstimate", downloadEstimateRouter);
 
 app.use(Sentry.Handlers.errorHandler());
 
