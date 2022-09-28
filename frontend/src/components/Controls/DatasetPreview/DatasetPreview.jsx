@@ -80,7 +80,7 @@ export default function DatasetPreview({
                 // setRecordLoading(true)
               }}
             >
-              Table
+              {t('datasetPreviewTableText')}
             </button>
             <button
               className={`toggleButton ${selectedVis === 'plot' && 'selected'}`}
@@ -89,7 +89,7 @@ export default function DatasetPreview({
                 // setRecordLoading(true)
               }}
             >
-              Plot
+              {t('datasetPreviewPlotText')}
             </button>
 
             <h4 className='datasetTitle'>

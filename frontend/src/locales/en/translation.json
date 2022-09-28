@@ -101,6 +101,8 @@
   "datasetInspectorFilterText": "Filter table",
   "datasetInspectorClickPreviewText": "Click on a Record to get a data preview.",
   "datasetInspectorRecordTable": "Record list",
+  "datasetInspectorERDDAPText": "Dataset source URL",
+  "datasetInspectorCKANText": "Catalogue URL",
   "downloadModalTitleText": "Download Data from CIOOS Data Explorer",
   "downloadModalButtonTitle": "Download selected data",
   "downloadModalButtonText": "Download",
@@ -244,5 +246,11 @@
   "filterInfoButtonTitle": "Learn more about the filter here",
   "datasetInspectorModalTitle": "Dataset Preview",
   "tableComponentRowsPerPage": "Rows per page",
-  "tableComponentOf": "of"
+  "tableComponentOf": "of",
+  "pointDetailsControlRowDatasetsSelected": "Datasets selected",
+  "pointDetailsControlRowToDownload": "To download",
+  "datasetPreviewPlotXAxisSelect": "X axis",
+  "datasetPreviewPlotYAxisSelect": "Y axis",
+  "datasetPreviewTableText": "Table",
+  "datasetPreviewPlotText": "Plot"
 }
