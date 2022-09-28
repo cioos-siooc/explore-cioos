@@ -1,6 +1,7 @@
 require("dotenv").config();
-var express = require("express");
-var router = express.Router();
+const express = require("express");
+
+const router = express.Router();
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { validatorMiddleware } = require("../utils/validatorMiddlewares");
@@ -39,20 +40,20 @@ router.get(
     const SQL = `
   with relevent_points as (
     ${
-      isHexGrid
-        ? `SELECT :zoomPKColumn: pk,count(distinct point_pk) count,`
-        : "SELECT point_pk pk, d.platform as platform,sum(p.days)::bigint count,"
-    } array_to_json(array_agg(distinct dataset_pk)) datasets,     
+  isHexGrid
+    ? "SELECT :zoomPKColumn: pk,count(distinct point_pk) count,"
+    : "SELECT point_pk pk, d.platform as platform,sum(p.days)::bigint count,"
+} array_to_json(array_agg(distinct dataset_pk)) datasets,     
       p.:geom_column: AS geom FROM cde.profiles p
         -- used for organizations filtering
         JOIN cde.datasets d
         ON p.dataset_pk = d.pk 
        ${hasFilter ? "WHERE :filters" : ""}
         ${
-          isHexGrid
-            ? `GROUP BY :zoomPKColumn:,p.:geom_column:`
-            : "GROUP BY geom,point_pk,platform"
-        } ),
+  isHexGrid
+    ? "GROUP BY :zoomPKColumn:,p.:geom_column:"
+    : "GROUP BY geom,point_pk,platform"
+} ),
     te AS (select ST_TileEnvelope(:z, :x, :y) tile_envelope ),
     mvtgeom AS (
       SELECT pk,count, 
@@ -89,7 +90,7 @@ router.get(
         error: e.toString(),
       });
     }
-  }
+  },
 );
 
 module.exports = router;
