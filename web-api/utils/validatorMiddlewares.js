@@ -1,5 +1,6 @@
-var express = require("express");
+const express = require("express");
 const { check, validationResult } = require("express-validator");
+
 const router = express.Router();
 
 const { polygonJSONToWKT } = require("./polygon");
@@ -29,7 +30,6 @@ function datasetDetailsMiddleware() {
     check("datasetPKs").isInt(),
     errorHandler,
   ];
-  
 }
 function shapeFiltersMiddleware() {
   return [
@@ -42,24 +42,24 @@ function shapeFiltersMiddleware() {
     // 360 to accomodate mapbox world copies
     check(["lonMin", "lonMax"]).isFloat({ min: -360, max: 360 }).optional(),
     async function checkValidShape(req, res, next) {
-      const { latMin, latMax, lonMin, lonMax, polygon } = req.query;
+      const {
+        latMin, latMax, lonMin, lonMax, polygon,
+      } = req.query;
       // this has already
       const isValidPolygon = Boolean(polygon && polygonJSONToWKT(polygon));
-      
+
       // these have already been checked for type and value range
-      const isBoundingBox =
-        latMin != undefined ||
-        latMax != undefined ||
-        lonMin != undefined ||
-        lonMax != undefined;
-      
-      const isValidLatLongMaxMin =
-        latMin != undefined &&
-        latMax != undefined &&
-        lonMin != undefined &&
-        lonMax != undefined;
-      
-      if ( (polygon && isValidPolygon) || (isBoundingBox && isValidLatLongMaxMin) || (!isBoundingBox && !polygon) ) {
+      const isBoundingBox = latMin != undefined
+        || latMax != undefined
+        || lonMin != undefined
+        || lonMax != undefined;
+
+      const isValidLatLongMaxMin = latMin != undefined
+        && latMax != undefined
+        && lonMin != undefined
+        && lonMax != undefined;
+
+      if ((polygon && isValidPolygon) || (isBoundingBox && isValidLatLongMaxMin) || (!isBoundingBox && !polygon)) {
         await next();
       } else {
         res.status(400).json({ errors: ["invalid shape"] });
@@ -92,5 +92,5 @@ module.exports = {
   validatorMiddleware,
   requiredShapeMiddleware,
   generalFiltersMiddleWare,
-  datasetDetailsMiddleware
+  datasetDetailsMiddleware,
 };
