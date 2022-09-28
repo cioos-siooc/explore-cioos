@@ -1,6 +1,7 @@
 const e = require("express");
-var express = require("express");
-var router = express.Router();
+const express = require("express");
+
+const router = express.Router();
 const db = require("../db");
 const cache = require("../utils/cache");
 
@@ -11,10 +12,8 @@ const cache = require("../utils/cache");
  *
  * */
 
-router.get("/", cache.route(), async function (req, res, next) {
-  res.send((await db.raw("SELECT DISTINCT  platform FROM cde.datasets WHERE platform IS NOT NULL")).rows.map(e=>e.platform));
+router.get("/", cache.route(), async (req, res, next) => {
+  res.send((await db.raw("SELECT DISTINCT  platform FROM cde.datasets WHERE platform IS NOT NULL")).rows.map((e) => e.platform));
 });
 
 module.exports = router;
-
-

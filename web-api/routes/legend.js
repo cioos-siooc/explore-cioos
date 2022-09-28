@@ -1,5 +1,6 @@
-var express = require("express");
-var router = express.Router();
+const express = require("express");
+
+const router = express.Router();
 const db = require("../db");
 const { validatorMiddleware } = require("../utils/validatorMiddlewares");
 const cache = require("../utils/cache");
@@ -19,7 +20,7 @@ router.get(
   "/",
   cache.route(),
   validatorMiddleware(),
-  async function (req, res, next) {
+  async (req, res, next) => {
     const filters = createDBFilter(req.query);
     const hasFilter = filters.toSQL().sql;
     const sql = `
@@ -41,7 +42,7 @@ router.get(
     const rows = await db.raw(sql, { filters });
 
     res.send(rows && { recordsCount: rows.rows[0] });
-  }
+  },
 );
 
 module.exports = router;
