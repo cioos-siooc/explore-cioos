@@ -1,14 +1,7 @@
 import * as React from 'react'
 import {
-  ArrowDown,
-  ArrowUp,
   CheckSquare,
-  ChevronCompactRight,
   CircleFill,
-  SortAlphaDown,
-  SortAlphaUp,
-  SortNumericDown,
-  SortNumericUp,
   Square
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
@@ -16,7 +9,6 @@ import platformColors from '../../platformColors'
 import './styles.css'
 import DataTable from 'react-data-table-component'
 import DataTableExtensions from 'react-data-table-component-extensions'
-import { ribbonArrow } from 'd3'
 
 export default function DatasetsTable({
   handleSelectAllDatasets,
@@ -25,7 +17,7 @@ export default function DatasetsTable({
   selectAll,
   setInspectDataset,
   isDownloadModal,
-  setHoveredDataset = () => {}
+  setHoveredDataset = () => { }
 }) {
   const { t } = useTranslation()
 
@@ -42,7 +34,6 @@ export default function DatasetsTable({
       ) : (
         <Square onClick={selectAllOnclick} />
       ),
-
       selector: (row) => row.selected,
       cell: (row) =>
         row.selected ? (
@@ -50,7 +41,6 @@ export default function DatasetsTable({
         ) : (
           <Square onClick={checkBoxOnclick(row)} />
         ),
-
       ignoreRowClick: true,
       width: '60px',
       sortable: false
@@ -99,9 +89,14 @@ export default function DatasetsTable({
     },
     {
       name: t('datasetsTableHeaderLocationsText'),
-      selector: (row) => row.profiles_count,
+      selector: (row) => {
+        if (row.profiles_count !== row.n_profiles) {
+          return `${row.profiles_count} / ${row.n_profiles}`
+        } else {
+          return row.profiles_count
+        }
+      },
       wrap: true,
-
       sortable: true,
       width: '100px'
     }
@@ -125,7 +120,6 @@ export default function DatasetsTable({
       >
         <DataTable
           striped
-          // dense
           columns={columns}
           data={data}
           defaultSortFieldId={3}
