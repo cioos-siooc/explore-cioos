@@ -10,10 +10,12 @@ import {
   CalendarWeek,
   FileEarmarkSpreadsheet,
   Water,
-  BroadcastPin
+  BroadcastPin,
+  X
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import _ from 'lodash'
+
 import platformsJSONfile from '../platforms.json'
 import eovsJSONfile from '../eovs.json'
 import { server } from '../config.js'
@@ -85,7 +87,7 @@ export default function App() {
   const [rangeLevels, setRangeLevels] = useState()
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
   const [hoveredDataset, setHoveredDataset] = useState()
-  const [query, setQuery] = useState({
+  const defaultQuery = {
     startDate: defaultStartDate,
     endDate: defaultEndDate,
     startDepth: defaultStartDepth,
@@ -94,7 +96,8 @@ export default function App() {
     orgsSelected: defaultOrgsSelected,
     datasetsSelected: defaultDatatsetsSelected,
     platformsSelected: defaultPlatformsSelected
-  })
+  }
+  const [query, setQuery] = useState(defaultQuery)
 
   // EOV filter initial values and state
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
@@ -513,6 +516,18 @@ export default function App() {
     )
   }
 
+  function resetFilters() {
+    setStartDate(defaultStartDate)
+    setEndDate(defaultEndDate)
+    setStartDepth(defaultStartDepth)
+    setEndDepth(defaultEndDepth)
+    setEovsSelected(eovsSelected.map(eov => { return { ...eov, isSelected: false } }))
+    setOrgsSelected(orgsSelected.map(org => { return { ...org, isSelected: false } }))
+    setDatasetsSelected(datasetsSelected.map(dataset => { return { ...dataset, isSelected: false } }))
+    setPlatformsSelected(platformsSelected.map(platform => { return { ...platform, isSelected: false } }))
+    setPolygon()
+  }
+
   return (
     <ErrorBoundary
       errorBoundaryMessage={t('errorBoundaryMessage')}
@@ -521,6 +536,7 @@ export default function App() {
       {loading && <Loading />}
       {rangeLevels && (
         <Map
+          polygon={polygon}
           setPolygon={setPolygon}
           setPointsToReview={setPointsToReview}
           setLoading={setLoading}
@@ -762,6 +778,14 @@ export default function App() {
             setEndDepth={setEndDepth}
           />
         </Filter>
+        <button
+          className='resetFiltersButton'
+          title={t('resetFiltersButtonTooltipText')}
+          onClick={() => resetFilters()}
+          disabled={loading}
+        >
+          <X size='25px' />
+        </button>
       </Controls>
       {currentRangeLevel && (
         <Legend

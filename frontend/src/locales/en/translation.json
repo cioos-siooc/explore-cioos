@@ -183,5 +183,6 @@
   "datasetPreviewPlotXAxisSelect": "X axis",
   "datasetPreviewPlotYAxisSelect": "Y axis",
   "datasetPreviewTableText": "Table",
-  "datasetPreviewPlotText": "Plot"
+  "datasetPreviewPlotText": "Plot",
+  "resetFiltersButtonTooltipText": "Reset all filters and polygon selection to defaults"
 }

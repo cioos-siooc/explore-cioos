@@ -1,5 +1,6 @@
-var express = require("express");
-var router = express.Router();
+const express = require("express");
+
+const router = express.Router();
 const db = require("../db");
 const cache = require("../utils/cache");
 
@@ -10,13 +11,13 @@ const cache = require("../utils/cache");
  *
  * */
 
-router.get("/", cache.route(), async function (req, res, next) {
+router.get("/", cache.route(), async (req, res, next) => {
   res.send(
     (
       await db.raw(
-        "SELECT DISTINCT UNNEST(eovs) ocean_variables FROM cde.datasets"
+        "SELECT DISTINCT UNNEST(eovs) ocean_variables FROM cde.datasets",
       )
-    ).rows.map((e) => e.ocean_variables)
+    ).rows.map((e) => e.ocean_variables),
   );
 });
 

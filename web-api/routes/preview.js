@@ -1,10 +1,11 @@
-var express = require("express");
+const express = require("express");
 // helps with async error handling in express < v5
 require("express-async-errors");
-var router = express.Router();
+
+const router = express.Router();
+const axios = require("axios");
 const db = require("../db");
 const { validatorMiddleware } = require("../utils/validatorMiddlewares");
-const axios = require("axios");
 
 /*
  * /preview
@@ -13,7 +14,7 @@ const axios = require("axios");
  * TODO: How will this work with timeseries profiles?
  */
 
-router.get("/", validatorMiddleware(), async function (req, res, next) {
+router.get("/", validatorMiddleware(), async (req, res, next) => {
   const NUM_RECORDS = 1000;
   const { dataset, profile } = req.query;
   const sql = `WITH step1 AS (
@@ -70,7 +71,7 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
   try {
     const { data } = await axios.get(erddapQuery);
     console.log("FOUND ", data.table?.rows?.length, " ROWS", erddapQuery);
-    data.table.rows=data.table.rows.slice(0,1000)
+    data.table.rows = data.table.rows.slice(0, 1000);
     res.send(data);
   } catch (error) {
     if (error.response) {
