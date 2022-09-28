@@ -1,0 +1,25 @@
+{
+  "user_query": {
+    "language": "en",
+    "lat_min": null,
+    "lat_max": null,
+    "lon_min": null,
+    "lon_max": null,
+    "depth_min": null,
+    "depth_max": null,
+    "polygon_region": false,
+    "email": "nobody@example.com",
+    "job_id": "f8e98d"
+  },
+  "cache_filtered": [
+    {
+      "erddap_url": "https://pac-dev2.cioos.org/erddap",
+      "dataset_id": "amundsen798",
+      "title": "ArcticNet - Arctic SOLAS 0706a - Northern Baffin Bay CTD data",
+      "profile_variables": ["filename"],
+      "cdm_data_type": "Profile",
+      "ckan_id": null,
+      "ckan_url": "https://catalogue.cioos.ca/dataset/"
+    }
+  ]
+}
