@@ -1,27 +1,27 @@
-var createError = require("http-errors");
-var express = require("express");
-var path = require("path");
-var cookieParser = require("cookie-parser");
-var logger = require("morgan");
-var cors = require("cors");
-
-var downloadRouter = require("./routes/download");
-var indexRouter = require("./routes/index");
-var legendRouter = require("./routes/legend");
-var organizationsRouter = require("./routes/organizations");
-var datasetsRouter = require("./routes/datasets");
-var pointQueryRouter = require("./routes/pointQuery");
-var tilesRouter = require("./routes/tiles");
-var oceanVariablesRouter = require("./routes/oceanVariables");
-var previewRouter = require("./routes/preview");
-var platformsRouter = require("./routes/platforms");
-var datasetRecordsListRouter = require("./routes/datasetRecordsList");
-
-var app = express();
+const createError = require("http-errors");
+const express = require("express");
+const path = require("path");
+const cookieParser = require("cookie-parser");
+const logger = require("morgan");
+const cors = require("cors");
 
 const Sentry = require("@sentry/node");
-// Importing @sentry/tracing patches the global hub for tracing to work.
 const Tracing = require("@sentry/tracing");
+const downloadRouter = require("./routes/download");
+const indexRouter = require("./routes/index");
+const legendRouter = require("./routes/legend");
+const organizationsRouter = require("./routes/organizations");
+const datasetsRouter = require("./routes/datasets");
+const pointQueryRouter = require("./routes/pointQuery");
+const tilesRouter = require("./routes/tiles");
+const oceanVariablesRouter = require("./routes/oceanVariables");
+const previewRouter = require("./routes/preview");
+const platformsRouter = require("./routes/platforms");
+const datasetRecordsListRouter = require("./routes/datasetRecordsList");
+
+const app = express();
+
+// Importing @sentry/tracing patches the global hub for tracing to work.
 
 if (process.env.ENVIRONMENT === "production") {
   console.log("Using sentry");
@@ -65,12 +65,12 @@ app.use("/datasetRecordsList", datasetRecordsListRouter);
 app.use(Sentry.Handlers.errorHandler());
 
 // catch 404 and forward to error handler
-app.use(function (req, res, next) {
+app.use((req, res, next) => {
   next(createError(404));
 });
 
 // error handler
-app.use(function (err, req, res, next) {
+app.use((err, req, res, next) => {
   // set locals, only providing error in development
   res.locals.message = err.message;
   res.locals.error = req.app.get("env") === "development" ? err : {};
