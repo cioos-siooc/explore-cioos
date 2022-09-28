@@ -39,7 +39,6 @@ export default function TimeSelector(props) {
   }
 
   function handleSetEndDate(date) {
-    console.log(date)
     const tempDate = new Date(date)
     setEndDate(date)
     if (tempDate >= new Date(startDate)) {
@@ -53,8 +52,13 @@ export default function TimeSelector(props) {
   }
 
   function onChange(value) {
-    handleSetEndDate(new Date(value[1]).toISOString().split('T')[0])
-    handleSetStartDate(new Date(value[0]).toISOString().split('T')[0])
+    const tempStartDate = new Date(value[0]).toISOString().split('T')[0]
+    const tempEndDate = new Date(value[1]).toISOString().split('T')[0]
+    if (startDate !== tempStartDate) {
+      handleSetStartDate(tempStartDate)
+    } else if (endDate !== tempEndDate) {
+      handleSetEndDate(tempEndDate)
+    }
   }
 
   const dateToday = new Date().getTime()
