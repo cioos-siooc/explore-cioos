@@ -95,8 +95,6 @@ export default function DatasetInspector({
   return (
     <div
       className='datasetInspector'
-      onMouseEnter={() => setHoveredDataset(dataset)}
-      onMouseLeave={() => setHoveredDataset()}
     >
       <div
         className='backButton'
@@ -108,7 +106,11 @@ export default function DatasetInspector({
         {/* Back */}
       </div>
       <div>
-        <div className='metadataAndRecordIDTableGridContainer'>
+        <div
+          className='metadataAndRecordIDTableGridContainer'
+          onMouseEnter={() => setHoveredDataset(dataset)}
+          onMouseLeave={() => setHoveredDataset()}
+        >
           <strong>{t('datasetInspectorTitleText')}</strong>
           <FilterButton
             setOptionsSelected={datasetFilter.setDatasetsSelected}
