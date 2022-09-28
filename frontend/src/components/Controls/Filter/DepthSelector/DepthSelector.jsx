@@ -46,9 +46,48 @@ export default function DepthSelector(props) {
     }
   }
 
+  function onChange(value) {
+    props.setStartDepth(value[0])
+    props.setEndDepth(value[1])
+  }
+
   return (
     <div className='depthSelector'>
       <div className='inputs'>
+        <div className='depthQuickSelectGrid'>
+          <button
+            onClick={() => {
+              props.setStartDepth(0)
+              props.setEndDepth(100)
+            }}
+          >
+            100 m
+          </button>
+          <button
+            onClick={() => {
+              props.setStartDepth(0)
+              props.setEndDepth(500)
+            }}
+          >
+            500 m
+          </button>
+          <button
+            onClick={() => {
+              props.setStartDepth(0)
+              props.setEndDepth(1000)
+            }}
+          >
+            1000 m
+          </button>
+          <button
+            onClick={() => {
+              props.setStartDepth(1000)
+              props.setEndDepth(12000)
+            }}
+          >
+            1000+ m
+          </button>
+        </div>
         <div
           className='depth'
           title={!depthValid ? t('depthFilterStartInvalidTitle') : undefined}
@@ -81,10 +120,20 @@ export default function DepthSelector(props) {
         </div>
       </div>
       <RangeSelector
-        startDepth={props.startDepth}
-        endDepth={props.endDepth}
-        setStartDepth={props.setStartDepth}
-        setEndDepth={props.setEndDepth}
+        start={props.startDepth}
+        end={props.endDepth}
+        marks={{
+          0: '0m',
+          2000: '2000m',
+          4000: '4000m',
+          6000: '6000m',
+          8000: '8000m',
+          10000: '10000m',
+          12000: '12000m'
+        }}
+        min={0}
+        max={12000}
+        onChange={onChange}
       />
       {!depthValid && (
         <div>

@@ -4,6 +4,7 @@ import PropTypes from 'prop-types'
 import { useTranslation } from 'react-i18next'
 import { X } from 'react-bootstrap-icons'
 
+import RangeSelector from '../RangeSelector/RangeSelector.jsx'
 import './styles.css'
 
 // Spacing elements out to the left and right using justify-content: space-between. https://medium.com/12-developer-labors/css-all-the-ways-to-align-elements-left-and-right-52ecce4a4af9
@@ -50,8 +51,58 @@ export default function TimeSelector(props) {
     }
   }
 
+  function onChange(value) {
+    const tempStartDate = new Date(value[0]).toISOString().split('T')[0]
+    const tempEndDate = new Date(value[1]).toISOString().split('T')[0]
+    if (startDate !== tempStartDate) {
+      handleSetStartDate(tempStartDate)
+    } else if (endDate !== tempEndDate) {
+      handleSetEndDate(tempEndDate)
+    }
+  }
+
+  const dateToday = new Date().getTime()
+
   return (
     <div className='timeSelector'>
+      <div className='depthQuickSelectGrid'>
+        <button
+          onClick={() => {
+            const date = new Date()
+            props.setEndDate(date.toISOString().split('T')[0])
+            props.setStartDate(new Date(date.getTime() - 10 * 86400000).toISOString().split('T')[0])
+          }}
+        >
+          10 days
+        </button>
+        <button
+          onClick={() => {
+            const date = new Date()
+            props.setEndDate(date.toISOString().split('T')[0])
+            props.setStartDate(new Date(date.getTime() - 30 * 86400000).toISOString().split('T')[0])
+          }}
+        >
+          30 days
+        </button>
+        <button
+          onClick={() => {
+            const date = new Date()
+            props.setEndDate(date.toISOString().split('T')[0])
+            props.setStartDate(new Date(date.getTime() - 365 * 86400000).toISOString().split('T')[0])
+          }}
+        >
+          1 year
+        </button>
+        <button
+          onClick={() => {
+            const date = new Date()
+            props.setEndDate(date.toISOString().split('T')[0])
+            props.setStartDate(new Date(date.getTime() - 3652 * 86400000).toISOString().split('T')[0])
+          }}
+        >
+          1 decade
+        </button>
+      </div>
       <div className='date'>
         <span>
           {t('timeSelectorStartDate')}
@@ -60,8 +111,8 @@ export default function TimeSelector(props) {
         <input
           type='date'
           value={startDate}
-          max='9999-12-31'
-          min='0000-01-01'
+          max={new Date().toISOString().split('T')[0]}
+          min='1900-01-01'
           onChange={(e) => handleSetStartDate(e.target.value)}
         />
       </div>
@@ -73,11 +124,34 @@ export default function TimeSelector(props) {
         <input
           type='date'
           value={endDate}
-          max='9999-12-31'
-          min='0000-01-01'
+          max={new Date().toISOString().split('T')[0]}
+          min='1900-01-01'
           onChange={(e) => handleSetEndDate(e.target.value)}
         />
       </div>
+      <RangeSelector
+        start={new Date(props.startDate).getTime()}
+        end={new Date(props.endDate).getTime()}
+        marks={{
+          '-2208960000000': '1900',
+          // '-1893427200000': '1910',
+          '-1577894400000': '1920',
+          // '-1262275200000': '1930',
+          '-946742400000': '1940',
+          // '-631123200000': '1950',
+          '-315590400000': '1960',
+          // '28800000': '1970',
+          '315561600000': '1980',
+          // '631180800000': '1990',
+          '946713600000': '2000',
+          // '1262332800000': '2010',
+          '1577865600000': '2020',
+          [dateToday]: '',
+        }}
+        min={-2208960000000}
+        max={dateToday}
+        onChange={onChange}
+      />
       {!dateValid && (
         <div>
           {' '}
