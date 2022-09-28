@@ -22,11 +22,13 @@ import {
 } from '../../utilities'
 import { colorScale, defaultQuery } from '../config'
 import platformColors from '../../components/platformColors'
+import _ from 'lodash'
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
 export default function CreateMap({
   query,
   setPointsToReview,
+  polygon,
   setPolygon,
   setLoading,
   zoom,
@@ -98,6 +100,12 @@ export default function CreateMap({
     return accumulatedPlatformColors
   }, colors)
   colors.push('#000000')
+
+  useEffect(() => {
+    if(map.current && !polygon && drawPolygon.current?.getAll()?.features?.length > 0) {
+      drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
+    }
+  }, [polygon])
 
   useEffect(() => {
     setColorStops()
