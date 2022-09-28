@@ -427,20 +427,19 @@ export default function App() {
   }
 
   function submitRequest() {
-    fetch(
-      `${server}/download?${createDataFilterQueryString(
-        query
-      )}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload
-        .map((point) => point.pk)
-        .join(',')}&email=${email}&lang=${i18n.language}`
-    )
-      .then((response) => {
-        if (response.ok) {
-          setSubmissionState('successful')
-        } else {
-          setSubmissionState('failed')
-        }
-      })
+    let url = `${server}/download?${createDataFilterQueryString(query)}&datasetPKs=${pointsToDownload
+      .map((point) => point.pk)
+      .join(',')}&email=${email}&lang=${i18n.language}`
+    if (polygon) {
+      url += `&polygon=${JSON.stringify(polygon)}`
+    }
+    fetch(url).then((response) => {
+      if (response.ok) {
+        setSubmissionState('successful')
+      } else {
+        setSubmissionState('failed')
+      }
+    })
       .catch((error) => {
         setSubmissionState('failed')
         throw error
