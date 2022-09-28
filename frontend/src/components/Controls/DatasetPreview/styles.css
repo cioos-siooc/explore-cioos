@@ -27,7 +27,7 @@
 }
 
 .tableAndPlotGridContainer .toggleButton {
-  width: 66px;
+  min-width: 66px;
   height: 42px;
   margin: 0px 16.5px;
   background-color: white;

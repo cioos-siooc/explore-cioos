@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Modal, Dropdown, DropdownButton, Table } from 'react-bootstrap'
+import { useTranslation } from 'react-i18next'
 import './styles.css'
 import Plot from 'react-plotly.js'
 
@@ -11,6 +12,8 @@ export default function DatasetPreviewPlot({
   inspectRecordID,
   data
 }) {
+  const { t } = useTranslation()
+
   const { title } = inspectDataset
   const isProfile = inspectDataset.cdm_data_type
     .toLowerCase()
@@ -34,7 +37,7 @@ export default function DatasetPreviewPlot({
   return (
     <>
       <DropdownButton
-        title={plotAxes.x ? 'X axis: ' + plotAxes.x : 'Select X axis variable'}
+        title={t('datasetPreviewPlotXAxisSelect') + ': ' + plotAxes.x}
       >
         {datasetPreview &&
           datasetPreview?.table?.columnNames.map((columnName) => {
@@ -49,7 +52,7 @@ export default function DatasetPreviewPlot({
           })}
       </DropdownButton>
       <DropdownButton
-        title={plotAxes.y ? 'Y Axis: ' + plotAxes.y : 'Select Y axis variable'}
+        title={t('datasetPreviewPlotXAxisSelect') + ': ' + plotAxes.y}
       >
         {datasetPreview &&
           datasetPreview?.table?.columnNames.map((columnName) => {
