@@ -66,7 +66,7 @@ export default function DepthSelector(props) {
           <button
             onClick={() => {
               props.setStartDepth(0)
-              props.setEndDepth(250)
+              props.setEndDepth(500)
             }}
           >
             500 m
@@ -74,7 +74,7 @@ export default function DepthSelector(props) {
           <button
             onClick={() => {
               props.setStartDepth(0)
-              props.setEndDepth(500)
+              props.setEndDepth(1000)
             }}
           >
             1000 m
