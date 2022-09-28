@@ -1,5 +1,6 @@
-var express = require("express");
-var router = express.Router();
+const express = require("express");
+
+const router = express.Router();
 
 /*
  * /
@@ -8,12 +9,12 @@ var router = express.Router();
  *
  */
 
-router.get("/", function (req, res, next) {
+router.get("/", (req, res, next) => {
   res.render("index", { title: "CDE API" });
 });
 
-router.get("/sentry-test", function (req, res, next) {
-  throw new Error("Testing sentry")
+router.get("/sentry-test", (req, res, next) => {
+  throw new Error("Testing sentry");
 });
 
 module.exports = router;

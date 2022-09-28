@@ -124,3 +124,15 @@ body {
     top: 176px;
   }
 }
+
+.resetFiltersButton:hover {
+  background-color: #c6e3df;
+}
+
+.resetFiltersButton {
+  pointer-events: all;
+  background-color: transparent;
+  border-radius: 42px;
+  border: 2px solid transparent;
+  margin-left: 5px;
+}
