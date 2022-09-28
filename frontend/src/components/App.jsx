@@ -207,6 +207,23 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (polygon) {
+      if (!polygonIsRectangle(polygon)) {
+        const elem = document.querySelector('.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon')
+        if (elem) {
+          elem.style.backgroundColor = '#c6e3df'
+        }
+      }
+    } else {
+      // remove colour from button
+      const elem = document.querySelector('.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon')
+      if (elem) {
+        elem.style.backgroundColor = '#ffffff'
+      }
+    }
+  }, [polygon])
+
+  useEffect(() => {
     if (_.isEmpty(pointsToDownload)) {
       setSubmissionFeedback()
     }
