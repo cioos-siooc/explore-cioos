@@ -184,5 +184,6 @@
   "datasetPreviewPlotXAxisSelect": "Axe X",
   "datasetPreviewPlotYAxisSelect": "Axe Y",
   "datasetPreviewTableText": "Tableau",
-  "datasetPreviewPlotText": "Graphique"
+  "datasetPreviewPlotText": "Graphique",
+  "resetFiltersButtonTooltipText": "Réinitialiser tous les filtres et la sélection de polygones aux valeurs par défaut"
 }
