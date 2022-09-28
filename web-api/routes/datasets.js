@@ -1,9 +1,10 @@
-var express = require("express");
-var router = express.Router();
+const express = require("express");
+
+const router = express.Router();
 const db = require("../db");
 const cache = require("../utils/cache");
 
-router.get("/", cache.route(), async function (req, res, next) {
+router.get("/", cache.route(), async (req, res, next) => {
   const SQL = `SELECT title, 
                       pk,
                       organization_pks,
