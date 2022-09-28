@@ -6,8 +6,6 @@ import 'rc-slider/assets/index.css'
 import './styles.css'
 
 export default function RangeSelector({ start, end, marks, min, max, onChange }) {
-  // const [dynamicKey, setDynamicKey] = useState(Date.now())
-  // console.log(marks)
   return (
     <div className='rangeSelector'>
       <Slider
