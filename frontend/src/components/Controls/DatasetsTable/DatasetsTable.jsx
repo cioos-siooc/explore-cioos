@@ -11,7 +11,7 @@ import DataTable from 'react-data-table-component'
 import DataTableExtensions from 'react-data-table-component-extensions'
 import { polygon } from '@turf/turf'
 import { server } from '../../../config'
-import { createDataFilterQueryString } from '../../../utilities'
+import { bytesToMemorySizeString, createDataFilterQueryString } from '../../../utilities'
 
 export default function DatasetsTable({
   handleSelectAllDatasets,
@@ -36,21 +36,34 @@ export default function DatasetsTable({
   useEffect(() => {
     if (isDownloadModal) {
       let url = `${server}/downloadEstimate?`
-      if (polygon) {
-        url += `&polygon=${JSON.stringify(polygon)}`
-      }
-      if (query) {
-        url += `&${createDataFilterQueryString(query)}`
-      }
+      let unfilteredSizeEstimates
       if (datasets) {
         url += `&datasetPKs=${datasets.map(ds => ds.pk).join(',')}`
       }
-      fetch(url).then((response) => {
-        if (response.ok) return response.json()
-      }).then((estimates) => {
-        setDownloadSizeEstimates(estimates)
-        console.log(url, estimates, datasets)
-      }).catch((error) => {
+      fetch(url).then(response => response.ok && response.json()).then(ufse => {
+        unfilteredSizeEstimates = ufse
+      }).then(() => {
+        if (polygon) {
+          url += `&polygon=${JSON.stringify(polygon)}`
+        }
+        if (query) {
+          url += `&${createDataFilterQueryString(query)}`
+        }
+        fetch(url).then((response) => {
+          if (response.ok) return response.json()
+        }).then((estimates) => {
+          const filteredAndUnfilteredSizeEstimates = estimates.map(e => {
+            return {
+              ...e,
+              unfilteredSize: unfilteredSizeEstimates.filter(ufse => ufse.pk === e.pk)[0].size
+            }
+          })
+          setDownloadSizeEstimates(filteredAndUnfilteredSizeEstimates)
+          console.log(url, filteredAndUnfilteredSizeEstimates, datasets)
+        }).catch((error) => {
+          throw error
+        })
+      }).catch(error => {
         throw error
       })
     }
@@ -62,12 +75,16 @@ export default function DatasetsTable({
     } else if (downloadSizeEstimates) {
       console.log(downloadSizeEstimates, datasets)
       const tempData = datasets.map((ds) => {
-        const size = downloadSizeEstimates.filter(dse => dse.pk === ds.pk)[0].size
+        const tempDS = downloadSizeEstimates.filter(dse => dse.pk === ds.pk)[0]
+        const estimates = {
+          filteredSize: tempDS.size,
+          unfilteredSize: tempDS.unfilteredSize
+        }
         return {
           ...ds,
-          sizeEstimate: size,
-          internalDownload: size < 1000000000,
-          erddapLink: size > 1000000000 && ds.erddap_url
+          sizeEstimate: estimates,
+          internalDownload: estimates.filteredSize < 1000000000,
+          erddapLink: estimates.filteredSize > 1000000000 && ds.erddap_url
         }
       })
       setTableData({ columns: generateColumns(), data: tempData })
@@ -91,7 +108,7 @@ export default function DatasetsTable({
           ),
         ignoreRowClick: true,
         width: '60px',
-        sortable: false
+        sortable: true
       },
 
       {
@@ -151,10 +168,10 @@ export default function DatasetsTable({
       }
     ]
 
-    if (isDownloadModal) {
+    if (isDownloadModal && downloadSizeEstimates) {
       columns.push({
         name: 'Estimated download size',
-        selector: (row) => row.sizeEstimate,
+        selector: (row) => `${bytesToMemorySizeString(row.sizeEstimate.filteredSize)} / ${bytesToMemorySizeString(row.sizeEstimate.unfilteredSize)}`,
         wrap: true,
         sortable: true,
         width: '200px'
