@@ -15,9 +15,9 @@ export default function DatasetPreview({
   setInspectRecordID,
   showModal,
   setShowModal,
-  recordLoading
+  recordLoading,
+  setRecordLoading
 }) {
-  if (!datasetPreview) return <></>
   const { t, i18n } = useTranslation()
   const clearAxes = { x: null, y: null }
   const [plotAxes, setAxes] = useState(clearAxes)
@@ -42,6 +42,17 @@ export default function DatasetPreview({
     })
     setData(data)
   }, [datasetPreview])
+  console.log(data?.rows?.length)
+  const onModalClose = () => {
+    setInspectRecordID()
+    setShowModal(false)
+    setAxes(clearAxes)
+    setSelectedVis('table')
+    setInspectRecordID()
+    setData()
+    setRecordLoading(false)
+  }
+  const dataIsReady = !recordLoading && datasetPreview?.table?.rows
 
   return (
     <Modal
@@ -49,48 +60,40 @@ export default function DatasetPreview({
       show={showModal}
       // fullscreen
       size='xl'
-      onHide={() => {
-        setInspectRecordID()
-        setShowModal(false)
-        setAxes(clearAxes)
-        setSelectedVis('table')
-        setInspectRecordID()
-        setData()
-      }}
-      onExit={() => {
-        setInspectRecordID()
-        setShowModal(false)
-        setAxes(clearAxes)
-        setSelectedVis('table')
-        setInspectRecordID()
-        setData()
-      }}
+      onHide={onModalClose}
+      onExit={onModalClose}
       centered
       scrollable
     >
       {inspectDataset && inspectRecordID && (
         <>
           <Modal.Header closeButton className='tableAndPlotGridContainer'>
-            <button
-              className={`toggleButton ${
-                selectedVis === 'table' && 'selected'
-              }`}
-              onClick={() => {
-                setSelectedVis('table')
-                // setRecordLoading(true)
-              }}
-            >
-              {t('datasetPreviewTableText')}
-            </button>
-            <button
-              className={`toggleButton ${selectedVis === 'plot' && 'selected'}`}
-              onClick={() => {
-                setSelectedVis('plot')
-                // setRecordLoading(true)
-              }}
-            >
-              {t('datasetPreviewPlotText')}
-            </button>
+            {dataIsReady && (
+              <>
+                <button
+                  className={`toggleButton ${
+                    selectedVis === 'table' && 'selected'
+                  }`}
+                  onClick={() => {
+                    setSelectedVis('table')
+                    // setRecordLoading(true)
+                  }}
+                >
+                  {t('datasetPreviewTableText')}
+                </button>
+                <button
+                  className={`toggleButton ${
+                    selectedVis === 'plot' && 'selected'
+                  }`}
+                  onClick={() => {
+                    setSelectedVis('plot')
+                    // setRecordLoading(true)
+                  }}
+                >
+                  {t('datasetPreviewPlotText')}
+                </button>
+              </>
+            )}
 
             <h4 className='datasetTitle'>
               {inspectDataset.title}: <i>{inspectRecordID}</i>
@@ -98,27 +101,36 @@ export default function DatasetPreview({
               {/* Dataset Preview */}
             </h4>
           </Modal.Header>
-          <Modal.Body
-            style={selectedVis === 'table' ? { padding: 0 } : undefined}
-          >
+          <Modal.Body>
             <div className='tableAndPlotGridItem tableAndPlot'>
               {recordLoading ? (
                 <Loading />
-              ) : selectedVis === 'table' ? (
-                <DatasetPreviewTable
-                  datasetPreview={datasetPreview}
-                  data={data}
-                  // setRecordLoading={setRecordLoading}
-                />
               ) : (
-                <DatasetPreviewPlot
-                  inspectDataset={inspectDataset}
-                  plotAxes={plotAxes}
-                  datasetPreview={datasetPreview}
-                  setAxes={setAxes}
-                  inspectRecordID={inspectRecordID}
-                  data={data}
-                />
+                <div>
+                  {datasetPreview?.table?.rows ? (
+                    <div>
+                      {selectedVis === 'table' ? (
+                        <DatasetPreviewTable
+                          datasetPreview={datasetPreview}
+                          data={data}
+                        />
+                      ) : (
+                        <DatasetPreviewPlot
+                          inspectDataset={inspectDataset}
+                          plotAxes={plotAxes}
+                          datasetPreview={datasetPreview}
+                          setAxes={setAxes}
+                          inspectRecordID={inspectRecordID}
+                          data={data}
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <p>{t('datasetPreviewNoData')}</p>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </Modal.Body>
