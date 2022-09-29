@@ -16,6 +16,7 @@ import './styles.css'
 export default function DatasetInspector({
   dataset,
   setInspectDataset,
+  setBackClicked,
   setHoveredDataset,
   setInspectRecordID,
   filterSet,
@@ -102,7 +103,10 @@ export default function DatasetInspector({
     >
       <div
         className='backButton'
-        onClick={() => setInspectDataset()}
+        onClick={() => {
+          setBackClicked(true)
+          setInspectDataset()
+        }}
         title={t('datasetInspectorBackButtonTitle')} // 'Return to dataset list'
       >
         <ChevronCompactLeft />
