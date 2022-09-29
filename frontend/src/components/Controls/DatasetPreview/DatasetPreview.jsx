@@ -42,7 +42,7 @@ export default function DatasetPreview({
     })
     setData(data)
   }, [datasetPreview])
-  console.log(data?.rows?.length)
+
   const onModalClose = () => {
     setInspectRecordID()
     setShowModal(false)
