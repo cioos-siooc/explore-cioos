@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react'
 import {
   CheckSquare,
   CircleFill,
-  Square
+  Square,
+  Check2Circle,
+  XCircle
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import platformColors from '../../platformColors'
@@ -12,6 +14,7 @@ import DataTableExtensions from 'react-data-table-component-extensions'
 import { polygon } from '@turf/turf'
 import { server } from '../../../config'
 import { bytesToMemorySizeString, createDataFilterQueryString } from '../../../utilities'
+import _ from 'lodash'
 
 export default function DatasetsTable({
   handleSelectAllDatasets,
@@ -84,7 +87,7 @@ export default function DatasetsTable({
           ...ds,
           sizeEstimate: estimates,
           internalDownload: estimates.filteredSize < 1000000000,
-          erddapLink: estimates.filteredSize > 1000000000 && ds.erddap_url
+          erddapLink: ds.erddap_url
         }
       })
       setTableData({ columns: generateColumns(), data: tempData })
@@ -168,24 +171,41 @@ export default function DatasetsTable({
       }
     ]
 
-    if (isDownloadModal && downloadSizeEstimates) {
+    if (isDownloadModal) {
       columns.push({
         name: 'Estimated download size',
-        selector: (row) => `${bytesToMemorySizeString(row.sizeEstimate.filteredSize)} / ${bytesToMemorySizeString(row.sizeEstimate.unfilteredSize)}`,
+        selector: (row) => !_.isEmpty(downloadSizeEstimates) && (`${bytesToMemorySizeString(row.sizeEstimate.filteredSize)} / ${bytesToMemorySizeString(row.sizeEstimate.unfilteredSize)}`),
         wrap: true,
         sortable: true,
         width: '200px'
       })
       columns.push({
-        name: 'Downloadable',
-        selector: (row) => row.internalDownload ? 'true' : 'false',
+        name: 'CDE Downloadable',
+        selector: (row) => !_.isEmpty(downloadSizeEstimates) && (row.internalDownload),
+        cell: (row) => {
+          if (!_.isEmpty(downloadSizeEstimates)) {
+            return row.internalDownload ? <Check2Circle color='green' size='25' /> : <XCircle color='red' size='25' />
+          }
+        },
         wrap: true,
         sortable: true,
-        width: '150px'
+        width: '200px'
       })
       columns.push({
         name: 'External download',
-        selector: (row) => row.erddapLink,
+        selector: (row) => !_.isEmpty(downloadSizeEstimates) && (row.erddapLink),
+        cell: (row) => {
+          if (!_.isEmpty(downloadSizeEstimates)) {
+            return (
+              <a
+                href={row.erddapLink}
+                target='_blank' rel='noreferrer'
+              >
+                ERDDAP
+              </a>
+            )
+          }
+        },
         wrap: true,
         sortable: true,
         width: '150px'
@@ -195,6 +215,16 @@ export default function DatasetsTable({
     return columns
   }
 
+  /* TODO:
+  - add number of downloadable datasets count to download
+  - add section with more download details about the download that is currently setup
+  - remove the size estimator
+  - add the cookie for the email
+  - add the 'enable' / 'disable' filter options for each filter using toggles, or using additional columns in the table
+  - remove or fix the download instructions to reflect the changes that we have implemented (maybe make it an toggle to see area)
+  - automatically select or deselect datasets that do/don't fit within the dataset size limitations
+  */
+
   return (
     <div className='datasetsTable'>
       <DataTableExtensions
@@ -202,7 +232,7 @@ export default function DatasetsTable({
         print={false}
         export={false}
         filterPlaceholder={t('datasetInspectorFilterText')}
-        filter={!isDownloadModal}
+        filter={true}
       >
         <DataTable
           striped
