@@ -30,6 +30,7 @@ export default function DatasetInspector({
 
   useEffect(() => {
     setLoading(true)
+    
     fetch(`${server}/datasetRecordsList?datasetPKs=${dataset.pk}&${query}`)
       .then((response) => {
         if (response.ok) {
@@ -220,7 +221,7 @@ export default function DatasetInspector({
                   data={data}
                   defaultSortField='profile_id'
                   defaultSortAsc={false}
-                  pagination={data?.length > 100}
+                  pagination
                   paginationPerPage={100}
                   paginationRowsPerPageOptions={[100, 150, 200, 250]}
                   paginationComponentOptions={{
