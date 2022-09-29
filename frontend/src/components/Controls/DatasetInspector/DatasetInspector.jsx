@@ -31,8 +31,10 @@ export default function DatasetInspector({
 
   useEffect(() => {
     setLoading(true)
-    
-    fetch(`${server}/datasetRecordsList?datasetPKs=${dataset.pk}&${query}`)
+    const queryParams = new URLSearchParams(query)
+    queryParams.append('datasetPKs', dataset.pk)
+
+    fetch(`${server}/datasetRecordsList?${queryParams.toString()}`)
       .then((response) => {
         if (response.ok) {
           response.json().then((data) => {
