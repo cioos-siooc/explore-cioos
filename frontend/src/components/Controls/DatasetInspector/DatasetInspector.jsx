@@ -18,7 +18,8 @@ export default function DatasetInspector({
   setInspectDataset,
   setHoveredDataset,
   setInspectRecordID,
-  filterSet
+  filterSet,
+  query
 }) {
   const { t } = useTranslation()
   const [datasetRecords, setDatasetRecords] = useState()
@@ -29,7 +30,7 @@ export default function DatasetInspector({
 
   useEffect(() => {
     setLoading(true)
-    fetch(`${server}/datasetRecordsList?datasetPKs=${dataset.pk}`)
+    fetch(`${server}/datasetRecordsList?datasetPKs=${dataset.pk}&${query}`)
       .then((response) => {
         if (response.ok) {
           response.json().then((data) => {

@@ -48,6 +48,7 @@ export default function SelectionDetails({
   )
   const [datasetsSelected, setDatasetsSelected] = useState()
   const [filteredDatasets, setFilteredDatasets] = useState([])
+  const [combinedQueries, setCombinedQueries] = useState([])
 
   useEffect(() => {
     if (!_.isEmpty(debouncedDatasetTitleSearchText)) {
@@ -95,6 +96,7 @@ export default function SelectionDetails({
         '?' + [filtersQuery, shapeQuery].filter((e) => e).join('&')
       setInspectDataset()
       setLoading(true)
+      setCombinedQueries(combinedQueries)
       const urlString = `${server}/pointQuery${combinedQueries}`
       fetch(urlString).then((response) => {
         if (response.ok) {
@@ -162,7 +164,7 @@ export default function SelectionDetails({
       setInspectRecordID()
     }
   }, [inspectRecordID])
-
+  console.log(polygon)
   return (
     <div
       className='pointDetails'
@@ -194,6 +196,7 @@ export default function SelectionDetails({
             setInspectDataset={setInspectDataset}
             setInspectRecordID={setInspectRecordID}
             filterSet={filterSet}
+            query={combinedQueries}
           />
         ) : (
           <>
