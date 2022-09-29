@@ -164,7 +164,7 @@ export default function SelectionDetails({
       setInspectRecordID()
     }
   }, [inspectRecordID])
-  console.log(polygon)
+  
   return (
     <div
       className='pointDetails'
