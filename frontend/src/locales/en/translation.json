@@ -184,5 +184,6 @@
   "datasetPreviewPlotYAxisSelect": "Y axis",
   "datasetPreviewTableText": "Table",
   "datasetPreviewPlotText": "Plot",
+  "datasetPreviewNoData": "This dataset can not be previewed. Try again later",
   "resetFiltersButtonTooltipText": "Reset all filters and polygon selection to defaults"
 }
