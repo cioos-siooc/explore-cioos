@@ -241,11 +241,12 @@ export default function SelectionDetails({
         setDatasetPreview={setDatasetPreview}
         inspectDataset={inspectDataset}
         setInspectDataset={setInspectDataset}
-        showModal={showModal}
+        showModal={showModal || recordLoading}
         setShowModal={setShowModal}
         inspectRecordID={inspectRecordID}
         setInspectRecordID={setInspectRecordID}
         recordLoading={recordLoading}
+        setRecordLoading={setRecordLoading}
       />
     </div>
   )
