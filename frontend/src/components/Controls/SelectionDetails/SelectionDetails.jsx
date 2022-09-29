@@ -40,6 +40,7 @@ export default function SelectionDetails({
   const [inspectRecordID, setInspectRecordID] = useState()
   const [showModal, setShowModal] = useState(false)
   const [recordLoading, setRecordLoading] = useState(false)
+  const [backClicked, setBackClicked] = useState(false)
   const [datasetPreview, setDatasetPreview] = useState()
   const [datasetTitleSearchText, setDatasetTitleSearchText] = useState('')
   const debouncedDatasetTitleSearchText = useDebounce(
@@ -77,7 +78,7 @@ export default function SelectionDetails({
       setPointsToReview(pointsData.filter((point) => point.selected))
     }
     setLoading(false)
-    if (pointsData.length === 1) {
+    if (pointsData.length === 1 && !backClicked) {
       // Auto load single selected dataset
       setInspectDataset(pointsData[0])
       // setLoading(true)
@@ -116,6 +117,7 @@ export default function SelectionDetails({
         }
       })
     }
+    setBackClicked(false)
   }, [query, polygon, i18n.language])
 
   function handleSelectDataset(point) {
@@ -193,6 +195,7 @@ export default function SelectionDetails({
           <DatasetInspector
             dataset={inspectDataset}
             setHoveredDataset={setHoveredDataset}
+            setBackClicked={setBackClicked}
             setInspectDataset={setInspectDataset}
             setInspectRecordID={setInspectRecordID}
             filterSet={filterSet}
