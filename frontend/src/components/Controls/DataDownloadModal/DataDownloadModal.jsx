@@ -33,7 +33,9 @@ export default function DataDownloadModal({
             {/* Download Data from CIOOS Data Explorer */}
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body>{children}</Modal.Body>
+        <Modal.Body>
+          {children}
+        </Modal.Body>
       </Modal>
       <button
         className='downloadButton'

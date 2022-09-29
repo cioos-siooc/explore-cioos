@@ -4,7 +4,7 @@ import { ProgressBar, Row, Col, Container } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
-import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
+// import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
 
 import './styles.css'
@@ -18,6 +18,8 @@ export default function DownloadDetails({
   pointsToReview,
   setPointsToDownload,
   setHoveredDataset,
+  polygon,
+  query,
   children
 }) {
   const { t } = useTranslation()
@@ -94,6 +96,8 @@ export default function DownloadDetails({
             setDatasets={setPointsData}
             datasets={pointsData}
             setHoveredDataset={setHoveredDataset}
+            polygon={polygon}
+            query={query}
           />
         </Col>
       </Row>
