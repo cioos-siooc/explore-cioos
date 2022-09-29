@@ -416,8 +416,11 @@ export default function App() {
   useEffect(() => {
     if (!loading && !_.isEmpty(rangeLevels)) {
       fetch(`${server}/legend?${createDataFilterQueryString(query)}`)
-        .then((response) => response.json())
-        .then((legend) => {
+        .then((response) => {
+          if (response.ok) {
+            return response.json()
+          }
+        }).then((legend) => {
           if (legend) {
             setRangeLevels(legend.recordsCount)
           }
@@ -475,6 +478,8 @@ export default function App() {
           width={650}
           pointsToReview={pointsToReview}
           setPointsToDownload={setPointsToDownload}
+          polygon={polygon}
+          query={query}
         >
           <Col>
             <input
@@ -541,7 +546,6 @@ export default function App() {
           setPointsToReview={setPointsToReview}
           setLoading={setLoading}
           query={query}
-          polygon={polygon}
           zoom={zoom}
           setZoom={setZoom}
           rangeLevels={rangeLevels}
