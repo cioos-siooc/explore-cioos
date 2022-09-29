@@ -185,5 +185,6 @@
   "datasetPreviewPlotYAxisSelect": "Axe Y",
   "datasetPreviewTableText": "Tableau",
   "datasetPreviewPlotText": "Graphique",
+  "datasetPreviewNoData": "Ce jeu de données ne peut pas être prévisualisé. Réessayez plus tard",
   "resetFiltersButtonTooltipText": "Réinitialiser tous les filtres et la sélection de polygones aux valeurs par défaut"
 }
