@@ -56,6 +56,13 @@ import {
   setAllOptionsIsSelectedTo,
   polygonIsRectangle
 } from '../utilities.js'
+import {
+  useParams,
+  useLocation,
+  useHistory,
+  useSearchParams,
+  useNavigate
+} from 'react-router-dom'
 
 import 'bootstrap/dist/css/bootstrap.min.css'
 import './styles.css'
@@ -73,7 +80,10 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 export default function App() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const lang = searchParams.get('lang')
   const { t, i18n } = useTranslation()
+
   const [selectionPanelOpen, setSelectionPanelOpen] = useState(true)
   const [pointsToDownload, setPointsToDownload] = useState()
   const [pointsToReview, setPointsToReview] = useState()
@@ -98,6 +108,8 @@ export default function App() {
     platformsSelected: defaultPlatformsSelected
   }
   const [query, setQuery] = useState(defaultQuery)
+
+  const navigate = useNavigate()
 
   // EOV filter initial values and state
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
@@ -211,13 +223,17 @@ export default function App() {
 
   useEffect(() => {
     if (polygon && !polygonIsRectangle(polygon)) {
-      const elem = document.querySelector('.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon')
+      const elem = document.querySelector(
+        '.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon'
+      )
       if (elem) {
         elem.style.backgroundColor = '#c6e3df'
       }
     } else {
       // remove colour from button
-      const elem = document.querySelector('.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon')
+      const elem = document.querySelector(
+        '.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon'
+      )
       if (elem) {
         elem.style.backgroundColor = '#ffffff'
       }
@@ -237,6 +253,18 @@ export default function App() {
     setSelectionPanelOpen(true)
   }, [pointsToReview])
 
+  useEffect(() => {
+    const params1 = new URLSearchParams(new URL(window.location.href).search)
+    const params2 = new URLSearchParams(createDataFilterQueryString(query))
+
+    const combined = new URLSearchParams({
+      ...Object.fromEntries(params1),
+      ...Object.fromEntries(params2)
+    })
+
+    navigate('?' + combined.toString())
+  }, [query])
+
   // Filter option data structure:
   /*
   [{
@@ -248,8 +276,30 @@ export default function App() {
     },
     pk: 123
   }]
+
   */
   useEffect(() => {
+    if (lang !== i18n.language) {
+      i18n.changeLanguage(lang)
+    }
+  }, [lang])
+  useEffect(() => {
+    const filtersFromURL = Object.fromEntries(
+      new URL(window.location.href).searchParams
+    )
+    const {
+      timeMin: startDate,
+      timeMax: endDate,
+      depthMin: startDepth,
+      depthMax: endDepth
+    } = filtersFromURL
+    if (startDate) setStartDate(startDate)
+    if (endDate) setStartDate(endDate)
+    if (startDepth) setStartDepth(Number.parseInt(startDepth))
+    if (endDepth) setEndDepth(Number.parseInt(endDepth))
+
+    const platformsFromURL = filtersFromURL?.platforms?.split(',') || []
+
     /* /platforms returns array of platform names:
       ['abc', 'def', ...]
     */
@@ -265,7 +315,7 @@ export default function App() {
             return {
               title: platform,
               pk: platform,
-              isSelected: false,
+              isSelected: platformsFromURL.includes(platform),
               hover_en: platformMetadata.definition_en,
               hover_fr: platformMetadata.definition_fr
             }
@@ -279,6 +329,9 @@ export default function App() {
     /* /oceanVariables returns array of variable names:
       ['abc', 'def', ...]
     */
+
+    const eovsFromURL = filtersFromURL?.eovs?.split(',') || []
+
     fetch(`${server}/oceanVariables`)
       .then((response) => response.json())
       .then((eovs) => {
@@ -288,7 +341,7 @@ export default function App() {
 
             return {
               title: eov,
-              isSelected: false,
+              isSelected: eovsFromURL.includes(eov),
               pk: index,
               hover_en: eovMetadata['definition EN'],
               hover_fr: eovMetadata['definition FR']
@@ -376,40 +429,40 @@ export default function App() {
 
   useEffect(() => {
     switch (submissionState) {
-      case 'submitted':
-        submitRequest()
-        setSubmissionFeedback({
-          icon: (
-            <Spinner
-              className='text-warning'
-              as='span'
-              animation='border'
-              size={30}
-              role='status'
-              aria-hidden='true'
-            />
-          ),
-          text: t('submissionStateTextSubmitting') // 'Submitting...'
-        })
-        break
+    case 'submitted':
+      submitRequest()
+      setSubmissionFeedback({
+        icon: (
+          <Spinner
+            className='text-warning'
+            as='span'
+            animation='border'
+            size={30}
+            role='status'
+            aria-hidden='true'
+          />
+        ),
+        text: t('submissionStateTextSubmitting') // 'Submitting...'
+      })
+      break
 
-      case 'successful':
-        setSubmissionFeedback({
-          icon: <CheckCircle className='text-success' size={30} />,
-          text: t('submissionStateTextSuccess', { email }) // Request successful. Download link will be sent to: ' + email
-        })
-        break
+    case 'successful':
+      setSubmissionFeedback({
+        icon: <CheckCircle className='text-success' size={30} />,
+        text: t('submissionStateTextSuccess', { email }) // Request successful. Download link will be sent to: ' + email
+      })
+      break
 
-      case 'failed':
-        setSubmissionFeedback({
-          icon: <XCircle className='text-danger' size={30} />,
-          text: t('submissionStateTextFailed') // 'Request failed'
-        })
-        break
+    case 'failed':
+      setSubmissionFeedback({
+        icon: <XCircle className='text-danger' size={30} />,
+        text: t('submissionStateTextFailed') // 'Request failed'
+      })
+      break
 
-      default:
-        setSubmissionFeedback()
-        break
+    default:
+      setSubmissionFeedback()
+      break
     }
   }, [submissionState])
 
@@ -502,9 +555,9 @@ export default function App() {
                   submissionFeedback &&
                   submissionState !== 'submitted' &&
                   t('submitRequestButtonResubmitText')) ||
-                (_.isEmpty(pointsToDownload) &&
-                  t('submitRequestButtonSelectDataText')) ||
-                t('submitRequestButtonSubmitText') // 'Submit Request'
+                  (_.isEmpty(pointsToDownload) &&
+                    t('submitRequestButtonSelectDataText')) ||
+                  t('submitRequestButtonSubmitText') // 'Submit Request'
               }
             </button>
           </Col>
@@ -522,10 +575,26 @@ export default function App() {
     setEndDate(defaultEndDate)
     setStartDepth(defaultStartDepth)
     setEndDepth(defaultEndDepth)
-    setEovsSelected(eovsSelected.map(eov => { return { ...eov, isSelected: false } }))
-    setOrgsSelected(orgsSelected.map(org => { return { ...org, isSelected: false } }))
-    setDatasetsSelected(datasetsSelected.map(dataset => { return { ...dataset, isSelected: false } }))
-    setPlatformsSelected(platformsSelected.map(platform => { return { ...platform, isSelected: false } }))
+    setEovsSelected(
+      eovsSelected.map((eov) => {
+        return { ...eov, isSelected: false }
+      })
+    )
+    setOrgsSelected(
+      orgsSelected.map((org) => {
+        return { ...org, isSelected: false }
+      })
+    )
+    setDatasetsSelected(
+      datasetsSelected.map((dataset) => {
+        return { ...dataset, isSelected: false }
+      })
+    )
+    setPlatformsSelected(
+      platformsSelected.map((platform) => {
+        return { ...platform, isSelected: false }
+      })
+    )
     setPolygon()
   }
 
@@ -797,7 +866,9 @@ export default function App() {
         />
       )}
       <button
-        className={`boxQueryButton ${polygon && polygonIsRectangle(polygon) && 'active'}`}
+        className={`boxQueryButton ${
+          polygon && polygonIsRectangle(polygon) && 'active'
+        }`}
         id='boxQueryButton'
         title={t('rectangleToolTitle')}
       >

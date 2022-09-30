@@ -5,6 +5,7 @@ const { DefinePlugin } = require('webpack')
 module.exports = {
   devtool: 'inline-source-map',
   devServer: {
+    historyApiFallback: true,
     port: 8000
   },
   entry: './src/',
