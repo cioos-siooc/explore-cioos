@@ -80,7 +80,7 @@ function objectToURL(obj) {
     .join('&')
 }
 
-export function createDataFilterQueryString(query) {
+export function createDataFilterQueryString(query, filterLengths) {
   const { orgsSelected, eovsSelected, platformsSelected, datasetsSelected } =
     query
 
@@ -96,27 +96,39 @@ export function createDataFilterQueryString(query) {
     },
     {}
   )
+  let platforms, datasetPKs, orgPKs
 
   const eovs = eovsSelected
     .filter((eov) => eov.isSelected) // pulling the selected eov names out (these don't have pks)
     .map((eov) => eov.title)
     .join() // create the comma delimited list of eovs
 
-  const platforms = platformsSelected
-    .filter((platform) => platform.isSelected)
-    .map((platform) => platform.title)
-    .join()
+  if (platformsSelected.every((e) => e.isSelected)) {
+    platforms = ''
+  } else {
+    platforms = platformsSelected
+      .filter((platform) => platform.isSelected)
+      .map((platform) => platform.title)
+      .join()
+  }
 
-  const datasetPKs = datasetsSelected
-    .filter((dataset) => dataset.isSelected) // getting the selected datasets out
-    .map((dataset) => dataset.pk) // getting the pks of the selected datasets using the dataset title to access the pk
-    .join() // create the comma delimited list of dataset pks
+  if (datasetsSelected.every((e) => e.isSelected)) {
+    datasetPKs = ''
+  } else {
+    datasetPKs = datasetsSelected
+      .filter((dataset) => dataset.isSelected) // getting the selected datasets out
+      .map((dataset) => dataset.pk) // getting the pks of the selected datasets using the dataset title to access the pk
+      .join() // create the comma delimited list of dataset pks
+  }
 
-  const orgPKs = orgsSelected
-    .filter((org) => org.isSelected) // getting the selected orgs out
-    .map((org) => org.pk) // getting the pks of the selected organizations using the orgs title to access the pk
-    .join() // create the comma delimited list of org pks
-
+  if (orgsSelected.every((e) => e.isSelected)) {
+    orgPKs = ''
+  } else {
+    orgPKs = orgsSelected
+      .filter((org) => org.isSelected) // getting the selected orgs out
+      .map((org) => org.pk) // getting the pks of the selected organizations using the orgs title to access the pk
+      .join() // create the comma delimited list of org pks
+  }
   const { startDepth, endDepth, startDate, endDate } = queryWithoutDefaults
 
   const apiMappedQuery = {

@@ -288,17 +288,27 @@ export default function App() {
       new URL(window.location.href).searchParams
     )
     const {
-      timeMin: startDate,
-      timeMax: endDate,
-      depthMin: startDepth,
-      depthMax: endDepth
+      timeMin,
+      timeMax,
+      depthMin,
+      depthMax,
+      datasetPKs,
+      organizations,
+      platforms,
+      eovs
     } = filtersFromURL
     if (startDate) setStartDate(startDate)
-    if (endDate) setStartDate(endDate)
-    if (startDepth) setStartDepth(Number.parseInt(startDepth))
-    if (endDepth) setEndDepth(Number.parseInt(endDepth))
+    if (timeMin) setStartDate(timeMin)
+    if (timeMax) setStartDate(timeMax)
+    if (depthMin && Number.parseInt(depthMin) > 0) {
+      setStartDepth(Number.parseInt(depthMin))
+    }
 
-    const platformsFromURL = filtersFromURL?.platforms?.split(',') || []
+    if (depthMax && Number.parseInt(depthMax) > 0) {
+      setEndDepth(Number.parseInt(depthMax))
+    }
+
+    const platformsFromURL = platforms?.split(',') || []
 
     /* /platforms returns array of platform names:
       ['abc', 'def', ...]
@@ -330,7 +340,7 @@ export default function App() {
       ['abc', 'def', ...]
     */
 
-    const eovsFromURL = filtersFromURL?.eovs?.split(',') || []
+    const eovsFromURL = eovs?.split(',') || []
 
     fetch(`${server}/oceanVariables`)
       .then((response) => response.json())
@@ -364,6 +374,9 @@ export default function App() {
         ...
       ]
     */
+    const orgsFromURL = (organizations?.split(',') || []).map((e) =>
+      Number.parseInt(e)
+    )
     fetch(`${server}/organizations`)
       .then((response) => response.json())
       .then((orgsR) => {
@@ -371,7 +384,7 @@ export default function App() {
           orgsR.map((org) => {
             return {
               title: org.name,
-              isSelected: false,
+              isSelected: orgsFromURL.includes(org.pk),
               pk: org.pk
             }
           })
@@ -395,6 +408,10 @@ export default function App() {
         }
       ]
     */
+    const datasetsFromURL = (datasetPKs?.split(',') || []).map((e) =>
+      Number.parseInt(e)
+    )
+    console.log(datasetsFromURL)
     fetch(`${server}/datasets`)
       .then((response) => response.json())
       .then((datasetsR) => {
@@ -404,7 +421,7 @@ export default function App() {
               title: dataset.title,
               titleTranslated: dataset.title_translated,
               platform: dataset.platform,
-              isSelected: false,
+              isSelected: datasetsFromURL.includes(dataset.pk),
               pk: dataset.pk
             }
           })
