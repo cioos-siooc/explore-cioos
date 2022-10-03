@@ -4,14 +4,14 @@ import { ProgressBar, Row, Col, Container } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
-// import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
-import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
 
 import './styles.css'
 import {
   bytesToMemorySizeString,
-  getPointsDataSize
+  getPointsDataSize,
+  createDataFilterQueryString
 } from '../../../utilities.js'
+import { server } from '../../../config.js'
 
 // Note: datasets and points are exchangable terminology
 export default function DownloadDetails({
@@ -25,21 +25,79 @@ export default function DownloadDetails({
   const { t } = useTranslation()
 
   const [selectAll, setSelectAll] = useState(true)
-  const [pointsData, setPointsData] = useState(pointsToReview)
-  const [inspectDataset, setInspectDataset] = useState()
+  const [pointsData, setPointsData] = useState(pointsToReview.map(ptr => {
+    return { ...ptr, downloadDisabled: false }
+  }))
   const [dataTotal, setDataTotal] = useState(0)
+  const [downloadSizeEstimates, setDownloadSizeEstimates] = useState()
+
+  useEffect(() => {
+    let url = `${server}/downloadEstimate?`
+    let unfilteredSizeEstimates
+    if (pointsData) {
+      url += `&datasetPKs=${pointsData.map(ds => ds.pk).join(',')}`
+    }
+    fetch(url).then(response => response.ok && response.json()).then(ufse => {
+      unfilteredSizeEstimates = ufse
+    }).then(() => {
+      if (polygon) {
+        url += `&polygon=${JSON.stringify(polygon)}`
+      }
+      if (query) {
+        url += `&${createDataFilterQueryString(query)}`
+      }
+      fetch(url).then((response) => {
+        if (response.ok) return response.json()
+      }).then((estimates) => {
+        const filteredAndUnfilteredSizeEstimates = estimates.map(e => {
+          return {
+            ...e,
+            unfilteredSize: unfilteredSizeEstimates.filter(ufse => ufse.pk === e.pk)[0].size
+          }
+        })
+        setDownloadSizeEstimates(filteredAndUnfilteredSizeEstimates)
+      }).catch((error) => {
+        throw error
+      })
+    }).catch(error => {
+      throw error
+    })
+  }, [query, polygon])
+
+  useEffect(() => {
+    if (downloadSizeEstimates) {
+      const tempData = pointsData.map((ds) => {
+        const tempDS = downloadSizeEstimates.filter(dse => dse.pk === ds.pk)[0]
+        const estimates = {
+          filteredSize: tempDS.size,
+          unfilteredSize: tempDS.unfilteredSize
+        }
+        return {
+          ...ds,
+          selected: estimates.filteredSize < 1000000000,
+          sizeEstimate: estimates,
+          internalDownload: estimates.filteredSize < 1000000000,
+          erddapLink: ds.erddap_url,
+          downloadDisabled: estimates.filteredSize > 1000000000
+        }
+      })
+      setPointsData(tempData)
+    }
+  }, [downloadSizeEstimates])
 
   useEffect(() => {
     if (!_.isEmpty(pointsData)) {
       const total = getPointsDataSize(pointsData)
       setDataTotal(total / 1000000)
-      setPointsToDownload(pointsData.filter((point) => point.selected))
+      setPointsToDownload(pointsData.filter((point) => point.selected && !point.downloadDisabled))
     }
-  }, [pointsData])
+  }, [pointsData, downloadSizeEstimates])
 
   function handleSelectDataset(point) {
     const dataset = pointsData.filter((p) => p.pk === point.pk)[0]
-    dataset.selected = !point.selected
+    if (!point.downloadDisabled) {
+      dataset.selected = !point.selected
+    }
     const result = pointsData.map((p) => {
       if (p.pk === point.pk) {
         return dataset
@@ -55,7 +113,7 @@ export default function DownloadDetails({
       pointsData.map((p) => {
         return {
           ...p,
-          selected: !selectAll
+          selected: p.downloadDisabled === false ? !selectAll : false
         }
       })
     )
@@ -64,87 +122,24 @@ export default function DownloadDetails({
 
   return (
     <Container className='downloadDetails'>
-      <Row>
-        <Col>
-          <span>
-            <b>{t('downloadDetailsDownloadDataBoldText')}</b>
-            {/* Download Data */}
-            {/* {t('downloadDetailsDownloadDataStepsText')} */}
-            {/* 1) Finalize dataset selections,
-            2) Ensure selections are within the 100MB limit,
-            3) Provide an email address to receive the download link, and,
-            4) Submit the download request.
-            Filters applied in the CIOOS Data Explorer also apply to dataset downloads. */}
-            <ol>
-              <li>{t('downloadDetailsDownloadDataSteps1')}</li>
-              <li>{t('downloadDetailsDownloadDataSteps2')}</li>
-              <li>{t('downloadDetailsDownloadDataSteps3')}</li>
-              <li>{t('downloadDetailsDownloadDataSteps4')}</li>
-            </ol>
-          </span>
-        </Col>
-      </Row>
-      <hr />
       <Row className='downloadDataRow'>
         <Col>
           <DatasetsTable
             isDownloadModal
             handleSelectAllDatasets={handleSelectAllDatasets}
             handleSelectDataset={handleSelectDataset}
-            setInspectDataset={setInspectDataset}
             selectAll={selectAll}
             setDatasets={setPointsData}
             datasets={pointsData}
             setHoveredDataset={setHoveredDataset}
-            polygon={polygon}
-            query={query}
+            downloadSizeEstimates={downloadSizeEstimates}
           />
         </Col>
       </Row>
       <hr />
       <Row>
         <Col>
-          <ProgressBar
-            className='dataTotalBar'
-            title={t('downloadDetailsProgressTitle')} // 'Amount of download size used'
-          >
-            <ProgressBar
-              striped
-              className='upTo100'
-              variant='success'
-              now={dataTotal < 100 ? dataTotal : 100}
-              label={
-                dataTotal < 100
-                  ? bytesToMemorySizeString(dataTotal * 1000000)
-                  : '100 MB'
-              }
-              key={1}
-            />
-            {dataTotal > 100 && (
-              <ProgressBar
-                striped
-                className='past100'
-                variant='warning'
-                now={dataTotal > 100 ? (dataTotal - 100).toFixed(2) : 0}
-                label={
-                  dataTotal > 100
-                    ? bytesToMemorySizeString(
-                      (dataTotal - 100).toFixed(2) * 1000000
-                    )
-                    : 0
-                }
-                key={2}
-              />
-            )}
-          </ProgressBar>
-          <div className='dataTotalRatio'>
-            {bytesToMemorySizeString(dataTotal * 1000000)} of 100MB Max
-            <QuestionIconTooltip
-              tooltipText={'downloadDetailsProgressTooltipText'} // 'Downloads are limited to 100MB.'
-              size={20}
-              tooltipPlacement={'top'}
-            />
-          </div>
+          Test
         </Col>
         {children}
       </Row>
