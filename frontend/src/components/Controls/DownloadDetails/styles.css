@@ -6,8 +6,12 @@
   margin: 0px;
 }
 
+.downloadableIcon {
+  margin: auto 40px;
+}
+
 .downloadDataRow {
-  max-height: 40vh;
+  max-height: 80vh;
   overflow-y: auto;
 }
 
