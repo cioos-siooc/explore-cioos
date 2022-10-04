@@ -1,20 +1,17 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
-import { ProgressBar } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 import { InfoSquare, X } from 'react-bootstrap-icons'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetPreview from '../DatasetPreview/DatasetPreview.jsx'
 import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
-import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
 import LanguageSelector from '../LanguageSelector/LanguageSelector.jsx'
 import Loading from '../Loading/Loading.jsx'
 import Logo from '../../Images/logo_FINAL.png'
 import { server } from '../../../config'
 import './styles.css'
 import {
-  bytesToMemorySizeString,
   createDataFilterQueryString,
   getPointsDataSize,
   createSelectionQueryString,

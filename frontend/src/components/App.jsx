@@ -171,6 +171,12 @@ export default function App() {
   // Filter open state
   const [openFilter, setOpenFilter] = useState()
 
+  const [timeFilterActive, setTimeFilterActive] = useState(false)
+  const [filterDownloadByTime, setFilterDownloadByTime] = useState(false)
+  const [depthFilterActive, setDepthFilterActive] = useState(false)
+  const [filterDownloadByDepth, setFilterDownloadByDepth] = useState(false)
+  const [polygonFilterActive, setPolygonFilterActive] = useState(false)
+  const [filterDownloadByPolygon, setFilterDownloadByPolygon] = useState(false)
   // TODO: consider adding a 'searched' property to the options to indicate whether they satisfy the search terms,
   // and removing the extra concept of 'allOptions' vs 'selectedOptions'
 
@@ -222,6 +228,8 @@ export default function App() {
         elem.style.backgroundColor = '#ffffff'
       }
     }
+    setPolygonFilterActive(!_.isEmpty(polygon))
+    setFilterDownloadByPolygon(!_.isEmpty(polygon))
   }, [polygon])
 
   useEffect(() => {
@@ -426,6 +434,10 @@ export default function App() {
           }
         })
     }
+    setTimeFilterActive(startDate !== defaultStartDate || endDate !== defaultEndDate)
+    setFilterDownloadByTime(startDate !== defaultStartDate || endDate !== defaultEndDate)
+    setDepthFilterActive(startDepth !== defaultStartDepth || endDepth !== defaultEndDepth)
+    setFilterDownloadByDepth(startDepth !== defaultStartDepth || endDepth !== defaultEndDepth)
   }, [query])
 
   useEffect(() => {
@@ -480,6 +492,15 @@ export default function App() {
           setPointsToDownload={setPointsToDownload}
           polygon={polygon}
           query={query}
+          timeFilterActive={timeFilterActive}
+          filterDownloadByTime={filterDownloadByTime}
+          setFilterDownloadByTime={setFilterDownloadByTime}
+          depthFilterActive={depthFilterActive}
+          filterDownloadByDepth={filterDownloadByDepth}
+          setFilterDownloadByDepth={setFilterDownloadByDepth}
+          polygonFilterActive={polygonFilterActive}
+          filterDownloadByPolygon={filterDownloadByPolygon}
+          setFilterDownloadByPolygon={setFilterDownloadByPolygon}
         >
           <Col>
             <input
@@ -729,7 +750,7 @@ export default function App() {
           />
         </Filter>
         <Filter
-          active={startDate !== defaultStartDate || endDate !== defaultEndDate}
+          active={timeFilterActive}
           badgeTitle={timeframesBadgeTitle}
           optionsSelected={(startDate, endDate)}
           setOptionsSelected={() => {
@@ -755,9 +776,7 @@ export default function App() {
           />
         </Filter>
         <Filter
-          active={
-            startDepth !== defaultStartDepth || endDepth !== defaultEndDepth
-          }
+          active={depthFilterActive}
           badgeTitle={depthRangeBadgeTitle}
           optionsSelected={(startDepth, endDepth)}
           setOptionsSelected={() => {
