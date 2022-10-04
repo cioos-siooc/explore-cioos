@@ -262,7 +262,8 @@ export default function App() {
     const params2 = new URLSearchParams(createDataFilterQueryString(query))
     const obj = {
       ...mapView,
-      ...Object.fromEntries(params2)
+      ...Object.fromEntries(params2),
+      lang
     }
     const combined = new URLSearchParams(obj)
     navigate('?' + combined.toString())
