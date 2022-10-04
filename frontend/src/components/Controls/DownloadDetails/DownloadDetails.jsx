@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
-import { Row, Col, Container } from 'react-bootstrap'
+import { Row, Col, Container, Spinner } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
 import _ from 'lodash'
@@ -10,10 +10,12 @@ import Loading from '../Loading/Loading.jsx'
 import {
   getPointsDataSize,
   createDataFilterQueryString,
+  bytesToMemorySizeString,
 } from '../../../utilities.js'
 import { defaultEndDate, defaultEndDepth, defaultStartDate, defaultStartDepth } from '../../config.js'
 import { server } from '../../../config.js'
 import './styles.css'
+import { CheckSquare, Square } from 'react-bootstrap-icons'
 
 
 // Note: datasets and points are exchangable terminology
@@ -45,6 +47,7 @@ export default function DownloadDetails({
 
   useEffect(() => {
     setLoading(true)
+    setDownloadSizeEstimates()
     let url = `${server}/downloadEstimate?`
     let unfilteredSizeEstimates
     let filteredAndUnfilteredSizeEstimates
@@ -95,12 +98,14 @@ export default function DownloadDetails({
 
   useEffect(() => {
     if (downloadSizeEstimates) {
+      let tempDataTotal = 0
       const tempData = pointsData.map((ds) => {
         const tempDS = downloadSizeEstimates.filter(dse => dse.pk === ds.pk)[0]
         const estimates = {
           filteredSize: tempDS.size,
           unfilteredSize: tempDS.unfilteredSize
         }
+        tempDataTotal = tempDataTotal + tempDS.size
         return {
           ...ds,
           selected: estimates.filteredSize < 1000000000,
@@ -111,16 +116,24 @@ export default function DownloadDetails({
         }
       })
       setPointsData(tempData)
+      setDataTotal(tempDataTotal)
     }
   }, [downloadSizeEstimates])
 
   useEffect(() => {
     if (!_.isEmpty(pointsData)) {
-      const total = getPointsDataSize(pointsData)
-      setDataTotal(total / 1000000)
       setPointsToDownload(pointsData.filter((point) => point.selected && !point.downloadDisabled))
+      if (downloadSizeEstimates) {
+        let tempDataTotal = 0
+        pointsData.forEach(point => {
+          if (point.selected) {
+            tempDataTotal = tempDataTotal + point.sizeEstimate.filteredSize
+          }
+        })
+        setDataTotal(tempDataTotal)
+      }
     }
-  }, [pointsData, downloadSizeEstimates])
+  }, [pointsData])
 
   function handleSelectDataset(point) {
     const dataset = pointsData.filter((p) => p.pk === point.pk)[0]
@@ -157,40 +170,102 @@ export default function DownloadDetails({
     <Container className='downloadDetails'>
       <Row>
         <Col>
+          <strong>Download limit:</strong>
+          <div>
+            {'Datasets that are '}
+            <strong style={{ color: 'white', backgroundColor: '#4fbc89' }}>{'less than 1GB'}</strong>
+            {' can be downloaded as a group through the CIOOS Data Explorer.'}
+          </div>
+          <div>
+            {'Datasets that are '}
+            <strong style={{ color: 'white', backgroundColor: '#dc3545' }}>{'more than 1GB'}</strong>
+            {' can be downloaded individually through a dataset\'s ERDDAP database directly.'}
+          </div>
+          {/* <div>
+            {``}
+          </div> */}
+        </Col>
+      </Row>
+      <Row>
+        <Col>
           <div
             className='filterDownloadToggles'
           >
-            <strong>Filter downloaded data by:</strong>
-            <button
-              className={timeFilterToggleClassName}
-              onClick={() => setFilterDownloadByTime(!filterDownloadByTime)}
-              disabled={!timeFilterActive}
-            >
-              Time
-            </button>
-            <button
-              className={depthFilterToggleClassName}
-              onClick={() => setFilterDownloadByDepth(!filterDownloadByDepth)}
-              disabled={!depthFilterActive}
-            >
-              Depth
-            </button>
-            <button
-              className={polygonFilterToggleClassName}
-              onClick={() => setFilterDownloadByPolygon(!filterDownloadByPolygon)}
-              disabled={!polygonFilterActive}
-            >
-              Polygon
-            </button>
+            {timeFilterActive &&
+              <div
+                className={timeFilterToggleClassName}
+              >
+                {/* <strong>
+                  {'Time: '}
+                </strong> */}
+                <>
+                  <button
+                    onClick={() => setFilterDownloadByTime(!filterDownloadByTime)}
+                    disabled={!timeFilterActive}
+                  >
+                    {`${query.startDate} - ${query.endDate}`}
+                  </button>
+                  {/* {filterDownloadByTime ?
+                    <CheckSquare />
+                    :
+                    <Square />
+                  } */}
+                </>
+              </div>
+            }
+            {depthFilterActive &&
+              <div
+                className={depthFilterToggleClassName}
+              >
+                {/* <strong>
+                  {'Depth: '}
+                </strong> */}
+                <>
+                  <button
+                    onClick={() => setFilterDownloadByDepth(!filterDownloadByDepth)}
+                    disabled={!depthFilterActive}
+                  >
+                    {`${query.startDepth} - ${query.endDepth}(m)`}
+                  </button>
+                  {/* {filterDownloadByDepth ?
+                    <CheckSquare />
+                    :
+                    <Square />
+                  } */}
+                </>
+              </div>
+            }
+            {polygonFilterActive &&
+              <div
+                className={polygonFilterToggleClassName}
+              >
+                {/* <strong>
+                  {'Shape: '}
+                </strong> */}
+                <>
+                  <button
+                    onClick={() => setFilterDownloadByPolygon(!filterDownloadByPolygon)}
+                    disabled={!polygonFilterActive}
+                  >
+                    {`${polygon.map((coordinate, index) => {
+                      if (index !== polygon.length - 1) {
+                        return `[${coordinate[0].toFixed(2)}, ${coordinate[1].toFixed(2)}]`
+                      }
+                    })}`}
+                  </button>
+                  {/* {filterDownloadByPolygon ?
+                    <CheckSquare />
+                    :
+                    <Square />
+                  } */}
+                </>
+              </div>
+            }
           </div>
         </Col>
       </Row>
       <Row className='downloadDataRow'>
         <Col>
-          {/* {loading ?
-            <Loading />
-            :
-          } */}
           <DatasetsTable
             isDownloadModal
             handleSelectAllDatasets={handleSelectAllDatasets}
@@ -207,7 +282,41 @@ export default function DownloadDetails({
       <hr />
       <Row>
         <Col>
-          Test
+          <div className='downloadDetailsDownloadInfoItem'>
+            {'Datasets to download: '}
+            {
+              downloadSizeEstimates ?
+                <strong>
+                  {`${pointsData.filter(point => point.selected).length} / ${pointsData.length}`}
+                </strong>
+                :
+                <Spinner
+                  className='datasetSizeTotalSpinner'
+                  as='span'
+                  animation='border'
+                  size={50}
+                  role='status'
+                  aria-hidden='true'
+                />
+            }
+          </div>
+          <div className='downloadDetailsDownloadInfoItem'>
+            {'Total download size: '}
+            {downloadSizeEstimates ?
+              <strong>
+                {bytesToMemorySizeString(dataTotal)}
+              </strong>
+              :
+              <Spinner
+                className='datasetSizeTotalSpinner'
+                as='span'
+                animation='border'
+                size={50}
+                role='status'
+                aria-hidden='true'
+              />
+            }
+          </div>
         </Col>
         {children}
       </Row>
