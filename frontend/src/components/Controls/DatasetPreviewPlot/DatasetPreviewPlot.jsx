@@ -95,8 +95,7 @@ export default function DatasetPreviewPlot({
               }}
               config={{
                 displaylogo: false,
-                modeBarButtonsToRemove: ['select2d', 'lasso2d'],
-                scrollZoom: true,
+                modeBarButtonsToRemove: ['select2d', 'lasso2d', 'resetScale'],
                 responsive: true
               }}
             />
