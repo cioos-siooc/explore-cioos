@@ -1,4 +1,5 @@
 const db = require("../db");
+const { changePKtoPkURL } = require("./misc");
 
 const createDBFilter = require("./dbFilter");
 
@@ -71,6 +72,6 @@ FROM   sub`;
 
   const rows = await q;
 
-  return rows.rows.map((e) => ({ ...e, pk: e.pk_url }));
+  return rows.rows.map(changePKtoPkURL);
 }
 module.exports = { getShapeQuery };
