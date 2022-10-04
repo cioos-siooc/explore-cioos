@@ -36,7 +36,7 @@ CREATE TABLE skipped_datasets (
 DROP TABLE IF EXISTS datasets;
 CREATE TABLE datasets (
     pk serial PRIMARY KEY,
-    pk_url TEXT,
+    pk_url INTEGER,
     dataset_id TEXT,
     erddap_url TEXT,
     platform TEXT,
@@ -63,7 +63,7 @@ CREATE TABLE datasets (
 DROP TABLE IF EXISTS organizations;
 CREATE TABLE organizations (
     pk SERIAL PRIMARY KEY,
-    pk_url TEXT,
+    pk_url INTEGER,
     name TEXT UNIQUE,
     color TEXT
 );
