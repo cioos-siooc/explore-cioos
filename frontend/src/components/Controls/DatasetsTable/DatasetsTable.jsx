@@ -44,10 +44,8 @@ export default function DatasetsTable({
     setTableData({ columns: generateColumns(), data: datasets })
   }, [datasets, downloadSizeEstimates])
 
-  if (isDownloadModal) {
-    console.log(loading)
-  }
   function generateColumns() {
+    const cellPadding = '4px'
     const columns = [
       {
         name: <div title={'Download from CIOOS Data Explorer'}>
@@ -75,7 +73,9 @@ export default function DatasetsTable({
         ,
         ignoreRowClick: true,
         width: '80px',
-        sortable: true
+        sortable: true,
+        paddingLeft: cellPadding,
+        paddingRight: cellPadding
       },
 
       {
@@ -100,29 +100,34 @@ export default function DatasetsTable({
           )
         },
         width: '60px',
-        sortable: true
+        sortable: true,
+        paddingLeft: cellPadding,
+        paddingRight: cellPadding
       },
       {
         name: t('datasetsTableHeaderTitleText'),
         selector: (row) => row.title,
         wrap: true,
-        width: '250px',
+        width: '220px',
         sortable: true
       },
       {
         name: t('datasetsTableHeaderTypeText'),
-
-        selector: (row) =>
+        selector: (row) => row.cdm_data_type,
+        cell: (row) =>
           row.cdm_data_type
             .replace('TimeSeriesProfile', 'Timeseries / Profile')
             .replace('TimeSeries', 'Timeseries'),
         wrap: true,
         width: '100px',
         sortable: true,
+        paddingLeft: cellPadding,
+        paddingRight: cellPadding
       },
       {
         name: t('datasetsTableHeaderLocationsText'),
-        selector: (row) => {
+        selector: (row) => row.profiles_count,
+        cell: (row) => {
           if (row.profiles_count !== row.n_profiles) {
             return `${row.profiles_count} / ${row.n_profiles}`
           } else {
@@ -131,20 +136,27 @@ export default function DatasetsTable({
         },
         wrap: true,
         sortable: true,
-        width: '100px'
+        width: '100px',
+        paddingLeft: cellPadding,
+        paddingRight: cellPadding
       }
     ]
 
     if (isDownloadModal) {
       columns.push({
         name: 'Estimated download size',
-        selector: (row) => (`${bytesToMemorySizeString(row?.sizeEstimate?.filteredSize)} / ${bytesToMemorySizeString(row?.sizeEstimate?.unfilteredSize)}`),
+        selector: (row) => row.sizeEstimate.filteredSize,
         cell: (row) => {
-          const estimatedDownloadSizeRowClassName = classNames('downloadSizeEstimate', { downloadable: row?.sizeEstimate?.filteredSize < 1000000000 })
+          const estimatedFilteredDownloadSizeRowClassName = classNames('downloadSizeEstimateFiltered', { downloadable: row?.sizeEstimate?.filteredSize < 1000000000 })
           if (!_.isEmpty(downloadSizeEstimates)) {
             return (
-              <div className={estimatedDownloadSizeRowClassName}>
-                {!_.isEmpty(downloadSizeEstimates) && `${bytesToMemorySizeString(row?.sizeEstimate?.filteredSize)} / ${bytesToMemorySizeString(row?.sizeEstimate?.unfilteredSize)}`}
+              <div className='downloadSizeEstimate'>
+                {!_.isEmpty(downloadSizeEstimates) && (
+                  <>
+                    <div className={estimatedFilteredDownloadSizeRowClassName}>{bytesToMemorySizeString(row?.sizeEstimate?.filteredSize)}</div>
+                    {` / ${bytesToMemorySizeString(row?.sizeEstimate?.unfilteredSize)}`}
+                  </>
+                )}
               </div>
             )
           } else {
@@ -159,11 +171,13 @@ export default function DatasetsTable({
         },
         wrap: true,
         sortable: true,
-        width: '200px'
+        width: '200px',
+        paddingLeft: cellPadding,
+        paddingRight: cellPadding
       })
       columns.push({
         name: 'CDE Downloadable',
-        selector: (row) => row?.internalDownload,
+        selector: (row) => row.internalDownload,
         cell: (row) => {
           if (!_.isEmpty(downloadSizeEstimates)) {
             return row.internalDownload ? <Check2Circle className='downloadableIcon' color='green' size='25' /> : <XCircle className='downloadableIcon' color='red' size='25' />
@@ -179,11 +193,13 @@ export default function DatasetsTable({
         },
         wrap: true,
         sortable: true,
-        width: '170px'
+        width: '170px',
+        paddingLeft: cellPadding,
+        paddingRight: cellPadding
       })
       columns.push({
         name: 'External download',
-        selector: (row) => row?.erddapLink,
+        selector: (row) => row.erddapLink,
         cell: (row) => {
           if (!_.isEmpty(downloadSizeEstimates) && row.erddapLink) {
             return (
@@ -206,7 +222,9 @@ export default function DatasetsTable({
         },
         wrap: true,
         sortable: true,
-        width: '150px'
+        width: '150px',
+        paddingLeft: cellPadding,
+        paddingRight: cellPadding
       })
     }
 
@@ -216,11 +234,8 @@ export default function DatasetsTable({
   /* TODO:
 - add number of downloadable datasets count to download
 - add section with more download details about the download that is currently setup
-- remove the size estimator
 - add the cookie for the email
-- add the 'enable' / 'disable' filter options for each filter using toggles, or using additional columns in the table
 - remove or fix the download instructions to reflect the changes that we have implemented (maybe make it an toggle to see area)
-- automatically select or deselect datasets that do/don't fit within the dataset size limitations
 */
 
   return (

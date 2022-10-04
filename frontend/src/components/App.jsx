@@ -404,7 +404,7 @@ export default function App() {
       case 'successful':
         setSubmissionFeedback({
           icon: <CheckCircle className='text-success' size={30} />,
-          text: t('submissionStateTextSuccess', { email }) // Request successful. Download link will be sent to: ' + email
+          text: t('submissionStateTextSuccess') // Request successful. Download link will be sent to: ' + email
         })
         break
 

@@ -81,3 +81,20 @@
   /* background-color: lightgray; */
   opacity: 50%;
 }
+
+.datasetsTable .downloadSizeEstimate {
+  line-height: 30px;
+  padding: 0px 10px;
+  min-width: max-content;
+}
+
+.datasetsTable .downloadSizeEstimateFiltered {
+  height: 30px;
+  display: inline;
+  background-color: #dc3545;
+  color: white;
+}
+
+.datasetsTable .downloadSizeEstimateFiltered.downloadable {
+  background-color: #4fbc89;
+}
