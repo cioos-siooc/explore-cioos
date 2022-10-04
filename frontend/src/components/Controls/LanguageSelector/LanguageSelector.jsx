@@ -2,12 +2,11 @@ import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import './styles.css'
 import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom'
-import I18NextHttpBackend from 'i18next-http-backend'
 
 export default function LanguageSelector({ className }) {
   const { t, i18n } = useTranslation()
   const { lang } = useParams()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
 
   const otherLanguage = i18n.languages.filter((l) => l !== lang).pop()

@@ -34,6 +34,7 @@ export default function CreateMap({
   setLoading,
   zoom,
   setZoom,
+  setMapView,
   offsetFlyTo,
   rangeLevels,
   hoveredDataset
@@ -696,20 +697,11 @@ export default function CreateMap({
     })
     map.current.on('moveend', (e) => {
       const center = map.current.getCenter()
-
-      const url = new URL(window.location.href)
-      const params = Object.fromEntries(new URLSearchParams(url.search))
-
-      navigate(
-        '?' +
-          new URLSearchParams({
-            ...params,
-            lang: i18n.language,
-            lat: center.lat,
-            lon: center.lng,
-            zoom: map.current.getZoom()
-          }).toString()
-      )
+      setMapView({
+        lat: center.lat,
+        lon: center.lng,
+        zoom: map.current.getZoom()
+      })
     })
     map.current.on('mousedown', (e) => {
       if (e.originalEvent.shiftKey) {

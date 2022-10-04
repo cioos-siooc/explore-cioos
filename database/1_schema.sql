@@ -10,18 +10,19 @@ CREATE schema cde;
 
 SET search_path TO cde, public;
 
- DROP TABLE IF EXISTS hexes_zoom_0;
-  CREATE TABLE hexes_zoom_0 (
+DROP TABLE IF EXISTS hexes_zoom_0;
+CREATE TABLE hexes_zoom_0 (
     pk serial PRIMARY KEY,
     geom geometry(Polygon,3857)
 );  
-  DROP TABLE IF EXISTS hexes_zoom_1;
 
+DROP TABLE IF EXISTS hexes_zoom_1;
 CREATE TABLE hexes_zoom_1 (
     pk serial PRIMARY KEY,
     geom geometry(Polygon,3857)
   );
 
+ 
 
 -- The scraper will skip datasets in this table
 DROP TABLE IF EXISTS skipped_datasets;

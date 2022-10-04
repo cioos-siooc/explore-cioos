@@ -15,26 +15,29 @@ CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
   -- create tables to store the hex polygons. Once they are joined with cde.points
   -- the polygons are copied over to that table
  
+drop index if exists cde.hexes_zoom_0_geom_idx;
+drop index if exists cde.hexes_zoom_1_geom_idx;
+
 
   INSERT INTO cde.hexes_zoom_0 (geom)  SELECT geom from ST_HexagonGrid(
           100000,
           st_setsrid(ST_EstimatedExtent('cde','points', 'geom'),3857)
       ); 
 
-  CREATE INDEX
-    ON cde.hexes_zoom_0
-    USING GIST (geom);
-
 
   INSERT INTO cde.hexes_zoom_1 (geom) SELECT geom from ST_HexagonGrid(
           10000,
           st_setsrid(ST_EstimatedExtent('cde','points', 'geom'),3857)
       ); 
-
-  CREATE INDEX
-    ON cde.hexes_zoom_1
+    
+     CREATE INDEX hexes_zoom_0_geom_idx
+    ON cde.hexes_zoom_0
     USING GIST (geom);
     
+  CREATE INDEX hexes_zoom_1_geom_idx
+    ON cde.hexes_zoom_1
+    USING GIST (geom);
+
     -- clear existing hexes from profiles
   UPDATE cde.profiles SET hex_zoom_0=null,hex_zoom_1=null;
 

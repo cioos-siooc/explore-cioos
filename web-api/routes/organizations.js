@@ -12,7 +12,9 @@ const cache = require("../utils/cache");
  * */
 
 router.get("/", cache.route(), async (req, res, next) => {
-  res.send(await db("cde.organizations").orderByRaw("UPPER(name)"));
+  res.send(
+    (await db("cde.organizations").orderByRaw("UPPER(name)")).map((e) => ({ ...e, pk: e.pk_url })),
+  );
 });
 
 module.exports = router;

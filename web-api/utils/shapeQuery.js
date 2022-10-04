@@ -11,6 +11,7 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
 
   const sql = `WITH sub AS
         (SELECT   d.pk,
+                  d.pk_url,
                   d.dataset_id,
                   d.n_profiles,
                   d.cdm_data_type,
@@ -30,13 +31,20 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                            || ckan_id AS ckan_url
                   -- replace '0 days' with '1 day' when its a single day profile
                   -- query records count = sum((number of days covered by the query that are in the profile) * profile records per day * fraction of the depth range that profile covers)
-                  ${doEstimate
+                  ${
+  doEstimate
     ? `,SUM(
                   -- number of days covered by this query that overlap this profile time range
                   coalesce(nullif(date_part('days',range_intersection_length(tstzrange(:timeMin,:timeMax),tstzrange(p.time_min,p.time_max))),0),1) * p.records_per_day *
                   -- depth multiplier - fraction of depth range that this query overlaps with profile depth range
-                  coalesce(nullif(range_intersection_length(numrange(:depthMin,:depthMax),numrange(p.depth_min::NUMERIC,p.depth_max::NUMERIC)),0),1) / (coalesce(nullif(p.depth_max-p.depth_min,0),1)) ) AS records_count` : ""}
-                  ${getRecordsList ? ",json_agg(json_build_object( 'profile_id',coalesce(p.profile_id, p.timeseries_id), 'time_min',p.time_min::DATE, 'time_max',p.time_max::DATE, 'depth_min',p.depth_min, 'depth_max',p.depth_max ) ORDER BY time_min DESC ) AS profiles" : ""}
+                  coalesce(nullif(range_intersection_length(numrange(:depthMin,:depthMax),numrange(p.depth_min::NUMERIC,p.depth_max::NUMERIC)),0),1) / (coalesce(nullif(p.depth_max-p.depth_min,0),1)) ) AS records_count`
+    : ""
+}
+                  ${
+  getRecordsList
+    ? ",json_agg(json_build_object( 'profile_id',coalesce(p.profile_id, p.timeseries_id), 'time_min',p.time_min::DATE, 'time_max',p.time_max::DATE, 'depth_min',p.depth_min, 'depth_max',p.depth_max ) ORDER BY time_min DESC ) AS profiles"
+    : ""
+}
                   
          FROM     cde.profiles p
          JOIN     cde.datasets d
@@ -63,6 +71,6 @@ FROM   sub`;
 
   const rows = await q;
 
-  return rows.rows;
+  return rows.rows.map((e) => ({ ...e, pk: e.pk_url }));
 }
 module.exports = { getShapeQuery };
