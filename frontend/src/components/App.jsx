@@ -94,6 +94,21 @@ export default function App() {
   const [submissionFeedback, setSubmissionFeedback] = useState()
   const [loading, setLoading] = useState(true)
   const [zoom, setZoom] = useState(2)
+
+  const filtersFromURL = Object.fromEntries(
+    new URL(window.location.href).searchParams
+  )
+  console.log('filtersFromURL', filtersFromURL)
+  const { lat, lon, zoom: zoomFromURL } = filtersFromURL
+
+  const [mapView, setMapView] = useState({
+    lat: lat === 'undefined' ? undefined : lat || 45,
+    lon: lon === 'undefined' ? undefined : lon || -123,
+    zoom: zoomFromURL === 'undefined' ? zoomFromURL : zoomFromURL || 7
+
+    // lon,
+    // zoomFromURL
+  })
   const [rangeLevels, setRangeLevels] = useState()
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
   const [hoveredDataset, setHoveredDataset] = useState()
@@ -113,6 +128,8 @@ export default function App() {
 
   // EOV filter initial values and state
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
+  const [isPageLoad, setIsPageLoad] = useState(true)
+
   const debouncedEovsSelected = useDebounce(eovsSelected, 500)
   const eovsFilterTranslationKey = 'oceanVariablesFiltername' // 'Ocean Variables'
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(
@@ -254,16 +271,21 @@ export default function App() {
   }, [pointsToReview])
 
   useEffect(() => {
-    const params1 = new URLSearchParams(new URL(window.location.href).search)
+    // how to avoid running this on page load?
+    setIsPageLoad(false)
+    if (isPageLoad) return
     const params2 = new URLSearchParams(createDataFilterQueryString(query))
-
-    const combined = new URLSearchParams({
-      ...Object.fromEntries(params1),
+    const obj = {
+      ...mapView,
       ...Object.fromEntries(params2)
-    })
+    }
+    // if (!Object.keys(obj).length) return
+    console.log('obj', obj)
 
+    const combined = new URLSearchParams(obj)
+    console.log('navigate to ', combined)
     navigate('?' + combined.toString())
-  }, [query])
+  }, [query, mapView])
 
   // Filter option data structure:
   /*
@@ -287,6 +309,7 @@ export default function App() {
     const filtersFromURL = Object.fromEntries(
       new URL(window.location.href).searchParams
     )
+    console.log('filtersFromURL', filtersFromURL)
     const {
       timeMin,
       timeMax,
@@ -295,8 +318,17 @@ export default function App() {
       datasetPKs,
       organizations,
       platforms,
-      eovs
+      eovs,
+      lat,
+      lon,
+      zoom
     } = filtersFromURL
+    console.log('filtersFromURL', filtersFromURL)
+    if (lat || lon || zoom) {
+      console.log(lat)
+      setMapView({ lat, lon, zoom })
+    }
+
     if (startDate) setStartDate(startDate)
     if (timeMin) setStartDate(timeMin)
     if (timeMax) setStartDate(timeMax)
@@ -631,6 +663,7 @@ export default function App() {
           polygon={polygon}
           zoom={zoom}
           setZoom={setZoom}
+          setMapView={setMapView}
           rangeLevels={rangeLevels}
           offsetFlyTo={selectionPanelOpen}
           hoveredDataset={hoveredDataset}

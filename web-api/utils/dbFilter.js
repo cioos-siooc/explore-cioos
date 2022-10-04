@@ -76,7 +76,7 @@ function createDBFilter(request) {
 
   if (datasetPKs) {
     parameters.datasetPKs = datasetPKs.split(",");
-    filters.push("d.pk = ANY (:datasetPKs)");
+    filters.push("d.pk_url = ANY (:datasetPKs)");
   }
 
   if (pointPKs) {
@@ -92,12 +92,10 @@ function createDBFilter(request) {
   if (polygon) {
     const wktPolygon = polygonJSONToWKT(polygon);
     parameters.wktPolygon = wktPolygon;
-    filters.push(
-      "ST_Contains(ST_GeomFromText(:wktPolygon,4326),ST_Transform(geom,4326)) is true",
-    );
+    filters.push("ST_Contains(ST_GeomFromText(:wktPolygon,4326),ST_Transform(geom,4326)) is true");
   }
   const sql = filters.join(" AND \n");
-
+  console.log(filters, parameters);
   const query = db.raw(sql, parameters);
 
   return query;
