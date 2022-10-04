@@ -18,8 +18,6 @@ export default function LanguageSelector({ className }) {
       onClick={() => {
         const params = searchParams
         params.set('lang', otherLanguage)
-        console.log(params.toString())
-
         navigate('?' + params.toString())
       }}
     >

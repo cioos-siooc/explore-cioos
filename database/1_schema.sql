@@ -151,3 +151,17 @@ CREATE TABLE skipped_datasets (
     dataset_id text,
     reason_code text
 );
+
+DROP TABLE IF EXISTS cde.organizations_lookup;
+CREATE TABLE cde.organizations_lookup (
+    pk SERIAL PRIMARY KEY,
+    name TEXT UNIQUE
+);
+
+DROP TABLE IF EXISTS cde.datasets_lookup;
+CREATE TABLE cde.datasets_lookup (
+    pk serial PRIMARY KEY,
+    dataset_id TEXT,
+    erddap_url TEXT,
+    UNIQUE(dataset_id, erddap_url)
+);

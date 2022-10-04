@@ -94,21 +94,7 @@ export default function App() {
   const [submissionFeedback, setSubmissionFeedback] = useState()
   const [loading, setLoading] = useState(true)
   const [zoom, setZoom] = useState(2)
-
-  const filtersFromURL = Object.fromEntries(
-    new URL(window.location.href).searchParams
-  )
-  console.log('filtersFromURL', filtersFromURL)
-  const { lat, lon, zoom: zoomFromURL } = filtersFromURL
-
-  const [mapView, setMapView] = useState({
-    lat: lat === 'undefined' ? undefined : lat || 45,
-    lon: lon === 'undefined' ? undefined : lon || -123,
-    zoom: zoomFromURL === 'undefined' ? zoomFromURL : zoomFromURL || 7
-
-    // lon,
-    // zoomFromURL
-  })
+  const [mapView, setMapView] = useState({})
   const [rangeLevels, setRangeLevels] = useState()
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
   const [hoveredDataset, setHoveredDataset] = useState()
@@ -271,7 +257,6 @@ export default function App() {
   }, [pointsToReview])
 
   useEffect(() => {
-    // how to avoid running this on page load?
     setIsPageLoad(false)
     if (isPageLoad) return
     const params2 = new URLSearchParams(createDataFilterQueryString(query))
@@ -279,11 +264,7 @@ export default function App() {
       ...mapView,
       ...Object.fromEntries(params2)
     }
-    // if (!Object.keys(obj).length) return
-    console.log('obj', obj)
-
     const combined = new URLSearchParams(obj)
-    console.log('navigate to ', combined)
     navigate('?' + combined.toString())
   }, [query, mapView])
 
@@ -309,7 +290,6 @@ export default function App() {
     const filtersFromURL = Object.fromEntries(
       new URL(window.location.href).searchParams
     )
-    console.log('filtersFromURL', filtersFromURL)
     const {
       timeMin,
       timeMax,
@@ -323,9 +303,8 @@ export default function App() {
       lon,
       zoom
     } = filtersFromURL
-    console.log('filtersFromURL', filtersFromURL)
+
     if (lat || lon || zoom) {
-      console.log(lat)
       setMapView({ lat, lon, zoom })
     }
 
@@ -443,7 +422,6 @@ export default function App() {
     const datasetsFromURL = (datasetPKs?.split(',') || []).map((e) =>
       Number.parseInt(e)
     )
-    console.log(datasetsFromURL)
     fetch(`${server}/datasets`)
       .then((response) => response.json())
       .then((datasetsR) => {

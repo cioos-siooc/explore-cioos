@@ -95,7 +95,6 @@ function createDBFilter(request) {
     filters.push("ST_Contains(ST_GeomFromText(:wktPolygon,4326),ST_Transform(geom,4326)) is true");
   }
   const sql = filters.join(" AND \n");
-  console.log(filters, parameters);
   const query = db.raw(sql, parameters);
 
   return query;
