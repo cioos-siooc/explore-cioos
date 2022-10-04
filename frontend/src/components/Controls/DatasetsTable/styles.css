@@ -70,3 +70,14 @@
 .datasetsTable tbody tr td svg:hover {
   background-color: lightgrey;
 }
+
+.datasetsTable .downloadIcon {
+  margin-left: 2px;
+}
+
+.datasetsTable .datasetsTableSpinner {
+  /* position: absolute; */
+  margin:0px 40px;
+  /* background-color: lightgray; */
+  opacity: 50%;
+}

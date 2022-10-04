@@ -1,17 +1,20 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
-import { ProgressBar, Row, Col, Container } from 'react-bootstrap'
+import { Row, Col, Container } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
+import classNames from 'classnames'
+import _ from 'lodash'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
-
-import './styles.css'
+import Loading from '../Loading/Loading.jsx'
 import {
-  bytesToMemorySizeString,
   getPointsDataSize,
-  createDataFilterQueryString
+  createDataFilterQueryString,
 } from '../../../utilities.js'
+import { defaultEndDate, defaultEndDepth, defaultStartDate, defaultStartDepth } from '../../config.js'
 import { server } from '../../../config.js'
+import './styles.css'
+
 
 // Note: datasets and points are exchangable terminology
 export default function DownloadDetails({
@@ -20,49 +23,75 @@ export default function DownloadDetails({
   setHoveredDataset,
   polygon,
   query,
+  timeFilterActive,
+  filterDownloadByTime,
+  setFilterDownloadByTime,
+  depthFilterActive,
+  filterDownloadByDepth,
+  setFilterDownloadByDepth,
+  polygonFilterActive,
+  filterDownloadByPolygon,
+  setFilterDownloadByPolygon,
   children
 }) {
   const { t } = useTranslation()
-
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState(pointsToReview.map(ptr => {
     return { ...ptr, downloadDisabled: false }
   }))
   const [dataTotal, setDataTotal] = useState(0)
   const [downloadSizeEstimates, setDownloadSizeEstimates] = useState()
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    setLoading(true)
     let url = `${server}/downloadEstimate?`
     let unfilteredSizeEstimates
+    let filteredAndUnfilteredSizeEstimates
     if (pointsData) {
       url += `&datasetPKs=${pointsData.map(ds => ds.pk).join(',')}`
     }
     fetch(url).then(response => response.ok && response.json()).then(ufse => {
       unfilteredSizeEstimates = ufse
     }).then(() => {
-      if (polygon) {
-        url += `&polygon=${JSON.stringify(polygon)}`
-      }
-      if (query) {
-        url += `&${createDataFilterQueryString(query)}`
-      }
-      fetch(url).then((response) => {
-        if (response.ok) return response.json()
-      }).then((estimates) => {
-        const filteredAndUnfilteredSizeEstimates = estimates.map(e => {
+      if (filterDownloadByPolygon || filterDownloadByTime || filterDownloadByDepth) {
+        if (polygon && filterDownloadByPolygon) {
+          url += `&polygon=${JSON.stringify(polygon)}`
+        }
+        if (query) {
+          const tempQuery = { ...query }
+          if (!filterDownloadByTime) {
+            tempQuery.startDate = defaultStartDate
+            tempQuery.endDate = defaultEndDate
+          }
+          if (!filterDownloadByDepth) {
+            tempQuery.startDepth = defaultStartDepth
+            tempQuery.endDepth = defaultEndDepth
+          }
+          url += `&${createDataFilterQueryString(tempQuery)}`
+        }
+        fetch(url).then((response) => {
+          if (response.ok) return response.json()
+        }).then((estimates) => {
+          filteredAndUnfilteredSizeEstimates = estimates.map(e => {
+            return {
+              ...e,
+              unfilteredSize: unfilteredSizeEstimates.filter(ufse => ufse.pk === e.pk)[0].size
+            }
+          })
+          setDownloadSizeEstimates(filteredAndUnfilteredSizeEstimates)
+        }).catch((error) => { throw error }).then(() => setLoading(false))
+      } else {
+        filteredAndUnfilteredSizeEstimates = unfilteredSizeEstimates.map(e => {
           return {
             ...e,
             unfilteredSize: unfilteredSizeEstimates.filter(ufse => ufse.pk === e.pk)[0].size
           }
         })
         setDownloadSizeEstimates(filteredAndUnfilteredSizeEstimates)
-      }).catch((error) => {
-        throw error
-      })
-    }).catch(error => {
-      throw error
-    })
-  }, [query, polygon])
+      }
+    }).catch(error => { throw error }).then(() => setLoading(false))
+  }, [query, polygon, filterDownloadByTime, filterDownloadByDepth, filterDownloadByPolygon])
 
   useEffect(() => {
     if (downloadSizeEstimates) {
@@ -120,10 +149,48 @@ export default function DownloadDetails({
     setSelectAll(!selectAll)
   }
 
+  const filterToggleClassname = 'filterDownloadToggle'
+  const timeFilterToggleClassName = classNames(filterToggleClassname, { active: filterDownloadByTime }, { disabled: !timeFilterActive })
+  const depthFilterToggleClassName = classNames(filterToggleClassname, { active: filterDownloadByDepth }, { disabled: !depthFilterActive })
+  const polygonFilterToggleClassName = classNames(filterToggleClassname, { active: filterDownloadByPolygon }, { disabled: !polygonFilterActive })
   return (
     <Container className='downloadDetails'>
+      <Row>
+        <Col>
+          <div
+            className='filterDownloadToggles'
+          >
+            <strong>Filter downloaded data by:</strong>
+            <button
+              className={timeFilterToggleClassName}
+              onClick={() => setFilterDownloadByTime(!filterDownloadByTime)}
+              disabled={!timeFilterActive}
+            >
+              Time
+            </button>
+            <button
+              className={depthFilterToggleClassName}
+              onClick={() => setFilterDownloadByDepth(!filterDownloadByDepth)}
+              disabled={!depthFilterActive}
+            >
+              Depth
+            </button>
+            <button
+              className={polygonFilterToggleClassName}
+              onClick={() => setFilterDownloadByPolygon(!filterDownloadByPolygon)}
+              disabled={!polygonFilterActive}
+            >
+              Polygon
+            </button>
+          </div>
+        </Col>
+      </Row>
       <Row className='downloadDataRow'>
         <Col>
+          {/* {loading ?
+            <Loading />
+            :
+          } */}
           <DatasetsTable
             isDownloadModal
             handleSelectAllDatasets={handleSelectAllDatasets}
@@ -133,6 +200,7 @@ export default function DownloadDetails({
             datasets={pointsData}
             setHoveredDataset={setHoveredDataset}
             downloadSizeEstimates={downloadSizeEstimates}
+            loading={loading}
           />
         </Col>
       </Row>

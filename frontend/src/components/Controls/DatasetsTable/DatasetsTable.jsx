@@ -4,7 +4,8 @@ import {
   CircleFill,
   Square,
   Check2Circle,
-  XCircle
+  XCircle,
+  Download
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import platformColors from '../../platformColors'
@@ -13,6 +14,8 @@ import DataTable from 'react-data-table-component'
 import DataTableExtensions from 'react-data-table-component-extensions'
 import { bytesToMemorySizeString } from '../../../utilities'
 import _ from 'lodash'
+import classNames from 'classnames'
+import { Spinner } from 'react-bootstrap'
 
 export default function DatasetsTable({
   handleSelectAllDatasets,
@@ -22,7 +25,8 @@ export default function DatasetsTable({
   setInspectDataset,
   setHoveredDataset = () => { },
   isDownloadModal,
-  downloadSizeEstimates
+  downloadSizeEstimates,
+  loading
 }) {
   const { t } = useTranslation()
   const [tableData, setTableData] = useState({ columns: generateColumns(), data: datasets })
@@ -40,23 +44,37 @@ export default function DatasetsTable({
     setTableData({ columns: generateColumns(), data: datasets })
   }, [datasets, downloadSizeEstimates])
 
+  if (isDownloadModal) {
+    console.log(loading)
+  }
   function generateColumns() {
     const columns = [
       {
-        name: selectAll ? (
-          <CheckSquare onClick={selectAllOnclick} />
-        ) : (
-          <Square onClick={selectAllOnclick} />
-        ),
-        selector: (row) => row.selected,
-        cell: (row) =>
-          row.selected ? (
-            <CheckSquare onClick={checkBoxOnclick(row)} />
+        name: <div title={'Download from CIOOS Data Explorer'}>
+          {selectAll ? (
+            <CheckSquare onClick={selectAllOnclick} />
           ) : (
-            <Square onClick={checkBoxOnclick(row)} />
-          ),
+            <Square onClick={selectAllOnclick} />
+          )}
+          <Download className='downloadIcon' onClick={selectAllOnclick} />
+        </div>
+        ,
+        selector: (row) => row.selected,
+        cell: (row) => {
+          return (
+            <div title={'Download from CIOOS Data Explorer'}>
+              {row.selected ? (
+                <CheckSquare onClick={checkBoxOnclick(row)} />
+              ) : (
+                <Square onClick={checkBoxOnclick(row)} />
+              )}
+              {/* <Download className='downloadIcon' /> */}
+            </div>
+          )
+        }
+        ,
         ignoreRowClick: true,
-        width: '60px',
+        width: '80px',
         sortable: true
       },
 
@@ -120,17 +138,43 @@ export default function DatasetsTable({
     if (isDownloadModal) {
       columns.push({
         name: 'Estimated download size',
-        selector: (row) => !_.isEmpty(downloadSizeEstimates) && (`${bytesToMemorySizeString(row.sizeEstimate.filteredSize)} / ${bytesToMemorySizeString(row.sizeEstimate.unfilteredSize)}`),
+        selector: (row) => (`${bytesToMemorySizeString(row?.sizeEstimate?.filteredSize)} / ${bytesToMemorySizeString(row?.sizeEstimate?.unfilteredSize)}`),
+        cell: (row) => {
+          const estimatedDownloadSizeRowClassName = classNames('downloadSizeEstimate', { downloadable: row?.sizeEstimate?.filteredSize < 1000000000 })
+          if (!_.isEmpty(downloadSizeEstimates)) {
+            return (
+              <div className={estimatedDownloadSizeRowClassName}>
+                {!_.isEmpty(downloadSizeEstimates) && `${bytesToMemorySizeString(row?.sizeEstimate?.filteredSize)} / ${bytesToMemorySizeString(row?.sizeEstimate?.unfilteredSize)}`}
+              </div>
+            )
+          } else {
+            return (<Spinner
+              className='datasetsTableSpinner'
+              as='span'
+              animation='border'
+              size={50}
+              role='status'
+              aria-hidden='true' />)
+          }
+        },
         wrap: true,
         sortable: true,
         width: '200px'
       })
       columns.push({
         name: 'CDE Downloadable',
-        selector: (row) => !_.isEmpty(downloadSizeEstimates) && (row.internalDownload),
+        selector: (row) => row?.internalDownload,
         cell: (row) => {
           if (!_.isEmpty(downloadSizeEstimates)) {
             return row.internalDownload ? <Check2Circle className='downloadableIcon' color='green' size='25' /> : <XCircle className='downloadableIcon' color='red' size='25' />
+          } else {
+            return (<Spinner
+              className='datasetsTableSpinner'
+              as='span'
+              animation='border'
+              size={50}
+              role='status'
+              aria-hidden='true' />)
           }
         },
         wrap: true,
@@ -139,7 +183,7 @@ export default function DatasetsTable({
       })
       columns.push({
         name: 'External download',
-        selector: (row) => !_.isEmpty(downloadSizeEstimates) && (row.erddapLink),
+        selector: (row) => row?.erddapLink,
         cell: (row) => {
           if (!_.isEmpty(downloadSizeEstimates) && row.erddapLink) {
             return (
@@ -150,6 +194,14 @@ export default function DatasetsTable({
                 ERDDAP
               </a>
             )
+          } else {
+            return (<Spinner
+              className='datasetsTableSpinner'
+              as='span'
+              animation='border'
+              size={50}
+              role='status'
+              aria-hidden='true' />)
           }
         },
         wrap: true,
@@ -162,14 +214,14 @@ export default function DatasetsTable({
   }
 
   /* TODO:
-  - add number of downloadable datasets count to download
-  - add section with more download details about the download that is currently setup
-  - remove the size estimator
-  - add the cookie for the email
-  - add the 'enable' / 'disable' filter options for each filter using toggles, or using additional columns in the table
-  - remove or fix the download instructions to reflect the changes that we have implemented (maybe make it an toggle to see area)
-  - automatically select or deselect datasets that do/don't fit within the dataset size limitations
-  */
+- add number of downloadable datasets count to download
+- add section with more download details about the download that is currently setup
+- remove the size estimator
+- add the cookie for the email
+- add the 'enable' / 'disable' filter options for each filter using toggles, or using additional columns in the table
+- remove or fix the download instructions to reflect the changes that we have implemented (maybe make it an toggle to see area)
+- automatically select or deselect datasets that do/don't fit within the dataset size limitations
+*/
 
   return (
     <div className='datasetsTable'>

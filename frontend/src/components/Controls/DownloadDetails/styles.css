@@ -11,6 +11,7 @@
 }
 
 .downloadDataRow {
+  min-height: 300px;
   max-height: 80vh;
   overflow-y: auto;
 }
@@ -58,4 +59,27 @@
 
 .downloadQuote {
   text-align: center;
+}
+
+/* .filterDownloadToggle {
+  display: 
+} */
+
+.filterDownloadToggle {
+  display: inline;
+  background-color: white;
+  border-radius: 42px;
+  border: 2px solid darkgrey;
+}
+
+.filterDownloadToggle.active {
+  background-color: #c6e3df;
+}
+
+.filterDownloadToggle.disabled:hover {
+  background-color: white;
+}
+
+.filterDownloadToggle:hover {
+  background-color: #c6e3df;
 }

@@ -80,12 +80,8 @@ function objectToURL(obj) {
     .join('&')
 }
 
-export function createDataFilterQueryString(query) {
-  const { orgsSelected, eovsSelected, platformsSelected, datasetsSelected } =
-    query
-
-  // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
-  const queryWithoutDefaults = Object.keys(defaultQuery).reduce(
+export function createQueryWithoutDefaults (query) {
+  return Object.keys(defaultQuery).reduce(
     // going through each
     (accumulatorObject, field) => {
       if (query[field] !== defaultQuery[field]) {
@@ -96,6 +92,14 @@ export function createDataFilterQueryString(query) {
     },
     {}
   )
+}
+
+export function createDataFilterQueryString(query) {
+  const { orgsSelected, eovsSelected, platformsSelected, datasetsSelected } =
+    query
+
+  // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
+  const queryWithoutDefaults = createQueryWithoutDefaults(query)
 
   const eovs = eovsSelected
     .filter((eov) => eov.isSelected) // pulling the selected eov names out (these don't have pks)

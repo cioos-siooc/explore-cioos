@@ -39,8 +39,8 @@ export default function DatasetInspector({
         }
       })
       .catch((error) => {
-        console.log(error)
         setLoading(false)
+        throw error
       })
   }, [dataset])
 
