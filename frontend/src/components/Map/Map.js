@@ -10,7 +10,7 @@ import { useState, useEffect, useRef } from 'react'
 import * as turf from '@turf/turf'
 import DrawRectangle from 'mapbox-gl-draw-rectangle-mode'
 import { useTranslation } from 'react-i18next'
-import { useSearchParams, useNavigate, useParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import './styles.css'
 
 import { server } from '../../config'
@@ -18,7 +18,6 @@ import {
   createDataFilterQueryString,
   generateColorStops,
   getCurrentRangeLevel,
-  polygonIsRectangle,
   updateMapToolTitleLanguage
 } from '../../utilities'
 import { colorScale, defaultQuery } from '../config'

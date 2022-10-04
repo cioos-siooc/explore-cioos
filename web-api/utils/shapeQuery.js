@@ -55,6 +55,8 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
 SELECT *
        ${doEstimate ? ",round(:adder + records_count * num_columns * :multiplier) AS SIZE" : ""}
 FROM   sub`;
+  let queryParams;
+
   if (doEstimate) {
     queryParams = {
       timeMin,
