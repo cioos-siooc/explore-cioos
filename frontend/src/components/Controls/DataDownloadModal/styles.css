@@ -1,6 +1,6 @@
-.dataDownloadModal .modal-header {
+/* .dataDownloadModal .modal-header {
   padding: 5px;
-}
+} */
 
 .dataDownloadModal .modal-body {
   padding: 0px;
@@ -34,5 +34,13 @@
   border-radius: 10px;
   height: 40px;
   text-align: center;
-  min-width: 10em;
+  width: 100%;
+}
+
+.submitRequestButton.disabled:hover {
+  background-color: white;
+}
+
+.submitRequestButton:hover {
+  background-color: #c6e3df;;
 }
