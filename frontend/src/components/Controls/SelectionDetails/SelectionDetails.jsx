@@ -217,9 +217,9 @@ export default function SelectionDetails({
               } */}
             <div className='pointDetailsControls'>
               <div className='pointDetailsControlRow'>
-                <strong>{t('pointDetailsControlRowDatasetsSelected')}:</strong>{' '}
+                <strong>{t('pointDetailsControlRowDatasetsSelected')}</strong>{' '}
                 {pointsData.length}
-                <strong>{t('pointDetailsControlRowToDownload')}:</strong>{' '}
+                <strong>{t('pointDetailsControlRowToDownload')}</strong>{' '}
                 {datasetsSelected}
                 {children}
               </div>

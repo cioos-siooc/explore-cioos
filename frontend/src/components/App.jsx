@@ -517,7 +517,7 @@ export default function App() {
               disabled={
                 !emailValid ||
                 _.isEmpty(pointsToDownload) ||
-                getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
+                // getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
                 submissionState === 'submitted'
               }
               onClick={() => handleSubmission()}
