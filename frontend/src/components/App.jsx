@@ -178,8 +178,6 @@ export default function App() {
   const [filterDownloadByDepth, setFilterDownloadByDepth] = useState(false)
   const [polygonFilterActive, setPolygonFilterActive] = useState(false)
   const [filterDownloadByPolygon, setFilterDownloadByPolygon] = useState(false)
-  // TODO: consider adding a 'searched' property to the options to indicate whether they satisfy the search terms,
-  // and removing the extra concept of 'allOptions' vs 'selectedOptions'
 
   // Update query
   useEffect(() => {
