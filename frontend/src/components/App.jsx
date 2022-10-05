@@ -317,9 +317,8 @@ export default function App() {
       setMapView({ lat, lon, zoom })
     }
 
-    if (startDate) setStartDate(startDate)
     if (timeMin) setStartDate(timeMin)
-    if (timeMax) setStartDate(timeMax)
+    if (timeMax) setEndDate(timeMax)
     if (depthMin && Number.parseInt(depthMin) > 0) {
       setStartDepth(Number.parseInt(depthMin))
     }
