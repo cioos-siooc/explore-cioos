@@ -103,7 +103,7 @@
   "datasetInspectorRecordTable": "Record list",
   "datasetInspectorERDDAPText": "Dataset source URL",
   "datasetInspectorCKANText": "Catalogue URL",
-  "downloadModalTitleText": "Download Data from CIOOS Data Explorer",
+  "downloadModalTitleText": "Download Data",
   "downloadModalButtonTitle": "Download selected data",
   "downloadModalButtonText": "Download",
   "legendTitleText": "point",

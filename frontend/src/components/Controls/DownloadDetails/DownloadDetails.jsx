@@ -102,13 +102,15 @@ export default function DownloadDetails({
   useEffect(() => {
     if (downloadSizeEstimates) {
       let tempDataTotal = 0
+      let tempDataDownloadable = 0
       const tempData = pointsData.map((ds) => {
         const tempDS = downloadSizeEstimates.filter(dse => dse.pk === ds.pk)[0]
         const estimates = {
           filteredSize: tempDS.size,
           unfilteredSize: tempDS.unfilteredSize
         }
-        tempDataTotal = tempDataTotal + tempDS.size
+        tempDataTotal = tempDataTotal + tempDS.unfilteredSize
+        tempDataDownloadable = tempDataDownloadable + tempDS.size
         return {
           ...ds,
           selected: estimates.filteredSize < 1000000000,
@@ -119,7 +121,7 @@ export default function DownloadDetails({
         }
       })
       setPointsData(tempData)
-      setDataTotal(tempDataTotal)
+      setDataTotal({ unfilteredSize: tempDataTotal, filteredSize: tempDataDownloadable })
     }
   }, [downloadSizeEstimates])
 
@@ -128,12 +130,14 @@ export default function DownloadDetails({
       setPointsToDownload(pointsData.filter((point) => point.selected && !point.downloadDisabled))
       if (downloadSizeEstimates) {
         let tempDataTotal = 0
+        let tempDataDownloadable = 0
         pointsData.forEach(point => {
+          tempDataTotal = tempDataTotal + point.sizeEstimate.unfilteredSize
           if (point.selected) {
-            tempDataTotal = tempDataTotal + point.sizeEstimate.filteredSize
+            tempDataDownloadable = tempDataDownloadable + point.sizeEstimate.filteredSize
           }
         })
-        setDataTotal(tempDataTotal)
+        setDataTotal({ unfilteredSize: tempDataTotal, filteredSize: tempDataDownloadable })
       }
     }
   }, [pointsData])
@@ -164,6 +168,8 @@ export default function DownloadDetails({
     )
     setSelectAll(!selectAll)
   }
+
+  console.log(dataTotal)
 
   const filterToggleClassname = 'filterDownloadToggle'
   const timeFilterToggleClassName = classNames(filterToggleClassname, { active: filterDownloadByTime }, { disabled: !timeFilterActive })
@@ -309,7 +315,7 @@ export default function DownloadDetails({
       <Row className='downloadDetailsDownloadInfoRow'>
         <Col>
           <div className='downloadDetailsDownloadInfoItem'>
-            {'Download '}
+            {'Datasets '}
             {
               downloadSizeEstimates ?
                 <strong>
@@ -327,10 +333,11 @@ export default function DownloadDetails({
             }
           </div>
           <div className='downloadDetailsDownloadInfoItem'>
-            {'Downloadable size '}
+            {'Size '}
             {downloadSizeEstimates ?
               <strong>
-                {bytesToMemorySizeString(dataTotal)}
+                {`${bytesToMemorySizeString(dataTotal.filteredSize)} /
+                ${bytesToMemorySizeString(dataTotal.unfilteredSize)}`}
               </strong>
               :
               <Spinner

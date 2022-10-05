@@ -513,10 +513,11 @@ export default function App() {
               placeholder='email@email.com'
               onInput={(e) => handleEmailChange(e.target.value)}
             />
-          </Col>
-          <Col xs='auto'>
             <button
-              className='submitRequestButton'
+              className={`submitRequestButton ${(!emailValid ||
+                _.isEmpty(pointsToDownload) ||
+                // getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
+                submissionState === 'submitted') && 'disabled'}`}
               disabled={
                 !emailValid ||
                 _.isEmpty(pointsToDownload) ||
@@ -536,6 +537,8 @@ export default function App() {
               }
             </button>
           </Col>
+          {/* <Col xs='auto'>
+          </Col> */}
           <Col className='submissionFeedback'>
             {submissionFeedback && submissionFeedback.icon}
             {submissionFeedback && submissionFeedback.text}
