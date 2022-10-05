@@ -179,7 +179,7 @@
   "tableComponentRowsPerPage": "Rows per page",
   "tableComponentOf": "of",
   "pointDetailsControlRowDatasetsSelected": "Datasets",
-  "pointDetailsControlRowToDownload": "To download",
+  "pointDetailsControlRowToDownload": "Selected",
   "datasetPreviewPlotXAxisSelect": "X axis",
   "datasetPreviewPlotYAxisSelect": "Y axis",
   "datasetPreviewTableText": "Table",

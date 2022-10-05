@@ -12,7 +12,7 @@
 
 .downloadDataRow {
   min-height: 300px;
-  max-height: calc(80vh - 100px);
+  max-height: calc(80vh - 240px);
   overflow-y: auto;
 }
 
@@ -72,8 +72,10 @@
 .filterDownloadToggle button{
   background-color: white;
   border-radius: 42px;
-  border: 2px solid darkgrey;
-  margin: 0px 5px;
+  border: 1px solid lightgrey;
+  height: 42px;
+  margin: 1px 5px 1px 1px;
+  padding: 0px 15px 0px 0px;
 }
 
 .filterDownloadToggle.active button {
@@ -86,12 +88,26 @@
 
 .filterDownloadToggle:hover button {
   background-color: #c6e3df;
+  border: 2px solid darkgrey;
+  margin: 0px 5px 0px 0px;
+  padding: 0px 15px 0px 0px;
 }
 
 .downloadDetails .datasetSizeTotalSpinner {
-  opacity: 50%;
+  opacity: 30%;
+  /* display:inline; */
+  width: 30px;
+  height: 30px;
+  position: absolute;
+  margin-left: 10px;
+}
+
+.downloadDetailsDownloadInfoRow.row {
+  margin: 10px 0px 10px 0px;
 }
 
 .downloadDetailsDownloadInfoItem {
   min-height: 40px;
+  line-height: 30px;
 }
+

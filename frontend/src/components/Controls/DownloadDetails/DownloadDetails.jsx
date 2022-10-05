@@ -6,16 +6,19 @@ import classNames from 'classnames'
 import _ from 'lodash'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
+import polygonImage from '../../Images/polygonIcon.png'
+import rectangleImage from '../../Images/rectangleIcon.png'
 import Loading from '../Loading/Loading.jsx'
 import {
   getPointsDataSize,
   createDataFilterQueryString,
   bytesToMemorySizeString,
+  polygonIsRectangle,
 } from '../../../utilities.js'
 import { defaultEndDate, defaultEndDepth, defaultStartDate, defaultStartDepth } from '../../config.js'
 import { server } from '../../../config.js'
 import './styles.css'
-import { CheckSquare, Square } from 'react-bootstrap-icons'
+import { ArrowsExpand, CalendarWeek, Check2Circle, XCircle } from 'react-bootstrap-icons'
 
 
 // Note: datasets and points are exchangable terminology
@@ -170,20 +173,20 @@ export default function DownloadDetails({
     <Container className='downloadDetails'>
       <Row>
         <Col>
-          <strong>Download limit:</strong>
+          <strong>Download limits</strong>
           <div>
-            {'Datasets that are '}
-            <strong style={{ color: 'white', backgroundColor: '#4fbc89' }}>{'less than 1GB'}</strong>
-            {' can be downloaded as a group through the CIOOS Data Explorer.'}
+            {'Datasets '}
+            <strong style={{ color: 'white', backgroundColor: '#4fbc89' }}>{'smaller than 1GB'}</strong>
+            {' are CDE downloadable '} <Check2Circle color='green' size='25' /> {'through the CIOOS Data Explorer.'}
           </div>
           <div>
-            {'Datasets that are '}
-            <strong style={{ color: 'white', backgroundColor: '#dc3545' }}>{'more than 1GB'}</strong>
-            {' can be downloaded individually through a dataset\'s ERDDAP database directly.'}
+            {'Datasets '}
+            <strong style={{ color: 'white', backgroundColor: '#dc3545' }}>{'larger than 1GB'}</strong>
+            {' are not CDE downloadable '}<XCircle color='red' size='25' /> {', but can be downloaded individually through ERDDAP.'}
           </div>
-          {/* <div>
-            {``}
-          </div> */}
+          <div>
+            <i>Tip:</i>{' Use Time, Depth and Space filters to change dataset download sizes. Toggle active filters on and off below.'}
+          </div>
         </Col>
       </Row>
       <Row>
@@ -203,6 +206,10 @@ export default function DownloadDetails({
                     onClick={() => setFilterDownloadByTime(!filterDownloadByTime)}
                     disabled={!timeFilterActive}
                   >
+                    <CalendarWeek style={{
+                      margin: '0px 15px',
+                      height: '30px'
+                    }} />
                     {`${query.startDate} - ${query.endDate}`}
                   </button>
                   {/* {filterDownloadByTime ?
@@ -225,6 +232,10 @@ export default function DownloadDetails({
                     onClick={() => setFilterDownloadByDepth(!filterDownloadByDepth)}
                     disabled={!depthFilterActive}
                   >
+                    <ArrowsExpand style={{
+                      margin: '0px 15px',
+                      height: '30px'
+                    }} />
                     {`${query.startDepth} - ${query.endDepth}(m)`}
                   </button>
                   {/* {filterDownloadByDepth ?
@@ -247,11 +258,26 @@ export default function DownloadDetails({
                     onClick={() => setFilterDownloadByPolygon(!filterDownloadByPolygon)}
                     disabled={!polygonFilterActive}
                   >
-                    {`${polygon.map((coordinate, index) => {
-                      if (index !== polygon.length - 1) {
-                        return `[${coordinate[0].toFixed(2)}, ${coordinate[1].toFixed(2)}]`
-                      }
-                    })}`}
+                    <div
+                      className='mapbox-gl-draw-polygon'
+                      style={{
+                        display: 'inline',
+                        backgroundImage: `url(${polygonIsRectangle(polygon) ? rectangleImage : polygonImage})`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '30px 30px',
+                        backgroundPositionX: '10px',
+                        backgroundPositionY: '-5px',
+                        borderRadius: '0px',
+                        height: '42px',
+                        paddingLeft: '45px'
+                      }}
+                    >
+                      {`${polygon.map((coordinate, index) => {
+                        if (index !== polygon.length - 1) {
+                          return `[${coordinate[0].toFixed(2)}, ${coordinate[1].toFixed(2)}]`
+                        }
+                      })}`}
+                    </div>
                   </button>
                   {/* {filterDownloadByPolygon ?
                     <CheckSquare />
@@ -280,10 +306,10 @@ export default function DownloadDetails({
         </Col>
       </Row>
       <hr />
-      <Row>
+      <Row className='downloadDetailsDownloadInfoRow'>
         <Col>
           <div className='downloadDetailsDownloadInfoItem'>
-            {'Datasets to download: '}
+            {'Download '}
             {
               downloadSizeEstimates ?
                 <strong>
@@ -294,14 +320,14 @@ export default function DownloadDetails({
                   className='datasetSizeTotalSpinner'
                   as='span'
                   animation='border'
-                  size={50}
+                  size={30}
                   role='status'
                   aria-hidden='true'
                 />
             }
           </div>
           <div className='downloadDetailsDownloadInfoItem'>
-            {'Total download size: '}
+            {'Downloadable size '}
             {downloadSizeEstimates ?
               <strong>
                 {bytesToMemorySizeString(dataTotal)}
@@ -311,7 +337,7 @@ export default function DownloadDetails({
                 className='datasetSizeTotalSpinner'
                 as='span'
                 animation='border'
-                size={50}
+                size={30}
                 role='status'
                 aria-hidden='true'
               />
