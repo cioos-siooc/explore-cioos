@@ -181,10 +181,14 @@ export default function DownloadDetails({
   const polygonFilterToggleClassName = classNames(filterToggleClassname, { active: filterDownloadByPolygon }, { disabled: !polygonFilterActive })
   let polygonFilterText = ''
   polygon.forEach((coordinate, index) => {
-    if (polygon.length > 3 && index < 3) {
-      polygonFilterText += `[${coordinate[0].toFixed(2)}, ${coordinate[1].toFixed(2)}]`
-    } else if (index === polygon.length - 1) {
-      polygonFilterText += `...[${coordinate[0].toFixed(2)}, ${coordinate[1].toFixed(2)}]`
+    if (polygon.length >= 6) {
+      if (index === polygon.length - 2) {
+        polygonFilterText += `...[${coordinate[0].toFixed(1)}, ${coordinate[1].toFixed(1)}]`
+      } else if (index <= 3) {
+        polygonFilterText += `[${coordinate[0].toFixed(1)}, ${coordinate[1].toFixed(1)}]`
+      }
+    } else if (index < polygon.length - 1) {
+      polygonFilterText += `[${coordinate[0].toFixed(1)}, ${coordinate[1].toFixed(1)}]`
     }
   })
   return (
