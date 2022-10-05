@@ -82,7 +82,7 @@ if (process.env.NODE_ENV === 'production') {
 
 export default function App() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const lang = searchParams.get('lang')
+  const lang = searchParams.get('lang') || 'en'
   const { t, i18n } = useTranslation()
 
   const [selectionPanelOpen, setSelectionPanelOpen] = useState(true)
@@ -482,19 +482,19 @@ export default function App() {
       })
       break
 
-      case 'successful':
-        setSubmissionFeedback({
-          icon: <Check2Circle size={30} style={{ color: '#52a79b' }} />,
-          text: t('submissionStateTextSuccess') // Request successful. Download link will be sent to: ' + email
-        })
-        break
+    case 'successful':
+      setSubmissionFeedback({
+        icon: <Check2Circle size={30} style={{ color: '#52a79b' }} />,
+        text: t('submissionStateTextSuccess') // Request successful. Download link will be sent to: ' + email
+      })
+      break
 
-      case 'failed':
-        setSubmissionFeedback({
-          icon: <XCircle size={30} style={{ color: '#e3285e' }} />,
-          text: t('submissionStateTextFailed') // 'Request failed'
-        })
-        break
+    case 'failed':
+      setSubmissionFeedback({
+        icon: <XCircle size={30} style={{ color: '#e3285e' }} />,
+        text: t('submissionStateTextFailed') // 'Request failed'
+      })
+      break
 
     default:
       setSubmissionFeedback()
@@ -509,16 +509,25 @@ export default function App() {
           if (response.ok) {
             return response.json()
           }
-        }).then((legend) => {
+        })
+        .then((legend) => {
           if (legend) {
             setRangeLevels(legend.recordsCount)
           }
         })
     }
-    setTimeFilterActive(startDate !== defaultStartDate || endDate !== defaultEndDate)
-    setFilterDownloadByTime(startDate !== defaultStartDate || endDate !== defaultEndDate)
-    setDepthFilterActive(startDepth !== defaultStartDepth || endDepth !== defaultEndDepth)
-    setFilterDownloadByDepth(startDepth !== defaultStartDepth || endDepth !== defaultEndDepth)
+    setTimeFilterActive(
+      startDate !== defaultStartDate || endDate !== defaultEndDate
+    )
+    setFilterDownloadByTime(
+      startDate !== defaultStartDate || endDate !== defaultEndDate
+    )
+    setDepthFilterActive(
+      startDepth !== defaultStartDepth || endDepth !== defaultEndDepth
+    )
+    setFilterDownloadByDepth(
+      startDepth !== defaultStartDepth || endDepth !== defaultEndDepth
+    )
   }, [query])
 
   useEffect(() => {
@@ -544,19 +553,22 @@ export default function App() {
   }
 
   function submitRequest() {
-    let url = `${server}/download?${createDataFilterQueryString(query)}&datasetPKs=${pointsToDownload
+    let url = `${server}/download?${createDataFilterQueryString(
+      query
+    )}&datasetPKs=${pointsToDownload
       .map((point) => point.pk)
       .join(',')}&email=${email}&lang=${i18n.language}`
     if (polygon) {
       url += `&polygon=${JSON.stringify(polygon)}`
     }
-    fetch(url).then((response) => {
-      if (response.ok) {
-        setSubmissionState('successful')
-      } else {
-        setSubmissionState('failed')
-      }
-    })
+    fetch(url)
+      .then((response) => {
+        if (response.ok) {
+          setSubmissionState('successful')
+        } else {
+          setSubmissionState('failed')
+        }
+      })
       .catch((error) => {
         setSubmissionState('failed')
         throw error
@@ -600,10 +612,13 @@ export default function App() {
               onInput={(e) => handleEmailChange(e.target.value)}
             />
             <button
-              className={`submitRequestButton ${(!emailValid ||
-                _.isEmpty(pointsToDownload) ||
-                // getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
-                submissionState === 'submitted') && 'disabled'}`}
+              className={`submitRequestButton ${
+                (!emailValid ||
+                  _.isEmpty(pointsToDownload) ||
+                  // getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
+                  submissionState === 'submitted') &&
+                'disabled'
+              }`}
               disabled={
                 !emailValid ||
                 _.isEmpty(pointsToDownload) ||
