@@ -8,7 +8,6 @@ import './styles.css'
 export default function DataDownloadModal({
   disabled,
   children,
-  setEmail,
   setSubmissionState
 }) {
   const { t } = useTranslation()
@@ -22,7 +21,6 @@ export default function DataDownloadModal({
         centered
         aria-labelledby='contained-modal-title-vcenter'
         onHide={() => {
-          setEmail()
           setSubmissionState()
           setShowModal(false)
         }}

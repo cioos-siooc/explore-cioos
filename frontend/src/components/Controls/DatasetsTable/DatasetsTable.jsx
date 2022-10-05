@@ -232,10 +232,7 @@ export default function DatasetsTable({
   }
 
   /* TODO:
-- add number of downloadable datasets count to download
-- add section with more download details about the download that is currently setup
 - add the cookie for the email
-- remove or fix the download instructions to reflect the changes that we have implemented (maybe make it an toggle to see area)
 */
 
   return (

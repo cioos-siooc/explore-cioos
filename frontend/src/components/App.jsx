@@ -3,7 +3,7 @@ import * as Sentry from '@sentry/react'
 import { Integrations } from '@sentry/tracing'
 import { Col, Spinner } from 'react-bootstrap'
 import {
-  CheckCircle,
+  Check2Circle,
   XCircle,
   ArrowsExpand,
   Building,
@@ -54,7 +54,8 @@ import {
   generateRangeSelectBadgeTitle,
   useDebounce,
   setAllOptionsIsSelectedTo,
-  polygonIsRectangle
+  polygonIsRectangle,
+  getCookieValue
 } from '../utilities.js'
 
 import 'bootstrap/dist/css/bootstrap.min.css'
@@ -78,7 +79,7 @@ export default function App() {
   const [pointsToDownload, setPointsToDownload] = useState()
   const [pointsToReview, setPointsToReview] = useState()
   const [polygon, setPolygon] = useState()
-  const [email, setEmail] = useState()
+  const [email, setEmail] = useState(getCookieValue('email'))
   const [emailValid, setEmailValid] = useState(false)
   const [submissionState, setSubmissionState] = useState()
   const [submissionFeedback, setSubmissionFeedback] = useState()
@@ -403,14 +404,14 @@ export default function App() {
 
       case 'successful':
         setSubmissionFeedback({
-          icon: <CheckCircle className='text-success' size={30} />,
+          icon: <Check2Circle className='text-success' size={30} style={{ color: '#4fbc89' }} />,
           text: t('submissionStateTextSuccess') // Request successful. Download link will be sent to: ' + email
         })
         break
 
       case 'failed':
         setSubmissionFeedback({
-          icon: <XCircle className='text-danger' size={30} />,
+          icon: <XCircle className='text-danger' size={30} style={{ color: '#dc3545' }} />,
           text: t('submissionStateTextFailed') // 'Request failed'
         })
         break
@@ -457,6 +458,9 @@ export default function App() {
 
   function handleSubmission() {
     setSubmissionState('submitted')
+    if (validateEmail(email)) {
+      document.cookie = `email=${email}; Secure; max-age=${60 * 60 * 24 * 31}`
+    }
   }
 
   function submitRequest() {
@@ -507,6 +511,7 @@ export default function App() {
               disabled={submissionState === 'submitted'}
               className='emailAddress'
               type='email'
+              value={email}
               placeholder='email@email.com'
               onInput={(e) => handleEmailChange(e.target.value)}
             />
