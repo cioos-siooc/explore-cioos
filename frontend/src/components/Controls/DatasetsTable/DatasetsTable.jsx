@@ -180,7 +180,7 @@ export default function DatasetsTable({
         selector: (row) => row.internalDownload,
         cell: (row) => {
           if (!_.isEmpty(downloadSizeEstimates)) {
-            return row.internalDownload ? <Check2Circle className='downloadableIcon' color='green' size='25' /> : <XCircle className='downloadableIcon' color='red' size='25' />
+            return row.internalDownload ? <Check2Circle className='downloadableIcon' color='#52a79b' size='25' /> : <XCircle className='downloadableIcon' color='#e3285e' size='25' />
           } else {
             return (<Spinner
               className='datasetsTableSpinner'

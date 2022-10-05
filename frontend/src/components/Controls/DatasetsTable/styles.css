@@ -91,10 +91,10 @@
 .datasetsTable .downloadSizeEstimateFiltered {
   height: 30px;
   display: inline;
-  background-color: #dc3545;
+  background-color: #e3285e;
   color: white;
 }
 
 .datasetsTable .downloadSizeEstimateFiltered.downloadable {
-  background-color: #4fbc89;
+  background-color: #52a79b;
 }

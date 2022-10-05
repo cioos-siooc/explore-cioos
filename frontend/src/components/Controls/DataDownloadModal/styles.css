@@ -30,7 +30,7 @@
 
 .submitRequestButton {
   background-color: White;
-  border: solid 2px darkgrey;
+  border: solid 2px lightgrey;
   border-radius: 10px;
   height: 40px;
   text-align: center;
@@ -42,5 +42,6 @@
 }
 
 .submitRequestButton:hover {
-  background-color: #c6e3df;;
+  background-color: #c6e3df;
+  border: 2px solid darkgrey;
 }
