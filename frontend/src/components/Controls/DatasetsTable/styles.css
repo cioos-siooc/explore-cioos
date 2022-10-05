@@ -70,3 +70,31 @@
 .datasetsTable tbody tr td svg:hover {
   background-color: lightgrey;
 }
+
+.datasetsTable .downloadIcon {
+  margin-left: 2px;
+}
+
+.datasetsTable .datasetsTableSpinner {
+  /* position: absolute; */
+  margin:0px 40px;
+  /* background-color: lightgray; */
+  opacity: 30%;
+}
+
+.datasetsTable .downloadSizeEstimate {
+  line-height: 30px;
+  padding: 0px 10px;
+  min-width: max-content;
+}
+
+.datasetsTable .downloadSizeEstimateFiltered {
+  height: 30px;
+  display: inline;
+  background-color: #e3285e;
+  color: white;
+}
+
+.datasetsTable .downloadSizeEstimateFiltered.downloadable {
+  background-color: #52a79b;
+}

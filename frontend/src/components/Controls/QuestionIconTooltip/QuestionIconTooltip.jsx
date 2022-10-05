@@ -1,3 +1,4 @@
+import classNames from 'classnames'
 import * as React from 'react'
 import { Tooltip, OverlayTrigger } from 'react-bootstrap'
 import { QuestionCircle } from 'react-bootstrap-icons'
@@ -5,7 +6,8 @@ import { QuestionCircle } from 'react-bootstrap-icons'
 export default function QuestionIconTooltip({
   tooltipText,
   tooltipPlacement,
-  size
+  size,
+  className = ''
 }) {
   return (
     <OverlayTrigger
@@ -13,7 +15,7 @@ export default function QuestionIconTooltip({
       placement={tooltipPlacement}
       overlay={<Tooltip>{tooltipText}</Tooltip>}
     >
-      <QuestionCircle className='helpIcon' color='#007bff' size={size} />
+      <QuestionCircle className={classNames('helpIcon', className)} color='#007bff' size={size} />
     </OverlayTrigger>
   )
 }

@@ -1,13 +1,7 @@
 .datasetInspector {
   height: 100%;
-  border: 2px solid transparent; 
   padding: -2px;
 }
-
-.datasetInspector:hover{
-  border: 2px solid #c6e3df;
-}
-
 
 .datasetInspector .backButton {
   text-align: center;
@@ -47,6 +41,10 @@
   grid-auto-rows: max-content;
 }
 
+.metadataAndRecordIDTableGridContainer {
+  border: 2px solid transparent;
+}
+
 .metadataAndRecordIDTableGridContainer button, a {
   border: 1px solid transparent;
   border-radius: 10px;
@@ -63,6 +61,10 @@
 
 .metadataAndRecordIDTableGridContainer a:hover {
   background-color: #c6e3df;
+}
+
+.metadataAndRecordIDTableGridContainer:hover {
+  border: 2px solid #c6e3df;
 }
 
 .metadataGridItem{
