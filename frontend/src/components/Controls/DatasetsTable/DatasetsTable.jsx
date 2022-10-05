@@ -231,10 +231,6 @@ export default function DatasetsTable({
     return columns
   }
 
-  /* TODO:
-- add the cookie for the email
-*/
-
   return (
     <div className='datasetsTable'>
       <DataTableExtensions
