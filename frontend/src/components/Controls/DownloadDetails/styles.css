@@ -1,13 +1,30 @@
+.downloadDetails .container {
+  padding: 0px !important;
+}
+
 .downloadDetails .row {
   padding: 5px 0px;
+  /* margin-left: 0px;
+  margin-right: 0px; */
+}
+
+.downloadDetails .col {
+  padding: 0px 0px;
+  margin-left: 0px;
+  margin-right: 0px;
 }
 
 .downloadDetails>hr {
   margin: 0px;
 }
 
+.downloadableIcon {
+  margin: auto 40px;
+}
+
 .downloadDataRow {
-  max-height: 40vh;
+  min-height: 300px;
+  max-height: calc(80vh - 160px);
   overflow-y: auto;
 }
 
@@ -55,3 +72,89 @@
 .downloadQuote {
   text-align: center;
 }
+
+.filterDownloadToggles{
+  display: flex;
+  flex-wrap: wrap;
+  min-height: 84px;
+  justify-content: center;
+  padding: 20px 10px 20px 100px;
+  background-color: #f7f7f7;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+.filterDownloadToggles .helpIcon {
+  margin-right: 5px;
+  margin-left: 5px;
+  margin-top: 3px;
+}
+
+.filterDownloadToggles .helpIcon.helpIconWithMarginTop{
+  margin-top: 12px;
+}
+
+.filterDownloadToggle {
+  display: inline;
+}
+
+.filterDownloadToggle button{
+  background-color: white;
+  border-radius: 42px;
+  border: 1px solid lightgrey;
+  height: 42px;
+  margin: 1px 5px 1px 1px;
+  padding: 0px 15px 0px 0px;
+}
+
+.filterDownloadToggle.active button {
+  background-color: #c6e3df;
+}
+
+.filterDownloadToggle.disabled:hover button {
+  background-color: white;
+}
+
+.filterDownloadToggle:hover button {
+  background-color: #c6e3df;
+  border: 2px solid darkgrey;
+  margin: 0px 5px 0px 0px;
+  padding: 0px 15px 0px 0px;
+}
+
+.downloadDetails .datasetSizeTotalSpinner {
+  opacity: 30%;
+  /* display:inline; */
+  width: 30px;
+  height: 30px;
+  position: absolute;
+  margin-left: 10px;
+}
+
+.downloadDetailsDownloadInfoRow.row {
+  text-align: center;
+  margin: 10px 0px 10px 0px;
+}
+
+.downloadDetailsDownloadInfoItem {
+  min-height: 40px;
+  line-height: 30px;
+}
+
+.downloadDetailsDownloadLimits {
+  background-color: #f7f7f7;
+}
+
+.downloadDetails .downloadDetailsBackButton{
+  position: absolute;
+  left: 20px;
+  top: 20px;
+  height: 42px;
+  border-radius: 10px;
+  border: 2px solid darkgrey;
+  background-color: white;
+}
+
+.downloadDetails .downloadDetailsBackButton:hover {
+  background-color: #f3f3f3;
+} 
