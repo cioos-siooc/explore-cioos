@@ -99,6 +99,7 @@ export default function App() {
     platformsSelected: defaultPlatformsSelected
   }
   const [query, setQuery] = useState(defaultQuery)
+  const [showModal, setShowModal] = useState(false)
 
   // EOV filter initial values and state
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
@@ -487,6 +488,8 @@ export default function App() {
         disabled={_.isEmpty(pointsToReview)}
         setEmail={setEmail}
         setSubmissionState={setSubmissionState}
+        showModal={showModal}
+        setShowModal={setShowModal}
       >
         <DownloadDetails
           width={650}
@@ -504,6 +507,7 @@ export default function App() {
           filterDownloadByPolygon={filterDownloadByPolygon}
           setFilterDownloadByPolygon={setFilterDownloadByPolygon}
           setSubmissionState={setSubmissionState}
+          setShowModal={setShowModal}
         >
           <Col>
             <input

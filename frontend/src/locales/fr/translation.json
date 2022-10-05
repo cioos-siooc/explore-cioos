@@ -104,7 +104,7 @@
   "datasetInspectorRecordTable": "Liste d'enregistrements",
   "datasetInspectorERDDAPText": "URL source de l'ensemble de données",
   "datasetInspectorCKANText": "URL du catalogue",
-  "downloadModalTitleText": "Télécharger les données",
+  "downloadModalTitleText": "Télécharger",
   "downloadModalButtonTitle": "Télécharger les données sélectionnées",
   "downloadModalButtonText": "Télécharger",
   "legendTitleText": "point",

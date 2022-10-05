@@ -18,7 +18,7 @@ import {
 import { defaultEndDate, defaultEndDepth, defaultStartDate, defaultStartDepth } from '../../config.js'
 import { server } from '../../../config.js'
 import './styles.css'
-import { ArrowsExpand, CalendarWeek, Check2Circle, XCircle } from 'react-bootstrap-icons'
+import { ArrowsExpand, CalendarWeek, Check2Circle, ChevronCompactLeft, XCircle } from 'react-bootstrap-icons'
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
 
 
@@ -39,6 +39,7 @@ export default function DownloadDetails({
   filterDownloadByPolygon,
   setFilterDownloadByPolygon,
   setSubmissionState,
+  setShowModal,
   children
 }) {
   const { t } = useTranslation()
@@ -178,8 +179,19 @@ export default function DownloadDetails({
   const timeFilterToggleClassName = classNames(filterToggleClassname, { active: filterDownloadByTime }, { disabled: !timeFilterActive })
   const depthFilterToggleClassName = classNames(filterToggleClassname, { active: filterDownloadByDepth }, { disabled: !depthFilterActive })
   const polygonFilterToggleClassName = classNames(filterToggleClassname, { active: filterDownloadByPolygon }, { disabled: !polygonFilterActive })
+  let polygonFilterText = ''
+  polygon.forEach((coordinate, index) => {
+    if (polygon.length > 3 && index < 3) {
+      polygonFilterText += `[${coordinate[0].toFixed(2)}, ${coordinate[1].toFixed(2)}]`
+    } else if (index === polygon.length - 1) {
+      polygonFilterText += `...[${coordinate[0].toFixed(2)}, ${coordinate[1].toFixed(2)}]`
+    }
+  })
   return (
     <Container className='downloadDetails'>
+      <button className='downloadDetailsBackButton' onClick={() => setShowModal(false)}>
+        <ChevronCompactLeft />Back
+      </button>
       <Row style={{ padding: '0px' }}>
         <Col>
           <div
@@ -264,11 +276,7 @@ export default function DownloadDetails({
                         paddingLeft: '45px'
                       }}
                     >
-                      {`${polygon.map((coordinate, index) => {
-                        if (index !== polygon.length - 1) {
-                          return `[${coordinate[0].toFixed(2)}, ${coordinate[1].toFixed(2)}]`
-                        }
-                      })}`}
+                      {polygonFilterText}
                     </div>
                   </button>
                 </>
@@ -297,10 +305,10 @@ export default function DownloadDetails({
           <div>
             {'Datasets '}
             <strong style={{ color: 'white', backgroundColor: '#e3285e' }}>{'larger than 1GB'}</strong>
-            {' are not CDE downloadable '}<XCircle color='#e3285e' size='25' />
-            {'. Datasets '}
+            {' are not downloadable '}<XCircle color='#e3285e' size='25' />
+            {'  Datasets '}
             <strong style={{ color: 'white', backgroundColor: '#52a79b' }}>{'smaller than 1GB'}</strong>
-            {' are CDE downloadable '} <Check2Circle color='#52a79b' size='25' />
+            {' are downloadable '} <Check2Circle color='#52a79b' size='25' />
           </div>
         </Col>
       </Row>
@@ -325,7 +333,7 @@ export default function DownloadDetails({
             }
           </div>
           <div className='downloadDetailsDownloadInfoItem'>
-            {'Size '}
+            {'Download Size '}
             {downloadSizeEstimates ?
               <strong>
                 {`${bytesToMemorySizeString(dataTotal.filteredSize)} /

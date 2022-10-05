@@ -7,11 +7,12 @@ import './styles.css'
 
 export default function DataDownloadModal({
   disabled,
+  setSubmissionState,
+  showModal,
+  setShowModal,
   children,
-  setSubmissionState
 }) {
   const { t } = useTranslation()
-  const [showModal, setShowModal] = useState(false)
   return (
     <div>
       <Modal
@@ -25,12 +26,12 @@ export default function DataDownloadModal({
           setShowModal(false)
         }}
       >
-        <Modal.Header closeButton>
-          <Modal.Title id='contained-modal-title-vcenter'>
-            {t('downloadModalTitleText')}
-            {/* Download Data from CIOOS Data Explorer */}
-          </Modal.Title>
-        </Modal.Header>
+        {/* <Modal.Header closeButton> */}
+        {/* <Modal.Title id='contained-modal-title-vcenter'> */}
+        {/* {t('downloadModalTitleText')} */}
+        {/* Download Data from CIOOS Data Explorer */}
+        {/* </Modal.Title> */}
+        {/* </Modal.Header> */}
         <Modal.Body>
           {children}
         </Modal.Body>
