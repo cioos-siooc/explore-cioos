@@ -180,17 +180,19 @@ export default function DownloadDetails({
   const depthFilterToggleClassName = classNames(filterToggleClassname, { active: filterDownloadByDepth }, { disabled: !depthFilterActive })
   const polygonFilterToggleClassName = classNames(filterToggleClassname, { active: filterDownloadByPolygon }, { disabled: !polygonFilterActive })
   let polygonFilterText = ''
-  polygon.forEach((coordinate, index) => {
-    if (polygon.length >= 6) {
-      if (index === polygon.length - 2) {
-        polygonFilterText += `...[${coordinate[0].toFixed(1)}, ${coordinate[1].toFixed(1)}]`
-      } else if (index <= 3) {
+  if (polygon) {
+    polygon.forEach((coordinate, index) => {
+      if (polygon.length >= 6) {
+        if (index === polygon.length - 2) {
+          polygonFilterText += `...[${coordinate[0].toFixed(1)}, ${coordinate[1].toFixed(1)}]`
+        } else if (index <= 3) {
+          polygonFilterText += `[${coordinate[0].toFixed(1)}, ${coordinate[1].toFixed(1)}]`
+        }
+      } else if (index < polygon.length - 1) {
         polygonFilterText += `[${coordinate[0].toFixed(1)}, ${coordinate[1].toFixed(1)}]`
       }
-    } else if (index < polygon.length - 1) {
-      polygonFilterText += `[${coordinate[0].toFixed(1)}, ${coordinate[1].toFixed(1)}]`
-    }
-  })
+    })
+  }
   return (
     <Container className='downloadDetails'>
       <button className='downloadDetailsBackButton' onClick={() => setShowModal(false)}>
