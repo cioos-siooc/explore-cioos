@@ -19,6 +19,7 @@ import { defaultEndDate, defaultEndDepth, defaultStartDate, defaultStartDepth } 
 import { server } from '../../../config.js'
 import './styles.css'
 import { ArrowsExpand, CalendarWeek, Check2Circle, XCircle } from 'react-bootstrap-icons'
+import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
 
 
 // Note: datasets and points are exchangable terminology
@@ -37,6 +38,7 @@ export default function DownloadDetails({
   polygonFilterActive,
   filterDownloadByPolygon,
   setFilterDownloadByPolygon,
+  setSubmissionState,
   children
 }) {
   const { t } = useTranslation()
@@ -97,6 +99,7 @@ export default function DownloadDetails({
         setDownloadSizeEstimates(filteredAndUnfilteredSizeEstimates)
       }
     }).catch(error => { throw error }).then(() => setLoading(false))
+    setSubmissionState()
   }, [query, polygon, filterDownloadByTime, filterDownloadByDepth, filterDownloadByPolygon])
 
   useEffect(() => {
@@ -177,36 +180,35 @@ export default function DownloadDetails({
   const polygonFilterToggleClassName = classNames(filterToggleClassname, { active: filterDownloadByPolygon }, { disabled: !polygonFilterActive })
   return (
     <Container className='downloadDetails'>
-      <Row>
-        <Col>
-          <strong>Download limits</strong>
-          <div>
-            {'Datasets '}
-            <strong style={{ color: 'white', backgroundColor: '#52a79b' }}>{'smaller than 1GB'}</strong>
-            {' are CDE downloadable '} <Check2Circle color='#52a79b' size='25' /> {'through the CIOOS Data Explorer.'}
-          </div>
-          <div>
-            {'Datasets '}
-            <strong style={{ color: 'white', backgroundColor: '#e3285e' }}>{'larger than 1GB'}</strong>
-            {' are not CDE downloadable '}<XCircle color='#e3285e' size='25' /> {', but can be downloaded individually through ERDDAP.'}
-          </div>
-          <div>
-            <i>Tip:</i>{' Use Time, Depth and Space filters to change dataset download sizes. Toggle active filters on and off below.'}
-          </div>
-        </Col>
-      </Row>
-      <Row>
+      <Row style={{ padding: '0px' }}>
         <Col>
           <div
             className='filterDownloadToggles'
           >
+            {(!timeFilterActive && !depthFilterActive && !polygonFilterActive) && (
+              <>
+                < QuestionIconTooltip
+                  tooltipText={'Use Time, Depth and Space filters to change dataset download sizes. Active filters are applied to all datasets in a download. Use the available ERDDAP links to download large datasets.'}
+                  tooltipPlacement={'left'}
+                  size={20}
+                />
+                <i>
+                  {' No Time, Depth, or Space filters currently active'}
+                </i>
+              </>
+            )}
+            {(timeFilterActive || depthFilterActive || polygonFilterActive) &&
+              <QuestionIconTooltip
+                tooltipText={'Use Time, Depth and Space filters to change dataset download sizes. Active filters are applied to all datasets in a download. Use the available ERDDAP links to download large datasets.'}
+                tooltipPlacement={'left'}
+                size={20}
+                className='helpIconWithMarginTop'
+              />
+            }
             {timeFilterActive &&
               <div
                 className={timeFilterToggleClassName}
               >
-                {/* <strong>
-                  {'Time: '}
-                </strong> */}
                 <>
                   <button
                     onClick={() => setFilterDownloadByTime(!filterDownloadByTime)}
@@ -218,11 +220,6 @@ export default function DownloadDetails({
                     }} />
                     {`${query.startDate} - ${query.endDate}`}
                   </button>
-                  {/* {filterDownloadByTime ?
-                    <CheckSquare />
-                    :
-                    <Square />
-                  } */}
                 </>
               </div>
             }
@@ -230,9 +227,6 @@ export default function DownloadDetails({
               <div
                 className={depthFilterToggleClassName}
               >
-                {/* <strong>
-                  {'Depth: '}
-                </strong> */}
                 <>
                   <button
                     onClick={() => setFilterDownloadByDepth(!filterDownloadByDepth)}
@@ -244,11 +238,6 @@ export default function DownloadDetails({
                     }} />
                     {`${query.startDepth} - ${query.endDepth}(m)`}
                   </button>
-                  {/* {filterDownloadByDepth ?
-                    <CheckSquare />
-                    :
-                    <Square />
-                  } */}
                 </>
               </div>
             }
@@ -256,9 +245,6 @@ export default function DownloadDetails({
               <div
                 className={polygonFilterToggleClassName}
               >
-                {/* <strong>
-                  {'Shape: '}
-                </strong> */}
                 <>
                   <button
                     onClick={() => setFilterDownloadByPolygon(!filterDownloadByPolygon)}
@@ -285,11 +271,6 @@ export default function DownloadDetails({
                       })}`}
                     </div>
                   </button>
-                  {/* {filterDownloadByPolygon ?
-                    <CheckSquare />
-                    :
-                    <Square />
-                  } */}
                 </>
               </div>
             }
@@ -311,7 +292,18 @@ export default function DownloadDetails({
           />
         </Col>
       </Row>
-      <hr />
+      <Row className='downloadDetailsDownloadLimits'>
+        <Col style={{ textAlign: 'center', margin: '15px 0px' }}>
+          <div>
+            {'Datasets '}
+            <strong style={{ color: 'white', backgroundColor: '#e3285e' }}>{'larger than 1GB'}</strong>
+            {' are not CDE downloadable '}<XCircle color='#e3285e' size='25' />
+            {'. Datasets '}
+            <strong style={{ color: 'white', backgroundColor: '#52a79b' }}>{'smaller than 1GB'}</strong>
+            {' are CDE downloadable '} <Check2Circle color='#52a79b' size='25' />
+          </div>
+        </Col>
+      </Row>
       <Row className='downloadDetailsDownloadInfoRow'>
         <Col>
           <div className='downloadDetailsDownloadInfoItem'>
