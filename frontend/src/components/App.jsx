@@ -574,6 +574,7 @@ export default function App() {
           setZoom={setZoom}
           rangeLevels={rangeLevels}
           offsetFlyTo={selectionPanelOpen}
+          setHoveredDataset={setHoveredDataset}
           hoveredDataset={hoveredDataset}
         />
       )}
