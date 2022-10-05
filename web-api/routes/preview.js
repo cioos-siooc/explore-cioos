@@ -1,6 +1,7 @@
 const express = require("express");
 // helps with async error handling in express < v5
 require("express-async-errors");
+const Sentry = require("@sentry/node");
 
 const router = express.Router();
 const axios = require("axios");
@@ -76,9 +77,9 @@ router.get("/", validatorMiddleware(), async (req, res, next) => {
   } catch (error) {
     if (error.response) {
       console.error(error.response);
-      if (error.response.status === 404) res.send([]);
-      // TODO throw sentry error if no data
+      Sentry.captureMessage("No preview data found at", erddapQuery);
     }
+    res.send([]);
   }
 });
 

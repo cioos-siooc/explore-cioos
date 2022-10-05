@@ -98,6 +98,13 @@ export function createDataFilterQueryString(query, filterLengths) {
   )
   let platforms, datasetPKs, orgPKs
 
+export function createDataFilterQueryString(query) {
+  const { orgsSelected, eovsSelected, platformsSelected, datasetsSelected } =
+    query
+
+  // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
+  const queryWithoutDefaults = createQueryWithoutDefaults(query)
+
   const eovs = eovsSelected
     .filter((eov) => eov.isSelected) // pulling the selected eov names out (these don't have pks)
     .map((eov) => eov.title)

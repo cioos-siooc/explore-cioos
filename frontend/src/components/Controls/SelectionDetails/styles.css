@@ -9,6 +9,10 @@
   overflow-x: hidden;
 }
 
+.pointDetailsInfoRow.fullHeight {
+  height: calc(100% - 70px);
+}
+
 @media (max-height: 500px) {
   .pointDetailsInfoRow {
     max-height: 420px;

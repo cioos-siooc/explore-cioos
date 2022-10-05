@@ -36,7 +36,8 @@ export default function CreateMap({
   setMapView,
   offsetFlyTo,
   rangeLevels,
-  hoveredDataset
+  hoveredDataset,
+  setHoveredDataset
 }) {
   const { t, i18n } = useTranslation()
 
@@ -601,6 +602,10 @@ export default function CreateMap({
         creatingPolygon.current = false
       }
     }
+
+    map.current.on('mousemove', (e) => {
+      setHoveredDataset()
+    })
 
     map.current.on('mousemove', 'points', (e) => {
       if (!draw.getMode().includes('draw')) {
