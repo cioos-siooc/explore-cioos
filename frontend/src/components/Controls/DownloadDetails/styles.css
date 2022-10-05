@@ -24,7 +24,7 @@
 
 .downloadDataRow {
   min-height: 300px;
-  max-height: calc(80vh - 280px);
+  max-height: calc(80vh - 160px);
   overflow-y: auto;
 }
 
@@ -75,10 +75,13 @@
 
 .filterDownloadToggles{
   display: flex;
+  flex-wrap: wrap;
+  min-height: 84px;
   justify-content: center;
-  padding: 10px 0px;
-  /* border-bottom: 1px solid lightgrey; */
+  padding: 20px 10px 20px 100px;
   background-color: #f7f7f7;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
 }
 
 .filterDownloadToggles .helpIcon {
@@ -142,3 +145,16 @@
   background-color: #f7f7f7;
 }
 
+.downloadDetails .downloadDetailsBackButton{
+  position: absolute;
+  left: 20px;
+  top: 20px;
+  height: 42px;
+  border-radius: 10px;
+  border: 2px solid darkgrey;
+  background-color: white;
+}
+
+.downloadDetails .downloadDetailsBackButton:hover {
+  background-color: #f3f3f3;
+} 
