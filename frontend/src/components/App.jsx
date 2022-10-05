@@ -3,7 +3,7 @@ import * as Sentry from '@sentry/react'
 import { Integrations } from '@sentry/tracing'
 import { Col, Spinner } from 'react-bootstrap'
 import {
-  CheckCircle,
+  Check2Circle,
   XCircle,
   ArrowsExpand,
   Building,
@@ -54,7 +54,8 @@ import {
   generateRangeSelectBadgeTitle,
   useDebounce,
   setAllOptionsIsSelectedTo,
-  polygonIsRectangle
+  polygonIsRectangle,
+  getCookieValue
 } from '../utilities.js'
 
 import 'bootstrap/dist/css/bootstrap.min.css'
@@ -78,7 +79,7 @@ export default function App() {
   const [pointsToDownload, setPointsToDownload] = useState()
   const [pointsToReview, setPointsToReview] = useState()
   const [polygon, setPolygon] = useState()
-  const [email, setEmail] = useState()
+  const [email, setEmail] = useState(getCookieValue('email'))
   const [emailValid, setEmailValid] = useState(false)
   const [submissionState, setSubmissionState] = useState()
   const [submissionFeedback, setSubmissionFeedback] = useState()
@@ -98,6 +99,7 @@ export default function App() {
     platformsSelected: defaultPlatformsSelected
   }
   const [query, setQuery] = useState(defaultQuery)
+  const [showModal, setShowModal] = useState(false)
 
   // EOV filter initial values and state
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
@@ -171,8 +173,12 @@ export default function App() {
   // Filter open state
   const [openFilter, setOpenFilter] = useState()
 
-  // TODO: consider adding a 'searched' property to the options to indicate whether they satisfy the search terms,
-  // and removing the extra concept of 'allOptions' vs 'selectedOptions'
+  const [timeFilterActive, setTimeFilterActive] = useState(false)
+  const [filterDownloadByTime, setFilterDownloadByTime] = useState(false)
+  const [depthFilterActive, setDepthFilterActive] = useState(false)
+  const [filterDownloadByDepth, setFilterDownloadByDepth] = useState(false)
+  const [polygonFilterActive, setPolygonFilterActive] = useState(false)
+  const [filterDownloadByPolygon, setFilterDownloadByPolygon] = useState(false)
 
   // Update query
   useEffect(() => {
@@ -222,6 +228,8 @@ export default function App() {
         elem.style.backgroundColor = '#ffffff'
       }
     }
+    setPolygonFilterActive(!_.isEmpty(polygon))
+    setFilterDownloadByPolygon(!_.isEmpty(polygon))
   }, [polygon])
 
   useEffect(() => {
@@ -395,14 +403,14 @@ export default function App() {
 
       case 'successful':
         setSubmissionFeedback({
-          icon: <CheckCircle className='text-success' size={30} />,
-          text: t('submissionStateTextSuccess', { email }) // Request successful. Download link will be sent to: ' + email
+          icon: <Check2Circle size={30} style={{ color: '#52a79b' }} />,
+          text: t('submissionStateTextSuccess') // Request successful. Download link will be sent to: ' + email
         })
         break
 
       case 'failed':
         setSubmissionFeedback({
-          icon: <XCircle className='text-danger' size={30} />,
+          icon: <XCircle size={30} style={{ color: '#e3285e' }} />,
           text: t('submissionStateTextFailed') // 'Request failed'
         })
         break
@@ -416,13 +424,20 @@ export default function App() {
   useEffect(() => {
     if (!loading && !_.isEmpty(rangeLevels)) {
       fetch(`${server}/legend?${createDataFilterQueryString(query)}`)
-        .then((response) => response.json())
-        .then((legend) => {
+        .then((response) => {
+          if (response.ok) {
+            return response.json()
+          }
+        }).then((legend) => {
           if (legend) {
             setRangeLevels(legend.recordsCount)
           }
         })
     }
+    setTimeFilterActive(startDate !== defaultStartDate || endDate !== defaultEndDate)
+    setFilterDownloadByTime(startDate !== defaultStartDate || endDate !== defaultEndDate)
+    setDepthFilterActive(startDepth !== defaultStartDepth || endDepth !== defaultEndDepth)
+    setFilterDownloadByDepth(startDepth !== defaultStartDepth || endDepth !== defaultEndDepth)
   }, [query])
 
   useEffect(() => {
@@ -442,23 +457,25 @@ export default function App() {
 
   function handleSubmission() {
     setSubmissionState('submitted')
+    if (validateEmail(email)) {
+      document.cookie = `email=${email}; Secure; max-age=${60 * 60 * 24 * 31}`
+    }
   }
 
   function submitRequest() {
-    fetch(
-      `${server}/download?${createDataFilterQueryString(
-        query
-      )}&polygon=${JSON.stringify(polygon)}&datasetPKs=${pointsToDownload
-        .map((point) => point.pk)
-        .join(',')}&email=${email}&lang=${i18n.language}`
-    )
-      .then((response) => {
-        if (response.ok) {
-          setSubmissionState('successful')
-        } else {
-          setSubmissionState('failed')
-        }
-      })
+    let url = `${server}/download?${createDataFilterQueryString(query)}&datasetPKs=${pointsToDownload
+      .map((point) => point.pk)
+      .join(',')}&email=${email}&lang=${i18n.language}`
+    if (polygon) {
+      url += `&polygon=${JSON.stringify(polygon)}`
+    }
+    fetch(url).then((response) => {
+      if (response.ok) {
+        setSubmissionState('successful')
+      } else {
+        setSubmissionState('failed')
+      }
+    })
       .catch((error) => {
         setSubmissionState('failed')
         throw error
@@ -471,28 +488,45 @@ export default function App() {
         disabled={_.isEmpty(pointsToReview)}
         setEmail={setEmail}
         setSubmissionState={setSubmissionState}
+        showModal={showModal}
+        setShowModal={setShowModal}
       >
         <DownloadDetails
           width={650}
           pointsToReview={pointsToReview}
           setPointsToDownload={setPointsToDownload}
+          polygon={polygon}
+          query={query}
+          timeFilterActive={timeFilterActive}
+          filterDownloadByTime={filterDownloadByTime}
+          setFilterDownloadByTime={setFilterDownloadByTime}
+          depthFilterActive={depthFilterActive}
+          filterDownloadByDepth={filterDownloadByDepth}
+          setFilterDownloadByDepth={setFilterDownloadByDepth}
+          polygonFilterActive={polygonFilterActive}
+          filterDownloadByPolygon={filterDownloadByPolygon}
+          setFilterDownloadByPolygon={setFilterDownloadByPolygon}
+          setSubmissionState={setSubmissionState}
+          setShowModal={setShowModal}
         >
           <Col>
             <input
               disabled={submissionState === 'submitted'}
               className='emailAddress'
               type='email'
+              value={email}
               placeholder='email@email.com'
               onInput={(e) => handleEmailChange(e.target.value)}
             />
-          </Col>
-          <Col xs='auto'>
             <button
-              className='submitRequestButton'
+              className={`submitRequestButton ${(!emailValid ||
+                _.isEmpty(pointsToDownload) ||
+                // getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
+                submissionState === 'submitted') && 'disabled'}`}
               disabled={
                 !emailValid ||
                 _.isEmpty(pointsToDownload) ||
-                getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
+                // getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
                 submissionState === 'submitted'
               }
               onClick={() => handleSubmission()}
@@ -508,6 +542,8 @@ export default function App() {
               }
             </button>
           </Col>
+          {/* <Col xs='auto'>
+          </Col> */}
           <Col className='submissionFeedback'>
             {submissionFeedback && submissionFeedback.icon}
             {submissionFeedback && submissionFeedback.text}
@@ -542,11 +578,11 @@ export default function App() {
           setPointsToReview={setPointsToReview}
           setLoading={setLoading}
           query={query}
-          polygon={polygon}
           zoom={zoom}
           setZoom={setZoom}
           rangeLevels={rangeLevels}
           offsetFlyTo={selectionPanelOpen}
+          setHoveredDataset={setHoveredDataset}
           hoveredDataset={hoveredDataset}
         />
       )}
@@ -726,7 +762,7 @@ export default function App() {
           />
         </Filter>
         <Filter
-          active={startDate !== defaultStartDate || endDate !== defaultEndDate}
+          active={timeFilterActive}
           badgeTitle={timeframesBadgeTitle}
           optionsSelected={(startDate, endDate)}
           setOptionsSelected={() => {
@@ -752,9 +788,7 @@ export default function App() {
           />
         </Filter>
         <Filter
-          active={
-            startDepth !== defaultStartDepth || endDepth !== defaultEndDepth
-          }
+          active={depthFilterActive}
           badgeTitle={depthRangeBadgeTitle}
           optionsSelected={(startDepth, endDepth)}
           setOptionsSelected={() => {

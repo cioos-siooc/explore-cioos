@@ -52,7 +52,8 @@ body {
 
 .emailAddress {
   height: 40px;
-  width: 300px;
+  width: 100%;
+  margin-bottom: 10px;
 }
 
 .boxQueryButton {
@@ -99,6 +100,7 @@ body {
 .submissionFeedback svg,
 .submissionFeedback span {
   margin-right: 5px;
+  margin-left: 5px;
 }
 
 @media all and (max-width: 915px) {
