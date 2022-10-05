@@ -98,7 +98,7 @@
   "datasetInspectorDepthRangeText": "Depth Range",
   "datasetInspectorDepthTooLargeWarningText": "too big",
   "datasetInspectorRecordsShownText": "records shown...",
-  "datasetInspectorFilterText": "Filter table",
+  "datasetInspectorFilterText": "Search table",
   "datasetInspectorClickPreviewText": "Click on a Record to get a data preview.",
   "datasetInspectorRecordTable": "Record list",
   "datasetInspectorERDDAPText": "Dataset source URL",

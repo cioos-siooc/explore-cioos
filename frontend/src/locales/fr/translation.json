@@ -99,7 +99,7 @@
   "datasetInspectorDepthRangeText": "Intervalle de profondeur",
   "datasetInspectorDepthTooLargeWarningText": "trop volumineux",
   "datasetInspectorRecordsShownText": " enregistrements affichés...",
-  "datasetInspectorFilterText": "Filtrer le tableau",
+  "datasetInspectorFilterText": "Recherche le tableau",
   "datasetInspectorClickPreviewText": "Cliquez sur un enregistrement pour obtenir un aperçu des données.",
   "datasetInspectorRecordTable": "Liste d'enregistrements",
   "datasetInspectorERDDAPText": "URL source de l'ensemble de données",

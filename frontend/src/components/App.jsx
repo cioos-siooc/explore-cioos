@@ -503,6 +503,7 @@ export default function App() {
           polygonFilterActive={polygonFilterActive}
           filterDownloadByPolygon={filterDownloadByPolygon}
           setFilterDownloadByPolygon={setFilterDownloadByPolygon}
+          setSubmissionState={setSubmissionState}
         >
           <Col>
             <input
