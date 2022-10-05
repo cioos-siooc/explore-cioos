@@ -181,7 +181,7 @@ export default function SelectionDetails({
         />
         <LanguageSelector className='noPosition' />
       </div>
-      <div className='pointDetailsInfoRow'>
+      <div className={`pointDetailsInfoRow ${inspectDataset ? 'fullHeight' : ''}`}>
         {loading ? (
           <Loading />
         ) : inspectDataset ? (
@@ -238,6 +238,6 @@ export default function SelectionDetails({
         setInspectRecordID={setInspectRecordID}
         recordLoading={recordLoading}
       />
-    </div>
+    </div >
   )
 }
