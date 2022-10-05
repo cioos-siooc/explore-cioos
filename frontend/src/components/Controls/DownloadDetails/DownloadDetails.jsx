@@ -182,13 +182,13 @@ export default function DownloadDetails({
           <strong>Download limits</strong>
           <div>
             {'Datasets '}
-            <strong style={{ color: 'white', backgroundColor: '#4fbc89' }}>{'smaller than 1GB'}</strong>
-            {' are CDE downloadable '} <Check2Circle color='green' size='25' /> {'through the CIOOS Data Explorer.'}
+            <strong style={{ color: 'white', backgroundColor: '#52a79b' }}>{'smaller than 1GB'}</strong>
+            {' are CDE downloadable '} <Check2Circle color='#52a79b' size='25' /> {'through the CIOOS Data Explorer.'}
           </div>
           <div>
             {'Datasets '}
-            <strong style={{ color: 'white', backgroundColor: '#dc3545' }}>{'larger than 1GB'}</strong>
-            {' are not CDE downloadable '}<XCircle color='red' size='25' /> {', but can be downloaded individually through ERDDAP.'}
+            <strong style={{ color: 'white', backgroundColor: '#e3285e' }}>{'larger than 1GB'}</strong>
+            {' are not CDE downloadable '}<XCircle color='#e3285e' size='25' /> {', but can be downloaded individually through ERDDAP.'}
           </div>
           <div>
             <i>Tip:</i>{' Use Time, Depth and Space filters to change dataset download sizes. Toggle active filters on and off below.'}

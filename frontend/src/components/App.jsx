@@ -402,14 +402,14 @@ export default function App() {
 
       case 'successful':
         setSubmissionFeedback({
-          icon: <Check2Circle className='text-success' size={30} style={{ color: '#4fbc89' }} />,
+          icon: <Check2Circle size={30} style={{ color: '#52a79b' }} />,
           text: t('submissionStateTextSuccess') // Request successful. Download link will be sent to: ' + email
         })
         break
 
       case 'failed':
         setSubmissionFeedback({
-          icon: <XCircle className='text-danger' size={30} style={{ color: '#dc3545' }} />,
+          icon: <XCircle size={30} style={{ color: '#e3285e' }} />,
           text: t('submissionStateTextFailed') // 'Request failed'
         })
         break
