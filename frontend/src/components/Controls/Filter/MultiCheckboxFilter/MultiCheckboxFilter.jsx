@@ -124,7 +124,7 @@ export default function MultiCheckboxFilter({
               <div
                 className={`optionButton ${option.isSelected && 'selected'}`}
                 key={index}
-                title={t(title)}
+                title={hoverText ? '' : t(title)}
                 onClick={() => {
                   if (searchable) {
                     setOptionsSelected(

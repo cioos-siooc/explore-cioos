@@ -10,18 +10,19 @@ CREATE schema cde;
 
 SET search_path TO cde, public;
 
- DROP TABLE IF EXISTS hexes_zoom_0;
-  CREATE TABLE hexes_zoom_0 (
+DROP TABLE IF EXISTS hexes_zoom_0;
+CREATE TABLE hexes_zoom_0 (
     pk serial PRIMARY KEY,
     geom geometry(Polygon,3857)
 );  
-  DROP TABLE IF EXISTS hexes_zoom_1;
 
+DROP TABLE IF EXISTS hexes_zoom_1;
 CREATE TABLE hexes_zoom_1 (
     pk serial PRIMARY KEY,
     geom geometry(Polygon,3857)
   );
 
+ 
 
 -- The scraper will skip datasets in this table
 DROP TABLE IF EXISTS skipped_datasets;
@@ -35,6 +36,7 @@ CREATE TABLE skipped_datasets (
 DROP TABLE IF EXISTS datasets;
 CREATE TABLE datasets (
     pk serial PRIMARY KEY,
+    pk_url INTEGER,
     dataset_id TEXT,
     erddap_url TEXT,
     platform TEXT,
@@ -61,6 +63,7 @@ CREATE TABLE datasets (
 DROP TABLE IF EXISTS organizations;
 CREATE TABLE organizations (
     pk SERIAL PRIMARY KEY,
+    pk_url INTEGER,
     name TEXT UNIQUE,
     color TEXT
 );
@@ -149,4 +152,18 @@ CREATE TABLE skipped_datasets (
     erddap_url text,
     dataset_id text,
     reason_code text
+);
+
+DROP TABLE IF EXISTS cde.organizations_lookup;
+CREATE TABLE cde.organizations_lookup (
+    pk SERIAL PRIMARY KEY,
+    name TEXT UNIQUE
+);
+
+DROP TABLE IF EXISTS cde.datasets_lookup;
+CREATE TABLE cde.datasets_lookup (
+    pk serial PRIMARY KEY,
+    dataset_id TEXT,
+    erddap_url TEXT,
+    UNIQUE(dataset_id, erddap_url)
 );

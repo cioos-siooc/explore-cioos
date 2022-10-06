@@ -11,6 +11,16 @@ import Loading from './components/Controls/Loading/Loading.jsx'
 import translationEN from './locales/en/translation.json'
 import translationFR from './locales/fr/translation.json'
 import App from './components/App.jsx'
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Outlet,
+  Link,
+  Redirect,
+  Switch,
+  Router
+} from 'react-router-dom'
 
 const resources = {
   en: {
@@ -40,12 +50,17 @@ i18n
     },
     react: { useSuspense: true }
   })
-
 // This is where react reaches into the DOM, finds the <div id="app"> element, and replaces it with the content of ReactD3Viz's render function JSX.
 const domContainer = document.querySelector('#app')
 ReactDOM.render(
   <Suspense fallback={<Loading />}>
-    <App />
+    <BrowserRouter>
+      <Routes>
+        <Route path='/' element={<App />} />
+      </Routes>
+    </BrowserRouter>
+    ,{/* <App /> */}
+    {/* </Router> */}
   </Suspense>,
   domContainer
 )

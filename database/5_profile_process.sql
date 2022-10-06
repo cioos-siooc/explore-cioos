@@ -76,6 +76,19 @@ SET    n_profiles = profiles_per_dataset.count
 FROM   profiles_per_dataset
 WHERE  profiles_per_dataset.pk = d.pk;  
 
+
+-- insert any new names. changed/deleted datasets will always be in here
+INSERT INTO cde.organizations_lookup (name) select name from cde.organizations ON CONFLICT DO NOTHING;
+INSERT INTO cde.datasets_lookup (erddap_url,dataset_id) select erddap_url,dataset_id from cde.datasets ON CONFLICT DO NOTHING;
+
+UPDATE cde.datasets
+SET pk_url=datasets_lookup.pk
+FROM cde.datasets_lookup
+WHERE datasets_lookup.erddap_url=datasets.erddap_url AND
+datasets_lookup.dataset_id = datasets.dataset_id;
+
+
+
   END;
 $$ LANGUAGE plpgsql;
 

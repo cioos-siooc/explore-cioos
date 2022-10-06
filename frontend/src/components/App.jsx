@@ -57,6 +57,13 @@ import {
   polygonIsRectangle,
   getCookieValue
 } from '../utilities.js'
+import {
+  useParams,
+  useLocation,
+  useHistory,
+  useSearchParams,
+  useNavigate
+} from 'react-router-dom'
 
 import 'bootstrap/dist/css/bootstrap.min.css'
 import './styles.css'
@@ -74,7 +81,10 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 export default function App() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const lang = searchParams.get('lang') || 'en'
   const { t, i18n } = useTranslation()
+
   const [selectionPanelOpen, setSelectionPanelOpen] = useState(true)
   const [pointsToDownload, setPointsToDownload] = useState()
   const [pointsToReview, setPointsToReview] = useState()
@@ -85,6 +95,7 @@ export default function App() {
   const [submissionFeedback, setSubmissionFeedback] = useState()
   const [loading, setLoading] = useState(true)
   const [zoom, setZoom] = useState(2)
+  const [mapView, setMapView] = useState({})
   const [rangeLevels, setRangeLevels] = useState()
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
   const [hoveredDataset, setHoveredDataset] = useState()
@@ -101,8 +112,12 @@ export default function App() {
   const [query, setQuery] = useState(defaultQuery)
   const [showModal, setShowModal] = useState(false)
 
+  const navigate = useNavigate()
+
   // EOV filter initial values and state
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
+  const [isPageLoad, setIsPageLoad] = useState(true)
+
   const debouncedEovsSelected = useDebounce(eovsSelected, 500)
   const eovsFilterTranslationKey = 'oceanVariablesFiltername' // 'Ocean Variables'
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(
@@ -217,13 +232,17 @@ export default function App() {
 
   useEffect(() => {
     if (polygon && !polygonIsRectangle(polygon)) {
-      const elem = document.querySelector('.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon')
+      const elem = document.querySelector(
+        '.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon'
+      )
       if (elem) {
         elem.style.backgroundColor = '#c6e3df'
       }
     } else {
       // remove colour from button
-      const elem = document.querySelector('.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon')
+      const elem = document.querySelector(
+        '.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon'
+      )
       if (elem) {
         elem.style.backgroundColor = '#ffffff'
       }
@@ -245,6 +264,19 @@ export default function App() {
     setSelectionPanelOpen(true)
   }, [pointsToReview])
 
+  useEffect(() => {
+    setIsPageLoad(false)
+    if (isPageLoad) return
+    const params2 = new URLSearchParams(createDataFilterQueryString(query))
+    const obj = {
+      ...mapView,
+      ...Object.fromEntries(params2),
+      lang
+    }
+    const combined = new URLSearchParams(obj)
+    navigate('?' + combined.toString())
+  }, [query, mapView])
+
   // Filter option data structure:
   /*
   [{
@@ -256,8 +288,47 @@ export default function App() {
     },
     pk: 123
   }]
+
   */
   useEffect(() => {
+    if (lang !== i18n.language) {
+      i18n.changeLanguage(lang)
+    }
+  }, [lang])
+  useEffect(() => {
+    const filtersFromURL = Object.fromEntries(
+      new URL(window.location.href).searchParams
+    )
+    const {
+      timeMin,
+      timeMax,
+      depthMin,
+      depthMax,
+      datasetPKs,
+      organizations,
+      platforms,
+      eovs,
+      lat,
+      lon,
+      zoom
+    } = filtersFromURL
+
+    if (lat || lon || zoom) {
+      setMapView({ lat, lon, zoom })
+    }
+
+    if (timeMin) setStartDate(timeMin)
+    if (timeMax) setEndDate(timeMax)
+    if (depthMin && Number.parseInt(depthMin) > 0) {
+      setStartDepth(Number.parseInt(depthMin))
+    }
+
+    if (depthMax && Number.parseInt(depthMax) > 0) {
+      setEndDepth(Number.parseInt(depthMax))
+    }
+
+    const platformsFromURL = platforms?.split(',') || []
+
     /* /platforms returns array of platform names:
       ['abc', 'def', ...]
     */
@@ -273,7 +344,7 @@ export default function App() {
             return {
               title: platform,
               pk: platform,
-              isSelected: false,
+              isSelected: platformsFromURL.includes(platform),
               hover_en: platformMetadata.definition_en,
               hover_fr: platformMetadata.definition_fr
             }
@@ -287,6 +358,9 @@ export default function App() {
     /* /oceanVariables returns array of variable names:
       ['abc', 'def', ...]
     */
+
+    const eovsFromURL = eovs?.split(',') || []
+
     fetch(`${server}/oceanVariables`)
       .then((response) => response.json())
       .then((eovs) => {
@@ -296,7 +370,7 @@ export default function App() {
 
             return {
               title: eov,
-              isSelected: false,
+              isSelected: eovsFromURL.includes(eov),
               pk: index,
               hover_en: eovMetadata['definition EN'],
               hover_fr: eovMetadata['definition FR']
@@ -319,6 +393,9 @@ export default function App() {
         ...
       ]
     */
+    const orgsFromURL = (organizations?.split(',') || []).map((e) =>
+      Number.parseInt(e)
+    )
     fetch(`${server}/organizations`)
       .then((response) => response.json())
       .then((orgsR) => {
@@ -326,7 +403,7 @@ export default function App() {
           orgsR.map((org) => {
             return {
               title: org.name,
-              isSelected: false,
+              isSelected: orgsFromURL.includes(org.pk),
               pk: org.pk
             }
           })
@@ -350,6 +427,9 @@ export default function App() {
         }
       ]
     */
+    const datasetsFromURL = (datasetPKs?.split(',') || []).map((e) =>
+      Number.parseInt(e)
+    )
     fetch(`${server}/datasets`)
       .then((response) => response.json())
       .then((datasetsR) => {
@@ -359,7 +439,7 @@ export default function App() {
               title: dataset.title,
               titleTranslated: dataset.title_translated,
               platform: dataset.platform,
-              isSelected: false,
+              isSelected: datasetsFromURL.includes(dataset.pk),
               pk: dataset.pk
             }
           })
@@ -384,40 +464,40 @@ export default function App() {
 
   useEffect(() => {
     switch (submissionState) {
-      case 'submitted':
-        submitRequest()
-        setSubmissionFeedback({
-          icon: (
-            <Spinner
-              className='text-warning'
-              as='span'
-              animation='border'
-              size={30}
-              role='status'
-              aria-hidden='true'
-            />
-          ),
-          text: t('submissionStateTextSubmitting') // 'Submitting...'
-        })
-        break
+    case 'submitted':
+      submitRequest()
+      setSubmissionFeedback({
+        icon: (
+          <Spinner
+            className='text-warning'
+            as='span'
+            animation='border'
+            size={30}
+            role='status'
+            aria-hidden='true'
+          />
+        ),
+        text: t('submissionStateTextSubmitting') // 'Submitting...'
+      })
+      break
 
-      case 'successful':
-        setSubmissionFeedback({
-          icon: <Check2Circle size={30} style={{ color: '#52a79b' }} />,
-          text: t('submissionStateTextSuccess') // Request successful. Download link will be sent to: ' + email
-        })
-        break
+    case 'successful':
+      setSubmissionFeedback({
+        icon: <Check2Circle size={30} style={{ color: '#52a79b' }} />,
+        text: t('submissionStateTextSuccess') // Request successful. Download link will be sent to: ' + email
+      })
+      break
 
-      case 'failed':
-        setSubmissionFeedback({
-          icon: <XCircle size={30} style={{ color: '#e3285e' }} />,
-          text: t('submissionStateTextFailed') // 'Request failed'
-        })
-        break
+    case 'failed':
+      setSubmissionFeedback({
+        icon: <XCircle size={30} style={{ color: '#e3285e' }} />,
+        text: t('submissionStateTextFailed') // 'Request failed'
+      })
+      break
 
-      default:
-        setSubmissionFeedback()
-        break
+    default:
+      setSubmissionFeedback()
+      break
     }
   }, [submissionState])
 
@@ -428,16 +508,25 @@ export default function App() {
           if (response.ok) {
             return response.json()
           }
-        }).then((legend) => {
+        })
+        .then((legend) => {
           if (legend) {
             setRangeLevels(legend.recordsCount)
           }
         })
     }
-    setTimeFilterActive(startDate !== defaultStartDate || endDate !== defaultEndDate)
-    setFilterDownloadByTime(startDate !== defaultStartDate || endDate !== defaultEndDate)
-    setDepthFilterActive(startDepth !== defaultStartDepth || endDepth !== defaultEndDepth)
-    setFilterDownloadByDepth(startDepth !== defaultStartDepth || endDepth !== defaultEndDepth)
+    setTimeFilterActive(
+      startDate !== defaultStartDate || endDate !== defaultEndDate
+    )
+    setFilterDownloadByTime(
+      startDate !== defaultStartDate || endDate !== defaultEndDate
+    )
+    setDepthFilterActive(
+      startDepth !== defaultStartDepth || endDepth !== defaultEndDepth
+    )
+    setFilterDownloadByDepth(
+      startDepth !== defaultStartDepth || endDepth !== defaultEndDepth
+    )
   }, [query])
 
   useEffect(() => {
@@ -463,19 +552,22 @@ export default function App() {
   }
 
   function submitRequest() {
-    let url = `${server}/download?${createDataFilterQueryString(query)}&datasetPKs=${pointsToDownload
+    let url = `${server}/download?${createDataFilterQueryString(
+      query
+    )}&datasetPKs=${pointsToDownload
       .map((point) => point.pk)
       .join(',')}&email=${email}&lang=${i18n.language}`
     if (polygon) {
       url += `&polygon=${JSON.stringify(polygon)}`
     }
-    fetch(url).then((response) => {
-      if (response.ok) {
-        setSubmissionState('successful')
-      } else {
-        setSubmissionState('failed')
-      }
-    })
+    fetch(url)
+      .then((response) => {
+        if (response.ok) {
+          setSubmissionState('successful')
+        } else {
+          setSubmissionState('failed')
+        }
+      })
       .catch((error) => {
         setSubmissionState('failed')
         throw error
@@ -519,10 +611,13 @@ export default function App() {
               onInput={(e) => handleEmailChange(e.target.value)}
             />
             <button
-              className={`submitRequestButton ${(!emailValid ||
-                _.isEmpty(pointsToDownload) ||
-                // getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
-                submissionState === 'submitted') && 'disabled'}`}
+              className={`submitRequestButton ${
+                (!emailValid ||
+                  _.isEmpty(pointsToDownload) ||
+                  // getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
+                  submissionState === 'submitted') &&
+                'disabled'
+              }`}
               disabled={
                 !emailValid ||
                 _.isEmpty(pointsToDownload) ||
@@ -536,9 +631,9 @@ export default function App() {
                   submissionFeedback &&
                   submissionState !== 'submitted' &&
                   t('submitRequestButtonResubmitText')) ||
-                (_.isEmpty(pointsToDownload) &&
-                  t('submitRequestButtonSelectDataText')) ||
-                t('submitRequestButtonSubmitText') // 'Submit Request'
+                  (_.isEmpty(pointsToDownload) &&
+                    t('submitRequestButtonSelectDataText')) ||
+                  t('submitRequestButtonSubmitText') // 'Submit Request'
               }
             </button>
           </Col>
@@ -558,10 +653,26 @@ export default function App() {
     setEndDate(defaultEndDate)
     setStartDepth(defaultStartDepth)
     setEndDepth(defaultEndDepth)
-    setEovsSelected(eovsSelected.map(eov => { return { ...eov, isSelected: false } }))
-    setOrgsSelected(orgsSelected.map(org => { return { ...org, isSelected: false } }))
-    setDatasetsSelected(datasetsSelected.map(dataset => { return { ...dataset, isSelected: false } }))
-    setPlatformsSelected(platformsSelected.map(platform => { return { ...platform, isSelected: false } }))
+    setEovsSelected(
+      eovsSelected.map((eov) => {
+        return { ...eov, isSelected: false }
+      })
+    )
+    setOrgsSelected(
+      orgsSelected.map((org) => {
+        return { ...org, isSelected: false }
+      })
+    )
+    setDatasetsSelected(
+      datasetsSelected.map((dataset) => {
+        return { ...dataset, isSelected: false }
+      })
+    )
+    setPlatformsSelected(
+      platformsSelected.map((platform) => {
+        return { ...platform, isSelected: false }
+      })
+    )
     setPolygon()
   }
 
@@ -580,6 +691,7 @@ export default function App() {
           query={query}
           zoom={zoom}
           setZoom={setZoom}
+          setMapView={setMapView}
           rangeLevels={rangeLevels}
           offsetFlyTo={selectionPanelOpen}
           setHoveredDataset={setHoveredDataset}
@@ -831,7 +943,9 @@ export default function App() {
         />
       )}
       <button
-        className={`boxQueryButton ${polygon && polygonIsRectangle(polygon) && 'active'}`}
+        className={`boxQueryButton ${
+          polygon && polygonIsRectangle(polygon) && 'active'
+        }`}
         id='boxQueryButton'
         title={t('rectangleToolTitle')}
       >
