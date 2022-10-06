@@ -1,25 +1,25 @@
 import * as React from 'react'
-import i18next from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { updateMapToolTitleLanguage } from '../../../utilities'
 import './styles.css'
+import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom'
 
 export default function LanguageSelector({ className }) {
   const { t, i18n } = useTranslation()
-  const otherLanguage = i18n.languages.filter((lang) => lang !== i18n.language)
+  const { lang } = useParams()
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+
+  const otherLanguage = i18n.languages.filter((l) => l !== lang).pop()
 
   return (
     <div
       className={className + ' languageSelector'}
-      onClick={() => {
-        i18next.changeLanguage(otherLanguage)
-        // change URL lang parameter
-        const url = new URL(window.location.href)
-        url.searchParams.set('lang', otherLanguage)
-        history.replaceState(null, '', url)
-        updateMapToolTitleLanguage(t)
-      }}
       title={t('languageSelectorTitle')}
+      onClick={() => {
+        const params = searchParams
+        params.set('lang', otherLanguage)
+        navigate('?' + params.toString())
+      }}
     >
       {`${otherLanguage}`.toUpperCase()}
     </div>

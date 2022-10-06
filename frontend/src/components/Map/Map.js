@@ -10,6 +10,7 @@ import { useState, useEffect, useRef } from 'react'
 import * as turf from '@turf/turf'
 import DrawRectangle from 'mapbox-gl-draw-rectangle-mode'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import './styles.css'
 
 import { server } from '../../config'
@@ -17,7 +18,6 @@ import {
   createDataFilterQueryString,
   generateColorStops,
   getCurrentRangeLevel,
-  polygonIsRectangle,
   updateMapToolTitleLanguage
 } from '../../utilities'
 import { colorScale, defaultQuery } from '../config'
@@ -33,12 +33,17 @@ export default function CreateMap({
   setLoading,
   zoom,
   setZoom,
+  setMapView,
   offsetFlyTo,
   rangeLevels,
   hoveredDataset,
   setHoveredDataset
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
+
   const mapContainer = useRef(null)
   const map = useRef(null)
   const creatingPolygon = useRef(false)
@@ -103,7 +108,11 @@ export default function CreateMap({
   colors.push('#000000')
 
   useEffect(() => {
-    if(map.current && !polygon && drawPolygon.current?.getAll()?.features?.length > 0) {
+    if (
+      map.current &&
+      !polygon &&
+      drawPolygon.current?.getAll()?.features?.length > 0
+    ) {
       drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
     }
   }, [polygon])
@@ -274,13 +283,13 @@ export default function CreateMap({
   }
 
   useEffect(() => {
+    const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${
+      query !== defaultQuery && `?${createDataFilterQueryString(query)}`
+    }`
     setPointsToReview()
     setPolygon()
     if (map && map.current && map.current.loaded()) {
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${
-        query !== defaultQuery && `?${createDataFilterQueryString(query)}`
-      }`
 
       map.current.getSource('points').tiles = [tileQuery]
       map.current.getSource('hexes').tiles = [tileQuery]
@@ -308,9 +317,9 @@ export default function CreateMap({
     }
   }, [query])
 
-  const mapZoom = new URL(window.location.href).searchParams.get('zoom')
-  const mapLongitude = new URL(window.location.href).searchParams.get('lon')
-  const mapLatitude = new URL(window.location.href).searchParams.get('lat')
+  const mapZoom = searchParams.get('zoom')
+  const mapLongitude = searchParams.get('lon')
+  const mapLatitude = searchParams.get('lat')
 
   useEffect(() => {
     // If already created don't proceed
@@ -399,13 +408,17 @@ export default function CreateMap({
 
       setColorStops()
 
+      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${
+        query !== defaultQuery && `?${createDataFilterQueryString(query)}`
+      }`
+
       map.current.addLayer({
         id: 'points',
         type: 'circle',
         minzoom: hexMaxZoom,
         source: {
           type: 'vector',
-          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`]
+          tiles: [tileQuery]
         },
         'source-layer': 'internal-layer-name',
         paint: {
@@ -433,7 +446,7 @@ export default function CreateMap({
 
         source: {
           type: 'vector',
-          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`]
+          tiles: [tileQuery]
         },
         'source-layer': 'internal-layer-name',
 
@@ -685,7 +698,14 @@ export default function CreateMap({
           )
         }
       }
-      setZoom(map.current.getZoom())
+    })
+    map.current.on('moveend', (e) => {
+      const center = map.current.getCenter()
+      setMapView({
+        lat: center.lat,
+        lon: center.lng,
+        zoom: map.current.getZoom()
+      })
     })
     map.current.on('mousedown', (e) => {
       if (e.originalEvent.shiftKey) {

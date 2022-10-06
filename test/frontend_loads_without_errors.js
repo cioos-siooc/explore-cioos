@@ -29,6 +29,7 @@ const url = "http://localhost:8098";
   });
   browser.close();
   if (errors.length) {
+    console.log(errors);
     process.exit(1);
   }
   process.exit(0);

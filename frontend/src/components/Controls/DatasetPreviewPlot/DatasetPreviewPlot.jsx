@@ -94,6 +94,8 @@ export default function DatasetPreviewPlot({
                 // title: title
               }}
               config={{
+                displaylogo: false,
+                modeBarButtonsToRemove: ['select2d', 'lasso2d', 'resetScale'],
                 responsive: true
               }}
             />
