@@ -42,7 +42,8 @@ module.exports = {
       favicon: './public/ICON_color_dark_bkg.svg'
     }),
     new DefinePlugin({
-      'process.env.API_URL': JSON.stringify(process.env.API_URL)
+      'process.env.API_URL': JSON.stringify(process.env.API_URL),
+      'process.env.BASE_URL': JSON.stringify(process.env.BASE_URL || '/')
     })
   ]
 }
