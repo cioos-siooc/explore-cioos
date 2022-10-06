@@ -49,6 +49,7 @@ services:
       context: ./frontend
       args:
         API_URL: $API_URL
+        BASE_URL: $BASE_URL
     expose:
       - "80"
     # depends_on:

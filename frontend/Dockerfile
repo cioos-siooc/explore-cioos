@@ -3,7 +3,9 @@ FROM node:16 as build-deps
 WORKDIR /usr/src/app
 
 ARG API_URL
+ARG BASE_URL
 ENV API_URL $API_URL
+ENV BASE_URL $BASE_URL
 
 COPY . .
 RUN npm ci --quiet

@@ -54,7 +54,7 @@ i18n
 const domContainer = document.querySelector('#app')
 ReactDOM.render(
   <Suspense fallback={<Loading />}>
-    <BrowserRouter>
+    <BrowserRouter basename={process.env.BASE_URL}>
       <Routes>
         <Route path='/' element={<App />} />
       </Routes>
