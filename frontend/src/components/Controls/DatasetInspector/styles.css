@@ -45,7 +45,7 @@
   border: 2px solid transparent;
 }
 
-.metadataAndRecordIDTableGridContainer button, a {
+.metadataAndRecordIDTableGridContainer button, .metadataAndRecordIDTableGridContainer a {
   border: 1px solid transparent;
   border-radius: 10px;
   padding: 5px; 
