@@ -8,7 +8,8 @@ import DatasetPreview from '../DatasetPreview/DatasetPreview.jsx'
 import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
 import LanguageSelector from '../LanguageSelector/LanguageSelector.jsx'
 import Loading from '../Loading/Loading.jsx'
-import Logo from '../../Images/logo_FINAL.png'
+import CIOOSLogoEN from '../../Images/CIOOSNationalLogoBlackEnglish.svg'
+import CIOOSLogoFR from '../../Images/CIOOSNationalLogoBlackFrench.svg'
 import { server } from '../../../config'
 import './styles.css'
 import {
@@ -163,7 +164,7 @@ export default function SelectionDetails({
       setInspectRecordID()
     }
   }, [inspectRecordID])
-  
+
   return (
     <div
       className='pointDetails'
@@ -180,8 +181,8 @@ export default function SelectionDetails({
         </button>
         <img
           className='pointDetailsHeaderLogo'
-          src={Logo}
-          onClick={() => alert('reset application')}
+          src={i18n.language === 'en' ? CIOOSLogoEN : CIOOSLogoFR}
+          onClick={() => i18n.language === 'en' ? window.open('https://www.cioos.ca') : window.open('https://www.siooc.ca/fr/accueil/')}
         />
         <LanguageSelector className='noPosition' />
       </div>
