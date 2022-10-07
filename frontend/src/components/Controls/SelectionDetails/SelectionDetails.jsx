@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { InfoSquare, X } from 'react-bootstrap-icons'
+import { InfoSquare } from 'react-bootstrap-icons'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetPreview from '../DatasetPreview/DatasetPreview.jsx'
@@ -10,6 +10,8 @@ import LanguageSelector from '../LanguageSelector/LanguageSelector.jsx'
 import Loading from '../Loading/Loading.jsx'
 import CIOOSLogoEN from '../../Images/CIOOSNationalLogoBlackEnglish.svg'
 import CIOOSLogoFR from '../../Images/CIOOSNationalLogoBlackFrench.svg'
+import CDELogoEN from '../../Images/CDELogoEN.png'
+import CDELogoFR from '../../Images/CDELogoFR.png'
 import { server } from '../../../config'
 import './styles.css'
 import {
@@ -183,6 +185,13 @@ export default function SelectionDetails({
           className='pointDetailsHeaderLogo'
           src={i18n.language === 'en' ? CIOOSLogoEN : CIOOSLogoFR}
           onClick={() => i18n.language === 'en' ? window.open('https://www.cioos.ca') : window.open('https://www.siooc.ca/fr/accueil/')}
+          title={t('PointDetailsCIOOSLogoTitleText')}
+        />
+        <img
+          className='pointDetailsHeaderLogo'
+          src={i18n.language === 'en' ? CDELogoEN : CDELogoFR}
+          onClick={() => resetFilters()}
+          title={t('PointDetailsCDELogoTitleText')}
         />
         <LanguageSelector className='noPosition' />
       </div>
