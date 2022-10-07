@@ -29,6 +29,7 @@ export default function SelectionDetails({
   polygon,
   setHoveredDataset,
   filterSet,
+  setShowIntroModal,
   children
 }) {
   const { t, i18n } = useTranslation()
@@ -176,7 +177,7 @@ export default function SelectionDetails({
       <div className='pointDetailsHeader'>
         <button
           className='pointDetailsHeaderIntroButton'
-          onClick={() => alert('open intro modal')}
+          onClick={() => setShowIntroModal(true)}
           title={t('introReopenTitle')} // 'Re-open introduction'
         >
           <InfoSquare color='#007bff' size={'25px'} />
