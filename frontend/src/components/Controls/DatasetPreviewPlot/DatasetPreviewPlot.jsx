@@ -51,7 +51,7 @@ export default function DatasetPreviewPlot({
           })}
       </DropdownButton>
       <DropdownButton
-        title={t('datasetPreviewPlotXAxisSelect') + ': ' + plotAxes.y}
+        title={t('datasetPreviewPlotYAxisSelect') + ': ' + plotAxes.y}
       >
         {datasetPreview &&
           datasetPreview?.table?.columnNames.map((columnName) => {
