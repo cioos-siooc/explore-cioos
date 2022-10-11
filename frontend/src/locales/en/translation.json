@@ -59,9 +59,9 @@
   "multiCheckboxFilterNoFilterWarning": "No filter options",
   "multiCheckboxFilterSelectSearchResults": "All search results",
   "timeSelectorQuickSelect10Days": "10 Days",
-  "timeSelectorQuickSelect30Days":"30 days",
-  "timeSelectorQuickSelect1Year":"1 year",
-  "timeSelectorQuickSelect10Years":"1 decade",
+  "timeSelectorQuickSelect30Days": "30 days",
+  "timeSelectorQuickSelect1Year": "1 year",
+  "timeSelectorQuickSelect10Years": "1 decade",
   "timeSelectorStartDate": "Start Date: ",
   "timeSelectorEndDate": "End Date: ",
   "selectionPanelHandleTitleClose": "Close",
@@ -104,7 +104,7 @@
   "datasetInspectorDepthTooLargeWarningText": "too big",
   "datasetInspectorRecordsShownText": "records shown...",
   "datasetInspectorFilterText": "Search table",
-  "datasetInspectorClickPreviewText": "Click on a Record to get a data preview.",
+  "datasetInspectorClickPreviewText": "Click on a record to preview the first 1000 records in a table or plot",
   "datasetInspectorRecordTable": "Record list",
   "datasetInspectorERDDAPText": "Dataset source URL",
   "datasetInspectorCKANText": "Catalogue URL",
@@ -202,10 +202,9 @@
   "downloadDetailsDownloadLimitsDownloadableMessagePart2": "smaller than 1GB",
   "downloadDetailsDownloadLimitsDownloadableMessagePart3": " are downloadable ",
   "downloadDetailsNoFiltersActiveMessage": " No Time, Depth, or Space filters currently active",
-  "downloadDetailsDownloadInfoDatasets":"Datasets ",
-  "downloadDetailsDownloadInfoDownloadSize":"Download size ",
-  "datasetsTableDownloadModalEstimateDownloadSizeColumnName":"Estimated download size",
+  "downloadDetailsDownloadInfoDatasets": "Datasets ",
+  "downloadDetailsDownloadInfoDownloadSize": "Download size ",
+  "datasetsTableDownloadModalEstimateDownloadSizeColumnName": "Estimated download size",
   "datasetTableDownloadModalCDEDownloadableColumnName": "Downloadable",
-  "datasetTableDownloadModalExternalDownloadColumnName": "External download" 
-
+  "datasetTableDownloadModalExternalDownloadColumnName": "External download"
 }
