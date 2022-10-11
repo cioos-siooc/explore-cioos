@@ -464,40 +464,40 @@ export default function App() {
 
   useEffect(() => {
     switch (submissionState) {
-      case 'submitted':
-        submitRequest()
-        setSubmissionFeedback({
-          icon: (
-            <Spinner
-              className='text-warning'
-              as='span'
-              animation='border'
-              size={30}
-              role='status'
-              aria-hidden='true'
-            />
-          ),
-          text: t('submissionStateTextSubmitting') // 'Submitting...'
-        })
-        break
+    case 'submitted':
+      submitRequest()
+      setSubmissionFeedback({
+        icon: (
+          <Spinner
+            className='text-warning'
+            as='span'
+            animation='border'
+            size={30}
+            role='status'
+            aria-hidden='true'
+          />
+        ),
+        text: t('submissionStateTextSubmitting') // 'Submitting...'
+      })
+      break
 
-      case 'successful':
-        setSubmissionFeedback({
-          icon: <Check2Circle size={30} style={{ color: '#52a79b' }} />,
-          text: t('submissionStateTextSuccess') // Request successful. Download link will be sent to: ' + email
-        })
-        break
+    case 'successful':
+      setSubmissionFeedback({
+        icon: <Check2Circle size={30} style={{ color: '#52a79b' }} />,
+        text: t('submissionStateTextSuccess') // Request successful. Download link will be sent to: ' + email
+      })
+      break
 
-      case 'failed':
-        setSubmissionFeedback({
-          icon: <XCircle size={30} style={{ color: '#e3285e' }} />,
-          text: t('submissionStateTextFailed') // 'Request failed'
-        })
-        break
+    case 'failed':
+      setSubmissionFeedback({
+        icon: <XCircle size={30} style={{ color: '#e3285e' }} />,
+        text: t('submissionStateTextFailed') // 'Request failed'
+      })
+      break
 
-      default:
-        setSubmissionFeedback()
-        break
+    default:
+      setSubmissionFeedback()
+      break
     }
   }, [submissionState])
 
@@ -616,7 +616,7 @@ export default function App() {
                 // getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
                 submissionState === 'submitted') &&
                 'disabled'
-                }`}
+              }`}
               disabled={
                 !emailValid ||
                 _.isEmpty(pointsToDownload) ||
@@ -944,7 +944,7 @@ export default function App() {
       )}
       <button
         className={`boxQueryButton ${polygon && polygonIsRectangle(polygon) && 'active'
-          }`}
+        }`}
         id='boxQueryButton'
         title={t('rectangleToolTitle')}
       >
