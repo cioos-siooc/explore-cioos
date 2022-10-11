@@ -86,6 +86,13 @@ export default function SelectionDetails({
     }
   }, [pointsData])
 
+  function datasetsInLanguage(point) {
+    return {
+      ...point,
+      title: point.title_translated[i18n.language] || point.title,
+      selected: false
+    }
+  }
   useEffect(() => {
     setDataTotal(0)
     if (!loading) {
@@ -94,24 +101,19 @@ export default function SelectionDetails({
       if (polygon) {
         shapeQuery = createSelectionQueryString(polygon)
       }
-      const combinedQueries =
-        '?' + [filtersQuery, shapeQuery].filter((e) => e).join('&')
+      const combinedQueries = [filtersQuery, shapeQuery]
+        .filter((e) => e)
+        .join('&')
       setInspectDataset()
       setLoading(true)
       setCombinedQueries(combinedQueries)
-      const urlString = `${server}/pointQuery${combinedQueries}`
+      const urlString = `${server}/pointQuery${
+        combinedQueries ? '?' + combinedQueries : ''
+      }`
       fetch(urlString).then((response) => {
         if (response.ok) {
           response.json().then((data) => {
-            setPointsData(
-              data.map((point) => {
-                return {
-                  ...point,
-                  title: point.title_translated[i18n.language] || point.title,
-                  selected: false
-                }
-              })
-            )
+            setPointsData(data.map(datasetsInLanguage))
           })
         } else {
           setPointsData([])
@@ -119,7 +121,13 @@ export default function SelectionDetails({
       })
     }
     setBackClicked(false)
-  }, [query, polygon, i18n.language])
+  }, [query, polygon])
+
+  useEffect(() => {
+    if (!loading) {
+      setPointsData(pointsData.map(datasetsInLanguage))
+    }
+  }, [i18n.language])
 
   function handleSelectDataset(point) {
     const dataset = pointsData.filter((p) => p.pk === point.pk)[0]
