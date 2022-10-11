@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Modal, Dropdown, DropdownButton, Table } from 'react-bootstrap'
+import React, { useEffect } from 'react'
+import { Dropdown, DropdownButton } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 import './styles.css'
 import Plot from 'react-plotly.js'
@@ -14,7 +14,6 @@ export default function DatasetPreviewPlot({
 }) {
   const { t } = useTranslation()
 
-  const { title } = inspectDataset
   const isProfile = inspectDataset.cdm_data_type
     .toLowerCase()
     .includes('profile')

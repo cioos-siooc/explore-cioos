@@ -5,7 +5,6 @@ import {
   ChevronCompactDown,
   ChevronCompactUp,
   X,
-  QuestionCircle,
   BoxArrowUpRight
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'

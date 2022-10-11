@@ -1,5 +1,4 @@
 import * as React from 'react'
-import { useState } from 'react'
 import { Modal } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 
@@ -10,7 +9,7 @@ export default function DataDownloadModal({
   setSubmissionState,
   showModal,
   setShowModal,
-  children,
+  children
 }) {
   const { t } = useTranslation()
   return (
@@ -32,9 +31,7 @@ export default function DataDownloadModal({
         {/* Download Data from CIOOS Data Explorer */}
         {/* </Modal.Title> */}
         {/* </Modal.Header> */}
-        <Modal.Body>
-          {children}
-        </Modal.Body>
+        <Modal.Body>{children}</Modal.Body>
       </Modal>
       <button
         className='downloadButton'

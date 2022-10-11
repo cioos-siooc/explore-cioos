@@ -36,14 +36,14 @@ export default function SelectionDetails({
   const [selectAll, setSelectAll] = useState(false)
   const [pointsData, setPointsData] = useState([])
   const [inspectDataset, setInspectDataset] = useState()
-  const [dataTotal, setDataTotal] = useState(0)
+  const [, setDataTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [inspectRecordID, setInspectRecordID] = useState()
   const [showModal, setShowModal] = useState(false)
   const [recordLoading, setRecordLoading] = useState(false)
   const [backClicked, setBackClicked] = useState(false)
   const [datasetPreview, setDatasetPreview] = useState()
-  const [datasetTitleSearchText, setDatasetTitleSearchText] = useState('')
+  const [datasetTitleSearchText] = useState('')
   const debouncedDatasetTitleSearchText = useDebounce(
     datasetTitleSearchText,
     300
@@ -185,18 +185,23 @@ export default function SelectionDetails({
         <img
           className='pointDetailsHeaderLogo'
           src={i18n.language === 'en' ? CIOOSLogoEN : CIOOSLogoFR}
-          onClick={() => i18n.language === 'en' ? window.open('https://www.cioos.ca') : window.open('https://www.siooc.ca/fr/accueil/')}
+          onClick={() =>
+            i18n.language === 'en'
+              ? window.open('https://www.cioos.ca')
+              : window.open('https://www.siooc.ca/fr/accueil/')
+          }
           title={t('PointDetailsCIOOSLogoTitleText')}
         />
         <img
           className='pointDetailsHeaderLogo'
           src={i18n.language === 'en' ? CDELogoEN : CDELogoFR}
-          onClick={() => resetFilters()}
           title={t('PointDetailsCDELogoTitleText')}
         />
         <LanguageSelector className='noPosition' />
       </div>
-      <div className={`pointDetailsInfoRow ${inspectDataset ? 'fullHeight' : ''}`}>
+      <div
+        className={`pointDetailsInfoRow ${inspectDataset ? 'fullHeight' : ''}`}
+      >
         {loading ? (
           <Loading />
         ) : inspectDataset ? (
@@ -234,16 +239,10 @@ export default function SelectionDetails({
               } */}
             <div className='pointDetailsControls'>
               <div className='pointDetailsControlRow'>
-                {t('pointDetailsControlRowDatasetsSelected')}
-                {' '}
-                <strong>
-                  {pointsData.length}
-                </strong>
-                {t('pointDetailsControlRowToDownload')}
-                {' '}
-                <strong>
-                  {datasetsSelected}
-                </strong>
+                {t('pointDetailsControlRowDatasetsSelected')}{' '}
+                <strong>{pointsData.length}</strong>
+                {t('pointDetailsControlRowToDownload')}{' '}
+                <strong>{datasetsSelected}</strong>
                 {children}
               </div>
             </div>
@@ -262,6 +261,6 @@ export default function SelectionDetails({
         recordLoading={recordLoading}
         setRecordLoading={setRecordLoading}
       />
-    </div >
+    </div>
   )
 }

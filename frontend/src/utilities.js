@@ -146,26 +146,6 @@ export function createDataFilterQueryString(query, filterLengths) {
   return objectToURL(apiMappedQuery)
 }
 
-export function bytesToMemorySizeString(bytes) {
-  const num = parseFloat(bytes)
-  // if(_.isEmpty(bytes)) return '---'
-  if (num === NaN || num === 'NaN' || bytes === null) {
-    return 'NaN'
-  } else if (num < 1000000) {
-    return `${(num / 1000).toFixed(2)}KB`
-  } else if (num < 1000000000) {
-    return `${(num / 1000000).toFixed(2)}MB`
-  } else if (num < 1000000000000) {
-    return `${(num / 1000000000).toFixed(2)}GB`
-  } else if (num < 1000000000000000) {
-    return `${(num / 1000000000000).toFixed(2)}TB`
-  } else if (num < 1000000000000000000) {
-    return `${(num / 1000000000000000).toFixed(2)}PB`
-  } else {
-    return '>1PB'
-  }
-}
-
 // returns an array of {stop: num, color: string} objects
 export function generateColorStops(colorScale, range) {
   // check if fewer points than colors
@@ -194,7 +174,7 @@ export function generateColorStops(colorScale, range) {
   })
   const result = []
   const map = new Map()
-  colorStops.map((colorStop) => {
+  colorStops.forEach((colorStop) => {
     // ensure there aren't duplicates
     if (!map.has(colorStop.stop)) {
       map.set(colorStop.stop, true)
@@ -254,7 +234,7 @@ export function polygonIsRectangle(polygon) {
   const lons = unique(p.map((e) => e[0]))
   const lats = unique(p.map((e) => e[1]))
 
-  return lons.length == 2 && lats.length == 2
+  return lons.length === 2 && lats.length === 2
 }
 const unique = (arr) => [...new Set(arr)]
 
