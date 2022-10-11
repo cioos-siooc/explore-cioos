@@ -73,7 +73,7 @@ export default function TimeSelector(props) {
             props.setStartDate(new Date(date.getTime() - 10 * 86400000).toISOString().split('T')[0])
           }}
         >
-          10 days
+          {t('timeSelectorQuickSelect10Days')}
         </button>
         <button
           onClick={() => {
@@ -82,7 +82,7 @@ export default function TimeSelector(props) {
             props.setStartDate(new Date(date.getTime() - 30 * 86400000).toISOString().split('T')[0])
           }}
         >
-          30 days
+          {t('timeSelectorQuickSelect30Days')}
         </button>
         <button
           onClick={() => {
@@ -91,7 +91,7 @@ export default function TimeSelector(props) {
             props.setStartDate(new Date(date.getTime() - 365 * 86400000).toISOString().split('T')[0])
           }}
         >
-          1 year
+          {t('timeSelectorQuickSelect1Year')}
         </button>
         <button
           onClick={() => {
@@ -100,7 +100,7 @@ export default function TimeSelector(props) {
             props.setStartDate(new Date(date.getTime() - 3652 * 86400000).toISOString().split('T')[0])
           }}
         >
-          1 decade
+          {t('timeSelectorQuickSelect10Years')}
         </button>
       </div>
       <div className='date'>

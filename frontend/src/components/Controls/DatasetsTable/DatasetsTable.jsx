@@ -144,7 +144,7 @@ export default function DatasetsTable({
 
     if (isDownloadModal) {
       columns.push({
-        name: 'Estimated download size',
+        name: t('datasetsTableDownloadModalEstimateDownloadSizeColumnName'),
         selector: (row) => row.sizeEstimate.filteredSize,
         cell: (row) => {
           const estimatedFilteredDownloadSizeRowClassName = classNames('downloadSizeEstimateFiltered', { downloadable: row?.sizeEstimate?.filteredSize < 1000000000 })
@@ -176,7 +176,7 @@ export default function DatasetsTable({
         paddingRight: cellPadding
       })
       columns.push({
-        name: 'CDE Downloadable',
+        name: t('datasetTableDownloadModalCDEDownloadableColumnName'),
         selector: (row) => row.internalDownload,
         cell: (row) => {
           if (!_.isEmpty(downloadSizeEstimates)) {
@@ -198,7 +198,7 @@ export default function DatasetsTable({
         paddingRight: cellPadding
       })
       columns.push({
-        name: 'External download',
+        name: t('datasetTableDownloadModalExternalDownloadColumnName'),
         selector: (row) => row.erddapLink,
         cell: (row) => {
           if (!_.isEmpty(downloadSizeEstimates) && row.erddapLink) {
