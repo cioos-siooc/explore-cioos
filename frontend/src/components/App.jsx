@@ -87,7 +87,6 @@ export default function App() {
   const [submissionState, setSubmissionState] = useState()
   const [submissionFeedback, setSubmissionFeedback] = useState()
   const [loading, setLoading] = useState(true)
-  const [zoom, setZoom] = useState(2)
   const [mapView, setMapView] = useState({})
   const [rangeLevels, setRangeLevels] = useState()
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
@@ -106,7 +105,7 @@ export default function App() {
   const [showModal, setShowModal] = useState(false)
   const [showIntroModal, setShowIntroModal] = useState(false)
   const navigate = useNavigate()
-
+  const { zoom } = mapView
   // EOV filter initial values and state
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected)
   const [isPageLoad, setIsPageLoad] = useState(true)
@@ -682,8 +681,6 @@ export default function App() {
           setPointsToReview={setPointsToReview}
           setLoading={setLoading}
           query={query}
-          zoom={zoom}
-          setZoom={setZoom}
           setMapView={setMapView}
           rangeLevels={rangeLevels}
           offsetFlyTo={selectionPanelOpen}
