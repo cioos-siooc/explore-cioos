@@ -31,7 +31,6 @@ export default function CreateMap({
   polygon,
   setPolygon,
   setLoading,
-  zoom,
   setMapView,
   offsetFlyTo,
   rangeLevels,
@@ -175,7 +174,7 @@ export default function CreateMap({
     if (!map.current || !layersLoaded.current) return
 
     if (pk) {
-      if (zoom >= 7) {
+      if (map.current.getZoom() >= 7) {
         map.current.setPaintProperty('points', 'circle-color', 'lightgrey')
         map.current.setPaintProperty(
           'points-highlighted',
@@ -233,11 +232,7 @@ export default function CreateMap({
 
   useEffect(() => {
     if (map.current) {
-      if (!_.isEmpty(hoveredDataset)) {
-        hoverHighlightPoints(hoveredDataset.pk)
-      } else {
-        hoverHighlightPoints()
-      }
+      hoverHighlightPoints(hoveredDataset?.pk)
     }
   }, [hoveredDataset])
 
@@ -345,7 +340,7 @@ export default function CreateMap({
         ]
       },
       center: [mapLongitude || -150, mapLatitude || 60], // starting position
-      zoom: mapZoom || zoom // starting zoom,
+      zoom: mapZoom || 2 // starting zoom,
     })
 
     // disable map rotation using right click + drag

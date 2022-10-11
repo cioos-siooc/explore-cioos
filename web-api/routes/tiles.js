@@ -43,16 +43,14 @@ router.get(
   isHexGrid
     ? "SELECT :zoomPKColumn: pk,count(distinct point_pk) count,"
     : "SELECT point_pk pk, d.platform as platform,sum(p.days)::bigint count,"
-} array_to_json(array_agg(distinct dataset_pk)) datasets,     
+} array_to_json(array_agg(distinct d.pk_url)) datasets,     
       p.:geom_column: AS geom FROM cde.profiles p
         -- used for organizations filtering
         JOIN cde.datasets d
         ON p.dataset_pk = d.pk 
        ${hasFilter ? "WHERE :filters" : ""}
         ${
-  isHexGrid
-    ? "GROUP BY :zoomPKColumn:,p.:geom_column:"
-    : "GROUP BY geom,point_pk,platform"
+  isHexGrid ? "GROUP BY :zoomPKColumn:,p.:geom_column:" : "GROUP BY geom,point_pk,platform"
 } ),
     te AS (select ST_TileEnvelope(:z, :x, :y) tile_envelope ),
     mvtgeom AS (
@@ -70,8 +68,7 @@ router.get(
   `;
 
     try {
-      console.log(SQL);
-      const tileRaw = await db.raw(SQL, {
+      const q = db.raw(SQL, {
         filters,
         zoomPKColumn,
         geom_column: sqlQuery.geom_column,
@@ -80,6 +77,7 @@ router.get(
         y,
       });
 
+      const tileRaw = await q;
       const tile = tileRaw.rows[0];
 
       res.setHeader("Content-Type", "application/x-protobuf");
