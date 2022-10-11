@@ -105,16 +105,6 @@ export default function CreateMap({
   colors.push('#000000')
 
   useEffect(() => {
-    if (
-      map.current &&
-      !polygon &&
-      drawPolygon.current?.getAll()?.features?.length > 0
-    ) {
-      drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
-    }
-  }, [polygon])
-
-  useEffect(() => {
     setColorStops()
   }, [rangeLevels])
 
@@ -126,9 +116,8 @@ export default function CreateMap({
 
   useEffect(() => {
     if (boxSelectStartCoords && boxSelectEndCoords) {
-      if (drawPolygon.current.getAll().features.length > 0) {
-        drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
-      }
+      drawPolygon.current?.deleteAll()
+
       const lineString = turf.lineString([
         boxSelectStartCoords,
         boxSelectEndCoords
@@ -350,10 +339,7 @@ export default function CreateMap({
     map.current.touchZoomRotate.disableRotation()
 
     function deleteAllShapes() {
-      if (drawPolygon.current?.getAll()?.features?.length > 0) {
-        drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
-      }
-
+      drawPolygon.current?.deleteAll()
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
       setPointsToReview()
       setPolygon()
@@ -540,11 +526,8 @@ export default function CreateMap({
     const handleMapPointsOnClick = (e) => {
       e.originalEvent.preventDefault()
       if (!creatingPolygon.current) {
-        if (drawPolygon.current.getAll().features.length > 0) {
-          drawPolygon.current.delete(
-            drawPolygon.current.getAll().features[0].id
-          )
-        }
+        drawPolygon.current?.deleteAll()
+
         if (map.current.offsetFlyTo === undefined) {
           map.current.offsetFlyTo = true
         }
