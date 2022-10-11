@@ -1,14 +1,17 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { InfoSquare, X } from 'react-bootstrap-icons'
+import { InfoSquare } from 'react-bootstrap-icons'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetPreview from '../DatasetPreview/DatasetPreview.jsx'
 import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
 import LanguageSelector from '../LanguageSelector/LanguageSelector.jsx'
 import Loading from '../Loading/Loading.jsx'
-import Logo from '../../Images/logo_FINAL.png'
+import CIOOSLogoEN from '../../Images/CIOOSNationalLogoBlackEnglish.svg'
+import CIOOSLogoFR from '../../Images/CIOOSNationalLogoBlackFrench.svg'
+import CDELogoEN from '../../Images/CDELogoEN.png'
+import CDELogoFR from '../../Images/CDELogoFR.png'
 import { server } from '../../../config'
 import './styles.css'
 import {
@@ -26,6 +29,7 @@ export default function SelectionDetails({
   polygon,
   setHoveredDataset,
   filterSet,
+  setShowIntroModal,
   children
 }) {
   const { t, i18n } = useTranslation()
@@ -163,7 +167,7 @@ export default function SelectionDetails({
       setInspectRecordID()
     }
   }, [inspectRecordID])
-  
+
   return (
     <div
       className='pointDetails'
@@ -173,15 +177,22 @@ export default function SelectionDetails({
       <div className='pointDetailsHeader'>
         <button
           className='pointDetailsHeaderIntroButton'
-          onClick={() => alert('open intro modal')}
+          onClick={() => setShowIntroModal(true)}
           title={t('introReopenTitle')} // 'Re-open introduction'
         >
           <InfoSquare color='#007bff' size={'25px'} />
         </button>
         <img
           className='pointDetailsHeaderLogo'
-          src={Logo}
-          onClick={() => alert('reset application')}
+          src={i18n.language === 'en' ? CIOOSLogoEN : CIOOSLogoFR}
+          onClick={() => i18n.language === 'en' ? window.open('https://www.cioos.ca') : window.open('https://www.siooc.ca/fr/accueil/')}
+          title={t('PointDetailsCIOOSLogoTitleText')}
+        />
+        <img
+          className='pointDetailsHeaderLogo'
+          src={i18n.language === 'en' ? CDELogoEN : CDELogoFR}
+          onClick={() => resetFilters()}
+          title={t('PointDetailsCDELogoTitleText')}
         />
         <LanguageSelector className='noPosition' />
       </div>
@@ -223,10 +234,16 @@ export default function SelectionDetails({
               } */}
             <div className='pointDetailsControls'>
               <div className='pointDetailsControlRow'>
-                <strong>{t('pointDetailsControlRowDatasetsSelected')}</strong>{' '}
-                {pointsData.length}
-                <strong>{t('pointDetailsControlRowToDownload')}</strong>{' '}
-                {datasetsSelected}
+                {t('pointDetailsControlRowDatasetsSelected')}
+                {' '}
+                <strong>
+                  {pointsData.length}
+                </strong>
+                {t('pointDetailsControlRowToDownload')}
+                {' '}
+                <strong>
+                  {datasetsSelected}
+                </strong>
                 {children}
               </div>
             </div>

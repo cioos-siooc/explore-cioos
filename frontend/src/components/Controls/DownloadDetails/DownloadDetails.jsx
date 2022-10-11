@@ -173,13 +173,12 @@ export default function DownloadDetails({
     setSelectAll(!selectAll)
   }
 
-  console.log(dataTotal)
-
   const filterToggleClassname = 'filterDownloadToggle'
   const timeFilterToggleClassName = classNames(filterToggleClassname, { active: filterDownloadByTime }, { disabled: !timeFilterActive })
   const depthFilterToggleClassName = classNames(filterToggleClassname, { active: filterDownloadByDepth }, { disabled: !depthFilterActive })
   const polygonFilterToggleClassName = classNames(filterToggleClassname, { active: filterDownloadByPolygon }, { disabled: !polygonFilterActive })
   let polygonFilterText = ''
+
   if (polygon) {
     polygon.forEach((coordinate, index) => {
       if (polygon.length >= 6) {
@@ -196,7 +195,7 @@ export default function DownloadDetails({
   return (
     <Container className='downloadDetails'>
       <button className='downloadDetailsBackButton' onClick={() => setShowModal(false)}>
-        <ChevronCompactLeft />Back
+        <ChevronCompactLeft />{t('downloadModalBackButtonText')}
       </button>
       <Row style={{ padding: '0px' }}>
         <Col>
@@ -206,18 +205,18 @@ export default function DownloadDetails({
             {(!timeFilterActive && !depthFilterActive && !polygonFilterActive) && (
               <>
                 < QuestionIconTooltip
-                  tooltipText={'Use Time, Depth and Space filters to change dataset download sizes. Active filters are applied to all datasets in a download. Use the available ERDDAP links to download large datasets.'}
+                  tooltipText={t('downloadDetailsFilterQuestionTooltipText')}
                   tooltipPlacement={'left'}
                   size={20}
                 />
                 <i>
-                  {' No Time, Depth, or Space filters currently active'}
+                  {t('downloadDetailsNoFiltersActiveMessage')}
                 </i>
               </>
             )}
             {(timeFilterActive || depthFilterActive || polygonFilterActive) &&
               <QuestionIconTooltip
-                tooltipText={'Use Time, Depth and Space filters to change dataset download sizes. Active filters are applied to all datasets in a download. Use the available ERDDAP links to download large datasets.'}
+                tooltipText={t('downloadDetailsFilterQuestionTooltipText')}
                 tooltipPlacement={'left'}
                 size={20}
                 className='helpIconWithMarginTop'
@@ -309,19 +308,19 @@ export default function DownloadDetails({
       <Row className='downloadDetailsDownloadLimits'>
         <Col style={{ textAlign: 'center', margin: '15px 0px' }}>
           <div>
-            {'Datasets '}
-            <strong style={{ color: 'white', backgroundColor: '#e3285e' }}>{'larger than 1GB'}</strong>
-            {' are not downloadable '}<XCircle color='#e3285e' size='25' />
-            {'  Datasets '}
-            <strong style={{ color: 'white', backgroundColor: '#52a79b' }}>{'smaller than 1GB'}</strong>
-            {' are downloadable '} <Check2Circle color='#52a79b' size='25' />
+            {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart1')}
+            <strong style={{ color: 'white', backgroundColor: '#e3285e' }}>{t('downloadDetailsDownloadLimitsNotDownloadableMessagePart2')}</strong>
+            {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart3')}<XCircle color='#e3285e' size='25' />
+            {t('downloadDetailsDownloadLimitsDownloadableMessagePart1')}
+            <strong style={{ color: 'white', backgroundColor: '#52a79b' }}>{t('downloadDetailsDownloadLimitsDownloadableMessagePart2')}</strong>
+            {t('downloadDetailsDownloadLimitsDownloadableMessagePart3')} <Check2Circle color='#52a79b' size='25' />
           </div>
         </Col>
       </Row>
       <Row className='downloadDetailsDownloadInfoRow'>
         <Col>
           <div className='downloadDetailsDownloadInfoItem'>
-            {'Datasets '}
+            {t('downloadDetailsDownloadInfoDatasets')}
             {
               downloadSizeEstimates ?
                 <strong>
@@ -339,7 +338,7 @@ export default function DownloadDetails({
             }
           </div>
           <div className='downloadDetailsDownloadInfoItem'>
-            {'Download Size '}
+            {t('downloadDetailsDownloadInfoDownloadSize')}
             {downloadSizeEstimates ?
               <strong>
                 {`${bytesToMemorySizeString(dataTotal.filteredSize)} /

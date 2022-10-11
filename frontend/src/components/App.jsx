@@ -111,7 +111,7 @@ export default function App() {
   }
   const [query, setQuery] = useState(defaultQuery)
   const [showModal, setShowModal] = useState(false)
-
+  const [showIntroModal, setShowIntroModal] = useState(false)
   const navigate = useNavigate()
 
   // EOV filter initial values and state
@@ -464,40 +464,40 @@ export default function App() {
 
   useEffect(() => {
     switch (submissionState) {
-    case 'submitted':
-      submitRequest()
-      setSubmissionFeedback({
-        icon: (
-          <Spinner
-            className='text-warning'
-            as='span'
-            animation='border'
-            size={30}
-            role='status'
-            aria-hidden='true'
-          />
-        ),
-        text: t('submissionStateTextSubmitting') // 'Submitting...'
-      })
-      break
+      case 'submitted':
+        submitRequest()
+        setSubmissionFeedback({
+          icon: (
+            <Spinner
+              className='text-warning'
+              as='span'
+              animation='border'
+              size={30}
+              role='status'
+              aria-hidden='true'
+            />
+          ),
+          text: t('submissionStateTextSubmitting') // 'Submitting...'
+        })
+        break
 
-    case 'successful':
-      setSubmissionFeedback({
-        icon: <Check2Circle size={30} style={{ color: '#52a79b' }} />,
-        text: t('submissionStateTextSuccess') // Request successful. Download link will be sent to: ' + email
-      })
-      break
+      case 'successful':
+        setSubmissionFeedback({
+          icon: <Check2Circle size={30} style={{ color: '#52a79b' }} />,
+          text: t('submissionStateTextSuccess') // Request successful. Download link will be sent to: ' + email
+        })
+        break
 
-    case 'failed':
-      setSubmissionFeedback({
-        icon: <XCircle size={30} style={{ color: '#e3285e' }} />,
-        text: t('submissionStateTextFailed') // 'Request failed'
-      })
-      break
+      case 'failed':
+        setSubmissionFeedback({
+          icon: <XCircle size={30} style={{ color: '#e3285e' }} />,
+          text: t('submissionStateTextFailed') // 'Request failed'
+        })
+        break
 
-    default:
-      setSubmissionFeedback()
-      break
+      default:
+        setSubmissionFeedback()
+        break
     }
   }, [submissionState])
 
@@ -611,13 +611,12 @@ export default function App() {
               onInput={(e) => handleEmailChange(e.target.value)}
             />
             <button
-              className={`submitRequestButton ${
-                (!emailValid ||
-                  _.isEmpty(pointsToDownload) ||
-                  // getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
-                  submissionState === 'submitted') &&
+              className={`submitRequestButton ${(!emailValid ||
+                _.isEmpty(pointsToDownload) ||
+                // getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
+                submissionState === 'submitted') &&
                 'disabled'
-              }`}
+                }`}
               disabled={
                 !emailValid ||
                 _.isEmpty(pointsToDownload) ||
@@ -631,9 +630,9 @@ export default function App() {
                   submissionFeedback &&
                   submissionState !== 'submitted' &&
                   t('submitRequestButtonResubmitText')) ||
-                  (_.isEmpty(pointsToDownload) &&
-                    t('submitRequestButtonSelectDataText')) ||
-                  t('submitRequestButtonSubmitText') // 'Submit Request'
+                (_.isEmpty(pointsToDownload) &&
+                  t('submitRequestButtonSelectDataText')) ||
+                t('submitRequestButtonSubmitText') // 'Submit Request'
               }
             </button>
           </Col>
@@ -718,6 +717,7 @@ export default function App() {
                   orgFilter: { orgsSelected, setOrgsSelected },
                   datasetFilter: { datasetsSelected, setDatasetsSelected }
                 }}
+                setShowIntroModal={setShowIntroModal}
               >
                 {DownloadButton()}
               </SelectionDetails>
@@ -943,15 +943,14 @@ export default function App() {
         />
       )}
       <button
-        className={`boxQueryButton ${
-          polygon && polygonIsRectangle(polygon) && 'active'
-        }`}
+        className={`boxQueryButton ${polygon && polygonIsRectangle(polygon) && 'active'
+          }`}
         id='boxQueryButton'
         title={t('rectangleToolTitle')}
       >
         <div className='rectangleIcon' />
       </button>
-      <IntroModal initialOpenState={true} />
+      <IntroModal showModal={showIntroModal} setShowModal={setShowIntroModal} />
     </ErrorBoundary>
   )
 }
