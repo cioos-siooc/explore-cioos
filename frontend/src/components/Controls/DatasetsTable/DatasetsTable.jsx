@@ -12,7 +12,8 @@ import platformColors from '../../platformColors'
 import './styles.css'
 import DataTable from 'react-data-table-component'
 import DataTableExtensions from 'react-data-table-component-extensions'
-import { bytesToMemorySizeString } from '../../../utilities'
+import bytes from 'bytes'
+
 import _ from 'lodash'
 import classNames from 'classnames'
 import { Spinner } from 'react-bootstrap'
@@ -23,13 +24,16 @@ export default function DatasetsTable({
   datasets,
   selectAll,
   setInspectDataset,
-  setHoveredDataset = () => { },
+  setHoveredDataset = () => {},
   isDownloadModal,
   downloadSizeEstimates,
   loading
 }) {
   const { t } = useTranslation()
-  const [tableData, setTableData] = useState({ columns: generateColumns(), data: datasets })
+  const [tableData, setTableData] = useState({
+    columns: generateColumns(),
+    data: datasets
+  })
   const checkBoxOnclick = (point) => () => {
     if (!isDownloadModal || point.internalDownload) {
       handleSelectDataset(point)
@@ -48,15 +52,16 @@ export default function DatasetsTable({
     const cellPadding = '4px'
     const columns = [
       {
-        name: <div title={'Download from CIOOS Data Explorer'}>
-          {selectAll ? (
-            <CheckSquare onClick={selectAllOnclick} />
-          ) : (
-            <Square onClick={selectAllOnclick} />
-          )}
-          <Download className='downloadIcon' onClick={selectAllOnclick} />
-        </div>
-        ,
+        name: (
+          <div title={'Download from CIOOS Data Explorer'}>
+            {selectAll ? (
+              <CheckSquare onClick={selectAllOnclick} />
+            ) : (
+              <Square onClick={selectAllOnclick} />
+            )}
+            <Download className='downloadIcon' onClick={selectAllOnclick} />
+          </div>
+        ),
         selector: (row) => row.selected,
         cell: (row) => {
           return (
@@ -69,8 +74,7 @@ export default function DatasetsTable({
               {/* <Download className='downloadIcon' /> */}
             </div>
           )
-        }
-        ,
+        },
         ignoreRowClick: true,
         width: '80px',
         sortable: true,
@@ -147,26 +151,34 @@ export default function DatasetsTable({
         name: t('datasetsTableDownloadModalEstimateDownloadSizeColumnName'),
         selector: (row) => row.sizeEstimate.filteredSize,
         cell: (row) => {
-          const estimatedFilteredDownloadSizeRowClassName = classNames('downloadSizeEstimateFiltered', { downloadable: row?.sizeEstimate?.filteredSize < 1000000000 })
+          const estimatedFilteredDownloadSizeRowClassName = classNames(
+            'downloadSizeEstimateFiltered',
+            { downloadable: row?.sizeEstimate?.filteredSize < 1000000000 }
+          )
           if (!_.isEmpty(downloadSizeEstimates)) {
             return (
               <div className='downloadSizeEstimate'>
                 {!_.isEmpty(downloadSizeEstimates) && (
                   <>
-                    <div className={estimatedFilteredDownloadSizeRowClassName}>{bytesToMemorySizeString(row?.sizeEstimate?.filteredSize)}</div>
-                    {` / ${bytesToMemorySizeString(row?.sizeEstimate?.unfilteredSize)}`}
+                    <div className={estimatedFilteredDownloadSizeRowClassName}>
+                      {bytes(row?.sizeEstimate?.filteredSize)}
+                    </div>
+                    {` / ${bytes(row?.sizeEstimate?.unfilteredSize)}`}
                   </>
                 )}
               </div>
             )
           } else {
-            return (<Spinner
-              className='datasetsTableSpinner'
-              as='span'
-              animation='border'
-              size={50}
-              role='status'
-              aria-hidden='true' />)
+            return (
+              <Spinner
+                className='datasetsTableSpinner'
+                as='span'
+                animation='border'
+                size={50}
+                role='status'
+                aria-hidden='true'
+              />
+            )
           }
         },
         wrap: true,
@@ -180,15 +192,26 @@ export default function DatasetsTable({
         selector: (row) => row.internalDownload,
         cell: (row) => {
           if (!_.isEmpty(downloadSizeEstimates)) {
-            return row.internalDownload ? <Check2Circle className='downloadableIcon' color='#52a79b' size='25' /> : <XCircle className='downloadableIcon' color='#e3285e' size='25' />
+            return row.internalDownload ? (
+              <Check2Circle
+                className='downloadableIcon'
+                color='#52a79b'
+                size='25'
+              />
+            ) : (
+              <XCircle className='downloadableIcon' color='#e3285e' size='25' />
+            )
           } else {
-            return (<Spinner
-              className='datasetsTableSpinner'
-              as='span'
-              animation='border'
-              size={50}
-              role='status'
-              aria-hidden='true' />)
+            return (
+              <Spinner
+                className='datasetsTableSpinner'
+                as='span'
+                animation='border'
+                size={50}
+                role='status'
+                aria-hidden='true'
+              />
+            )
           }
         },
         wrap: true,
@@ -203,21 +226,21 @@ export default function DatasetsTable({
         cell: (row) => {
           if (!_.isEmpty(downloadSizeEstimates) && row.erddapLink) {
             return (
-              <a
-                href={row.erddapLink}
-                target='_blank' rel='noreferrer'
-              >
+              <a href={row.erddapLink} target='_blank' rel='noreferrer'>
                 ERDDAP
               </a>
             )
           } else {
-            return (<Spinner
-              className='datasetsTableSpinner'
-              as='span'
-              animation='border'
-              size={50}
-              role='status'
-              aria-hidden='true' />)
+            return (
+              <Spinner
+                className='datasetsTableSpinner'
+                as='span'
+                animation='border'
+                size={50}
+                role='status'
+                aria-hidden='true'
+              />
+            )
           }
         },
         wrap: true,

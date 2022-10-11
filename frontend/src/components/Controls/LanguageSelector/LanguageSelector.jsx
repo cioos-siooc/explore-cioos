@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import './styles.css'
-import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 export default function LanguageSelector({ className }) {
   const { t, i18n } = useTranslation()

@@ -1,6 +1,5 @@
 import classNames from 'classnames'
 import * as React from 'react'
-import { useState } from 'react'
 import { ChevronCompactLeft, ChevronCompactRight } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 

@@ -11,11 +11,10 @@ export default function DatasetPreviewTable({ datasetPreview, data }) {
 
   const { t } = useTranslation()
 
-  const {
-    columnNames,
-    columnUnits,
-    rows = []
-  } = datasetPreview.table || { rows: [], columnNames: [] }
+  const { columnNames, columnUnits } = datasetPreview.table || {
+    rows: [],
+    columnNames: []
+  }
 
   const columns = columnNames.map((colName, i) => ({
     name: splitLines(

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Modal, Dropdown, DropdownButton, Table } from 'react-bootstrap'
-import { ChevronCompactLeft } from 'react-bootstrap-icons'
+import { Modal } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 
 import Loading from '../Loading/Loading.jsx'
@@ -18,7 +17,7 @@ export default function DatasetPreview({
   recordLoading,
   setRecordLoading
 }) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const clearAxes = { x: null, y: null }
   const [plotAxes, setAxes] = useState(clearAxes)
   const [selectedVis, setSelectedVis] = useState('table')
@@ -27,7 +26,7 @@ export default function DatasetPreview({
 
   useEffect(() => {
     const columnNames = datasetPreview?.table?.columnNames || []
-    const columnUnits = datasetPreview?.table?.columnUnits || []
+
     const rows = datasetPreview?.table?.rows || []
 
     // reformat datasetPreview into array of objects

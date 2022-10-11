@@ -10,7 +10,7 @@ import { useState, useEffect, useRef } from 'react'
 import * as turf from '@turf/turf'
 import DrawRectangle from 'mapbox-gl-draw-rectangle-mode'
 import { useTranslation } from 'react-i18next'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import './styles.css'
 
 import { server } from '../../config'
@@ -32,17 +32,15 @@ export default function CreateMap({
   setPolygon,
   setLoading,
   zoom,
-  setZoom,
   setMapView,
   offsetFlyTo,
   rangeLevels,
   hoveredDataset,
   setHoveredDataset
 }) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
 
-  const [searchParams, setSearchParams] = useSearchParams()
-  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   const mapContainer = useRef(null)
   const map = useRef(null)

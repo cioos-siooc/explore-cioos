@@ -15,7 +15,8 @@ module.exports = {
     indent: ['error', 2],
     quotes: [2, 'single', { avoidEscape: true }],
     semi: [2, 'never'],
-    'jsx-quotes': [2, 'prefer-single']
+    'jsx-quotes': [2, 'prefer-single'],
+    'react/prop-types': 0
   },
   plugins: ['prettier'],
   settings: {

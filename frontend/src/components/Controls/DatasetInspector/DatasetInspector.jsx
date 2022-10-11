@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { ChevronCompactLeft, CircleFill, X } from 'react-bootstrap-icons'
-import { Container, Table } from 'react-bootstrap'
+import { ChevronCompactLeft } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import DataTable from 'react-data-table-component'
 import DataTableExtensions from 'react-data-table-component-extensions'
 import 'react-data-table-component-extensions/dist/index.css'
 
-import platformColors from '../../platformColors'
+// import platformColors from '../../platformColors'
 import Loading from '../Loading/Loading.jsx'
 import { server } from '../../../config'
 import { splitLines } from '../../../utilities'
@@ -25,9 +24,9 @@ export default function DatasetInspector({
   const { t } = useTranslation()
   const [datasetRecords, setDatasetRecords] = useState()
   const [loading, setLoading] = useState(false)
-  const platformColor = platformColors.filter(
-    (pc) => pc.platform === dataset.platform
-  )
+  // const platformColor = platformColors.filter(
+  //   (pc) => pc.platform === dataset.platform
+  // )
 
   useEffect(() => {
     setLoading(true)
@@ -98,9 +97,7 @@ export default function DatasetInspector({
   const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet
 
   return (
-    <div
-      className='datasetInspector'
-    >
+    <div className='datasetInspector'>
       <div
         className='backButton'
         onClick={() => {
