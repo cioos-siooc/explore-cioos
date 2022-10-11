@@ -84,9 +84,7 @@ export default function IntroModal({ showModal, setShowModal }) {
     default:
       return (
         <div className='tipInfo'>
-          <p>
-            {t('introModalWelcomeMessage')}
-          </p>
+          <p>{t('introModalWelcomeMessage')}</p>
           <p>
             <a
               className='feedbackButton'
@@ -155,7 +153,9 @@ export default function IntroModal({ showModal, setShowModal }) {
         </Modal.Header>
         <Modal.Body>
           <Container fluid>
-            {/* {t('test', { test })} */}
+            <Row style={{ marginBottom: '5px' }}>
+              {t('tipInfoHoverHelpHeading')}
+            </Row>
             <Row>
               <div className='steps' onMouseOut={() => setHoveredStep()}>
                 <div
