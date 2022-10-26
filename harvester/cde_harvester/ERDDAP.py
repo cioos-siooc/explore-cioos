@@ -14,6 +14,8 @@ import requests
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 from cde_harvester.dataset import Dataset
 
+# size in bytes
+MAX_RESPONSE_SIZE = 1e+8
 
 class ERDDAP(object):
     "Stores the ERDDAP server URL and functions related to querying it"
@@ -110,6 +112,9 @@ class ERDDAP(object):
                 cache[url_combined] = response
         else:
             response = self.session.get(url_combined)
+        
+        if len(response.content) > MAX_RESPONSE_SIZE:
+            raise RuntimeError("Response too big")
 
         original_hostname = urlparse(url_combined).hostname
         actual_hostname = urlparse(response.url).hostname
