@@ -298,20 +298,11 @@ export default function App() {
       zoom
     } = filtersFromURL
 
-    if (lat || lon || zoom) {
-      setMapView({ lat, lon, zoom })
-    }
-
+    if (lat || lon || zoom) setMapView({ lat, lon, zoom })
     if (timeMin) setStartDate(timeMin)
     if (timeMax) setEndDate(timeMax)
-    if (depthMin && Number.parseInt(depthMin) > 0) {
-      setStartDepth(Number.parseInt(depthMin))
-    }
-
-    if (depthMax && Number.parseInt(depthMax) > 0) {
-      setEndDepth(Number.parseInt(depthMax))
-    }
-
+    if (depthMin && Number.parseInt(depthMin) > 0) setStartDepth(Number.parseInt(depthMin))
+    if (depthMax && Number.parseInt(depthMax) > 0) setEndDepth(Number.parseInt(depthMax))
     const platformsFromURL = platforms?.split(',') || []
 
     /* /platforms returns array of platform names:
@@ -340,10 +331,6 @@ export default function App() {
         throw error
       })
 
-    /* /oceanVariables returns array of variable names:
-      ['abc', 'def', ...]
-    */
-
     const eovsFromURL = eovs?.split(',') || []
 
     fetch(`${server}/oceanVariables`)
@@ -367,20 +354,10 @@ export default function App() {
         throw error
       })
 
-    /* /organizations returns array of org objects:
-      [
-        {
-          color:null,
-          name:'abc',
-          pk_text:null
-          pk:87,
-        },
-        ...
-      ]
-    */
     const orgsFromURL = (organizations?.split(',') || []).map((e) =>
       Number.parseInt(e)
     )
+
     fetch(`${server}/organizations`)
       .then((response) => response.json())
       .then((orgsR) => {
@@ -398,23 +375,10 @@ export default function App() {
         throw error
       })
 
-    /* /datasets returns array of dataset objects
-      [
-        {
-          title:'abc',
-          title_translated:
-            {
-              en: 'abc',
-              fr: 'def'
-            }
-          organization_pks: [54, ...],
-          pk: 86923,
-        }
-      ]
-    */
     const datasetsFromURL = (datasetPKs?.split(',') || []).map((e) =>
       Number.parseInt(e)
     )
+
     fetch(`${server}/datasets`)
       .then((response) => response.json())
       .then((datasetsR) => {
