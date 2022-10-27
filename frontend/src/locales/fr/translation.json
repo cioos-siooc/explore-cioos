@@ -207,6 +207,6 @@
   "downloadDetailsDownloadInfoDatasets": "Les ensembles de données ",
   "downloadDetailsDownloadInfoDownloadSize": "Taille de téléchargement ",
   "datasetsTableDownloadModalEstimateDownloadSizeColumnName": "Taille de téléchargement estimée",
-  "datasetTableDownloadModalCDEDownloadableColumnName": "Téléchargeable",
+  "datasetTableDownloadModalCDEDownloadableColumnName": "CDE téléchargeable",
   "datasetTableDownloadModalExternalDownloadColumnName": "Téléchargement externe"
 }

@@ -16,7 +16,7 @@ import bytes from 'bytes'
 
 import _ from 'lodash'
 import classNames from 'classnames'
-import { Spinner } from 'react-bootstrap'
+import { Spinner, OverlayTrigger, Tooltip } from 'react-bootstrap'
 
 export default function DatasetsTable({
   handleSelectAllDatasets,
@@ -24,7 +24,7 @@ export default function DatasetsTable({
   datasets,
   selectAll,
   setInspectDataset,
-  setHoveredDataset = () => {},
+  setHoveredDataset = () => { },
   isDownloadModal,
   downloadSizeEstimates,
   loading
@@ -193,13 +193,23 @@ export default function DatasetsTable({
         cell: (row) => {
           if (!_.isEmpty(downloadSizeEstimates)) {
             return row.internalDownload ? (
-              <Check2Circle
-                className='downloadableIcon'
-                color='#52a79b'
-                size='25'
-              />
+              <OverlayTrigger
+                placement='top'
+                overlay={<Tooltip>Requests for less than 1GB of data from a dataset can be downloaded through CDE</Tooltip>}
+              >
+                <Check2Circle
+                  className='downloadableIcon'
+                  color='#52a79b'
+                  size='25'
+                />
+              </OverlayTrigger>
             ) : (
-              <XCircle className='downloadableIcon' color='#e3285e' size='25' />
+              <OverlayTrigger
+                placement='top'
+                overlay={<Tooltip>Requests for more than 1GB of data from a dataset can be downloaded through the provided ERDDAP link</Tooltip>}
+              >
+                <XCircle className='downloadableIcon' color='#e3285e' size='25' />
+              </OverlayTrigger>
             )
           } else {
             return (
