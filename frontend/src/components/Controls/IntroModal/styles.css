@@ -83,7 +83,7 @@
   margin: 2px;
   background-color: #abd3df;
   background-repeat: no-repeat;
-  background-size: 200px 200px;
+  background-size: 225px 225px;
   background-position: bottom;
 }
 
@@ -181,9 +181,9 @@
   background-size: contain;
 }
 
-.feedbackButtonImage {
+/* .feedbackButtonImage {
   background-image: url(../../Images/feedbackButton.png);
-}
+} */
 
 .infoButtonImage {
   background-image: url(../../Images/infoButton.png);
@@ -199,7 +199,7 @@
   min-height: 300px;
 }
 
-.feedbackButton {
+/* .feedbackButton {
   background-color: #fff;
   box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
   border-radius: 40px;
@@ -211,4 +211,4 @@
 
 .feedbackButton:hover {
   background-color: #f3f3f3;
-}
+} */

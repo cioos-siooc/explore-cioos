@@ -24,6 +24,7 @@ export default function DataDownloadModal({
           setSubmissionState()
           setShowModal(false)
         }}
+        fullscreen='lg-down'
       >
         <Modal.Body>{children}</Modal.Body>
       </Modal>

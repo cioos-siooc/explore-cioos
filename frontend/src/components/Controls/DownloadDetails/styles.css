@@ -28,6 +28,15 @@
   overflow-y: auto;
 }
 
+@media (max-width: 900px) {
+  .downloadDataRow {
+    max-height: 100%;
+  }
+  .downloadDetails.container {
+    max-width: 100%;
+  }
+}
+
 .downloadDetailsControls {
   border-top: 1px solid darkgrey;
   background-color: white;
