@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { InfoSquare } from 'react-bootstrap-icons'
+import { InfoSquare, ChatDots } from 'react-bootstrap-icons'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetPreview from '../DatasetPreview/DatasetPreview.jsx'
@@ -107,9 +107,8 @@ export default function SelectionDetails({
       setInspectDataset()
       setLoading(true)
       setCombinedQueries(combinedQueries)
-      const urlString = `${server}/pointQuery${
-        combinedQueries ? '?' + combinedQueries : ''
-      }`
+      const urlString = `${server}/pointQuery${combinedQueries ? '?' + combinedQueries : ''
+        }`
       fetch(urlString).then((response) => {
         if (response.ok) {
           response.json().then((data) => {
@@ -183,15 +182,8 @@ export default function SelectionDetails({
       onMouseLeave={() => setHoveredDataset()}
     >
       <div className='pointDetailsHeader'>
-        <button
-          className='pointDetailsHeaderIntroButton'
-          onClick={() => setShowIntroModal(true)}
-          title={t('introReopenTitle')} // 'Re-open introduction'
-        >
-          <InfoSquare color='#007bff' size={'25px'} />
-        </button>
         <img
-          className='pointDetailsHeaderLogo'
+          className='pointDetailsHeaderLogo CIOOS'
           src={i18n.language === 'en' ? CIOOSLogoEN : CIOOSLogoFR}
           onClick={() =>
             i18n.language === 'en'
@@ -201,10 +193,26 @@ export default function SelectionDetails({
           title={t('PointDetailsCIOOSLogoTitleText')}
         />
         <img
-          className='pointDetailsHeaderLogo'
+          className='pointDetailsHeaderLogo CDE'
           src={i18n.language === 'en' ? CDELogoEN : CDELogoFR}
           title={t('PointDetailsCDELogoTitleText')}
         />
+        <button
+          className='pointDetailsHeaderIntroButton'
+          onClick={() => setShowIntroModal(true)}
+          title={t('introReopenTitle')} // 'Re-open introduction'
+        >
+          <InfoSquare color='#007bff' size={'25px'} />
+        </button>
+        <a
+          className='feedbackButton'
+          title={t('feedbackButtonTitle')}
+          href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit'
+          target='_blank'
+          rel='noreferrer'
+        >
+          <ChatDots size='28px' color='#007bff' />
+        </a>
         <LanguageSelector className='noPosition' />
       </div>
       <div

@@ -173,6 +173,7 @@ export default function IntroModal({ showModal, setShowModal }) {
         onHide={() => setShowModal(false)}
         scrollable
         className='introModal'
+        fullscreen='lg-down'
       >
         <Modal.Header closeButton>
           <Modal.Title
