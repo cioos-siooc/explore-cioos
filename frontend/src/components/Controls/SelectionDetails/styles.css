@@ -184,3 +184,29 @@
   background-color: lightgray;
   cursor: pointer;
 }
+
+.pointDetailsControlRowGridContainer {
+    width: 100%;
+    text-align: center;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    grid-auto-rows: minmax(10px, auto);
+    font-size: 25px;
+}
+
+.pointDetailsControlRowGridContainer > *{
+  padding: 5px 0px 0px 0px;
+}
+
+.pointDetailsControlRowGridContainer .numberOfDatasets {
+  color: #c6e3df;
+}
+
+.pointDetailsControlRowGridContainer .filteredDatasets {
+  color: #52A79B ;
+}
+
+.pointDetailsControlRowGridContainer .selectedDatasets {
+  color: black;
+}

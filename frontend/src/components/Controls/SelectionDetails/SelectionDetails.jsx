@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { InfoSquare, ChatDots } from 'react-bootstrap-icons'
+import { InfoSquare, ChatDots, Filter, FileEarmarkSpreadsheet, Download } from 'react-bootstrap-icons'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetPreview from '../DatasetPreview/DatasetPreview.jsx'
@@ -30,6 +30,7 @@ export default function SelectionDetails({
   setHoveredDataset,
   filterSet,
   setShowIntroModal,
+  totalNumberOfDatasets,
   children
 }) {
   const { t, i18n } = useTranslation()
@@ -255,10 +256,35 @@ export default function SelectionDetails({
               } */}
             <div className='pointDetailsControls'>
               <div className='pointDetailsControlRow'>
-                {t('pointDetailsControlRowDatasetsSelected')}{' '}
+                <div className='pointDetailsControlRowGridContainer' >
+                  <div className='numberOfDatasets'
+                    title={t('pointDetailsControlRowDatasetsSelected')}
+                  >
+                    <strong>{totalNumberOfDatasets}</strong>
+                    {' '}
+                    <FileEarmarkSpreadsheet size={18} />
+                  </div>
+                  <div className='filteredDatasets'
+                    title={t('pointDetailsControlRowFilteredDatasets')}
+                  >
+                    <strong>{pointsData.length}</strong>
+                    {' '}
+                    <Filter size={18} />
+                  </div>
+                  <div className='selectedDatasets'
+                    title={t('pointDetailsControlRowToDownload')}
+                  >
+                    <strong>{datasetsSelected}</strong>
+                    {' '}
+                    <Download size={18} />
+                  </div>
+                </div>
+                {/* {t('pointDetailsControlRowDatasetsSelected')}{' '}
+                <strong>{totalNumberOfDatasets}</strong>
+                Filtered
                 <strong>{pointsData.length}</strong>
                 {t('pointDetailsControlRowToDownload')}{' '}
-                <strong>{datasetsSelected}</strong>
+                <strong>{datasetsSelected}</strong> */}
                 {children}
               </div>
             </div>
@@ -277,6 +303,6 @@ export default function SelectionDetails({
         recordLoading={recordLoading}
         setRecordLoading={setRecordLoading}
       />
-    </div>
+    </div >
   )
 }

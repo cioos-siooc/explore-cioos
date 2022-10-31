@@ -188,6 +188,8 @@ export default function App() {
   const [polygonFilterActive, setPolygonFilterActive] = useState(false)
   const [filterDownloadByPolygon, setFilterDownloadByPolygon] = useState(false)
 
+  const [totalNumberOfDatasets, setTotalNumberOfDatasets] = useState()
+
   // Update query
   useEffect(() => {
     setQuery({
@@ -382,6 +384,7 @@ export default function App() {
     fetch(`${server}/datasets`)
       .then((response) => response.json())
       .then((datasetsR) => {
+        if (_.isEmpty(totalNumberOfDatasets)) setTotalNumberOfDatasets(datasetsR.length)
         setDatasetsSelected(
           datasetsR.map((dataset) => {
             return {
@@ -665,6 +668,7 @@ export default function App() {
                   datasetFilter: { datasetsSelected, setDatasetsSelected }
                 }}
                 setShowIntroModal={setShowIntroModal}
+                totalNumberOfDatasets={totalNumberOfDatasets}
               >
                 {DownloadButton()}
               </SelectionDetails>
