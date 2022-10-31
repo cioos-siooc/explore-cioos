@@ -347,7 +347,7 @@ export default function DownloadDetails({
                         backgroundImage: `url(${polygonIsRectangle(polygon)
                           ? rectangleImage
                           : polygonImage
-                          })`,
+                        })`,
                         backgroundRepeat: 'no-repeat',
                         backgroundSize: '30px 30px',
                         backgroundPositionX: '10px',
@@ -411,7 +411,7 @@ export default function DownloadDetails({
             {downloadSizeEstimates ? (
               <strong>
                 {`${pointsData.filter((point) => point.selected).length} / ${pointsData.length
-                  }`}
+                }`}
               </strong>
             ) : (
               <Spinner
