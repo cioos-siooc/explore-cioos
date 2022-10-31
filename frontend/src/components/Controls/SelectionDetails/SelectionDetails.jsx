@@ -27,10 +27,12 @@ export default function SelectionDetails({
   setPointsToReview,
   query,
   polygon,
+  setPolygon,
   setHoveredDataset,
   filterSet,
   setShowIntroModal,
   totalNumberOfDatasets,
+  resetFilters,
   children
 }) {
   const { t, i18n } = useTranslation()
@@ -197,6 +199,10 @@ export default function SelectionDetails({
           className='pointDetailsHeaderLogo CDE'
           src={i18n.language === 'en' ? CDELogoEN : CDELogoFR}
           title={t('PointDetailsCDELogoTitleText')}
+          onClick={() => {
+            resetFilters()
+            setPolygon()
+          }}
         />
         <button
           className='pointDetailsHeaderIntroButton'
