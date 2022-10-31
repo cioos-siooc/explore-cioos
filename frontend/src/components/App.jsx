@@ -660,6 +660,7 @@ export default function App() {
                 setPointsToReview={setPointsToReview}
                 query={query}
                 polygon={polygon}
+                setPolygon={setPolygon}
                 setHoveredDataset={setHoveredDataset}
                 filterSet={{
                   eovFilter: { eovsSelected, setEovsSelected },
@@ -669,6 +670,7 @@ export default function App() {
                 }}
                 setShowIntroModal={setShowIntroModal}
                 totalNumberOfDatasets={totalNumberOfDatasets}
+                resetFilters={resetFilters}
               >
                 {DownloadButton()}
               </SelectionDetails>
