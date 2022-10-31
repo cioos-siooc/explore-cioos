@@ -24,13 +24,8 @@ export default function DataDownloadModal({
           setSubmissionState()
           setShowModal(false)
         }}
+        fullscreen='lg-down'
       >
-        {/* <Modal.Header closeButton> */}
-        {/* <Modal.Title id='contained-modal-title-vcenter'> */}
-        {/* {t('downloadModalTitleText')} */}
-        {/* Download Data from CIOOS Data Explorer */}
-        {/* </Modal.Title> */}
-        {/* </Modal.Header> */}
         <Modal.Body>{children}</Modal.Body>
       </Modal>
       <button

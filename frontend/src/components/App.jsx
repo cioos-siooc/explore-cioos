@@ -103,7 +103,8 @@ export default function App() {
   }
   const [query, setQuery] = useState(defaultQuery)
   const [showModal, setShowModal] = useState(false)
-  const [showIntroModal, setShowIntroModal] = useState(false)
+  const introOpenCookie = !getCookieValue('introModalOpen')
+  const [showIntroModal, setShowIntroModal] = useState(introOpenCookie !== undefined ? introOpenCookie : true)
   const navigate = useNavigate()
   const { zoom } = mapView
   // EOV filter initial values and state
@@ -187,6 +188,8 @@ export default function App() {
   const [polygonFilterActive, setPolygonFilterActive] = useState(false)
   const [filterDownloadByPolygon, setFilterDownloadByPolygon] = useState(false)
 
+  const [totalNumberOfDatasets, setTotalNumberOfDatasets] = useState()
+
   // Update query
   useEffect(() => {
     setQuery({
@@ -269,24 +272,16 @@ export default function App() {
     navigate('?' + combined.toString())
   }, [query, mapView])
 
-  // Filter option data structure:
-  /*
-  [{
-    title: 'abc',
-    isSelected: boolean,
-    titleTranslated: {
-      en: 'abc',
-      fr: 'def'
-    },
-    pk: 123
-  }]
+  useEffect(() => {
+    document.cookie = `introModalOpen=${showIntroModal}; Secure; max-age=${60 * 60 * 24 * 31}`
+  }, [showIntroModal])
 
-  */
   useEffect(() => {
     if (lang !== i18n.language) {
       i18n.changeLanguage(lang)
     }
   }, [lang])
+
   useEffect(() => {
     const filtersFromURL = Object.fromEntries(
       new URL(window.location.href).searchParams
@@ -305,20 +300,11 @@ export default function App() {
       zoom
     } = filtersFromURL
 
-    if (lat || lon || zoom) {
-      setMapView({ lat, lon, zoom })
-    }
-
+    if (lat || lon || zoom) setMapView({ lat, lon, zoom })
     if (timeMin) setStartDate(timeMin)
     if (timeMax) setEndDate(timeMax)
-    if (depthMin && Number.parseInt(depthMin) > 0) {
-      setStartDepth(Number.parseInt(depthMin))
-    }
-
-    if (depthMax && Number.parseInt(depthMax) > 0) {
-      setEndDepth(Number.parseInt(depthMax))
-    }
-
+    if (depthMin && Number.parseInt(depthMin) > 0) setStartDepth(Number.parseInt(depthMin))
+    if (depthMax && Number.parseInt(depthMax) > 0) setEndDepth(Number.parseInt(depthMax))
     const platformsFromURL = platforms?.split(',') || []
 
     /* /platforms returns array of platform names:
@@ -347,10 +333,6 @@ export default function App() {
         throw error
       })
 
-    /* /oceanVariables returns array of variable names:
-      ['abc', 'def', ...]
-    */
-
     const eovsFromURL = eovs?.split(',') || []
 
     fetch(`${server}/oceanVariables`)
@@ -374,20 +356,10 @@ export default function App() {
         throw error
       })
 
-    /* /organizations returns array of org objects:
-      [
-        {
-          color:null,
-          name:'abc',
-          pk_text:null
-          pk:87,
-        },
-        ...
-      ]
-    */
     const orgsFromURL = (organizations?.split(',') || []).map((e) =>
       Number.parseInt(e)
     )
+
     fetch(`${server}/organizations`)
       .then((response) => response.json())
       .then((orgsR) => {
@@ -405,26 +377,14 @@ export default function App() {
         throw error
       })
 
-    /* /datasets returns array of dataset objects
-      [
-        {
-          title:'abc',
-          title_translated:
-            {
-              en: 'abc',
-              fr: 'def'
-            }
-          organization_pks: [54, ...],
-          pk: 86923,
-        }
-      ]
-    */
     const datasetsFromURL = (datasetPKs?.split(',') || []).map((e) =>
       Number.parseInt(e)
     )
+
     fetch(`${server}/datasets`)
       .then((response) => response.json())
       .then((datasetsR) => {
+        if (_.isEmpty(totalNumberOfDatasets)) setTotalNumberOfDatasets(datasetsR.length)
         setDatasetsSelected(
           datasetsR.map((dataset) => {
             return {
@@ -603,11 +563,10 @@ export default function App() {
               onInput={(e) => handleEmailChange(e.target.value)}
             />
             <button
-              className={`submitRequestButton ${
-                (!emailValid ||
-                  _.isEmpty(pointsToDownload) ||
-                  // getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
-                  submissionState === 'submitted') &&
+              className={`submitRequestButton ${(!emailValid ||
+                _.isEmpty(pointsToDownload) ||
+                // getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
+                submissionState === 'submitted') &&
                 'disabled'
               }`}
               disabled={
@@ -623,9 +582,9 @@ export default function App() {
                   submissionFeedback &&
                   submissionState !== 'submitted' &&
                   t('submitRequestButtonResubmitText')) ||
-                  (_.isEmpty(pointsToDownload) &&
-                    t('submitRequestButtonSelectDataText')) ||
-                  t('submitRequestButtonSubmitText') // 'Submit Request'
+                (_.isEmpty(pointsToDownload) &&
+                  t('submitRequestButtonSelectDataText')) ||
+                t('submitRequestButtonSubmitText') // 'Submit Request'
               }
             </button>
           </Col>
@@ -701,6 +660,7 @@ export default function App() {
                 setPointsToReview={setPointsToReview}
                 query={query}
                 polygon={polygon}
+                setPolygon={setPolygon}
                 setHoveredDataset={setHoveredDataset}
                 filterSet={{
                   eovFilter: { eovsSelected, setEovsSelected },
@@ -709,6 +669,8 @@ export default function App() {
                   datasetFilter: { datasetsSelected, setDatasetsSelected }
                 }}
                 setShowIntroModal={setShowIntroModal}
+                totalNumberOfDatasets={totalNumberOfDatasets}
+                resetFilters={resetFilters}
               >
                 {DownloadButton()}
               </SelectionDetails>
@@ -934,8 +896,7 @@ export default function App() {
         />
       )}
       <button
-        className={`boxQueryButton ${
-          polygon && polygonIsRectangle(polygon) && 'active'
+        className={`boxQueryButton ${polygon && polygonIsRectangle(polygon) && 'active'
         }`}
         id='boxQueryButton'
         title={t('rectangleToolTitle')}

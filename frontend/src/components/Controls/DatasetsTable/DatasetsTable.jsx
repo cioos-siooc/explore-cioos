@@ -5,7 +5,10 @@ import {
   Square,
   Check2Circle,
   XCircle,
-  Download
+  Download,
+  BroadcastPin,
+  FileEarmarkSpreadsheet,
+  PinMapFill
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import platformColors from '../../platformColors'
@@ -16,7 +19,7 @@ import bytes from 'bytes'
 
 import _ from 'lodash'
 import classNames from 'classnames'
-import { Spinner } from 'react-bootstrap'
+import { Spinner, OverlayTrigger, Tooltip } from 'react-bootstrap'
 
 export default function DatasetsTable({
   handleSelectAllDatasets,
@@ -24,7 +27,7 @@ export default function DatasetsTable({
   datasets,
   selectAll,
   setInspectDataset,
-  setHoveredDataset = () => {},
+  setHoveredDataset = () => { },
   isDownloadModal,
   downloadSizeEstimates,
   loading
@@ -49,17 +52,17 @@ export default function DatasetsTable({
   }, [datasets, downloadSizeEstimates])
 
   function generateColumns() {
-    const cellPadding = '4px'
+    // const cellPadding = '0px'
     const columns = [
       {
         name: (
           <div title={'Download from CIOOS Data Explorer'}>
             {selectAll ? (
-              <CheckSquare onClick={selectAllOnclick} />
+              <CheckSquare onClick={selectAllOnclick} size={16} />
             ) : (
-              <Square onClick={selectAllOnclick} />
+              <Square onClick={selectAllOnclick} size={16} />
             )}
-            <Download className='downloadIcon' onClick={selectAllOnclick} />
+            <Download className='downloadIcon' onClick={selectAllOnclick} size={18} title={t('datasetInspectorDownloadText')} />
           </div>
         ),
         selector: (row) => row.selected,
@@ -67,26 +70,30 @@ export default function DatasetsTable({
           return (
             <div title={'Download from CIOOS Data Explorer'}>
               {row.selected ? (
-                <CheckSquare onClick={checkBoxOnclick(row)} />
+                <CheckSquare onClick={checkBoxOnclick(row)} size={16} />
               ) : (
-                <Square onClick={checkBoxOnclick(row)} />
+                <Square onClick={checkBoxOnclick(row)} size={16} />
               )}
+              <Download className='downloadIcon' onClick={checkBoxOnclick(row)} size={18} />
               {/* <Download className='downloadIcon' /> */}
             </div>
           )
         },
         ignoreRowClick: true,
-        width: '80px',
         sortable: true,
-        paddingLeft: cellPadding,
-        paddingRight: cellPadding
+        width: '60px',
+        // paddingLeft: cellPadding,
+        // paddingRight: cellPadding
       },
 
       {
-        name: <div>{t('datasetInspectorPlatformText')}</div>,
-        compact: true,
+        name: (
+          <div>
+            <BroadcastPin size={20} title={t('datasetInspectorPlatformText')} />
+          </div>
+        ),
+        // compact: true,
         wrap: true,
-
         center: true,
         selector: (row) => row.platform,
         cell: (point) => {
@@ -103,16 +110,20 @@ export default function DatasetsTable({
             />
           )
         },
-        width: '60px',
         sortable: true,
-        paddingLeft: cellPadding,
-        paddingRight: cellPadding
+        width: '60px',
+        // paddingLeft: cellPadding,
+        // paddingRight: cellPadding
       },
       {
-        name: t('datasetsTableHeaderTitleText'),
+        name: (
+          <div>
+            <FileEarmarkSpreadsheet size={17} title={t('datasetsTableHeaderTitleText')} />
+          </div>
+        ),
         selector: (row) => row.title,
         wrap: true,
-        width: '220px',
+        width: '280px',
         sortable: true
       },
       {
@@ -123,13 +134,17 @@ export default function DatasetsTable({
             .replace('TimeSeriesProfile', 'Timeseries / Profile')
             .replace('TimeSeries', 'Timeseries'),
         wrap: true,
-        width: '100px',
         sortable: true,
-        paddingLeft: cellPadding,
-        paddingRight: cellPadding
+        width: '80px',
+        // paddingLeft: cellPadding,
+        // paddingRight: cellPadding
       },
       {
-        name: t('datasetsTableHeaderLocationsText'),
+        name: (
+          <div>
+            <PinMapFill size={18} title={t('datasetsTableHeaderLocationsText')} />
+          </div>
+        ),
         selector: (row) => row.profiles_count,
         cell: (row) => {
           if (row.profiles_count !== row.n_profiles) {
@@ -140,9 +155,9 @@ export default function DatasetsTable({
         },
         wrap: true,
         sortable: true,
-        width: '100px',
-        paddingLeft: cellPadding,
-        paddingRight: cellPadding
+        width: '60px',
+        // paddingLeft: cellPadding,
+        // paddingRight: cellPadding
       }
     ]
 
@@ -184,8 +199,8 @@ export default function DatasetsTable({
         wrap: true,
         sortable: true,
         width: '200px',
-        paddingLeft: cellPadding,
-        paddingRight: cellPadding
+        // paddingLeft: cellPadding,
+        // paddingRight: cellPadding
       })
       columns.push({
         name: t('datasetTableDownloadModalCDEDownloadableColumnName'),
@@ -193,13 +208,23 @@ export default function DatasetsTable({
         cell: (row) => {
           if (!_.isEmpty(downloadSizeEstimates)) {
             return row.internalDownload ? (
-              <Check2Circle
-                className='downloadableIcon'
-                color='#52a79b'
-                size='25'
-              />
+              <OverlayTrigger
+                placement='top'
+                overlay={<Tooltip>Requests for less than 1GB of data from a dataset can be downloaded through CDE</Tooltip>}
+              >
+                <Check2Circle
+                  className='downloadableIcon'
+                  color='#52a79b'
+                  size='25'
+                />
+              </OverlayTrigger>
             ) : (
-              <XCircle className='downloadableIcon' color='#e3285e' size='25' />
+              <OverlayTrigger
+                placement='top'
+                overlay={<Tooltip>Requests for more than 1GB of data from a dataset can be downloaded through the provided ERDDAP link</Tooltip>}
+              >
+                <XCircle className='downloadableIcon' color='#e3285e' size='25' />
+              </OverlayTrigger>
             )
           } else {
             return (
@@ -217,8 +242,8 @@ export default function DatasetsTable({
         wrap: true,
         sortable: true,
         width: '170px',
-        paddingLeft: cellPadding,
-        paddingRight: cellPadding
+        // paddingLeft: cellPadding,
+        // paddingRight: cellPadding
       })
       columns.push({
         name: t('datasetTableDownloadModalExternalDownloadColumnName'),
@@ -246,8 +271,8 @@ export default function DatasetsTable({
         wrap: true,
         sortable: true,
         width: '150px',
-        paddingLeft: cellPadding,
-        paddingRight: cellPadding
+        // paddingLeft: cellPadding,
+        // paddingRight: cellPadding
       })
     }
 
@@ -270,6 +295,7 @@ export default function DatasetsTable({
           defaultSortFieldId={3}
           onRowClicked={isDownloadModal ? undefined : setInspectDataset}
           onRowMouseEnter={setHoveredDataset}
+          onRowMouseLeave={() => setHoveredDataset()}
           highlightOnHover={!isDownloadModal}
           pointerOnHover={!isDownloadModal}
           pagination={tableData.data?.length > 100}
@@ -279,6 +305,26 @@ export default function DatasetsTable({
             rowsPerPageText: t('tableComponentRowsPerPage'),
             rangeSeparatorText: t('tableComponentOf'),
             selectAllRowsItem: false
+          }}
+          // compact
+          customStyles={{
+            rows: {
+              style: {
+                minHeight: '72px', // override the row height
+              },
+            },
+            headCells: {
+              style: {
+                paddingLeft: '5px', // override the cell padding for head cells
+                paddingRight: '0px',
+              },
+            },
+            cells: {
+              style: {
+                paddingLeft: '5px', // override the cell padding for data cells
+                paddingRight: '0px',
+              },
+            },
           }}
         />
       </DataTableExtensions>

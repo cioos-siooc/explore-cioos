@@ -3,6 +3,9 @@ import { useState } from 'react'
 import { Container, Modal, Row } from 'react-bootstrap'
 import { ChatDots } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
+
+import polygonImage from '../../Images/polygonIcon.png'
+import rectangleImage from '../../Images/rectangleIcon.png'
 import './styles.css'
 
 export default function IntroModal({ showModal, setShowModal }) {
@@ -28,7 +31,33 @@ export default function IntroModal({ showModal, setShowModal }) {
             {/* There are four ways to select data: */}
             <ul>
               <li>
-                {t('stepInfoSelectTextB')}
+                <button
+                  style={{
+                    height: '42px',
+                    borderRadius: '4px',
+                    border: '0px',
+                    boxShadow: '0 0 0 2px rgb(0 0 0 / 10%)',
+                    backgroundColor: '#fff',
+                    padding: '5px',
+                    width: '42px'
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'inline',
+                      backgroundImage: `url(${rectangleImage})`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '30px 30px',
+                      backgroundPositionX: '0px',
+                      backgroundPositionY: '-5px',
+                      borderRadius: '0px',
+                      height: '42px',
+                      width: '42px',
+                      paddingLeft: '42px'
+                    }}
+                  />
+                </button>
+                {'  '}{t('stepInfoSelectTextB')}
                 {/* Creating a rectangle at any zoom level:
                   Click and hold shift while dragging the cursor at any zoom level or use the rectangle tool (insert icon).
                   With the tool selected, click on the map to start drawing the rectangle.
@@ -36,7 +65,33 @@ export default function IntroModal({ showModal, setShowModal }) {
                   Note that you can only have one rectangle selection active at a time. */}
               </li>
               <li>
-                {t('stepInfoSelectTextC')}
+                <button
+                  style={{
+                    height: '42px',
+                    borderRadius: '4px',
+                    border: '0px',
+                    boxShadow: '0 0 0 2px rgb(0 0 0 / 10%)',
+                    backgroundColor: '#fff',
+                    padding: '5px',
+                    width: '42px'
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'inline',
+                      backgroundImage: `url(${polygonImage})`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '30px 28px',
+                      backgroundPositionX: '0px',
+                      backgroundPositionY: '-5px',
+                      borderRadius: '0px',
+                      height: '42px',
+                      width: '42px',
+                      paddingLeft: '42px'
+                    }}
+                  />
+                </button>
+                {'  '}{t('stepInfoSelectTextC')}
                 {/* Creating a polygon at any zoom level:
                   For an irregular shape use the polygon tool (insert icon).
                   With the tool selected, click on the map to start drawing the polygon.
@@ -49,7 +104,7 @@ export default function IntroModal({ showModal, setShowModal }) {
               </li>
             </ul>
           </div>
-        </div>
+        </div >
       )
     case 'inspect':
       return (
@@ -118,6 +173,7 @@ export default function IntroModal({ showModal, setShowModal }) {
         onHide={() => setShowModal(false)}
         scrollable
         className='introModal'
+        fullscreen='lg-down'
       >
         <Modal.Header closeButton>
           <Modal.Title
