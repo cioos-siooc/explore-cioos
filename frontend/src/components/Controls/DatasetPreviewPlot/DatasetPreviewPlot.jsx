@@ -20,34 +20,34 @@ export default function DatasetPreviewPlot({
 
   useEffect(() => {
     switch (inspectDataset.cdm_data_type) {
-      case 'Profile':
-      case 'TimeSeriesProfile':
-        setPlotAxes({
-          x: {
-            columnName: inspectDataset.first_eov_column,
-            unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
-          },
-          y: {
-            columnName: 'depth',
-            unit: 'm'
-          }
-        })
-        break
-      case 'TimeSeries':
-        setPlotAxes({
-          x: {
-            columnName: 'time',
-            unit: 'UTC'
-          },
-          y: {
-            columnName: inspectDataset.first_eov_column,
-            unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
-          }
-        })
-        break
+    case 'Profile':
+    case 'TimeSeriesProfile':
+      setPlotAxes({
+        x: {
+          columnName: inspectDataset.first_eov_column,
+          unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
+        },
+        y: {
+          columnName: 'depth',
+          unit: 'm'
+        }
+      })
+      break
+    case 'TimeSeries':
+      setPlotAxes({
+        x: {
+          columnName: 'time',
+          unit: 'UTC'
+        },
+        y: {
+          columnName: inspectDataset.first_eov_column,
+          unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
+        }
+      })
+      break
 
-      default:
-        break
+    default:
+      break
     }
   }, [inspectRecordID])
 

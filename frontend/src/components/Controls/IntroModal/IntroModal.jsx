@@ -15,151 +15,151 @@ export default function IntroModal({ showModal, setShowModal }) {
 
   function generateInfo() {
     switch (hoveredStep) {
-      case 'filter':
-        return (
-          <div className='stepInfo'>
-            {t('stepInfoFilter')}
-            <div className='stepInfoContent'>{t('stepInfoFilterText')}</div>
-          </div>
-        )
-      case 'select':
-        return (
-          <div className='stepInfo'>
-            {t('stepInfoSelect')}
-            <div className='stepInfoContent'>
-              {t('stepInfoSelectTextA')}
-              {/* There are four ways to select data: */}
-              <ul>
-                <li>
-                  <button
+    case 'filter':
+      return (
+        <div className='stepInfo'>
+          {t('stepInfoFilter')}
+          <div className='stepInfoContent'>{t('stepInfoFilterText')}</div>
+        </div>
+      )
+    case 'select':
+      return (
+        <div className='stepInfo'>
+          {t('stepInfoSelect')}
+          <div className='stepInfoContent'>
+            {t('stepInfoSelectTextA')}
+            {/* There are four ways to select data: */}
+            <ul>
+              <li>
+                <button
+                  style={{
+                    height: '42px',
+                    borderRadius: '4px',
+                    border: '0px',
+                    boxShadow: '0 0 0 2px rgb(0 0 0 / 10%)',
+                    backgroundColor: '#fff',
+                    padding: '5px',
+                    width: '42px'
+                  }}
+                >
+                  <div
                     style={{
+                      display: 'inline',
+                      backgroundImage: `url(${rectangleImage})`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '30px 30px',
+                      backgroundPositionX: '0px',
+                      backgroundPositionY: '-5px',
+                      borderRadius: '0px',
                       height: '42px',
-                      borderRadius: '4px',
-                      border: '0px',
-                      boxShadow: '0 0 0 2px rgb(0 0 0 / 10%)',
-                      backgroundColor: '#fff',
-                      padding: '5px',
-                      width: '42px'
+                      width: '42px',
+                      paddingLeft: '42px'
                     }}
-                  >
-                    <div
-                      style={{
-                        display: 'inline',
-                        backgroundImage: `url(${rectangleImage})`,
-                        backgroundRepeat: 'no-repeat',
-                        backgroundSize: '30px 30px',
-                        backgroundPositionX: '0px',
-                        backgroundPositionY: '-5px',
-                        borderRadius: '0px',
-                        height: '42px',
-                        width: '42px',
-                        paddingLeft: '42px'
-                      }}
-                    />
-                  </button>
-                  {'  '}{t('stepInfoSelectTextB')}
-                  {/* Creating a rectangle at any zoom level:
+                  />
+                </button>
+                {'  '}{t('stepInfoSelectTextB')}
+                {/* Creating a rectangle at any zoom level:
                   Click and hold shift while dragging the cursor at any zoom level or use the rectangle tool (insert icon).
                   With the tool selected, click on the map to start drawing the rectangle.
                   Drag to the opposing corner and click again.
                   Note that you can only have one rectangle selection active at a time. */}
-                </li>
-                <li>
-                  <button
+              </li>
+              <li>
+                <button
+                  style={{
+                    height: '42px',
+                    borderRadius: '4px',
+                    border: '0px',
+                    boxShadow: '0 0 0 2px rgb(0 0 0 / 10%)',
+                    backgroundColor: '#fff',
+                    padding: '5px',
+                    width: '42px'
+                  }}
+                >
+                  <div
                     style={{
+                      display: 'inline',
+                      backgroundImage: `url(${polygonImage})`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '30px 28px',
+                      backgroundPositionX: '0px',
+                      backgroundPositionY: '-5px',
+                      borderRadius: '0px',
                       height: '42px',
-                      borderRadius: '4px',
-                      border: '0px',
-                      boxShadow: '0 0 0 2px rgb(0 0 0 / 10%)',
-                      backgroundColor: '#fff',
-                      padding: '5px',
-                      width: '42px'
+                      width: '42px',
+                      paddingLeft: '42px'
                     }}
-                  >
-                    <div
-                      style={{
-                        display: 'inline',
-                        backgroundImage: `url(${polygonImage})`,
-                        backgroundRepeat: 'no-repeat',
-                        backgroundSize: '30px 28px',
-                        backgroundPositionX: '0px',
-                        backgroundPositionY: '-5px',
-                        borderRadius: '0px',
-                        height: '42px',
-                        width: '42px',
-                        paddingLeft: '42px'
-                      }}
-                    />
-                  </button>
-                  {'  '}{t('stepInfoSelectTextC')}
-                  {/* Creating a polygon at any zoom level:
+                  />
+                </button>
+                {'  '}{t('stepInfoSelectTextC')}
+                {/* Creating a polygon at any zoom level:
                   For an irregular shape use the polygon tool (insert icon).
                   With the tool selected, click on the map to start drawing the polygon.
                   When you\'ve finished drawing the search area, finish your search area by clicking on the first point again. */}
-                </li>
-                <li>
-                  {t('stepInfoSelectTextD')}
-                  {/* Selecting points at the points zoom level:
+              </li>
+              <li>
+                {t('stepInfoSelectTextD')}
+                {/* Selecting points at the points zoom level:
                   At the points zoom level, click to directly select. */}
-                </li>
-              </ul>
-            </div>
-          </div >
-        )
-      case 'inspect':
-        return (
-          <div className='stepInfo'>
-            {t('stepInfoInspect')}
-            <div className='stepInfoContent'>
-              {t('stepInfoInspectText')}
+              </li>
+            </ul>
+          </div>
+        </div >
+      )
+    case 'inspect':
+      return (
+        <div className='stepInfo'>
+          {t('stepInfoInspect')}
+          <div className='stepInfoContent'>
+            {t('stepInfoInspectText')}
 
-              {/* <Trans i18nKey="stepInfoInspectText" >
+            {/* <Trans i18nKey="stepInfoInspectText" >
                 After making a selection, a summary of the selected dataset(s) will appear in a panel to the left.
                 Click the table headers to sort results alphabetically by title, type of dataset, or numerically by number of records and estimated size.
                 You can view each dataset in more detail by clicking the arrow button next to the estimated dataset size.
                 <i> Note: Only selected datasets will be available to download.</i>
               </Trans> */}
-            </div>
           </div>
-        )
-      case 'download':
-        return (
-          <div className='stepInfo'>
-            {t('stepInfoDownload')}
-            <div className='stepInfoContent'>
-              {t('stepInfoDownloadText')}
-              {/* To download the data, click the Download link at the bottom of the panel or top of the page.
+        </div>
+      )
+    case 'download':
+      return (
+        <div className='stepInfo'>
+          {t('stepInfoDownload')}
+          <div className='stepInfoContent'>
+            {t('stepInfoDownloadText')}
+            {/* To download the data, click the Download link at the bottom of the panel or top of the page.
               This page allows the user to confirm their data order by verifying dataset titles, records, the size of the download, and inspect dataset details.
               Enter your email address and submit to confirm your order.
               An email providing the direct download link will be sent shortly.
               <i> Note: Filters that have been applied in the search will also be applied to the data download. A 100MB size limit applies to all orders; downloads that are more than 100MB will be cut off at 100MB. Check the bar at the bottom of the panel to verify the order does not exceed the maximum. If the size is over 100MB, please submit multiple orders of smaller sizes.</i> */}
-            </div>
           </div>
-        )
-      default:
-        return (
-          <div className='tipInfo'>
-            <p>{t('introModalWelcomeMessage')}</p>
-            <p>
-              <a
-                className='feedbackButton'
-                title={t('feedbackButtonTitle')}
-                href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit'
-                target='_blank'
-                rel='noreferrer'
-              >
-                <ChatDots size='30px' />
-              </a>
-              {t('tipInfoFeedback')}
-              {/* Please fill out our user feedback survey! It helps improve this interface and find bugs. */}
-            </p>
-            <p>
-              <img className='infoButtonImage' />
-              {t('tipInfoReopen')}
-              {/* Click the info button to reopen this information panel. */}
-            </p>
-          </div>
-        )
+        </div>
+      )
+    default:
+      return (
+        <div className='tipInfo'>
+          <p>{t('introModalWelcomeMessage')}</p>
+          <p>
+            <a
+              className='feedbackButton'
+              title={t('feedbackButtonTitle')}
+              href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit'
+              target='_blank'
+              rel='noreferrer'
+            >
+              <ChatDots size='30px' />
+            </a>
+            {t('tipInfoFeedback')}
+            {/* Please fill out our user feedback survey! It helps improve this interface and find bugs. */}
+          </p>
+          <p>
+            <img className='infoButtonImage' />
+            {t('tipInfoReopen')}
+            {/* Click the info button to reopen this information panel. */}
+          </p>
+        </div>
+      )
     }
   }
 

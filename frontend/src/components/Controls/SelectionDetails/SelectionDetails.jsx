@@ -111,7 +111,7 @@ export default function SelectionDetails({
       setLoading(true)
       setCombinedQueries(combinedQueries)
       const urlString = `${server}/pointQuery${combinedQueries ? '?' + combinedQueries : ''
-        }`
+      }`
       fetch(urlString).then((response) => {
         if (response.ok) {
           response.json().then((data) => {
