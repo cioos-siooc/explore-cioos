@@ -18,8 +18,8 @@ export default function DatasetPreview({
   setRecordLoading
 }) {
   const { t } = useTranslation()
-  const clearAxes = { x: null, y: null }
-  const [plotAxes, setAxes] = useState(clearAxes)
+  const clearAxes = { x: { columnName: null, unit: null }, y: { columnName: null, unit: null } }
+  const [plotAxes, setPlotAxes] = useState(clearAxes)
   const [selectedVis, setSelectedVis] = useState('table')
 
   const [data, setData] = useState()
@@ -45,7 +45,7 @@ export default function DatasetPreview({
   const onModalClose = () => {
     setInspectRecordID()
     setShowModal(false)
-    setAxes(clearAxes)
+    setPlotAxes(clearAxes)
     setSelectedVis('table')
     setInspectRecordID()
     setData()
@@ -70,9 +70,8 @@ export default function DatasetPreview({
             {dataIsReady && (
               <>
                 <button
-                  className={`toggleButton ${
-                    selectedVis === 'table' && 'selected'
-                  }`}
+                  className={`toggleButton ${selectedVis === 'table' && 'selected'
+                    }`}
                   onClick={() => {
                     setSelectedVis('table')
                     // setRecordLoading(true)
@@ -81,9 +80,8 @@ export default function DatasetPreview({
                   {t('datasetPreviewTableText')}
                 </button>
                 <button
-                  className={`toggleButton ${
-                    selectedVis === 'plot' && 'selected'
-                  }`}
+                  className={`toggleButton ${selectedVis === 'plot' && 'selected'
+                    }`}
                   onClick={() => {
                     setSelectedVis('plot')
                     // setRecordLoading(true)
@@ -118,7 +116,7 @@ export default function DatasetPreview({
                           inspectDataset={inspectDataset}
                           plotAxes={plotAxes}
                           datasetPreview={datasetPreview}
-                          setAxes={setAxes}
+                          setPlotAxes={setPlotAxes}
                           inspectRecordID={inspectRecordID}
                           data={data}
                         />

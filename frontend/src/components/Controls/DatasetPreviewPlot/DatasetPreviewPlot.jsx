@@ -8,7 +8,7 @@ export default function DatasetPreviewPlot({
   inspectDataset,
   plotAxes,
   datasetPreview,
-  setAxes,
+  setPlotAxes,
   inspectRecordID,
   data
 }) {
@@ -20,30 +20,49 @@ export default function DatasetPreviewPlot({
 
   useEffect(() => {
     switch (inspectDataset.cdm_data_type) {
-    case 'Profile':
-    case 'TimeSeriesProfile':
-      setAxes({ x: inspectDataset.first_eov_column, y: 'depth' })
-      break
-    case 'TimeSeries':
-      setAxes({ x: 'time', y: inspectDataset.first_eov_column })
-      break
+      case 'Profile':
+      case 'TimeSeriesProfile':
+        setPlotAxes({
+          x: {
+            columnName: inspectDataset.first_eov_column,
+            unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
+          },
+          y: {
+            columnName: 'depth',
+            unit: 'm'
+          }
+        })
+        break
+      case 'TimeSeries':
+        setPlotAxes({
+          x: {
+            columnName: 'time',
+            unit: 'UTC'
+          },
+          y: {
+            columnName: inspectDataset.first_eov_column,
+            unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
+          }
+        })
+        break
 
-    default:
-      break
+      default:
+        break
     }
   }, [inspectRecordID])
 
   return (
     <>
       <DropdownButton
-        title={t('datasetPreviewPlotXAxisSelect') + ': ' + plotAxes.x}
+        title={t('datasetPreviewPlotXAxisSelect') + ': ' + plotAxes.x.columnName}
       >
         {datasetPreview &&
-          datasetPreview?.table?.columnNames.map((columnName) => {
+          datasetPreview?.table?.columnNames.map((columnName, index) => {
+            console.log(datasetPreview.table)
             return (
               <Dropdown.Item
                 key={columnName}
-                onClick={() => setAxes({ x: columnName, y: plotAxes.y })}
+                onClick={() => setPlotAxes({ x: { columnName, unit: datasetPreview.table.columnUnits[index] }, y: plotAxes.y })}
               >
                 {columnName}
               </Dropdown.Item>
@@ -51,14 +70,14 @@ export default function DatasetPreviewPlot({
           })}
       </DropdownButton>
       <DropdownButton
-        title={t('datasetPreviewPlotYAxisSelect') + ': ' + plotAxes.y}
+        title={t('datasetPreviewPlotYAxisSelect') + ': ' + plotAxes.y.columnName}
       >
         {datasetPreview &&
-          datasetPreview?.table?.columnNames.map((columnName) => {
+          datasetPreview?.table?.columnNames.map((columnName, index) => {
             return (
               <Dropdown.Item
                 key={columnName}
-                onClick={() => setAxes({ x: plotAxes.x, y: columnName })}
+                onClick={() => setPlotAxes({ x: plotAxes.x, y: { columnName, unit: datasetPreview.table.columnUnits[index] } })}
               >
                 {columnName}
               </Dropdown.Item>
@@ -72,8 +91,8 @@ export default function DatasetPreviewPlot({
             <Plot
               data={[
                 {
-                  x: data.map((row) => row[plotAxes.x]) || [],
-                  y: data.map((row) => row[plotAxes.y]) || [],
+                  x: data.map((row) => row[plotAxes.x.columnName]) || [],
+                  y: data.map((row) => row[plotAxes.y.columnName]) || [],
                   type: 'scatter',
                   mode: 'markers'
                 }
@@ -85,12 +104,13 @@ export default function DatasetPreviewPlot({
                   automargin: true,
 
                   side: isProfile ? 'top' : undefined,
-                  autorange: isProfile ? 'reversed' : undefined
+                  autorange: isProfile ? 'reversed' : undefined,
+                  title: `( ${plotAxes.y.unit} )`
                 },
                 xaxis: {
-                  automargin: true
+                  automargin: true,
+                  title: `( ${plotAxes.x.unit} )`
                 }
-                // title: title
               }}
               config={{
                 displaylogo: false,
