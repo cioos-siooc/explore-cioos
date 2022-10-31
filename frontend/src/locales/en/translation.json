@@ -4,7 +4,7 @@
   "stepInfoInspect": "Inspect",
   "stepInfoDownload": "Download",
   "stepInfoFilterText": "By default, the Data Explorer displays all available datasets. Use the filters at the top of the screen to narrow down your selections.",
-  "stepInfoSelectTextA": "There are fhree ways to select data:",
+  "stepInfoSelectTextA": "There are three ways to select data:",
   "stepInfoSelectTextB": "Creating a rectangle at any zoom level: Click and hold shift while dragging the cursor at any zoom level or use the rectangle tool (insert icon). With the tool selected, click on the map to start drawing the rectangle. Drag to the opposing corner and click again. Note that you can only have one rectangle selection active at a time.",
   "stepInfoSelectTextC": "Creating a polygon at any zoom level: For an irregular shape use the polygon tool (insert icon). With the tool selected, click on the map to start drawing the polygon. When you've finished drawing the search area, finish your search area by clicking on the first point again.",
   "stepInfoSelectTextD": "Selecting points at the points zoom level: Click any observation to directly select.",
