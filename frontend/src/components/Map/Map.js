@@ -138,6 +138,19 @@ export default function CreateMap({
     }
   }, [boxSelectEndCoords])
 
+  useEffect(() => {
+    if(map.current && _.isEmpty(polygon)) {
+      deleteAllShapes()
+    }
+  }, [polygon])
+
+  function deleteAllShapes() {
+    drawPolygon.current?.deleteAll()
+    map.current.setFilter('points-highlighted', ['in', 'pk', ''])
+    setPointsToReview()
+    setPolygon()
+  }
+
   function setColorStops() {
     if (map.current) {
       colorStops.current = generateColorStops(
@@ -337,13 +350,6 @@ export default function CreateMap({
 
     // disable map rotation using touch rotation gesture
     map.current.touchZoomRotate.disableRotation()
-
-    function deleteAllShapes() {
-      drawPolygon.current?.deleteAll()
-      map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-      setPointsToReview()
-      setPolygon()
-    }
 
     // clone an element to remove it's events
     function cloneElement(oldElement) {

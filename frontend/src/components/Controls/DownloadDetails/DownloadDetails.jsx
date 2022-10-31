@@ -344,10 +344,9 @@ export default function DownloadDetails({
                       className='mapbox-gl-draw-polygon'
                       style={{
                         display: 'inline',
-                        backgroundImage: `url(${
-                          polygonIsRectangle(polygon)
-                            ? rectangleImage
-                            : polygonImage
+                        backgroundImage: `url(${polygonIsRectangle(polygon)
+                          ? rectangleImage
+                          : polygonImage
                         })`,
                         backgroundRepeat: 'no-repeat',
                         backgroundSize: '30px 30px',
@@ -385,29 +384,33 @@ export default function DownloadDetails({
       <Row className='downloadDetailsDownloadLimits'>
         <Col style={{ textAlign: 'center', margin: '15px 0px' }}>
           <div>
-            {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart1')}
-            <strong style={{ color: 'white', backgroundColor: '#e3285e' }}>
-              {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart2')}
-            </strong>
-            {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart3')}
-            <XCircle color='#e3285e' size='25' />
+            <Check2Circle color='#52a79b' size='25' />
             {t('downloadDetailsDownloadLimitsDownloadableMessagePart1')}
             <strong style={{ color: 'white', backgroundColor: '#52a79b' }}>
               {t('downloadDetailsDownloadLimitsDownloadableMessagePart2')}
             </strong>
             {t('downloadDetailsDownloadLimitsDownloadableMessagePart3')}{' '}
-            <Check2Circle color='#52a79b' size='25' />
+            <XCircle color='#e3285e' size='25' />
+            {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart1')}
+            <strong style={{ color: 'white', backgroundColor: '#e3285e' }}>
+              {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart2')}
+            </strong>
+            {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart3')}
           </div>
         </Col>
       </Row>
       <Row className='downloadDetailsDownloadInfoRow'>
         <Col>
           <div className='downloadDetailsDownloadInfoItem'>
+            <Check2Circle
+              color='#52a79b'
+              size='25'
+            />
+            {' '}
             {t('downloadDetailsDownloadInfoDatasets')}
             {downloadSizeEstimates ? (
               <strong>
-                {`${pointsData.filter((point) => point.selected).length} / ${
-                  pointsData.length
+                {`${pointsData.filter((point) => point.selected).length} / ${pointsData.length
                 }`}
               </strong>
             ) : (
