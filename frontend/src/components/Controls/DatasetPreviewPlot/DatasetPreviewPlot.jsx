@@ -20,36 +20,59 @@ export default function DatasetPreviewPlot({
 
   useEffect(() => {
     switch (inspectDataset.cdm_data_type) {
-    case 'Profile':
-    case 'TimeSeriesProfile':
-      setPlotAxes({
-        x: {
-          columnName: inspectDataset.first_eov_column,
-          unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
-        },
-        y: {
-          columnName: 'depth',
-          unit: 'm'
-        }
-      })
-      break
-    case 'TimeSeries':
-      setPlotAxes({
-        x: {
-          columnName: 'time',
-          unit: 'UTC'
-        },
-        y: {
-          columnName: inspectDataset.first_eov_column,
-          unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
-        }
-      })
-      break
+      case 'Profile':
+      case 'TimeSeriesProfile':
+        setPlotAxes({
+          x: {
+            columnName: inspectDataset.first_eov_column,
+            unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
+          },
+          y: {
+            columnName: 'depth',
+            unit: 'm'
+          }
+        })
+        break
+      case 'TimeSeries':
+        setPlotAxes({
+          x: {
+            columnName: 'time',
+            unit: 'UTC'
+          },
+          y: {
+            columnName: inspectDataset.first_eov_column,
+            unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
+          }
+        })
+        break
 
-    default:
-      break
+      default:
+        break
     }
   }, [inspectRecordID])
+
+  //   Plotly.plot(gd, [{
+  //     type: ‘bar’,
+  //     x: [1, 2, 3, 4],
+  //     y: [5, 10, 2, 8],
+  //     marker: {
+  //     color: ‘#C8A2C8’,
+  //     line: {
+  //     width: 2.5
+  //   }
+  //     }
+  //     }], {
+  //   title: ‘Auto - Resize’,
+  //   font: {
+  //     size: 16
+  //   },
+  //   margin: {
+  //     t: 20, //top margin
+  //       l: 20, //left margin
+  //         r: 20, //right margin
+  //           b: 20 //bottom margin
+  //   }
+  // });
 
   return (
     <>
@@ -98,8 +121,8 @@ export default function DatasetPreviewPlot({
                 }
               ]}
               layout={{
-                autosize: false,
-                margin: { l: 0, t: 50, r: 0, b: 50 },
+                autosize: true,
+                // margin: { l: 0, t: 50, r: 0, b: 50 },
                 yaxis: {
                   automargin: true,
 
@@ -116,6 +139,12 @@ export default function DatasetPreviewPlot({
                 displaylogo: false,
                 modeBarButtonsToRemove: ['select2d', 'lasso2d', 'resetScale'],
                 responsive: true
+              }}
+              margin={{
+                t: 20, // top margin
+                l: 20, // left margin
+                r: 20, // right margin
+                b: 20 // bottom margin
               }}
             />
           )}
