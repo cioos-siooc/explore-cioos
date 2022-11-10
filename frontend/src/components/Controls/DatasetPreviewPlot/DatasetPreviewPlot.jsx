@@ -12,7 +12,7 @@ export default function DatasetPreviewPlot({
   inspectRecordID,
   data
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   const isProfile = inspectDataset.cdm_data_type
     .toLowerCase()
@@ -51,29 +51,6 @@ export default function DatasetPreviewPlot({
     }
   }, [inspectRecordID])
 
-  //   Plotly.plot(gd, [{
-  //     type: ‘bar’,
-  //     x: [1, 2, 3, 4],
-  //     y: [5, 10, 2, 8],
-  //     marker: {
-  //     color: ‘#C8A2C8’,
-  //     line: {
-  //     width: 2.5
-  //   }
-  //     }
-  //     }], {
-  //   title: ‘Auto - Resize’,
-  //   font: {
-  //     size: 16
-  //   },
-  //   margin: {
-  //     t: 20, //top margin
-  //       l: 20, //left margin
-  //         r: 20, //right margin
-  //           b: 20 //bottom margin
-  //   }
-  // });
-
   return (
     <>
       <DropdownButton
@@ -107,7 +84,6 @@ export default function DatasetPreviewPlot({
             )
           })}
       </DropdownButton>
-
       <div className='datasetPreviewPlot'>
         <>
           {plotAxes.x !== undefined && plotAxes.y !== undefined && data && (
@@ -121,11 +97,11 @@ export default function DatasetPreviewPlot({
                 }
               ]}
               layout={{
+                uirevision: true,
                 autosize: true,
-                // margin: { l: 0, t: 50, r: 0, b: 50 },
+                // dragmode: false,
                 yaxis: {
                   automargin: true,
-
                   side: isProfile ? 'top' : undefined,
                   autorange: isProfile ? 'reversed' : undefined,
                   title: `( ${plotAxes.y.unit} )`
@@ -138,13 +114,9 @@ export default function DatasetPreviewPlot({
               config={{
                 displaylogo: false,
                 modeBarButtonsToRemove: ['select2d', 'lasso2d', 'resetScale'],
-                responsive: true
-              }}
-              margin={{
-                t: 20, // top margin
-                l: 20, // left margin
-                r: 20, // right margin
-                b: 20 // bottom margin
+                responsive: true,
+                scrollZoom: true,
+                locale: i18n.language === 'fr' ? 'fr' : 'en'
               }}
             />
           )}
