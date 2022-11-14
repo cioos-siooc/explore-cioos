@@ -71,7 +71,7 @@ export default function DatasetPreview({
               <>
                 <button
                   className={`toggleButton ${selectedVis === 'table' && 'selected'
-                  }`}
+                    }`}
                   onClick={() => {
                     setSelectedVis('table')
                     // setRecordLoading(true)
@@ -81,7 +81,7 @@ export default function DatasetPreview({
                 </button>
                 <button
                   className={`toggleButton ${selectedVis === 'plot' && 'selected'
-                  }`}
+                    }`}
                   onClick={() => {
                     setSelectedVis('plot')
                     // setRecordLoading(true)
@@ -103,9 +103,9 @@ export default function DatasetPreview({
               {recordLoading ? (
                 <Loading />
               ) : (
-                <div>
+                <>
                   {datasetPreview?.table?.rows ? (
-                    <div>
+                    <>
                       {selectedVis === 'table' ? (
                         <DatasetPreviewTable
                           datasetPreview={datasetPreview}
@@ -121,13 +121,13 @@ export default function DatasetPreview({
                           data={data}
                         />
                       )}
-                    </div>
+                    </>
                   ) : (
-                    <div>
+                    <>
                       <p>{t('datasetPreviewNoData')}</p>
-                    </div>
+                    </>
                   )}
-                </div>
+                </>
               )}
             </div>
           </Modal.Body>
