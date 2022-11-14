@@ -12,7 +12,7 @@ export default function DatasetPreviewPlot({
   inspectRecordID,
   data
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   const isProfile = inspectDataset.cdm_data_type
     .toLowerCase()
@@ -20,34 +20,34 @@ export default function DatasetPreviewPlot({
 
   useEffect(() => {
     switch (inspectDataset.cdm_data_type) {
-    case 'Profile':
-    case 'TimeSeriesProfile':
-      setPlotAxes({
-        x: {
-          columnName: inspectDataset.first_eov_column,
-          unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
-        },
-        y: {
-          columnName: 'depth',
-          unit: 'm'
-        }
-      })
-      break
-    case 'TimeSeries':
-      setPlotAxes({
-        x: {
-          columnName: 'time',
-          unit: 'UTC'
-        },
-        y: {
-          columnName: inspectDataset.first_eov_column,
-          unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
-        }
-      })
-      break
+      case 'Profile':
+      case 'TimeSeriesProfile':
+        setPlotAxes({
+          x: {
+            columnName: inspectDataset.first_eov_column,
+            unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
+          },
+          y: {
+            columnName: 'depth',
+            unit: 'm'
+          }
+        })
+        break
+      case 'TimeSeries':
+        setPlotAxes({
+          x: {
+            columnName: 'time',
+            unit: 'UTC'
+          },
+          y: {
+            columnName: inspectDataset.first_eov_column,
+            unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
+          }
+        })
+        break
 
-    default:
-      break
+      default:
+        break
     }
   }, [inspectRecordID])
 
@@ -84,7 +84,6 @@ export default function DatasetPreviewPlot({
             )
           })}
       </DropdownButton>
-
       <div className='datasetPreviewPlot'>
         <>
           {plotAxes.x !== undefined && plotAxes.y !== undefined && data && (
@@ -98,24 +97,32 @@ export default function DatasetPreviewPlot({
                 }
               ]}
               layout={{
-                autosize: false,
-                margin: { l: 0, t: 50, r: 0, b: 50 },
+                uirevision: true,
+                autosize: true,
+                // dragmode: false,
                 yaxis: {
                   automargin: true,
-
                   side: isProfile ? 'top' : undefined,
                   autorange: isProfile ? 'reversed' : undefined,
-                  title: `( ${plotAxes.y.unit} )`
+                  title: `( ${plotAxes.y.unit} )`,
+                  uirevision: true
                 },
                 xaxis: {
                   automargin: true,
-                  title: `( ${plotAxes.x.unit} )`
+                  title: `( ${plotAxes.x.unit} )`,
+                  uirevision: true
+                },
+                dragmode: 'zoom',
+                modebar: {
+                  uirevision: true
                 }
               }}
               config={{
                 displaylogo: false,
-                modeBarButtonsToRemove: ['select2d', 'lasso2d', 'resetScale'],
-                responsive: true
+                modeBarButtonsToRemove: ['select2d', 'lasso2d', 'resetScale', 'pan2d'],
+                responsive: true,
+                scrollZoom: true,
+                locale: i18n.language === 'fr' ? 'fr' : 'en',
               }}
             />
           )}
