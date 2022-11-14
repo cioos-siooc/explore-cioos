@@ -104,19 +104,25 @@ export default function DatasetPreviewPlot({
                   automargin: true,
                   side: isProfile ? 'top' : undefined,
                   autorange: isProfile ? 'reversed' : undefined,
-                  title: `( ${plotAxes.y.unit} )`
+                  title: `( ${plotAxes.y.unit} )`,
+                  uirevision: true
                 },
                 xaxis: {
                   automargin: true,
-                  title: `( ${plotAxes.x.unit} )`
+                  title: `( ${plotAxes.x.unit} )`,
+                  uirevision: true
+                },
+                dragmode: 'zoom',
+                modebar: {
+                  uirevision: true
                 }
               }}
               config={{
                 displaylogo: false,
-                modeBarButtonsToRemove: ['select2d', 'lasso2d', 'resetScale'],
+                modeBarButtonsToRemove: ['select2d', 'lasso2d', 'resetScale', 'pan2d'],
                 responsive: true,
                 scrollZoom: true,
-                locale: i18n.language === 'fr' ? 'fr' : 'en'
+                locale: i18n.language === 'fr' ? 'fr' : 'en',
               }}
             />
           )}
