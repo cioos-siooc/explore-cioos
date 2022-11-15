@@ -1,6 +1,7 @@
 require("dotenv").config();
-var express = require("express");
-var router = express.Router();
+const express = require("express");
+
+const router = express.Router();
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { validatorMiddleware } = require("../utils/validatorMiddlewares");
@@ -27,6 +28,7 @@ router.get(
     // zoom levels: 0-4,5-6,7+
     const isHexGrid = z < 7;
     const zoomColumn = z < 5 ? "hex_zoom_0" : "hex_zoom_1";
+    const zoomPKColumn = z < 5 ? "hex_0_pk" : "hex_1_pk";
 
     // calculate the bounding polygon for this tile
     const sqlQuery = {
@@ -37,16 +39,23 @@ router.get(
     // not joining to cde.points to get hexagons as that could be slower
     const SQL = `
   with relevent_points as (
-        SELECT count(p.*) count, ${isHexGrid ? "" : "point_pk AS pk,"}
-        p.:geom_column: AS geom FROM cde.profiles p
+    ${
+  isHexGrid
+    ? "SELECT :zoomPKColumn: pk,count(distinct point_pk) count,"
+    : "SELECT point_pk pk, d.platform as platform,sum(p.days)::bigint count,"
+} array_to_json(array_agg(distinct d.pk_url)) datasets,     
+      p.:geom_column: AS geom FROM cde.profiles p
+        -- used for organizations filtering
         JOIN cde.datasets d
-        ON p.dataset_pk = d.pk
+        ON p.dataset_pk = d.pk 
        ${hasFilter ? "WHERE :filters" : ""}
-        ${isHexGrid ? `GROUP BY :geom_column:` : "GROUP BY point_pk,geom"} ),
+        ${
+  isHexGrid ? "GROUP BY :zoomPKColumn:,p.:geom_column:" : "GROUP BY geom,point_pk,platform"
+} ),
     te AS (select ST_TileEnvelope(:z, :x, :y) tile_envelope ),
     mvtgeom AS (
-      SELECT count,
-       ${isHexGrid ? "" : "pk,"}
+      SELECT pk,count, 
+       ${isHexGrid ? "" : "platform,"} datasets,
         ST_AsMVTGeom (
           relevent_points.geom,
           tile_envelope
@@ -59,14 +68,16 @@ router.get(
   `;
 
     try {
-      const tileRaw = await db.raw(SQL, {
+      const q = db.raw(SQL, {
         filters,
+        zoomPKColumn,
         geom_column: sqlQuery.geom_column,
         z,
         x,
         y,
       });
 
+      const tileRaw = await q;
       const tile = tileRaw.rows[0];
 
       res.setHeader("Content-Type", "application/x-protobuf");
@@ -77,7 +88,7 @@ router.get(
         error: e.toString(),
       });
     }
-  }
+  },
 );
 
 module.exports = router;

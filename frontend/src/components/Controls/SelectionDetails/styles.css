@@ -1,16 +1,27 @@
 .pointDetails {
+  height: 100%;
   width: 100%;
 }
 
 .pointDetailsInfoRow {
-  max-height: calc(100vh - 80px);
+  height: calc(100% - 130px); 
   overflow-y: auto;
   overflow-x: hidden;
 }
 
+.pointDetailsInfoRow.fullHeight {
+  height: calc(100% - 70px);
+}
+
+@media (max-height: 500px) {
+  .pointDetailsInfoRow {
+    max-height: 420px;
+  }
+}
+
 .pointDetailsControls {
   border-top: 1px solid darkgrey;
-  background-color: #f7f7f7;
+  background-color: white;
   position: absolute;
   bottom: 0px;
   left: 0px;
@@ -54,4 +65,148 @@
 .noDataNotice {
   text-align: center;
   margin-top: 100px;
+}
+
+.pointDetailsHeader {
+  height: 66px;
+  display: flex;
+  border-bottom: 1px solid lightgray;
+}
+
+.pointDetailsHeaderLogo {
+  padding: 3px 0px;
+}
+
+.pointDetailsHeaderLogo.CIOOS {
+  margin: auto 0px;
+  height: 100%;
+  padding: 10px;
+}
+
+.pointDetailsHeaderLogo.CDE {
+  /* margin: auto 0px auto 70px; */
+  padding: 0px;
+  height: 100%;
+  width: 100%;
+  object-fit:scale-down;
+}
+
+.pointDetailsHeaderLogo.CDE:hover {
+  cursor: pointer;
+  background-color: #c6e3df;
+  /* padding: -2px; */
+}
+
+.pointDetailsHeaderLogo.CIOOS:hover {
+  cursor: pointer;
+  background-color: #f3f3f3;
+  /* padding: -2px; */
+}
+
+.pointDetailsHeaderIntroButton {
+  margin: 10px 10px 10px 0px;
+  pointer-events: all;
+  background-color: #fff;
+  /* box-shadow: 0 0 0 2px rgb(0 0 0 / 10%); */
+  border-radius: 4px;
+  border: 0px;
+  height: 42px;
+  width: 42px;
+  text-align: center;
+  z-index: 3;
+}
+
+.pointDetailsHeaderIntroButton:hover {
+  background-color: #f3f3f3;
+}
+
+.feedbackButtonImage {
+  background-image: url(../../Images/feedbackButton.png);
+}
+
+.feedbackButton {
+  background-color: #fff;
+  /* box-shadow: 0 0 0 2px rgb(0 0 0 / 10%); */
+  border-radius: 4px;
+  width: 42px;
+  height: 42px;
+  z-index: 100;
+  padding: 6px 7px 5px 7px;
+  margin: auto 10px;
+}
+
+.feedbackButton:hover {
+  background-color: #f3f3f3;
+}
+
+.noPosition.languageSelector{
+  position: inherit;
+  top: inherit;
+  right: inherit;
+  margin: 10px;
+  pointer-events: all;
+  z-index: 3;
+  width: 42px;
+  height: 42px;
+  text-align: center;
+  /* margin: auto; */
+  padding:7px 5px 5px 5px;
+  background-color: white;
+  border-radius: 4px;
+  /* border: 2px solid lightgrey; */
+}
+
+.noPosition.languageSelector:hover {
+  background-color: #f3f3f3;
+}
+
+.pointDetailsSearchBar {
+  width: 100%;
+  padding:15px;
+}
+
+.pointDetailsSearchBarContainer {
+  position: relative;
+}
+
+.pointDetailsSearchBar input {
+  width: 100%;
+}
+
+.pointDetailsSearchBarClearSearchButton {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  border-radius: 30px;
+}
+
+.pointDetailsSearchBarClearSearchButton:hover {
+  background-color: lightgray;
+  cursor: pointer;
+}
+
+.pointDetailsControlRowGridContainer {
+    width: 100%;
+    text-align: center;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    grid-auto-rows: minmax(10px, auto);
+    font-size: 25px;
+}
+
+.pointDetailsControlRowGridContainer > *{
+  padding: 5px 0px 0px 0px;
+}
+
+.pointDetailsControlRowGridContainer .numberOfDatasets {
+  color: #c6e3df;
+}
+
+.pointDetailsControlRowGridContainer .filteredDatasets {
+  color: #52A79B ;
+}
+
+.pointDetailsControlRowGridContainer .selectedDatasets {
+  color: black;
 }

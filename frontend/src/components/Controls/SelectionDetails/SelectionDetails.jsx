@@ -1,69 +1,137 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
-import { ProgressBar } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
+import { InfoSquare, ChatDots, Filter, FileEarmarkSpreadsheet, Download } from 'react-bootstrap-icons'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
+import DatasetPreview from '../DatasetPreview/DatasetPreview.jsx'
 import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
-import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
+import LanguageSelector from '../LanguageSelector/LanguageSelector.jsx'
 import Loading from '../Loading/Loading.jsx'
+import CIOOSLogoEN from '../../Images/CIOOSNationalLogoBlackEnglish.svg'
+import CIOOSLogoFR from '../../Images/CIOOSNationalLogoBlackFrench.svg'
+import CDELogoEN from '../../Images/CDELogoEN.png'
+import CDELogoFR from '../../Images/CDELogoFR.png'
 import { server } from '../../../config'
-
 import './styles.css'
 import {
-  bytesToMemorySizeString,
   createDataFilterQueryString,
   getPointsDataSize,
-  createSelectionQueryString
+  createSelectionQueryString,
+  useDebounce
 } from '../../../utilities.js'
+import _ from 'lodash'
 
 // Note: datasets and points are exchangable terminology
-export default function SelectionDetails ({ setPointsToReview, query, polygon, children }) {
+export default function SelectionDetails({
+  setPointsToReview,
+  query,
+  polygon,
+  setPolygon,
+  setHoveredDataset,
+  filterSet,
+  setShowIntroModal,
+  totalNumberOfDatasets,
+  resetFilters,
+  children
+}) {
   const { t, i18n } = useTranslation()
-  const [selectAll, setSelectAll] = useState(true)
+  const [selectAll, setSelectAll] = useState(false)
   const [pointsData, setPointsData] = useState([])
   const [inspectDataset, setInspectDataset] = useState()
-  const [dataTotal, setDataTotal] = useState(0)
+  const [, setDataTotal] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [inspectRecordID, setInspectRecordID] = useState()
+  const [showModal, setShowModal] = useState(false)
+  const [recordLoading, setRecordLoading] = useState(false)
+  const [backClicked, setBackClicked] = useState(false)
+  const [datasetPreview, setDatasetPreview] = useState()
+  const [datasetTitleSearchText] = useState('')
+  const debouncedDatasetTitleSearchText = useDebounce(
+    datasetTitleSearchText,
+    300
+  )
+  const [datasetsSelected, setDatasetsSelected] = useState()
+  const [filteredDatasets, setFilteredDatasets] = useState([])
+  const [combinedQueries, setCombinedQueries] = useState([])
 
   useEffect(() => {
-    setDataTotal(0)
+    if (!_.isEmpty(debouncedDatasetTitleSearchText)) {
+      setFilteredDatasets(
+        pointsData.filter((dataset) => {
+          return `${dataset.title}`
+            .toLowerCase()
+            .includes(`${debouncedDatasetTitleSearchText}`.toLowerCase())
+        })
+      )
+    } else {
+      setFilteredDatasets(pointsData)
+    }
+  }, [debouncedDatasetTitleSearchText])
+
+  useEffect(() => {
     if (!_.isEmpty(pointsData)) {
+      let count = 0
+      pointsData.forEach((point) => {
+        if (point.selected) count++
+      })
+      setDatasetsSelected(count)
+      setDataTotal(0)
       const total = getPointsDataSize(pointsData)
       setDataTotal(total / 1000000)
-      setPointsToReview(pointsData.filter(point => point.selected))
+      setPointsToReview(pointsData.filter((point) => point.selected))
     }
     setLoading(false)
+    if (pointsData.length === 1 && !backClicked) {
+      // Auto load single selected dataset
+      setInspectDataset(pointsData[0])
+      // setLoading(true)
+    }
   }, [pointsData])
 
+  function datasetsInLanguage(point) {
+    return {
+      ...point,
+      title: point.title_translated[i18n.language] || point.title,
+      selected: false
+    }
+  }
   useEffect(() => {
     setDataTotal(0)
-    if (polygon !== undefined && !loading) {
+    if (!loading) {
       const filtersQuery = createDataFilterQueryString(query)
-      const shapeQuery = createSelectionQueryString(polygon)
-      const combinedQueries = [filtersQuery, shapeQuery].filter(e => e).join('&')
+      let shapeQuery = []
+      if (polygon) {
+        shapeQuery = createSelectionQueryString(polygon)
+      }
+      const combinedQueries = [filtersQuery, shapeQuery]
+        .filter((e) => e)
+        .join('&')
       setInspectDataset()
       setLoading(true)
-      const urlString = `${server}/pointQuery?${combinedQueries}`
-      fetch(urlString).then(response => {
+      setCombinedQueries(combinedQueries)
+      const urlString = `${server}/pointQuery${combinedQueries ? '?' + combinedQueries : ''
+      }`
+      fetch(urlString).then((response) => {
         if (response.ok) {
-          response.json().then(data => {
-            setPointsData(data.map(point => {
-              return {
-                ...point,
-                title: point.title_translated[i18n.language] || point.title,
-                selected: true
-              }
-            }))
+          response.json().then((data) => {
+            setPointsData(data.map(datasetsInLanguage))
           })
         } else {
           setPointsData([])
         }
       })
     }
-  }, [polygon, i18n.language])
+    setBackClicked(false)
+  }, [query, polygon])
 
-  function handleSelectDataset (point) {
+  useEffect(() => {
+    if (!loading) {
+      setPointsData(pointsData.map(datasetsInLanguage))
+    }
+  }, [i18n.language])
+
+  function handleSelectDataset(point) {
     const dataset = pointsData.filter((p) => p.pk === point.pk)[0]
     dataset.selected = !point.selected
     const result = pointsData.map((p) => {
@@ -76,88 +144,171 @@ export default function SelectionDetails ({ setPointsToReview, query, polygon, c
     setPointsData(result)
   }
 
-  function handleSelectAllDatasets () {
-    setPointsData(pointsData.map(p => {
-      return {
-        ...p,
-        selected: !selectAll
-      }
-    }))
+  function handleSelectAllDatasets() {
+    setPointsData(
+      pointsData.map((p) => {
+        return {
+          ...p,
+          selected: !selectAll
+        }
+      })
+    )
     setSelectAll(!selectAll)
   }
 
-  return (
-    <div className='pointDetails'>
-      <div className='pointDetailsInfoRow'>
-        {loading
-          ? (
-            <Loading />
-            )
-          : (inspectDataset
-              ? <DatasetInspector
-              dataset={inspectDataset}
-              setInspectDataset={setInspectDataset}
-            />
-              : (
-                  pointsData && pointsData.length > 0 &&
-              <DatasetsTable
-                handleSelectAllDatasets={handleSelectAllDatasets}
-                handleSelectDataset={handleSelectDataset}
-                setInspectDataset={setInspectDataset}
-                selectAll={selectAll}
-                setDatasets={setPointsData}
-                datasets={pointsData}
-              />
-                ) || (
-                  pointsData && pointsData.length === 0 &&
-              <div className="noDataNotice">
-                {t('selectionDetailsNoDataWarning')}
-                {/* No Data. Modify filters or change selection on map. */}
-              </div>
-                )
-            )
+  useEffect(() => {
+    if (inspectDataset) {
+      if (inspectRecordID) {
+        setShowModal(true)
+        setRecordLoading(true)
+        fetch(
+          `${server}/preview?dataset=${inspectDataset.dataset_id}&profile=${inspectRecordID}`
+        )
+          .then((response) => response.json())
+          .then((preview) => {
+            setDatasetPreview(preview)
+            setRecordLoading(false)
+          })
+          .catch((error) => {
+            throw error
+          })
+      }
+    } else {
+      setInspectRecordID()
+    }
+  }, [inspectRecordID])
 
-        }
+  return (
+    <div
+      className='pointDetails'
+      onMouseEnter={() => setHoveredDataset(inspectDataset)}
+      onMouseLeave={() => setHoveredDataset()}
+    >
+      <div className='pointDetailsHeader'>
+        <img
+          className='pointDetailsHeaderLogo CIOOS'
+          src={i18n.language === 'en' ? CIOOSLogoEN : CIOOSLogoFR}
+          onClick={() =>
+            i18n.language === 'en'
+              ? window.open('https://www.cioos.ca')
+              : window.open('https://www.siooc.ca/fr/accueil/')
+          }
+          title={t('PointDetailsCIOOSLogoTitleText')}
+        />
+        <img
+          className='pointDetailsHeaderLogo CDE'
+          src={i18n.language === 'en' ? CDELogoEN : CDELogoFR}
+          title={t('PointDetailsCDELogoTitleText')}
+          onClick={() => {
+            resetFilters()
+            setPolygon()
+          }}
+        />
+        <button
+          className='pointDetailsHeaderIntroButton'
+          onClick={() => setShowIntroModal(true)}
+          title={t('introReopenTitle')} // 'Re-open introduction'
+        >
+          <InfoSquare color='#007bff' size={'25px'} />
+        </button>
+        <a
+          className='feedbackButton'
+          title={t('feedbackButtonTitle')}
+          href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit'
+          target='_blank'
+          rel='noreferrer'
+        >
+          <ChatDots size='28px' color='#007bff' />
+        </a>
+        <LanguageSelector className='noPosition' />
       </div>
-      <div className='pointDetailsControls'>
-        <div className='pointDetailsControlRow'>
-          <div>
-            <ProgressBar
-              className='dataTotalBar'
-              title={t('selectionDetailsProgressBarTitle')}
-            >
-              <ProgressBar
-                striped
-                className='upTo100'
-                variant='success'
-                now={dataTotal < 100 ? dataTotal : 100}
-                label={dataTotal < 100 ? bytesToMemorySizeString(dataTotal * 1000000) : '100 MB'}
-                key={1}
-              />
-              {dataTotal > 100 &&
-                <ProgressBar
-                  striped
-                  className='past100'
-                  variant='warning'
-                  now={dataTotal > 100 ? (dataTotal - 100).toFixed(2) : 0}
-                  label={dataTotal > 100 ? bytesToMemorySizeString((dataTotal - 100).toFixed(2) * 1000000) : 0}
-                  key={2}
-                />
+      <div
+        className={`pointDetailsInfoRow ${inspectDataset ? 'fullHeight' : ''}`}
+      >
+        {loading ? (
+          <Loading />
+        ) : inspectDataset ? (
+          <DatasetInspector
+            dataset={inspectDataset}
+            setHoveredDataset={setHoveredDataset}
+            setBackClicked={setBackClicked}
+            setInspectDataset={setInspectDataset}
+            setInspectRecordID={setInspectRecordID}
+            filterSet={filterSet}
+            query={combinedQueries}
+          />
+        ) : (
+          <>
+            <DatasetsTable
+              handleSelectAllDatasets={handleSelectAllDatasets}
+              handleSelectDataset={handleSelectDataset}
+              setInspectDataset={setInspectDataset}
+              setInspectRecordID={setInspectRecordID}
+              filterSet={filterSet}
+              selectAll={selectAll}
+              setDatasets={setPointsData}
+              datasets={
+                _.isEmpty(debouncedDatasetTitleSearchText)
+                  ? pointsData
+                  : filteredDatasets
               }
-            </ProgressBar>
-            <div className='dataTotalRatio'>
-              {bytesToMemorySizeString(dataTotal * 1000000)} {t('selectionDetailsMaxRatio')}
-              {/* of 100MB Max */}
-              <QuestionIconTooltip
-                tooltipText={t('selectionDetailsQuestionTooltipText')} // 'Downloads are limited to 100MB.'}
-                size={20}
-                tooltipPlacement={'top'}
-              />
+              setHoveredDataset={setHoveredDataset}
+            />
+            {/* {(!pointsData || pointsData.length === 0) &&
+                <div className="noDataNotice">
+                  {t('selectionDetailsNoDataWarning')} */}
+            {/* No Data. Modify filters or change selection on map. */}
+            {/* </div>
+              } */}
+            <div className='pointDetailsControls'>
+              <div className='pointDetailsControlRow'>
+                <div className='pointDetailsControlRowGridContainer' >
+                  <div className='numberOfDatasets'
+                    title={t('pointDetailsControlRowDatasetsSelected')}
+                  >
+                    <strong>{totalNumberOfDatasets}</strong>
+                    {' '}
+                    <FileEarmarkSpreadsheet size={18} />
+                  </div>
+                  <div className='filteredDatasets'
+                    title={t('pointDetailsControlRowFilteredDatasets')}
+                  >
+                    <strong>{pointsData.length}</strong>
+                    {' '}
+                    <Filter size={18} />
+                  </div>
+                  <div className='selectedDatasets'
+                    title={t('pointDetailsControlRowToDownload')}
+                  >
+                    <strong>{datasetsSelected}</strong>
+                    {' '}
+                    <Download size={18} />
+                  </div>
+                </div>
+                {/* {t('pointDetailsControlRowDatasetsSelected')}{' '}
+                <strong>{totalNumberOfDatasets}</strong>
+                Filtered
+                <strong>{pointsData.length}</strong>
+                {t('pointDetailsControlRowToDownload')}{' '}
+                <strong>{datasetsSelected}</strong> */}
+                {children}
+              </div>
             </div>
-          </div>
-          {children}
-        </div>
+          </>
+        )}
       </div>
+      <DatasetPreview
+        datasetPreview={datasetPreview}
+        setDatasetPreview={setDatasetPreview}
+        inspectDataset={inspectDataset}
+        setInspectDataset={setInspectDataset}
+        showModal={showModal || recordLoading}
+        setShowModal={setShowModal}
+        inspectRecordID={inspectRecordID}
+        setInspectRecordID={setInspectRecordID}
+        recordLoading={recordLoading}
+        setRecordLoading={setRecordLoading}
+      />
     </div >
   )
 }

@@ -1,10 +1,12 @@
-var express = require("express");
+const express = require("express");
 // helps with async error handling in express < v5
 require("express-async-errors");
-var router = express.Router();
+const Sentry = require("@sentry/node");
+
+const router = express.Router();
+const axios = require("axios");
 const db = require("../db");
 const { validatorMiddleware } = require("../utils/validatorMiddlewares");
-const axios = require("axios");
 
 /*
  * /preview
@@ -13,11 +15,12 @@ const axios = require("axios");
  * TODO: How will this work with timeseries profiles?
  */
 
-router.get("/", validatorMiddleware(), async function (req, res, next) {
+router.get("/", validatorMiddleware(), async (req, res, next) => {
   const NUM_RECORDS = 1000;
   const { dataset, profile } = req.query;
   const sql = `WITH step1 AS (
                SELECT d.dataset_id,
+                      d.first_eov_column,
                       COALESCE(d.timeseries_id_variable,d.profile_id_variable) profile_variable,
                       COALESCE(p.timeseries_id,p.profile_id) profile,
                       d.profile_id_variable,
@@ -42,7 +45,6 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
                 FROM   step2
                 WHERE  profile=:profile
                 AND    dataset_id=:dataset`;
-
   const q = db.raw(sql, { profile, dataset, NUM_RECORDS });
   const rows = await q;
 
@@ -60,7 +62,7 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
     use_whole_profile,
   } = rows.rows[0];
 
-  let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.dataTable?&${profile_variable}=~"${profile_id}"`;
+  let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?&${profile_variable}=~"${profile_id}"`;
   if (!use_whole_profile) {
     // putting timeMax in case many new records were added since the profile was harvested
     erddapQuery += `&time>${new_start_time}&time<${time_max}`;
@@ -69,14 +71,15 @@ router.get("/", validatorMiddleware(), async function (req, res, next) {
   console.log("Fetching preview from ", erddapQuery);
   try {
     const { data } = await axios.get(erddapQuery);
-    console.log("FOUND ", data.rows.length, " ROWS", erddapQuery);
+    console.log("FOUND ", data.table?.rows?.length, " ROWS", erddapQuery);
+    data.table.rows = data.table.rows.slice(0, 1000);
     res.send(data);
   } catch (error) {
     if (error.response) {
       console.error(error.response);
-      if (error.response.status === 404) res.send([]);
-      // TODO throw sentry error if no data
+      Sentry.captureMessage("No preview data found at", erddapQuery);
     }
+    res.send([]);
   }
 });
 

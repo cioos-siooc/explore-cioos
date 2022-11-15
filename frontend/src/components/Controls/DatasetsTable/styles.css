@@ -2,12 +2,31 @@
   text-align: left;
 }
 
+.datasetsTable .selectDatasetColumn {
+  width: 50px;
+}
+
 .datasetsTable th {
   cursor: pointer;
 }
 
-.datasetsTable th:hover {
+.datasetsTable thead th {
+  background-color: white;
+}
+
+.datasetsTable tr {
+  border: 2px solid transparent;
+  margin: -2px;
+  overflow-wrap: break-word;
+}
+
+.datasetsTable thead th:hover {
   background-color: lightgray;
+}
+
+.datasetsTable tr:hover {
+  background-color: #c6e3df;
+  cursor: pointer;
 }
 
 .datasetsTable td {
@@ -16,7 +35,6 @@
 
 .datasetsTable .datasetsTableTitleCell {
   min-width: 150px;
-  word-break: break-all;
 }
 
 .datasetsTable .inspectButton {
@@ -35,4 +53,48 @@
 
 .selectAllHeader {
   display: flex
+}
+
+.selectAllHeader svg {
+  margin-bottom: 5px;
+}
+
+.datasetsTable .optionColorCircle {
+  margin-right: 5px;
+}
+
+.datasetsTable .datasetTableLocationsCell svg {
+  float: right;
+}
+
+.datasetsTable tbody tr td svg:hover {
+  background-color: lightgrey;
+}
+
+.datasetsTable .downloadIcon {
+  margin-left: 2px;
+}
+
+.datasetsTable .datasetsTableSpinner {
+  /* position: absolute; */
+  margin:0px 40px;
+  /* background-color: lightgray; */
+  opacity: 30%;
+}
+
+.datasetsTable .downloadSizeEstimate {
+  line-height: 30px;
+  padding: 0px 10px;
+  min-width: max-content;
+}
+
+.datasetsTable .downloadSizeEstimateFiltered {
+  height: 30px;
+  display: inline;
+  background-color: #e3285e;
+  color: white;
+}
+
+.datasetsTable .downloadSizeEstimateFiltered.downloadable {
+  background-color: #52a79b;
 }

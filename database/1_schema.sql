@@ -10,7 +10,21 @@ CREATE schema cde;
 
 SET search_path TO cde, public;
 
--- The harvester will skip datasets in this table
+DROP TABLE IF EXISTS hexes_zoom_0;
+CREATE TABLE hexes_zoom_0 (
+    pk serial PRIMARY KEY,
+    geom geometry(Polygon,3857)
+);  
+
+DROP TABLE IF EXISTS hexes_zoom_1;
+CREATE TABLE hexes_zoom_1 (
+    pk serial PRIMARY KEY,
+    geom geometry(Polygon,3857)
+  );
+
+ 
+
+-- The scraper will skip datasets in this table
 DROP TABLE IF EXISTS skipped_datasets;
 CREATE TABLE skipped_datasets (
     pk serial PRIMARY KEY,
@@ -22,9 +36,10 @@ CREATE TABLE skipped_datasets (
 DROP TABLE IF EXISTS datasets;
 CREATE TABLE datasets (
     pk serial PRIMARY KEY,
+    pk_url INTEGER,
     dataset_id TEXT,
     erddap_url TEXT,
-    platform text,
+    platform TEXT,
     title TEXT,
     title_fr TEXT,
     summary TEXT,
@@ -39,6 +54,8 @@ CREATE TABLE datasets (
     organization_pks INTEGER[],
     n_profiles integer,
     profile_variables text[],
+    num_columns integer,
+    first_eov_column TEXT,
     UNIQUE(dataset_id, erddap_url)
 );
 
@@ -46,9 +63,32 @@ CREATE TABLE datasets (
 DROP TABLE IF EXISTS organizations;
 CREATE TABLE organizations (
     pk SERIAL PRIMARY KEY,
+    pk_url INTEGER,
     name TEXT UNIQUE,
     color TEXT
 );
+
+
+
+-- One record per unique lat/long
+-- this table is mostly used to build hexes, its not queried by the API
+DROP TABLE IF EXISTS points;
+CREATE TABLE points (
+    pk serial PRIMARY KEY,
+    geom geometry(Point,3857),
+    -- these values are copied back into profiles
+    hex_zoom_0 geometry(Polygon,3857),
+    hex_zoom_1 geometry(Polygon,3857),
+    hex_0_pk integer REFERENCES hexes_zoom_0(pk),
+    hex_1_pk integer REFERENCES hexes_zoom_1(pk)
+);
+
+CREATE INDEX
+  ON points
+  USING GIST (geom);
+
+ 
+
 
 -- profiles/timeseries per dataset
 DROP TABLE IF EXISTS profiles;
@@ -72,7 +112,10 @@ CREATE TABLE profiles (
     -- hex polygon that this point is in for zoom 0 (zoomed out)
     hex_zoom_0 geometry(polygon,3857),
     hex_zoom_1 geometry(polygon,3857),
+    hex_0_pk integer references hexes_zoom_0(pk),
+    hex_1_pk integer references hexes_zoom_1(pk),
     point_pk INTEGER,
+    days bigint,
     UNIQUE(erddap_url,dataset_id,timeseries_id,profile_id)
 );
 
@@ -80,25 +123,10 @@ CREATE INDEX ON profiles USING GIST (geom);
 CREATE INDEX ON profiles USING GIST (hex_zoom_0);
 CREATE INDEX ON profiles USING GIST (hex_zoom_1);
 CREATE INDEX ON profiles(latitude);
-CREATE INDEX ON profiles(latitude);
+CREATE INDEX ON profiles(longitude);
 
 
--- One record per unique lat/long
--- this table is mostly used to build hexes, its not queried by the API
-DROP TABLE IF EXISTS points;
-CREATE TABLE points (
-    pk serial PRIMARY KEY,
-    geom geometry(Point,3857),
-    -- these values are copied back into profiles
-    hex_zoom_0 geometry(Polygon,3857),
-    hex_zoom_1 geometry(Polygon,3857)
-);
 
-CREATE INDEX
-  ON points
-  USING GIST (geom);
-
- 
 
 --
 DROP TABLE IF EXISTS download_jobs;
@@ -119,19 +147,6 @@ CREATE TABLE download_jobs (
     downloader_output text
 );
 
-
-DROP TABLE IF EXISTS erddap_variables;
-CREATE TABLE erddap_variables (
-    dataset_pk integer REFERENCES datasets(pk),
-    erddap_url text,
-    dataset_id text,
-    "name" text,
-    "type" text,
-    actual_range text,
-    cf_role text,
-    standard_name text
-);
-
 DROP TABLE IF EXISTS skipped_datasets;
 CREATE TABLE skipped_datasets (
     erddap_url text,
@@ -139,42 +154,16 @@ CREATE TABLE skipped_datasets (
     reason_code text
 );
 
-
-DROP TABLE IF EXISTS eov_to_standard_name;
-CREATE TABLE eov_to_standard_name (
+DROP TABLE IF EXISTS cde.organizations_lookup;
+CREATE TABLE cde.organizations_lookup (
     pk SERIAL PRIMARY KEY,
-    eov text,
-    standard_name text,
-    UNIQUE(eov,standard_name)
+    name TEXT UNIQUE
 );
 
--- DROP VIEW dataset_to_eov;
-CREATE OR REPLACE VIEW dataset_to_eov AS
- SELECT d.pk, eov,v.standard_name
-   FROM datasets d
-     JOIN erddap_variables v ON v.dataset_pk =  d.pk
-     JOIN eov_to_standard_name ets ON ets.standard_name = v.standard_name;
-
-DROP FUNCTION IF EXISTS range_intersection_length( numrange, numrange );
-CREATE OR REPLACE FUNCTION range_intersection_length(a numrange,b numrange )
-   RETURNS numeric 
-   LANGUAGE plpgsql
-  AS
-$$
-DECLARE 
-BEGIN
-RETURN upper(a*b)-lower(a*b);
-END;
-$$;
-
-DROP FUNCTION IF EXISTS range_intersection_length( tstzrange, tstzrange );
-CREATE OR REPLACE FUNCTION range_intersection_length(a tstzrange,b tstzrange )
-   RETURNS interval 
-   LANGUAGE plpgsql
-  as
-$$
-DECLARE 
-BEGIN
-RETURN upper(a*b)-lower(a*b);
-END;
-$$;
+DROP TABLE IF EXISTS cde.datasets_lookup;
+CREATE TABLE cde.datasets_lookup (
+    pk serial PRIMARY KEY,
+    dataset_id TEXT,
+    erddap_url TEXT,
+    UNIQUE(dataset_id, erddap_url)
+);

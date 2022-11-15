@@ -3,10 +3,11 @@ name: Build and Test
 on:
   push:
     paths:
-    - 'downloader/**'
+      - "downloader/**"
 
 jobs:
   build-and-test:
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     strategy:
       matrix:

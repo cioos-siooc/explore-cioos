@@ -1,8 +1,7 @@
 // This is the entry point for Webpack to grab the js files. This is automatically found by webpack.
 // eslint-disable-next-line no-unused-vars
-import React from 'react'
+import React, { Suspense } from 'react'
 import ReactDOM from 'react-dom'
-import { Suspense } from 'react'
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
@@ -11,6 +10,7 @@ import Loading from './components/Controls/Loading/Loading.jsx'
 import translationEN from './locales/en/translation.json'
 import translationFR from './locales/fr/translation.json'
 import App from './components/App.jsx'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
 const resources = {
   en: {
@@ -40,11 +40,17 @@ i18n
     },
     react: { useSuspense: true }
   })
-
 // This is where react reaches into the DOM, finds the <div id="app"> element, and replaces it with the content of ReactD3Viz's render function JSX.
 const domContainer = document.querySelector('#app')
 ReactDOM.render(
   <Suspense fallback={<Loading />}>
-    <App />
-  </Suspense>
-  , domContainer)
+    <BrowserRouter basename={process.env.BASE_URL}>
+      <Routes>
+        <Route path='/' element={<App />} />
+      </Routes>
+    </BrowserRouter>
+    ,{/* <App /> */}
+    {/* </Router> */}
+  </Suspense>,
+  domContainer
+)

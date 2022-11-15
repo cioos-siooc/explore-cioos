@@ -34,14 +34,18 @@ class Dataset(object):
         self.timeseries_id_variable = ""
         self.profile_id_variable = ""
         self.trajectory_id_variable = ""
+        self.num_columns = 0
+        self.first_eov_column = ""
 
         self.get_metadata()
 
     def get_df(self):
+
+
         self.df = pd.DataFrame(
             {
                 "title": [self.globals["title"]],
-                "summary": [self.globals["summary"]],
+                # "summary": [self.globals["summary"]],
                 "erddap_url": [self.erddap_url],
                 "dataset_id": [self.id],
                 "cdm_data_type": [self.cdm_data_type],
@@ -53,8 +57,11 @@ class Dataset(object):
                 "timeseries_id_variable": self.timeseries_id_variable,
                 "profile_id_variable": self.profile_id_variable,
                 "trajectory_id_variable":self.trajectory_id_variable,
+                "num_columns":len(self.df_variables),
+                "first_eov_column": self.first_eov_column,
             }
         )
+        
         return self.df
 
     def dataset_tabledap_query(self, url):
@@ -228,8 +235,15 @@ class Dataset(object):
     def get_eovs(self):
         eovs = []
         dataset_standard_names = self.df_variables["standard_name"].to_list()
+
         for eov in cde_eov_to_standard_name:
-            if intersection(dataset_standard_names, cde_eov_to_standard_name[eov]):
+            overlap = intersection(dataset_standard_names, cde_eov_to_standard_name[eov])
+            if overlap:
+                # check if list of standard names in this EOV overlaps with list of standard names in this dataset
+                
+                # set first_eov_column, which is used to set default column in preview
+                first_standard_name = overlap[0]
+                self.first_eov_column=self.df_variables.query(f"standard_name=='{first_standard_name}'").head(1)['name'].item()
                 eovs.append(eov)
         return eovs
 
@@ -244,7 +258,7 @@ class Dataset(object):
             try:
                 l06_platform_label = platforms_nerc_ioos.query(
                     f"ioos_label=='{platform}'"
-                )["l06_label"].item()
+                )["category"].item()
 
                 return l06_platform_label
 
@@ -252,10 +266,16 @@ class Dataset(object):
                 self.logger.debug("Found unsupported IOOS platform:", platform)
 
         if "L06" in platform_vocabulary:
+            platforms_nerc_ioos_no_duplicates = platforms_nerc_ioos.drop_duplicates(
+                subset=["l06_label"]
+            )
+
             if platform in list(platforms_nerc_ioos["l06_label"]):
-                return platform
+                return platforms_nerc_ioos_no_duplicates.query(
+                    f"l06_label=='{platform}'"
+                )["category"].item()
             else:
-                self.logger.debug("Found unsupported L06 platform:", platform)
+                self.logger.debug("Found unsupported L06 platform: " + platform)
 
     def get_metadata(self):
         "get all the global and variable metadata for a dataset"

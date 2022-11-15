@@ -1,0 +1,14 @@
+.datasetPreviewPlot {
+  width: 100%;
+  min-height: 100%;
+}
+
+.datasetPreviewPlot .js-plotly-plot, .datasetPreviewPlot .plot-container.plotly, .datasetPreviewPlot .user-select-none.svg-container {
+  width: 100%;
+  min-height: 100%;
+}
+
+.datasetPreviewPlot .user-select-none.svg-container {
+  min-height: 450px !important;
+  height: 100% !important;
+}

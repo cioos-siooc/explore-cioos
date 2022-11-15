@@ -1,3 +1,8 @@
+.datasetInspector {
+  height: 100%;
+  padding: -2px;
+}
+
 .datasetInspector .backButton {
   text-align: center;
   margin: 10px 10px 10px 10px;
@@ -14,6 +19,79 @@
   cursor: pointer;
 }
 
-.datasetInspector .backButton svg {
+.datasetInspector .optionColorCircle {
   margin-right: 5px;
+  margin-bottom: 5px;
 }
+
+.datasetInspectorLoadingContainer{
+  position: absolute; 
+  height: 200px;
+  width: 100%;
+}
+
+.inspectorTable tbody tr:hover {
+  background-color: #c6e3df;
+  cursor: pointer;
+}
+
+.metadataGridContainer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: max-content;
+}
+
+.metadataAndRecordIDTableGridContainer {
+  border: 2px solid transparent;
+}
+
+.metadataAndRecordIDTableGridContainer button, .metadataAndRecordIDTableGridContainer a {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 5px; 
+  min-height: 20px;
+  margin: 5px 5px;
+  background-color: #f3f3f3;
+}
+
+.metadataAndRecordIDTableGridContainer strong {
+  /* margin-top: 10px; */
+  display: block;
+}
+
+.metadataAndRecordIDTableGridContainer a:hover {
+  background-color: #c6e3df;
+}
+
+.metadataAndRecordIDTableGridContainer:hover {
+  border: 2px solid #c6e3df;
+}
+
+.metadataGridItem{
+  margin-bottom: 10px;
+}
+
+.metadataGridItem a {
+  line-height: 42px;
+}
+
+.metadataGridItem a.unavailable:hover {
+  background-color: #f3f3f3;
+  cursor:not-allowed;
+}
+
+/* .datasetInspector {
+  display: flex;
+  max-height: 50%;
+  overflow: auto;
+}
+
+.datasetInspector .inspectorTable {
+  max-width: 50%;
+  min-width: 50%;
+}
+
+.datasetInspector .datasetMetadata {
+  max-width: 50%;
+  min-width: 50%;
+} */

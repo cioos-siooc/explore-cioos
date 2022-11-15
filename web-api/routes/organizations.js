@@ -1,7 +1,9 @@
-var express = require("express");
-var router = express.Router();
+const express = require("express");
+
+const router = express.Router();
 const db = require("../db");
 const cache = require("../utils/cache");
+const { changePKtoPkURL } = require("../utils/misc");
 
 /**
  * /organizations
@@ -10,8 +12,8 @@ const cache = require("../utils/cache");
  *
  * */
 
-router.get("/", cache.route(), async function (req, res, next) {
-  res.send(await db("cde.organizations").orderByRaw("UPPER(name)"));
+router.get("/", cache.route(), async (req, res, next) => {
+  res.send((await db("cde.organizations").orderByRaw("UPPER(name)")).map(changePKtoPkURL));
 });
 
 module.exports = router;

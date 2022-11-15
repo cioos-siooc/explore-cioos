@@ -12,6 +12,10 @@
   border-radius: 0px;
 }
 
+.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon:hover {
+background-color: #f3f3f3 !important;
+}
+
 .mapbox-gl-draw_polygon.active {
   background-color: lightgray;
 }

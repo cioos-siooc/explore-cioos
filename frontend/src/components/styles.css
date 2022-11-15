@@ -52,13 +52,14 @@ body {
 
 .emailAddress {
   height: 40px;
-  width: 300px;
+  width: 100%;
+  margin-bottom: 10px;
 }
 
 .boxQueryButton {
   position: absolute;
   right: 10px;
-  bottom: 250px;
+  bottom: 240px;
   width: 42px;
   height: 42px;
   border-radius: 4px 4px 0px 0px;
@@ -67,6 +68,10 @@ body {
   background-color: #fff;
   padding: 5px;
   z-index: 2;
+}
+
+.boxQueryButton.active {
+  background-color: #c6e3df;
 }
 
 .rectangleIcon {
@@ -86,22 +91,7 @@ body {
   border-radius: 0px 0px 4px 4px;
 }
 
-.feedbackButton {
-  position: absolute;
-  right: 10px;
-  top: 60px;
-  background-color: #fff;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
-  border-radius: 40px;
-  width: 42px;
-  height: 42px;
-  z-index: 100;
-  padding: 5.5px;
-}
 
-.feedbackButton:hover {
-  background-color: #f3f3f3;
-}
 
 .submissionFeedback span {
   vertical-align: middle;
@@ -110,28 +100,41 @@ body {
 .submissionFeedback svg,
 .submissionFeedback span {
   margin-right: 5px;
+  margin-left: 5px;
 }
 
-@media all and (max-width: 900px) {
-  .logo {
+@media all and (max-width: 915px) {
+  /* .logo {
     left: calc(900px - 140px);
-  }
-
+  } */
+/* 
   .feedbackButton {
     left: 848px;
-  }
+  } */
 
   .boxQueryButton {
     left: 848px;
   }
 
-  .introButton {
+  /* .introButton {
     left: 848px;
-  }
+  } */
 }
 
 @media all and (max-height: 500px) {
   .boxQueryButton {
-    top: 210px;
+    top: 176px;
   }
+}
+
+.resetFiltersButton:hover {
+  background-color: #c6e3df;
+}
+
+.resetFiltersButton {
+  pointer-events: all;
+  background-color: transparent;
+  border-radius: 42px;
+  border: 2px solid transparent;
+  margin-left: 5px;
 }

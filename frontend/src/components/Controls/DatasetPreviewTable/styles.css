@@ -1,0 +1,12 @@
+.datasetPreviewTable {
+  max-width: 50%;
+  min-width: 50%;
+}
+
+/* .datasetPreviewTable.top-scrollbars {
+  transform: rotateX(180deg);
+}
+
+.datasetPreviewTable.top-scrollbars * {
+  transform: rotateX(180deg);
+} */

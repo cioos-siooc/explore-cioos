@@ -32,5 +32,5 @@ const cdeQuery = (url) => fetch(API_URL + url).then((res) => res.json());
   assert(oceanVariables.length == 1), "oceanVariables";
   assert(pointQuery.length == 1), "pointQuery";
   assert(tiles.byteLength > 2000), "tiles";
-  assert(preview.rows.length > 100), "preview";
+  assert(preview.table.rows.length > 100), "preview";
 })();

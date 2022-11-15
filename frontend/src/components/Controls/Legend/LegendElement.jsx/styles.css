@@ -1,0 +1,11 @@
+.legendElement {
+  display: flex;
+  flex-direction: row;
+  justify-content: start;
+  margin: 2px;
+  line-height: 11px;
+}
+
+.legendElement svg {
+  transform-origin: center;
+}

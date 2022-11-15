@@ -82,7 +82,6 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
 
     datasets_file = f"{folder}/datasets.csv"
     profiles_file = f"{folder}/profiles.csv"
-    variables_file = f"{folder}/variables.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
     ckan_file = f"{folder}/ckan.csv"
 
@@ -127,26 +126,26 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     print("Cleaning up data")
     datasets = datasets.replace(np.nan, None)
 
-    datasets["summary"] = datasets["summary"].apply(lambda x: unescape_ascii(x))
+    # datasets["summary"] = datasets["summary"].apply(lambda x: unescape_ascii(x))
     datasets["title"] = datasets["title"].apply(lambda x: unescape_ascii(x))
 
     datasets["ckan_title"].fillna(datasets["title"], inplace=True)
-    datasets["ckan_summary"].fillna(datasets["summary"], inplace=True)
+    # datasets["ckan_summary"].fillna(datasets["summary"], inplace=True)
 
     # prioritize with organizations from CKAN and then pull ERDDAP if needed
     datasets["organizations"] = datasets.apply(
         lambda x: x["ckan_organizations"] or x["organizations"], axis=1
     )
     del datasets["title"]
-    del datasets["summary"]
+    # del datasets["summary"]
     del datasets["ckan_organizations"]
 
     datasets.rename(
         columns={
             "ckan_title": "title",
             "ckan_title_fr": "title_fr",
-            "ckan_summary": "summary",
-            "ckan_summary_fr": "summary_fr",
+            # "ckan_summary": "summary",
+            # "ckan_summary_fr": "summary_fr",
         },
         inplace=True,
     )
@@ -163,7 +162,6 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
         datasets_file, index=False
     )
     profiles.drop_duplicates().to_csv(profiles_file, index=False)
-    variables.drop_duplicates().to_csv(variables_file, index=False)
     df_ckan.to_csv(ckan_file, index=False)
     skipped_datasets.drop_duplicates().to_csv(skipped_datasets_file, index=False)
 
@@ -171,7 +169,6 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
         "Wrote",
         datasets_file,
         profiles_file,
-        variables_file,
         ckan_file,
         skipped_datasets_file,
     )
@@ -195,61 +192,21 @@ def load_config(config_file):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--urls",
-        help="harvest from these erddap servers, comme separated",
-    )
-    parser.add_argument(
-        "--dataset_ids",
-        help="only scrape these dataset IDs. Comma separated list",
-    )
-
-    parser.add_argument(
-        "--cache", help="Cache requests, for testing only", action="store_true"
-    )
-
-    parser.add_argument(
-        "--folder",
-        help="Folder to save harvested data to",
-        default="harvest",
-    )
-
-    parser.add_argument(
-        "--log-level",
-        default="debug",
-        help="Provide logging level. Example --log-level debug, default=debug",
-    )
-    parser.add_argument(
-        "--log-time",
-        default=False,
-        help="add time to logs",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--max-workers",
-        default=1,
-        help="max threads that harvester will use",
-    )
-
-    parser.add_argument(
-        "-f",
-        "--file",
-        help="get these options from a config file instead",
-    )
-
-    args = parser.parse_args()
     
-    log_time = args.log_time
-    log_level = args.log_level
-    urls = args.urls
-    cache = args.cache
-    dataset_ids = args.dataset_ids
-    max_workers = args.max_workers
-    folder = args.folder
+    parser = argparse.ArgumentParser()
 
-    config_file=args.file
-    if config_file:
+    if '-f' in sys.argv or '--file' in sys.argv:
+        # Use config file
+        parser.add_argument(
+            "-f",
+            "--file",
+            help="get these options from a config file instead",
+            required=True
+        )
+
+        args = parser.parse_args()
+        config_file=args.file
+
         config = load_config(config_file)
         print(
             "Using config from harvest_config.yaml, ignoring command line arguments"
@@ -262,6 +219,53 @@ if __name__ == "__main__":
         log_time = config.get("log_time")
         log_level = config.get("log_level")
         
+    else:        
+        parser.add_argument(
+            "--urls",
+            help="harvest from these erddap servers, comme separated",
+            required=True
+        )
+        parser.add_argument(
+            "--dataset_ids",
+            help="only scrape these dataset IDs. Comma separated list",
+        )
+
+        parser.add_argument(
+            "--cache", help="Cache requests, for testing only", action="store_true"
+        )
+
+        parser.add_argument(
+            "--folder",
+            help="Folder to save harvested data to",
+            default="harvest",
+        )
+
+        parser.add_argument(
+            "--log-level",
+            default="debug",
+            help="Provide logging level. Example --log-level debug, default=debug",
+        )
+        parser.add_argument(
+            "--log-time",
+            default=False,
+            help="add time to logs",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--max-workers",
+            default=1,
+            help="max threads that harvester will use",
+        )
+
+        args = parser.parse_args()
+        
+        log_time = args.log_time
+        log_level = args.log_level
+        urls = args.urls or ""
+        cache = args.cache
+        dataset_ids = args.dataset_ids
+        max_workers = args.max_workers
+        folder = args.folder
 
     setup_logging(log_time, log_level)
 
