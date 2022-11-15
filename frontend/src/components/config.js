@@ -1,4 +1,5 @@
 export const defaultEovsSelected = []
+export const defaultPlatformsSelected = []
 export const defaultOrgsSelected = []
 export const defaultDatatsetsSelected = []
 export const defaultStartDate = '1900-01-01'
@@ -13,7 +14,15 @@ export const defaultQuery = {
   endDepth: defaultEndDepth
 }
 
-export const colorScale = ['#52A79B', '#4A968C', '#3D7B73', '#2F6059', '#224440', '#1B3733', '#142926']
+export const colorScale = [
+  '#52A79B',
+  '#4A968C',
+  '#3D7B73',
+  '#2F6059',
+  '#224440',
+  '#1B3733',
+  '#142926'
+]
 
 export const languages = [
   {

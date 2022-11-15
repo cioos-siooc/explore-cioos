@@ -19,6 +19,7 @@ services:
       retries: 5
   web-api:
     build: ./web-api
+    restart: always
     env_file:
       - .env
     expose:
@@ -48,6 +49,7 @@ services:
       context: ./frontend
       args:
         API_URL: $API_URL
+        BASE_URL: $BASE_URL
     expose:
       - "80"
     # depends_on:
@@ -59,14 +61,12 @@ services:
       dockerfile: ./harvester/Dockerfile
     profiles:
       - tools
-    depends_on:
-      - db
     volumes:
       - ./harvest_config.yaml:/usr/src/app/harvest_config.yaml
       - ./harvester_cache:/usr/src/app/harvester_cache
       - ./harvest:/usr/src/app/harvest
     environment:
-      - "DB_HOST_EXTERNAL=db"
+      - "DB_HOST_EXTERNAL=$DB_HOST_EXTERNAL"
     env_file:
       - .env
 

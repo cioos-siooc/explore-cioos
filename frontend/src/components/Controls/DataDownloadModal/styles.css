@@ -1,6 +1,6 @@
-.dataDownloadModal .modal-header {
+/* .dataDownloadModal .modal-header {
   padding: 5px;
-}
+} */
 
 .dataDownloadModal .modal-body {
   padding: 0px;
@@ -12,7 +12,7 @@
 
 .downloadButton {
   pointer-events: all;
-  background-color: #f7f7f7;
+  background-color: white;
   border: solid 2px darkgrey;
   border-radius: 10px;
   height: 40px;
@@ -20,18 +20,28 @@
 }
 
 .downloadButton:disabled:hover {
-  background-color: #f7f7f7;
+  background-color: white;
+  cursor: not-allowed;
 }
 
 .downloadButton:hover {
-  background-color: lightgray;
+  background-color: #c6e3df;
 }
 
 .submitRequestButton {
-  background-color: #f7f7f7;
-  border: solid 2px darkgrey;
+  background-color: White;
+  border: solid 2px lightgrey;
   border-radius: 10px;
   height: 40px;
   text-align: center;
-  min-width: 10em;
+  width: 100%;
+}
+
+.submitRequestButton.disabled:hover {
+  background-color: white;
+}
+
+.submitRequestButton:hover {
+  background-color: #c6e3df;
+  border: 2px solid darkgrey;
 }

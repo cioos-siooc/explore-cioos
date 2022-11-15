@@ -1,0 +1,146 @@
+.tableAndPlotGridItem {
+  height: 100%;
+  overflow: auto;
+}
+
+.tableAndPlotGridItem.tableAndPlot {
+  min-height: 100px;
+}
+
+ .backButton {
+  text-align: center;
+  border: 2px solid darkgrey;
+  border-radius: 10px;
+  justify-content: space-between;
+  padding: 5px;
+  margin-right: 10px;
+  min-width: fit-content;
+}
+
+.backButton:hover {
+  background-color: #c6e3df;
+  cursor: pointer;
+}
+
+.backButton svg {
+  margin-right: 5px;
+}
+
+.tableAndPlotGridContainer .toggleButton {
+  min-width: 66px;
+  height: 42px;
+  margin: 0px 16.5px;
+  background-color: white;
+  border-radius: 5px;
+  border: 2px solid darkgrey;
+  color: black;
+  line-height: 15px;
+}
+
+.toggleButton:hover {
+  background-color: #c6e3df;
+}
+
+.toggleButton.selected {
+  background-color: #52A79B;
+  color: white;
+}
+
+.dataPreviewModal .datasetTitle {
+  margin: 10px auto;
+}
+
+.tableAndPlotGridItem .dropdown{
+  display: inline;
+  margin-right: 10px;
+}
+
+.tableAndPlotGridItem .dropdown button {
+  background-color: #52A79B;
+}
+
+.tableAndPlotGridItem.tableAndPlot {
+  margin-top: 15px;
+}
+
+.tableAndPlotGridItem hr {
+  margin-top: 0px;
+}
+
+/* .tableAndPlot .dropDownButton {
+
+} */
+
+/*
+.dataPreviewModal .modal-header button {
+  margin: 0px 10px;
+}
+
+.previewFlexContainer {
+  display: flex;
+  height: 100%;
+}
+
+.recordIDTable {
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 0px;
+  margin: 9px 0 9px 0px;
+}
+
+.metadataGridContainer {
+  display: grid;
+  grid-template-columns: 198px 198px;
+  grid-auto-rows: minmax(66px, auto);
+  gap: 16.5px;
+}
+
+.metadataAndRecordIDTableGridContainer {
+  display: grid;
+}
+
+.metadataGridItem h5 {
+  font-weight: bolder;
+  line-height: 20px;
+}
+
+.selectedRecordID {
+  color: white;
+  background-color: #52A79B;
+}
+
+.selectedRecordID:hover {
+  color: white;
+}
+
+.tableAndPlotGridContainer {
+  display: grid;
+  height: 100%;
+  grid-template-columns: 100%;
+  grid-template-rows: max-content calc(100% - 76px);
+  margin: 0px 16.5px;
+  gap: 16.5px;
+}
+
+.tableAndPlotGridItem {
+  height: 100%;
+  overflow: auto;
+}
+
+.deselectRecordButton {
+  height: 42px;
+  background-color: white;
+  border-radius: 5px;
+  border: 2px solid darkgrey;
+  color: black;
+  line-height: 15px;
+  margin: 0px 16.5px;
+}
+
+.deselectRecordButton:hover {
+  background-color: #c6e3df;
+}
+
+.tableAndPlot .dropdown {
+  display: inline;
+} */

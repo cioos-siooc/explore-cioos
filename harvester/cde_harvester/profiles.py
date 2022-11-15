@@ -5,17 +5,6 @@ from datetime import datetime
 import pandas as pd
 from cde_harvester.ERDDAP import ERDDAP
 
-dtypes = {
-    "erddap_url": str,
-    "dataset_id": str,
-    "timeseries_id": str,
-    "profile_id": str,
-    "latitude": float,
-    "longitude": float,
-    "depth_min": float,
-    "depth_max": float,
-}
-
 
 def get_profiles(dataset):
     """
@@ -34,6 +23,8 @@ def get_profiles(dataset):
     """
 
     df_variables = dataset.df_variables
+
+    vertical_variables = ["depth", "altitude"]
 
     # lat,lon not in this list. They have to be treated differently as getting the min of the lat and lon could create a point not in the dataset
     llat_variables = [
@@ -119,6 +110,10 @@ def get_profiles(dataset):
             # For ongoing datasets
             if "NaN" in max:
                 max = datetime.utcnow().isoformat()
+
+            if llat_variable in vertical_variables:
+                min=float(min)
+                max=float(max)
 
             profiles_with_lat_lon[llat_variable + "_min"] = min
             profiles_with_lat_lon[llat_variable + "_max"] = max
@@ -226,7 +221,6 @@ def get_profiles(dataset):
 
     profiles["records_per_day"] = profiles["n_records"] / (days)
 
-    profiles = profiles.astype(dtypes)
     profiles = profiles.round(4)
 
     profiles_bad_geom_query = f"""((latitude <= -90) or (latitude >= 90) or  \

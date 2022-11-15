@@ -1,6 +1,6 @@
 .introButton {
   position: absolute;
-  bottom: 300px;
+  bottom: 312px;
   right: 10px;
   pointer-events: all;
   background-color: #fff;
@@ -14,7 +14,7 @@
 }
 
 .introButton:hover {
-  background-color: #f7f7f7;
+  background-color: #f3f3f3;
 }
 
 .introModal .modalHeader {
@@ -83,7 +83,7 @@
   margin: 2px;
   background-color: #abd3df;
   background-repeat: no-repeat;
-  background-size: 200px 200px;
+  background-size: 225px 225px;
   background-position: bottom;
 }
 
@@ -154,6 +154,14 @@
   /* min-height: 275px; */
 }
 
+.tipInfo p {
+  margin: 15px 0px;
+}
+
+.tipInfo a {
+  margin-right: 15px;
+}
+
 .tagLine {
   display: inline;
   margin: auto;
@@ -173,9 +181,9 @@
   background-size: contain;
 }
 
-.feedbackButtonImage {
+/* .feedbackButtonImage {
   background-image: url(../../Images/feedbackButton.png);
-}
+} */
 
 .infoButtonImage {
   background-image: url(../../Images/infoButton.png);
@@ -183,10 +191,24 @@
 
 @media all and (max-height: 500px) {
   .introButton {
-    top: 157px;
+    top: 145px;
   }
 }
 
 .infoBox {
   min-height: 300px;
 }
+
+/* .feedbackButton {
+  background-color: #fff;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  border-radius: 40px;
+  width: 42px;
+  height: 42px;
+  z-index: 100;
+  padding: 5.5px;
+}
+
+.feedbackButton:hover {
+  background-color: #f3f3f3;
+} */

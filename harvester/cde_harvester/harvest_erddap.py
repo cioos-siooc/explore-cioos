@@ -20,11 +20,38 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
     def skipped_reason(code):
         return [[erddap.domain, dataset_id, code]]
 
-    df_profiles_all = pd.DataFrame()
+    profiles_variables = {
+        "erddap_url": str,
+        "dataset_id": str,
+        "timeseries_id": str,
+        "profile_id": str,
+        "latitude": float,
+        "longitude": float,
+        "depth_min": float,
+        "depth_max": float,
+    }
 
-    df_datasets_all = pd.DataFrame(
-        columns=["erddap_url", "dataset_id", "cdm_data_type", "platform"]
-    )
+    df_profiles_all = pd.DataFrame(profiles_variables,index=[])
+
+    dataset_variables = {
+            "title":str,
+            "summary": str,
+            "erddap_url": str,
+            "dataset_id": str,
+            "cdm_data_type": str,
+            "platform": str,
+            "eovs": str,
+            "organizations": str,
+            "n_profiles": float,
+            "profile_variables": str,
+            "timeseries_id_variable": str,
+            "profile_id_variable": str,
+            "trajectory_id_variable": str,
+            "num_columns": int,
+            "first_eov_column": str,
+            }
+    df_datasets_all = pd.DataFrame(dataset_variables,index=[])
+   
     df_variables_all = pd.DataFrame(
         columns=[
             "name",
@@ -35,11 +62,14 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
             "dataset_id",
         ]
     )
-
+    
     erddap = ERDDAP(erddap_url, cache_requests)
     logger = erddap.get_logger()
     df_all_datasets = erddap.df_all_datasets
 
+    if df_all_datasets.empty:
+        return
+        
     cdm_data_types_supported = [
         # "Point",
         "TimeSeries",
