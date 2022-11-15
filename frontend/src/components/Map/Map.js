@@ -138,12 +138,6 @@ export default function CreateMap({
     }
   }, [boxSelectEndCoords])
 
-  useEffect(() => {
-    if(map.current && _.isEmpty(polygon)) {
-      deleteAllShapes()
-    }
-  }, [polygon])
-
   function deleteAllShapes() {
     drawPolygon.current?.deleteAll()
     map.current.setFilter('points-highlighted', ['in', 'pk', ''])
@@ -367,28 +361,31 @@ export default function CreateMap({
         document.getElementsByClassName('mapbox-gl-draw_polygon').item(0)
       )
 
-      if (boxQueryElement) {
-        boxQueryElement.onclick = (e) => {
-          map.current.getCanvas().style.cursor = 'crosshair'
-          deleteAllShapes()
-          creatingPolygon.current = true
-          draw.changeMode('draw_rectangle')
-        }
+      boxQueryElement.onclick = (e) => {
+        map.current.getCanvas().style.cursor = 'crosshair'
+        deleteAllShapes()
+        creatingPolygon.current = true
+        drawPolygon.current.changeMode('draw_rectangle')
+        return false
       }
-      if (polyQueryElement) {
-        polyQueryElement.onclick = () => {
-          map.current.getCanvas().style.cursor = 'crosshair'
-          deleteAllShapes()
-          creatingPolygon.current = true
-          draw.changeMode('draw_polygon')
-        }
+      
+      polyQueryElement.onclick = (e) => {
+        map.current.getCanvas().style.cursor = 'crosshair'
+        deleteAllShapes()
+        creatingPolygon.current = true
+        drawPolygon.current.changeMode('draw_polygon')
+        return false
       }
-      if (trashQueryElement) {
-        trashQueryElement.onclick = () => {
-          creatingPolygon.current = false
-          map.current.getCanvas().style.cursor = 'unset'
-          deleteAllShapes()
-        }
+
+      trashQueryElement.onclick = () => {
+        endDrawing()
+        return false
+      }
+
+      function endDrawing() {
+        map.current.getCanvas().style.cursor = 'unset'
+        drawPolygon.current.changeMode('simple_select')
+        deleteAllShapes()
       }
 
       setColorStops()
@@ -645,7 +642,7 @@ export default function CreateMap({
       highlightPoints(polygon)
       setPolygon(polygon)
       map.current.getCanvas().style.cursor = 'unset'
-      creatingPolygon.current = false
+      // creatingPolygon.current = false
       // if(!polygonIsRectangle(polygon)){
       //   // set className of polygon button to active
       //   const polygonCreateButton = document.getElementsByClassName('mapbox-gl-draw_ctrl-draw-btn mapbox-gl-draw_polygon')
