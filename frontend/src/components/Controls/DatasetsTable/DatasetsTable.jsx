@@ -53,10 +53,14 @@ export default function DatasetsTable({
 
   function generateColumns() {
     // const cellPadding = '0px'
+    const disabledCheckboxStyle = {
+      backgroundColor: 'lightgrey'
+    }
+
     const columns = [
       {
         name: (
-          <div title={'Download from CIOOS Data Explorer'}>
+          <div title={t('datasetsTableDownloadModalDatasetCheckboxTooltip')}>
             {selectAll ? (
               <CheckSquare onClick={selectAllOnclick} size={16} />
             ) : (
@@ -68,11 +72,19 @@ export default function DatasetsTable({
         selector: (row) => row.selected,
         cell: (row) => {
           return (
-            <div title={'Download from CIOOS Data Explorer'}>
+            <div title={t('datasetsTableDownloadModalDatasetCheckboxTooltip')}>
               {row.selected ? (
                 <CheckSquare onClick={checkBoxOnclick(row)} size={16} />
               ) : (
-                <Square onClick={checkBoxOnclick(row)} size={16} />
+                <Square
+                  style={
+                    isDownloadModal &&
+                    !row.internalDownload &&
+                    disabledCheckboxStyle
+                  }
+                  onClick={checkBoxOnclick(row)}
+                  size={16}
+                />
               )}
               <Download className='downloadIcon' onClick={checkBoxOnclick(row)} size={18} />
               {/* <Download className='downloadIcon' /> */}
@@ -131,8 +143,8 @@ export default function DatasetsTable({
         selector: (row) => row.cdm_data_type,
         cell: (row) =>
           row.cdm_data_type
-            .replace('TimeSeriesProfile', 'Timeseries / Profile')
-            .replace('TimeSeries', 'Timeseries'),
+            .replace('TimeSeriesProfile', 'Time series / Profile')
+            .replace('TimeSeries', 'Time series'),
         wrap: true,
         sortable: true,
         width: '80px',
@@ -210,7 +222,13 @@ export default function DatasetsTable({
             return row.internalDownload ? (
               <OverlayTrigger
                 placement='top'
-                overlay={<Tooltip>Requests for less than 1GB of data from a dataset can be downloaded through CDE</Tooltip>}
+                overlay={
+                  <Tooltip>
+                    {t(
+                      'datasetTableDownloadModalCDEDownloadableColumnNameTooltip'
+                    )}
+                  </Tooltip>
+                }
               >
                 <Check2Circle
                   className='downloadableIcon'
@@ -221,7 +239,13 @@ export default function DatasetsTable({
             ) : (
               <OverlayTrigger
                 placement='top'
-                overlay={<Tooltip>Requests for more than 1GB of data from a dataset can be downloaded through the provided ERDDAP link</Tooltip>}
+                overlay={
+                  <Tooltip>
+                    {t(
+                      'datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip'
+                    )}
+                  </Tooltip>
+                }
               >
                 <XCircle className='downloadableIcon' color='#e3285e' size='25' />
               </OverlayTrigger>
