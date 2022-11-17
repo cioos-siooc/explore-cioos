@@ -40,7 +40,9 @@ export default function SelectionDetails({
   const [pointsData, setPointsData] = useState([])
   const [inspectDataset, setInspectDataset] = useState()
   const [, setDataTotal] = useState(0)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [initialPointsQueryComplete, setInitialPointsQueryComplete] =
+    useState(false)
   const [inspectRecordID, setInspectRecordID] = useState()
   const [showModal, setShowModal] = useState(false)
   const [recordLoading, setRecordLoading] = useState(false)
@@ -98,7 +100,7 @@ export default function SelectionDetails({
   }
   useEffect(() => {
     setDataTotal(0)
-    if (!loading) {
+    if (!loading && query.eovsSelected.length) {
       const filtersQuery = createDataFilterQueryString(query)
       let shapeQuery = []
       if (polygon) {
@@ -121,6 +123,7 @@ export default function SelectionDetails({
         } else {
           setPointsData([])
         }
+        setInitialPointsQueryComplete(true)
       })
     }
     setBackClicked(false)
@@ -226,7 +229,7 @@ export default function SelectionDetails({
       <div
         className={`pointDetailsInfoRow ${inspectDataset ? 'fullHeight' : ''}`}
       >
-        {loading ? (
+        {loading || !initialPointsQueryComplete ? (
           <Loading />
         ) : inspectDataset ? (
           <DatasetInspector
