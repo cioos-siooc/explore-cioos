@@ -272,8 +272,9 @@ export default function CreateMap({
   }
 
   useEffect(() => {
+    const q = createDataFilterQueryString(query)
     const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${
-      query !== defaultQuery && `?${createDataFilterQueryString(query)}`
+      query !== defaultQuery && q && `?${q}`
     }`
     setPointsToReview()
     setPolygon()
@@ -390,8 +391,10 @@ export default function CreateMap({
 
       setColorStops()
 
+      const q = createDataFilterQueryString(query)
+
       const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${
-        query !== defaultQuery && `?${createDataFilterQueryString(query)}`
+        query !== defaultQuery && q && `?${q}`
       }`
 
       map.current.addLayer({

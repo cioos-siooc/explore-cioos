@@ -399,7 +399,8 @@ export default function App() {
       })
 
     /** Get initial legend values */
-    fetch(`${server}/legend?${createDataFilterQueryString(query)}`)
+    const legendQuery = createDataFilterQueryString(query)
+    fetch(`${server}/legend${legendQuery && '?' + legendQuery}`)
       .then((response) => response.json())
       .then((legend) => {
         if (legend) {
