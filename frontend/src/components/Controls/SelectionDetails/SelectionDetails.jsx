@@ -110,7 +110,8 @@ export default function SelectionDetails({
       setInspectDataset()
       setLoading(true)
       setCombinedQueries(combinedQueries)
-      const urlString = `${server}/pointQuery${combinedQueries ? '?' + combinedQueries : ''
+      const urlString = `${server}/pointQuery${
+        combinedQueries ? '?' + combinedQueries : ''
       }`
       fetch(urlString).then((response) => {
         if (response.ok) {
