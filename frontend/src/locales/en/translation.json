@@ -90,7 +90,7 @@
   "datasetsTableDetailsTitle": "Open dataset details",
   "datasetInspectorBackButtonTitle": "Return to dataset list",
   "datasetInspectorBackButtonText": "Back",
-  "datasetInspectorDownloadText":"Download",
+  "datasetInspectorDownloadText": "Download",
   "datasetInspectorTitleText": "Title",
   "datasetInspectorURLText": "Dataset URLs",
   "datasetInspectorERDDAPURL": "Dataset",
@@ -209,5 +209,8 @@
   "downloadDetailsDownloadInfoDownloadSize": "Download size ",
   "datasetsTableDownloadModalEstimateDownloadSizeColumnName": "Estimated download size",
   "datasetTableDownloadModalCDEDownloadableColumnName": "CDE downloadable",
+  "datasetsTableDownloadModalDatasetCheckboxTooltip": "Download from CIOOS Data Explorer",
+  "datasetTableDownloadModalCDEDownloadableColumnNameTooltip": "Requests for less than 1GB of data from a dataset can be downloaded through CDE",
+  "datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip": "Requests for more than 1GB of data from a dataset can be downloaded through the provided ERDDAP link",
   "datasetTableDownloadModalExternalDownloadColumnName": "External download"
 }
