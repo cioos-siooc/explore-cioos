@@ -399,7 +399,8 @@ export default function App() {
       })
 
     /** Get initial legend values */
-    fetch(`${server}/legend?${createDataFilterQueryString(query)}`)
+    const legendQuery = createDataFilterQueryString(query)
+    fetch(`${server}/legend${legendQuery && '?' + legendQuery}`)
       .then((response) => response.json())
       .then((legend) => {
         if (legend) {
@@ -501,12 +502,17 @@ export default function App() {
   }
 
   function submitRequest() {
-    let url = `${server}/download?${createDataFilterQueryString(
-      query
-    )}&datasetPKs=${pointsToDownload
-      .map((point) => point.pk)
-      .join(',')}&email=${email}&lang=${i18n.language}`
-    if (polygon) {
+    const downloadQuery = { ...query }
+    if ((startDate !== defaultStartDate || endDate !== defaultEndDate) && !filterDownloadByTime) {
+      downloadQuery.startDate = defaultStartDate
+      downloadQuery.endDate = defaultEndDate
+    }
+    if ((startDepth !== defaultStartDepth || endDepth !== defaultEndDepth) && !filterDownloadByDepth) {
+      downloadQuery.startDepth = defaultStartDepth
+      downloadQuery.endDepth = defaultEndDepth
+    }
+    let url = `${server}/download?${createDataFilterQueryString(downloadQuery)}&datasetPKs=${pointsToDownload.map((point) => point.pk).join(',')}&email=${email}&lang=${i18n.language}`
+    if (polygon && filterDownloadByPolygon) {
       url += `&polygon=${JSON.stringify(polygon)}`
     }
     fetch(url)

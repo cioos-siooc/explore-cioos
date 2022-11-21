@@ -80,7 +80,7 @@ function objectToURL (obj) {
     .join('&')
 }
 
-export function createDataFilterQueryString(query, filterLengths) {
+export function createDataFilterQueryString(query) {
   const { orgsSelected, eovsSelected, platformsSelected, datasetsSelected } =
     query
 
