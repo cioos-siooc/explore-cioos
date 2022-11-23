@@ -2,7 +2,7 @@ const express = require("express");
 
 const router = express.Router();
 const { getShapeQuery } = require("../utils/shapeQuery");
-const { requiredShapeMiddleware } = require("../utils/validatorMiddlewares");
+const cache = require("../utils/cache");
 
 /**
  * /pointQuery
@@ -13,7 +13,7 @@ const { requiredShapeMiddleware } = require("../utils/validatorMiddlewares");
  * if no shape is given, it returns all datasets
  */
 
-router.get("/", async (req, res, next) => {
+router.get("/", cache.route(), async (req, res, next) => {
   const rows = await getShapeQuery(req.query, false, false);
   res.send(rows);
 });
