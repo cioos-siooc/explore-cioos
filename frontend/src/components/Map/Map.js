@@ -7,7 +7,12 @@ import maplibreGl, {
 } from 'maplibre-gl'
 import MapboxDraw from '@mapbox/mapbox-gl-draw'
 import { useState, useEffect, useRef } from 'react'
-import * as turf from '@turf/turf'
+
+import * as helpers from '@turf/helpers'
+import turfBboxPolygon from '@turf/bbox-polygon'
+import turfPointsWithinPolygon from '@turf/points-within-polygon'
+import turfBbox from '@turf/bbox'
+
 import DrawRectangle from 'mapbox-gl-draw-rectangle-mode'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
@@ -22,7 +27,6 @@ import {
 } from '../../utilities'
 import { colorScale, defaultQuery } from '../config'
 import platformColors from '../../components/platformColors'
-import _ from 'lodash'
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
 export default function CreateMap({
@@ -118,11 +122,11 @@ export default function CreateMap({
     if (boxSelectStartCoords && boxSelectEndCoords) {
       drawPolygon.current?.deleteAll()
 
-      const lineString = turf.lineString([
+      const lineStringObj = helpers.lineString([
         boxSelectStartCoords,
         boxSelectEndCoords
       ])
-      const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
+      const bboxPolygonObj = turfBboxPolygon(turfBbox(lineStringObj))
       setBoxSelectEndCoords()
       setBoxSelectStartCoords()
       setLoading(true)
@@ -130,11 +134,11 @@ export default function CreateMap({
         type: 'Feature',
         geometry: {
           type: 'Polygon',
-          coordinates: [bboxPolygon.geometry.coordinates[0]]
+          coordinates: [bboxPolygonObj.geometry.coordinates[0]]
         }
       })
-      highlightPoints(bboxPolygon.geometry.coordinates[0])
-      setPolygon(bboxPolygon.geometry.coordinates[0])
+      highlightPoints(bboxPolygonObj.geometry.coordinates[0])
+      setPolygon(bboxPolygonObj.geometry.coordinates[0])
     }
   }, [boxSelectEndCoords])
 
@@ -249,8 +253,8 @@ export default function CreateMap({
         })
 
       const featureCollection = { type: 'FeatureCollection', features }
-      const searchWithin = turf.polygon([polygon])
-      const pointsWithinPolygon = turf.pointsWithinPolygon(
+      const searchWithin = helpers.polygon([polygon])
+      const pointsWithinPolygon = turfPointsWithinPolygon(
         featureCollection,
         searchWithin
       )
@@ -555,8 +559,8 @@ export default function CreateMap({
           [cornerA.lng, cornerA.lat],
           [cornerB.lng, cornerB.lat]
         ]
-        const lineString = turf.lineString(clickLngLatBBox)
-        const bboxPolygon = turf.bboxPolygon(turf.bbox(lineString))
+        const lineString = helpers.lineString(clickLngLatBBox)
+        const bboxPolygon = turfBboxPolygon(turfBbox(lineString))
         highlightPoints(bboxPolygon.geometry.coordinates[0])
         setPolygon(bboxPolygon.geometry.coordinates[0])
       } else if (

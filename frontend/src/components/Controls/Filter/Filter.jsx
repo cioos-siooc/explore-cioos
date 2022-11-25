@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { useRef, useState, useEffect } from 'react'
-import * as _ from 'lodash'
 import {
   ChevronCompactDown,
   ChevronCompactUp,
@@ -8,6 +7,7 @@ import {
   BoxArrowUpRight
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
+import noop from 'lodash/noop'
 
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
 import { abbreviateString, useOutsideAlerter } from '../../../utilities'
@@ -41,7 +41,7 @@ export default function Filter({
   useOutsideAlerter(wrapperRef, setFilterOpen, false)
 
   useEffect(() => {
-    controlled ? setFilterOpen(openFilter) : _.noop()
+    controlled ? setFilterOpen(openFilter) : noop()
   }, [openFilter])
 
   // Using tabIndex to enable onBlur() focus loss capturing: https://stackoverflow.com/a/37491578

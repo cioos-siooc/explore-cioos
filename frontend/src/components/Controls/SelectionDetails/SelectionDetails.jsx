@@ -20,7 +20,8 @@ import {
   createSelectionQueryString,
   useDebounce
 } from '../../../utilities.js'
-import _ from 'lodash'
+
+import isEmpty from 'lodash/isEmpty'
 
 // Note: datasets and points are exchangable terminology
 export default function SelectionDetails({
@@ -58,7 +59,7 @@ export default function SelectionDetails({
   const [combinedQueries, setCombinedQueries] = useState([])
 
   useEffect(() => {
-    if (!_.isEmpty(debouncedDatasetTitleSearchText)) {
+    if (!isEmpty(debouncedDatasetTitleSearchText)) {
       setFilteredDatasets(
         pointsData.filter((dataset) => {
           return `${dataset.title}`
@@ -72,7 +73,7 @@ export default function SelectionDetails({
   }, [debouncedDatasetTitleSearchText])
 
   useEffect(() => {
-    if (!_.isEmpty(pointsData)) {
+    if (!isEmpty(pointsData)) {
       let count = 0
       pointsData.forEach((point) => {
         if (point.selected) count++
@@ -252,7 +253,7 @@ export default function SelectionDetails({
               selectAll={selectAll}
               setDatasets={setPointsData}
               datasets={
-                _.isEmpty(debouncedDatasetTitleSearchText)
+                isEmpty(debouncedDatasetTitleSearchText)
                   ? pointsData
                   : filteredDatasets
               }

@@ -3,17 +3,20 @@ const { CleanWebpackPlugin } = require('clean-webpack-plugin')
 const { DefinePlugin } = require('webpack')
 
 module.exports = {
+  externals: {
+    'Plotly': 'Plotly',
+    'createPlotlyComponent': 'createPlotlyComponent',
+    'maplibre-gl': 'maplibregl',
+    'react': 'React',
+    'react-bootstrap': 'ReactBootstrap',
+    'react-dom': 'ReactDOM',
+  },
   devtool: 'inline-source-map',
   devServer: {
     historyApiFallback: true,
     port: 8000
   },
   entry: './src/',
-  resolve: {
-    alias: {
-      'mapbox-gl': 'maplibre-gl'
-    }
-  },
   mode: 'development',
   module: {
     rules: [
