@@ -6,7 +6,6 @@ import {
   CircleFill,
   HexagonFill
 } from 'react-bootstrap-icons'
-import * as _ from 'lodash'
 
 import {
   capitalizeFirstLetter,
@@ -18,6 +17,7 @@ import platformColors from '../../platformColors'
 import './styles.css'
 import LegendElement from './LegendElement.jsx/LegendElement.jsx'
 import classNames from 'classnames'
+import isEmpty from 'lodash/isEmpty'
 
 export default function Legend({
   currentRangeLevel,
@@ -29,7 +29,7 @@ export default function Legend({
   const [legendOpen, setLegendOpen] = useState(true)
 
   function generateLegendElements() {
-    if (_.isEmpty(currentRangeLevel)) {
+    if (isEmpty(currentRangeLevel)) {
       // No Data
       return (
         <div

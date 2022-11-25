@@ -4,27 +4,24 @@ const { CleanWebpackPlugin } = require('clean-webpack-plugin')
 const { DefinePlugin } = require('webpack')
 
 module.exports = {
+  externals: {
+    'Plotly': 'Plotly',
+    'createPlotlyComponent': 'createPlotlyComponent',
+    'maplibre-gl': 'maplibregl',
+    'react': 'React',
+    'react-bootstrap': 'ReactBootstrap',
+    'react-dom': 'ReactDOM',
+  },
   entry: {
     main: './src/',
     vendor: [
       '@sentry/react',
-      '@turf/turf',
-      'bootstrap',
-      'lodash',
-      'maplibre-gl',
       'react-bootstrap-icons',
-      'react-dom'
     ]
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name].[chunkhash].js'
-  },
-
-  resolve: {
-    alias: {
-      'mapbox-gl': 'maplibre-gl'
-    }
   },
   mode: 'production',
   module: {

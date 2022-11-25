@@ -1,8 +1,8 @@
-import _ from 'lodash'
 import React from 'react'
 import { OverlayTrigger, Tooltip } from 'react-bootstrap'
 import { X } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
+import isEmpty from 'lodash/isEmpty'
 
 import './styles.css'
 
@@ -10,7 +10,7 @@ export default function FilterButton({ setOptionsSelected, optionsSelected, opti
   const { t, i18n } = useTranslation()
   const tooltipText = option[`hover_${i18n.language}`] || option.title
 
-  const filterOptionSelected = !_.isEmpty(optionsSelected.filter(opt => option.pk === opt.pk && opt.isSelected))
+  const filterOptionSelected = !isEmpty(optionsSelected.filter(opt => option.pk === opt.pk && opt.isSelected))
 
   return (
     <OverlayTrigger
