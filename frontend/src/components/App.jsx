@@ -14,8 +14,7 @@ import {
   X
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
-import _ from 'lodash'
-
+import isEmpty from 'lodash/isEmpty'
 import platformsJSONfile from '../platforms.json'
 import eovsJSONfile from '../eovs.json'
 import { server } from '../config.js'
@@ -58,7 +57,6 @@ import {
 } from '../utilities.js'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 
-import 'bootstrap/dist/css/bootstrap.min.css'
 import './styles.css'
 
 if (process.env.NODE_ENV === 'production') {
@@ -239,18 +237,18 @@ export default function App() {
         elem.style.backgroundColor = '#ffffff'
       }
     }
-    setPolygonFilterActive(!_.isEmpty(polygon))
-    setFilterDownloadByPolygon(!_.isEmpty(polygon))
+    setPolygonFilterActive(!isEmpty(polygon))
+    setFilterDownloadByPolygon(!isEmpty(polygon))
   }, [polygon])
 
   useEffect(() => {
-    if (_.isEmpty(pointsToDownload)) {
+    if (isEmpty(pointsToDownload)) {
       setSubmissionFeedback()
     }
   }, [pointsToDownload])
 
   useEffect(() => {
-    if (_.isEmpty(pointsToReview)) {
+    if (isEmpty(pointsToReview)) {
       setPointsToDownload()
     }
     setSelectionPanelOpen(true)
@@ -381,7 +379,7 @@ export default function App() {
     fetch(`${server}/datasets`)
       .then((response) => response.json())
       .then((datasetsR) => {
-        if (_.isEmpty(totalNumberOfDatasets)) setTotalNumberOfDatasets(datasetsR.length)
+        if (isEmpty(totalNumberOfDatasets)) setTotalNumberOfDatasets(datasetsR.length)
         setDatasetsSelected(
           datasetsR.map((dataset) => {
             return {
@@ -414,45 +412,45 @@ export default function App() {
 
   useEffect(() => {
     switch (submissionState) {
-      case 'submitted':
-        submitRequest()
-        setSubmissionFeedback({
-          icon: (
-            <Spinner
-              className='text-warning'
-              as='span'
-              animation='border'
-              size={30}
-              role='status'
-              aria-hidden='true'
-            />
-          ),
-          text: t('submissionStateTextSubmitting') // 'Submitting...'
-        })
-        break
+    case 'submitted':
+      submitRequest()
+      setSubmissionFeedback({
+        icon: (
+          <Spinner
+            className='text-warning'
+            as='span'
+            animation='border'
+            size={30}
+            role='status'
+            aria-hidden='true'
+          />
+        ),
+        text: t('submissionStateTextSubmitting') // 'Submitting...'
+      })
+      break
 
-      case 'successful':
-        setSubmissionFeedback({
-          icon: <Check2Circle size={30} style={{ color: '#52a79b' }} />,
-          text: t('submissionStateTextSuccess') // Request successful. Download link will be sent to: ' + email
-        })
-        break
+    case 'successful':
+      setSubmissionFeedback({
+        icon: <Check2Circle size={30} style={{ color: '#52a79b' }} />,
+        text: t('submissionStateTextSuccess') // Request successful. Download link will be sent to: ' + email
+      })
+      break
 
-      case 'failed':
-        setSubmissionFeedback({
-          icon: <XCircle size={30} style={{ color: '#e3285e' }} />,
-          text: t('submissionStateTextFailed') // 'Request failed'
-        })
-        break
+    case 'failed':
+      setSubmissionFeedback({
+        icon: <XCircle size={30} style={{ color: '#e3285e' }} />,
+        text: t('submissionStateTextFailed') // 'Request failed'
+      })
+      break
 
-      default:
-        setSubmissionFeedback()
-        break
+    default:
+      setSubmissionFeedback()
+      break
     }
   }, [submissionState])
 
   useEffect(() => {
-    if (!loading && !_.isEmpty(rangeLevels)) {
+    if (!loading && !isEmpty(rangeLevels)) {
       fetch(`${server}/legend?${createDataFilterQueryString(query)}`)
         .then((response) => {
           if (response.ok) {
@@ -532,7 +530,7 @@ export default function App() {
   function DownloadButton () {
     return (
       <DataDownloadModal
-        disabled={_.isEmpty(pointsToReview)}
+        disabled={isEmpty(pointsToReview)}
         setEmail={setEmail}
         setSubmissionState={setSubmissionState}
         showModal={showModal}
@@ -567,25 +565,25 @@ export default function App() {
             />
             <button
               className={`submitRequestButton ${(!emailValid ||
-                _.isEmpty(pointsToDownload) ||
+                isEmpty(pointsToDownload) ||
                 // getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
                 submissionState === 'submitted') &&
                 'disabled'
-                }`}
+              }`}
               disabled={
                 !emailValid ||
-                _.isEmpty(pointsToDownload) ||
+                isEmpty(pointsToDownload) ||
                 // getPointsDataSize(pointsToDownload) / 1000000 > 100 ||
                 submissionState === 'submitted'
               }
               onClick={() => handleSubmission()}
             >
               {
-                (!_.isEmpty(pointsToDownload) &&
+                (!isEmpty(pointsToDownload) &&
                   submissionFeedback &&
                   submissionState !== 'submitted' &&
                   t('submitRequestButtonResubmitText')) ||
-                (_.isEmpty(pointsToDownload) &&
+                (isEmpty(pointsToDownload) &&
                   t('submitRequestButtonSelectDataText')) ||
                 t('submitRequestButtonSubmitText') // 'Submit Request'
               }
@@ -900,7 +898,7 @@ export default function App() {
       )}
       <button
         className={`boxQueryButton ${polygon && polygonIsRectangle(polygon) && 'active'
-          }`}
+        }`}
         id='boxQueryButton'
         title={t('rectangleToolTitle')}
       >

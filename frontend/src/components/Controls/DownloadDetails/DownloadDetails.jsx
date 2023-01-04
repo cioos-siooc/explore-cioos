@@ -3,12 +3,12 @@ import { useState, useEffect } from 'react'
 import { Row, Col, Container, Spinner } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
-import _ from 'lodash'
 import bytes from 'bytes'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import polygonImage from '../../Images/polygonIcon.png'
 import rectangleImage from '../../Images/rectangleIcon.png'
+import isEmpty from 'lodash/isEmpty'
 
 import {
   createDataFilterQueryString,
@@ -175,7 +175,7 @@ export default function DownloadDetails({
   }, [downloadSizeEstimates])
 
   useEffect(() => {
-    if (!_.isEmpty(pointsData)) {
+    if (!isEmpty(pointsData)) {
       setPointsToDownload(
         pointsData.filter((point) => point.selected && !point.downloadDisabled)
       )
