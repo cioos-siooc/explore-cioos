@@ -16,8 +16,8 @@ import './styles.css'
 import DataTable from 'react-data-table-component'
 import DataTableExtensions from 'react-data-table-component-extensions'
 import bytes from 'bytes'
+import isEmpty from 'lodash/isEmpty'
 
-import _ from 'lodash'
 import classNames from 'classnames'
 import { Spinner, OverlayTrigger, Tooltip } from 'react-bootstrap'
 
@@ -182,10 +182,10 @@ export default function DatasetsTable({
             'downloadSizeEstimateFiltered',
             { downloadable: row?.sizeEstimate?.filteredSize < 1000000000 }
           )
-          if (!_.isEmpty(downloadSizeEstimates)) {
+          if (!isEmpty(downloadSizeEstimates)) {
             return (
               <div className='downloadSizeEstimate'>
-                {!_.isEmpty(downloadSizeEstimates) && (
+                {!isEmpty(downloadSizeEstimates) && (
                   <>
                     <div className={estimatedFilteredDownloadSizeRowClassName}>
                       {bytes(row?.sizeEstimate?.filteredSize)}
@@ -218,7 +218,7 @@ export default function DatasetsTable({
         name: t('datasetTableDownloadModalCDEDownloadableColumnName'),
         selector: (row) => row.internalDownload,
         cell: (row) => {
-          if (!_.isEmpty(downloadSizeEstimates)) {
+          if (!isEmpty(downloadSizeEstimates)) {
             return row.internalDownload ? (
               <OverlayTrigger
                 placement='top'
@@ -273,7 +273,7 @@ export default function DatasetsTable({
         name: t('datasetTableDownloadModalExternalDownloadColumnName'),
         selector: (row) => row.erddapLink,
         cell: (row) => {
-          if (!_.isEmpty(downloadSizeEstimates) && row.erddapLink) {
+          if (!isEmpty(downloadSizeEstimates) && row.erddapLink) {
             return (
               <a href={row.erddapLink} target='_blank' rel='noreferrer'>
                 ERDDAP
