@@ -38,8 +38,15 @@ ALTER TABLE cde.profiles
     ALTER COLUMN hex_zoom_0 SET NOT NULL,
     ALTER COLUMN hex_zoom_1 SET NOT NULL,
     ALTER COLUMN point_pk SET NOT NULL,
-    ALTER COLUMN records_per_day SET NOT NULL;
-    
+    ALTER COLUMN records_per_day SET NOT NULL,
+    ADD CONSTRAINT hexes_zoom_0_foreign FOREIGN KEY (hex_0_pk) REFERENCES cde.hexes_zoom_0 (pk),
+    ADD CONSTRAINT hexes_zoom_1_foreign FOREIGN KEY (hex_1_pk) REFERENCES cde.hexes_zoom_1 (pk);
+
+ALTER TABLE cde.points
+    ADD CONSTRAINT hexes_zoom_0_points_foreign FOREIGN KEY (hex_0_pk) REFERENCES cde.hexes_zoom_0 (pk),
+    ADD CONSTRAINT hexes_zoom_1_points_foreign FOREIGN KEY (hex_1_pk) REFERENCES cde.hexes_zoom_1 (pk);
+
+
 END;
 
 $$ LANGUAGE plpgsql;
@@ -74,8 +81,14 @@ ALTER TABLE cde.profiles
     ALTER COLUMN hex_zoom_0 DROP NOT NULL,
     ALTER COLUMN hex_zoom_1 DROP NOT NULL,
     ALTER COLUMN point_pk DROP NOT NULL,
-    ALTER COLUMN records_per_day DROP NOT NULL;
-    
+    ALTER COLUMN records_per_day DROP NOT NULL,
+    DROP CONSTRAINT IF EXISTS hexes_zoom_0_foreign,
+    DROP CONSTRAINT IF EXISTS hexes_zoom_1_foreign;    
+
+ALTER TABLE cde.points
+    DROP CONSTRAINT IF EXISTS hexes_zoom_0_points_foreign,
+    DROP CONSTRAINT IF EXISTS hexes_zoom_1_points_foreign;    
+
 END;
 
 $$ LANGUAGE plpgsql;
