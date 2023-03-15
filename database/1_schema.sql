@@ -79,15 +79,21 @@ CREATE TABLE points (
     -- these values are copied back into profiles
     hex_zoom_0 geometry(Polygon,3857),
     hex_zoom_1 geometry(Polygon,3857),
-    hex_0_pk integer REFERENCES hexes_zoom_0(pk),
-    hex_1_pk integer REFERENCES hexes_zoom_1(pk)
+    hex_0_pk integer,
+    hex_1_pk integer
 );
 
 CREATE INDEX
   ON points
   USING GIST (geom);
 
- 
+CREATE INDEX hex_zoom_0
+ON cde.points
+USING GIST (geom);
+
+CREATE INDEX hex_zoom_1
+ON cde.points
+USING GIST (geom);
 
 
 -- profiles/timeseries per dataset
@@ -112,8 +118,8 @@ CREATE TABLE profiles (
     -- hex polygon that this point is in for zoom 0 (zoomed out)
     hex_zoom_0 geometry(polygon,3857),
     hex_zoom_1 geometry(polygon,3857),
-    hex_0_pk integer references hexes_zoom_0(pk),
-    hex_1_pk integer references hexes_zoom_1(pk),
+    hex_0_pk integer,
+    hex_1_pk integer,
     point_pk INTEGER,
     days bigint,
     UNIQUE(erddap_url,dataset_id,timeseries_id,profile_id)
