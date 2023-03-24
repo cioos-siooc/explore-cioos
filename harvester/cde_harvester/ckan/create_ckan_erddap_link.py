@@ -21,6 +21,8 @@ def split_erddap_url(url):
     dataset_id = f.split(".html")[0]
     return (erddap_host, dataset_id)
 
+def unescape_ascii_list(l):
+    return  [unescape_ascii(x) for x in l]
 
 def unescape_ascii(x):
     try:
