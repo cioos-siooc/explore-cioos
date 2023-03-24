@@ -90,7 +90,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     ckan_file = f"{folder}/ckan.csv"
 
     if datasets.empty:
-        print("No datasets scraped")
+        print("No datasets harvested")
         sys.exit(1)
 
     # see what standard names arent covered by our EOVs:
@@ -232,7 +232,7 @@ if __name__ == "__main__":
         )
         parser.add_argument(
             "--dataset_ids",
-            help="only scrape these dataset IDs. Comma separated list",
+            help="only harvest these dataset IDs. Comma separated list",
         )
 
         parser.add_argument(

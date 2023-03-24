@@ -59,7 +59,7 @@ If you just want to see how a dataset is harvested by CDE:
       npm start
   ```
 
-- Scrape a single dataset and load CKAN data.
+- Harvest a single dataset and load CKAN data.
 
   ```sh
     sh data_loader_test.sh
@@ -107,7 +107,7 @@ From the production server,
 - Start all services:
   `sudo docker-compose -f docker-compose.production.yaml up -d --build`
 
-- Scrape data:
+- Harvest data:
 
   ```sh
   conda create -n cde python=3.10

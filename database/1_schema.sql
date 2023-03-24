@@ -24,7 +24,7 @@ CREATE TABLE hexes_zoom_1 (
 
  
 
--- The scraper will skip datasets in this table
+-- The harvester will skip datasets in this table
 DROP TABLE IF EXISTS skipped_datasets;
 CREATE TABLE skipped_datasets (
     pk serial PRIMARY KEY,

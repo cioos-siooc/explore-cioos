@@ -37,7 +37,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
 
     This will take a few minutes
 
-    dataset_ids are the list of datasets IDs that have been scraped
+    dataset_ids are the list of datasets IDs that have been harvested
     """
     records = list_ckan_records_with_erddap_urls(cache)
 
