@@ -8,7 +8,11 @@ import threading
 import queue
 import numpy as np
 import pandas as pd
-from cde_harvester.ckan.create_ckan_erddap_link import get_ckan_records, unescape_ascii
+from cde_harvester.ckan.create_ckan_erddap_link import (
+    get_ckan_records,
+    unescape_ascii,
+    unescape_ascii_list,
+)
 from cde_harvester.harvest_erddap import harvest_erddap
 from cde_harvester.utils import (
     cf_standard_names,
@@ -134,7 +138,8 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
 
     # prioritize with organizations from CKAN and then pull ERDDAP if needed
     datasets["organizations"] = datasets.apply(
-        lambda x: x["ckan_organizations"] or x["organizations"], axis=1
+        lambda x: x["ckan_organizations"] or unescape_ascii_list(x["organizations"]),
+        axis=1,
     )
     del datasets["title"]
     # del datasets["summary"]
