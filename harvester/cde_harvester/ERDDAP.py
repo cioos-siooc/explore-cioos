@@ -112,11 +112,11 @@ class ERDDAP(object):
                 response = cache[url_combined]
             else:
                 logger.debug("CACHE MISS")
-                response = self.session.get(url_combined)
+                response = self.session.get(url_combined, timeout=3600)
                 cache[url_combined] = response
         else:
-            response = self.session.get(url_combined)
-        
+            response = self.session.get(url_combined, timeout=3600)
+
         if len(response.content) > MAX_RESPONSE_SIZE:
             raise RuntimeError("Response too big")
 
