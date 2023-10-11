@@ -1,5 +1,16 @@
 # ERDDAP harvester
 
+## Installation with venv
+
+```bash
+cd harvester
+python -m venv venv
+source ./venv/bin/activate
+pip install .
+```
+
+## Running
+
 The erddap harvester also calls the CKAN harvester
 
 - `python -m cde_harvester --urls https://catalogue.hakai.org/erddap,https://www.smartatlantic.ca/erddap`

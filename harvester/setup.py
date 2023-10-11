@@ -11,6 +11,7 @@ setup(
     include_package_data=True,
     package_data={"": ["cde_to_goos_eov.json", "goos_eov_to_standard_name.json"]},
     install_requires=[
+        "requests",
         "pandas",
         "erddapy",
         "shapely",
