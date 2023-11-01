@@ -53,14 +53,19 @@ def intersection(lst1, lst2):
 def flatten(t):
     return [item for sublist in t for item in sublist]
 
+def get_cf_names():
+    cf_names_xml_url="https://cfconventions.org/Data/cf-standard-names/current/src/cf-standard-name-table.xml"
 
-cf_standard_names = (
-    pd.read_xml(
-        "https://cfconventions.org/Data/cf-standard-names/78/src/cf-standard-name-table.xml"
+    print ("Downloading", cf_names_xml_url)
+
+    cf_standard_names = (
+        pd.read_xml(cf_names_xml_url)
+        .sort_values(by="id")["id"]
+        .unique()
     )
-    .sort_values(by="id")["id"]
-    .unique()
-)
+    return cf_standard_names
+
+cf_standard_names = get_cf_names()
 
 # list of standard names that are supported by CDE
 supported_standard_names = flatten(cde_eov_to_standard_name.values())
