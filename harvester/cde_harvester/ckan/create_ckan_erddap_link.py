@@ -13,7 +13,6 @@ CKAN_API_URL = "https://catalogue.cioos.ca/api/3"
 
 
 def split_erddap_url(url):
-
     """
     Split an ERDDAP URL into it's host and dataset ID
 
