@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import traceback
+import json
+import os
 
 import pandas as pd
 from cde_harvester.CDEComplianceChecker import CDEComplianceChecker
@@ -9,13 +11,28 @@ from cde_harvester.harvest_errors import (CDM_DATA_TYPE_UNSUPPORTED,
                                           HTTP_ERROR, UNKNOWN_ERROR)
 from cde_harvester.profiles import get_profiles
 from requests.exceptions import HTTPError
+from urllib.parse import urlparse
 
 # TIMEOUT = 30
+
+
+def get_datasets_to_skip():
+    skipped_datasets_path = "skipped_datasets.json"
+
+    if os.path.exists(skipped_datasets_path):
+        print(f"Loading list of datasets to skip from {skipped_datasets_path}")
+        with open(skipped_datasets_path) as f:
+            datasets_to_skip = json.load(f)
+            return datasets_to_skip
+    print(f"No skipped datasets list found")
+    return {}
 
 
 def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=False):
     # """ """
     skipped_datasets_reasons = []
+    hostname = urlparse(erddap_url).hostname
+    datasets_to_skip = get_datasets_to_skip().get(hostname, [])
 
     def skipped_reason(code):
         return [[erddap.domain, dataset_id, code]]
@@ -101,7 +118,9 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
     # loop through each dataset to be processed
     for i, df_dataset_row in df_all_datasets.iterrows():
         dataset_id = df_dataset_row["datasetID"]
-
+        if dataset_id in datasets_to_skip:
+            logger.info(f"Skipping dataset: {dataset_id} because its on the skip list")
+            continue
         try:
             logger.info(f"Querying dataset: {dataset_id} {i+1}/{len(df_all_datasets)}")
             dataset = erddap.get_dataset(dataset_id)
