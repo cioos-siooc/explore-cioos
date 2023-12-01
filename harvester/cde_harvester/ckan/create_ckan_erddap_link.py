@@ -5,6 +5,7 @@
 import diskcache as dc
 import pandas as pd
 import requests
+import re
 
 # National CKAN has all the regions' records
 CKAN_API_URL = "https://catalogue.cioos.ca/api/3"
@@ -16,8 +17,19 @@ def split_erddap_url(url):
 
     Eg: split_erddap_url("https://data.cioospacific.ca/erddap/tabledap/IOS_BOT_Profiles.html")
     ('https://data.cioospacific.ca', 'IOS_BOT_Profiles')
+
+    The split can also be done when the language is specified in the url, if it follows this example:
+    https://cnodc-cndoc.azure.cloud-nuage.dfo-mpo.gc.ca/erddap/fr/tabledap/cnodc_msc50_pacific.html
     """
-    [erddap_host, f] = url.split("/erddap/tabledap/")
+
+    pattern = re.compile(r"/erddap/(?:[a-z]{2}/)?tabledap/")
+    match = pattern.search(url)
+    if match:
+        erddap_host, f = re.split(pattern, url, maxsplit=1)
+    else:
+        error_message = f"Invalid URL format: {url}"
+        raise ValueError(error_message)
+
     dataset_id = f.split(".html")[0]
     return (erddap_host, dataset_id)
 
