@@ -30,20 +30,27 @@ sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
     integrations=[
         LoggingIntegration(
-            level=logging.INFO,        # Capture info and above as breadcrumbs
-            event_level=logging.WARNING   # Send records as events
+            level=logging.INFO,  # Capture info and above as breadcrumbs
+            event_level=logging.WARNING,  # Send records as events
         ),
     ],
-    environment=os.environ.get("ENVIRONMENT","development"),
+    environment=os.environ.get("ENVIRONMENT", "development"),
 )
+
 
 def setup_logging(log_time, log_level):
     # setup logging
-    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s : %(message)s" if log_time else "%(name)s : %(message)s")
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s - %(name)s : %(message)s"
+        if log_time
+        else "%(name)s : %(message)s",
+    )
     logger = logging.getLogger()
     return logger
 
-@monitor(monitor_slug='main-harvester')
+
+@monitor(monitor_slug="main-harvester")
 def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     erddap_urls = erddap_urls.split(",")
     limit_dataset_ids = None

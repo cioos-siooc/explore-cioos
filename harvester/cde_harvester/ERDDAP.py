@@ -126,9 +126,7 @@ class ERDDAP(object):
         if original_hostname != actual_hostname:
             # redirect due to EDDTableFromErddap
             if dataset:
-                logger.debug(
-                    "Redirecting %s to %s", original_hostname, actual_hostname
-                )
+                logger.debug("Redirecting %s to %s", original_hostname, actual_hostname)
                 dataset.erddap_url = response.url.split("/erddap")[0] + "/erddap"
 
         no_data = False
