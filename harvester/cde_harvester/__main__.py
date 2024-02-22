@@ -38,21 +38,29 @@ sentry_sdk.init(
 
 def setup_logging(log_time, log_level):
     # setup logging
-    print(log_time, log_level)
-    root = logging.getLogger()
-
-    root.setLevel(getattr(logging, (log_level or "DEBUG").upper()))
-    handler = logging.StreamHandler(sys.stdout)
-
     if log_time:
         format = "%(asctime)s - %(name)s : %(message)s"
     else:
         format = "%(name)s : %(message)s"
 
-    formatter = logging.Formatter(format)
+    logging.basicConfig(level=logging.DEBUG, format=format)
+    logger = logging.getLogger()
+    # root = logging.getLogger()
 
-    handler.setFormatter(formatter)
-    root.addHandler(handler)
+
+    # root.setLevel(getattr(logging, (log_level or "DEBUG").upper()))
+    # handler = logging.StreamHandler(sys.stdout)
+
+    # if log_time:
+    #     format = "%(asctime)s - %(name)s : %(message)s"
+    # else:
+    #     format = "%(name)s : %(message)s"
+
+    # formatter = logging.Formatter(format)
+
+    # handler.setFormatter(formatter)
+    # root.addHandler(handler)
+    return logger
 
 @monitor(monitor_slug='main-harvester')
 def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
@@ -78,11 +86,11 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     # Send thirty task requests to the worker.
     
     for erddap_url in erddap_urls:
-        print("Adding to queue",erddap_url)
+        logger.info("Adding to queue %s",erddap_url)
         q.put((erddap_url, result, limit_dataset_ids, cache_requests))
 
     q.join()
-    print('All work completed')
+    logger.info('All work completed')
 
     profiles = pd.DataFrame()
     datasets = pd.DataFrame()
@@ -104,7 +112,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     ckan_file = f"{folder}/ckan.csv"
 
     if datasets.empty:
-        print("No datasets harvested")
+        logging.info("No datasets harvested")
         sys.exit(1)
 
     # see what standard names arent covered by our EOVs:
@@ -127,13 +135,13 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     ]
 
     if standard_names_not_harvested_that_are_real:
-        print(
-            "Found these standard_names that CDE doesnt support yet:\n",
+        logger.warning(
+            "Found these standard_names that CDE doesnt support yet: %s",
             standard_names_not_harvested_that_are_real,
         )
 
     # query CKAN national for more metadata related to the ERDDAP datsets we have so far
-    print("Gathering CKAN data")
+    logger.info("Gathering CKAN data")
     df_ckan = get_ckan_records(datasets["dataset_id"].to_list(), cache=cache_requests)
     datasets = (
         datasets.set_index(["erddap_url", "dataset_id"])
@@ -141,7 +149,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
         .reset_index()
     )
 
-    print("Cleaning up data")
+    logger.info("Cleaning up data")
     datasets = datasets.replace(np.nan, None)
 
     # datasets["summary"] = datasets["summary"].apply(lambda x: unescape_ascii(x))
@@ -174,7 +182,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     profiles["depth_min"] = profiles["depth_min"].fillna(0)
     profiles["depth_max"] = profiles["depth_max"].fillna(0)
 
-    print("Adding", len(datasets), "datasets and", len(profiles), "profiles")
+    logger.info("Adding %s datasets and %s profiles", len(datasets), len(profiles))
 
     # drop duplicates caused by EDDTableFromErddap redirects
     datasets.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
@@ -184,8 +192,8 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     df_ckan.to_csv(ckan_file, index=False)
     skipped_datasets.drop_duplicates().to_csv(skipped_datasets_file, index=False)
 
-    print(
-        "Wrote",
+    logger.info(
+        "Wrote %s %s %s %s",
         datasets_file,
         profiles_file,
         ckan_file,
@@ -193,8 +201,9 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     )
 
     if not skipped_datasets.empty:
-        print(
-            f"skipped {len(skipped_datasets)} datasets:",
+        logger.info(
+            "skipped %s datasets: %s",
+            len(skipped_datasets),
             skipped_datasets["dataset_id"].to_list(),
         )
 
@@ -206,8 +215,8 @@ def load_config(config_file):
             config = yaml.safe_load(stream)
             return config
 
-        except yaml.YAMLError as exc:
-            print(exc)
+        except yaml.YAMLError:
+            logger.error("Failed to load config yaml", exc_info=True)
 
 
 if __name__ == "__main__":
@@ -227,7 +236,7 @@ if __name__ == "__main__":
         config_file=args.file
 
         config = load_config(config_file)
-        print(
+        logging.info(
             "Using config from harvest_config.yaml, ignoring command line arguments"
         )
         urls = ",".join(config.get("erddap_urls") or [])
@@ -286,6 +295,5 @@ if __name__ == "__main__":
         max_workers = args.max_workers
         folder = args.folder
 
-    setup_logging(log_time, log_level)
-
+    logger = setup_logging(log_time, log_level)
     main(urls, cache, folder or "harvest", dataset_ids,max_workers)
