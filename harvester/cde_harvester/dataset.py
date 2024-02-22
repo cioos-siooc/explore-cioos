@@ -252,7 +252,7 @@ class Dataset(object):
         platform_vocabulary = self.globals.get("platform_vocabulary")
 
         if not (platform and platform_vocabulary):
-            return None
+            return "unknown"
 
         if "ioos" in platform_vocabulary:
             try:
