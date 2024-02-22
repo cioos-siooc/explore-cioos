@@ -34,6 +34,7 @@ sentry_sdk.init(
             event_level=logging.WARNING   # Send records as events
         ),
     ],
+    environment=os.environ.get("ENVIRONMENT","development"),
 )
 
 def setup_logging(log_time, log_level):
