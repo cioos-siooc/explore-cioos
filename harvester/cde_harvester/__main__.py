@@ -39,28 +39,8 @@ sentry_sdk.init(
 
 def setup_logging(log_time, log_level):
     # setup logging
-    if log_time:
-        format = "%(asctime)s - %(name)s : %(message)s"
-    else:
-        format = "%(name)s : %(message)s"
-
-    logging.basicConfig(level=logging.DEBUG, format=format)
+    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s : %(message)s" if log_time else "%(name)s : %(message)s")
     logger = logging.getLogger()
-    # root = logging.getLogger()
-
-
-    # root.setLevel(getattr(logging, (log_level or "DEBUG").upper()))
-    # handler = logging.StreamHandler(sys.stdout)
-
-    # if log_time:
-    #     format = "%(asctime)s - %(name)s : %(message)s"
-    # else:
-    #     format = "%(name)s : %(message)s"
-
-    # formatter = logging.Formatter(format)
-
-    # handler.setFormatter(formatter)
-    # root.addHandler(handler)
     return logger
 
 @monitor(monitor_slug='main-harvester')
