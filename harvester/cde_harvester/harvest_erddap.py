@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 # TIMEOUT = 30
 logger = logging.getLogger(__name__)
 
+
 def get_datasets_to_skip():
     skipped_datasets_path = "skipped_datasets.json"
 
@@ -152,12 +153,14 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
             response = e.response
             # dataset_logger.error(response.text)
             dataset_logger.error(
-                "HTTP ERROR: %s %s",response.status_code,response.reason
+                "HTTP ERROR: %s %s", response.status_code, response.reason
             )
             skipped_datasets_reasons += skipped_reason(HTTP_ERROR)
 
         except Exception as e:
-            logger.error("Error occurred at %s %s", erddap_url, dataset_id, exc_info=True)
+            logger.error(
+                "Error occurred at %s %s", erddap_url, dataset_id, exc_info=True
+            )
             skipped_datasets_reasons += skipped_reason(UNKNOWN_ERROR)
 
     skipped_datasets_columns = ["erddap_url", "dataset_id", "reason_code"]
@@ -170,7 +173,9 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
 
         # logger.info(record_count)
         logger.info(
-            "skipped: %s datasets: %s", len(df_skipped_datasets),df_skipped_datasets['dataset_id'].to_list()
+            "skipped: %s datasets: %s",
+            len(df_skipped_datasets),
+            df_skipped_datasets["dataset_id"].to_list(),
         )
     else:
         df_skipped_datasets = pd.DataFrame(columns=skipped_datasets_columns)
