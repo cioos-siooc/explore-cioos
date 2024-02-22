@@ -1,6 +1,7 @@
 import yaml
 import argparse
 import logging
+from dotenv import load_dotenv
 import os
 import time
 import sys
@@ -8,6 +9,9 @@ import threading
 import queue
 import numpy as np
 import pandas as pd
+import sentry_sdk
+from sentry_sdk.crons import monitor
+from sentry_sdk.integrations.logging import LoggingIntegration
 from cde_harvester.ckan.create_ckan_erddap_link import (
     get_ckan_records,
     unescape_ascii,
@@ -19,8 +23,18 @@ from cde_harvester.utils import (
     supported_standard_names,
 )
 
-logging.getLogger("urllib3").setLevel(logging.WARNING)
+load_dotenv()
 
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+sentry_sdk.init(
+    dsn=os.environ.get("SENTRY_DSN"),
+    integrations=[
+        LoggingIntegration(
+            level=logging.INFO,        # Capture info and above as breadcrumbs
+            event_level=logging.WARNING   # Send records as events
+        ),
+    ],
+)
 
 def setup_logging(log_time, log_level):
     # setup logging
@@ -40,7 +54,7 @@ def setup_logging(log_time, log_level):
     handler.setFormatter(formatter)
     root.addHandler(handler)
 
-
+@monitor(monitor_slug='main-harvester')
 def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     erddap_urls = erddap_urls.split(",")
     limit_dataset_ids = None
