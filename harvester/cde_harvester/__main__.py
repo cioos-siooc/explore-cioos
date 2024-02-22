@@ -284,4 +284,8 @@ if __name__ == "__main__":
         folder = args.folder
 
     logger = setup_logging(log_time, log_level)
-    main(urls, cache, folder or "harvest", dataset_ids,max_workers)
+    try:
+        main(urls, cache, folder or "harvest", dataset_ids,max_workers)
+    except Exception as e:
+        logger.error("Harvester failed!!!", exc_info=True)
+        raise e
