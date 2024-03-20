@@ -233,7 +233,7 @@ if __name__ == "__main__":
         max_workers = config.get("max-workers",1)
         dataset_ids = ",".join(config.get("dataset_ids") or [])
         log_time = config.get("log_time")
-        log_level = config.get("log_level")
+        log_level = config.get("log_level","INFO")
         
     else:        
         parser.add_argument(
