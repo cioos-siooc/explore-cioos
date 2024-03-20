@@ -41,7 +41,7 @@ sentry_sdk.init(
 def setup_logging(log_time, log_level):
     # setup logging
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.getLevelName(log_level.upper()),
         format="%(asctime)s - %(name)s : %(message)s"
         if log_time
         else "%(name)s : %(message)s",
