@@ -17,7 +17,7 @@ def is_valid_duration(duration):
         return False
 
 
-class Dataset(object):
+class Dataset:
     def __init__(self, erddap_server, id):
         self.id = id
         self.erddap_server = erddap_server
@@ -40,7 +40,6 @@ class Dataset(object):
         self.get_metadata()
 
     def get_df(self):
-
         self.df = pd.DataFrame(
             {
                 "title": [self.globals["title"]],
@@ -227,7 +226,7 @@ class Dataset(object):
             count = df_count[["time"]].time[0]
             extrapolated_count = (int(count) / extraplolation_days) * days_in_dataset
 
-            df_count.loc[0, "time"] = extrapolated_count
+            df_count.loc[0, "time"] = int(extrapolated_count)
 
         return df_count
 

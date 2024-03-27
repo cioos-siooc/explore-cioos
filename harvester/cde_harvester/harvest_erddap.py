@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
+import dataclasses
 import json
 import logging
 import os
-import traceback
 from urllib.parse import urlparse
 
 import pandas as pd
@@ -15,10 +15,66 @@ from cde_harvester.harvest_errors import (
     UNKNOWN_ERROR,
 )
 from cde_harvester.profiles import get_profiles
+from loguru import logger
 from requests.exceptions import HTTPError
 
 # TIMEOUT = 30
 logger = logging.getLogger(__name__)
+
+
+@dataclasses.dataclass
+class Profile:
+    erddap_url: str
+    dataset_id: str
+    timeseries_id: str
+    profile_id: str
+    latitude: float
+    longitude: float
+    depth_min: float
+    depth_max: float
+
+
+@dataclasses.dataclass
+class Dataset:
+    title: str
+    summary: str
+    erddap_url: str
+    dataset_id: str
+    cdm_data_type: str
+    platform: str
+    eovs: str
+    organizations: str
+    n_profiles: float
+    profile_variables: str
+    timeseries_id_variable: str
+    profile_id_variable: str
+    trajectory_id_variable: str
+    num_columns: int
+    first_eov_column: str
+
+
+@dataclasses.dataclass
+class Variable:
+    name: str
+    type: str
+    cf_role: str
+    standard_name: str
+    erddap_url: str
+    dataset_id: str
+
+
+def dataclass_dtype_dict(dataclass):
+    return {field.name: field.type for field in dataclasses.fields(dataclass)}
+
+
+CDM_DATA_TYPES_SUPPORTED = [
+    # "Point",
+    "TimeSeries",
+    "Profile",
+    "TimeSeriesProfile",
+    # "Trajectory",
+    # "TrajectoryProfile",
+]
 
 
 def get_datasets_to_skip():
@@ -42,48 +98,9 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
     def skipped_reason(code):
         return [[erddap.domain, dataset_id, code]]
 
-    profiles_variables = {
-        "erddap_url": str,
-        "dataset_id": str,
-        "timeseries_id": str,
-        "profile_id": str,
-        "latitude": float,
-        "longitude": float,
-        "depth_min": float,
-        "depth_max": float,
-    }
-
-    df_profiles_all = pd.DataFrame(profiles_variables, index=[])
-
-    dataset_variables = {
-        "title": str,
-        "summary": str,
-        "erddap_url": str,
-        "dataset_id": str,
-        "cdm_data_type": str,
-        "platform": str,
-        "eovs": str,
-        "organizations": str,
-        "n_profiles": float,
-        "profile_variables": str,
-        "timeseries_id_variable": str,
-        "profile_id_variable": str,
-        "trajectory_id_variable": str,
-        "num_columns": int,
-        "first_eov_column": str,
-    }
-    df_datasets_all = pd.DataFrame(dataset_variables, index=[])
-
-    df_variables_all = pd.DataFrame(
-        columns=[
-            "name",
-            "type",
-            "cf_role",
-            "standard_name",
-            "erddap_url",
-            "dataset_id",
-        ]
-    )
+    df_profiles_all = pd.DataFrame(dataclass_dtype_dict(Profile), index=[])
+    df_datasets_all = pd.DataFrame(dataclass_dtype_dict(Dataset), index=[])
+    df_variables_all = pd.DataFrame(dataclass_dtype_dict(Variable), index=[])
 
     erddap = ERDDAP(erddap_url, cache_requests)
     logger = erddap.get_logger()
@@ -92,24 +109,16 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
     if df_all_datasets.empty:
         return
 
-    cdm_data_types_supported = [
-        # "Point",
-        "TimeSeries",
-        "Profile",
-        "TimeSeriesProfile",
-        # "Trajectory",
-        # "TrajectoryProfile",
-    ]
     if limit_dataset_ids:
         df_all_datasets = df_all_datasets.query("datasetID in @limit_dataset_ids")
 
-    cdm_data_type_test = "cdm_data_type in @cdm_data_types_supported"
+    cdm_data_type_test = "cdm_data_type in @CDM_DATA_TYPES_SUPPORTED"
 
     unsupported_datasets = df_all_datasets.query(f"not ({cdm_data_type_test})")
     if not unsupported_datasets.empty:
         unsupported_datasets_list = unsupported_datasets["datasetID"].to_list()
         logger.warn(
-            f"Skipping datasets because cdm_data_type is not {str(cdm_data_types_supported)}: {unsupported_datasets_list}"
+            f"Skipping datasets because cdm_data_type is not {str(CDM_DATA_TYPES_SUPPORTERD)}: {unsupported_datasets_list}"
         )
         for dataset_id in unsupported_datasets_list:
             skipped_datasets_reasons += [
@@ -140,12 +149,21 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
                 if df_profiles.empty:
                     dataset_logger.warning("No profiles found")
                 else:
-
                     # only write dataset/metadata/profile if there are some profiles
-                    df_profiles_all = pd.concat([df_profiles_all, df_profiles])
-                    df_datasets_all = pd.concat([df_datasets_all, dataset.get_df()])
-                    df_variables_all = pd.concat(
-                        [df_variables_all, dataset.df_variables]
+                    df_profiles_all = (
+                        pd.concat([df_profiles_all, df_profiles])
+                        if not df_profiles_all.empty
+                        else df_profiles
+                    )
+                    df_datasets_all = (
+                        pd.concat([df_datasets_all, dataset.get_df()])
+                        if not df_datasets_all.empty
+                        else dataset.get_df()
+                    )
+                    df_variables_all = (
+                        pd.concat([df_variables_all, dataset.df_variables])
+                        if not df_variables_all.empty
+                        else dataset.df_variables
                     )
                     dataset_logger.info("complete")
             else:

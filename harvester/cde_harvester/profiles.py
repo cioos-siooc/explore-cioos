@@ -199,8 +199,8 @@ def get_profiles(dataset):
         profiles["depth_min"] = 0
         profiles["depth_max"] = 0
 
-    profiles["depth_min"].fillna(0, inplace=True)
-    profiles["depth_max"].fillna(0, inplace=True)
+    profiles["depth_min"] = profiles["depth_min"].fillna(0.0)
+    profiles["depth_max"] = profiles["depth_max"].fillna(0.0)
 
     if not "profile_id" in profiles:
         profiles["profile_id"] = ""

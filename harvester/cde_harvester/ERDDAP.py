@@ -18,11 +18,10 @@ from cde_harvester.dataset import Dataset
 MAX_RESPONSE_SIZE = 1e8
 
 
-class ERDDAP(object):
+class ERDDAP:
     "Stores the ERDDAP server URL and functions related to querying it"
 
     def __init__(self, erddap_url, cache_requests=False):
-        super(ERDDAP, self).__init__()
         self.cache_requests = cache_requests
 
         if cache_requests:
@@ -78,7 +77,7 @@ class ERDDAP(object):
         is_timestamp = s.startswith("1.") or s.startswith("-1.")
 
         if is_timestamp:
-            return pd.to_datetime(s, unit="s")
+            return pd.to_datetime(float(s), unit="s")
 
         return pd.to_datetime(s, errors="coerce")
 
@@ -88,7 +87,7 @@ class ERDDAP(object):
         is_timestamp = time.startswith("1.") or time.startswith("-1.")
 
         if is_timestamp:
-            return pd.to_datetime(series, unit="s")
+            return pd.to_datetime(series.astype(float), unit="s")
 
         return pd.to_datetime(series, errors="coerce")
 
