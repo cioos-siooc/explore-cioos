@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 def get_l06_codes_and_labels():
-
     url = "http://vocab.nerc.ac.uk/collection/L06/current/?_profile=nvs&_mediatype=application/ld+json"
     logger.info("Downloading %s", url)
     platforms = requests.get(url).json()["@graph"]
