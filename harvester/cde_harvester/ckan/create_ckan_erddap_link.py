@@ -2,10 +2,11 @@
 # coding: utf-8
 
 
+import re
+
 import diskcache as dc
 import pandas as pd
 import requests
-import re
 
 # National CKAN has all the regions' records
 CKAN_API_URL = "https://catalogue.cioos.ca/api/3"

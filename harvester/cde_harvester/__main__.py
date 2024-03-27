@@ -1,27 +1,23 @@
-import yaml
 import argparse
 import logging
-from dotenv import load_dotenv
 import os
-import time
+import queue
 import sys
 import threading
-import queue
+import time
+
 import numpy as np
 import pandas as pd
 import sentry_sdk
+import yaml
+from cde_harvester.ckan.create_ckan_erddap_link import (get_ckan_records,
+                                                        unescape_ascii,
+                                                        unescape_ascii_list)
+from cde_harvester.harvest_erddap import harvest_erddap
+from cde_harvester.utils import cf_standard_names, supported_standard_names
+from dotenv import load_dotenv
 from sentry_sdk.crons import monitor
 from sentry_sdk.integrations.logging import LoggingIntegration
-from cde_harvester.ckan.create_ckan_erddap_link import (
-    get_ckan_records,
-    unescape_ascii,
-    unescape_ascii_list,
-)
-from cde_harvester.harvest_erddap import harvest_erddap
-from cde_harvester.utils import (
-    cf_standard_names,
-    supported_standard_names,
-)
 
 load_dotenv()
 

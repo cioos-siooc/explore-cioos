@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
-import traceback
 import json
-import os
 import logging
+import os
+import traceback
+from urllib.parse import urlparse
 
 import pandas as pd
 from cde_harvester.CDEComplianceChecker import CDEComplianceChecker
@@ -12,7 +13,6 @@ from cde_harvester.harvest_errors import (CDM_DATA_TYPE_UNSUPPORTED,
                                           HTTP_ERROR, UNKNOWN_ERROR)
 from cde_harvester.profiles import get_profiles
 from requests.exceptions import HTTPError
-from urllib.parse import urlparse
 
 # TIMEOUT = 30
 logger = logging.getLogger(__name__)
