@@ -34,12 +34,18 @@ sentry_sdk.init(
 
 def setup_logging(log_time, log_level):
     # setup logging
-    logger.remove()
-    logger.add(
-        sys.stderr,
-        level=log_level.upper(),
+    logger_format = (
+        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> "
+        "<level>{level: <8}</level> | "
+        "<magenta>[ {extra[erddap_url]} - {extra[dataset_id]} ]</magenta> "
+        "<cyan>{name}:{function}:{line}</cyan> | "
+        "<level>{message}</level>"
     )
-    return logger
+    logger.remove()
+    logger.configure(
+        handlers=[dict(sink=sys.stdout, level=log_level.upper(), format=logger_format)],
+        extra={"erddap_url": "", "dataset_id": ""},
+    )
 
 
 @monitor(monitor_slug="main-harvester")
@@ -275,7 +281,8 @@ if __name__ == "__main__":
         max_workers = args.max_workers
         folder = args.folder
 
-    logger = setup_logging(log_time, log_level)
+    setup_logging(log_time, log_level)
+
     try:
         main(urls, cache, folder or "harvest", dataset_ids, max_workers)
     except Exception as e:

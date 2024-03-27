@@ -1,4 +1,3 @@
-import logging
 from datetime import datetime
 
 import numpy as np
@@ -6,6 +5,7 @@ import pandas as pd
 import requests
 from cde_harvester.platform_ioos_to_l06 import platforms_nerc_ioos
 from cde_harvester.utils import cde_eov_to_standard_name, intersection
+from loguru import logger
 from requests.exceptions import HTTPError
 
 
@@ -21,7 +21,7 @@ class Dataset:
     def __init__(self, erddap_server, id):
         self.id = id
         self.erddap_server = erddap_server
-        self.logger = self.get_logger()
+        self.logger = logger.bind(erddap_url=erddap_server.url, dataset_id=id)
 
         self.erddap_url = erddap_server.url
         self.erddap_csv_to_df = erddap_server.erddap_csv_to_df
@@ -270,7 +270,7 @@ class Dataset:
                 return l06_platform_label
 
             except ValueError:
-                self.logger.error("Found unsupported IOOS platform: %s", platform)
+                self.logger.error("Found unsupported IOOS platform: {}", platform)
 
         if "L06" in platform_vocabulary:
             platforms_nerc_ioos_no_duplicates = platforms_nerc_ioos.drop_duplicates(
@@ -355,7 +355,3 @@ class Dataset:
 
         if self.globals.get("platform"):
             self.platform = self.get_platform_code()
-
-    def get_logger(self):
-        logger = logging.getLogger(f"{self.erddap_server.domain} - {self.id}")
-        return logger

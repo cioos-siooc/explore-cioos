@@ -103,7 +103,6 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
     df_variables_all = pd.DataFrame(dataclass_dtype_dict(Variable), index=[])
 
     erddap = ERDDAP(erddap_url, cache_requests)
-    logger = erddap.get_logger()
     df_all_datasets = erddap.df_all_datasets
 
     if df_all_datasets.empty:
@@ -117,8 +116,10 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
     unsupported_datasets = df_all_datasets.query(f"not ({cdm_data_type_test})")
     if not unsupported_datasets.empty:
         unsupported_datasets_list = unsupported_datasets["datasetID"].to_list()
-        logger.warn(
-            f"Skipping datasets because cdm_data_type is not {str(CDM_DATA_TYPES_SUPPORTERD)}: {unsupported_datasets_list}"
+        logger.warning(
+            "Skipping datasets because cdm_data_type is not {}: {}",
+            CDM_DATA_TYPES_SUPPORTED,
+            unsupported_datasets_list,
         )
         for dataset_id in unsupported_datasets_list:
             skipped_datasets_reasons += [
@@ -138,7 +139,6 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
         try:
             logger.info(f"Querying dataset: {dataset_id} {i+1}/{len(df_all_datasets)}")
             dataset = erddap.get_dataset(dataset_id)
-            dataset_logger = dataset.logger
             compliance_checker = CDEComplianceChecker(dataset)
             passes_checks = compliance_checker.passes_all_checks()
 
@@ -147,7 +147,7 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
                 df_profiles = get_profiles(dataset)
 
                 if df_profiles.empty:
-                    dataset_logger.warning("No profiles found")
+                    logger.warning("No profiles found")
                 else:
                     # only write dataset/metadata/profile if there are some profiles
                     df_profiles_all = (
@@ -165,7 +165,7 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
                         if not df_variables_all.empty
                         else dataset.df_variables
                     )
-                    dataset_logger.info("complete")
+                    logger.info("complete")
             else:
                 skipped_datasets_reasons += skipped_reason(
                     compliance_checker.failure_reason_code
@@ -173,9 +173,7 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
         except HTTPError as e:
             response = e.response
             # dataset_logger.error(response.text)
-            dataset_logger.error(
-                "HTTP ERROR: %s %s", response.status_code, response.reason
-            )
+            logger.error("HTTP ERROR: %s %s", response.status_code, response.reason)
             skipped_datasets_reasons += skipped_reason(HTTP_ERROR)
 
         except Exception as e:
