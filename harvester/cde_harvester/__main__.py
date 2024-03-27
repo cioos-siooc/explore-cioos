@@ -10,9 +10,11 @@ import numpy as np
 import pandas as pd
 import sentry_sdk
 import yaml
-from cde_harvester.ckan.create_ckan_erddap_link import (get_ckan_records,
-                                                        unescape_ascii,
-                                                        unescape_ascii_list)
+from cde_harvester.ckan.create_ckan_erddap_link import (
+    get_ckan_records,
+    unescape_ascii,
+    unescape_ascii_list,
+)
 from cde_harvester.harvest_erddap import harvest_erddap
 from cde_harvester.utils import cf_standard_names, supported_standard_names
 from dotenv import load_dotenv
@@ -56,6 +58,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     result = []
 
     q = queue.Queue()
+
     def worker():
         while True:
             (erddap_url, result, limit_dataset_ids, cache_requests) = q.get()
@@ -66,15 +69,15 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     # Turn-on the worker thread.
     for x in range(max_workers):
         threading.Thread(target=worker, daemon=True).start()
-    
+
     # Send thirty task requests to the worker.
-    
+
     for erddap_url in erddap_urls:
-        logger.info("Adding to queue %s",erddap_url)
+        logger.info("Adding to queue %s", erddap_url)
         q.put((erddap_url, result, limit_dataset_ids, cache_requests))
 
     q.join()
-    logger.info('All work completed')
+    logger.info("All work completed")
 
     profiles = pd.DataFrame()
     datasets = pd.DataFrame()
@@ -204,20 +207,20 @@ def load_config(config_file):
 
 
 if __name__ == "__main__":
-    
+
     parser = argparse.ArgumentParser()
 
-    if '-f' in sys.argv or '--file' in sys.argv:
+    if "-f" in sys.argv or "--file" in sys.argv:
         # Use config file
         parser.add_argument(
             "-f",
             "--file",
             help="get these options from a config file instead",
-            required=True
+            required=True,
         )
 
         args = parser.parse_args()
-        config_file=args.file
+        config_file = args.file
 
         config = load_config(config_file)
         logging.info(
@@ -226,16 +229,16 @@ if __name__ == "__main__":
         urls = ",".join(config.get("erddap_urls") or [])
         cache = config.get("cache")
         folder = config.get("folder")
-        max_workers = config.get("max-workers",1)
+        max_workers = config.get("max-workers", 1)
         dataset_ids = ",".join(config.get("dataset_ids") or [])
         log_time = config.get("log_time")
-        log_level = config.get("log_level","INFO")
-        
-    else:        
+        log_level = config.get("log_level", "INFO")
+
+    else:
         parser.add_argument(
             "--urls",
             help="harvest from these erddap servers, comme separated",
-            required=True
+            required=True,
         )
         parser.add_argument(
             "--dataset_ids",
@@ -270,7 +273,7 @@ if __name__ == "__main__":
         )
 
         args = parser.parse_args()
-        
+
         log_time = args.log_time
         log_level = args.log_level
         urls = args.urls or ""
@@ -281,7 +284,7 @@ if __name__ == "__main__":
 
     logger = setup_logging(log_time, log_level)
     try:
-        main(urls, cache, folder or "harvest", dataset_ids,max_workers)
+        main(urls, cache, folder or "harvest", dataset_ids, max_workers)
     except Exception as e:
         logger.error("Harvester failed!!!", exc_info=True)
         raise e

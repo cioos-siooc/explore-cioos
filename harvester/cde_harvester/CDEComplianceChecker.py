@@ -1,9 +1,14 @@
-from cde_harvester.harvest_errors import (DEPTH_AND_ALTITUDE,
-                                          INGEST_FLAG_FALSE,
-                                          MISSING_REQUIRED_VARS,
-                                          NO_SUPPORTED_VARIABLES)
-from cde_harvester.utils import (cf_standard_names, intersection,
-                                 supported_standard_names)
+from cde_harvester.harvest_errors import (
+    DEPTH_AND_ALTITUDE,
+    INGEST_FLAG_FALSE,
+    MISSING_REQUIRED_VARS,
+    NO_SUPPORTED_VARIABLES,
+)
+from cde_harvester.utils import (
+    cf_standard_names,
+    intersection,
+    supported_standard_names,
+)
 
 
 class CDEComplianceChecker(object):

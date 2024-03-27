@@ -56,17 +56,17 @@ def intersection(lst1, lst2):
 def flatten(t):
     return [item for sublist in t for item in sublist]
 
+
 def get_cf_names():
-    cf_names_xml_url="https://cfconventions.org/Data/cf-standard-names/current/src/cf-standard-name-table.xml"
+    cf_names_xml_url = "https://cfconventions.org/Data/cf-standard-names/current/src/cf-standard-name-table.xml"
 
     logger.info("Downloading %s", cf_names_xml_url)
 
     cf_standard_names = (
-        pd.read_xml(cf_names_xml_url)
-        .sort_values(by="id")["id"]
-        .unique()
+        pd.read_xml(cf_names_xml_url).sort_values(by="id")["id"].unique()
     )
     return cf_standard_names
+
 
 cf_standard_names = get_cf_names()
 
