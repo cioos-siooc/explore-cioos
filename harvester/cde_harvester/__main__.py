@@ -5,6 +5,7 @@ import sys
 import threading
 import time
 
+import click
 import numpy as np
 import pandas as pd
 import sentry_sdk
@@ -32,7 +33,7 @@ sentry_sdk.init(
 )
 
 
-def setup_logging(log_time, log_level):
+def setup_logging(log_level):
     # setup logging
     logger_format = (
         "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> "
@@ -206,85 +207,59 @@ def load_config(config_file):
             logger.error("Failed to load config yaml", exc_info=True)
 
 
+@click.command()
+@click.option(
+    "--erddap_urls",
+    "--urls",
+    help="harvest from these erddap servers, comme separated",
+    type=str,
+    required=True,
+)
+@click.option(
+    "--dataset_ids",
+    help="only harvest these dataset IDs. Comma separated list",
+    type=str,
+    default="",
+)
+@click.option(
+    "--cache-requests", "--cache", help="Cache requests, for testing only", is_flag=True
+)
+@click.option(
+    "--folder",
+    help="Folder to save harvested data to",
+    default="harvest",
+)
+@click.option(
+    "--log-level",
+    default="debug",
+    type=click.Choice(
+        ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], case_sensitive=False
+    ),
+    help="Provide logging level. Example --log-level debug, default=debug",
+)
+@click.option(
+    "--max-workers",
+    default=1,
+    type=int,
+    help="max threads that harvester will use",
+)
+@click.option(
+    "-c",
+    "--config",
+    "-f",
+    "--file",
+    type=click.Path(exists=True),
+    help="get these options from a config file instead",
+)
+@logger.catch(reraise=True, message="Harvester failed!!!")
+def cli(**kwargs):
+    """Harvest ERDDAP datasets and profiles and save to CSV files"""
+    config = kwargs.pop("config")
+    if config:
+        kwargs.update(load_config(config))
+    setup_logging(kwargs.pop("log_level"))
+    main(**kwargs)
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-
-    if "-f" in sys.argv or "--file" in sys.argv:
-        # Use config file
-        parser.add_argument(
-            "-f",
-            "--file",
-            help="get these options from a config file instead",
-            required=True,
-        )
-
-        args = parser.parse_args()
-        config_file = args.file
-
-        config = load_config(config_file)
-        logger.info(
-            "Using config from harvest_config.yaml, ignoring command line arguments"
-        )
-        urls = ",".join(config.get("erddap_urls") or [])
-        cache = config.get("cache")
-        folder = config.get("folder")
-        max_workers = config.get("max-workers", 1)
-        dataset_ids = ",".join(config.get("dataset_ids") or [])
-        log_time = config.get("log_time")
-        log_level = config.get("log_level", "INFO")
-
-    else:
-        parser.add_argument(
-            "--urls",
-            help="harvest from these erddap servers, comme separated",
-            required=True,
-        )
-        parser.add_argument(
-            "--dataset_ids",
-            help="only harvest these dataset IDs. Comma separated list",
-        )
-
-        parser.add_argument(
-            "--cache", help="Cache requests, for testing only", action="store_true"
-        )
-
-        parser.add_argument(
-            "--folder",
-            help="Folder to save harvested data to",
-            default="harvest",
-        )
-
-        parser.add_argument(
-            "--log-level",
-            default="debug",
-            help="Provide logging level. Example --log-level debug, default=debug",
-        )
-        parser.add_argument(
-            "--log-time",
-            default=False,
-            help="add time to logs",
-            action="store_true",
-        )
-        parser.add_argument(
-            "--max-workers",
-            default=1,
-            help="max threads that harvester will use",
-        )
-
-        args = parser.parse_args()
-
-        log_time = args.log_time
-        log_level = args.log_level
-        urls = args.urls or ""
-        cache = args.cache
-        dataset_ids = args.dataset_ids
-        max_workers = args.max_workers
-        folder = args.folder
-
-    setup_logging(log_time, log_level)
-
-    try:
-        main(urls, cache, folder or "harvest", dataset_ids, max_workers)
-    except Exception as e:
-        logger.error("Harvester failed!!!", exc_info=True)
-        raise e
+    cli()
