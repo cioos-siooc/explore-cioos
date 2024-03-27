@@ -133,13 +133,10 @@ class Dataset:
         if profile_ids.empty:
             return profile_ids
 
-        profile_ids = profile_ids.dropna(subset=["latitude", "longitude"])
-
-        profile_ids["latlon"] = (
-            profile_ids["latitude"].astype(str)
-            + ","
-            + profile_ids["longitude"].astype(str)
+        profile_ids = profile_ids.dropna(subset=["latitude", "longitude"]).assign(
+            latlon=lambda x: f"{x.latitude},{x.longitude}"
         )
+
         profiles_with_multiple_locations = (
             profile_ids.groupby(profile_variable_list)
             .count()[["latlon"]]
