@@ -37,7 +37,7 @@ class Profile:
 @dataclasses.dataclass
 class Dataset:
     title: str
-    summary: str
+    # summary: str
     erddap_url: str
     dataset_id: str
     cdm_data_type: str
@@ -89,7 +89,7 @@ def get_datasets_to_skip():
     return {}
 
 
-def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=False):
+def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=False, folder=None):
     # """ """
     skipped_datasets_reasons = []
     hostname = urlparse(erddap_url).hostname
@@ -131,6 +131,9 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
     if erddap.df_all_datasets.empty:
         raise RuntimeError("No datasets found")
     # loop through each dataset to be processed
+    profiles_all = []
+    datasets_all = []
+    variables_all = []
     for i, df_dataset_row in df_all_datasets.iterrows():
         dataset_id = df_dataset_row["datasetID"]
         if dataset_id in datasets_to_skip:
@@ -148,24 +151,13 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
 
                 if df_profiles.empty:
                     logger.warning("No profiles found")
-                else:
-                    # only write dataset/metadata/profile if there are some profiles
-                    df_profiles_all = (
-                        pd.concat([df_profiles_all, df_profiles])
-                        if not df_profiles_all.empty
-                        else df_profiles
-                    )
-                    df_datasets_all = (
-                        pd.concat([df_datasets_all, dataset.get_df()])
-                        if not df_datasets_all.empty
-                        else dataset.get_df()
-                    )
-                    df_variables_all = (
-                        pd.concat([df_variables_all, dataset.df_variables])
-                        if not df_variables_all.empty
-                        else dataset.df_variables
-                    )
-                    logger.info("complete")
+                    continue
+            
+                # only write dataset/metadata/profile if there are some profiles
+                profiles_all.append(df_profiles)
+                datasets_all.append(dataset.get_df())
+                variables_all.append(dataset.df_variables)
+                logger.info("complete")
             else:
                 skipped_datasets_reasons += skipped_reason(
                     compliance_checker.failure_reason_code
@@ -202,9 +194,9 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
     # using 'result' to return data from each thread
     result.append(
         [
-            df_profiles_all,
-            df_datasets_all,
-            df_variables_all,
+            pd.concat(profiles_all).astype(dataclass_dtype_dict(Profile)),
+            pd.concat(datasets_all).astype(dataclass_dtype_dict(Dataset)),
+            pd.concat(variables_all).astype(dataclass_dtype_dict(Variable)),
             df_skipped_datasets,
         ]
     )
