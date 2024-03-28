@@ -36,9 +36,9 @@ sentry_sdk.init(
 def setup_logging(log_level):
     # setup logging
     logger_format = (
-        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> "
+        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
         "<level>{level: <8}</level> | "
-        "<magenta>[ {extra[erddap_url]} - {extra[dataset_id]} ]</magenta> "
+        "<magenta> {extra[erddap_url]} | {extra[dataset_id]} </magenta> | "
         "<cyan>{name}:{function}:{line}</cyan> | "
         "<level>{message}</level>"
     )
