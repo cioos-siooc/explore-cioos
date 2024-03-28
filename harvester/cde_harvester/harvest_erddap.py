@@ -89,7 +89,9 @@ def get_datasets_to_skip():
     return {}
 
 
-def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=False, folder=None):
+def harvest_erddap(
+    erddap_url, result, limit_dataset_ids=None, cache_requests=False, folder=None
+):
     # """ """
     skipped_datasets_reasons = []
     hostname = urlparse(erddap_url).hostname
@@ -152,7 +154,7 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
                 if df_profiles.empty:
                     logger.warning("No profiles found")
                     continue
-            
+
                 # only write dataset/metadata/profile if there are some profiles
                 profiles_all.append(df_profiles)
                 datasets_all.append(dataset.get_df())

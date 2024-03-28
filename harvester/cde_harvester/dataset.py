@@ -151,7 +151,7 @@ class Dataset:
         if profiles_with_multiple_locations:
             self.logger.warn(
                 "Non unique lat/lon found within profiles: {}",
-                profiles_with_multiple_locations
+                profiles_with_multiple_locations,
             )
 
         self.profile_ids = profile_ids
