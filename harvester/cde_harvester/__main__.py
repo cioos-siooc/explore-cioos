@@ -62,20 +62,18 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
 
     def worker():
         while True:
-            (erddap_url, result, limit_dataset_ids, cache_requests) = q.get()
-            harvest_erddap(erddap_url, result, limit_dataset_ids, cache_requests)
+            harvest_erddap(*q.get())
             time.sleep(1)
             q.task_done()
 
     # Turn-on the worker thread.
-    for x in range(max_workers):
+    for _ in range(max_workers):
         threading.Thread(target=worker, daemon=True).start()
 
     # Send thirty task requests to the worker.
-
     for erddap_url in erddap_urls:
         logger.info("Adding to queue {}", erddap_url)
-        q.put((erddap_url, result, limit_dataset_ids, cache_requests))
+        q.put((erddap_url, result, limit_dataset_ids, cache_requests, folder))
 
     q.join()
     logger.info("All work completed")
