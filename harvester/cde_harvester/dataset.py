@@ -39,6 +39,9 @@ class Dataset:
 
         self.get_metadata()
 
+    def __repr__(self):
+        return f"Dataset(erddap='{self.erddap_server.url}' datasetID='{self.id}')"
+
     def get_df(self):
         self.df = pd.DataFrame(
             {

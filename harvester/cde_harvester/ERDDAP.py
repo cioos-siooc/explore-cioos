@@ -56,6 +56,9 @@ class ERDDAP:
         if self.df_all_datasets.empty:
             print("No datasets found at:", self.url)
 
+    def __repr__(self):
+        return f"ERDDAP({self.url})"
+
     def get_all_datasets(self):
         "Get a string list of dataset IDs from the ERDDAP server"
         # allDatasets indexes table and grid datasets
