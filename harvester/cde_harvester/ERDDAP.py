@@ -53,7 +53,7 @@ class ERDDAP:
 
         if not erddap_url.endswith("/erddap"):
             # ERDDAP URL almost always ends in /erddap
-            logger.warning("URL doesn't end in /erddap, trying anyway")
+            self.logger.warning("URL doesn't end in /erddap, trying anyway")
 
         self.df_all_datasets = self.get_all_datasets()
 
@@ -100,7 +100,7 @@ class ERDDAP:
 
         def _cache_request(url):
             if self.cache_requests and url in self.cache:
-                logger.debug("load CACHE")
+                self.logger.debug("load CACHE")
                 response = self.cache[url]
                 if self.cache_requests == True:
                     return response
@@ -112,7 +112,7 @@ class ERDDAP:
 
             response = self.session.get(url, timeout=3600)
             if self.cache_requests:
-                logger.debug("save CACHE")
+                self.logger.debug("save CACHE")
                 self.cache[url] = response
             return response
 
@@ -149,7 +149,7 @@ class ERDDAP:
             and "Query error: No operator found in constraint=&quot;orderByCount"
             in response.text
         ):
-            self.self.logger.error(
+            self.logger.error(
                 "OrderByCount not available within this ERDDAP Version"
             )
             no_data = True
