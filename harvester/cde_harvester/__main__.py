@@ -220,12 +220,13 @@ def load_config(config_file):
     default="",
 )
 @click.option(
-    "--cache-requests", "--cache", help="Cache requests, for testing only", is_flag=True
+    "--cache-requests/--no-cache-requests", "--cache/--no-cache", help="Cache requests, for testing only", default=True
 )
 @click.option(
     "--folder",
     help="Folder to save harvested data to",
-    default="harvest",
+    default=Path("harvest"),
+    type=click.Path(dir_okay=True, file_okay=False)
 )
 @click.option(
     "--log-level",
