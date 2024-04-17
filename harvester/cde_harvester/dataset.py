@@ -152,7 +152,7 @@ class Dataset:
         profile_ids = profile_ids.drop_duplicates(profile_variable_list)
 
         if profiles_with_multiple_locations:
-            self.logger.warn(
+            self.logger.warning(
                 "Non unique lat/lon found within profiles: {}",
                 profiles_with_multiple_locations,
             )

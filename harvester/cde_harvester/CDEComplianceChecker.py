@@ -53,7 +53,7 @@ class CDEComplianceChecker(object):
             x for x in standard_names_in_dataset if x not in cf_standard_names
         ]
         if non_standard_names:
-            logger.warn("Found unstandard standard_name: {}", non_standard_names)
+            logger.warning("Found unstandard standard_name: {}", non_standard_names)
 
         #  This dataset has at least one standard name mapped to GOOS
         supported_variables = intersection(

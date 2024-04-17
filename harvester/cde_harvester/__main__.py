@@ -50,7 +50,7 @@ def setup_logging(log_level):
 
 
 def review_standard_names_not_supported(standard_names: list):
-
+    "Create warning for standard names that arent supported by CDE yet"
     llat_variables = ["latitude", "longitude", "time", "depth", ""]
 
     unsupported_standard_names = [
@@ -88,7 +88,6 @@ def main(erddaps, cache_requests, folder: Path, max_workers: int):
     for erddap_conn in erddaps:
         logger.info("Adding to queue {}", erddap_conn["url"])
         q.put((erddap_conn, results, cache_requests))
-
     q.join()
     logger.info("All work completed")
 
@@ -169,7 +168,7 @@ def main(erddaps, cache_requests, folder: Path, max_workers: int):
         "Adding {} datasets and {} profiles", len(datasets), len(all_erddaps_profiles)
     )
 
-    # drop duplicates caused by EDDTableFromErddap redirects
+    # write files to disk
     logger.info("Writing data to files: {}, {}, {}, {}", datasets_file, profiles_file, ckan_file, skipped_datasets_file)
     datasets.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
         datasets_file, index=False
@@ -179,7 +178,6 @@ def main(erddaps, cache_requests, folder: Path, max_workers: int):
     all_erddaps_skipped_datasets.drop_duplicates().to_csv(
         skipped_datasets_file, index=False
     )
-
     logger.info("Harvested data saved to files")
 
     if not all_erddaps_skipped_datasets.empty:
