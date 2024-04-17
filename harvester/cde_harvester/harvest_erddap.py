@@ -88,22 +88,19 @@ def get_datasets_to_skip():
     return {}
 
 
-def harvest_erddap(
-    erddap_url, result, limit_dataset_ids=None, cache_requests=False, folder=None
-):
+def harvest_erddap(erddap_conn, result, cache_requests=False):
     # """ """
     skipped_datasets_reasons = []
+    erddap_url = erddap_conn["url"]
+    limit_dataset_ids = erddap_conn.get("dataset_ids", None)
+
     hostname = urlparse(erddap_url).hostname
     datasets_to_skip = get_datasets_to_skip().get(hostname, [])
 
     def skipped_reason(code):
         return [[erddap.domain, dataset_id, code]]
 
-    df_profiles_all = pd.DataFrame(dataclass_dtype_dict(Profile), index=[])
-    df_datasets_all = pd.DataFrame(dataclass_dtype_dict(Dataset), index=[])
-    df_variables_all = pd.DataFrame(dataclass_dtype_dict(Variable), index=[])
-
-    erddap = ERDDAP(erddap_url, cache_requests)
+    erddap = ERDDAP(erddap_conn, cache_requests)
     df_all_datasets = erddap.df_all_datasets
 
     if df_all_datasets.empty:
@@ -196,10 +193,10 @@ def harvest_erddap(
 
     # using 'result' to return data from each thread
     result.append(
-        [
-            pd.concat(profiles_all).astype(dataclass_dtype_dict(Profile)),
-            pd.concat(datasets_all).astype(dataclass_dtype_dict(Dataset)),
-            pd.concat(variables_all).astype(dataclass_dtype_dict(Variable)),
-            df_skipped_datasets,
-        ]
+        dict(
+            profiles=pd.concat(profiles_all).astype(dataclass_dtype_dict(Profile)),
+            datasets=pd.concat(datasets_all).astype(dataclass_dtype_dict(Dataset)),
+            variables=pd.concat(variables_all).astype(dataclass_dtype_dict(Variable)),
+            skipped_datasets=df_skipped_datasets,
+        )
     )

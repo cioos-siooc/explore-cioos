@@ -11,6 +11,7 @@ import pandas as pd
 import requests
 from cde_harvester.dataset import Dataset
 from loguru import logger
+from requests.auth import HTTPBasicAuth
 
 # size in bytes
 MAX_RESPONSE_SIZE = 1e8
@@ -19,7 +20,7 @@ MAX_RESPONSE_SIZE = 1e8
 class ERDDAP:
     "Stores the ERDDAP server URL and functions related to querying it"
 
-    def __init__(self, erddap_url, cache_requests=False):
+    def __init__(self, erddap, cache_requests=False):
         self.cache_requests = cache_requests
 
         if cache_requests:
@@ -35,9 +36,11 @@ class ERDDAP:
             logger.debug("count {}", self.cache.count)
             logger.debug("volume() {}", self.cache.volume())
             logger.debug("size_limit {}", self.cache.size_limit)
-
-        self.domain = urlparse(erddap_url).netloc
+        erddap_url = erddap["url"]
+        self.domain = urlparse(erddap["url"]).netloc
         self.session = requests.Session()
+        if erddap.get("username") and erddap.get("password"):
+            self.session.auth = HTTPBasicAuth(erddap["username"], erddap["password"])
 
         self.logger = logger.bind(erddap_url=erddap_url)
         self.df_all_datasets = None
@@ -51,6 +54,7 @@ class ERDDAP:
         if not erddap_url.endswith("/erddap"):
             # ERDDAP URL almost always ends in /erddap
             logger.warning("URL doesn't end in /erddap, trying anyway")
+
         self.df_all_datasets = self.get_all_datasets()
 
         if self.df_all_datasets.empty:
