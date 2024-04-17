@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 
-import traceback
 import json
 import os
+import traceback
+from urllib.parse import urlparse
 
 import pandas as pd
 from cde_harvester.CDEComplianceChecker import CDEComplianceChecker
 from cde_harvester.ERDDAP import ERDDAP
-from cde_harvester.harvest_errors import (CDM_DATA_TYPE_UNSUPPORTED,
-                                          HTTP_ERROR, UNKNOWN_ERROR)
+from cde_harvester.harvest_errors import (
+    CDM_DATA_TYPE_UNSUPPORTED,
+    HTTP_ERROR,
+    UNKNOWN_ERROR,
+)
 from cde_harvester.profiles import get_profiles
 from requests.exceptions import HTTPError
-from urllib.parse import urlparse
 
 # TIMEOUT = 30
 
@@ -48,27 +51,27 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
         "depth_max": float,
     }
 
-    df_profiles_all = pd.DataFrame(profiles_variables,index=[])
+    df_profiles_all = pd.DataFrame(profiles_variables, index=[])
 
     dataset_variables = {
-            "title":str,
-            "summary": str,
-            "erddap_url": str,
-            "dataset_id": str,
-            "cdm_data_type": str,
-            "platform": str,
-            "eovs": str,
-            "organizations": str,
-            "n_profiles": float,
-            "profile_variables": str,
-            "timeseries_id_variable": str,
-            "profile_id_variable": str,
-            "trajectory_id_variable": str,
-            "num_columns": int,
-            "first_eov_column": str,
-            }
-    df_datasets_all = pd.DataFrame(dataset_variables,index=[])
-   
+        "title": str,
+        "summary": str,
+        "erddap_url": str,
+        "dataset_id": str,
+        "cdm_data_type": str,
+        "platform": str,
+        "eovs": str,
+        "organizations": str,
+        "n_profiles": float,
+        "profile_variables": str,
+        "timeseries_id_variable": str,
+        "profile_id_variable": str,
+        "trajectory_id_variable": str,
+        "num_columns": int,
+        "first_eov_column": str,
+    }
+    df_datasets_all = pd.DataFrame(dataset_variables, index=[])
+
     df_variables_all = pd.DataFrame(
         columns=[
             "name",
@@ -79,14 +82,14 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
             "dataset_id",
         ]
     )
-    
+
     erddap = ERDDAP(erddap_url, cache_requests)
     logger = erddap.get_logger()
     df_all_datasets = erddap.df_all_datasets
 
     if df_all_datasets.empty:
         return
-        
+
     cdm_data_types_supported = [
         # "Point",
         "TimeSeries",
