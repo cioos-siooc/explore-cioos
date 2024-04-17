@@ -96,7 +96,7 @@ def harvest_erddap(erddap_conn, result, cache_requests=False):
 
     hostname = urlparse(erddap_url).hostname
     datasets_to_skip = get_datasets_to_skip().get(hostname, [])
-    
+
     def skipped_reason(code):
         return [[erddap.domain, dataset_id, code]]
 

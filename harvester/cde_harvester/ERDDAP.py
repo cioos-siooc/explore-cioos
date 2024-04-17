@@ -97,6 +97,25 @@ class ERDDAP:
 
     def erddap_csv_to_df(self, url, skiprows=[1], dataset=None):
         """If theres an error in the request, this raises up to the dataset loop, so this dataset gets skipped"""
+
+        def _cache_request(url):
+            if self.cache_requests and url in self.cache:
+                logger.debug("load CACHE")
+                response = self.cache[url]
+                if self.cache_requests == True:
+                    return response
+                elif (
+                    isinstance(self.cache_requests, list)
+                    and response.status_code in self.cache_requests
+                ):
+                    return response
+
+            response = self.session.get(url, timeout=3600)
+            if self.cache_requests:
+                logger.debug("save CACHE")
+                self.cache[url] = response
+            return response
+
         if dataset:
             erddap_url = dataset.erddap_url
         else:
@@ -106,19 +125,7 @@ class ERDDAP:
 
         self.logger.debug(unquote(url_combined))
 
-        response = None
-        if self.cache_requests:
-            cache = self.cache
-            if url_combined in self.cache:
-                logger.debug("load CACHE")
-                response = cache[url_combined]
-            else:
-                self.logger.debug("miss CACHE")
-                response = self.session.get(url_combined, timeout=3600)
-                cache[url_combined] = response
-        else:
-            response = self.session.get(url_combined, timeout=3600)
-
+        response = _cache_request(url_combined)
         if len(response.content) > MAX_RESPONSE_SIZE:
             raise RuntimeError("Response too big")
 

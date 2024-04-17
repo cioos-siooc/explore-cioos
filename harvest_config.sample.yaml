@@ -6,7 +6,7 @@ erddaps:
     dataset_ids: []
 
 # set to true to test with caching. Not available in production docker compose file
-# defaults to false
+# defaults to false or a list of status_code to cache (e.g. [200, 404])
 cache_requests: true
 
 # defaults to 'harvest'

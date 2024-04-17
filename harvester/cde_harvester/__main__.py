@@ -67,6 +67,7 @@ def review_standard_names_not_supported(standard_names: list):
             unsupported_standard_names,
         )
 
+
 def cleanup_datasets_table(datasets):
     logger.info("Cleaning up data")
     datasets = datasets.replace(np.nan, None)
@@ -98,6 +99,7 @@ def cleanup_datasets_table(datasets):
 
     datasets = datasets.replace(r"\n", " ", regex=True)
     return datasets
+
 
 @monitor(monitor_slug="main-harvester")
 def main(erddaps, cache_requests, folder: Path, max_workers: int):
@@ -173,7 +175,13 @@ def main(erddaps, cache_requests, folder: Path, max_workers: int):
     )
 
     # write files to disk
-    logger.info("Writing data to files: {}, {}, {}, {}", datasets_file, profiles_file, ckan_file, skipped_datasets_file)
+    logger.info(
+        "Writing data to files: {}, {}, {}, {}",
+        datasets_file,
+        profiles_file,
+        ckan_file,
+        skipped_datasets_file,
+    )
     datasets.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
         datasets_file, index=False
     )
@@ -218,13 +226,22 @@ def load_config(config_file):
     default="",
 )
 @click.option(
-    "--cache-requests/--no-cache-requests", "--cache/--no-cache", help="Cache requests, for testing only", default=True
+    "--cache-requests/--no-cache-requests",
+    "--cache/--no-cache",
+    help="Cache requests, for testing only",
+    default=None,
+)
+@click.option(
+    "--cache-requests-status-codes",
+    help="Cache requests with these status codes, comma separated list of integers",
+    type=str,
+    default=None,
 )
 @click.option(
     "--folder",
     help="Folder to save harvested data to",
     default=Path("harvest"),
-    type=click.Path(dir_okay=True, file_okay=False)
+    type=click.Path(dir_okay=True, file_okay=False),
 )
 @click.option(
     "--log-level",
@@ -251,19 +268,28 @@ def load_config(config_file):
 @logger.catch(reraise=True, message="Harvester failed!!!")
 def cli(**kwargs):
     """Harvest ERDDAP datasets and profiles and save to CSV files"""
-    config = kwargs.pop("config")
+    config = kwargs.pop("config",{})
+    cache_requests_status_code = kwargs.pop("cache_requests_status_codes")
     if config:
         config = load_config(config)
-    if erddap_urls := kwargs.pop("erddap_urls"):
-        config["erddaps"] = [
-            {"url": erddap_url} for erddap_url in erddap_urls.split(",")
-        ]
-    if dataset_ids := kwargs.pop("dataset_ids"):
-        dataset_ids = dataset_ids.split(",")
-        for id, _ in enumerate(config["erddaps"]):
-            config["erddaps"][id]["dataset_ids"] = dataset_ids
+    else:
+        config = {}
+        if erddap_urls := kwargs.pop("erddap_urls"):
+            config["erddaps"] = [
+                {"url": erddap_url} for erddap_url in erddap_urls.split(",")
+            ]
+        if dataset_ids := kwargs.pop("dataset_ids"):
+            dataset_ids = dataset_ids.split(",")
+            for id, _ in enumerate(config["erddaps"]):
+                config["erddaps"][id]["dataset_ids"] = dataset_ids
+        
+        config.update(kwargs)
+        cache_requests_status_code = kwargs.pop("cache_requests_status_codes")
 
-    config.update(kwargs)
+        if cache_requests_status_code:
+            config["cache_requests"] = [
+                int(x) for x in cache_requests_status_code.split(",")
+            ]
     setup_logging(config.pop("log_level"))
     main(**config)
 
