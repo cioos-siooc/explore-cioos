@@ -4,6 +4,7 @@ import queue
 import sys
 import threading
 import time
+from pathlib import Path
 
 import click
 import numpy as np
@@ -50,11 +51,7 @@ def setup_logging(log_level):
 
 
 @monitor(monitor_slug="main-harvester")
-def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
-    erddap_urls = erddap_urls.split(",")
-    limit_dataset_ids = None
-    if dataset_ids:
-        limit_dataset_ids = dataset_ids.split(",")
+def main(erddaps, cache_requests, folder: Path, max_workers: int):
 
     result = []
 
@@ -101,12 +98,12 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
         logger.info("No datasets harvested")
         sys.exit(1)
 
-    # see what standard names arent covered by our EOVs:
-    standard_names_harvested = (
-        variables.query("not standard_name.isnull()")["standard_name"].unique().tolist()
-    )
-
-    llat_variables = ["latitude", "longitude", "time", "depth", ""]
+    logger.debug("Create output_folder and define output files")
+    folder.mkdir(exist_ok=True, parents=True)
+    datasets_file = folder / "datasets.csv"
+    profiles_file = folder / "profiles.csv"
+    skipped_datasets_file = folder / "skipped.csv"
+    ckan_file = folder / "ckan.csv"
 
     # this gets a list of all the standard names
 
