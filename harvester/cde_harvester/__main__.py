@@ -67,6 +67,37 @@ def review_standard_names_not_supported(standard_names: list):
             unsupported_standard_names,
         )
 
+def cleanup_datasets_table(datasets):
+    logger.info("Cleaning up data")
+    datasets = datasets.replace(np.nan, None)
+
+    # datasets["summary"] = datasets["summary"].apply(lambda x: unescape_ascii(x))
+    datasets["title"] = datasets["title"].apply(lambda x: unescape_ascii(x))
+
+    datasets["ckan_title"] = datasets["ckan_title"].fillna(datasets["title"])
+    # datasets["ckan_summary"].fillna(datasets["summary"], inplace=True)
+
+    # prioritize with organizations from CKAN and then pull ERDDAP if needed
+    datasets["organizations"] = datasets.apply(
+        lambda x: x["ckan_organizations"] or unescape_ascii_list(x["organizations"]),
+        axis=1,
+    )
+    del datasets["title"]
+    # del datasets["summary"]
+    del datasets["ckan_organizations"]
+
+    datasets.rename(
+        columns={
+            "ckan_title": "title",
+            "ckan_title_fr": "title_fr",
+            # "ckan_summary": "summary",
+            # "ckan_summary_fr": "summary_fr",
+        },
+        inplace=True,
+    )
+
+    datasets = datasets.replace(r"\n", " ", regex=True)
+    return datasets
 
 @monitor(monitor_slug="main-harvester")
 def main(erddaps, cache_requests, folder: Path, max_workers: int):
@@ -131,35 +162,8 @@ def main(erddaps, cache_requests, folder: Path, max_workers: int):
         .reset_index()
     )
 
-    logger.info("Cleaning up data")
-    datasets = datasets.replace(np.nan, None)
-
-    # datasets["summary"] = datasets["summary"].apply(lambda x: unescape_ascii(x))
-    datasets["title"] = datasets["title"].apply(lambda x: unescape_ascii(x))
-
-    datasets["ckan_title"] = datasets["ckan_title"].fillna(datasets["title"])
-    # datasets["ckan_summary"].fillna(datasets["summary"], inplace=True)
-
-    # prioritize with organizations from CKAN and then pull ERDDAP if needed
-    datasets["organizations"] = datasets.apply(
-        lambda x: x["ckan_organizations"] or unescape_ascii_list(x["organizations"]),
-        axis=1,
-    )
-    del datasets["title"]
-    # del datasets["summary"]
-    del datasets["ckan_organizations"]
-
-    datasets.rename(
-        columns={
-            "ckan_title": "title",
-            "ckan_title_fr": "title_fr",
-            # "ckan_summary": "summary",
-            # "ckan_summary_fr": "summary_fr",
-        },
-        inplace=True,
-    )
-
-    datasets = datasets.replace(r"\n", " ", regex=True)
+    # clean up datasets table
+    datasets = cleanup_datasets_table(datasets)
 
     all_erddaps_profiles["depth_min"] = all_erddaps_profiles["depth_min"].fillna(0.0)
     all_erddaps_profiles["depth_max"] = all_erddaps_profiles["depth_max"].fillna(0.0)
