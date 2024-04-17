@@ -1,7 +1,6 @@
 import time
 
-from download_scheduler.download_scheduler import (get_a_download_job,
-                                                   run_download)
+from download_scheduler.download_scheduler import get_a_download_job, run_download
 
 if __name__ == "__main__":
     print("Waiting for jobs..")
