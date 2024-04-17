@@ -88,6 +88,11 @@ def get_datasets_to_skip():
     return {}
 
 
+def harvest_erddap_contextualized(erddap_conn, result, cache_requests=False):
+    with logger.contextualize( erddap_url=erddap_conn["url"]):
+        return harvest_erddap(erddap_conn, result, cache_requests)
+
+
 def harvest_erddap(erddap_conn, result, cache_requests=False):
     # """ """
     skipped_datasets_reasons = []

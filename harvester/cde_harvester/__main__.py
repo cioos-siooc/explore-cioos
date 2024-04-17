@@ -15,7 +15,7 @@ from cde_harvester.ckan.create_ckan_erddap_link import (
     unescape_ascii,
     unescape_ascii_list,
 )
-from cde_harvester.harvest_erddap import harvest_erddap
+from cde_harvester.harvest_erddap import harvest_erddap_contextualized
 from cde_harvester.utils import cf_standard_names, supported_standard_names
 from dotenv import load_dotenv
 from loguru import logger
@@ -109,7 +109,7 @@ def main(erddaps, cache_requests, folder: Path, max_workers: int):
 
     def worker():
         while True:
-            harvest_erddap(*q.get())
+            harvest_erddap_contextualized(*q.get())
             time.sleep(1)
             q.task_done()
 
