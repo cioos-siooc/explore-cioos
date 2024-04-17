@@ -38,14 +38,14 @@ def setup_logging(log_level):
     logger_format = (
         "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
         "<level>{level: <8}</level> | "
-        "<magenta> {extra[erddap_url]}/.../{extra[dataset_id]} </magenta> | "
+        "<magenta> {extra[erddap_url]} </magenta> | "
         "<cyan>{name}:{function}:{line}</cyan> | "
         "<level>{message}</level>"
     )
     logger.remove()
     logger.configure(
         handlers=[dict(sink=sys.stdout, level=log_level.upper(), format=logger_format)],
-        extra={"erddap_url": "", "dataset_id": ""},
+        extra={"erddap_url": ""},
     )
 
 

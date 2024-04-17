@@ -134,7 +134,8 @@ def harvest_erddap(erddap_conn, result, cache_requests=False):
     variables_all = []
     for i, df_dataset_row in df_all_datasets.iterrows():
         dataset_id = df_dataset_row["datasetID"]
-        with logger.contextualize(erddap_url=erddap_url,dataset_id=dataset_id):
+        dataset_url = df_dataset_row['tabledap'] or df_dataset_row['griddap']
+        with logger.contextualize(erddap_url=dataset_url):
             if dataset_id in datasets_to_skip:
                 logger.info("Skipping dataset: {} because its on the skip list", dataset_id)
                 continue
