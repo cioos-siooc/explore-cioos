@@ -42,7 +42,7 @@ class ERDDAP:
         if erddap.get("username") and erddap.get("password"):
             self.session.auth = HTTPBasicAuth(erddap["username"], erddap["password"])
 
-        self.logger = logger.bind(erddap_url=erddap_url)
+        self.logger = logger
         self.df_all_datasets = None
 
         erddap_url = erddap_url.rstrip("/")

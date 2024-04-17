@@ -21,7 +21,7 @@ class Dataset:
     def __init__(self, erddap_server, id):
         self.id = id
         self.erddap_server = erddap_server
-        self.logger = logger.bind(erddap_url=erddap_server.url, dataset_id=id)
+        self.logger = logger
 
         self.erddap_url = erddap_server.url
         self.erddap_csv_to_df = erddap_server.erddap_csv_to_df

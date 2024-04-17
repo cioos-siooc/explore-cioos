@@ -134,45 +134,46 @@ def harvest_erddap(erddap_conn, result, cache_requests=False):
     variables_all = []
     for i, df_dataset_row in df_all_datasets.iterrows():
         dataset_id = df_dataset_row["datasetID"]
-        if dataset_id in datasets_to_skip:
-            logger.info("Skipping dataset: {} because its on the skip list", dataset_id)
-            continue
-        try:
-            logger.info(
-                "Querying dataset: {} {}/{}", dataset_id, i + 1, len(df_all_datasets)
-            )
-            dataset = erddap.get_dataset(dataset_id)
-            compliance_checker = CDEComplianceChecker(dataset)
-            passes_checks = compliance_checker.passes_all_checks()
-
-            # these are the variables we are pulling max/min values for
-            if passes_checks:
-                df_profiles = get_profiles(dataset)
-
-                if df_profiles.empty:
-                    logger.warning("No profiles found")
-                    continue
-
-                # only write dataset/metadata/profile if there are some profiles
-                profiles_all.append(df_profiles)
-                datasets_all.append(dataset.get_df())
-                variables_all.append(dataset.df_variables)
-                logger.info("complete")
-            else:
-                skipped_datasets_reasons += skipped_reason(
-                    compliance_checker.failure_reason_code
+        with logger.contextualize(erddap_url=erddap_url,dataset_id=dataset_id):
+            if dataset_id in datasets_to_skip:
+                logger.info("Skipping dataset: {} because its on the skip list", dataset_id)
+                continue
+            try:
+                logger.info(
+                    "Querying dataset: {} {}/{}", dataset_id, i + 1, len(df_all_datasets)
                 )
-        except HTTPError as e:
-            response = e.response
-            # dataset_logger.error(response.text)
-            logger.error("HTTP ERROR: {} {}", response.status_code, response.reason)
-            skipped_datasets_reasons += skipped_reason(HTTP_ERROR)
+                dataset = erddap.get_dataset(dataset_id)
+                compliance_checker = CDEComplianceChecker(dataset)
+                passes_checks = compliance_checker.passes_all_checks()
 
-        except Exception as e:
-            logger.error(
-                "Error occurred at {} {}", erddap_url, dataset_id, exc_info=True
-            )
-            skipped_datasets_reasons += skipped_reason(UNKNOWN_ERROR)
+                # these are the variables we are pulling max/min values for
+                if passes_checks:
+                    df_profiles = get_profiles(dataset)
+
+                    if df_profiles.empty:
+                        logger.warning("No profiles found")
+                        continue
+
+                    # only write dataset/metadata/profile if there are some profiles
+                    profiles_all.append(df_profiles)
+                    datasets_all.append(dataset.get_df())
+                    variables_all.append(dataset.df_variables)
+                    logger.info("complete")
+                else:
+                    skipped_datasets_reasons += skipped_reason(
+                        compliance_checker.failure_reason_code
+                    )
+            except HTTPError as e:
+                response = e.response
+                # dataset_logger.error(response.text)
+                logger.error("HTTP ERROR: {} {}", response.status_code, response.reason)
+                skipped_datasets_reasons += skipped_reason(HTTP_ERROR)
+
+            except Exception as e:
+                logger.exception(
+                    "Error occurred at {} {}", erddap_url, dataset_id
+                )
+                skipped_datasets_reasons += skipped_reason(UNKNOWN_ERROR)
 
     skipped_datasets_columns = ["erddap_url", "dataset_id", "reason_code"]
 
