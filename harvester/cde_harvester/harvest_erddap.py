@@ -19,7 +19,6 @@ from loguru import logger
 from requests.exceptions import HTTPError
 
 # TIMEOUT = 30
-logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
@@ -81,7 +80,7 @@ def get_datasets_to_skip():
     skipped_datasets_path = "skipped_datasets.json"
 
     if os.path.exists(skipped_datasets_path):
-        logger.info(f"Loading list of datasets to skip from {skipped_datasets_path}")
+        logger.info("Loading list of datasets to skip from {}", skipped_datasets_path)
         with open(skipped_datasets_path) as f:
             datasets_to_skip = json.load(f)
             return datasets_to_skip
@@ -139,10 +138,12 @@ def harvest_erddap(
     for i, df_dataset_row in df_all_datasets.iterrows():
         dataset_id = df_dataset_row["datasetID"]
         if dataset_id in datasets_to_skip:
-            logger.info(f"Skipping dataset: {dataset_id} because its on the skip list")
+            logger.info("Skipping dataset: {} because its on the skip list", dataset_id)
             continue
         try:
-            logger.info(f"Querying dataset: {dataset_id} {i+1}/{len(df_all_datasets)}")
+            logger.info(
+                "Querying dataset: {} {}/{}", dataset_id, i + 1, len(df_all_datasets)
+            )
             dataset = erddap.get_dataset(dataset_id)
             compliance_checker = CDEComplianceChecker(dataset)
             passes_checks = compliance_checker.passes_all_checks()
@@ -167,12 +168,12 @@ def harvest_erddap(
         except HTTPError as e:
             response = e.response
             # dataset_logger.error(response.text)
-            logger.error("HTTP ERROR: %s %s", response.status_code, response.reason)
+            logger.error("HTTP ERROR: {} {}", response.status_code, response.reason)
             skipped_datasets_reasons += skipped_reason(HTTP_ERROR)
 
         except Exception as e:
             logger.error(
-                "Error occurred at %s %s", erddap_url, dataset_id, exc_info=True
+                "Error occurred at {} {}", erddap_url, dataset_id, exc_info=True
             )
             skipped_datasets_reasons += skipped_reason(UNKNOWN_ERROR)
 
@@ -186,7 +187,7 @@ def harvest_erddap(
 
         # logger.info(record_count)
         logger.info(
-            "skipped: %s datasets: %s",
+            "skipped: {} datasets: {}",
             len(df_skipped_datasets),
             df_skipped_datasets["dataset_id"].to_list(),
         )

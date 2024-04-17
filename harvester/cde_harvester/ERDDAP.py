@@ -106,9 +106,10 @@ class ERDDAP:
         if self.cache_requests:
             cache = self.cache
             if url_combined in self.cache:
+                logger.debug("load CACHE")
                 response = cache[url_combined]
             else:
-                self.logger.debug("CACHE MISS")
+                self.logger.debug("miss CACHE")
                 response = self.session.get(url_combined, timeout=3600)
                 cache[url_combined] = response
         else:

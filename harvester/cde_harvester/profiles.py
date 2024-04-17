@@ -233,12 +233,12 @@ def get_profiles(dataset):
     profiles_bad_geom = profiles.query(profiles_bad_geom_query)
 
     if not profiles_bad_geom.empty:
-        dataset.logger.warn(
+        dataset.logger.warning(
             "These profiles with bad lat/long/depth/time values will be removed:"
         )
         # TODO this could use record_id if it existed
-        dataset.logger.warn(set(profiles_bad_geom["profile_id"].to_list()))
-        dataset.logger.warn(set(profiles_bad_geom["timeseries_id"].to_list()))
+        dataset.logger.warning(set(profiles_bad_geom["profile_id"].to_list()))
+        dataset.logger.warning(set(profiles_bad_geom["timeseries_id"].to_list()))
 
         profiles = profiles.query("not " + profiles_bad_geom_query)
 
