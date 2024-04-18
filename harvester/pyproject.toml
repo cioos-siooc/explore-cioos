@@ -1,8 +1,11 @@
 [tool.poetry]
 name = "cde-harvester"
 version = "0.1.0"
-description = ""
-authors = ["Jessy Barrette <30420025+JessyBarrette@users.noreply.github.com>"]
+description = "Harvests metadata data from a list of ERDDAP servers and stores it in a database to be use by the CIOOS Data Explorer"
+authors = [
+    "Nate Rosenstock",
+    "Jessy Barrette <30420025+JessyBarrette@users.noreply.github.com>"
+]
 readme = "README.md"
 
 
