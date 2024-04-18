@@ -270,7 +270,7 @@ def load_config(config_file):
 def cli(**kwargs):
     """Harvest ERDDAP datasets and profiles and save to CSV files"""
     config = kwargs.pop("config",{})
-    cache_requests_status_code = kwargs.pop("cache_requests_status_codes")
+    cache_requests_status_code = kwargs.pop("cache_requests_status_codes",None)
     if config:
         config = load_config(config)
     else:
@@ -279,14 +279,17 @@ def cli(**kwargs):
             config["erddaps"] = [
                 {"url": erddap_url} for erddap_url in erddap_urls.split(",")
             ]
+        else: 
+            raise click.ClickException("Please provide --erddap_urls or a configuration file with --config")
+        
         if dataset_ids := kwargs.pop("dataset_ids"):
             dataset_ids = dataset_ids.split(",")
             for id, _ in enumerate(config["erddaps"]):
                 config["erddaps"][id]["dataset_ids"] = dataset_ids
         
         config.update(kwargs)
-        cache_requests_status_code = kwargs.pop("cache_requests_status_codes")
-
+        
+        cache_requests_status_code = kwargs.pop("cache_requests_status_codes", None)
         if cache_requests_status_code:
             config["cache_requests"] = [
                 int(x) for x in cache_requests_status_code.split(",")
