@@ -1,0 +1,1 @@
+This is the default download folder defined by the `.env.sample` and used by the downloader
