@@ -13,10 +13,10 @@
   },
   "cache_filtered": [
     {
-      "erddap_url": "https://pac-dev2.cioos.org/erddap",
-      "dataset_id": "amundsen798",
-      "title": "ArcticNet - Arctic SOLAS 0706a - Northern Baffin Bay CTD data",
-      "profile_variables": ["filename"],
+      "erddap_url": "https://data.cioospacific.ca/erddap",
+      "dataset_id": "IYS_NISKIN_chl_phaeo",
+      "title": "Chlorophyll a and Phaeopigment Concentrations from the 2019 Gulf of Alaska International Year of the Salmon Expedition",
+      "profile_variables": ["profile"],
       "cdm_data_type": "Profile",
       "ckan_id": null,
       "ckan_url": "https://catalogue.cioos.ca/dataset/"
