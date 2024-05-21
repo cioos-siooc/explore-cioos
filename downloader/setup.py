@@ -8,6 +8,6 @@ setup(
     description="",
     url="",
     packages=["erddap_downloader"],
-    install_requires=["pandas", "erddapy", "shapely", "pdfkit"],
+    install_requires=["pandas<2.0.0", "erddapy", "shapely", "pdfkit"],
     include_package_data=True,
 )
