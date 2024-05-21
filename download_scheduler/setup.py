@@ -11,7 +11,7 @@ setup(
     package_data={"download_scheduler": ["templates/*.j2"]},
     include_package_data=True,
     install_requires=[
-        "sqlalchemy",
+        "sqlalchemy<2.0.0",
         "psycopg2-binary",
         "sentry-sdk",
         "python-dotenv",

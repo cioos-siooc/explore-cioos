@@ -1,7 +1,8 @@
 version: "3.3"
 services:
   db:
-    image: "$DOCKER_POSTGIS_REPO/postgis:13-3.1-alpine"
+    image: "postgis/postgis:13-3.1-alpine"
+    platform: linux/x86_64
     ports:
       - "${DB_PORT:-5432}:${DB_PORT:-5432}"
     environment:
