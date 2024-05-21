@@ -15,7 +15,7 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 from cde_harvester.dataset import Dataset
 
 # size in bytes
-MAX_RESPONSE_SIZE = 1e8
+MAX_RESPONSE_SIZE = 2e8
 
 
 class ERDDAP(object):
