@@ -15,7 +15,7 @@ setup(
         "pandas<2.0.0",
         "erddapy",
         "shapely",
-        "sqlalchemy",
+        "sqlalchemy<2.0.0",
         "psycopg2-binary",
         "python-dotenv",
         "diskcache",
