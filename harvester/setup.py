@@ -22,5 +22,7 @@ setup(
         "lxml",
         "numpy",
         "pyyaml",
+        "sentry-sdk",
+        "python-dotenv",
     ],
 )
