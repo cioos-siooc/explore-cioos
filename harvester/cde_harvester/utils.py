@@ -1,7 +1,10 @@
+import logging
 import json
 import os
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 def get_cde_eov_to_standard_name():
@@ -56,7 +59,7 @@ def flatten(t):
 def get_cf_names():
     cf_names_xml_url="https://cfconventions.org/Data/cf-standard-names/current/src/cf-standard-name-table.xml"
 
-    print ("Downloading", cf_names_xml_url)
+    logger.info("Downloading %s", cf_names_xml_url)
 
     cf_standard_names = (
         pd.read_xml(cf_names_xml_url)
