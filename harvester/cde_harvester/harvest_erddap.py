@@ -3,7 +3,6 @@
 import json
 import logging
 import os
-import traceback
 from urllib.parse import urlparse
 
 import pandas as pd
