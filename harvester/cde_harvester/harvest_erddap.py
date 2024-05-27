@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+from urllib.parse import urlparse
 
 import pandas as pd
 from cde_harvester.CDEComplianceChecker import CDEComplianceChecker
