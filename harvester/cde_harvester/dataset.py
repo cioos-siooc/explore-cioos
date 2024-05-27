@@ -271,7 +271,7 @@ class Dataset(object):
                 return l06_platform_label
 
             except ValueError:
-                self.logger.debug("Found unsupported IOOS platform:", platform)
+                self.logger.error("Found unsupported IOOS platform: %s", platform)
 
         if "L06" in platform_vocabulary:
             platforms_nerc_ioos_no_duplicates = platforms_nerc_ioos.drop_duplicates(
@@ -283,7 +283,7 @@ class Dataset(object):
                     f"l06_label=='{platform}'"
                 )["category"].item()
             else:
-                self.logger.debug("Found unsupported L06 platform: " + platform)
+                self.logger.error("Found unsupported L06 platform: %s", platform)
 
     def get_metadata(self):
         "get all the global and variable metadata for a dataset"

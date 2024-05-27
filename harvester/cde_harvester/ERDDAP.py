@@ -69,8 +69,8 @@ class ERDDAP(object):
                 skiprows=[1, 2],
             )
             return df
-        except requests.exceptions.HTTPError as e:
-            print(e)
+        except requests.exceptions.HTTPError:
+            self.logger.error("ERDDAP query failed", exc_info=True)
             return pd.DataFrame()
 
     def parse_erddap_date(s):
@@ -127,9 +127,7 @@ class ERDDAP(object):
         if original_hostname != actual_hostname:
             # redirect due to EDDTableFromErddap
             if dataset:
-                logger.debug(
-                    "Redirecting " + original_hostname + " to " + actual_hostname
-                )
+                logger.debug("Redirecting %s to %s", original_hostname, actual_hostname)
                 dataset.erddap_url = response.url.split("/erddap")[0] + "/erddap"
 
         no_data = False
