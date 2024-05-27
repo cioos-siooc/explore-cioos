@@ -1,3 +1,4 @@
+import logging
 import pandas as pd
 import requests
 
@@ -10,11 +11,13 @@ CDE converts IOOS to L06 using a mapping found here:  https://mmisw.org/ont?iri=
 
 """
 
+logger = logging.getLogger(__name__)
+
 
 def get_l06_codes_and_labels():
 
     url = "http://vocab.nerc.ac.uk/collection/L06/current/?_profile=nvs&_mediatype=application/ld+json"
-    print("Downloading", url)
+    logger.info("Downloading %s", url)
     platforms = requests.get(url).json()["@graph"]
 
     platforms_parsed = {}
@@ -55,7 +58,7 @@ def get_ioos_to_l06_mapping():
 
     # download mapping
     url = "https://mmisw.org/ont/api/v0/ont?format=jsonld&iri=http://mmisw.org/ont/bodc/MapSeaVoxPlatforms2IOOSandRDIPlatforms"
-    print("Downloading", url)
+    logger.info("Downloading %s", url)
     res = requests.get(url).json()
     rows = []
     # parse mapping
