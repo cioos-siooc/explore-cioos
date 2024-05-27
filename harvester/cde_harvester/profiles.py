@@ -112,8 +112,8 @@ def get_profiles(dataset):
                 max = datetime.utcnow().isoformat()
 
             if llat_variable in vertical_variables:
-                min=float(min)
-                max=float(max)
+                min = float(min)
+                max = float(max)
 
             profiles_with_lat_lon[llat_variable + "_min"] = min
             profiles_with_lat_lon[llat_variable + "_max"] = max

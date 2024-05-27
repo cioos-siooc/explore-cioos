@@ -2,10 +2,11 @@
 # coding: utf-8
 
 
+import re
+
 import diskcache as dc
 import pandas as pd
 import requests
-import re
 
 # National CKAN has all the regions' records
 CKAN_API_URL = "https://catalogue.cioos.ca/api/3"
@@ -33,8 +34,10 @@ def split_erddap_url(url):
     dataset_id = f.split(".html")[0]
     return (erddap_host, dataset_id)
 
+
 def unescape_ascii_list(l):
-    return  [unescape_ascii(x) for x in l]
+    return [unescape_ascii(x) for x in l]
+
 
 def unescape_ascii(x):
     try:
