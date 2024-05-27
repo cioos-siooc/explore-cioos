@@ -17,6 +17,7 @@ from cde_harvester.ckan.create_ckan_erddap_link import (
 from cde_harvester.harvest_erddap import harvest_erddap
 from cde_harvester.utils import cf_standard_names, supported_standard_names
 from dotenv import load_dotenv
+import yaml
 from sentry_sdk.crons import monitor
 from sentry_sdk.integrations.logging import LoggingIntegration
 
