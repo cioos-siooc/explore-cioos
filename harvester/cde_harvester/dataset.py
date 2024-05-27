@@ -41,7 +41,6 @@ class Dataset(object):
 
     def get_df(self):
 
-
         self.df = pd.DataFrame(
             {
                 "title": [self.globals["title"]],
@@ -56,12 +55,12 @@ class Dataset(object):
                 "profile_variables": [self.profile_variable_list],
                 "timeseries_id_variable": self.timeseries_id_variable,
                 "profile_id_variable": self.profile_id_variable,
-                "trajectory_id_variable":self.trajectory_id_variable,
-                "num_columns":len(self.df_variables),
+                "trajectory_id_variable": self.trajectory_id_variable,
+                "num_columns": len(self.df_variables),
                 "first_eov_column": self.first_eov_column,
             }
         )
-        
+
         return self.df
 
     def dataset_tabledap_query(self, url):
@@ -117,10 +116,10 @@ class Dataset(object):
         # sorting so the url is consistent every time for query caching
         profile_variable_list = sorted(list(profile_variables.values()))
         self.profile_variables = profile_variables
-        
-        self.timeseries_id_variable=profile_variables.get('timeseries_id')
-        self.profile_id_variable=profile_variables.get('profile_id')
-        self.trajectory_id_variable=profile_variables.get('trajectory_id')
+
+        self.timeseries_id_variable = profile_variables.get("timeseries_id")
+        self.profile_id_variable = profile_variables.get("profile_id")
+        self.trajectory_id_variable = profile_variables.get("trajectory_id")
 
         self.profile_variable_list = profile_variable_list
 
@@ -237,13 +236,19 @@ class Dataset(object):
         dataset_standard_names = self.df_variables["standard_name"].to_list()
 
         for eov in cde_eov_to_standard_name:
-            overlap = intersection(dataset_standard_names, cde_eov_to_standard_name[eov])
+            overlap = intersection(
+                dataset_standard_names, cde_eov_to_standard_name[eov]
+            )
             if overlap:
                 # check if list of standard names in this EOV overlaps with list of standard names in this dataset
-                
+
                 # set first_eov_column, which is used to set default column in preview
                 first_standard_name = overlap[0]
-                self.first_eov_column=self.df_variables.query(f"standard_name=='{first_standard_name}'").head(1)['name'].item()
+                self.first_eov_column = (
+                    self.df_variables.query(f"standard_name=='{first_standard_name}'")
+                    .head(1)["name"]
+                    .item()
+                )
                 eovs.append(eov)
         return eovs
 

@@ -32,9 +32,7 @@ def main(folder):
     profiles_file = f"{folder}/profiles.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
 
-    print(
-        "Reading", datasets_file, profiles_file, skipped_datasets_file
-    )
+    print("Reading", datasets_file, profiles_file, skipped_datasets_file)
 
     # ckan_file = f"ckan_{uuid_suffix}.csv"
 
