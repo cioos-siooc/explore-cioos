@@ -78,7 +78,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
         q.put((erddap_url, result, limit_dataset_ids, cache_requests))
 
     q.join()
-    logger.info('All work completed')
+    logger.info("All work completed")
 
     profiles = pd.DataFrame()
     datasets = pd.DataFrame()
