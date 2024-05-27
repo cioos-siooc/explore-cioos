@@ -1,6 +1,5 @@
 import argparse
 import logging
-from dotenv import load_dotenv
 import os
 import queue
 import sys
@@ -10,8 +9,6 @@ import time
 import numpy as np
 import pandas as pd
 import sentry_sdk
-from sentry_sdk.crons import monitor
-from sentry_sdk.integrations.logging import LoggingIntegration
 from cde_harvester.ckan.create_ckan_erddap_link import (
     get_ckan_records,
     unescape_ascii,
@@ -19,6 +16,9 @@ from cde_harvester.ckan.create_ckan_erddap_link import (
 )
 from cde_harvester.harvest_erddap import harvest_erddap
 from cde_harvester.utils import cf_standard_names, supported_standard_names
+from dotenv import load_dotenv
+from sentry_sdk.crons import monitor
+from sentry_sdk.integrations.logging import LoggingIntegration
 
 load_dotenv()
 
@@ -39,9 +39,11 @@ def setup_logging(log_time, log_level):
     # setup logging
     logging.basicConfig(
         level=logging.getLevelName(log_level.upper()),
-        format="%(asctime)s - %(name)s : %(message)s"
-        if log_time
-        else "%(name)s : %(message)s",
+        format=(
+            "%(asctime)s - %(name)s : %(message)s"
+            if log_time
+            else "%(name)s : %(message)s"
+        ),
     )
     logger = logging.getLogger()
     return logger
@@ -72,11 +74,11 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     # Send thirty task requests to the worker.
 
     for erddap_url in erddap_urls:
-        logger.info("Adding to queue %s",erddap_url)
+        logger.info("Adding to queue %s", erddap_url)
         q.put((erddap_url, result, limit_dataset_ids, cache_requests))
 
     q.join()
-    print('All work completed')
+    print("All work completed")
 
     profiles = pd.DataFrame()
     datasets = pd.DataFrame()
@@ -231,9 +233,9 @@ if __name__ == "__main__":
         max_workers = config.get("max-workers", 1)
         dataset_ids = ",".join(config.get("dataset_ids") or [])
         log_time = config.get("log_time")
-        log_level = config.get("log_level","INFO")
-        
-    else:        
+        log_level = config.get("log_level", "INFO")
+
+    else:
         parser.add_argument(
             "--urls",
             help="harvest from these erddap servers, comme separated",
@@ -283,7 +285,7 @@ if __name__ == "__main__":
 
     logger = setup_logging(log_time, log_level)
     try:
-        main(urls, cache, folder or "harvest", dataset_ids,max_workers)
+        main(urls, cache, folder or "harvest", dataset_ids, max_workers)
     except Exception as e:
         logger.error("Harvester failed!!!", exc_info=True)
         raise e
