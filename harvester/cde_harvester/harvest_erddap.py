@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 import json
-import os
 import logging
+import os
 
 import pandas as pd
 from cde_harvester.CDEComplianceChecker import CDEComplianceChecker
