@@ -24,6 +24,8 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 load_dotenv()
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
+logger = logging.getLogger()
+
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
     integrations=[
@@ -38,15 +40,18 @@ sentry_sdk.init(
 
 def setup_logging(log_time, log_level):
     # setup logging
-    logging.basicConfig(
-        level=logging.getLevelName(log_level.upper()),
-        format=(
-            "%(asctime)s - %(name)s : %(message)s"
-            if log_time
-            else "%(name)s : %(message)s"
-        ),
+    logger.setLevel(logging.getLevelName(log_level.upper()))
+
+    # Define the stream log format and level
+    c_handler = logging.StreamHandler()
+    c_handler.setLevel(logging.getLevelName(log_level.upper()))
+    c_format = logging.Formatter(
+        "%(asctime)s - %(name)s : %(message)s"
+        if log_time
+        else "%(name)s : %(message)s"
     )
-    logger = logging.getLogger()
+    c_handler.setFormatter(c_format)
+    logger.addHandler(c_handler)
     return logger
 
 
