@@ -41,14 +41,13 @@ sentry_sdk.init(
 def setup_logging(log_time, log_level):
     # setup logging
     logger.setLevel(logging.getLevelName(log_level.upper()))
-
+    logger.handlers.clear()
     # Define the stream log format and level
     c_handler = logging.StreamHandler()
     c_handler.setLevel(logging.getLevelName(log_level.upper()))
     c_format = logging.Formatter(
-        "%(asctime)s - %(name)s : %(message)s"
-        if log_time
-        else "%(name)s : %(message)s"
+        ("%(asctime)s - " if log_time else "")
+        + "%(levelname)-8s - %(name)s : %(message)s"
     )
     c_handler.setFormatter(c_format)
     logger.addHandler(c_handler)
