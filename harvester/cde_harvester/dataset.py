@@ -285,9 +285,13 @@ class Dataset(object):
             else:
                 self.logger.error("Found unsupported L06 platform: %s", platform)
 
-        self.logger.warning("Found platform='%s' without known vocabulary='%s', setting to 'unkown'", platform, platform_vocabulary)
+        self.logger.warning(
+            "Found platform='%s' without known vocabulary='%s', setting to 'unknown'",
+            platform,
+            platform_vocabulary,
+        )
         return "unknown"
-    
+
     def get_metadata(self):
         "get all the global and variable metadata for a dataset"
 
