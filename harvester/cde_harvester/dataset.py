@@ -253,7 +253,7 @@ class Dataset(object):
         return eovs
 
     def get_platform_code(self):
-        platform = self.globals["platform"]
+        platform = self.globals.get("platform")
         platform_vocabulary = self.globals.get("platform_vocabulary")
 
         if not (platform and platform_vocabulary):
@@ -278,12 +278,19 @@ class Dataset(object):
                 subset=["l06_label"]
             )
 
-            if platform in list(platforms_nerc_ioos["l06_label"]):
+            if platform.lower() in list(platforms_nerc_ioos["l06_label"]):
                 return platforms_nerc_ioos_no_duplicates.query(
-                    f"l06_label=='{platform}'"
+                    f"l06_label=='{platform.lower()}'"
                 )["category"].item()
             else:
                 self.logger.error("Found unsupported L06 platform: %s", platform)
+
+        self.logger.warning(
+            "Found platform='%s' without known vocabulary='%s', setting to 'unknown'",
+            platform,
+            platform_vocabulary,
+        )
+        return "unknown"
 
     def get_metadata(self):
         "get all the global and variable metadata for a dataset"
@@ -354,8 +361,7 @@ class Dataset(object):
             filter(None, set([globals_dict.get(x) for x in organization_fields]))
         )
 
-        if self.globals.get("platform"):
-            self.platform = self.get_platform_code()
+        self.platform = self.get_platform_code()
 
     def get_logger(self):
         logger = logging.getLogger(f"{self.erddap_server.domain} - {self.id}")
