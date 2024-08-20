@@ -28,7 +28,7 @@ If you just want to see how a dataset is harvested by CDE:
 - Rename .env.sample from the root directory to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
 
 - Start a local database using `docker`:
-  `docker-compose up db -d`
+  `docker-compose up -d db`
 - Setup Python virtual env and install Python modules:
 
   ```sh
