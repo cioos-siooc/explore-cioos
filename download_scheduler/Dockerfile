@@ -14,6 +14,7 @@ WORKDIR /usr/src/app
 
 COPY . .
 
+RUN pip install --upgrade pip
 RUN pip install -q .
 
 # -u seems to be needed to get it to print to stdout
