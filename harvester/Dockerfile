@@ -2,9 +2,8 @@ FROM python:3.10.2
 
 WORKDIR /usr/src/app
 
-COPY ./harvester ./harvester
-COPY ./db-loader ./db-loader
+COPY ./harvester ./db-loader ./download_scheduler ./pyproject.toml ./poetry.lock ./
 
-RUN pip install -q ./db-loader ./harvester
+RUN pip install -q .
 
 CMD [ "sh","./harvester/run.sh" ]

@@ -1,4 +1,4 @@
-FROM python:3.9-slim-buster
+FROM python:3.10.2
 
 # for shapely, pdf creation
 RUN apt-get -y -qq update
@@ -14,7 +14,7 @@ WORKDIR /usr/src/app
 
 COPY . .
 
-RUN pip install -q ./downloader ./download_scheduler ./harvester
+RUN pip install -q .
 
 # -u seems to be needed to get it to print to stdout
 CMD [ "python", "-u","-m","download_scheduler" ]
