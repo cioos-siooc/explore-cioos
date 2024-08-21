@@ -13,9 +13,9 @@ authors = [
 ]
 readme = "README.md"
 packages = [
-    { include = "cde_harvester", from = "./harvester" },
-    { include = "erddap_downloader", from = "./downloader" },
-    { include = "cde_db_loader", from = "./db-loader" },
+    { include = "cde_harvester", from = "harvester" },
+    { include = "erddap_downloader", from = "downloader" },
+    { include = "cde_db_loader", from = "db-loader" },
 ]
 
 [tool.poetry.dependencies]
