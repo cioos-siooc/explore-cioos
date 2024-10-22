@@ -14,5 +14,6 @@ setup(
         "psycopg2-binary",
         "python-dotenv",
         "numpy",
+        "sentry_sdk",
     ],
 )
