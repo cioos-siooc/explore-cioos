@@ -1,11 +1,11 @@
 #!/bin/sh
-cd ~/cde
 date
-sh data_loader.sh
+cd /home/cioos/cde
+docker-compose run harvester
 
-sudo docker exec -t cde_redis_1 redis-cli FLUSHALL
-sh refresh_cache.sh
-sudo docker exec -t cde_redis_1 redis-cli INFO | grep used_memory_human
-sudo docker exec -t cde_redis_1 redis-cli DBSIZE
+docker exec -t cde-redis-1 redis-cli FLUSHALL
+sh cde_refresh_cache.sh
+docker exec -t cde-redis-1 redis-cli INFO | grep used_memory_human
+docker exec -t cde-redis-1 redis-cli DBSIZE
 
 date

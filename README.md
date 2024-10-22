@@ -7,15 +7,15 @@
 If you just want to see how a dataset is harvested by CDE:
 
 1. Start your python environment environment, `conda create -n cde python=3.10;conda activate cde`
-1. `pip install -e ./harvester`
-1. `python -m cde_harvester --urls https://data.cioospacific.ca/erddap --dataset_ids ECCC_MSC_BUOYS`
-1. See files in `harvest` folder
+2. `pip install -e .`
+3. `python -m cde_harvester --urls https://data.cioospacific.ca/erddap --dataset_ids ECCC_MSC_BUOYS`
+4. See files in `harvest` folder
 
 ## Starting using docker
 
 1. Install [Docker](https://docs.docker.com/get-docker/) and [Docker compose](https://docs.docker.com/compose/install/). New versions of Docker include `docker-compose`
 1. Rename .env.sample to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
-1. `docker-compose up -d` to start all services. This will take a few minute to download, build, create the database schema.
+1. `docker-compose -f docker-compose.production.yaml up -d` to start all services. This will take a few minute to download, build, create the database schema.
 1. Start your python 3.10 or greater environment, eg `conda create -n cde python=3.10;conda activate cde`
 1. `pip install -e ./harvester -e ./db-loader`
 1. Run harvester to load data. From this directory, run: `sh data_loader_test.sh` to just load one dataset for testing purposes
@@ -28,7 +28,7 @@ If you just want to see how a dataset is harvested by CDE:
 - Rename .env.sample from the root directory to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
 
 - Start a local database using `docker`:
-  `docker-compose up db -d`
+  `docker-compose up -d db`
 - Setup Python virtual env and install Python modules:
 
   ```sh
