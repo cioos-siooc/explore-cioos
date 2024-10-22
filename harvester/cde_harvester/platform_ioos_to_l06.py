@@ -26,14 +26,15 @@ def get_l06_codes_and_labels():
 
     for platform in platforms:
         # first entry describes the vocabulary, skip it
-        if not "identifier" in platform:
+        if not "dce:identifier" in platform:
             continue
 
-        label = platform["prefLabel"]["@value"]
-        broader = platform.get("broader", [])
+        label = platform["skos:prefLabel"]["@value"]
+        broader = platform.get("skos:broader", [])
         id = platform["@id"]
         found_parent_platform = False
         for url in broader:
+            url = url["@id"]
             if "L06" in url:
                 platforms_parsed[id] = {"broader_L06_url": url, "l06_label": label}
                 found_parent_platform = True

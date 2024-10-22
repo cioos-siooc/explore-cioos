@@ -6,12 +6,30 @@ import sys
 
 import numpy as np
 import pandas as pd
+import sentry_sdk
 from cde_harvester.utils import df_cde_eov_to_standard_name
 from dotenv import load_dotenv
+from sentry_sdk.integrations.logging import LoggingIntegration
 from sqlalchemy import create_engine
 from sqlalchemy.dialects.postgresql import ARRAY, INTEGER, TEXT
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
+
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s - %(levelname)-8s - %(name)s : %(message)s"
+)
+logger = logging.getLogger()
+
+sentry_sdk.init(
+    dsn=os.environ.get("SENTRY_DSN"),
+    integrations=[
+        LoggingIntegration(
+            level=logging.INFO,  # Capture info and above as breadcrumbs
+            event_level=logging.WARNING,  # Send records as events
+        ),
+    ],
+    environment=os.environ.get("ENVIRONMENT", "development"),
+)
 
 
 def main(folder):
@@ -26,13 +44,15 @@ def main(folder):
     engine = create_engine(database_link)
     # test connection
     engine.connect()
-    print("Connected to ", envs["DB_HOST_EXTERNAL"])
+    logger.info("Connected to %s", envs["DB_HOST_EXTERNAL"])
 
     datasets_file = f"{folder}/datasets.csv"
     profiles_file = f"{folder}/profiles.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
 
-    print("Reading", datasets_file, profiles_file, skipped_datasets_file)
+    logger.info(
+        "Reading %s,%s, %s", datasets_file, profiles_file, skipped_datasets_file
+    )
 
     # ckan_file = f"ckan_{uuid_suffix}.csv"
 
@@ -47,22 +67,22 @@ def main(folder):
     )
 
     if datasets.empty:
-        print("No datasets found")
+        logger.info("No datasets found")
         sys.exit(1)
 
     # this gets a list of all the standard names
 
     schema = "cde"
     with engine.begin() as transaction:
-        print("Writing to DB:")
+        logger.info("Writing to DB:")
 
-        print("Dropping constraints")
+        logger.info("Dropping constraints")
         transaction.execute("SELECT drop_constraints();")
 
-        print("Clearing tables")
+        logger.info("Clearing tables")
         transaction.execute("SELECT remove_all_data();")
 
-        print("Writing datasets")
+        logger.info("Writing datasets")
 
         datasets.to_sql(
             "datasets",
@@ -80,7 +100,7 @@ def main(folder):
 
         profiles = profiles.replace("", np.NaN)
 
-        print("Writing profiles")
+        logger.info("Writing profiles")
 
         # profiles has some columns to fix up first
         profiles.to_sql(
@@ -92,7 +112,7 @@ def main(folder):
             # method="multi",
         )
 
-        print("Writing skipped_datasets")
+        logger.info("Writing skipped_datasets")
         skipped_datasets.to_sql(
             "skipped_datasets",
             con=transaction,
@@ -101,20 +121,20 @@ def main(folder):
             index=False,
         )
 
-        print("Processing new records")
+        logger.info("Processing new records")
         transaction.execute("SELECT profile_process();")
         transaction.execute("SELECT ckan_process();")
 
-        print("Creating hexes")
+        logger.info("Creating hexes")
         transaction.execute("SELECT create_hexes();")
 
         # This ensures that all fields were set successfully
-        print("Setting constraints")
+        logger.info("Setting constraints")
         transaction.execute("SELECT set_constraints();")
 
-        print("Wrote to db:", f"{schema}.datasets")
-        print("Wrote to db:", f"{schema}.profiles")
-        print("Wrote to db:", f"{schema}.skipped_datasets")
+        logger.info("Wrote to db: %s", f"{schema}.datasets")
+        logger.info("Wrote to db: %s", f"{schema}.profiles")
+        logger.info("Wrote to db: %s", f"{schema}.skipped_datasets")
 
 
 if __name__ == "__main__":
@@ -127,5 +147,8 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-
-    main(args.folder)
+    try:
+        main(args.folder)
+    except Exception:
+        logger.error("Failed to write to db", exc_info=True)
+        sys.exit(1)
