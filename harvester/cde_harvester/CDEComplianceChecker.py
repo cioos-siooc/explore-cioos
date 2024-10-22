@@ -9,16 +9,16 @@ from cde_harvester.utils import (
     intersection,
     supported_standard_names,
 )
+from loguru import logger
 
 
 class CDEComplianceChecker(object):
     def __init__(self, dataset):
         self.dataset = dataset
-        self.logger = dataset.logger
         self.failure_reason_code = ""
 
     def failed_error(self, msg, failure_reason_code):
-        self.logger.error("Skipping dataset:" + msg)
+        logger.error("Skipping dataset:" + msg)
         self.failure_reason_code = failure_reason_code
 
     def check_required_variables(self):
@@ -53,9 +53,7 @@ class CDEComplianceChecker(object):
             x for x in standard_names_in_dataset if x not in cf_standard_names
         ]
         if non_standard_names:
-            self.logger.warn(
-                "Found unstandard standard_name:" + str(non_standard_names)
-            )
+            logger.warning("Found unstandard standard_name: {}", non_standard_names)
 
         #  This dataset has at least one standard name mapped to GOOS
         supported_variables = intersection(

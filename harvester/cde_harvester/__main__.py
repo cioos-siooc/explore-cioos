@@ -1,11 +1,11 @@
-import argparse
-import logging
 import os
 import queue
 import sys
 import threading
 import time
+from pathlib import Path
 
+import click
 import numpy as np
 import pandas as pd
 import sentry_sdk
@@ -15,140 +15,67 @@ from cde_harvester.ckan.create_ckan_erddap_link import (
     unescape_ascii,
     unescape_ascii_list,
 )
-from cde_harvester.harvest_erddap import harvest_erddap
+from cde_harvester.harvest_erddap import harvest_erddap_contextualized
 from cde_harvester.utils import cf_standard_names, supported_standard_names
 from dotenv import load_dotenv
+from loguru import logger
 from sentry_sdk.crons import monitor
-from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.integrations.loguru import LoguruIntegration
 
 load_dotenv()
-
-logging.getLogger("urllib3").setLevel(logging.WARNING)
-logger = logging.getLogger()
 
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
     integrations=[
-        LoggingIntegration(
-            level=logging.INFO,  # Capture info and above as breadcrumbs
-            event_level=logging.WARNING,  # Send records as events
-        ),
+        LoguruIntegration(),
     ],
     environment=os.environ.get("ENVIRONMENT", "development"),
 )
 
 
-def setup_logging(log_time, log_level):
+def setup_logging(log_level):
     # setup logging
-    logger.setLevel(logging.getLevelName(log_level.upper()))
-    logger.handlers.clear()
-    # Define the stream log format and level
-    c_handler = logging.StreamHandler()
-    c_handler.setLevel(logging.getLevelName(log_level.upper()))
-    c_format = logging.Formatter(
-        ("%(asctime)s - " if log_time else "")
-        + "%(levelname)-8s - %(name)s : %(message)s"
+    logger_format = (
+        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+        "<level>{level: <8}</level> | "
+        "<magenta> {extra[erddap_url]} </magenta> | "
+        "<cyan>{name}:{function}:{line}</cyan> | "
+        "<level>{message}</level>"
     )
-    c_handler.setFormatter(c_format)
-    logger.addHandler(c_handler)
-    return logger
-
-
-@monitor(monitor_slug="main-harvester")
-def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
-    erddap_urls = erddap_urls.split(",")
-    limit_dataset_ids = None
-    if dataset_ids:
-        limit_dataset_ids = dataset_ids.split(",")
-
-    result = []
-
-    q = queue.Queue()
-
-    def worker():
-        while True:
-            (erddap_url, result, limit_dataset_ids, cache_requests) = q.get()
-            harvest_erddap(erddap_url, result, limit_dataset_ids, cache_requests)
-            time.sleep(1)
-            q.task_done()
-
-    # Turn-on the worker thread.
-    for x in range(max_workers):
-        threading.Thread(target=worker, daemon=True).start()
-
-    # Send thirty task requests to the worker.
-
-    for erddap_url in erddap_urls:
-        logger.info("Adding to queue %s", erddap_url)
-        q.put((erddap_url, result, limit_dataset_ids, cache_requests))
-
-    q.join()
-    logger.info("All work completed")
-
-    profiles = pd.DataFrame()
-    datasets = pd.DataFrame()
-    variables = pd.DataFrame()
-    skipped_datasets = pd.DataFrame()
-
-    for [profile, dataset, variable, skipped_dataset] in result:
-        profiles = pd.concat([profiles, profile])
-        datasets = pd.concat([datasets, dataset])
-        variables = pd.concat([variables, variable])
-        skipped_datasets = pd.concat([skipped_datasets, skipped_dataset])
-
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-
-    datasets_file = f"{folder}/datasets.csv"
-    profiles_file = f"{folder}/profiles.csv"
-    skipped_datasets_file = f"{folder}/skipped.csv"
-    ckan_file = f"{folder}/ckan.csv"
-
-    if datasets.empty:
-        logging.info("No datasets harvested")
-        sys.exit(1)
-
-    # see what standard names arent covered by our EOVs:
-    standard_names_harvested = (
-        variables.query("not standard_name.isnull()")["standard_name"].unique().tolist()
+    logger.remove()
+    logger.configure(
+        handlers=[dict(sink=sys.stdout, level=log_level.upper(), format=logger_format)],
+        extra={"erddap_url": ""},
     )
 
+
+def review_standard_names_not_supported(standard_names: list):
+    "Create warning for standard names that arent supported by CDE yet"
     llat_variables = ["latitude", "longitude", "time", "depth", ""]
 
-    # this gets a list of all the standard names
-
-    standard_names_not_harvested = [
+    unsupported_standard_names = [
         x
-        for x in standard_names_harvested
-        if x not in supported_standard_names + llat_variables
+        for x in standard_names
+        if x in cf_standard_names
+        and x not in llat_variables
+        and x not in supported_standard_names
     ]
 
-    standard_names_not_harvested_that_are_real = [
-        x for x in standard_names_not_harvested if x in cf_standard_names
-    ]
-
-    if standard_names_not_harvested_that_are_real:
+    if unsupported_standard_names:
         logger.warning(
-            "Found these standard_names that CDE doesnt support yet: %s",
-            standard_names_not_harvested_that_are_real,
+            "Found these standard_names that CDE doesnt support yet: {}",
+            unsupported_standard_names,
         )
 
-    # query CKAN national for more metadata related to the ERDDAP datsets we have so far
-    logger.info("Gathering CKAN data")
-    df_ckan = get_ckan_records(datasets["dataset_id"].to_list(), cache=cache_requests)
-    datasets = (
-        datasets.set_index(["erddap_url", "dataset_id"])
-        .join(df_ckan.set_index(["erddap_url", "dataset_id"]), how="left")
-        .reset_index()
-    )
 
+def cleanup_datasets_table(datasets):
     logger.info("Cleaning up data")
     datasets = datasets.replace(np.nan, None)
 
     # datasets["summary"] = datasets["summary"].apply(lambda x: unescape_ascii(x))
     datasets["title"] = datasets["title"].apply(lambda x: unescape_ascii(x))
 
-    datasets["ckan_title"].fillna(datasets["title"], inplace=True)
+    datasets["ckan_title"] = datasets["ckan_title"].fillna(datasets["title"])
     # datasets["ckan_summary"].fillna(datasets["summary"], inplace=True)
 
     # prioritize with organizations from CKAN and then pull ERDDAP if needed
@@ -171,33 +98,105 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     )
 
     datasets = datasets.replace(r"\n", " ", regex=True)
+    return datasets
 
-    profiles["depth_min"] = profiles["depth_min"].fillna(0)
-    profiles["depth_max"] = profiles["depth_max"].fillna(0)
 
-    logger.info("Adding %s datasets and %s profiles", len(datasets), len(profiles))
+@monitor(monitor_slug="main-harvester")
+def main(erddaps, cache_requests, folder: Path, max_workers: int):
 
-    # drop duplicates caused by EDDTableFromErddap redirects
-    datasets.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
-        datasets_file, index=False
+    results = []
+    q = queue.Queue()
+
+    def worker():
+        while True:
+            harvest_erddap_contextualized(*q.get())
+            time.sleep(1)
+            q.task_done()
+
+    # Turn-on the worker thread.
+    for _ in range(max_workers):
+        threading.Thread(target=worker, daemon=True).start()
+
+    # Send thirty task requests to the worker.
+    for erddap_conn in erddaps:
+        logger.info("Adding to queue {}", erddap_conn["url"])
+        q.put((erddap_conn, results, cache_requests))
+    q.join()
+    logger.info("All work completed")
+
+    all_erddaps_profiles = pd.DataFrame()
+    all_erddaps_datasets = pd.DataFrame()
+    all_erddaps_variables = pd.DataFrame()
+    all_erddaps_skipped_datasets = pd.DataFrame()
+
+    for result in results:
+        all_erddaps_profiles = pd.concat([all_erddaps_profiles, result["profiles"]])
+        all_erddaps_datasets = pd.concat([all_erddaps_datasets, result["datasets"]])
+        all_erddaps_variables = pd.concat([all_erddaps_variables, result["variables"]])
+        all_erddaps_skipped_datasets = pd.concat(
+            [all_erddaps_skipped_datasets, result["skipped_datasets"]]
+        )
+
+    if all_erddaps_datasets.empty:
+        logger.info("No datasets harvested")
+        sys.exit(1)
+
+    logger.debug("Create output_folder and define output files")
+    folder.mkdir(exist_ok=True, parents=True)
+    datasets_file = folder / "datasets.csv"
+    profiles_file = folder / "profiles.csv"
+    skipped_datasets_file = folder / "skipped.csv"
+    ckan_file = folder / "ckan.csv"
+
+    # Review standard names that arent supported by CDE
+    review_standard_names_not_supported(
+        all_erddaps_variables["standard_name"].dropna().unique().tolist()
     )
-    profiles.drop_duplicates().to_csv(profiles_file, index=False)
-    df_ckan.to_csv(ckan_file, index=False)
-    skipped_datasets.drop_duplicates().to_csv(skipped_datasets_file, index=False)
+
+    # query CKAN national for more metadata related to the ERDDAP datsets we have so far
+    logger.info("Gathering CKAN data")
+    df_ckan = get_ckan_records(
+        all_erddaps_datasets["dataset_id"].to_list(), cache=cache_requests
+    )
+    datasets = (
+        all_erddaps_datasets.set_index(["erddap_url", "dataset_id"])
+        .join(df_ckan.set_index(["erddap_url", "dataset_id"]), how="left")
+        .reset_index()
+    )
+
+    # clean up datasets table
+    datasets = cleanup_datasets_table(datasets)
+
+    all_erddaps_profiles["depth_min"] = all_erddaps_profiles["depth_min"].fillna(0.0)
+    all_erddaps_profiles["depth_max"] = all_erddaps_profiles["depth_max"].fillna(0.0)
 
     logger.info(
-        "Wrote %s %s %s %s",
+        "Adding {} datasets and {} profiles", len(datasets), len(all_erddaps_profiles)
+    )
+
+    # write files to disk
+    logger.info(
+        "Writing data to files: {}, {}, {}, {}",
         datasets_file,
         profiles_file,
         ckan_file,
         skipped_datasets_file,
     )
+    datasets.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
+        datasets_file, index=False
+    )
+    all_erddaps_profiles.drop_duplicates().to_csv(profiles_file, index=False)
+    df_ckan.to_csv(ckan_file, index=False)
+    all_erddaps_skipped_datasets.drop_duplicates().to_csv(
+        skipped_datasets_file, index=False
+    )
+    logger.info("Harvested data saved to files")
 
-    if not skipped_datasets.empty:
+    if not all_erddaps_skipped_datasets.empty:
         logger.info(
-            "skipped %s datasets: %s",
-            len(skipped_datasets),
-            skipped_datasets["dataset_id"].to_list(),
+            "skipped {} datasets: {}",
+            len(all_erddaps_skipped_datasets),
+            all_erddaps_skipped_datasets["dataset_id"].to_list(),
         )
 
 
@@ -206,91 +205,98 @@ def load_config(config_file):
     with open(config_file, "r") as stream:
         try:
             config = yaml.safe_load(stream)
+            config['folder'] = Path(config['folder'])
             return config
 
         except yaml.YAMLError:
             logger.error("Failed to load config yaml", exc_info=True)
 
 
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser()
-
-    if "-f" in sys.argv or "--file" in sys.argv:
-        # Use config file
-        parser.add_argument(
-            "-f",
-            "--file",
-            help="get these options from a config file instead",
-            required=True,
-        )
-
-        args = parser.parse_args()
-        config_file = args.file
-
-        config = load_config(config_file)
-        logging.info(
-            "Using config from harvest_config.yaml, ignoring command line arguments"
-        )
-        urls = ",".join(config.get("erddap_urls") or [])
-        cache = config.get("cache")
-        folder = config.get("folder")
-        max_workers = config.get("max-workers", 1)
-        dataset_ids = ",".join(config.get("dataset_ids") or [])
-        log_time = config.get("log_time")
-        log_level = config.get("log_level", "INFO")
-
+@click.command()
+@click.option(
+    "--erddap_urls",
+    "--urls",
+    help="harvest from these erddap servers, comme separated",
+    type=str,
+    default=None,
+)
+@click.option(
+    "--dataset_ids",
+    help="only harvest these dataset IDs. Comma separated list",
+    type=str,
+    default="",
+)
+@click.option(
+    "--cache-requests/--no-cache-requests",
+    "--cache/--no-cache",
+    help="Cache requests, for testing only",
+    default=None,
+)
+@click.option(
+    "--cache-requests-status-codes",
+    help="Cache requests with these status codes, comma separated list of integers",
+    type=str,
+    default=None,
+)
+@click.option(
+    "--folder",
+    help="Folder to save harvested data to",
+    default=Path("harvest"),
+    type=click.Path(dir_okay=True, file_okay=False),
+)
+@click.option(
+    "--log-level",
+    default="debug",
+    type=click.Choice(
+        ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], case_sensitive=False
+    ),
+    help="Provide logging level. Example --log-level debug, default=debug",
+)
+@click.option(
+    "--max-workers",
+    default=1,
+    type=int,
+    help="max threads that harvester will use",
+)
+@click.option(
+    "-c",
+    "--config",
+    "-f",
+    "--file",
+    type=click.Path(exists=True),
+    help="get these options from a config file instead",
+)
+@logger.catch(reraise=True, message="Harvester failed!!!")
+def cli(**kwargs):
+    """Harvest ERDDAP datasets and profiles and save to CSV files"""
+    config = kwargs.pop("config",{})
+    cache_requests_status_code = kwargs.pop("cache_requests_status_codes",None)
+    if config:
+        config = load_config(config)
     else:
-        parser.add_argument(
-            "--urls",
-            help="harvest from these erddap servers, comme separated",
-            required=True,
-        )
-        parser.add_argument(
-            "--dataset_ids",
-            help="only harvest these dataset IDs. Comma separated list",
-        )
+        config = {}
+        if erddap_urls := kwargs.pop("erddap_urls"):
+            config["erddaps"] = [
+                {"url": erddap_url} for erddap_url in erddap_urls.split(",")
+            ]
+        else: 
+            raise click.ClickException("Please provide --erddap_urls or a configuration file with --config")
+        
+        if dataset_ids := kwargs.pop("dataset_ids"):
+            dataset_ids = dataset_ids.split(",")
+            for id, _ in enumerate(config["erddaps"]):
+                config["erddaps"][id]["dataset_ids"] = dataset_ids
+        
+        config.update(kwargs)
+        
+        cache_requests_status_code = kwargs.pop("cache_requests_status_codes", None)
+        if cache_requests_status_code:
+            config["cache_requests"] = [
+                int(x) for x in cache_requests_status_code.split(",")
+            ]
+    setup_logging(config.pop("log_level"))
+    main(**config)
 
-        parser.add_argument(
-            "--cache", help="Cache requests, for testing only", action="store_true"
-        )
 
-        parser.add_argument(
-            "--folder",
-            help="Folder to save harvested data to",
-            default="harvest",
-        )
-
-        parser.add_argument(
-            "--log-level",
-            default="debug",
-            help="Provide logging level. Example --log-level debug, default=debug",
-        )
-        parser.add_argument(
-            "--log-time",
-            default=False,
-            help="add time to logs",
-            action="store_true",
-        )
-        parser.add_argument(
-            "--max-workers",
-            default=1,
-            help="max threads that harvester will use",
-        )
-
-        args = parser.parse_args()
-
-        log_time = args.log_time
-        log_level = args.log_level
-        urls = args.urls or ""
-        cache = args.cache
-        dataset_ids = args.dataset_ids
-        max_workers = args.max_workers
-        folder = args.folder
-
-    logger = setup_logging(log_time, log_level)
-    try:
-        main(urls, cache, folder or "harvest", dataset_ids, max_workers)
-    except Exception as e:
-        logger.error("Harvester failed!!!", exc_info=True)
-        raise e
+if __name__ == "__main__":
+    cli()
