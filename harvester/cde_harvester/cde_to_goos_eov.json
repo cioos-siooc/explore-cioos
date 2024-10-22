@@ -32,5 +32,6 @@
   "stableCarbonIsotopes": ["stableCarbonIsotopes"],
   "temperature": ["seaSurfaceTemperature", "subSurfaceTemperature"],
   "transientTracers": ["transientTracers"],
-  "zooplanktonBiomassAndDiversity": ["zooplanktonBiomassAndDiversity"]
+  "zooplanktonBiomassAndDiversity": ["zooplanktonBiomassAndDiversity"],
+  "oceanBottomPressure": ["oceanBottomPressure"]
 }

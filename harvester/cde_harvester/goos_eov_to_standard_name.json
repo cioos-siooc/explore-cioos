@@ -214,7 +214,9 @@
     "sea_floor_depth_below_geoid",
     "sea_floor_depth_below_reference_ellipsoid",
     "sea_floor_depth_below_geopotential_datum",
-    "sea_floor_depth_below_sea_surface",
+    "sea_floor_depth_below_sea_surface"
+  ],
+  "oceanBottomPressure": [
     "sea_water_pressure_at_sea_floor"
   ],
   "seaSurfaceSalinity": [

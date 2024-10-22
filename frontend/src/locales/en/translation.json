@@ -211,6 +211,7 @@
   "datasetTableDownloadModalCDEDownloadableColumnName": "CDE downloadable",
   "datasetsTableDownloadModalDatasetCheckboxTooltip": "Download from CIOOS Data Explorer",
   "datasetTableDownloadModalCDEDownloadableColumnNameTooltip": "Requests for less than 1GB of data from a dataset can be downloaded through CDE",
-  "datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip": "Requests for more than 1GB of data from a dataset can be downloaded through the provided ERDDAP™ link",
-  "datasetTableDownloadModalExternalDownloadColumnName": "External download"
+  "datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip": "Requests for more than 1GB of data from a dataset can be downloaded through the provided ERDDAP link",
+  "datasetTableDownloadModalExternalDownloadColumnName": "External download",
+  "oceanBottomPressure": "Ocean Bottom Pressure"
 }
