@@ -1,6 +1,7 @@
 """
 download_erddap regroup a set of tool used by CDE to download ERDDAP datasets.
 """
+
 import io
 import os
 import sys
@@ -14,7 +15,7 @@ from erddap_downloader.download_pdf import download_pdf
 from erddapy import ERDDAP
 from shapely.geometry import Point
 
-ONE_MB = 10 ** 6
+ONE_MB = 10**6
 DATASET_SIZE_LIMIT = 1000 * ONE_MB
 QUERY_SIZE_LIMIT = 5000 * ONE_MB
 
@@ -84,7 +85,7 @@ def get_erddap_download_url(
 
     # Add constraint for lat/long range
     # If polygon given get the boundaries for erddap
-    if polygon_region!='all':
+    if polygon_region != "all":
         (
             user_constraint["lon_min"],
             user_constraint["lat_min"],
@@ -187,28 +188,28 @@ def get_datasets(json_query, output_path="", create_pdf=False):
         "total_size": 0,
         "empty_download": True,
     }
-    
-    
+
     # Convert WKT polygon to shapely polygon object
     polygon_region_wkt = json_query["user_query"].get("polygon_region")
 
     if polygon_region_wkt:
-        polygon_regions = [
-            shapely.wkt.loads(polygon_region_wkt)
-        ]
+        polygon_regions = [shapely.wkt.loads(polygon_region_wkt)]
     else:
-         polygon_regions = []
+        polygon_regions = []
 
     # Duplicate polygon over -180 to 180 limit and generate multiple queries to match each side
     if polygon_regions:
         if polygon_regions[0].bounds[0] < -180 or polygon_regions[0].bounds[2] > 180:
             for shift in [-360, 360]:
                 new_region = shapely.affinity.translate(polygon_regions[0], xoff=shift)
-                if -180 < new_region.bounds[0] < 180 or -180 < new_region.bounds[2] < 180:
+                if (
+                    -180 < new_region.bounds[0] < 180
+                    or -180 < new_region.bounds[2] < 180
+                ):
                     polygon_regions += [new_region]
 
     # Download file locally
-    chunksize = 1024 ** 2  # 1MB
+    chunksize = 1024**2  # 1MB
 
     # Download data to drive, down
     for dataset in json_query["cache_filtered"]:
@@ -227,8 +228,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
             dataset["erddap_metadata"] = harvester_dataset.df_variables
 
         # Get variable list to download
-        variable_list = get_variable_list(
-            dataset["erddap_metadata"])
+        variable_list = get_variable_list(dataset["erddap_metadata"])
 
         # Try getting data
         df = pd.DataFrame()
@@ -237,7 +237,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
         download_status = DOWNLOADING
         download_url_list = []
         erddap_error = ""
-        for polygon_region in polygon_regions or ['all']:
+        for polygon_region in polygon_regions or ["all"]:
 
             # Get download url
             download_url = get_erddap_download_url(
@@ -294,8 +294,8 @@ def get_datasets(json_query, output_path="", create_pdf=False):
             df_temp = pd.read_csv(io.BytesIO(data_downloaded), low_memory=False)
             units = df_temp.iloc[0].replace({pd.NA: ""}).astype(str)  # get units
             df_temp = df_temp.iloc[1:]
-            
-            if(polygon_region!='all'):
+
+            if polygon_region != "all":
                 # Filter data to polygon
                 df_temp = filter_polygon_region(df_temp, polygon_region)
 

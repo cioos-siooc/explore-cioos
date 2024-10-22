@@ -183,7 +183,7 @@ export default function DatasetInspector({
                   }
                   rel='noreferrer'
                 >
-                  {t('datasetInspectorERDDAPURL')} (ERDDAP)
+                  {t('datasetInspectorERDDAPURL')} (ERDDAP™)
                 </a>
               )}
             </div>

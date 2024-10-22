@@ -20,5 +20,13 @@ build
 *.csv
 !harvester/**/*.csv
 harvest
-harvester_cache
+harvester_cache*
 harvest_config.yaml
+
+cache.zip~
+ceda_log
+erddap_scraper_dc.zip
+out1
+log
+
+most_common_queries

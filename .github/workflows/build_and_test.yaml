@@ -11,23 +11,23 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.9]
+        python-version: ["3.10"]
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Start containers
         run: |
           mv .env.sample .env
-          docker-compose -f "docker-compose.production.yaml" up -d --build --quiet-pull
+          docker compose -f "docker-compose.production.yaml" up -d --build --quiet-pull
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install ERDDAP harvester and db loader
-        run: pip install -q ./harvester ./db-loader
+      - name: Install Python environment
+        run: pip install .
 
       - name: Run ERDDAP harvester on sample dataset
         run: python -m cde_harvester --urls https://data.cioospacific.ca/erddap/ --dataset_ids DFO_MEDS_BUOYS --folder erddap_harvest
@@ -54,4 +54,4 @@ jobs:
 
       - name: Stop containers
         if: always()
-        run: docker-compose -f "docker-compose.production.yaml" down
+        run: docker compose -f "docker-compose.production.yaml" down
