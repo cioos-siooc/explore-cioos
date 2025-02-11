@@ -174,6 +174,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
 
     profiles["depth_min"] = profiles["depth_min"].fillna(0)
     profiles["depth_max"] = profiles["depth_max"].fillna(0)
+    profiles.drop(columns=['altitutde_min', 'altitutde_max'], inplace=True, errors='ignore')
 
     logger.info("Adding %s datasets and %s profiles", len(datasets), len(profiles))
 
