@@ -104,7 +104,7 @@ def main(folder):
 
         # profiles has some columns to fix up first
         logger.info("profiles.columns: %s", profiles.columns)
-        profiles.drop(columns=["altitude_min", "altitude_max"], errors="ignore").to_sql(
+        profiles.drop(columns=["altitude_min", "altitude_max"], errors="ignore").dropna(subset=['time_min']).to_sql(
             "profiles",
             con=transaction,
             if_exists="append",
