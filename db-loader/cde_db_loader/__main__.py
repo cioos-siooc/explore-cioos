@@ -58,6 +58,7 @@ def main(folder):
 
     datasets = pd.read_csv(datasets_file)
     profiles = pd.read_csv(profiles_file)
+    profiles = profiles.drop(columns=["altitude_min", "altitude_max"], errors="ignore")
     skipped_datasets = pd.read_csv(skipped_datasets_file)
 
     datasets["eovs"] = datasets["eovs"].apply(ast.literal_eval)
