@@ -11,6 +11,8 @@ COPY poetry.lock /usr/src/app/poetry.lock
 COPY README.md /usr/src/app/README.md
 
 RUN pip install --upgrade pip
-RUN pip install -q .
+RUN pip install poetry
+RUN poetry config virtualenvs.create false
+RUN poetry install
 
 CMD [ "sh","./harvester/run.sh" ]
