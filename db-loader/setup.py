@@ -13,7 +13,7 @@ setup(
         "sqlalchemy==1.4.16",
         "psycopg2-binary",
         "python-dotenv",
-        "numpy",
+        "numpy<2.0.0",
         "sentry_sdk",
     ],
 )
