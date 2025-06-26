@@ -1,4 +1,3 @@
-import logging
 from datetime import datetime
 
 import numpy as np
@@ -6,6 +5,7 @@ import pandas as pd
 import requests
 from cde_harvester.platform_ioos_to_l06 import platforms_nerc_ioos
 from cde_harvester.utils import cde_eov_to_standard_name, intersection
+from loguru import logger
 from requests.exceptions import HTTPError
 
 
@@ -17,11 +17,11 @@ def is_valid_duration(duration):
         return False
 
 
-class Dataset(object):
+class Dataset:
     def __init__(self, erddap_server, id):
         self.id = id
         self.erddap_server = erddap_server
-        self.logger = self.get_logger()
+        self.logger = logger
 
         self.erddap_url = erddap_server.url
         self.erddap_csv_to_df = erddap_server.erddap_csv_to_df
@@ -39,8 +39,10 @@ class Dataset(object):
 
         self.get_metadata()
 
-    def get_df(self):
+    def __repr__(self):
+        return f"Dataset(erddap='{self.erddap_server.url}' datasetID='{self.id}')"
 
+    def get_df(self):
         self.df = pd.DataFrame(
             {
                 "title": [self.globals["title"]],
@@ -134,13 +136,10 @@ class Dataset(object):
         if profile_ids.empty:
             return profile_ids
 
-        profile_ids = profile_ids.dropna(subset=["latitude", "longitude"])
-
-        profile_ids["latlon"] = (
-            profile_ids["latitude"].astype(str)
-            + ","
-            + profile_ids["longitude"].astype(str)
+        profile_ids = profile_ids.dropna(subset=["latitude", "longitude"]).assign(
+            latlon=lambda x: f"{x.latitude},{x.longitude}"
         )
+
         profiles_with_multiple_locations = (
             profile_ids.groupby(profile_variable_list)
             .count()[["latlon"]]
@@ -153,9 +152,9 @@ class Dataset(object):
         profile_ids = profile_ids.drop_duplicates(profile_variable_list)
 
         if profiles_with_multiple_locations:
-            self.logger.warn(
-                "Non unique lat/lon found within profiles:"
-                + str(profiles_with_multiple_locations)
+            self.logger.warning(
+                "Non unique lat/lon found within profiles: {}",
+                profiles_with_multiple_locations,
             )
 
         self.profile_ids = profile_ids
@@ -227,7 +226,7 @@ class Dataset(object):
             count = df_count[["time"]].time[0]
             extrapolated_count = (int(count) / extraplolation_days) * days_in_dataset
 
-            df_count.loc[0, "time"] = extrapolated_count
+            df_count.loc[0, "time"] = int(extrapolated_count)
 
         return df_count
 
@@ -271,7 +270,7 @@ class Dataset(object):
                 return l06_platform_label
 
             except ValueError:
-                self.logger.error("Found unsupported IOOS platform: %s", platform)
+                self.logger.error("Found unsupported IOOS platform: {}", platform)
 
         if "L06" in platform_vocabulary:
             platforms_nerc_ioos_no_duplicates = platforms_nerc_ioos.drop_duplicates(
@@ -362,7 +361,3 @@ class Dataset(object):
         )
 
         self.platform = self.get_platform_code()
-
-    def get_logger(self):
-        logger = logging.getLogger(f"{self.erddap_server.domain} - {self.id}")
-        return logger

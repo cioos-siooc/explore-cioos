@@ -2,7 +2,6 @@
 
 # The ERDDAP class contains functions relating to querying the ERDDAP server
 
-import logging
 import re
 from io import StringIO
 from urllib.parse import unquote, urlparse
@@ -10,19 +9,18 @@ from urllib.parse import unquote, urlparse
 import diskcache as dc
 import pandas as pd
 import requests
-
-logging.getLogger("urllib3").setLevel(logging.WARNING)
 from cde_harvester.dataset import Dataset
+from loguru import logger
+from requests.auth import HTTPBasicAuth
 
 # size in bytes
-MAX_RESPONSE_SIZE = 2e8
+MAX_RESPONSE_SIZE = 1e8
 
 
-class ERDDAP(object):
+class ERDDAP:
     "Stores the ERDDAP server URL and functions related to querying it"
 
-    def __init__(self, erddap_url, cache_requests=False):
-        super(ERDDAP, self).__init__()
+    def __init__(self, erddap, cache_requests=False):
         self.cache_requests = cache_requests
 
         if cache_requests:
@@ -33,18 +31,19 @@ class ERDDAP(object):
                 size_limit=10000000000,
                 cull_limit=0,
             )
-            print("Cache stats:")
-            print("eviction_policy", self.cache.eviction_policy)
-            print("count", self.cache.count)
-            print("volume()", self.cache.volume())
-            print("size_limit", self.cache.size_limit)
-
-        self.domain = urlparse(erddap_url).netloc
+            logger.debug("Cache stats:")
+            logger.debug("eviction_policy {}", self.cache.eviction_policy)
+            logger.debug("count {}", self.cache.count)
+            logger.debug("volume() {}", self.cache.volume())
+            logger.debug("size_limit {}", self.cache.size_limit)
+        erddap_url = erddap["url"]
+        self.domain = urlparse(erddap["url"]).netloc
         self.session = requests.Session()
+        if erddap.get("username") and erddap.get("password"):
+            self.session.auth = HTTPBasicAuth(erddap["username"], erddap["password"])
 
-        self.logger = self.get_logger()
+        self.logger = logger
         self.df_all_datasets = None
-        logger = self.logger
 
         erddap_url = erddap_url.rstrip("/")
         self.url = erddap_url
@@ -54,11 +53,15 @@ class ERDDAP(object):
 
         if not erddap_url.endswith("/erddap"):
             # ERDDAP URL almost always ends in /erddap
-            logger.warning("URL doesn't end in /erddap, trying anyway")
+            self.logger.warning("URL doesn't end in /erddap, trying anyway")
+
         self.df_all_datasets = self.get_all_datasets()
 
         if self.df_all_datasets.empty:
             print("No datasets found at:", self.url)
+
+    def __repr__(self):
+        return f"ERDDAP({self.url})"
 
     def get_all_datasets(self):
         "Get a string list of dataset IDs from the ERDDAP server"
@@ -78,7 +81,7 @@ class ERDDAP(object):
         is_timestamp = s.startswith("1.") or s.startswith("-1.")
 
         if is_timestamp:
-            return pd.to_datetime(s, unit="s")
+            return pd.to_datetime(float(s), unit="s")
 
         return pd.to_datetime(s, errors="coerce")
 
@@ -88,36 +91,41 @@ class ERDDAP(object):
         is_timestamp = time.startswith("1.") or time.startswith("-1.")
 
         if is_timestamp:
-            return pd.to_datetime(series, unit="s")
+            return pd.to_datetime(series.astype(float), unit="s")
 
         return pd.to_datetime(series, errors="coerce")
 
     def erddap_csv_to_df(self, url, skiprows=[1], dataset=None):
         """If theres an error in the request, this raises up to the dataset loop, so this dataset gets skipped"""
-        if dataset:
-            logger = dataset.logger
-            erddap_url = dataset.erddap_url
 
+        def _cache_request(url):
+            if self.cache_requests and url in self.cache:
+                self.logger.debug("load CACHE")
+                response = self.cache[url]
+                if self.cache_requests == True:
+                    return response
+                elif (
+                    isinstance(self.cache_requests, list)
+                    and response.status_code in self.cache_requests
+                ):
+                    return response
+
+            response = self.session.get(url, timeout=3600)
+            if self.cache_requests:
+                self.logger.debug("save CACHE")
+                self.cache[url] = response
+            return response
+
+        if dataset:
+            erddap_url = dataset.erddap_url
         else:
-            logger = self.logger
             erddap_url = self.url
 
         url_combined = erddap_url + url
 
-        logger.debug(unquote(url_combined))
+        self.logger.debug(unquote(url_combined))
 
-        response = None
-        if self.cache_requests:
-            cache = self.cache
-            if url_combined in self.cache:
-                response = cache[url_combined]
-            else:
-                logger.debug("CACHE MISS")
-                response = self.session.get(url_combined, timeout=3600)
-                cache[url_combined] = response
-        else:
-            response = self.session.get(url_combined, timeout=3600)
-
+        response = _cache_request(url_combined)
         if len(response.content) > MAX_RESPONSE_SIZE:
             raise RuntimeError("Response too big")
 
@@ -127,7 +135,9 @@ class ERDDAP(object):
         if original_hostname != actual_hostname:
             # redirect due to EDDTableFromErddap
             if dataset:
-                logger.debug("Redirecting %s to %s", original_hostname, actual_hostname)
+                self.logger.debug(
+                    "Redirecting {} to {}", original_hostname, actual_hostname
+                )
                 dataset.erddap_url = response.url.split("/erddap")[0] + "/erddap"
 
         no_data = False
@@ -139,7 +149,9 @@ class ERDDAP(object):
             and "Query error: No operator found in constraint=&quot;orderByCount"
             in response.text
         ):
-            logger.error("OrderByCount not available within this ERDDAP Version")
+            self.logger.error(
+                "OrderByCount not available within this ERDDAP Version"
+            )
             no_data = True
         elif (
             # Older erddaps respond with 500 for no data
@@ -152,7 +164,7 @@ class ERDDAP(object):
             response.status_code == 500
             and "You are requesting too much data." in response.text
         ):
-            logger.error("Query too big for the server")
+            self.logger.error("Query too big for the server")
             no_data = True
         elif response.status_code != 200:
             # Report if not All OK
@@ -163,12 +175,8 @@ class ERDDAP(object):
                 StringIO(response.text), skiprows=skiprows, encoding="unicode_escape"
             )
         if no_data:
-            logger.error("Empty response")
+            self.logger.error("Empty response")
             return pd.DataFrame()
 
     def get_dataset(self, dataset_id):
         return Dataset(self, dataset_id)
-
-    def get_logger(self):
-        logger = logging.getLogger(self.domain)
-        return logger

@@ -7,6 +7,7 @@ import re
 import diskcache as dc
 import pandas as pd
 import requests
+from loguru import logger
 
 # National CKAN has all the regions' records
 CKAN_API_URL = "https://catalogue.cioos.ca/api/3"
@@ -64,7 +65,6 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         resources = record_full["resources"]
         erddap_url = ""
         for resource in resources:
-
             if "tabledap" in resource["url"]:
                 erddap_url = resource["url"]
                 continue
@@ -150,7 +150,7 @@ def list_ckan_records_with_erddap_urls(cache_requests):
             CKAN_API_URL
             + f"/action/package_search?rows={row_page_limit}&start={row_start}&q=erddap"
         )
-        print(erddap_datasets_query)
+        logger.info(erddap_datasets_query)
 
         if cache_requests:
             # limit cache to 10gb
@@ -176,6 +176,6 @@ def list_ckan_records_with_erddap_urls(cache_requests):
         records_remaining = count_total - count_page
         row_start += row_page_limit
 
-    print("Found", len(records_total), " CKAN records")
+    logger.info("Found {} CKAN records", len(records_total))
 
     return records_total

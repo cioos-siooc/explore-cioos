@@ -53,8 +53,7 @@ def get_profiles(dataset):
 
     if profiles.empty:
         return profiles
-    logger = dataset.logger
-    logger.debug(f"Found {len(profiles)} profiles")
+    dataset.logger.debug(f"Found {len(profiles)} profiles")
 
     # If TimeSeriesProfiles review how many profiles per timeseries exist
     if dataset.cdm_data_type == "TimeSeriesProfile":
@@ -103,7 +102,7 @@ def get_profiles(dataset):
         # if this dataset is a single profile and actual_range is set, use that
         elif len(profiles) == 1 and df_variables.loc[llat_variable].get("actual_range"):
             # if this dataset is a single profile and actual_range is set, use that
-            logger.debug(f"Using dataset actual_range for {llat_variable}")
+            dataset.logger.debug(f"Using dataset actual_range for {llat_variable}")
 
             [min, max] = df_variables.loc[llat_variable]["actual_range"].split(",")
 
@@ -124,7 +123,7 @@ def get_profiles(dataset):
 
             # Something went wrong
             if profile_min_max.empty:
-                logger.error(f"No data found for  {dataset.id}")
+                dataset.logger.error(f"No data found for  {dataset.id}")
                 return profile_min_max
 
         profiles_with_lat_lon = profiles_with_lat_lon.join(profile_min_max)
@@ -133,7 +132,7 @@ def get_profiles(dataset):
 
     # Get Count for each dataset
     # First identify variables to use
-    logger.debug("Get record Count")
+    dataset.logger.debug("Get record Count")
     count_variables = profile_variable_list.copy()
 
     count_variables.append("time")
@@ -165,7 +164,7 @@ def get_profiles(dataset):
     profiles = profiles.query("not n_records.isnull()")
 
     if profiles.empty:
-        logger.error("Error counting records")
+        dataset.logger.error("Error counting records")
         return profiles
 
     profiles = profiles.reset_index(drop=False).copy()
@@ -199,8 +198,8 @@ def get_profiles(dataset):
         profiles["depth_min"] = 0
         profiles["depth_max"] = 0
 
-    profiles["depth_min"].fillna(0, inplace=True)
-    profiles["depth_max"].fillna(0, inplace=True)
+    profiles["depth_min"] = profiles["depth_min"].fillna(0.0)
+    profiles["depth_max"] = profiles["depth_max"].fillna(0.0)
 
     if not "profile_id" in profiles:
         profiles["profile_id"] = ""
@@ -234,12 +233,12 @@ def get_profiles(dataset):
     profiles_bad_geom = profiles.query(profiles_bad_geom_query)
 
     if not profiles_bad_geom.empty:
-        logger.warn(
+        dataset.logger.warning(
             "These profiles with bad lat/long/depth/time values will be removed:"
         )
         # TODO this could use record_id if it existed
-        logger.warn(set(profiles_bad_geom["profile_id"].to_list()))
-        logger.warn(set(profiles_bad_geom["timeseries_id"].to_list()))
+        dataset.logger.warning(set(profiles_bad_geom["profile_id"].to_list()))
+        dataset.logger.warning(set(profiles_bad_geom["timeseries_id"].to_list()))
 
         profiles = profiles.query("not " + profiles_bad_geom_query)
 
