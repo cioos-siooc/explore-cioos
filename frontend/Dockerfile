@@ -1,5 +1,5 @@
 # Stage 1 - the build process
-FROM node:16 as build-deps
+FROM node:16 AS build-deps
 WORKDIR /usr/src/app
 
 ARG API_URL
