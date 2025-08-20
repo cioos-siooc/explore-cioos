@@ -31,7 +31,7 @@ def drop_db(verbose):
     with engine.begin() as conn:
         try:
             print("🔄 Dropping schema cde", end="\r")
-            conn.execute("DROP SCHEMA IF EXISTS cde CASCADE;")
+            conn.execute(text("DROP SCHEMA IF EXISTS cde CASCADE;"))
             print("✅ Schema cde dropped             ")
         except Exception as e:
             handle_error(e,verbose)
@@ -79,7 +79,7 @@ def removeData(    verbose: bool = typer.Option(False, help="Enable verbose outp
             with engine.begin() as conn:
                 try:
                     print("🔄 Truncating Tables", end="\r")
-                    conn.execute("SELECT remove_all_data();")
+                    conn.execute(text("SELECT remove_all_data();"))
                     print("✅ Tables Truncated            ")
                 except Exception as e:
                     handle_error(e, verbose)
@@ -87,7 +87,7 @@ def removeData(    verbose: bool = typer.Option(False, help="Enable verbose outp
         with engine.begin() as conn:
             try:
                     print("🔄 Truncating Tables", end="\r")
-                    conn.execute("SELECT remove_all_data();")
+                    conn.execute(text("SELECT remove_all_data();"))
                     print("✅ Tables Truncated            ")
             except Exception as e:
                 handle_error(e, verbose)
