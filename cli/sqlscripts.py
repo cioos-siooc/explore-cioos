@@ -2,28 +2,35 @@ class sqlscripts:
     folder = "../database/"
 
     try:
-        with open(folder + "1_schema.sql", "r") as scriptfile:
+        scriptname = "1_schema.sql"
+        with open(folder + scriptname, "r") as scriptfile:
             schema = scriptfile.read()
 
-        with open(folder + "3_ckan_process.sql") as scriptfile:
+        scriptname = "3_ckan_process.sql"
+        with open(folder + scriptname) as scriptfile:
             ckan_process = scriptfile.read()
 
-        with open(folder + "4_create_hexes.sql") as scriptfile:
+        scriptname = "4_create_hexes.sql"
+        with open(folder + scriptname) as scriptfile:
             create_hexes = scriptfile.read()
 
-        with open(folder + "5_profile_process.sql") as scriptfile:
+        scriptname = "5_profile_process.sql"
+        with open(folder + scriptname) as scriptfile:
             profile_process = scriptfile.read()
 
-        with open(folder + "6_remove_all_data.sql") as scriptfile:
+        scriptname = "6_remove_all_data.sql"
+        with open(folder + scriptname) as scriptfile:
             remove_all_data = scriptfile.read()
 
-        with open(folder + "7_contraints.sql") as scriptfile:
+        scriptname = "7_contraints.sql"
+        with open(folder + scriptname) as scriptfile:
             constraints = scriptfile.read()
 
-        with open(folder + "8_range_functions.sql") as scriptfile:
+        scriptname = "8_range_functions.sql"
+        with open(folder + scriptname) as scriptfile:
             range_functions = scriptfile.read()
 
     except FileNotFoundError:
-        print("Error: The file 'your_file.txt' was not found.")
+        print(f"Error: The file {folder + scriptname} was not found.")
     except Exception as e:
         print(f"An error occurred: {e}")
