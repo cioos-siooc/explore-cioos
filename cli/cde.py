@@ -6,6 +6,7 @@ import redis_commands
 import sys
 from dotenv import load_dotenv
 import cron_commands
+
 sys.path.insert(1, "../harvester/")
 sys.path.insert(1, "../db-loader/")
 
@@ -13,8 +14,13 @@ load_dotenv(os.getcwd() + "/.env")
 envs = os.environ
 app = typer.Typer()
 app.add_typer(db.app, name="db", help="CLI tool for managing the CDE database.")
-app.add_typer(redis_commands.app, name="redis", help="CLI tool for managing the Redis database.")
-app.add_typer(cron_commands.app, name="crontab", help="CLI tool for managing the CDE cron jobs.")
+app.add_typer(
+    redis_commands.app, name="redis", help="CLI tool for managing the Redis database."
+)
+app.add_typer(
+    cron_commands.app, name="crontab", help="CLI tool for managing the CDE cron jobs."
+)
+
 
 def handle_error(e, verbose):
     try:
