@@ -23,15 +23,21 @@ def handle_error(e):
 def _install_tab(n, tabfile, activate, user, logfile, folder, urls, unit):
     os.makedirs(folder, exist_ok=True) 
     cron = CronTab(user=user)
-    job = cron.new(command='cd ' + os.getcwd() + ' && ' + '.venv/bin/python' + ' cde.py harvester --urls '+ urls + ' --yes >> ' + logfile + ' 2>&1', comment = "CDE CLI cron created from:" + folder+'/'+ tabfile + ' at: ' + str(datetime.now())) #not datetime.now() used to ensure uniquenness
-    #job = cron.new(command='cd ' + os.getcwd() + ' && ' + 'date >> ' + logfile + ' 2>&1', comment = "CDE CLI cron created from:" + folder+'/'+ tabfile + ' at: ' + str(datetime.now())) #simple cron for testing
+    #job = cron.new(command='cd ' + os.getcwd() + ' && ' + '.venv/bin/python' + ' cde.py harvester --urls '+ urls + ' --yes >> ' + logfile + ' 2>&1', comment = "CDE CLI cron created from:" + folder+'/'+ tabfile + ' at: ' + str(datetime.now())) #not datetime.now() used to ensure uniquenness
+    job = cron.new(command='cd ' + os.getcwd() + ' && ' + 'date >> ' + logfile + ' 2>&1', comment = "CDE CLI cron created from:" + folder+'/'+ tabfile + ' at: ' + str(datetime.now())) #simple cron for testing
     if unit == "minutes":
         job.minute.every(n)
     elif unit =="hours":
+        job.minute.on(0)
         job.hour.every(n)
     elif unit == "days":
+        job.minute.on(0)
+        job.hour.on(0)
         job.day.every(n)
     elif unit == "months":
+        job.minute.on(0)
+        job.hour.on(0)
+        job.day.on(1)
         job.month.every(n)
     cron.write(folder+'/'+ tabfile )
     if activate:
@@ -44,9 +50,6 @@ def install_tab(folder: str = typer.Option("./cronjobs", help="folder where cron
                 ):
     with CronTab(tabfile= folder+ '/' +tabfile ) as cron:
         cron.write_to_user(user = user)
-
-
-
 
 @app.command(help="Create a cron job that runs every n hours, on the hour")
 def hours(   n: int= typer.Option(5, help="number n hours since the start of each day to harvest data" ),
