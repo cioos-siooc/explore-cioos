@@ -23,8 +23,8 @@ def handle_error(e):
 def _install_tab(n, tabfile, activate, user, logfile, folder, urls, unit):
     os.makedirs(folder, exist_ok=True) 
     cron = CronTab(user=user)
-    #job = cron.new(command='cd ' + os.getcwd() + ' && ' + '.venv/bin/python' + ' cde.py harvester --urls '+ urls + ' --yes >> ' + logfile + ' 2>&1')
-    job = cron.new(command='cd ' + os.getcwd() + ' && ' + 'date >> ' + logfile + ' 2>&1', comment = "CDE CLI cron created from:" + folder+'/'+ tabfile + ' at: ' + str(datetime.now()))
+    job = cron.new(command='cd ' + os.getcwd() + ' && ' + '.venv/bin/python' + ' cde.py harvester --urls '+ urls + ' --yes >> ' + logfile + ' 2>&1', comment = "CDE CLI cron created from:" + folder+'/'+ tabfile + ' at: ' + str(datetime.now())) #not datetime.now() used to ensure uniquenness
+    #job = cron.new(command='cd ' + os.getcwd() + ' && ' + 'date >> ' + logfile + ' 2>&1', comment = "CDE CLI cron created from:" + folder+'/'+ tabfile + ' at: ' + str(datetime.now())) #simple cron for testing
     if unit == "minutes":
         job.minute.every(n)
     elif unit =="hours":
@@ -46,18 +46,9 @@ def install_tab(folder: str = typer.Option("./cronjobs", help="folder where cron
         cron.write_to_user(user = user)
 
 
-@app.command(help="")
-def minutes(   n: int= typer.Option(30, help="number n minutes past hour harvest data (CAREFUL!)" ),
-                tabfile: str = typer.Option("harvester.cron", help="file to save cron job to. Used to keep track of cron jobs"),
-                activate: bool = typer.Option(True, help="install cron"),
-                user: str = typer.Option("root", help="CronTab user"),
-                logfile: str = typer.Option("cron-harvester.log", help="log file of harvester output"),
-                folder: str = typer.Option("./cronjobs", help="folder where cron jobs are saved. "),
-                urls: str = typer.Option(..., help="harvest from these erddap servers, comma separated")            
-            ):
-    _install_tab(n=n, tabfile=tabfile, activate=activate, user=user, logfile=logfile, folder=folder, urls=urls, unit="minutes")
 
-@app.command(help="")
+
+@app.command(help="Create a cron job that runs every n hours, on the hour")
 def hours(   n: int= typer.Option(5, help="number n hours since the start of each day to harvest data" ),
                 tabfile: str = typer.Option("harvester.cron", help="file to save cron job to. Used to keep track of cron jobs"),
                 activate: bool = typer.Option(True, help="install cron"),
@@ -68,7 +59,7 @@ def hours(   n: int= typer.Option(5, help="number n hours since the start of eac
             ):
     _install_tab(n=n, tabfile=tabfile, activate=activate, user=user, logfile=logfile, folder=folder, urls=urls, unit="hours")
 
-@app.command(help="")
+@app.command(help="Create a cron job that runs every n days, on the day")
 def days(   n: int= typer.Option(3, help="number of incremental days since the start of each month to harvest data" ),
                 tabfile: str = typer.Option("harvester.cron", help="file to save cron job to. Used to keep track of cron jobs"),
                 activate: bool = typer.Option(True, help="install cron"),
@@ -77,9 +68,9 @@ def days(   n: int= typer.Option(3, help="number of incremental days since the s
                 folder: str = typer.Option("./cronjobs", help="folder where cron jobs are saved. "),
                 urls: str = typer.Option(..., help="harvest from these erddap servers, comma separated")            
             ):
-    _install_tab(n=n, tabfile=tabfile, activate=activate, user=user, logfile=logfile, folder=folder, urls=urls, unit="hours")
+    _install_tab(n=n, tabfile=tabfile, activate=activate, user=user, logfile=logfile, folder=folder, urls=urls, unit="days")
 
-@app.command(help="")
+@app.command(help="Create a cron job that runs every n months, on the month")
 def months(   n: int= typer.Option(3, help="number of incremental days since the start of each month to harvest data" ),
                 tabfile: str = typer.Option("harvester.cron", help="file to save cron job to. Used to keep track of cron jobs"),
                 activate: bool = typer.Option(True, help="install cron"),
@@ -91,7 +82,7 @@ def months(   n: int= typer.Option(3, help="number of incremental days since the
     _install_tab(n=n, tabfile=tabfile, activate=activate, user=user, logfile=logfile, folder=folder, urls=urls, unit="months")
 
 
-@app.command()
+@app.command(help = "List cron jobs saved in folder the cronjob folder")
 def list_jobs(folder: str = typer.Option("./cronjobs", help="folder where cron jobs are saved. ")):
     for cronfile in os.listdir(folder):
         print(cronfile)
@@ -101,9 +92,9 @@ def list_jobs(folder: str = typer.Option("./cronjobs", help="folder where cron j
                 print('\t',cron)
                 
 
-@app.command()
+@app.command(help="Remove cron jobs saved in tabfile from the user's crontab")
 def remove_crontab(folder: str = typer.Option("./cronjobs", help="folder where cron jobs are saved. "),
-                   tabfile: str = typer.Option("harvester.cron", help="file to saved cron job are. Used to keep track of cron jobs"),
+                   tabfile: str = typer.Option("harvester.cron", help="file where saved cron job are. Used to keep track of cron jobs"),
                    user: str = typer.Option("root", help="CronTab user")):
     
     with CronTab(user=user) as user_tab:
