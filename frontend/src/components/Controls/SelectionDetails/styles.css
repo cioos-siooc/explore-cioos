@@ -86,16 +86,21 @@
   height: 100%;
 }
 
-.pointDetailsHeaderLogo {
-  /* margin: 3px 0px; */
-}
+
 
 .pointDetailsHeaderLogo.CIOOS {
   margin: auto 0px;
   height: 100%;
   padding: 10px;
 }
-
+.pointDetailsHeader #pointDetailsHeaderControls, #pointDetailsHeaderControls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  justify-content: flex-end;
+  height: 100%;
+}
 .pointDetailsHeaderLogo.CDE {
   display: flex;
   align-items: center;
