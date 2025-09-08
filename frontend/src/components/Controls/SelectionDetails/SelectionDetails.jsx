@@ -1,7 +1,13 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { InfoSquare, ChatDots, Filter, FileEarmarkSpreadsheet, Download } from 'react-bootstrap-icons'
+import {
+  InfoSquare,
+  ChatDots,
+  Filter,
+  FileEarmarkSpreadsheet,
+  Download
+} from 'react-bootstrap-icons'
 
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetPreview from '../DatasetPreview/DatasetPreview.jsx'
@@ -10,8 +16,6 @@ import LanguageSelector from '../LanguageSelector/LanguageSelector.jsx'
 import Loading from '../Loading/Loading.jsx'
 import CIOOSLogoEN from '../../Images/CIOOSNationalLogoBlackEnglish.svg'
 import CIOOSLogoFR from '../../Images/CIOOSNationalLogoBlackFrench.svg'
-import CDELogoEN from '../../Images/CDELogoEN.png'
-import CDELogoFR from '../../Images/CDELogoFR.png'
 import { server } from '../../../config'
 import './styles.css'
 import {
@@ -185,47 +189,70 @@ export default function SelectionDetails({
 
   return (
     <div
-      className='pointDetails'
+      className="pointDetails"
       onMouseEnter={() => setHoveredDataset(inspectDataset)}
       onMouseLeave={() => setHoveredDataset()}
     >
-      <div className='pointDetailsHeader'>
-        <img
-          className='pointDetailsHeaderLogo CIOOS'
-          src={i18n.language === 'en' ? CIOOSLogoEN : CIOOSLogoFR}
-          onClick={() =>
-            i18n.language === 'en'
-              ? window.open('https://www.cioos.ca')
-              : window.open('https://www.siooc.ca/fr/accueil/')
-          }
-          title={t('PointDetailsCIOOSLogoTitleText')}
-        />
-        <img
-          className='pointDetailsHeaderLogo CDE'
-          src={i18n.language === 'en' ? CDELogoEN : CDELogoFR}
+      <div className="pointDetailsHeader">
+        <div className="pointDetailsHeaderBrand">
+          <img
+            className="pointDetailsHeaderLogo CIOOS"
+            src={i18n.language === 'en' ? CIOOSLogoEN : CIOOSLogoFR}
+            alt={t('PointDetailsCIOOSLogoTitleText')}
+            onClick={() =>
+              i18n.language === 'en'
+                ? window.open('https://www.cioos.ca')
+                : window.open('https://www.siooc.ca/fr/accueil/')
+            }
+            title={t('PointDetailsCIOOSLogoTitleText')}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                i18n.language === 'en'
+                  ? window.open('https://www.cioos.ca')
+                  : window.open('https://www.siooc.ca/fr/accueil/')
+              }
+            }}
+          />
+        </div>
+        <div
+          className="pointDetailsHeaderLogo CDE"
+          aria-label={t('PointDetailsCDELogoTitleText')}
           title={t('PointDetailsCDELogoTitleText')}
+          role="button"
+          tabIndex={0}
           onClick={() => {
             resetFilters()
             setPolygon()
           }}
-        />
-        <button
-          className='pointDetailsHeaderIntroButton'
-          onClick={() => setShowIntroModal(true)}
-          title={t('introReopenTitle')} // 'Re-open introduction'
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              resetFilters()
+              setPolygon()
+            }
+          }}
         >
-          <InfoSquare color='#007bff' size={'25px'} />
-        </button>
-        <a
-          className='feedbackButton'
-          title={t('feedbackButtonTitle')}
-          href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit'
-          target='_blank'
-          rel='noreferrer'
-        >
-          <ChatDots size='28px' color='#007bff' />
-        </a>
-        <LanguageSelector className='noPosition' />
+          {t('DataExplorer')}
+        </div>
+        <div id="pointDetailsHeaderControls" aria-label="header controls">
+          <button
+            className="pointDetailsHeaderIntroButton"
+            onClick={() => setShowIntroModal(true)}
+            title={t('introReopenTitle')} // 'Re-open introduction'
+          >
+            <InfoSquare color="#007bff" size={'25px'} />
+          </button>
+          <a
+            className="feedbackButton"
+            title={t('feedbackButtonTitle')}
+            href="https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <ChatDots size="28px" color="#007bff" />
+          </a>
+          <LanguageSelector className="noPosition" />
+        </div>
       </div>
       <div
         className={`pointDetailsInfoRow ${inspectDataset ? 'fullHeight' : ''}`}
@@ -265,29 +292,27 @@ export default function SelectionDetails({
             {/* No Data. Modify filters or change selection on map. */}
             {/* </div>
               } */}
-            <div className='pointDetailsControls'>
-              <div className='pointDetailsControlRow'>
-                <div className='pointDetailsControlRowGridContainer' >
-                  <div className='numberOfDatasets'
+            <div className="pointDetailsControls">
+              <div className="pointDetailsControlRow">
+                <div className="pointDetailsControlRowGridContainer">
+                  <div
+                    className="numberOfDatasets"
                     title={t('pointDetailsControlRowDatasetsSelected')}
                   >
-                    <strong>{totalNumberOfDatasets}</strong>
-                    {' '}
+                    <strong>{totalNumberOfDatasets}</strong>{' '}
                     <FileEarmarkSpreadsheet size={18} />
                   </div>
-                  <div className='filteredDatasets'
+                  <div
+                    className="filteredDatasets"
                     title={t('pointDetailsControlRowFilteredDatasets')}
                   >
-                    <strong>{pointsData.length}</strong>
-                    {' '}
-                    <Filter size={18} />
+                    <strong>{pointsData.length}</strong> <Filter size={18} />
                   </div>
-                  <div className='selectedDatasets'
+                  <div
+                    className="selectedDatasets"
                     title={t('pointDetailsControlRowToDownload')}
                   >
-                    <strong>{datasetsSelected}</strong>
-                    {' '}
-                    <Download size={18} />
+                    <strong>{datasetsSelected}</strong> <Download size={18} />
                   </div>
                 </div>
                 {/* {t('pointDetailsControlRowDatasetsSelected')}{' '}
@@ -314,6 +339,6 @@ export default function SelectionDetails({
         recordLoading={recordLoading}
         setRecordLoading={setRecordLoading}
       />
-    </div >
+    </div>
   )
 }

@@ -15,6 +15,7 @@
   "tipInfoReopen": "Cliquez sur le bouton d'informations en haut à gauche de l'écran pour rouvrir ce panneau d'informations.",
   "introModalWelcomeMessage": "Bienvenue dans l'explorateur de données du SIOOC. Utilisez la carte pour rechercher géographiquement des données, parmi les ensembles de données pris en charge. Filtrez, regroupez et téléchargez uniquement les données qui répondent à vos critères. Les téléchargements de l’Explorateur de données respectent un format standardisé (.csv).",
   "CIOOSDataExplorer": "Explorateur de données du SIOOC",
+  "DataExplorer": "Explorateur de données",
   "CIOOSQuote": "\"Des données océaniques pour l'avenir de nos océans\"",
   "CIOOSLogoButtonTitle": "Accéder à la page d'accueil du SIOOC",
   "introReopenTitle": "Revenir à l'introduction",

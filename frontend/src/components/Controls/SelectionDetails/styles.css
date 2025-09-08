@@ -70,11 +70,24 @@
 .pointDetailsHeader {
   height: 66px;
   display: flex;
-  border-bottom: 1px solid lightgray;
+  align-items: center;
+  border-bottom: 1px solid #d8e4e2;
+  background: linear-gradient(90deg,#ffffff 0%, #f1f7f6 100%);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+  padding: 0 8px;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.pointDetailsHeaderBrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 100%;
 }
 
 .pointDetailsHeaderLogo {
-  padding: 3px 0px;
+  /* margin: 3px 0px; */
 }
 
 .pointDetailsHeaderLogo.CIOOS {
@@ -84,11 +97,21 @@
 }
 
 .pointDetailsHeaderLogo.CDE {
-  /* margin: auto 0px auto 70px; */
-  padding: 0px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   height: 100%;
-  width: 100%;
-  object-fit:scale-down;
+  font-size: 18px;
+  font-weight: 100;
+  letter-spacing: 0.5px;
+  font-family: Montserrat, Helvetica, Arial, sans-serif;
+  color: #003c3c;
+  padding: 0 16px;
+  width: 150px;
+  text-transform: uppercase;
+  position: relative;
+  line-height: 1.1;
 }
 
 .pointDetailsHeaderLogo.CDE:hover {
@@ -100,20 +123,21 @@
 .pointDetailsHeaderLogo.CIOOS:hover {
   cursor: pointer;
   background-color: #f3f3f3;
-  /* padding: -2px; */
 }
 
 .pointDetailsHeaderIntroButton {
-  margin: 10px 10px 10px 0px;
+  margin: 0;
   pointer-events: all;
   background-color: #fff;
-  /* box-shadow: 0 0 0 2px rgb(0 0 0 / 10%); */
-  border-radius: 4px;
-  border: 0px;
-  height: 42px;
-  width: 42px;
+  border-radius: 6px;
+  border: 0;
+  height: 44px;
+  width: 44px;
   text-align: center;
   z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .pointDetailsHeaderIntroButton:hover {
@@ -126,13 +150,15 @@
 
 .feedbackButton {
   background-color: #fff;
-  /* box-shadow: 0 0 0 2px rgb(0 0 0 / 10%); */
-  border-radius: 4px;
-  width: 42px;
-  height: 42px;
+  border-radius: 6px;
+  width: 44px;
+  height: 44px;
   z-index: 100;
-  padding: 6px 7px 5px 7px;
-  margin: auto 10px;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .feedbackButton:hover {
@@ -140,20 +166,19 @@
 }
 
 .noPosition.languageSelector{
-  position: inherit;
-  top: inherit;
-  right: inherit;
-  margin: 10px;
+  position: static;
   pointer-events: all;
   z-index: 3;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   text-align: center;
-  /* margin: auto; */
-  padding:7px 5px 5px 5px;
-  background-color: white;
-  border-radius: 4px;
-  /* border: 2px solid lightgrey; */
+  padding: 0;
+  margin: 0;
+  background-color: #fff;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .noPosition.languageSelector:hover {

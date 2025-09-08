@@ -15,6 +15,7 @@
   "tipInfoReopen": "Click the info button at the top left of the screen to reopen this information panel.",
   "introModalWelcomeMessage": "Welcome to the CIOOS Data Explorer. Use the map to search geographically for data, across supported datasets. Filter, aggregate, and download just the data that meets your criteria. Data Explorer downloads are in a standardized (.csv) format.",
   "CIOOSDataExplorer": "CIOOS Data Explorer",
+  "DataExplorer": "Data Explorer",
   "CIOOSQuote": "\"Ocean Data For Our Ocean Future\"",
   "CIOOSLogoButtonTitle": "Go to the CIOOS homepage",
   "introReopenTitle": "Re-open introduction",
