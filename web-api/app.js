@@ -19,6 +19,8 @@ const previewRouter = require("./routes/preview");
 const platformsRouter = require("./routes/platforms");
 const datasetRecordsListRouter = require("./routes/datasetRecordsList");
 const downloadEstimateRouter = require("./routes/downloadEstimate");
+const swaggerSpec = require('./swagger');
+const swaggerUi = require('swagger-ui-express');
 
 const app = express();
 
@@ -63,6 +65,10 @@ app.use("/preview", previewRouter);
 app.use("/platforms", platformsRouter);
 app.use("/datasetRecordsList", datasetRecordsListRouter);
 app.use("/downloadEstimate", downloadEstimateRouter);
+
+// Swagger docs
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: true }));
+app.get('/openapi.json', (req, res) => res.json(swaggerSpec));
 
 app.use(Sentry.Handlers.errorHandler());
 
