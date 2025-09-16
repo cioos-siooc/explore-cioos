@@ -3,6 +3,29 @@ const express = require("express");
 require("express-async-errors");
 const Sentry = require("@sentry/node");
 
+/**
+ * @swagger
+ * /preview:
+ *   get:
+ *     summary: Preview sample records for a dataset profile
+ *     tags: [Preview]
+ *     description: Returns up to 1000 representative records from an ERDDAP dataset profile/time-series.
+ *     parameters:
+ *       - in: query
+ *         name: dataset
+ *         required: true
+ *         schema: { type: string }
+ *       - in: query
+ *         name: profile
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Preview data from ERDDAP in tabledap JSON format.
+ *       400:
+ *         description: Missing or invalid parameters.
+ */
+
 const router = express.Router();
 const axios = require("axios");
 const db = require("../db");

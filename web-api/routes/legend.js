@@ -16,6 +16,59 @@ const createDBFilter = require("../utils/dbFilter");
  * Takes all the filters, returns a number range for each of the 3 major zoom levels
  */
 
+/**
+ * @swagger
+ * /legend:
+ *   get:
+ *     summary: Get hex/point density ranges for legend
+ *     tags: [Legend]
+ *     description: Returns min/max counts for three zoom levels used to render the map legend.
+ *     parameters:
+ *       - in: query
+ *         name: timeMin
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: timeMax
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: latMin
+ *         schema: { type: number }
+ *       - in: query
+ *         name: latMax
+ *         schema: { type: number }
+ *       - in: query
+ *         name: lonMin
+ *         schema: { type: number }
+ *       - in: query
+ *         name: lonMax
+ *         schema: { type: number }
+ *       - in: query
+ *         name: depthMin
+ *         schema: { type: number }
+ *       - in: query
+ *         name: depthMax
+ *         schema: { type: number }
+ *     responses:
+ *       200:
+ *         description: Legend count ranges.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 recordsCount:
+ *                   type: object
+ *                   properties:
+ *                     zoom0:
+ *                       type: array
+ *                       items: { type: integer }
+ *                     zoom1:
+ *                       type: array
+ *                       items: { type: integer }
+ *                     zoom2:
+ *                       type: array
+ *                       items: { type: integer }
+ */
 router.get(
   "/",
   cache.route(),
