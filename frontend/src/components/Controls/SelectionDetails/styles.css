@@ -71,6 +71,7 @@
   height: 66px;
   display: flex;
   border-bottom: 1px solid lightgray;
+  align-items: center;
 }
 
 .pointDetailsHeaderLogo {
