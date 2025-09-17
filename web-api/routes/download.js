@@ -16,6 +16,59 @@ const { requiredShapeMiddleware } = require("../utils/validatorMiddlewares");
  * Requires a shape (either polygon or latMin/Max) and email
  */
 
+/**
+ * @swagger
+ * /download:
+ *   get:
+ *     summary: Submit download job
+ *     tags: [Download]
+ *     description: Creates a download job for datasets matching filters and spatial selection.
+ *     parameters:
+ *       - in: query
+ *         name: email
+ *         required: true
+ *         schema: { type: string, format: email }
+ *       - in: query
+ *         name: polygon
+ *         schema: { type: string }
+ *         description: GeoJSON polygon string.
+ *       - in: query
+ *         name: timeMin
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: timeMax
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: depthMin
+ *         schema: { type: number }
+ *       - in: query
+ *         name: depthMax
+ *         schema: { type: number }
+ *       - in: query
+ *         name: latMin
+ *         schema: { type: number }
+ *       - in: query
+ *         name: latMax
+ *         schema: { type: number }
+ *       - in: query
+ *         name: lonMin
+ *         schema: { type: number }
+ *       - in: query
+ *         name: lonMax
+ *         schema: { type: number }
+ *     responses:
+ *       200:
+ *         description: Download job accepted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 count:
+ *                   type: integer
+ *       400:
+ *         description: Validation error
+ */
 router.get(
   "/",
   requiredShapeMiddleware(),
