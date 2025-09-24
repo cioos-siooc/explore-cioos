@@ -58,7 +58,6 @@ services:
   harvester:
     build:
       context: ./harvester
-      dockerfile: Dockerfile
     profiles:
       - tools
     volumes:
