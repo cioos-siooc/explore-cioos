@@ -8,5 +8,6 @@ dependencies = [
     "erddapy>=2.2.4",
     "pandas<2.0.0",
     "pdfkit>=1.0.0",
+    "sentry-sdk>=2.38.0",
     "shapely>=2.1.1",
 ]
