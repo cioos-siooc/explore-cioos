@@ -1,0 +1,8 @@
+# Examples:
+# Force LF for all text
+* text=auto eol=lf
+
+# Or target specific types:
+*.sh text eol=lf
+*.py text eol=lf
+*.js text eol=lf
