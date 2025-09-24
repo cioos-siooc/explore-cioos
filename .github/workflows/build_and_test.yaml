@@ -21,19 +21,8 @@ jobs:
           mv .env.sample .env
           docker compose -f "docker-compose.production.yaml" up -d --build --quiet-pull
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install Python environment
-        run: pip install .
-
       - name: Run ERDDAP harvester on sample dataset
-        run: python -m cde_harvester --urls https://data.cioospacific.ca/erddap/ --dataset_ids DFO_MEDS_BUOYS --folder erddap_harvest
-
-      - name: Load harvested data into the DB
-        run: python -m cde_db_loader --folder erddap_harvest
+        run: cp ./harvest_config.sample.yaml ./harvest_config.yaml && docker compose -f "docker-compose.production.yaml" up -d harvester
 
       - name: Install node
         uses: actions/setup-node@v3
