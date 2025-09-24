@@ -1,4 +1,4 @@
-FROM python:3.10.2
+FROM ghcr.io/astral-sh/uv:python3.10-bookworm
 
 # for shapely, pdf creation
 RUN apt-get -y -qq update
@@ -12,10 +12,14 @@ RUN strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so
 
 WORKDIR /usr/src/app
 
-COPY . .
+COPY ./download_scheduler/uv.lock ./download_scheduler/pyproject.toml ./
+COPY ./downloader .
 
-RUN pip install --upgrade pip
-RUN pip install -q .
+WORKDIR /usr/src/app/download_scheduler
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-install-project
+
+COPY ./download_scheduler .
 
 # -u seems to be needed to get it to print to stdout
 CMD [ "python", "-u","-m","download_scheduler" ]
