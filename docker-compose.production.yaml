@@ -72,8 +72,7 @@ services:
 
   harvester:
     build:
-      context: .
-      dockerfile: ./harvester/Dockerfile
+      context: ./harvester
     profiles:
       - tools
     depends_on:
