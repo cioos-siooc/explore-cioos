@@ -1,0 +1,20 @@
+[project]
+name = "harvester"
+version = "0.2.0"
+description = "CIOOS Explorer Harvester"
+readme = "README.md"
+requires-python = "~=3.10.0"
+dependencies = [
+    "diskcache>=5.6.3",
+    "erddapy>=2.2.0",
+    "lxml>=5.1.0",
+    "numpy>=1.26.4",
+    "pandas<2.0.0",
+    "psycopg2-binary>=2.9.9",
+    "python-dotenv>=1.0.1",
+    "pyyaml>=6.0.1",
+    "requests>=2.31.0",
+    "sentry-sdk>=1.43.0",
+    "shapely>=2.0.3",
+    "sqlalchemy<2.0.0",
+]
