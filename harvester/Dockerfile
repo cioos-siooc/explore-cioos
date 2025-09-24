@@ -1,18 +1,21 @@
-FROM python:3.10.2
+FROM ghcr.io/astral-sh/uv:python3.10-bookworm
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-COPY harvester /usr/src/app/harvester
-COPY downloader /usr/src/app/downloader
-COPY db-loader /usr/src/app/db-loader
-COPY download_scheduler /usr/src/app/download_scheduler
-COPY pyproject.toml /usr/src/app/pyproject.toml
-COPY poetry.lock /usr/src/app/poetry.lock
-COPY README.md /usr/src/app/README.md
+COPY uv.lock pyproject.toml ./
+# Install dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-install-project 
 
-RUN pip install --upgrade pip
-RUN pip install poetry
-RUN poetry config virtualenvs.create false
-RUN poetry install
+# Copy application files
+COPY cde_harvester .
+# COPY downloader /app/downloader
+COPY cde_db_loader .
+# COPY download_scheduler /app/download_scheduler
+COPY run.sh .
 
-CMD [ "sh","./harvester/run.sh" ]
+# Sync the project
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked
+
+CMD [ "sh","run.sh" ]
