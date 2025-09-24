@@ -3,7 +3,7 @@ name = "harvester"
 version = "0.2.0"
 description = "CIOOS Explorer Harvester"
 readme = "README.md"
-requires-python = "~=3.10.0"
+requires-python = ">=3.10,<3.11"
 dependencies = [
     "db-loader",
     "diskcache>=5.6.3",
