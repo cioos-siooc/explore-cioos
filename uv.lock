@@ -97,7 +97,7 @@ wheels = [
 [[package]]
 name = "db-loader"
 version = "0.1.0"
-source = { virtual = "db-loader" }
+source = { directory = "db-loader" }
 dependencies = [
     { name = "numpy" },
     { name = "pandas" },
@@ -129,9 +129,10 @@ wheels = [
 [[package]]
 name = "download-scheduler"
 version = "0.1.0"
-source = { virtual = "download_scheduler" }
+source = { directory = "download_scheduler" }
 dependencies = [
     { name = "downloader" },
+    { name = "harvester" },
     { name = "jinja2" },
     { name = "psycopg2-binary" },
     { name = "python-dotenv" },
@@ -141,7 +142,8 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "downloader", virtual = "downloader" },
+    { name = "downloader", directory = "downloader" },
+    { name = "harvester", directory = "harvester" },
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
@@ -152,11 +154,12 @@ requires-dist = [
 [[package]]
 name = "downloader"
 version = "0.1.0"
-source = { virtual = "downloader" }
+source = { directory = "downloader" }
 dependencies = [
     { name = "erddapy" },
     { name = "pandas" },
     { name = "pdfkit" },
+    { name = "sentry-sdk" },
     { name = "shapely" },
 ]
 
@@ -165,6 +168,7 @@ requires-dist = [
     { name = "erddapy", specifier = ">=2.2.4" },
     { name = "pandas", specifier = "<2.0.0" },
     { name = "pdfkit", specifier = ">=1.0.0" },
+    { name = "sentry-sdk", specifier = ">=2.38.0" },
     { name = "shapely", specifier = ">=2.1.1" },
 ]
 
@@ -205,8 +209,8 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "download-scheduler", virtual = "download_scheduler" },
-    { name = "harvester", virtual = "harvester" },
+    { name = "download-scheduler", directory = "download_scheduler" },
+    { name = "harvester", directory = "harvester" },
 ]
 
 [[package]]
@@ -272,7 +276,7 @@ wheels = [
 [[package]]
 name = "harvester"
 version = "0.2.0"
-source = { virtual = "harvester" }
+source = { directory = "harvester" }
 dependencies = [
     { name = "db-loader" },
     { name = "diskcache" },
@@ -291,7 +295,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "db-loader", virtual = "db-loader" },
+    { name = "db-loader", directory = "db-loader" },
     { name = "diskcache", specifier = ">=5.6.3" },
     { name = "erddapy", specifier = ">=2.2.0" },
     { name = "lxml", specifier = ">=5.1.0" },

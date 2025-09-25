@@ -11,3 +11,11 @@ dependencies = [
     "sentry-sdk>=2.38.0",
     "shapely>=2.1.1",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["erddap_downloader"]
+
+
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
