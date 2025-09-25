@@ -10,7 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "node-fetch": "^3.2.6",
-    "puppeteer": "^14.2.1"
+    "puppeteer": "^24.22.3"
   },
   "type": "module"
 }
