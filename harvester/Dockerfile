@@ -4,7 +4,7 @@ WORKDIR /app
 
 # 1. Copy path dependency (db-loader) and manifests for harvester
 COPY ./db-loader /app/db-loader
-COPY ./harvester/pyproject.toml ./harvester/uv.lock ./harvester/
+COPY ./harvester/pyproject.toml ./harvester/uv.lock ./harvester/README.md ./harvester/
 
 WORKDIR /app/harvester
 
