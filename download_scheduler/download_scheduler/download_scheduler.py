@@ -11,6 +11,7 @@ from erddap_downloader import downloader_wrapper
 from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+from loguru import logger
 
 from download_scheduler.download_email import send_email
 
@@ -40,7 +41,7 @@ if envs["ENVIRONMENT"] == "production":
 
 
 database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
-print("Connecting to", envs["DB_HOST"])
+logger.debug("Connecting to", envs["DB_HOST"])
 engine = create_engine(database_link)
 
 create_pdf = False
@@ -51,7 +52,7 @@ output_folder = "./downloads"
 
 if "CREATE_PDF" in envs:
     create_pdf = envs["CREATE_PDF"] == "True"
-    print("Create PDFs:", create_pdf)
+    logger.info("Create PDFs:", create_pdf)
 
 
 def get_a_download_job():
@@ -68,7 +69,7 @@ def get_a_download_job():
     if row:
         pk = row["pk"]
         job_id = row["job_id"]
-        print("Starting job:", pk, job_id)
+        logger.info("Starting job:", pk, job_id)
         update_download_jobs(
             pk, {"status": "downloading", "time_start": "NOW()"}, session
         )
@@ -181,8 +182,8 @@ def run_download(row):
         status = "failed"
         stack_trace = traceback.format_exc()
         downloader_error = str(stack_trace).replace("'", "")
-        print(e)
-        print(stack_trace)
+        logger.error(e)
+        logger.error(stack_trace)
         sentry_sdk.capture_message(f"download by {email} failed")
 
     # The downloader crashed and returned a string (error message) instead of json

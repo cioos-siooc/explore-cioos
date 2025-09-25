@@ -3,6 +3,7 @@ import smtplib
 import traceback
 from email.message import EmailMessage
 
+from loguru import logger
 from dotenv import load_dotenv
 
 envs = os.environ
@@ -13,11 +14,12 @@ if not os.getenv("GMAIL_USER"):
 
 def send_email(mail_to, mail_message_body, mail_subject):
     if "GMAIL_USER" not in envs:
-        print("GMAIL auth not configured")
+        logger.error("GMAIL auth not configured")
         return
-    print("Emailing", mail_to)
+    logger.debug("Emailing: {}", mail_to)
     gmail_user = envs["GMAIL_USER"]
     if not gmail_user:
+        logger.error("GMAIL_USER not set")
         return
     gmail_password = envs["GMAIL_PASSWORD"]
 
@@ -33,4 +35,4 @@ def send_email(mail_to, mail_message_body, mail_subject):
         s.send_message(msg)
         s.quit()
     except smtplib.SMTPAuthenticationError as e:
-        print(e, traceback.format_exc())
+        logger.error(e, traceback.format_exc())
