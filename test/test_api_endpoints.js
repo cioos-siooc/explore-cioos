@@ -20,25 +20,25 @@ const cdeQuery = (url) => {
 
   console.log("Testing /datasets")
   const datasets = await cdeQuery("/datasets");
-  assert(datasets.length == 2, "datasets.length != 2 ");
+  assert(datasets.length == 2, "datasets.length != 2: datasets.length = " + datasets.length);
   
   console.log("Testing /legend")
   const legend = await cdeQuery("/legend");
-  assert(Object.values(legend.recordsCount).length == 3, "legend.length != 3 ");
-  
+  assert(Object.values(legend.recordsCount).length == 3, "legend.length != 3: legend.length = " + Object.values(legend.recordsCount).length);
+
   console.log("Testing /organizations")
   const oceanVariables = await cdeQuery("/oceanVariables");
   assert(oceanVariables.length == 1, "oceanVariables.length != 1: oceanVariables.length = " + oceanVariables.length);
 
   console.log("Testing /oceanVariables")
   const organizations = await cdeQuery("/organizations");
-  assert(organizations.length == 2, "organizations.length != 2 ");
+  assert(organizations.length == 2, "organizations.length != 2: organizations.length = " + organizations.length);
   
   console.log("Testing /tiles")
   const tiles = await fetch(API_URL + "/tiles/2/1/1.mvt").then((tile) =>
     tile.arrayBuffer()
   );
-  assert(tiles.byteLength > 2000), "tiles.byteLength < 2000";
+  assert(tiles.byteLength > 2000, "tiles.byteLength < 2000: tiles.byteLength = " + tiles.byteLength);
 
   console.log("Testing /pointQuery")
   const pointQuery = await cdeQuery(
@@ -50,6 +50,6 @@ const cdeQuery = (url) => {
   const preview = await cdeQuery(
     "/preview?profile=C44131&dataset=DFO_MEDS_BUOYS"
   );
-  assert(preview.table.rows.length > 100), "preview.table.rows.length < 100";
+  assert(preview.table.rows.length > 100), "preview.table.rows.length < 100: preview.table.rows.length = " + preview.table.rows.length;
 
 })();
