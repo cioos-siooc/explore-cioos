@@ -1,0 +1,24 @@
+[project]
+name = "download-scheduler"
+version = "0.1.0"
+description = "CIOOS Explorer Downloader Scheduler"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "downloader",
+    "harvester",
+    "jinja2>=3.1.6",
+    "loguru>=0.7.3",
+    "psycopg2-binary>=2.9.10",
+    "python-dotenv>=1.1.1",
+    "sentry-sdk>=2.38.0",
+    "sqlalchemy<2.0.0",
+]
+
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+downloader = { path = "../downloader" }
+harvester = { path = "../harvester" }

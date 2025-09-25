@@ -10,8 +10,7 @@ import LanguageSelector from '../LanguageSelector/LanguageSelector.jsx'
 import Loading from '../Loading/Loading.jsx'
 import CIOOSLogoEN from '../../Images/CIOOSNationalLogoBlackEnglish.svg'
 import CIOOSLogoFR from '../../Images/CIOOSNationalLogoBlackFrench.svg'
-import CDELogoEN from '../../Images/CDELogoEN.png'
-import CDELogoFR from '../../Images/CDELogoFR.png'
+import Logo from '../../logo.js'
 import { server } from '../../../config'
 import './styles.css'
 import {
@@ -200,15 +199,7 @@ export default function SelectionDetails({
           }
           title={t('PointDetailsCIOOSLogoTitleText')}
         />
-        <img
-          className='pointDetailsHeaderLogo CDE'
-          src={i18n.language === 'en' ? CDELogoEN : CDELogoFR}
-          title={t('PointDetailsCDELogoTitleText')}
-          onClick={() => {
-            resetFilters()
-            setPolygon()
-          }}
-        />
+        <Logo lang={i18n.language} />
         <button
           className='pointDetailsHeaderIntroButton'
           onClick={() => setShowIntroModal(true)}
