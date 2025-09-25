@@ -9,7 +9,11 @@ import fetch from "node-fetch";
 // url of frontend
 const API_URL = "http://localhost:8098/api";
 
-const cdeQuery = (url) => fetch(API_URL + url).then((res) => res.json());
+const cdeQuery = (url) => {
+  const fullUrl = API_URL + url;
+  console.log("Requesting:", fullUrl);
+  return fetch(fullUrl).then((res) => res.json());
+};
 
 (async () => {
   const datasets = await cdeQuery("/datasets");
