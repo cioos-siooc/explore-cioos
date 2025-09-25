@@ -1,0 +1,21 @@
+[project]
+name = "downloader"
+version = "0.1.0"
+description = "CIOOS Explorer download scheduler service."
+readme = "README.md"
+requires-python = ">=3.10,<3.11"
+dependencies = [
+    "erddapy>=2.2.4",
+    "pandas<2.0.0",
+    "pdfkit>=1.0.0",
+    "sentry-sdk>=2.38.0",
+    "shapely>=2.1.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["erddap_downloader"]
+
+
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
