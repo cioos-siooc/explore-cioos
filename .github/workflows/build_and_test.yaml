@@ -31,7 +31,8 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./test
-        run: npm ci --quiet
+        run: npm ci --quiet && \
+          apt update && apt install -y libnss3 libasound-dev
 
       - name: Test API endpoints
         working-directory: ./test
