@@ -5,7 +5,9 @@ import maplibreGl, {
   Popup,
   ScaleControl
 } from 'maplibre-gl'
-import MapboxDraw from '@mapbox/mapbox-gl-draw'
+import MapboxDraw from 'maplibre-gl-draw'
+// The fork retains the original CSS filename 'mapbox-gl-draw.css'
+import 'maplibre-gl-draw/dist/mapbox-gl-draw.css'
 import { useState, useEffect, useRef } from 'react'
 
 import * as helpers from '@turf/helpers'
@@ -55,25 +57,29 @@ export default function CreateMap({
     display(geojson)
   }
 
-  const modes = MapboxDraw.modes
-  MapboxDraw.modes.direct_select.toDisplayFeatures = disabledEvent
-  MapboxDraw.modes.simple_select.toDisplayFeatures = disabledEvent
-
-  modes.draw_rectangle = DrawRectangle
+  // Build custom modes set explicitly instead of mutating the library global to
+  // avoid issues with the fork being stricter.
+  const baseModes = MapboxDraw.modes
+  const customModes = {
+    ...baseModes,
+    // Disable vertex editing by overriding toDisplayFeatures
+    direct_select: {
+      ...baseModes.direct_select,
+      toDisplayFeatures: disabledEvent
+    },
+    simple_select: {
+      ...baseModes.simple_select,
+      toDisplayFeatures: disabledEvent
+    },
+    draw_rectangle: DrawRectangle
+  }
 
   const drawControlOptions = {
     displayControlsDefault: false,
+    modes: customModes,
     controls: {
-      point: false,
-      line_string: false,
       polygon: true,
-      trash: true,
-      combine_features: false,
-      uncombine_features: false,
-      modes,
-      pitchWithRotate: false,
-      dragRotate: false,
-      touchZoomRotate: false
+      trash: true
     }
   }
   const smallCircleSize = 2.75
