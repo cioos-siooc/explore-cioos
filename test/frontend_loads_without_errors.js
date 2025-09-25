@@ -10,9 +10,27 @@ const errors = [];
 // url of frontend
 const url = "http://localhost:8098";
 
+const launchArgs = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-gpu',
+  '--no-zygote',
+  '--no-first-run'
+];
+
 (async () => {
-  const browser = await puppeteer.launch();
-  console.log("Testing frontend at ", url);
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: launchArgs,
+    });
+  } catch (e) {
+    console.error('Failed to launch browser:', e);
+    process.exit(1);
+  }
+  console.log("Testing frontend at", url, "with args", launchArgs.join(' '));
 
   console.log("Opening page");
   const page = await browser.newPage();
@@ -31,9 +49,10 @@ const url = "http://localhost:8098";
   console.log("Going to ", url);
   await page.goto(url, {
     waitUntil: "domcontentloaded",
+    timeout: 30000,
   });
   console.log("Waiting for network to be idle");
-  browser.close();
+  await browser.close();
   if (errors.length) {
     console.log(errors);
     process.exit(1);
