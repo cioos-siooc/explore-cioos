@@ -22,7 +22,7 @@ jobs:
           docker compose -f "docker-compose.production.yaml" up -d --build --quiet-pull
 
       - name: Run ERDDAP harvester on sample dataset
-        run: cp ./harvest_config.sample.yaml ./harvest_config.yaml && docker compose -f "docker-compose.production.yaml" up -d harvester
+        run: cp ./harvest_config.sample.yaml ./harvest_config.yaml && docker compose -f "docker-compose.production.yaml" up harvester
 
       - name: Install node
         uses: actions/setup-node@v3
