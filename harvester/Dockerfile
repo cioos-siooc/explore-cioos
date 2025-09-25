@@ -1,18 +1,23 @@
-FROM python:3.10.2
+FROM ghcr.io/astral-sh/uv:python3.10-bookworm
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-COPY harvester /usr/src/app/harvester
-COPY downloader /usr/src/app/downloader
-COPY db-loader /usr/src/app/db-loader
-COPY download_scheduler /usr/src/app/download_scheduler
-COPY pyproject.toml /usr/src/app/pyproject.toml
-COPY poetry.lock /usr/src/app/poetry.lock
-COPY README.md /usr/src/app/README.md
+# 1. Copy path dependency (db-loader) and manifests for harvester
+COPY ./db-loader /app/db-loader
+COPY ./harvester/pyproject.toml ./harvester/uv.lock ./harvester/README.md ./harvester/
 
-RUN pip install --upgrade pip
-RUN pip install poetry
-RUN poetry config virtualenvs.create false
-RUN poetry install
+WORKDIR /app/harvester
 
-CMD [ "sh","./harvester/run.sh" ]
+# 2. Install dependencies only (no project code yet)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-install-project || (echo "Lock mismatch, regenerating" && uv lock && uv sync --no-install-project)
+
+# 3. Copy source code
+COPY ./harvester/cde_harvester ./cde_harvester
+COPY ./harvester/run.sh ./run.sh
+
+# 4. Install project itself
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked || (echo "Lock mismatch final stage, aborting" && exit 1)
+
+CMD ["sh","run.sh"]
