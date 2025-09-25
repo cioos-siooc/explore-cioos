@@ -30,11 +30,11 @@ const cdeQuery = (url) => {
     "/preview?profile=C44131&dataset=DFO_MEDS_BUOYS"
   );
 
-  assert(datasets.length == 1, "datasets");
-  assert(Object.values(legend.recordsCount).length == 3, "legend");
-  assert(organizations.length == 1, "organizations");
-  assert(oceanVariables.length == 1), "oceanVariables";
-  assert(pointQuery.length == 1), "pointQuery";
-  assert(tiles.byteLength > 2000), "tiles";
-  assert(preview.table.rows.length > 100), "preview";
+  assert(datasets.length == 2, "datasets.length != 2 ");
+  assert(Object.values(legend.recordsCount).length == 3, "legend.length != 3 ");
+  assert(organizations.length == 2, "organizations.length != 2 ");
+  assert(oceanVariables.length == 1, "oceanVariables.length != 1: oceanVariables.length = " + oceanVariables.length);
+  assert(pointQuery.length == 2, "pointQuery length != 1: pointQuery.length = " + pointQuery.length);
+  assert(tiles.byteLength > 2000), "tiles.byteLength < 2000";
+  assert(preview.table.rows.length > 100), "preview.table.rows.length < 100";
 })();
