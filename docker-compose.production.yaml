@@ -79,9 +79,9 @@ services:
     depends_on:
       - db
     volumes:
-      - ./harvest_config.yaml:/usr/src/app/harvest_config.yaml
-      - ./harvester_cache:/usr/src/app/harvester_cache
-      - ./harvest:/usr/src/app/harvest
+      - ./harvest_config.yaml:/app/harvester/harvest_config.yaml
+      - ./harvester_cache:/app/harvester/harvester_cache
+      - ./harvest:/app/harvester/harvest
     environment:
       - "DB_HOST_EXTERNAL=$DB_HOST_EXTERNAL"
     env_file:
