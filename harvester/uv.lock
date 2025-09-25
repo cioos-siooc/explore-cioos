@@ -49,7 +49,7 @@ wheels = [
 [[package]]
 name = "db-loader"
 version = "0.1.0"
-source = { virtual = "../db-loader" }
+source = { directory = "../db-loader" }
 dependencies = [
     { name = "numpy" },
     { name = "pandas" },
@@ -133,7 +133,7 @@ wheels = [
 [[package]]
 name = "harvester"
 version = "0.2.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "db-loader" },
     { name = "diskcache" },
@@ -152,7 +152,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "db-loader", virtual = "../db-loader" },
+    { name = "db-loader", directory = "../db-loader" },
     { name = "diskcache", specifier = ">=5.6.3" },
     { name = "erddapy", specifier = ">=2.2.0" },
     { name = "lxml", specifier = ">=5.1.0" },

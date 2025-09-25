@@ -12,14 +12,13 @@ RUN strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so
 
 WORKDIR /usr/src/app
 
-COPY ./download_scheduler/uv.lock ./download_scheduler/pyproject.toml ./
-COPY ./downloader ./downloader
+COPY download_scheduler ./download_scheduler
+COPY downloader ./downloader
+COPY harvester ./harvester
+COPY db-loader ./db-loader
 
 WORKDIR /usr/src/app/download_scheduler
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-install-project
+    uv sync --no-install-project
 
-COPY ./download_scheduler ./download_scheduler
-
-# -u seems to be needed to get it to print to stdout
-CMD [ "python", "-u","-m","download_scheduler" ]
+CMD [ "uv", "run", "python", "-m", "download_scheduler" ]

@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "downloader",
+    "harvester",
     "jinja2>=3.1.6",
     "psycopg2-binary>=2.9.10",
     "python-dotenv>=1.1.1",
@@ -13,5 +14,10 @@ dependencies = [
     "sqlalchemy<2.0.0",
 ]
 
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
 [tool.uv.sources]
 downloader = { path = "../downloader" }
+harvester = { path = "../harvester" }
