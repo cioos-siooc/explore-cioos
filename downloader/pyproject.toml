@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10,<3.11"
 dependencies = [
     "erddapy>=2.2.4",
+    "harvester",
     "numpy<2.0.0",
     "pandas<2.0.0",
     "pdfkit>=1.0.0",
@@ -15,6 +16,9 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["erddap_downloader"]
+
+[tool.uv.sources]
+harvester = { path = "../harvester" }
 
 
 [build-system]
