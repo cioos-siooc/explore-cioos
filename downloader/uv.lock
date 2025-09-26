@@ -93,7 +93,6 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "erddapy" },
-    { name = "harvester" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "pdfkit" },
@@ -103,13 +102,13 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "harvester" },
     { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "erddapy", specifier = ">=2.2.4" },
-    { name = "harvester", directory = "../harvester" },
     { name = "numpy", specifier = "<2.0.0" },
     { name = "pandas", specifier = "<2.0.0" },
     { name = "pdfkit", specifier = ">=1.0.0" },
@@ -118,7 +117,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.4.2" }]
+dev = [
+    { name = "harvester", directory = "../harvester" },
+    { name = "pytest", specifier = ">=8.4.2" },
+]
 
 [[package]]
 name = "erddapy"
