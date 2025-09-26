@@ -17,11 +17,6 @@ jobs:
           # Install a specific version of uv.
           version: "0.8.22"
 
-      - name: Install downloader and harvester
-        run: |
-          pip install -q ./harvester
-          pip install -q ./downloader
-
       - name: Run downloader test files
         working-directory: ./downloader
-        run: sh test_downloader.sh
+        run: uv run pytest
