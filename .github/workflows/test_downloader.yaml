@@ -17,6 +17,10 @@ jobs:
           # Install a specific version of uv.
           version: "0.8.22"
 
+      - name: Install dependencies
+        working-directory: ./downloader
+        run: uv install
+
       - name: Run downloader test files
         working-directory: ./downloader
         run: uv run pytest
