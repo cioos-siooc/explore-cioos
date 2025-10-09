@@ -114,34 +114,6 @@ For complete local development with all services running outside Docker (advance
 
 8. See website at <http://localhost:8000>
 
-## Handy docker commands
-
-See which cde services are running:
-`docker-compose ps`
-
-Start all containers, the first time this runs it will build containers:
-`docker-compose up -d`
-
-Tail logs:
-`docker-compose logs -f`
-
-(Re/)Build and (re/)start all containers that have code changes:
-`docker-compose -f docker-compose.production.yaml up -d --build`
-
-Rebuild database: (this will erase all your data)
-
-```sh
-docker-compose stop db
-docker volume rm cde_postgres-data
-docker-compose up -d db
-```
-
-Redis CLI:
-`docker exec -it cde_redis_1 redis-cli`
-
-Flush redis tile cache:
-`docker exec -it cde_redis_1 redis-cli FLUSHALL`
-
 ## Production deployment
 
 From the production server,
