@@ -116,29 +116,45 @@ For complete local development with all services running outside Docker (advance
 
 ## Production deployment
 
-From the production server,
+Deploy CDE to production using Docker Compose with the production configuration file.
 
-- rename `.env.sample` to `production.env` and configure.
+### Initial Setup
 
-- Delete old redis and postgres data (if needed):
-  `sudo docker volume rm cde_postgres-data cde_redis-data`
+1. Rename `.env.sample` to `production.env` and configure with production settings.
 
-- Start all services:
-  `sudo docker-compose -f docker-compose.production.yaml up -d --build`
+2. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and configure the datasets to harvest.
 
-- Harvest data:
+3. Delete old redis and postgres data (if needed):
 
-  ```sh
-  conda create -n cde python=3.10
-  conda activate cde
-  pip install -e ./harvester -e ./db-loader
-  sh data_loader.sh
-  ```
+   ```sh
+   sudo docker volume rm cde_postgres-data cde_redis-data
+   ```
 
-- Add a crontab entry for the scheduler to run nightly.
+4. Start all services using the production Docker Compose file:
 
-- deploy frontend to Gitpages
+   ```sh
+   sudo docker compose -f docker-compose.production.yaml up -d --build
+   ```
 
-  ```sh
-  API_URL=https://explore.cioos.ca/api npm run deploy
-  ```
+### Data Harvesting
+
+The harvester should be run on a schedule to keep the data up to date. Set up a cron job to run the harvester container:
+
+1. Edit your crontab:
+
+   ```sh
+   crontab -e
+   ```
+
+2. Add an entry to run the harvester nightly (example runs at 2 AM):
+
+   ```cron
+   0 2 * * * cd /path/to/explore-cioos && docker compose -f docker-compose.production.yaml up harvester
+   ```
+
+   Or to run weekly (example runs Sunday at 2 AM):
+
+   ```cron
+   0 2 * * 0 cd /path/to/explore-cioos && docker compose -f docker-compose.production.yaml up harvester
+   ```
+
