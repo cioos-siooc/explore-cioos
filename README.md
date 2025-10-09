@@ -26,49 +26,93 @@ If you just want to see how a dataset is harvested by CDE:
 
 ## Front End Development
 
-- To run CDE locally, you will need Docker, Python and Node and a few terminal windows
+There are two main approaches for frontend development:
 
-- Rename .env.sample from the root directory to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
+### Option 1: Frontend Local + Backend via Docker Compose
 
-- Start a local database using `docker`:
-  `docker-compose up -d db`
-- Setup Python virtual env and install Python modules:
+Run the frontend locally while using Docker Compose for all backend services (recommended for full-stack development).
 
-  ```sh
-  conda create -n cde python=3.10
-  conda activate cde
-  pip install -e ./downloader -e ./download_scheduler -e ./harvester -e ./db-loader
-  ```
+1. Rename `.env.sample` from the root directory to `.env` and change any settings if needed. If you are running on your local machine, these settings don't need to change.
 
-- Start the API:
+2. Start all backend services using Docker Compose:
 
-  ```sh
-      cd web-api
-      npm install
-      npm start
-  ```
+   ```sh
+   docker compose up -d
+   ```
 
-- Start the download scheduler:
+3. Start the frontend locally:
 
-  ```sh
-      python -m download_scheduler
-  ```
+   ```sh
+   cd frontend
+   npm install
+   npm start
+   ```
 
-- Start the frontend:
+4. See website at <http://localhost:8000>
 
-  ```sh
-      cd frontend
-      npm install
-      npm start
-  ```
+### Option 2: Frontend Local + Remote API
 
-- Harvest a single dataset and load CKAN data.
+Run only the frontend locally and connect to a remote API (recommended for frontend-only development).
 
-  ```sh
-    sh data_loader_test.sh
-  ```
+1. Start the frontend with a custom API URL:
 
-- See website at <http://localhost:8000>
+   ```sh
+   cd frontend
+   npm install
+   REACT_APP_API_URL=https://your-remote-api.com/api npm start
+   ```
+
+2. See website at <http://localhost:8000>
+
+### Full Local Development Setup
+
+For complete local development with all services running outside Docker (advanced):
+
+1. Rename `.env.sample` from the root directory to `.env` and change any settings if needed.
+
+2. Start a local database using `docker`:
+
+   ```sh
+   docker compose up -d db
+   ```
+
+3. Setup Python virtual env and install Python modules:
+
+   ```sh
+   conda create -n cde python=3.10
+   conda activate cde
+   pip install -e ./downloader -e ./download_scheduler -e ./harvester -e ./db-loader
+   ```
+
+4. Start the API:
+
+   ```sh
+   cd web-api
+   npm install
+   npm start
+   ```
+
+5. Start the download scheduler:
+
+   ```sh
+   python -m download_scheduler
+   ```
+
+6. Start the frontend:
+
+   ```sh
+   cd frontend
+   npm install
+   npm start
+   ```
+
+7. Harvest a single dataset and load CKAN data:
+
+   ```sh
+   sh data_loader_test.sh
+   ```
+
+8. See website at <http://localhost:8000>
 
 ## Handy docker commands
 
