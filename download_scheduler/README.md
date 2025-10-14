@@ -1,8 +1,43 @@
-# Downloader scheduler
+# Download Scheduler
 
-This script checks the database every n seconds, and runs the downloader if there is anything to do.
+The download scheduler checks the database periodically and runs the downloader when there are pending download requests from users.
 
-Run from this directory with:
-`python -m download_scheduler`
+## Using Docker (Recommended)
 
-To get started change .env.sample to .env and fill out your connection info
+The scheduler runs automatically as a service in Docker Compose. See the main [README.md](../README.md) for setup instructions.
+
+Configuration is handled through the `.env` file at the project root.
+
+## Manual Setup
+
+To run the scheduler outside of Docker:
+
+1. Configure environment variables by copying `.env.sample` to `.env` in the project root and filling in your database connection info.
+
+2. Install dependencies using uv (recommended) or pip:
+
+   ```sh
+   # Using uv (recommended)
+   uv pip install -e .
+
+   # Or using pip
+   pip install -e .
+   ```
+
+3. Run the scheduler:
+
+   ```sh
+   python -m download_scheduler
+   ```
+
+## Configuration
+
+The scheduler uses these environment variables from `.env`:
+
+- `DB_HOST`: Database hostname (use `localhost` when running outside Docker)
+- `DB_NAME`: Database name
+- `DB_USER`: Database username
+- `DB_PASSWORD`: Database password
+- `DOWNLOADS_FOLDER`: Directory for downloaded files
+- `DOWNLOAD_WAF_URL`: Base URL for WAF downloads
+- `CREATE_PDF`: Enable/disable PDF generation
