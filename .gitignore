@@ -30,3 +30,6 @@ out1
 log
 
 most_common_queries
+
+nginx/logs/
+nginx/logrotate_state/
