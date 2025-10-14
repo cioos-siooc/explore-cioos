@@ -1,30 +1,48 @@
-# ERDDAP and CKAN downloader
+# ERDDAP and CKAN Downloader
+
+The CDE downloader retrieves data from CIOOS datasets based on JSON queries. For each dataset, the downloader:
+
+1. Retrieves a PDF copy of the CKAN dataset page (if enabled)
+2. Downloads data through ERDDAP in the specified format
+3. Filters data spatially to match only data within the provided polygon (for CSV format with polygon region selected)
 
 ## Installation
 
-Substitute `pip3` for `pip` if required
+### Using Docker (Recommended)
 
-1. Go the the downloader directory of the CDE package and Run the following command in a command shell:
+The downloader runs automatically as part of the download scheduler service in Docker Compose. See the main [README.md](../README.md) for Docker setup instructions.
 
-   ```python
+### Manual Installation
+
+If you need to run the downloader outside of Docker:
+
+1. Install using uv (recommended) or pip:
+
+   ```sh
+   # Using uv (recommended)
+   uv pip install -e .
+
+   # Or using pip
    pip install -e .
    ```
 
-1. Go to the harvester directory and install the harvester package and Run the same command:
+2. Install the harvester package (required dependency):
 
-   ```python
-   pip install -e .
+   ```sh
+   cd ../harvester
+   uv pip install -e .
    ```
 
-1. Download and install [wkhtmltopdf](https://wkhtmltopdf.org/downloads.html)
+3. (Optional) Download and install [wkhtmltopdf](https://wkhtmltopdf.org/downloads.html) if you need PDF generation functionality.
 
-## Description
+## Configuration
 
-The CDE downloader uses a json query (ex: downloader/test/\*.json ) to retrieve matching data
-form multiple CIOOS datasets. Downloader will for each datasets :
+Configure the downloader through environment variables in `.env` file at the project root:
 
-1. Retrieve a pdf copy of the CKAN page dataset
-2. Retrieve copy of the data through ERDDAP in the specified format.
-3. Data filtered spatially to match the only data present within the provided polygon if:
-   1. Format: CSV
-   2. Region selected via polygon
+- `DOWNLOADS_FOLDER`: Directory for downloaded files (default: `./downloads`)
+- `DOWNLOAD_WAF_URL`: Base URL for WAF downloads
+- `CREATE_PDF`: Enable/disable PDF generation (default: `False`)
+
+## Usage
+
+The downloader is typically invoked by the download scheduler service. For testing individual downloads, use the test JSON files located in `downloader/test/*.json`.
