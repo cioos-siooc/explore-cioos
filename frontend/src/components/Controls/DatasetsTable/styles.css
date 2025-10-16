@@ -1,23 +1,31 @@
 .datasetsTable {
-  text-align: left;
+  @apply text-left; /* text-align: left; */
 }
 
 .datasetsTable .selectDatasetColumn {
-  width: 50px;
+  @apply w-12; /* 50px ≈ w-12 in Tailwind spacing scale */
 }
 
 .datasetsTable th {
-  cursor: pointer;
+  @apply cursor-pointer; /* cursor: pointer; */
 }
 
 .datasetsTable thead th {
-  background-color: white;
+  @apply bg-white;
 }
 
 .datasetsTable tr {
+
   border: 2px solid transparent;
   margin: -2px;
   overflow-wrap: break-word;
+}
+.datasetsTable tr {
+  @apply wrap-break-word 
+        border-2 
+        border-transparent 
+        -m-px; 
+
 }
 
 .datasetsTable thead th:hover {
