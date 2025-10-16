@@ -14,6 +14,7 @@ import { abbreviateString, useOutsideAlerter } from '../../../utilities'
 
 import './styles.css'
 
+
 export default function Filter({
   active,
   badgeTitle,
@@ -62,10 +63,10 @@ export default function Filter({
           />
         )}
         {icon}
-        <div className='badgeTitle' title={badgeTitle}>
+        <div className='text-xl lg:text-base' title={badgeTitle}>
           {abbreviateString(badgeTitle, 35)}
         </div>
-        {filterOpen ? <ChevronCompactUp /> : <ChevronCompactDown />}
+        {filterOpen ? <ChevronCompactDown /> : <ChevronCompactDown />}
       </div>
       {(controlled ? filterOpen && openFilter : filterOpen) && (
         <div className='filterOptions'>

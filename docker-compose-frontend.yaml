@@ -10,6 +10,6 @@ services:
     build:
       context: ./frontend
       args:
-        API_URL: $API_URL
+        API_URL: https://explore.cioos.ca/api
     expose:
       - "80"

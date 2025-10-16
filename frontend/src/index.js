@@ -12,6 +12,7 @@ import translationFR from './locales/fr/translation.json'
 import App from './components/App.jsx'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
+import './index.css';
 const resources = {
   en: {
     translation: translationEN
