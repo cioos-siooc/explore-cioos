@@ -15,79 +15,76 @@
 }
 
 .datasetsTable tr {
-
-  border: 2px solid transparent;
-  margin: -2px;
-  overflow-wrap: break-word;
-}
-.datasetsTable tr {
-  @apply wrap-break-word 
-        border-2 
-        border-transparent 
-        -m-px; 
+  @apply break-words
+    border-2 
+    border-transparent 
+    -m-[2px]; 
 
 }
 
 .datasetsTable thead th:hover {
-  background-color: lightgray;
+  @apply bg-[lightgray];
 }
 
+
 .datasetsTable tr:hover {
-  background-color: #c6e3df;
-  cursor: pointer;
+  @apply bg-[#c6e3df] cursor-pointer;
 }
 
 .datasetsTable td {
-  cursor: pointer;
+   @apply cursor-pointer;
 }
 
 .datasetsTable .datasetsTableTitleCell {
-  min-width: 150px;
+  @apply min-w-[150px]
 }
 
 .datasetsTable .inspectButton {
-  text-align: center;
-  margin: 10px 5px 10px 5px;
-  border: 2px solid darkgrey;
-  border-radius: 10px;
-  width: 40px;
-  height: 40px;
-  padding: 5px;
+  @apply 
+    text-center
+    my-[10px] mx-[5px] /* similar to mt-[10px] mr-[5px]  mb-[10px] ml-[5px]*/
+    border-[2px]
+    border-[darkgrey] /* similar to (solid is default border-style)border-2 border-solid border-[darkgrey];*/
+    rounded-[10px]
+    w-[40px]
+    h-[40px]
+    p-[5px]
 }
 
 .datasetsTable .inspectButton:hover {
-  background-color: #c6e3df;
+  @apply bg-[#c6e3df];
 }
 
 .selectAllHeader {
-  display: flex
+   @apply flex;
 }
 
 .selectAllHeader svg {
-  margin-bottom: 5px;
+  @apply mb-[5px];
 }
 
 .datasetsTable .optionColorCircle {
-  margin-right: 5px;
+  @apply mr-[5px];
 }
 
 .datasetsTable .datasetTableLocationsCell svg {
-  float: right;
+  @apply float-right;
 }
 
 .datasetsTable tbody tr td svg:hover {
-  background-color: lightgrey;
+   @apply bg-[lightgrey];
 }
 
 .datasetsTable .downloadIcon {
-  margin-left: 2px;
+  @apply ml-[2px];
 }
 
 .datasetsTable .datasetsTableSpinner {
   /* position: absolute; */
-  margin:0px 40px;
-  /* background-color: lightgray; */
-  opacity: 30%;
+  @apply 
+    
+    my-[0px] mx-[40px] 
+    opacity-30;
 }
 
 .datasetsTable .downloadSizeEstimate {
