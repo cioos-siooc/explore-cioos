@@ -26,7 +26,7 @@ def reloadTopRequests():
     apiRequests = []
     log_files = sorted(glob.glob("/app/nginx/logs/access.log*"))
     for log_file in log_files:
-        print(f"Reading: {log_file}")
+        logger.info(f"Reading: {log_file}")
         # Handle both normal and gzipped logs
         if log_file.endswith(".gz"):
             open_func = gzip.open
@@ -50,6 +50,7 @@ def reloadTopRequests():
     result = [[count, item] for item, count in sorted(counts.items(), key=lambda x: x[1], reverse = True)]
     for apiRequest in result[0:4999]:
         try:
+            logger.info(f"requesting: {apiRequest[1]}")
             r= requests.get("http://nginx:4000"+apiRequest[1])
             
         except:
@@ -63,6 +64,8 @@ def redisFlow():
     reloadTopRequests()
     
 
+if __name__ == "__main__":
+    redisFlow()
     
 
 
