@@ -316,6 +316,7 @@ export default function DatasetsTable({
           <DataTable
         
           striped
+          
           columns={tableData.columns}
           data={tableData.data}
           defaultSortFieldId={3}
@@ -337,7 +338,7 @@ export default function DatasetsTable({
             rows: {
               style: {
                 minHeight: '72px', // override the row height
-                
+                // fontSize: '30px',
               },
             },
             headCells: {

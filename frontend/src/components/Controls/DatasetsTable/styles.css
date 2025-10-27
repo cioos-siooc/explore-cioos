@@ -106,3 +106,10 @@
 .datasetsTable .downloadSizeEstimateFiltered.downloadable {
   @apply bg-[#52a79b];
 }
+
+.datasetsTable .rdt_TableRow {
+  @apply
+  text-[20px]
+  lg:text-[13px];
+  
+}
