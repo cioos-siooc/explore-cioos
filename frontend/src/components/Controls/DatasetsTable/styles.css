@@ -88,18 +88,21 @@
 }
 
 .datasetsTable .downloadSizeEstimate {
-  line-height: 30px;
-  padding: 0px 10px;
-  min-width: max-content;
+  @apply 
+    leading-[30px]
+    px-[10px]
+    py-[0px]
+    min-w-[max-content];
 }
 
 .datasetsTable .downloadSizeEstimateFiltered {
-  height: 30px;
-  display: inline;
-  background-color: #e3285e;
-  color: white;
+  @apply 
+    inline
+    bg-[#e3285e]
+    h-[30px]
+    text-white;
 }
 
 .datasetsTable .downloadSizeEstimateFiltered.downloadable {
-  background-color: #52a79b;
+  @apply bg-[#52a79b];
 }

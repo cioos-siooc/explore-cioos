@@ -312,7 +312,9 @@ export default function DatasetsTable({
         filterPlaceholder={t('datasetInspectorFilterText')}
         filter={true}
       >
-        <DataTable
+        <div className='text-xl'>
+          <DataTable
+        
           striped
           columns={tableData.columns}
           data={tableData.data}
@@ -335,6 +337,7 @@ export default function DatasetsTable({
             rows: {
               style: {
                 minHeight: '72px', // override the row height
+                
               },
             },
             headCells: {
@@ -351,6 +354,8 @@ export default function DatasetsTable({
             },
           }}
         />
+        </div>
+        
       </DataTableExtensions>
     </div>
   )
