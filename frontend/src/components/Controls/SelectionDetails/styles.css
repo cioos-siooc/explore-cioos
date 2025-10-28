@@ -68,10 +68,21 @@
 }
 
 .pointDetailsHeader {
-  height: 66px;
+  @apply 
+    flex
+    h-[66px]
+    items-center
+    border-solid
+    border-b-2
+    border-b-[lightgray]
+    text-[18px]
+    lg:text-[13px];
+
+
+  /*height: 66px;
   display: flex;
   border-bottom: 1px solid lightgray;
-  align-items: center;
+  align-items: center; */
 }
 
 .pointDetailsHeaderLogo {

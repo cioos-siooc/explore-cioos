@@ -109,7 +109,15 @@
 
 .datasetsTable .rdt_TableRow {
   @apply
-  text-[20px]
+  text-[18px]
+  lg:text-[13px];
+  
+}
+
+.datasetsTable .rdt_TableHeadRow{
+  @apply
+  font-bold
+  text-[18px]
   lg:text-[13px];
   
 }
