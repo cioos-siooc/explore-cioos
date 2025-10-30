@@ -126,10 +126,15 @@
   width: 42px;
   text-align: center;
   z-index: 3;
+
+  /*@apply;*/
+    
+
+
 }
 
 .pointDetailsHeaderIntroButton:hover {
-  background-color: #f3f3f3;
+  background-color: #c6e3df;
 }
 
 .feedbackButtonImage {

@@ -121,3 +121,11 @@
   lg:text-[13px];
   
 }
+
+.datasetsTable .data-table-extensions .data-table-extensions-filter .filter-text {
+  @apply
+  text-[18px]
+  lg:text-[13px];
+  
+}
+

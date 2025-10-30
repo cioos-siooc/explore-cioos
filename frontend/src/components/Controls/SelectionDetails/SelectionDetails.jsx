@@ -205,7 +205,7 @@ export default function SelectionDetails({
           onClick={() => setShowIntroModal(true)}
           title={t('introReopenTitle')} // 'Re-open introduction'
         >
-          <InfoSquare color='#007bff' size={'25px'} />
+          <InfoSquare color='#007bff' size={'25px'}  />
         </button>
         <a
           className='feedbackButton'

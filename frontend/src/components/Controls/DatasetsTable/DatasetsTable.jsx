@@ -60,7 +60,7 @@ export default function DatasetsTable({
     const columns = [
       {
         name: (
-          <div title={t('datasetsTableDownloadModalDatasetCheckboxTooltip')}>
+          <div className="flex w-[100%]" title={t('datasetsTableDownloadModalDatasetCheckboxTooltip')}>
             {selectAll ? (
               <CheckSquare onClick={selectAllOnclick} size={16} />
             ) : (
@@ -72,7 +72,7 @@ export default function DatasetsTable({
         selector: (row) => row.selected,
         cell: (row) => {
           return (
-            <div title={t('datasetsTableDownloadModalDatasetCheckboxTooltip')}>
+            <div className="flex w-[100%]" title={t('datasetsTableDownloadModalDatasetCheckboxTooltip')}>
               {row.selected ? (
                 <CheckSquare onClick={checkBoxOnclick(row)} size={16} />
               ) : (
@@ -93,7 +93,7 @@ export default function DatasetsTable({
         },
         ignoreRowClick: true,
         sortable: true,
-        width: '60px',
+        width: '70px',
         // paddingLeft: cellPadding,
         // paddingRight: cellPadding
       },
