@@ -1,9 +1,11 @@
 .selectionPanel {
   pointer-events: all;
-  display: flex;
   height: 98vh;
   width: 580px;
   transition: width 1s;
+  display:flex;
+  /*@apply
+    absolute lg:flex;*/
 }
 
 .selectionPanel.closed {
@@ -16,6 +18,7 @@
   top: -10px;
   left: 0px;
   min-width: 560px;
+  
   height: 100vh;
   transition: left 1s;
 }

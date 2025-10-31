@@ -3,7 +3,9 @@
   flex-direction: row;
   justify-content: start;
   margin: 2px;
-  line-height: 11px;
+  
+
+  @apply leading-[15px] lg:leading-[11px]; 
 }
 
 .legendElement svg {

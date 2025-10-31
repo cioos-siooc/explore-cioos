@@ -63,7 +63,7 @@ export default function Filter({
           />
         )}
         {icon}
-        <div className='text-2xl font-bold lg:text-base lg:font-normal' title={badgeTitle}>
+        <div className='text-2xl  lg:text-base ' title={badgeTitle}>
           {abbreviateString(badgeTitle, 35)}
         </div>
         {filterOpen ? <ChevronCompactDown /> : <ChevronCompactDown />}

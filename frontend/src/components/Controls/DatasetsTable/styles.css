@@ -3,7 +3,7 @@
 }
 
 .datasetsTable .selectDatasetColumn {
-  @apply w-12; /* 50px ≈ w-12 in Tailwind spacing scale */
+  @apply w-[50px]; /* 50px ≈ w-12 in Tailwind spacing scale */
 }
 
 .datasetsTable th {

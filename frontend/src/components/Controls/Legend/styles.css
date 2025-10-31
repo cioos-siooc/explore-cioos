@@ -9,8 +9,9 @@
   padding: 2.5px 5px 2.5px 5px;
   overflow-y: auto;
   transition: left 1s;
-  font-size: small;
+  
   max-height: max-content;
+  @apply text-[large]  lg:text-[small]; 
 }
 
 .legend:hover {

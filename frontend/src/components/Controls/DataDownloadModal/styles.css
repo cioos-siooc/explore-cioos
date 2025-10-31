@@ -17,6 +17,8 @@
   border-radius: 10px;
   height: 40px;
   text-align: center;
+  @apply text-2xl  lg:text-base; 
+
 }
 
 .downloadButton:disabled:hover {
