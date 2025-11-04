@@ -93,7 +93,8 @@ export default function DatasetsTable({
         },
         ignoreRowClick: true,
         sortable: true,
-        width: '70px',
+        minWidth: '70px',
+        maxWidth: "120px"
         // paddingLeft: cellPadding,
         // paddingRight: cellPadding
       },
@@ -123,7 +124,8 @@ export default function DatasetsTable({
           )
         },
         sortable: true,
-        width: '60px',
+        minWidth: '60px',
+        maxWidth: "100px"
         // paddingLeft: cellPadding,
         // paddingRight: cellPadding
       },
@@ -135,7 +137,7 @@ export default function DatasetsTable({
         ),
         selector: (row) => row.title,
         wrap: true,
-        width: '280px',
+        minWidth: '280px',
         sortable: true
       },
       {
@@ -147,7 +149,8 @@ export default function DatasetsTable({
             .replace('TimeSeries', 'Time series'),
         wrap: true,
         sortable: true,
-        width: '80px',
+        minWidth: '80px',
+        maxWidth: "150px"
         // paddingLeft: cellPadding,
         // paddingRight: cellPadding
       },
@@ -167,7 +170,8 @@ export default function DatasetsTable({
         },
         wrap: true,
         sortable: true,
-        width: '60px',
+        minWidth: '60px',
+        maxWidth: "100px"
         // paddingLeft: cellPadding,
         // paddingRight: cellPadding
       }
@@ -210,7 +214,7 @@ export default function DatasetsTable({
         },
         wrap: true,
         sortable: true,
-        width: '200px',
+        minWidth: '200px',
         // paddingLeft: cellPadding,
         // paddingRight: cellPadding
       })
@@ -265,7 +269,7 @@ export default function DatasetsTable({
         },
         wrap: true,
         sortable: true,
-        width: '170px',
+        minWidth: '170px',
         // paddingLeft: cellPadding,
         // paddingRight: cellPadding
       })
@@ -294,7 +298,7 @@ export default function DatasetsTable({
         },
         wrap: true,
         sortable: true,
-        width: '150px',
+        minWidth: '150px',
         // paddingLeft: cellPadding,
         // paddingRight: cellPadding
       })
