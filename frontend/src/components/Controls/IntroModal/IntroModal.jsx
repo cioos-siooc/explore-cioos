@@ -144,7 +144,11 @@ export default function IntroModal({ showModal, setShowModal }) {
             <a
               className='feedbackButton'
               title={t('feedbackButtonTitle')}
-              href='https://docs.google.com/forms/d/1OAmp6_LDrCyb4KQZ3nANCljXw5YVLD4uzMsWyuh47KI/edit'
+              href={
+                i18n.language === 'en'
+                  ? 'https://docs.google.com/forms/d/e/1FAIpQLScrpW_V0whLXAIy7Vk4Wzd2UAZf-hUxPl455jhUlUoUzQGqvg/viewform?usp=dialog'
+                  : 'https://docs.google.com/forms/d/e/1FAIpQLScOHpRSyXeGIwkOCLR9_VLhxs6siSiEuTqEGHG1PVNN0BumsQ/viewform?usp=dialog'
+              }
               target='_blank'
               rel='noreferrer'
             >
