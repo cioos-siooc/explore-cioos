@@ -45,6 +45,9 @@
   padding: 10px;
   max-width: fit-content;
   min-width: 350px;
+  @apply
+  text-xl  lg:text-base;
+
 }
 
 .filterOptions button {
