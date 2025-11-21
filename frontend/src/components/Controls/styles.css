@@ -48,6 +48,7 @@
   border-right: 2px solid darkgrey;
   border-bottom: 2px solid darkgrey;
   transition: left 1s;
+  pointer-events: all;
 }
 
 
