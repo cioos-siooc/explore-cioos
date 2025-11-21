@@ -7,13 +7,20 @@
     border-b-2
     border-b-[lightgray]
     text-[18px]
+    bg-white
     lg:text-[13px];
+    flex-wrap: nowrap; /* stays one line */
+    justify-content: space-between;
+    gap: 8px;
 
 
   /*height: 66px;
   display: flex;
   border-bottom: 1px solid lightgray;
   align-items: center; */
+}
+.pointDetailsHeader a {
+  flex-shrink: 1; /* allow items to shrink when needed */
 }
 
 .pointDetailsHeaderLogo {

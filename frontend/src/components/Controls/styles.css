@@ -36,11 +36,13 @@
 
 .panelHandleClosed {
   background-color: white;
-  top: 0px;
+  display:flex;
+  justify-content: center;
+  align-items: center;
   position: relative; 
   z-index: 10;
-  width: 20px;
-  height: 40px;
+  width: 35px;
+  height: 70px;
   border-radius: 0px 10px 10px 0px;
   border-top: 2px solid darkgrey;
   border-right: 2px solid darkgrey;
@@ -55,18 +57,18 @@
   cursor: pointer;
 }
 
-.panelHandleClosed svg {
-  margin-top: 10px;
-}
 
-.panelHandleCol{
+
+.panelHandleCol {
   padding: 0px;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   height: min-content;
   padding: 0px;
-  width: min-content;
+  width: auto;
   z-index: 10;
+  flex: initial;
+
   
 
 }
