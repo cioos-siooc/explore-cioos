@@ -30,3 +30,43 @@
 .controls .row {
   flex-wrap: nowrap;
 }
+
+
+
+
+.panelHandleClosed {
+  background-color: white;
+  top: 0px;
+  position: relative; 
+  z-index: 10;
+  width: 20px;
+  height: 40px;
+  border-radius: 0px 10px 10px 0px;
+  border-top: 2px solid darkgrey;
+  border-right: 2px solid darkgrey;
+  border-bottom: 2px solid darkgrey;
+  transition: left 1s;
+}
+
+
+
+.panelHandleClosed:hover {
+  background-color: #c6e3df;
+  cursor: pointer;
+}
+
+.panelHandleClosed svg {
+  margin-top: 10px;
+}
+
+.panelHandleCol{
+  padding: 0px;
+  display: flex;
+  flex-wrap: wrap;
+  height: min-content;
+  padding: 0px;
+  width: min-content;
+  z-index: 10;
+  
+
+}

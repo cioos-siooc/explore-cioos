@@ -650,6 +650,8 @@ export default function App() {
       )}
       <Controls
         loading={loading}
+        isSelectionPanelOpen={selectionPanelOpen}
+        setSelectionPanelOpen={setSelectionPanelOpen}
         selectionPanel={
           <Col xs='auto' className='selectionPanelColumn'>
             <SelectionPanel

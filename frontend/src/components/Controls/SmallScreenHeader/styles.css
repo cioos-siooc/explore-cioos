@@ -1,73 +1,6 @@
-.selectionPanel {
-  pointer-events: all;
-  height: 98vh;
-  width: 580px;
-  transition: width 1s;
-  display:flex;
-  /*@apply
-    absolute lg:flex;*/
-}
-
-.selectionPanel.closed {
-  width: 20px;
-}
-
-.panelContents {
-  background-color: white;
-  position: relative;
-  top: -10px;
-  left: 0px;
-  min-width: 560px;
-  
-  height: 100vh;
-  transition: left 1s;
-}
-
-.panelContents.closed {
-  
-  @apply left-[-98vw] lg:left-[-560px];
-}
-
-@media (max-height: 500px) {
-  .panelContents {
-    min-height: 500px;
-    /* position: absolute; */
-  }
-}
-
-.panelHandle {
-  background-color: white;
-  position: relative;
-  top: 0px;
-  left: 0px;
-  z-index: 10;
-  width: 20px;
-  height: 40px;
-  border-radius: 0px 10px 10px 0px;
-  border-top: 2px solid darkgrey;
-  border-right: 2px solid darkgrey;
-  border-bottom: 2px solid darkgrey;
-  transition: left 1s;
-}
-
-.panelHandle.closed {
-  @apply left-[-98vw] lg:left-[-560px]
-    top-[90px] lg:top-[0px] ;
-}
-
-.panelHandle:hover {
-  background-color: #c6e3df;
-  cursor: pointer;
-}
-
-.panelHandle svg {
-  margin-top: 10px;
-}
-
 .pointDetailsHeader {
   @apply 
     flex
-    
     h-[66px]
     items-center
     border-solid
@@ -82,6 +15,7 @@
   border-bottom: 1px solid lightgray;
   align-items: center; */
 }
+
 .pointDetailsHeaderLogo {
   padding: 3px 0px;
 }
@@ -90,6 +24,20 @@
   margin: auto 0px;
   height: 100%;
   padding: 10px;
+}
+
+.pointDetailsHeaderLogo.CDE {
+  /* margin: auto 0px auto 70px; */
+  padding: 0px;
+  height: 100%;
+  width: 100%;
+  object-fit:scale-down;
+}
+
+.pointDetailsHeaderLogo.CDE:hover {
+  cursor: pointer;
+  background-color: #c6e3df;
+  /* padding: -2px; */
 }
 
 .pointDetailsHeaderLogo.CIOOS:hover {
@@ -115,9 +63,11 @@
 
 
 }
+
 .pointDetailsHeaderIntroButton:hover {
   background-color: #c6e3df;
 }
+
 .feedbackButtonImage {
   background-image: url(../../Images/feedbackButton.png);
 }
