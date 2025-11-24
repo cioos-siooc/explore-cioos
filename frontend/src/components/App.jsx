@@ -652,6 +652,7 @@ export default function App() {
         loading={loading}
         isSelectionPanelOpen={selectionPanelOpen}
         setSelectionPanelOpen={setSelectionPanelOpen}
+        setShowIntroModal= {setShowIntroModal}
         selectionPanel={
           <Col xs='auto' className='selectionPanelColumn'>
             <SelectionPanel

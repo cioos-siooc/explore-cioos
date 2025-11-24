@@ -5,7 +5,7 @@ import { SmallHeader } from './SmallScreenHeader/SmallScreenHeader'
 
 import './styles.css'
 
-export default function Controls({ selectionPanel, loading, isSelectionPanelOpen, setSelectionPanelOpen, children }) {
+export default function Controls({ selectionPanel, loading, isSelectionPanelOpen, setSelectionPanelOpen, setShowIntroModal, children }) {
   return (
     <div className={`controls ${loading === true && 'disabled'}`}>
       <Container fluid>
@@ -26,7 +26,7 @@ export default function Controls({ selectionPanel, loading, isSelectionPanelOpen
           ) : (
 
             <> 
-            <SmallHeader/>
+            <SmallHeader setShowIntroModal= {setShowIntroModal}/>
 
             <Row className='flex lg:hidden relative top-[10px]'>
             <Col className='panelHandleCol'>

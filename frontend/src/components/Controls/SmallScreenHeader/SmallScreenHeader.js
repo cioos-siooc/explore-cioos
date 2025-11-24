@@ -7,7 +7,7 @@ import Logo from '../../logo.js'
 import './styles.css'
     
     
-export  function SmallHeader({}) {
+export  function SmallHeader({setShowIntroModal}) {
   const { t, i18n } = useTranslation()
 
   return(
