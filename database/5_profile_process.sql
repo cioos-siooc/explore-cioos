@@ -62,7 +62,9 @@ BEGIN
 -- AFTER LOADING PROFILE DATA:
 
 -- Use shared function for geometry and linking
-PERFORM process_profile_geometry_and_links('cde.profiles');
+-- Set search path to cde schema so the function can find the profiles table
+SET search_path TO cde, public;
+PERFORM process_profile_geometry_and_links('profiles');
 
 -- point PKs
 DELETE FROM
