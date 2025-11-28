@@ -36,7 +36,7 @@ This mode:
 
 **Use when**: You want a complete refresh of the database from all ERDDAP servers
 
-### Incremental Mode (New)
+### Incremental Mode (Recommended for Updates)
 
 Use the `--incremental` flag to update only specific datasets:
 
@@ -44,17 +44,22 @@ Use the `--incremental` flag to update only specific datasets:
 python -m cde_db_loader --folder harvest --incremental
 ```
 
-This mode:
-1. **UPSERT datasets**: Updates existing datasets or inserts new ones based on (dataset_id, erddap_url) unique key
-2. **Replaces profiles**: Deletes old profiles for updated datasets, then inserts new ones
-3. **UPSERT skipped_datasets**: Updates the list of skipped datasets
-4. **Preserves other data**: Datasets not in the CSV files remain unchanged
-5. **Skips constraint operations**: Assumes constraints already exist (faster)
+This mode uses an optimized workflow with temporary tables and SQL functions:
+
+1. **Creates temporary staging tables** without constraints (via `create_temp_tables()`)
+2. **Loads CSV data** into temp tables (no constraint validation)
+3. **Processes data** in temp tables (calculates geometry, links datasets, etc.)
+4. **UPSERT datasets**: Updates existing or inserts new ones using `(dataset_id, erddap_url)` as unique key
+5. **Replaces profiles**: Deletes old profiles for updated datasets, then inserts new ones
+6. **UPSERT skipped_datasets**: Updates the list of skipped datasets
+7. **Runs processing functions**: Updates CKAN data, recalculates hexes, rebuilds indexes
+8. **Preserves other data**: Datasets not in the CSV files remain unchanged
 
 **Use when**:
 - You harvested only specific datasets (using `dataset_ids` filter in harvest config)
 - You want to update a subset of datasets without affecting others
-- You want faster database updates for incremental changes
+- You want faster database updates (typically 5-10x faster than full reload)
+- You're running scheduled/automated updates
 
 ## Workflow Examples
 
@@ -165,7 +170,34 @@ DB_USER=postgres
 DB_PASSWORD=yourpassword
 SENTRY_DSN=optional_sentry_url
 ENVIRONMENT=development
+INCREMENTAL_MODE=false  # Set to "true" to enable incremental mode by default
 ```
+
+**Note**: The `INCREMENTAL_MODE` environment variable can be used to set the default mode. The `--incremental` command-line flag overrides this setting.
+
+## Technical Details
+
+### Architecture
+
+The db-loader has been refactored for better maintainability and performance:
+
+**Python Code** ([`__main__.py`](cde_db_loader/__main__.py)):
+- Helper functions for data preparation (`prepare_profiles_dataframe`, `ensure_organization_pks`)
+- Constants for array column types (`DATASET_ARRAY_DTYPES`)
+- Minimal SQL - most logic delegated to database functions
+- **Incremental mode**: Just 25 lines (was 140 lines before refactoring)
+
+**SQL Functions** ([`database/`](../database/)):
+- [`5_profile_process.sql`](../database/5_profile_process.sql):
+  - `process_profile_geometry_and_links(table)` - Shared geometry/linking logic
+  - `process_temp_profiles()` - Process temp tables during incremental mode
+  - `profile_process()` - Full reload processing
+- [`9_incremental_upsert.sql`](../database/9_incremental_upsert.sql):
+  - `create_temp_tables()` - Create staging tables
+  - `upsert_datasets_from_temp()` - UPSERT datasets
+  - `replace_profiles_from_temp()` - Replace profiles
+  - `upsert_skipped_datasets_from_temp()` - UPSERT skipped datasets
+  - `process_incremental_update()` - **Main orchestrator** (single entry point)
 
 ## Troubleshooting
 

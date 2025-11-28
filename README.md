@@ -21,8 +21,17 @@ If you just want to see how a dataset is harvested by CDE:
     2. Production environment: `docker compose -f docker-compose.production.yaml up -d`
 5. See website at <http://localhost:8098>
 6. To update database and reharvest datasets:
-    1. Development environment:  `docker compose up -d harvester`
-    2. Production environment: `docker compose -f  docker-compose.production.yaml up -d harvester`
+    1. **Full reload** (clears all data, reloads everything):
+        - Development: `docker compose up -d harvester`
+        - Production: `docker compose -f docker-compose.production.yaml up -d harvester`
+    2. **Incremental update** (only updates changed datasets, much faster):
+        - Development: `docker compose run --rm -e INCREMENTAL_MODE=true harvester`
+        - Production: `docker compose -f docker-compose.production.yaml run --rm -e INCREMENTAL_MODE=true harvester`
+        - Or use the convenience script: `./run_harvester.sh --incremental`
+
+For more details, see:
+- [Harvester Usage Guide](HARVESTER_USAGE.md)
+- [DB Loader README](db-loader/README.md)
 
 ## Front End Development
 
