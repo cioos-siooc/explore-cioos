@@ -130,6 +130,10 @@ CREATE INDEX ON profiles USING GIST (hex_zoom_0);
 CREATE INDEX ON profiles USING GIST (hex_zoom_1);
 CREATE INDEX ON profiles(latitude);
 CREATE INDEX ON profiles(longitude);
+-- Index for efficient filtering by dataset during incremental updates
+CREATE INDEX ON profiles(erddap_url, dataset_id);
+-- Index for faster lookups when joining with specific profile/timeseries IDs
+CREATE INDEX ON profiles(erddap_url, dataset_id, timeseries_id, profile_id);
 
 
 

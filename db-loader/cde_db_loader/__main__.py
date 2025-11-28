@@ -10,7 +10,7 @@ import sentry_sdk
 from cde_harvester.utils import df_cde_eov_to_standard_name
 from dotenv import load_dotenv
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.dialects.postgresql import ARRAY, INTEGER, TEXT
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -32,7 +32,7 @@ sentry_sdk.init(
 )
 
 
-def main(folder):
+def main(folder, incremental=False):
     # setup database connection
 
     load_dotenv(os.getcwd() + "/.env")
@@ -76,33 +76,98 @@ def main(folder):
     with engine.begin() as transaction:
         logger.info("Writing to DB:")
 
-        logger.info("Dropping constraints")
-        transaction.execute("SELECT drop_constraints();")
+        if incremental:
+            logger.info("Using INCREMENTAL mode - will UPSERT datasets and profiles")
 
-        logger.info("Clearing tables")
-        transaction.execute("SELECT remove_all_data();")
+            # For incremental mode, we need to:
+            # 1. UPSERT datasets (update if exists, insert if new)
+            # 2. Delete old profiles for these datasets, then insert new ones
+            # 3. UPSERT skipped_datasets
 
-        logger.info("Writing datasets")
+            # First, handle datasets with UPSERT
+            logger.info("UPSERT datasets")
+            for _, row in datasets.iterrows():
+                # Build the column list and values dynamically
+                cols = [
+                    "dataset_id", "erddap_url", "platform", "title", "title_fr",
+                    "summary", "summary_fr", "cdm_data_type", "organizations",
+                    "eovs", "ckan_id", "timeseries_id_variable", "profile_id_variable",
+                    "trajectory_id_variable", "profile_variables", "num_columns",
+                    "first_eov_column"
+                ]
 
-        datasets.to_sql(
-            "datasets",
-            con=transaction,
-            if_exists="append",
-            schema=schema,
-            index=False,
-            dtype={
-                "eovs": ARRAY(TEXT),
-                "organizations": ARRAY(TEXT),
-                "profile_variables": ARRAY(TEXT),
-                "organization_pks": ARRAY(INTEGER),
-            },
-        )
+                # Filter out columns that don't exist in the row or are NaN
+                available_cols = [col for col in cols if col in row.index and pd.notna(row[col])]
 
+                # Build INSERT statement
+                insert_cols = ", ".join(available_cols)
+                insert_vals = ", ".join([f":{col}" for col in available_cols])
+
+                # Build UPDATE statement (exclude unique constraint columns)
+                update_cols = [col for col in available_cols if col not in ["dataset_id", "erddap_url"]]
+                update_set = ", ".join([f"{col} = EXCLUDED.{col}" for col in update_cols])
+
+                sql = text(f"""
+                    INSERT INTO {schema}.datasets ({insert_cols})
+                    VALUES ({insert_vals})
+                    ON CONFLICT (dataset_id, erddap_url)
+                    DO UPDATE SET {update_set}
+                """)
+
+                # Prepare parameters, converting lists to PostgreSQL arrays
+                params = {}
+                for col in available_cols:
+                    val = row[col]
+                    if isinstance(val, list):
+                        params[col] = val
+                    else:
+                        params[col] = val
+
+                transaction.execute(sql, params)
+
+            logger.info("Upserted %d datasets", len(datasets))
+
+            # Delete old profiles for the datasets we're updating
+            logger.info("Deleting old profiles for updated datasets")
+            for _, row in datasets.iterrows():
+                delete_sql = text(f"""
+                    DELETE FROM {schema}.profiles
+                    WHERE dataset_id = :dataset_id AND erddap_url = :erddap_url
+                """)
+                transaction.execute(delete_sql, {
+                    "dataset_id": row["dataset_id"],
+                    "erddap_url": row["erddap_url"]
+                })
+
+            logger.info("Deleted old profiles")
+
+        else:
+            logger.info("Using FULL RELOAD mode - will clear all data")
+
+            logger.info("Dropping constraints")
+            transaction.execute(text("SELECT drop_constraints();"))
+
+            logger.info("Clearing tables")
+            transaction.execute(text("SELECT remove_all_data();"))
+
+            logger.info("Writing datasets")
+            datasets.to_sql(
+                "datasets",
+                con=transaction,
+                if_exists="append",
+                schema=schema,
+                index=False,
+                dtype={
+                    "eovs": ARRAY(TEXT),
+                    "organizations": ARRAY(TEXT),
+                    "profile_variables": ARRAY(TEXT),
+                    "organization_pks": ARRAY(INTEGER),
+                },
+            )
+
+        # Insert profiles (works for both modes - incremental already deleted old ones)
         profiles = profiles.replace("", np.NaN)
-
         logger.info("Writing profiles")
-
-        # profiles has some columns to fix up first
         logger.info("profiles.columns: %s", profiles.columns)
         profiles.drop(columns=["altitude_min", "altitude_max"], errors="ignore").dropna(subset=['time_min']).to_sql(
             "profiles",
@@ -110,28 +175,47 @@ def main(folder):
             if_exists="append",
             schema=schema,
             index=False,
-            # method="multi",
         )
 
-        logger.info("Writing skipped_datasets")
-        skipped_datasets.to_sql(
-            "skipped_datasets",
-            con=transaction,
-            if_exists="append",
-            schema=schema,
-            index=False,
-        )
+        # Handle skipped_datasets
+        if incremental:
+            logger.info("UPSERT skipped_datasets")
+            for _, row in skipped_datasets.iterrows():
+                sql = text(f"""
+                    DELETE FROM {schema}.skipped_datasets
+                    WHERE dataset_id = :dataset_id AND erddap_url = :erddap_url;
+
+                    INSERT INTO {schema}.skipped_datasets (erddap_url, dataset_id, reason_code)
+                    VALUES (:erddap_url, :dataset_id, :reason_code)
+                """)
+                transaction.execute(sql, {
+                    "dataset_id": row["dataset_id"],
+                    "erddap_url": row["erddap_url"],
+                    "reason_code": row.get("reason_code", "")
+                })
+        else:
+            logger.info("Writing skipped_datasets")
+            skipped_datasets.to_sql(
+                "skipped_datasets",
+                con=transaction,
+                if_exists="append",
+                schema=schema,
+                index=False,
+            )
 
         logger.info("Processing new records")
-        transaction.execute("SELECT profile_process();")
-        transaction.execute("SELECT ckan_process();")
+        transaction.execute(text("SELECT profile_process();"))
+        transaction.execute(text("SELECT ckan_process();"))
 
         logger.info("Creating hexes")
-        transaction.execute("SELECT create_hexes();")
+        transaction.execute(text("SELECT create_hexes();"))
 
         # This ensures that all fields were set successfully
-        logger.info("Setting constraints")
-        transaction.execute("SELECT set_constraints();")
+        if not incremental:
+            logger.info("Setting constraints")
+            transaction.execute(text("SELECT set_constraints();"))
+        else:
+            logger.info("Skipping constraint refresh in incremental mode (constraints already exist)")
 
         logger.info("Wrote to db: %s", f"{schema}.datasets")
         logger.info("Wrote to db: %s", f"{schema}.profiles")
@@ -146,10 +230,15 @@ if __name__ == "__main__":
         default="harvest",
         help="folder with the CSV output files from harvesting",
     )
+    parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Use UPSERT instead of deleting all data - only update/insert changed datasets",
+    )
 
     args = parser.parse_args()
     try:
-        main(args.folder)
+        main(args.folder, args.incremental)
     except Exception:
         logger.error("Failed to write to db", exc_info=True)
         sys.exit(1)
