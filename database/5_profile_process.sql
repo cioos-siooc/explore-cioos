@@ -1,11 +1,58 @@
-/* 
+/*
 
-profile_process() 
+profile_process()
 
  - set profiles columns: geom, dataset_pk, point_pk
  - recreate the points table
- 
+
+process_temp_profiles()
+
+ - processes temp_profiles table during incremental mode
+ - contains shared logic with profile_process()
+
  */
+
+
+-- Helper function to process geometry and dataset linking
+-- Used by both profile_process() and process_temp_profiles()
+CREATE OR REPLACE FUNCTION process_profile_geometry_and_links(target_table TEXT) RETURNS VOID AS $$
+BEGIN
+    -- Set geom from lat/lon
+    EXECUTE format('
+        UPDATE %I
+        SET geom = ST_Transform(
+            ST_SetSRID(ST_MakePoint(longitude, latitude), 4326),
+            3857
+        )
+        WHERE geom IS NULL
+    ', target_table);
+
+    -- Link profiles to datasets via PK
+    EXECUTE format('
+        UPDATE %I p
+        SET dataset_pk = d.pk
+        FROM cde.datasets d
+        WHERE p.dataset_id = d.dataset_id
+          AND p.erddap_url = d.erddap_url
+          AND p.dataset_pk IS NULL
+    ', target_table);
+
+    -- Calculate days
+    EXECUTE format('
+        UPDATE %I
+        SET days = date_part(''days'', time_max - time_min) + 1
+        WHERE days IS NULL
+    ', target_table);
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Process temporary profiles table during incremental mode
+CREATE OR REPLACE FUNCTION process_temp_profiles() RETURNS VOID AS $$
+BEGIN
+    PERFORM process_profile_geometry_and_links('temp_profiles');
+END;
+$$ LANGUAGE plpgsql;
 
 
 CREATE OR REPLACE FUNCTION profile_process() RETURNS VOID AS $$
@@ -14,26 +61,8 @@ BEGIN
 
 -- AFTER LOADING PROFILE DATA:
 
-UPDATE
-        cde.profiles
-SET
-        geom = st_transform(
-                ST_SetSRID(ST_MakePoint(longitude, latitude), 4326),
-                3857
-        )
-WHERE
-        geom is null;
-
--- links profiles to datasets via PK
-UPDATE
-        cde.profiles p
-SET
-        dataset_pk = d.pk
-FROM
-        cde.datasets d
-WHERE
-        p.dataset_id = d.dataset_id
-        AND p.erddap_url = d.erddap_url;
+-- Use shared function for geometry and linking
+PERFORM process_profile_geometry_and_links('cde.profiles');
 
 -- point PKs
 DELETE FROM
@@ -61,7 +90,7 @@ FROM
 WHERE
         points.geom = profiles.geom;
 
-UPDATE cde.profiles set days=date_part('days',time_max-time_min)+1;
+-- Note: days calculation now handled by process_profile_geometry_and_links()
 
 -- Set number of profiles per dataset
 WITH profiles_per_dataset
