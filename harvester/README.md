@@ -1,4 +1,6 @@
-# ERDDAP harvester
+# ERDDAP Harvester
+
+The ERDDAP harvester crawls ERDDAP servers to extract dataset metadata and profile information. It also calls the CKAN harvester to gather additional metadata.
 
 ## Installation with venv
 
@@ -9,19 +11,71 @@ source ./venv/bin/activate
 pip install .
 ```
 
-## Running
+## Running Standalone
 
-The erddap harvester also calls the CKAN harvester
+The harvester reads from `harvest_config.yaml` by default, but you can override with command-line options:
 
-- `python -m cde_harvester --urls https://catalogue.hakai.org/erddap,https://www.smartatlantic.ca/erddap`
+### Harvest from specific ERDDAP servers
+```bash
+python -m cde_harvester --urls https://catalogue.hakai.org/erddap,https://www.smartatlantic.ca/erddap
+```
 
-- Request one or more dataset IDs (comma separated)
-  `python -m cde_harvester --urls https://catalogue.hakai.org/erddap --dataset_ids HakaiQuadraBoLResearch`
-- Use request caching, when this is run twice the second one should use cached responses
-  `python -m cde_harvester --urls https://catalogue.hakai.org/erddap --cache`
+### Harvest specific dataset IDs (comma separated)
+```bash
+python -m cde_harvester --urls https://catalogue.hakai.org/erddap --dataset_ids HakaiQuadraBoLResearch
+```
 
-## Standalone CKAN harvester
+### Use request caching (faster for testing)
+```bash
+python -m cde_harvester --urls https://catalogue.hakai.org/erddap --cache
+```
 
-Only used for testing as it is called by the erddap harvester
+## Running with Docker
 
-- `python -m cde_harvester.ckan`
+The harvester is typically run via Docker Compose. See the main [README](../README.md) for details.
+
+### Full Reload Mode (default)
+Clears all existing data and reloads everything from scratch:
+```bash
+docker compose run --rm harvester
+```
+
+### Incremental Mode
+Updates only changed datasets, preserving existing data (much faster):
+```bash
+docker compose run --rm -e INCREMENTAL_MODE=true harvester
+# Or use the convenience script:
+./run_harvester.sh --incremental
+```
+
+## Output Files
+
+The harvester generates CSV files in the `harvest/` directory:
+- `datasets.csv` - Dataset metadata
+- `profiles.csv` - Profile/timeseries information
+- `ckan.csv` - CKAN metadata
+- `skipped.csv` - Datasets that were skipped (with reasons)
+
+These files are then loaded into the database by the [db-loader](../db-loader/README.md).
+
+## Configuration
+
+Create `harvest_config.yaml` from `harvest_config.sample.yaml`:
+```yaml
+erddap_urls:
+  - https://data.cioospacific.ca/erddap
+  - https://catalogue.hakai.org/erddap
+  # Add more ERDDAP servers here
+
+# Optional: Limit to specific datasets
+# dataset_ids:
+#   - dataset_id_1
+#   - dataset_id_2
+```
+
+## Standalone CKAN Harvester
+
+For testing purposes only (normally called by ERDDAP harvester):
+```bash
+python -m cde_harvester.ckan
+```
