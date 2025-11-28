@@ -34,6 +34,12 @@ sentry_sdk.init(
 
 def main(folder, incremental=False):
     # setup database connection
+    
+    # Use a helper function to handle array columns properly
+    def is_valid_value(val):
+        if isinstance(val, (list, np.ndarray)):
+            return True  # Arrays are always valid
+        return pd.notna(val)
 
     load_dotenv(os.getcwd() + "/.env")
 
@@ -97,7 +103,7 @@ def main(folder, incremental=False):
                 ]
 
                 # Filter out columns that don't exist in the row or are NaN
-                available_cols = [col for col in cols if col in row.index and pd.notna(row[col])]
+                available_cols = [col for col in cols if col in row.index and is_valid_value(row[col])]
 
                 # Build INSERT statement
                 insert_cols = ", ".join(available_cols)
@@ -234,6 +240,7 @@ if __name__ == "__main__":
         "--incremental",
         action="store_true",
         help="Use UPSERT instead of deleting all data - only update/insert changed datasets",
+        default=os.environ.get("INCREMENTAL_MODE", "false").lower() == "true",
     )
 
     args = parser.parse_args()
