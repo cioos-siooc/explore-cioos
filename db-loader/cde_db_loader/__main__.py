@@ -32,14 +32,34 @@ sentry_sdk.init(
 )
 
 
+# Constants for array column types
+DATASET_ARRAY_DTYPES = {
+    "eovs": ARRAY(TEXT),
+    "organizations": ARRAY(TEXT),
+    "profile_variables": ARRAY(TEXT),
+    "organization_pks": ARRAY(INTEGER),
+}
+
+
+def prepare_profiles_dataframe(profiles):
+    """Clean and prepare profiles DataFrame for insertion."""
+    profiles = profiles.replace("", np.NaN)
+    return profiles.drop(columns=["altitude_min", "altitude_max"], errors="ignore").dropna(subset=['time_min'])
+
+
+def ensure_organization_pks(datasets):
+    """Ensure organization_pks column has empty arrays instead of null values."""
+    if 'organization_pks' not in datasets.columns or datasets['organization_pks'].isna().all():
+        datasets['organization_pks'] = [[] for _ in range(len(datasets))]
+    else:
+        datasets['organization_pks'] = datasets['organization_pks'].apply(
+            lambda x: x if isinstance(x, list) else []
+        )
+    return datasets
+
+
 def main(folder, incremental=False):
     # setup database connection
-    
-    # Use a helper function to handle array columns properly
-    def is_valid_value(val):
-        if isinstance(val, (list, np.ndarray)):
-            return True  # Arrays are always valid
-        return pd.notna(val)
 
     load_dotenv(os.getcwd() + "/.env")
 
@@ -92,68 +112,21 @@ def main(folder, incremental=False):
 
             # Create temporary tables that mirror the main tables structure WITHOUT constraints
             logger.info("Creating temporary tables")
-            transaction.execute(text(f"""
-                CREATE TEMP TABLE temp_datasets (LIKE {schema}.datasets INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
-                CREATE TEMP TABLE temp_profiles (LIKE {schema}.profiles INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
-                CREATE TEMP TABLE temp_skipped_datasets (LIKE {schema}.skipped_datasets INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
-
-                -- Explicitly drop all NOT NULL constraints from temp tables
-                -- These are column-level constraints that EXCLUDING CONSTRAINTS doesn't remove
-                ALTER TABLE temp_datasets
-                    ALTER COLUMN dataset_id DROP NOT NULL,
-                    ALTER COLUMN erddap_url DROP NOT NULL,
-                    ALTER COLUMN cdm_data_type DROP NOT NULL,
-                    ALTER COLUMN title DROP NOT NULL,
-                    ALTER COLUMN organizations DROP NOT NULL,
-                    ALTER COLUMN eovs DROP NOT NULL,
-                    ALTER COLUMN n_profiles DROP NOT NULL,
-                    ALTER COLUMN platform DROP NOT NULL,
-                    ALTER COLUMN organization_pks DROP NOT NULL;
-
-                ALTER TABLE temp_profiles
-                    ALTER COLUMN geom DROP NOT NULL,
-                    ALTER COLUMN dataset_pk DROP NOT NULL,
-                    ALTER COLUMN erddap_url DROP NOT NULL,
-                    ALTER COLUMN dataset_id DROP NOT NULL,
-                    ALTER COLUMN time_min DROP NOT NULL,
-                    ALTER COLUMN time_max DROP NOT NULL,
-                    ALTER COLUMN latitude DROP NOT NULL,
-                    ALTER COLUMN longitude DROP NOT NULL,
-                    ALTER COLUMN depth_min DROP NOT NULL,
-                    ALTER COLUMN depth_max DROP NOT NULL,
-                    ALTER COLUMN n_records DROP NOT NULL,
-                    ALTER COLUMN hex_zoom_0 DROP NOT NULL,
-                    ALTER COLUMN hex_zoom_1 DROP NOT NULL,
-                    ALTER COLUMN point_pk DROP NOT NULL,
-                    ALTER COLUMN records_per_day DROP NOT NULL;
-            """))
+            transaction.execute(text("SELECT create_temp_tables();"))
 
             # Load data into temp tables
             logger.info("Loading datasets into temp table")
-            # Ensure array columns have empty arrays instead of null
-            if 'organization_pks' not in datasets.columns or datasets['organization_pks'].isna().all():
-                datasets['organization_pks'] = [[] for _ in range(len(datasets))]
-            else:
-                datasets['organization_pks'] = datasets['organization_pks'].apply(
-                    lambda x: x if isinstance(x, list) else []
-                )
-
+            datasets = ensure_organization_pks(datasets)
             datasets.to_sql(
                 "temp_datasets",
                 con=transaction,
                 if_exists="append",
                 index=False,
-                dtype={
-                    "eovs": ARRAY(TEXT),
-                    "organizations": ARRAY(TEXT),
-                    "profile_variables": ARRAY(TEXT),
-                    "organization_pks": ARRAY(INTEGER),
-                },
+                dtype=DATASET_ARRAY_DTYPES,
             )
 
             logger.info("Loading profiles into temp table")
-            profiles = profiles.replace("", np.NaN)
-            profiles.drop(columns=["altitude_min", "altitude_max"], errors="ignore").dropna(subset=['time_min']).to_sql(
+            prepare_profiles_dataframe(profiles).to_sql(
                 "temp_profiles",
                 con=transaction,
                 if_exists="append",
@@ -168,109 +141,9 @@ def main(folder, incremental=False):
                 index=False,
             )
 
-            # Run processing functions on temp tables
-            logger.info("Processing temp tables")
-            # Modify profile_process to work on temp tables
-            transaction.execute(text("""
-                -- Set geom from lat/lon
-                UPDATE temp_profiles
-                SET geom = ST_Transform(
-                    ST_SetSRID(ST_MakePoint(longitude, latitude), 4326),
-                    3857
-                )
-                WHERE geom IS NULL;
-
-                -- Link profiles to datasets via PK (from main datasets table)
-                UPDATE temp_profiles p
-                SET dataset_pk = d.pk
-                FROM cde.datasets d
-                WHERE p.dataset_id = d.dataset_id
-                  AND p.erddap_url = d.erddap_url;
-
-                -- Calculate days
-                UPDATE temp_profiles
-                SET days = date_part('days', time_max - time_min) + 1
-                WHERE days IS NULL;
-            """))
-
-            # Now UPSERT from temp tables to main tables using efficient SQL
-            logger.info("UPSERT datasets from temp table")
-            transaction.execute(text(f"""
-                INSERT INTO {schema}.datasets
-                SELECT * FROM temp_datasets
-                ON CONFLICT (dataset_id, erddap_url)
-                DO UPDATE SET
-                    platform = EXCLUDED.platform,
-                    title = EXCLUDED.title,
-                    title_fr = EXCLUDED.title_fr,
-                    summary = EXCLUDED.summary,
-                    summary_fr = EXCLUDED.summary_fr,
-                    cdm_data_type = EXCLUDED.cdm_data_type,
-                    organizations = EXCLUDED.organizations,
-                    eovs = EXCLUDED.eovs,
-                    ckan_id = EXCLUDED.ckan_id,
-                    timeseries_id_variable = EXCLUDED.timeseries_id_variable,
-                    profile_id_variable = EXCLUDED.profile_id_variable,
-                    trajectory_id_variable = EXCLUDED.trajectory_id_variable,
-                    profile_variables = EXCLUDED.profile_variables,
-                    num_columns = EXCLUDED.num_columns,
-                    first_eov_column = EXCLUDED.first_eov_column,
-                    organization_pks = EXCLUDED.organization_pks,
-                    n_profiles = EXCLUDED.n_profiles
-            """))
-            logger.info("Datasets upserted")
-
-            # Temporarily drop constraints to allow inserting profiles with NULL hex values
-            # (hex values will be populated by create_hexes() later)
-            logger.info("Temporarily dropping constraints for profile insertion")
-            transaction.execute(text("SELECT drop_constraints();"))
-
-            # Delete old profiles for updated datasets, then insert new ones
-            logger.info("Deleting old profiles for updated datasets")
-            transaction.execute(text(f"""
-                DELETE FROM {schema}.profiles p
-                USING temp_datasets td
-                WHERE p.dataset_id = td.dataset_id
-                  AND p.erddap_url = td.erddap_url
-            """))
-
-            logger.info("Inserting new profiles")
-            transaction.execute(text(f"""
-                INSERT INTO {schema}.profiles
-                SELECT * FROM temp_profiles
-            """))
-            logger.info("Profiles inserted")
-
-            # UPSERT skipped_datasets
-            logger.info("UPSERT skipped_datasets")
-            transaction.execute(text(f"""
-                -- Delete existing entries for these datasets
-                DELETE FROM {schema}.skipped_datasets s
-                USING temp_skipped_datasets ts
-                WHERE s.dataset_id = ts.dataset_id
-                  AND s.erddap_url = ts.erddap_url;
-
-                -- Insert new entries
-                INSERT INTO {schema}.skipped_datasets
-                SELECT * FROM temp_skipped_datasets
-            """))
-
-            #Run ckan_process and other processing on the newly inserted/updated data
-            logger.info("Running CKAN processing")
-            transaction.execute(text("SELECT ckan_process();"))
-
-            # Run profile_process to update any remaining fields
-            logger.info("Running profile processing")
-            transaction.execute(text("SELECT profile_process();"))
-
-            # Recreate hexes for all data
-            logger.info("Creating hexes")
-            transaction.execute(text("SELECT create_hexes();"))
-
-            # Restore constraints now that all fields are populated
-            logger.info("Restoring constraints")
-            transaction.execute(text("SELECT set_constraints();"))
-
+            # Process and UPSERT all data using SQL functions
+            logger.info("Running incremental update")
+            transaction.execute(text("SELECT process_incremental_update();"))
             logger.info("Incremental update complete")
 
         else:
@@ -290,19 +163,12 @@ def main(folder, incremental=False):
                 if_exists="append",
                 schema=schema,
                 index=False,
-                dtype={
-                    "eovs": ARRAY(TEXT),
-                    "organizations": ARRAY(TEXT),
-                    "profile_variables": ARRAY(TEXT),
-                    "organization_pks": ARRAY(INTEGER),
-                },
+                dtype=DATASET_ARRAY_DTYPES,
             )
 
-            # Insert profiles (works for both modes - incremental already deleted old ones)
-            profiles = profiles.replace("", np.NaN)
             logger.info("Writing profiles")
             logger.info("profiles.columns: %s", profiles.columns)
-            profiles.drop(columns=["altitude_min", "altitude_max"], errors="ignore").dropna(subset=['time_min']).to_sql(
+            prepare_profiles_dataframe(profiles).to_sql(
                 "profiles",
                 con=transaction,
                 if_exists="append",
