@@ -12,6 +12,9 @@ body {
 .row>.selectionPanelColumn {
   padding-left: 0px;
   padding-right: 0px;
+   @apply
+    w-[95vw]  lg:w-[auto];
+
 }
 
 .logo.english {

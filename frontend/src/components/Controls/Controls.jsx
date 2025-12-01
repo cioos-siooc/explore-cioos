@@ -17,28 +17,28 @@ export default function Controls({ selectionPanel, loading, isSelectionPanelOpen
 
         {/* Mobile: show only one, based on open/close */}
        
-          {isSelectionPanelOpen ? (
+        {isSelectionPanelOpen ? (
 
-            <Row className='flex lg:hidden'>
-              {selectionPanel}
-            </Row>
-            
-          ) : (
-
-            <> 
-            <SmallHeader setShowIntroModal= {setShowIntroModal}/>
-
-            <Row className='flex lg:hidden relative top-[10px]'>
-            <Col className='panelHandleCol'>
-              <div className='panelHandleClosed' 
-                onClick={() => setSelectionPanelOpen(true)}>  
-                <ChevronCompactRight /> 
-              </div> 
-            </Col>
-          
-            <Col className='controlColumn'>{children}</Col>
+          <Row className='flex lg:hidden'>
+            {selectionPanel}
           </Row>
-            </>
+          
+        ) : (
+
+        <> 
+          <SmallHeader setShowIntroModal= {setShowIntroModal}/>
+
+          <Row className='flex lg:hidden relative top-[10px]'>
+          <Col className='panelHandleCol'>
+            <div className='panelHandleClosed' 
+              onClick={() => setSelectionPanelOpen(true)}>  
+              <ChevronCompactRight /> 
+            </div> 
+          </Col>
+        
+          <Col className='controlColumn'>{children}</Col>
+          </Row>
+          </>
 
 
            

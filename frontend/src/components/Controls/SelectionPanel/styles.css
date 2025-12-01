@@ -1,11 +1,11 @@
 .selectionPanel {
   pointer-events: all;
   height: 98vh;
-  width: 580px;
+  
   transition: width 1s;
   display:flex;
-  /*@apply
-    absolute lg:flex;*/
+  @apply
+    w-full lg:w-[580px];
 }
 
 .selectionPanel.closed {
@@ -17,10 +17,10 @@
   position: relative;
   top: -10px;
   left: 0px;
-  min-width: 560px;
-  
   height: 100vh;
   transition: left 1s;
+  @apply
+    min-w-full lg:min-w-[560px];
 }
 
 .panelContents.closed {
@@ -48,6 +48,7 @@
   border-right: 2px solid darkgrey;
   border-bottom: 2px solid darkgrey;
   transition: left 1s;
+  
 }
 
 .panelHandle.closed {

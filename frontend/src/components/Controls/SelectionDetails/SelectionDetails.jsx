@@ -221,6 +221,9 @@ export default function SelectionDetails({
       <div
         className={`pointDetailsInfoRow ${inspectDataset ? 'fullHeight' : ''}`}
       >
+          {console.log('loading:', loading)}
+  {console.log('initialPointsQueryComplete:', initialPointsQueryComplete)}
+  {console.log('inspectDataset:', inspectDataset)}
         {loading || !initialPointsQueryComplete ? (
           <Loading />
         ) : inspectDataset ? (
