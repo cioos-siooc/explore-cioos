@@ -5,8 +5,31 @@ const router = express.Router();
 const { getShapeQuery } = require("../utils/shapeQuery");
 
 /**
- * /downloadEstimate
- * Requires a list of dataset PKs, eg datasetPKs=1,2,3 the other filters are optional
+ * @swagger
+ * /downloadEstimate:
+ *   get:
+ *     summary: Estimate download sizes for selected datasets
+ *     tags: [Download]
+ *     description: Returns size estimates for given dataset PKs and optional filters.
+ *     parameters:
+ *       - in: query
+ *         name: datasetPKs
+ *         required: true
+ *         schema: { type: string }
+ *         description: Comma-separated dataset primary keys.
+ *     responses:
+ *       200:
+ *         description: Array of size estimates.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   pk: { type: string }
+ *                   dataset_id: { type: string }
+ *                   size: { type: number }
  */
 
 router.get("/", async (req, res, next) => {
