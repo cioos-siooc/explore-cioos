@@ -14,19 +14,24 @@ To run the scheduler outside of Docker:
 
 1. Configure environment variables by copying `.env.sample` to `.env` in the project root and filling in your database connection info.
 
-2. Install dependencies using uv (recommended) or pip:
+2. Create a virtual environment and install dependencies using uv (recommended) or pip:
 
    ```sh
    # Using uv (recommended)
-   uv pip install -e .
+   uv sync
 
    # Or using pip
    pip install -e .
    ```
 
+   This will create a local `.venv` directory and install all dependencies including the downloader and harvester packages.
+
 3. Run the scheduler:
 
    ```sh
+   uv run python -m download_scheduler
+
+   # Or if using pip/venv
    python -m download_scheduler
    ```
 
