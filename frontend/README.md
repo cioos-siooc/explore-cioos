@@ -33,10 +33,12 @@ Run only the frontend locally and connect to a remote API:
 ```sh
 cd frontend
 npm install
-REACT_APP_API_URL=https://your-remote-api.com/api npm start
+API_URL=https://your-remote-api.com/api npm start
 ```
 
 Access the application at <http://localhost:8000>
+
+**Note**: This project uses a custom webpack configuration (not Create React App), so environment variables use `API_URL` instead of the `REACT_APP_API_URL` convention.
 
 ### Option 3: Full Docker Compose
 
@@ -56,10 +58,12 @@ Build the frontend for production deployment:
 ```sh
 cd frontend
 npm install
-npm run build
+API_URL=https://your-api-url.com/api npm run build
 ```
 
 The production build will be generated in the `dist` folder.
+
+**Note**: The `API_URL` environment variable must be set at build time as it gets embedded into the webpack bundle via `DefinePlugin`.
 
 ## Deployment to GitHub Pages
 
