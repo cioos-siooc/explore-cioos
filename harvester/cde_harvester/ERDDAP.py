@@ -64,10 +64,12 @@ class ERDDAP(object):
         "Get a string list of dataset IDs from the ERDDAP server"
         # allDatasets indexes table and grid datasets
         try:
+            self.logger.info("Fetching all datasets from ERDDAP server: %s", self.url)
             df = self.erddap_csv_to_df(
                 '/tabledap/allDatasets.csv?&accessible="public"&dataStructure="table"',
                 skiprows=[1, 2],
             )
+            self.logger.info(f"Found {len(df)} datasets")
             return df
         except requests.exceptions.HTTPError:
             self.logger.error("ERDDAP query failed", exc_info=True)
@@ -104,7 +106,7 @@ class ERDDAP(object):
 
         url_combined = erddap_url + url
 
-        logger.debug(unquote(url_combined))
+        logger.info(f"Requesting: {unquote(url_combined)}")
 
         response = None
         if self.cache_requests:
@@ -113,10 +115,10 @@ class ERDDAP(object):
                 response = cache[url_combined]
             else:
                 logger.debug("CACHE MISS")
-                response = self.session.get(url_combined, timeout=3600)
+                response = self.session.get(url_combined, timeout=300)
                 cache[url_combined] = response
         else:
-            response = self.session.get(url_combined, timeout=3600)
+            response = self.session.get(url_combined, timeout=300)
 
         if len(response.content) > MAX_RESPONSE_SIZE:
             raise RuntimeError("Response too big")
