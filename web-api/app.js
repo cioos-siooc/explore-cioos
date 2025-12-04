@@ -19,6 +19,8 @@ const previewRouter = require("./routes/preview");
 const platformsRouter = require("./routes/platforms");
 const datasetRecordsListRouter = require("./routes/datasetRecordsList");
 const downloadEstimateRouter = require("./routes/downloadEstimate");
+const swaggerSpec = require('./swagger');
+const swaggerUi = require('swagger-ui-express');
 
 const app = express();
 
@@ -98,6 +100,19 @@ app.use("/preview", previewRouter);
 app.use("/platforms", platformsRouter);
 app.use("/datasetRecordsList", datasetRecordsListRouter);
 app.use("/downloadEstimate", downloadEstimateRouter);
+
+// Swagger docs - conditionally enabled via ENABLE_API_DOCS environment variable
+if (process.env.ENABLE_API_DOCS !== 'false') {
+  app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: true }));
+  app.get('/openapi.json', (_req, res) => res.json(swaggerSpec));
+  console.log("API documentation enabled at /docs and /openapi.json");
+} else {
+  // Redirect to BASE_URL when API docs are disabled
+  const redirectUrl = process.env.BASE_URL || '/';
+  app.use('/docs', (_req, res) => res.redirect(redirectUrl));
+  app.get('/openapi.json', (_req, res) => res.redirect(redirectUrl));
+  console.log(`API documentation disabled via ENABLE_API_DOCS=false (redirecting to ${redirectUrl})`);
+}
 
 app.use(Sentry.Handlers.errorHandler());
 
