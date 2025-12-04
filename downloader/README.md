@@ -16,24 +16,19 @@ The downloader runs automatically as part of the download scheduler service in D
 
 If you need to run the downloader outside of Docker:
 
-1. Install using uv (recommended) or pip:
+1. Create a virtual environment and install dependencies using uv (recommended) or pip:
 
    ```sh
    # Using uv (recommended)
-   uv pip install -e .
+   uv sync
 
    # Or using pip
    pip install -e .
    ```
 
-2. Install the harvester package (required dependency):
+   This will create a local `.venv` directory and install all dependencies including the harvester package.
 
-   ```sh
-   cd ../harvester
-   uv pip install -e .
-   ```
-
-3. (Optional) Download and install [wkhtmltopdf](https://wkhtmltopdf.org/downloads.html) if you need PDF generation functionality.
+2. (Optional) Download and install [wkhtmltopdf](https://wkhtmltopdf.org/downloads.html) if you need PDF generation functionality.
 
 ## Configuration
 
