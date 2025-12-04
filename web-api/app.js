@@ -42,7 +42,42 @@ if (process.env.ENVIRONMENT === "production") {
 // otherwise load from .env
 if (!process.env.DB_USER) require("dotenv").config();
 
-app.use(cors());
+// CORS configuration via environment variable:
+//  - CORS_ORIGINS="*" (default) allows all origins
+//  - CORS_ORIGINS="https://a.com,https://b.com" restricts to listed origins
+//  - CORS_ORIGINS="disabled" (case-insensitive) disables CORS middleware entirely
+//  - Non-browser / same-origin server-to-server requests (no Origin header) are always allowed when CORS enabled
+(() => {
+  const raw = process.env.CORS_ORIGINS || "*";
+  if (raw.toLowerCase() === "disabled") {
+    console.log("CORS middleware disabled via CORS_ORIGINS=disabled");
+    return; // do not install cors()
+  }
+
+  if (raw === "*") {
+    app.use(cors({ origin: true, credentials: true }));
+    console.log("CORS allowing all origins (*).");
+    return;
+  }
+
+  const allowed = raw
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const corsOptions = {
+    origin(origin, callback) {
+      if (!origin) return callback(null, true); // e.g. curl / server-side
+      if (allowed.includes(origin)) return callback(null, true);
+      console.warn("CORS blocked origin", origin);
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  };
+  console.log("CORS restricted to:", allowed.join(", "));
+  app.use(cors(corsOptions));
+})();
+
+
 // view engine setup
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "jade");
