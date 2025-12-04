@@ -13,6 +13,7 @@
     "@turf/points-within-polygon": "^6.5.0",
     "bytes": "^3.1.2",
     "classnames": "^2.3.1",
+    "core-js": "3.45.1",
     "d3": "^7.4.4",
     "i18next": "^21.8.5",
     "i18next-browser-languagedetector": "^6.1.4",
@@ -21,19 +22,28 @@
     "mapbox-gl-draw-rectangle-mode": "^1.0.4",
     "prop-types": "^15.8.1",
     "rc-slider": "^10.0.0",
+    "react": "18.3.1",
     "react-bootstrap-icons": "^1.8.2",
     "react-data-table-component": "^7.5.3",
     "react-data-table-component-extensions": "^1.6.0",
+    "react-dom": "18.3.1",
     "react-i18next": "^11.16.9",
-    "react-router-dom": "^6.4.1"
+    "react-router-dom": "^6.4.1",
+    "regenerator-runtime": "0.14.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.18.2",
-    "@babel/preset-env": "^7.18.2",
-    "@babel/preset-react": "^7.17.12",
-    "@babel/runtime": "^7.18.3",
-    "babel-cli": "^6.26.0",
-    "babel-loader": "^8.2.5",
+    "@babel/cli": "7.28.3",
+    "@babel/core": "7.28.4",
+    "@babel/plugin-transform-class-properties": "7.27.1",
+    "@babel/plugin-transform-nullish-coalescing-operator": "7.27.1",
+    "@babel/plugin-transform-numeric-separator": "7.27.1",
+    "@babel/plugin-transform-optional-chaining": "7.27.1",
+    "@babel/plugin-transform-private-methods": "7.27.1",
+    "@babel/plugin-transform-private-property-in-object": "7.27.1",
+    "@babel/preset-env": "7.28.3",
+    "@babel/preset-react": "7.27.1",
+    "@babel/runtime": "7.28.4",
+    "babel-loader": "8.4.1",
     "babel-preset-react-app": "^10.0.1",
     "clean-webpack-plugin": "^4.0.0",
     "css-loader": "^6.7.1",
@@ -48,14 +58,14 @@
     "eslint-plugin-promise": "^6.0.0",
     "eslint-plugin-react": "^7.30.0",
     "eslint-plugin-standard": "^4.1.0",
-    "gh-pages": "^4.0.0",
+    "gh-pages": "6.3.0",
     "html-webpack-plugin": "^5.5.0",
     "prettier": "^2.7.1",
     "style-loader": "^3.3.1",
-    "webpack": "^5.72.1",
+    "webpack": "5.101.3",
     "webpack-bundle-analyzer": "^4.5.0",
-    "webpack-cli": "^4.9.2",
-    "webpack-dev-server": "^4.9.0"
+    "webpack-cli": "5.1.4",
+    "webpack-dev-server": "5.2.2"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -68,5 +78,6 @@
     "lint:fix": "eslint --fix . --ext .js,.jsx --ignore-path .gitignore"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "overrides": {}
 }
