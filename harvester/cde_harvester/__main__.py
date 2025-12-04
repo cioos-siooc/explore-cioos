@@ -37,6 +37,8 @@ sentry_sdk.init(
     environment=os.environ.get("ENVIRONMENT", "development"),
 )
 
+# Ignored standard names that are not EOVs, mostly coordinate variables
+IGNORED_STANDARD_NAMES= ["latitude", "longitude", "time", "depth", "","altitude","sea_water_pressure","sea_water_pressure_due_to_sea_water"]
 
 def setup_logging(log_time, log_level):
     # setup logging
@@ -113,14 +115,12 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
         variables.query("not standard_name.isnull()")["standard_name"].unique().tolist()
     )
 
-    llat_variables = ["latitude", "longitude", "time", "depth", ""]
-
     # this gets a list of all the standard names
 
     standard_names_not_harvested = [
         x
         for x in standard_names_harvested
-        if x not in supported_standard_names + llat_variables
+        if (x not in supported_standard_names + IGNORED_STANDARD_NAMES) and (not x.startswith("platform_"))
     ]
 
     standard_names_not_harvested_that_are_real = [
