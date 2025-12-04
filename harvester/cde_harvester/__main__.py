@@ -5,6 +5,7 @@ import queue
 import sys
 import threading
 import time
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -38,19 +39,66 @@ sentry_sdk.init(
 )
 
 
-def setup_logging(log_time, log_level):
+def cleanup_old_logs(log_dir, days=30):
+    """Remove log files older than specified days."""
+    if not os.path.exists(log_dir):
+        return
+
+    cutoff_time = time.time() - (days * 86400)  # 86400 seconds in a day
+    removed_count = 0
+
+    for filename in os.listdir(log_dir):
+        if filename.startswith("harvest_") and filename.endswith(".log"):
+            filepath = os.path.join(log_dir, filename)
+            if os.path.isfile(filepath) and os.path.getmtime(filepath) < cutoff_time:
+                try:
+                    os.remove(filepath)
+                    removed_count += 1
+                    print(f"Removed old log file: {filename}")
+                except OSError as e:
+                    print(f"Warning: Failed to remove old log file {filename}: {e}")
+
+    if removed_count > 0:
+        print(f"Cleaned up {removed_count} log file(s) older than {days} days")
+
+
+def setup_logging(log_time, log_level, log_dir=None):
+    # Clean up old log files before setting up logging
+    if log_dir:
+        cleanup_old_logs(log_dir, days=30)
+
     # setup logging
     logger.setLevel(logging.getLevelName(log_level.upper()))
     logger.handlers.clear()
-    # Define the stream log format and level
-    c_handler = logging.StreamHandler()
-    c_handler.setLevel(logging.getLevelName(log_level.upper()))
-    c_format = logging.Formatter(
+
+    # Define log format
+    log_format = (
         ("%(asctime)s - " if log_time else "")
         + "%(levelname)-8s - %(name)s : %(message)s"
     )
+
+    # Add console handler
+    c_handler = logging.StreamHandler()
+    c_handler.setLevel(logging.getLevelName(log_level.upper()))
+    c_format = logging.Formatter(log_format)
     c_handler.setFormatter(c_format)
     logger.addHandler(c_handler)
+
+    # Add file handler with timestamped filename if log directory is specified
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = os.path.join(log_dir, f"harvest_{timestamp}.log")
+
+        f_handler = logging.FileHandler(log_file)
+        f_handler.setLevel(logging.getLevelName(log_level.upper()))
+        f_format = logging.Formatter(
+            "%(asctime)s - %(levelname)-8s - %(name)s : %(message)s"
+        )
+        f_handler.setFormatter(f_format)
+        logger.addHandler(f_handler)
+        logger.info(f"Logging to file: {log_file}")
+
     return logger
 
 
@@ -240,6 +288,7 @@ if __name__ == "__main__":
         dataset_ids = ",".join(config.get("dataset_ids") or [])
         log_time = config.get("log_time")
         log_level = config.get("log_level", "INFO")
+        log_dir = os.environ.get("HARVESTER_LOG_DIR") or config.get("log_dir")
 
     else:
         parser.add_argument(
@@ -278,6 +327,11 @@ if __name__ == "__main__":
             default=1,
             help="max threads that harvester will use",
         )
+        parser.add_argument(
+            "--log-dir",
+            default=None,
+            help="Directory to save log files to",
+        )
 
         args = parser.parse_args()
 
@@ -288,8 +342,9 @@ if __name__ == "__main__":
         dataset_ids = args.dataset_ids
         max_workers = args.max_workers
         folder = args.folder
+        log_dir = args.log_dir
 
-    logger = setup_logging(log_time, log_level)
+    logger = setup_logging(log_time, log_level, log_dir)
     try:
         main(urls, cache, folder or "harvest", dataset_ids, max_workers)
     except Exception as e:
