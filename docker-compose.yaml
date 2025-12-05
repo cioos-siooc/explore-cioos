@@ -74,10 +74,9 @@ services:
       - ./harvester_logs:/app/harvester/logs
     environment:
       - "HARVESTER_LOG_DIR=/app/harvester/logs"
+      - PREFECT_API_URL=http://prefect:4200/api
     env_file:
       - .env
-    environment:
-      - PREFECT_API_URL=http://prefect:4200/api
     depends_on:
       prefect:
         condition: service_healthy
