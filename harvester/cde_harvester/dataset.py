@@ -202,11 +202,10 @@ class Dataset(object):
         time_coverage_resolution = self.globals.get("time_coverage_resolution")
 
         if (
-            is_single_profile_dataset
-            and time_coverage_resolution
+            time_coverage_resolution
             and is_valid_duration(time_coverage_resolution)
         ):
-            self.logger.debug(f"Using time_coverage_resolution for count")
+            self.logger.debug(f"Using time_coverage_resolution for profile count")
             df_profile_ids = self.profile_ids.copy()
             readings_per_day = np.timedelta64(1, "D") / pd.Timedelta(
                 time_coverage_resolution
