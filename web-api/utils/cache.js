@@ -1,28 +1,37 @@
-console.log("Connecting to redis at", process.env.REDIS_HOST);
+const apicache = require('apicache');
+const redisClient = require('./redis');
 
-const cache = require("express-redis-cache")({
-  host: process.env.REDIS_HOST,
-});
+let middleware; // initialized on first request
 
-cache.on("connected", (message) => {
-  console.log(message);
-});
+function apicacheOptions() {
+  return {
+    // Don’t leak internal headers; set a sane default Cache-Control if route didn’t set one
+    headers: {
+      'cache-control': (req, res) => res.get('Cache-Control') || 'public, max-age=300',
+    },
+  };
+}
 
-cache.on("message", (message) => {
-  console.log(message);
-});
+async function ensureReady() {
+  if (middleware) return middleware;
 
-cache.on("error", (error) => {
-  if (process.env.ENVIRONMENT === "production") {
-    console.log(error);
-  } else {
-    cache.on("error", (error) => {
-      console.error("Running without Redis, that's ok");
-      cache.removeAllListeners();
-      // hide more error messages
-      cache.on("error", () => {});
-    });
+  try {
+    await redisClient.connect(); // redis@4 connect is idempotent
+    middleware = apicache.options({ ...apicacheOptions(), redisClient }).middleware;
+    console.log('Cache: using Redis backend');
+  } catch (e) {
+    console.warn('Cache: Redis unavailable, using in-memory cache:', e.message);
+    middleware = apicache.options(apicacheOptions()).middleware;
   }
-});
+  return middleware;
+}
 
-module.exports = cache;
+module.exports = {
+  route: (duration = '5 minutes') => {
+    return async (req, res, next) => {
+      const mw = await ensureReady();
+      return mw(duration)(req, res, next);
+    };
+  },
+};
+

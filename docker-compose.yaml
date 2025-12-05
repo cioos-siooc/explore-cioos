@@ -34,6 +34,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/logs:/var/log/nginx
       - ./nginx/logrotate_state:/var/lib/logrotate
+      - ./harvester_logs:/usr/share/nginx/html/harvester_logs:ro
     depends_on:
       - web-api
     ports:
@@ -70,6 +71,9 @@ services:
       - ./harvester_cache:/app/harvester/harvester_cache
       - ./harvest:/app/harvester/harvest
       - ./nginx/logs:/app/nginx/logs  
+      - ./harvester_logs:/app/harvester/logs
+    environment:
+      - "HARVESTER_LOG_DIR=/app/harvester/logs"
     env_file:
       - .env
     environment:
