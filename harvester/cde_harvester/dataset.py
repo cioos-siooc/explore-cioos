@@ -102,6 +102,15 @@ class Dataset(object):
         return df_min_max
 
     def get_profile_ids(self):
+
+        def is_metadata_unique_location(self):
+            if not self.globals.get("geospatial_lat_max") or not self.globals.get("geospatial_lat_min") or not self.globals.get("geospatial_lon_max") or not self.globals.get("geospatial_lon_min"):
+                return False
+            
+            dlat = float(self.globals.get("geospatial_lat_max")) - float(self.globals.get("geospatial_lat_min"))
+            dlon = float(self.globals.get("geospatial_lon_max")) - float(self.globals.get("geospatial_lon_min"))
+            return dlat == 0 and dlon == 0 
+
         df_variables = self.df_variables
 
         # Organize dataset variables by their cf_roles
@@ -127,9 +136,18 @@ class Dataset(object):
             return []
 
         # dropna - for when there are nulls in the lat/lon column leading to a second profile created
-        profile_ids = self.dataset_tabledap_query(
-            f"{','.join(profile_variable_list + lat_lng)}&distinct()"
-        )
+        if is_metadata_unique_location(self):
+            profile_ids = self.dataset_tabledap_query(
+                f"{','.join(profile_variable_list)}&distinct()"
+            )
+            # append lat/lon columns with unique location from metadata
+            profile_ids["latitude"] = float(self.globals.get("geospatial_lat_min"))
+            profile_ids["longitude"] = float(self.globals.get("geospatial_lon_min"))
+            self.logger.info("Dataset has unique location from metadata, appended lat/lon to profile IDs")
+        else:
+            profile_ids = self.dataset_tabledap_query(
+                f"{','.join(profile_variable_list + lat_lng)}&distinct()"
+            )
 
         if profile_ids.empty:
             return profile_ids
