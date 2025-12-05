@@ -1,30 +1,43 @@
-# ERDDAP and CKAN downloader
+# ERDDAP and CKAN Downloader
+
+The CDE downloader retrieves data from CIOOS datasets based on JSON queries. For each dataset, the downloader:
+
+1. Retrieves a PDF copy of the CKAN dataset page (if enabled)
+2. Downloads data through ERDDAP in the specified format
+3. Filters data spatially to match only data within the provided polygon (for CSV format with polygon region selected)
 
 ## Installation
 
-Substitute `pip3` for `pip` if required
+### Using Docker (Recommended)
 
-1. Go the the downloader directory of the CDE package and Run the following command in a command shell:
+The downloader runs automatically as part of the download scheduler service in Docker Compose. See the main [README.md](../README.md) for Docker setup instructions.
 
-   ```python
+### Manual Installation
+
+If you need to run the downloader outside of Docker:
+
+1. Create a virtual environment and install dependencies using uv (recommended) or pip:
+
+   ```sh
+   # Using uv (recommended)
+   uv sync
+
+   # Or using pip
    pip install -e .
    ```
 
-1. Go to the harvester directory and install the harvester package and Run the same command:
+   This will create a local `.venv` directory and install all dependencies including the harvester package.
 
-   ```python
-   pip install -e .
-   ```
+2. (Optional) Download and install [wkhtmltopdf](https://wkhtmltopdf.org/downloads.html) if you need PDF generation functionality.
 
-1. Download and install [wkhtmltopdf](https://wkhtmltopdf.org/downloads.html)
+## Configuration
 
-## Description
+Configure the downloader through environment variables in `.env` file at the project root:
 
-The CDE downloader uses a json query (ex: downloader/test/\*.json ) to retrieve matching data
-form multiple CIOOS datasets. Downloader will for each datasets :
+- `DOWNLOADS_FOLDER`: Directory for downloaded files (default: `./downloads`)
+- `DOWNLOAD_WAF_URL`: Base URL for WAF downloads
+- `CREATE_PDF`: Enable/disable PDF generation (default: `False`)
 
-1. Retrieve a pdf copy of the CKAN page dataset
-2. Retrieve copy of the data through ERDDAP in the specified format.
-3. Data filtered spatially to match the only data present within the provided polygon if:
-   1. Format: CSV
-   2. Region selected via polygon
+## Usage
+
+The downloader is typically invoked by the download scheduler service. For testing individual downloads, use the test JSON files located in `downloader/test/*.json`.

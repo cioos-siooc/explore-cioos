@@ -40,6 +40,7 @@
     "concentration_of_colored_dissolved_organic_matter_in_sea_water_expressed_as_equivalent_mass_fraction_of_quinine_sulfate_dihydrate",
     "surface_downwelling_photosynthetic_photon_flux_in_air",
     "surface_downwelling_photosynthetic_photon_flux_in_sea_water",
+    "downwelling_photosynthetic_photon_flux_in_sea_water",
     "surface_downwelling_shortwave_flux_in_air",
     "downwelling_photosynthetic_photon_spherical_irradiance_in_sea_water",
     "chlorophyll_concentration_in_sea_water",
@@ -244,7 +245,8 @@
     "northward_sea_water_velocity_at_sea_floor",
     "upward_sea_water_velocity",
     "sea_water_x_velocity",
-    "sea_water_y_velocity"
+    "sea_water_y_velocity",
+    "direction_of_sea_water_velocity"
   ],
   "subSurfaceSalinity": [
     "sea_surface_salinity",
@@ -254,7 +256,8 @@
     "sea_water_electrical_conductivity",
     "sea_water_density",
     "sea_water_sigma_t",
-    "sea_water_absolute_salinity"
+    "sea_water_absolute_salinity",
+    "square_of_brunt_vaisala_frequency_in_sea_water"
   ],
   "subSurfaceTemperature": [
     "sea_surface_temperature",

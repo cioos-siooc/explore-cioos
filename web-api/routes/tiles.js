@@ -13,6 +13,41 @@ const cache = require("../utils/cache");
  * Takes all the filters
  */
 
+/**
+ * @swagger
+ * /tiles/{z}/{x}/{y}.mvt:
+ *   get:
+ *     summary: Retrieve a vector tile of map data
+ *     tags: [Tiles]
+ *     description: Returns a Mapbox Vector Tile containing either hex bins or points with dataset aggregation.
+ *     parameters:
+ *       - in: path
+ *         name: z
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: x
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: y
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: timeMin
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: timeMax
+ *         schema: { type: string, format: date-time }
+ *     responses:
+ *       200:
+ *         description: MVT binary tile.
+ *         content:
+ *           application/x-protobuf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ */
 /* GET /tiles/:z/:x/:y.mvt */
 /* Retreive a vector tile by tileid */
 router.get(
