@@ -104,7 +104,7 @@ class Dataset(object):
     def get_profile_ids(self):
 
         def is_metadata_unique_location(self):
-            if not self.globals.get("geospatial_lat_max") or not self.globals.get("geospatial_lat_min") or not self.globals.get("geospatial_lon_max") or not self.globals.get("geospatial_lon_min"):
+            if not self.globals.get("geospatial_lat_max") or not self.globals.get("geospatial_lat_min") or not self.globals.get("geospatial_lon_max") or not self.globals.get("geospatial_lon_min") and self.globals.get("geospatial_lat_units") != "degrees_north" and self.globals.get("geospatial_lon_units") != "degrees_east":
                 return False
             
             dlat = float(self.globals.get("geospatial_lat_max")) - float(self.globals.get("geospatial_lat_min"))
