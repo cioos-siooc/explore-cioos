@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIOOS Data Explorer - Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #ffffff;
+            color: #333;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: #52a79b;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(82, 167, 155, 0.3);
+            margin-bottom: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header-logo {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            width: 130px;
+            height: 40px;
+            background-image: url(./NationalLogoEnglish.png);
+            background-color: #fff;
+            background-repeat: no-repeat;
+            background-size: contain;
+            border-radius: 10px;
+            box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+        }
+
+        h1 {
+            color: #ffffff;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #f0f8f7;
+            font-size: 1.1em;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(82, 167, 155, 0.15);
+            border-left: 4px solid #52a79b;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 20px rgba(82, 167, 155, 0.25);
+        }
+
+        .stat-value {
+            font-size: 3em;
+            font-weight: bold;
+            color: #52a79b;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            font-size: 1.1em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .chart-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(82, 167, 155, 0.15);
+            border-top: 3px solid #52a79b;
+        }
+
+        .chart-card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .chart-title {
+            font-size: 1.3em;
+            color: #52a79b;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        .chart-container.tall {
+            height: 400px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #52a79b;
+            font-size: 1.5em;
+        }
+
+        .error {
+            background: #ff6b6b;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .last-updated {
+            text-align: center;
+            color: #666;
+            margin-top: 20px;
+            font-size: 0.9em;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(82, 167, 155, 0.15);
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .stat-value {
+                font-size: 2em;
+            }
+        }
+
+        .legend-item {
+            display: inline-block;
+            margin: 5px 10px;
+        }
+
+        .legend-color {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-logo"></div>
+            <h1>CIOOS Data Explorer Dashboard</h1>
+            <p class="subtitle">Real-time statistics and visualizations</p>
+        </header>
+
+        <div id="loading" class="loading">Loading dashboard data...</div>
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="content" style="display: none;">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-datasets">-</div>
+                    <div class="stat-label">Datasets</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-organizations">-</div>
+                    <div class="stat-label">Organizations</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-profiles">-</div>
+                    <div class="stat-label">Total Profiles</div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-profile-subsets">-</div>
+                    <div class="stat-label">Profile Subsets</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-timeseries">-</div>
+                    <div class="stat-label">TimeSeries</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-timeseriesprofile">-</div>
+                    <div class="stat-label">TimeSeriesProfile</div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3 class="chart-title">Datasets by Platform</h3>
+                    <div class="chart-container">
+                        <canvas id="platformChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3 class="chart-title">Datasets by Organization</h3>
+                    <div class="chart-container">
+                        <canvas id="organizationChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3 class="chart-title">Dataset Sizes (Top 15)</h3>
+                    <div class="chart-container">
+                        <canvas id="datasetSizesChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3 class="chart-title">Profiles by Dataset (Top 10)</h3>
+                    <div class="chart-container">
+                        <canvas id="profilesDistributionChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card full-width">
+                    <h3 class="chart-title">Top 10 Datasets by Profile Count</h3>
+                    <div class="chart-container tall">
+                        <canvas id="topDatasetsChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card full-width">
+                    <h3 class="chart-title">Downloads Over Time (Last 30 Days)</h3>
+                    <div class="chart-container">
+                        <canvas id="downloadsTimelineChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3 class="chart-title">Profiles by Organization</h3>
+                    <div class="chart-container">
+                        <canvas id="profilesByOrganizationChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3 class="chart-title">Profiles by CDM Data Type</h3>
+                    <div class="chart-container">
+                        <canvas id="profilesByCdmDataTypeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="last-updated">
+                Last updated: <span id="last-updated"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API is accessible via /api/ prefix through nginx
+        const API_BASE = window.location.origin + '/api';
+
+        // Color palettes - primary color #52a79b with complementary colors
+        const colorPalette = [
+            '#52a79b', '#6bc4b4', '#3d7d73', '#4dd0e1',
+            '#26a69a', '#80cbc4', '#00897b', '#4db6ac',
+            '#b2dfdb', '#e0f2f1', '#009688', '#00bcd4'
+        ];
+
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'bottom'
+                }
+            }
+        };
+
+        function formatNumber(num) {
+            return num.toLocaleString();
+        }
+
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleString();
+        }
+
+        function truncateLabel(label, maxLength = 30) {
+            if (label.length <= maxLength) return label;
+            return label.substring(0, maxLength) + '...';
+        }
+
+        async function fetchStatistics() {
+            try {
+                const response = await fetch(`${API_BASE}/statistics`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error fetching statistics:', error);
+                throw error;
+            }
+        }
+
+        function updateStatCards(counts, profilesByCdmDataType) {
+            document.getElementById('stat-datasets').textContent = formatNumber(counts.datasets);
+            document.getElementById('stat-organizations').textContent = formatNumber(counts.organizations);
+            document.getElementById('stat-profiles').textContent = formatNumber(counts.profiles);
+
+            // Find counts for each CDM data type
+            const profileType = profilesByCdmDataType.find(p => p.cdm_data_type === 'Profile');
+            const timeseriesType = profilesByCdmDataType.find(p => p.cdm_data_type === 'TimeSeries');
+            const timeseriesProfileType = profilesByCdmDataType.find(p => p.cdm_data_type === 'TimeSeriesProfile');
+
+            document.getElementById('stat-profile-subsets').textContent = formatNumber(profileType ? profileType.count : 0);
+            document.getElementById('stat-timeseries').textContent = formatNumber(timeseriesType ? timeseriesType.count : 0);
+            document.getElementById('stat-timeseriesprofile').textContent = formatNumber(timeseriesProfileType ? timeseriesProfileType.count : 0);
+        }
+
+        function createPlatformChart(data) {
+            const ctx = document.getElementById('platformChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(d => d.platform || 'Unknown'),
+                    datasets: [{
+                        data: data.map(d => d.count),
+                        backgroundColor: colorPalette,
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    plugins: {
+                        ...chartOptions.plugins,
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = formatNumber(context.parsed);
+                                    return `${label}: ${value} datasets`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createOrganizationChart(orgData, orgTypeData) {
+            const ctx = document.getElementById('organizationChart').getContext('2d');
+
+            // Get unique organizations and CDM data types
+            const organizations = [...new Set(orgTypeData.map(d => d.organization))];
+            const cdmTypes = [...new Set(orgTypeData.map(d => d.cdm_data_type))];
+
+            // Create datasets for each CDM type
+            const datasets = cdmTypes.map((type, index) => {
+                return {
+                    label: type,
+                    data: organizations.map(org => {
+                        const item = orgTypeData.find(d => d.organization === org && d.cdm_data_type === type);
+                        return item ? item.count : 0;
+                    }),
+                    backgroundColor: colorPalette[index % colorPalette.length],
+                    borderWidth: 0
+                };
+            });
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: organizations.map(name => truncateLabel(name, 20)),
+                    datasets: datasets
+                },
+                options: {
+                    ...chartOptions,
+                    plugins: {
+                        ...chartOptions.plugins,
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createDatasetSizesChart(data) {
+            const ctx = document.getElementById('datasetSizesChart').getContext('2d');
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => truncateLabel(d.title, 30)),
+                    datasets: [{
+                        label: 'Estimated Size (MB)',
+                        data: data.map(d => d.estimated_size_mb),
+                        backgroundColor: data.map(d => {
+                            // Color by CDM data type
+                            if (d.cdm_data_type === 'Profile') return colorPalette[0];
+                            if (d.cdm_data_type === 'TimeSeries') return colorPalette[1];
+                            if (d.cdm_data_type === 'TimeSeriesProfile') return colorPalette[2];
+                            return colorPalette[3];
+                        }),
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    plugins: {
+                        ...chartOptions.plugins,
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const dataset = data[context.dataIndex];
+                                    return [
+                                        `Size: ${context.parsed.y.toFixed(2)} MB`,
+                                        `Profiles: ${formatNumber(dataset.profile_count)}`,
+                                        `Type: ${dataset.cdm_data_type}`
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toFixed(2) + ' MB';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createProfilesDistributionChart(data) {
+            const ctx = document.getElementById('profilesDistributionChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(d => truncateLabel(d.title)),
+                    datasets: [{
+                        data: data.map(d => d.count),
+                        backgroundColor: colorPalette,
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    plugins: {
+                        ...chartOptions.plugins,
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = formatNumber(context.parsed);
+                                    return `${label}: ${value} profiles`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createTopDatasetsChart(data) {
+            const ctx = document.getElementById('topDatasetsChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => truncateLabel(d.title, 40)),
+                    datasets: [{
+                        label: 'Profile Count',
+                        data: data.map(d => d.count),
+                        backgroundColor: '#52a79b',
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    indexAxis: 'y',
+                    plugins: {
+                        ...chartOptions.plugins,
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Profiles: ${formatNumber(context.parsed.x)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createDownloadsTimelineChart(data) {
+            const ctx = document.getElementById('downloadsTimelineChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.date),
+                    datasets: [{
+                        label: 'Downloads',
+                        data: data.map(d => d.count),
+                        borderColor: '#52a79b',
+                        backgroundColor: 'rgba(82, 167, 155, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    },
+                    plugins: {
+                        ...chartOptions.plugins,
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function createProfilesByOrganizationChart(orgData, orgTypeData) {
+            const ctx = document.getElementById('profilesByOrganizationChart').getContext('2d');
+
+            // Get unique organizations and CDM data types
+            const organizations = [...new Set(orgTypeData.map(d => d.organization))];
+            const cdmTypes = [...new Set(orgTypeData.map(d => d.cdm_data_type))];
+
+            // Create datasets for each CDM type
+            const datasets = cdmTypes.map((type, index) => {
+                return {
+                    label: type,
+                    data: organizations.map(org => {
+                        const item = orgTypeData.find(d => d.organization === org && d.cdm_data_type === type);
+                        return item ? item.count : 0;
+                    }),
+                    backgroundColor: colorPalette[index % colorPalette.length],
+                    borderWidth: 0
+                };
+            });
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: organizations.map(name => truncateLabel(name, 20)),
+                    datasets: datasets
+                },
+                options: {
+                    ...chartOptions,
+                    plugins: {
+                        ...chartOptions.plugins,
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createProfilesByCdmDataTypeChart(data) {
+            const ctx = document.getElementById('profilesByCdmDataTypeChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(d => d.cdm_data_type || 'Unknown'),
+                    datasets: [{
+                        data: data.map(d => d.count),
+                        backgroundColor: colorPalette,
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    plugins: {
+                        ...chartOptions.plugins,
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = formatNumber(context.parsed);
+                                    return `${label}: ${value} profiles`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function initDashboard() {
+            try {
+                const stats = await fetchStatistics();
+
+                // Update stat cards
+                updateStatCards(stats.counts, stats.profilesByCdmDataType);
+
+                // Create charts
+                createPlatformChart(stats.datasetsByPlatform);
+                createOrganizationChart(stats.datasetsByOrganization, stats.datasetsByOrgAndType);
+                createDatasetSizesChart(stats.datasetSizes);
+                createProfilesDistributionChart(stats.profilesByDataset);
+                createTopDatasetsChart(stats.topDatasetsByProfiles);
+                createDownloadsTimelineChart(stats.downloadsOverTime);
+                createProfilesByOrganizationChart(stats.profilesByOrganization, stats.profilesByOrgAndType);
+                createProfilesByCdmDataTypeChart(stats.profilesByCdmDataType);
+
+                // Update last updated time
+                document.getElementById('last-updated').textContent = formatDate(stats.lastUpdated);
+
+                // Show content, hide loading
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent =
+                    'Failed to load dashboard data. Please check if the API is running and try again.';
+            }
+        }
+
+        // Initialize dashboard when page loads
+        window.addEventListener('DOMContentLoaded', initDashboard);
+    </script>
+</body>
+</html>
