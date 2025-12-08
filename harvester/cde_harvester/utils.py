@@ -1,10 +1,32 @@
 import json
 import logging
 import os
+from pathlib import Path
 
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+
+class RelativePathFormatter(logging.Formatter):
+    """Custom formatter that shows relative path from project root (VSCode compatible)"""
+
+    def __init__(self, fmt=None, datefmt=None):
+        super().__init__(fmt, datefmt)
+        # Get the project root (parent of harvester directory)
+        self.project_root = Path(__file__).parent.parent.parent
+
+    def format(self, record):
+        # Convert absolute path to relative path
+        pathname = Path(record.pathname)
+        try:
+            relative_path = pathname.relative_to(self.project_root)
+            record.relative_path = str(relative_path)
+        except ValueError:
+            # If path is not relative to project root, use the filename
+            record.relative_path = record.filename
+
+        return super().format(record)
 
 
 def get_cde_eov_to_standard_name():

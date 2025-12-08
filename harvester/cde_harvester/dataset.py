@@ -5,7 +5,11 @@ import numpy as np
 import pandas as pd
 import requests
 from cde_harvester.platform_ioos_to_l06 import platforms_nerc_ioos
-from cde_harvester.utils import cde_eov_to_standard_name, intersection
+from cde_harvester.utils import (
+    RelativePathFormatter,
+    cde_eov_to_standard_name,
+    intersection,
+)
 from requests.exceptions import HTTPError
 
 
@@ -382,4 +386,14 @@ class Dataset(object):
 
     def get_logger(self):
         logger = logging.getLogger(f"{self.erddap_server.domain} - {self.id}")
+
+        # Configure formatter to include relative path and line number (VSCode compatible)
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = RelativePathFormatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(relative_path)s:%(lineno)d - %(message)s'
+            )
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+
         return logger

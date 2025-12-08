@@ -17,7 +17,11 @@ from cde_harvester.ckan.create_ckan_erddap_link import (
     unescape_ascii_list,
 )
 from cde_harvester.harvest_erddap import harvest_erddap
-from cde_harvester.utils import cf_standard_names, supported_standard_names
+from cde_harvester.utils import (
+    RelativePathFormatter,
+    cf_standard_names,
+    supported_standard_names,
+)
 from dotenv import load_dotenv
 from sentry_sdk.crons import monitor
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -73,16 +77,16 @@ def setup_logging(log_time, log_level, log_dir=None):
     logger.setLevel(logging.getLevelName(log_level.upper()))
     logger.handlers.clear()
 
-    # Define log format
+    # Define log format with relative path and line number (VSCode compatible)
     log_format = (
         ("%(asctime)s - " if log_time else "")
-        + "%(levelname)-8s - %(name)s : %(message)s"
+        + "%(levelname)-8s - %(name)s - %(relative_path)s:%(lineno)d : %(message)s"
     )
 
     # Add console handler
     c_handler = logging.StreamHandler()
     c_handler.setLevel(logging.getLevelName(log_level.upper()))
-    c_format = logging.Formatter(log_format)
+    c_format = RelativePathFormatter(log_format)
     c_handler.setFormatter(c_format)
     logger.addHandler(c_handler)
 
@@ -94,8 +98,8 @@ def setup_logging(log_time, log_level, log_dir=None):
 
         f_handler = logging.FileHandler(log_file)
         f_handler.setLevel(logging.getLevelName(log_level.upper()))
-        f_format = logging.Formatter(
-            "%(asctime)s - %(levelname)-8s - %(name)s : %(message)s"
+        f_format = RelativePathFormatter(
+            "%(asctime)s - %(levelname)-8s - %(name)s - %(relative_path)s:%(lineno)d : %(message)s"
         )
         f_handler.setFormatter(f_format)
         logger.addHandler(f_handler)
