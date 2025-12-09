@@ -21,6 +21,7 @@ function createDBFilter(request) {
     organizations,
     datasetPKs,
     pointPKs,
+    erddapServers,
   } = request;
 
   const filters = [];
@@ -87,6 +88,11 @@ function createDBFilter(request) {
   if (organizations) {
     parameters.organizationsString = organizations.split(",");
     filters.push("organization_pks && :organizationsString");
+  }
+
+  if (erddapServers) {
+    parameters.erddapServersArray = erddapServers.split(",");
+    filters.push("d.erddap_url = ANY(:erddapServersArray)");
   }
 
   if (polygon) {
