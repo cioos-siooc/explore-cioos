@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -47,6 +48,54 @@
             background-size: contain;
             border-radius: 10px;
             box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+        }
+
+        .language-toggle {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            background: white;
+            border-radius: 20px;
+            padding: 4px;
+            box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+            display: flex;
+            align-items: center;
+            gap: 0;
+            width: 80px;
+            height: 36px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .language-toggle .toggle-option {
+            flex: 1;
+            text-align: center;
+            padding: 6px 0;
+            font-weight: 600;
+            font-size: 14px;
+            color: #666;
+            z-index: 2;
+            transition: color 0.3s ease;
+        }
+
+        .language-toggle .toggle-option.active {
+            color: white;
+        }
+
+        .language-toggle .toggle-slider {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            width: calc(50% - 4px);
+            height: calc(100% - 8px);
+            background: #52a79b;
+            border-radius: 16px;
+            transition: transform 0.3s ease;
+            z-index: 1;
+        }
+
+        .language-toggle.fr .toggle-slider {
+            transform: translateX(100%);
         }
 
         h1 {
@@ -186,12 +235,18 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <header>
+            <div class="language-toggle" id="language-toggle" onclick="toggleLanguage()">
+                <div class="toggle-slider"></div>
+                <div class="toggle-option active" id="toggle-en">EN</div>
+                <div class="toggle-option" id="toggle-fr">FR</div>
+            </div>
             <div class="header-logo"></div>
-            <h1>CIOOS Data Explorer Dashboard</h1>
-            <p class="subtitle">Real-time statistics and visualizations</p>
+            <h1 id="header-title">CIOOS Data Explorer Dashboard</h1>
+            <p class="subtitle" id="header-subtitle">Real-time statistics and visualizations</p>
         </header>
 
         <div id="loading" class="loading">Loading dashboard data...</div>
@@ -293,6 +348,122 @@
     </div>
 
     <script>
+        // Translations
+        const translations = {
+            en: {
+                title: 'CIOOS Data Explorer',
+                subtitle: 'Real-time statistics and visualizations',
+                loading: 'Loading dashboard data...',
+                error: 'Failed to load dashboard data. Please check if the API is running and try again.',
+                datasets: 'Datasets',
+                organizations: 'Organizations',
+                totalProfiles: 'Total Profiles',
+                profileSubsets: 'Profile Subsets',
+                timeSeries: 'TimeSeries',
+                timeSeriesProfile: 'TimeSeriesProfile',
+                lastUpdated: 'Last updated:',
+                chartTitles: {
+                    datasetsByPlatform: 'Datasets by Platform',
+                    datasetsByOrganization: 'Datasets by Organization',
+                    datasetSizes: 'Dataset Sizes (Top 15)',
+                    profilesByDataset: 'Subsets by Dataset (Top 10)',
+                    profilesByOrganization: 'Subsets by Organization',
+                    profilesByCdmDataType: 'Subsets by Dataset Type',
+                    profilesOverTimeByCdmType: 'Subsets Over Time by CDM Data Type',
+                    profilesOverTimeByOrg: 'Subsets Over Time by Organization'
+                }
+            },
+            fr: {
+                title: 'Explorateur de données du SIOOC',
+                subtitle: 'Statistiques et visualisations en temps réel',
+                loading: 'Chargement des données du tableau de bord...',
+                error: 'Échec du chargement des données du tableau de bord. Veuillez vérifier si l\'API est en cours d\'exécution et réessayer.',
+                datasets: 'Jeux de données',
+                organizations: 'Organisations',
+                totalProfiles: 'Profils totaux',
+                profileSubsets: 'Sous-ensembles de profils',
+                timeSeries: 'Séries chronologiques',
+                timeSeriesProfile: 'Profils de séries chronologiques',
+                lastUpdated: 'Dernière mise à jour:',
+                chartTitles: {
+                    datasetsByPlatform: 'Jeux de données par plateforme',
+                    datasetsByOrganization: 'Jeux de données par organisation',
+                    datasetSizes: 'Tailles des jeux de données (Top 15)',
+                    profilesByDataset: 'Sous-ensembles par jeu de données (Top 10)',
+                    profilesByOrganization: 'Sous-ensembles par organisation',
+                    profilesByCdmDataType: 'Sous-ensembles par type de jeu de données',
+                    profilesOverTimeByCdmType: 'Sous-ensembles au fil du temps par type de données CDM',
+                    profilesOverTimeByOrg: 'Sous-ensembles au fil du temps par organisation'
+                }
+            }
+        };
+
+        let currentLanguage = 'en';
+
+        function toggleLanguage() {
+            const newLang = currentLanguage === 'en' ? 'fr' : 'en';
+            setLanguage(newLang);
+        }
+
+        function setLanguage(lang) {
+            currentLanguage = lang;
+
+            // Update toggle states
+            const toggleContainer = document.getElementById('language-toggle');
+            const enOption = document.getElementById('toggle-en');
+            const frOption = document.getElementById('toggle-fr');
+
+            if (lang === 'fr') {
+                toggleContainer.classList.add('fr');
+                enOption.classList.remove('active');
+                frOption.classList.add('active');
+            } else {
+                toggleContainer.classList.remove('fr');
+                enOption.classList.add('active');
+                frOption.classList.remove('active');
+            }
+
+            // Update all text content
+            const t = translations[lang];
+            document.getElementById('header-title').textContent = t.title;
+            document.getElementById('header-subtitle').textContent = t.subtitle;
+            document.getElementById('loading').textContent = t.loading;
+
+            // Update stat labels
+            document.querySelectorAll('.stat-label')[0].textContent = t.datasets;
+            document.querySelectorAll('.stat-label')[1].textContent = t.organizations;
+            document.querySelectorAll('.stat-label')[2].textContent = t.totalProfiles;
+            document.querySelectorAll('.stat-label')[3].textContent = t.profileSubsets;
+            document.querySelectorAll('.stat-label')[4].textContent = t.timeSeries;
+            document.querySelectorAll('.stat-label')[5].textContent = t.timeSeriesProfile;
+
+            // Update chart titles
+            document.querySelectorAll('.chart-title')[0].textContent = t.chartTitles.datasetsByPlatform;
+            document.querySelectorAll('.chart-title')[1].textContent = t.chartTitles.datasetsByOrganization;
+            document.querySelectorAll('.chart-title')[2].textContent = t.chartTitles.datasetSizes;
+            document.querySelectorAll('.chart-title')[3].textContent = t.chartTitles.profilesByDataset;
+            document.querySelectorAll('.chart-title')[4].textContent = t.chartTitles.profilesByOrganization;
+            document.querySelectorAll('.chart-title')[5].textContent = t.chartTitles.profilesByCdmDataType;
+            document.querySelectorAll('.chart-title')[6].textContent = t.chartTitles.profilesOverTimeByCdmType;
+            document.querySelectorAll('.chart-title')[7].textContent = t.chartTitles.profilesOverTimeByOrg;
+
+            // Update last updated label
+            const lastUpdatedSpan = document.getElementById('last-updated');
+            if (lastUpdatedSpan && lastUpdatedSpan.textContent) {
+                const dateText = lastUpdatedSpan.textContent;
+                lastUpdatedSpan.parentElement.childNodes[0].textContent = t.lastUpdated + ' ';
+            }
+
+            // Store preference
+            localStorage.setItem('dashboardLanguage', lang);
+        }
+
+        // Load saved language preference
+        const savedLanguage = localStorage.getItem('dashboardLanguage') || 'en';
+        if (savedLanguage === 'fr') {
+            setLanguage('fr');
+        }
+
         // API is accessible via /api/ prefix through nginx
         const API_BASE = window.location.origin + '/api';
 
@@ -375,7 +546,7 @@
                         ...chartOptions.plugins,
                         tooltip: {
                             callbacks: {
-                                label: function(context) {
+                                label: function (context) {
                                     const label = context.label || '';
                                     const value = formatNumber(context.parsed);
                                     return `${label}: ${value} datasets`;
@@ -467,7 +638,7 @@
                         },
                         tooltip: {
                             callbacks: {
-                                label: function(context) {
+                                label: function (context) {
                                     const dataset = data[context.dataIndex];
                                     return [
                                         `Size: ${context.parsed.y.toFixed(2)} MB`,
@@ -482,7 +653,7 @@
                         y: {
                             beginAtZero: true,
                             ticks: {
-                                callback: function(value) {
+                                callback: function (value) {
                                     return value.toFixed(2) + ' MB';
                                 }
                             }
@@ -511,7 +682,7 @@
                         ...chartOptions.plugins,
                         tooltip: {
                             callbacks: {
-                                label: function(context) {
+                                label: function (context) {
                                     const label = context.label || '';
                                     const value = formatNumber(context.parsed);
                                     return `${label}: ${value} profiles`;
@@ -546,7 +717,7 @@
                         },
                         tooltip: {
                             callbacks: {
-                                label: function(context) {
+                                label: function (context) {
                                     return `Profiles: ${formatNumber(context.parsed.x)}`;
                                 }
                             }
@@ -670,7 +841,7 @@
                         ...chartOptions.plugins,
                         tooltip: {
                             callbacks: {
-                                label: function(context) {
+                                label: function (context) {
                                     const label = context.label || '';
                                     const value = formatNumber(context.parsed);
                                     return `${label}: ${value} profiles`;
@@ -810,8 +981,7 @@
             } catch (error) {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'block';
-                document.getElementById('error').textContent =
-                    'Failed to load dashboard data. Please check if the API is running and try again.';
+                document.getElementById('error').textContent = translations[currentLanguage].error;
             }
         }
 
@@ -819,4 +989,5 @@
         window.addEventListener('DOMContentLoaded', initDashboard);
     </script>
 </body>
+
 </html>
