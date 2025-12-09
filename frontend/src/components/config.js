@@ -2,6 +2,7 @@ export const defaultEovsSelected = []
 export const defaultPlatformsSelected = []
 export const defaultOrgsSelected = []
 export const defaultDatatsetsSelected = []
+export const defaultErddapServersSelected = []
 export const defaultStartDate = '1900-01-01'
 export const defaultEndDate = new Date().toISOString().split('T')[0]
 export const defaultStartDepth = 0
