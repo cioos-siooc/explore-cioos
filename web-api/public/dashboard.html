@@ -116,6 +116,20 @@
             margin-bottom: 30px;
         }
 
+        .stats-section {
+            margin-bottom: 20px;
+        }
+
+        .stats-section-title {
+            font-size: 0.9em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            padding-left: 5px;
+            font-weight: 600;
+        }
+
         .stat-card {
             background: white;
             padding: 30px;
@@ -131,6 +145,23 @@
             box-shadow: 0 6px 20px rgba(82, 167, 155, 0.25);
         }
 
+        .stat-card.total {
+            background: linear-gradient(135deg, #52a79b 0%, #6bc4b4 100%);
+            border-left: 4px solid #3d7d73;
+        }
+
+        .stat-card.total .stat-value {
+            color: white;
+        }
+
+        .stat-card.total .stat-label {
+            color: rgba(255, 255, 255, 0.95);
+        }
+
+        .stat-card.subset {
+            border-left: 4px solid #80cbc4;
+        }
+
         .stat-value {
             font-size: 3em;
             font-weight: bold;
@@ -143,6 +174,14 @@
             color: #666;
             text-transform: uppercase;
             letter-spacing: 1px;
+        }
+
+        .subset-equation {
+            text-align: center;
+            margin: 20px 0 30px 0;
+            font-size: 1.2em;
+            color: #52a79b;
+            font-weight: 600;
         }
 
         .charts-grid {
@@ -253,33 +292,44 @@
         <div id="error" class="error" style="display: none;"></div>
 
         <div id="content" style="display: none;">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value" id="stat-datasets">-</div>
-                    <div class="stat-label">Datasets</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="stat-organizations">-</div>
-                    <div class="stat-label">Organizations</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="stat-profiles">-</div>
-                    <div class="stat-label">Total Profiles</div>
+            <!-- General statistics -->
+            <div class="stats-section">
+                <div class="stats-section-title" id="section-general">General Statistics</div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-datasets">-</div>
+                        <div class="stat-label" id="label-datasets">Datasets</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-organizations">-</div>
+                        <div class="stat-label" id="label-organizations">Organizations</div>
+                    </div>
                 </div>
             </div>
 
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value" id="stat-profile-subsets">-</div>
-                    <div class="stat-label">Profile Subsets</div>
+            <!-- Profile breakdown -->
+            <div class="stats-section">
+                <div class="stats-section-title" id="section-profiles">Subsets Breakdown</div>
+                <div class="stats-grid">
+                    <div class="stat-card total">
+                        <div class="stat-value" id="stat-profiles">-</div>
+                        <div class="stat-label" id="label-profiles">Total Subsets</div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="stat-timeseries">-</div>
-                    <div class="stat-label">TimeSeries</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="stat-timeseriesprofile">-</div>
-                    <div class="stat-label">TimeSeriesProfile</div>
+
+                <div class="stats-grid">
+                    <div class="stat-card subset">
+                        <div class="stat-value" id="stat-profile-subsets">-</div>
+                        <div class="stat-label" id="label-profile-subsets">Profiles</div>
+                    </div>
+                    <div class="stat-card subset">
+                        <div class="stat-value" id="stat-timeseries">-</div>
+                        <div class="stat-label" id="label-timeseries">TimeSeries</div>
+                    </div>
+                    <div class="stat-card subset">
+                        <div class="stat-value" id="stat-timeseriesprofile">-</div>
+                        <div class="stat-label" id="label-timeseriesprofile">TimeSeriesProfiles</div>
+                    </div>
                 </div>
             </div>
 
@@ -355,12 +405,15 @@
                 subtitle: 'Real-time statistics and visualizations',
                 loading: 'Loading dashboard data...',
                 error: 'Failed to load dashboard data. Please check if the API is running and try again.',
+                sectionGeneral: 'General Statistics',
+                sectionProfiles: 'Profile Breakdown',
                 datasets: 'Datasets',
                 organizations: 'Organizations',
                 totalProfiles: 'Total Profiles',
                 profileSubsets: 'Profile Subsets',
                 timeSeries: 'TimeSeries',
                 timeSeriesProfile: 'TimeSeriesProfile',
+                equation: '= Profile Subsets + TimeSeries + TimeSeriesProfile',
                 lastUpdated: 'Last updated:',
                 chartTitles: {
                     datasetsByPlatform: 'Datasets by Platform',
@@ -373,17 +426,20 @@
                     profilesOverTimeByOrg: 'Subsets Over Time by Organization'
                 }
             },
-            fr: {   
+            fr: {
                 title: 'Explorateur de données du SIOOC',
                 subtitle: 'Statistiques et visualisations en temps réel',
                 loading: 'Chargement des données du tableau de bord...',
                 error: 'Échec du chargement des données du tableau de bord. Veuillez vérifier si l\'API est en cours d\'exécution et réessayer.',
+                sectionGeneral: 'Statistiques générales',
+                sectionProfiles: 'Répartition des profils',
                 datasets: 'Jeux de données',
                 organizations: 'Organisations',
                 totalProfiles: 'Profils totaux',
                 profileSubsets: 'Sous-ensembles de profils',
                 timeSeries: 'Séries chronologiques',
                 timeSeriesProfile: 'Profils de séries chronologiques',
+                equation: '= Sous-ensembles de profils + Séries chronologiques + Profils de séries chronologiques',
                 lastUpdated: 'Dernière mise à jour:',
                 chartTitles: {
                     datasetsByPlatform: 'Jeux de données par plateforme',
@@ -429,13 +485,20 @@
             document.getElementById('header-subtitle').textContent = t.subtitle;
             document.getElementById('loading').textContent = t.loading;
 
+            // Update section titles
+            document.getElementById('section-general').textContent = t.sectionGeneral;
+            document.getElementById('section-profiles').textContent = t.sectionProfiles;
+
             // Update stat labels
-            document.querySelectorAll('.stat-label')[0].textContent = t.datasets;
-            document.querySelectorAll('.stat-label')[1].textContent = t.organizations;
-            document.querySelectorAll('.stat-label')[2].textContent = t.totalProfiles;
-            document.querySelectorAll('.stat-label')[3].textContent = t.profileSubsets;
-            document.querySelectorAll('.stat-label')[4].textContent = t.timeSeries;
-            document.querySelectorAll('.stat-label')[5].textContent = t.timeSeriesProfile;
+            document.getElementById('label-datasets').textContent = t.datasets;
+            document.getElementById('label-organizations').textContent = t.organizations;
+            document.getElementById('label-profiles').textContent = t.totalProfiles;
+            document.getElementById('label-profile-subsets').textContent = t.profileSubsets;
+            document.getElementById('label-timeseries').textContent = t.timeSeries;
+            document.getElementById('label-timeseriesprofile').textContent = t.timeSeriesProfile;
+
+            // Update equation
+            document.getElementById('equation-text').textContent = t.equation;
 
             // Update chart titles
             document.querySelectorAll('.chart-title')[0].textContent = t.chartTitles.datasetsByPlatform;
