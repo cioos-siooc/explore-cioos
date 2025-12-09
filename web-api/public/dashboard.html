@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CIOOS Data Explorer - Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey@0.12.0/dist/chartjs-chart-sankey.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -40,14 +41,10 @@
             position: absolute;
             top: 15px;
             right: 20px;
-            width: 130px;
-            height: 40px;
-            background-image: url(./NationalLogoEnglish.png);
-            background-color: #fff;
+            width: 60px;
+            height: 60px;
             background-repeat: no-repeat;
-            background-size: contain;
-            border-radius: 10px;
-            box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+            background-image: url(./CIOOS_logo.svg);
         }
 
         .language-toggle {
@@ -389,6 +386,13 @@
                         <canvas id="profilesOverTimeByOrgChart"></canvas>
                     </div>
                 </div>
+
+                <div class="chart-card full-width">
+                    <h3 class="chart-title" id="sankey-title">Profile Flow: Total → ERDDAP Servers → CDM Types</h3>
+                    <div class="chart-container tall">
+                        <canvas id="sankeyChart"></canvas>
+                    </div>
+                </div>
             </div>
 
             <div class="last-updated">
@@ -423,7 +427,8 @@
                     profilesByOrganization: 'Subsets by Organization',
                     profilesByCdmDataType: 'Subsets by Dataset Type',
                     profilesOverTimeByCdmType: 'Subsets Over Time by Dataset Type',
-                    profilesOverTimeByOrg: 'Subsets Over Time by Organization'
+                    profilesOverTimeByOrg: 'Subsets Over Time by Organization',
+                    sankey: 'Subsets Flow: Total → ERDDAP Servers → Dataset Types'
                 }
             },
             fr: {
@@ -449,7 +454,8 @@
                     profilesByOrganization: 'Sous-ensembles par organisation',
                     profilesByCdmDataType: 'Sous-ensembles par type de jeu de données',
                     profilesOverTimeByCdmType: 'Sous-ensembles au fil du temps par type de jeux de données',
-                    profilesOverTimeByOrg: 'Sous-ensembles au fil du temps par organisation'
+                    profilesOverTimeByOrg: 'Sous-ensembles au fil du temps par organisation',
+                    sankey: 'Flux de sous-ensembles: Total → Serveurs ERDDAP → Types de jeux de données'
                 }
             }
         };
@@ -509,6 +515,7 @@
             document.querySelectorAll('.chart-title')[5].textContent = t.chartTitles.profilesByCdmDataType;
             document.querySelectorAll('.chart-title')[6].textContent = t.chartTitles.profilesOverTimeByCdmType;
             document.querySelectorAll('.chart-title')[7].textContent = t.chartTitles.profilesOverTimeByOrg;
+            document.getElementById('sankey-title').textContent = t.chartTitles.sankey;
 
             // Update last updated label
             const lastUpdatedSpan = document.getElementById('last-updated');
@@ -1018,6 +1025,93 @@
             });
         }
 
+        function createSankeyChart(stats) {
+            const ctx = document.getElementById('sankeyChart').getContext('2d');
+
+            // Build Sankey flow data
+            // Flow: Total Profiles → ERDDAP Servers → CDM Data Types
+            const flows = [];
+
+            // Helper function to shorten ERDDAP URL for display
+            function formatErddapUrl(url) {
+                try {
+                    const urlObj = new URL(url);
+                    return urlObj.hostname.replace('www.', '');
+                } catch {
+                    return url;
+                }
+            }
+
+            // Flow from Total Profiles to each ERDDAP Server
+            stats.profilesByErddapServer.forEach(item => {
+                if (item.count > 0) {
+                    const serverName = formatErddapUrl(item.erddap_url);
+                    flows.push({
+                        from: 'Total Profiles',
+                        to: serverName,
+                        flow: item.count
+                    });
+                }
+            });
+
+            // Flow from each ERDDAP Server to CDM Data Types
+            stats.profilesByErddapAndCdmType.forEach(item => {
+                if (item.count > 0) {
+                    const serverName = formatErddapUrl(item.erddap_url);
+                    flows.push({
+                        from: serverName,
+                        to: item.cdm_data_type,
+                        flow: item.count
+                    });
+                }
+            });
+
+            new Chart(ctx, {
+                type: 'sankey',
+                data: {
+                    datasets: [{
+                        data: flows,
+                        colorFrom: (c) => {
+                            const from = c.dataset.data[c.dataIndex].from;
+                            // Total Profiles node
+                            if (from === 'Total Profiles') return '#52a79b';
+                            // ERDDAP servers get varied colors from palette
+                            return colorPalette[from.charCodeAt(0) % colorPalette.length];
+                        },
+                        colorTo: (c) => {
+                            const to = c.dataset.data[c.dataIndex].to;
+                            // CDM types get specific colors
+                            if (to === 'Profile') return '#4dd0e1';
+                            if (to === 'TimeSeries') return '#26a69a';
+                            if (to === 'TimeSeriesProfile') return '#00897b';
+                            // ERDDAP servers get varied colors from palette
+                            return colorPalette[to.charCodeAt(0) % colorPalette.length];
+                        },
+                        colorMode: 'gradient',
+                        size: 'max',
+                        labels: {}
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    const item = context.dataset.data[context.dataIndex];
+                                    return `${item.from} → ${item.to}: ${formatNumber(item.flow)} profiles`;
+                                }
+                            }
+                        },
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
         async function initDashboard() {
             try {
                 const stats = await fetchStatistics();
@@ -1034,6 +1128,7 @@
                 createProfilesByCdmDataTypeChart(stats.profilesByCdmDataType);
                 createProfilesOverTimeByCdmTypeChart(stats.profilesOverTimeByCdmType);
                 createProfilesOverTimeByOrgChart(stats.profilesOverTimeByOrg);
+                createSankeyChart(stats);
 
                 // Update last updated time
                 document.getElementById('last-updated').textContent = formatDate(stats.lastUpdated);

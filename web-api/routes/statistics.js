@@ -193,6 +193,32 @@ router.get("/", cache.route(), async (req, res) => {
       ORDER BY time_period ASC, ol.name
     `);
 
+    // Get profiles by ERDDAP server for Sankey diagram
+    const profilesByErddapServer = await db.raw(`
+      SELECT
+        d.erddap_url,
+        COUNT(p.pk) as count
+      FROM cde.profiles p
+      JOIN cde.datasets d ON d.pk = p.dataset_pk
+      WHERE d.erddap_url IS NOT NULL
+      GROUP BY d.erddap_url
+      ORDER BY count DESC
+    `);
+
+    // Get profiles by ERDDAP server and CDM data type for Sankey diagram
+    const profilesByErddapAndCdmType = await db.raw(`
+      SELECT
+        d.erddap_url,
+        d.cdm_data_type,
+        COUNT(p.pk) as count
+      FROM cde.profiles p
+      JOIN cde.datasets d ON d.pk = p.dataset_pk
+      WHERE d.erddap_url IS NOT NULL
+        AND d.cdm_data_type IS NOT NULL
+      GROUP BY d.erddap_url, d.cdm_data_type
+      ORDER BY d.erddap_url, d.cdm_data_type
+    `);
+
     const statistics = {
       counts: {
         datasets: parseInt(datasetsCount.count),
@@ -257,6 +283,15 @@ router.get("/", cache.route(), async (req, res) => {
       profilesOverTimeByOrg: profilesOverTimeByOrg.rows.map((row) => ({
         time_period: row.time_period,
         organization: row.organization,
+        count: parseInt(row.count),
+      })),
+      profilesByErddapServer: profilesByErddapServer.rows.map((row) => ({
+        erddap_url: row.erddap_url,
+        count: parseInt(row.count),
+      })),
+      profilesByErddapAndCdmType: profilesByErddapAndCdmType.rows.map((row) => ({
+        erddap_url: row.erddap_url,
+        cdm_data_type: row.cdm_data_type,
         count: parseInt(row.count),
       })),
       lastUpdated: new Date().toISOString(),
