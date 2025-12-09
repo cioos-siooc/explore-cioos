@@ -19,7 +19,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./downloader
-        run: uv install
+        run: uv sync --locked
 
       - name: Run downloader test files
         working-directory: ./downloader
