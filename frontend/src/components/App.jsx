@@ -359,11 +359,13 @@ export default function App() {
       .then((response) => response.json())
       .then((orgsR) => {
         setOrgsSelected(
-          orgsR.map((org) => {
+          orgsR.map((org, index) => {
+            const pk = Number.isInteger(org.pk) ? org.pk : index
             return {
               title: org.name,
-              isSelected: orgsFromURL.includes(org.pk),
-              pk: org.pk
+              isSelected: orgsFromURL.includes(pk),
+              pk,
+              id: `${pk}-${org.name}`
             }
           })
         )
