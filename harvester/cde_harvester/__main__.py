@@ -263,6 +263,7 @@ def load_config(config_file):
 
 if __name__ == "__main__":
 
+    logger.info("Starting CDE Harvester")
     parser = argparse.ArgumentParser()
 
     if "-f" in sys.argv or "--file" in sys.argv:
