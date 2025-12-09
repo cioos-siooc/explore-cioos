@@ -14,12 +14,11 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
         with:
-          # Install a specific version of uv.
           version: "0.8.22"
 
       - name: Install dependencies
         working-directory: ./downloader
-        run: uv install
+        run: uv sync --lockfile
 
       - name: Run downloader test files
         working-directory: ./downloader

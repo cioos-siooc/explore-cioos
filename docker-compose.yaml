@@ -27,9 +27,13 @@ services:
     depends_on:
       - db
   nginx:
-    image: nginx:latest
+    build:
+        context: ./nginx
+        dockerfile: Dockerfile
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/logs:/var/log/nginx
+      - ./nginx/logrotate_state:/var/lib/logrotate
       - ./harvester_logs:/usr/share/nginx/html/harvester_logs:ro
     depends_on:
       - web-api
@@ -66,11 +70,46 @@ services:
       - ./harvest_config.yaml:/app/harvester/harvest_config.yaml
       - ./harvester_cache:/app/harvester/harvester_cache
       - ./harvest:/app/harvester/harvest
+      - ./nginx/logs:/app/nginx/logs  
       - ./harvester_logs:/app/harvester/logs
     environment:
       - "HARVESTER_LOG_DIR=/app/harvester/logs"
+      - PREFECT_API_URL=http://prefect:4200/api
     env_file:
       - .env
+    depends_on:
+      prefect:
+        condition: service_healthy
+      
+  redis:
+    image: "redis:alpine"
+    expose:
+      - "6379"
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - redis-data:/var/lib/redis
+      - ./redis-config/redis.conf:/usr/local/etc/redis/redis.conf
+      
+  prefect:
+    image: prefecthq/prefect:3.4.24.dev4-python3.12-conda
+    command: prefect server start --host 0.0.0.0
+    ports:
+      - "4200:4200"  # Prefect UI + API
+    environment:
+      PREFECT_API_URL: http://127.0.0.1:4200/api
+      PREFECT_UI_URL: http://localhost:4200
+      PREFECT_HOME: /root/.prefect
+    volumes:
+      - prefect_data:/root/.prefect
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4200/api/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
 
 volumes:
   postgres-data:
+  redis-data:
+  prefect_data:
