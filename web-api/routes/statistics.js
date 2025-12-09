@@ -165,6 +165,34 @@ router.get("/", cache.route(), async (req, res) => {
       .groupBy("d.cdm_data_type")
       .orderBy("count", "desc");
 
+    // Get profiles over time by CDM data type (binned by year)
+    const profilesOverTimeByCdmType = await db.raw(`
+      SELECT
+        DATE_TRUNC('year', p.time_min) as time_period,
+        d.cdm_data_type,
+        COUNT(p.pk) as count
+      FROM cde.profiles p
+      JOIN cde.datasets d ON d.pk = p.dataset_pk
+      WHERE p.time_min IS NOT NULL
+        AND d.cdm_data_type IS NOT NULL
+      GROUP BY DATE_TRUNC('year', p.time_min), d.cdm_data_type
+      ORDER BY time_period ASC, d.cdm_data_type
+    `);
+
+    // Get profiles over time by organization (binned by year)
+    const profilesOverTimeByOrg = await db.raw(`
+      SELECT
+        DATE_TRUNC('year', p.time_min) as time_period,
+        ol.name as organization,
+        COUNT(p.pk) as count
+      FROM cde.profiles p
+      JOIN cde.datasets d ON d.pk = p.dataset_pk
+      JOIN cde.organizations_lookup ol ON ol.pk = ANY(d.organization_pks)
+      WHERE p.time_min IS NOT NULL
+      GROUP BY DATE_TRUNC('year', p.time_min), ol.name
+      ORDER BY time_period ASC, ol.name
+    `);
+
     const statistics = {
       counts: {
         datasets: parseInt(datasetsCount.count),
@@ -219,6 +247,16 @@ router.get("/", cache.route(), async (req, res) => {
       })),
       profilesByCdmDataType: profilesByCdmDataType.map((row) => ({
         cdm_data_type: row.cdm_data_type || "unknown",
+        count: parseInt(row.count),
+      })),
+      profilesOverTimeByCdmType: profilesOverTimeByCdmType.rows.map((row) => ({
+        time_period: row.time_period,
+        cdm_data_type: row.cdm_data_type,
+        count: parseInt(row.count),
+      })),
+      profilesOverTimeByOrg: profilesOverTimeByOrg.rows.map((row) => ({
+        time_period: row.time_period,
+        organization: row.organization,
         count: parseInt(row.count),
       })),
       lastUpdated: new Date().toISOString(),

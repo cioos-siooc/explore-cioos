@@ -257,31 +257,31 @@
                     </div>
                 </div>
 
-                <div class="chart-card full-width">
-                    <h3 class="chart-title">Top 10 Datasets by Profile Count</h3>
-                    <div class="chart-container tall">
-                        <canvas id="topDatasetsChart"></canvas>
-                    </div>
-                </div>
-
-                <div class="chart-card full-width">
-                    <h3 class="chart-title">Downloads Over Time (Last 30 Days)</h3>
-                    <div class="chart-container">
-                        <canvas id="downloadsTimelineChart"></canvas>
-                    </div>
-                </div>
-
                 <div class="chart-card">
-                    <h3 class="chart-title">Profiles by Organization</h3>
+                    <h3 class="chart-title">Subsets by Organization</h3>
                     <div class="chart-container">
                         <canvas id="profilesByOrganizationChart"></canvas>
                     </div>
                 </div>
 
                 <div class="chart-card">
-                    <h3 class="chart-title">Profiles by CDM Data Type</h3>
+                    <h3 class="chart-title">Subsets by Dataset Type</h3>
                     <div class="chart-container">
                         <canvas id="profilesByCdmDataTypeChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card full-width">
+                    <h3 class="chart-title">Profiles Over Time by CDM Data Type</h3>
+                    <div class="chart-container">
+                        <canvas id="profilesOverTimeByCdmTypeChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card full-width">
+                    <h3 class="chart-title">Profiles Over Time by Organization</h3>
+                    <div class="chart-container">
+                        <canvas id="profilesOverTimeByOrgChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -682,6 +682,108 @@
             });
         }
 
+        function createProfilesOverTimeByCdmTypeChart(data) {
+            const ctx = document.getElementById('profilesOverTimeByCdmTypeChart').getContext('2d');
+
+            // Get unique time periods and CDM types
+            const timePeriods = [...new Set(data.map(d => d.time_period))].sort();
+            const cdmTypes = [...new Set(data.map(d => d.cdm_data_type))];
+
+            // Create datasets for each CDM type
+            const datasets = cdmTypes.map((type, index) => {
+                return {
+                    label: type,
+                    data: timePeriods.map(period => {
+                        const item = data.find(d => d.time_period === period && d.cdm_data_type === type);
+                        return item ? item.count : 0;
+                    }),
+                    backgroundColor: colorPalette[index % colorPalette.length],
+                    borderWidth: 0
+                };
+            });
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: timePeriods.map(p => new Date(p).getFullYear()),
+                    datasets: datasets
+                },
+                options: {
+                    ...chartOptions,
+                    plugins: {
+                        ...chartOptions.plugins,
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createProfilesOverTimeByOrgChart(data) {
+            const ctx = document.getElementById('profilesOverTimeByOrgChart').getContext('2d');
+
+            // Get unique time periods and organizations
+            const timePeriods = [...new Set(data.map(d => d.time_period))].sort();
+            const organizations = [...new Set(data.map(d => d.organization))];
+
+            // Create datasets for each organization
+            const datasets = organizations.map((org, index) => {
+                return {
+                    label: org,
+                    data: timePeriods.map(period => {
+                        const item = data.find(d => d.time_period === period && d.organization === org);
+                        return item ? item.count : 0;
+                    }),
+                    backgroundColor: colorPalette[index % colorPalette.length],
+                    borderWidth: 0
+                };
+            });
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: timePeriods.map(p => new Date(p).getFullYear()),
+                    datasets: datasets
+                },
+                options: {
+                    ...chartOptions,
+                    plugins: {
+                        ...chartOptions.plugins,
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
         async function initDashboard() {
             try {
                 const stats = await fetchStatistics();
@@ -694,10 +796,10 @@
                 createOrganizationChart(stats.datasetsByOrganization, stats.datasetsByOrgAndType);
                 createDatasetSizesChart(stats.datasetSizes);
                 createProfilesDistributionChart(stats.profilesByDataset);
-                createTopDatasetsChart(stats.topDatasetsByProfiles);
-                createDownloadsTimelineChart(stats.downloadsOverTime);
                 createProfilesByOrganizationChart(stats.profilesByOrganization, stats.profilesByOrgAndType);
                 createProfilesByCdmDataTypeChart(stats.profilesByCdmDataType);
+                createProfilesOverTimeByCdmTypeChart(stats.profilesOverTimeByCdmType);
+                createProfilesOverTimeByOrgChart(stats.profilesOverTimeByOrg);
 
                 // Update last updated time
                 document.getElementById('last-updated').textContent = formatDate(stats.lastUpdated);
