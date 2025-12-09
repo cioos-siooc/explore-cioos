@@ -9,6 +9,7 @@ router.get("/", cache.route(), async (req, res, next) => {
                       pk_url pk,
                       organization_pks,
                       platform,
+                      erddap_url,
                       json_build_object('en', title, 'fr', title_fr) title_translated
                       FROM cde.datasets
                       ORDER BY UPPER(title)`;
