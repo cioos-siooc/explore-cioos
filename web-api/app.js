@@ -19,6 +19,7 @@ const previewRouter = require("./routes/preview");
 const platformsRouter = require("./routes/platforms");
 const datasetRecordsListRouter = require("./routes/datasetRecordsList");
 const downloadEstimateRouter = require("./routes/downloadEstimate");
+const erddapServersRouter = require("./routes/erddapServers");
 
 const app = express();
 
@@ -98,6 +99,7 @@ app.use("/preview", previewRouter);
 app.use("/platforms", platformsRouter);
 app.use("/datasetRecordsList", datasetRecordsListRouter);
 app.use("/downloadEstimate", downloadEstimateRouter);
+app.use("/erddapServers", erddapServersRouter);
 
 app.use(Sentry.Handlers.errorHandler());
 
