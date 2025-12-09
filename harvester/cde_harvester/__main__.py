@@ -56,12 +56,12 @@ def cleanup_old_logs(log_dir, days=30):
                 try:
                     os.remove(filepath)
                     removed_count += 1
-                    print(f"Removed old log file: {filename}")
+                    logger.info(f"Removed old log file: {filename}")
                 except OSError as e:
-                    print(f"Warning: Failed to remove old log file {filename}: {e}")
+                    logger.warning(f"Warning: Failed to remove old log file {filename}: {e}")
 
     if removed_count > 0:
-        print(f"Cleaned up {removed_count} log file(s) older than {days} days")
+        logger.info(f"Cleaned up {removed_count} log file(s) older than {days} days")
 
 
 def setup_logging(log_time, log_level, log_dir=None):
@@ -278,7 +278,7 @@ if __name__ == "__main__":
         config_file = args.file
 
         config = load_config(config_file)
-        logging.info(
+        logger.info(
             "Using config from harvest_config.yaml, ignoring command line arguments"
         )
         urls = ",".join(config.get("erddap_urls") or [])
