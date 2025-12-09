@@ -50,7 +50,7 @@ class ERDDAP(object):
         self.url = erddap_url
 
         if not re.search("^https?://", erddap_url):
-            raise RuntimeError("URL Must start wih http or https")
+            raise RuntimeError(f"URL Must start wih http or https: {erddap_url}")
 
         if not erddap_url.endswith("/erddap"):
             # ERDDAP URL almost always ends in /erddap
