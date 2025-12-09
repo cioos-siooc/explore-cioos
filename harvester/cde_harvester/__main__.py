@@ -279,7 +279,7 @@ if __name__ == "__main__":
 
         config = load_config(config_file)
         logger.info(
-            "Using config from harvest_config.yaml, ignoring command line arguments"
+            f"Using config from {config_file}, ignoring command line arguments"
         )
         urls = ",".join(config.get("erddap_urls") or [])
         cache = config.get("cache")
@@ -291,6 +291,7 @@ if __name__ == "__main__":
         log_dir = os.environ.get("HARVESTER_LOG_DIR") or config.get("log_dir")
 
     else:
+        logger.info("Using command line arguments")
         parser.add_argument(
             "--urls",
             help="harvest from these erddap servers, comme separated",
