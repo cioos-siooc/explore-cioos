@@ -1,0 +1,47 @@
+[
+  {
+    "url": "https://data.cioospacific.ca/erddap",
+    "label_en": "CIOOS Pacific",
+    "label_fr": "SIOOC Pacifique"
+  },
+  {
+    "url": "https://catalogue.hakai.org/erddap",
+    "label_en": "Hakai Institue",
+    "label_fr": "Hakai Institute"
+  },
+  {
+    "url": "https://www.smartatlantic.ca/erddap",
+    "label_en": "SmartAtlantic",
+    "label_fr": "SmartAtlantic"
+  },
+  {
+    "url": "https://cioosatlantic.ca/erddap",
+    "label_en": "CIOOS Atlantic",
+    "label_fr": "SIOOC Atlantique"
+  },
+  {
+    "url": "https://erddap.ogsl.ca/erddap",
+    "label_en": "SLGO",
+    "label_fr": "OGSL"
+  },
+  {
+    "url": "http://dap.onc.uvic.ca/erddap",
+    "label_en": "ONC",
+    "label_fr": "ONC"
+  },
+  {
+    "url": "https://dap.oceannetworks.ca",
+    "label_en": "ONC",
+    "label_fr": "ONC"
+  },
+  {
+    "url": "https://data.ceotr.ca/erddap",
+    "label_en": "CEOTR",
+    "label_fr": "CEOTR"
+  },
+  {
+    "url": "https://seagull-erddap.glos.org/erddap",
+    "label_en": "GLOS",
+    "label_fr": "GLOS"
+  }
+]
