@@ -10,7 +10,7 @@ import sentry_sdk
 from cde_harvester.utils import df_cde_eov_to_standard_name
 from dotenv import load_dotenv
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.dialects.postgresql import ARRAY, INTEGER, TEXT
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -32,7 +32,33 @@ sentry_sdk.init(
 )
 
 
-def main(folder):
+# Constants for array column types
+DATASET_ARRAY_DTYPES = {
+    "eovs": ARRAY(TEXT),
+    "organizations": ARRAY(TEXT),
+    "profile_variables": ARRAY(TEXT),
+    "organization_pks": ARRAY(INTEGER),
+}
+
+
+def prepare_profiles_dataframe(profiles):
+    """Clean and prepare profiles DataFrame for insertion."""
+    profiles = profiles.replace("", np.NaN)
+    return profiles.drop(columns=["altitude_min", "altitude_max"], errors="ignore").dropna(subset=['time_min'])
+
+
+def ensure_organization_pks(datasets):
+    """Ensure organization_pks column has empty arrays instead of null values."""
+    if 'organization_pks' not in datasets.columns or datasets['organization_pks'].isna().all():
+        datasets['organization_pks'] = [[] for _ in range(len(datasets))]
+    else:
+        datasets['organization_pks'] = datasets['organization_pks'].apply(
+            lambda x: x if isinstance(x, list) else []
+        )
+    return datasets
+
+
+def main(folder, incremental=False):
     # setup database connection
 
     load_dotenv(os.getcwd() + "/.env")
@@ -76,62 +102,99 @@ def main(folder):
     with engine.begin() as transaction:
         logger.info("Writing to DB:")
 
-        logger.info("Dropping constraints")
-        transaction.execute("SELECT drop_constraints();")
+        if incremental:
+            logger.info("Using INCREMENTAL mode - will load to temp tables, process, then UPSERT")
 
-        logger.info("Clearing tables")
-        transaction.execute("SELECT remove_all_data();")
+            # Incremental approach using temporary tables:
+            # 1. Load all data into temporary tables (no constraints)
+            # 2. Run all processing functions on temp tables
+            # 3. UPSERT from temp tables into main tables
 
-        logger.info("Writing datasets")
+            # Create temporary tables that mirror the main tables structure WITHOUT constraints
+            logger.info("Creating temporary tables")
+            transaction.execute(text("SELECT create_temp_tables();"))
 
-        datasets.to_sql(
-            "datasets",
-            con=transaction,
-            if_exists="append",
-            schema=schema,
-            index=False,
-            dtype={
-                "eovs": ARRAY(TEXT),
-                "organizations": ARRAY(TEXT),
-                "profile_variables": ARRAY(TEXT),
-                "organization_pks": ARRAY(INTEGER),
-            },
-        )
+            # Load data into temp tables
+            logger.info("Loading datasets into temp table")
+            datasets = ensure_organization_pks(datasets)
+            datasets.to_sql(
+                "temp_datasets",
+                con=transaction,
+                if_exists="append",
+                index=False,
+                dtype=DATASET_ARRAY_DTYPES,
+            )
 
-        profiles = profiles.replace("", np.NaN)
+            logger.info("Loading profiles into temp table")
+            prepare_profiles_dataframe(profiles).to_sql(
+                "temp_profiles",
+                con=transaction,
+                if_exists="append",
+                index=False,
+            )
 
-        logger.info("Writing profiles")
+            logger.info("Loading skipped_datasets into temp table")
+            skipped_datasets.to_sql(
+                "temp_skipped_datasets",
+                con=transaction,
+                if_exists="append",
+                index=False,
+            )
 
-        # profiles has some columns to fix up first
-        logger.info("profiles.columns: %s", profiles.columns)
-        profiles.drop(columns=["altitude_min", "altitude_max"], errors="ignore").dropna(subset=['time_min']).to_sql(
-            "profiles",
-            con=transaction,
-            if_exists="append",
-            schema=schema,
-            index=False,
-            # method="multi",
-        )
+            # Process and UPSERT all data using SQL functions
+            logger.info("Running incremental update")
+            transaction.execute(text("SELECT process_incremental_update();"))
+            logger.info("Incremental update complete")
 
-        logger.info("Writing skipped_datasets")
-        skipped_datasets.to_sql(
-            "skipped_datasets",
-            con=transaction,
-            if_exists="append",
-            schema=schema,
-            index=False,
-        )
+        else:
+            # Original full reload logic
+            logger.info("Using FULL RELOAD mode - will clear all data")
 
-        logger.info("Processing new records")
-        transaction.execute("SELECT profile_process();")
-        transaction.execute("SELECT ckan_process();")
+            logger.info("Dropping constraints")
+            transaction.execute(text("SELECT drop_constraints();"))
 
-        logger.info("Creating hexes")
-        transaction.execute("SELECT create_hexes();")
+            logger.info("Clearing tables")
+            transaction.execute(text("SELECT remove_all_data();"))
 
-        # This ensures that all fields were set successfully
-        logger.info("Setting constraints")
-        transaction.execute("SELECT set_constraints();")
+            logger.info("Writing datasets")
+            datasets.to_sql(
+                "datasets",
+                con=transaction,
+                if_exists="append",
+                schema=schema,
+                index=False,
+                dtype=DATASET_ARRAY_DTYPES,
+            )
+
+            logger.info("Writing profiles")
+            logger.info("profiles.columns: %s", profiles.columns)
+            prepare_profiles_dataframe(profiles).to_sql(
+                "profiles",
+                con=transaction,
+                if_exists="append",
+                schema=schema,
+                index=False,
+            )
+
+            logger.info("Writing skipped_datasets")
+            skipped_datasets.to_sql(
+                "skipped_datasets",
+                con=transaction,
+                if_exists="append",
+                schema=schema,
+                index=False,
+            )
+
+            logger.info("Processing new records")
+            transaction.execute(text("SELECT profile_process();"))
+            transaction.execute(text("SELECT ckan_process();"))
+
+            logger.info("Creating hexes")
+            transaction.execute(text("SELECT create_hexes();"))
+
+            # This ensures that all fields were set successfully
+            logger.info("Setting constraints")
+            transaction.execute(text("SELECT set_constraints();"))
 
         logger.info("Wrote to db: %s", f"{schema}.datasets")
         logger.info("Wrote to db: %s", f"{schema}.profiles")
@@ -146,10 +209,16 @@ if __name__ == "__main__":
         default="harvest",
         help="folder with the CSV output files from harvesting",
     )
+    parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Use UPSERT instead of deleting all data - only update/insert changed datasets",
+        default=os.environ.get("INCREMENTAL_MODE", "false").lower() == "true",
+    )
 
     args = parser.parse_args()
     try:
-        main(args.folder)
+        main(args.folder, args.incremental)
     except Exception:
         logger.error("Failed to write to db", exc_info=True)
         sys.exit(1)
