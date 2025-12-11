@@ -16,10 +16,15 @@ class CDEComplianceChecker(object):
         self.dataset = dataset
         self.logger = dataset.logger
         self.failure_reason_code = ""
+        self.failure_details = ""
 
     def failed_error(self, msg, failure_reason_code):
         self.logger.error("Skipping dataset:" + msg)
         self.failure_reason_code = failure_reason_code
+        self.failure_details = msg
+
+    def get_failure_details(self):
+        return self.failure_details
 
     def check_required_variables(self):
         # make sure LLAT variables exist. Depth/Altitude is assumed to be 0 if it doesnt exist

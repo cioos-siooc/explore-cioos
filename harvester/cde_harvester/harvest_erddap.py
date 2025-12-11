@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import traceback
 from urllib.parse import urlparse
 
 import pandas as pd
@@ -38,8 +39,13 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
     hostname = urlparse(erddap_url).hostname
     datasets_to_skip = get_datasets_to_skip().get(hostname, [])
 
-    def skipped_reason(code):
-        return [[erddap.domain, dataset_id, code]]
+    def skipped_reason(code, error_trace=""):
+        # Combine error code and trace in the reason_code field
+        if error_trace:
+            full_reason = f"{code}\n\n{error_trace}"
+        else:
+            full_reason = code
+        return [[erddap.domain, dataset_id, full_reason]]
 
     profiles_variables = {
         "erddap_url": str,
@@ -111,9 +117,9 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
             f"Skipping datasets because cdm_data_type is not {str(cdm_data_types_supported)}: {unsupported_datasets_list}"
         )
         for dataset_id in unsupported_datasets_list:
-            skipped_datasets_reasons += [
-                [erddap.domain, dataset_id, CDM_DATA_TYPE_UNSUPPORTED]
-            ]
+            cdm_type = unsupported_datasets[unsupported_datasets["datasetID"] == dataset_id]["cdm_data_type"].values[0]
+            error_msg = f"CDM data type '{cdm_type}' not in supported types: {cdm_data_types_supported}"
+            skipped_datasets_reasons += skipped_reason(CDM_DATA_TYPE_UNSUPPORTED, error_msg)
 
     df_all_datasets = df_all_datasets.query(cdm_data_type_test)
 
@@ -148,22 +154,32 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
                     )
                     dataset_logger.info("complete")
             else:
+                error_trace = compliance_checker.get_failure_details()
                 skipped_datasets_reasons += skipped_reason(
-                    compliance_checker.failure_reason_code
+                    compliance_checker.failure_reason_code,
+                    error_trace
                 )
         except HTTPError as e:
             response = e.response
-            # dataset_logger.error(response.text)
+            # Capture full HTTP error details including traceback
+            error_trace = (
+                f"HTTP {response.status_code} {response.reason}\n"
+                f"URL: {response.url}\n"
+                f"Response: {response.text[:500]}\n"
+                f"Traceback:\n{''.join(traceback.format_tb(e.__traceback__))}"
+            )
             dataset_logger.error(
                 "HTTP ERROR: %s %s", response.status_code, response.reason
             )
-            skipped_datasets_reasons += skipped_reason(HTTP_ERROR)
+            skipped_datasets_reasons += skipped_reason(HTTP_ERROR, error_trace)
 
         except Exception as e:
+            # Capture full exception traceback
+            error_trace = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             logger.error(
                 "Error occurred at %s %s", erddap_url, dataset_id, exc_info=True
             )
-            skipped_datasets_reasons += skipped_reason(UNKNOWN_ERROR)
+            skipped_datasets_reasons += skipped_reason(UNKNOWN_ERROR, error_trace)
 
     skipped_datasets_columns = ["erddap_url", "dataset_id", "reason_code"]
 
