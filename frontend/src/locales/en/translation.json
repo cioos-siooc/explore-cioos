@@ -216,8 +216,9 @@
   "harvestResults": {
     "title": "Harvester Summary",
     "datasetId": "Dataset ID",
+    "datasetTitle": "Title",
     "erddapUrl": "ERDDAP URL",
-    "cdmDataType": "Data Type",
+    "cdmDataType": "cdm_data_type",
     "platform": "Platform",
     "profileCount": "Profiles",
     "status": "Status",

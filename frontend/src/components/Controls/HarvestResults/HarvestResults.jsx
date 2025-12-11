@@ -39,13 +39,6 @@ export default function HarvestResults({ onClose }) {
 
   const columns = [
     {
-      name: t('harvestResults.datasetId'),
-      selector: (row) => row.dataset_id,
-      sortable: true,
-      wrap: true,
-      minWidth: '200px',
-    },
-    {
       name: t('harvestResults.erddapUrl'),
       selector: (row) => row.erddap_url,
       sortable: true,
@@ -63,7 +56,24 @@ export default function HarvestResults({ onClose }) {
       ),
     },
     {
-      name: t('harvestResults.title'),
+      name: t('harvestResults.datasetId'),
+      selector: (row) => row.dataset_id,
+      sortable: true,
+      wrap: true,
+      minWidth: '200px',
+      cell: (row) => (
+        <a
+          href={`${row.erddap_url}/tabledap/${row.dataset_id}.html`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="erddap-link"
+        >
+          {row.dataset_id}
+        </a>
+      ),
+    },
+    {
+      name: t('harvestResults.datasetTitle'),
       selector: (row) => row.title || '-',
       sortable: true,
       wrap: true,
@@ -264,6 +274,9 @@ export default function HarvestResults({ onClose }) {
           highlightOnHover
           customStyles={customStyles}
           dense
+          filterPlaceholder={t('harvestResults.filterPlaceholder') || 'Filter by any column...'}
+          filter
+          export
         />
       </div>
     </div>

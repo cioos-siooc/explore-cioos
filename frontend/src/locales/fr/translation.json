@@ -217,8 +217,9 @@
   "harvestResults": {
     "title": "Résumé du moissonneur",
     "datasetId": "ID de l'ensemble de données",
+    "datasetTitle": "Titre",
     "erddapUrl": "URL ERDDAP",
-    "cdmDataType": "Type de données",
+    "cdmDataType": "cdm_data_type",
     "platform": "Plateforme",
     "profileCount": "Profils",
     "status": "Statut",
