@@ -212,5 +212,26 @@
   "datasetsTableDownloadModalDatasetCheckboxTooltip": "Download from CIOOS Data Explorer",
   "datasetTableDownloadModalCDEDownloadableColumnNameTooltip": "Requests for less than 1GB of data from a dataset can be downloaded through CDE",
   "datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip": "Requests for more than 1GB of data from a dataset can be downloaded through the provided ERDDAP™ link",
-  "datasetTableDownloadModalExternalDownloadColumnName": "External download"
+  "datasetTableDownloadModalExternalDownloadColumnName": "External download",
+  "harvestResults": {
+    "title": "Harvester Summary",
+    "datasetId": "Dataset ID",
+    "erddapUrl": "ERDDAP URL",
+    "cdmDataType": "Data Type",
+    "platform": "Platform",
+    "profileCount": "Profiles",
+    "status": "Status",
+    "error": "Error Details",
+    "total": "Total Datasets",
+    "successful": "Successful",
+    "failed": "Failed",
+    "loading": "Loading harvest results...",
+    "errorLoading": "Error loading harvest results",
+    "showDetails": "Show full error trace",
+    "filterPlaceholder": "Filter by any column...",
+    "statusValues": {
+      "success": "Success",
+      "failed": "Failed"
+    }
+  }
 }

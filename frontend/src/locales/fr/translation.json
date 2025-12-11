@@ -213,5 +213,26 @@
   "datasetsTableDownloadModalDatasetCheckboxTooltip": "Télécharger à partir de l'explorateur de données CIOOS",
   "datasetTableDownloadModalCDEDownloadableColumnNameTooltip": "Les demandes de moins de 1 Go de données à partir d'un ensemble de données peuvent être téléchargées via CDE",
   "datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip": "Les demandes de plus de 1 Go de données à partir d'un ensemble de données peuvent être téléchargées via le lien ERDDAP™ fourni",
-  "datasetTableDownloadModalExternalDownloadColumnName": "Téléchargement externe"
+  "datasetTableDownloadModalExternalDownloadColumnName": "Téléchargement externe",
+  "harvestResults": {
+    "title": "Résumé du moissonneur",
+    "datasetId": "ID de l'ensemble de données",
+    "erddapUrl": "URL ERDDAP",
+    "cdmDataType": "Type de données",
+    "platform": "Plateforme",
+    "profileCount": "Profils",
+    "status": "Statut",
+    "error": "Détails de l'erreur",
+    "total": "Ensembles de données totaux",
+    "successful": "Réussis",
+    "failed": "Échoués",
+    "loading": "Chargement des résultats de la récolte...",
+    "errorLoading": "Erreur lors du chargement des résultats de la récolte",
+    "showDetails": "Afficher la trace complète de l'erreur",
+    "filterPlaceholder": "Filtrer par n'importe quelle colonne...",
+    "statusValues": {
+      "success": "Succès",
+      "failed": "Échoué"
+    }
+  }
 }
