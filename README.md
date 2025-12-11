@@ -21,108 +21,149 @@ If you just want to see how a dataset is harvested by CDE:
     2. Production environment: `docker compose -f docker-compose.production.yaml up -d`
 5. See website at <http://localhost:8098>
 6. To update database and reharvest datasets:
-    1. Development environment:  `docker compose up -d harvester`
-    2. Production environment: `docker compose -f  docker-compose.production.yaml up -d harvester`
+    1. **Full reload** (clears all data, reloads everything):
+        - Development: `docker compose up -d harvester`
+        - Production: `docker compose -f docker-compose.production.yaml up -d harvester`
+    2. **Incremental update** (only updates changed datasets, much faster):
+        - Development: `docker compose run --rm -e INCREMENTAL_MODE=true harvester`
+        - Production: `docker compose -f docker-compose.production.yaml run --rm -e INCREMENTAL_MODE=true harvester`
+        - Or use the convenience script: `./run_harvester.sh --incremental`
+
+For more details, see:
+- [Harvester Usage Guide](HARVESTER_USAGE.md)
+- [DB Loader README](db-loader/README.md)
 
 ## Front End Development
 
-- To run CDE locally, you will need Docker, Python and Node and a few terminal windows
+There are two main approaches for frontend development:
 
-- Rename .env.sample from the root directory to .env and change any settings if needed. If you are running on your local machine these settings don't need to change
+### Option 1: Frontend Local + Backend via Docker Compose
 
-- Start a local database using `docker`:
-  `docker-compose up -d db`
-- Setup Python virtual env and install Python modules:
+Run the frontend locally while using Docker Compose for all backend services (recommended for full-stack development).
 
-  ```sh
-  conda create -n cde python=3.10
-  conda activate cde
-  pip install -e ./downloader -e ./download_scheduler -e ./harvester -e ./db-loader
-  ```
+1. Rename `.env.sample` from the root directory to `.env` and change any settings if needed. If you are running on your local machine, these settings don't need to change.
 
-- Start the API:
+2. Start all backend services using Docker Compose:
 
-  ```sh
-      cd web-api
-      npm install
-      npm start
-  ```
+   ```sh
+   docker compose up -d
+   ```
 
-- Start the download scheduler:
+3. Start the frontend locally:
 
-  ```sh
-      python -m download_scheduler
-  ```
+   ```sh
+   cd frontend
+   npm install
+   npm start
+   ```
 
-- Start the frontend:
+4. See website at <http://localhost:8000>
 
-  ```sh
-      cd frontend
-      npm install
-      npm start
-  ```
+### Option 2: Frontend Local + Remote API
 
-- Harvest a single dataset and load CKAN data.
+Run only the frontend locally and connect to a remote API (recommended for frontend-only development).
 
-  ```sh
-    sh data_loader_test.sh
-  ```
+1. Start the frontend with a custom API URL:
 
-- See website at <http://localhost:8000>
+   ```sh
+   cd frontend
+   npm install
+   REACT_APP_API_URL=https://your-remote-api.com/api npm start
+   ```
 
-## Handy docker commands
+2. See website at <http://localhost:8000>
 
-See which cde services are running:
-`docker-compose ps`
+### Full Local Development Setup
 
-Start all containers, the first time this runs it will build containers:
-`docker-compose up -d`
+For complete local development with all services running outside Docker (advanced):
 
-Tail logs:
-`docker-compose logs -f`
+1. Rename `.env.sample` from the root directory to `.env` and change any settings if needed.
 
-(Re/)Build and (re/)start all containers that have code changes:
-`docker-compose -f docker-compose.production.yaml up -d --build`
+2. Start a local database using `docker`:
 
-Rebuild database: (this will erase all your data)
+   ```sh
+   docker compose up -d db
+   ```
 
-```sh
-docker-compose stop db
-docker volume rm cde_postgres-data
-docker-compose up -d db
-```
+3. Setup Python virtual env and install Python modules:
 
-Redis CLI:
-`docker exec -it cde_redis_1 redis-cli`
+   ```sh
+   conda create -n cde python=3.10
+   conda activate cde
+   pip install -e ./downloader -e ./download_scheduler -e ./harvester -e ./db-loader
+   ```
 
-Flush redis tile cache:
-`docker exec -it cde_redis_1 redis-cli FLUSHALL`
+4. Start the API:
+
+   ```sh
+   cd web-api
+   npm install
+   npm start
+   ```
+
+5. Start the download scheduler:
+
+   ```sh
+   python -m download_scheduler
+   ```
+
+6. Start the frontend:
+
+   ```sh
+   cd frontend
+   npm install
+   npm start
+   ```
+
+7. Harvest a single dataset and load CKAN data:
+
+   ```sh
+   sh data_loader_test.sh
+   ```
+
+8. See website at <http://localhost:8000>
 
 ## Production deployment
 
-From the production server,
+Deploy CDE to production using Docker Compose with the production configuration file.
 
-- rename `.env.sample` to `production.env` and configure.
+### Initial Setup
 
-- Delete old redis and postgres data (if needed):
-  `sudo docker volume rm cde_postgres-data cde_redis-data`
+1. Rename `.env.sample` to `production.env` and configure with production settings.
 
-- Start all services:
-  `sudo docker-compose -f docker-compose.production.yaml up -d --build`
+2. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and configure the datasets to harvest.
 
-- Harvest data:
+3. Delete old redis and postgres data (if needed):
 
-  ```sh
-  conda create -n cde python=3.10
-  conda activate cde
-  pip install -e ./harvester -e ./db-loader
-  sh data_loader.sh
-  ```
+   ```sh
+   sudo docker volume rm cde_postgres-data cde_redis-data
+   ```
 
-- Add a crontab entry for the scheduler to run nightly.
+4. Start all services using the production Docker Compose file:
 
-- deploy frontend to Gitpages
+   ```sh
+   sudo docker compose -f docker-compose.production.yaml up -d --build
+   ```
 
-  ```sh
-  API_URL=https://explore.cioos.ca/api npm run deploy
-  ```
+### Data Harvesting
+
+The harvester should be run on a schedule to keep the data up to date. Set up a cron job to run the harvester container:
+
+1. Edit your crontab:
+
+   ```sh
+   crontab -e
+   ```
+
+2. Add an entry to run the harvester nightly (example runs at 2 AM):
+
+   ```cron
+   0 2 * * * cd /path/to/explore-cioos && docker compose -f docker-compose.production.yaml up harvester
+   ```
+
+   Or to run weekly (example runs Sunday at 2 AM):
+
+   ```cron
+   0 2 * * 0 cd /path/to/explore-cioos && docker compose -f docker-compose.production.yaml up harvester
+   ```
+

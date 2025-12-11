@@ -1,5 +1,5 @@
-/* 
- 
+/*
+
  set_constraints()
  drop_constraints()
 
@@ -87,9 +87,8 @@ ALTER TABLE cde.profiles
 
 ALTER TABLE cde.points
     DROP CONSTRAINT IF EXISTS hexes_zoom_0_points_foreign,
-    DROP CONSTRAINT IF EXISTS hexes_zoom_1_points_foreign;    
+    DROP CONSTRAINT IF EXISTS hexes_zoom_1_points_foreign;
 
 END;
 
 $$ LANGUAGE plpgsql;
-
