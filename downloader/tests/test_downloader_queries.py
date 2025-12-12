@@ -5,10 +5,10 @@ import pytest
 
 from erddap_downloader import downloader_wrapper
 
-QUERIES = (Path(__file__).parent / "queries").glob("*.json")
+QUERIES = list((Path(__file__).parent / "queries").glob("*.json"))
 
 def test_queries_exist():
-    assert len(list(QUERIES)) > 0
+    assert len(QUERIES) > 0
 
 @pytest.mark.parametrize("query", QUERIES)
 def test_downloader_query(query, tmp_path):
