@@ -58,7 +58,7 @@ services:
     env_file:
       - .env
     volumes:
-      - $DOWNLOADS_FOLDER:/usr/src/app/downloads
+      - downloads:/usr/src/app/download_scheduler/downloads
     restart: always
   frontend:
     build:
@@ -92,3 +92,4 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  downloads:

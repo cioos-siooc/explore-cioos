@@ -1,0 +1,86 @@
+l06_code,l06_label,category
+97,snowcat,snowcat
+99,mesocosm tank,mesocosm tank
+6D,unmanned aerial vehicle,non-buoyant aircraft
+60,non-buoyant aircraft,non-buoyant aircraft
+55,tethered floating pontoon,tethered floating pontoon
+49,surface ice buoy,drifting surface float
+42,drifting surface float,float
+98,snowmobile,snowmobile
+94,drift ice,cryosphere
+4A,Ice-tethered subsurface profiling float,drift ice
+90,cryosphere,cryosphere
+91,ice island,cryosphere
+92,ice shelf,cryosphere
+93,pack ice,cryosphere
+3C,surface gliders,autonomous surface water vehicle
+3B,autonomous surface water vehicle,surface vessel
+3D,drillship,surface vessel
+3Z,surface vessel,surface vessel
+36,fishing vessel,surface vessel
+38,man-powered boat,surface vessel
+18,river station,land or seafloor
+10,land or seafloor,land or seafloor
+69,autogyro,non-buoyant aircraft
+30,ship,surface vessel
+61,research aeroplane,non-buoyant aircraft
+66,manned spacecraft,spacecraft
+6Z,spacecraft,spacecraft
+52,free-floating balloon,buoyant aircraft
+50,buoyant aircraft,buoyant aircraft
+26,lowered unmanned submersible,submersible
+20,submersible,submersible
+16,offshore structure,land or seafloor
+3A,man-powered small boat,surface vessel
+6B,kite,non-buoyant aircraft
+41,moored surface buoy,mooring
+48,mooring,mooring
+6C,parachute,non-buoyant aircraft
+72,diver,organism
+70,organism,organism
+37,self-propelled boat,surface vessel
+9A,DUKW,amphibious vehicle
+95,amphibious vehicle,amphibious vehicle
+43,subsurface mooring,mooring
+35,vessel of opportunity on fixed route,surface vessel
+15,land/onshore vehicle,land or seafloor
+63,rocket,non-buoyant aircraft
+32,vessel of opportunity,surface vessel
+67,helicopter,non-buoyant aircraft
+62,aeroplane,non-buoyant aircraft
+6A,glider,non-buoyant aircraft
+13,beach/intertidal zone structure,land or seafloor
+54,airship,buoyant aircraft
+24,drifting manned submersible,submersible
+22,propelled unmanned submersible,submersible
+44,drifting subsurface float,float
+47,float,float
+76,fish,organism
+73,flightless bird,organism
+68,satellite,spacecraft
+33,self-propelled small boat,surface vessel
+74,seabird and duck,organism
+9B,hovercraft,amphibious vehicle
+34,vessel at fixed position,surface vessel
+39,naval vessel,surface vessel
+96,amphibious crawler,land or seafloor
+19,mesocosm bag,land or seafloor
+11,fixed benthic node,land or seafloor
+53,tethered balloon,buoyant aircraft
+12,sea bed vehicle,land or seafloor
+0,unknown,unknown
+23,towed unmanned submersible,submersible
+17,coastal structure,land or seafloor
+45,fixed subsurface vertical profiler,mooring
+21,propelled manned submersible,submersible
+75,cetacean,organism
+46,drifting subsurface profiling float,float
+14,land/onshore structure,land or seafloor
+71,human,organism
+77,land-sea mammals,organism
+64,geostationary orbiting satellite,spacecraft
+65,orbiting satellite,spacecraft
+51,free-rising balloon,buoyant aircraft
+25,autonomous underwater vehicle,submersible
+27,sub-surface gliders,autonomous underwater vehicle
+31,research vessel,surface vessel
