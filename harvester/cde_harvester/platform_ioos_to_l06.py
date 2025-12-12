@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 import pandas as pd
 import requests
@@ -14,8 +15,15 @@ CDE converts IOOS to L06 using a mapping found here:  https://mmisw.org/ont?iri=
 
 logger = logging.getLogger(__name__)
 
+PLATFORM_L06_CODES_AND_LABELS_CSV = Path(__file__).parent / "data" / "platform_nerc_l06_codes_and_labels.csv" 
+PLATFORM_L06_MAPPING_CSV = Path(__file__).parent / "data" / "platform_nerc_ioos_l06.csv"
+
 
 def get_l06_codes_and_labels():
+
+    if PLATFORM_L06_CODES_AND_LABELS_CSV.exists():
+        logger.info(f"Loading existing L06 codes and labels from {PLATFORM_L06_CODES_AND_LABELS_CSV}")
+        return pd.read_csv(PLATFORM_L06_CODES_AND_LABELS_CSV, index_col="l06_code")
 
     url = "http://vocab.nerc.ac.uk/collection/L06/current/?_profile=nvs&_mediatype=application/ld+json"
     logger.info("Downloading %s", url)
@@ -57,7 +65,10 @@ def get_l06_codes_and_labels():
 
 def get_ioos_to_l06_mapping():
     # Parse IOOS to L06 mapping
-
+    if PLATFORM_L06_MAPPING_CSV.exists():
+        logger.info(f"Loading existing IOOS to L06 mapping from {PLATFORM_L06_MAPPING_CSV}")
+        return pd.read_csv(PLATFORM_L06_MAPPING_CSV, index_col="l06_code")
+    
     # download mapping
     url = "https://mmisw.org/ont/api/v0/ont?format=jsonld&iri=http://mmisw.org/ont/bodc/MapSeaVoxPlatforms2IOOSandRDIPlatforms"
     logger.info("Downloading %s", url)
@@ -99,3 +110,10 @@ ioos_to_l06_mapping = get_ioos_to_l06_mapping()
 platforms_nerc_ioos = (
     l06_codes_and_labels.join(ioos_to_l06_mapping).reset_index().fillna("")
 )
+
+if __name__ == "__main__":
+    logger.info("Save platforms mapping and labels to CSV")
+    Path(PLATFORM_L06_MAPPING_CSV).parent.mkdir(parents=True, exist_ok=True)
+    platforms_nerc_ioos.to_csv(PLATFORM_L06_MAPPING_CSV)
+    l06_codes_and_labels.to_csv(PLATFORM_L06_CODES_AND_LABELS_CSV)
+    logger.info("Done")
