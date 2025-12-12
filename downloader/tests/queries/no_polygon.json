@@ -13,7 +13,7 @@
   },
   "cache_filtered": [
     {
-      "erddap_url": "https://pac-dev2.cioos.org/erddap",
+      "erddap_url": "https://erddap.amundsenscience.com/erddap",
       "dataset_id": "amundsen798",
       "title": "ArcticNet - Arctic SOLAS 0706a - Northern Baffin Bay CTD data",
       "profile_variables": ["filename"],
