@@ -1,95 +1,33 @@
-,l06_code,l06_label,category,ioos_label
-0,0,unknown,unknown,
-1,10,land or seafloor,land or seafloor,fixed
-2,11,fixed benthic node,land or seafloor,lander
-3,12,sea bed vehicle,land or seafloor,
-4,13,beach/intertidal zone structure,land or seafloor,
-5,14,land/onshore structure,land or seafloor,tower
-6,15,land/onshore vehicle,land or seafloor,
-7,16,offshore structure,land or seafloor,offshore_tower
-8,17,coastal structure,land or seafloor,dock
-9,17,coastal structure,land or seafloor,pier
-10,17,coastal structure,land or seafloor,tide_station
-11,18,river station,land or seafloor,river_level_station
-12,19,mesocosm bag,land or seafloor,
-13,20,submersible,submersible,submersible
-14,21,propelled manned submersible,submersible,
-15,22,propelled unmanned submersible,submersible,remotelyOperatedVehicle
-16,22,propelled unmanned submersible,submersible,remotely_operated_vehicle
-17,23,towed unmanned submersible,submersible,towed_underwater_vehicle
-18,24,drifting manned submersible,submersible,
-19,25,autonomous underwater vehicle,submersible,automated_underwater_vehicle
-20,25,autonomous underwater vehicle,submersible,autonomousUnderwterVehicle
-21,25,autonomous underwater vehicle,submersible,glider
-22,26,lowered unmanned submersible,submersible,rosette
-23,27,sub-surface gliders,autonomous underwater vehicle,
-24,30,ship,surface vessel,ship
-25,31,research vessel,surface vessel,
-26,32,vessel of opportunity,surface vessel,
-27,33,self-propelled small boat,surface vessel,personal_watercraft
-28,34,vessel at fixed position,surface vessel,
-29,35,vessel of opportunity on fixed route,surface vessel,
-30,36,fishing vessel,surface vessel,
-31,37,self-propelled boat,surface vessel,
-32,38,man-powered boat,surface vessel,
-33,39,naval vessel,surface vessel,
-34,3A,man-powered small boat,surface vessel,
-35,3B,autonomous surface water vehicle,surface vessel,umannedUnderwaterVehicle
-36,3C,surface gliders,autonomous surface water vehicle,
-37,3D,drillship,surface vessel,
-38,3Z,surface vessel,surface vessel,boat
-39,41,moored surface buoy,mooring,moored_buoy
-40,41,moored surface buoy,mooring,wave_buoy
-41,42,drifting surface float,float,drifting_buoy
-42,43,subsurface mooring,mooring,
-43,44,drifting subsurface float,float,
-44,45,fixed subsurface vertical profiler,mooring,
-45,46,drifting subsurface profiling float,float,profiler
-46,46,drifting subsurface profiling float,float,subsurface_float
-47,47,float,float,drifter
-48,48,mooring,mooring,buoy
-49,48,mooring,mooring,mooring
-50,48,mooring,mooring,profiling_buoy
-51,49,surface ice buoy,drifting surface float,
-52,4A,Ice-tethered subsurface profiling float,drift ice,
-53,50,buoyant aircraft,buoyant aircraft,
-54,51,free-rising balloon,buoyant aircraft,balloon
-55,52,free-floating balloon,buoyant aircraft,
-56,53,tethered balloon,buoyant aircraft,
-57,54,airship,buoyant aircraft,
-58,55,tethered floating pontoon,tethered floating pontoon,
-59,60,non-buoyant aircraft,non-buoyant aircraft,
-60,61,research aeroplane,non-buoyant aircraft,aircraft
-61,62,aeroplane,non-buoyant aircraft,airplane
-62,63,rocket,non-buoyant aircraft,
-63,64,geostationary orbiting satellite,spacecraft,
-64,65,orbiting satellite,spacecraft,
-65,66,manned spacecraft,spacecraft,
-66,67,helicopter,non-buoyant aircraft,
-67,68,satellite,spacecraft,
-68,69,autogyro,non-buoyant aircraft,
-69,6A,glider,non-buoyant aircraft,
-70,6B,kite,non-buoyant aircraft,
-71,6C,parachute,non-buoyant aircraft,
-72,6D,unmanned aerial vehicle,non-buoyant aircraft,
-73,6Z,spacecraft,spacecraft,
-74,70,organism,organism,
-75,71,human,organism,
-76,72,diver,organism,
-77,73,flightless bird,organism,
-78,74,seabird and duck,organism,
-79,75,cetacean,organism,
-80,76,fish,organism,
-81,77,land-sea mammals,organism,
-82,90,cryosphere,cryosphere,
-83,91,ice island,cryosphere,
-84,92,ice shelf,cryosphere,
-85,93,pack ice,cryosphere,
-86,94,drift ice,cryosphere,
-87,95,amphibious vehicle,amphibious vehicle,
-88,96,amphibious crawler,land or seafloor,
-89,97,snowcat,snowcat,
-90,98,snowmobile,snowmobile,
-91,99,mesocosm tank,mesocosm tank,
-92,9A,DUKW,amphibious vehicle,
-93,9B,hovercraft,amphibious vehicle,
+l06_code,ioos_label
+61,aircraft
+62,airplane
+25,automated_underwater_vehicle
+25,autonomousUnderwterVehicle
+51,balloon
+3Z,boat
+48,buoy
+17,dock
+47,drifter
+42,drifting_buoy
+10,fixed
+25,glider
+11,lander
+41,moored_buoy
+48,mooring
+16,offshore_tower
+33,personal_watercraft
+17,pier
+46,profiler
+48,profiling_buoy
+22,remotelyOperatedVehicle
+22,remotely_operated_vehicle
+18,river_level_station
+26,rosette
+30,ship
+20,submersible
+46,subsurface_float
+17,tide_station
+23,towed_underwater_vehicle
+14,tower
+3B,umannedUnderwaterVehicle
+41,wave_buoy

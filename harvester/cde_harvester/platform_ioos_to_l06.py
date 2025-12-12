@@ -108,12 +108,12 @@ l06_codes_and_labels = get_l06_codes_and_labels()
 ioos_to_l06_mapping = get_ioos_to_l06_mapping()
 
 platforms_nerc_ioos = (
-    l06_codes_and_labels.join(ioos_to_l06_mapping).reset_index().fillna("")
+    l06_codes_and_labels.join(ioos_to_l06_mapping).fillna("")
 )
 
 if __name__ == "__main__":
     logger.info("Save platforms mapping and labels to CSV")
     Path(PLATFORM_L06_MAPPING_CSV).parent.mkdir(parents=True, exist_ok=True)
-    platforms_nerc_ioos.to_csv(PLATFORM_L06_MAPPING_CSV)
+    ioos_to_l06_mapping.to_csv(PLATFORM_L06_MAPPING_CSV)
     l06_codes_and_labels.to_csv(PLATFORM_L06_CODES_AND_LABELS_CSV)
     logger.info("Done")
