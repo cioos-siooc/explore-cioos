@@ -319,7 +319,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
                 f.write(",".join(units.to_list()) + "\n")
 
                 # Write Data
-                df.to_csv(f, mode="a", header=False, index=False, line_terminator="\n")
+                df.to_csv(f, mode="a", header=False, index=False, lineterminator="\n")
 
             file_size = os.stat(output_file_path).st_size
         # Generate report for each download
