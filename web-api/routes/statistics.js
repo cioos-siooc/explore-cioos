@@ -166,31 +166,89 @@ router.get("/", cache.route(), async (req, res) => {
       .orderBy("count", "desc");
 
     // Get profiles over time by CDM data type (binned by year)
+    // For TimeSeries and TimeSeriesProfile, expand across all years from time_min to time_max
     const profilesOverTimeByCdmType = await db.raw(`
+      WITH year_series AS (
+        SELECT
+          p.pk,
+          d.cdm_data_type,
+          generate_series(
+            DATE_TRUNC('year', p.time_min)::date,
+            DATE_TRUNC('year', COALESCE(p.time_max, p.time_min))::date,
+            '1 year'::interval
+          )::date as time_period
+        FROM cde.profiles p
+        JOIN cde.datasets d ON d.pk = p.dataset_pk
+        WHERE p.time_min IS NOT NULL
+          AND d.cdm_data_type IS NOT NULL
+          AND d.cdm_data_type IN ('TimeSeries', 'TimeSeriesProfile')
+      ),
+      single_year AS (
+        SELECT
+          DATE_TRUNC('year', p.time_min)::date as time_period,
+          d.cdm_data_type,
+          p.pk
+        FROM cde.profiles p
+        JOIN cde.datasets d ON d.pk = p.dataset_pk
+        WHERE p.time_min IS NOT NULL
+          AND d.cdm_data_type IS NOT NULL
+          AND d.cdm_data_type NOT IN ('TimeSeries', 'TimeSeriesProfile')
+      ),
+      combined AS (
+        SELECT time_period, cdm_data_type, pk FROM year_series
+        UNION ALL
+        SELECT time_period, cdm_data_type, pk FROM single_year
+      )
       SELECT
-        DATE_TRUNC('year', p.time_min) as time_period,
-        d.cdm_data_type,
-        COUNT(p.pk) as count
-      FROM cde.profiles p
-      JOIN cde.datasets d ON d.pk = p.dataset_pk
-      WHERE p.time_min IS NOT NULL
-        AND d.cdm_data_type IS NOT NULL
-      GROUP BY DATE_TRUNC('year', p.time_min), d.cdm_data_type
-      ORDER BY time_period ASC, d.cdm_data_type
+        time_period,
+        cdm_data_type,
+        COUNT(DISTINCT pk) as count
+      FROM combined
+      GROUP BY time_period, cdm_data_type
+      ORDER BY time_period ASC, cdm_data_type
     `);
 
     // Get profiles over time by organization (binned by year)
+    // For TimeSeries and TimeSeriesProfile, expand across all years from time_min to time_max
     const profilesOverTimeByOrg = await db.raw(`
+      WITH year_series AS (
+        SELECT
+          p.pk,
+          ol.name as organization,
+          generate_series(
+            DATE_TRUNC('year', p.time_min)::date,
+            DATE_TRUNC('year', COALESCE(p.time_max, p.time_min))::date,
+            '1 year'::interval
+          )::date as time_period
+        FROM cde.profiles p
+        JOIN cde.datasets d ON d.pk = p.dataset_pk
+        JOIN cde.organizations_lookup ol ON ol.pk = ANY(d.organization_pks)
+        WHERE p.time_min IS NOT NULL
+          AND d.cdm_data_type IN ('TimeSeries', 'TimeSeriesProfile')
+      ),
+      single_year AS (
+        SELECT
+          DATE_TRUNC('year', p.time_min)::date as time_period,
+          ol.name as organization,
+          p.pk
+        FROM cde.profiles p
+        JOIN cde.datasets d ON d.pk = p.dataset_pk
+        JOIN cde.organizations_lookup ol ON ol.pk = ANY(d.organization_pks)
+        WHERE p.time_min IS NOT NULL
+          AND (d.cdm_data_type NOT IN ('TimeSeries', 'TimeSeriesProfile') OR d.cdm_data_type IS NULL)
+      ),
+      combined AS (
+        SELECT time_period, organization, pk FROM year_series
+        UNION ALL
+        SELECT time_period, organization, pk FROM single_year
+      )
       SELECT
-        DATE_TRUNC('year', p.time_min) as time_period,
-        ol.name as organization,
-        COUNT(p.pk) as count
-      FROM cde.profiles p
-      JOIN cde.datasets d ON d.pk = p.dataset_pk
-      JOIN cde.organizations_lookup ol ON ol.pk = ANY(d.organization_pks)
-      WHERE p.time_min IS NOT NULL
-      GROUP BY DATE_TRUNC('year', p.time_min), ol.name
-      ORDER BY time_period ASC, ol.name
+        time_period,
+        organization,
+        COUNT(DISTINCT pk) as count
+      FROM combined
+      GROUP BY time_period, organization
+      ORDER BY time_period ASC, organization
     `);
 
     // Get profiles by ERDDAP server for Sankey diagram
