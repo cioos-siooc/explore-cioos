@@ -71,6 +71,9 @@ export default function SelectionDetails({
     }
   }, [debouncedDatasetTitleSearchText])
 
+
+  
+
   useEffect(() => {
     if (!isEmpty(pointsData)) {
       let count = 0
@@ -99,35 +102,42 @@ export default function SelectionDetails({
     }
   }
   useEffect(() => {
-    setDataTotal(0)
-    if (!loading && query.eovsSelected.length) {
-      const filtersQuery = createDataFilterQueryString(query)
-      let shapeQuery = []
-      if (polygon) {
-        shapeQuery = createSelectionQueryString(polygon)
-      }
-      const combinedQueries = [filtersQuery, shapeQuery]
-        .filter((e) => e)
-        .join('&')
-      setInspectDataset()
-      setLoading(true)
-      setCombinedQueries(combinedQueries)
-      const urlString = `${server}/pointQuery${
-        combinedQueries ? '?' + combinedQueries : ''
-      }`
-      fetch(urlString).then((response) => {
-        if (response.ok) {
-          response.json().then((data) => {
-            setPointsData(data.map(datasetsInLanguage))
-          })
-        } else {
-          setPointsData([])
-        }
-        setInitialPointsQueryComplete(true)
+    if (!query.eovsSelected.length) return;
+
+    setDataTotal(0);
+
+    const filtersQuery = createDataFilterQueryString(query);
+    const shapeQuery = polygon
+      ? createSelectionQueryString(polygon)
+      : '';
+
+    const combinedQueries = [filtersQuery, shapeQuery]
+      .filter(Boolean)
+      .join('&');
+
+    setInspectDataset(undefined);
+    setLoading(true);
+    setCombinedQueries(combinedQueries);
+
+    const urlString = `${server}/pointQuery${
+      combinedQueries ? `?${combinedQueries}` : ''
+    }`;
+
+    fetch(urlString)
+      .then((response) => {
+        if (!response.ok) throw new Error();
+        return response.json();
       })
-    }
-    setBackClicked(false)
-  }, [query, polygon])
+      .then((data) => {
+        setPointsData(data.map(datasetsInLanguage));
+        setInitialPointsQueryComplete(true);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+
+    setBackClicked(false);
+  }, [query, polygon]);
 
   useEffect(() => {
     if (!loading) {
@@ -224,7 +234,9 @@ export default function SelectionDetails({
           {console.log('loading:', loading)}
   {console.log('initialPointsQueryComplete:', initialPointsQueryComplete)}
   {console.log('inspectDataset:', inspectDataset)}
-        {loading || !initialPointsQueryComplete ? (
+  {console.log(filteredDatasets)}
+  {console.log(pointsData)}
+        {loading && !initialPointsQueryComplete ? (
           <Loading />
         ) : inspectDataset ? (
           <DatasetInspector
