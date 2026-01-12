@@ -56,6 +56,7 @@ import {
   getCookieValue
 } from '../utilities.js'
 import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useMediaQuery } from "react-responsive";
 
 import './styles.css'
 
@@ -75,8 +76,9 @@ export default function App() {
   const [searchParams] = useSearchParams()
   const lang = searchParams.get('lang') || 'en'
   const { t, i18n } = useTranslation()
+  const isDesktop = useMediaQuery({ minWidth: 1024 });
 
-  const [selectionPanelOpen, setSelectionPanelOpen] = useState(true)
+  const [selectionPanelOpen, setSelectionPanelOpen] = useState(false);
   const [pointsToDownload, setPointsToDownload] = useState()
   const [pointsToReview, setPointsToReview] = useState()
   const [polygon, setPolygon] = useState()
@@ -187,6 +189,16 @@ export default function App() {
   const [filterDownloadByPolygon, setFilterDownloadByPolygon] = useState(false)
 
   const [totalNumberOfDatasets, setTotalNumberOfDatasets] = useState()
+
+
+  // Update when the breakpoint is evaluated
+  useEffect(() => {
+    if (isDesktop) {
+      setSelectionPanelOpen(true);   // open by default on desktop
+    } else {
+      setSelectionPanelOpen(false);  // closed by default on mobile
+    }
+  });
 
   // Update query
   useEffect(() => {
