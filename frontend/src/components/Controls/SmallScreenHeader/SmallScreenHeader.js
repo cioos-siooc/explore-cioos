@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { InfoSquare, ChatDots, Filter, FileEarmarkSpreadsheet, Download } from 'react-bootstrap-icons'
+import { InfoSquare, ChatDots, Filter, FileEarmarkSpreadsheet, Download, List } from 'react-bootstrap-icons'
 import CIOOSLogoEN from '../../Images/CIOOSNationalLogoBlackEnglish.svg'
 import CIOOSLogoFR from '../../Images/CIOOSNationalLogoBlackFrench.svg'
 import LanguageSelector from '../LanguageSelector/LanguageSelector.jsx'
@@ -7,7 +7,7 @@ import Logo from '../../logo.js'
 import './styles.css'
     
     
-export  function SmallHeader({setShowIntroModal}) {
+export  function SmallHeader({setShowIntroModal, setSelectionPanelOpen}) {
   const { t, i18n } = useTranslation()
 
   return(
@@ -40,6 +40,16 @@ export  function SmallHeader({setShowIntroModal}) {
           <ChatDots size='28px' color='#007bff' />
         </a>
         <LanguageSelector className='noPosition' />
+
+        <button
+        onClick={() => setSelectionPanelOpen(true)}
+        title="Open selection panel"  //  Open the selection panel
+        >
+          <List color='#007bff' className='w-[30px] h-[25px] mr-[15px]' />
+
+        </button>
+
+        
       </div>
   )
 } 

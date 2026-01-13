@@ -26,16 +26,9 @@ export default function Controls({ selectionPanel, loading, isSelectionPanelOpen
         ) : (
 
         <> 
-          <SmallHeader setShowIntroModal= {setShowIntroModal}/>
+          <SmallHeader setShowIntroModal= {setShowIntroModal} setSelectionPanelOpen={setSelectionPanelOpen}/>
 
           <Row className='flex lg:hidden relative top-[10px]'>
-          <Col className='panelHandleCol'>
-            <div className='panelHandleClosed' 
-              onClick={() => setSelectionPanelOpen(true)}>  
-              <ChevronCompactRight /> 
-            </div> 
-          </Col>
-        
           <Col className='controlColumn'>{children}</Col>
           </Row>
           </>
