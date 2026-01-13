@@ -76,7 +76,9 @@ export default function App() {
   const [searchParams] = useSearchParams()
   const lang = searchParams.get('lang') || 'en'
   const { t, i18n } = useTranslation()
+
   const isDesktop = useMediaQuery({ minWidth: 1024 });
+ 
 
   const [selectionPanelOpen, setSelectionPanelOpen] = useState(false);
   const [pointsToDownload, setPointsToDownload] = useState()
@@ -192,13 +194,11 @@ export default function App() {
 
 
   // Update when the breakpoint is evaluated
+  // Desktop detection
+ 
   useEffect(() => {
-    if (isDesktop) {
-      setSelectionPanelOpen(true);   // open by default on desktop
-    } else {
-      setSelectionPanelOpen(false);  // closed by default on mobile
-    }
-  });
+  setSelectionPanelOpen(isDesktop); 
+}, [isDesktop]);
 
   // Update query
   useEffect(() => {
@@ -260,11 +260,14 @@ export default function App() {
   }, [pointsToDownload])
 
   useEffect(() => {
-    if (isEmpty(pointsToReview)) {
-      setPointsToDownload()
-    }
-    setSelectionPanelOpen(true)
-  }, [pointsToReview])
+  if (isEmpty(pointsToReview)) {
+    setPointsToDownload();
+  }
+
+  if (isDesktop) {
+    setSelectionPanelOpen(true); // only open on desktop
+  }
+  }, [pointsToReview, isDesktop]);
 
   useEffect(() => {
     setIsPageLoad(false)

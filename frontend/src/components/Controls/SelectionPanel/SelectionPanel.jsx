@@ -8,7 +8,8 @@ import './styles.css'
 export default function SelectionPanel({ open, setOpen, children }) {
   const { t } = useTranslation()
   const selectionPanelClassName = classNames('selectionPanel', {
-    closed: !open
+    closed: !open,
+    open: open
   })
   const panelContentsClassName = classNames('panelContents', {
     closed: !open
