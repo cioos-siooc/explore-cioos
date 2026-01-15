@@ -41,10 +41,8 @@ class ERDDAP(object):
 
         self.domain = urlparse(erddap_url).netloc
         self.session = requests.Session()
-
-        self.logger = self.get_logger()
         self.df_all_datasets = None
-        logger = self.logger
+        logger = logging.getLogger(__name__)
 
         erddap_url = erddap_url.rstrip("/")
         self.url = erddap_url
@@ -63,16 +61,17 @@ class ERDDAP(object):
     def get_all_datasets(self):
         "Get a string list of dataset IDs from the ERDDAP server"
         # allDatasets indexes table and grid datasets
+        logger = logging.getLogger(__name__)
         try:
-            self.logger.info("Fetching all datasets from ERDDAP server: %s", self.url)
+            logger.info("Fetching all datasets from ERDDAP server: %s", self.url)
             df = self.erddap_csv_to_df(
                 '/tabledap/allDatasets.csv?&accessible="public"&dataStructure="table"',
                 skiprows=[1, 2],
             )
-            self.logger.info(f"Found {len(df)} datasets")
+            logger.info(f"Found {len(df)} datasets")
             return df
         except requests.exceptions.HTTPError:
-            self.logger.error("ERDDAP query failed", exc_info=True)
+            logger.error("ERDDAP query failed", exc_info=True)
             return pd.DataFrame()
 
     def parse_erddap_date(s):
@@ -170,7 +169,3 @@ class ERDDAP(object):
 
     def get_dataset(self, dataset_id):
         return Dataset(self, dataset_id)
-
-    def get_logger(self):
-        logger = logging.getLogger(self.domain)
-        return logger
