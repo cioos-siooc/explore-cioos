@@ -58,7 +58,7 @@ def reloadTopRequests():
             log.error(traceback.format_exc())
             continue
             
-@flow(name=f"refresh-redis_{datetime.now().strftime('%Y%m%d-%H%M%S')}")
+@flow(name=f"refresh-redis")
 def redisFlow():
     clearRedisCache()
     reloadTopRequests()

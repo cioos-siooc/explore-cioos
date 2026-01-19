@@ -1,7 +1,9 @@
 import argparse
 import logging
 import os
+import queue
 import sys
+import threading
 import time
 from datetime import datetime
 
@@ -15,18 +17,16 @@ from cde_harvester.ckan.create_ckan_erddap_link import (
     unescape_ascii_list,
 )
 from cde_harvester.harvest_erddap import harvest_erddap
-from cde_harvester.logging_utils import setup_integrated_logger, initialize_sentry
 from cde_harvester.utils import cf_standard_names, supported_standard_names
 from dotenv import load_dotenv
 from sentry_sdk.crons import monitor
 from sentry_sdk.integrations.logging import LoggingIntegration
-from prefect import flow, task
-
+from prefect import flow, get_run_logger
 load_dotenv()
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logger = logging.getLogger()
-"""
+
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
     integrations=[
@@ -37,8 +37,7 @@ sentry_sdk.init(
     ],
     environment=os.environ.get("ENVIRONMENT", "development"),
 )
-"""
-initialize_sentry()
+
 # Ignored standard names that are not EOVs, mostly coordinate variables
 IGNORED_STANDARD_NAMES= ["latitude", "longitude", "time", "depth", "","altitude","sea_water_pressure","sea_water_pressure_due_to_sea_water"]
 
@@ -64,34 +63,7 @@ def cleanup_old_logs(log_dir, days=30):
     if removed_count > 0:
         logger.info(f"Cleaned up {removed_count} log file(s) older than {days} days")
 
-def setup_logging(log_time, log_level, log_dir=None):
-    if log_dir:
-        cleanup_old_logs(log_dir, days=30)
-        os.makedirs(log_dir, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = os.path.join(log_dir, f"harvest_{timestamp}.log")
-        file_handler = logging.FileHandler(log_file)
-    else:
-        file_handler = None
-    
-    log_format = (
-        ("%(asctime)s - " if log_time else "")
-        + "%(levelname)-8s - %(name)s : %(message)s"
-    )
-    
-    logger = setup_integrated_logger(
-        name=None,  # root logger
-        level=log_level,
-        log_format=log_format,
-        include_console=True,
-        file_handler=file_handler
-    )
-    
-    if log_dir:
-        logger.info(f"Logging to file: {log_file}")
-    
-    return logger
-"""
+
 def setup_logging(log_time, log_level, log_dir=None):
     # Clean up old log files before setting up logging
     if log_dir:
@@ -130,10 +102,11 @@ def setup_logging(log_time, log_level, log_dir=None):
         logger.info(f"Logging to file: {log_file}")
 
     return logger
-"""
-@flow(name="cde-main-flow")
+
+@flow(name="cde-main", log_prints=True)
 @monitor(monitor_slug="main-harvester")
 def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
+    logger = get_run_logger()
     erddap_urls = erddap_urls.split(",")
     limit_dataset_ids = None
     if dataset_ids:

@@ -15,8 +15,8 @@ from cde_harvester.harvest_errors import (
 )
 from cde_harvester.profiles import get_profiles
 from requests.exceptions import HTTPError
-from prefect import flow, task
-from urllib.parse import urlparse
+from prefect import task
+
 # TIMEOUT = 30
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,7 @@ def get_datasets_to_skip():
             return datasets_to_skip
     logger.info(f"No skipped datasets list found")
     return {}
+
 
 @task(task_run_name="harvest-{erddap_url}")
 def harvest_erddap(erddap_url, limit_dataset_ids=None, cache_requests=False):
@@ -86,6 +87,7 @@ def harvest_erddap(erddap_url, limit_dataset_ids=None, cache_requests=False):
     )
 
     erddap = ERDDAP(erddap_url, cache_requests)
+    logger = erddap.get_logger()
     df_all_datasets = erddap.df_all_datasets
 
     if df_all_datasets.empty:

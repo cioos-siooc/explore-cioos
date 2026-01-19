@@ -10,7 +10,7 @@ from urllib.parse import unquote, urlparse
 import diskcache as dc
 import pandas as pd
 import requests
-
+from prefect import get_run_logger
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 from cde_harvester.dataset import Dataset
 
@@ -41,12 +41,13 @@ class ERDDAP(object):
 
         self.domain = urlparse(erddap_url).netloc
         self.session = requests.Session()
+
+        self.logger = get_run_logger()
         self.df_all_datasets = None
-        logger = logging.getLogger(__name__)
+        logger = self.logger
 
         erddap_url = erddap_url.rstrip("/")
         self.url = erddap_url
-
         if not re.search("^https?://", erddap_url):
             raise RuntimeError(f"URL Must start wih http or https: {erddap_url}")
 
@@ -61,17 +62,16 @@ class ERDDAP(object):
     def get_all_datasets(self):
         "Get a string list of dataset IDs from the ERDDAP server"
         # allDatasets indexes table and grid datasets
-        logger = logging.getLogger(__name__)
         try:
-            logger.info("Fetching all datasets from ERDDAP server: %s", self.url)
+            self.logger.info("Fetching all datasets from ERDDAP server: %s", self.url)
             df = self.erddap_csv_to_df(
                 '/tabledap/allDatasets.csv?&accessible="public"&dataStructure="table"',
                 skiprows=[1, 2],
             )
-            logger.info(f"Found {len(df)} datasets")
+            self.logger.info(f"Found {len(df)} datasets")
             return df
         except requests.exceptions.HTTPError:
-            logger.error("ERDDAP query failed", exc_info=True)
+            self.logger.error("ERDDAP query failed", exc_info=True)
             return pd.DataFrame()
 
     def parse_erddap_date(s):
@@ -169,3 +169,7 @@ class ERDDAP(object):
 
     def get_dataset(self, dataset_id):
         return Dataset(self, dataset_id)
+
+    def get_logger(self):
+        logger = logging.getLogger(__name__)
+        return logger
