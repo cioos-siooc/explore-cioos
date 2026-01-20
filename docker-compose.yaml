@@ -67,6 +67,18 @@ services:
       dockerfile: ./harvester/Dockerfile
     profiles:
       - tools
+    command:
+    - uv
+    - run
+    - python
+    - -m
+    - cde_harvester.run_flow
+    - --file
+    - /app/harvester/harvest_config.yaml
+    - --name
+    - harvester-deployment
+    - --cron
+    - "10 * * * *"
     volumes:
       - ./harvest_config.yaml:/app/harvester/harvest_config.yaml
       - ./harvester_cache:/app/harvester/harvester_cache

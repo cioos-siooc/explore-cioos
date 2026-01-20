@@ -15,7 +15,7 @@ from cde_harvester.harvest_errors import (
 )
 from cde_harvester.profiles import get_profiles
 from requests.exceptions import HTTPError
-from prefect import task
+from prefect import task, flow
 
 # TIMEOUT = 30
 logger = logging.getLogger(__name__)

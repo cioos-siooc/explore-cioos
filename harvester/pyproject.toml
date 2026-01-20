@@ -11,7 +11,7 @@ dependencies = [
     "lxml>=5.1.0",
     "numpy<2.0.0",
     "pandas<2.0.0",
-    "prefect>=2.20.22",
+    "prefect>=3.0.0",
     "psycopg2-binary>=2.9.9",
     "python-dotenv>=1.0.1",
     "pyyaml>=6.0.1",
@@ -19,7 +19,7 @@ dependencies = [
     "requests>=2.31.0",
     "sentry-sdk>=1.43.0",
     "shapely>=2.0.3",
-    "sqlalchemy<2.0.0",
+    "sqlalchemy>=2.0.0,<3.0.0",
 ]
 
 [build-system]

@@ -25,44 +25,37 @@ logger = logging.getLogger(__name__)
 
 
 @flow(name="cde-pipeline", log_prints=True)
-def cde_pipeline(config_file=None, redis_only=False, **kwargs):
+def cde_pipeline(config_file=None, redis_only=False, incremental=False):
     """
     Main Prefect flow that runs cde_harvester and cde_db_loader as subflows.
     
     Args:
         config_file: Path to harvest_config.yaml
         redis_only: If True, only run the redisFlow subflow
-        **kwargs: Additional arguments that override config file settings
+        incremental: If True, run db_loader in incremental mode
     """
     logger = get_run_logger()
     logger.info("Starting CDE Pipeline")
     
-    # Load configuration
-    if config_file:
-        config = load_config(config_file)
-        logger.info(f"Using config from {config_file}")
-        
-        # Extract harvester config
-        erddap_urls = ",".join(config.get("erddap_urls") or [])
-        cache_requests = config.get("cache", False)
-        folder = config.get("folder") or "harvest"  # Ensure folder is never None
-        max_workers = config.get("max-workers", 1)
-        dataset_ids = ",".join(config.get("dataset_ids") or [])
-        log_time = config.get("log_time", False)
-        log_level = config.get("log_level", "INFO")
-        log_dir = os.environ.get("HARVESTER_LOG_DIR") or config.get("log_dir")
+    # Load configuration - config_file is required for deployment
+    if not config_file:
+        raise ValueError("config_file is required")
+    
+    config = load_config(config_file)
+    logger.info(f"Using config from {config_file}")
+    
+    # Extract harvester config
+    erddap_urls = ",".join(config.get("erddap_urls") or [])
+    cache_requests = config.get("cache", False)
+    folder = config.get("folder") or "harvest"  # Ensure folder is never None
+    max_workers = config.get("max-workers", 1)
+    dataset_ids = ",".join(config.get("dataset_ids") or [])
+    log_time = config.get("log_time", False)
+    log_level = config.get("log_level", "INFO")
+    log_dir = os.environ.get("HARVESTER_LOG_DIR") or config.get("log_dir")
+    # Use config file's incremental setting if parameter is False
+    if not incremental:
         incremental = config.get("incremental", False)
-    else:
-        # Use kwargs for configuration
-        erddap_urls = kwargs.get("erddap_urls", "")
-        cache_requests = kwargs.get("cache", False)
-        folder = kwargs.get("folder", "harvest")
-        max_workers = kwargs.get("max_workers", 1)
-        dataset_ids = kwargs.get("dataset_ids", "")
-        log_time = kwargs.get("log_time", False)
-        log_level = kwargs.get("log_level", "INFO")
-        log_dir = kwargs.get("log_dir", None)
-        incremental = kwargs.get("incremental", False)
     
     # Setup logging (only for non-Prefect loggers)
     if not redis_only:
@@ -121,6 +114,86 @@ def cde_pipeline(config_file=None, redis_only=False, **kwargs):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
+        description="Run CDE harvester and db_loader as Prefect subflows or deploy as a Prefect flow"
+    )
+    
+    parser.add_argument(
+        "-f",
+        "--file",
+        help="Path to harvest_config.yaml file",
+        default=None
+    )
+    
+    parser.add_argument(
+        "--incremental",
+        help="Run db_loader in incremental mode",
+        action="store_true"
+    )
+    
+    parser.add_argument(
+        "--redis-only",
+        help="Only run the redisFlow subflow (skip harvester and db_loader)",
+        action="store_true"
+    )
+
+    # New arguments for Prefect deployment
+    parser.add_argument(
+        "--name",
+        help="Prefect deployment name (triggers deployment mode)",
+        default=None
+    )
+    parser.add_argument(
+        "--cron",
+        help="Cron schedule for Prefect deployment (requires --name)",
+        default=None
+    )
+    
+    args = parser.parse_args()
+    
+    try:
+        # ---------------- Deployment Mode ----------------
+        #TO-DO: add some checks to make sure both name and cron is present and cron is formed right
+        if args.name and args.cron:
+            from cde_harvester.run_flow import cde_pipeline as my_flow
+            logger.info(f"Deploying Prefect flow '{args.name}' with cron '{args.cron}'")
+            
+            # Only include flow parameters in `parameters` argument
+            parameters = {}
+            if args.file:
+                parameters["config_file"] = args.file
+            parameters["redis_only"] = args.redis_only
+            parameters["incremental"] = args.incremental
+
+            # Serve deployment
+            my_flow.serve(
+                name=args.name,
+                cron=args.cron,
+                parameters=parameters
+            )
+        # ---------------- Redis-only Mode ----------------
+        elif args.redis_only:
+            cde_pipeline(redis_only=True)
+        
+        # ---------------- Run Once Mode ----------------
+        elif args.file:
+            config = load_config(args.file)
+            config["incremental"] = args.incremental
+            cde_pipeline(config_file=args.file, redis_only=False)
+        
+        else:
+            logger.error(
+                "Config file is required (unless using --redis-only or deploying). "
+                "Use -f or --file to specify harvest_config.yaml"
+            )
+            sys.exit(1)
+    
+    except Exception as e:
+        logger.error("Pipeline failed", exc_info=True)
+        sys.exit(1)
+
+"""
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
         description="Run CDE harvester and db_loader as Prefect subflows"
     )
     
@@ -160,3 +233,4 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error("Pipeline failed", exc_info=True)
         sys.exit(1)
+"""
