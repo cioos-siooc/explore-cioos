@@ -1,0 +1,18 @@
+name: Deploy to Development
+
+on:
+  push:
+    branches:
+      - development
+      - feat/add-dev-deployment
+  workflow_dispatch:
+
+jobs:
+    deploy:
+      uses: cioos-siooc/cioos-co-alliance-infra/.github/workflows/deploy.yml@main
+      with:
+        service_name: explore-cioos-dev
+        target_host: cioos-co-dev-1
+      secrets:
+        WG_CONFIG: ${{ secrets.BELUGA_WIREGUARD_VPN_CONFIG }}
+        DEPLOY_SSH_KEY: ${{ secrets.BELUGA_RUNNER_PRIVATE_KEY }}
