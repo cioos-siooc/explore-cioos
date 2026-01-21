@@ -84,9 +84,13 @@
   position: absolute;
   border-radius: 5px;
   height: 30px;
-  width: 60;
+  width: 60px;
   bottom: 16px;
   right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1px;
+  white-space: nowrap;
 }
 
 .filterInfoButton:hover {
@@ -94,5 +98,5 @@
 }
 
 .filterInfoButton svg {
-  margin: 6px 7px 7px 7px;
+  /*margin: 6px 7px 7px 7px;*/
 }

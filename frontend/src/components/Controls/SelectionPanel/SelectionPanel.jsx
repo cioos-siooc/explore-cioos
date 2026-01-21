@@ -9,7 +9,7 @@ export default function SelectionPanel({ open, setOpen, children }) {
   const { t } = useTranslation()
   const selectionPanelClassName = classNames('selectionPanel', {
     closed: !open,
-    open: open
+    open: open 
   })
   const panelContentsClassName = classNames('panelContents', {
     closed: !open
