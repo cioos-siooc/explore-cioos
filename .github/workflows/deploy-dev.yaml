@@ -9,7 +9,7 @@ on:
 
 jobs:
   deploy:
-    uses: cioos-siooc/cioos-co-alliance-infra/.github/workflows/deploy.yml@main
+    uses: cioos-siooc/cioos-co-alliance-infra/.github/workflows/deploy.yml@master
     with:
       service_name: explore-cioos-dev
       target_host: cioos-co-dev-1
