@@ -11,7 +11,7 @@ jobs:
   deploy:
     uses: cioos-siooc/cioos-co-alliance-infra/.github/workflows/deploy.yml@master
     with:
-      service_name: explore-cioos-dev
+      service_name: explore-cioos
       target_host: cioos-co-dev-1
     secrets:
       WG_CONFIG: ${{ secrets.BELUGA_WIREGUARD_VPN_CONFIG }}
