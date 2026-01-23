@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+"""
+Script to deploy the CDE pipeline to Prefect with a Docker work pool.
+This creates the deployment but doesn't run a worker.
+"""
+
+import os
+
+from prefect.client.orchestration import get_client
+from prefect.client.schemas.actions import WorkPoolCreate, WorkPoolUpdate
+from prefect.exceptions import ObjectNotFound
+
+from cde_harvester.run_flow import cde_pipeline
+
+
+def create_docker_work_pool(pool_name="docker-pool"):
+    """
+    Create or Update a Docker work pool to ensure correct configuration.
+    """
+    print(f"Configuring work pool '{pool_name}'...")
+
+    # Base job template for Docker
+    base_job_template = {
+        "job_configuration": {
+            "image": "{{ image }}",
+            "command": "{{ command }}",
+            "env": "{{ env }}",
+            "labels": "{{ labels }}",
+            "name": "{{ name }}",
+            "network_mode": "{{ network_mode }}",
+            "networks": "{{ networks }}",
+            "volumes": "{{ volumes }}",
+            "stream_output": "{{ stream_output }}",
+            "auto_remove": "{{ auto_remove }}",
+            "image_pull_policy": "{{ image_pull_policy }}",
+        },
+        "variables": {
+            "type": "object",
+            "properties": {
+                "image": {
+                    "type": "string",
+                    "default": "prefecthq/prefect:3-python3.10",
+                },
+                "image_pull_policy": {"type": "string", "default": "Never"},
+                "command": {
+                    "type": "string",
+                    # CRITICAL: Must use 'uv run' because prefect is in the venv
+                    "default": "uv run prefect flow-run execute",
+                },
+                "env": {"type": "object"},
+                "labels": {"type": "object"},
+                "name": {"type": "string"},
+                "network_mode": {"type": "string"},
+                "networks": {"type": "array"},
+                "volumes": {"type": "array"},
+                "stream_output": {"type": "boolean", "default": True},
+                "auto_remove": {"type": "boolean", "default": True},
+            },
+        },
+    }
+
+    # Use sync client for simplicity in this script
+    with get_client(sync_client=True) as client:
+        try:
+            # Try to read the pool first
+            client.read_work_pool(work_pool_name=pool_name)
+
+            # If we get here, it exists, so we UPDATE it
+            print(f"Work pool '{pool_name}' exists. Updating configuration...")
+            work_pool_update = WorkPoolUpdate(base_job_template=base_job_template)
+            client.update_work_pool(
+                work_pool_name=pool_name, work_pool=work_pool_update
+            )
+            print(f"✅ Work pool '{pool_name}' updated successfully!")
+
+        except ObjectNotFound:
+            # If not found, CREATE it
+            print(f"Work pool '{pool_name}' not found. Creating...")
+            try:
+                work_pool = WorkPoolCreate(
+                    name=pool_name, type="docker", base_job_template=base_job_template
+                )
+                client.create_work_pool(work_pool=work_pool)
+                print(f"✅ Work pool '{pool_name}' created successfully!")
+            except Exception as e:
+                print(f"❌ Failed to create work pool: {e}")
+
+        except Exception as e:
+            print(f"❌ Error configuring work pool: {e}")
+
+
+def create_deployment():
+    """Create a deployment that uses the Docker work pool."""
+
+    # Get host root from environment variable, default to current working directory if running locally
+    host_root = os.getenv("HOST_ROOT", os.getcwd())
+
+    # Ensure work pool exists
+    create_docker_work_pool()
+
+    deployment_id = cde_pipeline.deploy(
+        name="cde-harvester-deployment",
+        work_pool_name="docker-pool",
+        image="explore-cioos-harvester:latest",
+        cron=os.getenv("HARVESTER_CRON", "10 0 */3 * *"),
+        build=False,  # Don't build, use existing image
+        push=False,  # Don't push image
+        parameters={
+            "config_file": "/app/harvester/harvest_config.yaml",
+            "redis_only": False,
+            "incremental": False,
+        },
+        job_variables={
+            "env": {
+                "PREFECT_API_URL": os.getenv(
+                    "PREFECT_API_URL", "http://prefect:4200/api"
+                ),
+                "HARVESTER_LOG_DIR": os.getenv(
+                    "HARVESTER_LOG_DIR", "/app/harvester/logs"
+                ),
+                "DB_NAME": os.getenv("DB_NAME", "cde"),
+                "DB_USER": os.getenv("DB_USER", "postgres"),
+                "DB_PASSWORD": os.getenv("DB_PASSWORD", "password"),
+                "DB_HOST": os.getenv("DB_HOST", "db"),
+                "DB_HOST_EXTERNAL": os.getenv("DB_HOST_EXTERNAL", "db"),
+                "REDIS_HOST": os.getenv("REDIS_HOST", "redis"),
+            },
+            "networks": ["explore-cioos_default"],
+            "volumes": [
+                f"{host_root}/harvest_config.yaml:/app/harvester/harvest_config.yaml:ro",
+                f"{host_root}/harvester_cache:/app/harvester/harvester_cache",
+                f"{host_root}/ckan_harvester_cache:/app/harvester/ckan_harvester_cache",
+                f"{host_root}/harvest:/app/harvester/harvest",
+                f"{host_root}/harvester_logs:/app/harvester/logs",
+            ],
+            "auto_remove": True,
+            "stream_output": True,
+            "image_pull_policy": "Never",  # Use local image, don't pull
+        },
+    )
+
+    print(f"\n✅ Deployment created with ID: {deployment_id}")
+    print("\nTo start a worker, run:")
+    print("  docker compose up worker -d")
+
+
+if __name__ == "__main__":
+    create_deployment()
