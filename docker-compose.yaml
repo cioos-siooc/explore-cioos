@@ -65,6 +65,7 @@ services:
     build:
       context: .
       dockerfile: ./harvester/Dockerfile
+    image: explore-cioos-harvester:latest
     profiles:
       - tools
     command:
@@ -72,27 +73,48 @@ services:
     - run
     - python
     - -m
-    - cde_harvester.run_flow
-    - --file
-    - /app/harvester/harvest_config.yaml
-    - --name
-    - harvester-deployment
-    - --cron
-    - "10 * * * *"
+    - cde_harvester.deploy
     volumes:
       - ./harvest_config.yaml:/app/harvester/harvest_config.yaml
       - ./harvester_cache:/app/harvester/harvester_cache
+      - ./ckan_harvester_cache:/app/harvester/ckan_harvester_cache
       - ./harvest:/app/harvester/harvest
       - ./nginx/logs:/app/nginx/logs  
       - ./harvester_logs:/app/harvester/logs
     environment:
       - "HARVESTER_LOG_DIR=/app/harvester/logs"
       - PREFECT_API_URL=http://prefect:4200/api
+      - HOST_ROOT=${HOST_ROOT}
     env_file:
       - .env
     depends_on:
       prefect:
         condition: service_healthy
+  
+  worker:
+    build:
+      context: .
+      dockerfile: ./harvester/Dockerfile
+    profiles:
+      - tools
+    command:
+    - bash
+    - -c
+    - "uv run prefect worker start --pool docker-pool --type docker"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./harvest_config.yaml:/app/harvester/harvest_config.yaml
+      - ./harvester_cache:/app/harvester/harvester_cache
+      - ./ckan_harvester_cache:/app/harvester/ckan_harvester_cache
+      - ./harvest:/app/harvester/harvest
+      - ./harvester_logs:/app/harvester/logs
+    environment:
+      - PREFECT_API_URL=http://prefect:4200/api
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    depends_on:
+      prefect:
+        condition: service_healthy
+    restart: unless-stopped
       
   redis:
     image: "redis:alpine"
