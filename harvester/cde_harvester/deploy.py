@@ -102,7 +102,7 @@ def create_deployment():
         name="cde-harvester-deployment",
         work_pool_name="docker-pool",
         image="explore-cioos-harvester:latest",
-        cron=os.getenv("HARVESTER_CRON", "10 0 */3 * *"),
+        cron=os.getenv("HARVESTER_CRON"),
         build=False,  # Don't build, use existing image
         push=False,  # Don't push image
         parameters={
