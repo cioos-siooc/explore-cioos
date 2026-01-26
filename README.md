@@ -89,10 +89,14 @@ For complete local development with all services running outside Docker (advance
 
 1. Rename `.env.sample` from the root directory to `.env` and change any settings if needed.
 
-2. Start a local database using `docker`:
+2. Start a local database and prefect server using `docker`:
 
    ```sh
-   docker compose up -d db
+   docker compose up -d db prefect
+   ```
+   *Alternatively*, you can run the prefect server manually:
+   ```sh
+   uv run prefect server start
    ```
 
 3. Setup Python virtual env and install Python modules using uv (recommended):
