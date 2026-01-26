@@ -6,9 +6,9 @@
 
 If you just want to see how a dataset is harvested by CDE:
 
-1. Start your python environment environment, `conda create -n cde python=3.10;conda activate cde`
-2. `pip install -e .`
-3. `python -m cde_harvester --urls https://data.cioospacific.ca/erddap --dataset_ids ECCC_MSC_BUOYS`
+1. Install [uv](https://github.com/astral-sh/uv)
+2. `cd harvester`
+3. `uv run python -m cde_harvester --urls https://data.cioospacific.ca/erddap --dataset_ids ECCC_MSC_BUOYS`
 4. See files in `harvest` folder
 
 ## Starting using docker
@@ -20,17 +20,27 @@ If you just want to see how a dataset is harvested by CDE:
     1. Development environment: `docker compose up -d`
     2. Production environment: `docker compose -f docker-compose.production.yaml up -d`
 5. See website at <http://localhost:8098>
-6. To update database and reharvest datasets:
-    1. **Full reload** (clears all data, reloads everything):
-        - Development: `docker compose up -d harvester`
-        - Production: `docker compose -f docker-compose.production.yaml up -d harvester`
-    2. **Incremental update** (only updates changed datasets, much faster):
-        - Development: `docker compose run --rm -e INCREMENTAL_MODE=true harvester`
-        - Production: `docker compose -f docker-compose.production.yaml run --rm -e INCREMENTAL_MODE=true harvester`
-        - Or use the convenience script: `./run_harvester.sh --incremental`
+6. See Prefect Dashboard at <http://localhost:4200> (Manage flows and deployments)
+
+### Data Harvesting with Prefect
+
+The harvester is now orchestrated by Prefect. The Docker Compose stack includes:
+- **Prefect Server**: Manage flows, view logs, and trigger runs.
+- **Prefect Worker**: Executes scheduled flows in Docker containers.
+
+To deploy the harvester flow (create/update schedule):
+```bash
+docker compose up harvester
+```
+This will register the flow with the Prefect server. You can then trigger runs from the UI or let the schedule take over.
+
+To manually trigger a run:
+1. Go to <http://localhost:4200>
+2. Find the **cde-harvester-deployment**
+3. Click **Run** -> **Quick Run**
 
 For more details, see:
-- [Harvester Usage Guide](HARVESTER_USAGE.md)
+- [Harvester Usage Guide](harvester/README.md)
 - [DB Loader README](db-loader/README.md)
 
 ## Front End Development
@@ -85,12 +95,19 @@ For complete local development with all services running outside Docker (advance
    docker compose up -d db
    ```
 
-3. Setup Python virtual env and install Python modules:
+3. Setup Python virtual env and install Python modules using uv (recommended):
 
    ```sh
-   conda create -n cde python=3.10
-   conda activate cde
-   pip install -e ./downloader -e ./download_scheduler -e ./harvester -e ./db-loader
+   # Install uv if needed
+   # pip install uv
+
+   # Harvester
+   cd harvester
+   uv sync
+   
+   # Download Scheduler
+   cd ../download_scheduler
+   uv sync
    ```
 
 4. Start the API:
@@ -145,25 +162,19 @@ Deploy CDE to production using Docker Compose with the production configuration 
    sudo docker compose -f docker-compose.production.yaml up -d --build
    ```
 
-### Data Harvesting
+### Data Harvesting (Production)
 
-The harvester should be run on a schedule to keep the data up to date. Set up a cron job to run the harvester container:
+The harvester should be run on a schedule to keep the data up to date. Since we use Prefect for orchestration, you don't need a system cron job.
 
-1. Edit your crontab:
-
+1. Ensure the Prefect Worker is running:
    ```sh
-   crontab -e
+   docker compose -f docker-compose.production.yaml up -d worker
    ```
 
-2. Add an entry to run the harvester nightly (example runs at 2 AM):
-
-   ```cron
-   0 2 * * * cd /path/to/explore-cioos && docker compose -f docker-compose.production.yaml up harvester
+2. Deploy the harvester flow with a schedule (defined in `.env` via `HARVESTER_CRON`):
+   ```sh
+   docker compose -f docker-compose.production.yaml up harvester
    ```
 
-   Or to run weekly (example runs Sunday at 2 AM):
-
-   ```cron
-   0 2 * * 0 cd /path/to/explore-cioos && docker compose -f docker-compose.production.yaml up harvester
-   ```
+This registers the deployment with Prefect. The worker will automatically pick up and execute jobs according to the schedule.
 
