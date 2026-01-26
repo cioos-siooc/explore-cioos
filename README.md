@@ -32,6 +32,8 @@ To deploy the harvester flow (create/update schedule):
 ```bash
 docker compose up harvester
 ```
+*Note: Set `INCREMENTAL_MODE=true` in your `.env` to make the deployment default to incremental harvesting (faster, only updates changed datasets).*
+
 This will register the flow with the Prefect server. You can then trigger runs from the UI or let the schedule take over.
 
 To manually trigger a run:
@@ -94,7 +96,7 @@ For complete local development with all services running outside Docker (advance
    ```sh
    docker compose up -d db prefect
    ```
-   *Alternatively*, you can run the prefect server manually:
+   *Alternatively*, you can run the prefect server manually in a separate terminal:
    ```sh
    uv run prefect server start
    ```
@@ -170,15 +172,16 @@ Deploy CDE to production using Docker Compose with the production configuration 
 
 The harvester should be run on a schedule to keep the data up to date. Since we use Prefect for orchestration, you don't need a system cron job.
 
-1. Ensure the Prefect Worker is running:
+1. Ensure the Prefect Server and Worker are running:
    ```sh
-   docker compose -f docker-compose.production.yaml up -d worker
+   docker compose -f docker-compose.production.yaml up -d prefect worker
    ```
 
 2. Deploy the harvester flow with a schedule (defined in `.env` via `HARVESTER_CRON`):
    ```sh
    docker compose -f docker-compose.production.yaml up harvester
    ```
+   *Note: By default, this runs in **Incremental Mode** if `INCREMENTAL_MODE=true` is set in your `.env`. This creates a deployment that only harvests changed datasets.*
 
 This registers the deployment with Prefect. The worker will automatically pick up and execute jobs according to the schedule.
 
