@@ -69,11 +69,7 @@ services:
     profiles:
       - tools
     command:
-    - uv
-    - run
-    - python
-    - -m
-    - cde_harvester.deploy
+      - uv run python -m cde_harvester.deploy
     volumes:
       - ./harvest_config.yaml:/app/harvester/harvest_config.yaml
       - ./harvester_cache:/app/harvester/harvester_cache
@@ -97,10 +93,7 @@ services:
       dockerfile: ./harvester/Dockerfile
     profiles:
       - tools
-    command:
-    - bash
-    - -c
-    - "uv run prefect worker start --pool docker-pool --type docker"
+    command: sh -c "uv run prefect worker start --pool docker-pool --type docker"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./harvest_config.yaml:/app/harvester/harvest_config.yaml
