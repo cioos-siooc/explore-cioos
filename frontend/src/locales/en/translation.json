@@ -229,7 +229,10 @@
     "loading": "Loading harvest results...",
     "errorLoading": "Error loading harvest results",
     "showDetails": "Show full error trace",
-    "filterPlaceholder": "Filter by any column...",
+    "filterPlaceholder": "Search across all columns...",
+    "allValues": "All",
+    "clearFilters": "Clear all filters",
+    "filterHelpText": "Use column:value syntax (e.g., status:failed, erddap:pac). Combine with AND/OR (e.g., status:failed AND platform:mooring). Columns: id, erddap, title, cdm, platform, status, error",
     "statusValues": {
       "success": "Success",
       "failed": "Failed"

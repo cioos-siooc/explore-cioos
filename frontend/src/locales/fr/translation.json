@@ -230,7 +230,10 @@
     "loading": "Chargement des résultats de la récolte...",
     "errorLoading": "Erreur lors du chargement des résultats de la récolte",
     "showDetails": "Afficher la trace complète de l'erreur",
-    "filterPlaceholder": "Filtrer par n'importe quelle colonne...",
+    "filterPlaceholder": "Rechercher dans toutes les colonnes...",
+    "allValues": "Tous",
+    "clearFilters": "Effacer tous les filtres",
+    "filterHelpText": "Syntaxe colonne:valeur (ex: status:failed, erddap:pac). Combiner avec AND/OR (ex: status:failed AND platform:mooring). Colonnes: id, erddap, title, cdm, platform, status, error",
     "statusValues": {
       "success": "Succès",
       "failed": "Échoué"
