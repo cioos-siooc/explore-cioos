@@ -7,6 +7,7 @@ import re
 import diskcache as dc
 import pandas as pd
 import requests
+from prefect import get_run_logger
 
 # National CKAN has all the regions' records
 CKAN_API_URL = "https://catalogue.cioos.ca/api/3"
@@ -64,7 +65,6 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         resources = record_full["resources"]
         erddap_url = ""
         for resource in resources:
-
             if "tabledap" in resource["url"]:
                 erddap_url = resource["url"]
                 continue
@@ -139,6 +139,8 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
 
 
 def list_ckan_records_with_erddap_urls(cache_requests):
+    logger = get_run_logger()
+    logger.info(f"cache_requests: {cache_requests}")
     row_page_limit = 1000
     row_start = 0
     # count total records avaiable, but we will have to page queries to get all results
@@ -150,9 +152,11 @@ def list_ckan_records_with_erddap_urls(cache_requests):
             CKAN_API_URL
             + f"/action/package_search?rows={row_page_limit}&start={row_start}&q=erddap"
         )
-        print(erddap_datasets_query)
-
+        logger.info(erddap_datasets_query)
+        # print(erddap_datasets_query)
+        logger.info(f"erddap_dataset_query:\n{erddap_datasets_query}")
         if cache_requests:
+            logger.info("checking for ckan cache")
             # limit cache to 10gb
             cache = dc.Cache(
                 "ckan_harvester_cache",
@@ -160,11 +164,19 @@ def list_ckan_records_with_erddap_urls(cache_requests):
                 size_limit=10000000000,
                 cull_limit=0,
             )
+            logger.info("Cache stats:")
+            logger.info(f"eviction_policy: {cache.eviction_policy}")
+            logger.info(f"count: {cache.count}")
+            logger.info(f"volume: {cache.volume()}")
+            logger.info(f"size_limit {cache.size_limit}")
             if erddap_datasets_query in cache:
+                logger.info("Cached CKAN records found")
                 result = cache[erddap_datasets_query]
+
             else:
                 result = requests.get(erddap_datasets_query).json()["result"]
                 cache[erddap_datasets_query] = result
+                logger.info("Cached CKAN records")
         else:
             result = requests.get(erddap_datasets_query).json()["result"]
 

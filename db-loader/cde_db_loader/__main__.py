@@ -13,12 +13,17 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 from sqlalchemy import create_engine, text
 from sqlalchemy.dialects.postgresql import ARRAY, INTEGER, TEXT
 
+from prefect import flow, get_run_logger
+
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(levelname)-8s - %(name)s : %(message)s"
 )
+
 logger = logging.getLogger()
+
+
 
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
@@ -57,10 +62,10 @@ def ensure_organization_pks(datasets):
         )
     return datasets
 
-
+@flow(name="cde-db-loader")
 def main(folder, incremental=False):
     # setup database connection
-
+    logger = get_run_logger()
     load_dotenv(os.getcwd() + "/.env")
 
     envs = os.environ

@@ -7,7 +7,7 @@ import requests
 from cde_harvester.platform_ioos_to_l06 import platforms_nerc_ioos
 from cde_harvester.utils import cde_eov_to_standard_name, intersection
 from requests.exceptions import HTTPError
-
+from prefect import get_run_logger
 
 def is_valid_duration(duration):
     try:
@@ -364,5 +364,6 @@ class Dataset(object):
         self.platform = self.get_platform_code()
 
     def get_logger(self):
-        logger = logging.getLogger(f"{self.erddap_server.domain} - {self.id}")
+        #logger = logging.getLogger(f"{self.erddap_server.domain} - {self.id}")
+        logger = get_run_logger()
         return logger
