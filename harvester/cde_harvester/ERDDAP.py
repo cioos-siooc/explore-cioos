@@ -171,5 +171,5 @@ class ERDDAP(object):
         return Dataset(self, dataset_id)
 
     def get_logger(self):
-        logger = logging.getLogger(__name__)
+        logger = logging.getLogger(self.domain)
         return logger
