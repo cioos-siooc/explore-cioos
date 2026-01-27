@@ -68,8 +68,7 @@ services:
     image: explore-cioos-harvester:latest
     profiles:
       - tools
-    command:
-      - uv run python -m cde_harvester.deploy
+    command: uv run python -m cde_harvester.deploy
     volumes:
       - ./harvest_config.yaml:/app/harvester/harvest_config.yaml
       - ./harvester_cache:/app/harvester/harvester_cache
