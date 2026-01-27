@@ -9,7 +9,7 @@ import sentry_sdk
 from dotenv import load_dotenv
 from erddap_downloader import downloader_wrapper
 from jinja2 import Environment, FileSystemLoader
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from loguru import logger
 
@@ -62,26 +62,9 @@ def get_a_download_job():
     session = Session(engine)
 
     rs = session.execute(
-        text(
-            "SELECT * FROM cde.download_jobs WHERE status='open' ORDER BY time ASC LIMIT 1 FOR UPDATE SKIP LOCKED"
-        )
+        "SELECT * FROM cde.download_jobs WHERE status='open' ORDER BY time ASC LIMIT 1 FOR UPDATE SKIP LOCKED"
     )
     row = rs.fetchone()
-
-    if row:
-        # SQLAlchemy 2.0 row access: row is a tuple-like object, but mapped
-        # We need to ensure we can access columns by name.
-        # However, for raw SQL, .mappings() is preferred
-        pass
-
-    # Re-executing with mappings to be safe for dict-like access
-    rs = session.execute(
-        text(
-            "SELECT * FROM cde.download_jobs WHERE status='open' ORDER BY time ASC LIMIT 1 FOR UPDATE SKIP LOCKED"
-        )
-    )
-    # Get row as a mapping (dict-like)
-    row = rs.mappings().fetchone()
 
     if row:
         pk = row["pk"]
@@ -251,16 +234,6 @@ def run_download(row):
 
 
 def update_download_jobs(pk, row, session=engine):
-    # Construct update clause carefully to avoid SQL injection vulnerability, though 'row' comes from internal logic
-    # In SA 2.0 we should bind parameters
-
-    set_clauses = []
-    params = {"pk": pk}
-
-    for key, value in row.items():
-        set_clauses.append(f"{key}=:{key}")
-        params[key] = value
-
-    sql_str = f"UPDATE cde.download_jobs SET {', '.join(set_clauses)} WHERE PK=:pk"
-
-    session.execute(text(sql_str), params)
+    params = ",".join([f"{key}='{value}'" for key, value in row.items()])
+    sql = f"UPDATE cde.download_jobs SET {params} WHERE PK={pk}"
+    session.execute(sql)
