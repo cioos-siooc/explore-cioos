@@ -21,6 +21,7 @@ import {
 } from '../../../utilities.js'
 
 import isEmpty from 'lodash/isEmpty'
+import SelectionPanel from '../SelectionPanel/SelectionPanel.jsx'
 
 // Note: datasets and points are exchangable terminology
 export default function SelectionDetails({
@@ -71,9 +72,6 @@ export default function SelectionDetails({
     }
   }, [debouncedDatasetTitleSearchText])
 
-
-  
-
   useEffect(() => {
     if (!isEmpty(pointsData)) {
       let count = 0
@@ -101,44 +99,45 @@ export default function SelectionDetails({
       selected: false
     }
   }
+ 
   useEffect(() => {
-    if (!query.eovsSelected.length) return;
+  if (!query.eovsSelected.length) return
 
-    setDataTotal(0);
+  setLoading(true)
+  setInitialPointsQueryComplete(false)
+  setDataTotal(0)
+  setInspectDataset()
 
-    const filtersQuery = createDataFilterQueryString(query);
-    const shapeQuery = polygon
-      ? createSelectionQueryString(polygon)
-      : '';
+  const filtersQuery = createDataFilterQueryString(query)
+  const shapeQuery = polygon ? createSelectionQueryString(polygon) : []
+  const combined = [filtersQuery, shapeQuery].filter(Boolean).join('&')
 
-    const combinedQueries = [filtersQuery, shapeQuery]
-      .filter(Boolean)
-      .join('&');
+  setCombinedQueries(combined)
 
-    setInspectDataset(undefined);
-    setLoading(true);
-    setCombinedQueries(combinedQueries);
+  const urlString = `${server}/pointQuery${combined ? '?' + combined : ''}`
 
-    const urlString = `${server}/pointQuery${
-      combinedQueries ? `?${combinedQueries}` : ''
-    }`;
+  let cancelled = false
 
-    fetch(urlString)
-      .then((response) => {
-        if (!response.ok) throw new Error();
-        return response.json();
-      })
-      .then((data) => {
-        setPointsData(data.map(datasetsInLanguage));
-        setInitialPointsQueryComplete(true);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+  fetch(urlString)
+    .then(res => res.ok ? res.json() : [])
+    .then(data => {
+      if (!cancelled) {
+        setPointsData(data.map(datasetsInLanguage))
+      }
+    })
+    .finally(() => {
+      if (!cancelled) {
+        setLoading(false)
+        setInitialPointsQueryComplete(true)
+      }
+    })
 
-    setBackClicked(false);
-  }, [query, polygon]);
+  setBackClicked(false)
 
+  return () => { cancelled = true }
+  }, [query, polygon])
+
+  
   useEffect(() => {
     if (!loading) {
       setPointsData(pointsData.map(datasetsInLanguage))
@@ -234,9 +233,7 @@ export default function SelectionDetails({
           {console.log('loading:', loading)}
   {console.log('initialPointsQueryComplete:', initialPointsQueryComplete)}
   {console.log('inspectDataset:', inspectDataset)}
-  {console.log(filteredDatasets)}
-  {console.log(pointsData)}
-        {loading && !initialPointsQueryComplete ? (
+        {loading || !initialPointsQueryComplete ? (
           <Loading />
         ) : inspectDataset ? (
           <DatasetInspector

@@ -196,9 +196,9 @@ export default function App() {
   // Update when the breakpoint is evaluated
   // Desktop detection
  
-  useEffect(() => {
+ /* useEffect(() => {
   setSelectionPanelOpen(isDesktop); 
-}, [isDesktop]);
+}, [isDesktop]);*/
 
   // Update query
   useEffect(() => {
@@ -264,9 +264,9 @@ export default function App() {
     setPointsToDownload();
   }
 
-  if (isDesktop) {
-    setSelectionPanelOpen(true); // only open on desktop
-  }
+  
+  setSelectionPanelOpen(true); // only open on desktop
+  
   }, [pointsToReview, isDesktop]);
 
   useEffect(() => {
@@ -690,6 +690,7 @@ export default function App() {
                 setShowIntroModal={setShowIntroModal}
                 totalNumberOfDatasets={totalNumberOfDatasets}
                 resetFilters={resetFilters}
+                
               >
                 {DownloadButton()}
               </SelectionDetails>
