@@ -1,3 +1,9 @@
+.main{
+   @apply
+  text-[18px]
+  lg:text-[13px];
+}
+
 .datasetInspector {
   height: 100%;
   padding: -2px;
@@ -95,3 +101,27 @@
   max-width: 50%;
   min-width: 50%;
 } */
+
+.main .rdt_TableRow{
+  @apply
+  text-[18px]
+  lg:text-[13px];
+}
+
+.main .rdt_TableHeadRow{
+  @apply
+  text-[18px]
+  lg:text-[13px];
+}
+
+
+.main .rdt_TableCell{
+  @apply
+  min-w-[150px];
+}
+
+
+.main .rdt_TableCol{
+  @apply
+  min-w-[150px];
+}

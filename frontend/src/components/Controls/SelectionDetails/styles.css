@@ -1,6 +1,9 @@
 .pointDetails {
   height: 100%;
   width: 100%;
+  @apply
+  text-[18px]
+  lg:text-[13px];
 }
 
 .pointDetailsInfoRow {
