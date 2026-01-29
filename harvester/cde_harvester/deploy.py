@@ -17,7 +17,6 @@ def create_docker_work_pool(pool_name="docker-pool"):
     """
     Create or Update a Docker work pool to ensure correct configuration.
     """
-    print(f"Configuring work pool '{pool_name}'...")
 
     # Base job template for Docker
     base_job_template = {
@@ -61,34 +60,24 @@ def create_docker_work_pool(pool_name="docker-pool"):
 
     # Use sync client for simplicity in this script
     with get_client(sync_client=True) as client:
+        pool_exists = True
         try:
-            # Try to read the pool first
-            client.read_work_pool(work_pool_name=pool_name)
-
-            # If we get here, it exists, so we UPDATE it
-            print(f"Work pool '{pool_name}' exists. Updating configuration...")
-            work_pool_update = WorkPoolUpdate(base_job_template=base_job_template)
-            client.update_work_pool(
-                work_pool_name=pool_name, work_pool=work_pool_update
-            )
-            print(f"✅ Work pool '{pool_name}' updated successfully!")
-
+            client.read_work_pool(pool_name)
         except ObjectNotFound:
-            # If not found, CREATE it
-            print(f"Work pool '{pool_name}' not found. Creating...")
-            try:
-                work_pool = WorkPoolCreate(
-                    name=pool_name, type="docker", base_job_template=base_job_template
+            pool_exists = False
+
+        if pool_exists:
+            # Update the job template
+            client.update_work_pool(pool_name,work_pool=WorkPoolUpdate(base_job_template=base_job_template))
+        else:
+            # Create the pool
+            client.create_work_pool(
+                work_pool=WorkPoolCreate(
+                    name=pool_name,
+                    type="docker",
+                    base_job_template=base_job_template
                 )
-                client.create_work_pool(work_pool=work_pool)
-                print(f"✅ Work pool '{pool_name}' created successfully!")
-            except Exception as e:
-                print(f"❌ Failed to create work pool: {e}")
-
-        except Exception as e:
-            print(f"❌ Error configuring work pool: {e}")
-
-
+            )
 def create_deployment():
     """Create a deployment that uses the Docker work pool."""
 
@@ -138,8 +127,6 @@ def create_deployment():
             "image_pull_policy": "Never",  # Use local image, don't pull
         },
     )
-
-    print(f"\n✅ Deployment created with ID: {deployment_id}")
     print("\nTo start a worker, run:")
     print("  docker compose up prefect_worker -d")
 
