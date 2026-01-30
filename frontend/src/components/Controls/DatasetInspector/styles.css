@@ -114,6 +114,13 @@
   lg:text-[13px];
 }
 
+.main .rdt_Pagination{
+  @apply
+  text-[18px]
+  lg:text-[13px];
+}
+
+
 
 .main .rdt_TableCell{
   @apply

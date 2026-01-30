@@ -323,6 +323,9 @@ export default function DatasetsTable({
           
           columns={tableData.columns}
           data={tableData.data}
+          fixedHeader
+        
+          
           defaultSortFieldId={3}
           onRowClicked={isDownloadModal ? undefined : setInspectDataset}
           onRowMouseEnter={setHoveredDataset}
