@@ -58,65 +58,27 @@ services:
         BASE_URL: $BASE_URL
     expose:
       - "80"
-    # depends_on:
-    #   - web-api
 
-  prefect_deployment:
+
+  harvester:
     build:
       context: .
       dockerfile: ./harvester/Dockerfile
-    image: explore-cioos-harvester:latest
     profiles:
       - tools
-    command: uv run python -m cde_harvester.deploy
     volumes:
       - ./harvest_config.yaml:/app/harvester/harvest_config.yaml
       - ./harvester_cache:/app/harvester/harvester_cache
-      - ./ckan_harvester_cache:/app/harvester/ckan_harvester_cache
       - ./harvest:/app/harvester/harvest
-      - ./nginx/logs:/app/nginx/logs  
       - ./harvester_logs:/app/harvester/logs
     environment:
       - "HARVESTER_LOG_DIR=/app/harvester/logs"
       - PREFECT_API_URL=http://prefect:4200/api
-      - HOST_ROOT=${HOST_ROOT}
     env_file:
       - .env
-    depends_on:
-      prefect:
-        condition: service_healthy
   
-  prefect_worker:
-    build:
-      context: .
-      dockerfile: ./harvester/Dockerfile
-    profiles:
-      - tools
-    command: sh -c "uv run prefect worker start --pool docker-pool --type docker"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./harvest_config.yaml:/app/harvester/harvest_config.yaml
-      - ./harvester_cache:/app/harvester/harvester_cache
-      - ./ckan_harvester_cache:/app/harvester/ckan_harvester_cache
-      - ./harvest:/app/harvester/harvest
-      - ./harvester_logs:/app/harvester/logs
-    environment:
-      - PREFECT_API_URL=http://prefect:4200/api
-      - DOCKER_HOST=unix:///var/run/docker.sock
-    depends_on:
-      prefect:
-        condition: service_healthy
-    restart: unless-stopped
-      
-  redis:
-    image: "redis:alpine"
-    expose:
-      - "6379"
-    command: redis-server /usr/local/etc/redis/redis.conf
-    volumes:
-      - redis-data:/var/lib/redis
-      - ./redis-config/redis.conf:/usr/local/etc/redis/redis.conf
-      
+
+  
   prefect:
     image: prefecthq/prefect:3.4.24.dev4-python3.12-conda
     command: prefect server start --host 0.0.0.0

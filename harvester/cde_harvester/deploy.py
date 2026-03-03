@@ -96,8 +96,6 @@ def create_deployment():
         push=False,  # Don't push image
         parameters={
             "config_file": "/app/harvester/harvest_config.yaml",
-            "redis_only": False,
-            "incremental": os.getenv("INCREMENTAL_MODE", "false").lower() == "true",
         },
         job_variables={
             "env": {

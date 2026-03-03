@@ -16,3 +16,10 @@ dataset_ids:
 
 # defaults to false
 log_time:
+
+#defaults to false
+flush_redis: False
+
+#defaults to false
+incremental: True
+
