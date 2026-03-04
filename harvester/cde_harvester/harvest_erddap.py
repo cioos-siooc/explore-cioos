@@ -15,179 +15,189 @@ from cde_harvester.harvest_errors import (
 )
 from cde_harvester.profiles import get_profiles
 from requests.exceptions import HTTPError
-from prefect import task, flow
+from prefect import task
 
-# TIMEOUT = 30
 logger = logging.getLogger(__name__)
+
+CDM_DATA_TYPES_SUPPORTED = [
+    "TimeSeries",
+    "Profile",
+    "TimeSeriesProfile",
+]
+
+SKIPPED_COLUMNS = ["erddap_url", "dataset_id", "reason_code"]
+
+_PROFILES_SCHEMA = {
+    "erddap_url": str,
+    "dataset_id": str,
+    "timeseries_id": str,
+    "profile_id": str,
+    "latitude": float,
+    "longitude": float,
+    "depth_min": float,
+    "depth_max": float,
+}
+
+_DATASET_SCHEMA = {
+    "title": str,
+    "summary": str,
+    "erddap_url": str,
+    "dataset_id": str,
+    "cdm_data_type": str,
+    "platform": str,
+    "eovs": str,
+    "organizations": str,
+    "n_profiles": float,
+    "profile_variables": str,
+    "timeseries_id_variable": str,
+    "profile_id_variable": str,
+    "trajectory_id_variable": str,
+    "num_columns": int,
+    "first_eov_column": str,
+}
+
+_VARIABLES_COLUMNS = ["name", "type", "cf_role", "standard_name", "erddap_url", "dataset_id"]
+
+
+def _empty_result():
+    return (
+        pd.DataFrame(_PROFILES_SCHEMA, index=[]),
+        pd.DataFrame(_DATASET_SCHEMA, index=[]),
+        pd.DataFrame(columns=_VARIABLES_COLUMNS),
+        pd.DataFrame(columns=SKIPPED_COLUMNS),
+    )
 
 
 def get_datasets_to_skip():
     skipped_datasets_path = "skipped_datasets.json"
-
     if os.path.exists(skipped_datasets_path):
         logger.info(f"Loading list of datasets to skip from {skipped_datasets_path}")
         with open(skipped_datasets_path) as f:
-            datasets_to_skip = json.load(f)
-            return datasets_to_skip
-    logger.info(f"No skipped datasets list found")
+            return json.load(f)
+    logger.info("No skipped datasets list found")
     return {}
 
 
-@task(task_run_name="harvest-{erddap_url}")
-def harvest_erddap(erddap_url, limit_dataset_ids=None, cache_requests=False):
-    # """ """
-    skipped_datasets_reasons = []
-    hostname = urlparse(erddap_url).hostname
-    datasets_to_skip = get_datasets_to_skip().get(hostname, [])
-
-    def skipped_reason(code):
-        return [[erddap.domain, dataset_id, code]]
-
-    profiles_variables = {
-        "erddap_url": str,
-        "dataset_id": str,
-        "timeseries_id": str,
-        "profile_id": str,
-        "latitude": float,
-        "longitude": float,
-        "depth_min": float,
-        "depth_max": float,
-    }
-
-    df_profiles_all = pd.DataFrame(profiles_variables, index=[])
-
-    dataset_variables = {
-        "title": str,
-        "summary": str,
-        "erddap_url": str,
-        "dataset_id": str,
-        "cdm_data_type": str,
-        "platform": str,
-        "eovs": str,
-        "organizations": str,
-        "n_profiles": float,
-        "profile_variables": str,
-        "timeseries_id_variable": str,
-        "profile_id_variable": str,
-        "trajectory_id_variable": str,
-        "num_columns": int,
-        "first_eov_column": str,
-    }
-    df_datasets_all = pd.DataFrame(dataset_variables, index=[])
-
-    df_variables_all = pd.DataFrame(
-        columns=[
-            "name",
-            "type",
-            "cf_role",
-            "standard_name",
-            "erddap_url",
-            "dataset_id",
-        ]
-    )
-
+@task(task_run_name="prepare-server-{erddap_url}")
+def prepare_server(erddap_url, limit_dataset_ids, cache_requests):
+    """
+    Fetch allDatasets.csv once for the server, filter by supported CDM types,
+    and return the list of dataset IDs to harvest plus any immediately-skipped rows.
+    """
     erddap = ERDDAP(erddap_url, cache_requests)
-    logger = erddap.get_logger()
-    df_all_datasets = erddap.df_all_datasets
+    task_logger = erddap.logger
+    df_all = erddap.df_all_datasets
 
-    if df_all_datasets.empty:
-        return
+    if df_all is None or df_all.empty:
+        task_logger.warning("No datasets found at %s", erddap_url)
+        return [], pd.DataFrame(columns=SKIPPED_COLUMNS)
 
-    cdm_data_types_supported = [
-        # "Point",
-        "TimeSeries",
-        "Profile",
-        "TimeSeriesProfile",
-        # "Trajectory",
-        # "TrajectoryProfile",
-    ]
     if limit_dataset_ids:
-        df_all_datasets = df_all_datasets.query("datasetID in @limit_dataset_ids")
+        df_all = df_all.query("datasetID in @limit_dataset_ids")
 
-    cdm_data_type_test = "cdm_data_type in @cdm_data_types_supported"
-
-    unsupported_datasets = df_all_datasets.query(f"not ({cdm_data_type_test})")
-    if not unsupported_datasets.empty:
-        unsupported_datasets_list = unsupported_datasets["datasetID"].to_list()
-        logger.warn(
-            f"Skipping datasets because cdm_data_type is not {str(cdm_data_types_supported)}: {unsupported_datasets_list}"
+    unsupported = df_all.query("cdm_data_type not in @CDM_DATA_TYPES_SUPPORTED")
+    if not unsupported.empty:
+        ids = unsupported["datasetID"].tolist()
+        task_logger.warning(
+            "Skipping %d datasets with unsupported cdm_data_type: %s", len(ids), ids
         )
-        for dataset_id in unsupported_datasets_list:
-            skipped_datasets_reasons += [
-                [erddap.domain, dataset_id, CDM_DATA_TYPE_UNSUPPORTED]
-            ]
-
-    df_all_datasets = df_all_datasets.query(cdm_data_type_test)
-
-    if erddap.df_all_datasets.empty:
-        raise RuntimeError("No datasets found")
-    # loop through each dataset to be processed
-    for i, df_dataset_row in df_all_datasets.iterrows():
-        dataset_id = df_dataset_row["datasetID"]
-        if dataset_id in datasets_to_skip:
-            logger.info(f"Skipping dataset: {dataset_id} because its on the skip list")
-            continue
-        try:
-            logger.info(f"Querying dataset: {dataset_id} {i+1}/{len(df_all_datasets)}")
-            dataset = erddap.get_dataset(dataset_id)
-            dataset_logger = dataset.logger
-            compliance_checker = CDEComplianceChecker(dataset)
-            passes_checks = compliance_checker.passes_all_checks()
-
-            # these are the variables we are pulling max/min values for
-            if passes_checks:
-                df_profiles = get_profiles(dataset)
-
-                if df_profiles.empty:
-                    dataset_logger.warning("No profiles found")
-                else:
-
-                    # only write dataset/metadata/profile if there are some profiles
-                    df_profiles_all = pd.concat([df_profiles_all, df_profiles])
-                    df_datasets_all = pd.concat([df_datasets_all, dataset.get_df()])
-                    df_variables_all = pd.concat(
-                        [df_variables_all, dataset.df_variables]
-                    )
-                    dataset_logger.info("complete")
-            else:
-                skipped_datasets_reasons += skipped_reason(
-                    compliance_checker.failure_reason_code
-                )
-        except HTTPError as e:
-            response = e.response
-            # dataset_logger.error(response.text)
-            dataset_logger.error(
-                "HTTP ERROR: %s %s", response.status_code, response.reason
-            )
-            skipped_datasets_reasons += skipped_reason(HTTP_ERROR)
-
-        except Exception as e:
-            logger.error(
-                "Error occurred at %s %s", erddap_url, dataset_id, exc_info=True
-            )
-            skipped_datasets_reasons += skipped_reason(UNKNOWN_ERROR)
-
-    skipped_datasets_columns = ["erddap_url", "dataset_id", "reason_code"]
-
-    if skipped_datasets_reasons:
-        df_skipped_datasets = pd.DataFrame(
-            skipped_datasets_reasons,
-            columns=skipped_datasets_columns,
-        )
-
-        # logger.info(record_count)
-        logger.info(
-            "skipped: %s datasets: %s",
-            len(df_skipped_datasets),
-            df_skipped_datasets["dataset_id"].to_list(),
+        initial_skipped = pd.DataFrame(
+            [[erddap.domain, did, CDM_DATA_TYPE_UNSUPPORTED] for did in ids],
+            columns=SKIPPED_COLUMNS,
         )
     else:
-        df_skipped_datasets = pd.DataFrame(columns=skipped_datasets_columns)
+        initial_skipped = pd.DataFrame(columns=SKIPPED_COLUMNS)
 
-    # Return the results
-    return [
-        df_profiles_all,
-        df_datasets_all,
-        df_variables_all,
-        df_skipped_datasets,
+    datasets_to_skip = get_datasets_to_skip().get(urlparse(erddap_url).hostname, [])
+    supported = df_all.query("cdm_data_type in @CDM_DATA_TYPES_SUPPORTED")
+    dataset_ids = [
+        did for did in supported["datasetID"].tolist()
+        if did not in datasets_to_skip
     ]
+
+    return dataset_ids, initial_skipped
+
+
+@task(task_run_name="check-dataset-{dataset_id}")
+def check_dataset(erddap_url, dataset_id, cache_requests):
+    """
+    Run compliance checks against the dataset metadata.
+
+    Returns (passed, skipped_df).
+    skipped_df has one row on failure, is empty on success.
+    """
+    erddap = ERDDAP(erddap_url, cache_requests, skip_all_datasets=True)
+    domain = erddap.domain
+    empty_skipped = pd.DataFrame(columns=SKIPPED_COLUMNS)
+
+    def skipped_row(code):
+        return pd.DataFrame([[domain, dataset_id, code]], columns=SKIPPED_COLUMNS)
+
+    try:
+        dataset = erddap.get_dataset(dataset_id)
+        compliance_checker = CDEComplianceChecker(dataset)
+
+        if not compliance_checker.passes_all_checks():
+            return False, skipped_row(compliance_checker.failure_reason_code)
+
+        return True, empty_skipped
+
+    except HTTPError as e:
+        response = e.response
+        logger.error(
+            "HTTP ERROR checking %s %s: %s %s",
+            erddap_url, dataset_id, response.status_code, response.reason,
+        )
+        return False, skipped_row(HTTP_ERROR)
+
+    except Exception:
+        logger.error("Error checking %s %s", erddap_url, dataset_id, exc_info=True)
+        return False, skipped_row(UNKNOWN_ERROR)
+
+
+@task(task_run_name="fetch-profiles-{dataset_id}")
+def fetch_profiles(erddap_url, dataset_id, cache_requests):
+    """
+    Fetch profile data and dataset metadata for a compliant dataset.
+
+    get_profiles() calls get_profile_ids() which sets dataset.profile_ids —
+    required by dataset.get_df() — so all three are retrieved here in the
+    correct order.
+
+    Returns (profiles_df, dataset_df, variables_df).
+    """
+    erddap = ERDDAP(erddap_url, cache_requests, skip_all_datasets=True)
+
+    try:
+        dataset = erddap.get_dataset(dataset_id)
+        df_profiles = get_profiles(dataset)  # sets dataset.profile_ids as side effect
+        if df_profiles.empty:
+            dataset.logger.warning("No profiles found for %s", dataset_id)
+            return (
+                pd.DataFrame(_PROFILES_SCHEMA, index=[]),
+                dataset.get_df(),
+                dataset.df_variables,
+            )
+        return df_profiles, dataset.get_df(), dataset.df_variables
+
+    except HTTPError as e:
+        response = e.response
+        logger.error(
+            "HTTP ERROR fetching profiles for %s %s: %s %s",
+            erddap_url, dataset_id, response.status_code, response.reason,
+        )
+        return (
+            pd.DataFrame(_PROFILES_SCHEMA, index=[]),
+            pd.DataFrame(_DATASET_SCHEMA, index=[]),
+            pd.DataFrame(columns=_VARIABLES_COLUMNS),
+        )
+
+    except Exception:
+        logger.error("Error fetching profiles for %s %s", erddap_url, dataset_id, exc_info=True)
+        return (
+            pd.DataFrame(_PROFILES_SCHEMA, index=[]),
+            pd.DataFrame(_DATASET_SCHEMA, index=[]),
+            pd.DataFrame(columns=_VARIABLES_COLUMNS),
+        )
+
+

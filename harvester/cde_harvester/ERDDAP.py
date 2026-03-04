@@ -21,7 +21,7 @@ MAX_RESPONSE_SIZE = 2e8
 class ERDDAP(object):
     "Stores the ERDDAP server URL and functions related to querying it"
 
-    def __init__(self, erddap_url, cache_requests=False):
+    def __init__(self, erddap_url, cache_requests=False, skip_all_datasets=False):
         super(ERDDAP, self).__init__()
         self.cache_requests = cache_requests
 
@@ -50,6 +50,10 @@ class ERDDAP(object):
         self.url = erddap_url
         if not re.search("^https?://", erddap_url):
             raise RuntimeError(f"URL Must start wih http or https: {erddap_url}")
+
+        if skip_all_datasets:
+            self.df_all_datasets = pd.DataFrame()
+            return
 
         if not erddap_url.endswith("/erddap"):
             # ERDDAP URL almost always ends in /erddap
