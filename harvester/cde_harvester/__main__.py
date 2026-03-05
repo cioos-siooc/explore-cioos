@@ -16,7 +16,7 @@ from cde_harvester.ckan.create_ckan_erddap_link import (
     unescape_ascii,
     unescape_ascii_list,
 )
-from cde_harvester.harvest_erddap import harvest_erddap
+from cde_harvester.erddap_harvester import harvest_erddap
 from cde_harvester.utils import cf_standard_names, supported_standard_names
 from dotenv import load_dotenv
 from sentry_sdk.crons import monitor
@@ -121,7 +121,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     
     # Wait for all tasks to complete and get results
     logger.info("Waiting for all harvest tasks to complete")
-    result = [future.result() for future in futures]
+    results = [future.result() for future in futures]
     logger.info("All work completed")
 
     profiles = pd.DataFrame()
@@ -129,11 +129,11 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     variables = pd.DataFrame()
     skipped_datasets = pd.DataFrame()
 
-    for [profile, dataset, variable, skipped_dataset] in result:
-        profiles = pd.concat([profiles, profile])
-        datasets = pd.concat([datasets, dataset])
-        variables = pd.concat([variables, variable])
-        skipped_datasets = pd.concat([skipped_datasets, skipped_dataset])
+    for result in results:
+        profiles = pd.concat([profiles, result.profiles])
+        datasets = pd.concat([datasets, result.datasets])
+        variables = pd.concat([variables, result.variables])
+        skipped_datasets = pd.concat([skipped_datasets, result.skipped])
 
     if not os.path.exists(folder):
         os.makedirs(folder)
