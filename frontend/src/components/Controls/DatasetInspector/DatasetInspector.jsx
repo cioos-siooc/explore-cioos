@@ -29,6 +29,7 @@ export default function DatasetInspector({
   // )
 
   useEffect(() => {
+    if (dataset.source_type === 'obis') return
     setLoading(true)
     const queryParams = new URLSearchParams(query)
     queryParams.set('datasetPKs', dataset.pk)
@@ -172,15 +173,21 @@ export default function DatasetInspector({
                 : dataset.profiles_count}
             </div>
             <div className='metadataGridItem ERDAP'>
-              <strong>{t('datasetInspectorERDDAPText')}</strong>
-              {dataset.erddap_url && (
+              <strong>{dataset.source_type === 'obis' ? 'OBIS' : t('datasetInspectorERDDAPText')}</strong>
+              {dataset.source_type === 'obis' ? (
+                <a
+                  href={`https://obis.org/dataset/${dataset.dataset_id}`}
+                  target='_blank'
+                  rel='noreferrer'
+                >
+                  View on OBIS
+                </a>
+              ) : dataset.erddap_url && (
                 <a
                   className={dataset.erddap_url ? undefined : 'unavailable'}
                   href={dataset.erddap_url}
                   target='_blank'
-                  title={
-                    dataset.erddap_url ? dataset.erddap_url : 'unavailable'
-                  }
+                  title={dataset.erddap_url ? dataset.erddap_url : 'unavailable'}
                   rel='noreferrer'
                 >
                   {t('datasetInspectorERDDAPURL')} (ERDDAP™)
@@ -202,42 +209,46 @@ export default function DatasetInspector({
               )}
             </div>
           </div>
-          <div className='metadataGridItem recordTable'>
-            <strong>{t('datasetInspectorRecordTable')}</strong>
-          </div>
-          {loading ? (
-            <div className='datasetInspectorLoadingContainer'>
-              <Loading />
-            </div>
-          ) : (
-            <div className='main'>
-              <div>{t('datasetInspectorClickPreviewText')}</div>
-              <DataTableExtensions
-                {...tableData}
-                print={false}
-                filterPlaceholder={t('datasetInspectorFilterText')}
-                export={false}
-              >
-                <DataTable
-                  onRowClicked={(row) => setInspectRecordID(row.profile_id)}
-                  striped
-                  pointerOnHover
-                  columns={columns}
-                  data={data}
-                  defaultSortField='profile_id'
-                  defaultSortAsc={false}
-                  pagination
-                  paginationPerPage={100}
-                  paginationRowsPerPageOptions={[100, 150, 200, 250]}
-                  paginationComponentOptions={{
-                    rowsPerPageText: t('tableComponentRowsPerPage'),
-                    rangeSeparatorText: t('tableComponentOf'),
-                    selectAllRowsItem: false
-                  }}
-                  highlightOnHover
-                />
-              </DataTableExtensions>
-            </div>
+          {dataset.source_type !== 'obis' && (
+            <>
+              <div className='metadataGridItem recordTable'>
+                <strong>{t('datasetInspectorRecordTable')}</strong>
+              </div>
+              {loading ? (
+                <div className='datasetInspectorLoadingContainer'>
+                  <Loading />
+                </div>
+              ) : (
+                <div className='main'>
+                  <div>{t('datasetInspectorClickPreviewText')}</div>
+                  <DataTableExtensions
+                    {...tableData}
+                    print={false}
+                    filterPlaceholder={t('datasetInspectorFilterText')}
+                    export={false}
+                  >
+                    <DataTable
+                      onRowClicked={(row) => setInspectRecordID(row.profile_id)}
+                      striped
+                      pointerOnHover
+                      columns={columns}
+                      data={data}
+                      defaultSortField='profile_id'
+                      defaultSortAsc={false}
+                      pagination
+                      paginationPerPage={100}
+                      paginationRowsPerPageOptions={[100, 150, 200, 250]}
+                      paginationComponentOptions={{
+                        rowsPerPageText: t('tableComponentRowsPerPage'),
+                        rangeSeparatorText: t('tableComponentOf'),
+                        selectAllRowsItem: false
+                      }}
+                      highlightOnHover
+                    />
+                  </DataTableExtensions>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

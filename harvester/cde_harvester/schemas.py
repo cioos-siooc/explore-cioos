@@ -53,6 +53,7 @@ class DatasetSchema(pa.DataFrameModel):
     trajectory_id_variable: Series[str] = pa.Field(nullable=True)
     num_columns: Series[float] = pa.Field(nullable=True)
     first_eov_column: Series[str] = pa.Field(nullable=True)
+    source_type: Series[str] = pa.Field(nullable=True, default="erddap")
 
     class Config:
         coerce = True

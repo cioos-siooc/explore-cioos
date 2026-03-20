@@ -92,15 +92,20 @@ export default function SelectionDetails({
   }, [pointsData])
 
   function datasetsInLanguage(point) {
+    if (!point.title_translated) {
+      console.warn('[SelectionDetails] datasetsInLanguage - missing title_translated for dataset:', point.title, point)
+    }
     return {
       ...point,
-      title: point.title_translated[i18n.language] || point.title,
+      title: point.title_translated?.[i18n.language] || point.title,
       selected: false
     }
   }
   useEffect(() => {
+    console.debug('[SelectionDetails] query/polygon effect fired. loading:', loading, 'eovsSelected.length:', query.eovsSelected.length, 'polygon:', polygon)
     setDataTotal(0)
     if (!loading && query.eovsSelected.length) {
+      console.debug('[SelectionDetails] guard passed - firing pointQuery')
       const filtersQuery = createDataFilterQueryString(query)
       let shapeQuery = []
       if (polygon) {
@@ -115,15 +120,21 @@ export default function SelectionDetails({
       const urlString = `${server}/pointQuery${
         combinedQueries ? '?' + combinedQueries : ''
       }`
+      console.debug('[SelectionDetails] fetching pointQuery:', urlString)
       fetch(urlString).then((response) => {
+        console.debug('[SelectionDetails] /pointQuery response status:', response.status, response.ok)
         if (response.ok) {
           response.json().then((data) => {
+            console.debug('[SelectionDetails] /pointQuery returned', data.length, 'datasets:', data)
             setPointsData(data.map(datasetsInLanguage))
           })
         } else {
+          console.error('[SelectionDetails] /pointQuery returned non-OK status:', response.status)
           setPointsData([])
         }
         setInitialPointsQueryComplete(true)
+      }).catch((error) => {
+        console.error('[SelectionDetails] /pointQuery fetch error:', error)
       })
     }
     setBackClicked(false)

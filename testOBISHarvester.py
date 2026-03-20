@@ -19,13 +19,8 @@ result = harvest_obis(limit_dataset_ids=data["datasets"], folder="./obis/")
 folder = "harvest_obis"
 os.makedirs(folder, exist_ok=True)
 
-datasets = result.datasets.copy()
+datasets = result.datasets.replace(np.nan, None)
 profiles = result.profiles.copy()
-
-# Add columns that the db-loader expects from the CKAN join step
-datasets["title_fr"] = None
-datasets["ckan_id"] = None
-datasets = datasets.replace(np.nan, None)
 
 # Write CSVs
 datasets.to_csv(f"{folder}/datasets.csv", index=False)

@@ -24,6 +24,7 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                   d.eovs                                          eovs,
                   organizations,
                   count(p.*)::integer profiles_count,
+                  d.source_type,
                   d.erddap_url
                            || '/tabledap/'
                            || d.dataset_id

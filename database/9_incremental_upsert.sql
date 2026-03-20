@@ -81,7 +81,8 @@ BEGIN
         num_columns = EXCLUDED.num_columns,
         first_eov_column = EXCLUDED.first_eov_column,
         organization_pks = EXCLUDED.organization_pks,
-        n_profiles = EXCLUDED.n_profiles;
+        n_profiles = EXCLUDED.n_profiles,
+        source_type = EXCLUDED.source_type;
 END;
 $$ LANGUAGE plpgsql;
 

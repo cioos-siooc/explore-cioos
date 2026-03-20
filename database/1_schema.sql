@@ -56,6 +56,7 @@ CREATE TABLE datasets (
     profile_variables text[],
     num_columns integer,
     first_eov_column TEXT,
+    source_type TEXT DEFAULT 'erddap',
     UNIQUE(dataset_id, erddap_url)
 );
 

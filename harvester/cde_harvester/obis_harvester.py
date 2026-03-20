@@ -1,3 +1,4 @@
+import gzip
 import json
 import logging
 import os
@@ -7,6 +8,7 @@ import pandas as pd
 import requests
 
 from cde_harvester.base_harvester import BaseHarvester, HarvestResult
+from cde_harvester.ckan.create_ckan_obis_link import get_ckan_obis_records
 from cde_harvester.schemas import (
     DatasetSchema,
     ProfileSchema,
@@ -77,6 +79,10 @@ class OBISHarvester(BaseHarvester):
         )
         df_variables = pd.DataFrame(columns=VariableSchema.to_schema().columns.keys())
 
+        # Enrich datasets with CKAN metadata (EOVs, French titles, CKAN IDs)
+        if not df_datasets.empty:
+            df_datasets = self._enrich_with_ckan(df_datasets)
+
         return HarvestResult(
             profiles=df_profiles,
             datasets=df_datasets,
@@ -84,12 +90,48 @@ class OBISHarvester(BaseHarvester):
             skipped=df_skipped,
         )
 
+    def _enrich_with_ckan(self, df_datasets):
+        """Join CKAN metadata onto datasets for EOVs, French titles, and CKAN IDs."""
+        logger.info("Fetching CKAN metadata for %d OBIS datasets", len(df_datasets))
+        df_ckan = get_ckan_obis_records(df_datasets["dataset_id"].tolist())
+
+        if df_ckan.empty:
+            df_datasets["title_fr"] = None
+            df_datasets["ckan_id"] = None
+            return df_datasets
+
+        df_datasets = df_datasets.merge(df_ckan, on="dataset_id", how="left")
+
+        # Use CKAN EOVs where available, keep empty list as fallback
+        df_datasets["eovs"] = df_datasets.apply(
+            lambda r: r["ckan_eovs"] if isinstance(r.get("ckan_eovs"), list) and r["ckan_eovs"] else r["eovs"],
+            axis=1,
+        )
+        # Use CKAN title if available, keep OBIS title as fallback
+        df_datasets["title"] = df_datasets["ckan_title"].fillna(df_datasets["title"])
+
+        df_datasets.drop(columns=["ckan_eovs", "ckan_title"], inplace=True)
+
+        return df_datasets
+
     def aggregate_profiles(self, dataset_id, results):
         """Aggregate occurrences by unique lat/lon into profile rows."""
         df = pd.DataFrame(results)
 
         # Filter records missing coordinates
         df = df.dropna(subset=["decimalLatitude", "decimalLongitude"])
+        if df.empty:
+            return df
+
+        # Drop coordinates outside Web Mercator range (EPSG:3857 limit ~±85.06°)
+        n_before = len(df)
+        df = df[
+            (df["decimalLatitude"].abs() <= 85.06) &
+            (df["decimalLongitude"].abs() <= 180)
+        ]
+        dropped = n_before - len(df)
+        if dropped:
+            logger.warning("Dropped %d occurrences with out-of-range coordinates for %s", dropped, dataset_id)
         if df.empty:
             return df
 
@@ -161,16 +203,34 @@ class OBISHarvester(BaseHarvester):
             "trajectory_id_variable": None,
             "num_columns": None,
             "first_eov_column": None,
+            "source_type": "obis",
         }])
         return dataset_row
+
+    def _read_cache(self, path):
+        """Read a JSON cache file, supporting both plain and gzip-compressed."""
+        gz_path = path + ".gz"
+        if os.path.isfile(gz_path):
+            with gzip.open(gz_path, "rt") as f:
+                return json.load(f)
+        if os.path.isfile(path):
+            with open(path, "r") as f:
+                return json.load(f)
+        return None
+
+    def _write_cache(self, path, data):
+        """Write data to a gzip-compressed JSON cache file."""
+        gz_path = path + ".gz"
+        with gzip.open(gz_path, "wt") as f:
+            json.dump(data, f)
 
     def fetch_dataset_metadata(self, dataset_id):
         """Fetch dataset metadata from the OBIS dataset API."""
         cache_file = os.path.join(self.folder, f"{dataset_id}_metadata.json")
 
-        if os.path.isfile(cache_file):
-            with open(cache_file, "r") as f:
-                return json.load(f)
+        cached = self._read_cache(cache_file)
+        if cached is not None:
+            return cached
 
         url = f"https://api.obis.org/v3/dataset/{dataset_id}"
         try:
@@ -183,9 +243,7 @@ class OBISHarvester(BaseHarvester):
             logger.warning("Failed to fetch metadata for %s: %s", dataset_id, e)
             metadata = {}
 
-        with open(cache_file, "w") as f:
-            json.dump(metadata, f)
-
+        self._write_cache(cache_file, metadata)
         return metadata
 
     def get_occurrences(self, dataset_id):
@@ -193,10 +251,10 @@ class OBISHarvester(BaseHarvester):
         os.makedirs(self.folder, exist_ok=True)
         cache_file = os.path.join(self.folder, f"{dataset_id}.json")
 
-        if os.path.isfile(cache_file):
+        cached = self._read_cache(cache_file)
+        if cached is not None:
             logger.info("Loaded %s occurrences from cache", dataset_id)
-            with open(cache_file, "r") as f:
-                return json.load(f)
+            return cached
 
         base_url = f"https://api.obis.org/v3/occurrence?datasetid={dataset_id}&size=10000"
         all_results = []
@@ -229,9 +287,7 @@ class OBISHarvester(BaseHarvester):
         occurrences_data = {"results": all_results, "total": len(all_results)}
         logger.info("Loaded %d occurrences from OBIS for %s", len(all_results), dataset_id)
 
-        with open(cache_file, "w") as f:
-            json.dump(occurrences_data, f)
-
+        self._write_cache(cache_file, occurrences_data)
         return occurrences_data
 
 
