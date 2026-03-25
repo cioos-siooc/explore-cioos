@@ -32,5 +32,5 @@ build-backend = "hatchling.build"
 packages = ["cde_harvester"]
 
 [tool.uv.sources]
-db-loader = { path = "../db-loader" }
+db-loader = { path = "../db-loader", editable = true }
 

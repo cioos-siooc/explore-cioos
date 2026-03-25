@@ -33,6 +33,28 @@ class ProfileSchema(pa.DataFrameModel):
         strict = False  # allow extra columns during transition
 
 
+class ObisCellSchema(pa.DataFrameModel):
+    """Schema for the obis_cells DataFrame.
+
+    Mirrors cde.obis_cells in the database.
+    """
+
+    erddap_url: Series[str]
+    dataset_id: Series[str]
+    latitude: Series[float] = pa.Field(ge=-90, le=90)
+    longitude: Series[float] = pa.Field(ge=-180, le=180)
+    scientific_names: Series[object]  # list column, stored as text[] in DB
+    n_records: Series[float] = pa.Field(nullable=True)
+    time_min: Series[pa.DateTime] = pa.Field(nullable=True)
+    time_max: Series[pa.DateTime] = pa.Field(nullable=True)
+    depth_min: Series[float] = pa.Field(nullable=True)
+    depth_max: Series[float] = pa.Field(nullable=True)
+
+    class Config:
+        coerce = True
+        strict = False
+
+
 class DatasetSchema(pa.DataFrameModel):
     """Schema for the datasets DataFrame.
 

@@ -124,3 +124,39 @@ datasets_lookup.dataset_id = datasets.dataset_id;
 $$ LANGUAGE plpgsql;
 
 
+CREATE OR REPLACE FUNCTION obis_process() RETURNS VOID AS $$
+BEGIN
+    SET search_path TO cde, public;
+
+    -- Set geom from lat/lon
+    UPDATE obis_cells
+    SET geom = ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)
+    WHERE geom IS NULL;
+
+    -- Link to datasets
+    UPDATE obis_cells c
+    SET dataset_pk = d.pk
+    FROM datasets d
+    WHERE c.dataset_id = d.dataset_id
+      AND c.erddap_url = d.erddap_url
+      AND c.dataset_pk IS NULL;
+
+    -- Insert distinct geometries into points (skip existing)
+    INSERT INTO points (geom)
+    SELECT DISTINCT o.geom FROM obis_cells o
+    WHERE NOT EXISTS (SELECT 1 FROM points p WHERE p.geom = o.geom);
+
+    -- Link obis_cells to point_pk
+    UPDATE obis_cells
+    SET point_pk = points.pk
+    FROM points
+    WHERE points.geom = obis_cells.geom
+      AND obis_cells.point_pk IS NULL;
+
+    -- Update n_profiles on datasets to reflect obis_cells count
+    UPDATE datasets d
+    SET n_profiles = (SELECT count(*) FROM obis_cells c WHERE c.dataset_pk = d.pk)
+    WHERE d.erddap_url = 'https://obis.org';
+
+END;
+$$ LANGUAGE plpgsql;

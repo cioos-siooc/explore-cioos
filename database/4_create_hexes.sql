@@ -49,5 +49,13 @@ CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
   FROM cde.points
   WHERE points.pk = profiles.point_pk;
 
+  UPDATE cde.obis_cells
+  SET hex_0_pk = points.hex_0_pk,
+      hex_1_pk  = points.hex_1_pk,
+      hex_zoom_0 = points.hex_zoom_0,
+      hex_zoom_1 = points.hex_zoom_1
+  FROM cde.points
+  WHERE points.pk = obis_cells.point_pk;
+
   END;
 $$ LANGUAGE plpgsql;

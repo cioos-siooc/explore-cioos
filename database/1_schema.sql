@@ -139,6 +139,35 @@ CREATE INDEX ON profiles(erddap_url, dataset_id, timeseries_id, profile_id);
 
 
 
+DROP TABLE IF EXISTS obis_cells;
+CREATE TABLE obis_cells (
+    pk serial PRIMARY KEY,
+    geom geometry(Point, 3857),
+    dataset_pk integer,
+    erddap_url text DEFAULT 'https://obis.org',
+    dataset_id text,
+    latitude double precision,
+    longitude double precision,
+    scientific_names text[] DEFAULT '{}',
+    n_records bigint,
+    time_min timestamptz,
+    time_max timestamptz,
+    depth_min double precision,
+    depth_max double precision,
+    hex_zoom_0 geometry(polygon, 3857),
+    hex_zoom_1 geometry(polygon, 3857),
+    hex_0_pk integer,
+    hex_1_pk integer,
+    point_pk integer,
+    UNIQUE(erddap_url, dataset_id, latitude, longitude)
+);
+
+CREATE INDEX ON obis_cells USING GIST (geom);
+CREATE INDEX ON obis_cells USING GIST (hex_zoom_0);
+CREATE INDEX ON obis_cells USING GIST (hex_zoom_1);
+CREATE INDEX ON obis_cells (erddap_url, dataset_id);
+
+
 --
 DROP TABLE IF EXISTS download_jobs;
 CREATE TABLE download_jobs (

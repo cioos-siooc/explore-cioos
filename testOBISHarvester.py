@@ -16,21 +16,21 @@ logger.info("Harvesting %d OBIS datasets", len(data["datasets"]))
 result = harvest_obis(limit_dataset_ids=data["datasets"], folder="./obis/")
 
 # Write CSVs in the format the db-loader expects
-folder = "harvest_obis"
+folder = "harvest_obis_missing"
 os.makedirs(folder, exist_ok=True)
 
 datasets = result.datasets.replace(np.nan, None)
-profiles = result.profiles.copy()
+obis_cells = result.obis_cells.copy()
 
 # Write CSVs
 datasets.to_csv(f"{folder}/datasets.csv", index=False)
-profiles.to_csv(f"{folder}/profiles.csv", index=False)
+obis_cells.to_csv(f"{folder}/obis_cells.csv", index=False)
 result.skipped.to_csv(f"{folder}/skipped.csv", index=False)
 
 logger.info(
-    "Wrote %d datasets, %d profiles, %d skipped to %s/",
+    "Wrote %d datasets, %d obis_cells, %d skipped to %s/",
     len(datasets),
-    len(profiles),
+    len(obis_cells),
     len(result.skipped),
     folder,
 )

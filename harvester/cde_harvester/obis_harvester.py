@@ -11,6 +11,7 @@ from cde_harvester.base_harvester import BaseHarvester, HarvestResult
 from cde_harvester.ckan.create_ckan_obis_link import get_ckan_obis_records
 from cde_harvester.schemas import (
     DatasetSchema,
+    ObisCellSchema,
     ProfileSchema,
     SkippedDatasetSchema,
     VariableSchema,
@@ -34,40 +35,53 @@ class OBISHarvester(BaseHarvester):
         self.folder = folder
 
     def harvest(self) -> HarvestResult:
-        all_profiles = []
+        all_cells = []
         all_datasets = []
         all_skipped = []
 
-        for dataset_id in self.limit_dataset_ids:
-            logger.info("Processing OBIS dataset: %s", dataset_id)
-            try:
-                occurrences = self.get_occurrences(dataset_id)
-                results = occurrences.get("results", [])
+        total = len(self.limit_dataset_ids)
+        for i, dataset_id in enumerate(self.limit_dataset_ids, 1):
+            logger.info("Processing OBIS dataset %d/%d: %s", i, total, dataset_id)
+            last_error = None
+            for attempt in range(1, 6):
+                try:
+                    occurrences = self.get_occurrences(dataset_id)
+                    results = occurrences.get("results", [])
 
-                if not results:
-                    logger.warning("No occurrences for dataset %s", dataset_id)
-                    all_skipped.append([OBIS_SOURCE_URL, dataset_id, "NO_OCCURRENCES"])
-                    continue
+                    if not results:
+                        logger.warning("No occurrences for dataset %s", dataset_id)
+                        all_skipped.append([OBIS_SOURCE_URL, dataset_id, "NO_OCCURRENCES"])
+                        break
 
-                profiles = self.aggregate_profiles(dataset_id, results)
-                if profiles.empty:
-                    all_skipped.append([OBIS_SOURCE_URL, dataset_id, "NO_VALID_COORDINATES"])
-                    continue
+                    cells = self.aggregate_cells(dataset_id, results)
+                    if cells.empty:
+                        all_skipped.append([OBIS_SOURCE_URL, dataset_id, "NO_VALID_COORDINATES"])
+                        break
 
-                dataset_row = self.build_dataset_row(dataset_id, results, profiles)
+                    dataset_row = self.build_dataset_row(dataset_id, results, cells)
 
-                all_profiles.append(profiles)
-                all_datasets.append(dataset_row)
+                    all_cells.append(cells)
+                    all_datasets.append(dataset_row)
+                    break
 
-            except Exception as e:
-                logger.error("Error processing OBIS dataset %s: %s", dataset_id, e, exc_info=True)
+                except Exception as e:
+                    last_error = e
+                    logger.error(
+                        "Error processing OBIS dataset %s (attempt %d/5): %s",
+                        dataset_id, attempt, e, exc_info=True,
+                    )
+                    if attempt < 5:
+                        self._clear_cache(dataset_id)
+            else:
+                logger.error("All 5 attempts failed for OBIS dataset %s: %s", dataset_id, last_error)
                 all_skipped.append([OBIS_SOURCE_URL, dataset_id, "UNKNOWN_ERROR"])
 
         # Build result DataFrames
-        df_profiles = (
-            pd.concat(all_profiles, ignore_index=True) if all_profiles
-            else pd.DataFrame(columns=ProfileSchema.to_schema().columns.keys())
+        df_obis_cells = (
+            pd.concat(all_cells, ignore_index=True) if all_cells
+            else pd.DataFrame(columns=ObisCellSchema.to_schema().columns.keys())
         )
+        df_profiles = pd.DataFrame(columns=ProfileSchema.to_schema().columns.keys())
         df_datasets = (
             pd.concat(all_datasets, ignore_index=True) if all_datasets
             else pd.DataFrame(columns=DatasetSchema.to_schema().columns.keys())
@@ -88,6 +102,7 @@ class OBISHarvester(BaseHarvester):
             datasets=df_datasets,
             variables=df_variables,
             skipped=df_skipped,
+            obis_cells=df_obis_cells,
         )
 
     def _enrich_with_ckan(self, df_datasets):
@@ -114,8 +129,8 @@ class OBISHarvester(BaseHarvester):
 
         return df_datasets
 
-    def aggregate_profiles(self, dataset_id, results):
-        """Aggregate occurrences by unique lat/lon into profile rows."""
+    def aggregate_cells(self, dataset_id, results):
+        """Aggregate occurrences by unique lat/lon grid cell into obis_cells rows."""
         df = pd.DataFrame(results)
 
         # Filter records missing coordinates
@@ -145,43 +160,45 @@ class OBISHarvester(BaseHarvester):
             if col not in df.columns:
                 df[col] = None
 
-        # Round coordinates to avoid near-duplicate locations
-        df["lat_round"] = df["decimalLatitude"].round(4)
-        df["lon_round"] = df["decimalLongitude"].round(4)
+        # Snap coordinates to a ~5 nautical mile grid (1/12 degree)
+        # Round to 8 decimal places to avoid floating-point artifacts from the
+        # multiply-back step (e.g. 550 * (1/12) can differ in the last bit
+        # across rows, causing duplicate-key violations on insert).
+        GRID_DEG = 1 / 12
+        df["lat_grid"] = ((df["decimalLatitude"] / GRID_DEG).round() * GRID_DEG).round(8)
+        df["lon_grid"] = ((df["decimalLongitude"] / GRID_DEG).round() * GRID_DEG).round(8)
 
-        group_cols = ["lat_round", "lon_round"]
+        # Ensure scientificName column exists
+        if "scientificName" not in df.columns:
+            df["scientificName"] = None
+
+        group_cols = ["lat_grid", "lon_grid"]
         grouped = df.groupby(group_cols)
 
-        profiles = grouped.agg(
-            latitude=("decimalLatitude", "first"),
-            longitude=("decimalLongitude", "first"),
+        cells = grouped.agg(
+            latitude=("lat_grid", "first"),
+            longitude=("lon_grid", "first"),
             depth_min=("minimumDepthInMeters", "min"),
             depth_max=("maximumDepthInMeters", "max"),
             time_min=("date_start", "min"),
             time_max=("date_end", "max"),
             n_records=("decimalLatitude", "count"),
+            scientific_names=("scientificName", lambda x: sorted(x.dropna().unique().tolist())),
         ).reset_index(drop=True)
 
-        profiles["erddap_url"] = OBIS_SOURCE_URL
-        profiles["dataset_id"] = dataset_id
-        profiles["timeseries_id"] = ""
-        profiles["profile_id"] = ""
-        profiles["n_profiles"] = None
+        cells["erddap_url"] = OBIS_SOURCE_URL
+        cells["dataset_id"] = dataset_id
 
-        # Compute records_per_day
-        profiles["time_min"] = pd.to_datetime(profiles["time_min"], errors="coerce", utc=True)
-        profiles["time_max"] = pd.to_datetime(profiles["time_max"], errors="coerce", utc=True)
-        days = (profiles["time_max"] - profiles["time_min"]).dt.days
-        days = days.replace(0, 1)
-        profiles["records_per_day"] = profiles["n_records"] / days
+        cells["time_min"] = pd.to_datetime(cells["time_min"], errors="coerce", utc=True)
+        cells["time_max"] = pd.to_datetime(cells["time_max"], errors="coerce", utc=True)
 
         # Fill missing depths
-        profiles["depth_min"] = profiles["depth_min"].fillna(0)
-        profiles["depth_max"] = profiles["depth_max"].fillna(0)
+        cells["depth_min"] = cells["depth_min"].fillna(0)
+        cells["depth_max"] = cells["depth_max"].fillna(0)
 
-        return profiles
+        return cells
 
-    def build_dataset_row(self, dataset_id, results, profiles):
+    def build_dataset_row(self, dataset_id, results, cells):
         """Build a single-row dataset DataFrame from OBIS dataset metadata."""
         metadata = self.fetch_dataset_metadata(dataset_id)
 
@@ -196,7 +213,7 @@ class OBISHarvester(BaseHarvester):
             "platform": "unknown",
             "eovs": [],
             "organizations": organizations,
-            "n_profiles": len(profiles),
+            "n_profiles": len(cells),
             "profile_variables": [],
             "timeseries_id_variable": None,
             "profile_id_variable": None,
@@ -206,6 +223,17 @@ class OBISHarvester(BaseHarvester):
             "source_type": "obis",
         }])
         return dataset_row
+
+    def _clear_cache(self, dataset_id):
+        """Delete cached occurrence and metadata files for a dataset."""
+        for name in [f"{dataset_id}.json", f"{dataset_id}_metadata.json"]:
+            for path in [
+                os.path.join(self.folder, name),
+                os.path.join(self.folder, name + ".gz"),
+            ]:
+                if os.path.isfile(path):
+                    os.remove(path)
+                    logger.info("Cleared cache file: %s", path)
 
     def _read_cache(self, path):
         """Read a JSON cache file, supporting both plain and gzip-compressed."""

@@ -300,7 +300,7 @@ wheels = [
 [[package]]
 name = "db-loader"
 version = "0.1.0"
-source = { directory = "../db-loader" }
+source = { editable = "../db-loader" }
 dependencies = [
     { name = "numpy" },
     { name = "pandas" },
@@ -500,7 +500,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "db-loader", directory = "../db-loader" },
+    { name = "db-loader", editable = "../db-loader" },
     { name = "diskcache", specifier = ">=5.6.3" },
     { name = "erddapy", specifier = ">=2.2.0" },
     { name = "lxml", specifier = ">=5.1.0" },

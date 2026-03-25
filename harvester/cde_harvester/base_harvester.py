@@ -7,6 +7,7 @@ from pandera.typing import DataFrame
 
 from cde_harvester.schemas import (
     DatasetSchema,
+    ObisCellSchema,
     ProfileSchema,
     SkippedDatasetSchema,
     VariableSchema,
@@ -23,6 +24,11 @@ class HarvestResult:
     datasets: DataFrame[DatasetSchema]
     variables: DataFrame[VariableSchema]
     skipped: DataFrame[SkippedDatasetSchema]
+    obis_cells: DataFrame[ObisCellSchema] = None
+
+    def __post_init__(self):
+        if self.obis_cells is None:
+            self.obis_cells = pd.DataFrame(columns=ObisCellSchema.to_schema().columns.keys())
 
     def validate(self):
         """Validate all DataFrames against their schemas.
@@ -35,6 +41,7 @@ class HarvestResult:
             ("datasets", DatasetSchema),
             ("variables", VariableSchema),
             ("skipped", SkippedDatasetSchema),
+            ("obis_cells", ObisCellSchema),
         ]:
             df = getattr(self, name)
             try:
