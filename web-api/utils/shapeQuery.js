@@ -10,7 +10,18 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
     timeMin = null, timeMax = null, depthMin = null, depthMax = null,
   } = query;
 
-  const sql = `WITH sub AS
+  const sql = `WITH combined AS (
+        SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,
+               profile_id, timeseries_id,
+               latitude, longitude, point_pk, geom
+        FROM cde.profiles
+        UNION ALL
+        SELECT dataset_pk, time_min, time_max, depth_min, depth_max, 0 as records_per_day,
+               NULL as profile_id, NULL as timeseries_id,
+               latitude, longitude, point_pk, geom
+        FROM cde.obis_cells
+  ),
+  sub AS
         (SELECT   d.pk,
                   d.pk_url,
                   d.dataset_id,
@@ -47,8 +58,8 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
     ? ",json_agg(json_build_object( 'profile_id',coalesce(p.profile_id, p.timeseries_id), 'time_min',p.time_min::DATE, 'time_max',p.time_max::DATE, 'depth_min',p.depth_min, 'depth_max',p.depth_max ) ORDER BY time_min DESC ) AS profiles"
     : ""
 }
-                  
-         FROM     cde.profiles p
+
+         FROM     combined p
          JOIN     cde.datasets d
          ON       p.dataset_pk = d.pk
          WHERE :filters

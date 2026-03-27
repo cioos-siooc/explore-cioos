@@ -71,16 +71,20 @@ services:
       - ./harvester_cache:/app/harvester/harvester_cache
       - ./harvest:/app/harvester/harvest
       - ./harvester_logs:/app/harvester/logs
+      - ./Obis_Datasets.json:/app/harvester/Obis_Datasets.json:ro
+      - ./obis_cache:/app/harvester/obis_cache
     environment:
       - "HARVESTER_LOG_DIR=/app/harvester/logs"
       - PREFECT_API_URL=http://prefect:4200/api
+      - PREFECT_LOGGING_LEVEL=INFO
+      - DB_HOST_EXTERNAL=db
     env_file:
       - .env
   
 
   
   prefect:
-    image: prefecthq/prefect:3.4.24.dev4-python3.12-conda
+    image: prefecthq/prefect:3.6-python3.12-conda
     command: prefect server start --host 0.0.0.0
     ports:
       - "4200:4200"  # Prefect UI + API

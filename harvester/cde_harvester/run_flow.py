@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from prefect import flow, get_run_logger
 
 # Import the existing flows
-from cde_harvester.__main__ import main as harvester_main, setup_logging, load_config
+from cde_harvester.__main__ import main as harvester_main, setup_logging, load_config, load_obis_dataset_ids
 from cde_harvester.redisFunctions import redisFlow
 
 # Import db_loader main - need to handle module path
@@ -55,6 +55,11 @@ def cde_pipeline(config_file=None):
     # Use config file's incremental setting if parameter is False
     incremental = config.get("incremental", False)
     flush_redis = config.get("flush_redis", False)
+
+    # OBIS configuration
+    obis_dataset_ids = load_obis_dataset_ids(config)
+    obis_folder = config.get("obis_folder")
+
     # Run harvester as a subflow
     logger.info("Running cde_harvester subflow")
     try:
@@ -63,7 +68,9 @@ def cde_pipeline(config_file=None):
             cache_requests=cache_requests,
             folder=folder,
             dataset_ids=dataset_ids,
-            max_workers=max_workers
+            max_workers=max_workers,
+            obis_dataset_ids=obis_dataset_ids,
+            obis_folder=obis_folder,
         )
         logger.info("cde_harvester completed successfully")
     except Exception as e:

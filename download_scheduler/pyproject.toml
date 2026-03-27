@@ -21,4 +21,4 @@ build-backend = "hatchling.build"
 
 [tool.uv.sources]
 downloader = { path = "../downloader" }
-harvester = { path = "../harvester" }
+harvester = { path = "../harvester", editable = true }

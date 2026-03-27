@@ -6,7 +6,10 @@ be joined onto harvested OBIS datasets to enrich them with EOVs,
 French titles, and CKAN IDs.
 """
 
+import gzip
+import json
 import logging
+import os
 
 import pandas as pd
 import requests
@@ -39,7 +42,23 @@ def _lookup_ckan_package(dataset_id, ckan_api_url=CKAN_API_URL):
         return None
 
 
-def get_ckan_obis_records(dataset_ids, ckan_api_url=CKAN_API_URL):
+def _read_cache(path):
+    gz = path + ".gz"
+    if os.path.isfile(gz):
+        with gzip.open(gz, "rt") as f:
+            return json.load(f)
+    if os.path.isfile(path):
+        with open(path) as f:
+            return json.load(f)
+    return None  # not cached
+
+
+def _write_cache(path, data):
+    with gzip.open(path + ".gz", "wt") as f:
+        json.dump(data, f)
+
+
+def get_ckan_obis_records(dataset_ids, ckan_api_url=CKAN_API_URL, cache_folder=None):
     """Fetch CKAN metadata for a list of OBIS dataset UUIDs.
 
     Parameters
@@ -48,17 +67,42 @@ def get_ckan_obis_records(dataset_ids, ckan_api_url=CKAN_API_URL):
         OBIS dataset UUIDs to look up.
     ckan_api_url : str
         Base URL of the CKAN API.
+    cache_folder : str, optional
+        Directory to cache per-dataset CKAN lookups as gzip JSON.
+        Uses the same folder as occurrence cache when provided.
 
     Returns
     -------
     pd.DataFrame
         Columns: dataset_id, ckan_id, ckan_eovs, ckan_title, title_fr
     """
+    if cache_folder:
+        os.makedirs(cache_folder, exist_ok=True)
+
     records = []
-    for dataset_id in dataset_ids:
-        pkg = _lookup_ckan_package(dataset_id, ckan_api_url)
+    total = len(dataset_ids)
+    fetched = 0
+    for i, dataset_id in enumerate(dataset_ids, 1):
+        if i % 50 == 0 or i == total:
+            logger.info("CKAN lookup progress: %d/%d", i, total)
+
+        pkg = None
+        cache_file = os.path.join(cache_folder, f"ckan_{dataset_id}.json") if cache_folder else None
+
+        if cache_file:
+            cached = _read_cache(cache_file)
+            if cached is not None:  # None means not cached; False/dict are valid hits
+                pkg = cached if cached else None
+            else:
+                pkg = _lookup_ckan_package(dataset_id, ckan_api_url)
+                fetched += 1
+                _write_cache(cache_file, pkg or False)
+        else:
+            pkg = _lookup_ckan_package(dataset_id, ckan_api_url)
+            fetched += 1
+
         if not pkg:
-            logger.info("No CKAN record found for %s", dataset_id)
+            logger.debug("No CKAN record found for %s", dataset_id)
             continue
 
         title_translated = pkg.get("title_translated") or {}
@@ -76,5 +120,8 @@ def get_ckan_obis_records(dataset_ids, ckan_api_url=CKAN_API_URL):
     if not df.empty:
         df = df.drop_duplicates(subset="dataset_id")
 
-    logger.info("Matched %d / %d OBIS datasets to CKAN records", len(df), len(dataset_ids))
+    logger.info(
+        "Matched %d / %d OBIS datasets to CKAN records (%d fetched, %d from cache)",
+        len(df), len(dataset_ids), fetched, len(dataset_ids) - fetched,
+    )
     return df

@@ -6,6 +6,8 @@ import time
 
 import pandas as pd
 import requests
+from prefect import task
+from prefect.logging import get_run_logger
 
 from cde_harvester.base_harvester import BaseHarvester, HarvestResult
 from cde_harvester.ckan.create_ckan_obis_link import get_ckan_obis_records
@@ -30,9 +32,10 @@ class OBISHarvester(BaseHarvester):
     the existing CDE schema.
     """
 
-    def __init__(self, limit_dataset_ids=None, folder="./obis"):
+    def __init__(self, limit_dataset_ids=None, folder="./obis", prefect_logger=None):
         self.limit_dataset_ids = limit_dataset_ids or []
         self.folder = folder
+        self.logger = prefect_logger or logger
 
     def harvest(self) -> HarvestResult:
         all_cells = []
@@ -41,7 +44,7 @@ class OBISHarvester(BaseHarvester):
 
         total = len(self.limit_dataset_ids)
         for i, dataset_id in enumerate(self.limit_dataset_ids, 1):
-            logger.info("Processing OBIS dataset %d/%d: %s", i, total, dataset_id)
+            self.logger.info("Processing OBIS dataset %d/%d: %s", i, total, dataset_id)
             last_error = None
             for attempt in range(1, 6):
                 try:
@@ -49,7 +52,7 @@ class OBISHarvester(BaseHarvester):
                     results = occurrences.get("results", [])
 
                     if not results:
-                        logger.warning("No occurrences for dataset %s", dataset_id)
+                        self.logger.warning("No occurrences for dataset %s", dataset_id)
                         all_skipped.append([OBIS_SOURCE_URL, dataset_id, "NO_OCCURRENCES"])
                         break
 
@@ -66,14 +69,14 @@ class OBISHarvester(BaseHarvester):
 
                 except Exception as e:
                     last_error = e
-                    logger.error(
+                    self.logger.error(
                         "Error processing OBIS dataset %s (attempt %d/5): %s",
                         dataset_id, attempt, e, exc_info=True,
                     )
                     if attempt < 5:
                         self._clear_cache(dataset_id)
             else:
-                logger.error("All 5 attempts failed for OBIS dataset %s: %s", dataset_id, last_error)
+                self.logger.error("All 5 attempts failed for OBIS dataset %s: %s", dataset_id, last_error)
                 all_skipped.append([OBIS_SOURCE_URL, dataset_id, "UNKNOWN_ERROR"])
 
         # Build result DataFrames
@@ -107,8 +110,8 @@ class OBISHarvester(BaseHarvester):
 
     def _enrich_with_ckan(self, df_datasets):
         """Join CKAN metadata onto datasets for EOVs, French titles, and CKAN IDs."""
-        logger.info("Fetching CKAN metadata for %d OBIS datasets", len(df_datasets))
-        df_ckan = get_ckan_obis_records(df_datasets["dataset_id"].tolist())
+        self.logger.info("Fetching CKAN metadata for %d OBIS datasets", len(df_datasets))
+        df_ckan = get_ckan_obis_records(df_datasets["dataset_id"].tolist(), cache_folder=self.folder)
 
         if df_ckan.empty:
             df_datasets["title_fr"] = None
@@ -146,7 +149,7 @@ class OBISHarvester(BaseHarvester):
         ]
         dropped = n_before - len(df)
         if dropped:
-            logger.warning("Dropped %d occurrences with out-of-range coordinates for %s", dropped, dataset_id)
+            self.logger.warning("Dropped %d occurrences with out-of-range coordinates for %s", dropped, dataset_id)
         if df.empty:
             return df
 
@@ -233,7 +236,7 @@ class OBISHarvester(BaseHarvester):
             ]:
                 if os.path.isfile(path):
                     os.remove(path)
-                    logger.info("Cleared cache file: %s", path)
+                    self.logger.info("Cleared cache file: %s", path)
 
     def _read_cache(self, path):
         """Read a JSON cache file, supporting both plain and gzip-compressed."""
@@ -268,22 +271,56 @@ class OBISHarvester(BaseHarvester):
             results = data.get("results", [])
             metadata = results[0] if results else {}
         except Exception as e:
-            logger.warning("Failed to fetch metadata for %s: %s", dataset_id, e)
+            self.logger.warning("Failed to fetch metadata for %s: %s", dataset_id, e)
             metadata = {}
 
         self._write_cache(cache_file, metadata)
         return metadata
 
     def get_occurrences(self, dataset_id):
-        """Fetch occurrences for a dataset, using cached JSON if available."""
+        """Fetch occurrences for a dataset via OBIS S3 parquet, with REST API fallback."""
         os.makedirs(self.folder, exist_ok=True)
         cache_file = os.path.join(self.folder, f"{dataset_id}.json")
 
         cached = self._read_cache(cache_file)
         if cached is not None:
-            logger.info("Loaded %s occurrences from cache", dataset_id)
+            self.logger.info("Loaded %s occurrences from cache", dataset_id)
             return cached
 
+        import duckdb
+        url = f"https://obis-open-data.s3.amazonaws.com/occurrence/{dataset_id}.parquet"
+        query = f"""
+            SELECT
+                interpreted.decimalLatitude    AS decimalLatitude,
+                interpreted.decimalLongitude   AS decimalLongitude,
+                interpreted.date_start         AS date_start,
+                interpreted.date_end           AS date_end,
+                interpreted.minimumDepthInMeters AS minimumDepthInMeters,
+                interpreted.maximumDepthInMeters AS maximumDepthInMeters,
+                interpreted.scientificName     AS scientificName,
+                _id                            AS id
+            FROM read_parquet('{url}')
+            WHERE interpreted.decimalLatitude  BETWEEN -85.06 AND 85.06
+              AND interpreted.decimalLongitude BETWEEN -180   AND 180
+        """
+        try:
+            df = duckdb.sql(query).df()
+            results = [
+                {k: None if v is pd.NA else v for k, v in row.items()}
+                for row in df.to_dict(orient="records")
+            ]
+            occurrences_data = {"results": results, "total": len(results)}
+            self.logger.info("Loaded %d occurrences from parquet for %s", len(results), dataset_id)
+            self._write_cache(cache_file, occurrences_data)
+            return occurrences_data
+        except Exception as e:
+            self.logger.warning("Parquet fetch failed for %s, falling back to API: %s", dataset_id, e)
+            return self._get_occurrences_api(dataset_id)
+
+    def _get_occurrences_api(self, dataset_id):
+        """Fetch occurrences from the OBIS REST API (fallback)."""
+        os.makedirs(self.folder, exist_ok=True)
+        cache_file = os.path.join(self.folder, f"{dataset_id}.json")
         base_url = f"https://api.obis.org/v3/occurrence?datasetid={dataset_id}&size=10000"
         all_results = []
         url = base_url
@@ -300,7 +337,7 @@ class OBISHarvester(BaseHarvester):
 
             all_results.extend(results)
             total = page_data.get("total", 0)
-            logger.info("  Page %d: %d/%d records", page, len(all_results), total)
+            self.logger.info("  Page %d: %d/%d records", page, len(all_results), total)
 
             if len(results) < 10000:
                 break
@@ -313,13 +350,14 @@ class OBISHarvester(BaseHarvester):
             time.sleep(0.1)
 
         occurrences_data = {"results": all_results, "total": len(all_results)}
-        logger.info("Loaded %d occurrences from OBIS for %s", len(all_results), dataset_id)
+        self.logger.info("Loaded %d occurrences from OBIS for %s", len(all_results), dataset_id)
 
         self._write_cache(cache_file, occurrences_data)
         return occurrences_data
 
 
+@task(task_run_name="harvest-obis")
 def harvest_obis(limit_dataset_ids=None, folder="./obis/"):
     """Run the OBIS harvester."""
-    harvester = OBISHarvester(limit_dataset_ids, folder)
+    harvester = OBISHarvester(limit_dataset_ids, folder, prefect_logger=get_run_logger())
     return harvester.harvest()

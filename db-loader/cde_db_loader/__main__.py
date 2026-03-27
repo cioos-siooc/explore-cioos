@@ -131,24 +131,23 @@ def main(folder, incremental=False):
 
     envs = os.environ
 
-    database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST_EXTERNAL']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
+    db_host = envs.get('DB_HOST_EXTERNAL', 'localhost')
+    database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{db_host}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
 
     engine = create_engine(database_link)
     # test connection
     engine.connect()
-    logger.info("Connected to %s", envs["DB_HOST_EXTERNAL"])
+    logger.info("Connected to %s", db_host)
 
     datasets_file = f"{folder}/datasets.csv"
     profiles_file = f"{folder}/profiles.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
     obis_cells_file = f"{folder}/obis_cells.csv"
 
-    logger.info(
-        "Reading %s,%s, %s", datasets_file, profiles_file, skipped_datasets_file
-    )
+    logger.info("Reading %s, %s", datasets_file, skipped_datasets_file)
 
     datasets = pd.read_csv(datasets_file)
-    profiles = pd.read_csv(profiles_file)
+    profiles = pd.read_csv(profiles_file) if os.path.isfile(profiles_file) else pd.DataFrame()
     skipped_datasets = pd.read_csv(skipped_datasets_file)
 
     obis_cells = None
@@ -195,14 +194,15 @@ def main(folder, incremental=False):
                 dtype=DATASET_ARRAY_DTYPES,
             )
 
-            logger.info("Loading profiles into temp table")
-            prepare_profiles_dataframe(profiles).to_sql(
-                "temp_profiles",
-                con=transaction,
-                if_exists="append",
-                index=False,
-                dtype=PROFILES_ARRAY_DTYPES,
-            )
+            if not profiles.empty:
+                logger.info("Loading profiles into temp table")
+                prepare_profiles_dataframe(profiles).to_sql(
+                    "temp_profiles",
+                    con=transaction,
+                    if_exists="append",
+                    index=False,
+                    dtype=PROFILES_ARRAY_DTYPES,
+                )
 
             if obis_cells is not None:
                 prepared = prepare_obis_cells_dataframe(obis_cells)
@@ -243,15 +243,17 @@ def main(folder, incremental=False):
             )
 
             logger.info("Writing profiles")
-            logger.info("profiles.columns: %s", profiles.columns)
-            prepare_profiles_dataframe(profiles).to_sql(
-                "profiles",
-                con=transaction,
-                if_exists="append",
-                schema=schema,
-                index=False,
-                dtype=PROFILES_ARRAY_DTYPES,
-            )
+            if profiles.empty:
+                logger.info("No profiles to write")
+            else:
+                prepare_profiles_dataframe(profiles).to_sql(
+                    "profiles",
+                    con=transaction,
+                    if_exists="append",
+                    schema=schema,
+                    index=False,
+                    dtype=PROFILES_ARRAY_DTYPES,
+                )
 
             if obis_cells is not None:
                 prepared = prepare_obis_cells_dataframe(obis_cells)

@@ -16,7 +16,7 @@ logger.info("Harvesting %d OBIS datasets", len(data["datasets"]))
 result = harvest_obis(limit_dataset_ids=data["datasets"], folder="./obis/")
 
 # Write CSVs in the format the db-loader expects
-folder = "harvest_obis_missing"
+folder = "harvest_obis"
 os.makedirs(folder, exist_ok=True)
 
 datasets = result.datasets.replace(np.nan, None)
