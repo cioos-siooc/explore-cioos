@@ -1,0 +1,30 @@
+name: Deploy Production
+
+on:
+  pull_request:
+    branches:
+      - development
+
+jobs:
+  deploy:
+    name: Deploy to production
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: cioos-siooc/cioos-deploy-docker-compose@main
+        with:
+          wg_config: ${{ secrets.AZURE_CO_WIREGUARD_VPN_CONFIG }}
+          ssh_host: "10.0.1.6"
+          ssh_username: "github-runner"
+          ssh_key: ${{ secrets.AZURE_CO_RUNNER_PRIVATE_KEY }}
+          #   ssh_passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          source_dir: "."
+          deploy_path: "/srv/services/explore-cioos"
+          stack_name: "explore-cioos-production"
+          compose_files: "docker-compose.production.yml"
+          op_secret_files: ".env.production"
+          #   op_service_account_token: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          docker_compose_down: "true"
