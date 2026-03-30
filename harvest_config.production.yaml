@@ -1,6 +1,6 @@
 # list of erddap URLs. Should end in /erddap
 erddap_urls:
-  - http://dap.oceannetwork.ca/erddap
+  - https://dap.oceannetworks.ca/erddap
   - https://erddap.amundsenscience.com/erddap
   - https://cioosatlantic.ca/erddap
   - https://catalogue.hakai.org/erddap
