@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from pathlib import Path
 
 import pandas as pd
 
@@ -57,9 +58,15 @@ def flatten(t):
     return [item for sublist in t for item in sublist]
 
 
-def get_cf_names():
-    cf_names_xml_url = "https://cfconventions.org/Data/cf-standard-names/current/src/cf-standard-name-table.xml"
+CF_STANDARD_NAMES_CSV = Path(__file__).parent / "data" / "cf_standard_names.csv"
 
+
+def get_cf_names():
+    if CF_STANDARD_NAMES_CSV.exists():
+        logger.info("Loading existing CF standard names from %s", CF_STANDARD_NAMES_CSV)
+        return pd.read_csv(CF_STANDARD_NAMES_CSV)["id"].unique()
+
+    cf_names_xml_url = "https://cfconventions.org/Data/cf-standard-names/current/src/cf-standard-name-table.xml"
     logger.info("Downloading %s", cf_names_xml_url)
 
     cf_standard_names = (
@@ -69,6 +76,20 @@ def get_cf_names():
 
 
 cf_standard_names = get_cf_names()
+
+
+if __name__ == "__main__":
+    """Download the latest CF standard names and save to local CSV cache.
+
+    Usage: python -m cde_harvester.utils
+    """
+    logging.basicConfig(level=logging.INFO)
+    cf_names_xml_url = "https://cfconventions.org/Data/cf-standard-names/current/src/cf-standard-name-table.xml"
+    logger.info("Updating CF standard names from %s", cf_names_xml_url)
+    cf_standard_names = pd.read_xml(cf_names_xml_url).sort_values(by="id")["id"].unique()
+    CF_STANDARD_NAMES_CSV.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(cf_standard_names, columns=["id"]).to_csv(CF_STANDARD_NAMES_CSV, index=False)
+    logger.info("Saved %d CF standard names to %s", len(cf_standard_names), CF_STANDARD_NAMES_CSV)
 
 # list of standard names that are supported by CDE
 supported_standard_names = flatten(cde_eov_to_standard_name.values())
