@@ -75,6 +75,7 @@ def get_cf_version_from_xml(url):
     return version_element.text.strip()
 
 
+# TODO: add pytest to verify check_cf_version detects when a newer CF standard names version is available
 def check_cf_version():
     """Warn if a newer version of CF standard names is available."""
     if not CF_STANDARD_NAMES_VERSION_FILE.exists():
@@ -96,17 +97,13 @@ def check_cf_version():
 
 
 def get_cf_names():
-    if CF_STANDARD_NAMES_CSV.exists():
-        logger.info("Loading existing CF standard names from %s", CF_STANDARD_NAMES_CSV)
-        check_cf_version()
-        return pd.read_csv(CF_STANDARD_NAMES_CSV)["id"].unique()
-
-    logger.info("Downloading %s", CF_NAMES_XML_URL)
-
-    cf_standard_names = (
-        pd.read_xml(CF_NAMES_XML_URL).sort_values(by="id")["id"].unique()
-    )
-    return cf_standard_names
+    if not CF_STANDARD_NAMES_CSV.exists():
+        raise FileNotFoundError(
+            f"CF standard names cache not found at {CF_STANDARD_NAMES_CSV}. "
+            "Run 'python -m cde_harvester.utils' to download it."
+        )
+    logger.info("Loading CF standard names from %s", CF_STANDARD_NAMES_CSV)
+    return pd.read_csv(CF_STANDARD_NAMES_CSV)["id"].unique()
 
 
 cf_standard_names = get_cf_names()
@@ -118,6 +115,7 @@ if __name__ == "__main__":
     Usage: python -m cde_harvester.utils
     """
     logging.basicConfig(level=logging.INFO)
+    check_cf_version()
     logger.info("Updating CF standard names from %s", CF_NAMES_XML_URL)
 
     with urlopen(CF_NAMES_XML_URL, timeout=30) as response:
