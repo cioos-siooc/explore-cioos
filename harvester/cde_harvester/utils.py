@@ -1,7 +1,9 @@
 import json
 import logging
 import os
+import xml.etree.ElementTree as ET
 from pathlib import Path
+from urllib.request import urlopen
 
 import pandas as pd
 
@@ -65,12 +67,12 @@ CF_NAMES_XML_URL = "https://cfconventions.org/Data/cf-standard-names/current/src
 
 def get_cf_version_from_xml(url):
     """Fetch just the version number from the CF standard names XML."""
-    import xml.etree.ElementTree as ET
-    from urllib.request import urlopen
-
     with urlopen(url, timeout=10) as response:
         tree = ET.parse(response)
-    return tree.getroot().find("version_number").text
+    version_element = tree.getroot().find("version_number")
+    if version_element is None or not version_element.text:
+        raise ValueError("CF standard names XML does not contain a version_number element")
+    return version_element.text.strip()
 
 
 def check_cf_version():
@@ -117,12 +119,22 @@ if __name__ == "__main__":
     """
     logging.basicConfig(level=logging.INFO)
     logger.info("Updating CF standard names from %s", CF_NAMES_XML_URL)
-    version = get_cf_version_from_xml(CF_NAMES_XML_URL)
-    cf_standard_names = pd.read_xml(CF_NAMES_XML_URL).sort_values(by="id")["id"].unique()
+
+    with urlopen(CF_NAMES_XML_URL, timeout=30) as response:
+        tree = ET.parse(response)
+    root = tree.getroot()
+
+    version_element = root.find("version_number")
+    if version_element is None or not version_element.text:
+        raise ValueError("CF standard names XML does not contain a version_number element")
+    version = version_element.text.strip()
+
+    names = sorted({entry.get("id") for entry in root.findall("entry") if entry.get("id")})
+
     CF_STANDARD_NAMES_CSV.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(cf_standard_names, columns=["id"]).to_csv(CF_STANDARD_NAMES_CSV, index=False)
+    pd.DataFrame(names, columns=["id"]).to_csv(CF_STANDARD_NAMES_CSV, index=False)
     CF_STANDARD_NAMES_VERSION_FILE.write_text(version)
-    logger.info("Saved %d CF standard names (version %s) to %s", len(cf_standard_names), version, CF_STANDARD_NAMES_CSV)
+    logger.info("Saved %d CF standard names (version %s) to %s", len(names), version, CF_STANDARD_NAMES_CSV)
 
 # list of standard names that are supported by CDE
 supported_standard_names = flatten(cde_eov_to_standard_name.values())
