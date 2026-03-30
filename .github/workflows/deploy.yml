@@ -17,7 +17,7 @@ jobs:
     environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: cioos-siooc/cioos-deploy-docker-compose@main
         with:
