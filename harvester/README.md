@@ -267,6 +267,14 @@ uv run python -m cde_harvester.ckan
 
 This is normally called automatically by the ERDDAP harvester to link datasets with their CKAN catalog entries.
 
+## Updating CF Standard Names
+
+The harvester uses a locally cached copy of the CF standard names table (`cde_harvester/data/cf_standard_names.csv`). To update it to the latest version from cfconventions.org:
+
+```bash
+python -m cde_harvester.utils
+```
+
 ## Troubleshooting
 
 ### Skipped Datasets
