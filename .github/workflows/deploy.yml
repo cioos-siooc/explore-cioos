@@ -30,4 +30,4 @@ jobs:
           compose_files: "docker-compose.production.yaml"
           op_secret_files: ".env.production"
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
-          docker_compose_down: "true"
+          docker_compose_down: "false"
