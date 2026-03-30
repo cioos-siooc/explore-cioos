@@ -10,7 +10,7 @@ from urllib.parse import unquote, urlparse
 import diskcache as dc
 import pandas as pd
 import requests
-
+from prefect import get_run_logger
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 from cde_harvester.dataset import Dataset
 
@@ -42,13 +42,12 @@ class ERDDAP(object):
         self.domain = urlparse(erddap_url).netloc
         self.session = requests.Session()
 
-        self.logger = self.get_logger()
+        self.logger = get_run_logger()
         self.df_all_datasets = None
         logger = self.logger
 
         erddap_url = erddap_url.rstrip("/")
         self.url = erddap_url
-
         if not re.search("^https?://", erddap_url):
             raise RuntimeError(f"URL Must start wih http or https: {erddap_url}")
 

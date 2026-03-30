@@ -20,4 +20,5 @@ COPY ./harvester/run.sh ./run.sh
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked || (echo "Lock mismatch final stage, aborting" && exit 1)
 
-CMD ["sh","run.sh"]
+#CMD ["sh","run.sh"]
+CMD ["uv", "run", "python", "-m", "cde_harvester.prefect_pipeline", "-f", "harvest_config.yaml"]

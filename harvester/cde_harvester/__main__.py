@@ -21,7 +21,7 @@ from cde_harvester.utils import cf_standard_names, supported_standard_names
 from dotenv import load_dotenv
 from sentry_sdk.crons import monitor
 from sentry_sdk.integrations.logging import LoggingIntegration
-
+from prefect import flow, get_run_logger
 load_dotenv()
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -103,36 +103,25 @@ def setup_logging(log_time, log_level, log_dir=None):
 
     return logger
 
-
+@flow(name="cde-main", log_prints=True)
 @monitor(monitor_slug="main-harvester")
 def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
+    logger = get_run_logger()
     erddap_urls = erddap_urls.split(",")
     limit_dataset_ids = None
     if dataset_ids:
         limit_dataset_ids = dataset_ids.split(",")
 
-    result = []
-
-    q = queue.Queue()
-
-    def worker():
-        while True:
-            (erddap_url, result, limit_dataset_ids, cache_requests) = q.get()
-            harvest_erddap(erddap_url, result, limit_dataset_ids, cache_requests)
-            time.sleep(1)
-            q.task_done()
-
-    # Turn-on the worker thread.
-    for x in range(max_workers):
-        threading.Thread(target=worker, daemon=True).start()
-
-    # Send thirty task requests to the worker.
-
+    # Submit tasks concurrently using Prefect
+    futures = []
     for erddap_url in erddap_urls:
-        logger.info("Adding to queue %s", erddap_url)
-        q.put((erddap_url, result, limit_dataset_ids, cache_requests))
-
-    q.join()
+        logger.info("Submitting harvest task for %s", erddap_url)
+        future = harvest_erddap.submit(erddap_url, limit_dataset_ids, cache_requests)
+        futures.append(future)
+    
+    # Wait for all tasks to complete and get results
+    logger.info("Waiting for all harvest tasks to complete")
+    result = [future.result() for future in futures]
     logger.info("All work completed")
 
     profiles = pd.DataFrame()
