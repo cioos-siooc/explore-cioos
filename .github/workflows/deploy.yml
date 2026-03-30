@@ -1,16 +1,17 @@
 name: Deploy
 
 on:
-  push:
+  workflow_run:
+    workflows: ["build_and_test"]
+    types:
+      - completed
     branches:
       - master
-      - development
-  pull_request:
-    branches:
       - development
 
 jobs:
   deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     name: Deploy to ${{ github.ref_name == 'master' && 'production' || 'development' }}
     timeout-minutes: 15
     runs-on: ubuntu-latest
