@@ -59,18 +59,50 @@ def flatten(t):
 
 
 CF_STANDARD_NAMES_CSV = Path(__file__).parent / "data" / "cf_standard_names.csv"
+CF_STANDARD_NAMES_VERSION_FILE = Path(__file__).parent / "data" / "cf_standard_names_version.txt"
+CF_NAMES_XML_URL = "https://cfconventions.org/Data/cf-standard-names/current/src/cf-standard-name-table.xml"
+
+
+def get_cf_version_from_xml(url):
+    """Fetch just the version number from the CF standard names XML."""
+    import xml.etree.ElementTree as ET
+    from urllib.request import urlopen
+
+    with urlopen(url, timeout=10) as response:
+        tree = ET.parse(response)
+    return tree.getroot().find("version_number").text
+
+
+def check_cf_version():
+    """Warn if a newer version of CF standard names is available."""
+    if not CF_STANDARD_NAMES_VERSION_FILE.exists():
+        return
+    local_version = CF_STANDARD_NAMES_VERSION_FILE.read_text().strip()
+    try:
+        remote_version = get_cf_version_from_xml(CF_NAMES_XML_URL)
+        if remote_version != local_version:
+            logger.warning(
+                "CF standard names update available: local version %s, remote version %s. "
+                "Run 'python -m cde_harvester.utils' to update.",
+                local_version,
+                remote_version,
+            )
+        else:
+            logger.info("CF standard names version %s is up to date.", local_version)
+    except Exception as e:
+        logger.debug("Could not check for CF standard names updates: %s", e)
 
 
 def get_cf_names():
     if CF_STANDARD_NAMES_CSV.exists():
         logger.info("Loading existing CF standard names from %s", CF_STANDARD_NAMES_CSV)
+        check_cf_version()
         return pd.read_csv(CF_STANDARD_NAMES_CSV)["id"].unique()
 
-    cf_names_xml_url = "https://cfconventions.org/Data/cf-standard-names/current/src/cf-standard-name-table.xml"
-    logger.info("Downloading %s", cf_names_xml_url)
+    logger.info("Downloading %s", CF_NAMES_XML_URL)
 
     cf_standard_names = (
-        pd.read_xml(cf_names_xml_url).sort_values(by="id")["id"].unique()
+        pd.read_xml(CF_NAMES_XML_URL).sort_values(by="id")["id"].unique()
     )
     return cf_standard_names
 
@@ -84,12 +116,13 @@ if __name__ == "__main__":
     Usage: python -m cde_harvester.utils
     """
     logging.basicConfig(level=logging.INFO)
-    cf_names_xml_url = "https://cfconventions.org/Data/cf-standard-names/current/src/cf-standard-name-table.xml"
-    logger.info("Updating CF standard names from %s", cf_names_xml_url)
-    cf_standard_names = pd.read_xml(cf_names_xml_url).sort_values(by="id")["id"].unique()
+    logger.info("Updating CF standard names from %s", CF_NAMES_XML_URL)
+    version = get_cf_version_from_xml(CF_NAMES_XML_URL)
+    cf_standard_names = pd.read_xml(CF_NAMES_XML_URL).sort_values(by="id")["id"].unique()
     CF_STANDARD_NAMES_CSV.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(cf_standard_names, columns=["id"]).to_csv(CF_STANDARD_NAMES_CSV, index=False)
-    logger.info("Saved %d CF standard names to %s", len(cf_standard_names), CF_STANDARD_NAMES_CSV)
+    CF_STANDARD_NAMES_VERSION_FILE.write_text(version)
+    logger.info("Saved %d CF standard names (version %s) to %s", len(cf_standard_names), version, CF_STANDARD_NAMES_CSV)
 
 # list of standard names that are supported by CDE
 supported_standard_names = flatten(cde_eov_to_standard_name.values())
