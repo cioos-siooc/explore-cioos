@@ -56,7 +56,7 @@ services:
     deploy:
       replicas: 2
     env_file:
-      - .env
+      - .env.production
     volumes:
       - downloads:/usr/src/app/download_scheduler/downloads
     restart: always
