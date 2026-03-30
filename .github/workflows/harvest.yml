@@ -5,10 +5,10 @@ on:
 
 jobs:
   harvest:
-    name: Run harvester on ${{ github.ref_name == 'main' && 'production' || 'development' }}
+    name: Run harvester on ${{ github.ref_name == 'master' && 'production' || 'development' }}
     timeout-minutes: 120
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+    environment: ${{ github.ref_name == 'master' && 'production' || 'development' }}
     steps:
       - name: Install WireGuard
         run: sudo apt-get install -y wireguard
@@ -34,7 +34,7 @@ jobs:
       - name: Run harvester
         run: |
           SSH_CMD="ssh -i ~/.ssh/deploy_key github-runner@${{ secrets.SERVER_IP }}"
-          STACK="explore-cioos-${{ github.ref_name == 'main' && 'production' || 'development' }}"
+          STACK="explore-cioos-${{ github.ref_name == 'master' && 'production' || 'development' }}"
           ${SSH_CMD} "cd /srv/services/explore-cioos && docker compose -p ${STACK} -f docker-compose.production.yaml --profile tools run -d --rm harvester"
 
       - name: Tear down WireGuard

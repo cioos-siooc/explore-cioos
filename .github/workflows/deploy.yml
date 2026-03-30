@@ -3,7 +3,7 @@ name: Deploy
 on:
   push:
     branches:
-      - main
+      - master
       - development
   pull_request:
     branches:
@@ -11,10 +11,10 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to ${{ github.ref_name == 'main' && 'production' || 'development' }}
+    name: Deploy to ${{ github.ref_name == 'master' && 'production' || 'development' }}
     timeout-minutes: 15
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+    environment: ${{ github.ref_name == 'master' && 'production' || 'development' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -29,7 +29,7 @@ jobs:
           ssh_username: "github-runner"
           ssh_key: ${{ secrets.AZURE_CO_RUNNER_PRIVATE_KEY }}
           deploy_path: "/srv/services/explore-cioos"
-          stack_name: "explore-cioos-${{ github.ref_name == 'main' && 'production' || 'development' }}"
+          stack_name: "explore-cioos-${{ github.ref_name == 'master' && 'production' || 'development' }}"
           compose_files: "docker-compose.production.yaml"
           op_secret_files: ".env.production"
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
