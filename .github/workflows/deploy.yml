@@ -20,9 +20,12 @@ jobs:
         uses: actions/checkout@v6
 
       - uses: cioos-siooc/cioos-deploy-docker-compose@main
+        if: ${{ env.SERVER_IP != '' }}
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
         with:
           wg_config: ${{ secrets.AZURE_CO_WIREGUARD_VPN_CONFIG }}
-          ssh_host: "10.0.1.6"
+          ssh_host: "${{ secrets.SERVER_IP }}"
           ssh_username: "github-runner"
           ssh_key: ${{ secrets.AZURE_CO_RUNNER_PRIVATE_KEY }}
           deploy_path: "/srv/services/explore-cioos"
