@@ -1,10 +1,7 @@
 name: Deploy
 
 on:
-  workflow_run:
-    workflows: ["Test"]
-    types:
-      - completed
+  push:
     branches:
       - master
       - development
@@ -12,15 +9,13 @@ on:
 jobs:
   deploy:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    name: Deploy to ${{ github.event.workflow_run.head_branch == 'master' && 'production' || 'development' }}
+    name: Deploy to ${{ github.ref_name == 'master' && 'production' || 'development' }}
     timeout-minutes: 15
     runs-on: ubuntu-latest
-    environment: ${{ github.event.workflow_run.head_branch == 'master' && 'production' || 'development' }}
+    environment: ${{ github.ref_name == 'master' && 'production' || 'development' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
 
       - uses: cioos-siooc/cioos-deploy-docker-compose@main
         if: ${{ env.SERVER_IP != '' }}
@@ -28,11 +23,11 @@ jobs:
           SERVER_IP: ${{ secrets.SERVER_IP }}
         with:
           wg_config: ${{ secrets.AZURE_CO_WIREGUARD_VPN_CONFIG }}
-          ssh_host: "${{ secrets.SERVER_IP }}"
+          ssh_host: 10.0.1.6
           ssh_username: "github-runner"
           ssh_key: ${{ secrets.AZURE_CO_RUNNER_PRIVATE_KEY }}
           deploy_path: "/srv/services/explore-cioos"
-          stack_name: "explore-cioos-${{ github.event.workflow_run.head_branch == 'master' && 'production' || 'development' }}"
+          stack_name: "explore-cioos-${{ github.ref_name == 'master' && 'production' || 'development' }}"
           compose_files: "docker-compose.production.yaml"
           op_secret_files: ".env.production:.env"
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
