@@ -20,7 +20,7 @@ folder:
 # use to test select datasets, eg: dataset_one,dataset_two
 dataset_ids:
 # defaults to false
-log_time:
+log_time: true
 
 # Directory to save log files (optional)
 # Use absolute path for Docker: /app/harvester/logs
