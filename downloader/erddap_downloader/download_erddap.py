@@ -27,6 +27,9 @@ FAILED = "FAILED"
 EMPTY = "EMPTY"
 IGNORED = "IGNORED"
 
+STAGE_INFO = "info"
+STAGE_TABLEDAP = "tabledap"
+
 
 def erddap_server_to_name(server):
     """
@@ -214,136 +217,155 @@ def get_datasets(json_query, output_path="", create_pdf=False):
 
     # Download data to drive, down
     for dataset in json_query["cache_filtered"]:
-        # If metadata for the dataset is not available retrieve it
-        if (
-            "erddap_metadata" not in dataset
-            or "globals" not in dataset["erddap_metadata"]
-            or "variables" not in dataset["erddap_metadata"]
-            or dataset["erddap_metadata"]["variables"] == []
-        ):
+        dataset_log = logger.bind(
+            erddap_url=dataset["erddap_url"],
+            dataset_id=dataset["dataset_id"],
+        )
 
-            harvest_erddap = cde_harvester.ERDDAP(dataset["erddap_url"])
-
-            harvester_dataset = harvest_erddap.get_dataset(dataset["dataset_id"])
-
-            dataset["erddap_metadata"] = harvester_dataset.df_variables
-
-        # Get variable list to download
-        variable_list = get_variable_list(dataset["erddap_metadata"])
-
-        # Try getting data
         df = pd.DataFrame()
         bytes_downloaded = 0
         file_size = 0
         download_status = DOWNLOADING
         download_url_list = []
         erddap_error = ""
-        for polygon_region in polygon_regions or ["all"]:
 
-            # Get download url
-            download_url = get_erddap_download_url(
-                dataset,
-                json_query["user_query"],
-                variable_list,
-                polygon_region=polygon_region,
-            )
-
-            # Add URL to the lis tof URL for this dataset
-            download_url_list += [download_url]
-
-            # If maximum size of query reached just don't download and give query url
-            # or if maximum download for this dataset is reached
+        try:
+            erddap_stage = STAGE_INFO
+            # If metadata for the dataset is not available retrieve it
             if (
-                report["total_size"] > QUERY_SIZE_LIMIT
-                or bytes_downloaded > DATASET_SIZE_LIMIT
+                "erddap_metadata" not in dataset
+                or "globals" not in dataset["erddap_metadata"]
+                or "variables" not in dataset["erddap_metadata"]
+                or dataset["erddap_metadata"]["variables"] == []
             ):
-                download_status = IGNORED
-                continue
+                harvest_erddap = cde_harvester.ERDDAP(dataset["erddap_url"])
+                harvester_dataset = harvest_erddap.get_dataset(dataset["dataset_id"])
+                dataset["erddap_metadata"] = harvester_dataset.df_variables
 
-            # Download data
-            logger.info(f"Download {download_url}")
-            data_downloaded = b""
-            with requests.get(download_url, stream=True) as response:
-                # Make sure the connection is working otherswise make a warning and send the error.
-                if response.status_code != 200:
-                    if response.status_code == 404:
-                        download_status = EMPTY
-                    else:
-                        download_status = FAILED
+            # Get variable list to download
+            variable_list = get_variable_list(dataset["erddap_metadata"])
 
-                    erddap_error = response.text
-                    logger.error(
-                        "ERDDAP downloader download error: HTTP {} - {}",
-                        response.status_code,
-                        dataset["erddap_url"],
-                        extra={
-                            "erddap_url": dataset["erddap_url"],
-                            "dataset_id": dataset["dataset_id"],
-                            "download_url": download_url,
-                            "status_code": response.status_code,
-                        }
-                    )
+            erddap_stage = STAGE_TABLEDAP
+            for polygon_region in polygon_regions or ["all"]:
+
+                # Get download url
+                download_url = get_erddap_download_url(
+                    dataset,
+                    json_query["user_query"],
+                    variable_list,
+                    polygon_region=polygon_region,
+                )
+
+                # Add URL to the list of URL for this dataset
+                download_url_list += [download_url]
+
+                # If maximum size of query reached just don't download and give query url
+                # or if maximum download for this dataset is reached
+                if (
+                    report["total_size"] > QUERY_SIZE_LIMIT
+                    or bytes_downloaded > DATASET_SIZE_LIMIT
+                ):
+                    download_status = IGNORED
                     continue
 
-                # Download data up to maximum size allowed
-                for chunk in response.iter_content(chunk_size=chunksize):
-                    # Get data downloaded
-                    bytes_downloaded += sys.getsizeof(chunk)
-                    data_downloaded += chunk
+                # Download data
+                dataset_log.info("Downloading {}", download_url)
+                data_downloaded = b""
+                with requests.get(download_url, stream=True) as response:
+                    # Make sure the connection is working otherwise make a warning and send the error.
+                    if response.status_code != 200:
+                        if response.status_code == 404:
+                            download_status = EMPTY
+                        else:
+                            download_status = FAILED
 
-                    # Stop download limit per dataset is reached
-                    if bytes_downloaded > DATASET_SIZE_LIMIT:
-                        download_status = PARTIAL
-                        print("Reached download limit per dataset!")
-                        break
+                        erddap_error = response.text[:1000]
+                        dataset_log.bind(
+                            download_url=download_url,
+                            status_code=response.status_code,
+                        ).error(
+                            "ERDDAP download error: HTTP {} for {}",
+                            response.status_code,
+                            dataset["dataset_id"],
+                        )
+                        continue
 
-            # Update how much download done
-            print(f"Downloaded {bytes_downloaded/ONE_MB:.3f} MB")
+                    # Download data up to maximum size allowed
+                    for chunk in response.iter_content(chunk_size=chunksize):
+                        # Get data downloaded
+                        bytes_downloaded += sys.getsizeof(chunk)
+                        data_downloaded += chunk
 
-            # Parse downloaded data
-            # Read CSV file with pandas
-            # Retrieve header and units on the first and second lines
-            df_temp = pd.read_csv(io.BytesIO(data_downloaded), low_memory=False)
-            units = df_temp.iloc[0].replace({pd.NA: ""}).astype(str)  # get units
-            df_temp = df_temp.iloc[1:]
+                        # Stop download limit per dataset is reached
+                        if bytes_downloaded > DATASET_SIZE_LIMIT:
+                            download_status = PARTIAL
+                            dataset_log.warning("Reached download limit per dataset")
+                            break
 
-            if polygon_region != "all":
-                # Filter data to polygon
-                df_temp = filter_polygon_region(df_temp, polygon_region)
+                # Update how much download done
+                dataset_log.info("Downloaded {:.3f} MB", bytes_downloaded / ONE_MB)
 
-            # Append data to previously downloaded one
-            df = pd.concat([df, df_temp])
-        # If download status hasn't changed, download was successfully completed
-        if download_status == DOWNLOADING:
-            download_status = COMPLETED
+                # Parse downloaded data
+                # Read CSV file with pandas
+                # Retrieve header and units on the first and second lines
+                df_temp = pd.read_csv(io.BytesIO(data_downloaded), low_memory=False)
+                units = df_temp.iloc[0].replace({pd.NA: ""}).astype(str)  # get units
+                df_temp = df_temp.iloc[1:]
 
-        if not df.empty:
-            report["empty_download"] = False
-            # Sort data along time
-            if "time" in df.columns:
-                df = df.sort_values("time")
+                if polygon_region != "all":
+                    # Filter data to polygon
+                    df_temp = filter_polygon_region(df_temp, polygon_region)
 
-            # Save to file
-            output_file_path = get_file_name_output(dataset, output_path, "csv")
-            with open(output_file_path, "w") as f:
-                # Write Header
-                f.write(",".join(list(df.columns)) + "\n")
-                f.write(",".join(units.to_list()) + "\n")
+                # Append data to previously downloaded one
+                df = pd.concat([df, df_temp])
 
-                # Write Data
-                df.to_csv(f, mode="a", header=False, index=False, lineterminator="\n")
+            # If download status hasn't changed, download was successfully completed
+            if download_status == DOWNLOADING:
+                download_status = COMPLETED
 
-            file_size = os.stat(output_file_path).st_size
-        # Generate report for each download
-        # Return download report
-        if download_status in [COMPLETED, PARTIAL]:
-            if create_pdf and dataset["ckan_url"] and dataset["ckan_id"]:
-                ckan_url = dataset["ckan_url"] + dataset["ckan_id"]
-                pdf_filename = get_file_name_output(dataset, output_path, "pdf")
-                download_pdf(ckan_url, pdf_filename)
+            if not df.empty:
+                report["empty_download"] = False
+                # Sort data along time
+                if "time" in df.columns:
+                    df = df.sort_values("time")
 
-            # Retrieve metadata
-            save_erddap_metadata(dataset, output_path=output_path)
+                # Save to file
+                output_file_path = get_file_name_output(dataset, output_path, "csv")
+                with open(output_file_path, "w") as f:
+                    # Write Header
+                    f.write(",".join(list(df.columns)) + "\n")
+                    f.write(",".join(units.to_list()) + "\n")
+
+                    # Write Data
+                    df.to_csv(f, mode="a", header=False, index=False, lineterminator="\n")
+
+                file_size = os.stat(output_file_path).st_size
+
+            # Generate report for each download
+            # Return download report
+            if download_status in [COMPLETED, PARTIAL]:
+                if create_pdf and dataset["ckan_url"] and dataset["ckan_id"]:
+                    ckan_url = dataset["ckan_url"] + dataset["ckan_id"]
+                    pdf_filename = get_file_name_output(dataset, output_path, "pdf")
+                    download_pdf(ckan_url, pdf_filename)
+
+                # Retrieve metadata
+                erddap_stage = STAGE_INFO
+                save_erddap_metadata(dataset, output_path=output_path)
+
+        except Exception as e:
+            download_status = FAILED
+            erddap_error = str(e)[:1000]
+            dataset_log.bind(erddap_stage=erddap_stage).error(
+                "Downloader failed to retrieve dataset {}",
+                erddap_stage,
+                extra={
+                    "erddap_stage": erddap_stage,
+                    "error": erddap_error,
+                    "erddap_url": dataset["erddap_url"]
+                    "dataset_id": dataset["dataset_id"],
+                }
+            )
 
         report["total_size"] += file_size
 

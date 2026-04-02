@@ -3,7 +3,6 @@ import json
 import os
 import pathlib
 import traceback
-from re import L
 
 import sentry_sdk
 from dotenv import load_dotenv
@@ -31,7 +30,7 @@ if not os.getenv("DB_HOST"):
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
     integrations=[
-        LoguruIntegration(),
+        LoguruIntegration(event_format="{message}"),
     ],
     environment=os.environ.get("ENVIRONMENT", "development"),
     traces_sample_rate=1.0,
@@ -40,7 +39,7 @@ sentry_sdk.init(
 
 
 database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
-logger.debug("Connecting to", envs["DB_HOST"])
+logger.debug("Connecting to {}", envs["DB_HOST"])
 engine = create_engine(database_link)
 
 create_pdf = False
@@ -51,7 +50,7 @@ output_folder = "./downloads"
 
 if "CREATE_PDF" in envs:
     create_pdf = envs["CREATE_PDF"] == "True"
-    logger.info("Create PDFs:", create_pdf)
+    logger.info("Create PDFs: {}", create_pdf)
 
 
 def get_a_download_job():
@@ -68,7 +67,7 @@ def get_a_download_job():
     if row:
         pk = row["pk"]
         job_id = row["job_id"]
-        logger.info("Starting job:", pk, job_id)
+        logger.info("Starting job pk={} job_id={}", pk, job_id)
         update_download_jobs(
             pk, {"status": "downloading", "time_start": "NOW()"}, session
         )
