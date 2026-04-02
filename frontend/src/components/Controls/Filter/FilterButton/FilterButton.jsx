@@ -8,6 +8,7 @@ import './styles.css'
 
 export default function FilterButton({ setOptionsSelected, optionsSelected, option }) {
   const { t, i18n } = useTranslation()
+  if (!option) return null
   const tooltipText = option[`hover_${i18n.language}`] || option.title
 
   const filterOptionSelected = !isEmpty(optionsSelected.filter(opt => option.pk === opt.pk && opt.isSelected))
