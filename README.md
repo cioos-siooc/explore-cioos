@@ -125,6 +125,10 @@ For complete local development with all services running outside Docker (advance
 
 8. See website at <http://localhost:8000>
 
+## CI/CD
+
+Pushes to `master` and `development` automatically deploy to the corresponding environment via the [Deploy workflow](.github/workflows/deploy.yml). The workflow connects to the remote server over WireGuard VPN, syncs the repository to the exact commit that triggered the run, injects secrets from 1Password, and brings up the Docker Compose stack.
+
 ## Production deployment
 
 Deploy CDE to production using Docker Compose with the production configuration file.
