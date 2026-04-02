@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from prefect import flow, get_run_logger
-from cde_harvester.__main__ import main as harvester_main, setup_logging, load_config
+from cde_harvester.__main__ import main as harvester_main, setup_logging, load_config, load_obis_dataset_ids
 from cde_harvester.redisFunctions import redisFlow
 from cde_db_loader.__main__ import main as db_loader_main
 from dotenv import load_dotenv
@@ -27,6 +27,8 @@ class PrefectCDEPipeline:
     log_dir: str
     incremental: bool
     flush_redis: bool
+    obis_dataset_ids: list
+    obis_folder: str
 
     @flow(name="Init CDE Config", log_prints=True)
     def init_config(self, config_file=None):
@@ -56,6 +58,8 @@ class PrefectCDEPipeline:
         self.log_dir = os.environ.get("HARVESTER_LOG_DIR") or config.get("log_dir")
         self.incremental = config.get("incremental", False)
         self.flush_redis = config.get("flush_redis", False)
+        self.obis_dataset_ids = load_obis_dataset_ids(config)
+        self.obis_folder = config.get("obis_folder")
 
         logger.info("CDE Pipeline initialized with configuration:")
         logger.info(f"{vars(self)}") # does this wrok?
@@ -80,7 +84,9 @@ class PrefectCDEPipeline:
                 cache_requests=self.cache_requests,
                 folder=self.folder,
                 dataset_ids=self.dataset_ids,
-                max_workers=self.max_workers
+                max_workers=self.max_workers,
+                obis_dataset_ids=self.obis_dataset_ids,
+                obis_folder=self.obis_folder,
             )
             logger.info("cde_harvester completed successfully")
         except Exception as e:

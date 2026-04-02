@@ -71,21 +71,30 @@ router.get(
       // if its a zoom level where hexes are show, return the hex shapes, otherwise return a point
       geom_column: isHexGrid ? zoomColumn : "geom",
     };
-    // not joining to cde.points to get hexagons as that could be slower
+    // Combine profiles and obis_cells so both appear on the map
     const SQL = `
-  with relevent_points as (
+  with combined as (
+    SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, :geom_column: as geom, days as record_count,
+           time_min, time_max, latitude, longitude, depth_min, depth_max
+    FROM cde.profiles
+    UNION ALL
+    SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, :geom_column: as geom, n_records as record_count,
+           time_min, time_max, latitude, longitude, depth_min, depth_max
+    FROM cde.obis_cells
+  ),
+  relevent_points as (
     ${
   isHexGrid
-    ? "SELECT :zoomPKColumn: pk,count(distinct point_pk) count,"
-    : "SELECT point_pk pk, d.platform as platform,sum(p.days)::bigint count,"
-} array_to_json(array_agg(distinct d.pk_url)) datasets,     
-      p.:geom_column: AS geom FROM cde.profiles p
+    ? "SELECT p.zoom_pk pk,count(distinct p.point_pk) count,"
+    : "SELECT p.point_pk pk, d.platform as platform,sum(p.record_count)::bigint count,"
+} array_to_json(array_agg(distinct d.pk_url)) datasets,
+      p.geom AS geom FROM combined p
         -- used for organizations filtering
         JOIN cde.datasets d
-        ON p.dataset_pk = d.pk 
+        ON p.dataset_pk = d.pk
        ${hasFilter ? "WHERE :filters" : ""}
         ${
-  isHexGrid ? "GROUP BY :zoomPKColumn:,p.:geom_column:" : "GROUP BY geom,point_pk,platform"
+  isHexGrid ? "GROUP BY p.zoom_pk,p.geom" : "GROUP BY p.geom,p.point_pk,d.platform"
 } ),
     te AS (select ST_TileEnvelope(:z, :x, :y) tile_envelope ),
     mvtgeom AS (

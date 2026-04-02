@@ -23,6 +23,7 @@ BEGIN
     CREATE TEMP TABLE IF NOT EXISTS temp_datasets (LIKE cde.datasets INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
     CREATE TEMP TABLE IF NOT EXISTS temp_profiles (LIKE cde.profiles INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
     CREATE TEMP TABLE IF NOT EXISTS temp_skipped_datasets (LIKE cde.skipped_datasets INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
+    CREATE TEMP TABLE IF NOT EXISTS temp_obis_cells (LIKE cde.obis_cells INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
 
     -- Explicitly drop all NOT NULL constraints from temp tables
     -- These are column-level constraints that EXCLUDING CONSTRAINTS doesn't remove
@@ -81,7 +82,8 @@ BEGIN
         num_columns = EXCLUDED.num_columns,
         first_eov_column = EXCLUDED.first_eov_column,
         organization_pks = EXCLUDED.organization_pks,
-        n_profiles = EXCLUDED.n_profiles;
+        n_profiles = EXCLUDED.n_profiles,
+        source_type = EXCLUDED.source_type;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -120,6 +122,33 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+-- Replace obis_cells for datasets that are in temp_datasets
+-- Deletes old obis_cells for those datasets, then inserts new ones from temp_obis_cells
+CREATE OR REPLACE FUNCTION replace_obis_cells_from_temp() RETURNS VOID AS $$
+BEGIN
+    -- Delete old obis_cells for updated datasets
+    DELETE FROM cde.obis_cells c
+    USING temp_datasets td
+    WHERE c.dataset_id = td.dataset_id
+      AND c.erddap_url = td.erddap_url;
+
+    -- Insert new obis_cells from temp table (only if temp_obis_cells has rows)
+    IF EXISTS (SELECT 1 FROM temp_obis_cells LIMIT 1) THEN
+        INSERT INTO cde.obis_cells (erddap_url, dataset_id, latitude, longitude, scientific_names, n_records, time_min, time_max, depth_min, depth_max)
+        SELECT erddap_url, dataset_id, latitude, longitude, scientific_names, n_records, time_min, time_max, depth_min, depth_max
+        FROM temp_obis_cells
+        ON CONFLICT (erddap_url, dataset_id, latitude, longitude) DO UPDATE SET
+            scientific_names = EXCLUDED.scientific_names,
+            n_records = EXCLUDED.n_records,
+            time_min = EXCLUDED.time_min,
+            time_max = EXCLUDED.time_max,
+            depth_min = EXCLUDED.depth_min,
+            depth_max = EXCLUDED.depth_max;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+
 -- Main incremental processing function
 -- Orchestrates the entire incremental update workflow
 CREATE OR REPLACE FUNCTION process_incremental_update() RETURNS VOID AS $$
@@ -136,17 +165,21 @@ BEGIN
     -- 4. Replace profiles (delete old, insert new)
     PERFORM replace_profiles_from_temp();
 
-    -- 5. UPSERT skipped datasets
+    -- 5. Replace obis_cells (delete old, insert new)
+    PERFORM replace_obis_cells_from_temp();
+
+    -- 6. UPSERT skipped datasets
     PERFORM upsert_skipped_datasets_from_temp();
 
-    -- 6. Run processing functions to populate remaining fields
+    -- 7. Run processing functions to populate remaining fields
     PERFORM ckan_process();
     PERFORM profile_process();
+    PERFORM obis_process();
 
-    -- 7. Create hexes for all data
+    -- 8. Create hexes for all data
     PERFORM create_hexes();
 
-    -- 8. Restore constraints
+    -- 9. Restore constraints
     PERFORM set_constraints();
 END;
 $$ LANGUAGE plpgsql;

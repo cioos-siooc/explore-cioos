@@ -77,9 +77,18 @@ router.get(
     const filters = createDBFilter(req.query);
     const hasFilter = filters.toSQL().sql;
     const sql = `
-        WITH records AS (
-        SELECT hex_zoom_0, hex_zoom_1, point_pk, days
-        FROM cde.profiles p
+        WITH combined AS (
+        SELECT hex_zoom_0, hex_zoom_1, point_pk, dataset_pk, days as record_count,
+               time_min, time_max, latitude, longitude, depth_min, depth_max
+        FROM cde.profiles
+        UNION ALL
+        SELECT hex_zoom_0, hex_zoom_1, point_pk, dataset_pk, n_records as record_count,
+               time_min, time_max, latitude, longitude, depth_min, depth_max
+        FROM cde.obis_cells
+        ),
+        records AS (
+        SELECT hex_zoom_0, hex_zoom_1, point_pk, record_count as days
+        FROM combined p
         JOIN cde.datasets d
         ON p.dataset_pk = d.pk
         ${hasFilter ? "WHERE :filters" : ""}

@@ -5,10 +5,12 @@ description = "CIOOS Explorer"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "db-loader",
     "download-scheduler",
     "harvester",
 ]
 
 [tool.uv.sources]
+db-loader = { path = "db-loader", editable = true }
 download-scheduler = { path = "download_scheduler" }
-harvester = { path = "harvester" }
+harvester = { path = "harvester", editable = true }

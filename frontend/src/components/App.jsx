@@ -308,23 +308,28 @@ export default function App() {
     fetch(`${server}/platforms`)
       .then((response) => response.json())
       .then((platforms) => {
+        console.debug('[App] /platforms response:', platforms)
+        const missing = platforms.filter(p => !platformsJSONfile.find(m => m.label_en === p))
+        if (missing.length) console.warn('[App] /platforms - no metadata found in platformsJSONfile for:', missing)
         setPlatformsSelected(
           platforms.map((platform, index) => {
             const platformMetadata = platformsJSONfile.find(
               (p) => p.label_en === platform
             )
+            if (!platformMetadata) console.error('[App] /platforms - missing metadata for platform:', platform)
 
             return {
               title: platform,
               pk: platform,
               isSelected: platformsFromURL.includes(platform),
-              hover_en: platformMetadata.definition_en,
-              hover_fr: platformMetadata.definition_fr
+              hover_en: platformMetadata?.definition_en,
+              hover_fr: platformMetadata?.definition_fr
             }
           })
         )
       })
       .catch((error) => {
+        console.error('[App] /platforms fetch failed:', error)
         throw error
       })
 
@@ -333,21 +338,25 @@ export default function App() {
     fetch(`${server}/oceanVariables`)
       .then((response) => response.json())
       .then((eovs) => {
+        console.debug('[App] /oceanVariables response:', eovs)
+        if (!eovs.length) console.warn('[App] /oceanVariables returned empty array - pointQuery will never fire!')
         setEovsSelected(
           eovs.map((eov, index) => {
             const eovMetadata = eovsJSONfile.eovs.find((e) => e.value === eov)
+            if (!eovMetadata) console.error('[App] /oceanVariables - no metadata in eovs.json for EOV:', eov)
 
             return {
               title: eov,
               isSelected: eovsFromURL.includes(eov),
               pk: index,
-              hover_en: eovMetadata['definition EN'],
-              hover_fr: eovMetadata['definition FR']
+              hover_en: eovMetadata?.['definition EN'],
+              hover_fr: eovMetadata?.['definition FR']
             }
           })
         )
       })
       .catch((error) => {
+        console.error('[App] /oceanVariables fetch failed:', error)
         throw error
       })
 
@@ -379,6 +388,7 @@ export default function App() {
     fetch(`${server}/datasets`)
       .then((response) => response.json())
       .then((datasetsR) => {
+        console.debug('[App] /datasets response count:', datasetsR.length)
         if (isEmpty(totalNumberOfDatasets)) setTotalNumberOfDatasets(datasetsR.length)
         setDatasetsSelected(
           datasetsR.map((dataset) => {

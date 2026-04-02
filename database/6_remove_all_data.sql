@@ -10,6 +10,7 @@ CREATE OR REPLACE FUNCTION remove_all_data() RETURNS VOID AS $$
 BEGIN
 
 DELETE FROM cde.profiles;
+DELETE FROM cde.obis_cells;
 DELETE FROM cde.datasets;
 DELETE FROM cde.organizations;
 DELETE FROM cde.points;
