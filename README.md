@@ -1,6 +1,7 @@
 # CDE - CIOOS Exploration and Data Discovery
 
-[![Test](https://github.com/HakaiInstitute/cde/actions/workflows/build_and_test.yaml/badge.svg)](https://github.com/HakaiInstitute/cde/actions/workflows/build_and_test.yaml)
+[![Test](https://github.com/cioos-siooc/explore-cioos/actions/workflows/build_and_test.yml/badge.svg)](https://github.com/cioos-siooc/explore-cioos/actions/workflows/build_and_test.yml)
+[![Deploy](https://github.com/cioos-siooc/explore-cioos/actions/workflows/deploy.yml/badge.svg)](https://github.com/cioos-siooc/explore-cioos/actions/workflows/deploy.yml)
 [![Last Harvest](https://github.com/cioos-siooc/explore-cioos/actions/workflows/harvest.yml/badge.svg)](https://github.com/cioos-siooc/explore-cioos/actions/workflows/harvest.yml)
 
 ## Testing a dataset
