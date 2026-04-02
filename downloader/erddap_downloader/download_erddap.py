@@ -261,7 +261,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
                 continue
 
             # Download data
-            print(f"Download {download_url}")
+            logger.info(f"Download {download_url}")
             data_downloaded = b""
             with requests.get(download_url, stream=True) as response:
                 # Make sure the connection is working otherswise make a warning and send the error.
