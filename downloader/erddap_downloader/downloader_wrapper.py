@@ -1,4 +1,5 @@
 import os
+import shutil
 
 from erddap_downloader import download_erddap
 from erddap_downloader.zip_folder import zip_folder
@@ -35,7 +36,7 @@ def run_download_query(download_query, output_folder, create_pdf=False):
     zip_folder(temp_folder, zip_full_path)
 
     # Delete temporary folder
-    os.system("rm -rf {}".format(temp_folder))
+    shutil.rmtree(temp_folder)
 
     # Output run report json
     query_report["zip_file_size"] = os.stat(zip_full_path).st_size

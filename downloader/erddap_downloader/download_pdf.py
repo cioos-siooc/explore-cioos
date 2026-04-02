@@ -1,21 +1,14 @@
-import os
-import traceback
-import warnings
-
 import pdfkit
+from loguru import logger
 
 
 def download_pdf(url, filename):
-    print("creating pdf file ", filename)
+    logger.info("Creating PDF file {}", filename)
 
     config = pdfkit.configuration()
 
     try:
-        if pdfkit.from_url(url, filename, configuration=config):
-            return 0
-        else:
+        if not pdfkit.from_url(url, filename, configuration=config):
             raise Exception("Unable to download file")
     except Exception as e:
-        print(e)
-        print(traceback.format_exc())
-        warnings.warn("Error creating PDF")
+        logger.error("Error creating PDF from {}: {}", url, e)
