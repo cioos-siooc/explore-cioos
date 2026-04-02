@@ -10,6 +10,7 @@ import Loading from './components/Controls/Loading/Loading.jsx'
 import translationEN from './locales/en/translation.json'
 import translationFR from './locales/fr/translation.json'
 import App from './components/App.jsx'
+import HarvestResults from './components/Controls/HarvestResults/HarvestResults.jsx'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
 const resources = {
@@ -47,6 +48,7 @@ ReactDOM.render(
     <BrowserRouter basename={process.env.BASE_URL}>
       <Routes>
         <Route path='/' element={<App />} />
+        <Route path='/harvest-results' element={<HarvestResults />} />
       </Routes>
     </BrowserRouter>
     ,{/* <App /> */}

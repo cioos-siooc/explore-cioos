@@ -1,0 +1,440 @@
+.harvest-results-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px;
+  background: white;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.harvest-results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 3px solid #52A79B;
+  padding-bottom: 10px;
+}
+
+.harvest-results-header h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  color: #52A79B;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.language-selector {
+  display: flex;
+  gap: 5px;
+  background: #f0f8f7;
+  border-radius: 6px;
+  padding: 4px;
+}
+
+.lang-button {
+  background: transparent;
+  border: none;
+  padding: 6px 16px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #52A79B;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.lang-button:hover {
+  background: rgba(82, 167, 155, 0.1);
+}
+
+.lang-button.active {
+  background: #52A79B;
+  color: white;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 32px;
+  cursor: pointer;
+  color: #52A79B;
+  line-height: 1;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.close-button:hover {
+  color: #3d7f75;
+  transform: scale(1.1);
+}
+
+.harvest-summary {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 20px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f0f8f7 0%, #e6f3f1 100%);
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(82, 167, 155, 0.1);
+}
+
+.summary-stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stat-label {
+  font-weight: 600;
+  color: #555;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #52A79B;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.summary-stat.success .stat-value {
+  color: #52A79B;
+}
+
+.summary-stat.failed .stat-value {
+  color: #e74c3c;
+}
+
+.harvest-results-table {
+  flex: 1;
+  overflow: auto;
+}
+
+.status-badge {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-family: 'Montserrat', sans-serif;
+  letter-spacing: 0.5px;
+}
+
+.status-success {
+  background: #d1f2eb;
+  color: #52A79B;
+  border: 1px solid #52A79B;
+}
+
+.status-failed {
+  background: #fadbd8;
+  color: #c0392b;
+  border: 1px solid #e74c3c;
+}
+
+.erddap-link {
+  color: #52A79B;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.erddap-link:hover {
+  color: #3d7f75;
+  text-decoration: underline;
+}
+
+.error-cell {
+  padding: 4px 0;
+  max-width: 100%;
+}
+
+.error-code {
+  font-weight: 700;
+  color: #c0392b;
+  margin-bottom: 4px;
+  font-family: 'Montserrat', sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.error-details {
+  margin-top: 8px;
+}
+
+.error-details summary {
+  cursor: pointer;
+  color: #52A79B;
+  font-size: 12px;
+  user-select: none;
+  font-weight: 600;
+  font-family: 'Montserrat', sans-serif;
+  transition: all 0.2s ease;
+}
+
+.error-details summary:hover {
+  color: #3d7f75;
+  text-decoration: underline;
+}
+
+.error-trace {
+  margin-top: 8px;
+  padding: 12px;
+  background: #f8f9fa;
+  border: 1px solid #52A79B;
+  border-radius: 6px;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: 'Courier New', Courier, monospace;
+  line-height: 1.5;
+}
+
+.loading-message,
+.error-message {
+  padding: 40px;
+  text-align: center;
+  font-size: 16px;
+  color: #666;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.error-message {
+  color: #e74c3c;
+  font-weight: 600;
+}
+
+/* Filter section */
+.filter-section {
+  margin-bottom: 20px;
+}
+
+.dropdown-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 15px;
+  align-items: flex-end;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 150px;
+}
+
+.filter-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.filter-dropdown {
+  padding: 8px 12px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  /* border: 2px solid #52A79B; */
+  border-radius: 8px;
+  background: white;
+  color: #333;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  max-width: 200px;
+}
+
+.filter-dropdown:focus {
+  border-color: #3d7f75;
+  box-shadow: 0 0 0 3px rgba(82, 167, 155, 0.1);
+}
+
+.filter-dropdown:hover {
+  border-color: #3d7f75;
+}
+
+.clear-all-filters-button {
+  padding: 8px 16px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.clear-all-filters-button:hover {
+  background: #c0392b;
+}
+
+.text-filter-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.text-filter-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.custom-filter-input {
+  width: 100%;
+  padding: 12px 45px 12px 15px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  /* border: 2px solid #52A79B; */
+  border-radius: 8px;
+  outline: none;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.custom-filter-input:focus {
+  border-color: #3d7f75;
+  box-shadow: 0 0 0 3px rgba(82, 167, 155, 0.1);
+}
+
+.custom-filter-input::placeholder {
+  color: #999;
+}
+
+.clear-filter-button {
+  position: absolute;
+  right: 10px;
+  background: #52A79B;
+  color: white;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  line-height: 1;
+  padding: 0;
+}
+
+.clear-filter-button:hover {
+  background: #3d7f75;
+  transform: scale(1.1);
+}
+
+.filter-help-text {
+  margin: 0;
+  font-size: 12px;
+  color: #777;
+  font-family: 'Montserrat', sans-serif;
+  font-style: italic;
+}
+
+/* Override DataTable styles for better integration */
+.harvest-results-table .rdt_TableWrapper {
+  border: 2px solid #52A79B;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(82, 167, 155, 0.1);
+}
+
+.harvest-results-table .rdt_Table {
+  font-size: 13px;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.harvest-results-table .rdt_TableHead {
+  background: linear-gradient(135deg, #52A79B 0%, #3d7f75 100%);
+  color: white;
+  font-weight: 600;
+}
+
+.harvest-results-table .rdt_TableHeadRow {
+  background: transparent;
+  border-bottom: 2px solid #3d7f75;
+  min-height: 52px;
+}
+
+.harvest-results-table .rdt_TableCol {
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+  font-family: 'Montserrat', sans-serif;
+  padding: 12px 8px;
+}
+
+.harvest-results-table .rdt_TableRow {
+  border-bottom: 1px solid #e0e0e0;
+  transition: background-color 0.2s ease;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.harvest-results-table .rdt_TableRow:hover {
+  background-color: #f0f8f7;
+}
+
+.harvest-results-table .rdt_TableCell {
+  font-size: 13px;
+  padding: 12px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Ensure text overflow with ellipsis for all cells */
+.harvest-results-table .rdt_TableCell>div {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Allow error details to wrap */
+.harvest-results-table .rdt_TableCell .error-cell {
+  white-space: normal;
+}
+
+/* Pagination styling */
+.harvest-results-table .rdt_Pagination {
+  border-top: 2px solid #52A79B;
+  background: #f8f9fa;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.harvest-results-table .rdt_Pagination button {
+  color: #52A79B;
+  fill: #52A79B;
+}
+
+.harvest-results-table .rdt_Pagination button:hover:not(:disabled) {
+  background-color: #e6f3f1;
+}
+
+.harvest-results-table .rdt_Pagination button:disabled {
+  opacity: 0.4;
+}

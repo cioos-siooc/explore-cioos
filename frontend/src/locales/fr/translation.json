@@ -213,5 +213,30 @@
   "datasetsTableDownloadModalDatasetCheckboxTooltip": "Télécharger à partir de l'explorateur de données CIOOS",
   "datasetTableDownloadModalCDEDownloadableColumnNameTooltip": "Les demandes de moins de 1 Go de données à partir d'un ensemble de données peuvent être téléchargées via CDE",
   "datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip": "Les demandes de plus de 1 Go de données à partir d'un ensemble de données peuvent être téléchargées via le lien ERDDAP™ fourni",
-  "datasetTableDownloadModalExternalDownloadColumnName": "Téléchargement externe"
+  "datasetTableDownloadModalExternalDownloadColumnName": "Téléchargement externe",
+  "harvestResults": {
+    "title": "Résumé du moissonneur",
+    "datasetId": "ID de l'ensemble de données",
+    "datasetTitle": "Titre",
+    "erddapUrl": "URL ERDDAP",
+    "cdmDataType": "cdm_data_type",
+    "platform": "Plateforme",
+    "profileCount": "Profils",
+    "status": "Statut",
+    "error": "Détails de l'erreur",
+    "total": "Ensembles de données totaux",
+    "successful": "Réussis",
+    "failed": "Échoués",
+    "loading": "Chargement des résultats de la récolte...",
+    "errorLoading": "Erreur lors du chargement des résultats de la récolte",
+    "showDetails": "Afficher la trace complète de l'erreur",
+    "filterPlaceholder": "Rechercher dans toutes les colonnes...",
+    "allValues": "Tous",
+    "clearFilters": "Effacer tous les filtres",
+    "filterHelpText": "Syntaxe colonne:valeur (ex: status:failed, erddap:pac). Combiner avec AND/OR (ex: status:failed AND platform:mooring). Colonnes: id, erddap, title, cdm, platform, status, error",
+    "statusValues": {
+      "success": "Succès",
+      "failed": "Échoué"
+    }
+  }
 }
