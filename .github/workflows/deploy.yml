@@ -20,7 +20,7 @@ jobs:
       - uses: cioos-siooc/cioos-deploy-docker-compose@main
         with:
           wg_config: ${{ secrets.AZURE_CO_WIREGUARD_VPN_CONFIG }}
-          ssh_host: ${{ env.SERVER_IP }}
+          ssh_host: ${{ vars.SERVER_IP }}
           ssh_username: "github-runner"
           ssh_key: ${{ secrets.AZURE_CO_RUNNER_PRIVATE_KEY }}
           deploy_path: "/srv/services/explore-cioos"
