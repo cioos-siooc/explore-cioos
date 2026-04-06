@@ -129,7 +129,7 @@ export function createDataFilterQueryString(query) {
       .map((org) => org.pk) // getting the pks of the selected organizations using the orgs title to access the pk
       .join() // create the comma delimited list of org pks
   }
-  const { startDepth, endDepth, startDate, endDate } = queryWithoutDefaults
+  const { startDepth, endDepth, startDate, endDate, showObis } = queryWithoutDefaults
 
   const apiMappedQuery = {
     // These properties are specified by the API's schema
@@ -140,7 +140,8 @@ export function createDataFilterQueryString(query) {
     timeMin: startDate,
     timeMax: endDate,
     depthMin: startDepth,
-    depthMax: endDepth
+    depthMax: endDepth,
+    includeObis: showObis === false ? 'false' : ''
   }
 
   return objectToURL(apiMappedQuery)

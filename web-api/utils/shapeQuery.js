@@ -8,6 +8,7 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
 
   const {
     timeMin = null, timeMax = null, depthMin = null, depthMax = null,
+    includeObis = 'true',
   } = query;
 
   const sql = `WITH combined AS (
@@ -15,11 +16,11 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                profile_id, timeseries_id,
                latitude, longitude, point_pk, geom
         FROM cde.profiles
-        UNION ALL
+        ${includeObis !== 'false' ? `UNION ALL
         SELECT dataset_pk, time_min, time_max, depth_min, depth_max, 0 as records_per_day,
                NULL as profile_id, NULL as timeseries_id,
                latitude, longitude, point_pk, geom
-        FROM cde.obis_cells
+        FROM cde.obis_cells` : ''}
   ),
   sub AS
         (SELECT   d.pk,

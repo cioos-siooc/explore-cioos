@@ -251,11 +251,11 @@ def main():
     try:
         if args.file:
             pipeline.init_config(config_file=args.file)
-        if args.deployment == "prod":
-            deploy(pipeline)
         else:
             logger.error("No config file provided. Use --config-file to specify the path to harvest_config.yaml")
             sys.exit(1)
+        if args.deployment == "prod":
+            deploy(pipeline)
     except Exception as e:
         logger.error(f"CDE Pipeline failed: {e}", exc_info=True)
         sys.exit(1)

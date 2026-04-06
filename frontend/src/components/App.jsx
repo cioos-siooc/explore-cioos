@@ -31,9 +31,11 @@ import Filter from './Controls/Filter/Filter.jsx'
 import MultiCheckboxFilter from './Controls/Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx'
 import TimeSelector from './Controls/Filter/TimeSelector/TimeSelector.jsx'
 import DepthSelector from './Controls/Filter/DepthSelector/DepthSelector.jsx'
+import QuestionIconTooltip from './Controls/QuestionIconTooltip/QuestionIconTooltip.jsx'
 import ErrorBoundary from './ErrorBoundary/ErrorBoundary.jsx'
 import EnglishLogo from './Images/CIOOSNationalLogoBlackEnglish.svg'
 import FrenchLogo from './Images/CIOOSNationalLogoBlackFrench.svg'
+import ObisIcon from './Images/obis_icon.png'
 import {
   defaultEovsSelected,
   defaultOrgsSelected,
@@ -97,7 +99,8 @@ export default function App() {
     eovsSelected: defaultEovsSelected,
     orgsSelected: defaultOrgsSelected,
     datasetsSelected: defaultDatatsetsSelected,
-    platformsSelected: defaultPlatformsSelected
+    platformsSelected: defaultPlatformsSelected,
+    showObis: true
   }
   const [query, setQuery] = useState(defaultQuery)
   const [showModal, setShowModal] = useState(false)
@@ -176,6 +179,9 @@ export default function App() {
     '(m)'
   )
 
+  // OBIS toggle
+  const [showObis, setShowObis] = useState(true)
+
   // Filter open state
   const [openFilter, setOpenFilter] = useState()
 
@@ -198,7 +204,8 @@ export default function App() {
       eovsSelected,
       orgsSelected,
       datasetsSelected,
-      platformsSelected
+      platformsSelected,
+      showObis
     })
   }, [
     debouncedStartDate,
@@ -208,7 +215,8 @@ export default function App() {
     debouncedEovsSelected,
     debouncedOrgsSelected,
     debouncedDatasetsSelected,
-    debouncedPlatformsSelected
+    debouncedPlatformsSelected,
+    showObis
   ])
 
   function createOptionSubset (searchTerms, allOptions) {
@@ -636,6 +644,7 @@ export default function App() {
       })
     )
     setPolygon()
+    setShowObis(true)
   }
 
   return (
@@ -889,6 +898,22 @@ export default function App() {
             setEndDepth={setEndDepth}
           />
         </Filter>
+        <div className='filter'>
+          <div
+            className={`filterHeader ${showObis ? 'active' : ''}`}
+            onClick={() => setShowObis(!showObis)}
+          >
+            <QuestionIconTooltip
+              tooltipText={t('obisToggleTooltip')}
+              tooltipPlacement='bottom'
+              size={20}
+            />
+            <img src={ObisIcon} alt='OBIS' style={{ height: '20px', width: '20px', alignSelf: 'center' }} />
+            <div className='badgeTitle'>
+              {t('obisToggleLabel')}
+            </div>
+          </div>
+        </div>
         <button
           className='resetFiltersButton'
           title={t('resetFiltersButtonTooltipText')}

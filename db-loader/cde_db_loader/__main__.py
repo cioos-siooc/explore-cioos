@@ -147,7 +147,7 @@ def main(folder, incremental=False):
     logger.info("Reading %s, %s", datasets_file, skipped_datasets_file)
 
     datasets = pd.read_csv(datasets_file)
-    profiles = pd.read_csv(profiles_file) if os.path.isfile(profiles_file) else pd.DataFrame()
+    profiles = pd.read_csv(profiles_file) if os.path.isfile(profiles_file) and os.path.getsize(profiles_file) > 1 else pd.DataFrame()
     skipped_datasets = pd.read_csv(skipped_datasets_file)
 
     obis_cells = None
