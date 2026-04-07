@@ -24,14 +24,6 @@ CREATE TABLE hexes_zoom_1 (
 
  
 
--- The harvester will skip datasets in this table
-DROP TABLE IF EXISTS skipped_datasets;
-CREATE TABLE skipped_datasets (
-    pk serial PRIMARY KEY,
-    dataset_id text,
-    erddap_url text
-);
-
 -- ERDDAP Datasets
 DROP TABLE IF EXISTS datasets;
 CREATE TABLE datasets (
@@ -84,17 +76,9 @@ CREATE TABLE points (
     hex_1_pk integer
 );
 
-CREATE INDEX
-  ON points
-  USING GIST (geom);
-
-CREATE INDEX hex_zoom_0
-ON cde.points
-USING GIST (geom);
-
-CREATE INDEX hex_zoom_1
-ON cde.points
-USING GIST (geom);
+CREATE INDEX ON points USING GIST (geom);
+CREATE INDEX hex_zoom_0 ON cde.points USING GIST (hex_zoom_0);
+CREATE INDEX hex_zoom_1 ON cde.points USING GIST (hex_zoom_1);
 
 
 -- profiles/timeseries per dataset
@@ -159,13 +143,15 @@ CREATE TABLE obis_cells (
     hex_0_pk integer,
     hex_1_pk integer,
     point_pk integer,
-    UNIQUE(erddap_url, dataset_id, latitude, longitude)
+    UNIQUE(erddap_url, dataset_id, latitude, longitude),
+    FOREIGN KEY (dataset_pk) REFERENCES datasets(pk)
 );
 
 CREATE INDEX ON obis_cells USING GIST (geom);
 CREATE INDEX ON obis_cells USING GIST (hex_zoom_0);
 CREATE INDEX ON obis_cells USING GIST (hex_zoom_1);
 CREATE INDEX ON obis_cells (erddap_url, dataset_id);
+CREATE INDEX ON obis_cells (latitude, longitude);
 
 
 --
