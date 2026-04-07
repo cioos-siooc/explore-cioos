@@ -14,6 +14,10 @@ BEGIN
 insert into cde.organizations (name)
 select distinct unnest(organizations) from cde.datasets ON CONFLICT DO NOTHING;
 
+-- Ensure organizations_lookup is populated before setting pk_url
+INSERT INTO cde.organizations_lookup (name)
+SELECT name FROM cde.organizations ON CONFLICT DO NOTHING;
+
 UPDATE cde.organizations
 SET pk_url=organizations_lookup.pk
 FROM cde.organizations_lookup

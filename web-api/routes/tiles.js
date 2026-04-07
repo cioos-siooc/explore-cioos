@@ -71,16 +71,17 @@ router.get(
       // if its a zoom level where hexes are show, return the hex shapes, otherwise return a point
       geom_column: isHexGrid ? zoomColumn : "geom",
     };
+    const includeObis = req.query.includeObis !== 'false';
     // Combine profiles and obis_cells so both appear on the map
     const SQL = `
   with combined as (
     SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, :geom_column: as geom, days as record_count,
            time_min, time_max, latitude, longitude, depth_min, depth_max
     FROM cde.profiles
-    UNION ALL
+    ${includeObis ? `UNION ALL
     SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, :geom_column: as geom, n_records as record_count,
            time_min, time_max, latitude, longitude, depth_min, depth_max
-    FROM cde.obis_cells
+    FROM cde.obis_cells` : ''}
   ),
   relevent_points as (
     ${
