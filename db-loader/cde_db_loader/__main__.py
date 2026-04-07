@@ -292,19 +292,23 @@ def main(folder, incremental=False):
 
                 t = time.time()
                 r = transaction.execute(text("""
-                    WITH ins AS (
-                        INSERT INTO cde.points (geom)
-                        SELECT ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)
-                        FROM (SELECT DISTINCT latitude, longitude FROM cde.obis_cells) sub
-                        RETURNING pk,
-                            round(ST_Y(ST_Transform(geom, 4326))::numeric, 8) AS latitude,
-                            round(ST_X(ST_Transform(geom, 4326))::numeric, 8) AS longitude
+                    INSERT INTO cde.points (geom)
+                    SELECT ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)
+                    FROM (SELECT DISTINCT latitude, longitude FROM cde.obis_cells) sub
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM cde.points p
+                        WHERE p.geom = ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)
                     )
-                    UPDATE cde.obis_cells c SET point_pk = ins.pk
-                    FROM ins
-                    WHERE c.latitude = ins.latitude AND c.longitude = ins.longitude
                 """))
-                logger.info("  inserted points and linked point_pk: %d rows (%.1fs)", r.rowcount, time.time() - t)
+                logger.info("  inserted points: %d rows (%.1fs)", r.rowcount, time.time() - t)
+
+                t = time.time()
+                r = transaction.execute(text("""
+                    UPDATE cde.obis_cells c SET point_pk = p.pk
+                    FROM cde.points p
+                    WHERE p.geom = ST_Transform(ST_SetSRID(ST_MakePoint(c.longitude, c.latitude), 4326), 3857)
+                """))
+                logger.info("  linked point_pk: %d rows (%.1fs)", r.rowcount, time.time() - t)
 
                 t = time.time()
                 r = transaction.execute(text("""

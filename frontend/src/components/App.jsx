@@ -300,10 +300,12 @@ export default function App() {
       eovs,
       lat,
       lon,
-      zoom
+      zoom,
+      includeObis
     } = filtersFromURL
 
     if (lat || lon || zoom) setMapView({ lat, lon, zoom })
+    if (includeObis === 'false') setShowObis(false)
     if (timeMin) setStartDate(timeMin)
     if (timeMax) setEndDate(timeMax)
     if (depthMin && Number.parseInt(depthMin) > 0) setStartDepth(Number.parseInt(depthMin))
