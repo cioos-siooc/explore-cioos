@@ -24,12 +24,15 @@ FROM cde.organizations_lookup
 WHERE organizations_lookup.name=organizations.name;
 
 -- convert organization list of names into list of pks
-with orgs as(
-select d.pk,(
-select array_remove(array_agg((select case when name=any(organizations) then pk_url end)),null) from cde.organizations) as asdf from cde.datasets d)
-update cde.datasets set organization_pks=orgs.asdf
-from orgs
-where orgs.pk=datasets.pk;
+UPDATE cde.datasets d
+SET organization_pks = sub.pks
+FROM (
+    SELECT d.pk, array_agg(o.pk_url) AS pks
+    FROM cde.datasets d
+    JOIN cde.organizations o ON o.name = ANY(d.organizations)
+    GROUP BY d.pk
+) sub
+WHERE d.pk = sub.pk;
 
 
   END;
