@@ -11,28 +11,28 @@
 CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
   BEGIN
 
-  DELETE FROM cde.hexes_zoom_0; 
+  DELETE FROM cde.hexes_zoom_0;
   DELETE FROM cde.hexes_zoom_1;
 
   UPDATE cde.points
   SET hex_zoom_0 = hexes.geom
   FROM ST_HexagonGrid(
-        100000,
-        st_setsrid(ST_EstimatedExtent('cde','points', 'geom'),3857)
-    ) hexes
+    100000,
+    ST_SetSRID(ST_EstimatedExtent('cde', 'points', 'geom'), 3857)
+  ) hexes
   WHERE ST_Intersects(points.geom, hexes.geom);
 
   -- this takes a few mins
   UPDATE cde.points
   SET hex_zoom_1 = hexes.geom
   FROM ST_HexagonGrid(
-        10000,
-        st_setsrid(ST_EstimatedExtent('cde','points', 'geom'),3857)
-    ) hexes
+    10000,
+    ST_SetSRID(ST_EstimatedExtent('cde', 'points', 'geom'), 3857)
+  ) hexes
   WHERE ST_Intersects(points.geom, hexes.geom);
 
-  INSERT INTO cde.hexes_zoom_0 (geom) select distinct hex_zoom_0 from cde.points;
-  INSERT INTO cde.hexes_zoom_1 (geom) select distinct hex_zoom_1 from cde.points;
+  INSERT INTO cde.hexes_zoom_0 (geom) SELECT DISTINCT hex_zoom_0 FROM cde.points;
+  INSERT INTO cde.hexes_zoom_1 (geom) SELECT DISTINCT hex_zoom_1 FROM cde.points;
 
   UPDATE cde.points
   SET hex_0_pk = hexes_zoom_0.pk
@@ -45,13 +45,16 @@ CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
   WHERE hexes_zoom_1.geom = points.hex_zoom_1;
 
   UPDATE cde.profiles
-  SET hex_0_pk = points.hex_0_pk, hex_1_pk = points.hex_1_pk, hex_zoom_0=points.hex_zoom_0, hex_zoom_1=points.hex_zoom_1
+  SET hex_0_pk = points.hex_0_pk,
+      hex_1_pk = points.hex_1_pk,
+      hex_zoom_0 = points.hex_zoom_0,
+      hex_zoom_1 = points.hex_zoom_1
   FROM cde.points
   WHERE points.pk = profiles.point_pk;
 
   UPDATE cde.obis_cells
   SET hex_0_pk = points.hex_0_pk,
-      hex_1_pk  = points.hex_1_pk,
+      hex_1_pk = points.hex_1_pk,
       hex_zoom_0 = points.hex_zoom_0,
       hex_zoom_1 = points.hex_zoom_1
   FROM cde.points
