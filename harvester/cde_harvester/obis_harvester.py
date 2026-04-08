@@ -189,7 +189,6 @@ class OBISHarvester(BaseHarvester):
             scientific_names=("scientificName", lambda x: sorted(x.dropna().unique().tolist())),
         ).reset_index(drop=True)
 
-        cells["erddap_url"] = OBIS_SOURCE_URL
         cells["dataset_id"] = dataset_id
 
         cells["time_min"] = pd.to_datetime(cells["time_min"], errors="coerce", utc=True)

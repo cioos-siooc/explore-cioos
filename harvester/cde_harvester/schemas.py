@@ -39,7 +39,6 @@ class ObisCellSchema(pa.DataFrameModel):
     Mirrors cde.obis_cells in the database.
     """
 
-    erddap_url: Series[str]
     dataset_id: Series[str]
     latitude: Series[float] = pa.Field(ge=-90, le=90)
     longitude: Series[float] = pa.Field(ge=-180, le=180)

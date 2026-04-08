@@ -17,32 +17,32 @@ process_temp_profiles()
 -- Used by both profile_process() and process_temp_profiles()
 CREATE OR REPLACE FUNCTION process_profile_geometry_and_links(target_table TEXT) RETURNS VOID AS $$
 BEGIN
-    -- Set geom from lat/lon
-    EXECUTE format('
-        UPDATE %I
-        SET geom = ST_Transform(
-            ST_SetSRID(ST_MakePoint(longitude, latitude), 4326),
-            3857
-        )
-        WHERE geom IS NULL
-    ', target_table);
+  -- Set geom from lat/lon
+  EXECUTE format('
+    UPDATE %I
+    SET geom = ST_Transform(
+      ST_SetSRID(ST_MakePoint(longitude, latitude), 4326),
+      3857
+    )
+    WHERE geom IS NULL
+  ', target_table);
 
-    -- Link profiles to datasets via PK
-    EXECUTE format('
-        UPDATE %I p
-        SET dataset_pk = d.pk
-        FROM cde.datasets d
-        WHERE p.dataset_id = d.dataset_id
-          AND p.erddap_url = d.erddap_url
-          AND p.dataset_pk IS NULL
-    ', target_table);
+  -- Link profiles to datasets via PK
+  EXECUTE format('
+    UPDATE %I p
+    SET dataset_pk = d.pk
+    FROM cde.datasets d
+    WHERE p.dataset_id = d.dataset_id
+      AND p.erddap_url = d.erddap_url
+      AND p.dataset_pk IS NULL
+  ', target_table);
 
-    -- Calculate days
-    EXECUTE format('
-        UPDATE %I
-        SET days = date_part(''days'', time_max - time_min) + 1
-        WHERE days IS NULL
-    ', target_table);
+  -- Calculate days
+  EXECUTE format('
+    UPDATE %I
+    SET days = date_part(''days'', time_max - time_min) + 1
+    WHERE days IS NULL
+  ', target_table);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -50,113 +50,98 @@ $$ LANGUAGE plpgsql;
 -- Process temporary profiles table during incremental mode
 CREATE OR REPLACE FUNCTION process_temp_profiles() RETURNS VOID AS $$
 BEGIN
-    PERFORM process_profile_geometry_and_links('temp_profiles');
+  PERFORM process_profile_geometry_and_links('temp_profiles');
 END;
 $$ LANGUAGE plpgsql;
 
 
 CREATE OR REPLACE FUNCTION profile_process() RETURNS VOID AS $$
 BEGIN
+  -- AFTER LOADING PROFILE DATA:
 
+  -- Use shared function for geometry and linking
+  -- Set search path to cde schema so the function can find the profiles table
+  SET search_path TO cde, public;
+  PERFORM process_profile_geometry_and_links('profiles');
 
--- AFTER LOADING PROFILE DATA:
+  -- Rebuild points table from distinct profile geometries
+  DELETE FROM cde.points;
 
--- Use shared function for geometry and linking
--- Set search path to cde schema so the function can find the profiles table
-SET search_path TO cde, public;
-PERFORM process_profile_geometry_and_links('profiles');
+  WITH pp AS (
+    SELECT DISTINCT geom FROM cde.profiles
+  )
+  INSERT INTO cde.points (geom)
+  SELECT geom FROM pp;
 
--- point PKs
-DELETE FROM
-        cde.points;
+  UPDATE cde.profiles
+  SET point_pk = points.pk
+  FROM cde.points
+  WHERE points.geom = profiles.geom;
 
-WITH pp as (
-        select
-                distinct geom
-        from
-                cde.profiles
-)
-INSERT INTO
-        cde.points (geom)
-SELECT
-        geom
-FROM
-        pp;
+  -- Note: days calculation now handled by process_profile_geometry_and_links()
 
-UPDATE
-        cde.profiles
-SET
-        point_pk = points.pk
-FROM
-        cde.points
-WHERE
-        points.geom = profiles.geom;
+  -- Set number of profiles per dataset
+  WITH profiles_per_dataset AS (
+    SELECT d.pk, COUNT(p.pk)
+    FROM cde.datasets d
+    JOIN cde.profiles p ON p.dataset_pk = d.pk
+    GROUP BY d.pk
+  )
+  UPDATE cde.datasets d
+  SET n_profiles = profiles_per_dataset.count
+  FROM profiles_per_dataset
+  WHERE profiles_per_dataset.pk = d.pk;
 
--- Note: days calculation now handled by process_profile_geometry_and_links()
+  -- Insert any new names; changed/deleted datasets will always be in here
+  INSERT INTO cde.organizations_lookup (name)
+  SELECT name FROM cde.organizations ON CONFLICT DO NOTHING;
 
--- Set number of profiles per dataset
-WITH profiles_per_dataset
-     AS (SELECT d.pk,
-                COUNT(p.pk)
-         FROM   cde.datasets d
-                JOIN cde.profiles p
-                  ON p.dataset_pk = d.pk
-         GROUP  BY d.pk)
-UPDATE cde.datasets d
-SET    n_profiles = profiles_per_dataset.count
-FROM   profiles_per_dataset
-WHERE  profiles_per_dataset.pk = d.pk;  
+  INSERT INTO cde.datasets_lookup (erddap_url, dataset_id)
+  SELECT erddap_url, dataset_id FROM cde.datasets ON CONFLICT DO NOTHING;
 
+  UPDATE cde.datasets
+  SET pk_url = datasets_lookup.pk
+  FROM cde.datasets_lookup
+  WHERE datasets_lookup.erddap_url = datasets.erddap_url
+    AND datasets_lookup.dataset_id = datasets.dataset_id;
 
--- insert any new names. changed/deleted datasets will always be in here
-INSERT INTO cde.organizations_lookup (name) select name from cde.organizations ON CONFLICT DO NOTHING;
-INSERT INTO cde.datasets_lookup (erddap_url,dataset_id) select erddap_url,dataset_id from cde.datasets ON CONFLICT DO NOTHING;
-
-UPDATE cde.datasets
-SET pk_url=datasets_lookup.pk
-FROM cde.datasets_lookup
-WHERE datasets_lookup.erddap_url=datasets.erddap_url AND
-datasets_lookup.dataset_id = datasets.dataset_id;
-
-
-
-  END;
+END;
 $$ LANGUAGE plpgsql;
 
 
 CREATE OR REPLACE FUNCTION obis_process() RETURNS VOID AS $$
 BEGIN
-    SET search_path TO cde, public;
+  SET search_path TO cde, public;
 
-    -- Set geom from lat/lon
-    UPDATE obis_cells
-    SET geom = ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)
-    WHERE geom IS NULL;
+  -- Set geom from lat/lon
+  UPDATE obis_cells
+  SET geom = ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)
+  WHERE geom IS NULL;
 
-    -- Link to datasets
-    UPDATE obis_cells c
-    SET dataset_pk = d.pk
-    FROM datasets d
-    WHERE c.dataset_id = d.dataset_id
-      AND c.erddap_url = d.erddap_url
-      AND c.dataset_pk IS NULL;
+  -- Link to datasets
+  UPDATE obis_cells c
+  SET dataset_pk = d.pk
+  FROM datasets d
+  WHERE c.dataset_id = d.dataset_id
+    AND d.source_type = 'obis'
+    AND c.dataset_pk IS NULL;
 
-    -- Insert distinct geometries into points (skip existing)
-    INSERT INTO points (geom)
-    SELECT DISTINCT o.geom FROM obis_cells o
-    WHERE NOT EXISTS (SELECT 1 FROM points p WHERE p.geom = o.geom);
+  -- Insert distinct geometries into points (skip existing)
+  INSERT INTO points (geom)
+  SELECT DISTINCT o.geom FROM obis_cells o
+  WHERE NOT EXISTS (SELECT 1 FROM points p WHERE p.geom = o.geom);
 
-    -- Link obis_cells to point_pk
-    UPDATE obis_cells
-    SET point_pk = points.pk
-    FROM points
-    WHERE points.geom = obis_cells.geom
-      AND obis_cells.point_pk IS NULL;
+  -- Link obis_cells to point_pk
+  UPDATE obis_cells
+  SET point_pk = points.pk
+  FROM points
+  WHERE points.geom = obis_cells.geom
+    AND obis_cells.point_pk IS NULL;
 
-    -- Update n_profiles on datasets to reflect obis_cells count
-    UPDATE datasets d
-    SET n_profiles = (SELECT count(*) FROM obis_cells c WHERE c.dataset_pk = d.pk)
-    WHERE d.erddap_url = 'https://obis.org';
+  -- Update n_profiles on datasets to reflect obis_cells count
+  UPDATE datasets d
+  SET n_profiles = (SELECT count(*) FROM obis_cells c WHERE c.dataset_pk = d.pk)
+  WHERE d.source_type = 'obis';
 
 END;
 $$ LANGUAGE plpgsql;

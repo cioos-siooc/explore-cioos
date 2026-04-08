@@ -10,7 +10,6 @@ CREATE TABLE IF NOT EXISTS cde.obis_cells (
     pk serial PRIMARY KEY,
     geom geometry(Point, 3857),
     dataset_pk integer,
-    erddap_url text DEFAULT 'https://obis.org',
     dataset_id text,
     latitude double precision,
     longitude double precision,
@@ -25,13 +24,13 @@ CREATE TABLE IF NOT EXISTS cde.obis_cells (
     hex_0_pk integer,
     hex_1_pk integer,
     point_pk integer,
-    UNIQUE(erddap_url, dataset_id, latitude, longitude)
+    UNIQUE(dataset_id, latitude, longitude)
 );
 
 CREATE INDEX IF NOT EXISTS obis_cells_geom_idx ON cde.obis_cells USING GIST (geom);
 CREATE INDEX IF NOT EXISTS obis_cells_hex_zoom_0_idx ON cde.obis_cells USING GIST (hex_zoom_0);
 CREATE INDEX IF NOT EXISTS obis_cells_hex_zoom_1_idx ON cde.obis_cells USING GIST (hex_zoom_1);
-CREATE INDEX IF NOT EXISTS obis_cells_erddap_url_dataset_id_idx ON cde.obis_cells (erddap_url, dataset_id);
+CREATE INDEX IF NOT EXISTS obis_cells_dataset_id_idx ON cde.obis_cells (dataset_id);
 
 -- Update remove_all_data to include obis_cells cleanup
 CREATE OR REPLACE FUNCTION public.remove_all_data() RETURNS VOID AS $$

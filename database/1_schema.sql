@@ -128,7 +128,6 @@ CREATE TABLE obis_cells (
     pk serial PRIMARY KEY,
     geom geometry(Point, 3857),
     dataset_pk integer,
-    erddap_url text DEFAULT 'https://obis.org',
     dataset_id text,
     latitude double precision,
     longitude double precision,
@@ -143,14 +142,14 @@ CREATE TABLE obis_cells (
     hex_0_pk integer,
     hex_1_pk integer,
     point_pk integer,
-    UNIQUE(erddap_url, dataset_id, latitude, longitude),
+    UNIQUE(dataset_id, latitude, longitude),
     FOREIGN KEY (dataset_pk) REFERENCES datasets(pk)
 );
 
 CREATE INDEX ON obis_cells USING GIST (geom);
 CREATE INDEX ON obis_cells USING GIST (hex_zoom_0);
 CREATE INDEX ON obis_cells USING GIST (hex_zoom_1);
-CREATE INDEX ON obis_cells (erddap_url, dataset_id);
+CREATE INDEX ON obis_cells (dataset_id);
 CREATE INDEX ON obis_cells (latitude, longitude);
 
 

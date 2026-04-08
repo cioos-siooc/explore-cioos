@@ -129,15 +129,14 @@ BEGIN
     -- Delete old obis_cells for updated datasets
     DELETE FROM cde.obis_cells c
     USING temp_datasets td
-    WHERE c.dataset_id = td.dataset_id
-      AND c.erddap_url = td.erddap_url;
+    WHERE c.dataset_id = td.dataset_id;
 
     -- Insert new obis_cells from temp table (only if temp_obis_cells has rows)
     IF EXISTS (SELECT 1 FROM temp_obis_cells LIMIT 1) THEN
-        INSERT INTO cde.obis_cells (erddap_url, dataset_id, latitude, longitude, scientific_names, n_records, time_min, time_max, depth_min, depth_max)
-        SELECT erddap_url, dataset_id, latitude, longitude, scientific_names, n_records, time_min, time_max, depth_min, depth_max
+        INSERT INTO cde.obis_cells (dataset_id, latitude, longitude, scientific_names, n_records, time_min, time_max, depth_min, depth_max)
+        SELECT dataset_id, latitude, longitude, scientific_names, n_records, time_min, time_max, depth_min, depth_max
         FROM temp_obis_cells
-        ON CONFLICT (erddap_url, dataset_id, latitude, longitude) DO UPDATE SET
+        ON CONFLICT (dataset_id, latitude, longitude) DO UPDATE SET
             scientific_names = EXCLUDED.scientific_names,
             n_records = EXCLUDED.n_records,
             time_min = EXCLUDED.time_min,

@@ -76,7 +76,7 @@ def prepare_obis_cells_dataframe(obis_cells):
     obis_cells["longitude"] = obis_cells["longitude"].round(8)
 
     # Deduplicate on unique key, merging scientific_names and aggregating numeric columns
-    key_cols = ["erddap_url", "dataset_id", "latitude", "longitude"]
+    key_cols = ["dataset_id", "latitude", "longitude"]
     agg = obis_cells.groupby(key_cols, dropna=False).agg(
         scientific_names=("scientific_names", lambda lists: sorted(set(name for lst in lists for name in lst))),
         n_records=("n_records", "sum"),
@@ -275,48 +275,7 @@ def main(folder, incremental=False):
 
             if obis_cells is not None:
                 logger.info("Processing obis_cells")
-
-                t = time.time()
-                r = transaction.execute(text(
-                    "UPDATE cde.obis_cells SET geom = ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857) WHERE geom IS NULL"
-                ))
-                logger.info("  set geom: %d rows (%.1fs)", r.rowcount, time.time() - t)
-
-                t = time.time()
-                r = transaction.execute(text("""
-                    UPDATE cde.obis_cells c SET dataset_pk = d.pk
-                    FROM cde.datasets d
-                    WHERE c.dataset_id = d.dataset_id AND c.erddap_url = d.erddap_url AND c.dataset_pk IS NULL
-                """))
-                logger.info("  linked to datasets: %d rows (%.1fs)", r.rowcount, time.time() - t)
-
-                t = time.time()
-                r = transaction.execute(text("""
-                    INSERT INTO cde.points (geom)
-                    SELECT ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)
-                    FROM (SELECT DISTINCT latitude, longitude FROM cde.obis_cells) sub
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM cde.points p
-                        WHERE p.geom = ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)
-                    )
-                """))
-                logger.info("  inserted points: %d rows (%.1fs)", r.rowcount, time.time() - t)
-
-                t = time.time()
-                r = transaction.execute(text("""
-                    UPDATE cde.obis_cells c SET point_pk = p.pk
-                    FROM cde.points p
-                    WHERE p.geom = ST_Transform(ST_SetSRID(ST_MakePoint(c.longitude, c.latitude), 4326), 3857)
-                """))
-                logger.info("  linked point_pk: %d rows (%.1fs)", r.rowcount, time.time() - t)
-
-                t = time.time()
-                r = transaction.execute(text("""
-                    UPDATE cde.datasets d
-                    SET n_profiles = (SELECT count(*) FROM cde.obis_cells c WHERE c.dataset_pk = d.pk)
-                    WHERE d.erddap_url = 'https://obis.org'
-                """))
-                logger.info("  updated dataset n_profiles: %d datasets (%.1fs)", r.rowcount, time.time() - t)
+                transaction.execute(text("SELECT obis_process();"))
 
             logger.info("Creating hexes")
             transaction.execute(text("SELECT create_hexes();"))
