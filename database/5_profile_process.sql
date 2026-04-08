@@ -127,9 +127,14 @@ BEGIN
     AND c.dataset_pk IS NULL;
 
   -- Insert distinct geometries into points (skip existing)
+  -- Deduplicate on lat/lon first (cheaper) before computing geometry
   INSERT INTO points (geom)
-  SELECT DISTINCT o.geom FROM obis_cells o
-  WHERE NOT EXISTS (SELECT 1 FROM points p WHERE p.geom = o.geom);
+  SELECT ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)
+  FROM (SELECT DISTINCT latitude, longitude FROM obis_cells) sub
+  WHERE NOT EXISTS (
+    SELECT 1 FROM points p
+    WHERE p.geom = ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)
+  );
 
   -- Link obis_cells to point_pk
   UPDATE obis_cells
