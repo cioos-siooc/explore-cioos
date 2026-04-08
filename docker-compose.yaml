@@ -72,7 +72,6 @@ services:
       - ./harvest:/app/harvester/harvest
       - ./harvester_logs:/app/harvester/logs
       - ./Obis_Datasets.json:/app/harvester/Obis_Datasets.json:ro
-      - ./Obis_Datasets_test.json:/app/harvester/Obis_Datasets_test.json:ro
       - ./obis_cache:/app/harvester/obis_cache
     environment:
       - "HARVESTER_LOG_DIR=/app/harvester/logs"
@@ -81,9 +80,7 @@ services:
       - DB_HOST_EXTERNAL=db
     env_file:
       - .env
-  
 
-  
   prefect:
     image: prefecthq/prefect:3.6-python3.12-conda
     command: prefect server start --host 0.0.0.0
@@ -105,5 +102,4 @@ services:
 
 volumes:
   postgres-data:
-  redis-data:
   prefect_data:
