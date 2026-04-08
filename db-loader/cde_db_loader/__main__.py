@@ -25,7 +25,6 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 
-
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
     integrations=[
@@ -50,10 +49,6 @@ OBIS_ARRAY_DTYPES = {
     "scientific_names": ARRAY(TEXT),
 }
 
-
-PROFILES_ARRAY_DTYPES = {
-    "scientific_names": ARRAY(TEXT),
-}
 
 
 def prepare_profiles_dataframe(profiles):
@@ -123,10 +118,8 @@ def ensure_organization_pks(datasets):
 
 @flow(name="cde-db-loader")
 def main(folder, incremental=False):
-    
     # setup database connection
     logger = get_run_logger()
-    logger.info("OBIS Loading testing")
     load_dotenv(os.getcwd() + "/.env")
 
     envs = os.environ
@@ -201,7 +194,6 @@ def main(folder, incremental=False):
                     con=transaction,
                     if_exists="append",
                     index=False,
-                    dtype=PROFILES_ARRAY_DTYPES,
                 )
 
             if obis_cells is not None:
@@ -233,6 +225,7 @@ def main(folder, incremental=False):
             transaction.execute(text("SELECT remove_all_data();"))
 
             logger.info("Writing datasets")
+            datasets = ensure_organization_pks(datasets)
             datasets.to_sql(
                 "datasets",
                 con=transaction,
@@ -252,7 +245,6 @@ def main(folder, incremental=False):
                     if_exists="append",
                     schema=schema,
                     index=False,
-                    dtype=PROFILES_ARRAY_DTYPES,
                 )
 
             if obis_cells is not None:
