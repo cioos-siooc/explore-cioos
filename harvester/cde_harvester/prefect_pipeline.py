@@ -33,9 +33,9 @@ class PrefectCDEPipeline:
     def init_config(self, config_file=None):
         """
         Init Prefect for cde_harvester.
-        
+
         Args:
-            dotenv_file: Path to .env file for Prefect configuration
+            config_file: Path to harvest_config.yaml
 
         """
         logger = get_run_logger()
@@ -63,7 +63,7 @@ class PrefectCDEPipeline:
         self.obis_folder = config.get("obis_folder")
 
         logger.info("CDE Pipeline initialized with configuration:")
-        logger.info(f"{vars(self)}") # does this wrok?
+        logger.info(f"{vars(self)}")
 
     @flow(name="CDE Pipeline", log_prints=True)
     def cde_pipeline(self):
@@ -100,6 +100,7 @@ class PrefectCDEPipeline:
             logger.info("cde_db_loader completed successfully")
         except Exception as e:
             logger.error(f"cde_db_loader failed: {e}", exc_info=True)
+            raise
 
         # Run redis refresh as a subflow
         logger.info("Running redisFlow subflow")
@@ -187,7 +188,6 @@ class PrefectCDEPipeline:
 
         self.create_docker_work_pool()
 
-        
         deployment_id = self.deploy(
             name="cde-harvester-deployment",
             work_pool_name="docker-pool",
@@ -233,11 +233,11 @@ class PrefectCDEPipeline:
 
 def deploy(pipeline):
     # Create deployment after successful run
-    # we should double check that this did deploy
-    if pipeline.create_deployment:
+    try:
+        pipeline.create_deployment()
         logger.info("CDE Pipeline and Deployment completed successfully")
-    else:
-        logger.error("CDE Pipeline completed but deployment failed")
+    except Exception as e:
+        logger.error("CDE Pipeline completed but deployment failed: %s", e)
         sys.exit(1)
 
 def main():
@@ -262,4 +262,4 @@ def main():
     pipeline.cde_pipeline()
 
 if __name__ == "__main__":
-   main()
+    main()
