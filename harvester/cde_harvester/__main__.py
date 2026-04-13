@@ -251,13 +251,10 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
     if not obis_cells.empty:
         obis_cells.to_csv(obis_cells_file, index=False)
 
-    logger.info(
-        "Wrote %s %s %s %s",
-        datasets_file,
-        profiles_file,
-        ckan_file,
-        skipped_datasets_file,
-    )
+    written_files = [datasets_file, profiles_file, skipped_datasets_file]
+    if not df_ckan.empty:
+        written_files.append(ckan_file)
+    logger.info("Wrote %s", " ".join(str(f) for f in written_files))
     if not obis_cells.empty:
         logger.info("Wrote %s (%d cells)", obis_cells_file, len(obis_cells))
 
