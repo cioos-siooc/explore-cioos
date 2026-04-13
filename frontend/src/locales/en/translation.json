@@ -96,6 +96,7 @@
   "datasetInspectorTitleText": "Title",
   "datasetInspectorURLText": "Dataset URLs",
   "datasetInspectorERDDAPURL": "Dataset",
+  "datasetInspectorOBISURL": "View on OBIS",
   "datasetInspectorCKANURL": "Metadata",
   "datasetInspectorOrganizationText": "Organizations",
   "datasetInspectorOceanVariablesText": "Ocean Variables",

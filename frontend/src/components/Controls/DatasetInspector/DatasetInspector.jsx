@@ -180,14 +180,13 @@ export default function DatasetInspector({
                   target='_blank'
                   rel='noreferrer'
                 >
-                  View on OBIS
+                  {t('datasetInspectorOBISURL')}
                 </a>
               ) : dataset.erddap_url && (
                 <a
-                  className={dataset.erddap_url ? undefined : 'unavailable'}
                   href={dataset.erddap_url}
                   target='_blank'
-                  title={dataset.erddap_url ? dataset.erddap_url : 'unavailable'}
+                  title={dataset.erddap_url}
                   rel='noreferrer'
                 >
                   {t('datasetInspectorERDDAPURL')} (ERDDAP™)

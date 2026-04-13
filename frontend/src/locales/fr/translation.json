@@ -96,6 +96,7 @@
   "datasetInspectorTitleText": "Titre",
   "datasetInspectorURLText": "URL des jeux de données",
   "datasetInspectorERDDAPURL": "Jeux de données",
+  "datasetInspectorOBISURL": "Voir sur OBIS",
   "datasetInspectorCKANURL": "Métadonnées",
   "datasetInspectorOrganizationText": "Organisations",
   "datasetInspectorOceanVariablesText": "Variables océaniques",
