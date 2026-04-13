@@ -79,7 +79,8 @@ router.get(
            time_min, time_max, latitude, longitude, depth_min, depth_max
     FROM cde.profiles
     ${includeObis ? `UNION ALL
-    SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, :geom_column: as geom, n_records as record_count,
+    SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, :geom_column: as geom,
+           date_part('days', time_max - time_min) + 1 as record_count,
            time_min, time_max, latitude, longitude, depth_min, depth_max
     FROM cde.obis_cells` : ''}
   ),
