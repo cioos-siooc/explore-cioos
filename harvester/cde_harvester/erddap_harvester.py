@@ -19,7 +19,6 @@ from cde_harvester.profiles import get_profiles
 from requests.exceptions import HTTPError
 from prefect import task
 
-# TIMEOUT = 30
 logger = logging.getLogger(__name__)
 
 
@@ -95,7 +94,7 @@ class ERDDAPHarvester(BaseHarvester):
         unsupported_datasets = df_all_datasets.query(f"not ({cdm_data_type_test})")
         if not unsupported_datasets.empty:
             unsupported_datasets_list = unsupported_datasets["datasetID"].to_list()
-            erddap_logger.warn(
+            erddap_logger.warning(
                 f"Skipping datasets because cdm_data_type is not {str(cdm_data_types_supported)}: {unsupported_datasets_list}"
             )
             for dataset_id in unsupported_datasets_list:
@@ -147,7 +146,6 @@ class ERDDAPHarvester(BaseHarvester):
                     )
             except HTTPError as e:
                 response = e.response
-                # dataset_logger.error(response.text)
                 dataset_logger.error(
                     "HTTP ERROR: %s %s", response.status_code, response.reason
                 )
@@ -170,7 +168,6 @@ class ERDDAPHarvester(BaseHarvester):
                 columns=skipped_columns,
             )
 
-            # logger.info(record_count)
             erddap_logger.info(
                 "skipped: %s datasets: %s",
                 len(df_skipped_datasets),
