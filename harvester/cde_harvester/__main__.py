@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 from sentry_sdk.crons import monitor
 from sentry_sdk.integrations.logging import LoggingIntegration
 from prefect import flow, get_run_logger
+
 load_dotenv()
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -107,7 +108,7 @@ def setup_logging(log_time, log_level, log_dir=None):
 
 @flow(name="cde-main", log_prints=True)
 @monitor(monitor_slug="main-harvester")
-def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers,
+def main(erddap_urls, cache_requests, folder, dataset_ids,
          obis_dataset_ids=None, obis_folder=None):
     logger = get_run_logger()
     limit_dataset_ids = None
@@ -279,14 +280,14 @@ def load_config(config_file):
             logger.error("Failed to load config yaml", exc_info=True)
 
 
-def load_obis_dataset_ids(config):
-    """Resolve OBIS dataset IDs from config, loading from JSON file if needed."""
-    obis_dataset_ids = config.get("obis_dataset_ids") or []
-    obis_datasets_file = config.get("obis_datasets_file")
-    if obis_datasets_file and not obis_dataset_ids:
-        with open(obis_datasets_file, "r") as f:
-            obis_dataset_ids = json.load(f).get("datasets", [])
-    return obis_dataset_ids
+def load_obis_dataset_ids(dataset_ids=None, datasets_file=None):
+    """Resolve OBIS dataset IDs, loading from JSON file if needed."""
+    if dataset_ids:
+        return dataset_ids
+    if datasets_file:
+        with open(datasets_file, "r") as f:
+            return json.load(f).get("datasets", [])
+    return []
 
 
 if __name__ == "__main__":
@@ -313,12 +314,14 @@ if __name__ == "__main__":
         urls = ",".join(config.get("erddap_urls") or [])
         cache = config.get("cache")
         folder = config.get("folder")
-        max_workers = config.get("max-workers", 1)
         dataset_ids = ",".join(config.get("dataset_ids") or [])
         log_time = config.get("log_time")
         log_level = config.get("log_level", "INFO")
         log_dir = os.environ.get("HARVESTER_LOG_DIR") or config.get("log_dir")
-        obis_dataset_ids = load_obis_dataset_ids(config)
+        obis_dataset_ids = load_obis_dataset_ids(
+            dataset_ids=config.get("obis_dataset_ids"),
+            datasets_file=config.get("obis_datasets_file"),
+        )
         obis_folder = config.get("obis_folder")
 
     else:
@@ -355,11 +358,6 @@ if __name__ == "__main__":
             action="store_true",
         )
         parser.add_argument(
-            "--max-workers",
-            default=1,
-            help="max threads that harvester will use",
-        )
-        parser.add_argument(
             "--log-dir",
             default=None,
             help="Directory to save log files to",
@@ -387,17 +385,13 @@ if __name__ == "__main__":
         urls = args.urls or ""
         cache = args.cache
         dataset_ids = args.dataset_ids
-        max_workers = args.max_workers
         folder = args.folder
         log_dir = args.log_dir
 
-        # Resolve OBIS dataset IDs from CLI args
-        obis_dataset_ids = []
-        if args.obis_dataset_ids:
-            obis_dataset_ids = args.obis_dataset_ids.split(",")
-        elif args.obis_datasets_file:
-            with open(args.obis_datasets_file, "r") as f:
-                obis_dataset_ids = json.load(f).get("datasets", [])
+        obis_dataset_ids = load_obis_dataset_ids(
+            dataset_ids=args.obis_dataset_ids.split(",") if args.obis_dataset_ids else None,
+            datasets_file=args.obis_datasets_file,
+        )
         obis_folder = args.obis_folder
 
         if not urls and not obis_dataset_ids:
@@ -405,7 +399,7 @@ if __name__ == "__main__":
 
     logger = setup_logging(log_time, log_level, log_dir)
     try:
-        main(urls, cache, folder or "harvest", dataset_ids, max_workers,
+        main(urls, cache, folder or "harvest", dataset_ids,
              obis_dataset_ids=obis_dataset_ids, obis_folder=obis_folder)
     except Exception as e:
         logger.error("Harvester failed!!!", exc_info=True)
