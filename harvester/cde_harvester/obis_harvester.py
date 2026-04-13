@@ -32,6 +32,8 @@ class OBISHarvester(BaseHarvester):
     the existing CDE schema.
     """
 
+    MAX_RETRIES = 5
+
     def __init__(self, limit_dataset_ids=None, folder="./obis", prefect_logger=None):
         self.limit_dataset_ids = limit_dataset_ids or []
         self.folder = folder
@@ -46,7 +48,7 @@ class OBISHarvester(BaseHarvester):
         for i, dataset_id in enumerate(self.limit_dataset_ids, 1):
             self.logger.info("Processing OBIS dataset %d/%d: %s", i, total, dataset_id)
             last_error = None
-            for attempt in range(1, 6):
+            for attempt in range(1, self.MAX_RETRIES + 1):
                 try:
                     occurrences = self.get_occurrences(dataset_id)
                     results = occurrences.get("results", [])
@@ -70,13 +72,13 @@ class OBISHarvester(BaseHarvester):
                 except Exception as e:
                     last_error = e
                     self.logger.error(
-                        "Error processing OBIS dataset %s (attempt %d/5): %s",
-                        dataset_id, attempt, e, exc_info=True,
+                        "Error processing OBIS dataset %s (attempt %d/%d): %s",
+                        dataset_id, attempt, self.MAX_RETRIES, e, exc_info=True,
                     )
-                    if attempt < 5:
+                    if attempt < self.MAX_RETRIES:
                         self._clear_cache(dataset_id)
             else:
-                self.logger.error("All 5 attempts failed for OBIS dataset %s: %s", dataset_id, last_error)
+                self.logger.error("All %d attempts failed for OBIS dataset %s: %s", self.MAX_RETRIES, dataset_id, last_error)
                 all_skipped.append([OBIS_SOURCE_URL, dataset_id, "UNKNOWN_ERROR"])
 
         # Build result DataFrames
@@ -240,12 +242,15 @@ class OBISHarvester(BaseHarvester):
     def _read_cache(self, path):
         """Read a JSON cache file, supporting both plain and gzip-compressed."""
         gz_path = path + ".gz"
-        if os.path.isfile(gz_path):
-            with gzip.open(gz_path, "rt") as f:
-                return json.load(f)
-        if os.path.isfile(path):
-            with open(path, "r") as f:
-                return json.load(f)
+        try:
+            if os.path.isfile(gz_path):
+                with gzip.open(gz_path, "rt") as f:
+                    return json.load(f)
+            if os.path.isfile(path):
+                with open(path, "r") as f:
+                    return json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            self.logger.warning("Corrupt cache file %s, will re-fetch: %s", path, e)
         return None
 
     def _write_cache(self, path, data):
