@@ -17,11 +17,11 @@ dataset_ids:
 # defaults to false
 log_time:
 
-#defaults to false
-flush_redis: False
+# defaults to false
+flush_redis: false
 
-#defaults to false
-incremental: True
+# defaults to false
+incremental: true
 
 # --- OBIS Configuration ---
 # Path to JSON file containing OBIS dataset UUIDs
