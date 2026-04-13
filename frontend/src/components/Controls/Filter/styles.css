@@ -7,11 +7,13 @@
   pointer-events: all;
   background-color: white;
   display: inline-flex;
+  align-items: center;
   text-align: center;
   border-radius: 30px;
   padding: 5px;
   cursor: pointer;
   border: 1px solid white;
+  font: inherit;
 }
 
 .filterHeader.active {

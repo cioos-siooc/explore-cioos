@@ -37,10 +37,10 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                   organizations,
                   count(p.*)::integer profiles_count,
                   d.source_type,
-                  d.erddap_url
-                           || '/tabledap/'
-                           || d.dataset_id
-                           || '.html' AS erddap_url,
+                  CASE WHEN d.source_type = 'obis'
+                           THEN 'https://obis.org/dataset/' || d.dataset_id
+                           ELSE d.erddap_url || '/tabledap/' || d.dataset_id || '.html'
+                  END AS erddap_url,
                   'https://catalogue.cioos.ca/dataset/'
                            || ckan_id AS ckan_url
                   -- replace '0 days' with '1 day' when its a single day profile

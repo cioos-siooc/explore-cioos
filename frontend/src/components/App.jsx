@@ -891,7 +891,7 @@ export default function App() {
           />
         </Filter>
         <div className='filter'>
-          <div
+          <button
             className={`filterHeader ${showObis ? 'active' : ''}`}
             onClick={() => setShowObis(!showObis)}
           >
@@ -904,7 +904,7 @@ export default function App() {
             <div className='badgeTitle'>
               {t('obisToggleLabel')}
             </div>
-          </div>
+          </button>
         </div>
         <button
           className='resetFiltersButton'

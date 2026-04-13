@@ -127,10 +127,13 @@ $$ LANGUAGE plpgsql;
 -- Deletes old obis_cells for those datasets, then inserts new ones from temp_obis_cells
 CREATE OR REPLACE FUNCTION replace_obis_cells_from_temp() RETURNS VOID AS $$
 BEGIN
-  -- Delete old obis_cells for updated datasets
+  -- Delete old obis_cells only for updated OBIS datasets
   DELETE FROM cde.obis_cells c
-  USING temp_datasets td
-  WHERE c.dataset_id = td.dataset_id;
+  USING temp_datasets td,
+        cde.datasets d
+  WHERE c.dataset_id = td.dataset_id
+    AND d.dataset_id = td.dataset_id
+    AND d.source_type = 'obis';
 
   -- Insert new obis_cells from temp table
   INSERT INTO cde.obis_cells (dataset_id, latitude, longitude, scientific_names, n_records, time_min, time_max, depth_min, depth_max)
