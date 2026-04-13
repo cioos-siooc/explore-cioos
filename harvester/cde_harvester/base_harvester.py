@@ -31,11 +31,7 @@ class HarvestResult:
             self.obis_cells = pd.DataFrame(columns=ObisCellSchema.to_schema().columns.keys())
 
     def validate(self):
-        """Validate all DataFrames against their schemas.
-
-        Logs warnings on validation failure rather than raising,
-        so existing workflows aren't broken during transition.
-        """
+        """Validate all DataFrames against their schemas."""
         for name, schema in [
             ("profiles", ProfileSchema),
             ("datasets", DatasetSchema),
@@ -44,10 +40,7 @@ class HarvestResult:
             ("obis_cells", ObisCellSchema),
         ]:
             df = getattr(self, name)
-            try:
-                schema.validate(df)
-            except Exception as e:
-                logger.warning("Schema validation failed for %s: %s", name, e)
+            schema.validate(df)
 
 
 class BaseHarvester(ABC):
