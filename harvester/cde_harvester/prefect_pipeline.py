@@ -21,7 +21,6 @@ class PrefectCDEPipeline:
     cache_requests: bool
     folder: str
     dataset_ids: str
-    max_workers: int
     log_time: bool
     log_level: str
     log_dir: str
@@ -52,13 +51,15 @@ class PrefectCDEPipeline:
         self.cache_requests = config.get("cache", False)
         self.folder = config.get("folder") or "harvest"
         self.dataset_ids = ",".join(config.get("dataset_ids") or [])
-        self.max_workers = config.get("max-workers", 1)
         self.log_time = config.get("log_time", False)
         self.log_level = config.get("log_level", "INFO")
         self.log_dir = os.environ.get("HARVESTER_LOG_DIR") or config.get("log_dir")
         self.incremental = config.get("incremental", False)
         self.flush_redis = config.get("flush_redis", False)
-        self.obis_dataset_ids = load_obis_dataset_ids(config)
+        self.obis_dataset_ids = load_obis_dataset_ids(
+            dataset_ids=config.get("obis_dataset_ids"),
+            datasets_file=config.get("obis_datasets_file"),
+        )
         self.obis_folder = config.get("obis_folder")
 
         logger.info("CDE Pipeline initialized with configuration:")
@@ -84,7 +85,6 @@ class PrefectCDEPipeline:
                 cache_requests=self.cache_requests,
                 folder=self.folder,
                 dataset_ids=self.dataset_ids,
-                max_workers=self.max_workers,
                 obis_dataset_ids=self.obis_dataset_ids,
                 obis_folder=self.obis_folder,
             )
