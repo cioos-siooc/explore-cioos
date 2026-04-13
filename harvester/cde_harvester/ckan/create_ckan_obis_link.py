@@ -44,13 +44,16 @@ def _lookup_ckan_package(dataset_id, ckan_api_url=CKAN_API_URL):
 
 def _read_cache(path):
     gz = path + ".gz"
-    if os.path.isfile(gz):
-        with gzip.open(gz, "rt") as f:
-            return json.load(f)
-    if os.path.isfile(path):
-        with open(path) as f:
-            return json.load(f)
-    return None  # not cached
+    try:
+        if os.path.isfile(gz):
+            with gzip.open(gz, "rt") as f:
+                return json.load(f)
+        if os.path.isfile(path):
+            with open(path) as f:
+                return json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("Corrupt cache file %s, will re-fetch: %s", path, e)
+    return None  # not cached or corrupt
 
 
 def _write_cache(path, data):
@@ -96,6 +99,7 @@ def get_ckan_obis_records(dataset_ids, ckan_api_url=CKAN_API_URL, cache_folder=N
             else:
                 pkg = _lookup_ckan_package(dataset_id, ckan_api_url)
                 fetched += 1
+                # Store False for "looked up but not found" to avoid re-fetching
                 _write_cache(cache_file, pkg or False)
         else:
             pkg = _lookup_ckan_package(dataset_id, ckan_api_url)
