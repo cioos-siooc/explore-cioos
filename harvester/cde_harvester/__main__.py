@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import os
 import queue
@@ -16,12 +17,14 @@ from cde_harvester.ckan.create_ckan_erddap_link import (
     unescape_ascii,
     unescape_ascii_list,
 )
-from cde_harvester.harvest_erddap import harvest_erddap
+from cde_harvester.erddap_harvester import harvest_erddap
+from cde_harvester.obis_harvester import harvest_obis
 from cde_harvester.utils import cf_standard_names, supported_standard_names
 from dotenv import load_dotenv
 from sentry_sdk.crons import monitor
 from sentry_sdk.integrations.logging import LoggingIntegration
 from prefect import flow, get_run_logger
+
 load_dotenv()
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -105,35 +108,55 @@ def setup_logging(log_time, log_level, log_dir=None):
 
 @flow(name="cde-main", log_prints=True)
 @monitor(monitor_slug="main-harvester")
-def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
+def main(erddap_urls, cache_requests, folder, dataset_ids,
+         obis_dataset_ids=None, obis_folder=None):
     logger = get_run_logger()
-    erddap_urls = erddap_urls.split(",")
     limit_dataset_ids = None
     if dataset_ids:
         limit_dataset_ids = dataset_ids.split(",")
 
-    # Submit tasks concurrently using Prefect
-    futures = []
-    for erddap_url in erddap_urls:
+    # Submit ERDDAP tasks concurrently using Prefect
+    erddap_futures = []
+    erddap_urls_list = [u.strip() for u in erddap_urls.split(",") if u.strip()] if erddap_urls else []
+    for erddap_url in erddap_urls_list:
         logger.info("Submitting harvest task for %s", erddap_url)
         future = harvest_erddap.submit(erddap_url, limit_dataset_ids, cache_requests)
-        futures.append(future)
-    
-    # Wait for all tasks to complete and get results
+        erddap_futures.append(future)
+
+    # Submit OBIS task (runs concurrently with ERDDAP tasks)
+    obis_future = None
+    if obis_dataset_ids:
+        logger.info("Submitting OBIS harvest task for %d datasets", len(obis_dataset_ids))
+        obis_cache = obis_folder or os.path.join(os.path.dirname(os.path.abspath(folder)), "obis_cache")
+        obis_future = harvest_obis.submit(limit_dataset_ids=obis_dataset_ids, folder=obis_cache)
+
+    # Wait for all tasks to complete
     logger.info("Waiting for all harvest tasks to complete")
-    result = [future.result() for future in futures]
-    logger.info("All work completed")
+    erddap_results = [f.result() for f in erddap_futures]
+    logger.info("All ERDDAP work completed")
 
-    profiles = pd.DataFrame()
-    datasets = pd.DataFrame()
+    # Collect ERDDAP results
+    erddap_profiles = pd.DataFrame()
+    erddap_datasets = pd.DataFrame()
     variables = pd.DataFrame()
-    skipped_datasets = pd.DataFrame()
+    erddap_skipped = pd.DataFrame()
 
-    for [profile, dataset, variable, skipped_dataset] in result:
-        profiles = pd.concat([profiles, profile])
-        datasets = pd.concat([datasets, dataset])
-        variables = pd.concat([variables, variable])
-        skipped_datasets = pd.concat([skipped_datasets, skipped_dataset])
+    for result in erddap_results:
+        erddap_profiles = pd.concat([erddap_profiles, result.profiles])
+        erddap_datasets = pd.concat([erddap_datasets, result.datasets])
+        variables = pd.concat([variables, result.variables])
+        erddap_skipped = pd.concat([erddap_skipped, result.skipped])
+
+    # Collect OBIS results
+    obis_cells = pd.DataFrame()
+    obis_datasets = pd.DataFrame()
+    obis_skipped = pd.DataFrame()
+    if obis_future:
+        obis_result = obis_future.result()
+        obis_cells = obis_result.obis_cells
+        obis_datasets = obis_result.datasets
+        obis_skipped = obis_result.skipped
+        logger.info("OBIS harvest completed: %d datasets, %d cells", len(obis_datasets), len(obis_cells))
 
     if not os.path.exists(folder):
         os.makedirs(folder)
@@ -142,94 +165,98 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
     profiles_file = f"{folder}/profiles.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
     ckan_file = f"{folder}/ckan.csv"
+    obis_cells_file = f"{folder}/obis_cells.csv"
 
-    if datasets.empty:
-        logging.info("No datasets harvested")
+    if erddap_datasets.empty and obis_datasets.empty:
+        logging.info("No datasets harvested from any source")
         sys.exit(1)
 
-    # see what standard names arent covered by our EOVs:
-    standard_names_harvested = (
-        variables.query("not standard_name.isnull()")["standard_name"].unique().tolist()
-    )
-
-    # this gets a list of all the standard names
-
-    standard_names_not_harvested = [
-        x
-        for x in standard_names_harvested
-        if (x not in supported_standard_names + IGNORED_STANDARD_NAMES) and (not x.startswith("platform_"))
-    ]
-
-    standard_names_not_harvested_that_are_real = [
-        x for x in standard_names_not_harvested if x in cf_standard_names
-    ]
-
-    if standard_names_not_harvested_that_are_real:
-        logger.warning(
-            "Found these standard_names that CDE doesnt support yet: %s",
-            standard_names_not_harvested_that_are_real,
+    # --- ERDDAP-specific post-processing ---
+    df_ckan = pd.DataFrame()
+    if not erddap_datasets.empty:
+        # see what standard names arent covered by our EOVs:
+        standard_names_harvested = (
+            variables.query("not standard_name.isnull()")["standard_name"].unique().tolist()
         )
 
-    # query CKAN national for more metadata related to the ERDDAP datsets we have so far
-    logger.info("Gathering CKAN data")
-    df_ckan = get_ckan_records(datasets["dataset_id"].to_list(), cache=cache_requests)
-    datasets = (
-        datasets.set_index(["erddap_url", "dataset_id"])
-        .join(df_ckan.set_index(["erddap_url", "dataset_id"]), how="left")
-        .reset_index()
-    )
+        standard_names_not_harvested = [
+            x
+            for x in standard_names_harvested
+            if (x not in supported_standard_names + IGNORED_STANDARD_NAMES) and (not x.startswith("platform_"))
+        ]
 
-    logger.info("Cleaning up data")
-    datasets = datasets.replace(np.nan, None)
+        standard_names_not_harvested_that_are_real = [
+            x for x in standard_names_not_harvested if x in cf_standard_names
+        ]
 
-    # datasets["summary"] = datasets["summary"].apply(lambda x: unescape_ascii(x))
-    datasets["title"] = datasets["title"].apply(lambda x: unescape_ascii(x))
+        if standard_names_not_harvested_that_are_real:
+            logger.warning(
+                "Found these standard_names that CDE doesnt support yet: %s",
+                standard_names_not_harvested_that_are_real,
+            )
 
-    datasets["ckan_title"].fillna(datasets["title"], inplace=True)
-    # datasets["ckan_summary"].fillna(datasets["summary"], inplace=True)
+        # query CKAN national for more metadata related to the ERDDAP datsets we have so far
+        logger.info("Gathering CKAN data")
+        df_ckan = get_ckan_records(erddap_datasets["dataset_id"].to_list(), cache=cache_requests)
+        erddap_datasets = (
+            erddap_datasets.set_index(["erddap_url", "dataset_id"])
+            .join(df_ckan.set_index(["erddap_url", "dataset_id"]), how="left")
+            .reset_index()
+        )
 
-    # prioritize with organizations from CKAN and then pull ERDDAP if needed
-    datasets["organizations"] = datasets.apply(
-        lambda x: x["ckan_organizations"] or unescape_ascii_list(x["organizations"]),
-        axis=1,
-    )
-    del datasets["title"]
-    # del datasets["summary"]
-    del datasets["ckan_organizations"]
+        logger.info("Cleaning up ERDDAP data")
+        erddap_datasets = erddap_datasets.replace(np.nan, None)
 
-    datasets.rename(
-        columns={
-            "ckan_title": "title",
-            "ckan_title_fr": "title_fr",
-            # "ckan_summary": "summary",
-            # "ckan_summary_fr": "summary_fr",
-        },
-        inplace=True,
-    )
+        erddap_datasets["title"] = erddap_datasets["title"].apply(lambda x: unescape_ascii(x))
 
-    datasets = datasets.replace(r"\n", " ", regex=True)
+        erddap_datasets["ckan_title"].fillna(erddap_datasets["title"], inplace=True)
 
-    profiles["depth_min"] = profiles["depth_min"].fillna(0)
-    profiles["depth_max"] = profiles["depth_max"].fillna(0)
-    profiles.drop(columns=['altitutde_min', 'altitutde_max'], inplace=True, errors='ignore')
+        # prioritize with organizations from CKAN and then pull ERDDAP if needed
+        erddap_datasets["organizations"] = erddap_datasets.apply(
+            lambda x: x["ckan_organizations"] or unescape_ascii_list(x["organizations"]),
+            axis=1,
+        )
+        del erddap_datasets["title"]
+        del erddap_datasets["ckan_organizations"]
 
-    logger.info("Adding %s datasets and %s profiles", len(datasets), len(profiles))
+        erddap_datasets.rename(
+            columns={
+                "ckan_title": "title",
+                "ckan_title_fr": "title_fr",
+            },
+            inplace=True,
+        )
 
-    # drop duplicates caused by EDDTableFromErddap redirects
+        erddap_datasets = erddap_datasets.replace(r"\n", " ", regex=True)
+
+        erddap_profiles["depth_min"] = erddap_profiles["depth_min"].fillna(0)
+        erddap_profiles["depth_max"] = erddap_profiles["depth_max"].fillna(0)
+        erddap_profiles.drop(columns=['altitutde_min', 'altitutde_max'], inplace=True, errors='ignore')
+
+    # --- Merge all sources ---
+    datasets = pd.concat([erddap_datasets, obis_datasets], ignore_index=True)
+    skipped_datasets = pd.concat([erddap_skipped, obis_skipped], ignore_index=True)
+
+    logger.info("Adding %s datasets, %s profiles, %s obis_cells", len(datasets), len(erddap_profiles), len(obis_cells))
+
+    # Write output CSVs
     datasets.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
         datasets_file, index=False
     )
-    profiles.drop_duplicates().to_csv(profiles_file, index=False)
-    df_ckan.to_csv(ckan_file, index=False)
+    erddap_profiles.drop_duplicates().to_csv(profiles_file, index=False)
+    if not df_ckan.empty:
+        df_ckan.to_csv(ckan_file, index=False)
     skipped_datasets.drop_duplicates().to_csv(skipped_datasets_file, index=False)
 
-    logger.info(
-        "Wrote %s %s %s %s",
-        datasets_file,
-        profiles_file,
-        ckan_file,
-        skipped_datasets_file,
-    )
+    if not obis_cells.empty:
+        obis_cells.to_csv(obis_cells_file, index=False)
+
+    written_files = [datasets_file, profiles_file, skipped_datasets_file]
+    if not df_ckan.empty:
+        written_files.append(ckan_file)
+    logger.info("Wrote %s", " ".join(str(f) for f in written_files))
+    if not obis_cells.empty:
+        logger.info("Wrote %s (%d cells)", obis_cells_file, len(obis_cells))
 
     if not skipped_datasets.empty:
         logger.info(
@@ -248,6 +275,16 @@ def load_config(config_file):
 
         except yaml.YAMLError:
             logger.error("Failed to load config yaml", exc_info=True)
+
+
+def load_obis_dataset_ids(dataset_ids=None, datasets_file=None):
+    """Resolve OBIS dataset IDs, loading from JSON file if needed."""
+    if dataset_ids:
+        return dataset_ids
+    if datasets_file:
+        with open(datasets_file, "r") as f:
+            return json.load(f).get("datasets", [])
+    return []
 
 
 if __name__ == "__main__":
@@ -274,18 +311,22 @@ if __name__ == "__main__":
         urls = ",".join(config.get("erddap_urls") or [])
         cache = config.get("cache")
         folder = config.get("folder")
-        max_workers = config.get("max-workers", 1)
         dataset_ids = ",".join(config.get("dataset_ids") or [])
         log_time = config.get("log_time")
         log_level = config.get("log_level", "INFO")
         log_dir = os.environ.get("HARVESTER_LOG_DIR") or config.get("log_dir")
+        obis_dataset_ids = load_obis_dataset_ids(
+            dataset_ids=config.get("obis_dataset_ids"),
+            datasets_file=config.get("obis_datasets_file"),
+        )
+        obis_folder = config.get("obis_folder")
 
     else:
         logger.info("Using command line arguments")
         parser.add_argument(
             "--urls",
-            help="harvest from these erddap servers, comme separated",
-            required=True,
+            help="harvest from these erddap servers, comma separated",
+            default="",
         )
         parser.add_argument(
             "--dataset_ids",
@@ -314,14 +355,24 @@ if __name__ == "__main__":
             action="store_true",
         )
         parser.add_argument(
-            "--max-workers",
-            default=1,
-            help="max threads that harvester will use",
-        )
-        parser.add_argument(
             "--log-dir",
             default=None,
             help="Directory to save log files to",
+        )
+        parser.add_argument(
+            "--obis-datasets-file",
+            default=None,
+            help='Path to JSON file with OBIS dataset IDs (format: {"datasets": ["uuid", ...]})',
+        )
+        parser.add_argument(
+            "--obis-dataset-ids",
+            default=None,
+            help="Comma-separated list of OBIS dataset UUIDs",
+        )
+        parser.add_argument(
+            "--obis-folder",
+            default=None,
+            help="Cache folder for OBIS occurrence data",
         )
 
         args = parser.parse_args()
@@ -331,13 +382,22 @@ if __name__ == "__main__":
         urls = args.urls or ""
         cache = args.cache
         dataset_ids = args.dataset_ids
-        max_workers = args.max_workers
         folder = args.folder
         log_dir = args.log_dir
 
+        obis_dataset_ids = load_obis_dataset_ids(
+            dataset_ids=args.obis_dataset_ids.split(",") if args.obis_dataset_ids else None,
+            datasets_file=args.obis_datasets_file,
+        )
+        obis_folder = args.obis_folder
+
+        if not urls and not obis_dataset_ids:
+            parser.error("At least one of --urls or --obis-datasets-file/--obis-dataset-ids is required")
+
     logger = setup_logging(log_time, log_level, log_dir)
     try:
-        main(urls, cache, folder or "harvest", dataset_ids, max_workers)
+        main(urls, cache, folder or "harvest", dataset_ids,
+             obis_dataset_ids=obis_dataset_ids, obis_folder=obis_folder)
     except Exception as e:
         logger.error("Harvester failed!!!", exc_info=True)
         raise e

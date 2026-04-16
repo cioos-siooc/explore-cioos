@@ -33,4 +33,6 @@ most_common_queries
 
 nginx/logs/
 nginx/logrotate_state/
+nginx/logs/*.log
 harvester_logs
+obis/

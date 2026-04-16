@@ -1,0 +1,42 @@
+name: Run Harvester
+
+on:
+  workflow_dispatch:
+
+jobs:
+  harvest:
+    name: Run harvester on ${{ github.ref_name == 'master' && 'production' || 'development' }}
+    timeout-minutes: 120
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'master' && 'production' || 'development' }}
+    steps:
+      - name: Install WireGuard
+        run: sudo apt-get install -y wireguard
+
+      - name: Configure and start WireGuard
+        run: |
+          echo "${{ secrets.AZURE_CO_WIREGUARD_VPN_CONFIG }}" | sed '/^DNS\s*=/Id' | sudo tee /etc/wireguard/wg0.conf > /dev/null
+          sudo chmod 600 /etc/wireguard/wg0.conf
+          sudo wg-quick up wg0
+
+      - name: Verify WireGuard connection
+        run: |
+          sudo wg show wg0
+          ping -c 3 ${{ secrets.SERVER_IP }}
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AZURE_CO_RUNNER_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Run harvester
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/deploy_key github-runner@${{ secrets.SERVER_IP }}"
+          STACK="explore-cioos-${{ github.ref_name == 'master' && 'production' || 'development' }}"
+          ${SSH_CMD} "cd /srv/services/explore-cioos && docker compose -p ${STACK} -f docker-compose.production.yaml --profile tools run -d --rm harvester"
+
+      - name: Tear down WireGuard
+        if: always()
+        run: sudo wg-quick down wg0

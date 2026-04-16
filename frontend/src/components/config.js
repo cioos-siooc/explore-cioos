@@ -7,11 +7,14 @@ export const defaultEndDate = new Date().toISOString().split('T')[0]
 export const defaultStartDepth = 0
 export const defaultEndDepth = 12000
 
+export const defaultShowObis = true
+
 export const defaultQuery = {
   startDate: defaultStartDate,
   endDate: defaultEndDate,
   startDepth: defaultStartDepth,
-  endDepth: defaultEndDepth
+  endDepth: defaultEndDepth,
+  showObis: defaultShowObis
 }
 
 export const colorScale = [

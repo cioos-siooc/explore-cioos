@@ -24,14 +24,6 @@ CREATE TABLE hexes_zoom_1 (
 
  
 
--- The harvester will skip datasets in this table
-DROP TABLE IF EXISTS skipped_datasets;
-CREATE TABLE skipped_datasets (
-    pk serial PRIMARY KEY,
-    dataset_id text,
-    erddap_url text
-);
-
 -- ERDDAP Datasets
 DROP TABLE IF EXISTS datasets;
 CREATE TABLE datasets (
@@ -56,6 +48,7 @@ CREATE TABLE datasets (
     profile_variables text[],
     num_columns integer,
     first_eov_column TEXT,
+    source_type TEXT DEFAULT 'erddap',
     UNIQUE(dataset_id, erddap_url)
 );
 
@@ -83,17 +76,9 @@ CREATE TABLE points (
     hex_1_pk integer
 );
 
-CREATE INDEX
-  ON points
-  USING GIST (geom);
-
-CREATE INDEX hex_zoom_0
-ON cde.points
-USING GIST (geom);
-
-CREATE INDEX hex_zoom_1
-ON cde.points
-USING GIST (geom);
+CREATE INDEX ON points USING GIST (geom);
+CREATE INDEX hex_zoom_0 ON cde.points USING GIST (hex_zoom_0);
+CREATE INDEX hex_zoom_1 ON cde.points USING GIST (hex_zoom_1);
 
 
 -- profiles/timeseries per dataset
@@ -136,6 +121,36 @@ CREATE INDEX ON profiles(erddap_url, dataset_id);
 CREATE INDEX ON profiles(erddap_url, dataset_id, timeseries_id, profile_id);
 
 
+
+
+DROP TABLE IF EXISTS obis_cells;
+CREATE TABLE obis_cells (
+    pk serial PRIMARY KEY,
+    geom geometry(Point, 3857),
+    dataset_pk integer,
+    dataset_id text,
+    latitude double precision,
+    longitude double precision,
+    scientific_names text[] DEFAULT '{}',
+    n_records bigint,
+    time_min timestamptz,
+    time_max timestamptz,
+    depth_min double precision,
+    depth_max double precision,
+    hex_zoom_0 geometry(polygon, 3857),
+    hex_zoom_1 geometry(polygon, 3857),
+    hex_0_pk integer,
+    hex_1_pk integer,
+    point_pk integer,
+    UNIQUE(dataset_id, latitude, longitude),
+    FOREIGN KEY (dataset_pk) REFERENCES datasets(pk)
+);
+
+CREATE INDEX ON obis_cells USING GIST (geom);
+CREATE INDEX ON obis_cells USING GIST (hex_zoom_0);
+CREATE INDEX ON obis_cells USING GIST (hex_zoom_1);
+CREATE INDEX ON obis_cells (dataset_id);
+CREATE INDEX ON obis_cells (latitude, longitude);
 
 
 --

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from prefect import flow, get_run_logger
-from cde_harvester.__main__ import main as harvester_main, setup_logging, load_config
+from cde_harvester.__main__ import main as harvester_main, setup_logging, load_config, load_obis_dataset_ids
 from cde_harvester.redisFunctions import redisFlow
 from cde_db_loader.__main__ import main as db_loader_main
 from dotenv import load_dotenv
@@ -21,20 +21,21 @@ class PrefectCDEPipeline:
     cache_requests: bool
     folder: str
     dataset_ids: str
-    max_workers: int
     log_time: bool
     log_level: str
     log_dir: str
     incremental: bool
     flush_redis: bool
+    obis_dataset_ids: list
+    obis_folder: str
 
     @flow(name="Init CDE Config", log_prints=True)
     def init_config(self, config_file=None):
         """
         Init Prefect for cde_harvester.
-        
+
         Args:
-            dotenv_file: Path to .env file for Prefect configuration
+            config_file: Path to harvest_config.yaml
 
         """
         logger = get_run_logger()
@@ -50,15 +51,19 @@ class PrefectCDEPipeline:
         self.cache_requests = config.get("cache", False)
         self.folder = config.get("folder") or "harvest"
         self.dataset_ids = ",".join(config.get("dataset_ids") or [])
-        self.max_workers = config.get("max-workers", 1)
         self.log_time = config.get("log_time", False)
         self.log_level = config.get("log_level", "INFO")
         self.log_dir = os.environ.get("HARVESTER_LOG_DIR") or config.get("log_dir")
         self.incremental = config.get("incremental", False)
         self.flush_redis = config.get("flush_redis", False)
+        self.obis_dataset_ids = load_obis_dataset_ids(
+            dataset_ids=config.get("obis_dataset_ids"),
+            datasets_file=config.get("obis_datasets_file"),
+        )
+        self.obis_folder = config.get("obis_folder")
 
         logger.info("CDE Pipeline initialized with configuration:")
-        logger.info(f"{vars(self)}") # does this wrok?
+        logger.info(f"{vars(self)}")
 
     @flow(name="CDE Pipeline", log_prints=True)
     def cde_pipeline(self):
@@ -80,7 +85,8 @@ class PrefectCDEPipeline:
                 cache_requests=self.cache_requests,
                 folder=self.folder,
                 dataset_ids=self.dataset_ids,
-                max_workers=self.max_workers
+                obis_dataset_ids=self.obis_dataset_ids,
+                obis_folder=self.obis_folder,
             )
             logger.info("cde_harvester completed successfully")
         except Exception as e:
@@ -94,6 +100,7 @@ class PrefectCDEPipeline:
             logger.info("cde_db_loader completed successfully")
         except Exception as e:
             logger.error(f"cde_db_loader failed: {e}", exc_info=True)
+            raise
 
         # Run redis refresh as a subflow
         logger.info("Running redisFlow subflow")
@@ -181,7 +188,6 @@ class PrefectCDEPipeline:
 
         self.create_docker_work_pool()
 
-        
         deployment_id = self.deploy(
             name="cde-harvester-deployment",
             work_pool_name="docker-pool",
@@ -227,11 +233,11 @@ class PrefectCDEPipeline:
 
 def deploy(pipeline):
     # Create deployment after successful run
-    # we should double check that this did deploy
-    if pipeline.create_deployment:
+    try:
+        pipeline.create_deployment()
         logger.info("CDE Pipeline and Deployment completed successfully")
-    else:
-        logger.error("CDE Pipeline completed but deployment failed")
+    except Exception as e:
+        logger.error("CDE Pipeline completed but deployment failed: %s", e)
         sys.exit(1)
 
 def main():
@@ -245,15 +251,15 @@ def main():
     try:
         if args.file:
             pipeline.init_config(config_file=args.file)
-        if args.deployment == "prod":
-            deploy(pipeline)
         else:
             logger.error("No config file provided. Use --config-file to specify the path to harvest_config.yaml")
             sys.exit(1)
+        if args.deployment == "prod":
+            deploy(pipeline)
     except Exception as e:
         logger.error(f"CDE Pipeline failed: {e}", exc_info=True)
         sys.exit(1)
     pipeline.cde_pipeline()
 
 if __name__ == "__main__":
-   main()
+    main()

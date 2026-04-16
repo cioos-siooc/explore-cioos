@@ -17,9 +17,22 @@ dataset_ids:
 # defaults to false
 log_time:
 
-#defaults to false
-flush_redis: False
+# defaults to false
+flush_redis: false
 
-#defaults to false
-incremental: True
+# defaults to false
+incremental: true
+
+# --- OBIS Configuration ---
+# Path to JSON file containing OBIS dataset UUIDs
+# Format: {"datasets": ["uuid1", "uuid2", ...]}
+# obis_datasets_file: ./Obis_Datasets.json
+
+# Or specify individual OBIS dataset IDs inline (for small sets / testing)
+# obis_dataset_ids:
+#   - 4b5e4ccb-cf66-44e4-8890-fa68f8404c3f
+
+# Cache folder for OBIS occurrence and metadata data
+# Defaults to obis_cache/ next to the output folder
+# obis_folder: ./obis_cache
 
