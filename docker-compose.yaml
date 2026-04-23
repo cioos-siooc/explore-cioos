@@ -2,10 +2,10 @@ services:
   db:
     image: "postgis/postgis:13-3.1-alpine"
     platform: linux/x86_64
-    ports:
-      - "${DB_PORT:-5432}:${DB_PORT:-5432}"
+    expose:
+      - "5432"
     environment:
-      - "PGPORT=${DB_PORT:-5432}"
+      - "PGPORT=5432"
       - "POSTGRES_DB=$DB_NAME"
       - "POSTGRES_PASSWORD=$DB_PASSWORD"
       - "POSTGRES_USER=$DB_USER"
@@ -25,7 +25,8 @@ services:
     expose:
       - "5000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
   nginx:
     image: nginx:latest
     volumes:
@@ -41,21 +42,24 @@ services:
       context: .
       dockerfile: ./download_scheduler/Dockerfile
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     env_file:
       - .env
+    environment:
+      - "DOWNLOAD_WAF_URL=${APP_DOMAIN}/downloads"
     volumes:
       - ./downloads:/usr/src/app/download_scheduler/downloads
   frontend:
     build:
       context: ./frontend
       args:
-        API_URL: $API_URL
-        BASE_URL: $BASE_URL
+        API_URL: ${API_URL:-http://web-api:5000/api}
+        BASE_URL: ${BASE_URL:-/}
     expose:
       - "80"
-    # depends_on:
-    #   - web-api
+    depends_on:
+      - web-api
 
   harvester:
     build:
