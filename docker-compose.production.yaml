@@ -7,6 +7,11 @@ services:
     volumes:
       - redis-data:/var/lib/redis
       - ./redis-config/redis.conf:/usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   db:
     image: "postgis/postgis:13-3.1-alpine"
     platform: linux/x86_64
@@ -38,18 +43,29 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     deploy:
       replicas: 4
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
   nginx:
-    image: nginx:latest
+    build: ./nginx
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./harvester_logs:/usr/share/nginx/html/harvester_logs:ro
     depends_on:
-      - web-api
+      web-api:
+        condition: service_healthy
     ports:
       - "$NGINX_PORT:4000"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
   scheduler:
     build:
       # Scheduler needs context ., see the dockerfile
@@ -67,6 +83,11 @@ services:
     volumes:
       - downloads:/usr/src/app/download_scheduler/downloads
     restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
   frontend:
     build:
       context: ./frontend
@@ -76,7 +97,13 @@ services:
     expose:
       - "80"
     depends_on:
-      - web-api
+      web-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   harvester:
     build:

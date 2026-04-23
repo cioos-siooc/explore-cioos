@@ -1,5 +1,7 @@
 FROM ghcr.io/astral-sh/uv:python3.10-bookworm
 
+RUN apt-get -y -qq update && apt-get -y -qq install curl
+
 WORKDIR /app
 
 # 1. Copy path dependency (db-loader) and manifests for harvester
@@ -19,5 +21,8 @@ COPY ./harvester/run.sh ./run.sh
 # 4. Install project itself
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked || (echo "Lock mismatch final stage, aborting" && exit 1)
+
+HEALTHCHECK --interval=60s --timeout=10s --retries=2 \
+  CMD test -f /tmp/harvester.pid && ps -p $(cat /tmp/harvester.pid) > /dev/null || exit 1
 
 CMD ["sh","run.sh"]

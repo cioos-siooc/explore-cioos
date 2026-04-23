@@ -3,7 +3,7 @@ FROM ghcr.io/astral-sh/uv:python3.10-bookworm
 # for shapely, pdf creation
 RUN apt-get -y -qq update
 # libqt5gui5 needed by wkhtmltopdf
-RUN apt-get -y -qq install gcc libc-dev libgeos-dev python3-dev wkhtmltopdf libqt5gui5
+RUN apt-get -y -qq install gcc libc-dev libgeos-dev python3-dev wkhtmltopdf libqt5gui5 curl
 
 # See https://github.com/wkhtmltopdf/wkhtmltopdf/issues/4497. exit 0 so it doesnt fail on ARM
 
@@ -20,5 +20,8 @@ COPY db-loader ./db-loader
 WORKDIR /usr/src/app/download_scheduler
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-install-project
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
 
 CMD [ "uv", "run", "python", "-m", "download_scheduler" ]
