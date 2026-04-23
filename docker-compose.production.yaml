@@ -130,6 +130,7 @@ services:
     environment:
       - PREFECT_API_URL=http://prefect:4200/api
       - HARVESTER_LOG_DIR=/app/harvester/logs
+      - HARVEST_CONFIG_FILE=/app/harvester/harvest_config.yaml
       - DB_HOST_EXTERNAL=${DB_HOST_EXTERNAL:-db}
       - REDIS_HOST=${REDIS_HOST:-redis}
       - PREFECT_LOGGING_EXTRA_LOGGERS=populate_vernaculars,cde_db_loader,cde_harvester

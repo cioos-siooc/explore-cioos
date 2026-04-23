@@ -141,6 +141,10 @@ services:
       DB_HOST_EXTERNAL: db
       REDIS_HOST: redis
       HARVESTER_LOG_DIR: /app/harvester/logs
+      # Where the app reads config inside the container (the ${HARVEST_CONFIG_FILE}
+      # host file above is always mounted here). Lets the harvester CLI find config
+      # via env var without a -f flag.
+      HARVEST_CONFIG_FILE: /app/harvester/harvest_config.yaml
       # Surface stdlib-logging from harvester/db-loader in Prefect UI logs.
       PREFECT_LOGGING_EXTRA_LOGGERS: populate_vernaculars,cde_db_loader,cde_harvester
       # This worker registers the pool + deployments on startup.
