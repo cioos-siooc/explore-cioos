@@ -88,6 +88,10 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "healthy" });
+});
+
 app.use("/", indexRouter);
 app.use("/download", downloadRouter);
 app.use("/legend", legendRouter);
