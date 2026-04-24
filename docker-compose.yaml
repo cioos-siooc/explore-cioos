@@ -37,6 +37,8 @@ services:
       - web-api
     ports:
       - "$NGINX_PORT:4000"
+    expose:
+      - "4000"
   scheduler:
     build:
       context: .
