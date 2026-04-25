@@ -36,9 +36,7 @@ services:
     depends_on:
       - web-api
     ports:
-      - "$NGINX_PORT:4000"
-    expose:
-      - "4000"
+      - "$NGINX_PORT:80"
   scheduler:
     build:
       context: .
@@ -49,14 +47,18 @@ services:
     env_file:
       - .env
     environment:
-      - "DOWNLOAD_WAF_URL=${APP_DOMAIN}/downloads"
+      # APP_DOMAIN auto-derives from Coolify's injected SERVICE_URL_NGINX when present;
+      # falls back to APP_DOMAIN from .env for local dev.
+      - "DOWNLOAD_WAF_URL=${SERVICE_URL_NGINX:-${APP_DOMAIN}}/downloads"
     volumes:
       - ./downloads:/usr/src/app/download_scheduler/downloads
   frontend:
     build:
       context: ./frontend
       args:
-        API_URL: ${API_URL:-http://web-api:5000/api}
+        # Default to a same-origin relative path so the SPA works on whatever
+        # public hostname serves it without a rebuild.
+        API_URL: ${API_URL:-/api}
         BASE_URL: ${BASE_URL:-/}
     expose:
       - "80"
