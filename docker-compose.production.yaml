@@ -1,12 +1,12 @@
 services:
-  redis:
+  app-redis:
     image: "redis:alpine"
     expose:
       - "6379"
     command: redis-server /usr/local/etc/redis/redis.conf
     volumes:
       - redis-data:/var/lib/redis
-      - ./redis-config/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./redis-config/redis.conf:/usr/local/etc/redis/redis.conf:ro
   db:
     image: "postgis/postgis:13-3.1-alpine"
     platform: linux/x86_64
@@ -37,7 +37,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      redis:
+      app-redis:
         condition: service_started
     deploy:
       replicas: 4
