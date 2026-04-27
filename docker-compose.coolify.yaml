@@ -1,0 +1,10 @@
+services:
+  harvester-deploy:
+    extends:
+      file: docker-compose.yaml
+      service: harvester
+    profiles: []
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
