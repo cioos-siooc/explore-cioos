@@ -148,5 +148,8 @@ BEGIN
   SET n_profiles = (SELECT count(*) FROM obis_cells c WHERE c.dataset_pk = d.pk)
   WHERE d.source_type = 'obis';
 
+  -- Refresh the scientific names lookup used by the /scientificNames typeahead
+  REFRESH MATERIALIZED VIEW CONCURRENTLY cde.obis_scientific_names;
+
 END;
 $$ LANGUAGE plpgsql;

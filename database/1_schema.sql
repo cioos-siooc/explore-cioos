@@ -151,6 +151,19 @@ CREATE INDEX ON obis_cells USING GIST (hex_zoom_0);
 CREATE INDEX ON obis_cells USING GIST (hex_zoom_1);
 CREATE INDEX ON obis_cells (dataset_id);
 CREATE INDEX ON obis_cells (latitude, longitude);
+CREATE INDEX obis_cells_scientific_names_gin ON cde.obis_cells USING GIN (scientific_names);
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+DROP MATERIALIZED VIEW IF EXISTS cde.obis_scientific_names;
+CREATE MATERIALIZED VIEW cde.obis_scientific_names AS
+  SELECT DISTINCT unnest(scientific_names) AS scientific_name
+    FROM cde.obis_cells
+   WHERE scientific_names IS NOT NULL;
+
+CREATE UNIQUE INDEX ON cde.obis_scientific_names (scientific_name);
+CREATE INDEX obis_scientific_names_trgm
+  ON cde.obis_scientific_names USING GIN (scientific_name gin_trgm_ops);
 
 
 --

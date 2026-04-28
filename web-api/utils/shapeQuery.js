@@ -9,18 +9,32 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
   const {
     timeMin = null, timeMax = null, depthMin = null, depthMax = null,
     includeObis = 'true',
+    scientificNames,
   } = query;
 
-  const sql = `WITH combined AS (
-        SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,
+  // Scientific-name filter is OBIS-only: when set, hide profiles and narrow OBIS.
+  const includeProfiles = !scientificNames;
+  const showObis = includeObis !== 'false';
+
+  const profilesBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,
                profile_id, timeseries_id,
                latitude, longitude, point_pk, geom
-        FROM cde.profiles
-        ${includeObis !== 'false' ? `UNION ALL
-        SELECT dataset_pk, time_min, time_max, depth_min, depth_max, 0 as records_per_day,
+        FROM cde.profiles`;
+  const obisBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, 0 as records_per_day,
                NULL as profile_id, NULL as timeseries_id,
                latitude, longitude, point_pk, geom
-        FROM cde.obis_cells` : ''}
+        FROM cde.obis_cells
+        WHERE :obisFilters`;
+
+  const branches = [];
+  if (includeProfiles) branches.push(profilesBranch);
+  if (showObis) branches.push(obisBranch);
+  const combinedInner = branches.length
+    ? branches.join("\n        UNION ALL\n        ")
+    : `${profilesBranch} WHERE FALSE`;
+
+  const sql = `WITH combined AS (
+        ${combinedInner}
   ),
   sub AS
         (SELECT   d.pk,
@@ -76,12 +90,12 @@ FROM   sub`;
       timeMax,
       depthMin,
       depthMax,
-      filters,
+      filters: filters.shared,
+      obisFilters: filters.obisOnly,
       adder: 0,
       multiplier: 10,
     };
-  } else queryParams = { filters };
-  if (!queryParams.filters?.sql) queryParams.filters = "TRUE";
+  } else queryParams = { filters: filters.shared, obisFilters: filters.obisOnly };
 
   const q = db.raw(sql, queryParams);
 

@@ -29,6 +29,7 @@ import Legend from './Controls/Legend/Legend.jsx'
 import IntroModal from './Controls/IntroModal/IntroModal.jsx'
 import Filter from './Controls/Filter/Filter.jsx'
 import MultiCheckboxFilter from './Controls/Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx'
+import ScientificNameFilter from './Controls/Filter/ScientificNameFilter/ScientificNameFilter.jsx'
 import TimeSelector from './Controls/Filter/TimeSelector/TimeSelector.jsx'
 import DepthSelector from './Controls/Filter/DepthSelector/DepthSelector.jsx'
 import QuestionIconTooltip from './Controls/QuestionIconTooltip/QuestionIconTooltip.jsx'
@@ -44,7 +45,8 @@ import {
   defaultStartDepth,
   defaultEndDepth,
   defaultDatatsetsSelected,
-  defaultPlatformsSelected
+  defaultPlatformsSelected,
+  defaultScientificNamesSelected
 } from './config.js'
 import {
   createDataFilterQueryString,
@@ -100,7 +102,8 @@ export default function App() {
     orgsSelected: defaultOrgsSelected,
     datasetsSelected: defaultDatatsetsSelected,
     platformsSelected: defaultPlatformsSelected,
-    showObis: true
+    showObis: true,
+    scientificNamesSelected: defaultScientificNamesSelected
   }
   const [query, setQuery] = useState(defaultQuery)
   const [showModal, setShowModal] = useState(false)
@@ -182,6 +185,15 @@ export default function App() {
   // OBIS toggle
   const [showObis, setShowObis] = useState(true)
 
+  // Scientific name filter (OBIS only)
+  const [scientificNamesSelected, setScientificNamesSelected] = useState(
+    defaultScientificNamesSelected
+  )
+  const debouncedScientificNamesSelected = useDebounce(
+    scientificNamesSelected,
+    500
+  )
+
   // Filter open state
   const [openFilter, setOpenFilter] = useState()
 
@@ -205,7 +217,8 @@ export default function App() {
       orgsSelected,
       datasetsSelected,
       platformsSelected,
-      showObis
+      showObis,
+      scientificNamesSelected
     })
   }, [
     debouncedStartDate,
@@ -216,7 +229,8 @@ export default function App() {
     debouncedOrgsSelected,
     debouncedDatasetsSelected,
     debouncedPlatformsSelected,
-    showObis
+    showObis,
+    debouncedScientificNamesSelected
   ])
 
   function createOptionSubset (searchTerms, allOptions) {
@@ -301,11 +315,20 @@ export default function App() {
       lat,
       lon,
       zoom,
-      includeObis
+      includeObis,
+      scientificNames
     } = filtersFromURL
 
     if (lat || lon || zoom) setMapView({ lat, lon, zoom })
     if (includeObis === 'false') setShowObis(false)
+    if (scientificNames) {
+      setScientificNamesSelected(
+        scientificNames
+          .split(',')
+          .map((name) => decodeURIComponent(name))
+          .filter(Boolean)
+      )
+    }
     if (timeMin) setStartDate(timeMin)
     if (timeMax) setEndDate(timeMax)
     if (depthMin && Number.parseInt(depthMin) > 0) setStartDepth(Number.parseInt(depthMin))
@@ -906,6 +929,19 @@ export default function App() {
             </div>
           </button>
         </div>
+        <ScientificNameFilter
+          scientificNamesSelected={scientificNamesSelected}
+          setScientificNamesSelected={setScientificNamesSelected}
+          disabled={!showObis}
+          disabledTooltip={t('scientificNameFilterDisabledTooltip')}
+          tooltip={t('scientificNameFilterTooltip')}
+          controlled
+          openFilter={openFilter === 'scientificNameFilterName'}
+          setOpenFilter={setOpenFilter}
+          filterName='scientificNameFilterName'
+          badgeTitle={t('scientificNameFilterName')}
+          searchPlaceholder={t('scientificNameFilterSearchPlaceholder')}
+        />
         <button
           className='resetFiltersButton'
           title={t('resetFiltersButtonTooltipText')}

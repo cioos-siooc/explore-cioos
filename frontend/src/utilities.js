@@ -81,8 +81,13 @@ function objectToURL (obj) {
 }
 
 export function createDataFilterQueryString(query) {
-  const { orgsSelected, eovsSelected, platformsSelected, datasetsSelected } =
-    query
+  const {
+    orgsSelected,
+    eovsSelected,
+    platformsSelected,
+    datasetsSelected,
+    scientificNamesSelected
+  } = query
 
   // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
   const queryWithoutDefaults = Object.keys(defaultQuery).reduce(
@@ -131,6 +136,10 @@ export function createDataFilterQueryString(query) {
   }
   const { startDepth, endDepth, startDate, endDate, showObis } = queryWithoutDefaults
 
+  const scientificNames = (scientificNamesSelected && scientificNamesSelected.length)
+    ? scientificNamesSelected.map(encodeURIComponent).join(',')
+    : ''
+
   const apiMappedQuery = {
     // These properties are specified by the API's schema
     eovs,
@@ -141,7 +150,8 @@ export function createDataFilterQueryString(query) {
     timeMax: endDate,
     depthMin: startDepth,
     depthMax: endDepth,
-    includeObis: showObis === false ? 'false' : ''
+    includeObis: showObis === false ? 'false' : '',
+    scientificNames
   }
 
   return objectToURL(apiMappedQuery)

@@ -21,9 +21,11 @@ function createDBFilter(request) {
     organizations,
     datasetPKs,
     pointPKs,
+    scientificNames,
   } = request;
 
   const filters = [];
+  const obisFilters = [];
   const parameters = {};
 
   if (eovs) {
@@ -94,10 +96,23 @@ function createDBFilter(request) {
     parameters.wktPolygon = wktPolygon;
     filters.push("ST_Contains(ST_GeomFromText(:wktPolygon,4326),ST_Transform(geom,4326)) is true");
   }
-  const sql = filters.join(" AND \n");
-  const query = db.raw(sql, parameters);
 
-  return query;
+  if (scientificNames) {
+    parameters.scientificNamesArr = unique(
+      scientificNames.split(",").map((s) => s.trim()).filter(Boolean),
+    );
+    obisFilters.push("scientific_names && :scientificNamesArr");
+  }
+
+  const sharedSql = filters.join(" AND \n") || "TRUE";
+  const obisSql = obisFilters.join(" AND \n") || "TRUE";
+
+  return {
+    shared: db.raw(sharedSql, parameters),
+    obisOnly: db.raw(obisSql, parameters),
+    hasShared: filters.length > 0,
+    hasObisOnly: obisFilters.length > 0,
+  };
 }
 
 module.exports = createDBFilter;

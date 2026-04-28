@@ -58,7 +58,6 @@ router.get(
     const { z, x, y } = req.params;
 
     const filters = createDBFilter(req.query);
-    const hasFilter = filters.toSQL().sql;
 
     // zoom levels: 0-4,5-6,7+
     const isHexGrid = z < 7;
@@ -72,17 +71,30 @@ router.get(
       geom_column: isHexGrid ? zoomColumn : "geom",
     };
     const includeObis = req.query.includeObis !== 'false';
+    // Scientific-name filter is OBIS-only: when set, hide profiles and narrow OBIS.
+    const includeProfiles = !req.query.scientificNames;
+
+    const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, :geom_column: as geom, days as record_count,
+           time_min, time_max, latitude, longitude, depth_min, depth_max
+    FROM cde.profiles`;
+    const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, :geom_column: as geom,
+           date_part('days', time_max - time_min) + 1 as record_count,
+           time_min, time_max, latitude, longitude, depth_min, depth_max
+    FROM cde.obis_cells
+    WHERE :obisFilters`;
+
+    const branches = [];
+    if (includeProfiles) branches.push(profilesBranch);
+    if (includeObis) branches.push(obisBranch);
+    // Guard: if nothing to show, return an empty CTE that still has the right columns
+    const combinedInner = branches.length
+      ? branches.join("\n    UNION ALL\n    ")
+      : `${profilesBranch} WHERE FALSE`;
+
     // Combine profiles and obis_cells so both appear on the map
     const SQL = `
   with combined as (
-    SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, :geom_column: as geom, days as record_count,
-           time_min, time_max, latitude, longitude, depth_min, depth_max
-    FROM cde.profiles
-    ${includeObis ? `UNION ALL
-    SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, :geom_column: as geom,
-           date_part('days', time_max - time_min) + 1 as record_count,
-           time_min, time_max, latitude, longitude, depth_min, depth_max
-    FROM cde.obis_cells` : ''}
+    ${combinedInner}
   ),
   relevent_points as (
     ${
@@ -94,7 +106,7 @@ router.get(
         -- used for organizations filtering
         JOIN cde.datasets d
         ON p.dataset_pk = d.pk
-       ${hasFilter ? "WHERE :filters" : ""}
+       ${filters.hasShared ? "WHERE :filters" : ""}
         ${
   isHexGrid ? "GROUP BY p.zoom_pk,p.geom" : "GROUP BY p.geom,p.point_pk,d.platform"
 } ),
@@ -115,7 +127,8 @@ router.get(
 
     try {
       const q = db.raw(SQL, {
-        filters,
+        filters: filters.shared,
+        obisFilters: filters.obisOnly,
         zoomPKColumn,
         geom_column: sqlQuery.geom_column,
         z,

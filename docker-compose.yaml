@@ -80,7 +80,18 @@ services:
       - DB_HOST_EXTERNAL=db
     env_file:
       - .env
-
+      
+      
+  redis:
+    image: "redis:alpine"
+    expose:
+      - "6379"
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - redis-data:/var/lib/redis
+      - ./redis-config/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - explore-cioos_default
   prefect:
     image: prefecthq/prefect:3.6-python3.12-conda
     command: prefect server start --host 0.0.0.0
@@ -103,3 +114,7 @@ services:
 volumes:
   postgres-data:
   prefect_data:
+  redis-data:
+networks:
+  explore-cioos_default:
+    external: true
