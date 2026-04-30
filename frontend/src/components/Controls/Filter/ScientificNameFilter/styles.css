@@ -1,0 +1,80 @@
+.scientificNameFilter .filterHeader.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.scientificNameFilter .filterHeader.disabled:hover {
+  background-color: white;
+  border: 1px solid white;
+}
+
+.scientificNameChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+  max-width: 420px;
+}
+
+.scientificNameChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 1px solid #b8b8b8;
+  cursor: pointer;
+  font-weight: normal;
+  font-size: 13px;
+}
+
+.scientificNameChipName {
+  font-style: italic;
+}
+
+.scientificNameChipVernacular {
+  font-style: normal;
+  color: #555;
+  font-size: 12px;
+}
+
+.scientificNameChip:hover {
+  background-color: #e8e8e8 !important;
+}
+
+.scientificNameSuggestions {
+  max-height: 260px;
+  min-width: 350px;
+  max-width: 500px;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+.scientificNameSuggestion {
+  padding: 5px 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.scientificNameSuggestionPrimary {
+  font-style: italic;
+}
+
+.scientificNameSuggestionVernacular {
+  font-size: 12px;
+  color: #666;
+  font-style: normal;
+  margin-top: 1px;
+}
+
+.scientificNameSuggestion:hover {
+  background-color: #c6e3df;
+}
+
+.scientificNameEmpty,
+.scientificNameLoading {
+  padding: 8px;
+  color: #888;
+  font-size: 13px;
+}
