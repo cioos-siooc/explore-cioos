@@ -1,6 +1,6 @@
 services:
   harvester:
-    profiles: []
+    profiles: !reset []
     restart: "no"
     depends_on:
       db:
