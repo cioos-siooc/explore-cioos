@@ -166,6 +166,22 @@ CREATE INDEX obis_scientific_names_trgm
   ON cde.obis_scientific_names USING GIN (scientific_name gin_trgm_ops);
 
 
+-- Vernacular (common) names per scientific name, sourced from WoRMS.
+-- Populated by db-loader/cde_db_loader/populate_vernaculars.py; not written by the harvester.
+-- Searches use unnest + ILIKE; with a small row count (one per scientific name)
+-- a seq scan is fast enough without a trigram index. Add a denormalised text
+-- column + IMMUTABLE wrapper if this ever needs an index.
+DROP TABLE IF EXISTS cde.scientific_name_vernaculars;
+CREATE TABLE cde.scientific_name_vernaculars (
+    scientific_name text PRIMARY KEY,
+    aphia_id        integer,
+    vernaculars_en  text[] NOT NULL DEFAULT '{}',
+    vernaculars_fr  text[] NOT NULL DEFAULT '{}',
+    fetched_at      timestamptz NOT NULL DEFAULT now(),
+    fetch_status    text NOT NULL DEFAULT 'ok'
+);
+
+
 --
 DROP TABLE IF EXISTS download_jobs;
 CREATE TABLE download_jobs (
