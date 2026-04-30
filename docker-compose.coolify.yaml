@@ -5,3 +5,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes: !reset
+      - ./harvest_config.sample.yaml:/app/harvester/harvest_config.sample.yaml
+      - ./harvester_cache:/app/harvester/harvester_cache
+      - ./harvest:/app/harvester/harvest
+      - ./harvester_logs:/app/harvester/logs
+    environment:
+      - "HARVESTER_LOG_DIR=/app/harvester/logs"
+      - "HARVEST_CONFIG_FILE=/app/harvester/harvest_config.sample.yaml"

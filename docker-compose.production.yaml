@@ -88,13 +88,13 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ./${HARVEST_CONFIG_FILE:-harvest_config.yaml}:/app/harvester/${HARVEST_CONFIG_FILE:-harvest_config.yaml}
+      - ./harvest_config.yaml:/app/harvester/harvest_config.yaml
       - ./harvester_cache:/app/harvester/harvester_cache
       - ./harvest:/app/harvester/harvest
       - ./harvester_logs:/app/harvester/logs
     environment:
       - "HARVESTER_LOG_DIR=/app/harvester/logs"
-      - "HARVEST_CONFIG_FILE=/app/harvester/${HARVEST_CONFIG_FILE:-harvest_config.yaml}"
+      - "HARVEST_CONFIG_FILE=/app/harvester/harvest_config.yaml"
     env_file:
       - .env
 volumes:
