@@ -3,7 +3,7 @@ services:
     ports: !reset []
   db:
     expose: !reset []
-  api:
+  web-api:
     expose: !reset []
   harvester:
     profiles: !reset []
