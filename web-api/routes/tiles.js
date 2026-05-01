@@ -57,7 +57,13 @@ router.get(
   async (req, res) => {
     const { z, x, y } = req.params;
 
-    const filters = createDBFilter(req.query);
+    let filters;
+    try {
+      filters = await createDBFilter(req.query);
+    } catch (err) {
+      if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+      throw err;
+    }
 
     // zoom levels: 0-4,5-6,7+
     const isHexGrid = z < 7;

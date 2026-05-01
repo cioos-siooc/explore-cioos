@@ -74,7 +74,13 @@ router.get(
   cache.route(),
   validatorMiddleware(),
   async (req, res, next) => {
-    const filters = createDBFilter(req.query);
+    let filters;
+    try {
+      filters = await createDBFilter(req.query);
+    } catch (err) {
+      if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+      throw err;
+    }
     const includeObis = req.query.includeObis !== 'false';
     // Scientific-name filter is OBIS-only: when set, hide profiles and narrow OBIS.
     const includeProfiles = !req.query.scientificNames;

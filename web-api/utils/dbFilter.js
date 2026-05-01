@@ -3,7 +3,28 @@ const { polygonJSONToWKT } = require("./polygon");
 const unique = (arr) => [...new Set(arr)];
 const db = require("../db");
 
-function createDBFilter(request) {
+// Hard cap on the AphiaID rolldown expansion. Selections expanding to more
+// than this many distinct AphiaIDs are rejected with HTTP 400 — a Phylum or
+// Kingdom selection blows past this and would force a multi-minute GIN OR
+// against tens of thousands of posting lists. The frontend already hides
+// those ranks from the dropdown; this is the API-level safety net for
+// programmatic clients.
+const MAX_EXPANDED_APHIA_IDS = 5000;
+
+class ScientificNameSelectionTooBroadError extends Error {
+  constructor(expandedCount, threshold) {
+    super(
+      `Scientific-name selection rolls down to ${expandedCount} taxa (max ${threshold}). ` +
+      "Pick a Family or below.",
+    );
+    this.name = "ScientificNameSelectionTooBroadError";
+    this.statusCode = 400;
+    this.expandedCount = expandedCount;
+    this.threshold = threshold;
+  }
+}
+
+async function createDBFilter(request) {
   const {
     timeMin,
     timeMax,
@@ -98,34 +119,54 @@ function createDBFilter(request) {
   }
 
   if (scientificNames) {
-    parameters.scientificNamesArr = unique(
+    const scientificNamesArr = unique(
       scientificNames.split(",").map((s) => s.trim()).filter(Boolean),
     );
-    // Rank-aware match: a cell hits if it overlaps the selected names directly
-    // (literal back-compat — also covers the case where the vernacular cache
-    // was never populated), OR if any of its names share an accepted AphiaID
-    // with a selection (synonyms), OR if any of its names lists a selected
-    // name's AphiaID in their ancestor chain (descendants — the rolldown).
-    obisFilters.push(`(
-      scientific_names && :scientificNamesArr
-      OR scientific_names && ARRAY(
-           SELECT v2.scientific_name
-             FROM cde.scientific_name_vernaculars v2
-            WHERE v2.aphia_id IS NOT NULL
-              AND (
-                v2.aphia_id IN (
-                  SELECT v1.aphia_id FROM cde.scientific_name_vernaculars v1
-                   WHERE v1.scientific_name = ANY(:scientificNamesArr)
-                     AND v1.aphia_id IS NOT NULL
-                )
-                OR v2.ancestor_aphia_ids && ARRAY(
-                  SELECT v3.aphia_id FROM cde.scientific_name_vernaculars v3
-                   WHERE v3.scientific_name = ANY(:scientificNamesArr)
-                     AND v3.aphia_id IS NOT NULL
-                )
-              )
-         )
-    )`);
+    parameters.scientificNamesArr = scientificNamesArr;
+
+    // Pre-compute the rolldown expansion in one fast query (~30ms even for
+    // Phylum). Returns the set of AphiaIDs that selection rolls down to:
+    // selected names' accepted AphiaIDs (covers synonyms via shared
+    // valid_AphiaID) UNION every taxon whose ancestor chain contains one.
+    // The GIN index on ancestor_aphia_ids makes this index-only.
+    const expansionSql = `
+      WITH selected_aids AS (
+        SELECT DISTINCT aphia_id
+          FROM cde.scientific_name_vernaculars
+         WHERE scientific_name = ANY(:scientificNamesArr)
+           AND aphia_id IS NOT NULL
+      )
+      SELECT aphia_id FROM selected_aids
+      UNION
+      SELECT v.aphia_id
+        FROM cde.scientific_name_vernaculars v
+       WHERE v.ancestor_aphia_ids && ARRAY(SELECT aphia_id FROM selected_aids)
+         AND v.aphia_id IS NOT NULL`;
+    const { rows: expRows } = await db.raw(expansionSql, { scientificNamesArr });
+    const expandedAphiaIds = expRows
+      .map((r) => r.aphia_id)
+      .filter((n) => Number.isInteger(n));
+
+    if (expandedAphiaIds.length > MAX_EXPANDED_APHIA_IDS) {
+      throw new ScientificNameSelectionTooBroadError(
+        expandedAphiaIds.length,
+        MAX_EXPANDED_APHIA_IDS,
+      );
+    }
+
+    parameters.expandedAphiaIds = expandedAphiaIds;
+
+    // Rank-aware match against obis_cells.aphia_ids using the precomputed
+    // expansion (a flat int[] parameter — PG plans this as one BitmapOr over
+    // GIN posting lists, no nested InitPlan, no per-row recheck of an inline
+    // subquery). The literal scientific_names branch is the back-compat
+    // fallback for selections WoRMS never resolved (aphia_id IS NULL on
+    // not_found rows) and for any obis_cells whose aphia_ids weren't
+    // backfilled yet — e.g. freshly harvested cells before
+    // 5_profile_process.sql runs.
+    obisFilters.push(
+      "(aphia_ids && :expandedAphiaIds OR scientific_names && :scientificNamesArr)",
+    );
   }
 
   const sharedSql = filters.join(" AND \n") || "TRUE";
@@ -140,3 +181,5 @@ function createDBFilter(request) {
 }
 
 module.exports = createDBFilter;
+module.exports.ScientificNameSelectionTooBroadError = ScientificNameSelectionTooBroadError;
+module.exports.MAX_EXPANDED_APHIA_IDS = MAX_EXPANDED_APHIA_IDS;

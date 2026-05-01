@@ -132,6 +132,13 @@ CREATE TABLE obis_cells (
     latitude double precision,
     longitude double precision,
     scientific_names text[] DEFAULT '{}',
+    -- WoRMS AphiaIDs corresponding to scientific_names. Populated post-harvest
+    -- by joining each name to cde.scientific_name_vernaculars; see
+    -- 5_profile_process.sql. Drives the rank-aware filter rolldown in
+    -- web-api/utils/dbFilter.js — selecting a higher-rank name expands to a
+    -- small integer set of descendant AphiaIDs and we test overlap on this
+    -- column instead of building a 100k+ name array per tile request.
+    aphia_ids integer[] NOT NULL DEFAULT '{}',
     n_records bigint,
     time_min timestamptz,
     time_max timestamptz,
@@ -152,6 +159,7 @@ CREATE INDEX ON obis_cells USING GIST (hex_zoom_1);
 CREATE INDEX ON obis_cells (dataset_id);
 CREATE INDEX ON obis_cells (latitude, longitude);
 CREATE INDEX obis_cells_scientific_names_gin ON cde.obis_cells USING GIN (scientific_names);
+CREATE INDEX obis_cells_aphia_ids_gin         ON cde.obis_cells USING GIN (aphia_ids);
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 

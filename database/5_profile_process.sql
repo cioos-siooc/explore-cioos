@@ -155,5 +155,23 @@ BEGIN
   -- in 1_schema.sql.
   REFRESH MATERIALIZED VIEW CONCURRENTLY cde.obis_scientific_name_popularity;
 
+  -- Backfill obis_cells.aphia_ids from the latest scientific_name_vernaculars
+  -- mappings so the rank-aware filter rolldown can use integer-set overlap.
+  -- Runs only over cells that haven't been resolved yet (or whose name list
+  -- changed). For names not yet in scientific_name_vernaculars (e.g. species
+  -- new to this harvest, before populate_vernaculars.py has caught up), the
+  -- subquery COALESCEs to '{}' and those cells fall back to literal-name
+  -- matching in dbFilter.js until the next vernacular populate + reprocess.
+  UPDATE cde.obis_cells c
+     SET aphia_ids = COALESCE((
+       SELECT array_agg(DISTINCT v.aphia_id)
+         FROM unnest(c.scientific_names) AS sn
+         JOIN cde.scientific_name_vernaculars v ON v.scientific_name = sn
+        WHERE v.aphia_id IS NOT NULL
+     ), '{}'::integer[])
+   WHERE c.scientific_names IS NOT NULL
+     AND coalesce(array_length(c.scientific_names, 1), 0) > 0
+     AND coalesce(array_length(c.aphia_ids, 1), 0) = 0;
+
 END;
 $$ LANGUAGE plpgsql;

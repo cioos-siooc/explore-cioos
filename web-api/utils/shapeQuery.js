@@ -4,7 +4,8 @@ const { changePKtoPkURL } = require("./misc");
 const createDBFilter = require("./dbFilter");
 
 async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
-  const filters = createDBFilter(query);
+  // Caller propagates ScientificNameSelectionTooBroadError as a 400.
+  const filters = await createDBFilter(query);
 
   const {
     timeMin = null, timeMax = null, depthMin = null, depthMax = null,
