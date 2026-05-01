@@ -1,9 +1,15 @@
 FROM ghcr.io/astral-sh/uv:python3.10-bookworm
 
-# for shapely, pdf creation
+ARG CREATE_PDF=false
+
+# for shapely
 RUN apt-get -y -qq update
-# libqt5gui5 needed by wkhtmltopdf
-RUN apt-get -y -qq install gcc libc-dev libgeos-dev python3-dev wkhtmltopdf libqt5gui5
+RUN apt-get -y -qq install gcc libc-dev libgeos-dev python3-dev
+
+# libqt5gui5 needed by wkhtmltopdf — only install when PDF generation is enabled
+RUN if [ "$CREATE_PDF" = "true" ] || [ "$CREATE_PDF" = "True" ]; then \
+    apt-get -y -qq install wkhtmltopdf libqt5gui5; \
+    fi
 
 # See https://github.com/wkhtmltopdf/wkhtmltopdf/issues/4497. exit 0 so it doesnt fail on ARM
 
