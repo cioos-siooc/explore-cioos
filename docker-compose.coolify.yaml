@@ -1,4 +1,10 @@
 services:
+  nginx:
+    ports: !reset []
+  db:
+    expose: !reset []
+  api:
+    expose: !reset []
   harvester:
     profiles: !reset []
     restart: "no"
