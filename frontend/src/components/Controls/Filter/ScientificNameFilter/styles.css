@@ -68,6 +68,11 @@
   margin-top: 1px;
 }
 
+.scientificNameSuggestionRank {
+  font-style: italic;
+  color: #888;
+}
+
 .scientificNameSuggestion:hover {
   background-color: #c6e3df;
 }

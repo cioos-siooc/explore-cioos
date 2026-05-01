@@ -2,14 +2,18 @@
 Populate cde.scientific_name_vernaculars from WoRMS.
 
 For every distinct scientific name in cde.obis_scientific_names that is not yet
-cached, look up the AphiaID via the WoRMS REST API and then fetch all vernacular
-(common) names. We store English (eng) and French (fra) vernaculars in separate
-text[] columns so the API can serve the right one based on the user's locale.
+cached, look up the AphiaID via the WoRMS REST API and then fetch the taxon's
+rank, full ancestor chain (for rank-aware filter rolldown), and vernacular
+(common) names. English (eng) and French (fra) vernaculars are stored in
+separate text[] columns so the API can serve the right one based on locale.
 
-Name lookup is batched via AphiaRecordsByMatchNames (up to 50 names per call).
-Vernacular calls are issued concurrently per chunk via a thread pool, since
-WoRMS has no batch vernacular endpoint and serial round-trip latency is the
-real bottleneck (each call ≈ 300 ms server-side).
+Name lookup is batched via AphiaRecordsByMatchNames (up to 50 names per call;
+returns rank + valid_AphiaID inline). Vernacular and classification calls are
+issued concurrently per chunk via a thread pool, since WoRMS has no batch
+endpoint for either and serial round-trip latency is the real bottleneck
+(each call ≈ 300 ms server-side). Classification fetches are deduped across
+the run via an in-memory cache keyed on accepted AphiaID, so synonyms only
+trigger one classification call between them.
 
 Names are processed in descending order of OBIS record count, so an interrupted
 run still leaves the most-impactful subset cached. Pass --top N to populate only
@@ -29,7 +33,9 @@ import concurrent.futures
 import logging
 import os
 import sys
+import threading
 import time
+from typing import NamedTuple
 from urllib.parse import urlencode
 
 import requests
@@ -89,6 +95,12 @@ STATUS_OK = "ok"
 STATUS_NOT_FOUND = "not_found"
 STATUS_ERROR = "error"
 
+# Sentinel accepted by --refresh-status to retarget rows that pre-date the
+# rank/classification columns (or whose classification fetch errored out).
+# Translated by names_to_process into a column-level condition rather than a
+# fetch_status check, since the rows in question typically have status='ok'.
+SENTINEL_MISSING_CLASSIFICATION = "missing_classification"
+
 
 def build_engine(workers: int = DEFAULT_WORKERS):
     load_dotenv(os.path.join(os.getcwd(), ".env"))
@@ -139,12 +151,13 @@ def build_session(workers: int = DEFAULT_WORKERS):
 
 
 def match_aphia_ids(session: requests.Session, names: list[str]):
-    """Batch-resolve scientific names to AphiaIDs.
+    """Batch-resolve scientific names to (AphiaID, rank) pairs.
 
-    Returns a list parallel to ``names``: each entry is an int AphiaID (preferring
-    valid_AphiaID, the accepted-name id for synonyms), or None if WoRMS had no
-    match. Raises requests.RequestException on transport / HTTP errors so the
-    caller can fall back to per-name handling.
+    Returns a list parallel to ``names``: each entry is ``(aphia_id, rank)`` where
+    ``aphia_id`` prefers ``valid_AphiaID`` (the accepted-name id for synonyms) and
+    ``rank`` is the WoRMS rank string (e.g. ``"Genus"``). Both fields are ``None``
+    when WoRMS had no match. Raises requests.RequestException on transport / HTTP
+    errors so the caller can fall back to per-name handling.
     """
     if not names:
         return []
@@ -153,21 +166,25 @@ def match_aphia_ids(session: requests.Session, names: list[str]):
     url = f"{WORMS_BASE}/AphiaRecordsByMatchNames?{urlencode(params)}"
     r = session.get(url, timeout=60)
     if r.status_code == 204 or not r.text.strip():
-        return [None] * len(names)
+        return [(None, None)] * len(names)
     r.raise_for_status()
     body = r.json() or []
     out = []
     for matches in body:
         if not matches:
-            out.append(None)
+            out.append((None, None))
             continue
         first = matches[0]
         # Prefer valid_AphiaID (the accepted-name id) since vernaculars hang off
         # accepted names; fall back to AphiaID if valid is missing.
         aid = first.get("valid_AphiaID") or first.get("AphiaID")
-        out.append(aid if isinstance(aid, int) and aid > 0 else None)
+        rank = first.get("rank")
+        if not (isinstance(aid, int) and aid > 0):
+            out.append((None, None))
+        else:
+            out.append((aid, rank if isinstance(rank, str) and rank else None))
     while len(out) < len(names):
-        out.append(None)
+        out.append((None, None))
     return out[: len(names)]
 
 
@@ -194,18 +211,76 @@ def fetch_vernaculars(session: requests.Session, aphia_id: int):
     return en, fr
 
 
+def fetch_classification(session: requests.Session, aphia_id: int):
+    """Return the strict-ancestor AphiaID list for a taxon, root-first.
+
+    WoRMS returns a nested chain (Superdomain → ... → queried taxon) where each
+    node has ``AphiaID``, ``rank``, ``scientificname``, and a single ``child``.
+    The leaf has ``child: null`` and is the queried taxon — its AphiaID is the
+    one we passed in, so we exclude it. Everything above is an ancestor used by
+    the rolldown filter.
+    """
+    url = f"{WORMS_BASE}/AphiaClassificationByAphiaID/{aphia_id}"
+    r = session.get(url, timeout=15)
+    if r.status_code == 204 or not r.text.strip():
+        return []
+    r.raise_for_status()
+    body = r.json()
+    if not body:
+        return []
+    ancestors = []
+    node = body
+    while isinstance(node, dict):
+        child = node.get("child")
+        aid = node.get("AphiaID")
+        # Strict ancestor: only count nodes that have a child below them.
+        if child is not None and isinstance(aid, int) and aid > 0:
+            ancestors.append(aid)
+        node = child
+    return ancestors
+
+
+class ClassificationCache:
+    """Run-wide cache so multiple synonyms with the same accepted AphiaID
+    only trigger one /AphiaClassificationByAphiaID call between them."""
+
+    def __init__(self):
+        self._cache: dict[int, list[int]] = {}
+        self._lock = threading.Lock()
+
+    def get(self, aphia_id: int):
+        with self._lock:
+            return self._cache.get(aphia_id)
+
+    def put(self, aphia_id: int, ancestors: list[int]):
+        with self._lock:
+            self._cache[aphia_id] = ancestors
+
+
+class TaxonResult(NamedTuple):
+    name: str
+    aphia_id: int | None
+    rank: str | None
+    ancestors: list[int]
+    vernaculars_en: list[str]
+    vernaculars_fr: list[str]
+    status: str
+
+
 UPSERT_SQL = text(
     """
     INSERT INTO cde.scientific_name_vernaculars
-        (scientific_name, aphia_id, vernaculars_en, vernaculars_fr,
-         fetched_at, fetch_status)
-    VALUES (:name, :aphia_id, :en, :fr, now(), :status)
+        (scientific_name, aphia_id, rank, ancestor_aphia_ids,
+         vernaculars_en, vernaculars_fr, fetched_at, fetch_status)
+    VALUES (:name, :aphia_id, :rank, :ancestors, :en, :fr, now(), :status)
     ON CONFLICT (scientific_name) DO UPDATE SET
-        aphia_id       = EXCLUDED.aphia_id,
-        vernaculars_en = EXCLUDED.vernaculars_en,
-        vernaculars_fr = EXCLUDED.vernaculars_fr,
-        fetched_at     = EXCLUDED.fetched_at,
-        fetch_status   = EXCLUDED.fetch_status
+        aphia_id           = EXCLUDED.aphia_id,
+        rank               = EXCLUDED.rank,
+        ancestor_aphia_ids = EXCLUDED.ancestor_aphia_ids,
+        vernaculars_en     = EXCLUDED.vernaculars_en,
+        vernaculars_fr     = EXCLUDED.vernaculars_fr,
+        fetched_at         = EXCLUDED.fetched_at,
+        fetch_status       = EXCLUDED.fetch_status
     """
 )
 
@@ -216,31 +291,46 @@ def names_to_process(conn, refresh_statuses, top_n=None):
     Names with the most observations come first so an interrupted run still
     leaves the most-impactful subset cached. ``top_n`` caps the result list.
     """
-    refresh_clause = ""
+    # Two refresh axes can apply at once: explicit fetch_status values (e.g.
+    # 'error', 'not_found') and the missing_classification sentinel that targets
+    # rows populated before the rank/classification columns existed.
+    refresh_clauses = []
     params = {}
-    if refresh_statuses:
-        refresh_clause = "OR v.fetch_status = ANY(:refresh)"
-        params["refresh"] = list(refresh_statuses)
+    statuses = set(refresh_statuses)
+    if SENTINEL_MISSING_CLASSIFICATION in statuses:
+        statuses.discard(SENTINEL_MISSING_CLASSIFICATION)
+        # status='ok' rows that have an aphia_id but no ancestors: pre-existing
+        # rows from the vernacular-only era, or rows whose classification fetch
+        # errored (we keep those at status='ok' since vernaculars succeeded).
+        refresh_clauses.append(
+            "(v.fetch_status = '" + STATUS_OK + "' "
+            "AND v.aphia_id IS NOT NULL "
+            "AND coalesce(array_length(v.ancestor_aphia_ids, 1), 0) = 0)"
+        )
+    if statuses:
+        refresh_clauses.append("v.fetch_status = ANY(:refresh)")
+        params["refresh"] = list(statuses)
+    refresh_clause = ""
+    if refresh_clauses:
+        refresh_clause = "OR (" + " OR ".join(refresh_clauses) + ")"
 
     limit_clause = ""
     if top_n is not None:
         limit_clause = "LIMIT :top_n"
         params["top_n"] = top_n
 
+    # Popularity is precomputed in cde.obis_scientific_name_popularity (a
+    # materialized view refreshed by 5_profile_process.sql after each harvest).
+    # Recomputing it inline here was a multi-minute unnest+GROUP BY over the
+    # whole obis_cells table — fine for a 6-hour backfill, but disastrous for
+    # short --top N runs that pay the bootstrap cost without amortising it.
     sql = text(
         f"""
-        WITH popularity AS (
-            SELECT sn AS scientific_name,
-                   SUM(c.n_records) AS total_records
-              FROM cde.obis_cells c,
-                   unnest(c.scientific_names) AS t(sn)
-             GROUP BY sn
-        )
         SELECT n.scientific_name
           FROM cde.obis_scientific_names n
      LEFT JOIN cde.scientific_name_vernaculars v
             ON v.scientific_name = n.scientific_name
-     LEFT JOIN popularity p
+     LEFT JOIN cde.obis_scientific_name_popularity p
             ON p.scientific_name = n.scientific_name
          WHERE v.scientific_name IS NULL
             {refresh_clause}
@@ -251,64 +341,93 @@ def names_to_process(conn, refresh_statuses, top_n=None):
     return [row[0] for row in conn.execute(sql, params)]
 
 
-def _vernacular_or_error(session, name, aid):
-    """Wrapper for the thread pool: returns (name, aid, en, fr, status)."""
+def _fetch_taxon_data(session, name, aid, rank, classification_cache):
+    """Worker: fetch vernaculars + (cached) classification for one (name, AphiaID).
+
+    Classification fetches are deduped across the run via ``classification_cache``;
+    a name whose accepted AphiaID was already seen reuses the cached ancestor list.
+    Classification failures are non-fatal — vernaculars still land and the row is
+    marked ok with an empty ancestor list, which a later
+    ``--refresh-status missing_classification`` pass can fill in.
+    """
     try:
         en, fr = fetch_vernaculars(session, aid)
-        return (name, aid, en, fr, STATUS_OK)
     except requests.RequestException as exc:
         logger.warning("AphiaVernacularsByAphiaID failed for %r (%s): %s", name, aid, exc)
-        return (name, aid, [], [], STATUS_ERROR)
+        return TaxonResult(name, aid, rank, [], [], [], STATUS_ERROR)
+
+    cached = classification_cache.get(aid)
+    if cached is not None:
+        return TaxonResult(name, aid, rank, cached, en, fr, STATUS_OK)
+
+    try:
+        ancestors = fetch_classification(session, aid)
+    except requests.RequestException as exc:
+        logger.warning("AphiaClassificationByAphiaID failed for %r (%s): %s", name, aid, exc)
+        ancestors = []
+    classification_cache.put(aid, ancestors)
+    return TaxonResult(name, aid, rank, ancestors, en, fr, STATUS_OK)
 
 
-def process_chunk(session, engine, executor, names, sleep_seconds, counts):
+def process_chunk(session, engine, executor, names, sleep_seconds, counts,
+                  classification_cache):
     """Resolve a chunk of names and persist results.
 
     All upserts for the chunk are committed in a single transaction.
     """
     try:
-        aphia_ids = match_aphia_ids(session, names)
+        matches = match_aphia_ids(session, names)
     except requests.RequestException as exc:
         logger.warning("Batch AphiaRecordsByMatchNames failed (%d names): %s", len(names), exc)
         with engine.begin() as conn:
             for name in names:
                 conn.execute(
                     UPSERT_SQL,
-                    {"name": name, "aphia_id": None, "en": [], "fr": [], "status": STATUS_ERROR},
+                    {"name": name, "aphia_id": None, "rank": None, "ancestors": [],
+                     "en": [], "fr": [], "status": STATUS_ERROR},
                 )
         counts[STATUS_ERROR] += len(names)
         time.sleep(sleep_seconds)
         return
     time.sleep(sleep_seconds)
 
-    # Split into immediate misses (no AphiaID) and pending vernacular fetches.
-    results = []
+    # Split into immediate misses (no AphiaID) and pending taxon-data fetches.
+    results: list[TaxonResult] = []
     pending = []
-    for name, aid in zip(names, aphia_ids):
+    for name, (aid, rank) in zip(names, matches):
         if aid is None:
-            results.append((name, None, [], [], STATUS_NOT_FOUND))
+            results.append(TaxonResult(name, None, None, [], [], [], STATUS_NOT_FOUND))
         else:
-            pending.append((name, aid))
+            pending.append((name, aid, rank))
 
     if executor is not None:
-        # Concurrent vernacular fetches.
-        futures = [executor.submit(_vernacular_or_error, session, name, aid)
-                   for name, aid in pending]
+        futures = [
+            executor.submit(_fetch_taxon_data, session, name, aid, rank, classification_cache)
+            for name, aid, rank in pending
+        ]
         for fut in concurrent.futures.as_completed(futures):
             results.append(fut.result())
     else:
         # Serial path: keep the per-call throttle.
-        for name, aid in pending:
-            results.append(_vernacular_or_error(session, name, aid))
+        for name, aid, rank in pending:
+            results.append(_fetch_taxon_data(session, name, aid, rank, classification_cache))
             time.sleep(sleep_seconds)
 
     with engine.begin() as conn:
-        for name, aid, en, fr, status in results:
+        for r in results:
             conn.execute(
                 UPSERT_SQL,
-                {"name": name, "aphia_id": aid, "en": en, "fr": fr, "status": status},
+                {
+                    "name": r.name,
+                    "aphia_id": r.aphia_id,
+                    "rank": r.rank,
+                    "ancestors": r.ancestors,
+                    "en": r.vernaculars_en,
+                    "fr": r.vernaculars_fr,
+                    "status": r.status,
+                },
             )
-            counts[status] += 1
+            counts[r.status] += 1
 
 
 def main():
@@ -352,7 +471,10 @@ def main():
         "--refresh-status",
         default="",
         help="Comma-separated list of fetch_status values to retry "
-             "(e.g. 'error,not_found'). Empty = skip already-cached rows.",
+             "(e.g. 'error,not_found'). Also accepts the sentinel "
+             "'missing_classification' to refill rank/ancestor data for rows "
+             "that were populated before those columns existed. "
+             "Empty = skip already-cached rows.",
     )
     args = parser.parse_args()
 
@@ -380,6 +502,7 @@ def main():
     counts = {STATUS_OK: 0, STATUS_NOT_FOUND: 0, STATUS_ERROR: 0}
     processed = 0
 
+    classification_cache = ClassificationCache()
     executor = (
         concurrent.futures.ThreadPoolExecutor(max_workers=workers)
         if workers > 1 else None
@@ -387,7 +510,8 @@ def main():
     try:
         for start in range(0, total, batch_size):
             chunk = todo[start : start + batch_size]
-            process_chunk(session, engine, executor, chunk, sleep_seconds, counts)
+            process_chunk(session, engine, executor, chunk, sleep_seconds, counts,
+                          classification_cache)
             processed += len(chunk)
             if processed % (batch_size * 5) == 0 or processed == total:
                 logger.info(

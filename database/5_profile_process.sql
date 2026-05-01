@@ -150,6 +150,10 @@ BEGIN
 
   -- Refresh the scientific names lookup used by the /scientificNames typeahead
   REFRESH MATERIALIZED VIEW CONCURRENTLY cde.obis_scientific_names;
+  -- ...and the per-name popularity counts used by populate_vernaculars.py to
+  -- order its work by impact. CONCURRENTLY requires the unique index defined
+  -- in 1_schema.sql.
+  REFRESH MATERIALIZED VIEW CONCURRENTLY cde.obis_scientific_name_popularity;
 
 END;
 $$ LANGUAGE plpgsql;

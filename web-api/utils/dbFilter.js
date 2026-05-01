@@ -101,7 +101,31 @@ function createDBFilter(request) {
     parameters.scientificNamesArr = unique(
       scientificNames.split(",").map((s) => s.trim()).filter(Boolean),
     );
-    obisFilters.push("scientific_names && :scientificNamesArr");
+    // Rank-aware match: a cell hits if it overlaps the selected names directly
+    // (literal back-compat — also covers the case where the vernacular cache
+    // was never populated), OR if any of its names share an accepted AphiaID
+    // with a selection (synonyms), OR if any of its names lists a selected
+    // name's AphiaID in their ancestor chain (descendants — the rolldown).
+    obisFilters.push(`(
+      scientific_names && :scientificNamesArr
+      OR scientific_names && ARRAY(
+           SELECT v2.scientific_name
+             FROM cde.scientific_name_vernaculars v2
+            WHERE v2.aphia_id IS NOT NULL
+              AND (
+                v2.aphia_id IN (
+                  SELECT v1.aphia_id FROM cde.scientific_name_vernaculars v1
+                   WHERE v1.scientific_name = ANY(:scientificNamesArr)
+                     AND v1.aphia_id IS NOT NULL
+                )
+                OR v2.ancestor_aphia_ids && ARRAY(
+                  SELECT v3.aphia_id FROM cde.scientific_name_vernaculars v3
+                   WHERE v3.scientific_name = ANY(:scientificNamesArr)
+                     AND v3.aphia_id IS NOT NULL
+                )
+              )
+         )
+    )`);
   }
 
   const sharedSql = filters.join(" AND \n") || "TRUE";

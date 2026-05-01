@@ -190,15 +190,21 @@ export default function ScientificNameFilter({
                 {t('scientificNameFilterNoResults')}
               </div>
             )}
-            {filteredSuggestions.map(({ scientificName, vernacular }) => (
+            {filteredSuggestions.map(({ scientificName, vernacular, rank }) => (
               <div
                 key={scientificName}
                 className='scientificNameSuggestion'
                 onClick={() => handleAdd(scientificName, vernacular)}
               >
                 <div className='scientificNameSuggestionPrimary'>{scientificName}</div>
-                {vernacular && (
-                  <div className='scientificNameSuggestionVernacular'>{vernacular}</div>
+                {(rank || vernacular) && (
+                  <div className='scientificNameSuggestionVernacular'>
+                    {rank && (
+                      <span className='scientificNameSuggestionRank'>{rank}</span>
+                    )}
+                    {rank && vernacular && ' · '}
+                    {vernacular}
+                  </div>
                 )}
               </div>
             ))}

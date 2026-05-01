@@ -36,7 +36,7 @@ const { errorHandler } = require("../utils/validatorMiddlewares");
  *         description: Comma-separated scientific names to look up exactly (overrides q).
  *     responses:
  *       200:
- *         description: Array of {scientificName, vernacular} objects. `vernacular` may be null.
+ *         description: Array of {scientificName, vernacular, rank} objects. `vernacular` and `rank` may be null.
  *         content:
  *           application/json:
  *             schema:
@@ -46,6 +46,7 @@ const { errorHandler } = require("../utils/validatorMiddlewares");
  *                 properties:
  *                   scientificName: { type: string }
  *                   vernacular: { type: string, nullable: true }
+ *                   rank: { type: string, nullable: true, description: "WoRMS taxonomic rank (e.g. Species, Genus). Selecting a higher-rank entry rolls down to descendants." }
  */
 router.get(
   "/",
@@ -78,7 +79,8 @@ router.get(
       }
       const lookupSql = `
         SELECT n.scientific_name AS "scientificName",
-               v.${vernCol}[1] AS vernacular
+               v.${vernCol}[1] AS vernacular,
+               v.rank          AS rank
           FROM cde.obis_scientific_names n
      LEFT JOIN cde.scientific_name_vernaculars v
             ON v.scientific_name = n.scientific_name
@@ -100,7 +102,8 @@ router.get(
                  WHERE :q <> '' AND vn ILIKE :sub
                  LIMIT 1),
                v.${vernCol}[1]
-             ) AS vernacular
+             ) AS vernacular,
+             v.rank AS rank
         FROM cde.obis_scientific_names n
    LEFT JOIN cde.scientific_name_vernaculars v
           ON v.scientific_name = n.scientific_name

@@ -165,6 +165,24 @@ CREATE UNIQUE INDEX ON cde.obis_scientific_names (scientific_name);
 CREATE INDEX obis_scientific_names_trgm
   ON cde.obis_scientific_names USING GIN (scientific_name gin_trgm_ops);
 
+-- Per-name OBIS record totals, used by populate_vernaculars.py to order names
+-- by popularity (so --top N targets the most-impactful subset). The unnest +
+-- GROUP BY over the full obis_cells table is a multi-minute scan, so we cache
+-- it as a materialized view rather than recomputing on every script run.
+-- Refreshed alongside obis_scientific_names in 5_profile_process.sql.
+DROP MATERIALIZED VIEW IF EXISTS cde.obis_scientific_name_popularity;
+CREATE MATERIALIZED VIEW cde.obis_scientific_name_popularity AS
+  SELECT sn AS scientific_name,
+         SUM(c.n_records)::bigint AS total_records
+    FROM cde.obis_cells c,
+         unnest(c.scientific_names) AS t(sn)
+   WHERE c.scientific_names IS NOT NULL
+   GROUP BY sn;
+
+CREATE UNIQUE INDEX ON cde.obis_scientific_name_popularity (scientific_name);
+CREATE INDEX obis_scientific_name_popularity_total_records
+  ON cde.obis_scientific_name_popularity (total_records DESC);
+
 
 -- Vernacular (common) names per scientific name, sourced from WoRMS.
 -- Populated by db-loader/cde_db_loader/populate_vernaculars.py; not written by the harvester.
@@ -173,13 +191,21 @@ CREATE INDEX obis_scientific_names_trgm
 -- column + IMMUTABLE wrapper if this ever needs an index.
 DROP TABLE IF EXISTS cde.scientific_name_vernaculars;
 CREATE TABLE cde.scientific_name_vernaculars (
-    scientific_name text PRIMARY KEY,
-    aphia_id        integer,
-    vernaculars_en  text[] NOT NULL DEFAULT '{}',
-    vernaculars_fr  text[] NOT NULL DEFAULT '{}',
-    fetched_at      timestamptz NOT NULL DEFAULT now(),
-    fetch_status    text NOT NULL DEFAULT 'ok'
+    scientific_name     text PRIMARY KEY,
+    aphia_id            integer,
+    rank                text,
+    ancestor_aphia_ids  integer[] NOT NULL DEFAULT '{}',
+    vernaculars_en      text[]    NOT NULL DEFAULT '{}',
+    vernaculars_fr      text[]    NOT NULL DEFAULT '{}',
+    fetched_at          timestamptz NOT NULL DEFAULT now(),
+    fetch_status        text NOT NULL DEFAULT 'ok'
 );
+
+-- GIN index supports the rank-aware filter expansion in web-api/utils/dbFilter.js:
+-- given a selected name's aphia_id X, find every taxon whose ancestor chain
+-- contains X via :X = ANY(ancestor_aphia_ids).
+CREATE INDEX scientific_name_vernaculars_ancestors_gin
+  ON cde.scientific_name_vernaculars USING GIN (ancestor_aphia_ids);
 
 
 --
