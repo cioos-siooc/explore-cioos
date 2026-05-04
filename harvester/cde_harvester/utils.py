@@ -10,42 +10,27 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def get_cde_eov_to_standard_name():
-    # get a dictionary with CDE EOVs as keys and a list of standard names under each
-    # this hides the GOOS layer
+def get_eov_to_standard_name():
+    # EOV → CF standard names mapping (synced from cioos-commons/eovs/standard_names.json)
     dir = os.path.dirname(os.path.realpath(__file__))
-
-    with open(dir + "/cde_to_goos_eov.json") as f:
-        cde_to_goos_eov = json.loads(f.read())
-
-    with open(dir + "/goos_eov_to_standard_name.json") as f:
-        goos_eov_to_standard_name = json.loads(f.read())
-
-    res = {}
-    for cde_eov, goos_eovs in cde_to_goos_eov.items():
-        res[cde_eov] = []
-        for goos_variable in goos_eovs:
-            res[cde_eov] = list(
-                set(res[cde_eov] + goos_eov_to_standard_name[goos_variable])
-            )
-    return res
+    with open(dir + "/eov_standard_names.json") as f:
+        return json.loads(f.read())
 
 
-# dictionary mapping from CDE ocean variables to standard names
-cde_eov_to_standard_name = get_cde_eov_to_standard_name()
+# dictionary mapping from ocean variables to standard names
+eov_to_standard_name = get_eov_to_standard_name()
 
 
-def get_df_cde_eov_to_standard_name(cde_eov_to_standard_name):
-    # this is just a dataframe version of get_cde_eov_to_standard_name
+def get_df_eov_to_standard_name(eov_to_standard_name):
     res = []
-    for cde_eov, standard_names in cde_eov_to_standard_name.items():
+    for eov, standard_names in eov_to_standard_name.items():
         for standard_name in standard_names:
-            res += [[cde_eov, standard_name]]
+            res += [[eov, standard_name]]
     return pd.DataFrame(res, columns=["eov", "standard_name"])
 
 
-# dataframe mapping of CDE ocean variables to standard names
-df_cde_eov_to_standard_name = get_df_cde_eov_to_standard_name(cde_eov_to_standard_name)
+# dataframe mapping of ocean variables to standard names
+df_eov_to_standard_name = get_df_eov_to_standard_name(eov_to_standard_name)
 
 
 def intersection(lst1, lst2):
@@ -135,4 +120,4 @@ if __name__ == "__main__":
     logger.info("Saved %d CF standard names (version %s) to %s", len(names), version, CF_STANDARD_NAMES_CSV)
 
 # list of standard names that are supported by CDE
-supported_standard_names = flatten(cde_eov_to_standard_name.values())
+supported_standard_names = flatten(eov_to_standard_name.values())

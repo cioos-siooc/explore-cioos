@@ -335,7 +335,7 @@ export default function App() {
       .then((eovs) => {
         setEovsSelected(
           eovs.map((eov, index) => {
-            const eovMetadata = eovsJSONfile.eovs.find((e) => e.value === eov)
+            const eovMetadata = eovsJSONfile.find((e) => e.value === eov)
 
             return {
               title: eov,
