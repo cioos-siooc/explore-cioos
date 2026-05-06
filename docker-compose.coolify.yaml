@@ -9,7 +9,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    volumes: !reset
+    volumes: !override
       - ./harvest_config.sample.yaml:/app/harvester/harvest_config.sample.yaml
       - ./harvester_cache:/app/harvester/harvester_cache
       - ./harvest:/app/harvester/harvest
