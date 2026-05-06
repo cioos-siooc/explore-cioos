@@ -13,10 +13,10 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./database:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD", "pg_isready", "-q", "-d", "${DB_NAME}", "-U", "${DB_USER}"]
+      test: ["CMD-SHELL", "psql -U $$POSTGRES_USER -d $$POSTGRES_DB -tAc \"SELECT 1 FROM pg_namespace WHERE nspname='cde'\" | grep -q 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 30
   web-api:
     build: ./web-api
     restart: always
