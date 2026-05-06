@@ -19,3 +19,5 @@ services:
     environment:
       - "HARVEST_CONFIG_FILE=/app/harvester/harvest_config.sample.yaml"
       - "HARVESTER_LOG_DIR=/app/harvester/logs"
+    entrypoint: ["sh","/app/harvester/run.sh"]
+      
