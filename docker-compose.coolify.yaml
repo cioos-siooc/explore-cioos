@@ -6,8 +6,6 @@ services:
   web-api:
     expose: !reset []
   harvester:
-    profiles: !reset []
-    restart: "no"
     depends_on:
       db:
         condition: service_healthy
