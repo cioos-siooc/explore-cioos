@@ -6,6 +6,7 @@ services:
   web-api:
     expose: !reset []
   harvester:
+    restart: no
     depends_on:
       db:
         condition: service_healthy
@@ -17,5 +18,6 @@ services:
     environment:
       - "HARVEST_CONFIG_FILE=/app/harvester/harvest_config.sample.yaml"
       - "HARVESTER_LOG_DIR=/app/harvester/logs"
+      - "DB_HOST_EXTERNAL=db"
     entrypoint: ["sh","/app/harvester/run.sh"]
       
