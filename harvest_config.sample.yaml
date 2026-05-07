@@ -36,3 +36,14 @@ incremental: true
 # Defaults to obis_cache/ next to the output folder
 # obis_folder: ./obis_cache
 
+# Geographic filter for OBIS occurrences. Defaults to canada (only ingest
+# occurrences inside Canadian EEZ + Canadian land territory). Datasets
+# contributed via the OBIS Canada or OTN-OBIS regional nodes are exempt
+# and harvested in their entirety. Set mode to 'none' to disable.
+# obis_geo_filter:
+#   mode: canada
+#   polygon_file:
+#   exempt_node_ids:
+#     - 7dfb2d90-9317-434d-8d4e-64adf324579a   # OBIS Canada
+#     - 68f83ea7-69a7-44fd-be77-3c3afd6f3cf8   # OTN-OBIS
+

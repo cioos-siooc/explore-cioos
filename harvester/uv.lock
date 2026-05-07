@@ -340,6 +340,7 @@ dependencies = [
     { name = "pandas" },
     { name = "psycopg2-binary" },
     { name = "python-dotenv" },
+    { name = "requests" },
     { name = "sentry-sdk" },
     { name = "sqlalchemy" },
 ]
@@ -350,6 +351,7 @@ requires-dist = [
     { name = "pandas", specifier = "<2.0.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
+    { name = "requests", specifier = ">=2.31.0" },
     { name = "sentry-sdk", specifier = ">=2.38.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0,<3.0.0" },
 ]

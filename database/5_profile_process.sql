@@ -109,7 +109,13 @@ END;
 $$ LANGUAGE plpgsql;
 
 
-CREATE OR REPLACE FUNCTION obis_process() RETURNS VOID AS $$
+-- Drop the previous 0-argument signature, if present from an earlier deploy.
+-- CREATE OR REPLACE FUNCTION only matches an existing definition by exact
+-- signature, so without this the old slow obis_process() would coexist with
+-- the new 1-arg version and incremental callers would still pick it up.
+DROP FUNCTION IF EXISTS obis_process();
+
+CREATE OR REPLACE FUNCTION obis_process(concurrent_refresh BOOLEAN DEFAULT TRUE) RETURNS VOID AS $$
 BEGIN
   SET search_path TO cde, public;
 
@@ -126,15 +132,18 @@ BEGIN
     AND d.source_type = 'obis'
     AND c.dataset_pk IS NULL;
 
-  -- Insert distinct geometries into points (skip existing)
-  -- Deduplicate on lat/lon first (cheaper) before computing geometry
+  -- Insert distinct geometries into points (skip existing).
+  -- LEFT JOIN anti-join over the distinct lat/lon set computes geom once per
+  -- distinct point instead of inside a correlated subquery for every candidate.
   INSERT INTO points (geom)
-  SELECT ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)
-  FROM (SELECT DISTINCT latitude, longitude FROM obis_cells) sub
-  WHERE NOT EXISTS (
-    SELECT 1 FROM points p
-    WHERE p.geom = ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)
-  );
+  SELECT src.new_geom
+    FROM (
+      SELECT DISTINCT
+             ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857) AS new_geom
+        FROM obis_cells
+    ) src
+    LEFT JOIN points p ON p.geom = src.new_geom
+   WHERE p.pk IS NULL;
 
   -- Link obis_cells to point_pk
   UPDATE obis_cells
@@ -148,30 +157,55 @@ BEGIN
   SET n_profiles = (SELECT count(*) FROM obis_cells c WHERE c.dataset_pk = d.pk)
   WHERE d.source_type = 'obis';
 
-  -- Refresh the scientific names lookup used by the /scientificNames typeahead
-  REFRESH MATERIALIZED VIEW CONCURRENTLY cde.obis_scientific_names;
-  -- ...and the per-name popularity counts used by populate_vernaculars.py to
-  -- order its work by impact. CONCURRENTLY requires the unique index defined
-  -- in 1_schema.sql.
-  REFRESH MATERIALIZED VIEW CONCURRENTLY cde.obis_scientific_name_popularity;
+  -- Matview refreshes. CONCURRENTLY costs ~2x and is only needed when readers
+  -- might be hitting the matview during the refresh; on a full rebuild after
+  -- TRUNCATE there are none. The caller passes FALSE on full rebuild and lets
+  -- the default TRUE apply for incremental (process_incremental_update path).
+  IF concurrent_refresh THEN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY cde.obis_scientific_names;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY cde.obis_scientific_name_popularity;
+  ELSE
+    REFRESH MATERIALIZED VIEW cde.obis_scientific_names;
+    REFRESH MATERIALIZED VIEW cde.obis_scientific_name_popularity;
+  END IF;
 
   -- Backfill obis_cells.aphia_ids from the latest scientific_name_vernaculars
   -- mappings so the rank-aware filter rolldown can use integer-set overlap.
   -- Runs only over cells that haven't been resolved yet (or whose name list
   -- changed). For names not yet in scientific_name_vernaculars (e.g. species
   -- new to this harvest, before populate_vernaculars.py has caught up), the
-  -- subquery COALESCEs to '{}' and those cells fall back to literal-name
-  -- matching in dbFilter.js until the next vernacular populate + reprocess.
+  -- COALESCE leaves aphia_ids as the default '{}' and those cells fall back
+  -- to literal-name matching in dbFilter.js until the next vernacular populate
+  -- + reprocess.
+  --
+  -- Performance: the GIN index on aphia_ids is dropped before the bulk UPDATE
+  -- and rebuilt after; rewriting it from scratch is much faster than 100K+
+  -- incremental insertions. The UPDATE itself is rewritten as a single
+  -- hash-join via two CTEs (cell_names → cell_aphias) instead of a per-row
+  -- correlated subquery.
+  DROP INDEX IF EXISTS cde.obis_cells_aphia_ids_gin;
+
+  WITH cell_names AS (
+    SELECT pk, unnest(scientific_names) AS sn
+      FROM cde.obis_cells
+     WHERE scientific_names IS NOT NULL
+       AND coalesce(array_length(scientific_names, 1), 0) > 0
+       AND coalesce(array_length(aphia_ids, 1), 0) = 0
+  ),
+  cell_aphias AS (
+    SELECT cn.pk, array_agg(DISTINCT v.aphia_id) AS aphia_ids
+      FROM cell_names cn
+      JOIN cde.scientific_name_vernaculars v ON v.scientific_name = cn.sn
+     WHERE v.aphia_id IS NOT NULL
+     GROUP BY cn.pk
+  )
   UPDATE cde.obis_cells c
-     SET aphia_ids = COALESCE((
-       SELECT array_agg(DISTINCT v.aphia_id)
-         FROM unnest(c.scientific_names) AS sn
-         JOIN cde.scientific_name_vernaculars v ON v.scientific_name = sn
-        WHERE v.aphia_id IS NOT NULL
-     ), '{}'::integer[])
-   WHERE c.scientific_names IS NOT NULL
-     AND coalesce(array_length(c.scientific_names, 1), 0) > 0
-     AND coalesce(array_length(c.aphia_ids, 1), 0) = 0;
+     SET aphia_ids = COALESCE(ca.aphia_ids, '{}'::integer[])
+    FROM cell_aphias ca
+   WHERE c.pk = ca.pk;
+
+  CREATE INDEX obis_cells_aphia_ids_gin
+    ON cde.obis_cells USING GIN (aphia_ids);
 
 END;
 $$ LANGUAGE plpgsql;

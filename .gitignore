@@ -12,6 +12,7 @@ cde_download*
 venv
 *.rdb
 *.env
+docker-compose.override.yaml
 .ipynb_checkpoints
 *.ipynb
 harvester_cache

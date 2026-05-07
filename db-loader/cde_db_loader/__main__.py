@@ -1,8 +1,12 @@
 import argparse
 import ast
+import csv
+import io
 import logging
 import os
 import sys
+import time
+from contextlib import contextmanager
 
 import numpy as np
 import pandas as pd
@@ -82,27 +86,57 @@ def prepare_obis_cells_dataframe(obis_cells):
     return agg
 
 
-OBIS_CELLS_CHUNK_SIZE = 1000
+@contextmanager
+def _timed(name, log):
+    """Log how long a block of work took."""
+    t0 = time.perf_counter()
+    try:
+        yield
+    finally:
+        log.info("Step '%s' took %.1fs", name, time.perf_counter() - t0)
 
 
-def load_obis_cells_chunked(df, table_name, con, schema=None, if_exists="append"):
-    """Load obis_cells DataFrame in chunks, logging progress."""
-    total = len(df)
-    loaded = 0
-    first_chunk = True
-    for start in range(0, total, OBIS_CELLS_CHUNK_SIZE):
-        chunk = df.iloc[start : start + OBIS_CELLS_CHUNK_SIZE]
-        chunk.to_sql(
-            table_name,
-            con=con,
-            if_exists=if_exists if first_chunk else "append",
-            schema=schema,
-            index=False,
-            dtype=OBIS_ARRAY_DTYPES,
+def _pg_text_array(values):
+    """Render a Python iterable as a PostgreSQL text-array literal: {"a","b\\"c"}."""
+    def quote(s):
+        return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"') + '"'
+    return "{" + ",".join(quote(v) for v in values) + "}"
+
+
+def load_obis_cells_copy(df, table_name, transaction, schema=None):
+    """Bulk-load an obis_cells DataFrame via COPY FROM STDIN.
+
+    Replaces the previous to_sql-based loader: COPY runs ~10-50x faster than
+    pandas to_sql() for the 100K+ row scale we hit on a full rebuild.
+    """
+    buf = io.StringIO()
+    writer = csv.writer(buf, quoting=csv.QUOTE_MINIMAL)
+    cols = list(df.columns)
+    for row in df.itertuples(index=False, name=None):
+        out = []
+        for col, val in zip(cols, row):
+            if val is None or (isinstance(val, float) and pd.isna(val)):
+                out.append(r"\N")
+            elif col == "scientific_names":
+                out.append(_pg_text_array(val if isinstance(val, (list, tuple)) else []))
+            else:
+                out.append(val)
+        writer.writerow(out)
+    buf.seek(0)
+
+    qualified = f"{schema}.{table_name}" if schema else table_name
+    raw = getattr(
+        transaction.connection,
+        "driver_connection",
+        getattr(transaction.connection, "connection", transaction.connection),
+    )
+    with raw.cursor() as cur:
+        cur.copy_expert(
+            f"COPY {qualified} ({','.join(cols)}) "
+            f"FROM STDIN WITH (FORMAT CSV, NULL '\\N')",
+            buf,
         )
-        loaded += len(chunk)
-        logger.info("  obis_cells: %d / %d rows loaded", loaded, total)
-        first_chunk = False
+    logger.info("  obis_cells: %d rows loaded via COPY", len(df))
 
 
 def ensure_organization_pks(datasets):
@@ -176,104 +210,140 @@ def main(folder, incremental=False):
             transaction.execute(text("SELECT create_temp_tables();"))
 
             # Load data into temp tables
-            logger.info("Loading datasets into temp table")
             datasets = ensure_organization_pks(datasets)
-            datasets.to_sql(
-                "temp_datasets",
-                con=transaction,
-                if_exists="append",
-                index=False,
-                dtype=DATASET_ARRAY_DTYPES,
-            )
-
-            if not profiles.empty:
-                logger.info("Loading profiles into temp table")
-                prepare_profiles_dataframe(profiles).to_sql(
-                    "temp_profiles",
+            with _timed("temp_datasets to_sql", logger):
+                logger.info("Loading datasets into temp table")
+                datasets.to_sql(
+                    "temp_datasets",
                     con=transaction,
                     if_exists="append",
                     index=False,
+                    dtype=DATASET_ARRAY_DTYPES,
+                    method="multi",
                 )
+
+            if not profiles.empty:
+                with _timed("temp_profiles to_sql", logger):
+                    logger.info("Loading profiles into temp table")
+                    prepare_profiles_dataframe(profiles).to_sql(
+                        "temp_profiles",
+                        con=transaction,
+                        if_exists="append",
+                        index=False,
+                        method="multi",
+                    )
 
             if obis_cells is not None:
                 prepared = prepare_obis_cells_dataframe(obis_cells)
-                logger.info("Loading obis_cells into temp table (%d rows)", len(prepared))
-                load_obis_cells_chunked(prepared, "temp_obis_cells", transaction)
+                with _timed("temp_obis_cells COPY", logger):
+                    logger.info("Loading obis_cells into temp table (%d rows)", len(prepared))
+                    load_obis_cells_copy(prepared, "temp_obis_cells", transaction)
 
-            logger.info("Loading skipped_datasets into temp table")
-            skipped_datasets.to_sql(
-                "temp_skipped_datasets",
-                con=transaction,
-                if_exists="append",
-                index=False,
-            )
+            with _timed("temp_skipped_datasets to_sql", logger):
+                logger.info("Loading skipped_datasets into temp table")
+                skipped_datasets.to_sql(
+                    "temp_skipped_datasets",
+                    con=transaction,
+                    if_exists="append",
+                    index=False,
+                    method="multi",
+                )
 
             # Process and UPSERT all data using SQL functions
-            logger.info("Running incremental update")
-            transaction.execute(text("SELECT process_incremental_update();"))
-            logger.info("Incremental update complete")
+            with _timed("process_incremental_update", logger):
+                logger.info("Running incremental update")
+                transaction.execute(text("SELECT process_incremental_update();"))
+                logger.info("Incremental update complete")
 
         else:
             # Original full reload logic
             logger.info("Using FULL RELOAD mode - will clear all data")
 
-            logger.info("Dropping constraints")
-            transaction.execute(text("SELECT drop_constraints();"))
+            # Session-level tuning for the bulk rebuild. SET LOCAL confines these
+            # to the current transaction. synchronous_commit=OFF is acceptable
+            # here because the rebuild is replayable from the harvest CSVs if
+            # the COMMIT is lost; do NOT apply this in the incremental path.
+            transaction.execute(text("""
+                SET LOCAL work_mem = '256MB';
+                SET LOCAL maintenance_work_mem = '1GB';
+                SET LOCAL synchronous_commit = OFF;
+                SET LOCAL temp_buffers = '256MB';
+            """))
 
-            logger.info("Clearing tables")
-            transaction.execute(text("SELECT remove_all_data();"))
+            with _timed("drop_constraints", logger):
+                logger.info("Dropping constraints")
+                transaction.execute(text("SELECT drop_constraints();"))
 
-            logger.info("Writing datasets")
+            with _timed("remove_all_data", logger):
+                logger.info("Clearing tables")
+                transaction.execute(text("SELECT remove_all_data();"))
+
             datasets = ensure_organization_pks(datasets)
-            datasets.to_sql(
-                "datasets",
-                con=transaction,
-                if_exists="append",
-                schema=schema,
-                index=False,
-                dtype=DATASET_ARRAY_DTYPES,
-            )
-
-            logger.info("Writing profiles")
-            if profiles.empty:
-                logger.info("No profiles to write")
-            else:
-                prepare_profiles_dataframe(profiles).to_sql(
-                    "profiles",
+            with _timed("datasets to_sql", logger):
+                logger.info("Writing datasets")
+                datasets.to_sql(
+                    "datasets",
                     con=transaction,
                     if_exists="append",
                     schema=schema,
                     index=False,
+                    dtype=DATASET_ARRAY_DTYPES,
+                    method="multi",
                 )
+
+            if profiles.empty:
+                logger.info("No profiles to write")
+            else:
+                with _timed("profiles to_sql", logger):
+                    logger.info("Writing profiles")
+                    prepare_profiles_dataframe(profiles).to_sql(
+                        "profiles",
+                        con=transaction,
+                        if_exists="append",
+                        schema=schema,
+                        index=False,
+                        method="multi",
+                    )
 
             if obis_cells is not None:
                 prepared = prepare_obis_cells_dataframe(obis_cells)
-                logger.info("Writing obis_cells (%d rows)", len(prepared))
-                load_obis_cells_chunked(prepared, "obis_cells", transaction, schema=schema)
+                with _timed("obis_cells COPY", logger):
+                    logger.info("Writing obis_cells (%d rows)", len(prepared))
+                    load_obis_cells_copy(prepared, "obis_cells", transaction, schema=schema)
 
-            logger.info("Writing skipped_datasets")
-            skipped_datasets.to_sql(
-                "skipped_datasets",
-                con=transaction,
-                if_exists="append",
-                schema=schema,
-                index=False,
-            )
+            with _timed("skipped_datasets to_sql", logger):
+                logger.info("Writing skipped_datasets")
+                skipped_datasets.to_sql(
+                    "skipped_datasets",
+                    con=transaction,
+                    if_exists="append",
+                    schema=schema,
+                    index=False,
+                    method="multi",
+                )
 
-            logger.info("Processing new records")
-            transaction.execute(text("SELECT profile_process();"))
-            transaction.execute(text("SELECT ckan_process();"))
+            with _timed("profile_process", logger):
+                logger.info("Processing new records")
+                transaction.execute(text("SELECT profile_process();"))
+            with _timed("ckan_process", logger):
+                transaction.execute(text("SELECT ckan_process();"))
 
             if obis_cells is not None:
-                logger.info("Processing obis_cells")
-                transaction.execute(text("SELECT obis_process();"))
+                with _timed("obis_process", logger):
+                    logger.info("Processing obis_cells")
+                    # FALSE = non-concurrent matview refresh. Safe in a full
+                    # rebuild (web-api is stopped, no readers to protect) and
+                    # avoids CONCURRENTLY's diff-and-swap overhead.
+                    transaction.execute(text("SELECT obis_process(FALSE);"))
 
-            logger.info("Creating hexes")
-            transaction.execute(text("SELECT create_hexes();"))
+            with _timed("create_hexes", logger):
+                logger.info("Creating hexes")
+                transaction.execute(text("SELECT create_hexes();"))
 
-            # This ensures that all fields were set successfully
-            logger.info("Setting constraints")
-            transaction.execute(text("SELECT set_constraints();"))
+            with _timed("set_constraints", logger):
+                # This ensures that all fields were set successfully
+                logger.info("Setting constraints")
+                transaction.execute(text("SELECT set_constraints();"))
 
         logger.info("Wrote to db: %s", f"{schema}.datasets")
         logger.info("Wrote to db: %s", f"{schema}.profiles")

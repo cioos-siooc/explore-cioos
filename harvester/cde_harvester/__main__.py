@@ -18,6 +18,7 @@ from cde_harvester.ckan.create_ckan_erddap_link import (
     unescape_ascii_list,
 )
 from cde_harvester.erddap_harvester import harvest_erddap
+from cde_harvester.obis_geo_filter import ObisGeoFilter
 from cde_harvester.obis_harvester import harvest_obis
 from cde_harvester.utils import cf_standard_names, supported_standard_names
 from dotenv import load_dotenv
@@ -109,7 +110,7 @@ def setup_logging(log_time, log_level, log_dir=None):
 @flow(name="cde-main", log_prints=True)
 @monitor(monitor_slug="main-harvester")
 def main(erddap_urls, cache_requests, folder, dataset_ids,
-         obis_dataset_ids=None, obis_folder=None):
+         obis_dataset_ids=None, obis_folder=None, obis_geo_filter=None):
     logger = get_run_logger()
     limit_dataset_ids = None
     if dataset_ids:
@@ -128,7 +129,11 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
     if obis_dataset_ids:
         logger.info("Submitting OBIS harvest task for %d datasets", len(obis_dataset_ids))
         obis_cache = obis_folder or os.path.join(os.path.dirname(os.path.abspath(folder)), "obis_cache")
-        obis_future = harvest_obis.submit(limit_dataset_ids=obis_dataset_ids, folder=obis_cache)
+        obis_future = harvest_obis.submit(
+            limit_dataset_ids=obis_dataset_ids,
+            folder=obis_cache,
+            geo_filter=obis_geo_filter,
+        )
 
     # Wait for all tasks to complete
     logger.info("Waiting for all harvest tasks to complete")
@@ -320,6 +325,12 @@ if __name__ == "__main__":
             datasets_file=config.get("obis_datasets_file"),
         )
         obis_folder = config.get("obis_folder")
+        geo_cfg = config.get("obis_geo_filter") or {}
+        obis_geo_filter = ObisGeoFilter(
+            mode=geo_cfg.get("mode", "canada"),
+            polygon_file=geo_cfg.get("polygon_file"),
+            exempt_node_ids=geo_cfg.get("exempt_node_ids"),
+        )
 
     else:
         logger.info("Using command line arguments")
@@ -374,6 +385,17 @@ if __name__ == "__main__":
             default=None,
             help="Cache folder for OBIS occurrence data",
         )
+        parser.add_argument(
+            "--obis-geo-filter",
+            choices=["canada", "none"],
+            default="canada",
+            help="Geographic filter for OBIS occurrences (default: canada)",
+        )
+        parser.add_argument(
+            "--obis-polygon-file",
+            default=None,
+            help="Override path to the boundary polygon WKT file",
+        )
 
         args = parser.parse_args()
 
@@ -390,6 +412,10 @@ if __name__ == "__main__":
             datasets_file=args.obis_datasets_file,
         )
         obis_folder = args.obis_folder
+        obis_geo_filter = ObisGeoFilter(
+            mode=args.obis_geo_filter,
+            polygon_file=args.obis_polygon_file,
+        )
 
         if not urls and not obis_dataset_ids:
             parser.error("At least one of --urls or --obis-datasets-file/--obis-dataset-ids is required")
@@ -397,7 +423,8 @@ if __name__ == "__main__":
     logger = setup_logging(log_time, log_level, log_dir)
     try:
         main(urls, cache, folder or "harvest", dataset_ids,
-             obis_dataset_ids=obis_dataset_ids, obis_folder=obis_folder)
+             obis_dataset_ids=obis_dataset_ids, obis_folder=obis_folder,
+             obis_geo_filter=obis_geo_filter)
     except Exception as e:
         logger.error("Harvester failed!!!", exc_info=True)
         raise e

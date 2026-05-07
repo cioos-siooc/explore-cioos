@@ -11,6 +11,7 @@ from prefect.logging import get_run_logger
 
 from cde_harvester.base_harvester import BaseHarvester, HarvestResult
 from cde_harvester.ckan.create_ckan_obis_link import get_ckan_obis_records
+from cde_harvester.obis_geo_filter import ObisGeoFilter
 from cde_harvester.schemas import (
     DatasetSchema,
     ObisCellSchema,
@@ -34,10 +35,12 @@ class OBISHarvester(BaseHarvester):
 
     MAX_RETRIES = 5
 
-    def __init__(self, limit_dataset_ids=None, folder="./obis", prefect_logger=None):
+    def __init__(self, limit_dataset_ids=None, folder="./obis", prefect_logger=None,
+                 geo_filter=None):
         self.limit_dataset_ids = limit_dataset_ids or []
         self.folder = folder
         self.logger = prefect_logger or logger
+        self.geo_filter = geo_filter or ObisGeoFilter(mode="canada")
 
     def harvest(self) -> HarvestResult:
         all_cells = []
@@ -50,6 +53,18 @@ class OBISHarvester(BaseHarvester):
             last_error = None
             for attempt in range(1, self.MAX_RETRIES + 1):
                 try:
+                    metadata = self.fetch_dataset_metadata(dataset_id)
+                    exempt = self.geo_filter.is_exempt(metadata)
+
+                    if not exempt:
+                        hit = self.geo_filter.extent_intersects(metadata.get("extent"))
+                        if hit is False:
+                            self.logger.info(
+                                "Skipping %s: extent outside Canadian borders", dataset_id,
+                            )
+                            all_skipped.append([OBIS_SOURCE_URL, dataset_id, "OUT_OF_REGION"])
+                            break
+
                     occurrences = self.get_occurrences(dataset_id)
                     results = occurrences.get("results", [])
 
@@ -58,12 +73,12 @@ class OBISHarvester(BaseHarvester):
                         all_skipped.append([OBIS_SOURCE_URL, dataset_id, "NO_OCCURRENCES"])
                         break
 
-                    cells = self.aggregate_cells(dataset_id, results)
+                    cells = self.aggregate_cells(dataset_id, results, apply_filter=not exempt)
                     if cells.empty:
                         all_skipped.append([OBIS_SOURCE_URL, dataset_id, "NO_VALID_COORDINATES"])
                         break
 
-                    dataset_row = self.build_dataset_row(dataset_id, results, cells)
+                    dataset_row = self.build_dataset_row(dataset_id, metadata, results, cells)
 
                     all_cells.append(cells)
                     all_datasets.append(dataset_row)
@@ -134,7 +149,7 @@ class OBISHarvester(BaseHarvester):
 
         return df_datasets
 
-    def aggregate_cells(self, dataset_id, results):
+    def aggregate_cells(self, dataset_id, results, apply_filter=False):
         """Aggregate occurrences by unique lat/lon grid cell into obis_cells rows."""
         df = pd.DataFrame(results)
 
@@ -154,6 +169,22 @@ class OBISHarvester(BaseHarvester):
             self.logger.warning("Dropped %d occurrences with out-of-range coordinates for %s", dropped, dataset_id)
         if df.empty:
             return df
+
+        # Geographic filter: keep only occurrences inside the configured polygon.
+        # Skipped for exempt datasets (OBIS Canada / OTN) and when the filter is off.
+        if apply_filter:
+            n_before = len(df)
+            mask = self.geo_filter.filter_points(
+                df["decimalLatitude"].to_numpy(),
+                df["decimalLongitude"].to_numpy(),
+            )
+            df = df[mask]
+            self.logger.info(
+                "Geo filter kept %d/%d occurrences for %s",
+                len(df), n_before, dataset_id,
+            )
+            if df.empty:
+                return df
 
         # Parse dates from OBIS unix timestamps (milliseconds)
         for col in ["date_start", "date_end"]:
@@ -202,10 +233,8 @@ class OBISHarvester(BaseHarvester):
 
         return cells
 
-    def build_dataset_row(self, dataset_id, results, cells):
+    def build_dataset_row(self, dataset_id, metadata, results, cells):
         """Build a single-row dataset DataFrame from OBIS dataset metadata."""
-        metadata = self.fetch_dataset_metadata(dataset_id)
-
         institutes = metadata.get("institutes") or []
         organizations = [inst.get("name") for inst in institutes if inst.get("name")]
 
@@ -361,7 +390,11 @@ class OBISHarvester(BaseHarvester):
 
 
 @task(task_run_name="harvest-obis")
-def harvest_obis(limit_dataset_ids=None, folder="./obis/"):
+def harvest_obis(limit_dataset_ids=None, folder="./obis/", geo_filter=None):
     """Run the OBIS harvester."""
-    harvester = OBISHarvester(limit_dataset_ids, folder, prefect_logger=get_run_logger())
+    harvester = OBISHarvester(
+        limit_dataset_ids, folder,
+        prefect_logger=get_run_logger(),
+        geo_filter=geo_filter,
+    )
     return harvester.harvest()
