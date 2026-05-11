@@ -46,10 +46,12 @@ DATASET_ARRAY_DTYPES = {
     "organizations": ARRAY(TEXT),
     "profile_variables": ARRAY(TEXT),
     "organization_pks": ARRAY(INTEGER),
+    "obis_nodes": ARRAY(TEXT),
 }
 
 OBIS_ARRAY_DTYPES = {
     "scientific_names": ARRAY(TEXT),
+    "aphia_ids": ARRAY(INTEGER),
 }
 
 
@@ -61,8 +63,15 @@ def prepare_profiles_dataframe(profiles):
     return profiles
 
 
-def prepare_obis_cells_dataframe(obis_cells):
-    """Clean and prepare obis_cells DataFrame for insertion."""
+def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
+    """Clean and prepare obis_cells DataFrame for insertion.
+
+    ``name_to_aphia`` (dict[str, int], optional) populates the aphia_ids
+    column at COPY time so the post-load obis_backfill_aphia_ids() UPDATE has
+    far fewer rows to touch. Names absent from the dict yield empty arrays
+    here and are picked up by the backfill (which still runs to handle rows
+    whose names weren't yet in scientific_name_vernaculars at COPY time).
+    """
     obis_cells = obis_cells.copy()
     # Parse scientific_names from CSV string repr back to list, or default to empty list
     obis_cells["scientific_names"] = obis_cells["scientific_names"].apply(
@@ -83,6 +92,14 @@ def prepare_obis_cells_dataframe(obis_cells):
         depth_min=("depth_min", "min"),
         depth_max=("depth_max", "max"),
     ).reset_index()
+
+    if name_to_aphia:
+        def resolve(names):
+            return sorted({name_to_aphia[n] for n in names if n in name_to_aphia})
+        agg["aphia_ids"] = agg["scientific_names"].apply(resolve)
+    else:
+        agg["aphia_ids"] = [[] for _ in range(len(agg))]
+
     return agg
 
 
@@ -103,6 +120,13 @@ def _pg_text_array(values):
     return "{" + ",".join(quote(v) for v in values) + "}"
 
 
+def _pg_int_array(values):
+    """Render a Python iterable as a PostgreSQL int-array literal: {1,2,3}."""
+    if not values:
+        return "{}"
+    return "{" + ",".join(str(int(v)) for v in values) + "}"
+
+
 def load_obis_cells_copy(df, table_name, transaction, schema=None):
     """Bulk-load an obis_cells DataFrame via COPY FROM STDIN.
 
@@ -119,6 +143,8 @@ def load_obis_cells_copy(df, table_name, transaction, schema=None):
                 out.append(r"\N")
             elif col == "scientific_names":
                 out.append(_pg_text_array(val if isinstance(val, (list, tuple)) else []))
+            elif col == "aphia_ids":
+                out.append(_pg_int_array(val if isinstance(val, (list, tuple)) else []))
             else:
                 out.append(val)
         writer.writerow(out)
@@ -186,6 +212,12 @@ def main(folder, incremental=False):
     datasets["profile_variables"] = datasets["profile_variables"].apply(
         ast.literal_eval
     )
+    if "obis_nodes" in datasets.columns:
+        datasets["obis_nodes"] = datasets["obis_nodes"].apply(
+            lambda x: ast.literal_eval(x) if isinstance(x, str) else (x if isinstance(x, list) else [])
+        )
+    else:
+        datasets["obis_nodes"] = [[] for _ in range(len(datasets))]
 
     if datasets.empty:
         logger.info("No datasets found")
@@ -196,6 +228,23 @@ def main(folder, incremental=False):
     schema = "cde"
     with engine.begin() as transaction:
         logger.info("Writing to DB:")
+
+        # Pre-fetch scientific_name → aphia_id mappings from existing
+        # vernaculars so prepare_obis_cells_dataframe can populate
+        # obis_cells.aphia_ids at COPY time. The post-load
+        # obis_backfill_aphia_ids() still runs to cover names that weren't yet
+        # in the vernaculars table when we fetched. The vernaculars table
+        # survives full reloads (not in remove_all_data's TRUNCATE list).
+        name_to_aphia = {}
+        if obis_cells is not None:
+            with _timed("fetch vernaculars for aphia_ids preload", logger):
+                rows = transaction.execute(text(
+                    "SELECT scientific_name, aphia_id "
+                    "FROM cde.scientific_name_vernaculars "
+                    "WHERE aphia_id IS NOT NULL"
+                )).all()
+                name_to_aphia = dict(rows)
+                logger.info("Pre-fetched %d name→aphia_id mappings", len(name_to_aphia))
 
         if incremental:
             logger.info("Using INCREMENTAL mode - will load to temp tables, process, then UPSERT")
@@ -234,7 +283,7 @@ def main(folder, incremental=False):
                     )
 
             if obis_cells is not None:
-                prepared = prepare_obis_cells_dataframe(obis_cells)
+                prepared = prepare_obis_cells_dataframe(obis_cells, name_to_aphia)
                 with _timed("temp_obis_cells COPY", logger):
                     logger.info("Loading obis_cells into temp table (%d rows)", len(prepared))
                     load_obis_cells_copy(prepared, "temp_obis_cells", transaction)
@@ -306,7 +355,7 @@ def main(folder, incremental=False):
                     )
 
             if obis_cells is not None:
-                prepared = prepare_obis_cells_dataframe(obis_cells)
+                prepared = prepare_obis_cells_dataframe(obis_cells, name_to_aphia)
                 with _timed("obis_cells COPY", logger):
                     logger.info("Writing obis_cells (%d rows)", len(prepared))
                     load_obis_cells_copy(prepared, "obis_cells", transaction, schema=schema)
@@ -329,12 +378,26 @@ def main(folder, incremental=False):
                 transaction.execute(text("SELECT ckan_process();"))
 
             if obis_cells is not None:
-                with _timed("obis_process", logger):
-                    logger.info("Processing obis_cells")
-                    # FALSE = non-concurrent matview refresh. Safe in a full
-                    # rebuild (web-api is stopped, no readers to protect) and
-                    # avoids CONCURRENTLY's diff-and-swap overhead.
-                    transaction.execute(text("SELECT obis_process(FALSE);"))
+                # Per-step invocation (sub-functions defined in 5_profile_process.sql)
+                # so each gets its own _timed log line and row-count info. The
+                # incremental path still calls the obis_process() wrapper.
+                # FALSE on obis_refresh_matviews = non-concurrent refresh. Safe in
+                # a full rebuild (web-api is stopped, no readers to protect) and
+                # avoids CONCURRENTLY's diff-and-swap overhead.
+                obis_steps = [
+                    ("obis_set_geom", "()"),
+                    ("obis_link_dataset_pk", "()"),
+                    ("obis_insert_points", "()"),
+                    ("obis_link_point_pk", "()"),
+                    ("obis_update_n_profiles", "()"),
+                    ("obis_refresh_matviews", "(FALSE)"),
+                    ("obis_backfill_aphia_ids", "()"),
+                ]
+                logger.info("Processing obis_cells")
+                for fn, args in obis_steps:
+                    with _timed(fn, logger):
+                        n = transaction.execute(text(f"SELECT {fn}{args};")).scalar()
+                        logger.info("  %s: %s rows affected", fn, n if n is not None else 0)
 
             with _timed("create_hexes", logger):
                 logger.info("Creating hexes")

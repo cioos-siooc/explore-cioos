@@ -36,7 +36,8 @@ export function generateMultipleSelectBadgeTitle (badgeTitle, optionsSelected) {
         oceanVariablesFiltername: 'oceanVariablesMulti',
         platformsFilterName: 'platformsMulti',
         organizationFilterName: 'organizationMulti',
-        datasetsFilterName: 'datasetsMulti'
+        datasetsFilterName: 'datasetsMulti',
+        obisNodesFilterName: 'obisNodesMulti'
       }
       return optionsSelectedFiltered.length + t(mapping[badgeTitle])
     }
@@ -86,7 +87,8 @@ export function createDataFilterQueryString(query) {
     eovsSelected,
     platformsSelected,
     datasetsSelected,
-    scientificNamesSelected
+    scientificNamesSelected,
+    obisNodesSelected
   } = query
 
   // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
@@ -140,6 +142,16 @@ export function createDataFilterQueryString(query) {
     ? scientificNamesSelected.map(encodeURIComponent).join(',')
     : ''
 
+  // obisNodes uses the MultiCheckboxFilter shape (array of {title,isSelected,pk});
+  // emit only when not all-deselected, comma-joined node names.
+  let obisNodes = ''
+  if (obisNodesSelected && obisNodesSelected.length) {
+    const picked = obisNodesSelected.filter((n) => n.isSelected).map((n) => n.title)
+    if (picked.length && picked.length < obisNodesSelected.length) {
+      obisNodes = picked.map(encodeURIComponent).join(',')
+    }
+  }
+
   const apiMappedQuery = {
     // These properties are specified by the API's schema
     eovs,
@@ -151,7 +163,8 @@ export function createDataFilterQueryString(query) {
     depthMin: startDepth,
     depthMax: endDepth,
     includeObis: showObis === false ? 'false' : '',
-    scientificNames
+    scientificNames,
+    obisNodes
   }
 
   return objectToURL(apiMappedQuery)

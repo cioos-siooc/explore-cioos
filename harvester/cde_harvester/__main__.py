@@ -242,6 +242,16 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
     datasets = pd.concat([erddap_datasets, obis_datasets], ignore_index=True)
     skipped_datasets = pd.concat([erddap_skipped, obis_skipped], ignore_index=True)
 
+    # ERDDAP rows don't have obis_nodes — fill with empty lists so the loader's
+    # ast.literal_eval doesn't choke on NaN, and so the column exists when only
+    # the ERDDAP source is being harvested.
+    if "obis_nodes" not in datasets.columns:
+        datasets["obis_nodes"] = [[] for _ in range(len(datasets))]
+    else:
+        datasets["obis_nodes"] = datasets["obis_nodes"].apply(
+            lambda x: x if isinstance(x, list) else []
+        )
+
     logger.info("Adding %s datasets, %s profiles, %s obis_cells", len(datasets), len(erddap_profiles), len(obis_cells))
 
     # Write output CSVs

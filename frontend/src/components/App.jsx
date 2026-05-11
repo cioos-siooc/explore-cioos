@@ -11,7 +11,8 @@ import {
   FileEarmarkSpreadsheet,
   Water,
   BroadcastPin,
-  X
+  X,
+  Diagram3
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import isEmpty from 'lodash/isEmpty'
@@ -46,7 +47,8 @@ import {
   defaultEndDepth,
   defaultDatatsetsSelected,
   defaultPlatformsSelected,
-  defaultScientificNamesSelected
+  defaultScientificNamesSelected,
+  defaultObisNodesSelected
 } from './config.js'
 import {
   createDataFilterQueryString,
@@ -103,7 +105,8 @@ export default function App() {
     datasetsSelected: defaultDatatsetsSelected,
     platformsSelected: defaultPlatformsSelected,
     showObis: true,
-    scientificNamesSelected: defaultScientificNamesSelected
+    scientificNamesSelected: defaultScientificNamesSelected,
+    obisNodesSelected: defaultObisNodesSelected
   }
   const [query, setQuery] = useState(defaultQuery)
   const [showModal, setShowModal] = useState(false)
@@ -194,6 +197,19 @@ export default function App() {
     500
   )
 
+  // OBIS nodes filter (OBIS only). Mirrors orgsSelected shape so it can use
+  // MultiCheckboxFilter directly.
+  const [obisNodesSelected, setObisNodesSelected] = useState(
+    defaultObisNodesSelected
+  )
+  const debouncedObisNodesSelected = useDebounce(obisNodesSelected, 500)
+  const obisNodesFilterTranslationKey = 'obisNodesFilterName'
+  const obisNodesBadgeTitle = generateMultipleSelectBadgeTitle(
+    obisNodesFilterTranslationKey,
+    obisNodesSelected
+  )
+  const [obisNodesSearchTerms, setObisNodesSearchTerms] = useState('')
+
   // Filter open state
   const [openFilter, setOpenFilter] = useState()
 
@@ -218,7 +234,8 @@ export default function App() {
       datasetsSelected,
       platformsSelected,
       showObis,
-      scientificNamesSelected
+      scientificNamesSelected,
+      obisNodesSelected
     })
   }, [
     debouncedStartDate,
@@ -230,7 +247,8 @@ export default function App() {
     debouncedDatasetsSelected,
     debouncedPlatformsSelected,
     showObis,
-    debouncedScientificNamesSelected
+    debouncedScientificNamesSelected,
+    debouncedObisNodesSelected
   ])
 
   function createOptionSubset (searchTerms, allOptions) {
@@ -316,7 +334,8 @@ export default function App() {
       lon,
       zoom,
       includeObis,
-      scientificNames
+      scientificNames,
+      obisNodes
     } = filtersFromURL
 
     if (lat || lon || zoom) setMapView({ lat, lon, zoom })
@@ -399,6 +418,26 @@ export default function App() {
               pk: org.pk
             }
           })
+        )
+      })
+      .catch((error) => {
+        throw error
+      })
+
+    // OBIS nodes — distinct list from /obisNodes. Names double as the pk
+    // since the schema stores text[] (no per-node lookup table).
+    const obisNodesFromURL = (obisNodes?.split(',') || []).map((s) =>
+      decodeURIComponent(s)
+    )
+    fetch(`${server}/obisNodes`)
+      .then((response) => response.json())
+      .then((nodesR) => {
+        setObisNodesSelected(
+          nodesR.map((node) => ({
+            title: node.name,
+            isSelected: obisNodesFromURL.includes(node.name),
+            pk: node.name
+          }))
         )
       })
       .catch((error) => {
@@ -817,6 +856,36 @@ export default function App() {
             setOptionsSelected={setOrgsSelected}
             searchable
             allOptions={orgsSelected}
+          />
+        </Filter>
+        <Filter
+          active={obisNodesSelected.filter((n) => n.isSelected).length !== 0}
+          badgeTitle={obisNodesBadgeTitle}
+          optionsSelected={obisNodesSelected}
+          setOptionsSelected={setObisNodesSelected}
+          tooltip={t('obisNodesFilterTooltip')}
+          icon={<Diagram3 />}
+          controlled
+          searchable
+          searchTerms={obisNodesSearchTerms}
+          setSearchTerms={setObisNodesSearchTerms}
+          searchPlaceholder={t('obisNodesFilterSearchPlaceholder')}
+          filterName={obisNodesFilterTranslationKey}
+          openFilter={openFilter === obisNodesFilterTranslationKey}
+          setOpenFilter={setOpenFilter}
+          selectAllButton={() =>
+            setAllOptionsIsSelectedTo(true, obisNodesSelected, setObisNodesSelected)
+          }
+          resetButton={() =>
+            setAllOptionsIsSelectedTo(false, obisNodesSelected, setObisNodesSelected)
+          }
+          numberOfOptions={obisNodesSelected.length}
+        >
+          <MultiCheckboxFilter
+            optionsSelected={createOptionSubset(obisNodesSearchTerms, obisNodesSelected)}
+            setOptionsSelected={setObisNodesSelected}
+            searchable
+            allOptions={obisNodesSelected}
           />
         </Filter>
         <Filter

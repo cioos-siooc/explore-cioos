@@ -44,19 +44,17 @@ CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
   FROM cde.hexes_zoom_1
   WHERE hexes_zoom_1.geom = points.hex_zoom_1;
 
+  -- Only the FK is propagated to profiles/obis_cells. Tile/legend queries
+  -- JOIN cde.hexes_zoom_0/1 to fetch the polygon when needed.
   UPDATE cde.profiles
   SET hex_0_pk = points.hex_0_pk,
-      hex_1_pk = points.hex_1_pk,
-      hex_zoom_0 = points.hex_zoom_0,
-      hex_zoom_1 = points.hex_zoom_1
+      hex_1_pk = points.hex_1_pk
   FROM cde.points
   WHERE points.pk = profiles.point_pk;
 
   UPDATE cde.obis_cells
   SET hex_0_pk = points.hex_0_pk,
-      hex_1_pk = points.hex_1_pk,
-      hex_zoom_0 = points.hex_zoom_0,
-      hex_zoom_1 = points.hex_zoom_1
+      hex_1_pk = points.hex_1_pk
   FROM cde.points
   WHERE points.pk = obis_cells.point_pk;
 

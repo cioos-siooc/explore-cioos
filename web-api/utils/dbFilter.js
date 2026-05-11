@@ -43,6 +43,7 @@ async function createDBFilter(request) {
     datasetPKs,
     pointPKs,
     scientificNames,
+    obisNodes,
   } = request;
 
   const filters = [];
@@ -110,6 +111,14 @@ async function createDBFilter(request) {
   if (organizations) {
     parameters.organizationsString = organizations.split(",");
     filters.push("organization_pks && :organizationsString");
+  }
+
+  if (obisNodes) {
+    parameters.obisNodesArr = obisNodes.split(",");
+    // Lives on cde.datasets; the join alias `d` is present in tile, legend
+    // and shape queries. Selecting any node implies OBIS-only mode (the
+    // tile/legend/shape routes drop the profiles branch when this is set).
+    filters.push("d.obis_nodes && :obisNodesArr");
   }
 
   if (polygon) {

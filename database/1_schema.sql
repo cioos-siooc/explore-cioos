@@ -14,13 +14,17 @@ DROP TABLE IF EXISTS hexes_zoom_0;
 CREATE TABLE hexes_zoom_0 (
     pk serial PRIMARY KEY,
     geom geometry(Polygon,3857)
-);  
+);
+
+CREATE INDEX ON cde.hexes_zoom_0 USING GIST (geom);
 
 DROP TABLE IF EXISTS hexes_zoom_1;
 CREATE TABLE hexes_zoom_1 (
     pk serial PRIMARY KEY,
     geom geometry(Polygon,3857)
   );
+
+CREATE INDEX ON cde.hexes_zoom_1 USING GIST (geom);
 
  
 
@@ -49,6 +53,7 @@ CREATE TABLE datasets (
     num_columns integer,
     first_eov_column TEXT,
     source_type TEXT DEFAULT 'erddap',
+    obis_nodes text[] DEFAULT '{}',
     UNIQUE(dataset_id, erddap_url)
 );
 
@@ -82,6 +87,9 @@ CREATE INDEX hex_zoom_1 ON cde.points USING GIST (hex_zoom_1);
 
 
 -- profiles/timeseries per dataset
+-- hex polygon geometries are stored on cde.hexes_zoom_0/1; only the FK is
+-- carried here. Tile / legend queries JOIN to those tables when polygon geom
+-- is needed.
 DROP TABLE IF EXISTS profiles;
 CREATE TABLE profiles (
     pk serial PRIMARY KEY,
@@ -100,9 +108,6 @@ CREATE TABLE profiles (
     n_records bigint,
     records_per_day float,
     n_profiles bigint,
-    -- hex polygon that this point is in for zoom 0 (zoomed out)
-    hex_zoom_0 geometry(polygon,3857),
-    hex_zoom_1 geometry(polygon,3857),
     hex_0_pk integer,
     hex_1_pk integer,
     point_pk INTEGER,
@@ -111,8 +116,6 @@ CREATE TABLE profiles (
 );
 
 CREATE INDEX ON profiles USING GIST (geom);
-CREATE INDEX ON profiles USING GIST (hex_zoom_0);
-CREATE INDEX ON profiles USING GIST (hex_zoom_1);
 CREATE INDEX ON profiles(latitude);
 CREATE INDEX ON profiles(longitude);
 -- Index for efficient filtering by dataset during incremental updates
@@ -126,11 +129,15 @@ CREATE INDEX ON profiles(erddap_url, dataset_id, timeseries_id, profile_id);
 DROP TABLE IF EXISTS obis_cells;
 CREATE TABLE obis_cells (
     pk serial PRIMARY KEY,
-    geom geometry(Point, 3857),
+    -- geom is computed at INSERT time from latitude/longitude. Avoids the
+    -- post-load full-table UPDATE that previously rewrote every row + every
+    -- index entry. See obis_set_geom() in 5_profile_process.sql (now a no-op).
     dataset_pk integer,
     dataset_id text,
     latitude double precision,
     longitude double precision,
+    geom geometry(Point, 3857) GENERATED ALWAYS AS
+      (ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)) STORED,
     scientific_names text[] DEFAULT '{}',
     -- WoRMS AphiaIDs corresponding to scientific_names. Populated post-harvest
     -- by joining each name to cde.scientific_name_vernaculars; see
@@ -144,8 +151,8 @@ CREATE TABLE obis_cells (
     time_max timestamptz,
     depth_min double precision,
     depth_max double precision,
-    hex_zoom_0 geometry(polygon, 3857),
-    hex_zoom_1 geometry(polygon, 3857),
+    -- hex polygon geometries live on cde.hexes_zoom_0/1; only the FK is
+    -- carried here. Tile / legend queries JOIN to get the polygon.
     hex_0_pk integer,
     hex_1_pk integer,
     point_pk integer,
@@ -154,12 +161,22 @@ CREATE TABLE obis_cells (
 );
 
 CREATE INDEX ON obis_cells USING GIST (geom);
-CREATE INDEX ON obis_cells USING GIST (hex_zoom_0);
-CREATE INDEX ON obis_cells USING GIST (hex_zoom_1);
 CREATE INDEX ON obis_cells (dataset_id);
 CREATE INDEX ON obis_cells (latitude, longitude);
-CREATE INDEX obis_cells_scientific_names_gin ON cde.obis_cells USING GIN (scientific_names);
+-- Partial GIN: only cells whose aphia_ids are still empty (i.e. WoRMS hasn't
+-- resolved any of their scientific_names yet). The literal-name predicate in
+-- web-api/utils/dbFilter.js fires only for those rows; once aphia_ids is
+-- populated, the integer-set GIN below covers the filter and the text GIN
+-- isn't needed. Saves substantial disk on resolved cells.
+CREATE INDEX obis_cells_scientific_names_gin ON cde.obis_cells USING GIN (scientific_names)
+  WHERE coalesce(array_length(aphia_ids, 1), 0) = 0;
 CREATE INDEX obis_cells_aphia_ids_gin         ON cde.obis_cells USING GIN (aphia_ids);
+
+-- FILLFACTOR leaves room on each page for HOT updates on non-indexed columns
+-- (dataset_pk, point_pk, hex_*_pk are filled by post-load UPDATEs). Reduces
+-- bloat from those passes; modest effect now that the geom UPDATE is gone.
+ALTER TABLE cde.obis_cells SET (fillfactor = 80);
+ALTER TABLE cde.points SET (fillfactor = 80);
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 

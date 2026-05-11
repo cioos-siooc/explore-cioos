@@ -237,6 +237,11 @@ class OBISHarvester(BaseHarvester):
         """Build a single-row dataset DataFrame from OBIS dataset metadata."""
         institutes = metadata.get("institutes") or []
         organizations = [inst.get("name") for inst in institutes if inst.get("name")]
+        # OBIS regional/thematic nodes (EurOBIS, OBIS-USA, etc.). The metadata
+        # is already fetched here for the EEZ-exemption check in
+        # obis_geo_filter.py; reuse it for the user-facing nodes filter.
+        nodes = metadata.get("nodes") or []
+        obis_nodes = [n.get("name") for n in nodes if n.get("name")]
 
         dataset_row = pd.DataFrame([{
             "title": metadata.get("title", ""),
@@ -254,6 +259,7 @@ class OBISHarvester(BaseHarvester):
             "num_columns": None,
             "first_eov_column": None,
             "source_type": "obis",
+            "obis_nodes": obis_nodes,
         }])
         return dataset_row
 

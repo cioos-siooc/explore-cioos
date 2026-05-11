@@ -11,10 +11,12 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
     timeMin = null, timeMax = null, depthMin = null, depthMax = null,
     includeObis = 'true',
     scientificNames,
+    obisNodes,
   } = query;
 
-  // Scientific-name filter is OBIS-only: when set, hide profiles and narrow OBIS.
-  const includeProfiles = !scientificNames;
+  // Scientific-name and OBIS-node filters are OBIS-only: when either is set,
+  // hide profiles and narrow to OBIS rows.
+  const includeProfiles = !scientificNames && !obisNodes;
   const showObis = includeObis !== 'false';
 
   const profilesBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,

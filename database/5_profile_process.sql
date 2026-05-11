@@ -109,58 +109,105 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- Drop the previous 0-argument signature, if present from an earlier deploy.
--- CREATE OR REPLACE FUNCTION only matches an existing definition by exact
--- signature, so without this the old slow obis_process() would coexist with
--- the new 1-arg version and incremental callers would still pick it up.
+-- OBIS post-load processing, split into per-step functions so the db-loader
+-- can time each step individually and surface row counts in logs. The wrapper
+-- obis_process() at the bottom preserves the previous calling convention used
+-- by process_incremental_update().
+--
+-- Drop the previous 0-arg signature if present from an earlier deploy. Without
+-- this the old single-shot obis_process() can coexist with the wrapper.
 DROP FUNCTION IF EXISTS obis_process();
 
-CREATE OR REPLACE FUNCTION obis_process(concurrent_refresh BOOLEAN DEFAULT TRUE) RETURNS VOID AS $$
+
+-- geom is now a GENERATED ALWAYS AS … STORED column on obis_cells (computed
+-- at INSERT time from latitude/longitude). The previous full-table UPDATE
+-- rewrote every row + every index entry; the generated column eliminates
+-- that pass entirely. Kept as a no-op so the loader's per-step list and the
+-- back-compat wrapper continue to work.
+CREATE OR REPLACE FUNCTION obis_set_geom() RETURNS bigint AS $$
 BEGIN
-  SET search_path TO cde, public;
+  RETURN 0;
+END;
+$$ LANGUAGE plpgsql;
 
-  -- Set geom from lat/lon
-  UPDATE obis_cells
-  SET geom = ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)
-  WHERE geom IS NULL;
 
-  -- Link to datasets
-  UPDATE obis_cells c
+CREATE OR REPLACE FUNCTION obis_link_dataset_pk() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
+  UPDATE cde.obis_cells c
   SET dataset_pk = d.pk
-  FROM datasets d
+  FROM cde.datasets d
   WHERE c.dataset_id = d.dataset_id
     AND d.source_type = 'obis'
     AND c.dataset_pk IS NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
 
-  -- Insert distinct geometries into points (skip existing).
-  -- LEFT JOIN anti-join over the distinct lat/lon set computes geom once per
-  -- distinct point instead of inside a correlated subquery for every candidate.
-  INSERT INTO points (geom)
+
+-- Insert distinct geometries into points (skip existing). LEFT JOIN anti-join
+-- over the distinct lat/lon set computes geom once per distinct point instead
+-- of inside a correlated subquery for every candidate.
+CREATE OR REPLACE FUNCTION obis_insert_points() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
+  INSERT INTO cde.points (geom)
   SELECT src.new_geom
     FROM (
       SELECT DISTINCT
              ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857) AS new_geom
-        FROM obis_cells
+        FROM cde.obis_cells
     ) src
-    LEFT JOIN points p ON p.geom = src.new_geom
+    LEFT JOIN cde.points p ON p.geom = src.new_geom
    WHERE p.pk IS NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
 
-  -- Link obis_cells to point_pk
-  UPDATE obis_cells
-  SET point_pk = points.pk
-  FROM points
-  WHERE points.geom = obis_cells.geom
-    AND obis_cells.point_pk IS NULL;
 
-  -- Update n_profiles on datasets to reflect obis_cells count
-  UPDATE datasets d
-  SET n_profiles = (SELECT count(*) FROM obis_cells c WHERE c.dataset_pk = d.pk)
-  WHERE d.source_type = 'obis';
+CREATE OR REPLACE FUNCTION obis_link_point_pk() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
+  UPDATE cde.obis_cells c
+  SET point_pk = p.pk
+  FROM cde.points p
+  WHERE p.geom = c.geom
+    AND c.point_pk IS NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
 
-  -- Matview refreshes. CONCURRENTLY costs ~2x and is only needed when readers
-  -- might be hitting the matview during the refresh; on a full rebuild after
-  -- TRUNCATE there are none. The caller passes FALSE on full rebuild and lets
-  -- the default TRUE apply for incremental (process_incremental_update path).
+
+-- Single GROUP BY scan over obis_cells, then JOIN-update datasets — replaces
+-- a per-dataset correlated subquery that re-scanned obis_cells N times.
+CREATE OR REPLACE FUNCTION obis_update_n_profiles() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
+  WITH counts AS (
+    SELECT dataset_pk, count(*) AS c
+    FROM cde.obis_cells
+    WHERE dataset_pk IS NOT NULL
+    GROUP BY dataset_pk
+  )
+  UPDATE cde.datasets d
+  SET n_profiles = counts.c
+  FROM counts
+  WHERE d.pk = counts.dataset_pk
+    AND d.source_type = 'obis';
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- CONCURRENTLY costs ~2x and is only needed when readers might be hitting the
+-- matview during the refresh; on a full rebuild after TRUNCATE there are none.
+-- Caller passes FALSE on full rebuild; default TRUE applies for incremental.
+CREATE OR REPLACE FUNCTION obis_refresh_matviews(concurrent_refresh BOOLEAN DEFAULT TRUE) RETURNS bigint AS $$
+BEGIN
   IF concurrent_refresh THEN
     REFRESH MATERIALIZED VIEW CONCURRENTLY cde.obis_scientific_names;
     REFRESH MATERIALIZED VIEW CONCURRENTLY cde.obis_scientific_name_popularity;
@@ -168,21 +215,24 @@ BEGIN
     REFRESH MATERIALIZED VIEW cde.obis_scientific_names;
     REFRESH MATERIALIZED VIEW cde.obis_scientific_name_popularity;
   END IF;
+  RETURN 0;
+END;
+$$ LANGUAGE plpgsql;
 
-  -- Backfill obis_cells.aphia_ids from the latest scientific_name_vernaculars
-  -- mappings so the rank-aware filter rolldown can use integer-set overlap.
-  -- Runs only over cells that haven't been resolved yet (or whose name list
-  -- changed). For names not yet in scientific_name_vernaculars (e.g. species
-  -- new to this harvest, before populate_vernaculars.py has caught up), the
-  -- COALESCE leaves aphia_ids as the default '{}' and those cells fall back
-  -- to literal-name matching in dbFilter.js until the next vernacular populate
-  -- + reprocess.
-  --
-  -- Performance: the GIN index on aphia_ids is dropped before the bulk UPDATE
-  -- and rebuilt after; rewriting it from scratch is much faster than 100K+
-  -- incremental insertions. The UPDATE itself is rewritten as a single
-  -- hash-join via two CTEs (cell_names → cell_aphias) instead of a per-row
-  -- correlated subquery.
+
+-- Backfill obis_cells.aphia_ids from scientific_name_vernaculars so the
+-- rank-aware filter rolldown can use integer-set overlap. Names not yet in
+-- vernaculars (species new to this harvest, before populate_vernaculars.py
+-- catches up) leave aphia_ids as default '{}' and fall back to literal-name
+-- matching in dbFilter.js until the next vernacular populate + reprocess.
+--
+-- Performance: the GIN index on aphia_ids is dropped before the bulk UPDATE
+-- and rebuilt after — rewriting it from scratch is much faster than 100K+
+-- incremental insertions. The UPDATE itself is a single hash-join via two
+-- CTEs (cell_names → cell_aphias) instead of a per-row correlated subquery.
+CREATE OR REPLACE FUNCTION obis_backfill_aphia_ids() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
   DROP INDEX IF EXISTS cde.obis_cells_aphia_ids_gin;
 
   WITH cell_names AS (
@@ -203,9 +253,37 @@ BEGIN
      SET aphia_ids = COALESCE(ca.aphia_ids, '{}'::integer[])
     FROM cell_aphias ca
    WHERE c.pk = ca.pk;
+  GET DIAGNOSTICS n = ROW_COUNT;
 
   CREATE INDEX obis_cells_aphia_ids_gin
     ON cde.obis_cells USING GIN (aphia_ids);
 
+  -- Partial scientific_names GIN: only indexes cells whose aphia_ids are
+  -- still empty (the literal-name fallback in dbFilter.js is the only path
+  -- that uses this index; once aphia_ids is populated, the integer-set GIN
+  -- covers the filter). Drop+rebuild keeps the partial predicate consistent
+  -- with the rows that just got their aphia_ids set above.
+  DROP INDEX IF EXISTS cde.obis_cells_scientific_names_gin;
+  CREATE INDEX obis_cells_scientific_names_gin
+    ON cde.obis_cells USING GIN (scientific_names)
+    WHERE coalesce(array_length(aphia_ids, 1), 0) = 0;
+
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Wrapper preserved for incremental callers (process_incremental_update calls
+-- obis_process() directly). Full-reload path in db-loader/__main__.py invokes
+-- the sub-functions individually so each gets its own _timed log line.
+CREATE OR REPLACE FUNCTION obis_process(concurrent_refresh BOOLEAN DEFAULT TRUE) RETURNS VOID AS $$
+BEGIN
+  PERFORM obis_set_geom();
+  PERFORM obis_link_dataset_pk();
+  PERFORM obis_insert_points();
+  PERFORM obis_link_point_pk();
+  PERFORM obis_update_n_profiles();
+  PERFORM obis_refresh_matviews(concurrent_refresh);
+  PERFORM obis_backfill_aphia_ids();
 END;
 $$ LANGUAGE plpgsql;

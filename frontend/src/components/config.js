@@ -9,6 +9,7 @@ export const defaultEndDepth = 12000
 
 export const defaultShowObis = true
 export const defaultScientificNamesSelected = []
+export const defaultObisNodesSelected = []
 
 export const defaultQuery = {
   startDate: defaultStartDate,
@@ -16,7 +17,8 @@ export const defaultQuery = {
   startDepth: defaultStartDepth,
   endDepth: defaultEndDepth,
   showObis: defaultShowObis,
-  scientificNamesSelected: defaultScientificNamesSelected
+  scientificNamesSelected: defaultScientificNamesSelected,
+  obisNodesSelected: defaultObisNodesSelected
 }
 
 export const colorScale = [

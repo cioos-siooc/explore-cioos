@@ -67,23 +67,21 @@ router.get(
 
     // zoom levels: 0-4,5-6,7+
     const isHexGrid = z < 7;
-    const zoomColumn = z < 5 ? "hex_zoom_0" : "hex_zoom_1";
     const zoomPKColumn = z < 5 ? "hex_0_pk" : "hex_1_pk";
+    const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
 
-    // calculate the bounding polygon for this tile
-    const sqlQuery = {
-      table: "cde.profiles",
-      // if its a zoom level where hexes are show, return the hex shapes, otherwise return a point
-      geom_column: isHexGrid ? zoomColumn : "geom",
-    };
     const includeObis = req.query.includeObis !== 'false';
-    // Scientific-name filter is OBIS-only: when set, hide profiles and narrow OBIS.
-    const includeProfiles = !req.query.scientificNames;
+    // Scientific-name and OBIS-node filters are OBIS-only: when either is
+    // set, hide profiles and narrow to OBIS rows.
+    const includeProfiles = !req.query.scientificNames && !req.query.obisNodes;
 
-    const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, :geom_column: as geom, days as record_count,
+    // At hex zoom we only need the hex FK and point_pk (for distinct counts);
+    // the polygon is fetched once per hex via JOIN to hexes_zoom_*. At point
+    // zoom we project the actual point geom.
+    const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
            time_min, time_max, latitude, longitude, depth_min, depth_max
     FROM cde.profiles`;
-    const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, :geom_column: as geom,
+    const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
            date_part('days', time_max - time_min) + 1 as record_count,
            time_min, time_max, latitude, longitude, depth_min, depth_max
     FROM cde.obis_cells
@@ -97,28 +95,34 @@ router.get(
       ? branches.join("\n    UNION ALL\n    ")
       : `${profilesBranch} WHERE FALSE`;
 
+    const relevantPointsSQL = isHexGrid
+      ? `SELECT p.zoom_pk pk, count(distinct p.point_pk) count,
+                array_to_json(array_agg(distinct d.pk_url)) datasets,
+                h.geom AS geom
+         FROM combined p
+         JOIN cde.datasets d ON p.dataset_pk = d.pk
+         JOIN ${hexesTable} h ON h.pk = p.zoom_pk
+         ${filters.hasShared ? "WHERE :filters" : ""}
+         GROUP BY p.zoom_pk, h.geom`
+      : `SELECT p.point_pk pk, d.platform as platform, sum(p.record_count)::bigint count,
+                array_to_json(array_agg(distinct d.pk_url)) datasets,
+                p.point_geom AS geom
+         FROM combined p
+         JOIN cde.datasets d ON p.dataset_pk = d.pk
+         ${filters.hasShared ? "WHERE :filters" : ""}
+         GROUP BY p.point_geom, p.point_pk, d.platform`;
+
     // Combine profiles and obis_cells so both appear on the map
     const SQL = `
   with combined as (
     ${combinedInner}
   ),
   relevent_points as (
-    ${
-  isHexGrid
-    ? "SELECT p.zoom_pk pk,count(distinct p.point_pk) count,"
-    : "SELECT p.point_pk pk, d.platform as platform,sum(p.record_count)::bigint count,"
-} array_to_json(array_agg(distinct d.pk_url)) datasets,
-      p.geom AS geom FROM combined p
-        -- used for organizations filtering
-        JOIN cde.datasets d
-        ON p.dataset_pk = d.pk
-       ${filters.hasShared ? "WHERE :filters" : ""}
-        ${
-  isHexGrid ? "GROUP BY p.zoom_pk,p.geom" : "GROUP BY p.geom,p.point_pk,d.platform"
-} ),
+    ${relevantPointsSQL}
+  ),
     te AS (select ST_TileEnvelope(:z, :x, :y) tile_envelope ),
     mvtgeom AS (
-      SELECT pk,count, 
+      SELECT pk,count,
        ${isHexGrid ? "" : "platform,"} datasets,
         ST_AsMVTGeom (
           relevent_points.geom,
@@ -136,7 +140,6 @@ router.get(
         filters: filters.shared,
         obisFilters: filters.obisOnly,
         zoomPKColumn,
-        geom_column: sqlQuery.geom_column,
         z,
         x,
         y,
