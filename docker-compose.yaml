@@ -25,13 +25,13 @@ services:
     expose:
       - "5000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
   nginx:
     build:
         context: ./nginx
         dockerfile: Dockerfile
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/logs:/var/log/nginx
       - ./nginx/logrotate_state:/var/lib/logrotate
       - ./harvester_logs:/usr/share/nginx/html/harvester_logs:ro
@@ -45,17 +45,24 @@ services:
       context: .
       dockerfile: ./download_scheduler/Dockerfile
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     env_file:
       - .env
+    environment:
+      # APP_DOMAIN auto-derives from Coolify's injected SERVICE_URL_NGINX when present;
+      # falls back to APP_DOMAIN from .env for local dev.
+      - "DOWNLOAD_WAF_URL=${SERVICE_URL_NGINX:-${APP_DOMAIN}}/downloads"
     volumes:
       - ./downloads:/usr/src/app/download_scheduler/downloads
   frontend:
     build:
       context: ./frontend
       args:
-        API_URL: $API_URL
-        BASE_URL: $BASE_URL
+        # Default to a same-origin relative path so the SPA works on whatever
+        # public hostname serves it without a rebuild.
+        API_URL: ${API_URL:-/api}
+        BASE_URL: ${BASE_URL:-/}
     expose:
       - "80"
 
@@ -80,16 +87,8 @@ services:
       - DB_HOST_EXTERNAL=db
     env_file:
       - .env
-      
-      
-  redis:
-    image: "redis:alpine"
-    expose:
-      - "6379"
-    command: redis-server /usr/local/etc/redis/redis.conf
-    volumes:
-      - redis-data:/var/lib/redis
-      - ./redis-config/redis.conf:/usr/local/etc/redis/redis.conf
+
+
   prefect:
     image: prefecthq/prefect:3.6-python3.12-conda
     command: prefect server start --host 0.0.0.0
@@ -112,4 +111,3 @@ services:
 volumes:
   postgres-data:
   prefect_data:
-  redis-data:
