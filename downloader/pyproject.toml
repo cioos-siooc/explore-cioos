@@ -17,7 +17,7 @@ dependencies = [
 packages = ["erddap_downloader"]
 
 [tool.uv.sources]
-harvester = { path = "../harvester" }
+harvester = { path = "../harvester", editable = true }
 
 
 [build-system]
