@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Dropdown, DropdownButton } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 import './styles.css'
@@ -16,6 +16,7 @@ export default function DatasetPreviewPlot({
   data
 }) {
   const { t, i18n } = useTranslation()
+  const [plotType, setPlotType] = useState('markers')
 
   const isProfile = inspectDataset.cdm_data_type
     .toLowerCase()
@@ -56,36 +57,53 @@ export default function DatasetPreviewPlot({
 
   return (
     <>
-      <DropdownButton
-        title={t('datasetPreviewPlotXAxisSelect') + ': ' + plotAxes.x.columnName}
-      >
-        {datasetPreview &&
-          datasetPreview?.table?.columnNames.map((columnName, index) => {
-            return (
-              <Dropdown.Item
-                key={columnName}
-                onClick={() => setPlotAxes({ x: { columnName, unit: datasetPreview.table.columnUnits[index] }, y: plotAxes.y })}
-              >
-                {columnName}
-              </Dropdown.Item>
-            )
-          })}
-      </DropdownButton>
-      <DropdownButton
-        title={t('datasetPreviewPlotYAxisSelect') + ': ' + plotAxes.y.columnName}
-      >
-        {datasetPreview &&
-          datasetPreview?.table?.columnNames.map((columnName, index) => {
-            return (
-              <Dropdown.Item
-                key={columnName}
-                onClick={() => setPlotAxes({ x: plotAxes.x, y: { columnName, unit: datasetPreview.table.columnUnits[index] } })}
-              >
-                {columnName}
-              </Dropdown.Item>
-            )
-          })}
-      </DropdownButton>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <DropdownButton
+            title={t('datasetPreviewPlotXAxisSelect') + ': ' + plotAxes.x.columnName}
+          >
+            {datasetPreview &&
+              datasetPreview?.table?.columnNames.map((columnName, index) => {
+                return (
+                  <Dropdown.Item
+                    key={columnName}
+                    onClick={() => setPlotAxes({ x: { columnName, unit: datasetPreview.table.columnUnits[index] }, y: plotAxes.y })}
+                  >
+                    {columnName}
+                  </Dropdown.Item>
+                )
+              })}
+          </DropdownButton>
+          <DropdownButton
+            title={t('datasetPreviewPlotYAxisSelect') + ': ' + plotAxes.y.columnName}
+          >
+            {datasetPreview &&
+              datasetPreview?.table?.columnNames.map((columnName, index) => {
+                return (
+                  <Dropdown.Item
+                    key={columnName}
+                    onClick={() => setPlotAxes({ x: plotAxes.x, y: { columnName, unit: datasetPreview.table.columnUnits[index] } })}
+                  >
+                    {columnName}
+                  </Dropdown.Item>
+                )
+              })}
+          </DropdownButton>
+        </div>
+        <DropdownButton
+          title={t('Plot type') + ': ' + t(plotType)}
+        >
+          <Dropdown.Item onClick={() => setPlotType('markers')}>
+            {t('markers')}
+          </Dropdown.Item>
+          <Dropdown.Item onClick={() => setPlotType('lines')}>
+            {t('line')}
+          </Dropdown.Item>
+          <Dropdown.Item onClick={() => setPlotType('markers+lines')}>
+            {t('markersAndLine')}
+          </Dropdown.Item>
+        </DropdownButton>
+      </div>
       <div className='datasetPreviewPlot'>
         <>
           {plotAxes.x !== undefined && plotAxes.y !== undefined && data && (
@@ -95,13 +113,13 @@ export default function DatasetPreviewPlot({
                   x: data.map((row) => row[plotAxes.x.columnName]) || [],
                   y: data.map((row) => row[plotAxes.y.columnName]) || [],
                   type: 'scatter',
-                  mode: 'markers'
+                  mode: plotType
                 }
               ]}
               layout={{
                 uirevision: true,
                 autosize: true,
-                // dragmode: false,
+                // dragmode: true,
                 yaxis: {
                   automargin: true,
                   side: isProfile ? 'top' : undefined,

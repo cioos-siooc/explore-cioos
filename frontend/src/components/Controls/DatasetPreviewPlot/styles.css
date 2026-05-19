@@ -12,3 +12,7 @@
   min-height: 450px !important;
   height: 100% !important;
 }
+
+.dropdown-menu {
+  z-index: 9999;
+}
