@@ -46,6 +46,8 @@ services:
     build:
       context: .
       dockerfile: ./download_scheduler/Dockerfile
+    profiles:
+      - tools
     depends_on:
       db:
         condition: service_healthy
