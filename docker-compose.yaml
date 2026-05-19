@@ -74,6 +74,7 @@ services:
     build:
       context: .
       dockerfile: ./harvester/Dockerfile
+    image: cde-harvester:latest
     profiles:
       - tools
     volumes:
@@ -89,6 +90,68 @@ services:
     env_file:
       - .env
 
+
+  # One-shot: registers the cde-harvester deployment + work pool with Prefect.
+  # Exits cleanly once done. Coolify will show this as "Exited (0)" — expected.
+  prefect_deployment:
+    image: cde-harvester:latest
+    depends_on:
+      prefect:
+        condition: service_healthy
+    restart: "no"
+    command:
+      - uv
+      - run
+      - python
+      - -m
+      - cde_harvester.prefect_pipeline
+      - -f
+      - harvest_config.yaml
+      - -d
+      - prod
+    env_file:
+      - .env
+    environment:
+      PREFECT_API_URL: http://prefect:4200/api
+      # Network the spawned flow-run containers should join so they can reach
+      # db / redis / prefect. Defaults to production's name; Coolify overrides
+      # via COOLIFY_RESOURCE_UUID.
+      PREFECT_DOCKER_NETWORK: ${COOLIFY_RESOURCE_UUID:-explore-cioos_default}
+      # Image tag the worker uses when spawning a flow-run container.
+      HARVESTER_IMAGE: cde-harvester:latest
+      # Empty -> bind-mount via HOST_ROOT (production). Set to "<uuid>_" under
+      # Coolify so the spawned containers attach Coolify's project-scoped
+      # named volumes (harvester-cache, harvest-data, harvester-logs, obis-cache).
+      PREFECT_VOLUME_PREFIX: ${COOLIFY_RESOURCE_UUID:+${COOLIFY_RESOURCE_UUID}_}
+      DB_HOST_EXTERNAL: db
+      HARVESTER_LOG_DIR: /app/harvester/logs
+      PREFECT_LOGGING_LEVEL: INFO
+
+  # Long-running: polls Prefect for work, spawns flow-run containers via the
+  # docker socket. Needs the deployment to have registered first.
+  prefect_worker:
+    image: cde-harvester:latest
+    depends_on:
+      prefect:
+        condition: service_healthy
+      prefect_deployment:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    command:
+      - uv
+      - run
+      - prefect
+      - worker
+      - start
+      - --pool
+      - docker-pool
+      - --type
+      - docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      PREFECT_API_URL: http://prefect:4200/api
+      PREFECT_LOGGING_LEVEL: INFO
 
   prefect:
     image: prefecthq/prefect:3.6-python3.12-conda

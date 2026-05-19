@@ -186,12 +186,38 @@ class PrefectCDEPipeline:
         # Get host root from environment variable, default to current working directory if running locally
         host_root = os.getenv("HOST_ROOT", os.getcwd())
 
+        # Coolify-friendly knobs. Defaults preserve the original production
+        # (bare docker-compose) behaviour; Coolify deployments set these to
+        # match the project-UUID-scoped network / image / named-volume prefix
+        # that Coolify generates.
+        job_image = os.getenv("HARVESTER_IMAGE", "explore-cioos-harvester:latest")
+        job_network = os.getenv("PREFECT_DOCKER_NETWORK", "explore-cioos_default")
+        # Empty -> use bind mounts under HOST_ROOT (production default).
+        # Set to e.g. "<project>_" -> use named volumes (Coolify).
+        volume_prefix = os.getenv("PREFECT_VOLUME_PREFIX", "")
+
+        if volume_prefix:
+            job_volumes = [
+                f"{volume_prefix}harvester-cache:/app/harvester/harvester_cache",
+                f"{volume_prefix}harvest-data:/app/harvester/harvest",
+                f"{volume_prefix}harvester-logs:/app/harvester/logs",
+                f"{volume_prefix}obis-cache:/app/harvester/obis_cache",
+            ]
+        else:
+            job_volumes = [
+                f"{host_root}/harvest_config.yaml:/app/harvester/harvest_config.yaml:ro",
+                f"{host_root}/harvester_cache:/app/harvester/harvester_cache",
+                f"{host_root}/ckan_harvester_cache:/app/harvester/ckan_harvester_cache",
+                f"{host_root}/harvest:/app/harvester/harvest",
+                f"{host_root}/harvester_logs:/app/harvester/logs",
+            ]
+
         self.create_docker_work_pool()
 
         deployment_id = self.deploy(
             name="cde-harvester-deployment",
             work_pool_name="docker-pool",
-            image="explore-cioos-harvester:latest",
+            image=job_image,
             cron=os.getenv("HARVESTER_CRON"),
             build=False,  # Don't build, use existing image
             push=False,  # Don't push image
@@ -213,14 +239,8 @@ class PrefectCDEPipeline:
                     "DB_HOST_EXTERNAL": os.getenv("DB_HOST_EXTERNAL", "db"),
                     "REDIS_HOST": os.getenv("REDIS_HOST", "redis"),
                 },
-                "networks": ["explore-cioos_default"],
-                "volumes": [
-                    f"{host_root}/harvest_config.yaml:/app/harvester/harvest_config.yaml:ro",
-                    f"{host_root}/harvester_cache:/app/harvester/harvester_cache",
-                    f"{host_root}/ckan_harvester_cache:/app/harvester/ckan_harvester_cache",
-                    f"{host_root}/harvest:/app/harvester/harvest",
-                    f"{host_root}/harvester_logs:/app/harvester/logs",
-                ],
+                "networks": [job_network],
+                "volumes": job_volumes,
                 "auto_remove": True,
                 "stream_output": True,
                 "image_pull_policy": "Never",  # Use local image, don't pull
