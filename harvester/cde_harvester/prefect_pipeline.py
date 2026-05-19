@@ -214,7 +214,10 @@ class PrefectCDEPipeline:
 
         self.create_docker_work_pool()
 
-        deployment_id = self.deploy(
+        # cde_pipeline is the @flow we want to register; Flow.deploy() is what
+        # actually creates the Prefect deployment record. (self.deploy doesn't
+        # exist — PrefectCDEPipeline is a plain class.)
+        deployment_id = self.cde_pipeline.deploy(
             name="cde-harvester-deployment",
             work_pool_name="docker-pool",
             image=job_image,
