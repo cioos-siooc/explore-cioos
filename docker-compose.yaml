@@ -93,6 +93,11 @@ services:
 
   # One-shot: registers the cde-harvester deployment + work pool with Prefect.
   # Exits cleanly once done. Coolify will show this as "Exited (0)" — expected.
+  #
+  # depends_on serializes startup deliberately: Docker 29's compose
+  # orchestrator hits a "No such container" race when multiple services
+  # transition Starting -> Started in the same millisecond. Chaining
+  # prefect_deployment behind nginx forces enough separation to avoid it.
   prefect_deployment:
     build:
       context: .
@@ -101,6 +106,8 @@ services:
     depends_on:
       prefect:
         condition: service_healthy
+      nginx:
+        condition: service_started
     restart: "no"
     command:
       - uv
