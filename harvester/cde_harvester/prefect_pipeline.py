@@ -278,11 +278,18 @@ def main():
             logger.error("No config file provided. Use --config-file to specify the path to harvest_config.yaml")
             sys.exit(1)
         if args.deployment == "prod":
+            # In 'prod' mode this process only REGISTERS the Prefect deployment
+            # and exits — the worker is responsible for actually running the
+            # pipeline on schedule / on demand. Running cde_pipeline() here
+            # would (a) duplicate work the worker will do, and (b) make
+            # registration sensitive to transient harvest failures, which
+            # repeatedly kills Coolify deploys.
             deploy(pipeline)
+        else:
+            pipeline.cde_pipeline()
     except Exception as e:
         logger.error(f"CDE Pipeline failed: {e}", exc_info=True)
         sys.exit(1)
-    pipeline.cde_pipeline()
 
 if __name__ == "__main__":
     main()
