@@ -16,6 +16,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY ./harvester/cde_harvester ./cde_harvester
 COPY ./harvester/run.sh ./run.sh
 
+# Bake in default harvest config and OBIS dataset list so the image is self-contained
+# (no host bind-mounts required). Operators can override at runtime if needed.
+COPY ./harvest_config.sample.yaml ./harvest_config.yaml
+COPY ./Obis_Datasets.json ./Obis_Datasets.json
+
 # 4. Install project itself
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked || (echo "Lock mismatch final stage, aborting" && exit 1)

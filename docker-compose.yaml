@@ -1,6 +1,6 @@
 services:
   db:
-    image: "postgis/postgis:13-3.1-alpine"
+    build: ./database
     platform: linux/x86_64
     expose:
       - "${DB_PORT:-5432}"
@@ -11,7 +11,6 @@ services:
       - "POSTGRES_USER=$DB_USER"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./database:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD", "pg_isready", "-q", "-d", "${DB_NAME}", "-U", "${DB_USER}"]
       interval: 10s
@@ -34,10 +33,10 @@ services:
     environment:
       - SERVICE_FQDN_NGINX_4000
     volumes:
-      - ./nginx/logs:/var/log/nginx
-      - ./nginx/logrotate_state:/var/lib/logrotate
-      - ./harvester_logs:/usr/share/nginx/html/harvester_logs:ro
-      - ./downloads:/usr/share/nginx/html/downloads:ro
+      - nginx_logs:/var/log/nginx
+      - nginx_logrotate:/var/lib/logrotate
+      - harvester_logs:/usr/share/nginx/html/harvester_logs:ro
+      - downloads:/usr/share/nginx/html/downloads:ro
     depends_on:
       - web-api
     expose:
@@ -58,7 +57,7 @@ services:
       # falls back to APP_DOMAIN from .env for local dev.
       - "DOWNLOAD_WAF_URL=${SERVICE_URL_NGINX:-${APP_DOMAIN}}/downloads"
     volumes:
-      - ./downloads:/usr/src/app/download_scheduler/downloads
+      - downloads:/usr/src/app/download_scheduler/downloads
   frontend:
     build:
       context: ./frontend
@@ -78,12 +77,10 @@ services:
     profiles:
       - tools
     volumes:
-      - ./harvest_config.yaml:/app/harvester/harvest_config.yaml
-      - ./harvester_cache:/app/harvester/harvester_cache
-      - ./harvest:/app/harvester/harvest
-      - ./harvester_logs:/app/harvester/logs
-      - ./Obis_Datasets.json:/app/harvester/Obis_Datasets.json:ro
-      - ./obis_cache:/app/harvester/obis_cache
+      - harvester_cache:/app/harvester/harvester_cache
+      - harvest_data:/app/harvester/harvest
+      - harvester_logs:/app/harvester/logs
+      - obis_cache:/app/harvester/obis_cache
     environment:
       - "HARVESTER_LOG_DIR=/app/harvester/logs"
       - PREFECT_API_URL=http://prefect:4200/api
@@ -120,3 +117,10 @@ services:
 volumes:
   postgres-data:
   prefect_data:
+  nginx_logs:
+  nginx_logrotate:
+  harvester_logs:
+  downloads:
+  harvester_cache:
+  harvest_data:
+  obis_cache:
