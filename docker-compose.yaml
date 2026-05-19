@@ -94,6 +94,9 @@ services:
   # One-shot: registers the cde-harvester deployment + work pool with Prefect.
   # Exits cleanly once done. Coolify will show this as "Exited (0)" — expected.
   prefect_deployment:
+    build:
+      context: .
+      dockerfile: ./harvester/Dockerfile
     image: cde-harvester:latest
     depends_on:
       prefect:
@@ -130,6 +133,9 @@ services:
   # Long-running: polls Prefect for work, spawns flow-run containers via the
   # docker socket. Needs the deployment to have registered first.
   prefect_worker:
+    build:
+      context: .
+      dockerfile: ./harvester/Dockerfile
     image: cde-harvester:latest
     depends_on:
       prefect:
