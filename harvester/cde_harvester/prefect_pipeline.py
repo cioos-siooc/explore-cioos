@@ -435,6 +435,15 @@ def populate_vernaculars_run(
     """
     # populate_vernaculars uses argparse. Monkey-patch sys.argv so we don't
     # have to refactor the script's CLI surface.
+    import logging as _logging
+
+    # PREFECT_LOGGING_EXTRA_LOGGERS attaches Prefect's handler to these
+    # loggers but does NOT change their level. Without explicit INFO, the
+    # script's `logger.info(...)` progress lines get filtered out before
+    # they reach Prefect's handler — silent flow run.
+    for name in ("populate_vernaculars", "cde_db_loader", "cde_harvester"):
+        _logging.getLogger(name).setLevel(_logging.INFO)
+
     from cde_db_loader.populate_vernaculars import main as vernaculars_main
 
     argv = ["populate_vernaculars"]
@@ -446,7 +455,12 @@ def populate_vernaculars_run(
     if refresh_status:
         argv += ["--refresh-status", refresh_status]
 
-    logger.info("populate_vernaculars argv: %s", argv)
+    # print() lines are captured by @flow(log_prints=True) → visible in the
+    # Prefect UI even if logging is misconfigured. Useful as a heartbeat /
+    # canary so a stuck WoRMS call doesn't look identical to a stuck flow.
+    print(f"populate_vernaculars argv: {argv}")
+    print("Calling vernaculars_main() — output below comes from the stdlib "
+          "logger 'populate_vernaculars' via PREFECT_LOGGING_EXTRA_LOGGERS")
 
     saved_argv = sys.argv
     try:
@@ -454,6 +468,8 @@ def populate_vernaculars_run(
         vernaculars_main()
     finally:
         sys.argv = saved_argv
+
+    print("vernaculars_main() returned")
 
 
 def deploy(pipeline):
