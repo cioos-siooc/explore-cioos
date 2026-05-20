@@ -187,14 +187,20 @@ class PrefectCDEPipeline:
         host_root = os.getenv("HOST_ROOT", os.getcwd())
 
         # Coolify-friendly knobs. Defaults preserve the original production
-        # (bare docker-compose) behaviour; Coolify deployments set these to
-        # match the project-UUID-scoped network / image / named-volume prefix
-        # that Coolify generates.
+        # (bare docker-compose) behaviour; Coolify deployments override via
+        # COOLIFY_RESOURCE_UUID (auto-injected) so the spawned flow-run
+        # containers join the project-scoped network and attach the
+        # project-scoped named volumes.
         job_image = os.getenv("HARVESTER_IMAGE", "explore-cioos-harvester:latest")
-        job_network = os.getenv("PREFECT_DOCKER_NETWORK", "explore-cioos_default")
-        # Empty -> use bind mounts under HOST_ROOT (production default).
-        # Set to e.g. "<project>_" -> use named volumes (Coolify).
-        volume_prefix = os.getenv("PREFECT_VOLUME_PREFIX", "")
+        coolify_uuid = os.getenv("COOLIFY_RESOURCE_UUID", "").strip()
+        if coolify_uuid:
+            # Coolify deployment
+            job_network = coolify_uuid
+            volume_prefix = coolify_uuid + "_"
+        else:
+            # Bare docker-compose / production
+            job_network = os.getenv("PREFECT_DOCKER_NETWORK", "explore-cioos_default")
+            volume_prefix = os.getenv("PREFECT_VOLUME_PREFIX", "")
 
         if volume_prefix:
             job_volumes = [
