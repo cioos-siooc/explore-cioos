@@ -244,7 +244,11 @@ class OBISHarvester(BaseHarvester):
         obis_nodes = [n.get("name") for n in nodes if n.get("name")]
 
         dataset_row = pd.DataFrame([{
-            "title": metadata.get("title", ""),
+            # Fall back to dataset_id if OBIS metadata fetch returned no title
+            # (empty dict from a transient error, missing field, etc.).
+            # cde.datasets has NOT NULL on `title`; an empty string can also
+            # cause issues downstream.
+            "title": metadata.get("title") or dataset_id,
             "erddap_url": OBIS_SOURCE_URL,
             "dataset_id": dataset_id,
             "cdm_data_type": "Point",

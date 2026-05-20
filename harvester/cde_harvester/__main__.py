@@ -242,6 +242,28 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
     datasets = pd.concat([erddap_datasets, obis_datasets], ignore_index=True)
     skipped_datasets = pd.concat([erddap_skipped, obis_skipped], ignore_index=True)
 
+    # Safety net: cde.datasets has NOT NULL on `title` (set_constraints), but
+    # upstream metadata occasionally lacks one — an ERDDAP dataset with no
+    # title attr + no matching CKAN record, or an OBIS dataset whose metadata
+    # fetch returned an empty dict. Without this, the WHOLE harvest rolls
+    # back at the final ALTER TABLE step. Fall back to dataset_id (always
+    # populated) and log a WARNING so the source data quality issue is
+    # visible without blocking ingest.
+    _missing_title = datasets["title"].isna() | (
+        datasets["title"].astype(str).str.strip() == ""
+    )
+    if _missing_title.any():
+        offenders = datasets.loc[_missing_title, ["erddap_url", "dataset_id"]]
+        logger.warning(
+            "%d dataset(s) missing title from source metadata; falling back to "
+            "dataset_id. Offenders: %s",
+            len(offenders),
+            offenders.to_dict(orient="records"),
+        )
+        datasets.loc[_missing_title, "title"] = datasets.loc[
+            _missing_title, "dataset_id"
+        ]
+
     # ERDDAP rows don't have obis_nodes — fill with empty lists so the loader's
     # ast.literal_eval doesn't choke on NaN, and so the column exists when only
     # the ERDDAP source is being harvested.
