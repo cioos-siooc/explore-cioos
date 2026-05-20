@@ -269,6 +269,46 @@ class PrefectCDEPipeline:
         logger.info(f"Deployment created with ID: {deployment_id}")
         return deployment_id
 
+def _normalize_coolify_multiline(value: str) -> str:
+    """Strip the leading indent Coolify's .env writer prepends to every
+    continuation line of multi-line env vars.
+
+    Example input (Coolify .env output):
+        erddap_urls:
+              - https://a
+              - https://b
+
+          cache: true
+          folder:
+
+    Example output:
+        erddap_urls:
+            - https://a
+            - https://b
+
+        cache: true
+        folder:
+    """
+    lines = value.split("\n")
+    if len(lines) <= 1:
+        return value
+    continuation = [ln for ln in lines[1:] if ln.strip()]
+    if not continuation:
+        return value
+    indents = [len(ln) - len(ln.lstrip(" ")) for ln in continuation]
+    min_indent = min(indents)
+    first_indent = len(lines[0]) - len(lines[0].lstrip(" "))
+    # Only strip if the first line is less-indented than the continuation
+    # block — that's the signature of Coolify's added indent (where the
+    # value-start sits flush with `KEY='`, but every later line is shifted).
+    if first_indent >= min_indent or min_indent == 0:
+        return value
+    return "\n".join(
+        [lines[0]]
+        + [ln[min_indent:] if ln.strip() else ln for ln in lines[1:]]
+    )
+
+
 @flow(name="CDE Pipeline Run", log_prints=True)
 def cde_pipeline_run(config_file: str = "/app/harvester/harvest_config.yaml"):
     """Deployable entry point for the harvest pipeline.
@@ -299,6 +339,14 @@ def cde_pipeline_run(config_file: str = "/app/harvester/harvest_config.yaml"):
     env_config = os.getenv("HARVEST_CONFIG_YAML", "").strip()
     override_path = "/app/harvester/overrides/harvest_config.yaml"
     if env_config:
+        # Coolify's .env writer prepends a fixed leading indent (typically
+        # 2 spaces) to every continuation line of a multi-line env var,
+        # while leaving the first line flush with the opening quote. That
+        # corrupts a YAML document whose top-level keys were at column 0:
+        # they end up at column 2, breaking the parse.
+        # Detect + strip that added indent so the YAML round-trips cleanly.
+        env_config = _normalize_coolify_multiline(env_config)
+
         env_config_path = "/tmp/harvest_config_from_env.yaml"
         with open(env_config_path, "w") as f:
             f.write(env_config)
