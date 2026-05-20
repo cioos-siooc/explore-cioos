@@ -231,6 +231,16 @@ class PrefectCDEPipeline:
                 "PREFECT_API_URL": os.getenv(
                     "PREFECT_API_URL", "http://prefect:4200/api"
                 ),
+                # Make stdlib `logging` from non-flow code (the harvester
+                # internals, db_loader, populate_vernaculars) surface in the
+                # Prefect UI's flow-run logs. Without this, only print() calls
+                # (captured because @flow(log_prints=True)) and direct
+                # get_run_logger() calls show up — and populate_vernaculars.py
+                # uses logging.getLogger(), so its progress lines would be
+                # invisible in the UI otherwise.
+                "PREFECT_LOGGING_EXTRA_LOGGERS": (
+                    "populate_vernaculars,cde_db_loader,cde_harvester"
+                ),
                 "HARVESTER_LOG_DIR": os.getenv(
                     "HARVESTER_LOG_DIR", "/app/harvester/logs"
                 ),
