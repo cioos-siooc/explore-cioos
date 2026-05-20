@@ -202,20 +202,10 @@ class PrefectCDEPipeline:
                 f"{volume_prefix}harvest-data:/app/harvester/harvest",
                 f"{volume_prefix}harvester-logs:/app/harvester/logs",
                 f"{volume_prefix}obis-cache:/app/harvester/obis_cache",
+                # Read-only override directory. cde_pipeline_run() picks files
+                # out of this if present, falling back to baked-in defaults.
+                f"{volume_prefix}cde-overrides:/app/harvester/overrides:ro",
             ]
-            # Operator-managed override directory mounted from Coolify's
-            # Persistent Storage host path. Coolify File Mounts targeting
-            # /data/coolify/applications/<uuid>/cde-overrides/* on the host
-            # will appear inside spawned flow-run containers at
-            # /app/harvester/overrides/* (read-only). cde_pipeline_run()
-            # picks up override files if present, else falls back to
-            # baked-in defaults.
-            coolify_uuid = os.getenv("COOLIFY_RESOURCE_UUID")
-            if coolify_uuid:
-                job_volumes.append(
-                    f"/data/coolify/applications/{coolify_uuid}/cde-overrides"
-                    ":/app/harvester/overrides:ro"
-                )
         else:
             job_volumes = [
                 f"{host_root}/harvest_config.yaml:/app/harvester/harvest_config.yaml:ro",
@@ -278,16 +268,14 @@ def cde_pipeline_run(config_file: str = "/app/harvester/harvest_config.yaml"):
     and runs init_config + cde_pipeline so the worker has something it can
     actually execute.
 
-    Override mechanism (Coolify deploys only):
-    If /app/harvester/overrides/harvest_config.yaml exists, use it instead of
-    the baked-in default. The /app/harvester/overrides directory is
-    bind-mounted (read-only) from Coolify's Persistent Storage path at
-    /data/coolify/applications/<uuid>/cde-overrides on the host. Operators
-    edit override files via Coolify UI -> Persistent Storage -> File Mount,
-    no image rebuild needed. A custom config can also reference its own
-    Obis_Datasets.json with an absolute path like
-    /app/harvester/overrides/Obis_Datasets.json (drop a second File Mount
-    for that too).
+    Override mechanism: if /app/harvester/overrides/harvest_config.yaml exists
+    (mounted from the cde_overrides named volume — see docker-compose.yaml),
+    use it instead of the baked-in default. Operators can drop a custom
+    harvest_config.yaml into that volume (e.g. via `docker cp my-config.yaml
+    <prefect_worker>:/app/harvester/overrides/`) and the next flow run will
+    pick it up — no image rebuild needed. The override file can also
+    reference its own Obis_Datasets.json via an absolute path like
+    /app/harvester/overrides/Obis_Datasets.json.
     """
     override_path = "/app/harvester/overrides/harvest_config.yaml"
     if os.path.exists(override_path):
