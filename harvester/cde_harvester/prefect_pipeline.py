@@ -244,6 +244,12 @@ class PrefectCDEPipeline:
                     "DB_HOST": os.getenv("DB_HOST", "db"),
                     "DB_HOST_EXTERNAL": os.getenv("DB_HOST_EXTERNAL", "db"),
                     "REDIS_HOST": os.getenv("REDIS_HOST", "redis"),
+                    # Operator-supplied overrides via Coolify env vars. The
+                    # spawned flow-run container reads these in cde_pipeline_run()
+                    # and writes them to /tmp/ before loading config. Empty
+                    # values are harmless (treated as "not set").
+                    "HARVEST_CONFIG_YAML": os.getenv("HARVEST_CONFIG_YAML", ""),
+                    "OBIS_DATASETS_JSON": os.getenv("OBIS_DATASETS_JSON", ""),
                 },
                 "networks": [job_network],
                 "volumes": job_volumes,
@@ -268,21 +274,47 @@ def cde_pipeline_run(config_file: str = "/app/harvester/harvest_config.yaml"):
     and runs init_config + cde_pipeline so the worker has something it can
     actually execute.
 
-    Override mechanism: if /app/harvester/overrides/harvest_config.yaml exists
-    (mounted from the cde_overrides named volume — see docker-compose.yaml),
-    use it instead of the baked-in default. Operators can drop a custom
-    harvest_config.yaml into that volume (e.g. via `docker cp my-config.yaml
-    <prefect_worker>:/app/harvester/overrides/`) and the next flow run will
-    pick it up — no image rebuild needed. The override file can also
-    reference its own Obis_Datasets.json via an absolute path like
-    /app/harvester/overrides/Obis_Datasets.json.
+    Override mechanism (precedence high -> low):
+
+    1. HARVEST_CONFIG_YAML env var. Pure UI workflow: paste YAML into Coolify's
+       env var editor, redeploy. Most natural for cloud-style ops since
+       Coolify's Persistent Storage UI is read-only for compose-based
+       resources. If your YAML references /tmp/Obis_Datasets.json for
+       obis_datasets_file, also set OBIS_DATASETS_JSON to override the OBIS
+       list — written to /tmp/Obis_Datasets.json at startup.
+
+    2. /app/harvester/overrides/harvest_config.yaml. Bind-mounted from the
+       cde_overrides named volume; editable via Coolify Terminal (`nano`)
+       on the prefect_worker container. Survives redeploys.
+
+    3. Baked-in default at /app/harvester/harvest_config.yaml. Used if neither
+       override is provided.
     """
+    env_config = os.getenv("HARVEST_CONFIG_YAML", "").strip()
     override_path = "/app/harvester/overrides/harvest_config.yaml"
-    if os.path.exists(override_path):
-        logger.info(f"Using override harvest config: {override_path}")
+    if env_config:
+        env_config_path = "/tmp/harvest_config_from_env.yaml"
+        with open(env_config_path, "w") as f:
+            f.write(env_config)
+        config_file = env_config_path
+        logger.info(
+            f"Using HARVEST_CONFIG_YAML env var ({len(env_config)} bytes -> {env_config_path})"
+        )
+    elif os.path.exists(override_path):
         config_file = override_path
+        logger.info(f"Using override harvest config: {override_path}")
     else:
         logger.info(f"Using baked-in harvest config: {config_file}")
+
+    # Optional OBIS override via env var. The harvest config's
+    # obis_datasets_file should reference /tmp/Obis_Datasets.json to pick it up.
+    env_obis = os.getenv("OBIS_DATASETS_JSON", "").strip()
+    if env_obis:
+        with open("/tmp/Obis_Datasets.json", "w") as f:
+            f.write(env_obis)
+        logger.info(
+            f"Wrote OBIS_DATASETS_JSON env var ({len(env_obis)} bytes -> /tmp/Obis_Datasets.json)"
+        )
 
     pipeline = PrefectCDEPipeline()
     pipeline.init_config(config_file=config_file)
