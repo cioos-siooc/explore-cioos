@@ -214,10 +214,10 @@ class PrefectCDEPipeline:
 
         self.create_docker_work_pool()
 
-        # cde_pipeline is the @flow we want to register; Flow.deploy() is what
-        # actually creates the Prefect deployment record. (self.deploy doesn't
-        # exist — PrefectCDEPipeline is a plain class.)
-        deployment_id = self.cde_pipeline.deploy(
+        # Deploy the top-level wrapper flow (not the bound method) — Prefect's
+        # deployment runner can't fill `self` for class-method flows, so we
+        # use cde_pipeline_run which is a regular @flow function.
+        deployment_id = cde_pipeline_run.deploy(
             name="cde-harvester-deployment",
             work_pool_name="docker-pool",
             image=job_image,
@@ -253,6 +253,22 @@ class PrefectCDEPipeline:
         print("  docker compose up prefect_worker -d")
         logger.info(f"Deployment created with ID: {deployment_id}")
         return deployment_id
+
+@flow(name="CDE Pipeline Run", log_prints=True)
+def cde_pipeline_run(config_file: str = "/app/harvester/harvest_config.yaml"):
+    """Deployable entry point for the harvest pipeline.
+
+    Prefect deployments invoke whatever flow is registered as a regular
+    function call. PrefectCDEPipeline.cde_pipeline is a method (its signature
+    is `(self)`), which Prefect's deployment runner can't fill — it raises
+    SignatureMismatchError. This top-level wrapper instantiates the pipeline
+    and runs init_config + cde_pipeline so the worker has something it can
+    actually execute.
+    """
+    pipeline = PrefectCDEPipeline()
+    pipeline.init_config(config_file=config_file)
+    pipeline.cde_pipeline()
+
 
 def deploy(pipeline):
     # Create deployment after successful run
