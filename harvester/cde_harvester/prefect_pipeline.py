@@ -202,6 +202,9 @@ class PrefectCDEPipeline:
                 f"{volume_prefix}harvest-data:/app/harvester/harvest",
                 f"{volume_prefix}harvester-logs:/app/harvester/logs",
                 f"{volume_prefix}obis-cache:/app/harvester/obis_cache",
+                # Read-only override directory. cde_pipeline_run() picks files
+                # out of this if present, falling back to baked-in defaults.
+                f"{volume_prefix}cde-overrides:/app/harvester/overrides:ro",
             ]
         else:
             job_volumes = [
@@ -264,7 +267,23 @@ def cde_pipeline_run(config_file: str = "/app/harvester/harvest_config.yaml"):
     SignatureMismatchError. This top-level wrapper instantiates the pipeline
     and runs init_config + cde_pipeline so the worker has something it can
     actually execute.
+
+    Override mechanism: if /app/harvester/overrides/harvest_config.yaml exists
+    (mounted from the cde_overrides named volume — see docker-compose.yaml),
+    use it instead of the baked-in default. Operators can drop a custom
+    harvest_config.yaml into that volume (e.g. via `docker cp my-config.yaml
+    <prefect_worker>:/app/harvester/overrides/`) and the next flow run will
+    pick it up — no image rebuild needed. The override file can also
+    reference its own Obis_Datasets.json via an absolute path like
+    /app/harvester/overrides/Obis_Datasets.json.
     """
+    override_path = "/app/harvester/overrides/harvest_config.yaml"
+    if os.path.exists(override_path):
+        logger.info(f"Using override harvest config: {override_path}")
+        config_file = override_path
+    else:
+        logger.info(f"Using baked-in harvest config: {config_file}")
+
     pipeline = PrefectCDEPipeline()
     pipeline.init_config(config_file=config_file)
     pipeline.cde_pipeline()

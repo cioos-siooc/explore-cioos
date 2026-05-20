@@ -162,6 +162,11 @@ services:
       - docker
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      # Operator-managed overrides for harvest_config.yaml / Obis_Datasets.json.
+      # Drop files into this named volume (via `docker cp` or `docker exec`
+      # into prefect_worker) and the next flow-run container will use them
+      # automatically. See cde_pipeline_run() in prefect_pipeline.py.
+      - cde_overrides:/app/harvester/overrides
     environment:
       PREFECT_API_URL: http://prefect:4200/api
       PREFECT_LOGGING_LEVEL: INFO
@@ -206,3 +211,4 @@ volumes:
   harvester_cache:
   harvest_data:
   obis_cache:
+  cde_overrides:
