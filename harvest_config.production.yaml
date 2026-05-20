@@ -1,0 +1,32 @@
+# list of erddap URLs. Should end in /erddap
+erddap_urls:
+    - https://erddap.amundsenscience.com/erddap/
+    - https://data.cioospacific.ca/erddap
+    #- http://dap.onc.uvic.ca/erddap
+    - https://seagull-erddap.glos.org/erddap
+    - https://erddap.ogsl.ca/erddap
+    - https://www.smartatlantic.ca/erddap
+    - https://catalogue.hakai.org/erddap
+    - https://cioosatlantic.ca/erddap
+
+# set to true to test with caching. Turn to False for production. 
+# defaults to false
+cache: true
+
+# defaults to 'harvest'
+folder:
+
+# use to test select datasets, eg: dataset_one,dataset_two
+dataset_ids:
+#   - amundsen798,amundsen796,amundsen11975_aquadopp,amundsen13109_compact_lw,amundsen13107_isus,SMA_halifax,SMA_MAMKA_Buoy
+
+# defaults to false
+log_time:
+
+#defaults to false
+flush_redis: False
+
+#defaults to false
+incremental: False
+
+obis_datasets_file: ./Obis_Datasets.json
