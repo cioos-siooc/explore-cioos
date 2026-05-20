@@ -223,51 +223,75 @@ class PrefectCDEPipeline:
 
         self.create_docker_work_pool()
 
+        # Shared job variables — both deployments below spawn flow-run
+        # containers from the same image into the same network/volumes, just
+        # invoking different top-level flows.
+        job_vars = {
+            "env": {
+                "PREFECT_API_URL": os.getenv(
+                    "PREFECT_API_URL", "http://prefect:4200/api"
+                ),
+                "HARVESTER_LOG_DIR": os.getenv(
+                    "HARVESTER_LOG_DIR", "/app/harvester/logs"
+                ),
+                "DB_NAME": os.getenv("DB_NAME", "cde"),
+                "DB_USER": os.getenv("DB_USER", "postgres"),
+                "DB_PASSWORD": os.getenv("DB_PASSWORD", "password"),
+                "DB_HOST": os.getenv("DB_HOST", "db"),
+                "DB_HOST_EXTERNAL": os.getenv("DB_HOST_EXTERNAL", "db"),
+                "REDIS_HOST": os.getenv("REDIS_HOST", "redis"),
+                # Operator-supplied overrides via Coolify env vars. The
+                # spawned flow-run container reads these in cde_pipeline_run()
+                # and writes them to /tmp/ before loading config. Empty
+                # values are harmless (treated as "not set").
+                "HARVEST_CONFIG_YAML": os.getenv("HARVEST_CONFIG_YAML", ""),
+                "OBIS_DATASETS_JSON": os.getenv("OBIS_DATASETS_JSON", ""),
+            },
+            "networks": [job_network],
+            "volumes": job_volumes,
+            "auto_remove": True,
+            "stream_output": True,
+            "image_pull_policy": "Never",  # Use local image, don't pull
+        }
+
+        # Deployment 1: the harvest itself.
         # Deploy the top-level wrapper flow (not the bound method) — Prefect's
         # deployment runner can't fill `self` for class-method flows, so we
         # use cde_pipeline_run which is a regular @flow function.
-        deployment_id = cde_pipeline_run.deploy(
+        harvest_id = cde_pipeline_run.deploy(
             name="cde-harvester-deployment",
             work_pool_name="docker-pool",
             image=job_image,
             cron=os.getenv("HARVESTER_CRON"),
-            build=False,  # Don't build, use existing image
-            push=False,  # Don't push image
+            build=False,
+            push=False,
             parameters={
                 "config_file": "/app/harvester/harvest_config.yaml",
             },
-            job_variables={
-                "env": {
-                    "PREFECT_API_URL": os.getenv(
-                        "PREFECT_API_URL", "http://prefect:4200/api"
-                    ),
-                    "HARVESTER_LOG_DIR": os.getenv(
-                        "HARVESTER_LOG_DIR", "/app/harvester/logs"
-                    ),
-                    "DB_NAME": os.getenv("DB_NAME", "cde"),
-                    "DB_USER": os.getenv("DB_USER", "postgres"),
-                    "DB_PASSWORD": os.getenv("DB_PASSWORD", "password"),
-                    "DB_HOST": os.getenv("DB_HOST", "db"),
-                    "DB_HOST_EXTERNAL": os.getenv("DB_HOST_EXTERNAL", "db"),
-                    "REDIS_HOST": os.getenv("REDIS_HOST", "redis"),
-                    # Operator-supplied overrides via Coolify env vars. The
-                    # spawned flow-run container reads these in cde_pipeline_run()
-                    # and writes them to /tmp/ before loading config. Empty
-                    # values are harmless (treated as "not set").
-                    "HARVEST_CONFIG_YAML": os.getenv("HARVEST_CONFIG_YAML", ""),
-                    "OBIS_DATASETS_JSON": os.getenv("OBIS_DATASETS_JSON", ""),
-                },
-                "networks": [job_network],
-                "volumes": job_volumes,
-                "auto_remove": True,
-                "stream_output": True,
-                "image_pull_policy": "Never",  # Use local image, don't pull
-            },
+            job_variables=job_vars,
         )
+
+        # Deployment 2: post-harvest WoRMS lookup that populates
+        # cde.scientific_name_vernaculars. Independent schedule (VERNACULARS_CRON)
+        # because the WoRMS API is slow and operators may want to backfill out
+        # of band. Idempotent + resumable, so re-running is safe.
+        vernaculars_id = populate_vernaculars_run.deploy(
+            name="populate-vernaculars-deployment",
+            work_pool_name="docker-pool",
+            image=job_image,
+            cron=os.getenv("VERNACULARS_CRON"),
+            build=False,
+            push=False,
+            job_variables=job_vars,
+        )
+
         print("\nTo start a worker, run:")
         print("  docker compose up prefect_worker -d")
-        logger.info(f"Deployment created with ID: {deployment_id}")
-        return deployment_id
+        logger.info(
+            "Deployments created: cde-harvester=%s populate-vernaculars=%s",
+            harvest_id, vernaculars_id,
+        )
+        return harvest_id
 
 def _normalize_coolify_multiline(value: str) -> str:
     """Strip the leading indent Coolify's .env writer prepends to every
@@ -373,6 +397,53 @@ def cde_pipeline_run(config_file: str = "/app/harvester/harvest_config.yaml"):
     pipeline = PrefectCDEPipeline()
     pipeline.init_config(config_file=config_file)
     pipeline.cde_pipeline()
+
+
+@flow(name="Populate Vernaculars", log_prints=True)
+def populate_vernaculars_run(
+    top: int = 0,
+    limit: int = 0,
+    workers: int = 8,
+    batch_size: int = 50,
+    refresh_status: str = "",
+):
+    """Populate cde.scientific_name_vernaculars from WoRMS (marinespecies.org).
+
+    Wraps db-loader/cde_db_loader/populate_vernaculars.py so it can be run as
+    a Prefect deployment alongside the harvest. Idempotent + resumable: only
+    names missing from the cache table are processed unless refresh_status is
+    set. WoRMS calls are slow (~300 ms each) so a full run can take a while —
+    use top=N for a triage backfill.
+
+    Parameters (Prefect-UI overridable via "Custom Run"):
+      top: only the N most-common species (0 = all)
+      limit: hard cap on rows processed this run (0 = no cap)
+      workers: parallel threads for WoRMS API calls (default 8)
+      batch_size: names per AphiaRecordsByMatchNames batch, max 50
+      refresh_status: re-fetch rows whose previous status matches, e.g.
+                      "error" or "error,not_found" ("" = only fetch new)
+    """
+    # populate_vernaculars uses argparse. Monkey-patch sys.argv so we don't
+    # have to refactor the script's CLI surface.
+    from cde_db_loader.populate_vernaculars import main as vernaculars_main
+
+    argv = ["populate_vernaculars"]
+    if top > 0:
+        argv += ["--top", str(top)]
+    if limit > 0:
+        argv += ["--limit", str(limit)]
+    argv += ["--workers", str(workers), "--batch-size", str(batch_size)]
+    if refresh_status:
+        argv += ["--refresh-status", refresh_status]
+
+    logger.info("populate_vernaculars argv: %s", argv)
+
+    saved_argv = sys.argv
+    try:
+        sys.argv = argv
+        vernaculars_main()
+    finally:
+        sys.argv = saved_argv
 
 
 def deploy(pipeline):
