@@ -173,6 +173,12 @@ services:
       - "4200"  # Prefect UI + API (route via Coolify domain if external access is needed)
     environment:
       PREFECT_API_URL: http://127.0.0.1:4200/api
+      # Tell the UI's JavaScript to make API calls same-origin (i.e., through
+      # whatever proxy/domain the user is reaching the UI from). Without this,
+      # the UI tries to hit PREFECT_API_URL directly from the browser, which
+      # points at the container's own loopback and fails silently. Relative
+      # path works on local + remote Coolify without knowing the FQDN.
+      PREFECT_UI_API_URL: /api
       PREFECT_UI_URL: http://localhost:4200
       PREFECT_HOME: /root/.prefect
     volumes:
