@@ -15,4 +15,4 @@ if (server.startsWith('/')) {
 
 console.debug('API_URL:', server)
 
-module.exports = { server }
+export { server }
