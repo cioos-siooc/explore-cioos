@@ -16,9 +16,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY ./harvester/cde_harvester ./cde_harvester
 COPY ./harvester/run.sh ./run.sh
 
-# Bake in default harvest config and OBIS dataset list so the image is self-contained
-# (no host bind-mounts required). Operators can override at runtime if needed.
-COPY ./harvest_config.sample.yaml ./harvest_config.yaml
+# Bake in a harvest config and the OBIS dataset list so the image is
+# self-contained. To use a different committed config (e.g.
+# harvest_config.production.yaml) pass it via the HARVEST_CONFIG_FILE
+# build arg; the compose wires it to an env var of the same name.
+ARG HARVEST_CONFIG_FILE=harvest_config.sample.yaml
+COPY ./${HARVEST_CONFIG_FILE} ./harvest_config.yaml
 COPY ./Obis_Datasets.json ./Obis_Datasets.json
 
 # 4. Install project itself

@@ -68,12 +68,12 @@ services:
         BASE_URL: ${BASE_URL:-/}
     expose:
       - "80"
-
-
   harvester:
     build:
       context: .
       dockerfile: ./harvester/Dockerfile
+      args:
+        HARVEST_CONFIG_FILE: ${HARVEST_CONFIG_FILE:-harvest_config.sample.yaml}
     image: cde-harvester:latest
     profiles:
       - tools
@@ -102,6 +102,8 @@ services:
     build:
       context: .
       dockerfile: ./harvester/Dockerfile
+      args:
+        HARVEST_CONFIG_FILE: ${HARVEST_CONFIG_FILE:-harvest_config.sample.yaml}
     image: cde-harvester:latest
     depends_on:
       prefect:
@@ -140,6 +142,8 @@ services:
     build:
       context: .
       dockerfile: ./harvester/Dockerfile
+      args:
+        HARVEST_CONFIG_FILE: ${HARVEST_CONFIG_FILE:-harvest_config.sample.yaml}
     image: cde-harvester:latest
     depends_on:
       prefect:
