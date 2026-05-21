@@ -1,9 +1,10 @@
 name: Deploy
 
 on:
-  branches:
-    - master
-    - development
+  push:
+    branches:
+      - master
+      - development
   workflow_dispatch:
 
 jobs:
