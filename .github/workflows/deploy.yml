@@ -1,10 +1,9 @@
 name: Deploy
 
 on:
-  push:
-    branches:
-      - master
-      - development
+  branches:
+    - master
+    - development
   workflow_dispatch:
 
 jobs:
@@ -22,7 +21,7 @@ jobs:
         with:
           wg_config: ${{ secrets.BELUGA_WIREGUARD_VPN_CONFIG }}
           ssh_host: "${{ secrets.SERVER_IP }}"
-          ssh_username: "github-runner"
+          ssh_username: "runner"
           ssh_key: ${{ secrets.BELUGA_RUNNER_PRIVATE_KEY }}
           deploy_path: "/srv/services/explore-cioos"
           stack_name: "explore-cioos-${{ (github.event.workflow_run.head_branch || github.ref_name) == 'master' && 'production' || 'development' }}"
