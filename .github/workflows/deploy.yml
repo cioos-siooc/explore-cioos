@@ -9,7 +9,6 @@ on:
 
 jobs:
   deploy:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     name: Deploy to ${{ (github.event.workflow_run.head_branch || github.ref_name) == 'master' && 'production' || 'development' }}
     timeout-minutes: 15
     runs-on: ubuntu-latest
