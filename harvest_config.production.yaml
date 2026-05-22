@@ -2,7 +2,7 @@
 erddap_urls:
     - https://erddap.amundsenscience.com/erddap/
     - https://data.cioospacific.ca/erddap
-    #- http://dap.onc.uvic.ca/erddap
+    - http://dap.onc.uvic.ca/erddap
     - https://seagull-erddap.glos.org/erddap
     - https://erddap.ogsl.ca/erddap
     - https://www.smartatlantic.ca/erddap
