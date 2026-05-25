@@ -44,6 +44,7 @@ async function createDBFilter(request) {
     pointPKs,
     scientificNames,
     obisNodes,
+    erddapServers,
   } = request;
 
   const filters = [];
@@ -119,6 +120,11 @@ async function createDBFilter(request) {
     // and shape queries. Selecting any node implies OBIS-only mode (the
     // tile/legend/shape routes drop the profiles branch when this is set).
     filters.push("d.obis_nodes && :obisNodesArr");
+  }
+
+  if (erddapServers) {
+    parameters.erddapServersArray = erddapServers.split(",");
+    filters.push("d.erddap_url = ANY(:erddapServersArray)");
   }
 
   if (polygon) {

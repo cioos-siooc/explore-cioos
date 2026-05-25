@@ -37,7 +37,8 @@ export function generateMultipleSelectBadgeTitle (badgeTitle, optionsSelected) {
         platformsFilterName: 'platformsMulti',
         organizationFilterName: 'organizationMulti',
         datasetsFilterName: 'datasetsMulti',
-        obisNodesFilterName: 'obisNodesMulti'
+        obisNodesFilterName: 'obisNodesMulti',
+        erddapServersFilterName: 'erddapServersMulti'
       }
       return optionsSelectedFiltered.length + t(mapping[badgeTitle])
     }
@@ -88,7 +89,8 @@ export function createDataFilterQueryString(query) {
     platformsSelected,
     datasetsSelected,
     scientificNamesSelected,
-    obisNodesSelected
+    obisNodesSelected,
+    erddapServersSelected
   } = query
 
   // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
@@ -152,12 +154,23 @@ export function createDataFilterQueryString(query) {
     }
   }
 
+  let erddapServers
+  if (erddapServersSelected?.every((e) => e.isSelected)) {
+    erddapServers = ''
+  } else {
+    erddapServers = erddapServersSelected
+      ?.filter((server) => server.isSelected)
+      .map((server) => server.url)
+      .join()
+  }
+
   const apiMappedQuery = {
     // These properties are specified by the API's schema
     eovs,
     platforms,
     datasetPKs,
     organizations: orgPKs,
+    erddapServers,
     timeMin: startDate,
     timeMax: endDate,
     depthMin: startDepth,
@@ -329,6 +342,30 @@ export function getCookieValue (cookieName) {
   }
 }
 
+export function formatErddapServerName(url, lang = 'en', serversData = null) {
+  if (!url) return ''
+  
+  // If serversData is provided, use it to look up the server name
+  if (serversData && Array.isArray(serversData)) {
+    const server = serversData.find(s => s.url === url)
+    if (server) {
+      return lang === 'fr' ? server.label_fr : server.label_en
+    }
+  }
+  
+  // Fallback: extract domain from URL
+  try {
+    const urlObj = new URL(url)
+    return urlObj.hostname
+  } catch (e) {
+    // If URL parsing fails, try to extract domain manually
+    const match = url.match(/:\/\/([^/]+)/)
+    if (match && match[1]) {
+      return match[1]
+    }
+    return url
+  }
+}
 export function updateMapToolTitleLanguage(t) {
   // const { t } = useTranslation()
   const polygonToolDiv = document.getElementsByClassName(

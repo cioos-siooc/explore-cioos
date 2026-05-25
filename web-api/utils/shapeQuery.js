@@ -54,6 +54,7 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                   organizations,
                   count(p.*)::integer profiles_count,
                   d.source_type,
+                  d.erddap_url AS erddap_server_url,
                   CASE WHEN d.source_type = 'obis'
                            THEN 'https://obis.org/dataset/' || d.dataset_id
                            ELSE d.erddap_url || '/tabledap/' || d.dataset_id || '.html'

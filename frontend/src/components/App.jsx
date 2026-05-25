@@ -12,12 +12,14 @@ import {
   Water,
   BroadcastPin,
   X,
-  Diagram3
+  Diagram3,
+  Server
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import isEmpty from 'lodash/isEmpty'
 import platformsJSONfile from '../platforms.json'
 import eovsJSONfile from '../eovs.json'
+import erddapServersJSONfile from '../erddapServers.json'
 import { server } from '../config.js'
 import Controls from './Controls/Controls.jsx'
 import Map from './Map/Map.js'
@@ -48,7 +50,8 @@ import {
   defaultDatatsetsSelected,
   defaultPlatformsSelected,
   defaultScientificNamesSelected,
-  defaultObisNodesSelected
+  defaultObisNodesSelected,
+  defaultErddapServersSelected
 } from './config.js'
 import {
   createDataFilterQueryString,
@@ -59,7 +62,8 @@ import {
   useDebounce,
   setAllOptionsIsSelectedTo,
   polygonIsRectangle,
-  getCookieValue
+  getCookieValue,
+  formatErddapServerName
 } from '../utilities.js'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 
@@ -106,7 +110,8 @@ export default function App() {
     platformsSelected: defaultPlatformsSelected,
     showObis: true,
     scientificNamesSelected: defaultScientificNamesSelected,
-    obisNodesSelected: defaultObisNodesSelected
+    obisNodesSelected: defaultObisNodesSelected,
+    erddapServersSelected: defaultErddapServersSelected
   }
   const [query, setQuery] = useState(defaultQuery)
   const [showModal, setShowModal] = useState(false)
@@ -159,6 +164,18 @@ export default function App() {
     platformsSelected
   )
   const [platformsSearchTerms, setPlatformsSearchTerms] = useState('')
+
+  // ERDDAP Servers filter initial values and state
+  const [erddapServersSelected, setErddapServersSelected] = useState(
+    defaultErddapServersSelected
+  )
+  const debouncedErddapServersSelected = useDebounce(erddapServersSelected, 500)
+  const erddapServersFilterTranslationKey = 'erddapServersFilterName'
+  const erddapServersBadgeTitle = generateMultipleSelectBadgeTitle(
+    erddapServersFilterTranslationKey,
+    erddapServersSelected
+  )
+  const [erddapServersSearchTerms, setErddapServersSearchTerms] = useState('')
 
   // Timeframe filter initial values and state
   const [startDate, setStartDate] = useState(defaultStartDate)
@@ -235,7 +252,8 @@ export default function App() {
       platformsSelected,
       showObis,
       scientificNamesSelected,
-      obisNodesSelected
+      obisNodesSelected,
+      erddapServersSelected
     })
   }, [
     debouncedStartDate,
@@ -248,7 +266,8 @@ export default function App() {
     debouncedPlatformsSelected,
     showObis,
     debouncedScientificNamesSelected,
-    debouncedObisNodesSelected
+    debouncedObisNodesSelected,
+    debouncedErddapServersSelected
   ])
 
   function createOptionSubset (searchTerms, allOptions) {
@@ -317,6 +336,23 @@ export default function App() {
     }
   }, [lang])
 
+  // Update ERDDAP server names when language changes
+  useEffect(() => {
+    if (erddapServersSelected.length > 0) {
+      setErddapServersSelected(
+        erddapServersSelected.map((server) => {
+          const serverMetadata = erddapServersJSONfile.find(
+            (s) => s.url === server.url
+          )
+          return {
+            ...server,
+            title: serverMetadata ? (i18n.language === 'fr' ? serverMetadata.label_fr : serverMetadata.label_en) : server.url
+          }
+        })
+      )
+    }
+  }, [i18n.language])
+
   useEffect(() => {
     const filtersFromURL = Object.fromEntries(
       new URL(window.location.href).searchParams
@@ -330,6 +366,7 @@ export default function App() {
       organizations,
       platforms,
       eovs,
+      erddapServers,
       lat,
       lon,
       zoom,
@@ -460,6 +497,30 @@ export default function App() {
               platform: dataset.platform,
               isSelected: datasetsFromURL.includes(dataset.pk),
               pk: dataset.pk
+            }
+          })
+        )
+      })
+      .catch((error) => {
+        throw error
+      })
+
+    const erddapServersFromURL = erddapServers?.split(',') || []
+
+    fetch(`${server}/erddapServers`)
+      .then((response) => response.json())
+      .then((servers) => {
+        setErddapServersSelected(
+          servers.map((serverUrl, index) => {
+            const serverMetadata = erddapServersJSONfile.find(
+              (s) => s.url === serverUrl
+            )
+
+            return {
+              title: serverMetadata ? (i18n.language === 'fr' ? serverMetadata.label_fr : serverMetadata.label_en) : serverUrl,
+              url: serverUrl,
+              isSelected: erddapServersFromURL.includes(serverUrl),
+              pk: index
             }
           })
         )
@@ -697,6 +758,11 @@ export default function App() {
         return { ...platform, isSelected: false }
       })
     )
+    setErddapServersSelected(
+      erddapServersSelected.map((server) => {
+        return { ...server, isSelected: false }
+      })
+    )
     setPolygon()
     setShowObis(true)
   }
@@ -928,6 +994,47 @@ export default function App() {
             searchable
             allOptions={datasetsSelected}
             translatable
+          />
+        </Filter>
+        <Filter
+          active={erddapServersSelected.filter((server) => server.isSelected).length !== 0}
+          badgeTitle={erddapServersBadgeTitle}
+          optionsSelected={erddapServersSelected}
+          setOptionsSelected={setErddapServersSelected}
+          tooltip={t('erddapServersFilterTooltip')}
+          icon={<Server />}
+          controlled
+          searchable
+          searchTerms={erddapServersSearchTerms}
+          setSearchTerms={setErddapServersSearchTerms}
+          searchPlaceholder={t('erddapServersFilterSearchPlaceholder')}
+          filterName={erddapServersFilterTranslationKey}
+          openFilter={openFilter === erddapServersFilterTranslationKey}
+          setOpenFilter={setOpenFilter}
+          selectAllButton={() =>
+            setAllOptionsIsSelectedTo(
+              true,
+              erddapServersSelected,
+              setErddapServersSelected
+            )
+          }
+          resetButton={() =>
+            setAllOptionsIsSelectedTo(
+              false,
+              erddapServersSelected,
+              setErddapServersSelected
+            )
+          }
+          numberOfOptions={erddapServersSelected.length}
+        >
+          <MultiCheckboxFilter
+            optionsSelected={createOptionSubset(
+              erddapServersSearchTerms,
+              erddapServersSelected
+            )}
+            setOptionsSelected={setErddapServersSelected}
+            searchable
+            allOptions={erddapServersSelected}
           />
         </Filter>
         <Filter

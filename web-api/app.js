@@ -21,6 +21,7 @@ const datasetRecordsListRouter = require("./routes/datasetRecordsList");
 const downloadEstimateRouter = require("./routes/downloadEstimate");
 const scientificNamesRouter = require("./routes/scientificNames");
 const obisNodesRouter = require("./routes/obisNodes");
+const erddapServersRouter = require("./routes/erddapServers");
 const swaggerSpec = require('./swagger');
 const swaggerUi = require('swagger-ui-express');
 
@@ -104,6 +105,7 @@ app.use("/datasetRecordsList", datasetRecordsListRouter);
 app.use("/downloadEstimate", downloadEstimateRouter);
 app.use("/scientificNames", scientificNamesRouter);
 app.use("/obisNodes", obisNodesRouter);
+app.use("/erddapServers", erddapServersRouter);
 
 // Swagger docs - conditionally enabled via ENABLE_API_DOCS environment variable
 if (process.env.ENABLE_API_DOCS !== 'false') {
