@@ -202,6 +202,25 @@ services:
     expose:
       - "6379"
 
+  # Read-only public dashboard showing per-run harvest history for every
+  # dataset on every configured ERDDAP server. Modelled on
+  # https://www.ocean-ops.org/harvest/. Queries cde.harvest_runs and
+  # cde.harvest_attempts, which the harvester populates via run lifecycle.
+  harvest-dashboard:
+    build:
+      context: ./harvest-dashboard
+      dockerfile: Dockerfile
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DB_HOST_EXTERNAL=db
+    ports:
+      - "${HARVEST_DASHBOARD_PORT:-8001}:8001"
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   postgres-data:
   prefect_data:

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}CIOOS Harvest Status{% endblock %}</title>
+
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // CIOOS National theme tokens, surfaced as Tailwind utility classes.
+    // See cioos-theme/SKILL.md for the source palette + type rules.
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            // Shared base
+            'cioos-navy':       '#152F37',
+            'cioos-sand':       '#F3F0EC',
+            'cioos-teal-light': '#C6E3DF',
+            // National primary
+            'cioos-primary':    '#52A79B',
+            // Status palette (CIOOS-aligned)
+            'cioos-error':      '#E25563',  // Atlantic red-coral, repurposed for error state
+            'cioos-warn':       '#B07A00',  // dark amber readable on sand
+          },
+          fontFamily: {
+            sans:    ['Montserrat', 'system-ui', 'sans-serif'],
+            heading: ['Sora', 'Montserrat', 'sans-serif'],
+            mono:    ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+          },
+          boxShadow: {
+            'cioos-card': '0 2px 8px rgba(21,47,55,0.08)',
+          },
+          maxWidth: {
+            'cioos-content': '1200px',
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: 'Montserrat', system-ui, sans-serif; color: #152F37; background: #F3F0EC; }
+    h1, h2, h3, h4 { font-family: 'Sora', 'Montserrat', sans-serif; color: #152F37; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    /* Status pills — CIOOS-aligned but semantically clear. */
+    .status-success { background:#C6E3DF; color:#152F37; }
+    .status-skipped { background:#F3F0EC; color:#B07A00; border:1px solid #E0D7C8; }
+    .status-error   { background:#FBE3E6; color:#9A1F2C; }
+    .status-running { background:#DCEEF7; color:#0F6D8E; }
+    .status-ok      { background:#C6E3DF; color:#152F37; }
+    .status-failed  { background:#FBE3E6; color:#9A1F2C; }
+
+    /* Sparkline glyphs */
+    .spark { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 2px; }
+    .spark-success { color:#52A79B; }
+    .spark-skipped { color:#B07A00; }
+    .spark-error   { color:#E25563; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <header class="bg-cioos-navy text-white">
+    <div class="max-w-cioos-content mx-auto px-6 py-4 flex flex-wrap items-center gap-6">
+      <a href="/" class="flex items-center gap-4 shrink-0">
+        <img src="/static/cioos-logo.svg" alt="CIOOS | SIOOC" class="h-10 w-auto">
+      </a>
+      <div class="flex-1 min-w-[200px]">
+        <div class="font-heading font-semibold text-lg leading-tight">Harvest Status</div>
+        <div class="text-xs text-cioos-teal-light/80 mt-0.5">
+          Per-dataset harvest history across all configured data sources
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-cioos-content mx-auto px-6 py-10">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="bg-cioos-navy text-white/80 mt-16">
+    <div class="max-w-cioos-content mx-auto px-6 py-8 text-xs flex flex-wrap items-baseline justify-between gap-4">
+      <div>
+        <span class="font-heading font-semibold text-white">CIOOS | SIOOC</span>
+        &nbsp;·&nbsp; Canadian Integrated Ocean Observing System
+      </div>
+      <div class="max-w-2xl text-right">
+        Each row records one harvest attempt. If your dataset isn't here, it hasn't been advertised
+        by its source provider (ERDDAP <code class="text-cioos-teal-light">allDatasets</code>,
+        OBIS dataset list, etc.) — check the source-specific requirements (ERDDAP:
+        <code class="text-cioos-teal-light">cdm_data_type</code> and CF compliance) or contact
+        <a class="underline hover:text-cioos-teal-light" href="mailto:info@cioos.ca">info@cioos.ca</a>.
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

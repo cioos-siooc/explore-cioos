@@ -25,6 +25,11 @@ class Dataset(object):
 
         self.erddap_url = erddap_server.url
         self.erddap_csv_to_df = erddap_server.erddap_csv_to_df
+        # Every ERDDAP HTTP request made for this dataset (info, tabledap
+        # queries, distinct(), orderByMinMax(), …) is appended here by
+        # ERDDAP.erddap_csv_to_df so harvest_attempts can record exactly
+        # what was fired. Lets an ERDDAP admin reproduce the failure.
+        self.queried_urls = []
         self.cdm_data_type = ""
         self.globals = {}
         self.platform = "unknown"

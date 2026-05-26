@@ -272,3 +272,45 @@ CREATE TABLE cde.datasets_lookup (
     erddap_url TEXT,
     UNIQUE(dataset_id, erddap_url)
 );
+
+-- Harvest audit log: one row per harvester invocation, one row per
+-- (dataset, run) attempt. Consumed by the harvest-dashboard service so an
+-- ERDDAP admin can self-serve "why didn't my dataset get harvested?".
+-- skipped_datasets above is kept as the "current state" view used elsewhere.
+DROP TABLE IF EXISTS cde.harvest_attempts;
+DROP TABLE IF EXISTS cde.harvest_runs;
+
+CREATE TABLE cde.harvest_runs (
+    run_id        uuid PRIMARY KEY,
+    started_at    timestamptz NOT NULL,
+    finished_at   timestamptz,
+    git_sha       text,
+    status        text NOT NULL,           -- 'running' | 'ok' | 'failed'
+    error_message text
+);
+CREATE INDEX harvest_runs_started_at_idx
+    ON cde.harvest_runs (started_at DESC);
+
+CREATE TABLE cde.harvest_attempts (
+    run_id        uuid NOT NULL REFERENCES cde.harvest_runs(run_id) ON DELETE CASCADE,
+    erddap_url    text NOT NULL,
+    dataset_id    text NOT NULL,
+    source        text NOT NULL,           -- 'erddap' | 'obis'
+    status        text NOT NULL,           -- 'success' | 'skipped' | 'error'
+    reason_code   text,                    -- one of harvest_errors.* when not success
+    error_message text,
+    duration_ms   integer,
+    attempted_at  timestamptz NOT NULL,
+    -- Newline-joined list of every URL the harvester fired for this
+    -- dataset (info/<id>/index.csv, tabledap/<id>.csv?…). The dashboard
+    -- splits on \n and renders each as a clickable link so an admin can
+    -- replay the exact requests to debug a failure.
+    query_urls    text,
+    PRIMARY KEY (run_id, erddap_url, dataset_id)
+);
+CREATE INDEX harvest_attempts_dataset_idx
+    ON cde.harvest_attempts (erddap_url, dataset_id, attempted_at DESC);
+CREATE INDEX harvest_attempts_status_idx
+    ON cde.harvest_attempts (status);
+CREATE INDEX harvest_attempts_attempted_at_idx
+    ON cde.harvest_attempts (attempted_at DESC);

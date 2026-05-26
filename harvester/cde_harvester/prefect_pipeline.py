@@ -219,6 +219,10 @@ class PrefectCDEPipeline:
                 f"{host_root}/ckan_harvester_cache:/app/harvester/ckan_harvester_cache",
                 f"{host_root}/harvest:/app/harvester/harvest",
                 f"{host_root}/harvester_logs:/app/harvester/logs",
+                # Persist OBIS metadata/occurrence caches across flow runs so we
+                # don't re-fetch the OBIS API every harvest. Mirrors the named
+                # volume the Coolify branch above mounts to the same path.
+                f"{host_root}/obis_cache:/app/harvester/obis_cache",
             ]
 
         self.create_docker_work_pool()

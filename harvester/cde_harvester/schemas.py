@@ -112,3 +112,47 @@ class SkippedDatasetSchema(pa.DataFrameModel):
     class Config:
         coerce = True
         strict = False
+
+
+class HarvestRunSchema(pa.DataFrameModel):
+    """Schema for the harvest_runs DataFrame (one row per harvester invocation).
+
+    Mirrors cde.harvest_runs in the database.
+    """
+
+    run_id: Series[str]
+    started_at: Series[pa.DateTime]
+    finished_at: Series[pa.DateTime] = pa.Field(nullable=True)
+    git_sha: Series[str] = pa.Field(nullable=True)
+    status: Series[str]
+    error_message: Series[str] = pa.Field(nullable=True)
+
+    class Config:
+        coerce = True
+        strict = False
+
+
+class HarvestAttemptSchema(pa.DataFrameModel):
+    """Schema for the harvest_attempts DataFrame (one row per dataset per run).
+
+    Mirrors cde.harvest_attempts in the database.
+    """
+
+    run_id: Series[str]
+    erddap_url: Series[str]
+    dataset_id: Series[str]
+    source: Series[str]
+    status: Series[str]                                 # 'success' | 'skipped' | 'error'
+    reason_code: Series[str] = pa.Field(nullable=True)  # set when status != 'success'
+    error_message: Series[str] = pa.Field(nullable=True)
+    duration_ms: Series[float] = pa.Field(nullable=True)
+    attempted_at: Series[pa.DateTime]
+    # Newline-joined URLs the harvester fired for this dataset. Stored as
+    # text (not text[]) because pandas + to_sql array handling needs custom
+    # dtypes; a newline-delimited blob is plenty for "show the admin what
+    # we asked for". Splitter lives in the dashboard.
+    query_urls: Series[str] = pa.Field(nullable=True)
+
+    class Config:
+        coerce = True
+        strict = False

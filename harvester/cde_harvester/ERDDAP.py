@@ -105,7 +105,12 @@ class ERDDAP(object):
 
         url_combined = erddap_url + url
 
-        logger.info(f"Requesting: {unquote(url_combined)}")
+        decoded_url = unquote(url_combined)
+        logger.info(f"Requesting: {decoded_url}")
+        # Record exactly what we requested so the dashboard can show the
+        # admin a clickable, reproducible link list per dataset attempt.
+        if dataset is not None:
+            dataset.queried_urls.append(decoded_url)
 
         response = None
         if self.cache_requests:

@@ -195,6 +195,8 @@ def main(folder, incremental=False):
     profiles_file = f"{folder}/profiles.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
     obis_cells_file = f"{folder}/obis_cells.csv"
+    harvest_runs_file = f"{folder}/harvest_runs.csv"
+    harvest_attempts_file = f"{folder}/harvest_attempts.csv"
 
     logger.info("Reading %s, %s", datasets_file, skipped_datasets_file)
 
@@ -206,6 +208,18 @@ def main(folder, incremental=False):
     if os.path.isfile(obis_cells_file):
         logger.info("Reading %s", obis_cells_file)
         obis_cells = pd.read_csv(obis_cells_file)
+
+    # Harvest audit CSVs are produced by the harvester's run lifecycle and
+    # feed the harvest-dashboard service. Optional so old harvest folders
+    # (pre-dashboard) still load cleanly.
+    harvest_runs_df = None
+    harvest_attempts_df = None
+    if os.path.isfile(harvest_runs_file):
+        logger.info("Reading %s", harvest_runs_file)
+        harvest_runs_df = pd.read_csv(harvest_runs_file)
+    if os.path.isfile(harvest_attempts_file):
+        logger.info("Reading %s", harvest_attempts_file)
+        harvest_attempts_df = pd.read_csv(harvest_attempts_file)
 
     datasets["eovs"] = datasets["eovs"].apply(ast.literal_eval)
     datasets["organizations"] = datasets["organizations"].apply(ast.literal_eval)
@@ -408,9 +422,38 @@ def main(folder, incremental=False):
                 logger.info("Setting constraints")
                 transaction.execute(text("SELECT set_constraints();"))
 
+        # Harvest audit: append-only. Same writes in both incremental and
+        # full-reload paths since these tables are never truncated.
+        if harvest_runs_df is not None and not harvest_runs_df.empty:
+            with _timed("harvest_runs to_sql", logger):
+                logger.info("Writing harvest_runs (%d rows)", len(harvest_runs_df))
+                harvest_runs_df.to_sql(
+                    "harvest_runs",
+                    con=transaction,
+                    if_exists="append",
+                    schema=schema,
+                    index=False,
+                    method="multi",
+                )
+        if harvest_attempts_df is not None and not harvest_attempts_df.empty:
+            with _timed("harvest_attempts to_sql", logger):
+                logger.info("Writing harvest_attempts (%d rows)", len(harvest_attempts_df))
+                harvest_attempts_df.to_sql(
+                    "harvest_attempts",
+                    con=transaction,
+                    if_exists="append",
+                    schema=schema,
+                    index=False,
+                    method="multi",
+                )
+
         logger.info("Wrote to db: %s", f"{schema}.datasets")
         logger.info("Wrote to db: %s", f"{schema}.profiles")
         logger.info("Wrote to db: %s", f"{schema}.skipped_datasets")
+        if harvest_runs_df is not None:
+            logger.info("Wrote to db: %s", f"{schema}.harvest_runs")
+        if harvest_attempts_df is not None:
+            logger.info("Wrote to db: %s", f"{schema}.harvest_attempts")
 
 
 if __name__ == "__main__":

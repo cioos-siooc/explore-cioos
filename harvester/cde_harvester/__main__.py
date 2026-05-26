@@ -3,10 +3,12 @@ import json
 import logging
 import os
 import queue
+import subprocess
 import sys
 import threading
 import time
-from datetime import datetime
+import uuid
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -20,6 +22,7 @@ from cde_harvester.ckan.create_ckan_erddap_link import (
 from cde_harvester.erddap_harvester import harvest_erddap
 from cde_harvester.obis_geo_filter import ObisGeoFilter
 from cde_harvester.obis_harvester import harvest_obis
+from cde_harvester.schemas import HarvestAttemptSchema
 from cde_harvester.utils import cf_standard_names, supported_standard_names
 from dotenv import load_dotenv
 from sentry_sdk.crons import monitor
@@ -107,6 +110,58 @@ def setup_logging(log_time, log_level, log_dir=None):
 
     return logger
 
+def _resolve_git_sha():
+    """Best-effort git SHA for the harvester source. Returns None if unavailable."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            capture_output=True, text=True, timeout=2,
+        )
+        if out.returncode == 0:
+            return out.stdout.strip() or None
+    except (FileNotFoundError, subprocess.SubprocessError):
+        pass
+    return os.environ.get("GIT_SHA") or None
+
+
+def _write_run_audit_csvs(folder, run_id, started_at, finished_at, git_sha,
+                          status, error_message, attempts_frames, logger):
+    """Write harvest_runs.csv and harvest_attempts.csv into the harvest folder.
+
+    Always called at the end of a run (success or failure) so the
+    harvest-dashboard service has a consistent audit trail per-run.
+    """
+    if not os.path.exists(folder):
+        os.makedirs(folder, exist_ok=True)
+
+    runs_file = f"{folder}/harvest_runs.csv"
+    attempts_file = f"{folder}/harvest_attempts.csv"
+
+    run_row = pd.DataFrame([{
+        "run_id": run_id,
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "git_sha": git_sha,
+        "status": status,
+        "error_message": error_message,
+    }])
+    run_row.to_csv(runs_file, index=False)
+
+    attempt_columns = list(HarvestAttemptSchema.to_schema().columns.keys())
+    frames = [f for f in attempts_frames if f is not None and not f.empty]
+    if frames:
+        df_attempts = pd.concat(frames, ignore_index=True)
+    else:
+        df_attempts = pd.DataFrame(columns=attempt_columns)
+    df_attempts.to_csv(attempts_file, index=False)
+
+    logger.info(
+        "Wrote run audit: %s (status=%s) + %s (%d attempts)",
+        runs_file, status, attempts_file, len(df_attempts),
+    )
+
+
 @flow(name="cde-main", log_prints=True)
 @monitor(monitor_slug="main-harvester")
 def main(erddap_urls, cache_requests, folder, dataset_ids,
@@ -116,52 +171,84 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
     if dataset_ids:
         limit_dataset_ids = dataset_ids.split(",")
 
-    # Submit ERDDAP tasks concurrently using Prefect
-    erddap_futures = []
-    erddap_urls_list = [u.strip() for u in erddap_urls.split(",") if u.strip()] if erddap_urls else []
-    for erddap_url in erddap_urls_list:
-        logger.info("Submitting harvest task for %s", erddap_url)
-        future = harvest_erddap.submit(erddap_url, limit_dataset_ids, cache_requests)
-        erddap_futures.append(future)
+    # Open a harvest run: one row in cde.harvest_runs, written out as a CSV at
+    # the end alongside the existing harvest outputs. Every per-dataset attempt
+    # (success / skipped / error) gets stamped with this run_id so the
+    # harvest-dashboard service can show history per dataset.
+    run_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc)
+    git_sha = _resolve_git_sha()
+    run_status = "ok"
+    run_error_message = None
+    erddap_attempts = pd.DataFrame()
+    obis_attempts = pd.DataFrame()
+    logger.info("Harvest run started: run_id=%s git_sha=%s", run_id, git_sha)
 
-    # Submit OBIS task (runs concurrently with ERDDAP tasks)
-    obis_future = None
-    if obis_dataset_ids:
-        logger.info("Submitting OBIS harvest task for %d datasets", len(obis_dataset_ids))
-        obis_cache = obis_folder or os.path.join(os.path.dirname(os.path.abspath(folder)), "obis_cache")
-        obis_future = harvest_obis.submit(
-            limit_dataset_ids=obis_dataset_ids,
-            folder=obis_cache,
-            geo_filter=obis_geo_filter,
+    try:
+        # Submit ERDDAP tasks concurrently using Prefect
+        erddap_futures = []
+        erddap_urls_list = [u.strip() for u in erddap_urls.split(",") if u.strip()] if erddap_urls else []
+        for erddap_url in erddap_urls_list:
+            logger.info("Submitting harvest task for %s", erddap_url)
+            future = harvest_erddap.submit(erddap_url, limit_dataset_ids, cache_requests, run_id=run_id)
+            erddap_futures.append(future)
+
+        # Submit OBIS task (runs concurrently with ERDDAP tasks)
+        obis_future = None
+        if obis_dataset_ids:
+            logger.info("Submitting OBIS harvest task for %d datasets", len(obis_dataset_ids))
+            obis_cache = obis_folder or os.path.join(os.path.dirname(os.path.abspath(folder)), "obis_cache")
+            obis_future = harvest_obis.submit(
+                limit_dataset_ids=obis_dataset_ids,
+                folder=obis_cache,
+                geo_filter=obis_geo_filter,
+                run_id=run_id,
+            )
+
+        # Wait for all tasks to complete
+        logger.info("Waiting for all harvest tasks to complete")
+        erddap_results = [f.result() for f in erddap_futures]
+        logger.info("All ERDDAP work completed")
+
+        # Collect ERDDAP results
+        erddap_profiles = pd.DataFrame()
+        erddap_datasets = pd.DataFrame()
+        variables = pd.DataFrame()
+        erddap_skipped = pd.DataFrame()
+
+        for result in erddap_results:
+            erddap_profiles = pd.concat([erddap_profiles, result.profiles])
+            erddap_datasets = pd.concat([erddap_datasets, result.datasets])
+            variables = pd.concat([variables, result.variables])
+            erddap_skipped = pd.concat([erddap_skipped, result.skipped])
+            erddap_attempts = pd.concat([erddap_attempts, result.attempts])
+
+        # Collect OBIS results
+        obis_cells = pd.DataFrame()
+        obis_datasets = pd.DataFrame()
+        obis_skipped = pd.DataFrame()
+        if obis_future:
+            obis_result = obis_future.result()
+            obis_cells = obis_result.obis_cells
+            obis_datasets = obis_result.datasets
+            obis_skipped = obis_result.skipped
+            obis_attempts = obis_result.attempts
+            logger.info("OBIS harvest completed: %d datasets, %d cells", len(obis_datasets), len(obis_cells))
+    except Exception as e:
+        run_status = "failed"
+        run_error_message = f"{type(e).__name__}: {e}"
+        _write_run_audit_csvs(
+            folder=folder,
+            run_id=run_id,
+            started_at=started_at,
+            finished_at=datetime.now(timezone.utc),
+            git_sha=git_sha,
+            status=run_status,
+            error_message=run_error_message,
+            attempts_frames=[erddap_attempts, obis_attempts],
+            logger=logger,
         )
-
-    # Wait for all tasks to complete
-    logger.info("Waiting for all harvest tasks to complete")
-    erddap_results = [f.result() for f in erddap_futures]
-    logger.info("All ERDDAP work completed")
-
-    # Collect ERDDAP results
-    erddap_profiles = pd.DataFrame()
-    erddap_datasets = pd.DataFrame()
-    variables = pd.DataFrame()
-    erddap_skipped = pd.DataFrame()
-
-    for result in erddap_results:
-        erddap_profiles = pd.concat([erddap_profiles, result.profiles])
-        erddap_datasets = pd.concat([erddap_datasets, result.datasets])
-        variables = pd.concat([variables, result.variables])
-        erddap_skipped = pd.concat([erddap_skipped, result.skipped])
-
-    # Collect OBIS results
-    obis_cells = pd.DataFrame()
-    obis_datasets = pd.DataFrame()
-    obis_skipped = pd.DataFrame()
-    if obis_future:
-        obis_result = obis_future.result()
-        obis_cells = obis_result.obis_cells
-        obis_datasets = obis_result.datasets
-        obis_skipped = obis_result.skipped
-        logger.info("OBIS harvest completed: %d datasets, %d cells", len(obis_datasets), len(obis_cells))
+        raise
 
     if not os.path.exists(folder):
         os.makedirs(folder)
@@ -174,6 +261,17 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
 
     if erddap_datasets.empty and obis_datasets.empty:
         logging.info("No datasets harvested from any source")
+        _write_run_audit_csvs(
+            folder=folder,
+            run_id=run_id,
+            started_at=started_at,
+            finished_at=datetime.now(timezone.utc),
+            git_sha=git_sha,
+            status="failed",
+            error_message="No datasets harvested from any source",
+            attempts_frames=[erddap_attempts, obis_attempts],
+            logger=logger,
+        )
         sys.exit(1)
 
     # --- ERDDAP-specific post-processing ---
@@ -301,6 +399,18 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             len(skipped_datasets),
             skipped_datasets["dataset_id"].to_list(),
         )
+
+    _write_run_audit_csvs(
+        folder=folder,
+        run_id=run_id,
+        started_at=started_at,
+        finished_at=datetime.now(timezone.utc),
+        git_sha=git_sha,
+        status=run_status,
+        error_message=run_error_message,
+        attempts_frames=[erddap_attempts, obis_attempts],
+        logger=logger,
+    )
 
 
 def load_config(config_file):
