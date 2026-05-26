@@ -79,7 +79,8 @@ def recent_runs(limit: int = RECENT_RUNS_LIMIT):
            COUNT(a.*) AS n_total
     FROM cde.harvest_runs r
     LEFT JOIN cde.harvest_attempts a USING (run_id)
-    GROUP BY r.run_id
+    GROUP BY r.run_id, r.started_at, r.finished_at, r.git_sha,
+             r.status, r.error_message
     ORDER BY r.started_at DESC
     LIMIT :limit
     """
