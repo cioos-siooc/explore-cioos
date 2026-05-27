@@ -8,9 +8,9 @@
   <h1 class="font-heading text-2xl font-bold">Harvest run <span class="font-mono text-base text-cioos-navy/60">{{ run.run_id }}</span></h1>
   <div class="flex flex-wrap items-baseline gap-3 mt-3 text-sm">
     <span class="px-2 py-0.5 rounded status-{{ run.status }}">{{ run.status }}</span>
-    <span>Started <time>{{ run.started_at.strftime('%Y-%m-%d %H:%M UTC') }}</time></span>
+    <span>Started <time>{{ run.started_at | dt }}</time></span>
     {% if run.finished_at %}
-      <span>Finished <time>{{ run.finished_at.strftime('%Y-%m-%d %H:%M UTC') }}</time></span>
+      <span>Finished <time>{{ run.finished_at | dt }}</time></span>
       <span class="text-cioos-navy/60">({{ run.duration_s or 0 }}s)</span>
     {% endif %}
     {% if run.git_sha %}<span class="text-cioos-navy/60">git {{ run.git_sha }}</span>{% endif %}

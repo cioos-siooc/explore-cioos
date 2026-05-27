@@ -34,7 +34,7 @@
         </div>
         <div class="text-xs text-cioos-navy/60 mt-4">
           Last attempt:
-          <time datetime="{{ s.last_attempted_at }}">{{ s.last_attempted_at.strftime('%Y-%m-%d %H:%M UTC') if s.last_attempted_at else '—' }}</time>
+          <time datetime="{{ s.last_attempted_at }}">{{ s.last_attempted_at | dt }}</time>
         </div>
       </a>
     {% endfor %}
@@ -64,7 +64,7 @@
         <tr class="border-t border-cioos-teal-light/50">
           <td class="px-4 py-2 whitespace-nowrap">
             <a class="text-cioos-primary hover:underline" href="/runs/{{ r.run_id }}">
-              {{ r.started_at.strftime('%Y-%m-%d %H:%M UTC') if r.started_at else r.run_id }}
+              {{ (r.started_at | dt(default=r.run_id)) }}
             </a>
           </td>
           <td class="px-4 py-2"><span class="px-2 py-0.5 rounded status-{{ r.status }}">{{ r.status }}</span></td>

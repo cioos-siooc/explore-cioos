@@ -216,10 +216,14 @@ def main(folder, incremental=False):
     harvest_attempts_df = None
     if os.path.isfile(harvest_runs_file):
         logger.info("Reading %s", harvest_runs_file)
-        harvest_runs_df = pd.read_csv(harvest_runs_file)
+        harvest_runs_df = pd.read_csv(
+            harvest_runs_file, parse_dates=["started_at", "finished_at"]
+        )
     if os.path.isfile(harvest_attempts_file):
         logger.info("Reading %s", harvest_attempts_file)
-        harvest_attempts_df = pd.read_csv(harvest_attempts_file)
+        harvest_attempts_df = pd.read_csv(
+            harvest_attempts_file, parse_dates=["attempted_at"]
+        )
 
     datasets["eovs"] = datasets["eovs"].apply(ast.literal_eval)
     datasets["organizations"] = datasets["organizations"].apply(ast.literal_eval)

@@ -123,6 +123,24 @@ def _split_urls(blob: str | None) -> list[str]:
     return [line.strip() for line in blob.splitlines() if line.strip()]
 
 
+def _fmt_dt(value, fmt: str = "%Y-%m-%d %H:%M UTC", default: str = "—") -> str:
+    """Format a timestamp that may arrive as a datetime or an ISO string.
+
+    The audit tables are timestamptz per schema, but a DB whose harvest
+    tables were auto-created from the CSV loader stores them as text, so the
+    value can come back as a string. Handle both rather than assume a type.
+    """
+    if value is None or value == "":
+        return default
+    if isinstance(value, str):
+        try:
+            value = _dt.datetime.fromisoformat(value)
+        except ValueError:
+            return value
+    return value.strftime(fmt)
+
+
+templates.env.filters["dt"] = _fmt_dt
 templates.env.filters["hostname"] = _hostname
 templates.env.filters["abs_url"]  = _ensure_scheme
 templates.env.filters["dataset_link"] = _dataset_link

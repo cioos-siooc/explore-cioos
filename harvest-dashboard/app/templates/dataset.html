@@ -25,7 +25,7 @@
   <div class="flex flex-wrap gap-3 items-baseline">
     <span class="px-2 py-0.5 rounded status-{{ latest.status }}">{{ latest.status }}</span>
     {% if latest.reason_code %}<code class="text-xs">{{ latest.reason_code }}</code>{% endif %}
-    <span class="text-xs text-cioos-navy/60">latest: {{ latest.attempted_at.strftime('%Y-%m-%d %H:%M UTC') }}</span>
+    <span class="text-xs text-cioos-navy/60">latest: {{ latest.attempted_at | dt }}</span>
   </div>
   {% if latest.error_message %}
   <pre class="text-xs whitespace-pre-wrap mt-4 bg-cioos-sand border border-cioos-teal-light rounded p-3">{{ latest.error_message }}</pre>
@@ -70,7 +70,7 @@
       <tbody>
       {% for h in history %}
         <tr class="border-t border-cioos-teal-light/50 align-top">
-          <td class="px-4 py-2 whitespace-nowrap">{{ h.attempted_at.strftime('%Y-%m-%d %H:%M UTC') }}</td>
+          <td class="px-4 py-2 whitespace-nowrap">{{ h.attempted_at | dt }}</td>
           <td class="px-4 py-2"><span class="px-2 py-0.5 rounded status-{{ h.status }}">{{ h.status }}</span></td>
           <td class="px-4 py-2">
             {% if h.reason_code %}<code class="text-xs">{{ h.reason_code }}</code>{% endif %}

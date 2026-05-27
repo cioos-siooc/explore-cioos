@@ -40,9 +40,9 @@
       {%- endfor %}
     </td>
     <td class="px-3 py-2 text-xs text-cioos-navy/70 whitespace-nowrap">
-      <div>{{ d.attempted_at.strftime('%Y-%m-%d %H:%M') if d.attempted_at else '—' }}</div>
+      <div>{{ d.attempted_at | dt('%Y-%m-%d %H:%M') }}</div>
       <div class="text-cioos-navy/50">
-        {% if d.last_success_at %}ok&nbsp;{{ d.last_success_at.strftime('%Y-%m-%d') }}{% else %}never ok{% endif %}
+        {% if d.last_success_at %}ok&nbsp;{{ d.last_success_at | dt('%Y-%m-%d') }}{% else %}never ok{% endif %}
       </div>
     </td>
   </tr>
