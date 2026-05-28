@@ -23,6 +23,7 @@ from cde_harvester.harvest_errors import (
     HTTP_ERROR,
     NO_PROFILES_FOUND,
     ON_SKIP_LIST,
+    QUERY_TOO_LARGE,
     UNKNOWN_ERROR,
 )
 from cde_harvester.profiles import get_profiles
@@ -235,18 +236,37 @@ class ERDDAPHarvester(BaseHarvester):
             except HTTPError as e:
                 duration_ms = int((time.monotonic() - t0) * 1000)
                 response = e.response
-                dataset_logger.error(
-                    "HTTP ERROR: %s %s", response.status_code, response.reason
-                )
-                skipped_datasets_reasons += skipped_reason(HTTP_ERROR)
-                record_attempt(
-                    dataset_id,
-                    status="error",
-                    reason_code=HTTP_ERROR,
-                    error_message=f"HTTP {response.status_code} {response.reason}",
-                    duration_ms=duration_ms,
-                    query_urls=getattr(dataset, "queried_urls", None),
-                )
+                # 413 isn't a transport failure — it's the server telling us
+                # the discovery query (typically `&distinct()` on high-volume
+                # datasets) is larger than it's willing to materialise. Mark
+                # the dataset as skipped with a dedicated reason so the
+                # dashboard's error counts reflect real fetch failures.
+                if response.status_code == 413:
+                    dataset_logger.warning(
+                        "Query too large for server (HTTP 413); skipping dataset"
+                    )
+                    skipped_datasets_reasons += skipped_reason(QUERY_TOO_LARGE)
+                    record_attempt(
+                        dataset_id,
+                        status="skipped",
+                        reason_code=QUERY_TOO_LARGE,
+                        error_message=f"HTTP {response.status_code} {response.reason}",
+                        duration_ms=duration_ms,
+                        query_urls=getattr(dataset, "queried_urls", None),
+                    )
+                else:
+                    dataset_logger.error(
+                        "HTTP ERROR: %s %s", response.status_code, response.reason
+                    )
+                    skipped_datasets_reasons += skipped_reason(HTTP_ERROR)
+                    record_attempt(
+                        dataset_id,
+                        status="error",
+                        reason_code=HTTP_ERROR,
+                        error_message=f"HTTP {response.status_code} {response.reason}",
+                        duration_ms=duration_ms,
+                        query_urls=getattr(dataset, "queried_urls", None),
+                    )
 
             except Exception as e:
                 duration_ms = int((time.monotonic() - t0) * 1000)
