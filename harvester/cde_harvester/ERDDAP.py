@@ -102,13 +102,19 @@ class ERDDAP(object):
             return pd.DataFrame()
 
     def parse_erddap_date(s):
-        """ERDDAP dates come either as timestamps or ISO 8601 datetimes"""
+        """ERDDAP dates come either as timestamps or ISO 8601 datetimes.
+
+        Always return tz-aware UTC. Without utc=True the epoch path returned
+        naive timestamps and the ISO path returned aware ones, so downstream
+        subtraction in get_count() raised tz-naive/tz-aware TypeErrors when
+        the two bounds happened to come from different formats.
+        """
         is_timestamp = s.startswith("1.") or s.startswith("-1.")
 
         if is_timestamp:
-            return pd.to_datetime(s, unit="s")
+            return pd.to_datetime(s, unit="s", utc=True)
 
-        return pd.to_datetime(s, errors="coerce")
+        return pd.to_datetime(s, errors="coerce", utc=True)
 
     def parse_erddap_dates(series):
         """ERDDAP dates come either as timestamps or ISO 8601 datetimes"""
@@ -116,9 +122,9 @@ class ERDDAP(object):
         is_timestamp = time.startswith("1.") or time.startswith("-1.")
 
         if is_timestamp:
-            return pd.to_datetime(series, unit="s")
+            return pd.to_datetime(series, unit="s", utc=True)
 
-        return pd.to_datetime(series, errors="coerce")
+        return pd.to_datetime(series, errors="coerce", utc=True)
 
     def erddap_csv_to_df(self, url, skiprows=[1], dataset=None):
         """If theres an error in the request, this raises up to the dataset loop, so this dataset gets skipped"""
