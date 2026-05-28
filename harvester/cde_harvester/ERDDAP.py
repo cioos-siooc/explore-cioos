@@ -11,11 +11,35 @@ import diskcache as dc
 import pandas as pd
 import requests
 from prefect import get_run_logger
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 from cde_harvester.dataset import Dataset
 
 # size in bytes
 MAX_RESPONSE_SIZE = 2e8
+
+# Transient HTTP statuses we should retry. 500 is included even though some
+# ERDDAPs use it semantically for "no data" / "query too big"; those responses
+# have a body we still need to inspect, so the retry only kicks in when the
+# server keeps returning 500 across attempts — i.e. it really is broken.
+_RETRY_STATUSES = (500, 502, 503, 504, 522, 524)
+
+
+def _build_retry_session() -> requests.Session:
+    session = requests.Session()
+    retry = Retry(
+        total=3,
+        backoff_factor=1.0,         # waits 0s, 2s, 4s between attempts
+        status_forcelist=_RETRY_STATUSES,
+        allowed_methods=frozenset(["GET", "HEAD"]),
+        raise_on_status=False,      # let the existing 5xx-handling logic run
+        respect_retry_after_header=True,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
 
 
 class ERDDAP(object):
@@ -40,7 +64,7 @@ class ERDDAP(object):
             print("size_limit", self.cache.size_limit)
 
         self.domain = urlparse(erddap_url).netloc
-        self.session = requests.Session()
+        self.session = _build_retry_session()
 
         self.logger = get_run_logger()
         self.df_all_datasets = None
