@@ -184,12 +184,12 @@ def dataset_history(erddap_url: str, dataset_id: str):
 def run_detail(run_id: str):
     sql = """
     SELECT r.run_id,
-           r.started_at,
-           r.finished_at,
+           r.started_at::timestamptz  AS started_at,
+           r.finished_at::timestamptz AS finished_at,
            r.git_sha,
            r.status,
            r.error_message,
-           EXTRACT(EPOCH FROM (r.finished_at - r.started_at))::int AS duration_s
+           EXTRACT(EPOCH FROM (r.finished_at::timestamptz - r.started_at::timestamptz))::int AS duration_s
     FROM cde.harvest_runs r
     WHERE r.run_id = :run_id
     """
