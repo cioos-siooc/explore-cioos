@@ -23,7 +23,10 @@ MAX_RESPONSE_SIZE = 2e8
 # ERDDAPs use it semantically for "no data" / "query too big"; those responses
 # have a body we still need to inspect, so the retry only kicks in when the
 # server keeps returning 500 across attempts — i.e. it really is broken.
-_RETRY_STATUSES = (500, 502, 503, 504, 522, 524)
+# 413 is here because seagull-erddap's WAF returns it when the harvester
+# issues parallel requests too quickly; the queries themselves are tiny and
+# succeed when retried after backoff.
+_RETRY_STATUSES = (413, 500, 502, 503, 504, 522, 524)
 
 
 def _build_retry_session() -> requests.Session:
