@@ -13,7 +13,7 @@ erddap_urls:
 
 # set to true to test with caching. Turn to False for production. 
 # defaults to false
-cache: true
+cache: False
 
 # defaults to 'harvest'
 folder:
