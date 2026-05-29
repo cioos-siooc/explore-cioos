@@ -26,7 +26,10 @@ MAX_RESPONSE_SIZE = 2e8
 # 413 is here because seagull-erddap's WAF returns it when the harvester
 # issues parallel requests too quickly; the queries themselves are tiny and
 # succeed when retried after backoff.
-_RETRY_STATUSES = (413, 500, 502, 503, 504, 522, 524)
+# 408 (Request Timeout) and 520 (Cloudflare "unknown error") are transient
+# timeouts seen on the cioosatlantic/cioospacific CTD-profile endpoints under
+# load; the same queries succeed on a later attempt, so retry rather than skip.
+_RETRY_STATUSES = (408, 413, 500, 502, 503, 504, 520, 522, 524)
 
 
 def _build_retry_session() -> requests.Session:
