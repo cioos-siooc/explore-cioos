@@ -286,10 +286,23 @@ CREATE TABLE cde.harvest_runs (
     finished_at   timestamptz,
     git_sha       text,
     status        text NOT NULL,           -- 'running' | 'ok' | 'failed'
-    error_message text
+    error_message text,
+    prefect_flow_run_id text,              -- Prefect flow run id (dashboard deep-links to the Prefect UI); null for CLI runs
+    scope         text,                    -- 'full' (all sources) | 'single' (one source)
+    triggered_source text,                 -- the requested source (erddap url or 'obis') for single-source runs
+    triggered_by  text                     -- dashboard user who launched it (Cloudflare Access email), if any
 );
 CREATE INDEX harvest_runs_started_at_idx
     ON cde.harvest_runs (started_at DESC);
+
+-- Additive migration for EXISTING databases. The DROP/CREATE above only runs on
+-- a fresh schema apply (and wipes audit history); to add these columns to a
+-- live cde.harvest_runs without dropping it, run just these statements (also in
+-- database/migrations/add-harvest-run-prefect-columns.sql). Idempotent.
+ALTER TABLE cde.harvest_runs ADD COLUMN IF NOT EXISTS prefect_flow_run_id text;
+ALTER TABLE cde.harvest_runs ADD COLUMN IF NOT EXISTS scope text;
+ALTER TABLE cde.harvest_runs ADD COLUMN IF NOT EXISTS triggered_source text;
+ALTER TABLE cde.harvest_runs ADD COLUMN IF NOT EXISTS triggered_by text;
 
 CREATE TABLE cde.harvest_attempts (
     run_id        uuid NOT NULL REFERENCES cde.harvest_runs(run_id) ON DELETE CASCADE,
