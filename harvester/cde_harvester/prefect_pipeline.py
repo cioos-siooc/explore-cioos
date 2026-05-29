@@ -11,10 +11,30 @@ import sys
 from prefect.client.orchestration import get_client
 from prefect.client.schemas.actions import WorkPoolCreate, WorkPoolUpdate
 from prefect.exceptions import ObjectNotFound
+from urllib.parse import urlparse
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+# OBIS is a single monolithic source; aliases the dashboard / a deployment may
+# pass for it. Kept in sync with cde_harvester.__main__._OBIS_ALIASES.
+_OBIS_ALIASES = {"obis", "https://obis.org", "http://obis.org", "obis.org"}
+
+
+def deployment_slug(source):
+    """Stable slug for a per-source deployment name.
+
+    MUST match the dashboard's derivation (harvest-dashboard/app/config.py) so a
+    dashboard-triggered run lands on the same per-source deployment as one
+    triggered from the Prefect UI. OBIS -> 'obis'; an ERDDAP url -> its hostname
+    with dots replaced by dashes, lowercased (e.g.
+    'https://erddap.ogsl.ca/erddap' -> 'erddap-ogsl-ca').
+    """
+    if not source or str(source).strip().lower() in _OBIS_ALIASES:
+        return "obis"
+    host = urlparse(source if "://" in source else "https://" + source).hostname or str(source)
+    return host.lower().replace(".", "-")
 
 class PrefectCDEPipeline:
     erddap_urls: str
@@ -28,6 +48,9 @@ class PrefectCDEPipeline:
     flush_redis: bool
     obis_dataset_ids: list
     obis_folder: str
+    # Single-source run controls (None = full harvest of all configured sources).
+    source: str
+    triggered_by: str
 
     @flow(name="Init CDE Config", log_prints=True)
     def init_config(self, config_file=None):
@@ -56,6 +79,10 @@ class PrefectCDEPipeline:
         self.log_dir = os.environ.get("HARVESTER_LOG_DIR") or config.get("log_dir")
         self.incremental = config.get("incremental", False)
         self.flush_redis = config.get("flush_redis", False)
+        # Default to a full harvest; cde_pipeline_run() overrides these for a
+        # single-source (per-source deployment / dashboard-triggered) run.
+        self.source = None
+        self.triggered_by = None
         self.obis_dataset_ids = load_obis_dataset_ids(
             dataset_ids=config.get("obis_dataset_ids"),
             datasets_file=config.get("obis_datasets_file"),
@@ -87,16 +114,29 @@ class PrefectCDEPipeline:
                 dataset_ids=self.dataset_ids,
                 obis_dataset_ids=self.obis_dataset_ids,
                 obis_folder=self.obis_folder,
+                source=self.source,
+                triggered_by=self.triggered_by,
             )
             logger.info("cde_harvester completed successfully")
         except Exception as e:
             logger.error(f"cde_harvester failed: {e}", exc_info=True)
             raise
-        
-        # Run db_loader as a subflow
+
+        # Run db_loader as a subflow.
+        # CRITICAL: a single-source run must NEVER use full-reload mode, which
+        # TRUNCATEs every table and would wipe all the OTHER sources. The
+        # incremental path is per-(dataset_id, erddap_url) scoped and safe, so
+        # force it whenever a source is set, regardless of config.
+        effective_incremental = self.incremental or bool(self.source)
+        if self.source and not self.incremental:
+            logger.warning(
+                "Single-source run (source=%s): forcing db-loader INCREMENTAL "
+                "mode so the full-reload TRUNCATE can't wipe other sources.",
+                self.source,
+            )
         logger.info("Running cde_db_loader subflow")
         try:
-            db_loader_main(folder=self.folder, incremental=self.incremental)
+            db_loader_main(folder=self.folder, incremental=effective_incremental)
             logger.info("cde_db_loader completed successfully")
         except Exception as e:
             logger.error(f"cde_db_loader failed: {e}", exc_info=True)
@@ -299,11 +339,42 @@ class PrefectCDEPipeline:
             job_variables=job_vars,
         )
 
+        # Deployments 3..N: one per source, ON-DEMAND (no cron). These let an
+        # operator re-harvest a single ERDDAP server (or OBIS) independently —
+        # from the Prefect UI or the dashboard "Trigger harvest" button —
+        # without re-running everything. The source list is taken from the
+        # already-loaded config (init_config runs before create_deployment), so
+        # adding a server to harvest_config.yaml auto-creates its deployment on
+        # the next registration. Re-running .deploy() with the same name UPDATES
+        # rather than duplicates. Each run forces incremental db-load (see
+        # cde_pipeline) so it can never TRUNCATE the other sources.
+        per_source = [u.strip() for u in (self.erddap_urls or "").split(",") if u.strip()]
+        if self.obis_dataset_ids:
+            per_source.append("obis")
+        source_deployment_names = []
+        for src in per_source:
+            dep_name = f"cde-harvester-{deployment_slug(src)}"
+            cde_pipeline_run.deploy(
+                name=dep_name,
+                work_pool_name="docker-pool",
+                image=job_image,
+                cron=None,  # on-demand only
+                build=False,
+                push=False,
+                parameters={
+                    "config_file": "/app/harvester/harvest_config.yaml",
+                    "source": src,
+                },
+                job_variables=job_vars,
+            )
+            source_deployment_names.append(dep_name)
+            logger.info("Per-source deployment registered: %s (source=%s)", dep_name, src)
+
         print("\nTo start a worker, run:")
         print("  docker compose up prefect_worker -d")
         logger.info(
-            "Deployments created: cde-harvester=%s populate-vernaculars=%s",
-            harvest_id, vernaculars_id,
+            "Deployments created: cde-harvester=%s populate-vernaculars=%s per-source=%s",
+            harvest_id, vernaculars_id, source_deployment_names,
         )
         return harvest_id
 
@@ -348,8 +419,19 @@ def _normalize_coolify_multiline(value: str) -> str:
 
 
 @flow(name="CDE Pipeline Run", log_prints=True)
-def cde_pipeline_run(config_file: str = "/app/harvester/harvest_config.yaml"):
+def cde_pipeline_run(
+    config_file: str = "/app/harvester/harvest_config.yaml",
+    source: str = None,
+    triggered_by: str = None,
+):
     """Deployable entry point for the harvest pipeline.
+
+    ``source`` (None = full harvest) narrows the run to a single source: an
+    ERDDAP url (full url, hostname, or the dashboard's base64 slug) or the
+    literal 'obis'. Per-source deployments set it; the dashboard passes it (plus
+    ``triggered_by`` = the Cloudflare-Access user email) when an operator clicks
+    "Trigger harvest". A single-source run is forced to incremental db-load so
+    it can't TRUNCATE the other sources.
 
     Prefect deployments invoke whatever flow is registered as a regular
     function call. PrefectCDEPipeline.cde_pipeline is a method (its signature
@@ -410,6 +492,8 @@ def cde_pipeline_run(config_file: str = "/app/harvester/harvest_config.yaml"):
 
     pipeline = PrefectCDEPipeline()
     pipeline.init_config(config_file=config_file)
+    pipeline.source = source
+    pipeline.triggered_by = triggered_by
     pipeline.cde_pipeline()
 
 

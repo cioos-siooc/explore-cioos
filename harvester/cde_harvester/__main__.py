@@ -1,4 +1,5 @@
 import argparse
+import base64
 import json
 import logging
 import os
@@ -9,6 +10,7 @@ import threading
 import time
 import uuid
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 import numpy as np
 import pandas as pd
@@ -125,8 +127,63 @@ def _resolve_git_sha():
     return os.environ.get("GIT_SHA") or None
 
 
+# OBIS is harvested as one monolithic source; in the audit it is recorded
+# under this sentinel erddap_url (obis_harvester.OBIS_SOURCE_URL). Accept a few
+# spellings so a dashboard/UI caller can ask for OBIS without knowing the exact
+# sentinel.
+_OBIS_ALIASES = {"obis", "https://obis.org", "http://obis.org", "obis.org"}
+
+
+def _resolve_source(source, erddap_urls_list):
+    """Resolve a requested ``source`` to a single ERDDAP url or the literal 'obis'.
+
+    Lenient on input: accepts the full configured URL, its hostname, the
+    dashboard's urlsafe-base64 slug, or an OBIS alias. Returns None when
+    ``source`` is falsy (= full harvest, no narrowing).
+
+    Raises ValueError if it does not resolve to exactly one configured source.
+    A typo MUST hard-fail before any harvest or DB write — a silently-empty
+    single-source harvest could otherwise be mistaken for "this source has no
+    datasets".
+    """
+    if not source:
+        return None
+    s = str(source).strip()
+    candidates = {s, s.rstrip("/")}
+    # The dashboard slugifies erddap_url as urlsafe-base64 (slug.py); accept it.
+    try:
+        decoded = base64.urlsafe_b64decode(s + "=" * (-len(s) % 4)).decode("utf-8").strip()
+        candidates.update({decoded, decoded.rstrip("/")})
+    except Exception:
+        pass
+    if candidates & _OBIS_ALIASES:
+        return "obis"
+
+    def _host(u):
+        try:
+            return urlparse(u if "://" in u else "https://" + u).hostname
+        except Exception:
+            return None
+
+    cand_norm = {c.rstrip("/") for c in candidates}
+    cand_hosts = {_host(c) for c in candidates if c}
+    matches = []
+    for url in erddap_urls_list:
+        if url.rstrip("/") in cand_norm or (_host(url) and _host(url) in cand_hosts):
+            matches.append(url)
+    matches = list(dict.fromkeys(matches))
+    if len(matches) == 1:
+        return matches[0]
+    raise ValueError(
+        f"source {source!r} did not resolve to exactly one configured source "
+        f"(matched {matches}; configured ERDDAP urls: {erddap_urls_list})"
+    )
+
+
 def _write_run_audit_csvs(folder, run_id, started_at, finished_at, git_sha,
-                          status, error_message, attempts_frames, logger):
+                          status, error_message, attempts_frames, logger,
+                          prefect_flow_run_id=None, scope="full",
+                          triggered_source=None, triggered_by=None):
     """Write harvest_runs.csv and harvest_attempts.csv into the harvest folder.
 
     Always called at the end of a run (success or failure) so the
@@ -145,6 +202,10 @@ def _write_run_audit_csvs(folder, run_id, started_at, finished_at, git_sha,
         "git_sha": git_sha,
         "status": status,
         "error_message": error_message,
+        "prefect_flow_run_id": prefect_flow_run_id,
+        "scope": scope,
+        "triggered_source": triggered_source,
+        "triggered_by": triggered_by,
     }])
     run_row.to_csv(runs_file, index=False)
 
@@ -165,7 +226,8 @@ def _write_run_audit_csvs(folder, run_id, started_at, finished_at, git_sha,
 @flow(name="cde-main", log_prints=True)
 @monitor(monitor_slug="main-harvester")
 def main(erddap_urls, cache_requests, folder, dataset_ids,
-         obis_dataset_ids=None, obis_folder=None, obis_geo_filter=None):
+         obis_dataset_ids=None, obis_folder=None, obis_geo_filter=None,
+         source=None, triggered_by=None):
     logger = get_run_logger()
     limit_dataset_ids = None
     if dataset_ids:
@@ -176,18 +238,47 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
     # (success / skipped / error) gets stamped with this run_id so the
     # harvest-dashboard service can show history per dataset.
     run_id = str(uuid.uuid4())
+    # Tie the run to its Prefect flow run so the dashboard can deep-link to the
+    # Prefect UI. None when invoked outside a flow (bare CLI).
+    try:
+        from prefect.runtime import flow_run as _pf_flow_run
+        prefect_flow_run_id = _pf_flow_run.id
+    except Exception:
+        prefect_flow_run_id = None
+    # scope/triggered_source describe whether this is a full harvest or a
+    # single-source run, recorded straight from the request so the except
+    # handler below always has them even if source resolution raises.
+    run_scope = "single" if source else "full"
+    triggered_source = source or None
     started_at = datetime.now(timezone.utc)
     git_sha = _resolve_git_sha()
     run_status = "ok"
     run_error_message = None
     erddap_attempts = pd.DataFrame()
     obis_attempts = pd.DataFrame()
-    logger.info("Harvest run started: run_id=%s git_sha=%s", run_id, git_sha)
+    logger.info(
+        "Harvest run started: run_id=%s git_sha=%s scope=%s source=%s flow_run=%s",
+        run_id, git_sha, run_scope, triggered_source, prefect_flow_run_id,
+    )
 
     try:
         # Submit ERDDAP tasks concurrently using Prefect
         erddap_futures = []
         erddap_urls_list = [u.strip() for u in erddap_urls.split(",") if u.strip()] if erddap_urls else []
+
+        # Single-source narrowing. Resolve BEFORE submitting any task so a bad
+        # source hard-fails the run instead of harvesting nothing. OBIS is
+        # monolithic, so an OBIS-source run keeps the full obis_dataset_ids
+        # list and drops all ERDDAP work, and vice-versa.
+        resolved_source = _resolve_source(source, erddap_urls_list)
+        if resolved_source == "obis":
+            logger.info("Single-source harvest: OBIS only")
+            erddap_urls_list = []
+        elif resolved_source:
+            logger.info("Single-source harvest: %s", resolved_source)
+            erddap_urls_list = [resolved_source]
+            obis_dataset_ids = None
+
         for erddap_url in erddap_urls_list:
             logger.info("Submitting harvest task for %s", erddap_url)
             future = harvest_erddap.submit(erddap_url, limit_dataset_ids, cache_requests, run_id=run_id)
@@ -247,6 +338,10 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             error_message=run_error_message,
             attempts_frames=[erddap_attempts, obis_attempts],
             logger=logger,
+            prefect_flow_run_id=prefect_flow_run_id,
+            scope=run_scope,
+            triggered_source=triggered_source,
+            triggered_by=triggered_by,
         )
         raise
 
@@ -271,6 +366,10 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             error_message="No datasets harvested from any source",
             attempts_frames=[erddap_attempts, obis_attempts],
             logger=logger,
+            prefect_flow_run_id=prefect_flow_run_id,
+            scope=run_scope,
+            triggered_source=triggered_source,
+            triggered_by=triggered_by,
         )
         sys.exit(1)
 

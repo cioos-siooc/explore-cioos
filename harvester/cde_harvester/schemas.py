@@ -126,6 +126,15 @@ class HarvestRunSchema(pa.DataFrameModel):
     git_sha: Series[str] = pa.Field(nullable=True)
     status: Series[str]
     error_message: Series[str] = pa.Field(nullable=True)
+    # Prefect flow-run id for this harvest, so the dashboard can deep-link to
+    # the Prefect UI. Null for bare-CLI runs (no flow context).
+    prefect_flow_run_id: Series[str] = pa.Field(nullable=True)
+    # 'full' (all configured sources) or 'single' (one source). triggered_source
+    # is the requested source (erddap url or 'obis'); triggered_by is the user
+    # who launched it from the dashboard (Cloudflare-Access email), if any.
+    scope: Series[str] = pa.Field(nullable=True)
+    triggered_source: Series[str] = pa.Field(nullable=True)
+    triggered_by: Series[str] = pa.Field(nullable=True)
 
     class Config:
         coerce = True
