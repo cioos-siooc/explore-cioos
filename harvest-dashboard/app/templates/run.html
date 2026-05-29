@@ -14,6 +14,14 @@
       <span class="text-cioos-navy/60">({{ run.duration_s or 0 }}s)</span>
     {% endif %}
     {% if run.git_sha %}<span class="text-cioos-navy/60">git {{ run.git_sha }}</span>{% endif %}
+    {% if run.scope == 'single' %}
+      <span class="px-2 py-0.5 rounded status-skipped">single source{% if run.triggered_source %}: {{ run.triggered_source | hostname }}{% endif %}</span>
+    {% endif %}
+    {% if run.triggered_by %}<span class="text-cioos-navy/60">by {{ run.triggered_by }}</span>{% endif %}
+    {% if run.prefect_flow_run_id and run.prefect_flow_run_id | prefect_run_url %}
+      <a href="{{ run.prefect_flow_run_id | prefect_run_url }}" target="_blank" rel="noopener"
+         class="text-cioos-primary font-semibold hover:underline">View in Prefect ↗</a>
+    {% endif %}
   </div>
   {% if run.error_message %}
   <pre class="text-xs whitespace-pre-wrap mt-4 bg-[#FBE3E6] border border-cioos-error/30 text-[#9A1F2C] rounded p-3">{{ run.error_message }}</pre>

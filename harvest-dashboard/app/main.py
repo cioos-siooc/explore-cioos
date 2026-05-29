@@ -4,6 +4,7 @@ Routes
 ------
 GET /                                    overview: cards per ERDDAP server + recent runs
 GET /server/{slug}                       all datasets on one server + sparklines (HTMX-filterable)
+POST /server/{slug}/trigger              trigger a single-source harvest (Prefect); HTMX partial. Gated by HARVEST_TRIGGER_ENABLED
 GET /server/{slug}/rows                  HTMX partial: dataset rows only (used by filter form)
 GET /dataset/{slug}/{dataset_id}         full attempt history for one dataset
 GET /runs/{run_id}                       all attempts in a single harvest run
@@ -26,7 +27,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import queries
+from . import config, prefect_client, queries
 from .slug import slugify, unslug
 
 
@@ -146,6 +147,7 @@ templates.env.filters["abs_url"]  = _ensure_scheme
 templates.env.filters["dataset_link"] = _dataset_link
 templates.env.filters["source_label"] = _source_label
 templates.env.filters["split_urls"] = _split_urls
+templates.env.filters["prefect_run_url"] = config.prefect_run_url
 
 
 @app.get("/healthz")
@@ -191,8 +193,41 @@ def server(request: Request, slug: str,
             "summary": summary,
             "status": status or "",
             "q": q or "",
+            "trigger_enabled": config.HARVEST_TRIGGER_ENABLED,
         },
     )
+
+
+@app.post("/server/{slug}/trigger", response_class=HTMLResponse)
+def trigger_server_harvest(request: Request, slug: str):
+    """Trigger a single-source harvest for this server via the Prefect API.
+
+    Access is already gated by Cloudflare Access (CIOOS accounts); this is the
+    only non-GET route. HARVEST_TRIGGER_ENABLED is a per-environment kill-switch.
+    The run is attributed to the Cloudflare-Access user. Always returns a 200
+    HTMX partial (success link or styled error) so the result swaps in cleanly.
+    """
+    if not config.HARVEST_TRIGGER_ENABLED:
+        raise HTTPException(status_code=403, detail="Harvest triggering is disabled")
+    erddap_url = unslug(slug)
+    source = config.source_for(erddap_url)
+    triggered_by = (
+        request.headers.get("Cf-Access-Authenticated-User-Email")
+        or request.headers.get("X-Forwarded-User")
+        or None
+    )
+    try:
+        result = prefect_client.trigger_source_harvest(source, triggered_by=triggered_by)
+        ctx = {
+            "ok": True,
+            "result": result,
+            "run_url": config.prefect_run_url(result["flow_run_id"]),
+            "hostname": _hostname(erddap_url),
+            "triggered_by": triggered_by,
+        }
+    except prefect_client.PrefectError as e:
+        ctx = {"ok": False, "error": str(e), "hostname": _hostname(erddap_url)}
+    return templates.TemplateResponse(request, "_trigger_result.html", ctx)
 
 
 @app.get("/server/{slug}/rows", response_class=HTMLResponse)

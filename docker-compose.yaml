@@ -216,6 +216,16 @@ services:
     environment:
       - DB_HOST_EXTERNAL=db
       - SERVICE_FQDN_HARVEST_DASHBOARD_8001
+      # Internal Prefect API for the per-source "Trigger harvest" button (the
+      # dashboard reaches prefect by service name on the shared compose network).
+      - PREFECT_API_URL=http://prefect:4200/api
+      # External Prefect UI base for the "View in Prefect" deep-links (what a
+      # browser hits). Override per stack via .env / Coolify.
+      - PREFECT_UI_URL=${PREFECT_UI_URL:-https://prefect-obis.cool.beluga.cioos.ca}
+      # Kill-switch for the trigger button (the dashboard itself is behind
+      # Cloudflare Access). Off by default.
+      - HARVEST_TRIGGER_ENABLED=${HARVEST_TRIGGER_ENABLED:-false}
+      - HARVEST_FLOW_NAME=${HARVEST_FLOW_NAME:-CDE Pipeline Run}
     expose:
       - "8001"
     depends_on:

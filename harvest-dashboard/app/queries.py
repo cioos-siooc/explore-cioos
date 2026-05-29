@@ -189,6 +189,10 @@ def run_detail(run_id: str):
            r.git_sha,
            r.status,
            r.error_message,
+           r.prefect_flow_run_id,
+           r.scope,
+           r.triggered_source,
+           r.triggered_by,
            EXTRACT(EPOCH FROM (r.finished_at::timestamptz - r.started_at::timestamptz))::int AS duration_s
     FROM cde.harvest_runs r
     WHERE r.run_id = :run_id

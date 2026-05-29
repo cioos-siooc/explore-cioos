@@ -13,7 +13,8 @@ RUN pip install --no-cache-dir \
         "jinja2>=3.1" \
         "sqlalchemy>=2.0" \
         "psycopg[binary]>=3.2" \
-        "python-dotenv>=1.0"
+        "python-dotenv>=1.0" \
+        "httpx>=0.27"
 
 COPY app ./app
 

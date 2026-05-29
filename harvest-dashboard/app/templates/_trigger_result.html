@@ -1,0 +1,16 @@
+{# HTMX partial returned by POST /server/{slug}/trigger #}
+{% if ok %}
+<span class="inline-flex items-center gap-2 px-2 py-1 rounded status-running">
+  <span>Harvest queued for {{ hostname }}.</span>
+  {% if run_url %}
+    <a href="{{ run_url }}" target="_blank" rel="noopener" class="underline font-semibold hover:opacity-80">View in Prefect ↗</a>
+  {% else %}
+    <span class="text-cioos-navy/60">Flow run {{ result.flow_run_name or result.flow_run_id }}</span>
+  {% endif %}
+</span>
+{% else %}
+<span class="inline-flex items-center gap-2 px-2 py-1 rounded status-error">
+  <span>Could not trigger harvest for {{ hostname }}.</span>
+  <span class="text-xs">{{ error }}</span>
+</span>
+{% endif %}
