@@ -294,15 +294,9 @@ CREATE TABLE cde.harvest_runs (
 );
 CREATE INDEX harvest_runs_started_at_idx
     ON cde.harvest_runs (started_at DESC);
-
--- Additive migration for EXISTING databases. The DROP/CREATE above only runs on
--- a fresh schema apply (and wipes audit history); to add these columns to a
--- live cde.harvest_runs without dropping it, run just these statements (also in
--- database/migrations/add-harvest-run-prefect-columns.sql). Idempotent.
-ALTER TABLE cde.harvest_runs ADD COLUMN IF NOT EXISTS prefect_flow_run_id text;
-ALTER TABLE cde.harvest_runs ADD COLUMN IF NOT EXISTS scope text;
-ALTER TABLE cde.harvest_runs ADD COLUMN IF NOT EXISTS triggered_source text;
-ALTER TABLE cde.harvest_runs ADD COLUMN IF NOT EXISTS triggered_by text;
+-- NOTE: applying this file DROP/CREATEs harvest_runs (wiping audit history). To
+-- add the columns above to a LIVE database without dropping it, run the
+-- idempotent migration in database/migrations/add-harvest-run-prefect-columns.sql.
 
 CREATE TABLE cde.harvest_attempts (
     run_id        uuid NOT NULL REFERENCES cde.harvest_runs(run_id) ON DELETE CASCADE,
