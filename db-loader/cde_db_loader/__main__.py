@@ -21,6 +21,14 @@ from prefect import flow, get_run_logger
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
+# Transaction-scoped advisory lock key. Every db-loader run takes this lock at
+# the top of its transaction so loads run STRICTLY one-at-a-time: a single-source
+# incremental run can never interleave with the nightly full-reload (whose
+# remove_all_data() TRUNCATEs every table), and two incremental loads can't
+# fight over drop/set_constraints + DELETE/INSERT. pg_advisory_xact_lock auto-
+# releases at COMMIT/ROLLBACK. Arbitrary stable constant ("CDE-LOADER").
+DB_LOADER_ADVISORY_LOCK_KEY = 738825001
+
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(levelname)-8s - %(name)s : %(message)s"
 )
@@ -249,6 +257,16 @@ def main(folder, incremental=False):
 
     schema = "cde"
     with engine.begin() as transaction:
+        # Serialize all loads against each other. Now that single-source
+        # harvests can be triggered on demand, a per-source incremental load
+        # could otherwise land mid-way through the nightly full-reload's
+        # TRUNCATE — catastrophic. This transaction-scoped lock makes concurrent
+        # loaders simply wait here until the one ahead commits/rolls back.
+        logger.info("Acquiring db-loader advisory lock (serializes concurrent loads)")
+        transaction.execute(
+            text("SELECT pg_advisory_xact_lock(:k)"),
+            {"k": DB_LOADER_ADVISORY_LOCK_KEY},
+        )
         logger.info("Writing to DB:")
 
         # Pre-fetch scientific_name → aphia_id mappings from existing
@@ -329,6 +347,32 @@ def main(folder, incremental=False):
         else:
             # Original full reload logic
             logger.info("Using FULL RELOAD mode - will clear all data")
+
+            # Full-reload guard (defense-in-depth behind cde_pipeline's
+            # force-incremental). Refuse to TRUNCATE when the incoming harvest
+            # covers fewer sources than the DB already holds — the signature of
+            # a single-source run wrongly taking the full-reload path, which
+            # would wipe every other source. A legitimate full reload after a
+            # source was removed from config is rarer; set CDE_ALLOW_FULL_RELOAD=1
+            # to permit it (it then prunes the removed source).
+            incoming_sources = set(datasets["erddap_url"].dropna().unique())
+            existing_sources = {
+                r[0] for r in transaction.execute(
+                    text("SELECT DISTINCT erddap_url FROM cde.datasets")
+                ).all()
+            }
+            allow_full = os.environ.get("CDE_ALLOW_FULL_RELOAD", "").lower() in (
+                "1", "true", "yes",
+            )
+            missing = existing_sources - incoming_sources
+            if existing_sources and missing and not allow_full:
+                raise RuntimeError(
+                    f"Refusing full reload: this harvest covers {len(incoming_sources)} "
+                    f"source(s) but cde.datasets holds {len(existing_sources)}, missing "
+                    f"e.g. {sorted(missing)[:3]}. A full reload would TRUNCATE those. "
+                    "Use incremental mode for a partial harvest, or set "
+                    "CDE_ALLOW_FULL_RELOAD=1 to intentionally prune."
+                )
 
             # Session-level tuning for the bulk rebuild. SET LOCAL confines these
             # to the current transaction. synchronous_commit=OFF is acceptable
