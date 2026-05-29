@@ -207,9 +207,17 @@ def trigger_server_harvest(request: Request, slug: str):
     The run is attributed to the Cloudflare-Access user. Always returns a 200
     HTMX partial (success link or styled error) so the result swaps in cleanly.
     """
-    if not config.HARVEST_TRIGGER_ENABLED:
-        raise HTTPException(status_code=403, detail="Harvest triggering is disabled")
     erddap_url = unslug(slug)
+    if not config.HARVEST_TRIGGER_ENABLED:
+        # Return the HTML partial (200) rather than HTTPException(403)'s JSON, so
+        # HTMX swaps a readable message into #trigger-result. The button is also
+        # hidden when disabled, so this is just defense-in-depth.
+        return templates.TemplateResponse(
+            request,
+            "_trigger_result.html",
+            {"ok": False, "error": "Harvest triggering is disabled (HARVEST_TRIGGER_ENABLED=false).",
+             "hostname": _hostname(erddap_url)},
+        )
     source = config.source_for(erddap_url)
     triggered_by = (
         request.headers.get("Cf-Access-Authenticated-User-Email")
