@@ -499,8 +499,8 @@ def _normalize_coolify_multiline(value: str) -> str:
 @flow(name="CDE Pipeline Run", log_prints=True)
 def cde_pipeline_run(
     config_file: str = "/app/harvester/harvest_config.yaml",
-    source: str = None,
-    triggered_by: str = None,
+    source: str | None = None,
+    triggered_by: str | None = None,
 ):
     """Deployable entry point for the harvest pipeline.
 
