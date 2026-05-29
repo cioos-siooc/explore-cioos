@@ -7,7 +7,10 @@ from dotenv import load_dotenv
 import logging
 import os
 import argparse
+import shutil
 import sys
+import time
+import uuid
 from prefect.client.orchestration import get_client
 from prefect.client.schemas.actions import WorkPoolCreate, WorkPoolUpdate
 from prefect.exceptions import ObjectNotFound
@@ -20,6 +23,46 @@ logger = logging.getLogger(__name__)
 # OBIS is a single monolithic source; aliases the dashboard / a deployment may
 # pass for it. Kept in sync with cde_harvester.__main__._OBIS_ALIASES.
 _OBIS_ALIASES = {"obis", "https://obis.org", "http://obis.org", "obis.org"}
+
+
+RUN_FOLDER_PREFIX = "run-"
+KEEP_RUN_FOLDERS = 5  # retain this many recent per-run output folders
+# Never prune a folder modified within this window — protects a concurrent
+# in-flight run (harvests can take ~1h) from being deleted by another run's prune.
+PRUNE_GRACE_SECONDS = 6 * 3600
+
+
+def _run_subfolder(base_folder, run_token):
+    """Per-run output folder under the shared harvest volume."""
+    return os.path.join(base_folder, f"{RUN_FOLDER_PREFIX}{run_token}")
+
+
+def _prune_run_folders(base_folder, keep=KEEP_RUN_FOLDERS, protect=None):
+    """Keep the newest `keep` per-run output folders; reclaim the older ones so
+    the harvest volume doesn't grow unbounded.
+
+    Only ever touches our own run-* directories — never the base folder, the
+    OBIS cache, the current run's folder (`protect`), or any folder modified
+    within the grace window (so a concurrent in-flight run is never deleted)."""
+    protect = os.path.abspath(protect) if protect else None
+    try:
+        runs = [
+            (os.path.getmtime(os.path.join(base_folder, n)), os.path.abspath(os.path.join(base_folder, n)))
+            for n in os.listdir(base_folder)
+            if n.startswith(RUN_FOLDER_PREFIX)
+            and os.path.isdir(os.path.join(base_folder, n))
+        ]
+    except FileNotFoundError:
+        return
+    now = time.time()
+    for mtime, path in sorted(runs, reverse=True)[keep:]:
+        if path == protect or (now - mtime) <= PRUNE_GRACE_SECONDS:
+            continue  # current run, or too recent to be sure it's idle
+        try:
+            shutil.rmtree(path)
+            logger.info("Pruned old harvest run folder: %s", path)
+        except OSError as e:
+            logger.warning("Could not prune run folder %s: %s", path, e)
 
 
 def deployment_slug(source):
@@ -103,17 +146,47 @@ class PrefectCDEPipeline:
         """
         logger = get_run_logger()
         logger.info("Starting CDE Pipeline")
-        
+
+        # Per-run output subfolder so concurrent harvests (e.g. an on-demand
+        # single-source trigger overlapping the nightly full run) don't clobber
+        # each other's CSVs in the shared harvest volume. The harvester writes
+        # into run_folder and the db-loader reads from it, so the handoff stays
+        # isolated per run.
+        base_folder = self.folder
+        try:
+            from prefect.runtime import flow_run as _pf_flow_run
+            run_token = _pf_flow_run.id or str(uuid.uuid4())
+        except Exception:
+            run_token = str(uuid.uuid4())
+        run_folder = _run_subfolder(base_folder, run_token)
+        # The OBIS occurrence cache must stay SHARED across runs (it's a cache,
+        # keyed by dataset). main() derives it from `folder`'s parent when
+        # obis_folder is unset — which would point inside the per-run subfolder
+        # and miss the cache — so pin it to the base-folder derivation and pass
+        # it explicitly. Matches harvester __main__ behaviour for the base run.
+        obis_folder = self.obis_folder or os.path.join(
+            os.path.dirname(os.path.abspath(base_folder)), "obis_cache"
+        )
+        # Invariant: the OBIS cache must live OUTSIDE the per-run folder tree, or
+        # pruning (which rmtrees run-* dirs) could eventually delete it. Our
+        # derivation puts it as a sibling of base_folder, so this always holds;
+        # assert it so a future config/path change fails loudly, not silently.
+        _abs_run, _abs_obis = os.path.abspath(run_folder), os.path.abspath(obis_folder)
+        assert _abs_obis != _abs_run and not _abs_obis.startswith(_abs_run + os.sep), (
+            f"OBIS cache {obis_folder} must not be inside the per-run folder {run_folder}"
+        )
+        logger.info("Run output folder: %s (shared OBIS cache: %s)", run_folder, obis_folder)
+
         # Run harvester as a subflow
         logger.info("Running cde_harvester subflow")
         try:
             harvester_main(
                 erddap_urls=self.erddap_urls,
                 cache_requests=self.cache_requests,
-                folder=self.folder,
+                folder=run_folder,
                 dataset_ids=self.dataset_ids,
                 obis_dataset_ids=self.obis_dataset_ids,
-                obis_folder=self.obis_folder,
+                obis_folder=obis_folder,
                 source=self.source,
                 triggered_by=self.triggered_by,
             )
@@ -136,8 +209,13 @@ class PrefectCDEPipeline:
             )
         logger.info("Running cde_db_loader subflow")
         try:
-            db_loader_main(folder=self.folder, incremental=effective_incremental)
+            db_loader_main(folder=run_folder, incremental=effective_incremental)
             logger.info("cde_db_loader completed successfully")
+            # Data is now in the DB; keep only the newest few run folders for
+            # debugging/replay and reclaim volume space. protect=run_folder so
+            # this run's own output is never pruned; kept on failure (above
+            # raises) so a failed run's CSVs survive for investigation.
+            _prune_run_folders(base_folder, protect=run_folder)
         except Exception as e:
             logger.error(f"cde_db_loader failed: {e}", exc_info=True)
             raise
