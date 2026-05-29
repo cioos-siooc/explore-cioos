@@ -509,6 +509,10 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         error_message=run_error_message,
         attempts_frames=[erddap_attempts, obis_attempts],
         logger=logger,
+        prefect_flow_run_id=prefect_flow_run_id,
+        scope=run_scope,
+        triggered_source=triggered_source,
+        triggered_by=triggered_by,
     )
 
 
