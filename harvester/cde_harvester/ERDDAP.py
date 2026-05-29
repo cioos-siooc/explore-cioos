@@ -15,6 +15,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 from cde_harvester.dataset import Dataset
+from cde_harvester.harvest_errors import ResponseTooLargeError
 
 # size in bytes
 MAX_RESPONSE_SIZE = 2e8
@@ -161,7 +162,9 @@ class ERDDAP(object):
             response = self.session.get(url_combined, timeout=3600)
 
         if len(response.content) > MAX_RESPONSE_SIZE:
-            raise RuntimeError("Response too big")
+            raise ResponseTooLargeError(
+                f"Response {len(response.content)} bytes exceeds {MAX_RESPONSE_SIZE:.0f}: {decoded_url}"
+            )
 
         original_hostname = urlparse(url_combined).hostname
         actual_hostname = urlparse(response.url).hostname

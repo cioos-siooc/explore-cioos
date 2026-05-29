@@ -23,6 +23,8 @@ from cde_harvester.harvest_errors import (
     HTTP_ERROR,
     NO_PROFILES_FOUND,
     ON_SKIP_LIST,
+    RESPONSE_TOO_LARGE,
+    ResponseTooLargeError,
     UNKNOWN_ERROR,
 )
 from cde_harvester.profiles import get_profiles
@@ -49,6 +51,16 @@ class ERDDAPHarvester(BaseHarvester):
         self.limit_dataset_ids = limit_dataset_ids
         self.cache_requests = cache_requests
         self.run_id = run_id
+
+    def _attempt_urls(self, dataset, dataset_id):
+        """URLs to record for a failed attempt. Prefer the dataset's own
+        queried_urls, but when the failure happened during construction
+        (get_metadata) the dataset object never reached the caller, so fall
+        back to the metadata URL — the request that would have run first."""
+        queried = getattr(dataset, "queried_urls", None)
+        if queried:
+            return queried
+        return [f"{self.erddap_url.rstrip('/')}/info/{dataset_id}/index.csv"]
 
     @staticmethod
     def get_datasets_to_skip():
@@ -245,7 +257,20 @@ class ERDDAPHarvester(BaseHarvester):
                     reason_code=HTTP_ERROR,
                     error_message=f"HTTP {response.status_code} {response.reason}",
                     duration_ms=duration_ms,
-                    query_urls=getattr(dataset, "queried_urls", None),
+                    query_urls=self._attempt_urls(dataset, dataset_id),
+                )
+
+            except ResponseTooLargeError as e:
+                duration_ms = int((time.monotonic() - t0) * 1000)
+                dataset_logger.error("Response too large: %s", e)
+                skipped_datasets_reasons += skipped_reason(RESPONSE_TOO_LARGE)
+                record_attempt(
+                    dataset_id,
+                    status="error",
+                    reason_code=RESPONSE_TOO_LARGE,
+                    error_message=str(e),
+                    duration_ms=duration_ms,
+                    query_urls=self._attempt_urls(dataset, dataset_id),
                 )
 
             except Exception as e:
@@ -263,7 +288,7 @@ class ERDDAPHarvester(BaseHarvester):
                     reason_code=UNKNOWN_ERROR,
                     error_message=f"{type(e).__name__}: {e}",
                     duration_ms=duration_ms,
-                    query_urls=getattr(dataset, "queried_urls", None),
+                    query_urls=self._attempt_urls(dataset, dataset_id),
                 )
 
         skipped_columns = list(SkippedDatasetSchema.to_schema().columns.keys())
