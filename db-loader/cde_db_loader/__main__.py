@@ -59,7 +59,11 @@ OBIS_ARRAY_DTYPES = {
 def prepare_profiles_dataframe(profiles):
     """Clean and prepare profiles DataFrame for insertion."""
     profiles = profiles.replace("", np.NaN)
-    profiles = profiles.drop(columns=["altitude_min", "altitude_max", "scientific_names"], errors="ignore").dropna(subset=['time_min'])
+    # Both time bounds are NOT NULL in cde.profiles. Drop either-null rows here,
+    # mirroring the harvester's filter (profiles.py): a time_max that passes the
+    # harvester's null check but fails parse_erddap_dates' coerce becomes NaT and
+    # would otherwise slip through and fail set_constraints().
+    profiles = profiles.drop(columns=["altitude_min", "altitude_max", "scientific_names"], errors="ignore").dropna(subset=['time_min', 'time_max'])
     return profiles
 
 
