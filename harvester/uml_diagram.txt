@@ -1,0 +1,150 @@
+================================================================================
+                        CDE Harvester Architecture UML
+================================================================================
+
+                            +------------------------+
+                            |      CLI Entry Point   |
+                            |   cde_harvester/__main__|
+                            +------------+-----------+
+                                         |
+                                         v
++-----------------------------------------------------------------------------+
+|                              Prefect Flows                                   |
++-----------------------------------------------------------------------------+
+
+    +---------------------+         +---------------------+
+    |  main (flow)        |         |  cde_pipeline       |
+    |  (harvester only)   |         |  (full pipeline)   |
+    +---------+-----------+         +----------+----------+
+              |                                  |
+              |  Submits                         |  Orchestrates
+              v                                  v
+    +---------------------+         +---------------------+
+    | harvest_erddap      |         | +---------------+  |
+    | (task)              |         | |harvester_main |--+---> db_loader
+    +---------+-----------+         | +---------------+  |
+              |                      | +---------------+  |
+              |                      | |db_loader_main |--+---> redisFlow
+              v                      | +---------------+  |
+    +---------------------+         +---------------------+
+    | harvest_erddap()    |
+    | (per ERDDAP server) |
+    +---------------------+
+
++-----------------------------------------------------------------------------+
+|                         External Systems                                     |
++-----------------------------------------------------------------------------+
+
+    +--------------------+      +--------------------+      +------------------+
+    |   ERDDAP Server    |      |  CDECompliance     |      |     CKAN API     |
+    |    (External)      |      |     Checker        |      |    (External)   |
+    +--------+-----------+      +--------+-----------+      +---------+--------+
+             |                           |                         |
+             | get_dataset()            | passes_all_checks()    | get_ckan_records()
+             |                           |                         |
+             v                           |                         v
+    +--------------------+              |                 +------------------+
+    |      Dataset       |<-------------+                 |  CKAN Records    |
+    |     [Model]        |                                +------------------+
+    +--------------------+
+
++-----------------------------------------------------------------------------+
+|                           Dataset Class                                      |
++-----------------------------------------------------------------------------+
+
+    Attributes:
+      - id, erddap_url, cdm_data_type
+      - globals (dict), platform, eovs, organizations
+      - df_variables, profile_ids, timeseries_id_variable
+      - profile_id_variable, trajectory_id_variable
+
+    Methods:
+      + get_metadata()          - Fetch dataset/variable metadata
+      + get_eovs()             - Extract EOVs from standard names
+      + get_platform_code()    - Map platform to L06 category
+      + get_profile_ids()     - Extract profile/timeseries identifiers
+      + get_max_min()         - Get spatial/temporal bounds
+      + get_count()           - Count records per profile
+      + get_df()              - Return DataFrame for output
+
++-----------------------------------------------------------------------------+
+|                           ERDDAP Class                                       |
++-----------------------------------------------------------------------------+
+
+    Attributes:
+      - url, domain, cache_requests, cache (diskcache)
+      - session (requests), df_all_datasets
+
+    Methods:
+      + __init__(url, cache)         - Initialize & fetch all datasets
+      + get_all_datasets()           - Fetch list of datasets from server
+      + erddap_csv_to_df(url)        - Convert ERDDAP CSV response to DF
+      + get_dataset(id)               - Create Dataset instance
+
++-----------------------------------------------------------------------------+
+|                          Data Output Flow                                    |
++-----------------------------------------------------------------------------+
+
+      +-------------+    +-------------+    +-------------+    +-------------+
+      |  datasets   |    |  profiles   |    |    ckan    |    |  skipped   |
+      |   .csv      |    |   .csv      |    |   .csv     |    |   .csv     |
+      +------+------+    +------+------+    +------+------+    +------+------+
+             |                   |                   |                   |
+             +-------------------+---------+---------+-------------------+
+                                     |
+                                     v
+                        +-------------------------+
+                        |    PostgreSQL Database  |
+                        |    (via db-loader)     |
+                        +------------+------------+
+                                     |
+                                     v
+                        +-------------------------+
+                        |      Redis Cache        |
+                        |    (redisFunctions)    |
+                        +-------------------------+
+
+================================================================================
+                          Key Classes Summary                                   |
+================================================================================
+
+  Class                  | File                      | Responsibility
+  -----------------------|---------------------------|--------------------------
+  ERDDAP                 | ERDDAP.py                 | Client for ERDDAP server
+  Dataset                | dataset.py                | Model for dataset
+  CDEComplianceChecker   | CDEComplianceChecker.py   | Validates CF compliance
+  harvest_erddap          | harvest_erddap.py        | Prefect task orchestrator
+  get_ckan_records       | ckan/create_ckan_...     | Fetches CKAN metadata
+  redisFlow              | redisFunctions.py         | Refreshes Redis cache
+
+================================================================================
+                            Main Flow Overview                                  |
+================================================================================
+
+1. CLI/ Prefect calls harvester_main()
+
+2. For each ERDDAP URL:
+   - harvest_erddap() task runs
+   - Fetch all datasets from server
+   - Filter by CDM data type (TimeSeries, Profile, TimeSeriesProfile)
+   - Iterate through each dataset
+
+3. For each dataset:
+   - Create Dataset instance
+   - CDEComplianceChecker validates compliance
+   - If valid: extract profiles, metadata, variables
+   - If invalid: add to skipped list
+
+4. Query CKAN for additional metadata
+
+5. Output CSV files:
+   - datasets.csv    - Dataset metadata
+   - profiles.csv    - Profile information
+   - ckan.csv        - CKAN metadata
+   - skipped.csv     - Skipped datasets with reasons
+
+6. db-loader loads CSV to PostgreSQL
+
+7. redisFlow refreshes Redis cache
+
+================================================================================
