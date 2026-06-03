@@ -4,7 +4,7 @@ Integration test: full harvester pipeline with mocked external I/O.
 Steps covered (mirrors the real nightly run):
   1. ERDDAP HTTP calls  → mocked via requests.Session.get
   2. CKAN HTTP calls    → mocked via requests.get
-  3. harvest_erddap()   → runs with real Dataset/ComplianceChecker/profiles logic
+  3. ERDDAPHarvester    → runs with real Dataset/ComplianceChecker/profiles logic
   4. CSV output         → written to tmp_path via the real __main__.main()
   5. DB load            → SQLAlchemy engine mocked; correct SQL calls asserted
 
@@ -13,10 +13,9 @@ data-flow transformation described in docs/data_flow.md.
 """
 
 import ast
+import logging
 import os
-from io import StringIO
 from unittest.mock import MagicMock, patch
-from urllib.parse import unquote
 
 import pandas as pd
 import pytest
@@ -25,12 +24,6 @@ from conftest import (
     CKAN_EMPTY_RESPONSE,
     CKAN_PACKAGE_SEARCH_RESPONSE,
     DATASET_ID,
-    ERDDAP_ALL_DATASETS_CSV,
-    ERDDAP_COUNT_CSV,
-    ERDDAP_DEPTH_MINMAX_CSV,
-    ERDDAP_INFO_CSV,
-    ERDDAP_PROFILE_IDS_CSV,
-    ERDDAP_TIME_MINMAX_CSV,
     ERDDAP_URL,
     MockResponse,
     _route_erddap_url,
@@ -47,42 +40,42 @@ def _erddap_session_get(url, **kwargs):
     return MockResponse(text=text, url=url)
 
 
+def _ckan_side_effects():
+    page1 = MagicMock()
+    page1.json.return_value = CKAN_PACKAGE_SEARCH_RESPONSE
+    page2 = MagicMock()
+    page2.json.return_value = CKAN_EMPTY_RESPONSE
+    return [page1, page2]
+
+
 # ---------------------------------------------------------------------------
-# Step 1 + 2 + 3: Harvest phase (ERDDAP + CKAN → DataFrames)
+# Step 1 + 2 + 3: Harvest phase (ERDDAP → HarvestResult)
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
 def harvest_result(tmp_path_factory):
     """
-    Run the real harvest_erddap() against a fully-mocked ERDDAP server.
+    Run ERDDAPHarvester.harvest() against a fully-mocked ERDDAP server.
     Returns (profiles_df, datasets_df, variables_df, skipped_df).
+    Uses harvest_erddap.fn() to bypass the Prefect @task decorator.
     """
-    tmp = tmp_path_factory.mktemp("harvest_phase")
-
-    ckan_page1 = MagicMock()
-    ckan_page1.json.return_value = CKAN_PACKAGE_SEARCH_RESPONSE
-    ckan_page2 = MagicMock()
-    ckan_page2.json.return_value = CKAN_EMPTY_RESPONSE
-
     with (
         patch("cde_harvester.ERDDAP.requests.Session") as mock_session_cls,
         patch(
             "cde_harvester.ckan.create_ckan_erddap_link.requests.get",
-            side_effect=[ckan_page1, ckan_page2],
+            side_effect=_ckan_side_effects(),
         ),
     ):
         mock_session = MagicMock()
         mock_session.get.side_effect = _erddap_session_get
         mock_session_cls.return_value = mock_session
 
-        from cde_harvester.harvest_erddap import harvest_erddap
+        from cde_harvester.erddap_harvester import harvest_erddap
 
-        result = []
-        harvest_erddap(ERDDAP_URL, result, limit_dataset_ids=[DATASET_ID])
+        result = harvest_erddap.fn(ERDDAP_URL, limit_dataset_ids=[DATASET_ID])
 
-    assert result, "harvest_erddap produced no output"
-    profiles, datasets, variables, skipped = result[0]
-    return profiles, datasets, variables, skipped
+    assert not result.datasets.empty, "harvest produced no datasets"
+    return result.profiles, result.datasets, result.variables, result.skipped
 
 
 # ---------------------------------------------------------------------------
@@ -133,37 +126,52 @@ class TestHarvestOutput:
 @pytest.fixture(scope="module")
 def written_csv_folder(tmp_path_factory, harvest_result):
     """
-    Run the harvester __main__.main() (CKAN + merge + write CSVs) using the
-    harvest_result DataFrames, capturing the folder it writes to.
+    Run harvester __main__.main() (CKAN merge + CSV write) using the
+    harvest DataFrames from harvest_result.
+
+    Patches:
+      - harvest_erddap.submit → returns a synchronous mock future holding
+        the pre-collected HarvestResult so main() doesn't re-harvest
+      - get_run_logger → stdlib logger (no Prefect context needed)
+      - CKAN requests → fixture data
     """
     profiles, datasets, variables, skipped = harvest_result
     tmp = tmp_path_factory.mktemp("csv_phase")
     folder = str(tmp)
 
-    ckan_page1 = MagicMock()
-    ckan_page1.json.return_value = CKAN_PACKAGE_SEARCH_RESPONSE
-    ckan_page2 = MagicMock()
-    ckan_page2.json.return_value = CKAN_EMPTY_RESPONSE
+    from cde_harvester.base_harvester import HarvestResult
+    hr = HarvestResult(profiles=profiles, datasets=datasets,
+                       variables=variables, skipped=skipped)
+
+    mock_future = MagicMock()
+    mock_future.result.return_value = hr
 
     with (
         patch("cde_harvester.ERDDAP.requests.Session") as mock_session_cls,
         patch(
             "cde_harvester.ckan.create_ckan_erddap_link.requests.get",
-            side_effect=[ckan_page1, ckan_page2],
+            side_effect=_ckan_side_effects(),
         ),
+        patch(
+            "cde_harvester.__main__.get_run_logger",
+            return_value=logging.getLogger("test"),
+        ),
+        patch(
+            "cde_harvester.__main__.harvest_erddap"
+        ) as mock_harvest_task,
     ):
         mock_session = MagicMock()
         mock_session.get.side_effect = _erddap_session_get
         mock_session_cls.return_value = mock_session
+        mock_harvest_task.submit.return_value = mock_future
 
         from cde_harvester.__main__ import main as harvester_main
 
-        harvester_main(
+        harvester_main.fn(
             erddap_urls=ERDDAP_URL,
             cache_requests=False,
             folder=folder,
             dataset_ids=DATASET_ID,
-            max_workers=1,
         )
 
     return folder
@@ -201,7 +209,6 @@ class TestCsvFilesWritten:
     def test_french_title_present(self, written_csv_folder):
         df = pd.read_csv(os.path.join(written_csv_folder, "datasets.csv"))
         row = df[df["dataset_id"] == DATASET_ID].iloc[0]
-        # title_fr must be non-null (CKAN provided it)
         assert pd.notna(row.get("title_fr"))
 
 
@@ -213,7 +220,8 @@ class TestCsvFilesWritten:
 def db_load_calls(written_csv_folder):
     """
     Run db-loader main() against the written CSVs with a mocked SQLAlchemy
-    engine.  Returns the list of SQL strings passed to text().
+    engine. Returns the list of SQL strings passed to text().
+    Uses main.fn() to bypass the Prefect @flow decorator.
     """
     engine = MagicMock()
     conn = MagicMock()
@@ -225,6 +233,10 @@ def db_load_calls(written_csv_folder):
     with (
         patch("cde_db_loader.__main__.create_engine", return_value=engine),
         patch("cde_db_loader.__main__.load_dotenv"),
+        patch(
+            "cde_db_loader.__main__.get_run_logger",
+            return_value=logging.getLogger("test"),
+        ),
         patch(
             "cde_db_loader.__main__.text",
             side_effect=lambda s: sql_calls.append(s) or s,
@@ -241,7 +253,7 @@ def db_load_calls(written_csv_folder):
     ):
         from cde_db_loader.__main__ import main as db_main
 
-        db_main(written_csv_folder, incremental=False)
+        db_main.fn(written_csv_folder, incremental=False)
 
     return sql_calls
 
