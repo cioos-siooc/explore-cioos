@@ -1,4 +1,0 @@
-{"time": "2026-06-02T16:48:13", "level": "INFO", "logger": "cde_harvester.harvest_erddap", "message": "No skipped datasets list found", "exc_info": null}
-{"time": "2026-06-02T16:48:13", "level": "INFO", "logger": "mock.erddap.local", "message": "Fetching all datasets from ERDDAP server: https://mock.erddap.local/erddap", "exc_info": null}
-{"time": "2026-06-02T16:48:13", "level": "INFO", "logger": "mock.erddap.local", "message": "Requesting: https://mock.erddap.local/erddap/tabledap/allDatasets.csv?&accessible=\"public\"&dataStructure=\"table\"", "exc_info": null}
-{"time": "2026-06-02T16:48:13", "level": "INFO", "logger": "mock.erddap.local", "message": "Found 0 datasets", "exc_info": null}
