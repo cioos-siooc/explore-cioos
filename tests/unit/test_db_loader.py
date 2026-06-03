@@ -60,13 +60,14 @@ def _run_main(harvest_folder, mock_engine, mocker, incremental=False):
     engine, conn = mock_engine
     mocker.patch("cde_db_loader.__main__.create_engine", return_value=engine)
     mocker.patch("cde_db_loader.__main__.load_dotenv")
+    mocker.patch("cde_db_loader.__main__.get_run_logger", return_value=__import__("logging").getLogger("test"))
     # Capture SQL strings; return the raw string so conn.execute gets it
     mock_text = mocker.patch(
         "cde_db_loader.__main__.text", side_effect=lambda s: s
     )
     mocker.patch("pandas.DataFrame.to_sql")
 
-    main(harvest_folder, incremental=incremental)
+    main.fn(harvest_folder, incremental=incremental)
 
     return [c.args[0] for c in mock_text.call_args_list]
 

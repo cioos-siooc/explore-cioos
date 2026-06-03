@@ -10,7 +10,7 @@
 
 **Files Involved:**
 - `harvester/cde_harvester/ERDDAP.py` — HTTP client
-- `harvester/cde_harvester/harvest_erddap.py` — discovery orchestration
+- `harvester/cde_harvester/erddap_harvester.py` — discovery orchestration (Prefect @task)
 - `downloader/erddap_downloader/download_erddap.py` — data download
 - `harvester/cioos_erddap_servers.csv` — list of known server URLs
 

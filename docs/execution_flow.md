@@ -39,34 +39,26 @@ cde_harvester/__main__.py
   ├── create ThreadPoolExecutor (max_workers from config)
   ├── create Queue of ERDDAP server URLs
   │
-  └── for each ERDDAP server URL (in parallel threads):
-        harvest_erddap.harvest_server(url, config)
-          │
-          ├── ERDDAP(url).get_dataset_list()
-          │     → GET /erddap/tabledap/allDatasets.csv
-          │     → returns list of dataset IDs
-          │
-          ├── for each dataset_id:
-          │     dataset.Dataset(erddap_client, dataset_id)
-          │       ├── fetch globals metadata   → /erddap/info/{id}/index.csv
-          │       ├── fetch variable metadata
-          │       ├── CDEComplianceChecker.check(dataset)
-          │       │     ├── has supported cf_role? (timeSeries/profile/trajectory)
-          │       │     ├── has at least one supported EOV variable?
-          │       │     └── not both depth AND altitude?
-          │       │
-          │       ├── [if compliant] profiles.get_profiles(dataset)
-          │       │     → GET /erddap/tabledap/{id}.csv?profile_id&time&depth&lat&lon
-          │       │     → extract min/max per profile
-          │       │
-          │       └── utils.get_ckan_record(globals)
-          │             → CKAN API lookup by organization name
-          │
-          └── output.write_csvs(folder)
-                → datasets.csv
-                → profiles.csv
-                → variables.csv
-                → ckan.csv
+  └── prefect_pipeline.run_harvest() [Prefect @flow]
+        │
+        ├── for each ERDDAP server URL:
+        │     erddap_harvester.harvest_erddap(url) [Prefect @task]
+        │       ERDDAPHarvester.harvest()
+        │         ├── ERDDAP(url) — fetch allDatasets.csv
+        │         ├── for each dataset_id:
+        │         │     erddap.get_dataset(id)
+        │         │       ├── fetch globals  → /erddap/info/{id}/index.csv
+        │         │       ├── CDEComplianceChecker.passes_all_checks()
+        │         │       └── [if compliant] profiles.get_profiles(dataset)
+        │         └── returns HarvestResult(profiles, datasets, variables, skipped, attempts)
+        │
+        ├── obis_harvester.harvest_obis() [Prefect @task]
+        │     OBISHarvester.harvest()
+        │       ├── fetch OBIS occurrence data within Canada EEZ
+        │       ├── obis_geo_filter — filter to Canadian waters
+        │       └── returns HarvestResult(obis_cells=…)
+        │
+        └── db_loader — load all HarvestResult DataFrames into PostgreSQL
 ```
 
 ### DB Loader Flow
@@ -191,15 +183,18 @@ cde_db_loader/__main__.py
 ```
 run.sh
 ├── cde_harvester.__main__
-│   ├── harvest_erddap.harvest_server (×N threads)
-│   │   ├── ERDDAP.get_dataset_list
-│   │   ├── dataset.Dataset (×M datasets)
-│   │   │   ├── ERDDAP.get_metadata
-│   │   │   ├── CDEComplianceChecker.check
-│   │   │   ├── profiles.get_profiles
-│   │   │   └── utils.get_ckan_record
-│   │   └── output.write_csvs
-│   └── [exit]
+│   └── prefect_pipeline.run_harvest [Prefect @flow]
+│       ├── erddap_harvester.harvest_erddap (×N servers) [Prefect @task]
+│       │   └── ERDDAPHarvester.harvest()
+│       │       ├── ERDDAP.get_dataset_list
+│       │       ├── dataset.Dataset (×M datasets)
+│       │       │   ├── ERDDAP.get_metadata
+│       │       │   ├── CDEComplianceChecker.passes_all_checks
+│       │       │   └── profiles.get_profiles
+│       │       └── returns HarvestResult
+│       ├── obis_harvester.harvest_obis [Prefect @task]
+│       │   └── OBISHarvester.harvest()
+│       └── [results → db_loader]
 │
 └── cde_db_loader.__main__
     ├── db_loader.full_reload      (or incremental_db_loader)

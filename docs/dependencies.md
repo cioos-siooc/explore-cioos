@@ -5,17 +5,24 @@
 ```
 run.sh
  ├── cde_harvester
+ │    ├── base_harvester.py       (BaseHarvester ABC, HarvestResult dataclass)
+ │    ├── schemas.py              (Pandera DataFrame schemas)
  │    ├── ERDDAP.py               (HTTP client)
  │    ├── dataset.py              (data model)
  │    │    └── profiles.py        (profile stats)
- │    ├── harvest_erddap.py       (orchestration)
+ │    ├── erddap_harvester.py     (ERDDAPHarvester + Prefect @task)
  │    │    ├── ERDDAP.py
  │    │    ├── dataset.py
  │    │    ├── CDEComplianceChecker.py
  │    │    └── utils.py           (EOV mappings, CKAN)
+ │    ├── obis_harvester.py       (OBISHarvester + Prefect @task)
+ │    │    └── obis_geo_filter.py (Canada EEZ boundary filter)
+ │    ├── prefect_pipeline.py     (top-level Prefect @flow)
+ │    │    ├── erddap_harvester.py
+ │    │    └── obis_harvester.py
+ │    ├── redisFunctions.py       (progress tracking via Redis)
  │    ├── platform_ioos_to_l06.py (vocab mapping)
- │    ├── output.py               (CSV writer)
- │    └── __main__.py             (threading, queue, CLI)
+ │    └── __main__.py             (CLI / Prefect entrypoint)
  │
  └── cde_db_loader
       ├── db_loader.py            (full reload)
@@ -43,7 +50,17 @@ web-api
       ├── oceanVariables.js
       ├── platforms.js
       ├── pointQuery.js
+      ├── erddapServers.js         (list of known ERDDAP servers)
+      ├── obisNodes.js             (list of OBIS nodes)
+      ├── scientificNames.js       (WoRMS-backed taxon search)
       └── preview.js
+
+harvest-dashboard
+ ├── app/main.py                  (FastAPI app; harvest status UI)
+ ├── app/queries.py               (PostgreSQL harvest_runs queries)
+ ├── app/prefect_client.py        (Prefect API calls for trigger/status)
+ ├── app/config.py                (env-based configuration)
+ └── app/templates/               (Jinja2 + HTMX templates)
 
 frontend
  ├── Map.js                       (Mapbox GL)

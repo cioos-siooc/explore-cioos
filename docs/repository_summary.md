@@ -97,8 +97,11 @@ Frontend
 
 | File | Why |
 |------|-----|
-| [harvester/cde_harvester/__main__.py](../harvester/cde_harvester/__main__.py) | Harvest orchestration and threading |
-| [harvester/cde_harvester/harvest_erddap.py](../harvester/cde_harvester/harvest_erddap.py) | Dataset discovery and compliance filtering |
+| [harvester/cde_harvester/__main__.py](../harvester/cde_harvester/__main__.py) | CLI / Prefect entrypoint |
+| [harvester/cde_harvester/prefect_pipeline.py](../harvester/cde_harvester/prefect_pipeline.py) | Top-level Prefect @flow orchestrator |
+| [harvester/cde_harvester/erddap_harvester.py](../harvester/cde_harvester/erddap_harvester.py) | ERDDAP dataset discovery and compliance filtering |
+| [harvester/cde_harvester/obis_harvester.py](../harvester/cde_harvester/obis_harvester.py) | OBIS occurrence data harvesting |
+| [harvester/cde_harvester/base_harvester.py](../harvester/cde_harvester/base_harvester.py) | BaseHarvester ABC and HarvestResult dataclass |
 | [harvester/cde_harvester/ERDDAP.py](../harvester/cde_harvester/ERDDAP.py) | ERDDAP API client |
 | [harvester/cde_harvester/dataset.py](../harvester/cde_harvester/dataset.py) | Dataset metadata model |
 | [db-loader/cde_db_loader/__main__.py](../db-loader/cde_db_loader/__main__.py) | DB load orchestration |

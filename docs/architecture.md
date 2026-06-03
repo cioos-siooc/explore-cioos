@@ -116,15 +116,19 @@ The system combines a nightly batch ETL pipeline (harvest → load) with a set o
 
 | Class / Module | Responsibility |
 |----------------|---------------|
-| `__main__.py` | Entry point; spins up thread pool, queue, progress bar |
-| `harvest_erddap.py` | Per-server orchestration; dataset list → compliant datasets |
+| `__main__.py` | Entry point; drives Prefect flow or legacy thread-pool path |
+| `prefect_pipeline.py` | Prefect `@flow` orchestration; coordinates ERDDAP and OBIS harvests |
+| `erddap_harvester.py` | `ERDDAPHarvester(BaseHarvester)` + Prefect `@task` wrapper; returns `HarvestResult` |
+| `obis_harvester.py` | `OBISHarvester(BaseHarvester)`; harvests OBIS occurrence data |
+| `base_harvester.py` | `BaseHarvester` ABC and `HarvestResult` dataclass |
+| `schemas.py` | Pandera `DataFrameSchema` types for all harvester DataFrames |
 | `ERDDAP.py` | HTTP client for ERDDAP REST API; disk-cache support |
 | `dataset.py` | `Dataset` class: parses globals, variables, profiles from ERDDAP |
 | `profiles.py` | Extracts profile/timeseries IDs and min/max statistics |
 | `CDEComplianceChecker.py` | Validates required cf_roles, EOV support, depth/altitude exclusions |
 | `utils.py` | EOV/CF standard name mappings, CKAN lookups |
 | `platform_ioos_to_l06.py` | IOOS ↔ NERC L06 platform vocabulary translation |
-| `output.py` | Writes `datasets.csv`, `profiles.csv`, `variables.csv`, `ckan.csv` |
+| `redisFunctions.py` | Redis helpers for harvest progress tracking |
 
 ### `cde_db_loader` (Python)
 

@@ -33,14 +33,16 @@ The SQL functions `profile_process()`, `ckan_process()`, and `create_hexes()` ar
 
 **Read in order:**
 
-1. [harvester/cde_harvester/__main__.py](../harvester/cde_harvester/__main__.py) — CLI entry point, threading setup
-2. [harvester/cde_harvester/harvest_erddap.py](../harvester/cde_harvester/harvest_erddap.py) — per-server orchestration
-3. [harvester/cde_harvester/ERDDAP.py](../harvester/cde_harvester/ERDDAP.py) — ERDDAP HTTP client
-4. [harvester/cde_harvester/dataset.py](../harvester/cde_harvester/dataset.py) — Dataset class (metadata model)
-5. [harvester/cde_harvester/CDEComplianceChecker.py](../harvester/cde_harvester/CDEComplianceChecker.py) — validation rules
-6. [harvester/cde_harvester/profiles.py](../harvester/cde_harvester/profiles.py) — profile stat extraction
-7. [harvester/cde_harvester/utils.py](../harvester/cde_harvester/utils.py) — EOV/CKAN helpers
-8. [harvester/cde_harvester/output.py](../harvester/cde_harvester/output.py) — CSV writer
+1. [harvester/cde_harvester/__main__.py](../harvester/cde_harvester/__main__.py) — CLI / Prefect entrypoint
+2. [harvester/cde_harvester/prefect_pipeline.py](../harvester/cde_harvester/prefect_pipeline.py) — top-level Prefect @flow
+3. [harvester/cde_harvester/base_harvester.py](../harvester/cde_harvester/base_harvester.py) — BaseHarvester ABC and HarvestResult dataclass
+4. [harvester/cde_harvester/erddap_harvester.py](../harvester/cde_harvester/erddap_harvester.py) — ERDDAPHarvester + Prefect @task
+5. [harvester/cde_harvester/obis_harvester.py](../harvester/cde_harvester/obis_harvester.py) — OBISHarvester + Prefect @task
+6. [harvester/cde_harvester/ERDDAP.py](../harvester/cde_harvester/ERDDAP.py) — ERDDAP HTTP client
+7. [harvester/cde_harvester/dataset.py](../harvester/cde_harvester/dataset.py) — Dataset class (metadata model)
+8. [harvester/cde_harvester/CDEComplianceChecker.py](../harvester/cde_harvester/CDEComplianceChecker.py) — validation rules
+9. [harvester/cde_harvester/profiles.py](../harvester/cde_harvester/profiles.py) — profile stat extraction
+10. [harvester/cde_harvester/utils.py](../harvester/cde_harvester/utils.py) — EOV/CKAN helpers
 
 At this point you understand what data enters the system and why some datasets are excluded.
 

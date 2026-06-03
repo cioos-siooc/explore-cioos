@@ -116,8 +116,8 @@ class TestRequiredVariables:
 ```
 harvest_result (module fixture)
   ↓ mocked ERDDAP session + CKAN get
-  ↓ real harvest_erddap()
-  ↓ produces (profiles, datasets, variables, skipped) DataFrames
+  ↓ real ERDDAPHarvester.harvest() via erddap_harvester.harvest_erddap.fn()
+  ↓ produces HarvestResult(profiles, datasets, variables, skipped) DataFrames
   ↓
 written_csv_folder (module fixture, depends on harvest_result)
   ↓ real harvester_main() — merges CKAN data, writes CSVs to tmp_path
@@ -144,7 +144,7 @@ ERDDAP Servers (mocked)          CKAN (mocked)
   │ orderByCount() records         │
   └─────────────┬──────────────────┘
                 │
-      harvest_erddap()         ← real code, mocked I/O
+      ERDDAPHarvester.harvest() ← real code, mocked I/O (via erddap_harvester.py)
       CDEComplianceChecker     ← real code
       get_profiles()           ← real code
                 │
@@ -352,22 +352,23 @@ ERDDAP Servers (mocked)          CKAN (mocked)
 
 ---
 
-### `unit/test_harvest_erddap.py` — 7 tests
+### `unit/test_harvest_erddap.py` — 6 tests
+
+Tests cover `cde_harvester.erddap_harvester.harvest_erddap` (Prefect @task). Tests call `.fn()` to bypass the Prefect task wrapper and assert on the returned `HarvestResult` dataclass.
 
 #### `TestHarvestErddapHappyPath`
 | Test | What it verifies |
 |------|-----------------|
-| `test_result_appended` | `harvest_erddap()` appends one entry to the `result` list |
-| `test_result_contains_four_dataframes` | Each result entry is `(profiles, datasets, variables, skipped)` |
-| `test_compliant_dataset_appears_in_datasets` | A compliant dataset ID appears in the datasets DataFrame |
+| `test_result_has_dataframe_fields` | `harvest_erddap.fn()` returns `HarvestResult` with `.profiles`, `.datasets`, `.variables`, `.skipped` DataFrames |
+| `test_compliant_dataset_appears_in_datasets` | A compliant dataset ID appears in `result.datasets` |
 | `test_dataset_id_filter_respected` | `limit_dataset_ids` excludes datasets not in the list |
 
 #### `TestHarvestErddapSkipping`
 | Test | What it verifies |
 |------|-----------------|
-| `test_unsupported_cdm_type_skipped` | `Point`-type datasets never reach `get_dataset`; appear in skipped with `CDM_DATA_TYPE_UNSUPPORTED` |
-| `test_non_compliant_dataset_added_to_skipped` | A dataset that fails compliance checks is in `skipped`, not `datasets` |
-| `test_http_error_adds_to_skipped` | `HTTPError` from `get_dataset` adds the dataset to skipped with `HTTP_ERROR` (also tests the bug fix: `dataset_logger` initialised to module logger before the try block) |
+| `test_unsupported_cdm_type_skipped` | `Point`-type datasets appear in `result.skipped` with `CDM_DATA_TYPE_UNSUPPORTED` |
+| `test_non_compliant_dataset_added_to_skipped` | A dataset with no EOVs fails compliance and appears in `result.skipped` |
+| `test_http_error_adds_to_skipped` | `HTTPError` from `get_dataset` adds the dataset to `result.skipped` with `HTTP_ERROR` (also covers the bug fix: `dataset_logger` now pre-initialised to `erddap_logger` before the try block) |
 
 ---
 
@@ -547,14 +548,14 @@ def test_non_compliant_dataset_rejected(info_csv, expected_code):
 
 ### 8. Add API route tests
 
-The web API (`web-api/`) has no test coverage. Add a `tests/api/` directory using `supertest` (Node.js) or a mock Express app, and test the `/datasets`, `/tiles`, and `/download` endpoints with a stubbed Knex connection.
+The web API (`web-api/`) has partial test coverage — existing routes (`/datasets`, `/tiles`, `/download`, etc.) are covered. The newer routes added with the OBIS integration (`/erddapServers`, `/obisNodes`, `/scientificNames`) still need tests.
 
 ---
 
 ## Bug Fixed During Test Development
 
-The test suite exposed a latent bug in `harvester/cde_harvester/harvest_erddap.py`:
+The test suite exposed a latent bug in `harvester/cde_harvester/erddap_harvester.py`:
 
 `dataset_logger` was used in the `except HTTPError` handler before it was guaranteed to be assigned (it was only set after a successful `erddap.get_dataset()` call). When `get_dataset()` raised an `HTTPError`, Python raised `UnboundLocalError`.
 
-**Fix applied:** `dataset_logger = logger` (module-level fallback) is now assigned before the try block. If `get_dataset()` succeeds, `dataset_logger` is then overwritten with `dataset.logger`.
+**Fix applied:** `dataset_logger = erddap_logger` (fallback to the ERDDAP-level logger) is now assigned before the try block. If `get_dataset()` succeeds, `dataset_logger` is overwritten with `dataset.logger`.
