@@ -607,11 +607,10 @@ def _data_summary(a) -> dict:
 def _per_server_summary(a) -> dict:
     summary: dict = {}
     for url, parts in a.per_server.items():
-        profiles_df, datasets_df, _, skipped_df = parts
         summary[url] = {
-            "datasets_harvested": len(datasets_df),
-            "datasets_skipped": len(skipped_df),
-            "profiles_extracted": len(profiles_df),
+            "datasets_harvested": len(parts.datasets),
+            "datasets_skipped": len(parts.skipped),
+            "profiles_extracted": len(parts.profiles),
         }
     return summary
 
