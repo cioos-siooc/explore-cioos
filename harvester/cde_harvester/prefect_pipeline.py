@@ -144,6 +144,21 @@ def deployment_slug(source):
     host = urlparse(source if "://" in source else "https://" + source).hostname or str(source)
     return host.lower().replace(".", "-")
 
+
+def _cron_env(var_name):
+    """Read a cron schedule from an env var, treating unset/empty/whitespace as
+    'no schedule' (None).
+
+    Prefect's .deploy(cron=...) has a footgun: a falsy-but-not-None value like
+    "" passes its `is not None` schedule-count check but then fails the
+    `interval or cron or rrule` branch, so it tries to build a schedule from
+    None and raises a DeploymentScheduleCreate ValidationError. An env var that
+    is SET BUT EMPTY (e.g. `VERNACULARS_CRON=`) yields exactly "" from getenv —
+    so normalize empty/whitespace to None, same as an unset var. Do NOT replace
+    this with getenv(name, None): that default only applies when the var is
+    unset, leaving the empty-string case broken."""
+    return (os.getenv(var_name) or "").strip() or None
+
 class PrefectCDEPipeline:
     erddap_urls: str
     cache_requests: bool
@@ -434,10 +449,7 @@ class PrefectCDEPipeline:
         ).deploy(
             name="populate-vernaculars-deployment",
             work_pool_name=POOL_NAME,
-            # `or None`: an env var set but EMPTY (VERNACULARS_CRON=) yields ""
-            # from getenv, and cron="" fails Prefect's schedule validation —
-            # coerce empty to None ( = no schedule), same as an unset var.
-            cron=os.getenv("VERNACULARS_CRON") or None,
+            cron=_cron_env("VERNACULARS_CRON"),  # empty/unset -> no schedule
             job_variables=job_vars,
         )
 
@@ -485,7 +497,7 @@ class PrefectCDEPipeline:
         ).deploy(
             name="cde-harvest-all",
             work_pool_name=POOL_NAME,
-            cron=os.getenv("HARVESTER_CRON") or None,  # empty "" -> no schedule
+            cron=_cron_env("HARVESTER_CRON"),  # empty/unset -> no schedule
             parameters={
                 "config_file": "/app/harvester/harvest_config.yaml",
             },
