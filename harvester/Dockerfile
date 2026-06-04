@@ -17,12 +17,13 @@ COPY ./harvester/cde_harvester ./cde_harvester
 COPY ./harvester/run.sh ./run.sh
 COPY ./harvester/worker-entrypoint.sh ./worker-entrypoint.sh
 
-# Bake in a harvest config and the OBIS dataset list so the image is
-# self-contained. To use a different committed config (e.g.
-# harvest_config.production.yaml) pass it via the HARVEST_CONFIG_FILE
-# build arg; the compose wires it to an env var of the same name.
-ARG HARVEST_CONFIG_FILE=harvest_config.sample.yaml
-COPY ./${HARVEST_CONFIG_FILE} ./harvest_config.yaml
+# Bake in the sample harvest config and the OBIS dataset list so the image is
+# self-contained (a worker that doesn't mount a config — e.g. a remote worker —
+# still has a working default). The compose files mount the operator's chosen
+# config over /app/harvester/harvest_config.yaml at runtime (see
+# HARVEST_CONFIG_FILE in docker-compose), so changing config is a restart, not
+# a rebuild.
+COPY ./harvest_config.sample.yaml ./harvest_config.yaml
 COPY ./Obis_Datasets.json ./Obis_Datasets.json
 
 # 4. Install project itself
