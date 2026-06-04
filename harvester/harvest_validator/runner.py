@@ -19,8 +19,7 @@ from typing import Optional
 
 import pandas as pd
 
-from cde_harvester.harvest_erddap import harvest_erddap
-from cde_harvester.ckan.create_ckan_erddap_link import get_ckan_records
+from cde_harvester.erddap_harvester import harvest_erddap
 
 from .collectors import LogCapture, HttpCallTracker
 
@@ -48,7 +47,7 @@ class HarvestArtifacts:
     log_capture: LogCapture
     http_tracker: HttpCallTracker
 
-    # Per-server breakdown: url → [profiles_df, datasets_df, variables_df, skipped_df]
+    # Per-server breakdown: url → HarvestResult
     per_server: dict = field(default_factory=dict)
 
     # Set if the harvest loop itself crashed (not individual dataset errors)
@@ -116,10 +115,10 @@ class HarvestRunner:
 
         end = datetime.now()
 
-        profiles = _concat([r[0] for r in all_results])
-        datasets = _concat([r[1] for r in all_results])
-        variables = _concat([r[2] for r in all_results])
-        skipped = _concat([r[3] for r in all_results])
+        profiles = _concat([r.profiles for r in all_results])
+        datasets = _concat([r.datasets for r in all_results])
+        variables = _concat([r.variables for r in all_results])
+        skipped = _concat([r.skipped for r in all_results])
 
         return HarvestArtifacts(
             run_id=self.run_id,
@@ -158,12 +157,12 @@ class HarvestRunner:
             while True:
                 (url, limit, use_cache) = q.get()
                 try:
-                    server_result: list = []
-                    harvest_erddap(url, server_result, limit, use_cache)
-                    if server_result:
-                        with lock:
-                            per_server[url] = server_result[0]
-                            all_results.append(server_result[0])
+                    result = harvest_erddap.fn(
+                        url, limit_dataset_ids=limit, cache_requests=use_cache
+                    )
+                    with lock:
+                        per_server[url] = result
+                        all_results.append(result)
                 except Exception:
                     pass  # logged by harvest_erddap; captured by LogCapture
                 finally:
