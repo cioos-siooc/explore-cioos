@@ -434,7 +434,10 @@ class PrefectCDEPipeline:
         ).deploy(
             name="populate-vernaculars-deployment",
             work_pool_name=POOL_NAME,
-            cron=os.getenv("VERNACULARS_CRON"),
+            # `or None`: an env var set but EMPTY (VERNACULARS_CRON=) yields ""
+            # from getenv, and cron="" fails Prefect's schedule validation —
+            # coerce empty to None ( = no schedule), same as an unset var.
+            cron=os.getenv("VERNACULARS_CRON") or None,
             job_variables=job_vars,
         )
 
@@ -482,7 +485,7 @@ class PrefectCDEPipeline:
         ).deploy(
             name="cde-harvest-all",
             work_pool_name=POOL_NAME,
-            cron=os.getenv("HARVESTER_CRON"),
+            cron=os.getenv("HARVESTER_CRON") or None,  # empty "" -> no schedule
             parameters={
                 "config_file": "/app/harvester/harvest_config.yaml",
             },
