@@ -2,8 +2,8 @@ services:
   db:
     build: ./database
     platform: linux/x86_64
-    expose:
-      - "${DB_PORT:-5432}"
+    ports:
+      - "${DB_PORT:-5432}:${DB_PORT:-5432}"
     environment:
       - "PGPORT=${DB_PORT:-5432}"
       - "POSTGRES_DB=$DB_NAME"
@@ -30,8 +30,6 @@ services:
     build:
         context: ./nginx
         dockerfile: Dockerfile
-    environment:
-      - SERVICE_FQDN_NGINX_4000
     volumes:
       - nginx_logs:/var/log/nginx
       - nginx_logrotate:/var/lib/logrotate
@@ -39,8 +37,8 @@ services:
       - downloads:/usr/share/nginx/html/downloads:ro
     depends_on:
       - web-api
-    expose:
-      - "4000"
+    ports:
+      - "${NGINX_PORT:-4000}:4000"
   scheduler:
     build:
       context: .
@@ -53,9 +51,7 @@ services:
     env_file:
       - .env
     environment:
-      # APP_DOMAIN auto-derives from Coolify's injected SERVICE_URL_NGINX when present;
-      # falls back to APP_DOMAIN from .env for local dev.
-      - "DOWNLOAD_WAF_URL=${SERVICE_URL_NGINX:-${APP_DOMAIN}}/downloads"
+      - "DOWNLOAD_WAF_URL=${APP_DOMAIN}/downloads"
     volumes:
       - downloads:/usr/src/app/download_scheduler/downloads
   frontend:
@@ -150,8 +146,8 @@ services:
         asyncio.run(ensure_db())
         PY
         exec prefect server start --host 0.0.0.0
-    expose:
-      - "4200"  # Prefect UI + API (route via Coolify domain if external access is needed)
+    ports:
+      - "4200:4200"  # Prefect UI + API
     env_file:
       - .env  # DB_USER / DB_PASSWORD / DB_NAME / DB_PORT for the connection URL
     environment:
@@ -197,7 +193,6 @@ services:
       - .env
     environment:
       - DB_HOST_EXTERNAL=db
-      - SERVICE_FQDN_HARVEST_DASHBOARD_8001
       # Internal Prefect API for the per-source "Trigger harvest" button (the
       # dashboard reaches prefect by service name on the shared compose network).
       - PREFECT_API_URL=http://prefect:4200/api

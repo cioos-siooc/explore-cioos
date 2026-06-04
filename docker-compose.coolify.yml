@@ -1,0 +1,40 @@
+# Coolify-specific overrides — layered on top of the base docker-compose.yaml.
+#
+#   docker compose -f docker-compose.yaml -f docker-compose.coolify.yml up -d
+#
+# (In Coolify, point the resource at docker-compose.yaml and add this file as an
+# additional/override compose file.)
+#
+# This override does two things for Coolify:
+#
+#   1. SERVICE_FQDN_* / SERVICE_URL_* "magic" env vars: Coolify reads these at
+#      deploy time to auto-generate a public FQDN for the service and proxy
+#      external traffic to the named port. They are meaningless outside Coolify.
+#
+#   2. Drops every published host port. The base docker-compose.yaml publishes
+#      db / nginx / prefect on the host for standalone use; under Coolify the
+#      proxy reaches each container over the internal network via the FQDN vars
+#      above, so host ports are unnecessary (and would collide on the host).
+#      `!reset` clears the base file's `ports` list (compose overrides can only
+#      add to lists, not remove — the !reset tag is how you drop them).
+services:
+  db:
+    ports: !reset []
+
+  nginx:
+    ports: !reset []
+    environment:
+      - SERVICE_FQDN_NGINX_4000
+
+  scheduler:
+    environment:
+      # APP_DOMAIN auto-derives from Coolify's injected SERVICE_URL_NGINX when
+      # present; falls back to APP_DOMAIN from .env otherwise.
+      - "DOWNLOAD_WAF_URL=${SERVICE_URL_NGINX:-${APP_DOMAIN}}/downloads"
+
+  prefect:
+    ports: !reset []
+
+  harvest-dashboard:
+    environment:
+      - SERVICE_FQDN_HARVEST_DASHBOARD_8001
