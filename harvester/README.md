@@ -144,7 +144,16 @@ HOST_ROOT=/path/to/your/workspace/explore-cioos
 
 # Optional: Harvester schedule (defaults to None unset)
 HARVESTER_CRON=10 0 */3 * *
+# Optional: WoRMS vernaculars backfill schedule (unset = none)
+VERNACULARS_CRON=
+# Optional: fire one full harvest immediately on (re)deploy (default false)
+RUN_ON_DEPLOY=false
 ```
+
+The `prefect_worker` runs harvest flows in-process on the `cde-process-pool`
+work pool and registers all deployments on startup. Scale with
+`docker compose up -d --scale prefect_worker=N`; run extra workers on another
+host via `docker-compose.worker.yaml` (set `REGISTER_DEPLOYMENTS=false` there).
 
 ### Configuration File
 

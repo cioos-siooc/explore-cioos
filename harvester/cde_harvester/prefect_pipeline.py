@@ -12,7 +12,7 @@ import sys
 import time
 import uuid
 from prefect.client.orchestration import get_client
-from prefect.client.schemas.actions import WorkPoolCreate, WorkPoolUpdate
+from prefect.client.schemas.actions import WorkPoolCreate
 from prefect.exceptions import ObjectNotFound
 from urllib.parse import urlparse
 
@@ -24,6 +24,11 @@ logger = logging.getLogger(__name__)
 # pass for it. Kept in sync with cde_harvester.__main__._OBIS_ALIASES.
 _OBIS_ALIASES = {"obis", "https://obis.org", "http://obis.org", "obis.org"}
 
+
+# Prefect process work pool the worker(s) poll and all deployments register
+# against. Workers run flows in-process (no spawned containers / docker socket),
+# which is what lets them scale via compose replicas and run on a remote host.
+POOL_NAME = "cde-process-pool"
 
 RUN_FOLDER_PREFIX = "run-"
 KEEP_RUN_FOLDERS = 5  # retain this many recent per-run output folders
@@ -232,33 +237,33 @@ class PrefectCDEPipeline:
         
         logger.info("CDE Pipeline completed successfully")
     
-    @flow(name="Create Docker Work Pool", log_prints=True)
-    def create_docker_work_pool(self, pool_name="docker-pool"):
-        """Create or update a Docker work pool for Prefect deployments."""
+    @flow(name="Create Process Work Pool", log_prints=True)
+    def create_process_work_pool(self, pool_name="cde-process-pool"):
+        """Create a `process` work pool for Prefect deployments (idempotent).
 
-        # Base job template for Docker
+        Flows run IN-PROCESS inside the worker container — no per-run containers,
+        no docker socket. The worker supplies env (DB creds, REDIS_HOST, etc.)
+        from its own container environment, so the job template is minimal: just
+        the default ``uv run prefect flow-run execute`` command (prefect lives in
+        the uv venv) plus the standard process knobs.
+
+        Safe to call from every worker replica concurrently: an existing pool is
+        left as-is, and the already-exists create race is swallowed."""
+
+        # Minimal process-pool job template. `working_dir` is left to the
+        # deployment's pull step (from_source set_working_directory).
         base_job_template = {
             "job_configuration": {
-                "image": "{{ image }}",
                 "command": "{{ command }}",
                 "env": "{{ env }}",
                 "labels": "{{ labels }}",
                 "name": "{{ name }}",
-                "network_mode": "{{ network_mode }}",
-                "networks": "{{ networks }}",
-                "volumes": "{{ volumes }}",
                 "stream_output": "{{ stream_output }}",
-                "auto_remove": "{{ auto_remove }}",
-                "image_pull_policy": "{{ image_pull_policy }}",
+                "working_dir": "{{ working_dir }}",
             },
             "variables": {
                 "type": "object",
                 "properties": {
-                    "image": {
-                        "type": "string",
-                        "default": "prefecthq/prefect:3-python3.10",
-                    },
-                    "image_pull_policy": {"type": "string", "default": "Never"},
                     "command": {
                         "type": "string",
                         # CRITICAL: Must use 'uv run' because prefect is in the venv
@@ -267,136 +272,83 @@ class PrefectCDEPipeline:
                     "env": {"type": "object"},
                     "labels": {"type": "object"},
                     "name": {"type": "string"},
-                    "network_mode": {"type": "string"},
-                    "networks": {"type": "array"},
-                    "volumes": {"type": "array"},
                     "stream_output": {"type": "boolean", "default": True},
-                    "auto_remove": {"type": "boolean", "default": True},
+                    "working_dir": {"type": "string"},
                 },
             },
         }
 
         # Use sync client for simplicity in this script
         with get_client(sync_client=True) as client:
-            pool_exists = True
             try:
                 client.read_work_pool(pool_name)
+                logger.info("CDE process work pool already exists: %s", pool_name)
+                return
             except ObjectNotFound:
-                pool_exists = False
+                pass
 
-            if pool_exists:
-                # Update the job template
-                client.update_work_pool(pool_name,work_pool=WorkPoolUpdate(base_job_template=base_job_template))
-                logger.info("CDE Workpool Updated")
-            else:
-                # Create the pool
+            try:
                 client.create_work_pool(
                     work_pool=WorkPoolCreate(
                         name=pool_name,
-                        type="docker",
-                        base_job_template=base_job_template
+                        type="process",
+                        base_job_template=base_job_template,
                     )
                 )
-                logger.info("CDE Workpool Created")
+                logger.info("CDE process work pool created: %s", pool_name)
+            except Exception as e:
+                # Another replica registering at the same instant may have won
+                # the create. Treat "already exists" as success; re-raise others.
+                if "already exists" in str(e).lower():
+                    logger.info(
+                        "CDE process work pool created concurrently by another "
+                        "replica: %s", pool_name
+                    )
+                else:
+                    raise
     
     @flow(name="Create Deployment", log_prints=True)
     def create_deployment(self):
-        # Get host root from environment variable, default to current working directory if running locally
-        host_root = os.getenv("HOST_ROOT", os.getcwd())
+        # Process-pool deployments. The flow runs IN-PROCESS inside the worker
+        # container (no spawned flow-run containers), so there is no image,
+        # network, or volume wiring here — the worker provides DB creds /
+        # REDIS_HOST / HARVESTER_LOG_DIR / config-override env vars from its own
+        # container environment (set in docker-compose), and the harvest volumes
+        # are mounted on the worker itself. This is what lets a worker run on a
+        # remote host: same image + PREFECT_API_URL + DB reachability is enough.
+        self.create_process_work_pool(POOL_NAME)
 
-        # Coolify-friendly knobs. Defaults preserve the original production
-        # (bare docker-compose) behaviour; Coolify deployments override via
-        # COOLIFY_RESOURCE_UUID (auto-injected) so the spawned flow-run
-        # containers join the project-scoped network and attach the
-        # project-scoped named volumes.
-        job_image = os.getenv("HARVESTER_IMAGE", "explore-cioos-harvester:latest")
-        coolify_uuid = os.getenv("COOLIFY_RESOURCE_UUID", "").strip()
-        if coolify_uuid:
-            # Coolify deployment
-            job_network = coolify_uuid
-            volume_prefix = coolify_uuid + "_"
-        else:
-            # Bare docker-compose / production
-            job_network = os.getenv("PREFECT_DOCKER_NETWORK", "explore-cioos_default")
-            volume_prefix = os.getenv("PREFECT_VOLUME_PREFIX", "")
+        # from_source tells a worker how to LOAD the flow code. We point it at
+        # the package directory baked into the image (/app/harvester). Every
+        # worker — local or remote — runs the same image with code at the same
+        # path, so the resulting set_working_directory pull step resolves on any
+        # host. Derived from this module's location so local dev works too.
+        source_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-        if volume_prefix:
-            job_volumes = [
-                f"{volume_prefix}harvester-cache:/app/harvester/harvester_cache",
-                f"{volume_prefix}harvest-data:/app/harvester/harvest",
-                f"{volume_prefix}harvester-logs:/app/harvester/logs",
-                f"{volume_prefix}obis-cache:/app/harvester/obis_cache",
-                # Read-only override directory. cde_pipeline_run() picks files
-                # out of this if present, falling back to baked-in defaults.
-                f"{volume_prefix}cde-overrides:/app/harvester/overrides:ro",
-            ]
-        else:
-            job_volumes = [
-                f"{host_root}/harvest_config.yaml:/app/harvester/harvest_config.yaml:ro",
-                f"{host_root}/harvester_cache:/app/harvester/harvester_cache",
-                f"{host_root}/ckan_harvester_cache:/app/harvester/ckan_harvester_cache",
-                f"{host_root}/harvest:/app/harvester/harvest",
-                f"{host_root}/harvester_logs:/app/harvester/logs",
-                # Persist OBIS metadata/occurrence caches across flow runs so we
-                # don't re-fetch the OBIS API every harvest. Mirrors the named
-                # volume the Coolify branch above mounts to the same path.
-                f"{host_root}/obis_cache:/app/harvester/obis_cache",
-            ]
-
-        self.create_docker_work_pool()
-
-        # Shared job variables — both deployments below spawn flow-run
-        # containers from the same image into the same network/volumes, just
-        # invoking different top-level flows.
+        # Minimal per-run env. Merged on top of the worker's own environment, so
+        # we only need the logging knob here: make stdlib `logging` from non-flow
+        # code (harvester internals, db_loader, populate_vernaculars) surface in
+        # the Prefect UI's flow-run logs. Everything else (DB creds, REDIS_HOST,
+        # HARVEST_CONFIG_YAML, ...) is inherited from the worker container.
         job_vars = {
             "env": {
-                "PREFECT_API_URL": os.getenv(
-                    "PREFECT_API_URL", "http://prefect:4200/api"
-                ),
-                # Make stdlib `logging` from non-flow code (the harvester
-                # internals, db_loader, populate_vernaculars) surface in the
-                # Prefect UI's flow-run logs. Without this, only print() calls
-                # (captured because @flow(log_prints=True)) and direct
-                # get_run_logger() calls show up — and populate_vernaculars.py
-                # uses logging.getLogger(), so its progress lines would be
-                # invisible in the UI otherwise.
                 "PREFECT_LOGGING_EXTRA_LOGGERS": (
                     "populate_vernaculars,cde_db_loader,cde_harvester"
                 ),
-                "HARVESTER_LOG_DIR": os.getenv(
-                    "HARVESTER_LOG_DIR", "/app/harvester/logs"
-                ),
-                "DB_NAME": os.getenv("DB_NAME", "cde"),
-                "DB_USER": os.getenv("DB_USER", "postgres"),
-                "DB_PASSWORD": os.getenv("DB_PASSWORD", "password"),
-                "DB_HOST": os.getenv("DB_HOST", "db"),
-                "DB_HOST_EXTERNAL": os.getenv("DB_HOST_EXTERNAL", "db"),
-                "REDIS_HOST": os.getenv("REDIS_HOST", "redis"),
-                # Operator-supplied overrides via Coolify env vars. The
-                # spawned flow-run container reads these in cde_pipeline_run()
-                # and writes them to /tmp/ before loading config. Empty
-                # values are harmless (treated as "not set").
-                "HARVEST_CONFIG_YAML": os.getenv("HARVEST_CONFIG_YAML", ""),
-                "OBIS_DATASETS_JSON": os.getenv("OBIS_DATASETS_JSON", ""),
             },
-            "networks": [job_network],
-            "volumes": job_volumes,
-            "auto_remove": True,
-            "stream_output": True,
-            "image_pull_policy": "Never",  # Use local image, don't pull
         }
 
         # Deployment 1: the harvest itself.
         # Deploy the top-level wrapper flow (not the bound method) — Prefect's
         # deployment runner can't fill `self` for class-method flows, so we
         # use cde_pipeline_run which is a regular @flow function.
-        harvest_id = cde_pipeline_run.deploy(
+        harvest_id = flow.from_source(
+            source=source_dir,
+            entrypoint="cde_harvester/prefect_pipeline.py:cde_pipeline_run",
+        ).deploy(
             name="cde-harvester-deployment",
-            work_pool_name="docker-pool",
-            image=job_image,
+            work_pool_name=POOL_NAME,
             cron=os.getenv("HARVESTER_CRON"),
-            build=False,
-            push=False,
             parameters={
                 "config_file": "/app/harvester/harvest_config.yaml",
             },
@@ -407,13 +359,13 @@ class PrefectCDEPipeline:
         # cde.scientific_name_vernaculars. Independent schedule (VERNACULARS_CRON)
         # because the WoRMS API is slow and operators may want to backfill out
         # of band. Idempotent + resumable, so re-running is safe.
-        vernaculars_id = populate_vernaculars_run.deploy(
+        vernaculars_id = flow.from_source(
+            source=source_dir,
+            entrypoint="cde_harvester/prefect_pipeline.py:populate_vernaculars_run",
+        ).deploy(
             name="populate-vernaculars-deployment",
-            work_pool_name="docker-pool",
-            image=job_image,
+            work_pool_name=POOL_NAME,
             cron=os.getenv("VERNACULARS_CRON"),
-            build=False,
-            push=False,
             job_variables=job_vars,
         )
 
@@ -432,13 +384,13 @@ class PrefectCDEPipeline:
         source_deployment_names = []
         for src in per_source:
             dep_name = f"cde-harvester-{deployment_slug(src)}"
-            cde_pipeline_run.deploy(
+            flow.from_source(
+                source=source_dir,
+                entrypoint="cde_harvester/prefect_pipeline.py:cde_pipeline_run",
+            ).deploy(
                 name=dep_name,
-                work_pool_name="docker-pool",
-                image=job_image,
+                work_pool_name=POOL_NAME,
                 cron=None,  # on-demand only
-                build=False,
-                push=False,
                 parameters={
                     "config_file": "/app/harvester/harvest_config.yaml",
                     "source": src,
@@ -449,7 +401,7 @@ class PrefectCDEPipeline:
             logger.info("Per-source deployment registered: %s (source=%s)", dep_name, src)
 
         print("\nTo start a worker, run:")
-        print("  docker compose up prefect_worker -d")
+        print(f"  uv run prefect worker start --pool {POOL_NAME} --type process")
         logger.info(
             "Deployments created: cde-harvester=%s populate-vernaculars=%s per-source=%s",
             harvest_id, vernaculars_id, source_deployment_names,

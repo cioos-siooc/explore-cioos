@@ -73,50 +73,35 @@ services:
     networks:
       - explore-cioos_default
 
-  prefect_deployment:
+  # Prefect PROCESS worker: registers the work pool + deployments on startup
+  # (REGISTER_DEPLOYMENTS=true), then runs harvest flows in-process. No spawned
+  # flow-run containers, no docker socket. Scale with --scale prefect_worker=N.
+  prefect_worker:
     build:
       context: .
       dockerfile: ./harvester/Dockerfile
     image: explore-cioos-harvester:latest
     profiles:
       - tools
-    command: uv run python -m cde_harvester.prefect_pipeline -f harvest_config.yaml -d prod
+    command: ["./worker-entrypoint.sh"]
     volumes:
       - ./harvest_config.yaml:/app/harvester/harvest_config.yaml
       - ./harvester_cache:/app/harvester/harvester_cache
       - ./ckan_harvester_cache:/app/harvester/ckan_harvester_cache
-      - ./harvest:/app/harvester/harvest
-      - ./nginx/logs:/app/nginx/logs  
-      - ./harvester_logs:/app/harvester/logs
+      - ./harvest:/app/harvester/harvest                  # resulting CSV files
+      - ./harvester_logs:/app/harvester/logs              # log files (served by nginx)
+      - ./overrides:/app/harvester/overrides
     environment:
-      - "HARVESTER_LOG_DIR=/app/harvester/logs"
       - PREFECT_API_URL=http://prefect:4200/api
+      - HARVESTER_LOG_DIR=/app/harvester/logs
+      - DB_HOST_EXTERNAL=${DB_HOST_EXTERNAL:-db}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - PREFECT_LOGGING_EXTRA_LOGGERS=populate_vernaculars,cde_db_loader,cde_harvester
+      - REGISTER_DEPLOYMENTS=true
+      - RUN_ON_DEPLOY=${RUN_ON_DEPLOY:-false}
       - HOST_ROOT=${HOST_ROOT}
     env_file:
       - .env
-    depends_on:
-      prefect:
-        condition: service_healthy
-    networks:
-      - explore-cioos_default
-
-  prefect_worker:
-    build:
-      context: .
-      dockerfile: ./harvester/Dockerfile
-    profiles:
-      - tools
-    command: uv run prefect worker start --pool docker-pool --type docker
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./harvest_config.yaml:/app/harvester/harvest_config.yaml
-      - ./harvester_cache:/app/harvester/harvester_cache
-      - ./ckan_harvester_cache:/app/harvester/ckan_harvester_cache
-      - ./harvest:/app/harvester/harvest
-      - ./harvester_logs:/app/harvester/logs
-    environment:
-      - PREFECT_API_URL=http://prefect:4200/api
-      - DOCKER_HOST=unix:///var/run/docker.sock
     depends_on:
       prefect:
         condition: service_healthy
@@ -136,14 +121,45 @@ services:
       - explore-cioos_default
 
   prefect:
-    image: prefecthq/prefect:3.4.24.dev4-python3.12-conda
-    command: prefect server start --host 0.0.0.0
+    # Non-conda image ships asyncpg so Prefect uses Postgres (the shared db
+    # service) as its metadata DB instead of SQLite, which locks under the
+    # concurrent access from scaled / remote workers.
+    image: prefecthq/prefect:3.6-python3.12
+    command:
+      - sh
+      - -c
+      - |
+        python - <<'PY'
+        import asyncio, os, asyncpg
+        async def ensure_db():
+            conn = await asyncpg.connect(
+                host="db", port=int(os.environ.get("DB_PORT", "5432")),
+                user=os.environ["DB_USER"], password=os.environ["DB_PASSWORD"],
+                database=os.environ["DB_NAME"],
+            )
+            try:
+                if not await conn.fetchval("SELECT 1 FROM pg_database WHERE datname='prefect'"):
+                    await conn.execute("CREATE DATABASE prefect")
+                    print("[prefect-init] created 'prefect' database")
+                else:
+                    print("[prefect-init] 'prefect' database already exists")
+            finally:
+                await conn.close()
+        asyncio.run(ensure_db())
+        PY
+        exec prefect server start --host 0.0.0.0
     ports:
       - "4200:4200"
+    env_file:
+      - .env
     environment:
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT:-5432}/prefect
       PREFECT_API_URL: http://127.0.0.1:4200/api
       PREFECT_UI_URL: http://localhost:4200
       PREFECT_HOME: /root/.prefect
+    depends_on:
+      db:
+        condition: service_healthy
     volumes:
       - prefect_data:/root/.prefect
     healthcheck:

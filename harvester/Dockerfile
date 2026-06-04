@@ -15,6 +15,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # 3. Copy source code
 COPY ./harvester/cde_harvester ./cde_harvester
 COPY ./harvester/run.sh ./run.sh
+COPY ./harvester/worker-entrypoint.sh ./worker-entrypoint.sh
 
 # Bake in a harvest config and the OBIS dataset list so the image is
 # self-contained. To use a different committed config (e.g.
