@@ -102,7 +102,7 @@ router.get(
       0,
     );
 
-    const wktPolygon = polygonJSONToWKT(polygon);
+    const wktPolygon = polygon ? polygonJSONToWKT(polygon) : null;
 
     const SQL = `
         WITH profiles_subset AS (
