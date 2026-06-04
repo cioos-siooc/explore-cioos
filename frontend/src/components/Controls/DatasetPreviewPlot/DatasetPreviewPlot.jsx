@@ -57,9 +57,10 @@ export default function DatasetPreviewPlot({
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
         <div style={{ display: 'flex', gap: '10px' }}>
           <DropdownButton
+            className="dropdownButtonLeft"
             title={t('datasetPreviewPlotXAxisSelect') + ': ' + plotAxes.x.columnName}
           >
             {datasetPreview &&
@@ -75,6 +76,7 @@ export default function DatasetPreviewPlot({
               })}
           </DropdownButton>
           <DropdownButton
+            className="dropdownButtonLeft"
             title={t('datasetPreviewPlotYAxisSelect') + ': ' + plotAxes.y.columnName}
           >
             {datasetPreview &&
@@ -91,7 +93,8 @@ export default function DatasetPreviewPlot({
           </DropdownButton>
         </div>
         <DropdownButton
-          title={t('Plot type') + ': ' + t(plotType)}
+          className="dropdownButtonRight dropdownButton"
+          title={t('plotType') + ': ' + t(plotType)}
         >
           <Dropdown.Item onClick={() => setPlotType('markers')}>
             {t('markers')}
@@ -103,7 +106,7 @@ export default function DatasetPreviewPlot({
             {t('markersAndLine')}
           </Dropdown.Item>
         </DropdownButton>
-      </div>
+        </div>
       <div className='datasetPreviewPlot'>
         <>
           {plotAxes.x !== undefined && plotAxes.y !== undefined && data && (

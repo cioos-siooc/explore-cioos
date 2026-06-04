@@ -33,7 +33,6 @@
 }
 
 .tableAndPlotGridContainer .toggleButton {
-  flex: 1;
   height: 42px;
   margin: 0px 16.5px;
   background-color: white;
@@ -42,8 +41,8 @@
   color: black;
   line-height: 15px;
   font-size: auto;
-  min-width: fit-content;
-  padding: 0px 0.5rem;
+  min-width: 100px;
+  max-width: 100px;
 }
 
 .toggleButton:hover {

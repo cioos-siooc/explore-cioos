@@ -16,3 +16,19 @@
 .dropdown-menu {
   z-index: 9999;
 }
+
+.dropdownButtonLeft .dropdown-toggle {
+  min-width: 120px !important;
+  max-width: 120px !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdownButtonRight .dropdown-toggle {
+  min-width: 255px !important;
+  max-width: 255px !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
