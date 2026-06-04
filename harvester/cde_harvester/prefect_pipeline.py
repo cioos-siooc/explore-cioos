@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-from prefect import flow, get_run_logger
-from cde_harvester.__main__ import main as harvester_main, setup_logging, load_config, load_obis_dataset_ids
+from prefect import flow, task, get_run_logger
+from prefect.deployments import run_deployment
+from cde_harvester.__main__ import main as harvester_main, setup_logging, load_config, load_obis_dataset_ids, cleanup_old_logs
 from cde_harvester.redisFunctions import redisFlow
 from cde_db_loader.__main__ import main as db_loader_main
 from dotenv import load_dotenv
+from contextlib import contextmanager
+from datetime import datetime
 import logging
 import os
 import argparse
 import shutil
 import sys
 import time
-import uuid
 from prefect.client.orchestration import get_client
 from prefect.client.schemas.actions import WorkPoolCreate
 from prefect.exceptions import ObjectNotFound
@@ -30,44 +32,102 @@ _OBIS_ALIASES = {"obis", "https://obis.org", "http://obis.org", "obis.org"}
 # which is what lets them scale via compose replicas and run on a remote host.
 POOL_NAME = "cde-process-pool"
 
-RUN_FOLDER_PREFIX = "run-"
-KEEP_RUN_FOLDERS = 5  # retain this many recent per-run output folders
+TIMESTAMP_FMT = "%Y%m%d_%H%M%S"
+KEEP_RUNS_PER_SERVER = 5  # retain this many recent timestamped runs per server
 # Never prune a folder modified within this window — protects a concurrent
 # in-flight run (harvests can take ~1h) from being deleted by another run's prune.
 PRUNE_GRACE_SECONDS = 6 * 3600
 
 
-def _run_subfolder(base_folder, run_token):
-    """Per-run output folder under the shared harvest volume."""
-    return os.path.join(base_folder, f"{RUN_FOLDER_PREFIX}{run_token}")
+def _timestamp():
+    """Filesystem-safe timestamp shared by a run's folder + log file names."""
+    return datetime.now().strftime(TIMESTAMP_FMT)
 
 
-def _prune_run_folders(base_folder, keep=KEEP_RUN_FOLDERS, protect=None):
-    """Keep the newest `keep` per-run output folders; reclaim the older ones so
-    the harvest volume doesn't grow unbounded.
+def _server_run_folder(base_folder, slug, timestamp):
+    """Per-server, per-run output folder: ``{base}/{slug}/{timestamp}``.
 
-    Only ever touches our own run-* directories — never the base folder, the
-    OBIS cache, the current run's folder (`protect`), or any folder modified
-    within the grace window (so a concurrent in-flight run is never deleted)."""
-    protect = os.path.abspath(protect) if protect else None
+    Keying by server slug (hostname-dashed / 'obis' / 'full') then timestamp lets
+    an operator track one server's harvests over time (``ls harvest/{slug}``) and
+    lets the orchestrator point every server in a batch at the SAME timestamp so
+    consolidation can find them all (``harvest/*/{batch_ts}``)."""
+    return os.path.join(base_folder, slug, timestamp)
+
+
+@contextmanager
+def _harvest_file_log(log_dir, log_level, label):
+    """Mirror the harvest's stdlib logging into a per-run file in ``log_dir``.
+
+    Under Prefect the flow runs in-process and logs via get_run_logger() (which
+    goes to the Prefect UI) — nothing writes a file. But the harvester / db-loader
+    internals all use stdlib ``logging.getLogger(__name__)``, which propagates to
+    the ROOT logger, so attaching a FileHandler to root captures that output to
+    ``{log_dir}/harvest_{ts}_{label}.log``. The prefect_worker mounts ``log_dir``
+    (HARVESTER_LOG_DIR) on the shared ``harvester_logs`` volume, which nginx
+    serves read-only at ``/harvester_logs/``.
+
+    ``label`` is the server slug (or 'full'/'consolidate') so the file name says
+    which server it belongs to. Process-pool flow runs each run in their own
+    subprocess, so concurrent per-server jobs get clean, non-interleaved files.
+    The handler is removed on exit so it doesn't leak across successive in-process
+    flow runs on the same worker.
+    """
+    if not log_dir:
+        yield None
+        return
+    os.makedirs(log_dir, exist_ok=True)
+    cleanup_old_logs(log_dir, days=30)
+    log_path = os.path.join(log_dir, f"harvest_{_timestamp()}_{label}.log")
+    handler = logging.FileHandler(log_path)
+    handler.setLevel(logging.getLevelName(str(log_level or "INFO").upper()))
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(levelname)-8s - %(name)s : %(message)s")
+    )
+    root = logging.getLogger()
+    root.addHandler(handler)
     try:
-        runs = [
-            (os.path.getmtime(os.path.join(base_folder, n)), os.path.abspath(os.path.join(base_folder, n)))
-            for n in os.listdir(base_folder)
-            if n.startswith(RUN_FOLDER_PREFIX)
-            and os.path.isdir(os.path.join(base_folder, n))
+        yield log_path
+    finally:
+        root.removeHandler(handler)
+        handler.close()
+
+
+def _prune_server_run_folders(base_folder, keep=KEEP_RUNS_PER_SERVER, protect=()):
+    """Within each per-server folder under ``base_folder``, keep the newest
+    ``keep`` timestamped run folders and reclaim the older ones so the harvest
+    volume doesn't grow unbounded.
+
+    Layout is ``{base}/{slug}/{timestamp}``, so we prune one slug at a time. Never
+    touches a folder in ``protect`` (this run's own output), nor one modified
+    within the grace window (so a concurrent in-flight run is never deleted). The
+    OBIS cache lives OUTSIDE ``base_folder`` so it is never a candidate here."""
+    protect = {os.path.abspath(p) for p in (protect or ())}
+    now = time.time()
+    try:
+        slug_dirs = [
+            os.path.join(base_folder, n) for n in os.listdir(base_folder)
+            if os.path.isdir(os.path.join(base_folder, n))
         ]
     except FileNotFoundError:
         return
-    now = time.time()
-    for mtime, path in sorted(runs, reverse=True)[keep:]:
-        if path == protect or (now - mtime) <= PRUNE_GRACE_SECONDS:
-            continue  # current run, or too recent to be sure it's idle
+    for slug_dir in slug_dirs:
         try:
-            shutil.rmtree(path)
-            logger.info("Pruned old harvest run folder: %s", path)
-        except OSError as e:
-            logger.warning("Could not prune run folder %s: %s", path, e)
+            runs = [
+                (os.path.getmtime(os.path.join(slug_dir, n)),
+                 os.path.abspath(os.path.join(slug_dir, n)))
+                for n in os.listdir(slug_dir)
+                if os.path.isdir(os.path.join(slug_dir, n))
+            ]
+        except FileNotFoundError:
+            continue
+        for mtime, path in sorted(runs, reverse=True)[keep:]:
+            if path in protect or (now - mtime) <= PRUNE_GRACE_SECONDS:
+                continue  # current run, or too recent to be sure it's idle
+            try:
+                shutil.rmtree(path)
+                logger.info("Pruned old harvest run folder: %s", path)
+            except OSError as e:
+                logger.warning("Could not prune run folder %s: %s", path, e)
 
 
 def deployment_slug(source):
@@ -152,90 +212,96 @@ class PrefectCDEPipeline:
         logger = get_run_logger()
         logger.info("Starting CDE Pipeline")
 
-        # Per-run output subfolder so concurrent harvests (e.g. an on-demand
-        # single-source trigger overlapping the nightly full run) don't clobber
-        # each other's CSVs in the shared harvest volume. The harvester writes
-        # into run_folder and the db-loader reads from it, so the handoff stays
-        # isolated per run.
+        # Per-server, per-run output folder: {base}/{slug}/{timestamp}. The slug
+        # is the server (hostname-dashed / 'obis'), or 'full' for an all-sources
+        # inline run. Keying by server lets an operator track one server's
+        # harvests over time and keeps concurrent runs (e.g. the per-server jobs
+        # the orchestrator fans out, or an on-demand dashboard trigger) from
+        # clobbering each other's CSVs. The harvester writes into run_folder and
+        # the db-loader reads from it, so the handoff stays isolated per run.
         base_folder = self.folder
-        try:
-            from prefect.runtime import flow_run as _pf_flow_run
-            run_token = _pf_flow_run.id or str(uuid.uuid4())
-        except Exception:
-            run_token = str(uuid.uuid4())
-        run_folder = _run_subfolder(base_folder, run_token)
-        # The OBIS occurrence cache must stay SHARED across runs (it's a cache,
-        # keyed by dataset). main() derives it from `folder`'s parent when
-        # obis_folder is unset — which would point inside the per-run subfolder
-        # and miss the cache — so pin it to the base-folder derivation and pass
-        # it explicitly. Matches harvester __main__ behaviour for the base run.
-        obis_folder = self.obis_folder or os.path.join(
-            os.path.dirname(os.path.abspath(base_folder)), "obis_cache"
-        )
-        # Invariant: the OBIS cache must live OUTSIDE the per-run folder tree, or
-        # pruning (which rmtrees run-* dirs) could eventually delete it. Our
-        # derivation puts it as a sibling of base_folder, so this always holds;
-        # assert it so a future config/path change fails loudly, not silently.
-        _abs_run, _abs_obis = os.path.abspath(run_folder), os.path.abspath(obis_folder)
-        assert _abs_obis != _abs_run and not _abs_obis.startswith(_abs_run + os.sep), (
-            f"OBIS cache {obis_folder} must not be inside the per-run folder {run_folder}"
-        )
-        logger.info("Run output folder: %s (shared OBIS cache: %s)", run_folder, obis_folder)
-
-        # Run harvester as a subflow
-        logger.info("Running cde_harvester subflow")
-        try:
-            harvester_main(
-                erddap_urls=self.erddap_urls,
-                cache_requests=self.cache_requests,
-                folder=run_folder,
-                dataset_ids=self.dataset_ids,
-                obis_dataset_ids=self.obis_dataset_ids,
-                obis_folder=obis_folder,
-                source=self.source,
-                triggered_by=self.triggered_by,
+        slug = deployment_slug(self.source) if self.source else "full"
+        timestamp = _timestamp()
+        run_folder = _server_run_folder(base_folder, slug, timestamp)
+        # Mirror this run's stdlib logging to a file under HARVESTER_LOG_DIR so
+        # nginx can serve it at /harvester_logs/ (see _harvest_file_log). Labeled
+        # by server slug so each server's log is identifiable. The harvest body
+        # runs inside this context so the file captures the whole run.
+        with _harvest_file_log(self.log_dir, self.log_level, slug) as log_path:
+            if log_path:
+                logger.info("Writing harvest log file: %s (served at /harvester_logs/)", log_path)
+            # The OBIS occurrence cache must stay SHARED across runs (it's a cache,
+            # keyed by dataset). main() derives it from `folder`'s parent when
+            # obis_folder is unset — which would point inside the per-run subfolder
+            # and miss the cache — so pin it to the base-folder derivation and pass
+            # it explicitly. Matches harvester __main__ behaviour for the base run.
+            obis_folder = self.obis_folder or os.path.join(
+                os.path.dirname(os.path.abspath(base_folder)), "obis_cache"
             )
-            logger.info("cde_harvester completed successfully")
-        except Exception as e:
-            logger.error(f"cde_harvester failed: {e}", exc_info=True)
-            raise
-
-        # Run db_loader as a subflow.
-        # CRITICAL: a single-source run must NEVER use full-reload mode, which
-        # TRUNCATEs every table and would wipe all the OTHER sources. The
-        # incremental path is per-(dataset_id, erddap_url) scoped and safe, so
-        # force it whenever a source is set, regardless of config.
-        effective_incremental = self.incremental or bool(self.source)
-        if self.source and not self.incremental:
-            logger.warning(
-                "Single-source run (source=%s): forcing db-loader INCREMENTAL "
-                "mode so the full-reload TRUNCATE can't wipe other sources.",
-                self.source,
+            # Invariant: the OBIS cache must live OUTSIDE the per-run folder tree, or
+            # pruning (which rmtrees per-server run dirs) could eventually delete it.
+            # Our derivation puts it as a sibling of base_folder, so this always
+            # holds; assert it so a future config/path change fails loudly.
+            _abs_run, _abs_obis = os.path.abspath(run_folder), os.path.abspath(obis_folder)
+            assert _abs_obis != _abs_run and not _abs_obis.startswith(_abs_run + os.sep), (
+                f"OBIS cache {obis_folder} must not be inside the per-run folder {run_folder}"
             )
-        logger.info("Running cde_db_loader subflow")
-        try:
-            db_loader_main(folder=run_folder, incremental=effective_incremental)
-            logger.info("cde_db_loader completed successfully")
-            # Data is now in the DB; keep only the newest few run folders for
-            # debugging/replay and reclaim volume space. protect=run_folder so
-            # this run's own output is never pruned; kept on failure (above
-            # raises) so a failed run's CSVs survive for investigation.
-            _prune_run_folders(base_folder, protect=run_folder)
-        except Exception as e:
-            logger.error(f"cde_db_loader failed: {e}", exc_info=True)
-            raise
+            logger.info("Run output folder: %s (shared OBIS cache: %s)", run_folder, obis_folder)
 
-        # Run redis refresh as a subflow
-        logger.info("Running redisFlow subflow")
-        if self.flush_redis:
+            # Run harvester as a subflow
+            logger.info("Running cde_harvester subflow")
             try:
-                redisFlow()
-                logger.info("redisFlow completed successfully")
+                harvester_main(
+                    erddap_urls=self.erddap_urls,
+                    cache_requests=self.cache_requests,
+                    folder=run_folder,
+                    dataset_ids=self.dataset_ids,
+                    obis_dataset_ids=self.obis_dataset_ids,
+                    obis_folder=obis_folder,
+                    source=self.source,
+                    triggered_by=self.triggered_by,
+                )
+                logger.info("cde_harvester completed successfully")
             except Exception as e:
-                logger.error(f"redisFlow failed: {e}", exc_info=True)
+                logger.error(f"cde_harvester failed: {e}", exc_info=True)
                 raise
-        
-        logger.info("CDE Pipeline completed successfully")
+
+            # Run db_loader as a subflow.
+            # CRITICAL: a single-source run must NEVER use full-reload mode, which
+            # TRUNCATEs every table and would wipe all the OTHER sources. The
+            # incremental path is per-(dataset_id, erddap_url) scoped and safe, so
+            # force it whenever a source is set, regardless of config.
+            effective_incremental = self.incremental or bool(self.source)
+            if self.source and not self.incremental:
+                logger.warning(
+                    "Single-source run (source=%s): forcing db-loader INCREMENTAL "
+                    "mode so the full-reload TRUNCATE can't wipe other sources.",
+                    self.source,
+                )
+            logger.info("Running cde_db_loader subflow")
+            try:
+                db_loader_main(folder=run_folder, incremental=effective_incremental)
+                logger.info("cde_db_loader completed successfully")
+                # Data is now in the DB; keep only the newest few run folders per
+                # server for debugging/replay and reclaim volume space.
+                # protect=run_folder so this run's own output is never pruned; kept
+                # on failure (above raises) so a failed run's CSVs survive.
+                _prune_server_run_folders(base_folder, protect=[run_folder])
+            except Exception as e:
+                logger.error(f"cde_db_loader failed: {e}", exc_info=True)
+                raise
+
+            # Run redis refresh as a subflow
+            logger.info("Running redisFlow subflow")
+            if self.flush_redis:
+                try:
+                    redisFlow()
+                    logger.info("redisFlow completed successfully")
+                except Exception as e:
+                    logger.error(f"redisFlow failed: {e}", exc_info=True)
+                    raise
+
+            logger.info("CDE Pipeline completed successfully")
     
     @flow(name="Create Process Work Pool", log_prints=True)
     def create_process_work_pool(self, pool_name="cde-process-pool"):
@@ -338,17 +404,20 @@ class PrefectCDEPipeline:
             },
         }
 
-        # Deployment 1: the harvest itself.
-        # Deploy the top-level wrapper flow (not the bound method) — Prefect's
-        # deployment runner can't fill `self` for class-method flows, so we
-        # use cde_pipeline_run which is a regular @flow function.
+        # Deployment 1: all-sources harvest in ONE flow run, ON-DEMAND (no cron).
+        # The scheduled harvest now fans out into one job per server via the
+        # orchestrator (Deployment 3 below), so this single-run variant is kept
+        # only as a manual fallback / for local testing. Deploy the top-level
+        # wrapper flow (not the bound method) — Prefect's deployment runner can't
+        # fill `self` for class-method flows, so we use cde_pipeline_run which is
+        # a regular @flow function.
         harvest_id = flow.from_source(
             source=source_dir,
             entrypoint="cde_harvester/prefect_pipeline.py:cde_pipeline_run",
         ).deploy(
             name="cde-harvester-deployment",
             work_pool_name=POOL_NAME,
-            cron=os.getenv("HARVESTER_CRON"),
+            cron=None,  # scheduled harvest is the per-server orchestrator instead
             parameters={
                 "config_file": "/app/harvester/harvest_config.yaml",
             },
@@ -400,11 +469,32 @@ class PrefectCDEPipeline:
             source_deployment_names.append(dep_name)
             logger.info("Per-source deployment registered: %s (source=%s)", dep_name, src)
 
+        # Deployment 3: the SCHEDULED fan-out orchestrator. On each HARVESTER_CRON
+        # tick it triggers the per-source deployments above — one independent
+        # harvest job per server, each with its own log + data folder, each
+        # loading its own data to the DB. Registered after the per-source loop so
+        # its targets already exist (it resolves them by name at run time). This
+        # is what carries the schedule now; the single-run deployment above is
+        # on-demand only.
+        orchestrator_id = flow.from_source(
+            source=source_dir,
+            entrypoint="cde_harvester/prefect_pipeline.py:cde_harvest_all_run",
+        ).deploy(
+            name="cde-harvest-all",
+            work_pool_name=POOL_NAME,
+            cron=os.getenv("HARVESTER_CRON"),
+            parameters={
+                "config_file": "/app/harvester/harvest_config.yaml",
+            },
+            job_variables=job_vars,
+        )
+
         print("\nTo start a worker, run:")
         print(f"  uv run prefect worker start --pool {POOL_NAME} --type process")
         logger.info(
-            "Deployments created: cde-harvester=%s populate-vernaculars=%s per-source=%s",
-            harvest_id, vernaculars_id, source_deployment_names,
+            "Deployments created: cde-harvester=%s cde-harvest-all=%s "
+            "populate-vernaculars=%s per-source=%s",
+            harvest_id, orchestrator_id, vernaculars_id, source_deployment_names,
         )
         return harvest_id
 
@@ -448,6 +538,52 @@ def _normalize_coolify_multiline(value: str) -> str:
     )
 
 
+def _resolve_harvest_config_file(config_file):
+    """Resolve the effective harvest config path via the override precedence
+    (high -> low): HARVEST_CONFIG_YAML env var, then
+    /app/harvester/overrides/harvest_config.yaml, then the baked-in default.
+
+    Also writes OBIS_DATASETS_JSON to /tmp/Obis_Datasets.json when set. Shared by
+    both the per-source/full run (cde_pipeline_run) and the fan-out orchestrator
+    (cde_harvest_all_run) so they always agree on which config — and therefore
+    which source list — is in effect. See cde_pipeline_run for the full rationale.
+    """
+    env_config = os.getenv("HARVEST_CONFIG_YAML", "").strip()
+    override_path = "/app/harvester/overrides/harvest_config.yaml"
+    if env_config:
+        # Coolify's .env writer prepends a fixed leading indent (typically
+        # 2 spaces) to every continuation line of a multi-line env var,
+        # while leaving the first line flush with the opening quote. That
+        # corrupts a YAML document whose top-level keys were at column 0:
+        # they end up at column 2, breaking the parse.
+        # Detect + strip that added indent so the YAML round-trips cleanly.
+        env_config = _normalize_coolify_multiline(env_config)
+
+        env_config_path = "/tmp/harvest_config_from_env.yaml"
+        with open(env_config_path, "w") as f:
+            f.write(env_config)
+        config_file = env_config_path
+        logger.info(
+            f"Using HARVEST_CONFIG_YAML env var ({len(env_config)} bytes -> {env_config_path})"
+        )
+    elif os.path.exists(override_path):
+        config_file = override_path
+        logger.info(f"Using override harvest config: {override_path}")
+    else:
+        logger.info(f"Using baked-in harvest config: {config_file}")
+
+    # Optional OBIS override via env var. The harvest config's
+    # obis_datasets_file should reference /tmp/Obis_Datasets.json to pick it up.
+    env_obis = os.getenv("OBIS_DATASETS_JSON", "").strip()
+    if env_obis:
+        with open("/tmp/Obis_Datasets.json", "w") as f:
+            f.write(env_obis)
+        logger.info(
+            f"Wrote OBIS_DATASETS_JSON env var ({len(env_obis)} bytes -> /tmp/Obis_Datasets.json)"
+        )
+    return config_file
+
+
 @flow(name="CDE Pipeline Run", log_prints=True)
 def cde_pipeline_run(
     config_file: str = "/app/harvester/harvest_config.yaml",
@@ -486,45 +622,111 @@ def cde_pipeline_run(
     3. Baked-in default at /app/harvester/harvest_config.yaml. Used if neither
        override is provided.
     """
-    env_config = os.getenv("HARVEST_CONFIG_YAML", "").strip()
-    override_path = "/app/harvester/overrides/harvest_config.yaml"
-    if env_config:
-        # Coolify's .env writer prepends a fixed leading indent (typically
-        # 2 spaces) to every continuation line of a multi-line env var,
-        # while leaving the first line flush with the opening quote. That
-        # corrupts a YAML document whose top-level keys were at column 0:
-        # they end up at column 2, breaking the parse.
-        # Detect + strip that added indent so the YAML round-trips cleanly.
-        env_config = _normalize_coolify_multiline(env_config)
-
-        env_config_path = "/tmp/harvest_config_from_env.yaml"
-        with open(env_config_path, "w") as f:
-            f.write(env_config)
-        config_file = env_config_path
-        logger.info(
-            f"Using HARVEST_CONFIG_YAML env var ({len(env_config)} bytes -> {env_config_path})"
-        )
-    elif os.path.exists(override_path):
-        config_file = override_path
-        logger.info(f"Using override harvest config: {override_path}")
-    else:
-        logger.info(f"Using baked-in harvest config: {config_file}")
-
-    # Optional OBIS override via env var. The harvest config's
-    # obis_datasets_file should reference /tmp/Obis_Datasets.json to pick it up.
-    env_obis = os.getenv("OBIS_DATASETS_JSON", "").strip()
-    if env_obis:
-        with open("/tmp/Obis_Datasets.json", "w") as f:
-            f.write(env_obis)
-        logger.info(
-            f"Wrote OBIS_DATASETS_JSON env var ({len(env_obis)} bytes -> /tmp/Obis_Datasets.json)"
-        )
+    config_file = _resolve_harvest_config_file(config_file)
 
     pipeline = PrefectCDEPipeline()
     pipeline.init_config(config_file=config_file)
     pipeline.source = source
     pipeline.triggered_by = triggered_by
     pipeline.cde_pipeline()
+
+
+# Flow name the per-source deployments register under (the @flow name of
+# cde_pipeline_run). Must match harvest-dashboard/app/config.HARVEST_FLOW_NAME so
+# both the dashboard and this orchestrator resolve the same deployment.
+HARVEST_FLOW_NAME = "CDE Pipeline Run"
+
+
+@task(name="trigger-source-harvest")
+def _trigger_source_harvest(source: str, triggered_by: str | None = None):
+    """Trigger the per-source deployment for ``source`` and wait for it to finish.
+
+    Creates a flow run of ``CDE Pipeline Run/cde-harvester-{slug}`` — a separate
+    Prefect job (its own subprocess on the process worker, its own per-server log
+    + data folder) that harvests AND incrementally loads just this server.
+    run_deployment() blocks (timeout=None) until the child reaches a terminal
+    state. Returns a small status dict instead of raising, so one failing server
+    doesn't abort the others; the orchestrator aggregates and reports at the end.
+    """
+    deployment_name = f"{HARVEST_FLOW_NAME}/cde-harvester-{deployment_slug(source)}"
+    params = {"source": source}
+    if triggered_by:
+        params["triggered_by"] = triggered_by
+    try:
+        flow_run = run_deployment(name=deployment_name, parameters=params)
+    except Exception as e:  # deployment missing / API error — report, don't abort
+        return {"source": source, "deployment": deployment_name,
+                "flow_run_id": None, "state": "TRIGGER_ERROR", "error": str(e)}
+    state = flow_run.state
+    return {
+        "source": source,
+        "deployment": deployment_name,
+        "flow_run_id": str(flow_run.id),
+        "flow_run_name": flow_run.name,
+        "state": state.name if state else "UNKNOWN",
+        "completed": bool(state and state.is_completed()),
+    }
+
+
+@flow(name="CDE Harvest All", log_prints=True)
+def cde_harvest_all_run(
+    config_file: str = "/app/harvester/harvest_config.yaml",
+    triggered_by: str | None = None,
+):
+    """Fan-out orchestrator (the SCHEDULED entry point): launch one independent
+    harvest job per source.
+
+    Instead of harvesting every ERDDAP server inside a single flow run, this
+    triggers the per-source deployment ('cde-harvester-{slug}') for each
+    configured source (every erddap_url, plus 'obis' when OBIS datasets are
+    configured) via run_deployment(). Each server therefore becomes its OWN
+    Prefect flow run — its own subprocess, its own per-server log + data folder,
+    independently retryable and visible in the UI.
+
+    Each per-source job harvests AND loads its own data to the DB (forced
+    incremental, so it can never TRUNCATE the others) — the regular per-source
+    pipeline, run once per server. There is no central consolidation step.
+
+    All jobs are triggered concurrently and waited on together; the worker must
+    allow enough concurrency to run them alongside this orchestrator (the default
+    process worker has no limit). A per-source failure is reported but does not
+    cancel the other servers; the flow ends red if any did not complete.
+    """
+    logger = get_run_logger()
+
+    # Same override precedence (env / overrides / baked-in) as the runs, so a
+    # Coolify config change reshapes the orchestrated source list too.
+    config_file = _resolve_harvest_config_file(config_file)
+    config = load_config(config_file)
+
+    sources = [u.strip() for u in (config.get("erddap_urls") or []) if u and u.strip()]
+    obis_ids = load_obis_dataset_ids(
+        dataset_ids=config.get("obis_dataset_ids"),
+        datasets_file=config.get("obis_datasets_file"),
+    )
+    if obis_ids:
+        sources.append("obis")
+    if not sources:
+        raise ValueError(
+            "No sources configured to harvest (erddap_urls / obis_dataset_ids)"
+        )
+
+    logger.info("Fanning out %d per-source harvest job(s): %s", len(sources), sources)
+    futures = [_trigger_source_harvest.submit(src, triggered_by) for src in sources]
+    results = [f.result() for f in futures]
+
+    for r in results:
+        logger.info(
+            "Source %s -> %s [%s] (flow_run=%s)",
+            r["source"], r["deployment"], r["state"], r.get("flow_run_id"),
+        )
+    failed = [r for r in results if not r.get("completed")]
+    if failed:
+        raise RuntimeError(
+            f"{len(failed)}/{len(sources)} per-source harvest job(s) did not complete: "
+            + ", ".join(f"{r['source']}={r['state']}" for r in failed)
+        )
+    logger.info("All %d per-source harvest job(s) completed", len(sources))
 
 
 @flow(name="Populate Vernaculars", log_prints=True)

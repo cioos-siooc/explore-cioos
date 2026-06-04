@@ -146,7 +146,7 @@ HOST_ROOT=/path/to/your/workspace/explore-cioos
 HARVESTER_CRON=10 0 */3 * *
 # Optional: WoRMS vernaculars backfill schedule (unset = none)
 VERNACULARS_CRON=
-# Optional: fire one full harvest immediately on (re)deploy (default false)
+# Optional: fire one harvest immediately on (re)deploy (default false)
 RUN_ON_DEPLOY=false
 ```
 
@@ -154,6 +154,18 @@ The `prefect_worker` runs harvest flows in-process on the `cde-process-pool`
 work pool and registers all deployments on startup. Scale with
 `docker compose up -d --scale prefect_worker=N`; run extra workers on another
 host via `docker-compose.worker.yaml` (set `REGISTER_DEPLOYMENTS=false` there).
+
+On each `HARVESTER_CRON` tick the **`cde-harvest-all`** orchestrator deployment
+fans out into **one harvest job per server**: it triggers the per-source
+deployment (`cde-harvester-<slug>`) for every configured ERDDAP url plus `obis`,
+so each server runs as its own Prefect flow run (own subprocess) with its own
+per-server log (`harvest_<ts>_<slug>.log`) and data folder
+(`harvest/<slug>/<timestamp>/`), and each loads its own data to the DB
+incrementally. Because the orchestrator waits on all of them concurrently, the
+worker must allow enough concurrency to run them alongside it — the default
+process worker has no `--limit`, which satisfies this. The single-run
+`cde-harvester-deployment` (all sources in one flow run) remains registered as an
+on-demand fallback with no schedule.
 
 ### Configuration File
 

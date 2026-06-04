@@ -26,10 +26,12 @@ if [ "${REGISTER_DEPLOYMENTS:-true}" = "true" ]; then
     || echo "[worker-entrypoint] registration failed (another replica may have won); continuing"
 
   if [ "${RUN_ON_DEPLOY:-false}" = "true" ]; then
-    echo "[worker-entrypoint] RUN_ON_DEPLOY=true -> triggering one full harvest"
+    echo "[worker-entrypoint] RUN_ON_DEPLOY=true -> triggering per-server harvest fan-out"
     # Only the registrar fires this, so it runs once per deploy regardless of
-    # replica count. Non-fatal so a transient API hiccup can't block the worker.
-    uv run prefect deployment run "CDE Pipeline Run/cde-harvester-deployment" \
+    # replica count. Triggers the orchestrator, which launches one harvest job
+    # per server (same as the cron path). Non-fatal so a transient API hiccup
+    # can't block the worker.
+    uv run prefect deployment run "CDE Harvest All/cde-harvest-all" \
       || echo "[worker-entrypoint] run-on-deploy trigger failed; worker will still start"
   fi
 fi
