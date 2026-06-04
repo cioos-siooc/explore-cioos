@@ -183,6 +183,11 @@ socket). Since we use Prefect for orchestration, you don't need a system cron jo
    On startup the worker registers the `cde-process-pool` work pool and all
    deployments (full harvest, per-source, vernaculars), then begins polling.
 
+   > The Prefect server stores its metadata in **Postgres** (a dedicated
+   > `prefect` database in the shared `db` service, auto-created on startup),
+   > not SQLite — SQLite locks under the concurrent access from scaled / remote
+   > workers. This is why `prefect` depends on `db`.
+
 2. Control *when* harvests run via `.env` (all optional):
    - `HARVESTER_CRON` / `VERNACULARS_CRON` — recurring schedules (unset = none).
    - `RUN_ON_DEPLOY=true` — fire one full harvest immediately on (re)deploy.
