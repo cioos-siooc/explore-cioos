@@ -41,7 +41,7 @@ services:
       - ./nginx/logs:/var/log/nginx
       - ./nginx/logrotate_state:/var/lib/logrotate
       - ./harvester_logs:/usr/share/nginx/html/harvester_logs:ro
-      - ./downloads:/usr/share/nginx/html/downloads:ro
+      - downloads:/usr/share/nginx/html/downloads:ro
     depends_on:
       - web-api
     ports:
@@ -58,7 +58,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./downloads:/usr/src/app/download_scheduler/downloads
+      - downloads:/usr/src/app/download_scheduler/downloads
     networks:
       - explore-cioos_default
 
@@ -160,6 +160,7 @@ volumes:
   postgres-data:
   redis-data:
   prefect_data:
+  downloads:
 
 networks:
   explore-cioos_default:
