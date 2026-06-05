@@ -15,6 +15,19 @@ function fmtDt(val) {
   return new Date(val).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
 }
 
+function fmtDuration(s) {
+  if (s == null) return '—'
+  if (s < 60) return `${s}s`
+  return `${Math.floor(s / 60)}m ${s % 60}s`
+}
+
+function runLabel(r) {
+  if (r.triggered_source) {
+    try { return new URL(r.triggered_source).hostname } catch { return r.triggered_source }
+  }
+  return r.scope || '—'
+}
+
 function ServerCard({ server, t }) {
   const slug = slugify(server.erddap_url)
   return (
@@ -58,7 +71,9 @@ export default function HarvestOverview() {
             <thead>
               <tr>
                 <th>{t('harvest.col.started')}</th>
+                <th>{t('harvest.col.scope')}</th>
                 <th>{t('harvest.col.status')}</th>
+                <th>{t('harvest.col.duration')}</th>
                 <th>{t('harvest.col.gitSha')}</th>
                 <th style={{ textAlign: 'right' }}>{t('harvest.col.ok')}</th>
                 <th style={{ textAlign: 'right' }}>{t('harvest.col.skipped')}</th>
@@ -69,13 +84,25 @@ export default function HarvestOverview() {
             <tbody>
               {(runs || []).map(r => (
                 <tr key={r.run_id}>
-                  <td>
+                  <td style={{ fontSize: '0.82rem' }}>
                     <Link to={`/harvest/run/${r.run_id}`} className="harvest-link">
                       {fmtDt(r.started_at)}
                     </Link>
                   </td>
+                  <td style={{ fontSize: '0.82rem' }}>
+                    <span title={r.triggered_source || r.scope}>{runLabel(r)}</span>
+                    {r.triggered_by && (
+                      <div className="harvest-muted" style={{ fontSize: '0.72rem' }}>{r.triggered_by}</div>
+                    )}
+                    {r.error_message && (
+                      <div style={{ fontSize: '0.72rem', color: '#7a1520', marginTop: '2px' }}>
+                        {r.error_message.slice(0, 80)}{r.error_message.length > 80 ? '…' : ''}
+                      </div>
+                    )}
+                  </td>
                   <td><StatusBadge status={r.status} /></td>
-                  <td className="harvest-mono harvest-muted">{r.git_sha ? r.git_sha.slice(0, 7) : '—'}</td>
+                  <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDuration(r.duration_s)}</td>
+                  <td className="harvest-mono harvest-muted" style={{ fontSize: '0.82rem' }}>{r.git_sha ? r.git_sha.slice(0, 7) : '—'}</td>
                   <td style={{ textAlign: 'right' }}>{r.n_success}</td>
                   <td style={{ textAlign: 'right' }}>{r.n_skipped}</td>
                   <td style={{ textAlign: 'right', color: r.n_error > 0 ? '#7a1520' : undefined }}>{r.n_error}</td>

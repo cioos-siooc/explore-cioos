@@ -71,6 +71,10 @@ async function recentRuns(limit = 20) {
            r.git_sha,
            r.status,
            r.error_message,
+           r.scope,
+           r.triggered_source,
+           r.triggered_by,
+           EXTRACT(EPOCH FROM (r.finished_at::timestamptz - r.started_at::timestamptz))::int AS duration_s,
            COUNT(a.*) FILTER (WHERE a.status = 'success') AS n_success,
            COUNT(a.*) FILTER (WHERE a.status = 'skipped') AS n_skipped,
            COUNT(a.*) FILTER (WHERE a.status = 'error')   AS n_error,
@@ -78,7 +82,7 @@ async function recentRuns(limit = 20) {
     FROM cde.harvest_runs r
     LEFT JOIN cde.harvest_attempts a USING (run_id)
     GROUP BY r.run_id, r.started_at, r.finished_at, r.git_sha,
-             r.status, r.error_message
+             r.status, r.error_message, r.scope, r.triggered_source, r.triggered_by
     ORDER BY r.started_at DESC
     LIMIT ?
   `
