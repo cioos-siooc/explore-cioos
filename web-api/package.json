@@ -4,7 +4,15 @@
   "private": true,
   "scripts": {
     "start": "node ./bin/www",
-    "lint:fix": "eslint --fix . --ext .js,.jsx --ignore-path .gitignore"
+    "lint:fix": "eslint --fix . --ext .js,.jsx --ignore-path .gitignore",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/__tests__/**/*.test.js"],
+    "setupFiles": ["<rootDir>/__tests__/setup.js"]
   },
   "dependencies": {
     "@mapbox/sphericalmercator": "^1.1.0",
@@ -30,16 +38,18 @@
     "pg-parse-float": "^0.0.1",
     "prettier": "^2.7.1",
     "redis": "5.8.2",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0",
     "uuid": "^8.3.2",
     "validator": "^13.7.0",
-    "wkt": "^0.1.1",
-    "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.0"
+    "wkt": "^0.1.1"
   },
   "devDependencies": {
     "eslint": "^8.24.0",
     "eslint-config-airbnb-base": "^15.0.0",
-    "eslint-plugin-import": "^2.26.0"
+    "eslint-plugin-import": "^2.26.0",
+    "jest": "^30.4.2",
+    "supertest": "^7.2.2"
   },
   "overrides": {
     "qs": "^6.13.0",
