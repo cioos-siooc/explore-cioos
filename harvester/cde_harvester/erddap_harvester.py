@@ -30,7 +30,7 @@ from cde_harvester.harvest_errors import (
 )
 from cde_harvester.profiles import get_profiles
 from requests.exceptions import HTTPError
-from prefect import get_run_logger, task
+from prefect import task
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ class DatasetHarvestResult:
     """Outcome of harvesting a single dataset (success or non-error skip).
 
     Error outcomes are raised as DatasetHarvestError instead, so the
-    per-dataset Prefect task run shows as Failed."""
+    parent harvest loop records them and continues."""
 
     status: str                      # "success" | "skipped"
     attempt: dict                    # one harvest_attempts.csv row
@@ -86,8 +86,8 @@ class DatasetHarvestResult:
 
 
 class DatasetHarvestError(Exception):
-    """Raised by harvest_dataset on an error outcome so Prefect marks the task
-    Failed. Carries the audit data the parent loop still needs to persist."""
+    """Raised by harvest_dataset on an error outcome. Carries the audit data
+    the parent loop still needs to persist (it catches this and continues)."""
 
     def __init__(self, attempt, skipped_reason_code, message):
         super().__init__(message)
@@ -216,11 +216,10 @@ class ERDDAPHarvester(BaseHarvester):
             ))
         if on_skip_list:
             df_all_datasets = df_all_datasets.query("datasetID not in @on_skip_list")
-        # Process each dataset as its own Prefect task, strictly one at a time
-        # (called directly, not .submit()), so a server is never hit by
-        # concurrent requests from us and every dataset shows as its own task
-        # run — Completed (green) on success/skip, Failed (red) on error —
-        # nested under this server's task in the Prefect UI.
+        # Harvest each dataset strictly one at a time (plain serial calls), so a
+        # server is never hit by concurrent requests from us. Per-dataset
+        # outcomes are reported via the 'harvest-dataset-status' table artifact
+        # and harvest_attempts.csv, not per-dataset Prefect task runs.
         total = len(df_all_datasets)
         for i, df_dataset_row in enumerate(df_all_datasets.itertuples(index=False)):
             dataset_id = df_dataset_row.datasetID
@@ -239,9 +238,8 @@ class ERDDAPHarvester(BaseHarvester):
                         [erddap.domain, dataset_id, result.skipped_reason_code]
                     ]
             except DatasetHarvestError as e:
-                # The per-dataset task is already marked Failed in Prefect; we
-                # still persist its error row + skipped-reason here so the
-                # server harvest continues and the audit trail stays complete.
+                # Persist the error row + skipped-reason here so the server
+                # harvest continues and the audit trail stays complete.
                 attempt_records.append(e.attempt)
                 skipped_datasets_reasons += [
                     [erddap.domain, dataset_id, e.skipped_reason_code]
@@ -277,21 +275,24 @@ class ERDDAPHarvester(BaseHarvester):
         )
 
 
-@task(task_run_name="{dataset_id}")
 def harvest_dataset(erddap, dataset_id, run_id=None, idx=None, total=None):
-    """Harvest a single ERDDAP dataset as its own Prefect task run.
+    """Harvest a single ERDDAP dataset.
 
     Reuses the already-constructed `erddap` object (the server connection +
     allDatasets are fetched once by the parent task — we must NOT rebuild it
-    per dataset). Called directly (not .submit()) and serially by
-    ERDDAPHarvester.harvest(), so a server is only ever hit one dataset at a
-    time.
+    per dataset). Called directly and serially by ERDDAPHarvester.harvest(),
+    so a server is only ever hit one dataset at a time.
 
-    Returns a DatasetHarvestResult on success/skip (-> task Completed). Raises
-    DatasetHarvestError on an error outcome (-> task Failed in the Prefect UI),
-    carrying the audit row the parent still needs to persist.
+    A plain function (not a @task): at hundreds of datasets per server the
+    per-dataset task runs only bloated Prefect's DB/UI for no concurrency gain
+    (it's called serially). Post-run triage is served by the
+    'harvest-dataset-status' table artifact + harvest_attempts.csv instead.
+
+    Returns a DatasetHarvestResult on success/skip. Raises DatasetHarvestError
+    on an error outcome, carrying the audit row the parent still needs to
+    persist (the parent's loop catches it and continues).
     """
-    log = get_run_logger()
+    log = erddap.get_logger()
     erddap_url = erddap.url
     t0 = time.monotonic()
     # Pre-declare so the exception handlers can still pull queried_urls if
