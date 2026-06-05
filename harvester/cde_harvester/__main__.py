@@ -180,6 +180,51 @@ def _resolve_source(source, erddap_urls_list):
     )
 
 
+# Order statuses worst-first so failures sort to the top of the artifact table.
+_STATUS_SORT = {"error": 0, "skipped": 1, "success": 2}
+
+
+def _publish_status_artifact(df_attempts, run_id, run_status, logger):
+    """Publish the per-dataset harvest status as a Prefect table artifact (keyed
+    'harvest-dataset-status') so it shows in the run's Artifacts tab. No-op
+    (debug-logged) outside a flow/task run context — never fails the run."""
+    try:
+        from prefect.artifacts import create_table_artifact
+    except Exception:
+        return
+    if df_attempts is None or df_attempts.empty:
+        return
+
+    # Readable subset; drop run_id (constant), query_urls (long) and attempted_at.
+    cols = ["dataset_id", "source", "status", "reason_code", "duration_ms",
+            "error_message", "erddap_url"]
+    df = df_attempts[[c for c in cols if c in df_attempts.columns]].copy()
+    if "status" in df.columns:
+        df = (
+            df.assign(_o=df["status"].map(lambda s: _STATUS_SORT.get(s, 3)))
+            .sort_values(["_o", "dataset_id"])
+            .drop(columns="_o")
+        )
+    # JSON-safe rows: NaN/NaT -> None.
+    rows = [
+        {k: (None if pd.isna(v) else v) for k, v in r.items()}
+        for r in df.to_dict("records")
+    ]
+    counts = (
+        df["status"].value_counts().to_dict() if "status" in df.columns else {}
+    )
+    summary = ", ".join(f"{k}={v}" for k, v in sorted(counts.items())) or "no attempts"
+    try:
+        create_table_artifact(
+            key="harvest-dataset-status",
+            table=rows,
+            description=f"Per-dataset harvest status (run {run_id}, {run_status}): {summary}",
+        )
+        logger.info("Published dataset-status Prefect artifact (%d rows): %s", len(rows), summary)
+    except Exception as e:
+        logger.debug("Could not publish dataset-status artifact: %s", e)
+
+
 def _write_run_audit_csvs(folder, run_id, started_at, finished_at, git_sha,
                           status, error_message, attempts_frames, logger,
                           prefect_flow_run_id=None, scope="full",
@@ -221,6 +266,9 @@ def _write_run_audit_csvs(folder, run_id, started_at, finished_at, git_sha,
         "Wrote run audit: %s (status=%s) + %s (%d attempts)",
         runs_file, status, attempts_file, len(df_attempts),
     )
+
+    # Surface the same per-dataset statuses in the Prefect UI as a table artifact.
+    _publish_status_artifact(df_attempts, run_id, status, logger)
 
 
 def _run_logger():

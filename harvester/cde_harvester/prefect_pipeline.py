@@ -41,6 +41,54 @@ def _run_logger():
     except Exception:
         return logger
 
+# Upload at most this many bytes (tail) of the log into the markdown artifact;
+# Prefect/UI handle large markdown poorly, and the full file stays on disk.
+_LOG_ARTIFACT_MAX_BYTES = 200_000
+
+
+def _publish_log_artifact(log_path):
+    """Upload the harvest log file as a Prefect markdown artifact (keyed
+    'harvest-log') so it's viewable from the run's Artifacts tab. If
+    HARVESTER_LOG_BASE_URL is set, also embed a clickable link to the served
+    file (served at {base}/harvester_logs/{name}). No-op outside a run context."""
+    if not log_path:
+        return
+    try:
+        from prefect.artifacts import create_markdown_artifact
+    except Exception:
+        return
+    try:
+        text = Path(log_path).read_text(errors="replace")
+    except OSError as e:
+        logger.warning("Could not read log file for artifact: %s", e)
+        return
+
+    name = Path(log_path).name
+    truncated = len(text) > _LOG_ARTIFACT_MAX_BYTES
+    if truncated:
+        text = text[-_LOG_ARTIFACT_MAX_BYTES:]
+
+    lines = []
+    base = (os.getenv("HARVESTER_LOG_BASE_URL") or "").strip().rstrip("/")
+    if base:
+        lines.append(f"[Open full log]({base}/harvester_logs/{name})\n")
+    lines.append(
+        f"_Showing last {_LOG_ARTIFACT_MAX_BYTES // 1000} KB of `{name}`._\n"
+        if truncated else f"_`{name}`_\n"
+    )
+    lines.append("```\n" + text + "\n```")
+    try:
+        create_markdown_artifact(
+            key="harvest-log",
+            markdown="\n".join(lines),
+            description=f"Harvest log file {name}",
+        )
+        logger.info("Published harvest log Prefect artifact (%s)", name)
+    except Exception as e:
+        # Outside a flow/task run context, or API hiccup — never fail the run for this.
+        logger.debug("Could not publish log artifact: %s", e)
+
+
 # OBIS aliases the dashboard / a deployment may pass; kept in sync with
 # cde_harvester.__main__._OBIS_ALIASES.
 _OBIS_ALIASES = {"obis", "https://obis.org", "http://obis.org", "obis.org"}
@@ -188,58 +236,65 @@ class PrefectCDEPipeline:
             if log_path:
                 logger.info("Writing harvest log file: %s (served at /harvester_logs/)", log_path)
 
-            # OBIS cache is shared across runs and MUST live outside the per-run tree
-            # (pruning rmtrees per-server run dirs); keep it a sibling of base_folder.
-            obis_folder = Path(self.obis_folder) if self.obis_folder else base_folder.resolve().parent / "obis_cache"
-            abs_run, abs_obis = run_folder.resolve(), obis_folder.resolve()
-            assert abs_obis != abs_run and abs_run not in abs_obis.parents, (
-                f"OBIS cache {obis_folder} must not be inside the per-run folder {run_folder}"
-            )
-            logger.info("Run output folder: %s (shared OBIS cache: %s)", run_folder, obis_folder)
-
-            logger.info("Running cde_harvester subflow")
+            # try/finally so the log file is uploaded as a Prefect artifact on
+            # both success AND failure (a failed run is exactly when the log
+            # matters); the per-dataset status table is published separately
+            # from the harvester (see __main__._publish_status_artifact).
             try:
-                harvester_main(
-                    erddap_urls=self.erddap_urls,
-                    cache_requests=self.cache_requests,
-                    folder=str(run_folder),
-                    dataset_ids=self.dataset_ids,
-                    obis_dataset_ids=self.obis_dataset_ids,
-                    obis_folder=str(obis_folder),
-                    source=self.source,
-                    triggered_by=self.triggered_by,
+                # OBIS cache is shared across runs and MUST live outside the per-run tree
+                # (pruning rmtrees per-server run dirs); keep it a sibling of base_folder.
+                obis_folder = Path(self.obis_folder) if self.obis_folder else base_folder.resolve().parent / "obis_cache"
+                abs_run, abs_obis = run_folder.resolve(), obis_folder.resolve()
+                assert abs_obis != abs_run and abs_run not in abs_obis.parents, (
+                    f"OBIS cache {obis_folder} must not be inside the per-run folder {run_folder}"
                 )
-                logger.info("cde_harvester completed successfully")
-            except Exception as e:
-                logger.error(f"cde_harvester failed: {e}", exc_info=True)
-                raise
+                logger.info("Run output folder: %s (shared OBIS cache: %s)", run_folder, obis_folder)
 
-            # Force incremental for single-source runs: full-reload TRUNCATEs every
-            # table and would wipe the other sources.
-            effective_incremental = self.incremental or bool(self.source)
-            if self.source and not self.incremental:
-                logger.warning("Single-source run (source=%s): forcing incremental db-load.", self.source)
-            logger.info("Running cde_db_loader subflow")
-            try:
-                db_loader_main(folder=str(run_folder), incremental=effective_incremental)
-                logger.info("cde_db_loader completed successfully")
-                # Prune only after a successful load so failed runs' CSVs survive.
-                _prune_server_run_folders(base_folder, protect=[run_folder])
-            except Exception as e:
-                logger.error(f"cde_db_loader failed: {e}", exc_info=True)
-                raise
-
-            if self.flush_redis:
-                logger.info("Refreshing redis cache")
+                logger.info("Running cde_harvester subflow")
                 try:
-                    clearRedisCache()
-                    reloadTopRequests()
-                    logger.info("redis refresh completed successfully")
+                    harvester_main(
+                        erddap_urls=self.erddap_urls,
+                        cache_requests=self.cache_requests,
+                        folder=str(run_folder),
+                        dataset_ids=self.dataset_ids,
+                        obis_dataset_ids=self.obis_dataset_ids,
+                        obis_folder=str(obis_folder),
+                        source=self.source,
+                        triggered_by=self.triggered_by,
+                    )
+                    logger.info("cde_harvester completed successfully")
                 except Exception as e:
-                    logger.error(f"redis refresh failed: {e}", exc_info=True)
+                    logger.error(f"cde_harvester failed: {e}", exc_info=True)
                     raise
 
-            logger.info("CDE Pipeline completed successfully")
+                # Force incremental for single-source runs: full-reload TRUNCATEs every
+                # table and would wipe the other sources.
+                effective_incremental = self.incremental or bool(self.source)
+                if self.source and not self.incremental:
+                    logger.warning("Single-source run (source=%s): forcing incremental db-load.", self.source)
+                logger.info("Running cde_db_loader subflow")
+                try:
+                    db_loader_main(folder=str(run_folder), incremental=effective_incremental)
+                    logger.info("cde_db_loader completed successfully")
+                    # Prune only after a successful load so failed runs' CSVs survive.
+                    _prune_server_run_folders(base_folder, protect=[run_folder])
+                except Exception as e:
+                    logger.error(f"cde_db_loader failed: {e}", exc_info=True)
+                    raise
+
+                if self.flush_redis:
+                    logger.info("Refreshing redis cache")
+                    try:
+                        clearRedisCache()
+                        reloadTopRequests()
+                        logger.info("redis refresh completed successfully")
+                    except Exception as e:
+                        logger.error(f"redis refresh failed: {e}", exc_info=True)
+                        raise
+
+                logger.info("CDE Pipeline completed successfully")
+            finally:
+                _publish_log_artifact(log_path)
 
     def create_process_work_pool(self, pool_name="cde-process-pool"):
         """Create the `process` work pool (idempotent; safe under concurrent replicas)."""
