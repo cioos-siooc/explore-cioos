@@ -23,12 +23,23 @@ from cde_harvester.__main__ import (
     load_obis_dataset_ids,
     main as harvester_main,
 )
-from cde_harvester.redisFunctions import redisFlow
+from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
 from cde_db_loader.__main__ import main as db_loader_main
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+
+def _run_logger():
+    """Prefect run logger when inside a run, else the module logger.
+
+    The pipeline steps below are plain methods now (not @flow), so some run
+    outside a flow context (e.g. init_config on the prod deploy path)."""
+    try:
+        return get_run_logger()
+    except Exception:
+        return logger
 
 # OBIS aliases the dashboard / a deployment may pass; kept in sync with
 # cde_harvester.__main__._OBIS_ALIASES.
@@ -37,7 +48,7 @@ _OBIS_ALIASES = {"obis", "https://obis.org", "http://obis.org", "obis.org"}
 # Process work pool the worker(s) poll; flows run in-process (no spawned containers).
 POOL_NAME = "cde-process-pool"
 # @flow name of cde_pipeline_run; must match harvest-dashboard/app/config.HARVEST_FLOW_NAME.
-HARVEST_FLOW_NAME = "CDE Pipeline Run"
+HARVEST_FLOW_NAME = "Harvest Source"
 
 TIMESTAMP_FMT = "%Y%m%d_%H%M%S"
 KEEP_RUNS_PER_SERVER = 5
@@ -133,10 +144,9 @@ class PrefectCDEPipeline:
     source: str
     triggered_by: str
 
-    @flow(name="Init CDE Config", log_prints=True)
     def init_config(self, config_file=None):
         """Load harvest_config.yaml into this pipeline instance."""
-        logger = get_run_logger()
+        logger = _run_logger()
         logger.info("INIT CDE Pipeline")
         if not config_file:
             raise ValueError("config_file is required")
@@ -164,10 +174,9 @@ class PrefectCDEPipeline:
         logger.info("CDE Pipeline initialized with configuration:")
         logger.info(f"{vars(self)}")
 
-    @flow(name="CDE Pipeline", log_prints=True)
     def cde_pipeline(self):
         """Harvest one source (or all), load to DB, optionally refresh redis."""
-        logger = get_run_logger()
+        logger = _run_logger()
         logger.info("Starting CDE Pipeline")
 
         # Per-server, per-run folder {base}/{slug}/{ts} so concurrent runs don't clobber.
@@ -221,17 +230,17 @@ class PrefectCDEPipeline:
                 raise
 
             if self.flush_redis:
-                logger.info("Running redisFlow subflow")
+                logger.info("Refreshing redis cache")
                 try:
-                    redisFlow()
-                    logger.info("redisFlow completed successfully")
+                    clearRedisCache()
+                    reloadTopRequests()
+                    logger.info("redis refresh completed successfully")
                 except Exception as e:
-                    logger.error(f"redisFlow failed: {e}", exc_info=True)
+                    logger.error(f"redis refresh failed: {e}", exc_info=True)
                     raise
 
             logger.info("CDE Pipeline completed successfully")
 
-    @flow(name="Create Process Work Pool", log_prints=True)
     def create_process_work_pool(self, pool_name="cde-process-pool"):
         """Create the `process` work pool (idempotent; safe under concurrent replicas)."""
         base_job_template = {
@@ -283,7 +292,6 @@ class PrefectCDEPipeline:
                 else:
                     raise
 
-    @flow(name="Create Deployment", log_prints=True)
     def create_deployment(self):
         """Register the work pool + all deployments (idempotent)."""
         self.create_process_work_pool(POOL_NAME)
@@ -418,7 +426,23 @@ def _resolve_harvest_config_file(config_file):
     return config_file
 
 
-@flow(name="CDE Pipeline Run", log_prints=True)
+def _pipeline_run_name():
+    """Per-run label: every ERDDAP source -> 'harvest-erddap-{full-host}'
+    (host with dots replaced by dashes), OBIS -> 'harvest-obis', full run ->
+    'harvest-full'. This sets only the flow_run_name — the flow NAME stays
+    'Harvest Source' so the dashboard deployment lookup still works."""
+    from prefect.runtime import flow_run
+
+    source = (flow_run.parameters or {}).get("source")
+    if not source:
+        return "harvest-full"
+    slug = deployment_slug(source)  # full host, dots -> dashes (e.g. erddap-amundsenscience-com)
+    if slug == "obis":
+        return "harvest-obis"
+    return f"harvest-erddap-{slug}"
+
+
+@flow(name="Harvest Source", flow_run_name=_pipeline_run_name, log_prints=True)
 def cde_pipeline_run(
     config_file: str = "/app/harvester/harvest_config.yaml",
     source: str | None = None,
@@ -457,7 +481,7 @@ def _trigger_source_harvest(source: str, triggered_by: str | None = None):
     }
 
 
-@flow(name="CDE Harvest All", log_prints=True)
+@flow(name="Harvest All Sources", log_prints=True)
 def cde_harvest_all_run(
     config_file: str = "/app/harvester/harvest_config.yaml",
     triggered_by: str | None = None,
@@ -550,18 +574,20 @@ def main():
     parser.add_argument("-d", "--deployment", type=str, default="local", help="Deployment target (local or prod)")
     args = parser.parse_args()
 
-    pipeline = PrefectCDEPipeline()
+    if not args.file:
+        logger.error("No config file provided. Use -f to specify harvest_config.yaml")
+        sys.exit(1)
     try:
-        if args.file:
-            pipeline.init_config(config_file=args.file)
-        else:
-            logger.error("No config file provided. Use -f to specify harvest_config.yaml")
-            sys.exit(1)
         if args.deployment == "prod":
             # 'prod' only REGISTERS deployments and exits; the worker runs them.
+            pipeline = PrefectCDEPipeline()
+            pipeline.init_config(config_file=args.file)
             deploy(pipeline)
         else:
-            pipeline.cde_pipeline()
+            # Local full run: go through the Harvest Source flow so init/harvest/
+            # load all execute inside a flow context (the harvest .submit() tasks
+            # need a task runner).
+            cde_pipeline_run(config_file=args.file)
     except Exception as e:
         logger.error(f"CDE Pipeline failed: {e}", exc_info=True)
         sys.exit(1)

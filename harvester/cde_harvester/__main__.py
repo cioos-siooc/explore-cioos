@@ -223,12 +223,24 @@ def _write_run_audit_csvs(folder, run_id, started_at, finished_at, git_sha,
     )
 
 
-@flow(name="cde-main", log_prints=True)
+def _run_logger():
+    """Prefect run logger when inside a run, else the module logger.
+
+    `main` is a plain function now (no longer a @flow), so it can be called
+    outside a flow context (the bare CLI wraps it in an ad-hoc flow, but the
+    fallback keeps it safe regardless).
+    """
+    try:
+        return get_run_logger()
+    except Exception:
+        return logger
+
+
 @monitor(monitor_slug="main-harvester")
 def main(erddap_urls, cache_requests, folder, dataset_ids,
          obis_dataset_ids=None, obis_folder=None, obis_geo_filter=None,
          source=None, triggered_by=None):
-    logger = get_run_logger()
+    logger = _run_logger()
     limit_dataset_ids = None
     if dataset_ids:
         limit_dataset_ids = dataset_ids.split(",")
@@ -667,9 +679,13 @@ if __name__ == "__main__":
 
     logger = setup_logging(log_time, log_level, log_dir)
     try:
-        main(urls, cache, folder or "harvest", dataset_ids,
-             obis_dataset_ids=obis_dataset_ids, obis_folder=obis_folder,
-             obis_geo_filter=obis_geo_filter)
+        # main is a plain function now; wrap it in an ad-hoc flow so the
+        # standalone CLI still has a flow context (the harvest .submit() tasks
+        # need a task runner).
+        flow(name="cde-main", log_prints=True)(main)(
+            urls, cache, folder or "harvest", dataset_ids,
+            obis_dataset_ids=obis_dataset_ids, obis_folder=obis_folder,
+            obis_geo_filter=obis_geo_filter)
     except Exception as e:
         logger.error("Harvester failed!!!", exc_info=True)
         raise e

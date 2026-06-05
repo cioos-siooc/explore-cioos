@@ -29,7 +29,7 @@ PREFECT_UI_URL = os.environ.get(
 
 # The registered @flow name of the deployable harvest pipeline
 # (prefect_pipeline.cde_pipeline_run). Per-source deployments live under it.
-HARVEST_FLOW_NAME = os.environ.get("HARVEST_FLOW_NAME", "CDE Pipeline Run")
+HARVEST_FLOW_NAME = os.environ.get("HARVEST_FLOW_NAME", "Harvest Source")
 
 # Kill-switch. When false (default) the trigger button is hidden and the POST
 # endpoint returns 403.

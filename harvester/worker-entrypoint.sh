@@ -31,7 +31,7 @@ if [ "${REGISTER_DEPLOYMENTS:-true}" = "true" ]; then
     # replica count. Triggers the orchestrator, which launches one harvest job
     # per server (same as the cron path). Non-fatal so a transient API hiccup
     # can't block the worker.
-    uv run prefect deployment run "CDE Harvest All/cde-harvest-all" \
+    uv run prefect deployment run "Harvest All Sources/cde-harvest-all" \
       || echo "[worker-entrypoint] run-on-deploy trigger failed; worker will still start"
   fi
 fi

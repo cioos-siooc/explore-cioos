@@ -321,8 +321,23 @@ class ERDDAPHarvester(BaseHarvester):
         )
 
 
-@task(task_run_name="harvest-{erddap_url}")
+def _erddap_task_run_name():
+    """Task run label 'harvest-erddap-{full-host}' (dots -> dashes), matching the
+    'Harvest Source' flow_run_name. Computed locally (not via prefect_pipeline.
+    deployment_slug) to avoid a circular import."""
+    from prefect.runtime import task_run
+
+    url = (task_run.parameters or {}).get("erddap_url", "") or ""
+    host = urlparse(url if "://" in url else "https://" + url).hostname or str(url)
+    return f"harvest-erddap-{host.lower().replace('.', '-')}"
+
+
+@task(task_run_name=_erddap_task_run_name)
 def harvest_erddap(erddap_url, limit_dataset_ids=None, cache_requests=False, run_id=None):
-    """Prefect task wrapper for ERDDAPHarvester."""
+    """Prefect task wrapper for ERDDAPHarvester.
+
+    Stays a @task (not a subflow) so multiple servers harvest concurrently via
+    .submit() — Prefect subflows run sequentially, tasks don't.
+    """
     harvester = ERDDAPHarvester(erddap_url, limit_dataset_ids, cache_requests, run_id=run_id)
     return harvester.harvest()

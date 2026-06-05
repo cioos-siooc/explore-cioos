@@ -206,7 +206,7 @@ services:
       # Kill-switch for the trigger button (the dashboard itself is behind
       # Cloudflare Access). Off by default.
       - HARVEST_TRIGGER_ENABLED=${HARVEST_TRIGGER_ENABLED:-false}
-      - HARVEST_FLOW_NAME=${HARVEST_FLOW_NAME:-CDE Pipeline Run}
+      - HARVEST_FLOW_NAME=${HARVEST_FLOW_NAME:-Harvest Source}
     expose:
       - "8001"
     depends_on:
