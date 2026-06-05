@@ -1,8 +1,7 @@
 [project]
-name = "cioos-harvester-tests"
+name = "harvester-tests"
 version = "0.1.0"
-description = "Validation test suite for the CIOOS data harvester pipeline"
-readme = "README.md"
+description = "Unit and integration tests for the CIOOS harvester pipeline"
 requires-python = ">=3.10,<3.11"
 dependencies = [
     "harvester",
@@ -13,8 +12,8 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-harvester = { path = "../harvester", editable = true }
-db-loader = { path = "../db-loader", editable = true }
+harvester = { path = "../", editable = true }
+db-loader = { path = "../../db-loader", editable = true }
 
 [tool.pytest.ini_options]
 testpaths = ["unit", "integration"]

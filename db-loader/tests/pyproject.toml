@@ -1,0 +1,19 @@
+[project]
+name = "db-loader-tests"
+version = "0.1.0"
+description = "Unit tests for the CIOOS db-loader"
+requires-python = ">=3.10,<3.11"
+dependencies = [
+    "db-loader",
+    "harvester",
+    "pytest>=8.2",
+    "pytest-mock>=3.14",
+]
+
+[tool.uv.sources]
+db-loader = { path = "../", editable = true }
+harvester = { path = "../../harvester", editable = true }
+
+[tool.pytest.ini_options]
+testpaths = ["unit"]
+addopts = "-v --tb=short"
