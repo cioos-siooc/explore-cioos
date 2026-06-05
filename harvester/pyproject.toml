@@ -30,7 +30,7 @@ requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["cde_harvester", "harvest_validator"]
+packages = ["cde_harvester"]
 
 [tool.uv.sources]
 db-loader = { path = "../db-loader", editable = true }
