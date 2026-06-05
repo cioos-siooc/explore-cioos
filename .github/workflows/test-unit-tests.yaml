@@ -44,15 +44,12 @@ jobs:
 
       - name: Run harvester tests
         if: steps.changes.outputs.harvester == 'true'
-        working-directory: ./harvester
-        run: uv run pytest
+        run: uv run pytest harvester
 
       - name: Run db-loader tests
         if: steps.changes.outputs.db-loader == 'true'
-        working-directory: ./db-loader
-        run: uv run pytest
+        run: uv run pytest db-loader
 
       - name: Run downloader tests
         if: steps.changes.outputs.downloader == 'true'
-        working-directory: ./downloader
-        run: uv run pytest
+        run: uv run pytest downloader
