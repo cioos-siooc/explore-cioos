@@ -3,7 +3,6 @@
 
 
 import re
-from datetime import datetime, timezone
 
 import diskcache as dc
 import pandas as pd
@@ -47,45 +46,6 @@ def _ckan_get_result(session, url):
             f"CKAN returned a non-JSON body (HTTP {resp.status_code}) for {url}: {snippet!r}"
         ) from e
     return payload["result"]
-
-
-# Last known-good CKAN records, used as the fallback when a live fetch fails.
-_CKAN_CACHE_DIR = "ckan_harvester_cache"
-_LAST_GOOD_KEY = "last_good_erddap_records"
-
-
-def _ckan_cache():
-    return dc.Cache(
-        _CKAN_CACHE_DIR,
-        eviction_policy="none",
-        size_limit=10000000000,
-        cull_limit=0,
-    )
-
-
-def _store_last_good_records(records, logger):
-    """Persist the record list as the fallback for future failed fetches (best-effort)."""
-    try:
-        with _ckan_cache() as cache:
-            cache[_LAST_GOOD_KEY] = {
-                "fetched_at": datetime.now(timezone.utc).isoformat(),
-                "records": records,
-            }
-    except Exception as e:
-        logger.warning("Could not store last-good CKAN cache: %s", e)
-
-
-def _load_last_good_records(logger):
-    """Return (records, fetched_at_iso) from the last-good cache, or (None, None)."""
-    try:
-        with _ckan_cache() as cache:
-            entry = cache.get(_LAST_GOOD_KEY)
-    except Exception as e:
-        logger.warning("Could not read last-good CKAN cache: %s", e)
-        return None, None
-    if not entry:
-        return None, None
-    return entry.get("records"), entry.get("fetched_at")
 
 
 def split_erddap_url(url):
@@ -209,28 +169,8 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
 
 
 def list_ckan_records_with_erddap_urls(cache_requests):
-    """Fetch all CKAN records with ERDDAP urls; on failure fall back to the
-    last known-good cache (WARNING), re-raising only if none exists."""
+    """Fetch all CKAN records with ERDDAP urls (paged)."""
     logger = get_run_logger()
-    try:
-        records = _fetch_all_ckan_records(cache_requests, logger)
-        _store_last_good_records(records, logger)
-        return records
-    except (requests.exceptions.RequestException, RuntimeError, KeyError) as e:
-        records, fetched_at = _load_last_good_records(logger)
-        if records is not None:
-            logger.warning(
-                "CKAN fetch failed (%s); falling back to last known-good cached "
-                "CKAN records (%d records, fetched %s). Metadata enrichment may "
-                "be stale.",
-                e, len(records), fetched_at,
-            )
-            return records
-        logger.error("CKAN fetch failed and no last-good cache is available: %s", e)
-        raise
-
-
-def _fetch_all_ckan_records(cache_requests, logger):
     logger.info(f"cache_requests: {cache_requests}")
     row_page_limit = 1000
     row_start = 0
