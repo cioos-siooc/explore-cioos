@@ -43,11 +43,9 @@ services:
       - harvester_logs:/app/harvester/logs
       - harvester_cache:/app/harvester/harvester_cache
       - obis_cache:/app/harvester/obis_cache
-      - cde_overrides:/app/harvester/overrides
 
 volumes:
   harvest_data:
   harvester_logs:
   harvester_cache:
   obis_cache:
-  cde_overrides:

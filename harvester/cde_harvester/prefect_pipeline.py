@@ -455,12 +455,11 @@ def _normalize_coolify_multiline(value: str) -> str:
 
 
 def _resolve_harvest_config_file(config_file):
-    """Resolve effective config: HARVEST_CONFIG_YAML env > overrides/ file > baked-in default.
+    """Resolve effective config: HARVEST_CONFIG_YAML env > mounted/baked-in default.
 
     Also writes OBIS_DATASETS_JSON to /tmp/Obis_Datasets.json when set.
     """
     env_config = os.getenv("HARVEST_CONFIG_YAML", "").strip()
-    override_path = Path("/app/harvester/overrides/harvest_config.yaml")
     if env_config:
         # Coolify indents multi-line env var continuations; strip it so the YAML parses.
         env_config = _normalize_coolify_multiline(env_config)
@@ -468,11 +467,8 @@ def _resolve_harvest_config_file(config_file):
         env_config_path.write_text(env_config)
         config_file = str(env_config_path)
         logger.info(f"Using HARVEST_CONFIG_YAML env var ({len(env_config)} bytes -> {env_config_path})")
-    elif override_path.exists():
-        config_file = str(override_path)
-        logger.info(f"Using override harvest config: {override_path}")
     else:
-        logger.info(f"Using baked-in harvest config: {config_file}")
+        logger.info(f"Using harvest config file: {config_file}")
 
     env_obis = os.getenv("OBIS_DATASETS_JSON", "").strip()
     if env_obis:

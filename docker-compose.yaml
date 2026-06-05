@@ -97,11 +97,6 @@ services:
       # Caches persisted across runs (cheap re-fetch if lost).
       - harvester_cache:/app/harvester/harvester_cache
       - obis_cache:/app/harvester/obis_cache
-      # Operator-managed overrides for harvest_config.yaml / Obis_Datasets.json.
-      # Drop files into this named volume (via `docker cp` or `docker exec`
-      # into prefect_worker) and the next run will use them automatically.
-      # See cde_pipeline_run() in prefect_pipeline.py.
-      - cde_overrides:/app/harvester/overrides
     env_file:
       - .env
     environment:
@@ -223,4 +218,3 @@ volumes:
   harvester_cache:
   harvest_data:
   obis_cache:
-  cde_overrides:

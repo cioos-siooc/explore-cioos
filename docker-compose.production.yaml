@@ -90,7 +90,6 @@ services:
       - ./ckan_harvester_cache:/app/harvester/ckan_harvester_cache
       - ./harvest:/app/harvester/harvest                  # resulting CSV files
       - ./harvester_logs:/app/harvester/logs              # log files (served by nginx)
-      - ./overrides:/app/harvester/overrides
     environment:
       - PREFECT_API_URL=http://prefect:4200/api
       - HARVESTER_LOG_DIR=/app/harvester/logs
