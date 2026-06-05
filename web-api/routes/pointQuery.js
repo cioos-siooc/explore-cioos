@@ -60,13 +60,7 @@ const cache = require("../utils/cache");
  *                 type: object
  */
 router.get("/", cache.route(), async (req, res, next) => {
-  let rows;
-  try {
-    rows = await getShapeQuery(req.query, false, false);
-  } catch (err) {
-    if (err.statusCode === 400) return res.status(400).json({ error: err.message });
-    throw err;
-  }
+  const rows = await getShapeQuery(req.query, false, false);
   res.send(rows);
 });
 module.exports = router;

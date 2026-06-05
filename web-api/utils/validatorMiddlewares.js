@@ -22,12 +22,6 @@ function generalFiltersMiddleWare() {
     check("eovs")
       .matches(/^[a-zA-Z,]*$/)
       .optional(),
-    check("scientificNames")
-      // letters, digits, space, period, comma, apostrophe, parens, hyphen
-      // (accommodates subgenus notation like "Halichondria (Halichondria) phakellioides")
-      .matches(/^[A-Za-z0-9 .,'()\-]*$/)
-      .isLength({ max: 4000 })
-      .optional(),
   ];
 }
 function datasetDetailsMiddleware() {
@@ -99,5 +93,4 @@ module.exports = {
   requiredShapeMiddleware,
   generalFiltersMiddleWare,
   datasetDetailsMiddleware,
-  errorHandler,
 };

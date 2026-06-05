@@ -88,19 +88,13 @@ router.get(
       lang = "en",
     } = req.query;
 
-    let shapeQueryResponse;
-    let filters;
-    try {
-      shapeQueryResponse = await getShapeQuery(req.query, true, false);
-      filters = await createDBFilter(req.query);
-    } catch (err) {
-      if (err.statusCode === 400) return res.status(400).json({ error: err.message });
-      throw err;
-    }
+    const shapeQueryResponse = await getShapeQuery(req.query, true, false);
     const estimateTotalSize = shapeQueryResponse.reduce(
       (partialSum, { size }) => partialSum + size,
       0,
     );
+
+    const filters = createDBFilter(req.query);
 
     const wktPolygon = polygonJSONToWKT(polygon);
 

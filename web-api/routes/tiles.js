@@ -57,72 +57,39 @@ router.get(
   async (req, res) => {
     const { z, x, y } = req.params;
 
-    let filters;
-    try {
-      filters = await createDBFilter(req.query);
-    } catch (err) {
-      if (err.statusCode === 400) return res.status(400).json({ error: err.message });
-      throw err;
-    }
+    const filters = createDBFilter(req.query);
+    const hasFilter = filters.toSQL().sql;
 
     // zoom levels: 0-4,5-6,7+
     const isHexGrid = z < 7;
+    const zoomColumn = z < 5 ? "hex_zoom_0" : "hex_zoom_1";
     const zoomPKColumn = z < 5 ? "hex_0_pk" : "hex_1_pk";
-    const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
 
-    const includeObis = req.query.includeObis !== 'false';
-    // Scientific-name and OBIS-node filters are OBIS-only: when either is
-    // set, hide profiles and narrow to OBIS rows.
-    const includeProfiles = !req.query.scientificNames && !req.query.obisNodes;
-
-    // At hex zoom we only need the hex FK and point_pk (for distinct counts);
-    // the polygon is fetched once per hex via JOIN to hexes_zoom_*. At point
-    // zoom we project the actual point geom.
-    const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
-           time_min, time_max, latitude, longitude, depth_min, depth_max
-    FROM cde.profiles`;
-    const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
-           date_part('days', time_max - time_min) + 1 as record_count,
-           time_min, time_max, latitude, longitude, depth_min, depth_max
-    FROM cde.obis_cells
-    WHERE :obisFilters`;
-
-    const branches = [];
-    if (includeProfiles) branches.push(profilesBranch);
-    if (includeObis) branches.push(obisBranch);
-    // Guard: if nothing to show, return an empty CTE that still has the right columns
-    const combinedInner = branches.length
-      ? branches.join("\n    UNION ALL\n    ")
-      : `${profilesBranch} WHERE FALSE`;
-
-    const relevantPointsSQL = isHexGrid
-      ? `SELECT p.zoom_pk pk, count(distinct p.point_pk) count,
-                array_to_json(array_agg(distinct d.pk_url)) datasets,
-                h.geom AS geom
-         FROM combined p
-         JOIN cde.datasets d ON p.dataset_pk = d.pk
-         JOIN ${hexesTable} h ON h.pk = p.zoom_pk
-         ${filters.hasShared ? "WHERE :filters" : ""}
-         GROUP BY p.zoom_pk, h.geom`
-      : `SELECT p.point_pk pk, d.platform as platform, sum(p.record_count)::bigint count,
-                array_to_json(array_agg(distinct d.pk_url)) datasets,
-                p.point_geom AS geom
-         FROM combined p
-         JOIN cde.datasets d ON p.dataset_pk = d.pk
-         ${filters.hasShared ? "WHERE :filters" : ""}
-         GROUP BY p.point_geom, p.point_pk, d.platform`;
-
-    // Combine profiles and obis_cells so both appear on the map
+    // calculate the bounding polygon for this tile
+    const sqlQuery = {
+      table: "cde.profiles",
+      // if its a zoom level where hexes are show, return the hex shapes, otherwise return a point
+      geom_column: isHexGrid ? zoomColumn : "geom",
+    };
+    // not joining to cde.points to get hexagons as that could be slower
     const SQL = `
-  with combined as (
-    ${combinedInner}
-  ),
-  relevent_points as (
-    ${relevantPointsSQL}
-  ),
+  with relevent_points as (
+    ${
+  isHexGrid
+    ? "SELECT :zoomPKColumn: pk,count(distinct point_pk) count,"
+    : "SELECT point_pk pk, d.platform as platform,sum(p.days)::bigint count,"
+} array_to_json(array_agg(distinct d.pk_url)) datasets,     
+      p.:geom_column: AS geom FROM cde.profiles p
+        -- used for organizations filtering
+        JOIN cde.datasets d
+        ON p.dataset_pk = d.pk 
+       ${hasFilter ? "WHERE :filters" : ""}
+        ${
+  isHexGrid ? "GROUP BY :zoomPKColumn:,p.:geom_column:" : "GROUP BY geom,point_pk,platform"
+} ),
     te AS (select ST_TileEnvelope(:z, :x, :y) tile_envelope ),
     mvtgeom AS (
-      SELECT pk,count,
+      SELECT pk,count, 
        ${isHexGrid ? "" : "platform,"} datasets,
         ST_AsMVTGeom (
           relevent_points.geom,
@@ -137,9 +104,9 @@ router.get(
 
     try {
       const q = db.raw(SQL, {
-        filters: filters.shared,
-        obisFilters: filters.obisOnly,
+        filters,
         zoomPKColumn,
+        geom_column: sqlQuery.geom_column,
         z,
         x,
         y,
