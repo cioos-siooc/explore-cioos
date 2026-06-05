@@ -72,10 +72,7 @@ def _build_attempt(run_id, erddap_url, dataset_id, status, reason_code=None,
 
 @dataclass
 class DatasetHarvestResult:
-    """Outcome of harvesting a single dataset (success or non-error skip).
-
-    Error outcomes are raised as DatasetHarvestError instead, so the
-    parent harvest loop records them and continues."""
+    """Outcome of harvesting a single dataset (success or non-error skip)."""
 
     status: str                      # "success" | "skipped"
     attempt: dict                    # one harvest_attempts.csv row
@@ -86,8 +83,7 @@ class DatasetHarvestResult:
 
 
 class DatasetHarvestError(Exception):
-    """Raised by harvest_dataset on an error outcome. Carries the audit data
-    the parent loop still needs to persist (it catches this and continues)."""
+    """Error outcome of harvest_dataset; carries the audit data the caller persists."""
 
     def __init__(self, attempt, skipped_reason_code, message):
         super().__init__(message)
@@ -145,6 +141,7 @@ class ERDDAPHarvester(BaseHarvester):
 
         erddap = ERDDAP(self.erddap_url, self.cache_requests)
         erddap_logger = erddap.get_logger()
+        erddap.df_all_datasets = erddap.get_all_datasets()
         df_all_datasets = erddap.df_all_datasets
 
         empty_attempts = pd.DataFrame(
@@ -182,9 +179,7 @@ class ERDDAPHarvester(BaseHarvester):
                 cdm_type = unsupported_datasets.loc[
                     unsupported_datasets["datasetID"] == dataset_id, "cdm_data_type"
                 ].iloc[0]
-                # No request was issued for this dataset (filtered from
-                # allDatasets), so it does NOT become a per-dataset task — just
-                # record the skip. Surface the URL the admin would inspect.
+                # No server request issued; record the skip with the info URL.
                 attempt_records.append(_build_attempt(
                     self.run_id, self.erddap_url, dataset_id,
                     status="skipped",
@@ -198,9 +193,7 @@ class ERDDAPHarvester(BaseHarvester):
         if erddap.df_all_datasets.empty:
             raise RuntimeError("No datasets found")
 
-        # Pre-filter the skip-list (skipped_datasets.json) here rather than per
-        # iteration — these issue no server request, so they stay cheap skip
-        # rows and do NOT become per-dataset Prefect tasks.
+        # Pre-filter the skip-list: these issue no server request.
         on_skip_list = [d for d in df_all_datasets["datasetID"] if d in datasets_to_skip]
         for dataset_id in on_skip_list:
             erddap_logger.info(
@@ -216,10 +209,7 @@ class ERDDAPHarvester(BaseHarvester):
             ))
         if on_skip_list:
             df_all_datasets = df_all_datasets.query("datasetID not in @on_skip_list")
-        # Harvest each dataset strictly one at a time (plain serial calls), so a
-        # server is never hit by concurrent requests from us. Per-dataset
-        # outcomes are reported via the 'harvest-dataset-status' table artifact
-        # and harvest_attempts.csv, not per-dataset Prefect task runs.
+        # Serial: never hit a server with concurrent requests.
         total = len(df_all_datasets)
         for i, df_dataset_row in enumerate(df_all_datasets.itertuples(index=False)):
             dataset_id = df_dataset_row.datasetID
@@ -238,8 +228,7 @@ class ERDDAPHarvester(BaseHarvester):
                         [erddap.domain, dataset_id, result.skipped_reason_code]
                     ]
             except DatasetHarvestError as e:
-                # Persist the error row + skipped-reason here so the server
-                # harvest continues and the audit trail stays complete.
+                # Record the error and continue to the next dataset.
                 attempt_records.append(e.attempt)
                 skipped_datasets_reasons += [
                     [erddap.domain, dataset_id, e.skipped_reason_code]
@@ -276,21 +265,10 @@ class ERDDAPHarvester(BaseHarvester):
 
 
 def harvest_dataset(erddap, dataset_id, run_id=None, idx=None, total=None):
-    """Harvest a single ERDDAP dataset.
+    """Harvest one ERDDAP dataset (plain function; reuses `erddap`, never rebuilds it).
 
-    Reuses the already-constructed `erddap` object (the server connection +
-    allDatasets are fetched once by the parent task — we must NOT rebuild it
-    per dataset). Called directly and serially by ERDDAPHarvester.harvest(),
-    so a server is only ever hit one dataset at a time.
-
-    A plain function (not a @task): at hundreds of datasets per server the
-    per-dataset task runs only bloated Prefect's DB/UI for no concurrency gain
-    (it's called serially). Post-run triage is served by the
-    'harvest-dataset-status' table artifact + harvest_attempts.csv instead.
-
-    Returns a DatasetHarvestResult on success/skip. Raises DatasetHarvestError
-    on an error outcome, carrying the audit row the parent still needs to
-    persist (the parent's loop catches it and continues).
+    Returns DatasetHarvestResult on success/skip; raises DatasetHarvestError on
+    error (carrying the audit row the caller persists).
     """
     log = erddap.get_logger()
     erddap_url = erddap.url

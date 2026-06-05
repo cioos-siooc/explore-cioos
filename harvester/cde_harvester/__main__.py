@@ -29,7 +29,7 @@ from cde_harvester.utils import cf_standard_names, supported_standard_names
 from dotenv import load_dotenv
 from sentry_sdk.crons import monitor
 from sentry_sdk.integrations.logging import LoggingIntegration
-from prefect import flow, get_run_logger
+from prefect import flow, get_run_logger, task
 
 load_dotenv()
 
@@ -284,6 +284,120 @@ def _run_logger():
         return logger
 
 
+@task(task_run_name="merge-and-write-csvs")
+def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skipped,
+                         obis_datasets, obis_cells, obis_skipped, df_ckan):
+    """Join CKAN metadata, merge all sources, and write the output CSVs (@task)."""
+    logger = _run_logger()
+    datasets_file = f"{folder}/datasets.csv"
+    profiles_file = f"{folder}/profiles.csv"
+    skipped_datasets_file = f"{folder}/skipped.csv"
+    ckan_file = f"{folder}/ckan.csv"
+    obis_cells_file = f"{folder}/obis_cells.csv"
+
+    # --- ERDDAP-specific post-processing ---
+    if not erddap_datasets.empty:
+        erddap_datasets = (
+            erddap_datasets.set_index(["erddap_url", "dataset_id"])
+            .join(df_ckan.set_index(["erddap_url", "dataset_id"]), how="left")
+            .reset_index()
+        )
+
+        logger.info("Cleaning up ERDDAP data")
+        erddap_datasets = erddap_datasets.replace(np.nan, None)
+
+        erddap_datasets["title"] = erddap_datasets["title"].apply(lambda x: unescape_ascii(x))
+
+        erddap_datasets["ckan_title"].fillna(erddap_datasets["title"], inplace=True)
+
+        # prioritize with organizations from CKAN and then pull ERDDAP if needed
+        erddap_datasets["organizations"] = erddap_datasets.apply(
+            lambda x: x["ckan_organizations"] or unescape_ascii_list(x["organizations"]),
+            axis=1,
+        )
+        del erddap_datasets["title"]
+        del erddap_datasets["ckan_organizations"]
+
+        erddap_datasets.rename(
+            columns={
+                "ckan_title": "title",
+                "ckan_title_fr": "title_fr",
+            },
+            inplace=True,
+        )
+
+        erddap_datasets = erddap_datasets.replace(r"\n", " ", regex=True)
+
+        erddap_profiles["depth_min"] = erddap_profiles["depth_min"].fillna(0)
+        erddap_profiles["depth_max"] = erddap_profiles["depth_max"].fillna(0)
+        erddap_profiles.drop(columns=['altitutde_min', 'altitutde_max'], inplace=True, errors='ignore')
+
+    # --- Merge all sources ---
+    datasets = pd.concat([erddap_datasets, obis_datasets], ignore_index=True)
+    skipped_datasets = pd.concat([erddap_skipped, obis_skipped], ignore_index=True)
+
+    # Safety net: cde.datasets has NOT NULL on `title` (set_constraints), but
+    # upstream metadata occasionally lacks one — an ERDDAP dataset with no
+    # title attr + no matching CKAN record, or an OBIS dataset whose metadata
+    # fetch returned an empty dict. Without this, the WHOLE harvest rolls
+    # back at the final ALTER TABLE step. Fall back to dataset_id (always
+    # populated) and log a WARNING so the source data quality issue is
+    # visible without blocking ingest.
+    _missing_title = datasets["title"].isna() | (
+        datasets["title"].astype(str).str.strip() == ""
+    )
+    if _missing_title.any():
+        offenders = datasets.loc[_missing_title, ["erddap_url", "dataset_id"]]
+        logger.warning(
+            "%d dataset(s) missing title from source metadata; falling back to "
+            "dataset_id. Offenders: %s",
+            len(offenders),
+            offenders.to_dict(orient="records"),
+        )
+        datasets.loc[_missing_title, "title"] = datasets.loc[
+            _missing_title, "dataset_id"
+        ]
+
+    # ERDDAP rows don't have obis_nodes — fill with empty lists so the loader's
+    # ast.literal_eval doesn't choke on NaN, and so the column exists when only
+    # the ERDDAP source is being harvested.
+    if "obis_nodes" not in datasets.columns:
+        datasets["obis_nodes"] = [[] for _ in range(len(datasets))]
+    else:
+        datasets["obis_nodes"] = datasets["obis_nodes"].apply(
+            lambda x: x if isinstance(x, list) else []
+        )
+
+    logger.info("Adding %s datasets, %s profiles, %s obis_cells", len(datasets), len(erddap_profiles), len(obis_cells))
+
+    # Write output CSVs
+    datasets.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
+        datasets_file, index=False
+    )
+    erddap_profiles.drop_duplicates().to_csv(profiles_file, index=False)
+    if not df_ckan.empty:
+        df_ckan.to_csv(ckan_file, index=False)
+    skipped_datasets.drop_duplicates().to_csv(skipped_datasets_file, index=False)
+
+    if not obis_cells.empty:
+        obis_cells.to_csv(obis_cells_file, index=False)
+
+    written_files = [datasets_file, profiles_file, skipped_datasets_file]
+    if not df_ckan.empty:
+        written_files.append(ckan_file)
+    logger.info("Wrote %s", " ".join(str(f) for f in written_files))
+    if not obis_cells.empty:
+        logger.info("Wrote %s (%d cells)", obis_cells_file, len(obis_cells))
+
+    if not skipped_datasets.empty:
+        logger.info(
+            "skipped %s datasets: %s",
+            len(skipped_datasets),
+            skipped_datasets["dataset_id"].to_list(),
+        )
+    return written_files
+
+
 @monitor(monitor_slug="main-harvester")
 def main(erddap_urls, cache_requests, folder, dataset_ids,
          obis_dataset_ids=None, obis_folder=None, obis_geo_filter=None,
@@ -408,12 +522,6 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
     if not os.path.exists(folder):
         os.makedirs(folder)
 
-    datasets_file = f"{folder}/datasets.csv"
-    profiles_file = f"{folder}/profiles.csv"
-    skipped_datasets_file = f"{folder}/skipped.csv"
-    ckan_file = f"{folder}/ckan.csv"
-    obis_cells_file = f"{folder}/obis_cells.csv"
-
     if erddap_datasets.empty and obis_datasets.empty:
         logging.info("No datasets harvested from any source")
         _write_run_audit_csvs(
@@ -460,104 +568,17 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         # query CKAN national for more metadata related to the ERDDAP datsets we have so far
         logger.info("Gathering CKAN data")
         df_ckan = get_ckan_records(erddap_datasets["dataset_id"].to_list(), cache=cache_requests)
-        erddap_datasets = (
-            erddap_datasets.set_index(["erddap_url", "dataset_id"])
-            .join(df_ckan.set_index(["erddap_url", "dataset_id"]), how="left")
-            .reset_index()
-        )
 
-        logger.info("Cleaning up ERDDAP data")
-        erddap_datasets = erddap_datasets.replace(np.nan, None)
-
-        erddap_datasets["title"] = erddap_datasets["title"].apply(lambda x: unescape_ascii(x))
-
-        erddap_datasets["ckan_title"].fillna(erddap_datasets["title"], inplace=True)
-
-        # prioritize with organizations from CKAN and then pull ERDDAP if needed
-        erddap_datasets["organizations"] = erddap_datasets.apply(
-            lambda x: x["ckan_organizations"] or unescape_ascii_list(x["organizations"]),
-            axis=1,
-        )
-        del erddap_datasets["title"]
-        del erddap_datasets["ckan_organizations"]
-
-        erddap_datasets.rename(
-            columns={
-                "ckan_title": "title",
-                "ckan_title_fr": "title_fr",
-            },
-            inplace=True,
-        )
-
-        erddap_datasets = erddap_datasets.replace(r"\n", " ", regex=True)
-
-        erddap_profiles["depth_min"] = erddap_profiles["depth_min"].fillna(0)
-        erddap_profiles["depth_max"] = erddap_profiles["depth_max"].fillna(0)
-        erddap_profiles.drop(columns=['altitutde_min', 'altitutde_max'], inplace=True, errors='ignore')
-
-    # --- Merge all sources ---
-    datasets = pd.concat([erddap_datasets, obis_datasets], ignore_index=True)
-    skipped_datasets = pd.concat([erddap_skipped, obis_skipped], ignore_index=True)
-
-    # Safety net: cde.datasets has NOT NULL on `title` (set_constraints), but
-    # upstream metadata occasionally lacks one — an ERDDAP dataset with no
-    # title attr + no matching CKAN record, or an OBIS dataset whose metadata
-    # fetch returned an empty dict. Without this, the WHOLE harvest rolls
-    # back at the final ALTER TABLE step. Fall back to dataset_id (always
-    # populated) and log a WARNING so the source data quality issue is
-    # visible without blocking ingest.
-    _missing_title = datasets["title"].isna() | (
-        datasets["title"].astype(str).str.strip() == ""
+    merge_and_write_csvs(
+        folder=folder,
+        erddap_datasets=erddap_datasets,
+        erddap_profiles=erddap_profiles,
+        erddap_skipped=erddap_skipped,
+        obis_datasets=obis_datasets,
+        obis_cells=obis_cells,
+        obis_skipped=obis_skipped,
+        df_ckan=df_ckan,
     )
-    if _missing_title.any():
-        offenders = datasets.loc[_missing_title, ["erddap_url", "dataset_id"]]
-        logger.warning(
-            "%d dataset(s) missing title from source metadata; falling back to "
-            "dataset_id. Offenders: %s",
-            len(offenders),
-            offenders.to_dict(orient="records"),
-        )
-        datasets.loc[_missing_title, "title"] = datasets.loc[
-            _missing_title, "dataset_id"
-        ]
-
-    # ERDDAP rows don't have obis_nodes — fill with empty lists so the loader's
-    # ast.literal_eval doesn't choke on NaN, and so the column exists when only
-    # the ERDDAP source is being harvested.
-    if "obis_nodes" not in datasets.columns:
-        datasets["obis_nodes"] = [[] for _ in range(len(datasets))]
-    else:
-        datasets["obis_nodes"] = datasets["obis_nodes"].apply(
-            lambda x: x if isinstance(x, list) else []
-        )
-
-    logger.info("Adding %s datasets, %s profiles, %s obis_cells", len(datasets), len(erddap_profiles), len(obis_cells))
-
-    # Write output CSVs
-    datasets.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
-        datasets_file, index=False
-    )
-    erddap_profiles.drop_duplicates().to_csv(profiles_file, index=False)
-    if not df_ckan.empty:
-        df_ckan.to_csv(ckan_file, index=False)
-    skipped_datasets.drop_duplicates().to_csv(skipped_datasets_file, index=False)
-
-    if not obis_cells.empty:
-        obis_cells.to_csv(obis_cells_file, index=False)
-
-    written_files = [datasets_file, profiles_file, skipped_datasets_file]
-    if not df_ckan.empty:
-        written_files.append(ckan_file)
-    logger.info("Wrote %s", " ".join(str(f) for f in written_files))
-    if not obis_cells.empty:
-        logger.info("Wrote %s (%d cells)", obis_cells_file, len(obis_cells))
-
-    if not skipped_datasets.empty:
-        logger.info(
-            "skipped %s datasets: %s",
-            len(skipped_datasets),
-            skipped_datasets["dataset_id"].to_list(),
-        )
 
     _write_run_audit_csvs(
         folder=folder,
