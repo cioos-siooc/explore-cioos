@@ -13,7 +13,9 @@ function hostname(url) {
 
 function fmtDt(val) {
   if (!val) return '—'
-  return new Date(val).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
+  const d = val instanceof Date ? val : new Date(val)
+  if (isNaN(d.getTime())) return String(val)
+  return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function fmtDuration(ms) {
