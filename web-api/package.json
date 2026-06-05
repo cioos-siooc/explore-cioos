@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "start": "node ./bin/www",
-    "test": "node --test \"utils/**/*.test.js\""
+    "test": "node --test \"utils/**/*.test.js\" && jest",
+    "test:api": "jest",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "@sentry/node": "^10.73.0",
@@ -26,6 +28,15 @@
     "swagger-ui-express": "^5.0.0",
     "uuid": "^11.1.0",
     "wkt": "^0.1.1"
+  },
+  "devDependencies": {
+    "jest": "^30.4.2",
+    "supertest": "^7.2.2"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/__tests__/**/*.test.js"],
+    "setupFiles": ["<rootDir>/__tests__/setup.js"]
   },
   "overrides": {
     "qs": "^6.13.0",
