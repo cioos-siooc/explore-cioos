@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import HarvestLayout from './HarvestLayout.jsx'
 import StatusBadge from './StatusBadge.jsx'
 import useHarvestFetch from './useHarvestFetch.js'
+import reasonLabel from './reasonLabel.js'
 import { slugify } from './slug.js'
 
 function hostname(url) {
@@ -134,7 +135,7 @@ export default function HarvestRun() {
                 <td><StatusBadge status={a.status} /></td>
                 <td>
                   {a.reason_code && (
-                    <span className="harvest-mono" style={{ fontSize: '0.8rem' }}>{a.reason_code}</span>
+                    <span title={a.reason_code} style={{ fontSize: '0.8rem' }}>{reasonLabel(t, a.reason_code)}</span>
                   )}
                   {a.error_message && (
                     <details style={{ marginTop: '0.2rem' }}>

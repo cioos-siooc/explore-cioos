@@ -141,10 +141,16 @@ async function serverDatasets(erddapUrl, statusFilter = null, q = null) {
            la.query_urls,
            ls.last_success_at,
            sp.history_statuses,
-           sp.history_times
+           sp.history_times,
+           ds.content_hash,
+           ds.last_updated_at,
+           ds.verified_at
     FROM latest_attempt la
     LEFT JOIN last_success ls USING (erddap_url, dataset_id)
     LEFT JOIN sparkline   sp USING (erddap_url, dataset_id)
+    LEFT JOIN cde.datasets ds
+        ON ds.dataset_id = la.dataset_id
+       AND rtrim(ds.erddap_url, '/') = rtrim(la.erddap_url, '/')
     WHERE (CAST(? AS text) IS NULL OR la.status = ?)
       AND (
             CAST(? AS text) IS NULL
@@ -184,6 +190,18 @@ async function datasetHistory(erddapUrl, datasetId) {
   `
   const result = await db.raw(sql, [erddapUrl, datasetId])
   return result.rows
+}
+
+async function datasetMeta(erddapUrl, datasetId) {
+  const sql = `
+    SELECT content_hash, last_updated_at, verified_at
+    FROM cde.datasets
+    WHERE dataset_id = ?
+      AND rtrim(erddap_url, '/') = rtrim(?, '/')
+    LIMIT 1
+  `
+  const result = await db.raw(sql, [datasetId, erddapUrl])
+  return result.rows[0] || null
 }
 
 async function runDetail(runId) {
@@ -268,7 +286,8 @@ router.get('/dataset/:slug/:datasetId', cache.route('1 minute'), async (req, res
     const erddapUrl = unslug(req.params.slug)
     const history = await datasetHistory(erddapUrl, req.params.datasetId)
     if (!history.length) return res.status(404).json({ error: 'No harvest history found' })
-    res.json(history)
+    const meta = await datasetMeta(erddapUrl, req.params.datasetId)
+    res.json({ history, meta })
   } catch (err) {
     next(err)
   }

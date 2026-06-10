@@ -141,7 +141,27 @@ def _fmt_dt(value, fmt: str = "%Y-%m-%d %H:%M UTC", default: str = "—") -> str
     return value.strftime(fmt)
 
 
+_REASON_LABELS = {
+    "UNCHANGED": "Unchanged",
+    "CDM_DATA_TYPE_UNSUPPORTED": "Unsupported CDM type",
+    "NO_PROFILES_FOUND": "No profiles found",
+    "ON_SKIP_LIST": "On skip list",
+    "HTTP_ERROR": "HTTP error",
+    "RESPONSE_TOO_LARGE": "Response too large",
+    "MISSING_REQUIRED_VARS": "Missing required variables",
+    "NO_SUPPORTED_VARIABLES": "No supported variables",
+    "INGEST_FLAG_FALSE": "Ingest disabled",
+    "DEPTH_AND_ALTITUDE": "Depth and altitude",
+    "UNKNOWN_ERROR": "Unknown error",
+}
+
+
+def _reason_label(code: str | None) -> str:
+    return _REASON_LABELS.get(code, code) if code else ""
+
+
 templates.env.filters["dt"] = _fmt_dt
+templates.env.filters["reason_label"] = _reason_label
 templates.env.filters["hostname"] = _hostname
 templates.env.filters["abs_url"]  = _ensure_scheme
 templates.env.filters["dataset_link"] = _dataset_link
@@ -270,6 +290,7 @@ def dataset(request: Request, slug: str, dataset_id: str):
             "dataset_id": dataset_id,
             "history": history,
             "latest": history[0],
+            "meta": queries.dataset_meta(erddap_url, dataset_id),
         },
     )
 

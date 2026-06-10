@@ -96,7 +96,7 @@
       <tbody>
       {% for r in reasons %}
         <tr class="border-t border-cioos-teal-light/50">
-          <td class="px-4 py-2 font-mono text-xs">{{ r.reason_code }}</td>
+          <td class="px-4 py-2 text-xs" title="{{ r.reason_code }}">{{ r.reason_code | reason_label }}</td>
           <td class="px-4 py-2 text-right font-semibold">{{ r.n }}</td>
         </tr>
       {% endfor %}

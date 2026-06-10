@@ -141,10 +141,16 @@ def server_datasets(erddap_url: str, status_filter: str | None = None,
            la.query_urls,
            ls.last_success_at,
            sp.history_statuses,
-           sp.history_times
+           sp.history_times,
+           ds.content_hash,
+           ds.last_updated_at,
+           ds.verified_at
     FROM latest_attempt la
     LEFT JOIN last_success ls USING (erddap_url, dataset_id)
     LEFT JOIN sparkline   sp USING (erddap_url, dataset_id)
+    LEFT JOIN cde.datasets ds
+        ON ds.dataset_id = la.dataset_id
+       AND rtrim(ds.erddap_url, '/') = rtrim(la.erddap_url, '/')
     WHERE (CAST(:status_filter AS text) IS NULL OR la.status = :status_filter)
       AND (
             CAST(:q AS text) IS NULL
@@ -158,6 +164,19 @@ def server_datasets(erddap_url: str, status_filter: str | None = None,
     """
     return _rows(sql, url=erddap_url, depth=SPARKLINE_DEPTH,
                  status_filter=status_filter, q=q)
+
+
+def dataset_meta(erddap_url: str, dataset_id: str):
+    """Current content_hash + harvest timestamps from cde.datasets (None if absent)."""
+    sql = """
+    SELECT content_hash, last_updated_at, verified_at
+    FROM cde.datasets
+    WHERE dataset_id = :dataset_id
+      AND rtrim(erddap_url, '/') = rtrim(:url, '/')
+    LIMIT 1
+    """
+    rows = _rows(sql, url=erddap_url, dataset_id=dataset_id)
+    return rows[0] if rows else None
 
 
 def dataset_history(erddap_url: str, dataset_id: str):

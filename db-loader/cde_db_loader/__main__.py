@@ -207,6 +207,7 @@ def main(folder, incremental=False):
     profiles_file = f"{folder}/profiles.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
     obis_cells_file = f"{folder}/obis_cells.csv"
+    verified_file = f"{folder}/verified.csv"
     harvest_runs_file = f"{folder}/harvest_runs.csv"
     harvest_attempts_file = f"{folder}/harvest_attempts.csv"
 
@@ -220,6 +221,11 @@ def main(folder, incremental=False):
     if os.path.isfile(obis_cells_file):
         logger.info("Reading %s", obis_cells_file)
         obis_cells = pd.read_csv(obis_cells_file)
+
+    verified = None
+    if os.path.isfile(verified_file) and os.path.getsize(verified_file) > 1:
+        logger.info("Reading %s", verified_file)
+        verified = pd.read_csv(verified_file, parse_dates=["verified_at"])
 
     # Harvest audit CSVs are produced by the harvester's run lifecycle and
     # feed the harvest-dashboard service. Optional so old harvest folders
@@ -343,6 +349,29 @@ def main(folder, incremental=False):
                 logger.info("Running incremental update")
                 transaction.execute(text("SELECT process_incremental_update();"))
                 logger.info("Incremental update complete")
+
+            # Skipped-unchanged datasets: advance only verified_at.
+            if verified is not None and not verified.empty:
+                with _timed("verified_at bump", logger):
+                    logger.info("Bumping verified_at for %d unchanged datasets", len(verified))
+                    transaction.execute(text(
+                        "CREATE TEMP TABLE temp_verified "
+                        "(erddap_url text, dataset_id text, verified_at timestamptz) "
+                        "ON COMMIT DROP"
+                    ))
+                    verified[["erddap_url", "dataset_id", "verified_at"]].to_sql(
+                        "temp_verified",
+                        con=transaction,
+                        if_exists="append",
+                        index=False,
+                        method="multi",
+                    )
+                    transaction.execute(text(
+                        "UPDATE cde.datasets d SET verified_at = v.verified_at "
+                        "FROM temp_verified v "
+                        "WHERE d.dataset_id = v.dataset_id "
+                        "AND d.erddap_url = v.erddap_url"
+                    ))
 
         else:
             # Original full reload logic

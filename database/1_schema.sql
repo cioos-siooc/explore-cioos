@@ -54,6 +54,10 @@ CREATE TABLE datasets (
     first_eov_column TEXT,
     source_type TEXT DEFAULT 'erddap',
     obis_nodes text[] DEFAULT '{}',
+    -- Croissant file-list hash (set only for file-backed datasets); skip-if-unchanged.
+    content_hash TEXT,
+    last_updated_at timestamptz,
+    verified_at timestamptz,
     UNIQUE(dataset_id, erddap_url)
 );
 

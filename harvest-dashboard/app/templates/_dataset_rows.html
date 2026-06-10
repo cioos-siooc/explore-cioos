@@ -20,7 +20,7 @@
     </td>
     <td class="px-3 py-2">
       {% if d.reason_code %}
-        <code class="text-xs break-all">{{ d.reason_code }}</code>
+        <code class="text-xs break-all" title="{{ d.reason_code }}">{{ d.reason_code | reason_label }}</code>
         {% if d.error_message %}
           <details class="mt-1">
             <summary class="text-xs text-cioos-navy/60 cursor-pointer hover:text-cioos-primary">details</summary>
@@ -44,6 +44,7 @@
       <div class="text-cioos-navy/50">
         {% if d.last_success_at %}ok&nbsp;{{ d.last_success_at | dt('%Y-%m-%d') }}{% else %}never ok{% endif %}
       </div>
+      {% if d.last_updated_at %}<div class="text-cioos-navy/50" title="content last changed">upd&nbsp;{{ d.last_updated_at | dt('%Y-%m-%d') }}</div>{% endif %}
     </td>
   </tr>
 {% else %}

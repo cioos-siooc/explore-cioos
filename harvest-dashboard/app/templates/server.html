@@ -40,7 +40,7 @@
     <summary class="cursor-pointer text-sm font-semibold text-cioos-navy">Failure reasons on this server ({{ reasons | length }})</summary>
     <table class="mt-3 text-sm w-full max-w-xl">
       {% for r in reasons %}
-      <tr><td class="px-2 py-1 font-mono text-xs">{{ r.reason_code }}</td><td class="px-2 py-1 text-right font-semibold">{{ r.n }}</td></tr>
+      <tr><td class="px-2 py-1 text-xs" title="{{ r.reason_code }}">{{ r.reason_code | reason_label }}</td><td class="px-2 py-1 text-right font-semibold">{{ r.n }}</td></tr>
       {% endfor %}
     </table>
   </details>

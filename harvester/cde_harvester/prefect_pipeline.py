@@ -250,6 +250,13 @@ class PrefectCDEPipeline:
                 )
                 logger.info("Run output folder: %s (shared OBIS cache: %s)", run_folder, obis_folder)
 
+                # Force incremental for single-source runs (full-reload would wipe
+                # other sources). Computed here so skip_unchanged is only set when
+                # the load is incremental — a skipped dataset is omitted from the CSV.
+                effective_incremental = self.incremental or bool(self.source)
+                if self.source and not self.incremental:
+                    logger.warning("Single-source run (source=%s): forcing incremental db-load.", self.source)
+
                 logger.info("Running cde_harvester subflow")
                 try:
                     harvester_main(
@@ -261,17 +268,13 @@ class PrefectCDEPipeline:
                         obis_folder=str(obis_folder),
                         source=self.source,
                         triggered_by=self.triggered_by,
+                        skip_unchanged=effective_incremental,
                     )
                     logger.info("cde_harvester completed successfully")
                 except Exception as e:
                     logger.error(f"cde_harvester failed: {e}", exc_info=True)
                     raise
 
-                # Force incremental for single-source runs: full-reload TRUNCATEs every
-                # table and would wipe the other sources.
-                effective_incremental = self.incremental or bool(self.source)
-                if self.source and not self.incremental:
-                    logger.warning("Single-source run (source=%s): forcing incremental db-load.", self.source)
                 logger.info("Running cde_db_loader subflow")
                 try:
                     db_loader_main(folder=str(run_folder), incremental=effective_incremental)

@@ -56,7 +56,7 @@
         </td>
         <td class="px-4 py-2"><span class="px-2 py-0.5 rounded status-{{ a.status }}">{{ a.status }}</span></td>
         <td class="px-4 py-2">
-          {% if a.reason_code %}<code class="text-xs">{{ a.reason_code }}</code>{% endif %}
+          {% if a.reason_code %}<code class="text-xs" title="{{ a.reason_code }}">{{ a.reason_code | reason_label }}</code>{% endif %}
           {% if a.error_message %}
             <details class="mt-1">
               <summary class="text-xs text-cioos-navy/60 cursor-pointer hover:text-cioos-primary">details</summary>

@@ -41,11 +41,13 @@ class Dataset(object):
         self.trajectory_id_variable = ""
         self.num_columns = 0
         self.first_eov_column = ""
+        self.content_hash = None
 
         self.get_metadata()
 
     def get_df(self):
 
+        now = datetime.now(timezone.utc)
         self.df = pd.DataFrame(
             {
                 "title": [self.globals["title"]],
@@ -63,6 +65,9 @@ class Dataset(object):
                 "trajectory_id_variable": self.trajectory_id_variable,
                 "num_columns": len(self.df_variables),
                 "first_eov_column": self.first_eov_column,
+                "content_hash": [self.content_hash],
+                "last_updated_at": [now],
+                "verified_at": [now],
             }
         )
 

@@ -47,6 +47,9 @@ def _attempt(dataset_id, status, reason=None, err=None):
         "last_success_at": NOW - dt.timedelta(days=2) if status != "success" else NOW,
         "history_statuses": [status, "success", "success", "success"],
         "history_times": [NOW, NOW, NOW, NOW],
+        "content_hash": "deadbeefcafef00d" * 4,
+        "last_updated_at": NOW - dt.timedelta(days=2),
+        "verified_at": NOW,
     }
 
 
@@ -62,13 +65,21 @@ queries.recent_runs = lambda limit=20: [{
 queries.reason_code_breakdown = lambda erddap_url=None: [
     {"reason_code": "CDM_DATA_TYPE_UNSUPPORTED", "n": 5},
     {"reason_code": "HTTP_ERROR", "n": 2},
+    {"reason_code": "UNCHANGED", "n": 9},
 ]
 queries.server_datasets = lambda erddap_url, status_filter=None, q=None: [
     _attempt("SCN_GP01OB04_a", "success"),
     _attempt("SCN_BROKEN", "error", "HTTP_ERROR", "HTTP 503 Service Unavailable"),
     _attempt("SCN_WRONG_CDM", "skipped", "CDM_DATA_TYPE_UNSUPPORTED",
              "cdm_data_type='Other' not in ['TimeSeries', ...]"),
+    _attempt("SCN_UNCHANGED", "skipped", "UNCHANGED",
+             "Croissant file-list hash unchanged since last harvest"),
 ]
+queries.dataset_meta = lambda erddap_url, dataset_id: {
+    "content_hash": "deadbeefcafef00d" * 4,
+    "last_updated_at": NOW - dt.timedelta(days=2),
+    "verified_at": NOW,
+}
 queries.dataset_history = lambda erddap_url, dataset_id: [
     {"run_id": RUN_ID, "attempted_at": NOW, "status": "error",
      "reason_code": "HTTP_ERROR", "error_message": "HTTP 503",

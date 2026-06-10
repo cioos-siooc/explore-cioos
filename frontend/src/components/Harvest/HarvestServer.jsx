@@ -5,6 +5,7 @@ import HarvestLayout from './HarvestLayout.jsx'
 import StatusBadge from './StatusBadge.jsx'
 import Sparkline from './Sparkline.jsx'
 import useHarvestFetch from './useHarvestFetch.js'
+import reasonLabel from './reasonLabel.js'
 import { unslug, slugify } from './slug.js'
 
 function hostname(url) {
@@ -94,7 +95,7 @@ export default function HarvestServer() {
             <tbody>
               {reasons.map(r => (
                 <tr key={r.reason_code}>
-                  <td className="harvest-mono">{r.reason_code}</td>
+                  <td title={r.reason_code}>{reasonLabel(t, r.reason_code)}</td>
                   <td style={{ textAlign: 'right', fontWeight: 600 }}>{r.n}</td>
                 </tr>
               ))}
@@ -147,6 +148,8 @@ export default function HarvestServer() {
                 <th>{t('harvest.col.reason')}</th>
                 <th>{t('harvest.col.lastAttempt')}</th>
                 <th>{t('harvest.col.lastSuccess')}</th>
+                <th>{t('harvest.col.lastUpdated')}</th>
+                <th>{t('harvest.col.verified')}</th>
                 <th>{t('harvest.col.duration')}</th>
               </tr>
             </thead>
@@ -179,7 +182,7 @@ export default function HarvestServer() {
                     <td><Sparkline statuses={d.history_statuses} /></td>
                     <td>
                       {d.reason_code
-                        ? <span className="harvest-mono" style={{ fontSize: '0.8rem' }}>{d.reason_code}</span>
+                        ? <span title={d.reason_code} style={{ fontSize: '0.8rem' }}>{reasonLabel(t, d.reason_code)}</span>
                         : <span className="harvest-muted">—</span>
                       }
                     </td>
@@ -190,13 +193,15 @@ export default function HarvestServer() {
                         : <span style={{ color: '#E25563' }}>{t('harvest.server.neverOk')}</span>
                       }
                     </td>
+                    <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDt(d.last_updated_at)}</td>
+                    <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDt(d.verified_at)}</td>
                     <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDuration(d.duration_ms)}</td>
                   </tr>
                 )
               })}
               {!loading && (!datasets || datasets.length === 0) && (
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '1.5rem', color: '#8a9ea2' }}>
+                  <td colSpan="9" style={{ textAlign: 'center', padding: '1.5rem', color: '#8a9ea2' }}>
                     {t('harvest.server.noDatasets')}
                   </td>
                 </tr>

@@ -24,9 +24,16 @@
 <section class="mb-8 bg-white border border-cioos-teal-light rounded-lg p-5 shadow-cioos-card">
   <div class="flex flex-wrap gap-3 items-baseline">
     <span class="px-2 py-0.5 rounded status-{{ latest.status }}">{{ latest.status }}</span>
-    {% if latest.reason_code %}<code class="text-xs">{{ latest.reason_code }}</code>{% endif %}
+    {% if latest.reason_code %}<code class="text-xs" title="{{ latest.reason_code }}">{{ latest.reason_code | reason_label }}</code>{% endif %}
     <span class="text-xs text-cioos-navy/60">latest: {{ latest.attempted_at | dt }}</span>
   </div>
+  {% if meta and (meta.content_hash or meta.last_updated_at or meta.verified_at) %}
+  <dl class="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+    {% if meta.last_updated_at %}<dt class="text-cioos-navy/60">Content last updated</dt><dd>{{ meta.last_updated_at | dt }}</dd>{% endif %}
+    {% if meta.verified_at %}<dt class="text-cioos-navy/60">Last verified</dt><dd>{{ meta.verified_at | dt }}</dd>{% endif %}
+    {% if meta.content_hash %}<dt class="text-cioos-navy/60">Content hash</dt><dd class="font-mono break-all" title="{{ meta.content_hash }}">{{ meta.content_hash[:16] }}…</dd>{% endif %}
+  </dl>
+  {% endif %}
   {% if latest.error_message %}
   <pre class="text-xs whitespace-pre-wrap mt-4 bg-cioos-sand border border-cioos-teal-light rounded p-3">{{ latest.error_message }}</pre>
   {% endif %}
@@ -73,7 +80,7 @@
           <td class="px-4 py-2 whitespace-nowrap">{{ h.attempted_at | dt }}</td>
           <td class="px-4 py-2"><span class="px-2 py-0.5 rounded status-{{ h.status }}">{{ h.status }}</span></td>
           <td class="px-4 py-2">
-            {% if h.reason_code %}<code class="text-xs">{{ h.reason_code }}</code>{% endif %}
+            {% if h.reason_code %}<code class="text-xs" title="{{ h.reason_code }}">{{ h.reason_code | reason_label }}</code>{% endif %}
             {% if h.error_message %}
               <details class="mt-1">
                 <summary class="text-xs text-cioos-navy/60 cursor-pointer hover:text-cioos-primary">details</summary>

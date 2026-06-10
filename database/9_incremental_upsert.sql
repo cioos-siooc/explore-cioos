@@ -83,7 +83,10 @@ BEGIN
     organization_pks = EXCLUDED.organization_pks,
     n_profiles = EXCLUDED.n_profiles,
     source_type = EXCLUDED.source_type,
-    obis_nodes = EXCLUDED.obis_nodes;
+    obis_nodes = EXCLUDED.obis_nodes,
+    content_hash = EXCLUDED.content_hash,
+    last_updated_at = EXCLUDED.last_updated_at,
+    verified_at = EXCLUDED.verified_at;
 END;
 $$ LANGUAGE plpgsql;
 

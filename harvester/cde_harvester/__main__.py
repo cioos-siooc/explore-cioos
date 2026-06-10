@@ -286,7 +286,8 @@ def _run_logger():
 
 @task(task_run_name="merge-and-write-csvs")
 def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skipped,
-                         obis_datasets, obis_cells, obis_skipped, df_ckan):
+                         obis_datasets, obis_cells, obis_skipped, df_ckan,
+                         erddap_verified=None):
     """Join CKAN metadata, merge all sources, and write the output CSVs (@task)."""
     logger = _run_logger()
     datasets_file = f"{folder}/datasets.csv"
@@ -294,6 +295,7 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     skipped_datasets_file = f"{folder}/skipped.csv"
     ckan_file = f"{folder}/ckan.csv"
     obis_cells_file = f"{folder}/obis_cells.csv"
+    verified_file = f"{folder}/verified.csv"
 
     # --- ERDDAP-specific post-processing ---
     if not erddap_datasets.empty:
@@ -382,6 +384,13 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     if not obis_cells.empty:
         obis_cells.to_csv(obis_cells_file, index=False)
 
+    # Datasets skipped as unchanged — only their verified_at is bumped by the loader.
+    if erddap_verified is not None and not erddap_verified.empty:
+        erddap_verified.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
+            verified_file, index=False
+        )
+        logger.info("Wrote %s (%d unchanged datasets)", verified_file, len(erddap_verified))
+
     written_files = [datasets_file, profiles_file, skipped_datasets_file]
     if not df_ckan.empty:
         written_files.append(ckan_file)
@@ -401,7 +410,7 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
 @monitor(monitor_slug="main-harvester")
 def main(erddap_urls, cache_requests, folder, dataset_ids,
          obis_dataset_ids=None, obis_folder=None, obis_geo_filter=None,
-         source=None, triggered_by=None):
+         source=None, triggered_by=None, skip_unchanged=False):
     logger = _run_logger()
     limit_dataset_ids = None
     if dataset_ids:
@@ -430,6 +439,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
     run_error_message = None
     erddap_attempts = pd.DataFrame()
     obis_attempts = pd.DataFrame()
+    erddap_verified = pd.DataFrame()
     logger.info(
         "Harvest run started: run_id=%s git_sha=%s scope=%s source=%s flow_run=%s",
         run_id, git_sha, run_scope, triggered_source, prefect_flow_run_id,
@@ -455,7 +465,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
 
         for erddap_url in erddap_urls_list:
             logger.info("Submitting harvest task for %s", erddap_url)
-            future = harvest_erddap.submit(erddap_url, limit_dataset_ids, cache_requests, run_id=run_id)
+            future = harvest_erddap.submit(erddap_url, limit_dataset_ids, cache_requests, run_id=run_id, skip_unchanged=skip_unchanged)
             erddap_futures.append(future)
 
         # Submit OBIS task (runs concurrently with ERDDAP tasks)
@@ -487,6 +497,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             variables = pd.concat([variables, result.variables])
             erddap_skipped = pd.concat([erddap_skipped, result.skipped])
             erddap_attempts = pd.concat([erddap_attempts, result.attempts])
+            erddap_verified = pd.concat([erddap_verified, result.verified])
 
         # Collect OBIS results
         obis_cells = pd.DataFrame()
@@ -578,6 +589,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         obis_cells=obis_cells,
         obis_skipped=obis_skipped,
         df_ckan=df_ckan,
+        erddap_verified=erddap_verified,
     )
 
     _write_run_audit_csvs(

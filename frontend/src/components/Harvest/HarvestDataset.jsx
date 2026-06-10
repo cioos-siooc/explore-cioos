@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import HarvestLayout from './HarvestLayout.jsx'
 import StatusBadge from './StatusBadge.jsx'
 import useHarvestFetch from './useHarvestFetch.js'
+import reasonLabel from './reasonLabel.js'
 import { unslug, slugify } from './slug.js'
 
 function hostname(url) {
@@ -56,12 +57,14 @@ export default function HarvestDataset() {
   const erddapUrl = unslug(slug)
   const host = hostname(erddapUrl)
 
-  const { data: history, loading, error } = useHarvestFetch(
+  const { data, loading, error } = useHarvestFetch(
     `/dataset/${slug}/${encodeURIComponent(datasetId)}`,
     [slug, datasetId]
   )
 
-  const latest = history && history[0]
+  const history = (data && data.history) || []
+  const meta = data && data.meta
+  const latest = history[0]
   const sourceUrl = latest ? datasetLink(erddapUrl, datasetId, latest.source) : '#'
   const viewOnLabel = latest?.source === 'obis'
     ? t('harvest.dataset.viewOnObis')
@@ -96,12 +99,23 @@ export default function HarvestDataset() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
             <StatusBadge status={latest.status} />
             {latest.reason_code && (
-              <span className="harvest-mono" style={{ fontSize: '0.85rem' }}>{latest.reason_code}</span>
+              <span title={latest.reason_code} style={{ fontSize: '0.85rem' }}>{reasonLabel(t, latest.reason_code)}</span>
             )}
             <span className="harvest-muted" style={{ fontSize: '0.82rem' }}>
               {fmtDt(latest.attempted_at)}
             </span>
           </div>
+          {meta && (meta.content_hash || meta.last_updated_at || meta.verified_at) && (
+            <div className="harvest-muted" style={{ fontSize: '0.8rem', marginBottom: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '1.25rem' }}>
+              {meta.last_updated_at && <span>{t('harvest.col.lastUpdated')}: {fmtDt(meta.last_updated_at)}</span>}
+              {meta.verified_at && <span>{t('harvest.col.verified')}: {fmtDt(meta.verified_at)}</span>}
+              {meta.content_hash && (
+                <span title={meta.content_hash}>
+                  {t('harvest.col.contentHash')}: <span className="harvest-mono">{meta.content_hash.slice(0, 16)}…</span>
+                </span>
+              )}
+            </div>
+          )}
           {latest.error_message && (
             <div className="harvest-error-box">{latest.error_message}</div>
           )}
@@ -134,7 +148,7 @@ export default function HarvestDataset() {
               <td><StatusBadge status={row.status} /></td>
               <td>
                 {row.reason_code && (
-                  <span className="harvest-mono" style={{ fontSize: '0.8rem' }}>{row.reason_code}</span>
+                  <span title={row.reason_code} style={{ fontSize: '0.8rem' }}>{reasonLabel(t, row.reason_code)}</span>
                 )}
                 {row.error_message && (
                   <details style={{ marginTop: '0.25rem' }}>
