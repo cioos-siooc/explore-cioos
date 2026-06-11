@@ -114,16 +114,25 @@ async function createDBFilter(request) {
     filters.push("organization_pks && :organizationsString");
   }
 
+  // Both live on cde.datasets; the join alias `d` is present in tile, legend
+  // and shape queries. They form the combined "Data Source" filter: ERDDAP
+  // datasets have NULL obis_nodes and OBIS datasets carry the sentinel
+  // https://obis.org as erddap_url (never offered by /erddapServers), so
+  // when both params are present a dataset matches if it comes from a
+  // selected server OR a selected node. obisNodes without erddapServers
+  // implies OBIS-only mode (the tile/legend/shape routes drop the profiles
+  // branch when this is set).
   if (obisNodes) {
     parameters.obisNodesArr = obisNodes.split(",");
-    // Lives on cde.datasets; the join alias `d` is present in tile, legend
-    // and shape queries. Selecting any node implies OBIS-only mode (the
-    // tile/legend/shape routes drop the profiles branch when this is set).
-    filters.push("d.obis_nodes && :obisNodesArr");
   }
-
   if (erddapServers) {
     parameters.erddapServersArray = erddapServers.split(",");
+  }
+  if (obisNodes && erddapServers) {
+    filters.push("(d.obis_nodes && :obisNodesArr OR d.erddap_url = ANY(:erddapServersArray))");
+  } else if (obisNodes) {
+    filters.push("d.obis_nodes && :obisNodesArr");
+  } else if (erddapServers) {
     filters.push("d.erddap_url = ANY(:erddapServersArray)");
   }
 
