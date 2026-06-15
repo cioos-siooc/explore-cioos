@@ -127,6 +127,7 @@ def harvest_erddap(erddap_url, result, limit_dataset_ids=None, cache_requests=Fa
             continue
         try:
             logger.info(f"Querying dataset: {dataset_id} {i+1}/{len(df_all_datasets)}")
+            dataset_logger = logger  # fallback until dataset is loaded
             dataset = erddap.get_dataset(dataset_id)
             dataset_logger = dataset.logger
             compliance_checker = CDEComplianceChecker(dataset)

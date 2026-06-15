@@ -1,0 +1,58 @@
+{
+  "run_id": "20260602_164345",
+  "start_time": "2026-06-02T16:43:45.077199",
+  "end_time": "2026-06-02T16:43:45.181721",
+  "duration_s": 0.104522,
+  "duration_human": "0s",
+  "config_summary": {
+    "erddap_server_count": 1,
+    "erddap_urls": [
+      "https://mock.erddap.local/erddap"
+    ],
+    "dataset_id_filter": [],
+    "cache_enabled": false,
+    "max_workers": 1
+  },
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "category": "Empty Output",
+      "title": "No datasets were harvested \u2014 output is completely empty",
+      "detail": "datasets DataFrame is empty despite no fatal error. Possible causes: all servers unreachable, all datasets skipped, or misconfigured erddap_urls in config.",
+      "affected": [],
+      "count": 0
+    }
+  ],
+  "skip_breakdown": [],
+  "http_summary": {
+    "total": 1,
+    "success": 1,
+    "errors": 0,
+    "redirects": 0,
+    "avg_elapsed_s": 0.0,
+    "max_elapsed_s": 0.0,
+    "total_mb": 0.0,
+    "errors_by_status": {},
+    "servers_contacted": [
+      "mock.erddap.local"
+    ]
+  },
+  "log_summary": {
+    "INFO": 4,
+    "DEBUG": 0,
+    "WARNING": 0,
+    "ERROR": 0,
+    "CRITICAL": 0
+  },
+  "data_summary": {
+    "servers_configured": 1,
+    "servers_with_results": 0,
+    "datasets_harvested": 0,
+    "datasets_skipped": 0,
+    "datasets_total": 0,
+    "profiles_extracted": 0,
+    "unique_erddap_servers_in_output": 0
+  },
+  "per_server_summary": {},
+  "error_log_lines": []
+}
