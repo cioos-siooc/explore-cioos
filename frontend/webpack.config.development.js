@@ -12,6 +12,13 @@ module.exports = {
     'react-dom': 'ReactDOM',
   },
   devtool: 'inline-source-map',
+  output: {
+    // Absolute publicPath so the bundle URL resolves from the document root on
+    // deep routes (e.g. /harvest/server/:slug); otherwise historyApiFallback
+    // serves index.html for the misresolved bundle request and the app never
+    // boots on reload. Matches the router basename (BASE_URL).
+    publicPath: process.env.BASE_URL || '/'
+  },
   devServer: {
     historyApiFallback: true,
     port: 8000

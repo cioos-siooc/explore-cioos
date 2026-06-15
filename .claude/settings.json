@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(awk '/^\\\\//{f=$0} /error|warning/{print f}')"
+    ]
+  }
+}

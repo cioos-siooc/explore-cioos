@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import HarvestLayout from './HarvestLayout.jsx'
 import StatusBadge from './StatusBadge.jsx'
+import HarvestModeBadge from './HarvestModeBadge.jsx'
 import useHarvestFetch from './useHarvestFetch.js'
 import reasonLabel from './reasonLabel.js'
 import { unslug, slugify } from './slug.js'
@@ -78,6 +79,7 @@ export default function HarvestDataset() {
         <div className="harvest-latest-card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
             <StatusBadge status={latest.status} />
+            {meta && <HarvestModeBadge dataset={meta} />}
             {latest.reason_code && (
               <span title={latest.reason_code} style={{ fontSize: '0.85rem' }}>{reasonLabel(t, latest.reason_code)}</span>
             )}

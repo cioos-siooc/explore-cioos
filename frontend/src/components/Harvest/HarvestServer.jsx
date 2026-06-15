@@ -3,9 +3,11 @@ import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import HarvestLayout from './HarvestLayout.jsx'
 import StatusBadge from './StatusBadge.jsx'
+import HarvestModeBadge from './HarvestModeBadge.jsx'
 import Sparkline from './Sparkline.jsx'
 import useHarvestFetch from './useHarvestFetch.js'
 import reasonLabel from './reasonLabel.js'
+import { harvestMode } from './harvestMode.js'
 import { unslug, slugify } from './slug.js'
 import { hostname, fmtDt, fmtDurationMs, datasetLink } from './format.js'
 
@@ -41,6 +43,7 @@ export default function HarvestServer() {
     (acc, d) => { acc[d.status] = (acc[d.status] || 0) + 1; acc.total++; return acc },
     { success: 0, skipped: 0, error: 0, total: 0 }
   )
+  const nIncremental = (datasets || []).filter(d => harvestMode(d) === 'incremental').length
 
   const breadcrumbs = (
     <><Link to="/harvest">{t('harvest.title')}</Link> / {host}</>
@@ -61,6 +64,17 @@ export default function HarvestServer() {
           {t('harvest.datasetsCount', { count: summary.total })}
         </span>
       </div>
+
+      {nIncremental > 0 && (
+        <div className="harvest-summary">
+          <span
+            className="harvest-count-pill harvest-count-files"
+            title={t('harvest.mode.incremental.tip')}
+          >
+            📁 {t('harvest.server.incrementalCount', { count: nIncremental })}
+          </span>
+        </div>
+      )}
 
       {reasons && reasons.length > 0 && (
         <details style={{ marginBottom: '1rem' }}>
@@ -120,6 +134,7 @@ export default function HarvestServer() {
               <tr>
                 <th>{t('harvest.col.status')}</th>
                 <th>{t('harvest.col.datasetId')}</th>
+                <th>{t('harvest.col.hashable')}</th>
                 <th>{t('harvest.col.recent')}</th>
                 <th>{t('harvest.col.reason')}</th>
                 <th>{t('harvest.col.lastUpdate')}</th>
@@ -153,6 +168,7 @@ export default function HarvestServer() {
                         ↗
                       </a>
                     </td>
+                    <td><HarvestModeBadge dataset={d} /></td>
                     <td><Sparkline statuses={d.history_statuses} /></td>
                     <td>
                       {d.reason_code
@@ -168,7 +184,7 @@ export default function HarvestServer() {
               })}
               {!loading && (!datasets || datasets.length === 0) && (
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '1.5rem', color: '#8a9ea2' }}>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '1.5rem', color: '#8a9ea2' }}>
                     {t('harvest.server.noDatasets')}
                   </td>
                 </tr>

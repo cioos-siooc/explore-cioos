@@ -91,6 +91,11 @@
 /* hash-verified, nothing re-harvested (run audit views) */
 .harvest-status-unchanged { background: #DCEEF7; color: #0d5c80; }
 
+/* ── Hashable column (file-based vs source-queried) ────────────────────────── */
+/* Cell text matches the rest of the table; the explanation is in the tooltip.
+   Summary count pill matches the success/skipped/error count pills. */
+.harvest-count-files { background: #C6E3DF; color: #0e3d35; }
+
 /* ── Sparkline ────────────────────────────────────────────────────────────── */
 .harvest-spark {
   font-family: monospace;
