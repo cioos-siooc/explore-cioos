@@ -533,7 +533,12 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
     if not os.path.exists(folder):
         os.makedirs(folder)
 
-    if erddap_datasets.empty and obis_datasets.empty:
+    # Empty erddap_datasets/obis_datasets is NOT a failure when skip_unchanged
+    # caching is on and every dataset hashed unchanged: those rows live in
+    # erddap_verified and still need their verified_at bumped via
+    # merge_and_write_csvs below. Only a run that harvested nothing AND verified
+    # nothing genuinely had no datasets to process.
+    if erddap_datasets.empty and obis_datasets.empty and erddap_verified.empty:
         logging.info("No datasets harvested from any source")
         _write_run_audit_csvs(
             folder=folder,
@@ -551,6 +556,12 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             triggered_by=triggered_by,
         )
         sys.exit(1)
+
+    if erddap_datasets.empty and obis_datasets.empty:
+        logging.info(
+            "No new/changed datasets to harvest; %d unchanged datasets to verify",
+            len(erddap_verified),
+        )
 
     # --- ERDDAP-specific post-processing ---
     df_ckan = pd.DataFrame()
@@ -578,9 +589,16 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
 
         # query CKAN national for more metadata related to the ERDDAP datsets we have so far
         logger.info("Gathering CKAN data")
-        df_ckan = get_ckan_records(erddap_datasets["dataset_id"].to_list(), cache=cache_requests)
+        # .submit() + wait_for (instead of a direct call) so the Prefect flow
+        # graph draws the real pipeline order: harvest -> fetch-ckan -> merge.
+        # The futures are already resolved, so this adds no waiting.
+        df_ckan = get_ckan_records.submit(
+            erddap_datasets["dataset_id"].to_list(), cache=cache_requests,
+            wait_for=erddap_futures,
+        )
 
-    merge_and_write_csvs(
+    # df_ckan may be a future; Prefect resolves it (and draws the edge) on submit.
+    merge_and_write_csvs.submit(
         folder=folder,
         erddap_datasets=erddap_datasets,
         erddap_profiles=erddap_profiles,
@@ -590,7 +608,8 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         obis_skipped=obis_skipped,
         df_ckan=df_ckan,
         erddap_verified=erddap_verified,
-    )
+        wait_for=[f for f in [*erddap_futures, obis_future] if f is not None],
+    ).result()
 
     _write_run_audit_csvs(
         folder=folder,

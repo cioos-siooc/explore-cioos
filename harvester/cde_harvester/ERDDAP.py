@@ -17,7 +17,13 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 from cde_harvester.dataset import Dataset
-from cde_harvester.harvest_errors import ResponseTooLargeError
+from cde_harvester.harvest_errors import (
+    HASH_CROISSANT_HTTP_ERROR,
+    HASH_CROISSANT_UNREADABLE,
+    HASH_FEDERATED_UNRESOLVED,
+    HASH_NO_FILE_LIST,
+    ResponseTooLargeError,
+)
 
 # size in bytes
 MAX_RESPONSE_SIZE = 2e8
@@ -160,7 +166,14 @@ class ERDDAP(object):
         url_combined = erddap_url + url
 
         decoded_url = unquote(url_combined)
-        logger.info(f"Requesting: {decoded_url}")
+        # Prefect's log viewer auto-links bare URLs but stops at "(" and
+        # quotes, truncating ERDDAP queries like orderByMinMax("...") and
+        # distinct(). Percent-encode just those characters so the whole URL
+        # stays clickable; ERDDAP decodes them server-side either way.
+        log_url = decoded_url.translate(
+            str.maketrans({"(": "%28", ")": "%29", '"': "%22", " ": "%20"})
+        )
+        logger.info(f"Requesting: {log_url}")
         # Record exactly what we requested so the dashboard can show the
         # admin a clickable, reproducible link list per dataset attempt.
         if dataset is not None:
@@ -229,27 +242,30 @@ class ERDDAP(object):
             return pd.DataFrame()
 
     def get_croissant_fingerprint(self, erddap_base, dataset_id, _hops=0):
-        """Return (content_hash, has_files) from the dataset's Croissant ld+json.
+        """Return (content_hash, has_files, reason) from the dataset's Croissant ld+json.
 
         Pulls ERDDAP's generated Croissant straight from the .croissant data
         endpoint. has_files is True only when it lists source files; the hash is a
         reliable change signal only then, so database-backed datasets (no file list)
         are never skipped. Federated datasets are followed to their origin (max 3
-        hops). Fail-open: (None, False) on any error.
+        hops). reason explains *why* there is no hash (a HASH_* code) and is None
+        when a hash was produced. Fail-open: (None, False, <reason>) on any error.
         """
         erddap_base = erddap_base.rstrip("/")
         try:
+            # Small metadata doc — don't inherit the 1h data-query timeout; a
+            # hung .croissant endpoint would otherwise stall every dataset.
             response = self.session.get(
-                f"{erddap_base}/tabledap/{dataset_id}.croissant", timeout=3600
+                f"{erddap_base}/tabledap/{dataset_id}.croissant", timeout=60
             )
             if response.status_code != 200:
-                return None, False
+                return None, False, HASH_CROISSANT_HTTP_ERROR
             doc = response.json()
         except Exception:
             self.logger.warning(
                 "Could not read Croissant for %s", dataset_id, exc_info=True
             )
-            return None, False
+            return None, False, HASH_CROISSANT_UNREADABLE
 
         distribution = doc.get("distribution") or []
         if isinstance(distribution, dict):
@@ -259,13 +275,16 @@ class ERDDAP(object):
             digest = hashlib.sha256(
                 json.dumps(doc, sort_keys=True, separators=(",", ":")).encode("utf-8")
             ).hexdigest()
-            return digest, True
+            return digest, True, None
 
         if _hops < 3:
             origin = _parse_erddap_source(_croissant_source_url(doc))
             if origin:
+                # Propagate the origin's outcome (hash or its own reason).
                 return self.get_croissant_fingerprint(origin[0], origin[1], _hops + 1)
-        return None, False
+            return None, False, HASH_NO_FILE_LIST
+
+        return None, False, HASH_FEDERATED_UNRESOLVED
 
     def get_dataset(self, dataset_id):
         return Dataset(self, dataset_id)

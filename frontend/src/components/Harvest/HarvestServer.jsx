@@ -7,31 +7,7 @@ import Sparkline from './Sparkline.jsx'
 import useHarvestFetch from './useHarvestFetch.js'
 import reasonLabel from './reasonLabel.js'
 import { unslug, slugify } from './slug.js'
-
-function hostname(url) {
-  try { return new URL(url).hostname || url } catch { return url }
-}
-
-function fmtDt(val) {
-  if (!val) return '—'
-  const d = val instanceof Date ? val : new Date(val)
-  if (isNaN(d.getTime())) return String(val)
-  return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-function fmtDuration(ms) {
-  if (ms == null) return '—'
-  return (ms / 1000).toFixed(1) + 's'
-}
-
-function datasetLink(erddapUrl, datasetId, source) {
-  if (source === 'obis') return `https://obis.org/dataset/${datasetId}`
-  try {
-    return `${erddapUrl.replace(/\/$/, '')}/tabledap/${datasetId}.html`
-  } catch {
-    return '#'
-  }
-}
+import { hostname, fmtDt, fmtDurationMs, datasetLink } from './format.js'
 
 export default function HarvestServer() {
   const { t } = useTranslation()
@@ -146,10 +122,8 @@ export default function HarvestServer() {
                 <th>{t('harvest.col.datasetId')}</th>
                 <th>{t('harvest.col.recent')}</th>
                 <th>{t('harvest.col.reason')}</th>
-                <th>{t('harvest.col.lastAttempt')}</th>
-                <th>{t('harvest.col.lastSuccess')}</th>
-                <th>{t('harvest.col.lastUpdated')}</th>
-                <th>{t('harvest.col.verified')}</th>
+                <th>{t('harvest.col.lastUpdate')}</th>
+                <th>{t('harvest.col.lastCheck')}</th>
                 <th>{t('harvest.col.duration')}</th>
               </tr>
             </thead>
@@ -186,22 +160,15 @@ export default function HarvestServer() {
                         : <span className="harvest-muted">—</span>
                       }
                     </td>
-                    <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDt(d.attempted_at)}</td>
-                    <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>
-                      {d.last_success_at
-                        ? fmtDt(d.last_success_at)
-                        : <span style={{ color: '#E25563' }}>{t('harvest.server.neverOk')}</span>
-                      }
-                    </td>
                     <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDt(d.last_updated_at)}</td>
-                    <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDt(d.verified_at)}</td>
-                    <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDuration(d.duration_ms)}</td>
+                    <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDt(d.attempted_at)}</td>
+                    <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDurationMs(d.duration_ms)}</td>
                   </tr>
                 )
               })}
               {!loading && (!datasets || datasets.length === 0) && (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '1.5rem', color: '#8a9ea2' }}>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '1.5rem', color: '#8a9ea2' }}>
                     {t('harvest.server.noDatasets')}
                   </td>
                 </tr>

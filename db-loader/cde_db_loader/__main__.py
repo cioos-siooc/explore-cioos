@@ -256,8 +256,19 @@ def main(folder, incremental=False):
         datasets["obis_nodes"] = [[] for _ in range(len(datasets))]
 
     if datasets.empty:
-        logger.info("No datasets found")
-        sys.exit(1)
+        if not incremental:
+            # A full reload with zero datasets would TRUNCATE everything and
+            # leave the DB empty — genuinely wrong, so bail out hard.
+            logger.info("No datasets found")
+            sys.exit(1)
+        # Incremental runs legitimately produce an empty datasets.csv when every
+        # dataset was unchanged and skipped by the harvester (skip_unchanged).
+        # That is a successful no-op, not a crash: fall through so we still bump
+        # verified_at for the unchanged datasets and append the harvest audit rows.
+        logger.info(
+            "No changed datasets in incremental run; "
+            "skipping dataset load, will still bump verified_at and write harvest audit"
+        )
 
     # this gets a list of all the standard names
 
@@ -306,16 +317,17 @@ def main(folder, incremental=False):
 
             # Load data into temp tables
             datasets = ensure_organization_pks(datasets)
-            with _timed("temp_datasets to_sql", logger):
-                logger.info("Loading datasets into temp table")
-                datasets.to_sql(
-                    "temp_datasets",
-                    con=transaction,
-                    if_exists="append",
-                    index=False,
-                    dtype=DATASET_ARRAY_DTYPES,
-                    method="multi",
-                )
+            if not datasets.empty:
+                with _timed("temp_datasets to_sql", logger):
+                    logger.info("Loading datasets into temp table")
+                    datasets.to_sql(
+                        "temp_datasets",
+                        con=transaction,
+                        if_exists="append",
+                        index=False,
+                        dtype=DATASET_ARRAY_DTYPES,
+                        method="multi",
+                    )
 
             if not profiles.empty:
                 with _timed("temp_profiles to_sql", logger):
@@ -334,15 +346,16 @@ def main(folder, incremental=False):
                     logger.info("Loading obis_cells into temp table (%d rows)", len(prepared))
                     load_obis_cells_copy(prepared, "temp_obis_cells", transaction)
 
-            with _timed("temp_skipped_datasets to_sql", logger):
-                logger.info("Loading skipped_datasets into temp table")
-                skipped_datasets.to_sql(
-                    "temp_skipped_datasets",
-                    con=transaction,
-                    if_exists="append",
-                    index=False,
-                    method="multi",
-                )
+            if not skipped_datasets.empty:
+                with _timed("temp_skipped_datasets to_sql", logger):
+                    logger.info("Loading skipped_datasets into temp table")
+                    skipped_datasets.to_sql(
+                        "temp_skipped_datasets",
+                        con=transaction,
+                        if_exists="append",
+                        index=False,
+                        method="multi",
+                    )
 
             # Process and UPSERT all data using SQL functions
             with _timed("process_incremental_update", logger):

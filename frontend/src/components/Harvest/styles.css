@@ -83,11 +83,13 @@
   white-space: nowrap;
 }
 
-.harvest-status-success { background: #C6E3DF; color: #0e3d35; }
-.harvest-status-skipped { background: #F3ECD6; color: #7a5c00; border: 1px solid #ddd0b0; }
-.harvest-status-error   { background: #FBE3E6; color: #7a1520; }
-.harvest-status-running { background: #DCEEF7; color: #0d5c80; }
-.harvest-status-failed  { background: #FBE3E6; color: #7a1520; }
+.harvest-status-success   { background: #C6E3DF; color: #0e3d35; }
+.harvest-status-skipped   { background: #F3ECD6; color: #7a5c00; border: 1px solid #ddd0b0; }
+.harvest-status-error     { background: #FBE3E6; color: #7a1520; }
+.harvest-status-running   { background: #DCEEF7; color: #0d5c80; }
+.harvest-status-failed    { background: #FBE3E6; color: #7a1520; }
+/* hash-verified, nothing re-harvested (run audit views) */
+.harvest-status-unchanged { background: #DCEEF7; color: #0d5c80; }
 
 /* ── Sparkline ────────────────────────────────────────────────────────────── */
 .harvest-spark {
@@ -203,9 +205,10 @@
   font-weight: 600;
 }
 
-.harvest-count-success { background: #C6E3DF; color: #0e3d35; }
-.harvest-count-skipped { background: #F3ECD6; color: #7a5c00; }
-.harvest-count-error   { background: #FBE3E6; color: #7a1520; }
+.harvest-count-success   { background: #C6E3DF; color: #0e3d35; }
+.harvest-count-unchanged { background: #DCEEF7; color: #0d5c80; }
+.harvest-count-skipped   { background: #F3ECD6; color: #7a5c00; }
+.harvest-count-error     { background: #FBE3E6; color: #7a1520; }
 
 .harvest-card-meta {
   font-size: 0.75rem;

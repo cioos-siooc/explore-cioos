@@ -76,6 +76,7 @@ class DatasetSchema(pa.DataFrameModel):
     first_eov_column: Series[str] = pa.Field(nullable=True)
     source_type: Series[str] = pa.Field(nullable=True, default="erddap")
     content_hash: Series[str] = pa.Field(nullable=True)
+    content_hash_reason: Series[str] = pa.Field(nullable=True)
     last_updated_at: Series[pa.DateTime] = pa.Field(nullable=True)
     verified_at: Series[pa.DateTime] = pa.Field(nullable=True)
 

@@ -56,6 +56,9 @@ CREATE TABLE datasets (
     obis_nodes text[] DEFAULT '{}',
     -- Croissant file-list hash (set only for file-backed datasets); skip-if-unchanged.
     content_hash TEXT,
+    -- Why content_hash is NULL (HASH_* code: database-backed, Croissant fetch error, …);
+    -- NULL when a hash was produced. Lets the dashboard explain unhashed datasets.
+    content_hash_reason TEXT,
     last_updated_at timestamptz,
     verified_at timestamptz,
     UNIQUE(dataset_id, erddap_url)

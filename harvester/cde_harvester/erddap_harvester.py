@@ -281,9 +281,32 @@ class ERDDAPHarvester(BaseHarvester):
             pd.DataFrame(verified_rows, columns=list(empty_verified.columns))
             if verified_rows else empty_verified
         )
-        if verified_rows:
+
+        # One explicit breakdown line per server so the outcome mix is visible
+        # at a glance instead of buried in per-dataset INFO lines. Counted from
+        # the attempt records — the authoritative per-dataset audit (the
+        # skipped_datasets table also contains error rows, so it can't tell
+        # skips and errors apart).
+        statuses = df_attempts["status"].value_counts() if not df_attempts.empty else {}
+        n_harvested = int(statuses.get("success", 0))
+        n_unchanged = len(df_verified)
+        n_error = int(statuses.get("error", 0))
+        n_skipped = int(statuses.get("skipped", 0)) - n_unchanged
+        erddap_logger.info(
+            "%s harvest summary: %s harvested, %s unchanged (hash match), "
+            "%s skipped, %s errors out of %s datasets",
+            erddap.domain,
+            n_harvested,
+            n_unchanged,
+            n_skipped,
+            n_error,
+            n_harvested + n_unchanged + n_skipped + n_error,
+        )
+        if verified_rows and self.skip_unchanged:
             erddap_logger.info(
-                "skipped (unchanged): %s datasets", len(df_verified)
+                "Datasets skipped because Croissant file-list hash unchanged (%s): %s",
+                n_unchanged,
+                df_verified["dataset_id"].to_list(),
             )
 
         # Return the results
@@ -316,11 +339,16 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
     dataset = None
     progress = f" {idx}/{total}" if idx and total else ""
     try:
-        new_hash, has_files = erddap.get_croissant_fingerprint(erddap_url, dataset_id)
+        new_hash, has_files, hash_reason = erddap.get_croissant_fingerprint(
+            erddap_url, dataset_id
+        )
         prev_hash = (previous_hashes or {}).get(dataset_id)
         if skip_unchanged and has_files and new_hash and prev_hash == new_hash:
             duration_ms = int((time.monotonic() - t0) * 1000)
-            log.info(f"Skipping dataset: {dataset_id}{progress} — unchanged (Croissant hash match)")
+            log.info(
+                f"Dataset not updated since last harvest, skipping: "
+                f"{dataset_id}{progress} (Croissant file-list hash unchanged)"
+            )
             return DatasetHarvestResult(
                 status="skipped_unchanged",
                 verified_at=datetime.now(timezone.utc),
@@ -337,6 +365,9 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
         log.info(f"Querying dataset: {dataset_id}{progress}")
         dataset = erddap.get_dataset(dataset_id)
         dataset.content_hash = new_hash
+        # Record why there's no hash (database-backed, fetch failure, …) so the
+        # harvest dashboard can distinguish "correctly unhashed" from "failed".
+        dataset.content_hash_reason = hash_reason
         compliance_checker = CDEComplianceChecker(dataset)
 
         if compliance_checker.passes_all_checks():

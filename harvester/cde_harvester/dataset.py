@@ -42,6 +42,8 @@ class Dataset(object):
         self.num_columns = 0
         self.first_eov_column = ""
         self.content_hash = None
+        # Why content_hash is None (a HASH_* code); None when a hash was produced.
+        self.content_hash_reason = None
 
         self.get_metadata()
 
@@ -66,6 +68,7 @@ class Dataset(object):
                 "num_columns": len(self.df_variables),
                 "first_eov_column": self.first_eov_column,
                 "content_hash": [self.content_hash],
+                "content_hash_reason": [self.content_hash_reason],
                 "last_updated_at": [now],
                 "verified_at": [now],
             }

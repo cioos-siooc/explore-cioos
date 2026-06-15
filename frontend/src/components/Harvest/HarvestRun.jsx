@@ -6,28 +6,7 @@ import StatusBadge from './StatusBadge.jsx'
 import useHarvestFetch from './useHarvestFetch.js'
 import reasonLabel from './reasonLabel.js'
 import { slugify } from './slug.js'
-
-function hostname(url) {
-  try { return new URL(url).hostname || url } catch { return url }
-}
-
-function fmtDt(val) {
-  if (!val) return '—'
-  const d = val instanceof Date ? val : new Date(val)
-  if (isNaN(d.getTime())) return String(val)
-  return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-function fmtDuration(s) {
-  if (s == null) return '—'
-  if (s < 60) return `${s}s`
-  return `${Math.floor(s / 60)}m ${s % 60}s`
-}
-
-function fmtDurationMs(ms) {
-  if (ms == null) return '—'
-  return (ms / 1000).toFixed(1) + 's'
-}
+import { hostname, fmtDt, fmtDurationS, fmtDurationMs, displayStatus } from './format.js'
 
 export default function HarvestRun() {
   const { t } = useTranslation()
@@ -38,8 +17,8 @@ export default function HarvestRun() {
   const attempts = data?.attempts || []
 
   const summary = attempts.reduce(
-    (acc, a) => { acc[a.status] = (acc[a.status] || 0) + 1; acc.total++; return acc },
-    { success: 0, skipped: 0, error: 0, total: 0 }
+    (acc, a) => { acc[displayStatus(a)] = (acc[displayStatus(a)] || 0) + 1; acc.total++; return acc },
+    { success: 0, unchanged: 0, skipped: 0, error: 0, total: 0 }
   )
 
   const breadcrumbs = (
@@ -68,7 +47,7 @@ export default function HarvestRun() {
         </div>
         <div className="harvest-run-meta-item">
           <span className="harvest-run-meta-label">{t('harvest.col.duration')}</span>
-          <span className="harvest-run-meta-value">{fmtDuration(run.duration_s)}</span>
+          <span className="harvest-run-meta-value">{fmtDurationS(run.duration_s)}</span>
         </div>
         {run.git_sha && (
           <div className="harvest-run-meta-item">
@@ -96,6 +75,7 @@ export default function HarvestRun() {
 
       <div className="harvest-summary" style={{ marginBottom: '1rem' }}>
         <span className="harvest-count-pill harvest-count-success">✓ {summary.success}</span>
+        <span className="harvest-count-pill harvest-count-unchanged" title={t('harvest.reason.UNCHANGED')}>↻ {summary.unchanged}</span>
         <span className="harvest-count-pill harvest-count-skipped">· {summary.skipped}</span>
         <span className="harvest-count-pill harvest-count-error">✗ {summary.error}</span>
         <span className="harvest-muted" style={{ fontSize: '0.85rem', alignSelf: 'center' }}>
@@ -132,9 +112,9 @@ export default function HarvestRun() {
                     {a.dataset_id}
                   </Link>
                 </td>
-                <td><StatusBadge status={a.status} /></td>
+                <td><StatusBadge status={displayStatus(a)} /></td>
                 <td>
-                  {a.reason_code && (
+                  {a.reason_code && a.reason_code !== 'UNCHANGED' && (
                     <span title={a.reason_code} style={{ fontSize: '0.8rem' }}>{reasonLabel(t, a.reason_code)}</span>
                   )}
                   {a.error_message && (
