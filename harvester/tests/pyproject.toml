@@ -6,14 +6,18 @@ requires-python = ">=3.10,<3.11"
 dependencies = [
     "harvester",
     "db-loader",
-    "pytest>=8.2",
-    "pytest-mock>=3.14",
-    "pytest-cov>=5.0",
 ]
 
 [tool.uv.sources]
 harvester = { path = "../", editable = true }
 db-loader = { path = "../../db-loader", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "pytest-mock>=3.14",
+    "pytest-cov>=5.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["unit", "integration"]

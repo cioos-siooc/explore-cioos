@@ -397,6 +397,12 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.0.0,<3.0.0" },
 ]
 
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=9.0.3" },
+    { name = "pytest-mock", specifier = ">=3.15.1" },
+]
+
 [[package]]
 name = "diskcache"
 version = "5.6.3"
@@ -624,6 +630,12 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.0.0,<3.0.0" },
 ]
 
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=9.0.3" },
+    { name = "pytest-mock", specifier = ">=3.15.1" },
+]
+
 [[package]]
 name = "harvester-tests"
 version = "0.1.0"
@@ -631,6 +643,10 @@ source = { virtual = "." }
 dependencies = [
     { name = "db-loader" },
     { name = "harvester" },
+]
+
+[package.dev-dependencies]
+dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-mock" },
@@ -640,6 +656,10 @@ dependencies = [
 requires-dist = [
     { name = "db-loader", editable = "../../db-loader" },
     { name = "harvester", editable = "../" },
+]
+
+[package.metadata.requires-dev]
+dev = [
     { name = "pytest", specifier = ">=8.2" },
     { name = "pytest-cov", specifier = ">=5.0" },
     { name = "pytest-mock", specifier = ">=3.14" },
