@@ -266,17 +266,24 @@ if __name__ == "__main__":
     logger.info("Starting CDE Harvester")
     parser = argparse.ArgumentParser()
 
-    if "-f" in sys.argv or "--file" in sys.argv:
-        # Use config file
+    # Determine if config file should be used
+    config_file_env = os.environ.get("HARVEST_CONFIG_FILE")
+    use_config_file = "-f" in sys.argv or "--file" in sys.argv or config_file_env is not None
+
+    if use_config_file:
+        # Use config file (from command line arg, env var, or default)
         parser.add_argument(
             "-f",
             "--file",
             help="get these options from a config file instead",
-            required=True,
+            required=False,
         )
 
         args = parser.parse_args()
-        config_file = args.file
+        config_file = args.file or config_file_env
+
+        if not config_file:
+            parser.error("Config file must be provided via -f/--file flag or HARVEST_CONFIG_FILE environment variable")
 
         config = load_config(config_file)
         logger.info(
