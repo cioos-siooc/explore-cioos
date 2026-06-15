@@ -30,6 +30,10 @@ If you just want to see how a dataset is harvested by CDE:
         - Development: `docker compose run --rm -e INCREMENTAL_MODE=true harvester`
         - Production: `docker compose -f docker-compose.production.yaml run --rm -e INCREMENTAL_MODE=true harvester`
         - Or use the convenience script: `./run_harvester.sh --incremental`
+    3. **Custom config file** (use a different harvest configuration):
+        - Set `HARVEST_CONFIG_FILE` environment variable or override at runtime:
+        - Development: `docker compose run --rm -e HARVEST_CONFIG_FILE=/app/harvester/custom_config.yaml harvester`
+        - Production: `docker compose -f docker-compose.production.yaml run --rm -e HARVEST_CONFIG_FILE=/app/harvester/custom_config.yaml harvester`
 
 For more details, see:
 - [Harvester Usage Guide](HARVESTER_USAGE.md)
