@@ -70,6 +70,7 @@ services:
       - ./harvester_logs:/app/harvester/logs
     environment:
       - "HARVESTER_LOG_DIR=/app/harvester/logs"
+      - "HARVEST_CONFIG_FILE=/app/harvester/harvest_config.yaml"
     env_file:
       - .env
 
