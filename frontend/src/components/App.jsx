@@ -257,7 +257,10 @@ export default function App() {
       orgsSelected,
       datasetsSelected,
       platformsSelected,
-      scientificNamesSelected,
+      // Scientific name only applies to OBIS data; when OBIS isn't shown the
+      // filter is disabled in the UI, so don't apply stale selections to the
+      // query (the selection state is preserved for when OBIS is re-enabled).
+      scientificNamesSelected: showObis ? scientificNamesSelected : [],
       obisNodesSelected,
       erddapServersSelected
     })
@@ -272,7 +275,8 @@ export default function App() {
     debouncedPlatformsSelected,
     debouncedScientificNamesSelected,
     debouncedObisNodesSelected,
-    debouncedErddapServersSelected
+    debouncedErddapServersSelected,
+    showObis
   ])
 
   function createOptionSubset (searchTerms, allOptions) {
@@ -781,6 +785,7 @@ export default function App() {
         return { ...node, isSelected: false }
       })
     )
+    setScientificNamesSelected([])
     setPolygon()
   }
 

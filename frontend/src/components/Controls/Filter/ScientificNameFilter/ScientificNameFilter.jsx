@@ -117,7 +117,9 @@ export default function ScientificNameFilter({
     return () => controller.abort()
   }, [scientificNamesSelected, lang])
 
-  const active = scientificNamesSelected && scientificNamesSelected.length > 0
+  // A disabled filter (OBIS not shown) must not read as active even if it
+  // still holds selections — those selections aren't applied to the query.
+  const active = !disabled && scientificNamesSelected && scientificNamesSelected.length > 0
   const displayName = badgeTitle || filterName
   const label = active
     ? `${displayName}: ${abbreviateString(scientificNamesSelected.join(', '), 30)}`
