@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import requests
 from cde_harvester.platform_ioos_to_l06 import platforms_nerc_ioos
-from cde_harvester.utils import cde_eov_to_standard_name, intersection
+from cde_harvester.utils import eov_to_standard_name, intersection
 from requests.exceptions import HTTPError
 
 
@@ -235,9 +235,9 @@ class Dataset(object):
         eovs = []
         dataset_standard_names = self.df_variables["standard_name"].to_list()
 
-        for eov in cde_eov_to_standard_name:
+        for eov in eov_to_standard_name:
             overlap = intersection(
-                dataset_standard_names, cde_eov_to_standard_name[eov]
+                dataset_standard_names, eov_to_standard_name[eov]
             )
             if overlap:
                 # check if list of standard names in this EOV overlaps with list of standard names in this dataset
