@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -521,6 +521,7 @@ source = { editable = "db-loader" }
 dependencies = [
     { name = "numpy" },
     { name = "pandas" },
+    { name = "prefect" },
     { name = "psycopg2-binary" },
     { name = "python-dotenv" },
     { name = "requests" },
@@ -532,6 +533,7 @@ dependencies = [
 requires-dist = [
     { name = "numpy", specifier = "<2.0.0" },
     { name = "pandas", specifier = "<2.0.0" },
+    { name = "prefect", specifier = ">=3.6.23" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "requests", specifier = ">=2.31.0" },
@@ -919,6 +921,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "pytest", specifier = ">=9.0.3" },
+    { name = "pytest-cov", specifier = ">=5.0" },
     { name = "pytest-mock", specifier = ">=3.15.1" },
 ]
 
