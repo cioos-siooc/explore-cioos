@@ -1,0 +1,50 @@
+repos:
+  # Python: Ruff linter + formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.4
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^(harvester|downloader|download_scheduler|db-loader)/
+      - id: ruff-format
+        files: ^(harvester|downloader|download_scheduler|db-loader)/
+
+  # JavaScript: ESLint (local hooks, requires node_modules installed)
+  - repo: local
+    hooks:
+      - id: eslint-frontend
+        name: eslint (frontend)
+        entry: bash -c '[ -x frontend/node_modules/.bin/eslint ] || { echo "Run npm install in frontend/ first"; exit 1; }; frontend/node_modules/.bin/eslint --fix -c frontend/.eslintrc.js --resolve-plugins-relative-to frontend "$@"' --
+        language: system
+        files: ^frontend/.*\.(js|jsx)$
+        exclude: node_modules/
+
+      - id: eslint-web-api
+        name: eslint (web-api)
+        entry: bash -c '[ -x web-api/node_modules/.bin/eslint ] || { echo "Run npm install in web-api/ first"; exit 1; }; web-api/node_modules/.bin/eslint --fix -c web-api/.eslintrc.js --resolve-plugins-relative-to web-api "$@"' --
+        language: system
+        files: ^web-api/.*\.js$
+        exclude: node_modules/
+
+      - id: prettier-frontend
+        name: prettier (frontend)
+        entry: bash -c '[ -x frontend/node_modules/.bin/prettier ] || { echo "Run npm install in frontend/ first"; exit 1; }; frontend/node_modules/.bin/prettier --write "$@"' --
+        language: system
+        files: ^frontend/.*\.(js|jsx|json|css)$
+        exclude: node_modules/|package-lock\.json
+
+  # General hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.lock$|package-lock\.json$
+      - id: end-of-file-fixer
+        exclude: \.lock$|package-lock\.json$
+      - id: check-yaml
+      - id: check-json
+        exclude: package-lock\.json$
+      - id: check-added-large-files
+
+default_language_version:
+  python: python3.10
