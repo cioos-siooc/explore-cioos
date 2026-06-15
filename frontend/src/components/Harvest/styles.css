@@ -94,7 +94,7 @@
 /* ── Hashable column (file-based vs source-queried) ────────────────────────── */
 /* Cell text matches the rest of the table; the explanation is in the tooltip.
    Summary count pill matches the success/skipped/error count pills. */
-.harvest-count-files { background: #C6E3DF; color: #0e3d35; }
+.harvest-count-files { color: #0e3d35; }
 
 /* ── Sparkline ────────────────────────────────────────────────────────────── */
 .harvest-spark {
