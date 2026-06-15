@@ -6,7 +6,6 @@ import StatusBadge from './StatusBadge.jsx'
 import HarvestModeBadge from './HarvestModeBadge.jsx'
 import useHarvestFetch from './useHarvestFetch.js'
 import reasonLabel from './reasonLabel.js'
-import { unslug, slugify } from './slug.js'
 import { hostname, fmtDt, fmtDurationMs, datasetLink } from './format.js'
 
 function QueryUrls({ blob, isError }) {
@@ -35,8 +34,6 @@ function QueryUrls({ blob, isError }) {
 export default function HarvestDataset() {
   const { t } = useTranslation()
   const { slug, datasetId } = useParams()
-  const erddapUrl = unslug(slug)
-  const host = hostname(erddapUrl)
 
   const { data, loading, error } = useHarvestFetch(
     `/dataset/${slug}/${encodeURIComponent(datasetId)}`,
@@ -46,6 +43,10 @@ export default function HarvestDataset() {
   const history = (data && data.history) || []
   const meta = data && data.meta
   const latest = history[0]
+  // The slug is a transformed source URL; the full erddap_url (and a clean
+  // hostname for display) come from the API response.
+  const erddapUrl = (data && data.erddap_url) || ''
+  const host = hostname(erddapUrl) || slug
   const sourceUrl = latest ? datasetLink(erddapUrl, datasetId, latest.source) : '#'
   const viewOnLabel = latest?.source === 'obis'
     ? t('harvest.dataset.viewOnObis')

@@ -8,7 +8,7 @@ import Sparkline from './Sparkline.jsx'
 import useHarvestFetch from './useHarvestFetch.js'
 import reasonLabel from './reasonLabel.js'
 import { harvestMode } from './harvestMode.js'
-import { unslug, slugify } from './slug.js'
+import { slugify } from './slug.js'
 import { hostname, fmtDt, fmtDurationMs, datasetLink } from './format.js'
 
 export default function HarvestServer() {
@@ -17,9 +17,6 @@ export default function HarvestServer() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '')
   const [q, setQ] = useState(searchParams.get('q') || '')
-
-  const erddapUrl = unslug(slug)
-  const host = hostname(erddapUrl)
 
   const qs = new URLSearchParams()
   if (statusFilter) qs.set('status', statusFilter)
@@ -30,6 +27,10 @@ export default function HarvestServer() {
     `/servers/${slug}${queryStr ? '?' + queryStr : ''}`,
     [slug, statusFilter, q]
   )
+  // The slug is a transformed source URL; the full erddap_url (and a clean
+  // hostname for display) come from the dataset rows once loaded.
+  const erddapUrl = (datasets && datasets[0] && datasets[0].erddap_url) || ''
+  const host = hostname(erddapUrl) || slug
   const { data: reasons } = useHarvestFetch(`/reasons/${slug}`, [slug])
 
   function applyFilters(newStatus, newQ) {
@@ -53,7 +54,9 @@ export default function HarvestServer() {
     <HarvestLayout breadcrumbs={breadcrumbs}>
       <h1 className="harvest-page-title">{host}</h1>
       <p className="harvest-page-sub">
-        <a href={erddapUrl} target="_blank" rel="noreferrer" className="harvest-link">{erddapUrl}</a>
+        {erddapUrl && (
+          <a href={erddapUrl} target="_blank" rel="noreferrer" className="harvest-link">{erddapUrl}</a>
+        )}
       </p>
 
       <div className="harvest-summary">

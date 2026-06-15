@@ -1,8 +1,11 @@
+// Harvest URLs use a readable slug derived from the source URL: the scheme is
+// dropped and '.' / '/' are replaced with '-'
+// (e.g. https://erddap.ogsl.ca/erddap -> erddap-ogsl-ca-erddap).
+// The transform isn't reversible, so the backend resolves a slug back to the
+// full stored erddap_url by applying the same transform to its URLs.
 export function slugify(url) {
-  return btoa(url).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-export function unslug(slug) {
-  const padded = slug + '='.repeat((4 - (slug.length % 4)) % 4)
-  return atob(padded.replace(/-/g, '+').replace(/_/g, '/'))
+  return String(url)
+    .replace(/^[a-z]+:\/\//i, '') // drop scheme
+    .replace(/\/+$/, '')          // drop trailing slash
+    .replace(/[./]/g, '-')        // '.' and '/' -> '-'
 }

@@ -38,6 +38,30 @@ function unslug(slug) {
   ).toString('utf8')
 }
 
+// Slugs are a readable form of the source URL: scheme dropped, '.' and '/'
+// replaced with '-' (e.g. erddap-ogsl-ca-erddap). Resolve one back to the full
+// stored erddap_url by applying the same transform to the stored URLs. Legacy
+// base64-encoded slugs (full URLs) are still honoured so old links keep working.
+async function resolveErddapUrl(slug) {
+  try {
+    const decoded = unslug(slug)
+    if (/^https?:\/\//i.test(decoded)) return decoded
+  } catch { /* not a base64 slug — fall through to the transform lookup */ }
+  // NB: avoid '?' in the regexes — knex treats it as a positional binding.
+  const sql = `
+    SELECT erddap_url
+    FROM (SELECT DISTINCT erddap_url FROM cde.harvest_attempts) u
+    WHERE translate(
+            regexp_replace(regexp_replace(erddap_url, '^[a-z]+://', '', 'i'), '/+$', ''),
+            './', '--'
+          ) = ?
+    ORDER BY erddap_url
+    LIMIT 1
+  `
+  const result = await db.raw(sql, [slug])
+  return result.rows[0] ? result.rows[0].erddap_url : slug
+}
+
 // ── SQL query helpers ─────────────────────────────────────────────────────────
 // Knex raw uses ? as positional placeholder. Pass null for optional params —
 // the CAST(? AS text) IS NULL pattern in the SQL handles them correctly.
@@ -298,7 +322,7 @@ router.get('/servers', cache.route('2 minutes'), async (req, res, next) => {
 
 router.get('/servers/:slug', cache.route('30 seconds'), async (req, res, next) => {
   try {
-    const erddapUrl = unslug(req.params.slug)
+    const erddapUrl = await resolveErddapUrl(req.params.slug)
     const status = req.query.status || null
     const q = req.query.q || null
     res.json(await serverDatasets(erddapUrl, status, q))
@@ -309,11 +333,11 @@ router.get('/servers/:slug', cache.route('30 seconds'), async (req, res, next) =
 
 router.get('/dataset/:slug/:datasetId', cache.route('1 minute'), async (req, res, next) => {
   try {
-    const erddapUrl = unslug(req.params.slug)
+    const erddapUrl = await resolveErddapUrl(req.params.slug)
     const history = await datasetHistory(erddapUrl, req.params.datasetId)
     if (!history.length) return res.status(404).json({ error: 'No harvest history found' })
     const meta = await datasetMeta(erddapUrl, req.params.datasetId)
-    res.json({ history, meta })
+    res.json({ history, meta, erddap_url: erddapUrl })
   } catch (err) {
     next(err)
   }
@@ -350,7 +374,7 @@ router.get('/reasons', cache.route('2 minutes'), async (req, res, next) => {
 
 router.get('/reasons/:slug', cache.route('2 minutes'), async (req, res, next) => {
   try {
-    const erddapUrl = unslug(req.params.slug)
+    const erddapUrl = await resolveErddapUrl(req.params.slug)
     res.json(await reasonBreakdown(erddapUrl))
   } catch (err) {
     next(err)
