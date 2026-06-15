@@ -96,7 +96,7 @@ router.get(
 
     const filters = createDBFilter(req.query);
 
-    const wktPolygon = polygonJSONToWKT(polygon);
+    const wktPolygon = polygon ? polygonJSONToWKT(polygon) : null;
 
     const SQL = `
         WITH profiles_subset AS (
