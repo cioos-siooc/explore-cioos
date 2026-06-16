@@ -184,6 +184,9 @@ export default function App() {
   // OBIS data is shown unless the source filter is active without any OBIS
   // node selected. Drives the scientific-name filter's disabled state.
   const showObis = !anyServersSelected || anyObisNodesSelected
+  // No OBIS nodes returned from /obisNodes means the database has no OBIS data,
+  // so OBIS-only UI (the Scientific Name filter) is hidden entirely.
+  const obisDataAvailable = obisNodesSelected.length > 0
 
   const sourcesBadgeTitle = (() => {
     const selectedTitles = [
@@ -1079,19 +1082,21 @@ export default function App() {
             setEndDepth={setEndDepth}
           />
         </Filter>
-        <ScientificNameFilter
-          scientificNamesSelected={scientificNamesSelected}
-          setScientificNamesSelected={setScientificNamesSelected}
-          disabled={!showObis}
-          disabledTooltip={t('scientificNameFilterDisabledTooltip')}
-          tooltip={t('scientificNameFilterTooltip')}
-          controlled
-          openFilter={openFilter === 'scientificNameFilterName'}
-          setOpenFilter={setOpenFilter}
-          filterName='scientificNameFilterName'
-          badgeTitle={t('scientificNameFilterName')}
-          searchPlaceholder={t('scientificNameFilterSearchPlaceholder')}
-        />
+        {obisDataAvailable && (
+          <ScientificNameFilter
+            scientificNamesSelected={scientificNamesSelected}
+            setScientificNamesSelected={setScientificNamesSelected}
+            disabled={!showObis}
+            disabledTooltip={t('scientificNameFilterDisabledTooltip')}
+            tooltip={t('scientificNameFilterTooltip')}
+            controlled
+            openFilter={openFilter === 'scientificNameFilterName'}
+            setOpenFilter={setOpenFilter}
+            filterName='scientificNameFilterName'
+            badgeTitle={t('scientificNameFilterName')}
+            searchPlaceholder={t('scientificNameFilterSearchPlaceholder')}
+          />
+        )}
         <button
           className='resetFiltersButton'
           title={t('resetFiltersButtonTooltipText')}
