@@ -378,6 +378,10 @@ class PrefectCDEPipeline:
                 # values are harmless (treated as "not set").
                 "HARVEST_CONFIG_YAML": os.getenv("HARVEST_CONFIG_YAML", ""),
                 "OBIS_DATASETS_JSON": os.getenv("OBIS_DATASETS_JSON", ""),
+                # Escape hatch for the db-loader full-reload guard: set to 1 to
+                # permit a full reload that prunes sources missing from the
+                # incoming harvest (e.g. dropping OBIS). Empty = guard enforced.
+                "CDE_ALLOW_FULL_RELOAD": os.getenv("CDE_ALLOW_FULL_RELOAD", ""),
             },
             "networks": [job_network],
             "volumes": job_volumes,

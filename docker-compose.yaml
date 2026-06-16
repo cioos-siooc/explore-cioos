@@ -16,6 +16,41 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # One-shot: applies database/migrations/*.sql to the live DB before any other
+  # service reads or writes it. Postgres only runs database/*.sql on a FRESH
+  # volume (docker-entrypoint-initdb.d), so schema changes added to 1_schema.sql
+  # never reach an existing volume on their own — this closes that gap. The
+  # migrations are idempotent (ADD COLUMN IF NOT EXISTS ...), so applying them on
+  # every `up` is safe. Exits cleanly once done (shows as "Exited (0)").
+  db_migrate:
+    image: postgres:13-alpine
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      PGHOST: db
+      PGPORT: ${DB_PORT:-5432}
+      PGUSER: $DB_USER
+      PGPASSWORD: $DB_PASSWORD
+      PGDATABASE: $DB_NAME
+    volumes:
+      - ./database/migrations:/migrations:ro
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        applied=0
+        for f in /migrations/*.sql; do
+          [ -e "$$f" ] || continue
+          echo "Applying migration: $$f"
+          psql -v ON_ERROR_STOP=1 -f "$$f"
+          applied=$$((applied+1))
+        done
+        echo "Migrations applied: $$applied"
+
   web-api:
     build: ./web-api
     restart: always
@@ -24,8 +59,8 @@ services:
     expose:
       - "5000"
     depends_on:
-      db:
-        condition: service_healthy
+      db_migrate:
+        condition: service_completed_successfully
   nginx:
     build:
         context: ./nginx
@@ -48,8 +83,8 @@ services:
     profiles:
       - tools
     depends_on:
-      db:
-        condition: service_healthy
+      db_migrate:
+        condition: service_completed_successfully
     env_file:
       - .env
     environment:
@@ -229,8 +264,8 @@ services:
     expose:
       - "8001"
     depends_on:
-      db:
-        condition: service_healthy
+      db_migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres-data:
