@@ -191,6 +191,7 @@ class ERDDAPHarvester(BaseHarvester):
             # Pre-declare so exception handlers (HTTPError / generic Exception)
             # can still pull queried_urls if get_dataset() succeeded before failing.
             dataset = None
+            dataset_logger = erddap_logger
             try:
                 erddap_logger.info(
                     f"Querying dataset: {dataset_id} {i+1}/{len(df_all_datasets)}"

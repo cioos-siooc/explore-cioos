@@ -73,7 +73,10 @@ class ERDDAP(object):
         self.domain = urlparse(erddap_url).netloc
         self.session = _build_retry_session()
 
-        self.logger = get_run_logger()
+        try:
+            self.logger = get_run_logger()
+        except Exception:
+            self.logger = logging.getLogger(self.__class__.__name__)
         self.df_all_datasets = None
         logger = self.logger
 

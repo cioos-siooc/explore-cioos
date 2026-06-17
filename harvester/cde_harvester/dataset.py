@@ -371,6 +371,7 @@ class Dataset(object):
         self.platform = self.get_platform_code()
 
     def get_logger(self):
-        #logger = logging.getLogger(f"{self.erddap_server.domain} - {self.id}")
-        logger = get_run_logger()
-        return logger
+        try:
+            return get_run_logger()
+        except Exception:
+            return logging.getLogger(f"{self.erddap_server.domain}.{self.id}")

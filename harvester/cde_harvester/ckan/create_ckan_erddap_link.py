@@ -139,7 +139,11 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
 
 
 def list_ckan_records_with_erddap_urls(cache_requests):
-    logger = get_run_logger()
+    try:
+        logger = get_run_logger()
+    except Exception:
+        import logging as _logging
+        logger = _logging.getLogger(__name__)
     logger.info(f"cache_requests: {cache_requests}")
     row_page_limit = 1000
     row_start = 0
