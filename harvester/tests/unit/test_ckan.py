@@ -76,6 +76,15 @@ class TestUnescapeAscii:
     def test_plain_string_unchanged(self):
         assert unescape_ascii("hello") == "hello"
 
+    def test_unicode_escape_decoded(self):
+        assert unescape_ascii(r"Café") == "Café"
+
+    def test_unicode_escape_in_french_title(self):
+        assert unescape_ascii(r"Institut für Meeresforschung") == "Institut für Meeresforschung"
+
+    def test_multiple_escapes_in_one_string(self):
+        assert unescape_ascii(r"élève") == "élève"
+
     def test_non_ascii_fallback_returns_input(self):
         # Passing a non-decodable sequence should return the original value
         result = unescape_ascii(b"\xff\xfe")
@@ -84,6 +93,10 @@ class TestUnescapeAscii:
     def test_list_unescaping(self):
         result = unescape_ascii_list(["hello", "world"])
         assert result == ["hello", "world"]
+
+    def test_list_unescaping_with_escapes(self):
+        result = unescape_ascii_list([r"Café", r"Institut für Meeresforschung"])
+        assert result == ["Café", "Institut für Meeresforschung"]
 
 
 # ---------------------------------------------------------------------------
