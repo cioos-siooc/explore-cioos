@@ -7,10 +7,45 @@ import re
 import diskcache as dc
 import pandas as pd
 import requests
-from prefect import get_run_logger
+from prefect import get_run_logger, task
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # National CKAN has all the regions' records
 CKAN_API_URL = "https://catalogue.cioos.ca/api/3"
+
+# Transient statuses worth retrying (CKAN's Cloudflare/Caddy returns these intermittently).
+_RETRY_STATUSES = (408, 429, 500, 502, 503, 504, 520, 522, 524)
+
+
+def _build_ckan_session() -> requests.Session:
+    session = requests.Session()
+    retry = Retry(
+        total=4,
+        backoff_factor=1.0,         # waits 0s, 2s, 4s, 8s between attempts
+        status_forcelist=_RETRY_STATUSES,
+        allowed_methods=frozenset(["GET"]),
+        raise_on_status=False,      # let raise_for_status() give a clean error
+        respect_retry_after_header=True,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
+def _ckan_get_result(session, url):
+    """GET a CKAN action endpoint and return its `result` (clear error on non-JSON)."""
+    resp = session.get(url, timeout=120)
+    resp.raise_for_status()
+    try:
+        payload = resp.json()
+    except requests.exceptions.JSONDecodeError as e:
+        snippet = resp.text[:200].replace("\n", " ").strip()
+        raise RuntimeError(
+            f"CKAN returned a non-JSON body (HTTP {resp.status_code}) for {url}: {snippet!r}"
+        ) from e
+    return payload["result"]
 
 
 def split_erddap_url(url):
@@ -47,14 +82,9 @@ def unescape_ascii(x):
         return x
 
 
+@task(task_run_name="fetch-ckan-metadata")
 def get_ckan_records(dataset_ids, limit=None, cache=False):
-    """
-    Goes through the list of ERDDAP URLs and dataset IDs and gets the full CKAN record for each dataset ID
-
-    This will take a few minutes
-
-    dataset_ids are the list of datasets IDs that have been harvested
-    """
+    """Fetch the full CKAN record for each harvested dataset ID (@task)."""
     records = list_ckan_records_with_erddap_urls(cache)
 
     # just used for testing
@@ -139,6 +169,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
 
 
 def list_ckan_records_with_erddap_urls(cache_requests):
+    """Fetch all CKAN records with ERDDAP urls (paged)."""
     try:
         logger = get_run_logger()
     except Exception:
@@ -151,6 +182,7 @@ def list_ckan_records_with_erddap_urls(cache_requests):
     # 1000 records per query (or as defined on the server)
     records_remaining = 1
     records_total = []
+    session = _build_ckan_session()
     while records_remaining:
         erddap_datasets_query = (
             CKAN_API_URL
@@ -178,11 +210,11 @@ def list_ckan_records_with_erddap_urls(cache_requests):
                 result = cache[erddap_datasets_query]
 
             else:
-                result = requests.get(erddap_datasets_query).json()["result"]
+                result = _ckan_get_result(session, erddap_datasets_query)
                 cache[erddap_datasets_query] = result
                 logger.info("Cached CKAN records")
         else:
-            result = requests.get(erddap_datasets_query).json()["result"]
+            result = _ckan_get_result(session, erddap_datasets_query)
 
         # count of total records, regardless of paging
         count_total = result["count"]

@@ -2,8 +2,8 @@ services:
   db:
     build: ./database
     platform: linux/x86_64
-    expose:
-      - "${DB_PORT:-5432}"
+    ports:
+      - "${DB_PORT:-5432}:${DB_PORT:-5432}"
     environment:
       - "PGPORT=${DB_PORT:-5432}"
       - "POSTGRES_DB=$DB_NAME"
@@ -65,8 +65,6 @@ services:
     build:
         context: ./nginx
         dockerfile: Dockerfile
-    environment:
-      - SERVICE_FQDN_NGINX_4000
     volumes:
       - nginx_logs:/var/log/nginx
       - nginx_logrotate:/var/lib/logrotate
@@ -74,8 +72,8 @@ services:
       - downloads:/usr/share/nginx/html/downloads:ro
     depends_on:
       - web-api
-    expose:
-      - "4000"
+    ports:
+      - "${NGINX_PORT:-4000}:4000"
   scheduler:
     build:
       context: .
@@ -88,9 +86,7 @@ services:
     env_file:
       - .env
     environment:
-      # APP_DOMAIN auto-derives from Coolify's injected SERVICE_URL_NGINX when present;
-      # falls back to APP_DOMAIN from .env for local dev.
-      - "DOWNLOAD_WAF_URL=${SERVICE_URL_NGINX:-${APP_DOMAIN}}/downloads"
+      - "DOWNLOAD_WAF_URL=${APP_DOMAIN}/downloads"
     volumes:
       - downloads:/usr/src/app/download_scheduler/downloads
   frontend:
@@ -103,116 +99,94 @@ services:
         BASE_URL: ${BASE_URL:-/}
     expose:
       - "80"
-  harvester:
-    build:
-      context: .
-      dockerfile: ./harvester/Dockerfile
-      args:
-        HARVEST_CONFIG_FILE: ${HARVEST_CONFIG_FILE:-harvest_config.sample.yaml}
-    image: cde-harvester:latest
-    profiles:
-      - tools
-    volumes:
-      - harvester_cache:/app/harvester/harvester_cache
-      - harvest_data:/app/harvester/harvest
-      - harvester_logs:/app/harvester/logs
-      - obis_cache:/app/harvester/obis_cache
-    environment:
-      - "HARVESTER_LOG_DIR=/app/harvester/logs"
-      - PREFECT_API_URL=http://prefect:4200/api
-      - PREFECT_LOGGING_LEVEL=INFO
-      - DB_HOST_EXTERNAL=db
-    env_file:
-      - .env
-
-
-  # One-shot: registers the cde-harvester deployment + work pool with Prefect.
-  # Exits cleanly once done. Coolify will show this as "Exited (0)" — expected.
-  #
-  # depends_on serializes startup deliberately: Docker 29's compose
-  # orchestrator hits a "No such container" race when multiple services
-  # transition Starting -> Started in the same millisecond. Chaining
-  # prefect_deployment behind nginx forces enough separation to avoid it.
-  prefect_deployment:
-    build:
-      context: .
-      dockerfile: ./harvester/Dockerfile
-      args:
-        HARVEST_CONFIG_FILE: ${HARVEST_CONFIG_FILE:-harvest_config.sample.yaml}
-    image: cde-harvester:latest
-    depends_on:
-      prefect:
-        condition: service_healthy
-      nginx:
-        condition: service_started
-    restart: "no"
-    command:
-      - uv
-      - run
-      - python
-      - -m
-      - cde_harvester.prefect_pipeline
-      - -f
-      - harvest_config.yaml
-      - -d
-      - prod
-    env_file:
-      - .env
-    environment:
-      PREFECT_API_URL: http://prefect:4200/api
-      # Image tag the worker uses when spawning a flow-run container.
-      HARVESTER_IMAGE: cde-harvester:latest
-      DB_HOST_EXTERNAL: db
-      HARVESTER_LOG_DIR: /app/harvester/logs
-      PREFECT_LOGGING_LEVEL: INFO
-      # Note: network name + volume prefix are derived in Python from the
-      # auto-injected COOLIFY_RESOURCE_UUID (or fall back to production
-      # defaults). Doing it in code rather than via ${} expansion here avoids
-      # confusing Coolify's compose parser, which mis-handles nested
-      # ${VAR:+...} syntax and creates spurious env-var entries.
-
-  # Long-running: polls Prefect for work, spawns flow-run containers via the
-  # docker socket. Needs the deployment to have registered first.
+  # Prefect PROCESS worker: runs harvest flows in-process (no spawned flow-run
+  # containers, no docker socket). On startup it registers the work pool +
+  # deployments (REGISTER_DEPLOYMENTS=true), optionally fires one harvest
+  # (RUN_ON_DEPLOY), then polls the cde-process-pool. Scale with:
+  #   docker compose up -d --scale prefect_worker=N
+  # (registration is idempotent + best-effort, so extra replicas are safe).
+  # To run a worker on another host, see docker-compose.worker.yaml.
   prefect_worker:
     build:
       context: .
       dockerfile: ./harvester/Dockerfile
-      args:
-        HARVEST_CONFIG_FILE: ${HARVEST_CONFIG_FILE:-harvest_config.sample.yaml}
     image: cde-harvester:latest
     depends_on:
       prefect:
         condition: service_healthy
-      prefect_deployment:
-        condition: service_completed_successfully
+      db:
+        condition: service_healthy
     restart: unless-stopped
-    command:
-      - uv
-      - run
-      - prefect
-      - worker
-      - start
-      - --pool
-      - docker-pool
-      - --type
-      - docker
+    command: ["./worker-entrypoint.sh"]
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      # Operator-managed overrides for harvest_config.yaml / Obis_Datasets.json.
-      # Drop files into this named volume (via `docker cp` or `docker exec`
-      # into prefect_worker) and the next flow-run container will use them
-      # automatically. See cde_pipeline_run() in prefect_pipeline.py.
-      - cde_overrides:/app/harvester/overrides
+      # Harvest config, mounted (not baked at build) so changing which config
+      # the worker uses is a restart, not a rebuild. ${HARVEST_CONFIG_FILE}
+      # selects the host file (e.g. harvest_config.production.yaml); defaults to
+      # the committed sample. The image still ships a baked sample as a fallback
+      # for workers that don't mount one (e.g. remote workers).
+      - ./${HARVEST_CONFIG_FILE:-harvest_config.sample.yaml}:/app/harvester/harvest_config.yaml:ro
+      # Shared output sinks — every replica on this host writes here, and nginx
+      # serves harvester_logs read-only at /harvester_logs.
+      - harvest_data:/app/harvester/harvest          # resulting CSV files
+      - harvester_logs:/app/harvester/logs           # log files
+      # Caches persisted across runs (cheap re-fetch if lost).
+      - harvester_cache:/app/harvester/harvester_cache
+      - obis_cache:/app/harvester/obis_cache
+    env_file:
+      - .env
     environment:
       PREFECT_API_URL: http://prefect:4200/api
       PREFECT_LOGGING_LEVEL: INFO
+      # In-process flows inherit this container's env for DB / redis access.
+      DB_HOST_EXTERNAL: db
+      REDIS_HOST: redis
+      HARVESTER_LOG_DIR: /app/harvester/logs
+      # Surface stdlib-logging from harvester/db-loader in Prefect UI logs.
+      PREFECT_LOGGING_EXTRA_LOGGERS: populate_vernaculars,cde_db_loader,cde_harvester
+      # This worker registers the pool + deployments on startup.
+      REGISTER_DEPLOYMENTS: "true"
+      # Optional: fire one full harvest immediately on (re)deploy. Off by default.
+      RUN_ON_DEPLOY: ${RUN_ON_DEPLOY:-false}
 
   prefect:
-    image: prefecthq/prefect:3.6-python3.12-conda
-    command: prefect server start --host 0.0.0.0
-    expose:
-      - "4200"  # Prefect UI + API (route via Coolify domain if external access is needed)
+    # Non-conda image: ships asyncpg, so Prefect can use Postgres as its
+    # metadata DB. SQLite (the default) throws "database is locked" under the
+    # concurrent access from scaled / remote workers — Postgres handles it.
+    image: prefecthq/prefect:3.6-python3.12
+    # On startup, create the dedicated `prefect` database in the shared `db`
+    # Postgres if it doesn't exist (idempotent; works on fresh AND existing
+    # volumes, including Coolify where initdb scripts won't re-run), then start
+    # the server. Prefect runs its own schema migrations against it.
+    command:
+      - sh
+      - -c
+      - |
+        python - <<'PY'
+        import asyncio, os, asyncpg
+        async def ensure_db():
+            conn = await asyncpg.connect(
+                host="db", port=int(os.environ.get("DB_PORT", "5432")),
+                user=os.environ["DB_USER"], password=os.environ["DB_PASSWORD"],
+                database=os.environ["DB_NAME"],
+            )
+            try:
+                if not await conn.fetchval("SELECT 1 FROM pg_database WHERE datname='prefect'"):
+                    await conn.execute("CREATE DATABASE prefect")
+                    print("[prefect-init] created 'prefect' database")
+                else:
+                    print("[prefect-init] 'prefect' database already exists")
+            finally:
+                await conn.close()
+        asyncio.run(ensure_db())
+        PY
+        exec prefect server start --host 0.0.0.0
+    ports:
+      - "4200:4200"  # Prefect UI + API
+    env_file:
+      - .env  # DB_USER / DB_PASSWORD / DB_NAME / DB_PORT for the connection URL
     environment:
+      # Use the shared Postgres (db service), isolated in its own `prefect` DB.
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT:-5432}/prefect
       PREFECT_API_URL: http://127.0.0.1:4200/api
       # Tell the UI's JavaScript to make API calls same-origin (i.e., through
       # whatever proxy/domain the user is reaching the UI from). Without this,
@@ -224,6 +198,9 @@ services:
       PREFECT_HOME: /root/.prefect
     volumes:
       - prefect_data:/root/.prefect
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4200/api/health')\""]
       interval: 10s
@@ -237,35 +214,6 @@ services:
     expose:
       - "6379"
 
-  # Read-only public dashboard showing per-run harvest history for every
-  # dataset on every configured ERDDAP server. Modelled on
-  # https://www.ocean-ops.org/harvest/. Queries cde.harvest_runs and
-  # cde.harvest_attempts, which the harvester populates via run lifecycle.
-  harvest-dashboard:
-    build:
-      context: ./harvest-dashboard
-      dockerfile: Dockerfile
-    restart: always
-    env_file:
-      - .env
-    environment:
-      - DB_HOST_EXTERNAL=db
-      - SERVICE_FQDN_HARVEST_DASHBOARD_8001
-      # Internal Prefect API for the per-source "Trigger harvest" button (the
-      # dashboard reaches prefect by service name on the shared compose network).
-      - PREFECT_API_URL=http://prefect:4200/api
-      # External Prefect UI base for the "View in Prefect" deep-links (what a
-      # browser hits). Override per stack via .env / Coolify.
-      - PREFECT_UI_URL=${PREFECT_UI_URL:-https://prefect-obis.cool.beluga.cioos.ca}
-      # Kill-switch for the trigger button (the dashboard itself is behind
-      # Cloudflare Access). Off by default.
-      - HARVEST_TRIGGER_ENABLED=${HARVEST_TRIGGER_ENABLED:-false}
-      - HARVEST_FLOW_NAME=${HARVEST_FLOW_NAME:-CDE Pipeline Run}
-    expose:
-      - "8001"
-    depends_on:
-      db_migrate:
-        condition: service_completed_successfully
 
 volumes:
   postgres-data:
@@ -277,4 +225,3 @@ volumes:
   harvester_cache:
   harvest_data:
   obis_cache:
-  cde_overrides:

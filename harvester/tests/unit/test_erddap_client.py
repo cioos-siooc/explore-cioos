@@ -34,6 +34,9 @@ def _make_erddap(all_datasets_csv=ERDDAP_ALL_DATASETS_CSV):
         from cde_harvester.ERDDAP import ERDDAP
         erddap = ERDDAP(ERDDAP_URL, cache_requests=False)
         erddap.session = mock_session  # expose for further assertions
+        # __init__ no longer auto-fetches the dataset list; the caller (harvest())
+        # now populates it explicitly via get_all_datasets(), so do the same here.
+        erddap.df_all_datasets = erddap.get_all_datasets()
     return erddap
 
 
@@ -77,6 +80,7 @@ class TestERDDAPInit:
             )
             from cde_harvester.ERDDAP import ERDDAP
             erddap = ERDDAP(ERDDAP_URL, cache_requests=False)
+            erddap.df_all_datasets = erddap.get_all_datasets()
         assert erddap.df_all_datasets.empty
 
 

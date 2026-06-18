@@ -176,18 +176,45 @@ Deploy CDE to production using Docker Compose with the production configuration 
 
 ### Data Harvesting (Production)
 
-The harvester should be run on a schedule to keep the data up to date. Since we use Prefect for orchestration, you don't need a system cron job.
+The harvester runs on a Prefect **`process` work pool**: the `prefect_worker`
+container runs harvest flows **in-process** (no per-run containers, no docker
+socket). Since we use Prefect for orchestration, you don't need a system cron job.
 
-1. Ensure the Prefect Server and Worker are running:
+1. Start the Prefect server and worker:
    ```sh
-   docker compose -f docker-compose.production.yaml up -d prefect worker
+   docker compose up -d prefect prefect_worker
    ```
+   On startup the worker registers the `cde-process-pool` work pool and all
+   deployments (full harvest, per-source, vernaculars), then begins polling.
 
-2. Deploy the harvester flow with a schedule (defined in `.env` via `HARVESTER_CRON`):
+   > The Prefect server stores its metadata in **Postgres** (a dedicated
+   > `prefect` database in the shared `db` service, auto-created on startup),
+   > not SQLite — SQLite locks under the concurrent access from scaled / remote
+   > workers. This is why `prefect` depends on `db`.
+
+2. Control *when* harvests run via `.env` (all optional):
+   - `HARVESTER_CRON` / `VERNACULARS_CRON` — recurring schedules (unset = none).
+   - `RUN_ON_DEPLOY=true` — fire one full harvest immediately on (re)deploy.
+   - Manual / per-source — trigger from the Prefect UI or the dashboard
+     "Trigger harvest" button at any time.
+
+   *Note: single-source runs always force **Incremental Mode** so they can't
+   TRUNCATE the other sources. Full runs honor `INCREMENTAL_MODE`.*
+
+3. Scale workers (more concurrent runs) on the same host:
    ```sh
-   docker compose -f docker-compose.production.yaml up harvester
+   docker compose up -d --scale prefect_worker=N
    ```
-   *Note: By default, this runs in **Incremental Mode** if `INCREMENTAL_MODE=true` is set in your `.env`. This creates a deployment that only harvests changed datasets.*
+   Registration is idempotent, so extra replicas are safe.
 
-This registers the deployment with Prefect. The worker will automatically pick up and execute jobs according to the schedule.
+4. Run a worker on **another host** (added capacity): the central Prefect API
+   and DB must be network-reachable, and the `cde-harvester` image must be
+   available there (registry pull, or `docker save | ssh | docker load`). Then:
+   ```sh
+   PREFECT_API_URL=https://<prefect-host>/api DB_HOST_EXTERNAL=<db-host> \
+     docker compose -f docker-compose.worker.yaml up -d
+   ```
+   Remote workers set `REGISTER_DEPLOYMENTS=false` so they only poll. Note that
+   CSV/log output and caches are local to each host (plain named volumes aren't
+   shared across hosts); the DB is the source of truth.
 

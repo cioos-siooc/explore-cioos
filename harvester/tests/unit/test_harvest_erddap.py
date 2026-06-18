@@ -38,6 +38,9 @@ def _make_erddap_mock(datasets: list[tuple], domain: str = "test.erddap.com"):
 
     df = pd.DataFrame(datasets, columns=["datasetID", "cdm_data_type"])
     mock_erddap.df_all_datasets = df
+    # harvest() now (re)loads the dataset list via get_all_datasets() rather than
+    # reading a pre-set df_all_datasets attribute, so stub the call too.
+    mock_erddap.get_all_datasets.return_value = df
     mock_erddap.get_logger.return_value = __import__("logging").getLogger("test")
     return mock_erddap
 

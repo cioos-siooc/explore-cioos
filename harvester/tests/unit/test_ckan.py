@@ -30,7 +30,9 @@ from cde_harvester.ckan.create_ckan_erddap_link import (
 
 def _make_ckan_get(mocker, pages):
     """
-    Patch requests.get inside the ckan module with a sequence of page responses.
+    Patch the CKAN session builder so session.get() yields the given page
+    responses. CKAN fetching now goes through a requests.Session built by
+    _build_ckan_session() rather than the module-level requests.get.
     Each call to list_ckan_records_with_erddap_urls paginates until results empty.
     """
     responses = []
@@ -39,9 +41,11 @@ def _make_ckan_get(mocker, pages):
         mock_resp.json.return_value = page
         responses.append(mock_resp)
 
+    mock_session = mocker.MagicMock()
+    mock_session.get.side_effect = responses
     mocker.patch(
-        "cde_harvester.ckan.create_ckan_erddap_link.requests.get",
-        side_effect=responses,
+        "cde_harvester.ckan.create_ckan_erddap_link._build_ckan_session",
+        return_value=mock_session,
     )
 
 

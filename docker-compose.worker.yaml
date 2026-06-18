@@ -1,0 +1,51 @@
+# Remote Prefect worker — run on a SECOND host to add harvest capacity.
+#
+# This brings up ONLY a process worker that polls the central Prefect server and
+# runs harvest flows in-process. It does NOT register deployments and never
+# triggers runs (REGISTER_DEPLOYMENTS=false) — the primary stack owns that.
+#
+# Prerequisites on this host:
+#   1. The cde-harvester image must be available. Either pull it from a registry
+#      (set image: <registry>/cde-harvester:tag and `docker compose pull`) or
+#      load it manually:  docker save cde-harvester:latest | ssh host docker load
+#   2. PREFECT_API_URL must reach the central Prefect server (public/VPN URL).
+#   3. DB_HOST_EXTERNAL must reach the central Postgres over the network.
+#
+# Usage:
+#   PREFECT_API_URL=https://prefect.example/api \
+#   DB_HOST_EXTERNAL=db.example DB_NAME=cde DB_USER=... DB_PASSWORD=... \
+#     docker compose -f docker-compose.worker.yaml up -d --scale prefect_worker=N
+#
+# Caches and CSV/log output are LOCAL to this host (plain named volumes are not
+# shared across hosts). The DB is the source of truth; to centralize CSV/log
+# artifacts across hosts, back these volumes with a network filesystem (NFS/SMB).
+services:
+  prefect_worker:
+    image: ${HARVESTER_IMAGE:-cde-harvester:latest}
+    restart: unless-stopped
+    command: ["./worker-entrypoint.sh"]
+    env_file:
+      - .env
+    environment:
+      # Central Prefect API — MUST be overridden to a reachable URL for this host.
+      PREFECT_API_URL: ${PREFECT_API_URL:?set PREFECT_API_URL to the central Prefect server}
+      PREFECT_LOGGING_LEVEL: INFO
+      PREFECT_LOGGING_EXTRA_LOGGERS: populate_vernaculars,cde_db_loader,cde_harvester
+      # DB / redis reachable from THIS host (override in .env or shell).
+      DB_HOST_EXTERNAL: ${DB_HOST_EXTERNAL:?set DB_HOST_EXTERNAL to the central Postgres}
+      REDIS_HOST: ${REDIS_HOST:-}
+      HARVESTER_LOG_DIR: /app/harvester/logs
+      # Remote workers ONLY poll — they must not re-register or re-trigger.
+      REGISTER_DEPLOYMENTS: "false"
+      RUN_ON_DEPLOY: "false"
+    volumes:
+      - harvest_data:/app/harvester/harvest
+      - harvester_logs:/app/harvester/logs
+      - harvester_cache:/app/harvester/harvester_cache
+      - obis_cache:/app/harvester/obis_cache
+
+volumes:
+  harvest_data:
+  harvester_logs:
+  harvester_cache:
+  obis_cache:

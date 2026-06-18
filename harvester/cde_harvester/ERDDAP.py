@@ -10,7 +10,8 @@ from urllib.parse import unquote, urlparse
 import diskcache as dc
 import pandas as pd
 import requests
-from prefect import get_run_logger
+from prefect import get_run_logger, task
+from prefect.cache_policies import NO_CACHE
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -71,6 +72,7 @@ class ERDDAP(object):
             print("size_limit", self.cache.size_limit)
 
         self.domain = urlparse(erddap_url).netloc
+        self.host_slug = self.domain.lower().replace(".", "-")  # for the task run label
         self.session = _build_retry_session()
 
         try:
@@ -88,13 +90,11 @@ class ERDDAP(object):
         if not erddap_url.endswith("/erddap"):
             # ERDDAP URL almost always ends in /erddap
             logger.warning("URL doesn't end in /erddap, trying anyway")
-        self.df_all_datasets = self.get_all_datasets()
+        # df_all_datasets is fetched lazily by the caller via get_all_datasets().
 
-        if self.df_all_datasets.empty:
-            print("No datasets found at:", self.url)
-
+    @task(task_run_name="list-datasets-{self.host_slug}", cache_policy=NO_CACHE)
     def get_all_datasets(self):
-        "Get a string list of dataset IDs from the ERDDAP server"
+        """Request the ERDDAP allDatasets list (its own @task for UI visibility)."""
         # allDatasets indexes table and grid datasets
         try:
             self.logger.info("Fetching all datasets from ERDDAP server: %s", self.url)

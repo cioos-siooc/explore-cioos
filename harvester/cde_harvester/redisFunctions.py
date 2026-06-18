@@ -5,7 +5,7 @@ import gzip
 import redis
 import traceback
 from prefect.logging import get_run_logger
-from prefect import flow, task
+from prefect import task
 from datetime import datetime
 
 
@@ -58,8 +58,9 @@ def reloadTopRequests():
             log.error(traceback.format_exc())
             continue
             
-@flow(name=f"refresh-redis")
 def redisFlow():
+    """Plain helper for the standalone CLI below; the pipeline calls the two
+    tasks directly. No longer a @flow (avoids a ceremony subflow box)."""
     clearRedisCache()
     reloadTopRequests()
     

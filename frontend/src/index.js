@@ -10,6 +10,10 @@ import Loading from './components/Controls/Loading/Loading.jsx'
 import translationEN from './locales/en/translation.json'
 import translationFR from './locales/fr/translation.json'
 import App from './components/App.jsx'
+import HarvestOverview from './components/Harvest/HarvestOverview.jsx'
+import HarvestServer   from './components/Harvest/HarvestServer.jsx'
+import HarvestDataset  from './components/Harvest/HarvestDataset.jsx'
+import HarvestRun      from './components/Harvest/HarvestRun.jsx'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
 const resources = {
@@ -47,6 +51,10 @@ ReactDOM.render(
     <BrowserRouter basename={process.env.BASE_URL}>
       <Routes>
         <Route path='/' element={<App />} />
+        <Route path='/harvest'                           element={<HarvestOverview />} />
+        <Route path='/harvest/server/:slug'              element={<HarvestServer />} />
+        <Route path='/harvest/dataset/:slug/:datasetId'  element={<HarvestDataset />} />
+        <Route path='/harvest/run/:runId'                element={<HarvestRun />} />
       </Routes>
     </BrowserRouter>
     ,{/* <App /> */}

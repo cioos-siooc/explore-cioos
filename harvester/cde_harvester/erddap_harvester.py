@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -34,6 +35,62 @@ from prefect import task
 logger = logging.getLogger(__name__)
 
 
+def _attempt_urls(erddap_url, dataset, dataset_id):
+    """URLs to record for a failed attempt. Prefer the dataset's own
+    queried_urls, but when the failure happened during construction
+    (get_metadata) the dataset object never reached the caller, so fall
+    back to the metadata URL — the request that would have run first."""
+    queried = getattr(dataset, "queried_urls", None)
+    if queried:
+        return queried
+    return [f"{erddap_url.rstrip('/')}/info/{dataset_id}/index.csv"]
+
+
+def _build_attempt(run_id, erddap_url, dataset_id, status, reason_code=None,
+                   error_message=None, duration_ms=None, query_urls=None):
+    """Build one harvest_attempts.csv row (kept identical to the legacy
+    record_attempt closure so the harvest-dashboard contract is unchanged)."""
+    urls = list(query_urls or [])
+    return {
+        "run_id": run_id,
+        # Store the full configured URL (scheme + host + /erddap path) — not
+        # erddap.domain which is just the hostname — so the harvest-dashboard
+        # can build correct /tabledap/ links without a server-list lookup.
+        # erddap.domain is still used by the skipped_datasets table elsewhere
+        # for legacy compatibility.
+        "erddap_url": erddap_url.rstrip("/"),
+        "dataset_id": dataset_id,
+        "source": "erddap",
+        "status": status,
+        "reason_code": reason_code,
+        "error_message": error_message,
+        "duration_ms": duration_ms,
+        "attempted_at": datetime.now(timezone.utc),
+        "query_urls": "\n".join(urls) if urls else None,
+    }
+
+
+@dataclass
+class DatasetHarvestResult:
+    """Outcome of harvesting a single dataset (success or non-error skip)."""
+
+    status: str                      # "success" | "skipped"
+    attempt: dict                    # one harvest_attempts.csv row
+    profiles: pd.DataFrame = None    # populated only on success
+    dataset_df: pd.DataFrame = None
+    variables: pd.DataFrame = None
+    skipped_reason_code: str = None  # for the skipped_datasets table, on skip
+
+
+class DatasetHarvestError(Exception):
+    """Error outcome of harvest_dataset; carries the audit data the caller persists."""
+
+    def __init__(self, attempt, skipped_reason_code, message):
+        super().__init__(message)
+        self.attempt = attempt                       # error row for harvest_attempts.csv
+        self.skipped_reason_code = skipped_reason_code
+
+
 class ERDDAPHarvester(BaseHarvester):
     """Harvester for ERDDAP servers."""
 
@@ -51,16 +108,6 @@ class ERDDAPHarvester(BaseHarvester):
         self.limit_dataset_ids = limit_dataset_ids
         self.cache_requests = cache_requests
         self.run_id = run_id
-
-    def _attempt_urls(self, dataset, dataset_id):
-        """URLs to record for a failed attempt. Prefer the dataset's own
-        queried_urls, but when the failure happened during construction
-        (get_metadata) the dataset object never reached the caller, so fall
-        back to the metadata URL — the request that would have run first."""
-        queried = getattr(dataset, "queried_urls", None)
-        if queried:
-            return queried
-        return [f"{self.erddap_url.rstrip('/')}/info/{dataset_id}/index.csv"]
 
     @staticmethod
     def get_datasets_to_skip():
@@ -82,32 +129,6 @@ class ERDDAPHarvester(BaseHarvester):
         hostname = urlparse(self.erddap_url).hostname
         datasets_to_skip = self.get_datasets_to_skip().get(hostname, [])
 
-        def skipped_reason(code):
-            return [[erddap.domain, dataset_id, code]]
-
-        def record_attempt(dataset_id, status, reason_code=None,
-                           error_message=None, duration_ms=None,
-                           erddap_url_override=None, query_urls=None):
-            base_url = (erddap_url_override or self.erddap_url).rstrip("/")
-            urls = list(query_urls or [])
-            attempt_records.append({
-                "run_id": self.run_id,
-                # Store the full configured URL (scheme + host + /erddap path)
-                # — not erddap.domain which is just the hostname — so the
-                # harvest-dashboard can build correct /tabledap/ links without
-                # a server-list lookup. erddap.domain is still used by the
-                # skipped_datasets table elsewhere for legacy compatibility.
-                "erddap_url": base_url,
-                "dataset_id": dataset_id,
-                "source": "erddap",
-                "status": status,
-                "reason_code": reason_code,
-                "error_message": error_message,
-                "duration_ms": duration_ms,
-                "attempted_at": datetime.now(timezone.utc),
-                "query_urls": "\n".join(urls) if urls else None,
-            })
-
         df_profiles_all = pd.DataFrame(
             columns=ProfileSchema.to_schema().columns.keys()
         )
@@ -120,6 +141,7 @@ class ERDDAPHarvester(BaseHarvester):
 
         erddap = ERDDAP(self.erddap_url, self.cache_requests)
         erddap_logger = erddap.get_logger()
+        erddap.df_all_datasets = erddap.get_all_datasets()
         df_all_datasets = erddap.df_all_datasets
 
         empty_attempts = pd.DataFrame(
@@ -157,140 +179,60 @@ class ERDDAPHarvester(BaseHarvester):
                 cdm_type = unsupported_datasets.loc[
                     unsupported_datasets["datasetID"] == dataset_id, "cdm_data_type"
                 ].iloc[0]
-                record_attempt(
-                    dataset_id,
+                # No server request issued; record the skip with the info URL.
+                attempt_records.append(_build_attempt(
+                    self.run_id, self.erddap_url, dataset_id,
                     status="skipped",
                     reason_code=CDM_DATA_TYPE_UNSUPPORTED,
                     error_message=f"cdm_data_type={cdm_type!r} not in {cdm_data_types_supported}",
-                    # No request was issued for this dataset (we filtered it
-                    # from allDatasets). Surface the URL the admin would
-                    # inspect to verify cdm_data_type.
                     query_urls=[f"{base}/info/{dataset_id}/index.html"],
-                )
+                ))
 
         df_all_datasets = df_all_datasets.query(cdm_data_type_test)
 
         if erddap.df_all_datasets.empty:
             raise RuntimeError("No datasets found")
-        # loop through each dataset to be processed
-        for i, df_dataset_row in df_all_datasets.iterrows():
-            dataset_id = df_dataset_row["datasetID"]
-            if dataset_id in datasets_to_skip:
-                erddap_logger.info(
-                    f"Skipping dataset: {dataset_id} because its on the skip list"
-                )
-                record_attempt(
-                    dataset_id,
-                    status="skipped",
-                    reason_code=ON_SKIP_LIST,
-                    error_message="Dataset listed in skipped_datasets.json",
-                    query_urls=[f"{self.erddap_url.rstrip('/')}/info/{dataset_id}/index.html"],
-                )
-                continue
-            t0 = time.monotonic()
-            # Pre-declare so exception handlers (HTTPError / generic Exception)
-            # can still pull queried_urls if get_dataset() succeeded before failing.
-            dataset = None
-            dataset_logger = erddap_logger
+
+        # Pre-filter the skip-list: these issue no server request.
+        on_skip_list = [d for d in df_all_datasets["datasetID"] if d in datasets_to_skip]
+        for dataset_id in on_skip_list:
+            erddap_logger.info(
+                f"Skipping dataset: {dataset_id} because its on the skip list"
+            )
+            skipped_datasets_reasons += [[erddap.domain, dataset_id, ON_SKIP_LIST]]
+            attempt_records.append(_build_attempt(
+                self.run_id, self.erddap_url, dataset_id,
+                status="skipped",
+                reason_code=ON_SKIP_LIST,
+                error_message="Dataset listed in skipped_datasets.json",
+                query_urls=[f"{self.erddap_url.rstrip('/')}/info/{dataset_id}/index.html"],
+            ))
+        if on_skip_list:
+            df_all_datasets = df_all_datasets.query("datasetID not in @on_skip_list")
+        # Serial: never hit a server with concurrent requests.
+        total = len(df_all_datasets)
+        for i, df_dataset_row in enumerate(df_all_datasets.itertuples(index=False)):
+            dataset_id = df_dataset_row.datasetID
             try:
-                erddap_logger.info(
-                    f"Querying dataset: {dataset_id} {i+1}/{len(df_all_datasets)}"
+                result = harvest_dataset(
+                    erddap, dataset_id,
+                    run_id=self.run_id, idx=i + 1, total=total,
                 )
-                dataset = erddap.get_dataset(dataset_id)
-                dataset_logger = dataset.logger
-                compliance_checker = CDEComplianceChecker(dataset)
-                passes_checks = compliance_checker.passes_all_checks()
-
-                # these are the variables we are pulling max/min values for
-                if passes_checks:
-                    df_profiles = get_profiles(dataset)
-                    duration_ms = int((time.monotonic() - t0) * 1000)
-
-                    if df_profiles.empty:
-                        dataset_logger.warning("No profiles found")
-                        record_attempt(
-                            dataset_id,
-                            status="skipped",
-                            reason_code=NO_PROFILES_FOUND,
-                            error_message="Dataset passed compliance but get_profiles returned no rows",
-                            duration_ms=duration_ms,
-                            query_urls=dataset.queried_urls,
-                        )
-                    else:
-                        # only write dataset/metadata/profile if there are some profiles
-                        df_profiles_all = pd.concat([df_profiles_all, df_profiles])
-                        df_datasets_all = pd.concat(
-                            [df_datasets_all, dataset.get_df()]
-                        )
-                        df_variables_all = pd.concat(
-                            [df_variables_all, dataset.df_variables]
-                        )
-                        dataset_logger.info("complete")
-                        record_attempt(
-                            dataset_id,
-                            status="success",
-                            duration_ms=duration_ms,
-                            query_urls=dataset.queried_urls,
-                        )
-                else:
-                    duration_ms = int((time.monotonic() - t0) * 1000)
-                    skipped_datasets_reasons += skipped_reason(
-                        compliance_checker.failure_reason_code
-                    )
-                    record_attempt(
-                        dataset_id,
-                        status="skipped",
-                        reason_code=compliance_checker.failure_reason_code,
-                        error_message=getattr(compliance_checker, "failure_details", None),
-                        duration_ms=duration_ms,
-                        query_urls=dataset.queried_urls,
-                    )
-            except HTTPError as e:
-                duration_ms = int((time.monotonic() - t0) * 1000)
-                response = e.response
-                dataset_logger.error(
-                    "HTTP ERROR: %s %s", response.status_code, response.reason
-                )
-                skipped_datasets_reasons += skipped_reason(HTTP_ERROR)
-                record_attempt(
-                    dataset_id,
-                    status="error",
-                    reason_code=HTTP_ERROR,
-                    error_message=f"HTTP {response.status_code} {response.reason}",
-                    duration_ms=duration_ms,
-                    query_urls=self._attempt_urls(dataset, dataset_id),
-                )
-
-            except ResponseTooLargeError as e:
-                duration_ms = int((time.monotonic() - t0) * 1000)
-                dataset_logger.error("Response too large: %s", e)
-                skipped_datasets_reasons += skipped_reason(RESPONSE_TOO_LARGE)
-                record_attempt(
-                    dataset_id,
-                    status="error",
-                    reason_code=RESPONSE_TOO_LARGE,
-                    error_message=str(e),
-                    duration_ms=duration_ms,
-                    query_urls=self._attempt_urls(dataset, dataset_id),
-                )
-
-            except Exception as e:
-                duration_ms = int((time.monotonic() - t0) * 1000)
-                erddap_logger.error(
-                    "Error occurred at %s %s",
-                    self.erddap_url,
-                    dataset_id,
-                    exc_info=True,
-                )
-                skipped_datasets_reasons += skipped_reason(UNKNOWN_ERROR)
-                record_attempt(
-                    dataset_id,
-                    status="error",
-                    reason_code=UNKNOWN_ERROR,
-                    error_message=f"{type(e).__name__}: {e}",
-                    duration_ms=duration_ms,
-                    query_urls=self._attempt_urls(dataset, dataset_id),
-                )
+                attempt_records.append(result.attempt)
+                if result.status == "success":
+                    df_profiles_all = pd.concat([df_profiles_all, result.profiles])
+                    df_datasets_all = pd.concat([df_datasets_all, result.dataset_df])
+                    df_variables_all = pd.concat([df_variables_all, result.variables])
+                elif result.skipped_reason_code:
+                    skipped_datasets_reasons += [
+                        [erddap.domain, dataset_id, result.skipped_reason_code]
+                    ]
+            except DatasetHarvestError as e:
+                # Record the error and continue to the next dataset.
+                attempt_records.append(e.attempt)
+                skipped_datasets_reasons += [
+                    [erddap.domain, dataset_id, e.skipped_reason_code]
+                ]
 
         skipped_columns = list(SkippedDatasetSchema.to_schema().columns.keys())
 
@@ -322,8 +264,134 @@ class ERDDAPHarvester(BaseHarvester):
         )
 
 
-@task(task_run_name="harvest-{erddap_url}")
+def harvest_dataset(erddap, dataset_id, run_id=None, idx=None, total=None):
+    """Harvest one ERDDAP dataset (plain function; reuses `erddap`, never rebuilds it).
+
+    Returns DatasetHarvestResult on success/skip; raises DatasetHarvestError on
+    error (carrying the audit row the caller persists).
+    """
+    log = erddap.get_logger()
+    erddap_url = erddap.url
+    t0 = time.monotonic()
+    # Pre-declare so the exception handlers can still pull queried_urls if
+    # get_dataset() succeeded before failing.
+    dataset = None
+    progress = f" {idx}/{total}" if idx and total else ""
+    try:
+        log.info(f"Querying dataset: {dataset_id}{progress}")
+        dataset = erddap.get_dataset(dataset_id)
+        compliance_checker = CDEComplianceChecker(dataset)
+
+        if compliance_checker.passes_all_checks():
+            df_profiles = get_profiles(dataset)
+            duration_ms = int((time.monotonic() - t0) * 1000)
+            if df_profiles.empty:
+                log.warning("No profiles found")
+                return DatasetHarvestResult(
+                    status="skipped",
+                    skipped_reason_code=NO_PROFILES_FOUND,
+                    attempt=_build_attempt(
+                        run_id, erddap_url, dataset_id,
+                        status="skipped",
+                        reason_code=NO_PROFILES_FOUND,
+                        error_message="Dataset passed compliance but get_profiles returned no rows",
+                        duration_ms=duration_ms,
+                        query_urls=dataset.queried_urls,
+                    ),
+                )
+            log.info("complete")
+            return DatasetHarvestResult(
+                status="success",
+                profiles=df_profiles,
+                dataset_df=dataset.get_df(),
+                variables=dataset.df_variables,
+                attempt=_build_attempt(
+                    run_id, erddap_url, dataset_id,
+                    status="success",
+                    duration_ms=duration_ms,
+                    query_urls=dataset.queried_urls,
+                ),
+            )
+
+        # Failed compliance — a legitimate skip, NOT an error (task stays green).
+        duration_ms = int((time.monotonic() - t0) * 1000)
+        return DatasetHarvestResult(
+            status="skipped",
+            skipped_reason_code=compliance_checker.failure_reason_code,
+            attempt=_build_attempt(
+                run_id, erddap_url, dataset_id,
+                status="skipped",
+                reason_code=compliance_checker.failure_reason_code,
+                error_message=getattr(compliance_checker, "failure_details", None),
+                duration_ms=duration_ms,
+                query_urls=dataset.queried_urls,
+            ),
+        )
+    except HTTPError as e:
+        duration_ms = int((time.monotonic() - t0) * 1000)
+        response = e.response
+        log.error("HTTP ERROR: %s %s", response.status_code, response.reason)
+        raise DatasetHarvestError(
+            attempt=_build_attempt(
+                run_id, erddap_url, dataset_id,
+                status="error",
+                reason_code=HTTP_ERROR,
+                error_message=f"HTTP {response.status_code} {response.reason}",
+                duration_ms=duration_ms,
+                query_urls=_attempt_urls(erddap_url, dataset, dataset_id),
+            ),
+            skipped_reason_code=HTTP_ERROR,
+            message=f"HTTP {response.status_code} {response.reason} harvesting {dataset_id}",
+        ) from e
+    except ResponseTooLargeError as e:
+        duration_ms = int((time.monotonic() - t0) * 1000)
+        log.error("Response too large: %s", e)
+        raise DatasetHarvestError(
+            attempt=_build_attempt(
+                run_id, erddap_url, dataset_id,
+                status="error",
+                reason_code=RESPONSE_TOO_LARGE,
+                error_message=str(e),
+                duration_ms=duration_ms,
+                query_urls=_attempt_urls(erddap_url, dataset, dataset_id),
+            ),
+            skipped_reason_code=RESPONSE_TOO_LARGE,
+            message=f"Response too large harvesting {dataset_id}: {e}",
+        ) from e
+    except Exception as e:
+        duration_ms = int((time.monotonic() - t0) * 1000)
+        log.error("Error occurred at %s %s", erddap_url, dataset_id, exc_info=True)
+        raise DatasetHarvestError(
+            attempt=_build_attempt(
+                run_id, erddap_url, dataset_id,
+                status="error",
+                reason_code=UNKNOWN_ERROR,
+                error_message=f"{type(e).__name__}: {e}",
+                duration_ms=duration_ms,
+                query_urls=_attempt_urls(erddap_url, dataset, dataset_id),
+            ),
+            skipped_reason_code=UNKNOWN_ERROR,
+            message=f"{type(e).__name__} harvesting {dataset_id}: {e}",
+        ) from e
+
+
+def _erddap_task_run_name():
+    """Task run label 'harvest-erddap-{full-host}' (dots -> dashes), matching the
+    'Harvest Source' flow_run_name. Computed locally (not via prefect_pipeline.
+    deployment_slug) to avoid a circular import."""
+    from prefect.runtime import task_run
+
+    url = (task_run.parameters or {}).get("erddap_url", "") or ""
+    host = urlparse(url if "://" in url else "https://" + url).hostname or str(url)
+    return f"harvest-erddap-{host.lower().replace('.', '-')}"
+
+
+@task(task_run_name=_erddap_task_run_name)
 def harvest_erddap(erddap_url, limit_dataset_ids=None, cache_requests=False, run_id=None):
-    """Prefect task wrapper for ERDDAPHarvester."""
+    """Prefect task wrapper for ERDDAPHarvester.
+
+    Stays a @task (not a subflow) so multiple servers harvest concurrently via
+    .submit() — Prefect subflows run sequentially, tasks don't.
+    """
     harvester = ERDDAPHarvester(erddap_url, limit_dataset_ids, cache_requests, run_id=run_id)
     return harvester.harvest()

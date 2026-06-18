@@ -1,0 +1,338 @@
+/* ── Harvest section root layout ──────────────────────────────────────────── */
+.harvest-root {
+  min-height: 100vh;
+  background: #F3F0EC;
+  font-family: 'Montserrat', sans-serif;
+  color: #152F37;
+}
+
+.harvest-header {
+  background: #152F37;
+  color: #fff;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.harvest-header-title {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.harvest-home-link {
+  color: #C6E3DF;
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.harvest-home-link:hover {
+  text-decoration: underline;
+  color: #fff;
+}
+
+.harvest-lang-toggle {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid #C6E3DF;
+  color: #C6E3DF;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 4px;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+}
+
+.harvest-lang-toggle:hover {
+  background: #C6E3DF;
+  color: #152F37;
+}
+
+.harvest-breadcrumb {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0.5rem 1.5rem;
+  font-size: 0.85rem;
+  color: #5a7a7f;
+}
+
+.harvest-breadcrumb a {
+  color: #52A79B;
+  text-decoration: none;
+}
+
+.harvest-breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.harvest-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem 1.5rem 3rem;
+}
+
+/* ── Status pills ─────────────────────────────────────────────────────────── */
+.harvest-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-transform: lowercase;
+  white-space: nowrap;
+}
+
+.harvest-status-success { background: #C6E3DF; color: #0e3d35; }
+.harvest-status-skipped { background: #F3ECD6; color: #7a5c00; border: 1px solid #ddd0b0; }
+.harvest-status-error   { background: #FBE3E6; color: #7a1520; }
+.harvest-status-running { background: #DCEEF7; color: #0d5c80; }
+.harvest-status-failed  { background: #FBE3E6; color: #7a1520; }
+
+/* ── Sparkline ────────────────────────────────────────────────────────────── */
+.harvest-spark {
+  font-family: monospace;
+  letter-spacing: 1px;
+  font-size: 0.95rem;
+}
+
+.harvest-spark-dot {
+  display: inline-block;
+}
+
+.harvest-spark-success { color: #52A79B; }
+.harvest-spark-skipped { color: #B07A00; }
+.harvest-spark-error   { color: #E25563; }
+.harvest-spark-empty   { color: #aaa; }
+
+/* ── Shared table styles ──────────────────────────────────────────────────── */
+.harvest-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  font-size: 0.88rem;
+}
+
+.harvest-table th {
+  background: #152F37;
+  color: #C6E3DF;
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  font-weight: 500;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.harvest-table td {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid #EDE8E2;
+  vertical-align: middle;
+}
+
+.harvest-table tr:last-child td {
+  border-bottom: none;
+}
+
+.harvest-table tr:hover td {
+  background: #F8F6F3;
+}
+
+/* ── Card grid (overview server cards) ───────────────────────────────────── */
+.harvest-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.harvest-card {
+  background: #fff;
+  border-radius: 6px;
+  padding: 1rem 1.1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  border-left: 4px solid #52A79B;
+  transition: box-shadow 0.15s;
+}
+
+.harvest-card:hover {
+  box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+  text-decoration: none;
+  color: inherit;
+}
+
+.harvest-card-hostname {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #152F37;
+  margin-bottom: 0.15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.harvest-card-url {
+  font-size: 0.75rem;
+  color: #7a8e91;
+  margin-bottom: 0.6rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.harvest-card-counts {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.harvest-count-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.harvest-count-success { background: #C6E3DF; color: #0e3d35; }
+.harvest-count-skipped { background: #F3ECD6; color: #7a5c00; }
+.harvest-count-error   { background: #FBE3E6; color: #7a1520; }
+
+.harvest-card-meta {
+  font-size: 0.75rem;
+  color: #8a9ea2;
+}
+
+/* ── Section headings ────────────────────────────────────────────────────── */
+.harvest-section-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #152F37;
+  margin: 1.75rem 0 0.75rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 2px solid #C6E3DF;
+}
+
+/* ── Filter bar ──────────────────────────────────────────────────────────── */
+.harvest-filter-bar {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  align-items: center;
+}
+
+.harvest-filter-bar select,
+.harvest-filter-bar input[type="text"] {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid #C6D8DB;
+  border-radius: 4px;
+  font-size: 0.88rem;
+  background: #fff;
+  color: #152F37;
+}
+
+.harvest-filter-bar input[type="text"] {
+  min-width: 200px;
+}
+
+/* ── Summary counts row ──────────────────────────────────────────────────── */
+.harvest-summary {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+/* ── Run meta row ────────────────────────────────────────────────────────── */
+.harvest-run-meta {
+  background: #fff;
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.harvest-run-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.harvest-run-meta-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7a8e91;
+}
+
+.harvest-run-meta-value {
+  font-weight: 500;
+  color: #152F37;
+}
+
+/* ── Error box ───────────────────────────────────────────────────────────── */
+.harvest-error-box {
+  background: #FBE3E6;
+  color: #7a1520;
+  border-radius: 4px;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Latest attempt card ─────────────────────────────────────────────────── */
+.harvest-latest-card {
+  background: #fff;
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  font-size: 0.88rem;
+}
+
+/* ── Query URLs list ─────────────────────────────────────────────────────── */
+.harvest-query-urls {
+  margin-top: 0.5rem;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+}
+
+.harvest-query-urls li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin-bottom: 0.2rem;
+  word-break: break-all;
+}
+
+.harvest-url-ok   { color: #52A79B; font-weight: 700; }
+.harvest-url-fail { color: #E25563; font-weight: 700; }
+
+/* ── Misc helpers ────────────────────────────────────────────────────────── */
+.harvest-mono { font-family: monospace; font-size: 0.85em; }
+.harvest-muted { color: #8a9ea2; }
+.harvest-page-title { font-size: 1.5rem; font-weight: 700; color: #152F37; margin-bottom: 0.25rem; }
+.harvest-page-sub   { font-size: 0.88rem; color: #5a7a7f; margin-bottom: 1rem; }
+
+.harvest-loading { padding: 2rem; text-align: center; color: #8a9ea2; }
+.harvest-fetch-error { padding: 1rem; color: #7a1520; background: #FBE3E6; border-radius: 4px; }
+
+a.harvest-link { color: #52A79B; text-decoration: none; }
+a.harvest-link:hover { text-decoration: underline; }
