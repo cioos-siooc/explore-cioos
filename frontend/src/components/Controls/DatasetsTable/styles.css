@@ -51,6 +51,47 @@
   background-color: var(--cioos-teal-light);
 }
 
+.datasetsTable .datasetsTableToolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 0;
+}
+
+.datasetsTable .datasetsTableToolbar .selectAllToggle {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  background: transparent;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.datasetsTable .datasetsTableToolbar .selectAllToggle:hover {
+  background-color: var(--cioos-teal-light);
+}
+
+.datasetsTable .datasetsTableToolbar .selectAllToggle.active {
+  background-color: var(--cioos-primary);
+  border-color: var(--cioos-primary);
+  color: white;
+}
+
+.datasetsTable .datasetsTableToolbar .datasetsTableSearch {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: 6px;
+  padding: 6px 10px;
+  outline: none;
+}
+
+.datasetsTable .datasetsTableToolbar .datasetsTableSearch:focus {
+  border-color: var(--cioos-primary);
+}
+
 .selectAllHeader {
   display: flex
 }
