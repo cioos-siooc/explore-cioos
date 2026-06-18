@@ -36,9 +36,14 @@
   border: 2px solid var(--cioos-primary);
   border-radius: var(--cioos-radius);
   height: 40px;
-  padding: 0 20px;
+  padding: 0 18px;
   font-weight: 600;
   text-align: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  flex: 0 0 auto;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 

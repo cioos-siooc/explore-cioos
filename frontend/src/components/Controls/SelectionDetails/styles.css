@@ -21,7 +21,10 @@
 
 .pointDetailsControls {
   border-top: 1px solid var(--cioos-hairline);
-  background-color: white;
+  background-color: var(--cioos-white);
+  /* Soft upward lift so the bar reads as a fixed control surface above the
+     scrolling dataset list rather than another row in it. */
+  box-shadow: 0 -3px 12px rgba(21, 47, 55, 0.06);
   position: absolute;
   bottom: 0px;
   left: 0px;
@@ -30,8 +33,10 @@
 
 .pointDetailsControlRow {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  padding: 10px 10px 10px 10px;
+  gap: 12px;
+  padding: 12px 16px;
 }
 
 .emailInput {
@@ -187,34 +192,70 @@
   cursor: pointer;
 }
 
-.pointDetailsControlRowGridContainer {
-    width: 100%;
-    text-align: center;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    grid-auto-rows: minmax(10px, auto);
-    font-size: 25px;
-}
-
-.pointDetailsControlRowGridContainer > *{
-  padding: 5px 0px 0px 0px;
-}
-
 /* Three-stage funnel: all datasets → filtered → selected for download.
-   Colour deepens with intent (muted ink → brand teal → navy) so the eye
-   tracks the narrowing. teal-light is unreadable as text, so the "all"
-   stage uses muted ink instead. */
-.pointDetailsControlRowGridContainer .numberOfDatasets {
+   Each stage stacks a small caption over its count; the row narrows
+   left-to-right and the colour deepens with intent (muted ink → brand
+   teal → navy) so the eye tracks the funnel. */
+.datasetFunnel {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.funnelStage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 2px 8px;
+  border-radius: var(--cioos-radius-sm);
+}
+
+.funnelLabel {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: var(--cioos-ink-40);
+  white-space: nowrap;
+}
+
+.funnelCount {
+  font-family: var(--cioos-font-display);
+  font-weight: 700;
+  font-size: 21px;
+  line-height: 1.15;
+}
+
+/* teal-light is unreadable as text, so the "all" stage uses muted ink. */
+.funnelStage.all .funnelCount {
   color: var(--cioos-ink-60);
 }
 
-.pointDetailsControlRowGridContainer .filteredDatasets {
+.funnelStage.filtered .funnelCount {
   color: var(--cioos-primary);
 }
 
-.pointDetailsControlRowGridContainer .selectedDatasets {
+.funnelStage.selected .funnelCount {
   color: var(--cioos-navy);
+}
+
+/* The narrowing connector between stages. */
+.funnelArrow {
+  flex: 0 0 auto;
+  color: var(--cioos-ink-40);
+}
+
+/* Selected is the payload for download — when it carries datasets, chip it
+   in teal-light so the eye links the count to the Download button. */
+.funnelStage.selected.active {
+  background-color: var(--cioos-teal-light);
+}
+
+.funnelStage.selected.active .funnelLabel {
+  color: var(--cioos-primary-700);
 }
 
 /* --- Mobile: keep the panel header on one line and the funnel counters
@@ -238,7 +279,11 @@
     flex-shrink: 0;
   }
 
-  .pointDetailsControlRowGridContainer {
-    font-size: 20px;
+  .funnelCount {
+    font-size: 18px;
+  }
+
+  .funnelStage {
+    padding: 2px 6px;
   }
 }
