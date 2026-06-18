@@ -140,7 +140,9 @@ export default function DatasetsTable({
         cell: (row) => formatErddapServerName(row.erddap_server_url || row.erddap_url, i18n.language, erddapServersJSONfile),
         wrap: true,
         sortable: true,
-        width: '120px'
+        // Sidebar: flex to fill the narrow panel instead of a fixed 120px that
+        // pushes later columns off-screen. Download modal keeps its fixed width.
+        ...(isDownloadModal ? { width: '120px' } : { minWidth: '80px', grow: 1 })
       },
       {
         name: (
@@ -150,8 +152,9 @@ export default function DatasetsTable({
         ),
         selector: (row) => row.title,
         wrap: true,
-        width: '280px',
-        sortable: true
+        sortable: true,
+        // Title takes the lion's share of the remaining space in the sidebar.
+        ...(isDownloadModal ? { width: '280px' } : { minWidth: '140px', grow: 3 })
       },
       {
         name: t('datasetsTableHeaderTypeText'),
@@ -262,7 +265,7 @@ export default function DatasetsTable({
                   </Tooltip>
                 }
               >
-                <XCircle className='downloadableIcon' color='#e3285e' size='25' />
+                <XCircle className='downloadableIcon' color='#E25563' size='25' />
               </OverlayTrigger>
             )
           } else {

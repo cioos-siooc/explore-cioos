@@ -386,13 +386,13 @@ export default function DownloadDetails({
           <div>
             <Check2Circle color='#52a79b' size='25' />
             {t('downloadDetailsDownloadLimitsDownloadableMessagePart1')}
-            <strong style={{ color: 'white', backgroundColor: '#52a79b' }}>
+            <strong style={{ color: 'white', backgroundColor: '#52A79B' }}>
               {t('downloadDetailsDownloadLimitsDownloadableMessagePart2')}
             </strong>
             {t('downloadDetailsDownloadLimitsDownloadableMessagePart3')}{' '}
-            <XCircle color='#e3285e' size='25' />
+            <XCircle color='#E25563' size='25' />
             {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart1')}
-            <strong style={{ color: 'white', backgroundColor: '#e3285e' }}>
+            <strong style={{ color: 'white', backgroundColor: '#E25563' }}>
               {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart2')}
             </strong>
             {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart3')}

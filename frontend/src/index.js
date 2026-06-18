@@ -16,6 +16,10 @@ import HarvestDataset  from './components/Harvest/HarvestDataset.jsx'
 import HarvestRun      from './components/Harvest/HarvestRun.jsx'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
+// CIOOS National design tokens + base typography. Imported first so the
+// var(--cioos-*) tokens and base font rules are available to every component.
+import './components/theme.css'
+
 const resources = {
   en: {
     translation: translationEN

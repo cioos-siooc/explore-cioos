@@ -8,7 +8,7 @@
 .controls.disabled .filterHeader,
 .controls.disabled .filterOptions {
   pointer-events: none !important;
-  background-color: lightgrey;
+  background-color: var(--cioos-surface-2);
 }
 
 .controls .controlColumn.col>div {

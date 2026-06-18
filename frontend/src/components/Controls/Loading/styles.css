@@ -1,6 +1,6 @@
 .loading {
   pointer-events: none;
-  background-color: lightgray;
+  background-color: var(--cioos-surface-2);
   opacity: 50%;
   position: absolute;
   top: 0;

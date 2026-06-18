@@ -39,7 +39,7 @@
 }
 
 .downloadDetailsControls {
-  border-top: 1px solid darkgrey;
+  border-top: 1px solid var(--cioos-hairline);
   background-color: white;
   padding: 10px;
   overflow-x: hidden;
@@ -76,7 +76,7 @@
 }
 
 .progress .past100 {
-  color: black;
+  color: var(--cioos-ink);
 }
 
 .downloadQuote {
@@ -89,7 +89,7 @@
   min-height: 84px;
   justify-content: center;
   padding: 20px 10px 20px 100px;
-  background-color: #f7f7f7;
+  background-color: var(--cioos-surface-2);
   border-top-left-radius: 8px;
   border-top-right-radius: 8px;
 }
@@ -111,18 +111,18 @@
 .filterDownloadToggle button{
   background-color: white;
   border-radius: 42px;
-  border: 1px solid lightgrey;
+  border: 1px solid var(--cioos-hairline);
   height: 42px;
   margin: 1px 5px 1px 1px;
   padding: 0px 15px 0px 0px;
 }
 
 .filterDownloadToggle.active button {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
 }
 
 .filterDownloadToggle.active:hover button {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
 }
 
 .filterDownloadToggle.disabled:hover button {
@@ -130,8 +130,8 @@
 }
 
 .filterDownloadToggle:hover button {
-  background-color: #f3f3f3;
-  border: 2px solid darkgrey;
+  background-color: var(--cioos-surface-2);
+  border: 2px solid var(--cioos-hairline);
   margin: 0px 5px 0px 0px;
   padding: 0px 15px 0px 0px;
 }
@@ -156,7 +156,7 @@
 }
 
 .downloadDetailsDownloadLimits {
-  background-color: #f7f7f7;
+  background-color: var(--cioos-surface-2);
 }
 
 .downloadDetails .downloadDetailsBackButton{
@@ -165,10 +165,10 @@
   top: 20px;
   height: 42px;
   border-radius: 10px;
-  border: 2px solid darkgrey;
+  border: 2px solid var(--cioos-hairline);
   background-color: white;
 }
 
 .downloadDetails .downloadDetailsBackButton:hover {
-  background-color: #f3f3f3;
+  background-color: var(--cioos-surface-2);
 } 

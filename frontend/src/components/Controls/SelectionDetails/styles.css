@@ -20,7 +20,7 @@
 }
 
 .pointDetailsControls {
-  border-top: 1px solid darkgrey;
+  border-top: 1px solid var(--cioos-hairline);
   background-color: white;
   position: absolute;
   bottom: 0px;
@@ -59,7 +59,7 @@
 }
 
 .progress .past100 {
-  color: black;
+  color: var(--cioos-ink);
 }
 
 .noDataNotice {
@@ -70,7 +70,8 @@
 .pointDetailsHeader {
   height: 66px;
   display: flex;
-  border-bottom: 1px solid lightgray;
+  /* background-color: var(--cioos-sand); */
+  border-bottom: 1px solid var(--cioos-hairline);
   align-items: center;
 }
 
@@ -94,13 +95,13 @@
 
 .pointDetailsHeaderLogo.CDE:hover {
   cursor: pointer;
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
   /* padding: -2px; */
 }
 
 .pointDetailsHeaderLogo.CIOOS:hover {
   cursor: pointer;
-  background-color: #f3f3f3;
+  background-color: var(--cioos-surface-2);
   /* padding: -2px; */
 }
 
@@ -118,7 +119,7 @@
 }
 
 .pointDetailsHeaderIntroButton:hover {
-  background-color: #f3f3f3;
+  background-color: var(--cioos-surface-2);
 }
 
 .feedbackButtonImage {
@@ -137,7 +138,7 @@
 }
 
 .feedbackButton:hover {
-  background-color: #f3f3f3;
+  background-color: var(--cioos-surface-2);
 }
 
 .noPosition.languageSelector{
@@ -154,11 +155,11 @@
   padding:7px 5px 5px 5px;
   background-color: white;
   border-radius: 4px;
-  /* border: 2px solid lightgrey; */
+  /* border: 2px solid var(--cioos-hairline); */
 }
 
 .noPosition.languageSelector:hover {
-  background-color: #f3f3f3;
+  background-color: var(--cioos-surface-2);
 }
 
 .pointDetailsSearchBar {
@@ -182,7 +183,7 @@
 }
 
 .pointDetailsSearchBarClearSearchButton:hover {
-  background-color: lightgray;
+  background-color: var(--cioos-surface-2);
   cursor: pointer;
 }
 
@@ -200,14 +201,44 @@
   padding: 5px 0px 0px 0px;
 }
 
+/* Three-stage funnel: all datasets → filtered → selected for download.
+   Colour deepens with intent (muted ink → brand teal → navy) so the eye
+   tracks the narrowing. teal-light is unreadable as text, so the "all"
+   stage uses muted ink instead. */
 .pointDetailsControlRowGridContainer .numberOfDatasets {
-  color: #c6e3df;
+  color: var(--cioos-ink-60);
 }
 
 .pointDetailsControlRowGridContainer .filteredDatasets {
-  color: #52A79B ;
+  color: var(--cioos-primary);
 }
 
 .pointDetailsControlRowGridContainer .selectedDatasets {
-  color: black;
+  color: var(--cioos-navy);
+}
+
+/* --- Mobile: keep the panel header on one line and the funnel counters
+   readable when the panel goes full-width on a phone. --- */
+@media (max-width: 600px) {
+  .pointDetailsHeader {
+    height: 56px;
+  }
+
+  .pointDetailsHeaderLogo.CIOOS {
+    padding: 8px;
+    min-width: 0;
+  }
+
+  .pointDetailsHeaderIntroButton,
+  .feedbackButton,
+  .noPosition.languageSelector {
+    height: 38px;
+    width: 38px;
+    margin: 6px 6px;
+    flex-shrink: 0;
+  }
+
+  .pointDetailsControlRowGridContainer {
+    font-size: 20px;
+  }
 }

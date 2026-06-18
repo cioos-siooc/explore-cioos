@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { useRef, useState, useEffect } from 'react'
+import { Tooltip, OverlayTrigger } from 'react-bootstrap'
 import {
   ChevronCompactDown,
   ChevronCompactUp,
@@ -9,7 +10,6 @@ import {
 import { useTranslation } from 'react-i18next'
 import noop from 'lodash/noop'
 
-import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
 import { abbreviateString, useOutsideAlerter } from '../../../utilities'
 
 import './styles.css'
@@ -44,29 +44,39 @@ export default function Filter({
     controlled ? setFilterOpen(openFilter) : noop()
   }, [openFilter])
 
+  const filterButton = (
+    <button
+      className={`filterHeader ${active && 'active'}`}
+      onClick={() => {
+        setFilterOpen(!filterOpen)
+        if (controlled) setOpenFilter(filterName)
+      }}
+    >
+      {icon}
+      <div className='badgeTitle' title={badgeTitle}>
+        {abbreviateString(badgeTitle, 35)}
+      </div>
+      {filterOpen ? <ChevronCompactUp /> : <ChevronCompactDown />}
+    </button>
+  )
+
   // Using tabIndex to enable onBlur() focus loss capturing: https://stackoverflow.com/a/37491578
   return (
     <div className='filter' ref={wrapperRef}>
-      <button
-        className={`filterHeader ${active && 'active'}`}
-        onClick={() => {
-          setFilterOpen(!filterOpen)
-          if (controlled) setOpenFilter(filterName)
-        }}
-      >
-        {tooltip && (
-          <QuestionIconTooltip
-            tooltipText={tooltip}
-            tooltipPlacement={'bottom'}
-            size={20}
-          />
-        )}
-        {icon}
-        <div className='badgeTitle' title={badgeTitle}>
-          {abbreviateString(badgeTitle, 35)}
-        </div>
-        {filterOpen ? <ChevronCompactUp /> : <ChevronCompactDown />}
-      </button>
+      {/* Tooltip text shown on hover (desktop) and on focus/tap (mobile),
+          replacing the old "?" help icon. Suppressed while the dropdown is
+          open so it doesn't overlap the options. */}
+      {tooltip && !filterOpen ? (
+        <OverlayTrigger
+          placement='bottom'
+          trigger={['hover', 'focus']}
+          overlay={<Tooltip>{tooltip}</Tooltip>}
+        >
+          {filterButton}
+        </OverlayTrigger>
+      ) : (
+        filterButton
+      )}
       {(controlled ? filterOpen && openFilter : filterOpen) && (
         <div className='filterOptions'>
           {searchable && (
@@ -115,7 +125,7 @@ export default function Filter({
               rel='noreferrer'
             >
               Info&nbsp;
-              <BoxArrowUpRight color='#007bff' size={17.5} />
+              <BoxArrowUpRight color='#52A79B' size={17.5} />
             </a>
           )}
         </div>

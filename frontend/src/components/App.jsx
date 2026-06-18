@@ -571,7 +571,7 @@ export default function App() {
 
     case 'failed':
       setSubmissionFeedback({
-        icon: <XCircle size={30} style={{ color: '#e3285e' }} />,
+        icon: <XCircle size={30} style={{ color: '#E25563' }} />,
         text: t('submissionStateTextFailed') // 'Request failed'
       })
       break

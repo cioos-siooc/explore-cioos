@@ -21,11 +21,11 @@
 }
 
 .datasetsTable thead th:hover {
-  background-color: lightgray;
+  background-color: var(--cioos-surface-2);
 }
 
 .datasetsTable tr:hover {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
   cursor: pointer;
 }
 
@@ -40,7 +40,7 @@
 .datasetsTable .inspectButton {
   text-align: center;
   margin: 10px 5px 10px 5px;
-  border: 2px solid darkgrey;
+  border: 2px solid var(--cioos-hairline);
   border-radius: 10px;
   width: 40px;
   height: 40px;
@@ -48,7 +48,7 @@
 }
 
 .datasetsTable .inspectButton:hover {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
 }
 
 .selectAllHeader {
@@ -68,7 +68,7 @@
 }
 
 .datasetsTable tbody tr td svg:hover {
-  background-color: lightgrey;
+  background-color: var(--cioos-surface-2);
 }
 
 .datasetsTable .downloadIcon {
@@ -78,7 +78,7 @@
 .datasetsTable .datasetsTableSpinner {
   /* position: absolute; */
   margin:0px 40px;
-  /* background-color: lightgray; */
+  /* background-color: var(--cioos-surface-2); */
   opacity: 30%;
 }
 
@@ -91,10 +91,10 @@
 .datasetsTable .downloadSizeEstimateFiltered {
   height: 30px;
   display: inline;
-  background-color: #e3285e;
+  background-color: var(--cioos-error);
   color: white;
 }
 
 .datasetsTable .downloadSizeEstimateFiltered.downloadable {
-  background-color: #52a79b;
+  background-color: var(--cioos-primary);
 }

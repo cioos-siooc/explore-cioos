@@ -6,42 +6,76 @@
   padding: 0px;
 }
 
+.dataDownloadModal .modal-content {
+  border: none;
+  border-top: 4px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius);
+  overflow: hidden;
+}
+
+.dataDownloadModal .modal-header {
+  background-color: var(--cioos-sand);
+  border-bottom: 1px solid var(--cioos-hairline);
+}
+
+.dataDownloadModal .modal-title {
+  font-family: var(--cioos-font-display);
+  font-weight: 700;
+  color: var(--cioos-navy);
+}
+
 .dataDownloadModal .modal-header .btn-close {
   margin-right: 5px;
 }
 
+/* Secondary / outline action — opens the download review. */
 .downloadButton {
   pointer-events: all;
-  background-color: white;
-  border: solid 2px darkgrey;
-  border-radius: 10px;
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary);
+  border: 2px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius);
   height: 40px;
+  padding: 0 20px;
+  font-weight: 600;
   text-align: center;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
+.downloadButton:disabled,
 .downloadButton:disabled:hover {
-  background-color: white;
+  background-color: var(--cioos-white);
+  color: var(--cioos-ink-40);
+  border-color: var(--cioos-hairline);
   cursor: not-allowed;
 }
 
 .downloadButton:hover {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
 }
 
+/* Primary call to action — submit the download request. */
 .submitRequestButton {
-  background-color: White;
-  border: solid 2px lightgrey;
-  border-radius: 10px;
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
+  border: 2px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius);
   height: 40px;
   text-align: center;
   width: 100%;
-}
-
-.submitRequestButton.disabled:hover {
-  background-color: white;
+  font-weight: 600;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .submitRequestButton:hover {
-  background-color: #c6e3df;
-  border: 2px solid darkgrey;
+  background-color: var(--cioos-primary-700);
+  border-color: var(--cioos-primary-700);
+}
+
+.submitRequestButton.disabled,
+.submitRequestButton.disabled:hover {
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink-40);
+  border-color: var(--cioos-hairline);
+  cursor: not-allowed;
 }

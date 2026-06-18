@@ -13,7 +13,7 @@
 }
 
 .languageSelector:hover {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
   cursor: pointer;
 }
 
