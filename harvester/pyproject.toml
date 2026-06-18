@@ -35,3 +35,14 @@ packages = ["cde_harvester"]
 [tool.uv.sources]
 db-loader = { path = "../db-loader", editable = true }
 
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-mock>=3.15.1",
+    "pytest-cov>=5.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit", "tests/integration"]
+addopts = "-v --tb=short"
+

@@ -12,7 +12,6 @@ import {
   Water,
   BroadcastPin,
   X,
-  Diagram3,
   Server
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
@@ -32,14 +31,13 @@ import Legend from './Controls/Legend/Legend.jsx'
 import IntroModal from './Controls/IntroModal/IntroModal.jsx'
 import Filter from './Controls/Filter/Filter.jsx'
 import MultiCheckboxFilter from './Controls/Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx'
+import SourceFilter from './Controls/Filter/SourceFilter/SourceFilter.jsx'
 import ScientificNameFilter from './Controls/Filter/ScientificNameFilter/ScientificNameFilter.jsx'
 import TimeSelector from './Controls/Filter/TimeSelector/TimeSelector.jsx'
 import DepthSelector from './Controls/Filter/DepthSelector/DepthSelector.jsx'
-import QuestionIconTooltip from './Controls/QuestionIconTooltip/QuestionIconTooltip.jsx'
 import ErrorBoundary from './ErrorBoundary/ErrorBoundary.jsx'
 import EnglishLogo from './Images/CIOOSNationalLogoBlackEnglish.svg'
 import FrenchLogo from './Images/CIOOSNationalLogoBlackFrench.svg'
-import ObisIcon from './Images/obis_icon.png'
 import {
   defaultEovsSelected,
   defaultOrgsSelected,
@@ -54,6 +52,7 @@ import {
   defaultErddapServersSelected
 } from './config.js'
 import {
+  capitalizeFirstLetter,
   createDataFilterQueryString,
   validateEmail,
   getCurrentRangeLevel,
@@ -62,8 +61,7 @@ import {
   useDebounce,
   setAllOptionsIsSelectedTo,
   polygonIsRectangle,
-  getCookieValue,
-  formatErddapServerName
+  getCookieValue
 } from '../utilities.js'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 
@@ -108,7 +106,6 @@ export default function App() {
     orgsSelected: defaultOrgsSelected,
     datasetsSelected: defaultDatatsetsSelected,
     platformsSelected: defaultPlatformsSelected,
-    showObis: true,
     scientificNamesSelected: defaultScientificNamesSelected,
     obisNodesSelected: defaultObisNodesSelected,
     erddapServersSelected: defaultErddapServersSelected
@@ -165,17 +162,46 @@ export default function App() {
   )
   const [platformsSearchTerms, setPlatformsSearchTerms] = useState('')
 
-  // ERDDAP Servers filter initial values and state
+  // Source filter (ERDDAP servers + OBIS nodes) initial values and state.
+  // The two lists stay separate under the hood — they map to different API
+  // parameters — but render as a single "Data Source" filter.
   const [erddapServersSelected, setErddapServersSelected] = useState(
     defaultErddapServersSelected
   )
   const debouncedErddapServersSelected = useDebounce(erddapServersSelected, 500)
-  const erddapServersFilterTranslationKey = 'erddapServersFilterName'
-  const erddapServersBadgeTitle = generateMultipleSelectBadgeTitle(
-    erddapServersFilterTranslationKey,
-    erddapServersSelected
+  const [obisNodesSelected, setObisNodesSelected] = useState(
+    defaultObisNodesSelected
   )
-  const [erddapServersSearchTerms, setErddapServersSearchTerms] = useState('')
+  const debouncedObisNodesSelected = useDebounce(obisNodesSelected, 500)
+  const sourcesFilterTranslationKey = 'sourceFilterName'
+  const [sourcesSearchTerms, setSourcesSearchTerms] = useState('')
+
+  const anyServersSelected = erddapServersSelected.some((s) => s.isSelected)
+  const anyObisNodesSelected = obisNodesSelected.some((n) => n.isSelected)
+  const allObisNodesSelected =
+    obisNodesSelected.length > 0 &&
+    obisNodesSelected.every((n) => n.isSelected)
+  // OBIS data is shown unless the source filter is active without any OBIS
+  // node selected. Drives the scientific-name filter's disabled state.
+  const showObis = !anyServersSelected || anyObisNodesSelected
+  // No OBIS nodes returned from /obisNodes means the database has no OBIS data,
+  // so OBIS-only UI (the Scientific Name filter) is hidden entirely.
+  const obisDataAvailable = obisNodesSelected.length > 0
+
+  const sourcesBadgeTitle = (() => {
+    const selectedTitles = [
+      ...erddapServersSelected.filter((s) => s.isSelected).map((s) => s.title),
+      // a fully selected OBIS group reads as one source
+      ...(allObisNodesSelected
+        ? ['OBIS']
+        : obisNodesSelected.filter((n) => n.isSelected).map((n) => n.title))
+    ]
+    if (selectedTitles.length === 0) return t(sourcesFilterTranslationKey)
+    if (selectedTitles.length === 1) {
+      return capitalizeFirstLetter(selectedTitles[0])
+    }
+    return selectedTitles.length + t('sourcesMulti')
+  })()
 
   // Timeframe filter initial values and state
   const [startDate, setStartDate] = useState(defaultStartDate)
@@ -202,9 +228,6 @@ export default function App() {
     '(m)'
   )
 
-  // OBIS toggle
-  const [showObis, setShowObis] = useState(true)
-
   // Scientific name filter (OBIS only)
   const [scientificNamesSelected, setScientificNamesSelected] = useState(
     defaultScientificNamesSelected
@@ -213,19 +236,6 @@ export default function App() {
     scientificNamesSelected,
     500
   )
-
-  // OBIS nodes filter (OBIS only). Mirrors orgsSelected shape so it can use
-  // MultiCheckboxFilter directly.
-  const [obisNodesSelected, setObisNodesSelected] = useState(
-    defaultObisNodesSelected
-  )
-  const debouncedObisNodesSelected = useDebounce(obisNodesSelected, 500)
-  const obisNodesFilterTranslationKey = 'obisNodesFilterName'
-  const obisNodesBadgeTitle = generateMultipleSelectBadgeTitle(
-    obisNodesFilterTranslationKey,
-    obisNodesSelected
-  )
-  const [obisNodesSearchTerms, setObisNodesSearchTerms] = useState('')
 
   // Filter open state
   const [openFilter, setOpenFilter] = useState()
@@ -250,8 +260,10 @@ export default function App() {
       orgsSelected,
       datasetsSelected,
       platformsSelected,
-      showObis,
-      scientificNamesSelected,
+      // Scientific name only applies to OBIS data; when OBIS isn't shown the
+      // filter is disabled in the UI, so don't apply stale selections to the
+      // query (the selection state is preserved for when OBIS is re-enabled).
+      scientificNamesSelected: showObis ? scientificNamesSelected : [],
       obisNodesSelected,
       erddapServersSelected
     })
@@ -264,10 +276,10 @@ export default function App() {
     debouncedOrgsSelected,
     debouncedDatasetsSelected,
     debouncedPlatformsSelected,
-    showObis,
     debouncedScientificNamesSelected,
     debouncedObisNodesSelected,
-    debouncedErddapServersSelected
+    debouncedErddapServersSelected,
+    showObis
   ])
 
   function createOptionSubset (searchTerms, allOptions) {
@@ -376,7 +388,6 @@ export default function App() {
     } = filtersFromURL
 
     if (lat || lon || zoom) setMapView({ lat, lon, zoom })
-    if (includeObis === 'false') setShowObis(false)
     if (scientificNames) {
       setScientificNamesSelected(
         scientificNames
@@ -506,23 +517,32 @@ export default function App() {
       })
 
     const erddapServersFromURL = erddapServers?.split(',') || []
+    // Legacy share links used includeObis=false with no server list to mean
+    // "ERDDAP data only" — that now reads as every server selected.
+    const selectAllServers =
+      includeObis === 'false' && erddapServersFromURL.length === 0
 
     fetch(`${server}/erddapServers`)
       .then((response) => response.json())
       .then((servers) => {
         setErddapServersSelected(
-          servers.map((serverUrl, index) => {
-            const serverMetadata = erddapServersJSONfile.find(
-              (s) => s.url === serverUrl
-            )
+          servers
+            // OBIS datasets carry https://obis.org as their erddap_url
+            // sentinel; OBIS is represented by its node group instead.
+            .filter((serverUrl) => serverUrl !== 'https://obis.org')
+            .map((serverUrl, index) => {
+              const serverMetadata = erddapServersJSONfile.find(
+                (s) => s.url === serverUrl
+              )
 
-            return {
-              title: serverMetadata ? (i18n.language === 'fr' ? serverMetadata.label_fr : serverMetadata.label_en) : serverUrl,
-              url: serverUrl,
-              isSelected: erddapServersFromURL.includes(serverUrl),
-              pk: index
-            }
-          })
+              return {
+                title: serverMetadata ? (i18n.language === 'fr' ? serverMetadata.label_fr : serverMetadata.label_en) : serverUrl,
+                url: serverUrl,
+                isSelected:
+                  selectAllServers || erddapServersFromURL.includes(serverUrl),
+                pk: index
+              }
+            })
         )
       })
       .catch((error) => {
@@ -763,8 +783,13 @@ export default function App() {
         return { ...server, isSelected: false }
       })
     )
+    setObisNodesSelected(
+      obisNodesSelected.map((node) => {
+        return { ...node, isSelected: false }
+      })
+    )
+    setScientificNamesSelected([])
     setPolygon()
-    setShowObis(true)
   }
 
   return (
@@ -925,36 +950,6 @@ export default function App() {
           />
         </Filter>
         <Filter
-          active={obisNodesSelected.filter((n) => n.isSelected).length !== 0}
-          badgeTitle={obisNodesBadgeTitle}
-          optionsSelected={obisNodesSelected}
-          setOptionsSelected={setObisNodesSelected}
-          tooltip={t('obisNodesFilterTooltip')}
-          icon={<Diagram3 />}
-          controlled
-          searchable
-          searchTerms={obisNodesSearchTerms}
-          setSearchTerms={setObisNodesSearchTerms}
-          searchPlaceholder={t('obisNodesFilterSearchPlaceholder')}
-          filterName={obisNodesFilterTranslationKey}
-          openFilter={openFilter === obisNodesFilterTranslationKey}
-          setOpenFilter={setOpenFilter}
-          selectAllButton={() =>
-            setAllOptionsIsSelectedTo(true, obisNodesSelected, setObisNodesSelected)
-          }
-          resetButton={() =>
-            setAllOptionsIsSelectedTo(false, obisNodesSelected, setObisNodesSelected)
-          }
-          numberOfOptions={obisNodesSelected.length}
-        >
-          <MultiCheckboxFilter
-            optionsSelected={createOptionSubset(obisNodesSearchTerms, obisNodesSelected)}
-            setOptionsSelected={setObisNodesSelected}
-            searchable
-            allOptions={obisNodesSelected}
-          />
-        </Filter>
-        <Filter
           active={datasetsSelected.filter((eov) => eov.isSelected).length !== 0}
           badgeTitle={datasetsBadgeTitle}
           optionsSelected={datasetsSelected}
@@ -997,44 +992,42 @@ export default function App() {
           />
         </Filter>
         <Filter
-          active={erddapServersSelected.filter((server) => server.isSelected).length !== 0}
-          badgeTitle={erddapServersBadgeTitle}
-          optionsSelected={erddapServersSelected}
-          setOptionsSelected={setErddapServersSelected}
-          tooltip={t('erddapServersFilterTooltip')}
+          active={anyServersSelected || anyObisNodesSelected}
+          badgeTitle={sourcesBadgeTitle}
+          tooltip={t('sourceFilterTooltip')}
           icon={<Server />}
           controlled
           searchable
-          searchTerms={erddapServersSearchTerms}
-          setSearchTerms={setErddapServersSearchTerms}
-          searchPlaceholder={t('erddapServersFilterSearchPlaceholder')}
-          filterName={erddapServersFilterTranslationKey}
-          openFilter={openFilter === erddapServersFilterTranslationKey}
+          searchTerms={sourcesSearchTerms}
+          setSearchTerms={setSourcesSearchTerms}
+          searchPlaceholder={t('sourceFilterSearchPlaceholder')}
+          filterName={sourcesFilterTranslationKey}
+          openFilter={openFilter === sourcesFilterTranslationKey}
           setOpenFilter={setOpenFilter}
-          selectAllButton={() =>
+          selectAllButton={() => {
             setAllOptionsIsSelectedTo(
               true,
               erddapServersSelected,
               setErddapServersSelected
             )
-          }
-          resetButton={() =>
+            setAllOptionsIsSelectedTo(true, obisNodesSelected, setObisNodesSelected)
+          }}
+          resetButton={() => {
             setAllOptionsIsSelectedTo(
               false,
               erddapServersSelected,
               setErddapServersSelected
             )
-          }
-          numberOfOptions={erddapServersSelected.length}
+            setAllOptionsIsSelectedTo(false, obisNodesSelected, setObisNodesSelected)
+          }}
+          numberOfOptions={erddapServersSelected.length + obisNodesSelected.length}
         >
-          <MultiCheckboxFilter
-            optionsSelected={createOptionSubset(
-              erddapServersSearchTerms,
-              erddapServersSelected
-            )}
-            setOptionsSelected={setErddapServersSelected}
-            searchable
-            allOptions={erddapServersSelected}
+          <SourceFilter
+            erddapServersSelected={erddapServersSelected}
+            setErddapServersSelected={setErddapServersSelected}
+            obisNodesSelected={obisNodesSelected}
+            setObisNodesSelected={setObisNodesSelected}
+            searchTerms={sourcesSearchTerms}
           />
         </Filter>
         <Filter
@@ -1089,35 +1082,21 @@ export default function App() {
             setEndDepth={setEndDepth}
           />
         </Filter>
-        <div className='filter'>
-          <button
-            className={`filterHeader ${showObis ? 'active' : ''}`}
-            onClick={() => setShowObis(!showObis)}
-          >
-            <QuestionIconTooltip
-              tooltipText={t('obisToggleTooltip')}
-              tooltipPlacement='bottom'
-              size={20}
-            />
-            <img src={ObisIcon} alt='OBIS' className='obisIcon' />
-            <div className='badgeTitle'>
-              {t('obisToggleLabel')}
-            </div>
-          </button>
-        </div>
-        <ScientificNameFilter
-          scientificNamesSelected={scientificNamesSelected}
-          setScientificNamesSelected={setScientificNamesSelected}
-          disabled={!showObis}
-          disabledTooltip={t('scientificNameFilterDisabledTooltip')}
-          tooltip={t('scientificNameFilterTooltip')}
-          controlled
-          openFilter={openFilter === 'scientificNameFilterName'}
-          setOpenFilter={setOpenFilter}
-          filterName='scientificNameFilterName'
-          badgeTitle={t('scientificNameFilterName')}
-          searchPlaceholder={t('scientificNameFilterSearchPlaceholder')}
-        />
+        {obisDataAvailable && (
+          <ScientificNameFilter
+            scientificNamesSelected={scientificNamesSelected}
+            setScientificNamesSelected={setScientificNamesSelected}
+            disabled={!showObis}
+            disabledTooltip={t('scientificNameFilterDisabledTooltip')}
+            tooltip={t('scientificNameFilterTooltip')}
+            controlled
+            openFilter={openFilter === 'scientificNameFilterName'}
+            setOpenFilter={setOpenFilter}
+            filterName='scientificNameFilterName'
+            badgeTitle={t('scientificNameFilterName')}
+            searchPlaceholder={t('scientificNameFilterSearchPlaceholder')}
+          />
+        )}
         <button
           className='resetFiltersButton'
           title={t('resetFiltersButtonTooltipText')}

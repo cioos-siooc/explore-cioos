@@ -6,7 +6,7 @@
   },
   {
     "url": "https://catalogue.hakai.org/erddap",
-    "label_en": "Hakai Institue",
+    "label_en": "Hakai Institute",
     "label_fr": "Hakai Institute"
   },
   {
@@ -33,6 +33,16 @@
     "url": "https://dap.oceannetworks.ca",
     "label_en": "ONC",
     "label_fr": "ONC"
+  },
+  {
+    "url": "https://dap.oceannetworks.ca/erddap",
+    "label_en": "ONC",
+    "label_fr": "ONC"
+  },
+  {
+    "url": "https://erddap.amundsenscience.com/erddap",
+    "label_en": "Amundsen Science",
+    "label_fr": "Amundsen Science"
   },
   {
     "url": "https://data.ceotr.ca/erddap",

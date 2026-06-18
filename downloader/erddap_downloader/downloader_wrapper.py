@@ -20,6 +20,7 @@ def run_download_query(download_query, output_folder, create_pdf=False):
     # check if no data returned, exit early
     if query_report["empty_download"]:
         query_report["zip_file_size"] = 0
+        os.system("rm -rf {}".format(temp_folder))
         return query_report
 
     # Zip the download

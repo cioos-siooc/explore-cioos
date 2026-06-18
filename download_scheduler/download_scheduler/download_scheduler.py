@@ -7,6 +7,7 @@ from re import L
 
 import sentry_sdk
 from dotenv import load_dotenv
+from sentry_sdk.integrations.loguru import LoguruIntegration
 from erddap_downloader import downloader_wrapper
 from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import create_engine
@@ -27,17 +28,15 @@ envs = os.environ
 if not os.getenv("DB_HOST"):
     load_dotenv(os.getcwd() + "/.env")
 
-if envs["ENVIRONMENT"] == "production":
-    ignore_errors = [KeyboardInterrupt]
-
-    sentry_sdk.init(
-        "https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595",
-        # Set traces_sample_rate to 1.0 to capture 100%
-        # of transactions for performance monitoring.
-        # We recommend adjusting this value in production.
-        traces_sample_rate=1.0,
-        ignore_errors=ignore_errors,
-    )
+sentry_sdk.init(
+    dsn=os.environ.get("SENTRY_DSN"),
+    integrations=[
+        LoguruIntegration(),
+    ],
+    environment=os.environ.get("ENVIRONMENT", "development"),
+    traces_sample_rate=1.0,
+    ignore_errors=[KeyboardInterrupt],
+)
 
 
 database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
@@ -182,9 +181,11 @@ def run_download(row):
         status = "failed"
         stack_trace = traceback.format_exc()
         downloader_error = str(stack_trace).replace("'", "")
-        logger.error(e)
-        logger.error(stack_trace)
-        sentry_sdk.capture_message(f"download by {email} failed")
+        logger.bind(
+            email=email,
+            job_id=user_query["job_id"],
+            pk=pk,
+        ).error(e)
 
     # The downloader crashed and returned a string (error message) instead of json
     if downloader_error:

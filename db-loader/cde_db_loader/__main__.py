@@ -11,7 +11,6 @@ from contextlib import contextmanager
 import numpy as np
 import pandas as pd
 import sentry_sdk
-from cde_harvester.utils import df_cde_eov_to_standard_name
 from dotenv import load_dotenv
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sqlalchemy import create_engine, text
@@ -63,7 +62,6 @@ OBIS_ARRAY_DTYPES = {
 }
 
 
-
 def prepare_profiles_dataframe(profiles):
     """Clean and prepare profiles DataFrame for insertion."""
     profiles = profiles.replace("", np.NaN)
@@ -71,7 +69,9 @@ def prepare_profiles_dataframe(profiles):
     # mirroring the harvester's filter (profiles.py): a time_max that passes the
     # harvester's null check but fails parse_erddap_dates' coerce becomes NaT and
     # would otherwise slip through and fail set_constraints().
-    profiles = profiles.drop(columns=["altitude_min", "altitude_max", "scientific_names"], errors="ignore").dropna(subset=['time_min', 'time_max'])
+    profiles = profiles.drop(
+        columns=["altitude_min", "altitude_max", "scientific_names"], errors="ignore"
+    ).dropna(subset=["time_min", "time_max"])
     return profiles
 
 
@@ -87,7 +87,11 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
     obis_cells = obis_cells.copy()
     # Parse scientific_names from CSV string repr back to list, or default to empty list
     obis_cells["scientific_names"] = obis_cells["scientific_names"].apply(
-        lambda x: ast.literal_eval(x) if isinstance(x, str) else (x if isinstance(x, list) else [])
+        lambda x: (
+            ast.literal_eval(x)
+            if isinstance(x, str)
+            else (x if isinstance(x, list) else [])
+        )
     )
     # Round lat/lon to 8 dp before dedup to avoid float-precision duplicates
     # (e.g. 45.83333333333333 vs 45.833333333333336 from grid arithmetic)
@@ -96,18 +100,27 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
 
     # Deduplicate on unique key, merging scientific_names and aggregating numeric columns
     key_cols = ["dataset_id", "latitude", "longitude"]
-    agg = obis_cells.groupby(key_cols, dropna=False).agg(
-        scientific_names=("scientific_names", lambda lists: sorted(set(name for lst in lists for name in lst))),
-        n_records=("n_records", "sum"),
-        time_min=("time_min", "min"),
-        time_max=("time_max", "max"),
-        depth_min=("depth_min", "min"),
-        depth_max=("depth_max", "max"),
-    ).reset_index()
+    agg = (
+        obis_cells.groupby(key_cols, dropna=False)
+        .agg(
+            scientific_names=(
+                "scientific_names",
+                lambda lists: sorted(set(name for lst in lists for name in lst)),
+            ),
+            n_records=("n_records", "sum"),
+            time_min=("time_min", "min"),
+            time_max=("time_max", "max"),
+            depth_min=("depth_min", "min"),
+            depth_max=("depth_max", "max"),
+        )
+        .reset_index()
+    )
 
     if name_to_aphia:
+
         def resolve(names):
             return sorted({name_to_aphia[n] for n in names if n in name_to_aphia})
+
         agg["aphia_ids"] = agg["scientific_names"].apply(resolve)
     else:
         agg["aphia_ids"] = [[] for _ in range(len(agg))]
@@ -127,8 +140,10 @@ def _timed(name, log):
 
 def _pg_text_array(values):
     """Render a Python iterable as a PostgreSQL text-array literal: {"a","b\\"c"}."""
+
     def quote(s):
         return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"') + '"'
+
     return "{" + ",".join(quote(v) for v in values) + "}"
 
 
@@ -154,7 +169,9 @@ def load_obis_cells_copy(df, table_name, transaction, schema=None):
             if val is None or (isinstance(val, float) and pd.isna(val)):
                 out.append(r"\N")
             elif col == "scientific_names":
-                out.append(_pg_text_array(val if isinstance(val, (list, tuple)) else []))
+                out.append(
+                    _pg_text_array(val if isinstance(val, (list, tuple)) else [])
+                )
             elif col == "aphia_ids":
                 out.append(_pg_int_array(val if isinstance(val, (list, tuple)) else []))
             else:
@@ -179,10 +196,13 @@ def load_obis_cells_copy(df, table_name, transaction, schema=None):
 
 def ensure_organization_pks(datasets):
     """Ensure organization_pks column has empty arrays instead of null values."""
-    if 'organization_pks' not in datasets.columns or datasets['organization_pks'].isna().all():
-        datasets['organization_pks'] = [[] for _ in range(len(datasets))]
+    if (
+        "organization_pks" not in datasets.columns
+        or datasets["organization_pks"].isna().all()
+    ):
+        datasets["organization_pks"] = [[] for _ in range(len(datasets))]
     else:
-        datasets['organization_pks'] = datasets['organization_pks'].apply(
+        datasets["organization_pks"] = datasets["organization_pks"].apply(
             lambda x: x if isinstance(x, list) else []
         )
     return datasets
@@ -195,7 +215,7 @@ def main(folder, incremental=False):
 
     envs = os.environ
 
-    db_host = envs.get('DB_HOST_EXTERNAL', 'localhost')
+    db_host = envs.get("DB_HOST_EXTERNAL", "localhost")
     database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{db_host}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
 
     engine = create_engine(database_link)
@@ -213,7 +233,11 @@ def main(folder, incremental=False):
     logger.info("Reading %s, %s", datasets_file, skipped_datasets_file)
 
     datasets = pd.read_csv(datasets_file)
-    profiles = pd.read_csv(profiles_file) if os.path.isfile(profiles_file) and os.path.getsize(profiles_file) > 1 else pd.DataFrame()
+    profiles = (
+        pd.read_csv(profiles_file)
+        if os.path.isfile(profiles_file) and os.path.getsize(profiles_file) > 1
+        else pd.DataFrame()
+    )
     skipped_datasets = pd.read_csv(skipped_datasets_file)
 
     obis_cells = None
@@ -244,7 +268,11 @@ def main(folder, incremental=False):
     )
     if "obis_nodes" in datasets.columns:
         datasets["obis_nodes"] = datasets["obis_nodes"].apply(
-            lambda x: ast.literal_eval(x) if isinstance(x, str) else (x if isinstance(x, list) else [])
+            lambda x: (
+                ast.literal_eval(x)
+                if isinstance(x, str)
+                else (x if isinstance(x, list) else [])
+            )
         )
     else:
         datasets["obis_nodes"] = [[] for _ in range(len(datasets))]
@@ -252,8 +280,6 @@ def main(folder, incremental=False):
     if datasets.empty:
         logger.info("No datasets found")
         sys.exit(1)
-
-    # this gets a list of all the standard names
 
     schema = "cde"
     with engine.begin() as transaction:
@@ -278,16 +304,20 @@ def main(folder, incremental=False):
         name_to_aphia = {}
         if obis_cells is not None:
             with _timed("fetch vernaculars for aphia_ids preload", logger):
-                rows = transaction.execute(text(
-                    "SELECT scientific_name, aphia_id "
-                    "FROM cde.scientific_name_vernaculars "
-                    "WHERE aphia_id IS NOT NULL"
-                )).all()
+                rows = transaction.execute(
+                    text(
+                        "SELECT scientific_name, aphia_id "
+                        "FROM cde.scientific_name_vernaculars "
+                        "WHERE aphia_id IS NOT NULL"
+                    )
+                ).all()
                 name_to_aphia = dict(rows)
                 logger.info("Pre-fetched %d name→aphia_id mappings", len(name_to_aphia))
 
         if incremental:
-            logger.info("Using INCREMENTAL mode - will load to temp tables, process, then UPSERT")
+            logger.info(
+                "Using INCREMENTAL mode - will load to temp tables, process, then UPSERT"
+            )
 
             # Incremental approach using temporary tables:
             # 1. Load all data into temporary tables (no constraints)
@@ -325,7 +355,9 @@ def main(folder, incremental=False):
             if obis_cells is not None:
                 prepared = prepare_obis_cells_dataframe(obis_cells, name_to_aphia)
                 with _timed("temp_obis_cells COPY", logger):
-                    logger.info("Loading obis_cells into temp table (%d rows)", len(prepared))
+                    logger.info(
+                        "Loading obis_cells into temp table (%d rows)", len(prepared)
+                    )
                     load_obis_cells_copy(prepared, "temp_obis_cells", transaction)
 
             with _timed("temp_skipped_datasets to_sql", logger):
@@ -357,12 +389,15 @@ def main(folder, incremental=False):
             # to permit it (it then prunes the removed source).
             incoming_sources = set(datasets["erddap_url"].dropna().unique())
             existing_sources = {
-                r[0] for r in transaction.execute(
+                r[0]
+                for r in transaction.execute(
                     text("SELECT DISTINCT erddap_url FROM cde.datasets")
                 ).all()
             }
             allow_full = os.environ.get("CDE_ALLOW_FULL_RELOAD", "").lower() in (
-                "1", "true", "yes",
+                "1",
+                "true",
+                "yes",
             )
             missing = existing_sources - incoming_sources
             if existing_sources and missing and not allow_full:
@@ -378,12 +413,14 @@ def main(folder, incremental=False):
             # to the current transaction. synchronous_commit=OFF is acceptable
             # here because the rebuild is replayable from the harvest CSVs if
             # the COMMIT is lost; do NOT apply this in the incremental path.
-            transaction.execute(text("""
+            transaction.execute(
+                text("""
                 SET LOCAL work_mem = '256MB';
                 SET LOCAL maintenance_work_mem = '1GB';
                 SET LOCAL synchronous_commit = OFF;
                 SET LOCAL temp_buffers = '256MB';
-            """))
+            """)
+            )
 
             with _timed("drop_constraints", logger):
                 logger.info("Dropping constraints")
@@ -424,7 +461,9 @@ def main(folder, incremental=False):
                 prepared = prepare_obis_cells_dataframe(obis_cells, name_to_aphia)
                 with _timed("obis_cells COPY", logger):
                     logger.info("Writing obis_cells (%d rows)", len(prepared))
-                    load_obis_cells_copy(prepared, "obis_cells", transaction, schema=schema)
+                    load_obis_cells_copy(
+                        prepared, "obis_cells", transaction, schema=schema
+                    )
 
             with _timed("skipped_datasets to_sql", logger):
                 logger.info("Writing skipped_datasets")
@@ -463,7 +502,9 @@ def main(folder, incremental=False):
                 for fn, args in obis_steps:
                     with _timed(fn, logger):
                         n = transaction.execute(text(f"SELECT {fn}{args};")).scalar()
-                        logger.info("  %s: %s rows affected", fn, n if n is not None else 0)
+                        logger.info(
+                            "  %s: %s rows affected", fn, n if n is not None else 0
+                        )
 
             with _timed("create_hexes", logger):
                 logger.info("Creating hexes")
@@ -489,7 +530,9 @@ def main(folder, incremental=False):
                 )
         if harvest_attempts_df is not None and not harvest_attempts_df.empty:
             with _timed("harvest_attempts to_sql", logger):
-                logger.info("Writing harvest_attempts (%d rows)", len(harvest_attempts_df))
+                logger.info(
+                    "Writing harvest_attempts (%d rows)", len(harvest_attempts_df)
+                )
                 harvest_attempts_df.to_sql(
                     "harvest_attempts",
                     con=transaction,
