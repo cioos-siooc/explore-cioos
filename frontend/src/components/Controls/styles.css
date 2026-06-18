@@ -11,10 +11,6 @@
   background-color: var(--cioos-surface-2);
 }
 
-.controls .controlColumn.col>div {
-  margin: 0px 0px 0px 10px;
-}
-
 .controlColumn.col {
   display: flex;
   flex-wrap: wrap;

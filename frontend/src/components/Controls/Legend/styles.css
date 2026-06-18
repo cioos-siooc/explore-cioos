@@ -22,7 +22,9 @@
 
 .legend.panelOpen {
   position: absolute;
-  left: 570px;
+  /* Tuck just inside the panel's right edge, derived from the shared panel
+     width token so the legend follows the sidebar as it resizes. */
+  left: calc(var(--cioos-panel-w) - 10px);
   bottom: 10px;
 }
 

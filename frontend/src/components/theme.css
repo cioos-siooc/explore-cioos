@@ -40,6 +40,7 @@
   --cioos-ring:           0 0 0 2px rgba(21, 47, 55, 0.10); /* default chrome ring */
 
   /* --- Shape --- */
+  --cioos-radius-lg:   16px;  /* floating panels / menus */
   --cioos-radius:      8px;   /* cards, surfaces, buttons */
   --cioos-radius-sm:   6px;   /* inputs, small controls */
   --cioos-radius-pill: 999px; /* filter chips, toggles */
@@ -52,6 +53,21 @@
   --cioos-depth-gradient: linear-gradient(180deg, var(--cioos-primary) 0%, var(--cioos-navy) 100%);
 
   --cioos-focus: 0 0 0 3px rgba(82, 167, 155, 0.55);
+
+  /* --- Layout: selection-panel width ---
+     Single source of truth for how wide the sidebar reads. Capped at 580px on
+     wide screens, proportional on tablets, and overridden to full-width on
+     phones (see media query below). The legend offset and the panel's own
+     closed-state transforms all derive from this token so they stay in sync. */
+  --cioos-panel-w: clamp(360px, 42vw, 580px);
+}
+
+/* Phones: the panel takes over the full viewport so the dataset details and
+   record table stay usable instead of overflowing a fixed column. */
+@media (max-width: 600px) {
+  :root {
+    --cioos-panel-w: 100vw;
+  }
 }
 
 body {

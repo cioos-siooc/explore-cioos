@@ -11,7 +11,6 @@ import {
   FileEarmarkSpreadsheet,
   Water,
   BroadcastPin,
-  X,
   Diagram3,
   Server
 } from 'react-bootstrap-icons'
@@ -31,6 +30,8 @@ import Loading from './Controls/Loading/Loading.jsx'
 import Legend from './Controls/Legend/Legend.jsx'
 import IntroModal from './Controls/IntroModal/IntroModal.jsx'
 import Filter from './Controls/Filter/Filter.jsx'
+import FilterMenu from './Controls/Filter/FilterMenu/FilterMenu.jsx'
+import FilterSection from './Controls/Filter/FilterMenu/FilterSection.jsx'
 import MultiCheckboxFilter from './Controls/Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx'
 import ScientificNameFilter from './Controls/Filter/ScientificNameFilter/ScientificNameFilter.jsx'
 import TimeSelector from './Controls/Filter/TimeSelector/TimeSelector.jsx'
@@ -63,7 +64,7 @@ import {
   setAllOptionsIsSelectedTo,
   polygonIsRectangle,
   getCookieValue,
-  formatErddapServerName
+  capitalizeFirstLetter
 } from '../utilities.js'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 
@@ -767,6 +768,150 @@ export default function App() {
     setShowObis(true)
   }
 
+  // Human label for a single multi-select option, matching how
+  // MultiCheckboxFilter renders it (translated title where available).
+  const optionLabel = (option, translatable) => {
+    let title = option.title
+    if (translatable) {
+      if (
+        option.titleTranslated &&
+        option.titleTranslated[i18n.languages[0]] &&
+        option.titleTranslated[i18n.languages[1]]
+      ) {
+        title = option.titleTranslated[i18n.language]
+      } else if (t(option.title)) {
+        title = t(option.title)
+      }
+    }
+    return capitalizeFirstLetter(title)
+  }
+
+  // Build the active-filter descriptor for one multi-select filter: the list
+  // of chosen options (each removable on its own) plus a clear-all handler.
+  const buildMultiActiveFilter = (
+    key,
+    label,
+    selected,
+    setSelected,
+    translatable
+  ) => {
+    const chosen = selected.filter((o) => o.isSelected)
+    if (chosen.length === 0) return false
+    return {
+      key,
+      label,
+      removeAll: () =>
+        setAllOptionsIsSelectedTo(false, selected, setSelected),
+      items: chosen.map((o) => ({
+        id: o.pk,
+        label: optionLabel(o, translatable),
+        remove: () =>
+          setSelected(
+            selected.map((opt) =>
+              opt.pk === o.pk ? { ...opt, isSelected: false } : opt
+            )
+          )
+      }))
+    }
+  }
+
+  // Filters currently constraining the map — surfaced next to the FilterMenu
+  // launcher as bullets that show what's applied. Each bullet can be dropped
+  // whole, or value-by-value, without opening the menu.
+  const activeFilters = [
+    buildMultiActiveFilter(
+      'eovs',
+      t(eovsFilterTranslationKey),
+      eovsSelected,
+      setEovsSelected,
+      true
+    ),
+    buildMultiActiveFilter(
+      'platforms',
+      t(platformsFilterTranslationKey),
+      platformsSelected,
+      setPlatformsSelected,
+      true
+    ),
+    buildMultiActiveFilter(
+      'orgs',
+      t(orgsFilterTranslationKey),
+      orgsSelected,
+      setOrgsSelected,
+      false
+    ),
+    buildMultiActiveFilter(
+      'datasets',
+      t(datasetsFilterTranslationKey),
+      datasetsSelected,
+      setDatasetsSelected,
+      true
+    ),
+    buildMultiActiveFilter(
+      'erddapServers',
+      t(erddapServersFilterTranslationKey),
+      erddapServersSelected,
+      setErddapServersSelected,
+      false
+    ),
+    timeFilterActive && {
+      key: 'time',
+      label: t('timeframeFilterName'),
+      removeAll: () => {
+        setStartDate(defaultStartDate)
+        setEndDate(defaultEndDate)
+      },
+      items: [
+        {
+          id: 'time',
+          label: timeframesBadgeTitle,
+          remove: () => {
+            setStartDate(defaultStartDate)
+            setEndDate(defaultEndDate)
+          }
+        }
+      ]
+    },
+    depthFilterActive && {
+      key: 'depth',
+      label: t('depthRangeFilterName'),
+      removeAll: () => {
+        setStartDepth(defaultStartDepth)
+        setEndDepth(defaultEndDepth)
+      },
+      items: [
+        {
+          id: 'depth',
+          label: depthRangeBadgeTitle,
+          remove: () => {
+            setStartDepth(defaultStartDepth)
+            setEndDepth(defaultEndDepth)
+          }
+        }
+      ]
+    },
+    buildMultiActiveFilter(
+      'obisNodes',
+      t(obisNodesFilterTranslationKey),
+      obisNodesSelected,
+      setObisNodesSelected,
+      false
+    ),
+    scientificNamesSelected.length > 0 && {
+      key: 'scientificName',
+      label: t('scientificNameFilterName'),
+      removeAll: () => setScientificNamesSelected([]),
+      items: scientificNamesSelected.map((name) => ({
+        id: name,
+        label: name,
+        remove: () =>
+          setScientificNamesSelected(
+            scientificNamesSelected.filter((n) => n !== name)
+          )
+      }))
+    }
+  ].filter(Boolean)
+
   return (
     <ErrorBoundary
       errorBoundaryMessage={t('errorBoundaryMessage')}
@@ -818,314 +963,321 @@ export default function App() {
           </Col>
         }
       >
-        <Filter
-          active={eovsSelected.filter((eov) => eov.isSelected).length !== 0}
-          badgeTitle={eovsBadgeTitle}
-          optionsSelected={eovsSelected}
-          setOptionsSelected={setEovsSelected}
-          tooltip={t('oceanVariableFilterTooltip')} // 'Filter data by ocean variable name. Selection works as logical OR operation.'
-          icon={<Water />}
-          controlled
-          searchable
-          searchTerms={eovsSearchTerms}
-          setSearchTerms={setEovsSearchTerms}
-          searchPlaceholder={t('oceanVariableFilterSeachPlaceholder')} // 'Search for ocean variable name...'
-          filterName={eovsFilterTranslationKey}
-          openFilter={openFilter === eovsFilterTranslationKey}
-          setOpenFilter={setOpenFilter}
-          selectAllButton={() =>
-            setAllOptionsIsSelectedTo(true, eovsSelected, setEovsSelected)
-          }
-          resetButton={() =>
-            setAllOptionsIsSelectedTo(false, eovsSelected, setEovsSelected)
-          }
-          numberOfOptions={eovsSelected.length}
+        <FilterMenu
+          activeFilters={activeFilters}
+          onReset={() => resetFilters()}
+          resetTitle={t('resetFiltersButtonTooltipText')}
+          loading={loading}
         >
-          <MultiCheckboxFilter
-            optionsSelected={createOptionSubset(eovsSearchTerms, eovsSelected)}
-            setOptionsSelected={setEovsSelected}
-            searchable
-            translatable
-            allOptions={eovsSelected}
-          />
-        </Filter>
-        <Filter
-          active={
-            platformsSelected.filter((eov) => eov.isSelected).length !== 0
-          }
-          badgeTitle={platformsBadgeTitle}
-          setOptionsSelected={setPlatformsSelected}
-          tooltip={t('platformFilterTooltip')} // 'Filter data by ocean variable name. Selection works as logical OR operation.'
-          icon={<BroadcastPin />}
-          controlled
-          searchable
-          searchTerms={platformsSearchTerms}
-          setSearchTerms={setPlatformsSearchTerms}
-          searchPlaceholder={t('platformsFilterSeachPlaceholder')} // 'Search for ocean variable name...'
-          filterName={platformsFilterTranslationKey}
-          openFilter={openFilter === platformsFilterTranslationKey}
-          setOpenFilter={setOpenFilter}
-          selectAllButton={() =>
-            setAllOptionsIsSelectedTo(
-              true,
-              platformsSelected,
-              setPlatformsSelected
-            )
-          }
-          resetButton={() =>
-            setAllOptionsIsSelectedTo(
-              false,
-              platformsSelected,
-              setPlatformsSelected
-            )
-          }
-          numberOfOptions={platformsSelected.length}
-          infoButton='http://vocab.nerc.ac.uk/collection/L06/current/'
-        >
-          <MultiCheckboxFilter
-            optionsSelected={createOptionSubset(
-              platformsSearchTerms,
-              platformsSelected
-            )}
-            setOptionsSelected={setPlatformsSelected}
-            searchable
-            colored
-            translatable
-            allOptions={platformsSelected}
-          />
-        </Filter>
-        <Filter
-          active={orgsSelected.filter((eov) => eov.isSelected).length !== 0}
-          badgeTitle={orgsBadgeTitle}
-          optionsSelected={orgsSelected}
-          setOptionsSelected={setOrgsSelected}
-          tooltip={t('organizationFilterTooltip')} // 'Filter data by responsible organisation name. Selection works as logical OR operation.'
-          icon={<Building />}
-          controlled
-          searchable
-          searchTerms={orgsSearchTerms}
-          setSearchTerms={setOrgsSearchTerms}
-          searchPlaceholder={t('organizationFilterSearchPlaceholder')} // 'Search for organization name...'
-          filterName={orgsFilterTranslationKey}
-          openFilter={openFilter === orgsFilterTranslationKey}
-          setOpenFilter={setOpenFilter}
-          selectAllButton={() =>
-            setAllOptionsIsSelectedTo(true, orgsSelected, setOrgsSelected)
-          }
-          resetButton={() =>
-            setAllOptionsIsSelectedTo(false, orgsSelected, setOrgsSelected)
-          }
-          numberOfOptions={orgsSelected.length}
-        >
-          <MultiCheckboxFilter
-            optionsSelected={createOptionSubset(orgsSearchTerms, orgsSelected)}
-            setOptionsSelected={setOrgsSelected}
-            searchable
-            allOptions={orgsSelected}
-          />
-        </Filter>
-        <Filter
-          active={obisNodesSelected.filter((n) => n.isSelected).length !== 0}
-          badgeTitle={obisNodesBadgeTitle}
-          optionsSelected={obisNodesSelected}
-          setOptionsSelected={setObisNodesSelected}
-          tooltip={t('obisNodesFilterTooltip')}
-          icon={<Diagram3 />}
-          controlled
-          searchable
-          searchTerms={obisNodesSearchTerms}
-          setSearchTerms={setObisNodesSearchTerms}
-          searchPlaceholder={t('obisNodesFilterSearchPlaceholder')}
-          filterName={obisNodesFilterTranslationKey}
-          openFilter={openFilter === obisNodesFilterTranslationKey}
-          setOpenFilter={setOpenFilter}
-          selectAllButton={() =>
-            setAllOptionsIsSelectedTo(true, obisNodesSelected, setObisNodesSelected)
-          }
-          resetButton={() =>
-            setAllOptionsIsSelectedTo(false, obisNodesSelected, setObisNodesSelected)
-          }
-          numberOfOptions={obisNodesSelected.length}
-        >
-          <MultiCheckboxFilter
-            optionsSelected={createOptionSubset(obisNodesSearchTerms, obisNodesSelected)}
-            setOptionsSelected={setObisNodesSelected}
-            searchable
-            allOptions={obisNodesSelected}
-          />
-        </Filter>
-        <Filter
-          active={datasetsSelected.filter((eov) => eov.isSelected).length !== 0}
-          badgeTitle={datasetsBadgeTitle}
-          optionsSelected={datasetsSelected}
-          setOptionsSelected={setDatasetsSelected}
-          tooltip={t('datasetFilterTooltip')} // 'Filter data by dataset name. Selection works as logical OR operation.'
-          icon={<FileEarmarkSpreadsheet />}
-          controlled
-          searchable
-          searchTerms={datasetSearchTerms}
-          setSearchTerms={setDatasetSearchTerms}
-          searchPlaceholder={t('datasetSearchPlaceholder')} // 'Search for dataset name...'
-          filterName={datasetsFilterTranslationKey}
-          openFilter={openFilter === datasetsFilterTranslationKey}
-          setOpenFilter={setOpenFilter}
-          selectAllButton={() =>
-            setAllOptionsIsSelectedTo(
-              true,
-              datasetsSelected,
-              setDatasetsSelected
-            )
-          }
-          resetButton={() =>
-            setAllOptionsIsSelectedTo(
-              false,
-              datasetsSelected,
-              setDatasetsSelected
-            )
-          }
-          numberOfOptions={datasetsSelected.length}
-        >
-          <MultiCheckboxFilter
-            optionsSelected={createOptionSubset(
-              datasetSearchTerms,
-              datasetsSelected
-            )}
-            setOptionsSelected={setDatasetsSelected}
-            searchable
-            allOptions={datasetsSelected}
-            translatable
-          />
-        </Filter>
-        <Filter
-          active={erddapServersSelected.filter((server) => server.isSelected).length !== 0}
-          badgeTitle={erddapServersBadgeTitle}
-          optionsSelected={erddapServersSelected}
-          setOptionsSelected={setErddapServersSelected}
-          tooltip={t('erddapServersFilterTooltip')}
-          icon={<Server />}
-          controlled
-          searchable
-          searchTerms={erddapServersSearchTerms}
-          setSearchTerms={setErddapServersSearchTerms}
-          searchPlaceholder={t('erddapServersFilterSearchPlaceholder')}
-          filterName={erddapServersFilterTranslationKey}
-          openFilter={openFilter === erddapServersFilterTranslationKey}
-          setOpenFilter={setOpenFilter}
-          selectAllButton={() =>
-            setAllOptionsIsSelectedTo(
-              true,
-              erddapServersSelected,
-              setErddapServersSelected
-            )
-          }
-          resetButton={() =>
-            setAllOptionsIsSelectedTo(
-              false,
-              erddapServersSelected,
-              setErddapServersSelected
-            )
-          }
-          numberOfOptions={erddapServersSelected.length}
-        >
-          <MultiCheckboxFilter
-            optionsSelected={createOptionSubset(
-              erddapServersSearchTerms,
-              erddapServersSelected
-            )}
-            setOptionsSelected={setErddapServersSelected}
-            searchable
-            allOptions={erddapServersSelected}
-          />
-        </Filter>
-        <Filter
-          active={timeFilterActive}
-          badgeTitle={timeframesBadgeTitle}
-          optionsSelected={(startDate, endDate)}
-          setOptionsSelected={() => {
-            setStartDate('1900-01-01')
-            setEndDate(new Date().toISOString().split('T')[0])
-          }}
-          tooltip={t('timeframeFilterTooltip')} // 'Filter data by timeframe. Selection works as inclusive range.'
-          icon={<CalendarWeek />}
-          controlled
-          filterName={timeframesFilterName}
-          openFilter={openFilter === timeframesFilterName}
-          setOpenFilter={setOpenFilter}
-          resetButton={() => {
-            setStartDate('1900-01-01')
-            setEndDate(new Date().toISOString().split('T')[0])
-          }}
-        >
-          <TimeSelector
-            startDate={startDate}
-            setStartDate={setStartDate}
-            endDate={endDate}
-            setEndDate={setEndDate}
-          />
-        </Filter>
-        <Filter
-          active={depthFilterActive}
-          badgeTitle={depthRangeBadgeTitle}
-          optionsSelected={(startDepth, endDepth)}
-          setOptionsSelected={() => {
-            setStartDepth(0)
-            setEndDepth(12000)
-          }}
-          tooltip={t('depthrangeFilterTooltip')} // 'Filter data by depth. Selection works as inclusive range.'
-          icon={<ArrowsExpand />}
-          controlled
-          filterName={depthRangeFilterName}
-          openFilter={openFilter === depthRangeFilterName}
-          setOpenFilter={setOpenFilter}
-          resetButton={() => {
-            setStartDepth(0)
-            setEndDepth(12000)
-          }}
-        >
-          <DepthSelector
-            startDepth={startDepth}
-            setStartDepth={setStartDepth}
-            endDepth={endDepth}
-            setEndDepth={setEndDepth}
-          />
-        </Filter>
-        <div className='filter'>
-          <button
-            className={`filterHeader ${showObis ? 'active' : ''}`}
-            onClick={() => setShowObis(!showObis)}
-          >
-            <QuestionIconTooltip
-              tooltipText={t('obisToggleTooltip')}
-              tooltipPlacement='bottom'
-              size={20}
-            />
-            <img src={ObisIcon} alt='OBIS' className='obisIcon' />
-            <div className='badgeTitle'>
-              {t('obisToggleLabel')}
+          <FilterSection title={t('filterGroupWhat')}>
+            <Filter
+              active={eovsSelected.filter((eov) => eov.isSelected).length !== 0}
+              badgeTitle={eovsBadgeTitle}
+              optionsSelected={eovsSelected}
+              setOptionsSelected={setEovsSelected}
+              tooltip={t('oceanVariableFilterTooltip')} // 'Filter data by ocean variable name. Selection works as logical OR operation.'
+              icon={<Water />}
+              controlled
+              searchable
+              searchTerms={eovsSearchTerms}
+              setSearchTerms={setEovsSearchTerms}
+              searchPlaceholder={t('oceanVariableFilterSeachPlaceholder')} // 'Search for ocean variable name...'
+              filterName={eovsFilterTranslationKey}
+              openFilter={openFilter === eovsFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              selectAllButton={() =>
+                setAllOptionsIsSelectedTo(true, eovsSelected, setEovsSelected)
+              }
+              resetButton={() =>
+                setAllOptionsIsSelectedTo(false, eovsSelected, setEovsSelected)
+              }
+              numberOfOptions={eovsSelected.length}
+            >
+              <MultiCheckboxFilter
+                optionsSelected={createOptionSubset(eovsSearchTerms, eovsSelected)}
+                setOptionsSelected={setEovsSelected}
+                searchable
+                translatable
+                allOptions={eovsSelected}
+              />
+            </Filter>
+            <Filter
+              active={
+                platformsSelected.filter((eov) => eov.isSelected).length !== 0
+              }
+              badgeTitle={platformsBadgeTitle}
+              setOptionsSelected={setPlatformsSelected}
+              tooltip={t('platformFilterTooltip')} // 'Filter data by ocean variable name. Selection works as logical OR operation.'
+              icon={<BroadcastPin />}
+              controlled
+              searchable
+              searchTerms={platformsSearchTerms}
+              setSearchTerms={setPlatformsSearchTerms}
+              searchPlaceholder={t('platformsFilterSeachPlaceholder')} // 'Search for ocean variable name...'
+              filterName={platformsFilterTranslationKey}
+              openFilter={openFilter === platformsFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              selectAllButton={() =>
+                setAllOptionsIsSelectedTo(
+                  true,
+                  platformsSelected,
+                  setPlatformsSelected
+                )
+              }
+              resetButton={() =>
+                setAllOptionsIsSelectedTo(
+                  false,
+                  platformsSelected,
+                  setPlatformsSelected
+                )
+              }
+              numberOfOptions={platformsSelected.length}
+              infoButton='http://vocab.nerc.ac.uk/collection/L06/current/'
+            >
+              <MultiCheckboxFilter
+                optionsSelected={createOptionSubset(
+                  platformsSearchTerms,
+                  platformsSelected
+                )}
+                setOptionsSelected={setPlatformsSelected}
+                searchable
+                colored
+                translatable
+                allOptions={platformsSelected}
+              />
+            </Filter>
+          </FilterSection>
+          <FilterSection title={t('filterGroupFrom')}>
+            <Filter
+              active={orgsSelected.filter((eov) => eov.isSelected).length !== 0}
+              badgeTitle={orgsBadgeTitle}
+              optionsSelected={orgsSelected}
+              setOptionsSelected={setOrgsSelected}
+              tooltip={t('organizationFilterTooltip')} // 'Filter data by responsible organisation name. Selection works as logical OR operation.'
+              icon={<Building />}
+              controlled
+              searchable
+              searchTerms={orgsSearchTerms}
+              setSearchTerms={setOrgsSearchTerms}
+              searchPlaceholder={t('organizationFilterSearchPlaceholder')} // 'Search for organization name...'
+              filterName={orgsFilterTranslationKey}
+              openFilter={openFilter === orgsFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              selectAllButton={() =>
+                setAllOptionsIsSelectedTo(true, orgsSelected, setOrgsSelected)
+              }
+              resetButton={() =>
+                setAllOptionsIsSelectedTo(false, orgsSelected, setOrgsSelected)
+              }
+              numberOfOptions={orgsSelected.length}
+            >
+              <MultiCheckboxFilter
+                optionsSelected={createOptionSubset(orgsSearchTerms, orgsSelected)}
+                setOptionsSelected={setOrgsSelected}
+                searchable
+                allOptions={orgsSelected}
+              />
+            </Filter>
+            <Filter
+              active={datasetsSelected.filter((eov) => eov.isSelected).length !== 0}
+              badgeTitle={datasetsBadgeTitle}
+              optionsSelected={datasetsSelected}
+              setOptionsSelected={setDatasetsSelected}
+              tooltip={t('datasetFilterTooltip')} // 'Filter data by dataset name. Selection works as logical OR operation.'
+              icon={<FileEarmarkSpreadsheet />}
+              controlled
+              searchable
+              searchTerms={datasetSearchTerms}
+              setSearchTerms={setDatasetSearchTerms}
+              searchPlaceholder={t('datasetSearchPlaceholder')} // 'Search for dataset name...'
+              filterName={datasetsFilterTranslationKey}
+              openFilter={openFilter === datasetsFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              selectAllButton={() =>
+                setAllOptionsIsSelectedTo(
+                  true,
+                  datasetsSelected,
+                  setDatasetsSelected
+                )
+              }
+              resetButton={() =>
+                setAllOptionsIsSelectedTo(
+                  false,
+                  datasetsSelected,
+                  setDatasetsSelected
+                )
+              }
+              numberOfOptions={datasetsSelected.length}
+            >
+              <MultiCheckboxFilter
+                optionsSelected={createOptionSubset(
+                  datasetSearchTerms,
+                  datasetsSelected
+                )}
+                setOptionsSelected={setDatasetsSelected}
+                searchable
+                allOptions={datasetsSelected}
+                translatable
+              />
+            </Filter>
+            <Filter
+              active={erddapServersSelected.filter((server) => server.isSelected).length !== 0}
+              badgeTitle={erddapServersBadgeTitle}
+              optionsSelected={erddapServersSelected}
+              setOptionsSelected={setErddapServersSelected}
+              tooltip={t('erddapServersFilterTooltip')}
+              icon={<Server />}
+              controlled
+              searchable
+              searchTerms={erddapServersSearchTerms}
+              setSearchTerms={setErddapServersSearchTerms}
+              searchPlaceholder={t('erddapServersFilterSearchPlaceholder')}
+              filterName={erddapServersFilterTranslationKey}
+              openFilter={openFilter === erddapServersFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              selectAllButton={() =>
+                setAllOptionsIsSelectedTo(
+                  true,
+                  erddapServersSelected,
+                  setErddapServersSelected
+                )
+              }
+              resetButton={() =>
+                setAllOptionsIsSelectedTo(
+                  false,
+                  erddapServersSelected,
+                  setErddapServersSelected
+                )
+              }
+              numberOfOptions={erddapServersSelected.length}
+            >
+              <MultiCheckboxFilter
+                optionsSelected={createOptionSubset(
+                  erddapServersSearchTerms,
+                  erddapServersSelected
+                )}
+                setOptionsSelected={setErddapServersSelected}
+                searchable
+                allOptions={erddapServersSelected}
+              />
+            </Filter>
+          </FilterSection>
+          <FilterSection title={t('filterGroupWhenWhere')}>
+            <Filter
+              active={timeFilterActive}
+              badgeTitle={timeframesBadgeTitle}
+              optionsSelected={(startDate, endDate)}
+              setOptionsSelected={() => {
+                setStartDate('1900-01-01')
+                setEndDate(new Date().toISOString().split('T')[0])
+              }}
+              tooltip={t('timeframeFilterTooltip')} // 'Filter data by timeframe. Selection works as inclusive range.'
+              icon={<CalendarWeek />}
+              controlled
+              filterName={timeframesFilterName}
+              openFilter={openFilter === timeframesFilterName}
+              setOpenFilter={setOpenFilter}
+              resetButton={() => {
+                setStartDate('1900-01-01')
+                setEndDate(new Date().toISOString().split('T')[0])
+              }}
+            >
+              <TimeSelector
+                startDate={startDate}
+                setStartDate={setStartDate}
+                endDate={endDate}
+                setEndDate={setEndDate}
+              />
+            </Filter>
+            <Filter
+              active={depthFilterActive}
+              badgeTitle={depthRangeBadgeTitle}
+              optionsSelected={(startDepth, endDepth)}
+              setOptionsSelected={() => {
+                setStartDepth(0)
+                setEndDepth(12000)
+              }}
+              tooltip={t('depthrangeFilterTooltip')} // 'Filter data by depth. Selection works as inclusive range.'
+              icon={<ArrowsExpand />}
+              controlled
+              filterName={depthRangeFilterName}
+              openFilter={openFilter === depthRangeFilterName}
+              setOpenFilter={setOpenFilter}
+              resetButton={() => {
+                setStartDepth(0)
+                setEndDepth(12000)
+              }}
+            >
+              <DepthSelector
+                startDepth={startDepth}
+                setStartDepth={setStartDepth}
+                endDepth={endDepth}
+                setEndDepth={setEndDepth}
+              />
+            </Filter>
+          </FilterSection>
+          <FilterSection title={t('filterGroupBiodiversity')}>
+            <div className='filter'>
+              <button
+                className={`filterHeader ${showObis ? 'active' : ''}`}
+                onClick={() => setShowObis(!showObis)}
+              >
+                <QuestionIconTooltip
+                  tooltipText={t('obisToggleTooltip')}
+                  tooltipPlacement='bottom'
+                  size={20}
+                />
+                <img src={ObisIcon} alt='OBIS' className='obisIcon' />
+                <div className='badgeTitle'>
+                  {t('obisToggleLabel')}
+                </div>
+              </button>
             </div>
-          </button>
-        </div>
-        <ScientificNameFilter
-          scientificNamesSelected={scientificNamesSelected}
-          setScientificNamesSelected={setScientificNamesSelected}
-          disabled={!showObis}
-          disabledTooltip={t('scientificNameFilterDisabledTooltip')}
-          tooltip={t('scientificNameFilterTooltip')}
-          controlled
-          openFilter={openFilter === 'scientificNameFilterName'}
-          setOpenFilter={setOpenFilter}
-          filterName='scientificNameFilterName'
-          badgeTitle={t('scientificNameFilterName')}
-          searchPlaceholder={t('scientificNameFilterSearchPlaceholder')}
-        />
-        <button
-          className='resetFiltersButton'
-          title={t('resetFiltersButtonTooltipText')}
-          onClick={() => resetFilters()}
-          disabled={loading}
-        >
-          <X size='25px' />
-        </button>
+            <Filter
+              active={obisNodesSelected.filter((n) => n.isSelected).length !== 0}
+              badgeTitle={obisNodesBadgeTitle}
+              optionsSelected={obisNodesSelected}
+              setOptionsSelected={setObisNodesSelected}
+              tooltip={t('obisNodesFilterTooltip')}
+              icon={<Diagram3 />}
+              controlled
+              searchable
+              searchTerms={obisNodesSearchTerms}
+              setSearchTerms={setObisNodesSearchTerms}
+              searchPlaceholder={t('obisNodesFilterSearchPlaceholder')}
+              filterName={obisNodesFilterTranslationKey}
+              openFilter={openFilter === obisNodesFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              selectAllButton={() =>
+                setAllOptionsIsSelectedTo(true, obisNodesSelected, setObisNodesSelected)
+              }
+              resetButton={() =>
+                setAllOptionsIsSelectedTo(false, obisNodesSelected, setObisNodesSelected)
+              }
+              numberOfOptions={obisNodesSelected.length}
+            >
+              <MultiCheckboxFilter
+                optionsSelected={createOptionSubset(obisNodesSearchTerms, obisNodesSelected)}
+                setOptionsSelected={setObisNodesSelected}
+                searchable
+                allOptions={obisNodesSelected}
+              />
+            </Filter>
+            <ScientificNameFilter
+              scientificNamesSelected={scientificNamesSelected}
+              setScientificNamesSelected={setScientificNamesSelected}
+              disabled={!showObis}
+              disabledTooltip={t('scientificNameFilterDisabledTooltip')}
+              tooltip={t('scientificNameFilterTooltip')}
+              controlled
+              openFilter={openFilter === 'scientificNameFilterName'}
+              setOpenFilter={setOpenFilter}
+              filterName='scientificNameFilterName'
+              badgeTitle={t('scientificNameFilterName')}
+              searchPlaceholder={t('scientificNameFilterSearchPlaceholder')}
+            />
+          </FilterSection>
+        </FilterMenu>
       </Controls>
       {currentRangeLevel && (
         <Legend

@@ -2,7 +2,7 @@
   pointer-events: all;
   display: flex;
   height: 98vh;
-  width: 580px;
+  width: var(--cioos-panel-w);
   max-width: 100vw;
   transition: width 1s;
 }
@@ -16,43 +16,29 @@
   position: relative;
   top: -10px;
   left: 0px;
-  min-width: 560px;
+  width: var(--cioos-panel-w);
+  max-width: 100vw;
   height: 100vh;
   border-right: 1px solid var(--cioos-hairline);
   box-shadow: var(--cioos-shadow-float);
   transition: left 1s;
 }
 
+/* Slide the panel (and its grip) fully off the left edge by exactly its own
+   width, so the same rule works whether the width is the clamped desktop
+   value or the 100vw phone value. */
 .panelContents.closed {
-  left: -560px;
+  left: calc(-1 * var(--cioos-panel-w));
+}
+
+.panelHandle.closed {
+  left: calc(-1 * var(--cioos-panel-w));
 }
 
 @media (max-height: 500px) {
   .panelContents {
     min-height: 500px;
     /* position: absolute; */
-  }
-}
-
-/* --- Mobile: the panel takes over the full viewport so the dataset
-   details and record table are usable on a phone instead of overflowing
-   a fixed 580px column. --- */
-@media (max-width: 600px) {
-  .selectionPanel {
-    width: 100vw;
-  }
-
-  .panelContents {
-    min-width: 100vw;
-    width: 100vw;
-  }
-
-  .panelContents.closed {
-    left: -100vw;
-  }
-
-  .panelHandle.closed {
-    left: -100vw;
   }
 }
 
@@ -75,10 +61,6 @@
   align-items: center;
   justify-content: center;
   transition: left 1s, width 0.15s ease;
-}
-
-.panelHandle.closed {
-  left: -560px;
 }
 
 .panelHandle:hover {
