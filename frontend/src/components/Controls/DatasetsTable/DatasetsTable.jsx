@@ -272,8 +272,7 @@ export default function DatasetsTable({
                 }
               >
                 <Check2Circle
-                  className='downloadableIcon'
-                  color='#52a79b'
+                  className='downloadableIcon success'
                   size='25'
                 />
               </OverlayTrigger>
@@ -288,7 +287,7 @@ export default function DatasetsTable({
                   </Tooltip>
                 }
               >
-                <XCircle className='downloadableIcon' color='#E25563' size='25' />
+                <XCircle className='downloadableIcon error' size='25' />
               </OverlayTrigger>
             )
           } else {

@@ -27,6 +27,7 @@ import {
   CalendarWeek,
   Check2Circle,
   ChevronCompactLeft,
+  Download,
   XCircle
 } from 'react-bootstrap-icons'
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
@@ -261,111 +262,87 @@ export default function DownloadDetails({
       }
     })
   }
+  const selectedCount = pointsData.filter((point) => point.selected).length
+
   return (
     <Container className='downloadDetails'>
-      <button
-        className='downloadDetailsBackButton'
-        onClick={() => setShowModal(false)}
-      >
-        <ChevronCompactLeft />
-        {t('downloadModalBackButtonText')}
-      </button>
-      <Row style={{ padding: '0px' }}>
-        <Col>
-          <div className='filterDownloadToggles'>
-            {!timeFilterActive && !depthFilterActive && !polygonFilterActive && (
-              <>
-                <QuestionIconTooltip
-                  tooltipText={t('downloadDetailsFilterQuestionTooltipText')}
-                  tooltipPlacement={'left'}
-                  size={20}
-                />
-                <i>{t('downloadDetailsNoFiltersActiveMessage')}</i>
-              </>
-            )}
-            {(timeFilterActive || depthFilterActive || polygonFilterActive) && (
-              <QuestionIconTooltip
-                tooltipText={t('downloadDetailsFilterQuestionTooltipText')}
-                tooltipPlacement={'left'}
-                size={20}
-                className='helpIconWithMarginTop'
-              />
-            )}
-            {timeFilterActive && (
-              <div className={timeFilterToggleClassName}>
-                <>
-                  <button
-                    onClick={() =>
-                      setFilterDownloadByTime(!filterDownloadByTime)
-                    }
-                    disabled={!timeFilterActive}
-                  >
-                    <CalendarWeek
-                      style={{
-                        margin: '0px 15px',
-                        height: '30px'
-                      }}
-                    />
-                    {`${query.startDate} - ${query.endDate}`}
-                  </button>
-                </>
-              </div>
-            )}
-            {depthFilterActive && (
-              <div className={depthFilterToggleClassName}>
-                <>
-                  <button
-                    onClick={() =>
-                      setFilterDownloadByDepth(!filterDownloadByDepth)
-                    }
-                    disabled={!depthFilterActive}
-                  >
-                    <ArrowsExpand
-                      style={{
-                        margin: '0px 15px',
-                        height: '30px'
-                      }}
-                    />
-                    {`${query.startDepth} - ${query.endDepth}(m)`}
-                  </button>
-                </>
-              </div>
-            )}
-            {polygonFilterActive && (
-              <div className={polygonFilterToggleClassName}>
-                <>
-                  <button
-                    onClick={() =>
-                      setFilterDownloadByPolygon(!filterDownloadByPolygon)
-                    }
-                    disabled={!polygonFilterActive}
-                  >
-                    <div
-                      className='mapbox-gl-draw-polygon'
-                      style={{
-                        display: 'inline',
-                        backgroundImage: `url(${polygonIsRectangle(polygon)
-                          ? rectangleImage
-                          : polygonImage
-                        })`,
-                        backgroundRepeat: 'no-repeat',
-                        backgroundSize: '30px 30px',
-                        backgroundPositionX: '10px',
-                        backgroundPositionY: '-5px',
-                        borderRadius: '0px',
-                        height: '42px',
-                        paddingLeft: '45px'
-                      }}
-                    >
-                      {polygonFilterText}
-                    </div>
-                  </button>
-                </>
-              </div>
-            )}
+      <div className='downloadDetailsHeader'>
+        <button
+          className='downloadDetailsBackButton'
+          onClick={() => setShowModal(false)}
+        >
+          <ChevronCompactLeft aria-hidden='true' />
+          {t('downloadModalBackButtonText')}
+        </button>
+        <h2 className='downloadDetailsTitle'>
+          <Download size={18} aria-hidden='true' />
+          {t('downloadModalTitleText')}
+        </h2>
+      </div>
+
+      <div className='filterDownloadToggles'>
+        <QuestionIconTooltip
+          tooltipText={t('downloadDetailsFilterQuestionTooltipText')}
+          tooltipPlacement={'right'}
+          size={20}
+        />
+        {!timeFilterActive && !depthFilterActive && !polygonFilterActive && (
+          <i className='noFiltersMessage'>
+            {t('downloadDetailsNoFiltersActiveMessage')}
+          </i>
+        )}
+        {timeFilterActive && (
+          <div className={timeFilterToggleClassName}>
+            <button
+              onClick={() => setFilterDownloadByTime(!filterDownloadByTime)}
+              disabled={!timeFilterActive}
+            >
+              <CalendarWeek className='filterToggleIcon' size={16} aria-hidden='true' />
+              <span>{`${query.startDate} – ${query.endDate}`}</span>
+            </button>
           </div>
-        </Col>
-      </Row>
+        )}
+        {depthFilterActive && (
+          <div className={depthFilterToggleClassName}>
+            <button
+              onClick={() => setFilterDownloadByDepth(!filterDownloadByDepth)}
+              disabled={!depthFilterActive}
+            >
+              <ArrowsExpand className='filterToggleIcon' size={16} aria-hidden='true' />
+              <span>{`${query.startDepth} – ${query.endDepth} m`}</span>
+            </button>
+          </div>
+        )}
+        {polygonFilterActive && (
+          <div className={polygonFilterToggleClassName}>
+            <button
+              onClick={() => setFilterDownloadByPolygon(!filterDownloadByPolygon)}
+              disabled={!polygonFilterActive}
+            >
+              <div
+                className='mapbox-gl-draw-polygon filterToggleIcon'
+                style={{
+                  display: 'inline',
+                  backgroundImage: `url(${polygonIsRectangle(polygon)
+                    ? rectangleImage
+                    : polygonImage
+                  })`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: '24px 24px',
+                  backgroundPositionX: '8px',
+                  backgroundPositionY: '-3px',
+                  borderRadius: '0px',
+                  height: '34px',
+                  paddingLeft: '38px'
+                }}
+              >
+                {polygonFilterText}
+              </div>
+            </button>
+          </div>
+        )}
+      </div>
+
       <Row className='downloadDataRow'>
         <Col>
           <DatasetsTable
@@ -381,66 +358,69 @@ export default function DownloadDetails({
           />
         </Col>
       </Row>
-      <Row className='downloadDetailsDownloadLimits'>
-        <Col style={{ textAlign: 'center', margin: '15px 0px' }}>
-          <div>
-            <Check2Circle color='#52a79b' size='25' />
+
+      <div className='downloadLegend'>
+        <span className='downloadLegendItem'>
+          <Check2Circle className='legendIcon success' size={18} aria-hidden='true' />
+          <span>
             {t('downloadDetailsDownloadLimitsDownloadableMessagePart1')}
-            <strong style={{ color: 'white', backgroundColor: '#52A79B' }}>
+            <span className='legendBadge success'>
               {t('downloadDetailsDownloadLimitsDownloadableMessagePart2')}
-            </strong>
-            {t('downloadDetailsDownloadLimitsDownloadableMessagePart3')}{' '}
-            <XCircle color='#E25563' size='25' />
+            </span>
+            {t('downloadDetailsDownloadLimitsDownloadableMessagePart3')}
+          </span>
+        </span>
+        <span className='downloadLegendItem'>
+          <XCircle className='legendIcon error' size={18} aria-hidden='true' />
+          <span>
             {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart1')}
-            <strong style={{ color: 'white', backgroundColor: '#E25563' }}>
+            <span className='legendBadge error'>
               {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart2')}
-            </strong>
+            </span>
             {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart3')}
-          </div>
-        </Col>
-      </Row>
+          </span>
+        </span>
+      </div>
+
       <Row className='downloadDetailsDownloadInfoRow'>
-        <Col>
-          <div className='downloadDetailsDownloadInfoItem'>
-            <Check2Circle
-              color='#52a79b'
-              size='25'
-            />
-            {' '}
-            {t('downloadDetailsDownloadInfoDatasets')}
-            {downloadSizeEstimates ? (
-              <strong>
-                {`${pointsData.filter((point) => point.selected).length} / ${pointsData.length
-                }`}
-              </strong>
-            ) : (
-              <Spinner
-                className='datasetSizeTotalSpinner'
-                as='span'
-                animation='border'
-                size={30}
-                role='status'
-                aria-hidden='true'
-              />
-            )}
-          </div>
-          <div className='downloadDetailsDownloadInfoItem'>
-            {t('downloadDetailsDownloadInfoDownloadSize')}
-            {downloadSizeEstimates ? (
-              <strong>
-                {`${bytes(dataTotal.filteredSize)} /
-                ${bytes(dataTotal.unfilteredSize)}`}
-              </strong>
-            ) : (
-              <Spinner
-                className='datasetSizeTotalSpinner'
-                as='span'
-                animation='border'
-                size={30}
-                role='status'
-                aria-hidden='true'
-              />
-            )}
+        <Col xs='auto'>
+          <div className='downloadSummary'>
+            <div className='downloadSummaryStat'>
+              <span className='downloadSummaryLabel'>
+                {t('downloadDetailsDownloadInfoDatasets')}
+              </span>
+              {downloadSizeEstimates ? (
+                <span className='downloadSummaryValue'>
+                  {`${selectedCount} / ${pointsData.length}`}
+                </span>
+              ) : (
+                <Spinner
+                  className='datasetSizeTotalSpinner'
+                  as='span'
+                  animation='border'
+                  role='status'
+                  aria-hidden='true'
+                />
+              )}
+            </div>
+            <div className='downloadSummaryStat'>
+              <span className='downloadSummaryLabel'>
+                {t('downloadDetailsDownloadInfoDownloadSize')}
+              </span>
+              {downloadSizeEstimates ? (
+                <span className='downloadSummaryValue'>
+                  {`${bytes(dataTotal.filteredSize)} / ${bytes(dataTotal.unfilteredSize)}`}
+                </span>
+              ) : (
+                <Spinner
+                  className='datasetSizeTotalSpinner'
+                  as='span'
+                  animation='border'
+                  role='status'
+                  aria-hidden='true'
+                />
+              )}
+            </div>
           </div>
         </Col>
         {children}
