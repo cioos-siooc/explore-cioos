@@ -286,14 +286,18 @@ def _run_logger():
 
 @task(task_run_name="merge-and-write-csvs")
 def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skipped,
-                         obis_datasets, obis_cells, obis_skipped, df_ckan):
+                         obis_datasets, obis_cells, obis_skipped, df_ckan,
+                         erddap_trajectories=None):
     """Join CKAN metadata, merge all sources, and write the output CSVs (@task)."""
     logger = _run_logger()
     datasets_file = f"{folder}/datasets.csv"
     profiles_file = f"{folder}/profiles.csv"
+    trajectories_file = f"{folder}/trajectories.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
     ckan_file = f"{folder}/ckan.csv"
     obis_cells_file = f"{folder}/obis_cells.csv"
+    if erddap_trajectories is None:
+        erddap_trajectories = pd.DataFrame()
 
     # --- ERDDAP-specific post-processing ---
     if not erddap_datasets.empty:
@@ -368,13 +372,17 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
             lambda x: x if isinstance(x, list) else []
         )
 
-    logger.info("Adding %s datasets, %s profiles, %s obis_cells", len(datasets), len(erddap_profiles), len(obis_cells))
+    logger.info("Adding %s datasets, %s profiles, %s trajectories, %s obis_cells", len(datasets), len(erddap_profiles), len(erddap_trajectories), len(obis_cells))
 
     # Write output CSVs
     datasets.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
         datasets_file, index=False
     )
     erddap_profiles.drop_duplicates().to_csv(profiles_file, index=False)
+    if not erddap_trajectories.empty:
+        erddap_trajectories.drop_duplicates(
+            ["erddap_url", "dataset_id", "trajectory_id"]
+        ).to_csv(trajectories_file, index=False)
     if not df_ckan.empty:
         df_ckan.to_csv(ckan_file, index=False)
     skipped_datasets.drop_duplicates().to_csv(skipped_datasets_file, index=False)
@@ -477,12 +485,14 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
 
         # Collect ERDDAP results
         erddap_profiles = pd.DataFrame()
+        erddap_trajectories = pd.DataFrame()
         erddap_datasets = pd.DataFrame()
         variables = pd.DataFrame()
         erddap_skipped = pd.DataFrame()
 
         for result in erddap_results:
             erddap_profiles = pd.concat([erddap_profiles, result.profiles])
+            erddap_trajectories = pd.concat([erddap_trajectories, result.trajectories])
             erddap_datasets = pd.concat([erddap_datasets, result.datasets])
             variables = pd.concat([variables, result.variables])
             erddap_skipped = pd.concat([erddap_skipped, result.skipped])
@@ -573,6 +583,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         folder=folder,
         erddap_datasets=erddap_datasets,
         erddap_profiles=erddap_profiles,
+        erddap_trajectories=erddap_trajectories,
         erddap_skipped=erddap_skipped,
         obis_datasets=obis_datasets,
         obis_cells=obis_cells,

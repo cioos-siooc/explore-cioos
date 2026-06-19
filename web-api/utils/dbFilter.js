@@ -49,25 +49,34 @@ async function createDBFilter(request) {
 
   const filters = [];
   const obisFilters = [];
+  // Trajectories are LineStrings, not points: the non-spatial predicates
+  // (time/eovs/platform/depth/dataset/org/server) are identical, but the
+  // spatial ones swap point-column tests for ST_Intersects on the line geom.
+  // Built in parallel and returned as `trajectory`.
+  const trajectoryFilters = [];
   const parameters = {};
 
   if (eovs) {
     parameters.eovsCommaSeparatedString = unique(eovs.split(","));
     filters.push("eovs && :eovsCommaSeparatedString");
+    trajectoryFilters.push("eovs && :eovsCommaSeparatedString");
   }
 
   if (platforms) {
     parameters.platformsCommaSeparatedString = unique(platforms.split(","));
     filters.push("platform = any(:platformsCommaSeparatedString)");
+    trajectoryFilters.push("platform = any(:platformsCommaSeparatedString)");
   }
 
   if (timeMin) {
     parameters.timeMin = timeMin;
     filters.push("time_max >= :timeMin::timestamptz");
+    trajectoryFilters.push("time_max >= :timeMin::timestamptz");
   }
   if (timeMax) {
     parameters.timeMax = timeMax;
     filters.push("time_min <= :timeMax::timestamptz");
+    trajectoryFilters.push("time_min <= :timeMax::timestamptz");
   }
 
   // This would be used if there was a rectangle selection for download
@@ -89,19 +98,30 @@ async function createDBFilter(request) {
     filters.push("longitude <= (:lonMax)::double precision");
   }
 
+  // Rectangle selection as a single envelope intersect for the line geom
+  // (point columns above don't exist on cde.trajectories).
+  if (latMin && latMax && lonMin && lonMax) {
+    trajectoryFilters.push(
+      "ST_Intersects(ST_Transform(geom,4326), ST_MakeEnvelope((:lonMin)::double precision,(:latMin)::double precision,(:lonMax)::double precision,(:latMax)::double precision,4326))",
+    );
+  }
+
   // disabled until we get depth data into the database
   if (depthMin) {
     parameters.depthMin = depthMin;
     filters.push("depth_max >= (:depthMin)::integer");
+    trajectoryFilters.push("depth_max >= (:depthMin)::integer");
   }
   if (depthMax) {
     parameters.depthMax = depthMax;
     filters.push("depth_min <= (:depthMax)::integer");
+    trajectoryFilters.push("depth_min <= (:depthMax)::integer");
   }
 
   if (datasetPKs) {
     parameters.datasetPKs = datasetPKs.split(",");
     filters.push("d.pk_url = ANY (:datasetPKs)");
+    trajectoryFilters.push("d.pk_url = ANY (:datasetPKs)");
   }
 
   if (pointPKs) {
@@ -112,6 +132,7 @@ async function createDBFilter(request) {
   if (organizations) {
     parameters.organizationsString = organizations.split(",");
     filters.push("organization_pks && :organizationsString");
+    trajectoryFilters.push("organization_pks && :organizationsString");
   }
 
   if (obisNodes) {
@@ -125,12 +146,15 @@ async function createDBFilter(request) {
   if (erddapServers) {
     parameters.erddapServersArray = erddapServers.split(",");
     filters.push("d.erddap_url = ANY(:erddapServersArray)");
+    trajectoryFilters.push("d.erddap_url = ANY(:erddapServersArray)");
   }
 
   if (polygon) {
     const wktPolygon = polygonJSONToWKT(polygon);
     parameters.wktPolygon = wktPolygon;
     filters.push("ST_Contains(ST_GeomFromText(:wktPolygon,4326),ST_Transform(geom,4326)) is true");
+    // A track is selected if the polygon intersects the line (not contains).
+    trajectoryFilters.push("ST_Intersects(ST_GeomFromText(:wktPolygon,4326),ST_Transform(geom,4326))");
   }
 
   if (scientificNames) {
@@ -186,12 +210,15 @@ async function createDBFilter(request) {
 
   const sharedSql = filters.join(" AND \n") || "TRUE";
   const obisSql = obisFilters.join(" AND \n") || "TRUE";
+  const trajectorySql = trajectoryFilters.join(" AND \n") || "TRUE";
 
   return {
     shared: db.raw(sharedSql, parameters),
     obisOnly: db.raw(obisSql, parameters),
+    trajectory: db.raw(trajectorySql, parameters),
     hasShared: filters.length > 0,
     hasObisOnly: obisFilters.length > 0,
+    hasTrajectory: trajectoryFilters.length > 0,
   };
 }
 

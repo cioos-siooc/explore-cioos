@@ -18,6 +18,8 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
   // hide profiles and narrow to OBIS rows.
   const includeProfiles = !scientificNames && !obisNodes;
   const showObis = includeObis !== 'false';
+  // Trajectories are not OBIS, so they follow the same gate as profiles.
+  const includeTrajectories = includeProfiles;
 
   const profilesBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,
                profile_id, timeseries_id,
@@ -36,11 +38,21 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
     ? branches.join("\n        UNION ALL\n        ")
     : `${profilesBranch} WHERE FALSE`;
 
-  const sql = `WITH combined AS (
-        ${combinedInner}
-  ),
-  sub AS
-        (SELECT   d.pk,
+  // Per-dataset query-records estimate. p.* columns; reused verbatim for the
+  // trajectory aggregation below by aliasing the trajectory table as p.
+  const estimateExpr = `SUM(
+                  coalesce(nullif(date_part('days',range_intersection_length(tstzrange(:timeMin,:timeMax),tstzrange(p.time_min,p.time_max))),0),1) * p.records_per_day *
+                  coalesce(nullif(range_intersection_length(numrange(:depthMin,:depthMax),numrange(p.depth_min::NUMERIC,p.depth_max::NUMERIC)),0),1) / (coalesce(nullif(p.depth_max-p.depth_min,0),1)) ) AS records_count`;
+
+  const estimateFragment = doEstimate ? `,${estimateExpr}` : "";
+  const recordsFragment = (idExpr) => getRecordsList
+    ? `,json_agg(json_build_object( 'profile_id',${idExpr}, 'time_min',p.time_min::DATE, 'time_max',p.time_max::DATE, 'depth_min',p.depth_min, 'depth_max',p.depth_max ) ORDER BY time_min DESC ) AS profiles`
+    : "";
+
+  // The selected columns are identical for the point-source aggregation (sub)
+  // and the trajectory aggregation (subTraj) so they can UNION ALL. `p` is the
+  // row alias in both (cde.trajectories aliased as p in subTraj).
+  const subSelect = (idExpr) => `SELECT   d.pk,
                   d.pk_url,
                   d.dataset_id,
                   d.n_profiles,
@@ -61,31 +73,34 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                   END AS erddap_url,
                   'https://catalogue.cioos.ca/dataset/'
                            || ckan_id AS ckan_url
-                  -- replace '0 days' with '1 day' when its a single day profile
-                  -- query records count = sum((number of days covered by the query that are in the profile) * profile records per day * fraction of the depth range that profile covers)
-                  ${
-  doEstimate
-    ? `,SUM(
-                  -- number of days covered by this query that overlap this profile time range
-                  coalesce(nullif(date_part('days',range_intersection_length(tstzrange(:timeMin,:timeMax),tstzrange(p.time_min,p.time_max))),0),1) * p.records_per_day *
-                  -- depth multiplier - fraction of depth range that this query overlaps with profile depth range
-                  coalesce(nullif(range_intersection_length(numrange(:depthMin,:depthMax),numrange(p.depth_min::NUMERIC,p.depth_max::NUMERIC)),0),1) / (coalesce(nullif(p.depth_max-p.depth_min,0),1)) ) AS records_count`
-    : ""
-}
-                  ${
-  getRecordsList
-    ? ",json_agg(json_build_object( 'profile_id',coalesce(p.profile_id, p.timeseries_id), 'time_min',p.time_min::DATE, 'time_max',p.time_max::DATE, 'depth_min',p.depth_min, 'depth_max',p.depth_max ) ORDER BY time_min DESC ) AS profiles"
-    : ""
-}
+                  ${estimateFragment}
+                  ${recordsFragment(idExpr)}`;
 
+  const subTrajCTE = includeTrajectories
+    ? `, subTraj AS
+        (${subSelect("p.trajectory_id")}
+         FROM     cde.trajectories p
+         JOIN     cde.datasets d
+         ON       p.dataset_pk = d.pk
+         WHERE :trajectoryFilters
+         GROUP BY d.pk)`
+    : "";
+
+  const unionTraj = includeTrajectories ? "UNION ALL SELECT * FROM subTraj" : "";
+
+  const sql = `WITH combined AS (
+        ${combinedInner}
+  ),
+  sub AS
+        (${subSelect("coalesce(p.profile_id, p.timeseries_id)")}
          FROM     combined p
          JOIN     cde.datasets d
          ON       p.dataset_pk = d.pk
          WHERE :filters
-         GROUP BY d.pk)
+         GROUP BY d.pk)${subTrajCTE}
 SELECT *
        ${doEstimate ? ",round(:adder + records_count * num_columns * :multiplier) AS SIZE" : ""}
-FROM   sub`;
+FROM   (SELECT * FROM sub ${unionTraj}) allsub`;
   let queryParams;
 
   if (doEstimate) {
@@ -96,10 +111,15 @@ FROM   sub`;
       depthMax,
       filters: filters.shared,
       obisFilters: filters.obisOnly,
+      trajectoryFilters: filters.trajectory,
       adder: 0,
       multiplier: 10,
     };
-  } else queryParams = { filters: filters.shared, obisFilters: filters.obisOnly };
+  } else queryParams = {
+    filters: filters.shared,
+    obisFilters: filters.obisOnly,
+    trajectoryFilters: filters.trajectory,
+  };
 
   const q = db.raw(sql, queryParams);
 

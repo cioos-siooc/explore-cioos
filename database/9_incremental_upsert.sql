@@ -25,6 +25,7 @@ BEGIN
   CREATE TEMP TABLE IF NOT EXISTS temp_profiles (LIKE cde.profiles INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
   CREATE TEMP TABLE IF NOT EXISTS temp_skipped_datasets (LIKE cde.skipped_datasets INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
   CREATE TEMP TABLE IF NOT EXISTS temp_obis_cells (LIKE cde.obis_cells INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
+  CREATE TEMP TABLE IF NOT EXISTS temp_trajectories (LIKE cde.trajectories INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
 
   -- Explicitly drop all NOT NULL constraints from temp tables
   -- These are column-level constraints that EXCLUDING CONSTRAINTS doesn't remove
@@ -122,6 +123,29 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+-- Replace trajectories for datasets that are in temp_datasets.
+-- Deletes old trajectories for those datasets, then inserts new ones. pk/geom/
+-- dataset_pk/days are intentionally not carried from temp: pk is a fresh
+-- serial, and geom/dataset_pk/days are derived by trajectory_process() after
+-- this runs. trajectory_hexes is fully rebuilt downstream by
+-- create_trajectory_hexes(), so no per-dataset cleanup of it is needed here.
+CREATE OR REPLACE FUNCTION replace_trajectories_from_temp() RETURNS VOID AS $$
+BEGIN
+  DELETE FROM cde.trajectories t
+  USING temp_datasets td
+  WHERE t.dataset_id = td.dataset_id
+    AND t.erddap_url = td.erddap_url;
+
+  INSERT INTO cde.trajectories
+    (geom_wkt, erddap_url, dataset_id, trajectory_id,
+     time_min, time_max, depth_min, depth_max, n_records, records_per_day)
+  SELECT geom_wkt, erddap_url, dataset_id, trajectory_id,
+         time_min, time_max, depth_min, depth_max, n_records, records_per_day
+  FROM temp_trajectories;
+END;
+$$ LANGUAGE plpgsql;
+
+
 -- Replace obis_cells for datasets that are in temp_datasets
 -- Deletes old obis_cells for those datasets, then inserts new ones from temp_obis_cells
 CREATE OR REPLACE FUNCTION replace_obis_cells_from_temp() RETURNS VOID AS $$
@@ -171,6 +195,9 @@ BEGIN
   -- 5. Replace obis_cells (delete old, insert new)
   PERFORM replace_obis_cells_from_temp();
 
+  -- 5b. Replace trajectories (delete old, insert new)
+  PERFORM replace_trajectories_from_temp();
+
   -- 6. UPSERT skipped datasets
   PERFORM upsert_skipped_datasets_from_temp();
 
@@ -179,9 +206,13 @@ BEGIN
   PERFORM ckan_process();
   PERFORM profile_process();
   PERFORM obis_process();
+  PERFORM trajectory_process();
 
-  -- 8. Create hexes for all data
+  -- 8. Create hexes for all data. create_trajectory_hexes() must run AFTER
+  -- create_hexes() so it can dedupe trajectory-only cells against the
+  -- point-derived grid and resolve hex FKs.
   PERFORM create_hexes();
+  PERFORM create_trajectory_hexes();
 
   -- 9. Restore constraints
   PERFORM set_constraints();

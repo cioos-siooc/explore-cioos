@@ -75,6 +75,24 @@ def prepare_profiles_dataframe(profiles):
     return profiles
 
 
+def prepare_trajectories_dataframe(trajectories):
+    """Clean and prepare the trajectories DataFrame for insertion.
+
+    Keeps only columns that exist on cde.trajectories (geom/dataset_pk/days are
+    derived post-load by trajectory_process()) and drops rows with no track
+    geometry or no time bounds — those can't render or be filtered.
+    """
+    keep = [
+        "erddap_url", "dataset_id", "trajectory_id", "geom_wkt",
+        "time_min", "time_max", "depth_min", "depth_max",
+        "n_records", "records_per_day",
+    ]
+    trajectories = trajectories.replace("", np.NaN)
+    trajectories = trajectories[[c for c in keep if c in trajectories.columns]]
+    trajectories = trajectories.dropna(subset=["geom_wkt", "time_min", "time_max"])
+    return trajectories
+
+
 def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
     """Clean and prepare obis_cells DataFrame for insertion.
 
@@ -205,6 +223,7 @@ def main(folder, incremental=False):
 
     datasets_file = f"{folder}/datasets.csv"
     profiles_file = f"{folder}/profiles.csv"
+    trajectories_file = f"{folder}/trajectories.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
     obis_cells_file = f"{folder}/obis_cells.csv"
     harvest_runs_file = f"{folder}/harvest_runs.csv"
@@ -214,6 +233,7 @@ def main(folder, incremental=False):
 
     datasets = pd.read_csv(datasets_file)
     profiles = pd.read_csv(profiles_file) if os.path.isfile(profiles_file) and os.path.getsize(profiles_file) > 1 else pd.DataFrame()
+    trajectories = pd.read_csv(trajectories_file) if os.path.isfile(trajectories_file) and os.path.getsize(trajectories_file) > 1 else pd.DataFrame()
     skipped_datasets = pd.read_csv(skipped_datasets_file)
 
     obis_cells = None
@@ -322,6 +342,17 @@ def main(folder, incremental=False):
                         method="multi",
                     )
 
+            if not trajectories.empty:
+                with _timed("temp_trajectories to_sql", logger):
+                    logger.info("Loading trajectories into temp table")
+                    prepare_trajectories_dataframe(trajectories).to_sql(
+                        "temp_trajectories",
+                        con=transaction,
+                        if_exists="append",
+                        index=False,
+                        method="multi",
+                    )
+
             if obis_cells is not None:
                 prepared = prepare_obis_cells_dataframe(obis_cells, name_to_aphia)
                 with _timed("temp_obis_cells COPY", logger):
@@ -420,6 +451,20 @@ def main(folder, incremental=False):
                         method="multi",
                     )
 
+            if trajectories.empty:
+                logger.info("No trajectories to write")
+            else:
+                with _timed("trajectories to_sql", logger):
+                    logger.info("Writing trajectories")
+                    prepare_trajectories_dataframe(trajectories).to_sql(
+                        "trajectories",
+                        con=transaction,
+                        if_exists="append",
+                        schema=schema,
+                        index=False,
+                        method="multi",
+                    )
+
             if obis_cells is not None:
                 prepared = prepare_obis_cells_dataframe(obis_cells, name_to_aphia)
                 with _timed("obis_cells COPY", logger):
@@ -440,6 +485,10 @@ def main(folder, incremental=False):
             with _timed("profile_process", logger):
                 logger.info("Processing new records")
                 transaction.execute(text("SELECT profile_process();"))
+            if not trajectories.empty:
+                with _timed("trajectory_process", logger):
+                    logger.info("Processing trajectories")
+                    transaction.execute(text("SELECT trajectory_process();"))
             with _timed("ckan_process", logger):
                 transaction.execute(text("SELECT ckan_process();"))
 
@@ -468,6 +517,11 @@ def main(folder, incremental=False):
             with _timed("create_hexes", logger):
                 logger.info("Creating hexes")
                 transaction.execute(text("SELECT create_hexes();"))
+
+            if not trajectories.empty:
+                with _timed("create_trajectory_hexes", logger):
+                    logger.info("Decomposing trajectories into hexes")
+                    transaction.execute(text("SELECT create_trajectory_hexes();"))
 
             with _timed("set_constraints", logger):
                 # This ensures that all fields were set successfully

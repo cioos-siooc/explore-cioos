@@ -201,6 +201,23 @@ export default function CreateMap({
           'pk',
           ...pointsInDataset
         ])
+
+        // Same treatment for trajectory lines: grey the base line layer and
+        // surface the hovered dataset's track(s) via the hovered overlay.
+        if (map.current.getLayer('trajectories')) {
+          map.current.setPaintProperty('trajectories', 'line-color', 'lightgrey')
+          const trajInDataset = map.current
+            .queryRenderedFeatures({ layers: ['trajectories'] })
+            .filter((feature) =>
+              JSON.parse(feature.properties.datasets).includes(pk)
+            )
+            .map((feature) => feature.properties.pk)
+          map.current.setFilter('trajectories-hovered', [
+            'in',
+            'pk',
+            ...trajInDataset
+          ])
+        }
       } else {
         map.current.setPaintProperty('hexes', 'fill-color', 'lightgrey')
         const features = map.current.queryRenderedFeatures({
@@ -222,6 +239,10 @@ export default function CreateMap({
         'circle-stroke-width',
         1
       )
+      if (map.current.getLayer('trajectories')) {
+        map.current.setFilter('trajectories-hovered', ['in', 'pk', ''])
+        map.current.setPaintProperty('trajectories', 'line-color', colors)
+      }
       map.current.setFilter('hexes-hovered', ['in', 'pk', ''])
       map.current.setPaintProperty('hexes', 'fill-color', {
         property: 'count',
@@ -287,14 +308,17 @@ export default function CreateMap({
 
       map.current.getSource('points').tiles = [tileQuery]
       map.current.getSource('hexes').tiles = [tileQuery]
+      map.current.getSource('trajectories').tiles = [tileQuery]
 
       // Remove the tiles for a particular source
       map.current.style.sourceCaches.hexes.clearTiles()
       map.current.style.sourceCaches.points.clearTiles()
+      map.current.style.sourceCaches.trajectories.clearTiles()
 
       // Load the new tiles for the current viewport (map.transform -> viewport)
       map.current.style.sourceCaches.hexes.update(map.current.transform)
       map.current.style.sourceCaches.points.update(map.current.transform)
+      map.current.style.sourceCaches.trajectories.update(map.current.transform)
 
       // Force a repaint, so that the map will be repainted without you having to touch the map
       map.current.triggerRepaint()
@@ -425,6 +449,52 @@ export default function CreateMap({
           'circle-stroke-opacity': 0.001,
           'circle-stroke-width': 10
         }
+      })
+
+      // Trajectories render as platform-colored lines, only at high zoom
+      // (>= hexMaxZoom); at lower zoom their coverage is already folded into
+      // the hex layer server-side. Same vector tile, different source-layer.
+      map.current.addLayer({
+        id: 'trajectories',
+        type: 'line',
+        minzoom: hexMaxZoom,
+        source: {
+          type: 'vector',
+          tiles: [tileQuery]
+        },
+        'source-layer': 'trajectories',
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round'
+        },
+        paint: {
+          'line-color': colors,
+          'line-opacity': circleOpacity,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 7, 1, 14, 3]
+        }
+      })
+
+      // Overlay used to emphasize the hovered dataset's track(s). Unfiltered
+      // tile source (like points-hovered) so it isn't affected by query tiles.
+      map.current.addLayer({
+        id: 'trajectories-hovered',
+        type: 'line',
+        minzoom: hexMaxZoom,
+        source: {
+          type: 'vector',
+          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`]
+        },
+        'source-layer': 'trajectories',
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round'
+        },
+        paint: {
+          'line-color': colors,
+          'line-opacity': 1,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 7, 3, 14, 6]
+        },
+        filter: ['in', 'pk', '']
       })
 
       map.current.addLayer({
@@ -708,9 +778,25 @@ export default function CreateMap({
       }
     })
 
+    map.current.on('mousemove', 'trajectories', () => {
+      if (!draw.getMode().includes('draw')) {
+        map.current.getCanvas().style.cursor = 'pointer'
+      }
+    })
+    map.current.on('mouseleave', 'trajectories', () => {
+      if (!draw.getMode().includes('draw')) {
+        map.current.getCanvas().style.cursor = 'grab'
+      }
+    })
+
     // Workaround for https://github.com/mapbox/mapbox-gl-draw/issues/617
     map.current.on('click', 'points', handleMapPointsOnClick)
     map.current.on('touchend', 'points', handleMapPointsOnClick)
+
+    // Clicking a track makes a small bbox selection at the click point; the
+    // backend /pointQuery resolves which trajectories (and points) intersect it.
+    map.current.on('click', 'trajectories', handleMapPointsOnClick)
+    map.current.on('touchend', 'trajectories', handleMapPointsOnClick)
 
     map.current.on('click', 'hexes', handleMapHexesOnClick)
     map.current.on('touchend', 'hexes', handleMapHexesOnClick)

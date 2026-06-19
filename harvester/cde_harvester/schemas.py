@@ -33,6 +33,30 @@ class ProfileSchema(pa.DataFrameModel):
         strict = False  # allow extra columns during transition
 
 
+class TrajectorySchema(pa.DataFrameModel):
+    """Schema for the trajectories DataFrame.
+
+    Mirrors cde.trajectories in the database. geom_wkt is a WKT MultiLineString
+    in EPSG:4326 (split at large time gaps); the DB derives the projected geom
+    from it post-load.
+    """
+
+    erddap_url: Series[str]
+    dataset_id: Series[str]
+    trajectory_id: Series[str]
+    geom_wkt: Series[str] = pa.Field(nullable=True)
+    time_min: Series[pa.DateTime] = pa.Field(nullable=True)
+    time_max: Series[pa.DateTime] = pa.Field(nullable=True)
+    depth_min: Series[float] = pa.Field(nullable=True)
+    depth_max: Series[float] = pa.Field(nullable=True)
+    n_records: Series[float] = pa.Field(nullable=True)
+    records_per_day: Series[float] = pa.Field(nullable=True)
+
+    class Config:
+        coerce = True
+        strict = False
+
+
 class ObisCellSchema(pa.DataFrameModel):
     """Schema for the obis_cells DataFrame.
 

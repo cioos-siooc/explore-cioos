@@ -104,6 +104,19 @@ router.get(
 
     const wktPolygon = polygonJSONToWKT(polygon);
 
+    // Datasets the downloader should fetch: point-source datasets (cde.profiles,
+    // shared filter) plus trajectory datasets (cde.trajectories, ST_Intersects
+    // filter). OBIS is intentionally excluded (it links out to obis.org). The
+    // downloader builds the per-dataset ERDDAP tabledap subset from dataset_id +
+    // the bbox/time in user_query, which applies equally to trajectory tabledap.
+    const trajSelect = `SELECT d.erddap_url, d.dataset_id, d.title, d.profile_variables,
+               d.cdm_data_type, d.ckan_id ckan_id,
+               'https://catalogue.cioos.ca/dataset/' ckan_url
+        FROM cde.trajectories t
+        JOIN cde.datasets d ON t.dataset_pk = d.pk
+        WHERE :trajectoryFilters
+        GROUP BY d.pk`;
+
     const SQL = `
         WITH profiles_subset AS (
         SELECT d.erddap_url,
@@ -115,16 +128,17 @@ router.get(
                'https://catalogue.cioos.ca/dataset/' ckan_url
         FROM cde.profiles p
         JOIN cde.datasets d ON p.dataset_pk =d.pk
-        WHERE
-        ${filters || ""} 
-        GROUP BY d.pk)
-        SELECT json_agg(t) FROM profiles_subset t;      
+        WHERE :filters
+        GROUP BY d.pk
+        ${filters.hasTrajectory ? `UNION\n        ${trajSelect}` : ""})
+        SELECT json_agg(t) FROM profiles_subset t;
       `;
 
-    console.log(SQL);
-
     try {
-      const tileRaw = await db.raw(SQL);
+      const tileRaw = await db.raw(SQL, {
+        filters: filters.shared,
+        trajectoryFilters: filters.trajectory,
+      });
       const tile = tileRaw.rows[0];
       if (tile.json_agg && tile.json_agg.length) {
         const jobID = uuidv4().substr(0, 6);

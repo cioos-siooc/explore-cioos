@@ -109,6 +109,87 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+-- Trajectory post-load processing. Mirrors profile_process() but for the
+-- LineString table: build geom from the harvester's WKT (4326 -> 3857), link
+-- dataset_pk, compute days. The hex decomposition is a separate step
+-- (create_trajectory_hexes) that must run AFTER create_hexes() so it can dedupe
+-- new trajectory-only cells against the point-derived hex grid.
+CREATE OR REPLACE FUNCTION trajectory_process() RETURNS VOID AS $$
+BEGIN
+  SET search_path TO cde, public;
+
+  -- Build the projected MultiLineString from the staged WKT (4326). Rows whose
+  -- WKT is missing or yields fewer than 2 points are left with geom NULL and are
+  -- skipped by every downstream step (they simply never render).
+  UPDATE cde.trajectories
+  SET geom = ST_Transform(ST_SetSRID(ST_GeomFromText(geom_wkt), 4326), 3857)
+  WHERE geom IS NULL
+    AND geom_wkt IS NOT NULL
+    AND ST_NPoints(ST_GeomFromText(geom_wkt)) >= 2;
+
+  UPDATE cde.trajectories t
+  SET dataset_pk = d.pk
+  FROM cde.datasets d
+  WHERE t.dataset_id = d.dataset_id
+    AND t.erddap_url = d.erddap_url
+    AND t.dataset_pk IS NULL;
+
+  UPDATE cde.trajectories
+  SET days = date_part('days', time_max - time_min) + 1
+  WHERE days IS NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Decompose each trajectory LINE into the shared hex grids so the low-zoom tile
+-- / legend aggregation can fold trajectory coverage into the density layer.
+-- Runs AFTER create_hexes() (which builds the point-derived hex cells).
+CREATE OR REPLACE FUNCTION create_trajectory_hexes() RETURNS VOID AS $$
+DECLARE
+  extent geometry;
+BEGIN
+  SET search_path TO cde, public;
+  DELETE FROM cde.trajectory_hexes;
+
+  SELECT ST_SetSRID(ST_Extent(geom), 3857) INTO extent
+  FROM cde.trajectories WHERE geom IS NOT NULL;
+
+  -- No trajectories loaded -> nothing to do.
+  IF extent IS NULL THEN
+    RETURN;
+  END IF;
+
+  -- Add any hex cells a track crosses that no point occupied. ST_HexagonGrid
+  -- has a fixed origin, so cells generated here are identical to (and dedupe
+  -- against) those create_hexes() built from points.
+  INSERT INTO cde.hexes_zoom_0 (geom)
+  SELECT DISTINCT g.geom
+  FROM cde.trajectories t
+  JOIN ST_HexagonGrid(100000, extent) g ON ST_Intersects(t.geom, g.geom)
+  LEFT JOIN cde.hexes_zoom_0 h ON h.geom = g.geom
+  WHERE h.pk IS NULL;
+
+  INSERT INTO cde.hexes_zoom_1 (geom)
+  SELECT DISTINCT g.geom
+  FROM cde.trajectories t
+  JOIN ST_HexagonGrid(10000, extent) g ON ST_Intersects(t.geom, g.geom)
+  LEFT JOIN cde.hexes_zoom_1 h ON h.geom = g.geom
+  WHERE h.pk IS NULL;
+
+  -- One row per (trajectory, crossed 10km cell). hex_0_pk is the 100km cell
+  -- containing that 10km cell's surface point, so GROUP BY hex_0_pk /
+  -- hex_1_pk both dedupe a track to one count per cell. LEFT JOIN on hex_0 so
+  -- a rare unmatched parent cell doesn't drop the (more granular) hex_1 row.
+  INSERT INTO cde.trajectory_hexes (trajectory_pk, dataset_pk, hex_0_pk, hex_1_pk)
+  SELECT DISTINCT t.pk, t.dataset_pk, h0.pk, h1.pk
+  FROM cde.trajectories t
+  JOIN cde.hexes_zoom_1 h1 ON ST_Intersects(t.geom, h1.geom)
+  LEFT JOIN cde.hexes_zoom_0 h0 ON ST_Contains(h0.geom, ST_PointOnSurface(h1.geom))
+  WHERE t.geom IS NOT NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+
 -- OBIS post-load processing, split into per-step functions so the db-loader
 -- can time each step individually and surface row counts in logs. The wrapper
 -- obis_process() at the bottom preserves the previous calling convention used

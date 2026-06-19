@@ -97,10 +97,22 @@ router.get(
                time_min, time_max, latitude, longitude, depth_min, depth_max
         FROM cde.obis_cells
         WHERE :obisFilters`;
+    // Trajectory coverage contributes to the hex density buckets (zoom0/zoom1)
+    // just like profiles/obis. point_pk is negated so a track counts once per
+    // hex without colliding with point point_pks.
+    const trajectoryBranch = `SELECT th.hex_0_pk, th.hex_1_pk, (-t.pk) as point_pk, th.dataset_pk,
+               t.days as record_count,
+               t.time_min, t.time_max,
+               NULL::double precision as latitude, NULL::double precision as longitude,
+               t.depth_min, t.depth_max
+        FROM cde.trajectory_hexes th
+        JOIN cde.trajectories t ON t.pk = th.trajectory_pk`;
 
     const branches = [];
     if (includeProfiles) branches.push(profilesBranch);
     if (includeObis) branches.push(obisBranch);
+    // Trajectories follow the same (non-OBIS) gate as profiles.
+    if (includeProfiles) branches.push(trajectoryBranch);
     const combinedInner = branches.length
       ? branches.join("\n        UNION ALL\n        ")
       : `${profilesBranch} WHERE FALSE`;

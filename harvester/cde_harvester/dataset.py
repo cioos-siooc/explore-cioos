@@ -106,7 +106,14 @@ class Dataset(object):
 
         return df_min_max
 
-    def get_profile_ids(self):
+    def get_profile_variables(self):
+        """Parse cf_role variables (profile_id/timeseries_id/trajectory_id) from
+        the dataset's variable metadata and cache them on self.
+
+        Factored out of get_profile_ids() so the trajectory extraction path can
+        learn the trajectory_id variable WITHOUT firing the expensive distinct()
+        query (which on a trajectory dataset would enumerate every point).
+        """
         df_variables = self.df_variables
 
         # Organize dataset variables by their cf_roles
@@ -116,17 +123,19 @@ class Dataset(object):
             .query('cf_role != ""')[["cf_role", "name"]]["name"]
             .to_dict()
         )
-        lat_lng = ["latitude", "longitude"]
-
         # sorting so the url is consistent every time for query caching
-        profile_variable_list = sorted(list(profile_variables.values()))
         self.profile_variables = profile_variables
-
+        self.profile_variable_list = sorted(list(profile_variables.values()))
         self.timeseries_id_variable = profile_variables.get("timeseries_id")
         self.profile_id_variable = profile_variables.get("profile_id")
         self.trajectory_id_variable = profile_variables.get("trajectory_id")
+        return profile_variables
 
-        self.profile_variable_list = profile_variable_list
+    def get_profile_ids(self):
+        # Populate profile_variables / *_id_variable / profile_variable_list
+        profile_variables = self.get_profile_variables()
+        profile_variable_list = self.profile_variable_list
+        lat_lng = ["latitude", "longitude"]
 
         if not profile_variables:
             return []

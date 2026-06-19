@@ -17,6 +17,7 @@ from cde_harvester.schemas import (
     HarvestAttemptSchema,
     ProfileSchema,
     SkippedDatasetSchema,
+    TrajectorySchema,
     VariableSchema,
 )
 from cde_harvester.harvest_errors import (
@@ -29,6 +30,10 @@ from cde_harvester.harvest_errors import (
     UNKNOWN_ERROR,
 )
 from cde_harvester.profiles import get_profiles
+from cde_harvester.trajectories import get_trajectories
+
+# cdm_data_types that are paths (handled by get_trajectories), not point sets.
+TRAJECTORY_CDM_TYPES = ["Trajectory", "TrajectoryProfile"]
 from requests.exceptions import HTTPError
 from prefect import task
 
@@ -76,7 +81,8 @@ class DatasetHarvestResult:
 
     status: str                      # "success" | "skipped"
     attempt: dict                    # one harvest_attempts.csv row
-    profiles: pd.DataFrame = None    # populated only on success
+    profiles: pd.DataFrame = None    # populated only on success (point datasets)
+    trajectories: pd.DataFrame = None  # populated only on success (trajectory datasets)
     dataset_df: pd.DataFrame = None
     variables: pd.DataFrame = None
     skipped_reason_code: str = None  # for the skipped_datasets table, on skip
@@ -99,8 +105,8 @@ class ERDDAPHarvester(BaseHarvester):
         "TimeSeries",
         "Profile",
         "TimeSeriesProfile",
-        # "Trajectory",
-        # "TrajectoryProfile",
+        "Trajectory",
+        "TrajectoryProfile",
     ]
 
     def __init__(self, erddap_url, limit_dataset_ids=None, cache_requests=False, run_id=None):
@@ -132,6 +138,9 @@ class ERDDAPHarvester(BaseHarvester):
         df_profiles_all = pd.DataFrame(
             columns=ProfileSchema.to_schema().columns.keys()
         )
+        df_trajectories_all = pd.DataFrame(
+            columns=TrajectorySchema.to_schema().columns.keys()
+        )
         df_datasets_all = pd.DataFrame(
             columns=DatasetSchema.to_schema().columns.keys()
         )
@@ -151,6 +160,7 @@ class ERDDAPHarvester(BaseHarvester):
         if df_all_datasets.empty:
             return HarvestResult(
                 profiles=df_profiles_all,
+                trajectories=df_trajectories_all,
                 datasets=df_datasets_all,
                 variables=df_variables_all,
                 skipped=pd.DataFrame(columns=SkippedDatasetSchema.to_schema().columns.keys()),
@@ -220,7 +230,10 @@ class ERDDAPHarvester(BaseHarvester):
                 )
                 attempt_records.append(result.attempt)
                 if result.status == "success":
-                    df_profiles_all = pd.concat([df_profiles_all, result.profiles])
+                    if result.profiles is not None:
+                        df_profiles_all = pd.concat([df_profiles_all, result.profiles])
+                    if result.trajectories is not None:
+                        df_trajectories_all = pd.concat([df_trajectories_all, result.trajectories])
                     df_datasets_all = pd.concat([df_datasets_all, result.dataset_df])
                     df_variables_all = pd.concat([df_variables_all, result.variables])
                 elif result.skipped_reason_code:
@@ -257,6 +270,7 @@ class ERDDAPHarvester(BaseHarvester):
         # Return the results
         return HarvestResult(
             profiles=df_profiles_all,
+            trajectories=df_trajectories_all,
             datasets=df_datasets_all,
             variables=df_variables_all,
             skipped=df_skipped_datasets,
@@ -283,10 +297,16 @@ def harvest_dataset(erddap, dataset_id, run_id=None, idx=None, total=None):
         compliance_checker = CDEComplianceChecker(dataset)
 
         if compliance_checker.passes_all_checks():
-            df_profiles = get_profiles(dataset)
+            is_trajectory = dataset.cdm_data_type in TRAJECTORY_CDM_TYPES
+            # Trajectory datasets are paths: extract a coarse LineString per
+            # trajectory instead of a point per profile.
+            df_records = (
+                get_trajectories(dataset) if is_trajectory else get_profiles(dataset)
+            )
             duration_ms = int((time.monotonic() - t0) * 1000)
-            if df_profiles.empty:
-                log.warning("No profiles found")
+            if df_records.empty:
+                what = "trajectories" if is_trajectory else "profiles"
+                log.warning("No %s found", what)
                 return DatasetHarvestResult(
                     status="skipped",
                     skipped_reason_code=NO_PROFILES_FOUND,
@@ -294,7 +314,7 @@ def harvest_dataset(erddap, dataset_id, run_id=None, idx=None, total=None):
                         run_id, erddap_url, dataset_id,
                         status="skipped",
                         reason_code=NO_PROFILES_FOUND,
-                        error_message="Dataset passed compliance but get_profiles returned no rows",
+                        error_message=f"Dataset passed compliance but no {what} were extracted",
                         duration_ms=duration_ms,
                         query_urls=dataset.queried_urls,
                     ),
@@ -302,7 +322,8 @@ def harvest_dataset(erddap, dataset_id, run_id=None, idx=None, total=None):
             log.info("complete")
             return DatasetHarvestResult(
                 status="success",
-                profiles=df_profiles,
+                profiles=None if is_trajectory else df_records,
+                trajectories=df_records if is_trajectory else None,
                 dataset_df=dataset.get_df(),
                 variables=dataset.df_variables,
                 attempt=_build_attempt(

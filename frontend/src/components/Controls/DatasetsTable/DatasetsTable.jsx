@@ -185,7 +185,8 @@ export default function DatasetsTable({
         cell: (row) =>
           row.cdm_data_type
             .replace('TimeSeriesProfile', 'Time series / Profile')
-            .replace('TimeSeries', 'Time series'),
+            .replace('TimeSeries', 'Time series')
+            .replace('TrajectoryProfile', 'Trajectory / Profile'),
         wrap: true,
         sortable: true,
         width: '80px',

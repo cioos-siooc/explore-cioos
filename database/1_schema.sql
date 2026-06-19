@@ -124,6 +124,60 @@ CREATE INDEX ON profiles(erddap_url, dataset_id);
 CREATE INDEX ON profiles(erddap_url, dataset_id, timeseries_id, profile_id);
 
 
+-- Trajectories (gliders, cruises, drifters, animal tags) — one row per
+-- trajectory_id. Unlike a profile (a single point) a trajectory is a PATH, so
+-- geom is a coarse, time-decimated MultiLineString built by the harvester (see
+-- harvester/cde_harvester/trajectories.py). It is a *Multi* line because the
+-- harvester splits the track at large time gaps, so a re-used trajectory_id or
+-- a track with a coverage gap renders as disconnected segments rather than one
+-- line bridging the gap. The web-api renders these as a line layer only at high
+-- zoom (>=7); at low zoom the track is folded into the shared hex grid via
+-- cde.trajectory_hexes below.
+DROP TABLE IF EXISTS trajectories;
+CREATE TABLE trajectories (
+    pk serial PRIMARY KEY,
+    geom geometry(MultiLineString,3857),
+    -- Staging column: the harvester emits the simplified track as a WKT
+    -- MultiLineString in EPSG:4326. trajectory_process() fills geom (3857) from
+    -- it post-load, mirroring how cde.profiles derives geom from latitude/longitude.
+    geom_wkt text,
+    dataset_pk integer REFERENCES datasets(pk),
+    erddap_url text,
+    dataset_id text,
+    trajectory_id text,
+    time_min timestamptz,
+    time_max timestamptz,
+    depth_min double precision,
+    depth_max double precision,
+    n_records bigint,
+    records_per_day float,
+    days bigint,
+    UNIQUE(erddap_url, dataset_id, trajectory_id)
+);
+
+CREATE INDEX ON trajectories USING GIST (geom);
+CREATE INDEX ON trajectories(erddap_url, dataset_id);
+
+
+-- Hex decomposition of each trajectory: one row per (trajectory, hex cell) the
+-- track crosses, on the SAME 100km / 10km grids as cde.profiles. Populated
+-- post-load by intersecting the LINE (not just its sample vertices) with the
+-- hex grid, so fast platforms (e.g. ships) that skip cells between samples are
+-- still counted. Lets the low-zoom tile/legend aggregation fold trajectory
+-- coverage into the density hex layer with no new client-side layer.
+DROP TABLE IF EXISTS trajectory_hexes;
+CREATE TABLE trajectory_hexes (
+    trajectory_pk integer,
+    dataset_pk integer,
+    hex_0_pk integer,
+    hex_1_pk integer
+);
+
+CREATE INDEX ON trajectory_hexes(hex_0_pk);
+CREATE INDEX ON trajectory_hexes(hex_1_pk);
+CREATE INDEX ON trajectory_hexes(dataset_pk);
+
+
 
 
 DROP TABLE IF EXISTS obis_cells;

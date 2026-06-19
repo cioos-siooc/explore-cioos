@@ -74,6 +74,8 @@ router.get(
     // Scientific-name and OBIS-node filters are OBIS-only: when either is
     // set, hide profiles and narrow to OBIS rows.
     const includeProfiles = !req.query.scientificNames && !req.query.obisNodes;
+    // Trajectories are not OBIS, so they follow the same gate as profiles.
+    const includeTrajectories = includeProfiles;
 
     // At hex zoom we only need the hex FK and point_pk (for distinct counts);
     // the polygon is fetched once per hex via JOIN to hexes_zoom_*. At point
@@ -86,10 +88,25 @@ router.get(
            time_min, time_max, latitude, longitude, depth_min, depth_max
     FROM cde.obis_cells
     WHERE :obisFilters`;
+    // Trajectories fold into the hex layer ONLY at low zoom (z<7); at high zoom
+    // they render as their own line layer (see trajectory MVT below), so this
+    // branch is excluded there. point_pk is the negated trajectory pk so a
+    // track counts once per hex via count(distinct point_pk) without colliding
+    // with profile/obis point_pks. lat/lon/geom are NULL (a line has no single
+    // point); at hex zoom the polygon filter uses the hex geom and the rect
+    // filter isn't used.
+    const trajectoryHexBranch = `SELECT (-t.pk) as point_pk, th.dataset_pk, :zoomPKColumn: as zoom_pk,
+           NULL::geometry as point_geom, t.days as record_count,
+           t.time_min, t.time_max,
+           NULL::double precision as latitude, NULL::double precision as longitude,
+           t.depth_min, t.depth_max
+    FROM cde.trajectory_hexes th
+    JOIN cde.trajectories t ON t.pk = th.trajectory_pk`;
 
     const branches = [];
     if (includeProfiles) branches.push(profilesBranch);
     if (includeObis) branches.push(obisBranch);
+    if (includeTrajectories && isHexGrid) branches.push(trajectoryHexBranch);
     // Guard: if nothing to show, return an empty CTE that still has the right columns
     const combinedInner = branches.length
       ? branches.join("\n    UNION ALL\n    ")
@@ -112,6 +129,31 @@ router.get(
          ${filters.hasShared ? "WHERE :filters" : ""}
          GROUP BY p.point_geom, p.point_pk, d.platform`;
 
+    // At high zoom, render trajectories as their own line source-layer
+    // ('trajectories'), simplified per-zoom and concatenated into the same
+    // tile as the hex/point ('internal-layer-name') layer.
+    const includeTrajLayer = !isHexGrid && includeTrajectories;
+    // Web-Mercator resolution (m/px) at this zoom, ~2px of tolerance — trims
+    // vertices before the 4096-grid quantization without visible distortion.
+    const simplifyTolerance = (156543.03392804097 / Math.pow(2, z)) * 2;
+
+    const trajLayerCTE = includeTrajLayer
+      ? `,
+    traj AS (
+      SELECT t.pk AS pk, d.platform AS platform,
+             array_to_json(array[d.pk_url]) AS datasets,
+             ST_AsMVTGeom(ST_Simplify(t.geom, :simplifyTolerance), te.tile_envelope) AS geom
+      FROM cde.trajectories t
+      JOIN cde.datasets d ON t.dataset_pk = d.pk, te
+      WHERE t.geom && te.tile_envelope
+        ${filters.hasTrajectory ? "AND :trajectoryFilters" : ""}
+    ),
+    traj_mvt AS (
+      SELECT ST_AsMVT(tg.*, 'trajectories', 4096, 'geom') AS bytes
+      FROM (SELECT pk, platform, datasets, geom FROM traj WHERE geom IS NOT NULL) tg
+    )`
+      : "";
+
     // Combine profiles and obis_cells so both appear on the map
     const SQL = `
   with combined as (
@@ -131,14 +173,20 @@ router.get(
       FROM
         relevent_points, te
       WHERE relevent_points.geom && tile_envelope
-    )
-    SELECT ST_AsMVT(mvtgeom.*, 'internal-layer-name', 4096, 'geom') AS st_asmvt from mvtgeom;
+    ),
+    base_mvt AS (
+      SELECT ST_AsMVT(mvtgeom.*, 'internal-layer-name', 4096, 'geom') AS bytes FROM mvtgeom
+    )${trajLayerCTE}
+    SELECT COALESCE((SELECT bytes FROM base_mvt), ''::bytea)
+           ${includeTrajLayer ? "|| COALESCE((SELECT bytes FROM traj_mvt), ''::bytea)" : ""} AS st_asmvt;
   `;
 
     try {
       const q = db.raw(SQL, {
         filters: filters.shared,
         obisFilters: filters.obisOnly,
+        trajectoryFilters: filters.trajectory,
+        simplifyTolerance,
         zoomPKColumn,
         z,
         x,
