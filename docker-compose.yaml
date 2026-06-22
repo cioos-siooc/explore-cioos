@@ -137,6 +137,7 @@ services:
     environment:
       PREFECT_API_URL: http://prefect:4200/api
       PREFECT_LOGGING_LEVEL: INFO
+      HARVEST_CONFIG_FILE: /app/harvester/harvest_config.yaml
       # In-process flows inherit this container's env for DB / redis access.
       DB_HOST_EXTERNAL: db
       REDIS_HOST: redis

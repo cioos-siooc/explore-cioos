@@ -36,6 +36,8 @@ docker compose up harvester
 ```
 *Note: Set `INCREMENTAL_MODE=true` in your `.env` to make the deployment default to incremental harvesting (faster, only updates changed datasets).*
 
+*Note: Set `HARVEST_CONFIG_FILE` to use a different harvest configuration without passing `-f` (e.g. `-e HARVEST_CONFIG_FILE=/app/harvester/custom_config.yaml`); defaults to `harvest_config.yaml`.*
+
 This will register the flow with the Prefect server. You can then trigger runs from the UI or let the schedule take over.
 
 To manually trigger a run:
