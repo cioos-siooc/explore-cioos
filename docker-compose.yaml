@@ -2,8 +2,6 @@ services:
   db:
     build: ./database
     platform: linux/x86_64
-    ports:
-      - "${DB_PORT:-5432}:${DB_PORT:-5432}"
     environment:
       - "PGPORT=${DB_PORT:-5432}"
       - "POSTGRES_DB=$DB_NAME"
@@ -72,8 +70,6 @@ services:
       - downloads:/usr/share/nginx/html/downloads:ro
     depends_on:
       - web-api
-    ports:
-      - "${NGINX_PORT:-4000}:4000"
   scheduler:
     build:
       context: .
@@ -187,8 +183,6 @@ services:
         asyncio.run(ensure_db())
         PY
         exec prefect server start --host 0.0.0.0
-    ports:
-      - "4200:4200"  # Prefect UI + API
     env_file:
       - .env  # DB_USER / DB_PASSWORD / DB_NAME / DB_PORT for the connection URL
     environment:
