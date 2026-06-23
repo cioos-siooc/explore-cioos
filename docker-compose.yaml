@@ -119,12 +119,15 @@ services:
     restart: unless-stopped
     command: ["./worker-entrypoint.sh"]
     volumes:
-      # Harvest config, mounted (not baked at build) so changing which config
-      # the worker uses is a restart, not a rebuild. ${HARVEST_CONFIG_FILE}
-      # selects the host file (e.g. harvest_config.production.yaml); defaults to
-      # the committed sample. The image still ships a baked sample as a fallback
-      # for workers that don't mount one (e.g. remote workers).
-      - ./${HARVEST_CONFIG_FILE:-harvest_config.sample.yaml}:/app/harvester/harvest_config.yaml:ro
+      # Harvest config, mounted to the fixed container path. Coolify rejects
+      # '${...}' in a volume source, so the host file can't be selected via an
+      # env var here; we mount the committed sample (always present on a fresh
+      # checkout — harvest_config.yaml is gitignored). To run a different config
+      # (e.g. harvest_config.production.yaml), override this mount in a compose
+      # override file (docker-compose.override.yaml locally, or the Coolify
+      # override). The image also ships a baked sample as a fallback for workers
+      # that don't mount one (e.g. remote workers).
+      - ./harvest_config.sample.yaml:/app/harvester/harvest_config.yaml:ro
       # Shared output sinks — every replica on this host writes here, and nginx
       # serves harvester_logs read-only at /harvester_logs.
       - harvest_data:/app/harvester/harvest          # resulting CSV files
