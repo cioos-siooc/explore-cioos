@@ -1,0 +1,23 @@
+# Local-dev host port publishing.
+#
+# The base docker-compose.yaml intentionally does NOT publish host ports, so
+# Coolify's single-file deploy (docker compose -f docker-compose.yaml up) routes
+# everything through its proxy without binding/colliding on host ports.
+#
+# For standalone local development, copy this file to docker-compose.override.yaml
+# (gitignored). A bare `docker compose up` auto-loads docker-compose.override.yaml
+# on top of the base, restoring host access to db / nginx / prefect. Coolify never
+# loads it because it deploys with an explicit `-f docker-compose.yaml`.
+#
+#   cp docker-compose.override.yaml.sample docker-compose.override.yaml
+#   docker compose up -d
+services:
+  db:
+    ports:
+      - "${DB_PORT:-5432}:${DB_PORT:-5432}"
+  nginx:
+    ports:
+      - "${NGINX_PORT:-4000}:4000"
+  prefect:
+    ports:
+      - "4200:4200"  # Prefect UI + API
