@@ -26,7 +26,7 @@ incremental: true
 # --- OBIS Configuration ---
 # Path to JSON file containing OBIS dataset UUIDs
 # Format: {"datasets": ["uuid1", "uuid2", ...]}
-# obis_datasets_file: ./Obis_Datasets.json
+obis_datasets_file: ./Obis_Datasets.json
 
 # Or specify individual OBIS dataset IDs inline (for small sets / testing)
 # obis_dataset_ids:
