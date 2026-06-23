@@ -21,3 +21,10 @@ services:
   prefect:
     ports:
       - "4200:4200"  # Prefect UI + API
+  prefect_worker:
+    # Mount your local harvest config so you can edit it without rebuilding the
+    # image. Create it first: `cp harvest_config.sample.yaml harvest_config.yaml`
+    # (harvest_config.yaml is gitignored). Without this mount the worker uses the
+    # config baked into the image.
+    volumes:
+      - ./harvest_config.yaml:/app/harvester/harvest_config.yaml:ro
