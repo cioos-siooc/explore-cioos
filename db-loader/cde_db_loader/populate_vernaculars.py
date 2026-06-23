@@ -578,6 +578,18 @@ def main():
         counts[STATUS_ERROR],
     )
 
+    # Propagate the freshly-populated vernaculars into obis_cells.aphia_ids so
+    # the rank-aware Scientific Name filter works immediately, without waiting
+    # for the next harvest/load. Without this, a first-time vernaculars run
+    # fills scientific_name_vernaculars but leaves every obis_cell's aphia_ids
+    # empty until a subsequent load runs the backfill. Idempotent and cheap:
+    # obis_backfill_aphia_ids() only touches cells whose aphia_ids are still
+    # empty (see 5_profile_process.sql).
+    logger.info("Backfilling obis_cells.aphia_ids from vernaculars")
+    with engine.begin() as conn:
+        backfilled = conn.execute(text("SELECT obis_backfill_aphia_ids()")).scalar()
+    logger.info("Backfilled aphia_ids into %s obis_cells", backfilled)
+
 
 if __name__ == "__main__":
     try:
