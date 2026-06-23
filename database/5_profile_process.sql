@@ -170,11 +170,15 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION obis_link_point_pk() RETURNS bigint AS $$
 DECLARE n bigint;
 BEGIN
+  -- Relink ALL obis_cells by geom, not just rows where point_pk IS NULL.
+  -- profile_process() rebuilds cde.points (DELETE + reinsert with new serial
+  -- pks) on every run, so any incremental harvest of a non-OBIS source orphans
+  -- the existing obis_cells.point_pk. Re-matching every row by geom keeps the
+  -- FK valid (mirrors how profiles are relinked in profile_process()).
   UPDATE cde.obis_cells c
   SET point_pk = p.pk
   FROM cde.points p
-  WHERE p.geom = c.geom
-    AND c.point_pk IS NULL;
+  WHERE p.geom = c.geom;
   GET DIAGNOSTICS n = ROW_COUNT;
   RETURN n;
 END;
