@@ -509,27 +509,77 @@ def cde_pipeline_run(
     pipeline.cde_pipeline()
 
 
+# Poll cadence and tolerance for _trigger_source_harvest's wait loop. We poll the
+# child's terminal state ourselves (rather than letting run_deployment block) so a
+# transient Prefect-API blip while WAITING doesn't masquerade as a harvest failure.
+# Only give up after the API is unreachable for ~this many consecutive polls.
+_POLL_INTERVAL_S = 5
+_MAX_CONSECUTIVE_POLL_FAILURES = 60  # ~5 min of continuous API unavailability
+
+
 @task(name="trigger-source-harvest")
 def _trigger_source_harvest(source: str, triggered_by: str | None = None):
-    """Run the per-source deployment for `source` and wait; return a status dict (never raises)."""
+    """Submit the per-source deployment for `source` and wait for it to finish; return a
+    status dict (never raises).
+
+    Submit and wait are deliberately separated. A failure to SUBMIT is a genuine
+    TRIGGER_ERROR (deployment missing / API down). Once submitted, the child runs
+    independently on the worker, so a transient API error while we poll for its
+    completion is NOT a harvest failure — we log it and keep polling by flow_run id.
+    A naive run_deployment() that blocks-and-polls conflates the two: a 500 during the
+    poll (e.g. shared-Postgres commit timeouts under a 10-source fan-out) would surface
+    as TRIGGER_ERROR even though the child kept running and loaded its data. Note we do
+    NOT use @task(retries=...) for the same reason: a retry would re-submit and spawn a
+    duplicate child harvest."""
+    logger = get_run_logger()
     deployment_name = f"{HARVEST_FLOW_NAME}/cde-harvester-{deployment_slug(source)}"
     params = {"source": source}
     if triggered_by:
         params["triggered_by"] = triggered_by
+
+    # Submit only (timeout=0 returns immediately without waiting). A failure here is a
+    # real trigger error.
     try:
-        flow_run = run_deployment(name=deployment_name, parameters=params)
+        flow_run = run_deployment(name=deployment_name, parameters=params, timeout=0)
     except Exception as e:  # deployment missing / API error — report, don't abort the batch
         return {"source": source, "deployment": deployment_name,
                 "flow_run_id": None, "state": "TRIGGER_ERROR", "error": str(e)}
-    state = flow_run.state
-    return {
-        "source": source,
-        "deployment": deployment_name,
-        "flow_run_id": str(flow_run.id),
-        "flow_run_name": flow_run.name,
-        "state": state.name if state else "UNKNOWN",
-        "completed": bool(state and state.is_completed()),
-    }
+
+    flow_run_id = flow_run.id
+    flow_run_name = flow_run.name
+    base = {"source": source, "deployment": deployment_name,
+            "flow_run_id": str(flow_run_id), "flow_run_name": flow_run_name}
+
+    # Wait for a terminal state, polling by id and tolerating transient read errors.
+    consecutive_failures = 0
+    last_error = None
+    while True:
+        time.sleep(_POLL_INTERVAL_S)
+        try:
+            with get_client(sync_client=True) as client:
+                state = client.read_flow_run(flow_run_id).state
+            consecutive_failures = 0
+        except Exception as e:
+            consecutive_failures += 1
+            last_error = str(e)
+            logger.warning(
+                "Transient error polling %s (%s), attempt %d/%d: %s",
+                source, flow_run_id, consecutive_failures,
+                _MAX_CONSECUTIVE_POLL_FAILURES, last_error,
+            )
+            if consecutive_failures >= _MAX_CONSECUTIVE_POLL_FAILURES:
+                # API unreachable for too long — surface it, but distinct from
+                # TRIGGER_ERROR: the child was submitted and may well have completed.
+                return {**base, "state": "POLL_ERROR", "completed": False,
+                        "error": f"gave up polling after {consecutive_failures} "
+                                 f"consecutive failures: {last_error}"}
+            continue
+
+        if state and state.is_final():
+            return {**base,
+                    "state": state.name,
+                    "completed": state.is_completed(),
+                    "error": None if state.is_completed() else f"final state {state.name}"}
 
 
 @flow(name="Harvest All Sources", log_prints=True)
@@ -565,7 +615,11 @@ def cde_harvest_all_run(
     if failed:
         raise RuntimeError(
             f"{len(failed)}/{len(sources)} per-source harvest job(s) did not complete: "
-            + ", ".join(f"{r['source']}={r['state']}" for r in failed)
+            + ", ".join(
+                f"{r['source']}={r['state']}"
+                + (f" ({r['error']})" if r.get("error") else "")
+                for r in failed
+            )
         )
     logger.info("All %d per-source harvest job(s) completed", len(sources))
 
