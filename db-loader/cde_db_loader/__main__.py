@@ -20,11 +20,20 @@ from prefect import get_run_logger, task
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-# Transaction-scoped advisory lock key. Every db-loader run takes this lock at
-# the top of its transaction so loads run STRICTLY one-at-a-time: a single-source
-# incremental run can never interleave with the nightly full-reload (whose
-# remove_all_data() TRUNCATEs every table), and two incremental loads can't
-# fight over drop/set_constraints + DELETE/INSERT. pg_advisory_xact_lock auto-
+# Transaction-scoped advisory lock key. Loads must run STRICTLY one-at-a-time over
+# the SHARED cde tables: a single-source incremental can never interleave with the
+# nightly full-reload (whose remove_all_data() TRUNCATEs every table), and two
+# incremental loads can't fight over drop/set_constraints + DELETE/INSERT.
+#
+# The lock is NOT taken at the top of the transaction. Incremental loads first
+# populate session-private temp tables (no shared-table contention) WITHOUT the
+# lock, then acquire it only around process_incremental_update() — the phase that
+# actually touches the shared tables. This keeps the lock held for minutes, not the
+# whole bulk upload (~tens of minutes), so concurrent loaders upload in parallel and
+# only serialize on the short processing phase. Full reloads still take the lock for
+# their entire transaction (they TRUNCATE shared tables from the start). A late-
+# acquiring incremental is still correct: the full-reload holds the same lock, so the
+# worst case is the incremental simply waits behind it. pg_advisory_xact_lock auto-
 # releases at COMMIT/ROLLBACK. Arbitrary stable constant ("CDE-LOADER").
 DB_LOADER_ADVISORY_LOCK_KEY = 738825001
 
@@ -282,17 +291,19 @@ def main(folder, incremental=False):
         sys.exit(1)
 
     schema = "cde"
-    with engine.begin() as transaction:
-        # Serialize all loads against each other. Now that single-source
-        # harvests can be triggered on demand, a per-source incremental load
-        # could otherwise land mid-way through the nightly full-reload's
-        # TRUNCATE — catastrophic. This transaction-scoped lock makes concurrent
-        # loaders simply wait here until the one ahead commits/rolls back.
+
+    def acquire_loader_lock():
+        # Transaction-scoped lock that serializes loads over the shared cde tables.
+        # See DB_LOADER_ADVISORY_LOCK_KEY for why this is acquired late (incremental)
+        # vs up-front (full reload). Concurrent loaders simply wait here until the one
+        # ahead commits/rolls back.
         logger.info("Acquiring db-loader advisory lock (serializes concurrent loads)")
         transaction.execute(
             text("SELECT pg_advisory_xact_lock(:k)"),
             {"k": DB_LOADER_ADVISORY_LOCK_KEY},
         )
+
+    with engine.begin() as transaction:
         logger.info("Writing to DB:")
 
         # Pre-fetch scientific_name → aphia_id mappings from existing
@@ -370,6 +381,14 @@ def main(folder, incremental=False):
                     method="multi",
                 )
 
+            # Temp-table uploads above are session-private and contend with nothing,
+            # so they ran lock-free. Take the lock now: process_incremental_update()
+            # is the phase that touches the shared cde tables (drop/set constraints,
+            # DELETE/INSERT) and must not interleave with another load or the
+            # full-reload TRUNCATE. The lock auto-releases at COMMIT, covering the
+            # harvest-audit appends below and the commit itself.
+            acquire_loader_lock()
+
             # Process and UPSERT all data using SQL functions
             with _timed("process_incremental_update", logger):
                 logger.info("Running incremental update")
@@ -379,6 +398,12 @@ def main(folder, incremental=False):
         else:
             # Original full reload logic
             logger.info("Using FULL RELOAD mode - will clear all data")
+
+            # A full reload TRUNCATEs the shared cde tables from the start, so it
+            # must hold the lock for its ENTIRE transaction (unlike the incremental
+            # path, which acquires it late). Take it before the guard read so the
+            # whole reload sees a consistent, serialized view.
+            acquire_loader_lock()
 
             # Full-reload guard (defense-in-depth behind cde_pipeline's
             # force-incremental). Refuse to TRUNCATE when the incoming harvest
