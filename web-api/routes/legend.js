@@ -74,25 +74,60 @@ router.get(
   cache.route(),
   validatorMiddleware(),
   async (req, res, next) => {
-    const filters = createDBFilter(req.query);
-    const hasFilter = filters.toSQL().sql;
+    let filters;
+    try {
+      filters = await createDBFilter(req.query);
+    } catch (err) {
+      if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+      throw err;
+    }
+    const includeObis = req.query.includeObis !== 'false';
+    // Scientific-name filters are OBIS-only: hide profiles when set. An
+    // OBIS-node selection also hides profiles, unless ERDDAP servers are
+    // selected alongside it (combined Source filter — show both, OR'd in
+    // the shared dataset filter).
+    const includeProfiles = !req.query.scientificNames
+      && (!req.query.obisNodes || Boolean(req.query.erddapServers));
+
+    // GROUP BY the hex FK (integer) instead of the polygon geom; the polygon
+    // lives on cde.hexes_zoom_0/1 and isn't needed here — only distinct
+    // point counts per bucket.
+    const profilesBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, days as record_count,
+               time_min, time_max, latitude, longitude, depth_min, depth_max
+        FROM cde.profiles`;
+    const obisBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk,
+               date_part('days', time_max - time_min) + 1 as record_count,
+               time_min, time_max, latitude, longitude, depth_min, depth_max
+        FROM cde.obis_cells
+        WHERE :obisFilters`;
+
+    const branches = [];
+    if (includeProfiles) branches.push(profilesBranch);
+    if (includeObis) branches.push(obisBranch);
+    const combinedInner = branches.length
+      ? branches.join("\n        UNION ALL\n        ")
+      : `${profilesBranch} WHERE FALSE`;
+
     const sql = `
-        WITH records AS (
-        SELECT hex_zoom_0, hex_zoom_1, point_pk, days
-        FROM cde.profiles p
+        WITH combined AS (
+        ${combinedInner}
+        ),
+        records AS (
+        SELECT hex_0_pk, hex_1_pk, point_pk, record_count as days
+        FROM combined p
         JOIN cde.datasets d
         ON p.dataset_pk = d.pk
-        ${hasFilter ? "WHERE :filters" : ""}
+        ${filters.hasShared ? "WHERE :filters" : ""}
         ),
 
-        sub1 AS (SELECT json_build_array(min(count),max(count)) zoom0 FROM (SELECT count(distinct records.point_pk) count FROM records GROUP BY hex_zoom_0) s),
-        sub2 AS (SELECT json_build_array(min(count),max(count)) zoom1 FROM (SELECT count(distinct records.point_pk) count FROM records GROUP BY hex_zoom_1) s),
+        sub1 AS (SELECT json_build_array(min(count),max(count)) zoom0 FROM (SELECT count(distinct records.point_pk) count FROM records GROUP BY hex_0_pk) s),
+        sub2 AS (SELECT json_build_array(min(count),max(count)) zoom1 FROM (SELECT count(distinct records.point_pk) count FROM records GROUP BY hex_1_pk) s),
         sub3 AS (SELECT json_build_array(min(count),max(count)) zoom2 FROM (SELECT count(distinct records.point_pk) count FROM records GROUP BY point_pk) s)
-        
+
         SELECT * from sub1,sub2,sub3
         `;
 
-    const rows = await db.raw(sql, { filters });
+    const rows = await db.raw(sql, { filters: filters.shared, obisFilters: filters.obisOnly });
 
     res.send(rows && { recordsCount: rows.rows[0] });
   },

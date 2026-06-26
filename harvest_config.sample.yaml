@@ -11,8 +11,39 @@ folder:
 
 # use to test select datasets, eg: dataset_one,dataset_two
 dataset_ids:
-  - ECCC_MSC_BUOYS
-  - DFO_MEDS_BUOYS
+#  - ECCC_MSC_BUOYS
+#  - DFO_MEDS_BUOYS
 
 # defaults to false
 log_time:
+
+# defaults to false
+flush_redis: false
+
+# defaults to false
+incremental: true
+
+# --- OBIS Configuration ---
+# Path to JSON file containing OBIS dataset UUIDs
+# Format: {"datasets": ["uuid1", "uuid2", ...]}
+obis_datasets_file: ./Obis_Datasets.json
+
+# Or specify individual OBIS dataset IDs inline (for small sets / testing)
+# obis_dataset_ids:
+#   - 4b5e4ccb-cf66-44e4-8890-fa68f8404c3f
+
+# Cache folder for OBIS occurrence and metadata data
+# Defaults to obis_cache/ next to the output folder
+# obis_folder: ./obis_cache
+
+# Geographic filter for OBIS occurrences. Defaults to canada (only ingest
+# occurrences inside Canadian EEZ + Canadian land territory). Datasets
+# contributed via the OBIS Canada or OTN-OBIS regional nodes are exempt
+# and harvested in their entirety. Set mode to 'none' to disable.
+# obis_geo_filter:
+#   mode: canada
+#   polygon_file:
+#   exempt_node_ids:
+#     - 7dfb2d90-9317-434d-8d4e-64adf324579a   # OBIS Canada
+#     - 68f83ea7-69a7-44fd-be77-3c3afd6f3cf8   # OTN-OBIS
+

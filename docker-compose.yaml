@@ -1,9 +1,7 @@
 services:
   db:
-    image: "postgis/postgis:13-3.1-alpine"
+    build: ./database
     platform: linux/x86_64
-    ports:
-      - "${DB_PORT:-5432}:${DB_PORT:-5432}"
     environment:
       - "PGPORT=${DB_PORT:-5432}"
       - "POSTGRES_DB=$DB_NAME"
@@ -11,12 +9,57 @@ services:
       - "POSTGRES_USER=$DB_USER"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./database:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD", "pg_isready", "-q", "-d", "${DB_NAME}", "-U", "${DB_USER}"]
+      # Probe over TCP (-h 127.0.0.1), NOT the default Unix socket. On a fresh
+      # volume the entrypoint runs initdb + /docker-entrypoint-initdb.d/*.sql
+      # behind a temporary server that listens on the local socket ONLY, so a
+      # socket-based pg_isready reports "healthy" while TCP 5432 still refuses
+      # connections. Dependents (prefect, db_migrate, web-api) then connect over
+      # TCP too early and crash with ConnectionRefused. Forcing TCP here keeps
+      # service_healthy false until the real server is actually accepting TCP.
+      test: ["CMD", "pg_isready", "-q", "-d", "${DB_NAME}", "-U", "${DB_USER}", "-h", "127.0.0.1", "-p", "${DB_PORT:-5432}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      # Fresh-volume init runs initdb + PostGIS + all init scripts behind a
+      # socket-only temp server; measured ~134s to TCP-ready on slow disk. Keep
+      # the grace well above that so expected early failures don't mark unhealthy.
+      start_period: 180s
+
+  # One-shot: applies database/migrations/*.sql to the live DB before any other
+  # service reads or writes it. Postgres only runs database/*.sql on a FRESH
+  # volume (docker-entrypoint-initdb.d), so schema changes added to 1_schema.sql
+  # never reach an existing volume on their own — this closes that gap. The
+  # migrations are idempotent (ADD COLUMN IF NOT EXISTS ...), so applying them on
+  # every `up` is safe. Exits cleanly once done (shows as "Exited (0)").
+  db_migrate:
+    image: postgres:13-alpine
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      PGHOST: db
+      PGPORT: ${DB_PORT:-5432}
+      PGUSER: $DB_USER
+      PGPASSWORD: $DB_PASSWORD
+      PGDATABASE: $DB_NAME
+    volumes:
+      - ./database/migrations:/migrations:ro
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        applied=0
+        for f in /migrations/*.sql; do
+          [ -e "$$f" ] || continue
+          echo "Applying migration: $$f"
+          psql -v ON_ERROR_STOP=1 -f "$$f"
+          applied=$$((applied+1))
+        done
+        echo "Migrations applied: $$applied"
+
   web-api:
     build: ./web-api
     restart: always
@@ -25,54 +68,185 @@ services:
     expose:
       - "5000"
     depends_on:
-      - db
+      db_migrate:
+        condition: service_completed_successfully
   nginx:
-    image: nginx:latest
+    build:
+        context: ./nginx
+        dockerfile: Dockerfile
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./harvester_logs:/usr/share/nginx/html/harvester_logs:ro
-      - ./downloads:/usr/share/nginx/html/downloads:ro
+      - nginx_logs:/var/log/nginx
+      - nginx_logrotate:/var/lib/logrotate
+      - harvester_logs:/usr/share/nginx/html/harvester_logs:ro
+      - downloads:/usr/share/nginx/html/downloads:ro
     depends_on:
       - web-api
-    ports:
-      - "$NGINX_PORT:4000"
   scheduler:
     build:
       context: .
       dockerfile: ./download_scheduler/Dockerfile
+    profiles:
+      - tools
     depends_on:
-      - db
+      db_migrate:
+        condition: service_completed_successfully
     env_file:
       - .env
+    environment:
+      - "DOWNLOAD_WAF_URL=${APP_DOMAIN}/downloads"
     volumes:
-      - ./downloads:/usr/src/app/download_scheduler/downloads
+      - downloads:/usr/src/app/download_scheduler/downloads
   frontend:
     build:
       context: ./frontend
       args:
-        API_URL: $API_URL
-        BASE_URL: $BASE_URL
+        # Default to a same-origin relative path so the SPA works on whatever
+        # public hostname serves it without a rebuild.
+        API_URL: ${API_URL:-/api}
+        BASE_URL: ${BASE_URL:-/}
     expose:
       - "80"
-    # depends_on:
-    #   - web-api
-
-  harvester:
+  # Prefect PROCESS worker: runs harvest flows in-process (no spawned flow-run
+  # containers, no docker socket). On startup it registers the work pool +
+  # deployments (REGISTER_DEPLOYMENTS=true), optionally fires one harvest
+  # (RUN_ON_DEPLOY), then polls the cde-process-pool. Scale with:
+  #   docker compose up -d --scale prefect_worker=N
+  # (registration is idempotent + best-effort, so extra replicas are safe).
+  # To run a worker on another host, see docker-compose.worker.yaml.
+  prefect_worker:
     build:
       context: .
       dockerfile: ./harvester/Dockerfile
-    profiles:
-      - tools
+    image: cde-harvester:latest
+    depends_on:
+      prefect:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    command: ["./worker-entrypoint.sh"]
     volumes:
-      - ./harvest_config.yaml:/app/harvester/harvest_config.yaml
-      - ./harvester_cache:/app/harvester/harvester_cache
-      - ./harvest:/app/harvester/harvest
-      - ./harvester_logs:/app/harvester/logs
-    environment:
-      - "HARVESTER_LOG_DIR=/app/harvester/logs"
-      - "HARVEST_CONFIG_FILE=/app/harvester/harvest_config.yaml"
+      # NOTE: the harvest config is NOT bind-mounted here. The image bakes
+      # harvest_config.yaml (from harvest_config.sample.yaml; see harvester
+      # Dockerfile), and the worker reads that baked file. A relative bind-mount
+      # of a repo file doesn't work under Coolify (it resolves the source to an
+      # empty persistent-storage dir and fails "mount dir onto file"). To run a
+      # custom config: locally, mount it via docker-compose.override.yaml (see
+      # docker-compose.override.yaml.sample); under Coolify, use a Persistent
+      # Storage file mount onto /app/harvester/harvest_config.yaml, or bake a
+      # different config into the image.
+      # Shared output sinks — every replica on this host writes here, and nginx
+      # serves harvester_logs read-only at /harvester_logs.
+      - harvest_data:/app/harvester/harvest          # resulting CSV files
+      - harvester_logs:/app/harvester/logs           # log files
+      # Caches persisted across runs (cheap re-fetch if lost).
+      - harvester_cache:/app/harvester/harvester_cache
+      - obis_cache:/app/harvester/obis_cache
     env_file:
       - .env
+    environment:
+      PREFECT_API_URL: http://prefect:4200/api
+      PREFECT_LOGGING_LEVEL: INFO
+      HARVEST_CONFIG_FILE: /app/harvester/harvest_config.yaml
+      # In-process flows inherit this container's env for DB / redis access.
+      DB_HOST_EXTERNAL: db
+      REDIS_HOST: redis
+      HARVESTER_LOG_DIR: /app/harvester/logs
+      # Surface stdlib-logging from harvester/db-loader in Prefect UI logs.
+      PREFECT_LOGGING_EXTRA_LOGGERS: populate_vernaculars,cde_db_loader,cde_harvester
+      # This worker registers the pool + deployments on startup.
+      REGISTER_DEPLOYMENTS: "true"
+      # Optional: fire one full harvest immediately on (re)deploy. Off by default.
+      RUN_ON_DEPLOY: ${RUN_ON_DEPLOY:-false}
+
+  prefect:
+    # Non-conda image: ships asyncpg, so Prefect can use Postgres as its
+    # metadata DB. SQLite (the default) throws "database is locked" under the
+    # concurrent access from scaled / remote workers — Postgres handles it.
+    image: prefecthq/prefect:3.6-python3.12
+    # On startup, create the dedicated `prefect` database in the shared `db`
+    # Postgres if it doesn't exist (idempotent; works on fresh AND existing
+    # volumes, including Coolify where initdb scripts won't re-run), then start
+    # the server. Prefect runs its own schema migrations against it.
+    command:
+      - sh
+      - -c
+      - |
+        python - <<'PY'
+        import asyncio, os, asyncpg
+        async def ensure_db():
+            # Wait for Postgres to accept TCP before starting the server. On a
+            # FRESH volume the db entrypoint runs initdb + the init *.sql scripts
+            # behind a temporary server bound to the local Unix socket ONLY, so
+            # pg_isready / the db healthcheck can report ready while TCP 5432 is
+            # still refusing connections. Connecting (or running Alembic) in that
+            # window dies with ConnectionRefused, so retry until TCP is truly up.
+            last = None
+            for attempt in range(1, 151):
+                try:
+                    conn = await asyncpg.connect(
+                        host="db", port=int(os.environ.get("DB_PORT", "5432")),
+                        user=os.environ["DB_USER"], password=os.environ["DB_PASSWORD"],
+                        database=os.environ["DB_NAME"],
+                    )
+                except (OSError, asyncpg.PostgresError) as e:
+                    last = e
+                    print(f"[prefect-init] db not ready over TCP (attempt {attempt}/150): {e!r}", flush=True)
+                    await asyncio.sleep(2)
+                    continue
+                try:
+                    if not await conn.fetchval("SELECT 1 FROM pg_database WHERE datname='prefect'"):
+                        await conn.execute("CREATE DATABASE prefect")
+                        print("[prefect-init] created 'prefect' database", flush=True)
+                    else:
+                        print("[prefect-init] 'prefect' database already exists", flush=True)
+                    return
+                finally:
+                    await conn.close()
+            raise SystemExit(f"[prefect-init] FATAL: db never became reachable over TCP: {last!r}")
+        asyncio.run(ensure_db())
+        PY
+        exec prefect server start --host 0.0.0.0
+    env_file:
+      - .env  # DB_USER / DB_PASSWORD / DB_NAME / DB_PORT for the connection URL
+    environment:
+      # Use the shared Postgres (db service), isolated in its own `prefect` DB.
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT:-5432}/prefect
+      PREFECT_API_URL: http://127.0.0.1:4200/api
+      # Tell the UI's JavaScript to make API calls same-origin (i.e., through
+      # whatever proxy/domain the user is reaching the UI from). Without this,
+      # the UI tries to hit PREFECT_API_URL directly from the browser, which
+      # points at the container's own loopback and fails silently. Relative
+      # path works on local + remote Coolify without knowing the FQDN.
+      PREFECT_UI_API_URL: /api
+      PREFECT_UI_URL: http://localhost:4200
+      PREFECT_HOME: /root/.prefect
+    volumes:
+      - prefect_data:/root/.prefect
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4200/api/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    expose:
+      - "6379"
+
 
 volumes:
   postgres-data:
+  prefect_data:
+  nginx_logs:
+  nginx_logrotate:
+  harvester_logs:
+  downloads:
+  harvester_cache:
+  harvest_data:
+  obis_cache:

@@ -15,9 +15,23 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # 3. Copy source code
 COPY ./harvester/cde_harvester ./cde_harvester
 COPY ./harvester/run.sh ./run.sh
+COPY ./harvester/worker-entrypoint.sh ./worker-entrypoint.sh
+
+# Bake a harvest config and the OBIS dataset list so the image is self-contained
+# (a worker that doesn't mount a config — e.g. a remote worker, or any Coolify
+# compose deploy where host bind-mounts of repo files don't work — still has a
+# working config). BAKED_HARVEST_CONFIG selects WHICH committed config to bake;
+# it defaults to the sample for local/dev builds. Deployments that want the full
+# production set point it at harvest_config.production.yaml via a build arg (e.g.
+# a Coolify "build variable"). This is build-time only and is distinct from the
+# runtime HARVEST_CONFIG_FILE env var the harvester reads.
+ARG BAKED_HARVEST_CONFIG=harvest_config.sample.yaml
+COPY ./${BAKED_HARVEST_CONFIG} ./harvest_config.yaml
+COPY ./Obis_Datasets.json ./Obis_Datasets.json
 
 # 4. Install project itself
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked || (echo "Lock mismatch final stage, aborting" && exit 1)
 
-CMD ["sh","run.sh"]
+#CMD ["sh","run.sh"]
+CMD ["uv", "run", "python", "-m", "cde_harvester.prefect_pipeline", "-f", "harvest_config.yaml"]

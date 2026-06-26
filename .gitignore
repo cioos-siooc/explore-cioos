@@ -12,6 +12,7 @@ cde_download*
 venv
 *.rdb
 *.env
+docker-compose.override.yaml
 .ipynb_checkpoints
 *.ipynb
 harvester_cache
@@ -30,5 +31,9 @@ out1
 log
 
 most_common_queries
-harvester_logs
+
+nginx/logs/
+nginx/logrotate_state/
 nginx/logs/*.log
+harvester_logs
+obis/
