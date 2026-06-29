@@ -36,9 +36,7 @@ export function generateMultipleSelectBadgeTitle (badgeTitle, optionsSelected) {
         oceanVariablesFiltername: 'oceanVariablesMulti',
         platformsFilterName: 'platformsMulti',
         organizationFilterName: 'organizationMulti',
-        datasetsFilterName: 'datasetsMulti',
-        obisNodesFilterName: 'obisNodesMulti',
-        erddapServersFilterName: 'erddapServersMulti'
+        datasetsFilterName: 'datasetsMulti'
       }
       return optionsSelectedFiltered.length + t(mapping[badgeTitle])
     }
@@ -138,30 +136,45 @@ export function createDataFilterQueryString(query) {
       .map((org) => org.pk) // getting the pks of the selected organizations using the orgs title to access the pk
       .join() // create the comma delimited list of org pks
   }
-  const { startDepth, endDepth, startDate, endDate, showObis } = queryWithoutDefaults
+  const { startDepth, endDepth, startDate, endDate } = queryWithoutDefaults
 
   const scientificNames = (scientificNamesSelected && scientificNamesSelected.length)
     ? scientificNamesSelected.map(encodeURIComponent).join(',')
     : ''
 
-  // obisNodes uses the MultiCheckboxFilter shape (array of {title,isSelected,pk});
-  // emit only when not all-deselected, comma-joined node names.
-  let obisNodes = ''
-  if (obisNodesSelected && obisNodesSelected.length) {
-    const picked = obisNodesSelected.filter((n) => n.isSelected).map((n) => n.title)
-    if (picked.length && picked.length < obisNodesSelected.length) {
-      obisNodes = picked.map(encodeURIComponent).join(',')
-    }
-  }
+  // Combined "Data Source" filter (ERDDAP servers + OBIS nodes). No selection
+  // — or everything selected — means no source filtering. A server-only
+  // selection hides OBIS via includeObis=false; node names are always emitted
+  // when any node is picked (even all of them) because their presence is what
+  // tells the API to keep OBIS rows while servers are also filtered, and to
+  // hide ERDDAP profiles when no servers are selected.
+  const selectedServers = (erddapServersSelected || []).filter((s) => s.isSelected)
+  const selectedNodes = (obisNodesSelected || []).filter((n) => n.isSelected)
+  const allServersSelected =
+    erddapServersSelected?.length > 0 &&
+    selectedServers.length === erddapServersSelected.length
+  const allNodesSelected =
+    obisNodesSelected?.length > 0 &&
+    selectedNodes.length === obisNodesSelected.length
 
-  let erddapServers
-  if (erddapServersSelected?.every((e) => e.isSelected)) {
-    erddapServers = ''
-  } else {
-    erddapServers = erddapServersSelected
-      ?.filter((server) => server.isSelected)
-      .map((server) => server.url)
-      .join()
+  let erddapServers = ''
+  let obisNodes = ''
+  let includeObis = ''
+  const sourceFilterActive =
+    (selectedServers.length > 0 || selectedNodes.length > 0) &&
+    !(allServersSelected && allNodesSelected)
+  if (sourceFilterActive) {
+    if (selectedNodes.length > 0) {
+      obisNodes = selectedNodes.map((n) => encodeURIComponent(n.title)).join(',')
+      if (selectedServers.length > 0) {
+        erddapServers = selectedServers.map((s) => s.url).join()
+      }
+    } else {
+      includeObis = 'false'
+      if (!allServersSelected) {
+        erddapServers = selectedServers.map((s) => s.url).join()
+      }
+    }
   }
 
   const apiMappedQuery = {
@@ -175,7 +188,7 @@ export function createDataFilterQueryString(query) {
     timeMax: endDate,
     depthMin: startDepth,
     depthMax: endDepth,
-    includeObis: showObis === false ? 'false' : '',
+    includeObis,
     scientificNames,
     obisNodes
   }

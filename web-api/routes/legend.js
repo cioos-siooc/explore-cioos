@@ -82,9 +82,12 @@ router.get(
       throw err;
     }
     const includeObis = req.query.includeObis !== 'false';
-    // Scientific-name and OBIS-node filters are OBIS-only: when either is
-    // set, hide profiles and narrow to OBIS rows.
-    const includeProfiles = !req.query.scientificNames && !req.query.obisNodes;
+    // Scientific-name filters are OBIS-only: hide profiles when set. An
+    // OBIS-node selection also hides profiles, unless ERDDAP servers are
+    // selected alongside it (combined Source filter — show both, OR'd in
+    // the shared dataset filter).
+    const includeProfiles = !req.query.scientificNames
+      && (!req.query.obisNodes || Boolean(req.query.erddapServers));
 
     // GROUP BY the hex FK (integer) instead of the polygon geom; the polygon
     // lives on cde.hexes_zoom_0/1 and isn't needed here — only distinct

@@ -8,7 +8,6 @@ export const defaultEndDate = new Date().toISOString().split('T')[0]
 export const defaultStartDepth = 0
 export const defaultEndDepth = 12000
 
-export const defaultShowObis = true
 export const defaultScientificNamesSelected = []
 export const defaultObisNodesSelected = []
 
@@ -17,7 +16,6 @@ export const defaultQuery = {
   endDate: defaultEndDate,
   startDepth: defaultStartDepth,
   endDepth: defaultEndDepth,
-  showObis: defaultShowObis,
   scientificNamesSelected: defaultScientificNamesSelected,
   obisNodesSelected: defaultObisNodesSelected
 }

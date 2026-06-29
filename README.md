@@ -36,6 +36,8 @@ docker compose up harvester
 ```
 *Note: Set `INCREMENTAL_MODE=true` in your `.env` to make the deployment default to incremental harvesting (faster, only updates changed datasets).*
 
+*Note: Set `HARVEST_CONFIG_FILE` to use a different harvest configuration without passing `-f` (e.g. `-e HARVEST_CONFIG_FILE=/app/harvester/custom_config.yaml`); defaults to `harvest_config.yaml`.*
+
 This will register the flow with the Prefect server. You can then trigger runs from the UI or let the schedule take over.
 
 To manually trigger a run:
@@ -147,6 +149,10 @@ For complete local development with all services running outside Docker (advance
    ```
 
 8. See website at <http://localhost:8000>
+
+## CI/CD
+
+Pushes to `master` and `development` automatically deploy to the corresponding environment via the [Deploy workflow](.github/workflows/deploy.yml). The workflow connects to the remote server over WireGuard VPN, syncs the repository to the exact commit that triggered the run, injects secrets from 1Password, and brings up the Docker Compose stack.
 
 ## Production deployment
 

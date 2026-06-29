@@ -11,6 +11,7 @@ import diskcache as dc
 import pandas as pd
 import requests
 from prefect import get_run_logger, task
+from prefect.cache_policies import NO_CACHE
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -74,7 +75,10 @@ class ERDDAP(object):
         self.host_slug = self.domain.lower().replace(".", "-")  # for the task run label
         self.session = _build_retry_session()
 
-        self.logger = get_run_logger()
+        try:
+            self.logger = get_run_logger()
+        except Exception:
+            self.logger = logging.getLogger(self.__class__.__name__)
         self.df_all_datasets = None
         logger = self.logger
 
@@ -88,7 +92,7 @@ class ERDDAP(object):
             logger.warning("URL doesn't end in /erddap, trying anyway")
         # df_all_datasets is fetched lazily by the caller via get_all_datasets().
 
-    @task(task_run_name="list-datasets-{self.host_slug}")
+    @task(task_run_name="list-datasets-{self.host_slug}", cache_policy=NO_CACHE)
     def get_all_datasets(self):
         """Request the ERDDAP allDatasets list (its own @task for UI visibility)."""
         # allDatasets indexes table and grid datasets
