@@ -29,6 +29,15 @@ from conftest import (
     _route_erddap_url,
 )
 
+from cde_harvester.base_harvester import HarvestResult
+from cde_harvester.erddap_harvester import harvest_erddap
+from cde_harvester.__main__ import (
+    get_ckan_records,
+    main as harvester_main,
+    merge_and_write_csvs,
+)
+from cde_db_loader.__main__ import main as db_main
+
 
 # ---------------------------------------------------------------------------
 # Session-level mock for all ERDDAP HTTP calls
@@ -69,8 +78,6 @@ def harvest_result(tmp_path_factory):
         mock_session = MagicMock()
         mock_session.get.side_effect = _erddap_session_get
         mock_session_cls.return_value = mock_session
-
-        from cde_harvester.erddap_harvester import harvest_erddap
 
         result = harvest_erddap.fn(ERDDAP_URL, limit_dataset_ids=[DATASET_ID])
 
@@ -123,6 +130,27 @@ class TestHarvestOutput:
 # Step 4: CSV writing phase
 # ---------------------------------------------------------------------------
 
+def _submit_without_flow(task, *, as_future=False):
+    """Stand-in for Prefect ``Task.submit()`` with no flow context.
+
+    main() is a plain function (the flattened pipeline runs every step under the
+    single cde_pipeline_run @flow), but it still ``.submit()``s its tasks — which
+    needs a task runner that only a flow context provides. Rather than stand up a
+    flow just for the test, run the task's wrapped ``.fn`` synchronously here.
+    The Prefect-only ``wait_for`` kwarg is stripped. ``as_future=True`` wraps the
+    result so the caller's ``.submit(...).result()`` still works.
+    """
+    def _submit(*args, wait_for=None, **kwargs):
+        value = task.fn(*args, **kwargs)
+        if not as_future:
+            return value
+        future = MagicMock()
+        future.result.return_value = value
+        return future
+
+    return _submit
+
+
 @pytest.fixture(scope="module")
 def written_csv_folder(tmp_path_factory, harvest_result):
     """
@@ -132,6 +160,8 @@ def written_csv_folder(tmp_path_factory, harvest_result):
     Patches:
       - harvest_erddap.submit → returns a synchronous mock future holding
         the pre-collected HarvestResult so main() doesn't re-harvest
+      - get_ckan_records.submit / merge_and_write_csvs.submit → run their
+        wrapped fns synchronously (no flow context / task runner needed)
       - get_run_logger → stdlib logger (no Prefect context needed)
       - CKAN requests → fixture data
     """
@@ -139,7 +169,6 @@ def written_csv_folder(tmp_path_factory, harvest_result):
     tmp = tmp_path_factory.mktemp("csv_phase")
     folder = str(tmp)
 
-    from cde_harvester.base_harvester import HarvestResult
     hr = HarvestResult(profiles=profiles, datasets=datasets,
                        variables=variables, skipped=skipped)
 
@@ -161,6 +190,17 @@ def written_csv_folder(tmp_path_factory, harvest_result):
         patch(
             "cde_harvester.__main__.harvest_erddap"
         ) as mock_harvest_task,
+        # get_ckan_records feeds a real DataFrame into merge; merge writes the
+        # CSVs the assertions read. Run both synchronously so the test drives the
+        # real merge + CSV-write logic without a flow context.
+        patch.object(
+            get_ckan_records, "submit", _submit_without_flow(get_ckan_records)
+        ),
+        patch.object(
+            merge_and_write_csvs,
+            "submit",
+            _submit_without_flow(merge_and_write_csvs, as_future=True),
+        ),
     ):
         mock_session = MagicMock()
         mock_session.get.side_effect = _erddap_session_get
@@ -172,10 +212,10 @@ def written_csv_folder(tmp_path_factory, harvest_result):
 
         mock_harvest_task.submit.return_value = mock_future
 
-        from cde_harvester.__main__ import main as harvester_main
-
-        # main() is now a plain function wrapped by @monitor (Sentry), not a
-        # Prefect @flow, so call it directly rather than via .fn().
+        # main() is a plain function (flattened pipeline: cde_pipeline_run is
+        # the only @flow). The .submit()ed tasks below need a task runner, which
+        # only a flow context provides — so run their wrapped fns synchronously
+        # via the patches above instead of standing up a flow just for the test.
         harvester_main(
             erddap_urls=ERDDAP_URL,
             cache_requests=False,
@@ -260,8 +300,6 @@ def db_load_calls(written_csv_folder):
             },
         ),
     ):
-        from cde_db_loader.__main__ import main as db_main
-
         db_main.fn(written_csv_folder, incremental=False)
 
     return sql_calls

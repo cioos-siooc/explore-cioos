@@ -42,6 +42,10 @@ def _make_erddap_mock(datasets: list[tuple], domain: str = "test.erddap.com"):
     # reading a pre-set df_all_datasets attribute, so stub the call too.
     mock_erddap.get_all_datasets.return_value = df
     mock_erddap.get_logger.return_value = __import__("logging").getLogger("test")
+    # Caching: harvest_dataset() unpacks get_croissant_fingerprint() into
+    # (content_hash, has_files, reason). Stub it so the bare MagicMock doesn't
+    # unpack to 0 values; has_files=False means skip_unchanged never triggers.
+    mock_erddap.get_croissant_fingerprint.return_value = (None, False, None)
     return mock_erddap
 
 
