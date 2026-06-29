@@ -1,6 +1,7 @@
 body {
-  font-family: "Montserrat", Sans-serif;
-  line-height: 21pt;
+  font-family: var(--cioos-font-body);
+  line-height: 1.5;
+  color: var(--cioos-ink);
 }
 
 .mapboxgl-ctrl-group>button {
@@ -22,11 +23,11 @@ body {
   top: 10px;
   right: 10px;
   background-image: url(./Images/NationalLogoEnglish.png);
-  background-color: #fff;
+  background-color: var(--cioos-white);
   background-repeat: no-repeat;
   background-size: contain;
-  border-radius: 10px;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  border-radius: var(--cioos-radius);
+  box-shadow: var(--cioos-shadow-card);
 }
 
 .logo.french {
@@ -38,16 +39,15 @@ body {
   top: 10px;
   right: 10px;
   background-image: url(./Images/NationalLogoFrench.png);
-  background-color: #fff;
+  background-color: var(--cioos-white);
   background-repeat: no-repeat;
   background-size: contain;
-  border-radius: 10px;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  border-radius: var(--cioos-radius);
+  box-shadow: var(--cioos-shadow-card);
 }
 
 .logo:hover {
-  background-color: #f3f3f3;
-  /* border: 2px solid lightgray; */
+  background-color: var(--cioos-surface-2);
 }
 
 .emailAddress {
@@ -62,16 +62,16 @@ body {
   bottom: 240px;
   width: 42px;
   height: 42px;
-  border-radius: 4px 4px 0px 0px;
+  border-radius: var(--cioos-radius) var(--cioos-radius) 0px 0px;
   border: 0px;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
-  background-color: #fff;
+  box-shadow: var(--cioos-shadow-card);
+  background-color: var(--cioos-white);
   padding: 5px;
   z-index: 2;
 }
 
 .boxQueryButton.active {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
 }
 
 .rectangleIcon {
@@ -84,11 +84,11 @@ body {
 }
 
 .boxQueryButton:hover {
-  background-color: #f3f3f3;
+  background-color: var(--cioos-surface-2);
 }
 
 .mapboxgl-ctrl-group {
-  border-radius: 0px 0px 4px 4px;
+  border-radius: 0px 0px var(--cioos-radius) var(--cioos-radius);
 }
 
 
@@ -128,7 +128,7 @@ body {
 }
 
 .resetFiltersButton:hover {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
 }
 
 .resetFiltersButton {

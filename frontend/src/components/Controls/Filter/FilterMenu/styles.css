@@ -1,0 +1,290 @@
+/* ------------------------------------------------------------------
+ * FilterMenu — single launcher that holds every filter, grouped into
+ * labelled subgroups. The launcher button lives in the toolbar; the panel
+ * drops below it and each filter opens its options as a side flyout.
+ * ------------------------------------------------------------------ */
+
+.filterMenu {
+  pointer-events: none;
+  position: relative;
+  /* Clear the sidebar grip handle, which protrudes ~22px (26px on hover) past
+     the panel's right edge into the start of the control column. */
+  margin-left: 38px;
+}
+
+/* The toolbar row: launcher button, the active-filter bullets, and reset all
+   sit on one line and wrap together when there are many active filters. */
+.filterMenuBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* --- Launcher button --- */
+.filterMenuButton {
+  pointer-events: all;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  box-shadow: var(--cioos-shadow-card);
+  color: var(--cioos-ink);
+  font: inherit;
+  font-weight: 600;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.filterMenuButton > svg {
+  color: var(--cioos-primary);
+}
+
+.filterMenuButton:hover {
+  background-color: var(--cioos-surface-2);
+  border-color: var(--cioos-primary);
+}
+
+/* Open or with active filters: brand-teal fill so it's clear filters are in
+   play even when the panel is closed. */
+.filterMenuButton.active,
+.filterMenuButton.open {
+  background-color: var(--cioos-teal-light);
+  border-color: var(--cioos-primary);
+}
+
+/* --- Active-filter bullets ---
+ * One group per active filter category. The group's label clears the whole
+ * filter; each value chip inside clears just that value. */
+.activeFilterBullets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  /* The list track itself is inert so the map stays grabbable between chips;
+     the groups re-enable pointer events. */
+  pointer-events: none;
+}
+
+.activeFilterGroup {
+  pointer-events: all;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  box-shadow: var(--cioos-shadow-card);
+  padding: 3px 6px 3px 4px;
+}
+
+/* The category label is the "delete the whole badge" control. It turns red on
+   hover to signal it clears the whole filter. */
+.activeFilterGroupLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  border-radius: var(--cioos-radius-pill);
+  padding: 2px 6px 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cioos-ink);
+  cursor: pointer;
+}
+
+.activeFilterGroupLabel:hover {
+  color: var(--cioos-error);
+}
+
+/* A single applied value, removable on its own. */
+.activeFilterItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 170px;
+  background-color: var(--cioos-teal-light);
+  border-radius: var(--cioos-radius-pill);
+  padding: 2px 2px 2px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cioos-ink);
+}
+
+.activeFilterItemLabel {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activeFilterItemRemove {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.activeFilterItemRemove:hover {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
+}
+
+/* --- Dropdown panel --- */
+.filterMenuPanel {
+  pointer-events: all;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 11;
+  width: 280px;
+  max-width: calc(100vw - 20px);
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-lg);
+  box-shadow: var(--cioos-shadow-float);
+  /* Must not clip the side flyouts. The filter set is small and fixed, so the
+     panel grows to fit rather than scrolling (a scrolling axis would force the
+     cross-axis to clip and cut the flyouts off). */
+  overflow: visible;
+}
+
+.filterMenuPanelBody {
+  padding: 10px;
+  overflow: visible;
+}
+
+/* --- Subgroups --- */
+.filterSection + .filterSection {
+  margin-top: 6px;
+  border-top: 1px solid var(--cioos-hairline);
+  padding-top: 6px;
+}
+
+.filterSectionHeading {
+  font-family: var(--cioos-font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cioos-ink-60);
+  padding: 6px 10px 4px;
+}
+
+.filterSectionItems {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* --- Reset (sits in the toolbar, after the bullets) ---
+ * Deliberately subtle: a small muted text link, not a button, so it stays out
+ * of the way of the active-filter bullets. */
+.filterMenuReset {
+  pointer-events: all;
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s ease;
+}
+
+.filterMenuReset:hover:not(:disabled) {
+  color: var(--cioos-error);
+}
+
+.filterMenuReset:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ------------------------------------------------------------------
+ * In-menu overrides: each filter becomes a full-width row, and its options
+ * open as a flyout to the right of the panel instead of a pill dropdown.
+ * Scoped to .filterMenuPanel so the standalone Filter styles are untouched.
+ * ------------------------------------------------------------------ */
+.filterMenuPanel .filter {
+  width: 100%;
+}
+
+.filterMenuPanel .filterHeader {
+  width: 100%;
+  justify-content: flex-start;
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius);
+  box-shadow: none;
+  padding: 6px 12px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.filterMenuPanel .filterHeader .badgeTitle {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.filterMenuPanel .filterHeader:hover {
+  background-color: var(--cioos-surface-2);
+  border-color: var(--cioos-hairline);
+}
+
+.filterMenuPanel .filterHeader.active {
+  background-color: var(--cioos-teal-light);
+  border-color: var(--cioos-primary);
+}
+
+.filterMenuPanel .filterHeader.active:hover {
+  background-color: var(--cioos-teal-light);
+}
+
+/* The options panel flies out to the right of the row, aligned to its top. */
+.filterMenuPanel .filterOptions {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 10px);
+  right: auto;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  border-radius: var(--cioos-radius-lg);
+}
+
+/* On narrow screens there's no room for a side flyout — fall back to an
+   inline expansion under the row so options stay reachable. */
+@media (max-width: 700px) {
+  .filterMenuPanel .filterOptions {
+    position: static;
+    margin: 4px 0 8px;
+    box-shadow: none;
+    border-color: var(--cioos-hairline);
+    min-width: 0;
+  }
+}

@@ -1,8 +1,19 @@
+button.filterButton {
+  border-radius: var(--cioos-radius-pill);
+  border: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-white);
+  padding: 2px 12px;
+  margin: 0 6px 6px 0;
+  font-weight: 500;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
 button.filterButton.selected {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
+  border-color: var(--cioos-primary);
 }
 
-button.filterButton:hover{
-  background-color: #c6e3df;
+button.filterButton:hover {
+  background-color: var(--cioos-surface-2);
+  border-color: var(--cioos-primary);
 }
-

@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Modal } from 'react-bootstrap'
+import { Download } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 
 import './styles.css'
@@ -34,8 +35,8 @@ export default function DataDownloadModal({
         disabled={disabled}
         title={t('downloadModalButtonTitle')} // 'Download selected data'
       >
+        <Download size={15} aria-hidden='true' />
         {t('downloadModalButtonText')}
-        {/* Download */}
       </button>
     </div>
   )

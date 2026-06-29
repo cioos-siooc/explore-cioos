@@ -1,12 +1,10 @@
-.downloadDetails .container {
+.downloadDetails.container {
   padding: 0px !important;
   max-width: none !important;
 }
 
 .downloadDetails .row {
   padding: 5px 0px;
-  /* margin-left: 0px;
-  margin-right: 0px; */
 }
 
 .downloadDetails .col {
@@ -15,18 +13,222 @@
   margin-right: 0px;
 }
 
-.downloadDetails>hr {
+.downloadDetails > hr {
   margin: 0px;
 }
 
-.downloadableIcon {
-  margin: auto 40px;
+/* --- Header: back affordance + modal title ---
+   Replaces the old absolutely-positioned floating back button (which forced a
+   100px left pad on the filter row). Sits flush under the modal's teal top
+   border, in sand, like a proper modal header. */
+.downloadDetailsHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background-color: var(--cioos-sand);
+  border-bottom: 1px solid var(--cioos-hairline);
 }
 
+.downloadDetails .downloadDetailsBackButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  padding: 0 12px 0 6px;
+  border-radius: var(--cioos-radius-sm);
+  border: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-white);
+  color: var(--cioos-ink);
+  font-weight: 600;
+}
+
+.downloadDetails .downloadDetailsBackButton:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.downloadDetailsTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-family: var(--cioos-font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: var(--cioos-navy);
+}
+
+.downloadDetailsTitle svg {
+  color: var(--cioos-primary);
+}
+
+/* --- Filter band: the time / depth / space filters applied to the order --- */
+.filterDownloadToggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 64px;
+  padding: 12px 16px;
+  background-color: var(--cioos-surface-2);
+}
+
+.filterDownloadToggles .helpIcon {
+  margin: 0;
+}
+
+.filterDownloadToggles .noFiltersMessage {
+  color: var(--cioos-ink-60);
+}
+
+.filterDownloadToggle {
+  display: inline-flex;
+}
+
+.filterDownloadToggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--cioos-white);
+  border-radius: var(--cioos-radius-pill);
+  border: 1px solid var(--cioos-hairline);
+  height: 36px;
+  padding: 0 14px 0 10px;
+  color: var(--cioos-ink);
+  font-weight: 500;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.filterDownloadToggle .filterToggleIcon {
+  color: var(--cioos-ink-60);
+  flex: 0 0 auto;
+}
+
+.filterDownloadToggle.active button {
+  background-color: var(--cioos-teal-light);
+  border-color: var(--cioos-primary);
+}
+
+.filterDownloadToggle.active button .filterToggleIcon {
+  color: var(--cioos-primary-700);
+}
+
+.filterDownloadToggle:hover button {
+  background-color: var(--cioos-surface-2);
+  border-color: var(--cioos-primary);
+}
+
+.filterDownloadToggle.active:hover button {
+  background-color: var(--cioos-teal-light);
+}
+
+.filterDownloadToggle.disabled button,
+.filterDownloadToggle.disabled:hover button {
+  background-color: var(--cioos-white);
+  border-color: var(--cioos-hairline);
+  color: var(--cioos-ink-40);
+  cursor: not-allowed;
+}
+
+/* --- Dataset table viewport --- */
 .downloadDataRow {
   min-height: 300px;
-  max-height: calc(80vh - 160px);
+  max-height: calc(80vh - 220px);
   overflow-y: auto;
+}
+
+/* --- Legend / key: which datasets the CDE can deliver directly --- */
+.downloadLegend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 24px;
+  padding: 12px 16px;
+  background-color: var(--cioos-surface-2);
+  border-top: 1px solid var(--cioos-hairline);
+  color: var(--cioos-ink-60);
+  font-size: 0.875rem;
+}
+
+.downloadLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.downloadLegendItem .legendIcon.success {
+  color: var(--cioos-success);
+}
+
+.downloadLegendItem .legendIcon.error {
+  color: var(--cioos-error);
+}
+
+.legendBadge {
+  border-radius: var(--cioos-radius-sm);
+  padding: 1px 6px;
+  font-weight: 600;
+}
+
+.legendBadge.success {
+  background-color: var(--cioos-success-bg);
+  color: var(--cioos-primary-700);
+}
+
+.legendBadge.error {
+  background-color: var(--cioos-error-bg);
+  color: var(--cioos-error);
+}
+
+/* --- Order summary + submit row ---
+   Echoes the SelectionDetails funnel: small uppercase caption stacked over a
+   display-font value, so the count + size read as the order total feeding the
+   Submit CTA on the right. */
+.downloadDetailsDownloadInfoRow.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0;
+  padding: 12px 16px;
+}
+
+.downloadSummary {
+  display: flex;
+  gap: 28px;
+}
+
+.downloadSummaryStat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  white-space: nowrap;
+}
+
+.downloadSummaryLabel {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: var(--cioos-ink-40);
+}
+
+.downloadSummaryValue {
+  font-family: var(--cioos-font-display);
+  font-weight: 700;
+  font-size: 21px;
+  line-height: 1.2;
+  color: var(--cioos-navy);
+}
+
+.downloadDetails .datasetSizeTotalSpinner {
+  opacity: 0.3;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
 }
 
 @media (max-width: 900px) {
@@ -36,139 +238,7 @@
   .downloadDetails.container {
     max-width: 100%;
   }
+  .downloadDetailsDownloadInfoRow.row {
+    justify-content: center;
+  }
 }
-
-.downloadDetailsControls {
-  border-top: 1px solid darkgrey;
-  background-color: white;
-  padding: 10px;
-  overflow-x: hidden;
-}
-
-.downloadDetailsControlRow {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px;
-}
-
-.emailInput {
-  width: 100%;
-  margin-right: 10px;
-}
-
-.dataTotalRatio svg {
-  margin-left: 5px;
-}
-
-.dataTotalBar {
-  height: 40px;
-  width: 325px;
-  margin-right: 10px;
-}
-
-.dataTotalBar.progress {
-  margin: 5px 0px 0px 0px;
-  height: 30px;
-}
-
-.progress .upTo100 {
-  color: white;
-}
-
-.progress .past100 {
-  color: black;
-}
-
-.downloadQuote {
-  text-align: center;
-}
-
-.filterDownloadToggles{
-  display: flex;
-  flex-wrap: wrap;
-  min-height: 84px;
-  justify-content: center;
-  padding: 20px 10px 20px 100px;
-  background-color: #f7f7f7;
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
-}
-
-.filterDownloadToggles .helpIcon {
-  margin-right: 5px;
-  margin-left: 5px;
-  margin-top: 3px;
-}
-
-.filterDownloadToggles .helpIcon.helpIconWithMarginTop{
-  margin-top: 12px;
-}
-
-.filterDownloadToggle {
-  display: inline;
-}
-
-.filterDownloadToggle button{
-  background-color: white;
-  border-radius: 42px;
-  border: 1px solid lightgrey;
-  height: 42px;
-  margin: 1px 5px 1px 1px;
-  padding: 0px 15px 0px 0px;
-}
-
-.filterDownloadToggle.active button {
-  background-color: #c6e3df;
-}
-
-.filterDownloadToggle.active:hover button {
-  background-color: #c6e3df;
-}
-
-.filterDownloadToggle.disabled:hover button {
-  background-color: white;
-}
-
-.filterDownloadToggle:hover button {
-  background-color: #f3f3f3;
-  border: 2px solid darkgrey;
-  margin: 0px 5px 0px 0px;
-  padding: 0px 15px 0px 0px;
-}
-
-.downloadDetails .datasetSizeTotalSpinner {
-  opacity: 30%;
-  /* display:inline; */
-  width: 30px;
-  height: 30px;
-  position: absolute;
-  margin-left: 10px;
-}
-
-.downloadDetailsDownloadInfoRow.row {
-  text-align: center;
-  margin: 10px 0px 10px 0px;
-}
-
-.downloadDetailsDownloadInfoItem {
-  min-height: 40px;
-  line-height: 30px;
-}
-
-.downloadDetailsDownloadLimits {
-  background-color: #f7f7f7;
-}
-
-.downloadDetails .downloadDetailsBackButton{
-  position: absolute;
-  left: 20px;
-  top: 20px;
-  height: 42px;
-  border-radius: 10px;
-  border: 2px solid darkgrey;
-  background-color: white;
-}
-
-.downloadDetails .downloadDetailsBackButton:hover {
-  background-color: #f3f3f3;
-} 

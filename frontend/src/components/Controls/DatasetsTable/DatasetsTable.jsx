@@ -36,6 +36,7 @@ export default function DatasetsTable({
   loading
 }) {
   const { t, i18n } = useTranslation()
+  const [searchText, setSearchText] = useState('')
   const [tableData, setTableData] = useState({
     columns: generateColumns(),
     data: datasets
@@ -50,9 +51,30 @@ export default function DatasetsTable({
     handleSelectAllDatasets()
   }
 
+  // Sidebar search: filter across the visible text fields. The download modal
+  // keeps its own DataTableExtensions filter, so this is a no-op there.
+  function filterBySearch(rows) {
+    if (isDownloadModal || isEmpty(searchText)) return rows
+    const query = searchText.toLowerCase()
+    return (rows || []).filter((row) =>
+      [
+        row.title,
+        row.cdm_data_type,
+        formatErddapServerName(
+          row.erddap_server_url || row.erddap_url,
+          i18n.language,
+          erddapServersJSONfile
+        )
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(query)
+    )
+  }
+
   useEffect(() => {
-    setTableData({ columns: generateColumns(), data: datasets })
-  }, [datasets, downloadSizeEstimates])
+    setTableData({ columns: generateColumns(), data: filterBySearch(datasets) })
+  }, [datasets, downloadSizeEstimates, searchText])
 
   function generateColumns() {
     // const cellPadding = '0px'
@@ -62,7 +84,9 @@ export default function DatasetsTable({
 
     const columns = [
       {
-        name: (
+        // Sidebar moves "select all" into the search toolbar and keeps just the
+        // download icon as the column header; the download modal keeps it inline.
+        name: isDownloadModal ? (
           <div title={t('datasetsTableDownloadModalDatasetCheckboxTooltip')}>
             {selectAll ? (
               <CheckSquare onClick={selectAllOnclick} size={16} />
@@ -71,6 +95,8 @@ export default function DatasetsTable({
             )}
             <Download className='downloadIcon' onClick={selectAllOnclick} size={18} title={t('datasetInspectorDownloadText')} />
           </div>
+        ) : (
+          <Download size={18} title={t('datasetInspectorDownloadText')} />
         ),
         selector: (row) => row.selected,
         cell: (row) => {
@@ -89,14 +115,12 @@ export default function DatasetsTable({
                   size={16}
                 />
               )}
-              <Download className='downloadIcon' onClick={checkBoxOnclick(row)} size={18} />
-              {/* <Download className='downloadIcon' /> */}
             </div>
           )
         },
         ignoreRowClick: true,
         sortable: true,
-        width: '60px',
+        width: '40px',
         // paddingLeft: cellPadding,
         // paddingRight: cellPadding
       },
@@ -107,8 +131,7 @@ export default function DatasetsTable({
             <BroadcastPin size={20} title={t('datasetInspectorPlatformText')} />
           </div>
         ),
-        // compact: true,
-        wrap: true,
+        compact: true,
         center: true,
         selector: (row) => row.platform,
         cell: (point) => {
@@ -126,7 +149,7 @@ export default function DatasetsTable({
           )
         },
         sortable: true,
-        width: '60px',
+        width: '40px',
         // paddingLeft: cellPadding,
         // paddingRight: cellPadding
       },
@@ -140,7 +163,9 @@ export default function DatasetsTable({
         cell: (row) => formatErddapServerName(row.erddap_server_url || row.erddap_url, i18n.language, erddapServersJSONfile),
         wrap: true,
         sortable: true,
-        width: '120px'
+        // Sidebar: flex to fill the narrow panel instead of a fixed 120px that
+        // pushes later columns off-screen. Download modal keeps its fixed width.
+        ...(isDownloadModal ? { width: '120px' } : { minWidth: '80px', grow: 1 })
       },
       {
         name: (
@@ -150,8 +175,9 @@ export default function DatasetsTable({
         ),
         selector: (row) => row.title,
         wrap: true,
-        width: '280px',
-        sortable: true
+        sortable: true,
+        // Title takes the lion's share of the remaining space in the sidebar.
+        ...(isDownloadModal ? { width: '280px' } : { minWidth: '140px', grow: 3 })
       },
       {
         name: t('datasetsTableHeaderTypeText'),
@@ -246,8 +272,7 @@ export default function DatasetsTable({
                 }
               >
                 <Check2Circle
-                  className='downloadableIcon'
-                  color='#52a79b'
+                  className='downloadableIcon success'
                   size='25'
                 />
               </OverlayTrigger>
@@ -262,7 +287,7 @@ export default function DatasetsTable({
                   </Tooltip>
                 }
               >
-                <XCircle className='downloadableIcon' color='#e3285e' size='25' />
+                <XCircle className='downloadableIcon error' size='25' />
               </OverlayTrigger>
             )
           } else {
@@ -318,55 +343,89 @@ export default function DatasetsTable({
     return columns
   }
 
+  // Sidebar toolbar: full-width search input with the "select all" toggle
+  // pulled in alongside it (replaces the cramped DataTableExtensions filter).
+  const sidebarToolbar = (
+    <div className='datasetsTableToolbar'>
+      <button
+        type='button'
+        className={classNames('selectAllToggle', { active: selectAll })}
+        onClick={selectAllOnclick}
+        aria-pressed={selectAll}
+        title={t('datasetsTableHeaderSelectAllTitle')}
+      >
+        {t('datasetsTableHeaderSelectAllTitle')}
+      </button>
+      <input
+        className='datasetsTableSearch'
+        type='text'
+        value={searchText}
+        placeholder={t('datasetInspectorFilterText')}
+        onChange={(e) => setSearchText(e.target.value)}
+      />
+    </div>
+  )
+
+  const table = (
+    <DataTable
+      striped
+      columns={tableData.columns}
+      data={tableData.data}
+      defaultSortFieldId={3}
+      onRowClicked={isDownloadModal ? undefined : setInspectDataset}
+      onRowMouseEnter={setHoveredDataset}
+      onRowMouseLeave={() => setHoveredDataset()}
+      highlightOnHover={!isDownloadModal}
+      pointerOnHover={!isDownloadModal}
+      subHeader={!isDownloadModal}
+      subHeaderAlign='center'
+      subHeaderComponent={!isDownloadModal ? sidebarToolbar : undefined}
+      pagination={tableData.data?.length > 100}
+      paginationPerPage={50}
+      paginationRowsPerPageOptions={[50, 100, 150, 200]}
+      paginationComponentOptions={{
+        rowsPerPageText: t('tableComponentRowsPerPage'),
+        rangeSeparatorText: t('tableComponentOf'),
+        selectAllRowsItem: false
+      }}
+      // compact
+      customStyles={{
+        rows: {
+          style: {
+            minHeight: '72px', // override the row height
+          },
+        },
+        headCells: {
+          style: {
+            paddingLeft: '5px', // override the cell padding for head cells
+            paddingRight: '0px',
+          },
+        },
+        cells: {
+          style: {
+            paddingLeft: '5px', // override the cell padding for data cells
+            paddingRight: '0px',
+          },
+        },
+      }}
+    />
+  )
+
   return (
     <div className='datasetsTable'>
-      <DataTableExtensions
-        {...tableData}
-        print={false}
-        export={false}
-        filterPlaceholder={t('datasetInspectorFilterText')}
-        filter={true}
-      >
-        <DataTable
-          striped
-          columns={tableData.columns}
-          data={tableData.data}
-          defaultSortFieldId={3}
-          onRowClicked={isDownloadModal ? undefined : setInspectDataset}
-          onRowMouseEnter={setHoveredDataset}
-          onRowMouseLeave={() => setHoveredDataset()}
-          highlightOnHover={!isDownloadModal}
-          pointerOnHover={!isDownloadModal}
-          pagination={tableData.data?.length > 100}
-          paginationPerPage={50}
-          paginationRowsPerPageOptions={[50, 100, 150, 200]}
-          paginationComponentOptions={{
-            rowsPerPageText: t('tableComponentRowsPerPage'),
-            rangeSeparatorText: t('tableComponentOf'),
-            selectAllRowsItem: false
-          }}
-          // compact
-          customStyles={{
-            rows: {
-              style: {
-                minHeight: '72px', // override the row height
-              },
-            },
-            headCells: {
-              style: {
-                paddingLeft: '5px', // override the cell padding for head cells
-                paddingRight: '0px',
-              },
-            },
-            cells: {
-              style: {
-                paddingLeft: '5px', // override the cell padding for data cells
-                paddingRight: '0px',
-              },
-            },
-          }}
-        />
-      </DataTableExtensions>
+      {isDownloadModal ? (
+        <DataTableExtensions
+          {...tableData}
+          print={false}
+          export={false}
+          filterPlaceholder={t('datasetInspectorFilterText')}
+          filter={true}
+        >
+          {table}
+        </DataTableExtensions>
+      ) : (
+        table
+      )}
     </div>
   )
 }

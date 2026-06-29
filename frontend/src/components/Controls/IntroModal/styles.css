@@ -3,9 +3,9 @@
   bottom: 312px;
   right: 10px;
   pointer-events: all;
-  background-color: #fff;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
-  border-radius: 4px;
+  background-color: var(--cioos-white);
+  box-shadow: var(--cioos-shadow-card);
+  border-radius: var(--cioos-radius);
   border: 0px;
   height: 42px;
   width: 42px;
@@ -14,11 +14,38 @@
 }
 
 .introButton:hover {
-  background-color: #f3f3f3;
+  background-color: var(--cioos-surface-2);
 }
 
 .introModal .modalHeader {
   padding: 0px 160px 0px 0px;
+}
+
+/* Modal chrome — brand the onboarding "hero". A thin primary rule at the
+   top ties it to the rest of the interface; the header sits on sand. */
+.introModal .modal-content {
+  border: none;
+  border-top: 4px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius);
+  overflow: hidden;
+}
+
+.introModal .modal-header {
+  background-color: var(--cioos-sand);
+  border-bottom: 1px solid var(--cioos-hairline);
+}
+
+.introModal .modal-title {
+  font-family: var(--cioos-font-display);
+  font-weight: 700;
+  color: var(--cioos-navy);
+}
+
+/* The tagline ("Ocean Data For Our Ocean Future") reads as a quiet
+   subtitle, not competing with the product name. */
+.introModal .tagLine {
+  color: var(--cioos-ink-60);
+  font-weight: 400;
 }
 
 .introLogo.english {
@@ -56,7 +83,7 @@
 }
 
 .introLogo:hover {
-  background-color: #f3f3f3;
+  background-color: var(--cioos-surface-2);
 }
 
 .introModal .modal-body {
@@ -70,21 +97,24 @@
 
 .stepImage {
   text-align: center;
+  font-family: var(--cioos-font-display);
   font-size: large;
-  font-weight: bold;
+  font-weight: 600;
+  color: var(--cioos-navy);
   /* flex-grow: 1; */
   flex-shrink: 1;
   flex-wrap: nowrap;
   width: 250px;
   height: 250px;
-  border-radius: 10px;
-  /* border: 1px solid lightgray; */
+  border-radius: var(--cioos-radius);
+  border: 1px solid var(--cioos-hairline);
   padding: 2px;
   margin: 2px;
-  background-color: #abd3df;
+  background-color: var(--cioos-teal-light);
   background-repeat: no-repeat;
   background-size: 225px 225px;
   background-position: bottom;
+  transition: box-shadow 0.15s ease;
 }
 
 @media (max-width: 1200px) {
@@ -130,8 +160,8 @@
 }
 
 .stepImage:hover {
-  /* border: 4px solid #52A79B; */
-  box-shadow: 0 0 0 4px #52A79B;
+  /* border: 4px solid var(--cioos-primary); */
+  box-shadow: 0 0 0 4px var(--cioos-primary);
   cursor: pointer;
 }
 
@@ -210,5 +240,5 @@
 }
 
 .feedbackButton:hover {
-  background-color: #f3f3f3;
+  background-color: var(--cioos-surface-2);
 } */

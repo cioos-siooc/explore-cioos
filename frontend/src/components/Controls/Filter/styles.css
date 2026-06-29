@@ -5,81 +5,114 @@
 
 .filterHeader {
   pointer-events: all;
-  background-color: white;
+  background-color: var(--cioos-white);
   display: inline-flex;
   align-items: center;
   text-align: center;
-  border-radius: 30px;
-  padding: 5px;
+  border-radius: var(--cioos-radius-pill);
+  padding: 5px 6px;
   cursor: pointer;
-  border: 1px solid white;
+  border: 1px solid var(--cioos-hairline);
+  box-shadow: var(--cioos-shadow-card);
+  color: var(--cioos-ink);
   font: inherit;
+  font-weight: 500;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
+/* Active filter: teal-light fill + a thin primary ring so an applied
+   filter is unmistakable against the map. */
 .filterHeader.active {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
+  border-color: var(--cioos-primary);
 }
 
 .filterHeader:hover {
-  background-color: #c6e3df;
-  border: 1px solid darkgrey;
+  background-color: var(--cioos-surface-2);
+  border-color: var(--cioos-primary);
 }
 
-.filterHeader>* {
+.filterHeader.active:hover {
+  background-color: var(--cioos-teal-light);
+}
+
+.filterHeader > * {
   margin: 0px 5px;
   height: 28px;
 }
 
+/* The variable / org / dataset icon picks up the brand teal. */
+.filterHeader > svg {
+  color: var(--cioos-primary);
+}
+
 .filterHeader button {
-  border-radius: 10px;
+  border-radius: var(--cioos-radius-sm);
 }
 
 .filterOptions {
   pointer-events: all;
   position: absolute;
-  top: 45px;
+  top: 48px;
   left: 0px;
   z-index: 10;
-  background-color: white;
-  border-radius: 10px;
-  padding: 10px;
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  box-shadow: var(--cioos-shadow-float);
+  padding: 12px;
   max-width: fit-content;
   min-width: 350px;
 }
 
+/* Utility actions inside the dropdown (Select all / Reset / Close). */
 .filterOptions button {
-  background-color: #c6e3df;
-  border: solid 2px darkgrey;
-  border-radius: 10px;
+  background-color: var(--cioos-teal-light);
+  color: var(--cioos-ink);
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  padding: 0 14px;
   margin: 5px 5px;
   height: 30px;
+  font-weight: 600;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .filterOptions button:hover {
-  background-color: #52a79b;
-  color: white;
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
 }
 
 .filterSearch {
   width: 100%;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  padding: 6px 10px;
+  font: inherit;
+}
+
+.filterSearch:focus {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
 }
 
 .clearFilter {
   position: absolute;
-  right: 12px;
-  top: 12px;
-  border-radius: 30px;
+  right: 14px;
+  top: 14px;
+  border-radius: var(--cioos-radius-pill);
 }
 
 .clearFilter:hover {
-  background-color: lightgray;
+  background-color: var(--cioos-surface-2);
   cursor: pointer;
 }
 
 .filterInfoButton {
   position: absolute;
-  border-radius: 5px;
+  border-radius: var(--cioos-radius-sm);
   height: 30px;
   width: 60;
   bottom: 16px;
@@ -87,7 +120,7 @@
 }
 
 .filterInfoButton:hover {
-  background-color: lightgrey;
+  background-color: var(--cioos-surface-2);
 }
 
 .filterInfoButton svg {

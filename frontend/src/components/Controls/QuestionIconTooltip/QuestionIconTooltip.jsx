@@ -15,7 +15,7 @@ export default function QuestionIconTooltip({
       placement={tooltipPlacement}
       overlay={<Tooltip>{tooltipText}</Tooltip>}
     >
-      <QuestionCircle className={classNames('helpIcon', className)} color='#007bff' size={size} />
+      <QuestionCircle className={classNames('helpIcon', className)} color='#52A79B' size={size} />
     </OverlayTrigger>
   )
 }

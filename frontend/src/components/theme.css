@@ -1,0 +1,144 @@
+/*
+ * CIOOS National — design tokens & base layer
+ * ------------------------------------------------------------------
+ * Single source of truth for the CIOOS Data Explorer's visual identity.
+ * Palette and type rules come from the official CIOOS National theme
+ * (Navy / Sand / Light-teal base + #52A79B teal primary; Sora display,
+ * Montserrat body). Component stylesheets should reference these tokens
+ * via var(--cioos-*) rather than re-hardcoding hex values.
+ */
+
+:root {
+  /* --- Shared base palette --- */
+  --cioos-navy:        #152F37;
+  --cioos-sand:        #F3F0EC;
+  --cioos-teal-light:  #C6E3DF;
+  --cioos-white:       #FFFFFF;
+
+  /* --- National primary --- */
+  --cioos-primary:     #52A79B;
+  --cioos-primary-700: #3C8377; /* hover/pressed — darker teal */
+
+  /* --- Derived neutrals (navy-tinted, never pure grey/black) --- */
+  --cioos-ink:         #152F37; /* body + heading text */
+  --cioos-ink-60:      rgba(21, 47, 55, 0.62); /* secondary text */
+  --cioos-ink-40:      rgba(21, 47, 55, 0.40); /* muted text / icons */
+  --cioos-hairline:    #DCE8E5; /* hairline borders between sand & teal-light */
+  --cioos-surface-2:   #EEF6F4; /* subtle hover wash on white surfaces */
+
+  /* --- Status palette (CIOOS-aligned) --- */
+  --cioos-success:     #52A79B;
+  --cioos-success-bg:  #C6E3DF;
+  --cioos-error:       #E25563; /* Atlantic red-coral, reused for errors */
+  --cioos-error-bg:    #FBE3E6;
+  --cioos-warn:        #B07A00;
+  --cioos-info:        #0F6D8E;
+
+  /* --- Elevation --- */
+  --cioos-shadow-card:    0 2px 8px rgba(21, 47, 55, 0.08);
+  --cioos-shadow-float:   0 4px 16px rgba(21, 47, 55, 0.16);
+  --cioos-ring:           0 0 0 2px rgba(21, 47, 55, 0.10); /* default chrome ring */
+
+  /* --- Shape --- */
+  --cioos-radius-lg:   16px;  /* floating panels / menus */
+  --cioos-radius:      8px;   /* cards, surfaces, buttons */
+  --cioos-radius-sm:   6px;   /* inputs, small controls */
+  --cioos-radius-pill: 999px; /* filter chips, toggles */
+
+  /* --- Type --- */
+  --cioos-font-body:    'Montserrat', system-ui, -apple-system, sans-serif;
+  --cioos-font-display: 'Sora', 'Montserrat', system-ui, sans-serif;
+
+  /* --- Signature: the ocean "water column" gradient (surface → depth) --- */
+  --cioos-depth-gradient: linear-gradient(180deg, var(--cioos-primary) 0%, var(--cioos-navy) 100%);
+
+  --cioos-focus: 0 0 0 3px rgba(82, 167, 155, 0.55);
+
+  /* --- Layout: selection-panel width ---
+     Single source of truth for how wide the sidebar reads. Capped at 580px on
+     wide screens, proportional on tablets, and overridden to full-width on
+     phones (see media query below). The legend offset and the panel's own
+     closed-state transforms all derive from this token so they stay in sync. */
+  --cioos-panel-w: clamp(360px, 42vw, 580px);
+}
+
+/* Phones: the panel takes over the full viewport so the dataset details and
+   record table stay usable instead of overflowing a fixed column. */
+@media (max-width: 600px) {
+  :root {
+    --cioos-panel-w: 100vw;
+  }
+}
+
+body {
+  font-family: var(--cioos-font-body);
+  color: var(--cioos-ink);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--cioos-font-display);
+  color: var(--cioos-ink);
+  font-weight: 600;
+}
+
+/* Accessible, on-brand keyboard focus for every interactive chrome element.
+   Scoped away from native form fields so it doesn't fight Bootstrap inputs. */
+.filterHeader:focus-visible,
+.filterButton:focus-visible,
+.panelHandle:focus-visible,
+.resetFiltersButton:focus-visible,
+.boxQueryButton:focus-visible,
+.introButton:focus-visible,
+.downloadButton:focus-visible,
+.submitRequestButton:focus-visible,
+.legendToggleButton:focus-visible,
+.pointDetailsHeaderIntroButton:focus-visible,
+.feedbackButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* Text inputs across the app (email + dataset search) share one quiet,
+   on-brand treatment with a teal focus ring. */
+.emailAddress,
+.emailInput,
+.pointDetailsSearchBar input {
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  padding: 8px 12px;
+  font: inherit;
+  color: var(--cioos-ink);
+}
+
+.emailAddress:focus,
+.emailInput:focus,
+.pointDetailsSearchBar input:focus {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
+}
+
+/* rc-slider (time / depth range filters) — replace the library's default
+   sky-blue with CIOOS teal so the range controls match the rest of the UI. */
+.rc-slider-rail { background-color: var(--cioos-hairline); }
+.rc-slider-track { background-color: var(--cioos-primary); }
+.rc-slider-dot-active { border-color: var(--cioos-primary); }
+.rc-slider-handle {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-white);
+  opacity: 1;
+}
+.rc-slider-handle:hover,
+.rc-slider-handle:focus,
+.rc-slider-handle-dragging.rc-slider-handle-dragging.rc-slider-handle-dragging {
+  border-color: var(--cioos-primary-700);
+  box-shadow: var(--cioos-focus);
+}
+
+/* Honour reduced-motion: the panel/legend slide transitions are decorative. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+  }
+}

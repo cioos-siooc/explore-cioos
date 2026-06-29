@@ -2,8 +2,10 @@
   position: absolute;
   bottom: 10px;
   left: 10px;
-  background-color: white;
-  border-radius: 10px;
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  box-shadow: var(--cioos-shadow-card);
   display: flex;
   flex-direction: column;
   padding: 2.5px 5px 2.5px 5px;
@@ -14,13 +16,15 @@
 }
 
 .legend:hover {
-  background-color: #f3f3f3;
+  background-color: var(--cioos-surface-2);
   cursor: pointer;
 }
 
 .legend.panelOpen {
   position: absolute;
-  left: 570px;
+  /* Tuck just inside the panel's right edge, derived from the shared panel
+     width token so the legend follows the sidebar as it resizes. */
+  left: calc(var(--cioos-panel-w) - 10px);
   bottom: 10px;
 }
 
@@ -30,10 +34,11 @@
 }
 
 .legendToggleButton {
-  border-radius: 10px;
+  border-radius: var(--cioos-radius-pill);
   min-height: 20px;
   min-width: 30px;
-  background-color: #d3d3d3;
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink);
   padding: 3px;
 }
 
@@ -43,7 +48,7 @@
 }
 
 .legendToggleButton:hover {
-  background-color: #c4c4c4;
+  background-color: var(--cioos-teal-light);
   cursor: pointer;
 }
 
