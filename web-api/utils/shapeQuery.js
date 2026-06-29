@@ -12,11 +12,14 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
     includeObis = 'true',
     scientificNames,
     obisNodes,
+    erddapServers,
   } = query;
 
-  // Scientific-name and OBIS-node filters are OBIS-only: when either is set,
-  // hide profiles and narrow to OBIS rows.
-  const includeProfiles = !scientificNames && !obisNodes;
+  // Scientific-name filters are OBIS-only: hide profiles when set. An
+  // OBIS-node selection also hides profiles, unless ERDDAP servers are
+  // selected alongside it (combined Source filter — show both, OR'd in the
+  // shared dataset filter).
+  const includeProfiles = !scientificNames && (!obisNodes || Boolean(erddapServers));
   const showObis = includeObis !== 'false';
 
   const profilesBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,

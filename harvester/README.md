@@ -77,6 +77,8 @@ python -m cde_harvester --urls https://catalogue.hakai.org/erddap --cache
 
 The harvester is typically run via Docker Compose. See the main [README](../README.md) for details.
 
+The `HARVEST_CONFIG_FILE` environment variable is automatically set in the docker-compose files to `/app/harvester/harvest_config.yaml`. This allows the harvester to automatically use the mounted config file without needing the `-f` flag.
+
 ### Full Reload Mode (default)
 Clears all existing data and reloads everything from scratch:
 ```bash
@@ -89,6 +91,12 @@ Updates only changed datasets, preserving existing data (much faster):
 docker compose run --rm -e INCREMENTAL_MODE=true harvester
 # Or use the convenience script:
 ./run_harvester.sh --incremental
+```
+
+### Using a Custom Config File
+To use a different config file, override the environment variable:
+```bash
+docker compose run --rm -e HARVEST_CONFIG_FILE=/app/harvester/custom_config.yaml harvester
 ```
 
 ## Output Files
@@ -148,6 +156,14 @@ HARVESTER_CRON=10 0 */3 * *
 VERNACULARS_CRON=
 # Optional: fire one harvest immediately on (re)deploy (default false)
 RUN_ON_DEPLOY=false
+
+# Harvest config file path (optional)
+# When set, automatically uses this config file without needing -f flag
+# Defaults to harvest_config.yaml if not provided
+HARVEST_CONFIG_FILE=/app/harvester/harvest_config.yaml
+
+# Harvester log directory (optional)
+HARVESTER_LOG_DIR=/app/harvester/logs
 ```
 
 The `prefect_worker` runs harvest flows in-process on the `cde-process-pool`

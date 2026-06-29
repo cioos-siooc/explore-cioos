@@ -20,6 +20,41 @@ services:
     networks:
       - explore-cioos_default
 
+  # One-shot: applies database/migrations/*.sql to the live DB before any other
+  # service reads or writes it. Postgres only runs database/*.sql on a FRESH
+  # volume, so schema changes added to 1_schema.sql never reach an existing
+  # volume on their own — this closes that gap. Migrations are idempotent
+  # (ADD COLUMN IF NOT EXISTS ...), so applying them on every deploy is safe.
+  db_migrate:
+    image: postgis/postgis:13-3.1-alpine
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      PGHOST: db
+      PGPORT: ${DB_PORT:-5432}
+      PGUSER: $DB_USER
+      PGPASSWORD: $DB_PASSWORD
+      PGDATABASE: $DB_NAME
+    volumes:
+      - ./database/migrations:/migrations:ro
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        applied=0
+        for f in /migrations/*.sql; do
+          [ -e "$$f" ] || continue
+          echo "Applying migration: $$f"
+          psql -v ON_ERROR_STOP=1 -f "$$f"
+          applied=$$((applied+1))
+        done
+        echo "Migrations applied: $$applied"
+    networks:
+      - explore-cioos_default
+
   web-api:
     build: ./web-api
     restart: always
@@ -28,7 +63,8 @@ services:
     expose:
       - "5000"
     depends_on:
-      - db
+      db_migrate:
+        condition: service_completed_successfully
     networks:
       - explore-cioos_default
 
@@ -41,7 +77,7 @@ services:
       - ./nginx/logs:/var/log/nginx
       - ./nginx/logrotate_state:/var/lib/logrotate
       - ./harvester_logs:/usr/share/nginx/html/harvester_logs:ro
-      - ./downloads:/usr/share/nginx/html/downloads:ro
+      - downloads:/usr/share/nginx/html/downloads:ro
     depends_on:
       - web-api
     ports:
@@ -54,11 +90,12 @@ services:
       context: .
       dockerfile: ./download_scheduler/Dockerfile
     depends_on:
-      - db
+      db_migrate:
+        condition: service_completed_successfully
     env_file:
       - .env
     volumes:
-      - ./downloads:/usr/src/app/download_scheduler/downloads
+      - downloads:/usr/src/app/download_scheduler/downloads
     networks:
       - explore-cioos_default
 
@@ -99,6 +136,7 @@ services:
       - REGISTER_DEPLOYMENTS=true
       - RUN_ON_DEPLOY=${RUN_ON_DEPLOY:-false}
       - HOST_ROOT=${HOST_ROOT}
+      - HARVEST_CONFIG_FILE=/app/harvester/harvest_config.yaml
     env_file:
       - .env
     depends_on:
@@ -175,6 +213,7 @@ volumes:
   postgres-data:
   redis-data:
   prefect_data:
+  downloads:
 
 networks:
   explore-cioos_default:

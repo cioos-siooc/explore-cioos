@@ -34,7 +34,3 @@ services:
 
   prefect:
     ports: !reset []
-
-  harvest-dashboard:
-    environment:
-      - SERVICE_FQDN_HARVEST_DASHBOARD_8001

@@ -2,8 +2,6 @@ services:
   db:
     build: ./database
     platform: linux/x86_64
-    ports:
-      - "${DB_PORT:-5432}:${DB_PORT:-5432}"
     environment:
       - "PGPORT=${DB_PORT:-5432}"
       - "POSTGRES_DB=$DB_NAME"
@@ -12,10 +10,56 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-q", "-d", "${DB_NAME}", "-U", "${DB_USER}"]
+      # Probe over TCP (-h 127.0.0.1), NOT the default Unix socket. On a fresh
+      # volume the entrypoint runs initdb + /docker-entrypoint-initdb.d/*.sql
+      # behind a temporary server that listens on the local socket ONLY, so a
+      # socket-based pg_isready reports "healthy" while TCP 5432 still refuses
+      # connections. Dependents (prefect, db_migrate, web-api) then connect over
+      # TCP too early and crash with ConnectionRefused. Forcing TCP here keeps
+      # service_healthy false until the real server is actually accepting TCP.
+      test: ["CMD", "pg_isready", "-q", "-d", "${DB_NAME}", "-U", "${DB_USER}", "-h", "127.0.0.1", "-p", "${DB_PORT:-5432}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      # Fresh-volume init runs initdb + PostGIS + all init scripts behind a
+      # socket-only temp server; measured ~134s to TCP-ready on slow disk. Keep
+      # the grace well above that so expected early failures don't mark unhealthy.
+      start_period: 180s
+
+  # One-shot: applies database/migrations/*.sql to the live DB before any other
+  # service reads or writes it. Postgres only runs database/*.sql on a FRESH
+  # volume (docker-entrypoint-initdb.d), so schema changes added to 1_schema.sql
+  # never reach an existing volume on their own — this closes that gap. The
+  # migrations are idempotent (ADD COLUMN IF NOT EXISTS ...), so applying them on
+  # every `up` is safe. Exits cleanly once done (shows as "Exited (0)").
+  db_migrate:
+    image: postgres:13-alpine
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      PGHOST: db
+      PGPORT: ${DB_PORT:-5432}
+      PGUSER: $DB_USER
+      PGPASSWORD: $DB_PASSWORD
+      PGDATABASE: $DB_NAME
+    volumes:
+      - ./database/migrations:/migrations:ro
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        applied=0
+        for f in /migrations/*.sql; do
+          [ -e "$$f" ] || continue
+          echo "Applying migration: $$f"
+          psql -v ON_ERROR_STOP=1 -f "$$f"
+          applied=$$((applied+1))
+        done
+        echo "Migrations applied: $$applied"
+
   web-api:
     build: ./web-api
     restart: always
@@ -24,8 +68,8 @@ services:
     expose:
       - "5000"
     depends_on:
-      db:
-        condition: service_healthy
+      db_migrate:
+        condition: service_completed_successfully
   nginx:
     build:
         context: ./nginx
@@ -37,8 +81,6 @@ services:
       - downloads:/usr/share/nginx/html/downloads:ro
     depends_on:
       - web-api
-    ports:
-      - "${NGINX_PORT:-4000}:4000"
   scheduler:
     build:
       context: .
@@ -46,8 +88,8 @@ services:
     profiles:
       - tools
     depends_on:
-      db:
-        condition: service_healthy
+      db_migrate:
+        condition: service_completed_successfully
     env_file:
       - .env
     environment:
@@ -84,12 +126,15 @@ services:
     restart: unless-stopped
     command: ["./worker-entrypoint.sh"]
     volumes:
-      # Harvest config, mounted (not baked at build) so changing which config
-      # the worker uses is a restart, not a rebuild. ${HARVEST_CONFIG_FILE}
-      # selects the host file (e.g. harvest_config.production.yaml); defaults to
-      # the committed sample. The image still ships a baked sample as a fallback
-      # for workers that don't mount one (e.g. remote workers).
-      - ./${HARVEST_CONFIG_FILE:-harvest_config.sample.yaml}:/app/harvester/harvest_config.yaml:ro
+      # NOTE: the harvest config is NOT bind-mounted here. The image bakes
+      # harvest_config.yaml (from harvest_config.sample.yaml; see harvester
+      # Dockerfile), and the worker reads that baked file. A relative bind-mount
+      # of a repo file doesn't work under Coolify (it resolves the source to an
+      # empty persistent-storage dir and fails "mount dir onto file"). To run a
+      # custom config: locally, mount it via docker-compose.override.yaml (see
+      # docker-compose.override.yaml.sample); under Coolify, use a Persistent
+      # Storage file mount onto /app/harvester/harvest_config.yaml, or bake a
+      # different config into the image.
       # Shared output sinks — every replica on this host writes here, and nginx
       # serves harvester_logs read-only at /harvester_logs.
       - harvest_data:/app/harvester/harvest          # resulting CSV files
@@ -102,6 +147,7 @@ services:
     environment:
       PREFECT_API_URL: http://prefect:4200/api
       PREFECT_LOGGING_LEVEL: INFO
+      HARVEST_CONFIG_FILE: /app/harvester/harvest_config.yaml
       # In-process flows inherit this container's env for DB / redis access.
       DB_HOST_EXTERNAL: db
       REDIS_HOST: redis
@@ -129,24 +175,38 @@ services:
         python - <<'PY'
         import asyncio, os, asyncpg
         async def ensure_db():
-            conn = await asyncpg.connect(
-                host="db", port=int(os.environ.get("DB_PORT", "5432")),
-                user=os.environ["DB_USER"], password=os.environ["DB_PASSWORD"],
-                database=os.environ["DB_NAME"],
-            )
-            try:
-                if not await conn.fetchval("SELECT 1 FROM pg_database WHERE datname='prefect'"):
-                    await conn.execute("CREATE DATABASE prefect")
-                    print("[prefect-init] created 'prefect' database")
-                else:
-                    print("[prefect-init] 'prefect' database already exists")
-            finally:
-                await conn.close()
+            # Wait for Postgres to accept TCP before starting the server. On a
+            # FRESH volume the db entrypoint runs initdb + the init *.sql scripts
+            # behind a temporary server bound to the local Unix socket ONLY, so
+            # pg_isready / the db healthcheck can report ready while TCP 5432 is
+            # still refusing connections. Connecting (or running Alembic) in that
+            # window dies with ConnectionRefused, so retry until TCP is truly up.
+            last = None
+            for attempt in range(1, 151):
+                try:
+                    conn = await asyncpg.connect(
+                        host="db", port=int(os.environ.get("DB_PORT", "5432")),
+                        user=os.environ["DB_USER"], password=os.environ["DB_PASSWORD"],
+                        database=os.environ["DB_NAME"],
+                    )
+                except (OSError, asyncpg.PostgresError) as e:
+                    last = e
+                    print(f"[prefect-init] db not ready over TCP (attempt {attempt}/150): {e!r}", flush=True)
+                    await asyncio.sleep(2)
+                    continue
+                try:
+                    if not await conn.fetchval("SELECT 1 FROM pg_database WHERE datname='prefect'"):
+                        await conn.execute("CREATE DATABASE prefect")
+                        print("[prefect-init] created 'prefect' database", flush=True)
+                    else:
+                        print("[prefect-init] 'prefect' database already exists", flush=True)
+                    return
+                finally:
+                    await conn.close()
+            raise SystemExit(f"[prefect-init] FATAL: db never became reachable over TCP: {last!r}")
         asyncio.run(ensure_db())
         PY
         exec prefect server start --host 0.0.0.0
-    ports:
-      - "4200:4200"  # Prefect UI + API
     env_file:
       - .env  # DB_USER / DB_PASSWORD / DB_NAME / DB_PORT for the connection URL
     environment:
@@ -171,7 +231,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 30
-      start_period: 30s
+      start_period: 120s
     restart: unless-stopped
 
   redis:

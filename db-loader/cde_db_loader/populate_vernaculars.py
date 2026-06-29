@@ -28,6 +28,7 @@ Usage:
         [--workers N] [--rate R] [--batch-size N]
         [--refresh-status error,not_found]
 """
+
 import argparse
 import concurrent.futures
 import logging
@@ -59,8 +60,15 @@ logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
 class LoggingRetry(Retry):
     """urllib3.Retry that logs each retry with full URL and reason."""
 
-    def increment(self, method=None, url=None, response=None, error=None,
-                  _pool=None, _stacktrace=None):
+    def increment(
+        self,
+        method=None,
+        url=None,
+        response=None,
+        error=None,
+        _pool=None,
+        _stacktrace=None,
+    ):
         full_url = url or ""
         if _pool is not None and url:
             full_url = f"{_pool.scheme}://{_pool.host}{url}"
@@ -73,12 +81,20 @@ class LoggingRetry(Retry):
         attempts_left = self.total - 1 if isinstance(self.total, int) else "?"
         logger.info(
             "Retrying %s %s (attempts left=%s) after %s",
-            method or "GET", full_url, attempts_left, reason,
+            method or "GET",
+            full_url,
+            attempts_left,
+            reason,
         )
         return super().increment(
-            method=method, url=url, response=response,
-            error=error, _pool=_pool, _stacktrace=_stacktrace,
+            method=method,
+            url=url,
+            response=response,
+            error=error,
+            _pool=_pool,
+            _stacktrace=_stacktrace,
         )
+
 
 WORMS_BASE = "https://www.marinespecies.org/rest"
 
@@ -131,7 +147,7 @@ def build_session(workers: int = DEFAULT_WORKERS):
         total=4,
         connect=4,
         read=4,
-        backoff_factor=0.5,           # 0.5s, 1s, 2s, 4s between attempts
+        backoff_factor=0.5,  # 0.5s, 1s, 2s, 4s between attempts
         status_forcelist=[429, 500, 502, 503, 504],
         allowed_methods=frozenset(["GET"]),
         raise_on_status=False,
@@ -353,7 +369,9 @@ def _fetch_taxon_data(session, name, aid, rank, classification_cache):
     try:
         en, fr = fetch_vernaculars(session, aid)
     except requests.RequestException as exc:
-        logger.warning("AphiaVernacularsByAphiaID failed for %r (%s): %s", name, aid, exc)
+        logger.warning(
+            "AphiaVernacularsByAphiaID failed for %r (%s): %s", name, aid, exc
+        )
         return TaxonResult(name, aid, rank, [], [], [], STATUS_ERROR)
 
     cached = classification_cache.get(aid)
@@ -363,14 +381,17 @@ def _fetch_taxon_data(session, name, aid, rank, classification_cache):
     try:
         ancestors = fetch_classification(session, aid)
     except requests.RequestException as exc:
-        logger.warning("AphiaClassificationByAphiaID failed for %r (%s): %s", name, aid, exc)
+        logger.warning(
+            "AphiaClassificationByAphiaID failed for %r (%s): %s", name, aid, exc
+        )
         ancestors = []
     classification_cache.put(aid, ancestors)
     return TaxonResult(name, aid, rank, ancestors, en, fr, STATUS_OK)
 
 
-def process_chunk(session, engine, executor, names, sleep_seconds, counts,
-                  classification_cache):
+def process_chunk(
+    session, engine, executor, names, sleep_seconds, counts, classification_cache
+):
     """Resolve a chunk of names and persist results.
 
     All upserts for the chunk are committed in a single transaction.
@@ -378,13 +399,22 @@ def process_chunk(session, engine, executor, names, sleep_seconds, counts,
     try:
         matches = match_aphia_ids(session, names)
     except requests.RequestException as exc:
-        logger.warning("Batch AphiaRecordsByMatchNames failed (%d names): %s", len(names), exc)
+        logger.warning(
+            "Batch AphiaRecordsByMatchNames failed (%d names): %s", len(names), exc
+        )
         with engine.begin() as conn:
             for name in names:
                 conn.execute(
                     UPSERT_SQL,
-                    {"name": name, "aphia_id": None, "rank": None, "ancestors": [],
-                     "en": [], "fr": [], "status": STATUS_ERROR},
+                    {
+                        "name": name,
+                        "aphia_id": None,
+                        "rank": None,
+                        "ancestors": [],
+                        "en": [],
+                        "fr": [],
+                        "status": STATUS_ERROR,
+                    },
                 )
         counts[STATUS_ERROR] += len(names)
         time.sleep(sleep_seconds)
@@ -402,7 +432,9 @@ def process_chunk(session, engine, executor, names, sleep_seconds, counts,
 
     if executor is not None:
         futures = [
-            executor.submit(_fetch_taxon_data, session, name, aid, rank, classification_cache)
+            executor.submit(
+                _fetch_taxon_data, session, name, aid, rank, classification_cache
+            )
             for name, aid, rank in pending
         ]
         for fut in concurrent.futures.as_completed(futures):
@@ -410,7 +442,9 @@ def process_chunk(session, engine, executor, names, sleep_seconds, counts,
     else:
         # Serial path: keep the per-call throttle.
         for name, aid, rank in pending:
-            results.append(_fetch_taxon_data(session, name, aid, rank, classification_cache))
+            results.append(
+                _fetch_taxon_data(session, name, aid, rank, classification_cache)
+            )
             time.sleep(sleep_seconds)
 
     with engine.begin() as conn:
@@ -437,29 +471,29 @@ def main():
         type=int,
         default=None,
         help="Process only the N most-common species (by total OBIS records). "
-             "Defaults to all uncached names. Useful for a fast triage backfill.",
+        "Defaults to all uncached names. Useful for a fast triage backfill.",
     )
     parser.add_argument(
         "--limit",
         type=int,
         default=None,
         help="Process at most this many names this run, after --top is applied "
-             "(useful for smoke tests).",
+        "(useful for smoke tests).",
     )
     parser.add_argument(
         "--workers",
         type=int,
         default=DEFAULT_WORKERS,
         help="Concurrent vernacular fetches per chunk (default: %(default)s). "
-             "Set to 1 to disable concurrency and re-enable per-call throttling.",
+        "Set to 1 to disable concurrency and re-enable per-call throttling.",
     )
     parser.add_argument(
         "--rate",
         type=float,
         default=DEFAULT_RATE_PER_SEC,
         help="Approximate WoRMS HTTP requests per second when concurrency is "
-             "off, and the throttle on the batch lookup call when on "
-             "(default: %(default)s).",
+        "off, and the throttle on the batch lookup call when on "
+        "(default: %(default)s).",
     )
     parser.add_argument(
         "--batch-size",
@@ -471,10 +505,10 @@ def main():
         "--refresh-status",
         default="",
         help="Comma-separated list of fetch_status values to retry "
-             "(e.g. 'error,not_found'). Also accepts the sentinel "
-             "'missing_classification' to refill rank/ancestor data for rows "
-             "that were populated before those columns existed. "
-             "Empty = skip already-cached rows.",
+        "(e.g. 'error,not_found'). Also accepts the sentinel "
+        "'missing_classification' to refill rank/ancestor data for rows "
+        "that were populated before those columns existed. "
+        "Empty = skip already-cached rows.",
     )
     args = parser.parse_args()
 
@@ -494,9 +528,12 @@ def main():
     total = len(todo)
     logger.info(
         "Names to process: %d (refresh=%s, top=%s, batch=%d, workers=%d, rate=%.1f/s)",
-        total, sorted(refresh) or "none",
+        total,
+        sorted(refresh) or "none",
         args.top if args.top is not None else "all",
-        batch_size, workers, args.rate,
+        batch_size,
+        workers,
+        args.rate,
     )
 
     counts = {STATUS_OK: 0, STATUS_NOT_FOUND: 0, STATUS_ERROR: 0}
@@ -505,13 +542,21 @@ def main():
     classification_cache = ClassificationCache()
     executor = (
         concurrent.futures.ThreadPoolExecutor(max_workers=workers)
-        if workers > 1 else None
+        if workers > 1
+        else None
     )
     try:
         for start in range(0, total, batch_size):
             chunk = todo[start : start + batch_size]
-            process_chunk(session, engine, executor, chunk, sleep_seconds, counts,
-                          classification_cache)
+            process_chunk(
+                session,
+                engine,
+                executor,
+                chunk,
+                sleep_seconds,
+                counts,
+                classification_cache,
+            )
             processed += len(chunk)
             if processed % (batch_size * 5) == 0 or processed == total:
                 logger.info(
@@ -532,6 +577,18 @@ def main():
         counts[STATUS_NOT_FOUND],
         counts[STATUS_ERROR],
     )
+
+    # Propagate the freshly-populated vernaculars into obis_cells.aphia_ids so
+    # the rank-aware Scientific Name filter works immediately, without waiting
+    # for the next harvest/load. Without this, a first-time vernaculars run
+    # fills scientific_name_vernaculars but leaves every obis_cell's aphia_ids
+    # empty until a subsequent load runs the backfill. Idempotent and cheap:
+    # obis_backfill_aphia_ids() only touches cells whose aphia_ids are still
+    # empty (see 5_profile_process.sql).
+    logger.info("Backfilling obis_cells.aphia_ids from vernaculars")
+    with engine.begin() as conn:
+        backfilled = conn.execute(text("SELECT obis_backfill_aphia_ids()")).scalar()
+    logger.info("Backfilled aphia_ids into %s obis_cells", backfilled)
 
 
 if __name__ == "__main__":

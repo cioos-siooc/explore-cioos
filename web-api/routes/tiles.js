@@ -71,9 +71,12 @@ router.get(
     const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
 
     const includeObis = req.query.includeObis !== 'false';
-    // Scientific-name and OBIS-node filters are OBIS-only: when either is
-    // set, hide profiles and narrow to OBIS rows.
-    const includeProfiles = !req.query.scientificNames && !req.query.obisNodes;
+    // Scientific-name filters are OBIS-only: hide profiles when set. An
+    // OBIS-node selection also hides profiles, unless ERDDAP servers are
+    // selected alongside it (combined Source filter — show both, OR'd in
+    // the shared dataset filter).
+    const includeProfiles = !req.query.scientificNames
+      && (!req.query.obisNodes || Boolean(req.query.erddapServers));
 
     // At hex zoom we only need the hex FK and point_pk (for distinct counts);
     // the polygon is fetched once per hex via JOIN to hexes_zoom_*. At point

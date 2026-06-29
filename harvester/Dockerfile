@@ -17,13 +17,16 @@ COPY ./harvester/cde_harvester ./cde_harvester
 COPY ./harvester/run.sh ./run.sh
 COPY ./harvester/worker-entrypoint.sh ./worker-entrypoint.sh
 
-# Bake in the sample harvest config and the OBIS dataset list so the image is
-# self-contained (a worker that doesn't mount a config — e.g. a remote worker —
-# still has a working default). The compose files mount the operator's chosen
-# config over /app/harvester/harvest_config.yaml at runtime (see
-# HARVEST_CONFIG_FILE in docker-compose), so changing config is a restart, not
-# a rebuild.
-COPY ./harvest_config.sample.yaml ./harvest_config.yaml
+# Bake a harvest config and the OBIS dataset list so the image is self-contained
+# (a worker that doesn't mount a config — e.g. a remote worker, or any Coolify
+# compose deploy where host bind-mounts of repo files don't work — still has a
+# working config). BAKED_HARVEST_CONFIG selects WHICH committed config to bake;
+# it defaults to the sample for local/dev builds. Deployments that want the full
+# production set point it at harvest_config.production.yaml via a build arg (e.g.
+# a Coolify "build variable"). This is build-time only and is distinct from the
+# runtime HARVEST_CONFIG_FILE env var the harvester reads.
+ARG BAKED_HARVEST_CONFIG=harvest_config.sample.yaml
+COPY ./${BAKED_HARVEST_CONFIG} ./harvest_config.yaml
 COPY ./Obis_Datasets.json ./Obis_Datasets.json
 
 # 4. Install project itself
