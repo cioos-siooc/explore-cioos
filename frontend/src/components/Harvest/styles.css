@@ -83,11 +83,18 @@
   white-space: nowrap;
 }
 
-.harvest-status-success { background: #C6E3DF; color: #0e3d35; }
-.harvest-status-skipped { background: #F3ECD6; color: #7a5c00; border: 1px solid #ddd0b0; }
-.harvest-status-error   { background: #FBE3E6; color: #7a1520; }
-.harvest-status-running { background: #DCEEF7; color: #0d5c80; }
-.harvest-status-failed  { background: #FBE3E6; color: #7a1520; }
+.harvest-status-success   { background: #C6E3DF; color: #0e3d35; }
+.harvest-status-skipped   { background: #F3ECD6; color: #7a5c00; border: 1px solid #ddd0b0; }
+.harvest-status-error     { background: #FBE3E6; color: #7a1520; }
+.harvest-status-running   { background: #DCEEF7; color: #0d5c80; }
+.harvest-status-failed    { background: #FBE3E6; color: #7a1520; }
+/* hash-verified, nothing re-harvested (run audit views) */
+.harvest-status-unchanged { background: #DCEEF7; color: #0d5c80; }
+
+/* ── Hashable column (file-based vs source-queried) ────────────────────────── */
+/* Cell text matches the rest of the table; the explanation is in the tooltip.
+   Summary count pill matches the success/skipped/error count pills. */
+.harvest-count-files { color: #0e3d35; }
 
 /* ── Sparkline ────────────────────────────────────────────────────────────── */
 .harvest-spark {
@@ -157,7 +164,6 @@
   text-decoration: none;
   color: inherit;
   display: block;
-  border-left: 4px solid #52A79B;
   transition: box-shadow 0.15s;
 }
 
@@ -203,9 +209,10 @@
   font-weight: 600;
 }
 
-.harvest-count-success { background: #C6E3DF; color: #0e3d35; }
-.harvest-count-skipped { background: #F3ECD6; color: #7a5c00; }
-.harvest-count-error   { background: #FBE3E6; color: #7a1520; }
+.harvest-count-success   { background: #C6E3DF; color: #0e3d35; }
+.harvest-count-unchanged { background: #DCEEF7; color: #0d5c80; }
+.harvest-count-skipped   { background: #F3ECD6; color: #7a5c00; }
+.harvest-count-error     { background: #FBE3E6; color: #7a1520; }
 
 .harvest-card-meta {
   font-size: 0.75rem;

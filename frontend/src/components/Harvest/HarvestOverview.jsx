@@ -4,24 +4,9 @@ import { useTranslation } from 'react-i18next'
 import HarvestLayout from './HarvestLayout.jsx'
 import StatusBadge from './StatusBadge.jsx'
 import useHarvestFetch from './useHarvestFetch.js'
+import reasonLabel from './reasonLabel.js'
 import { slugify } from './slug.js'
-
-function hostname(url) {
-  try { return new URL(url).hostname || url } catch { return url }
-}
-
-function fmtDt(val) {
-  if (!val) return '—'
-  const d = val instanceof Date ? val : new Date(val)
-  if (isNaN(d.getTime())) return String(val)
-  return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-function fmtDuration(s) {
-  if (s == null) return '—'
-  if (s < 60) return `${s}s`
-  return `${Math.floor(s / 60)}m ${s % 60}s`
-}
+import { hostname, fmtDt, fmtDurationS } from './format.js'
 
 function runLabel(r) {
   if (r.triggered_source) {
@@ -78,6 +63,7 @@ export default function HarvestOverview() {
                 <th>{t('harvest.col.duration')}</th>
                 <th>{t('harvest.col.gitSha')}</th>
                 <th style={{ textAlign: 'right' }}>{t('harvest.col.ok')}</th>
+                <th style={{ textAlign: 'right' }}>{t('harvest.col.unchanged')}</th>
                 <th style={{ textAlign: 'right' }}>{t('harvest.col.skipped')}</th>
                 <th style={{ textAlign: 'right' }}>{t('harvest.col.error')}</th>
                 <th style={{ textAlign: 'right' }}>{t('harvest.col.total')}</th>
@@ -103,9 +89,10 @@ export default function HarvestOverview() {
                     )}
                   </td>
                   <td><StatusBadge status={r.status} /></td>
-                  <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDuration(r.duration_s)}</td>
+                  <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDurationS(r.duration_s)}</td>
                   <td className="harvest-mono harvest-muted" style={{ fontSize: '0.82rem' }}>{r.git_sha ? r.git_sha.slice(0, 7) : '—'}</td>
                   <td style={{ textAlign: 'right' }}>{r.n_success}</td>
+                  <td className="harvest-muted" style={{ textAlign: 'right' }}>{r.n_unchanged}</td>
                   <td style={{ textAlign: 'right' }}>{r.n_skipped}</td>
                   <td style={{ textAlign: 'right', color: r.n_error > 0 ? '#7a1520' : undefined }}>{r.n_error}</td>
                   <td style={{ textAlign: 'right', fontWeight: 600 }}>{r.n_total}</td>
@@ -128,7 +115,7 @@ export default function HarvestOverview() {
             <tbody>
               {reasons.map(r => (
                 <tr key={r.reason_code}>
-                  <td className="harvest-mono">{r.reason_code}</td>
+                  <td title={r.reason_code}>{reasonLabel(t, r.reason_code)}</td>
                   <td style={{ textAlign: 'right', fontWeight: 600 }}>{r.n}</td>
                 </tr>
               ))}
