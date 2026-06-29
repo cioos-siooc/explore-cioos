@@ -137,6 +137,7 @@ services:
       - REGISTER_DEPLOYMENTS=true
       - RUN_ON_DEPLOY=${RUN_ON_DEPLOY:-false}
       - HOST_ROOT=${HOST_ROOT}
+      - HARVEST_CONFIG_FILE=/app/harvester/harvest_config.yaml
     env_file:
       - .env
     depends_on:

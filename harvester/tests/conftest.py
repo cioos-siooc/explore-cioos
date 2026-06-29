@@ -326,10 +326,10 @@ def build_mock_dataset(
     mock.globals = global_rows["Value"].to_dict()
 
     # EOVs — use the real utility to derive them
-    from cde_harvester.utils import cde_eov_to_standard_name, intersection
+    from cde_harvester.utils import eov_to_standard_name, intersection
     eovs = []
     dataset_standard_names = df_variables["standard_name"].tolist()
-    for eov, standard_names in cde_eov_to_standard_name.items():
+    for eov, standard_names in eov_to_standard_name.items():
         if intersection(dataset_standard_names, standard_names):
             eovs.append(eov)
     mock.eovs = eovs

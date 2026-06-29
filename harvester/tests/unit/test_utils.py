@@ -5,9 +5,9 @@ Unit tests for cde_harvester.utils — EOV/CF standard name mappings and helpers
 import pytest
 
 from cde_harvester.utils import (
-    cde_eov_to_standard_name,
-    df_cde_eov_to_standard_name,
-    get_cde_eov_to_standard_name,
+    eov_to_standard_name,
+    df_eov_to_standard_name,
+    get_eov_to_standard_name,
     intersection,
     supported_standard_names,
 )
@@ -35,32 +35,32 @@ class TestIntersection:
 
 class TestCdeEovMappings:
     def test_mapping_is_non_empty(self):
-        assert len(cde_eov_to_standard_name) > 0
+        assert len(eov_to_standard_name) > 0
 
     def test_most_eovs_map_to_at_least_one_standard_name(self):
         # Some EOVs (e.g. fishAbundanceAndDistribution) have no CF standard names
         # by design — they're monitored via non-CF methods. Verify the majority do.
-        eovs_with_names = [eov for eov, names in cde_eov_to_standard_name.items() if names]
-        assert len(eovs_with_names) > len(cde_eov_to_standard_name) // 2
+        eovs_with_names = [eov for eov, names in eov_to_standard_name.items() if names]
+        assert len(eovs_with_names) > len(eov_to_standard_name) // 2
 
     def test_sea_water_temperature_is_supported(self):
         assert "sea_water_temperature" in supported_standard_names
 
     def test_df_has_expected_columns(self):
-        assert "eov" in df_cde_eov_to_standard_name.columns
-        assert "standard_name" in df_cde_eov_to_standard_name.columns
+        assert "eov" in df_eov_to_standard_name.columns
+        assert "standard_name" in df_eov_to_standard_name.columns
 
     def test_df_rows_match_mapping(self):
         """Every row in the DataFrame must correspond to a valid (eov, standard_name) pair."""
-        for _, row in df_cde_eov_to_standard_name.iterrows():
+        for _, row in df_eov_to_standard_name.iterrows():
             eov = row["eov"]
             sn = row["standard_name"]
-            assert eov in cde_eov_to_standard_name
-            assert sn in cde_eov_to_standard_name[eov]
+            assert eov in eov_to_standard_name
+            assert sn in eov_to_standard_name[eov]
 
     def test_goos_and_cde_layers_both_collapsed(self):
-        """get_cde_eov_to_standard_name should hide the GOOS intermediate layer."""
-        mapping = get_cde_eov_to_standard_name()
+        """get_eov_to_standard_name should hide the GOOS intermediate layer."""
+        mapping = get_eov_to_standard_name()
         # Top-level keys are CDE EOVs, not GOOS EOVs
         assert isinstance(mapping, dict)
         for key in mapping:

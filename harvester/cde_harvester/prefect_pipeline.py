@@ -360,6 +360,13 @@ class PrefectCDEPipeline:
         job_vars = {
             "env": {
                 "PREFECT_LOGGING_EXTRA_LOGGERS": "populate_vernaculars,cde_db_loader,cde_harvester",
+                # Escape hatch for the db-loader full-reload guard: set to 1 to
+                # permit a full reload that prunes sources missing from the
+                # incoming harvest (e.g. dropping OBIS). Empty = guard enforced.
+                # The process worker inherits this from its container env too,
+                # but set it explicitly so the guard's state travels with the
+                # deployment job vars.
+                "CDE_ALLOW_FULL_RELOAD": os.getenv("CDE_ALLOW_FULL_RELOAD", ""),
             },
         }
 

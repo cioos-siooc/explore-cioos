@@ -148,10 +148,12 @@ def written_csv_folder(tmp_path_factory, harvest_result):
 
     with (
         patch("cde_harvester.ERDDAP.requests.Session") as mock_session_cls,
+        # CKAN fetching now goes through a requests.Session built by
+        # _build_ckan_session() and read with resp.json(), so patch the session
+        # builder rather than the (now unused) module-level requests.get.
         patch(
-            "cde_harvester.ckan.create_ckan_erddap_link.requests.get",
-            side_effect=_ckan_side_effects(),
-        ),
+            "cde_harvester.ckan.create_ckan_erddap_link._build_ckan_session",
+        ) as mock_ckan_session_builder,
         patch(
             "cde_harvester.__main__.get_run_logger",
             return_value=logging.getLogger("test"),
@@ -163,11 +165,18 @@ def written_csv_folder(tmp_path_factory, harvest_result):
         mock_session = MagicMock()
         mock_session.get.side_effect = _erddap_session_get
         mock_session_cls.return_value = mock_session
+
+        ckan_session = MagicMock()
+        ckan_session.get.side_effect = _ckan_side_effects()
+        mock_ckan_session_builder.return_value = ckan_session
+
         mock_harvest_task.submit.return_value = mock_future
 
         from cde_harvester.__main__ import main as harvester_main
 
-        harvester_main.fn(
+        # main() is now a plain function wrapped by @monitor (Sentry), not a
+        # Prefect @flow, so call it directly rather than via .fn().
+        harvester_main(
             erddap_urls=ERDDAP_URL,
             cache_requests=False,
             folder=folder,
