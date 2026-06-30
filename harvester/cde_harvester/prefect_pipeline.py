@@ -462,11 +462,12 @@ def _normalize_coolify_multiline(value: str) -> str:
 
 
 def _resolve_harvest_config_file(config_file):
-    """Resolve effective config: HARVEST_CONFIG_YAML env > mounted/baked-in default.
+    """Resolve effective config: HARVEST_CONFIG_YAML env > HARVEST_CONFIG_FILE env > baked-in default.
 
     Also writes OBIS_DATASETS_JSON to /tmp/Obis_Datasets.json when set.
     """
     env_config = os.getenv("HARVEST_CONFIG_YAML", "").strip()
+    env_config_file = os.getenv("HARVEST_CONFIG_FILE", "").strip()
     if env_config:
         # Coolify indents multi-line env var continuations; strip it so the YAML parses.
         env_config = _normalize_coolify_multiline(env_config)
@@ -474,6 +475,9 @@ def _resolve_harvest_config_file(config_file):
         env_config_path.write_text(env_config)
         config_file = str(env_config_path)
         logger.info(f"Using HARVEST_CONFIG_YAML env var ({len(env_config)} bytes -> {env_config_path})")
+    elif env_config_file:
+        config_file = env_config_file
+        logger.info(f"Using HARVEST_CONFIG_FILE env var: {config_file}")
     else:
         logger.info(f"Using harvest config file: {config_file}")
 
