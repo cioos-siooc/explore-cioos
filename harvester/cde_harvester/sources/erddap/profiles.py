@@ -3,7 +3,7 @@
 from datetime import datetime
 
 import pandas as pd
-from cde_harvester.ERDDAP import ERDDAP
+from cde_harvester.sources.erddap.client import ERDDAP
 
 
 def get_profiles(dataset):

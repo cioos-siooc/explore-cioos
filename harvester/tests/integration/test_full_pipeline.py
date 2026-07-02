@@ -29,8 +29,8 @@ from conftest import (
     _route_erddap_url,
 )
 
-from cde_harvester.base_harvester import HarvestResult
-from cde_harvester.erddap_harvester import harvest_erddap
+from cde_harvester.sources.base import HarvestResult
+from cde_harvester.sources.erddap.harvester import harvest_erddap
 from cde_harvester.__main__ import (
     get_ckan_records,
     main as harvester_main,
@@ -69,9 +69,9 @@ def harvest_result(tmp_path_factory):
     Uses harvest_erddap.fn() to bypass the Prefect @task decorator.
     """
     with (
-        patch("cde_harvester.ERDDAP.requests.Session") as mock_session_cls,
+        patch("cde_harvester.sources.erddap.client.requests.Session") as mock_session_cls,
         patch(
-            "cde_harvester.ckan.create_ckan_erddap_link.requests.get",
+            "cde_harvester.sources.ckan.create_ckan_erddap_link.requests.get",
             side_effect=_ckan_side_effects(),
         ),
     ):
@@ -176,12 +176,12 @@ def written_csv_folder(tmp_path_factory, harvest_result):
     mock_future.result.return_value = hr
 
     with (
-        patch("cde_harvester.ERDDAP.requests.Session") as mock_session_cls,
+        patch("cde_harvester.sources.erddap.client.requests.Session") as mock_session_cls,
         # CKAN fetching now goes through a requests.Session built by
         # _build_ckan_session() and read with resp.json(), so patch the session
         # builder rather than the (now unused) module-level requests.get.
         patch(
-            "cde_harvester.ckan.create_ckan_erddap_link._build_ckan_session",
+            "cde_harvester.sources.ckan.create_ckan_erddap_link._build_ckan_session",
         ) as mock_ckan_session_builder,
         patch(
             "cde_harvester.__main__.get_run_logger",

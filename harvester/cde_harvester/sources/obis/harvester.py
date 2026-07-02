@@ -10,9 +10,9 @@ import requests
 from prefect import task
 from prefect.logging import get_run_logger
 
-from cde_harvester.base_harvester import BaseHarvester, HarvestResult
-from cde_harvester.ckan.create_ckan_obis_link import get_ckan_obis_records
-from cde_harvester.obis_geo_filter import ObisGeoFilter
+from cde_harvester.sources.base import BaseHarvester, HarvestResult
+from cde_harvester.sources.ckan.create_ckan_obis_link import get_ckan_obis_records
+from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
 from cde_harvester.core.schemas import (
     DatasetSchema,
     HarvestAttemptSchema,

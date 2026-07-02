@@ -1,4 +1,5 @@
 import logging
+from importlib.resources import files
 from pathlib import Path
 
 import pandas as pd
@@ -15,8 +16,12 @@ CDE converts IOOS to L06 using a mapping found here:  https://mmisw.org/ont?iri=
 
 logger = logging.getLogger(__name__)
 
-PLATFORM_L06_CODES_AND_LABELS_CSV = Path(__file__).parent / "data" / "platform_nerc_l06_codes_and_labels.csv" 
-PLATFORM_L06_MAPPING_CSV = Path(__file__).parent / "data" / "platform_nerc_ioos_l06.csv"
+PLATFORM_L06_CODES_AND_LABELS_CSV = Path(
+    str(files("cde_harvester.data") / "platform_nerc_l06_codes_and_labels.csv")
+)
+PLATFORM_L06_MAPPING_CSV = Path(
+    str(files("cde_harvester.data") / "platform_nerc_ioos_l06.csv")
+)
 
 
 def get_l06_codes_and_labels():

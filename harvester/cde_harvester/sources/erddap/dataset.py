@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import requests
 from cde_harvester.core.observability import run_logger
-from cde_harvester.platform_ioos_to_l06 import platforms_nerc_ioos
+from cde_harvester.sources.erddap.platform_vocab import platforms_nerc_ioos
 from cde_harvester.utils import eov_to_standard_name, intersection
 from requests.exceptions import HTTPError
 

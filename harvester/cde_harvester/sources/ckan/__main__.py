@@ -1,6 +1,6 @@
 import argparse
 
-from cde_harvester.ckan.create_ckan_erddap_link import get_ckan_records
+from cde_harvester.sources.ckan.create_ckan_erddap_link import get_ckan_records
 
 output_file = "erddap_ckan_mapping.csv"
 

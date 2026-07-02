@@ -1,5 +1,5 @@
 """
-Unit tests for cde_harvester.ckan.create_ckan_erddap_link.
+Unit tests for cde_harvester.sources.ckan.create_ckan_erddap_link.
 
 All outbound CKAN HTTP calls are intercepted with pytest-mock so the tests run
 offline and deterministically.
@@ -16,7 +16,7 @@ from conftest import (
     DATASET_ID,
     ERDDAP_URL,
 )
-from cde_harvester.ckan.create_ckan_erddap_link import (
+from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     get_ckan_records,
     split_erddap_url,
     unescape_ascii,
@@ -44,7 +44,7 @@ def _make_ckan_get(mocker, pages):
     mock_session = mocker.MagicMock()
     mock_session.get.side_effect = responses
     mocker.patch(
-        "cde_harvester.ckan.create_ckan_erddap_link._build_ckan_session",
+        "cde_harvester.sources.ckan.create_ckan_erddap_link._build_ckan_session",
         return_value=mock_session,
     )
 

@@ -1,5 +1,5 @@
 """
-Unit tests for cde_harvester.erddap_harvester.harvest_erddap.
+Unit tests for cde_harvester.sources.erddap.harvester.harvest_erddap.
 
 The ERDDAP class constructor is patched so no HTTP calls are made.
 Individual Dataset objects are returned as pre-built MagicMocks.
@@ -16,7 +16,7 @@ from conftest import (
     build_mock_dataset,
     ERDDAP_INFO_NO_EOVS_CSV,
 )
-from cde_harvester.erddap_harvester import harvest_erddap
+from cde_harvester.sources.erddap.harvester import harvest_erddap
 from cde_harvester.core.errors import (
     CDM_DATA_TYPE_UNSUPPORTED,
     HTTP_ERROR,
@@ -73,8 +73,8 @@ def _run_harvest(erddap_mock, dataset_mock=None, limit=None):
     Uses .fn() to bypass the Prefect @task decorator.
     """
     with (
-        patch("cde_harvester.erddap_harvester.ERDDAP", return_value=erddap_mock),
-        patch("cde_harvester.erddap_harvester.get_profiles") as mock_get_profiles,
+        patch("cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock),
+        patch("cde_harvester.sources.erddap.harvester.get_profiles") as mock_get_profiles,
     ):
         if dataset_mock is None:
             dataset_mock = build_mock_dataset()
@@ -136,8 +136,8 @@ class TestHarvestErddapSkipping:
         )
 
         with (
-            patch("cde_harvester.erddap_harvester.ERDDAP", return_value=erddap_mock),
-            patch("cde_harvester.erddap_harvester.get_profiles"),
+            patch("cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock),
+            patch("cde_harvester.sources.erddap.harvester.get_profiles"),
         ):
             result = harvest_erddap.fn(ERDDAP_URL)
 

@@ -1,5 +1,5 @@
 """
-Unit tests for cde_harvester.profiles.get_profiles.
+Unit tests for cde_harvester.sources.erddap.profiles.get_profiles.
 
 Uses a fully-configured MagicMock dataset so that get_profiles can exercise
 its real logic (DataFrame manipulation, bad-geometry filtering, etc.) without
@@ -15,7 +15,7 @@ from conftest import (
     ERDDAP_URL,
     build_mock_dataset,
 )
-from cde_harvester.profiles import get_profiles
+from cde_harvester.sources.erddap.profiles import get_profiles
 
 
 # ---------------------------------------------------------------------------

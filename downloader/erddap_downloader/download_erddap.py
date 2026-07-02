@@ -7,7 +7,7 @@ import os
 import sys
 from urllib.parse import urlparse
 
-import cde_harvester.ERDDAP as cde_harvester
+import cde_harvester.sources.erddap.client as cde_harvester
 import pandas as pd
 import requests
 import shapely.wkt

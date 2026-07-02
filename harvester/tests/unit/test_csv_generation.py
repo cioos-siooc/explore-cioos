@@ -4,9 +4,9 @@ Unit tests for CSV file generation and structural validation.
 Each test generates its DataFrame by calling real codebase functions with
 mocked ERDDAP responses — not by constructing fixtures by hand.
 
-  datasets.csv  →  Dataset.get_df()      (cde_harvester.dataset)
-  profiles.csv  →  get_profiles()        (cde_harvester.profiles)
-  skipped.csv   →  CDEComplianceChecker  (cde_harvester.CDEComplianceChecker)
+  datasets.csv  →  Dataset.get_df()      (cde_harvester.sources.erddap.dataset)
+  profiles.csv  →  get_profiles()        (cde_harvester.sources.erddap.profiles)
+  skipped.csv   →  CDEComplianceChecker  (cde_harvester.sources.erddap.compliance)
                    + harvester skipped-row assembly
 """
 
@@ -26,9 +26,9 @@ from conftest import (
     mock_erddap_server,  # noqa: F401 — imported so pytest discovers the fixture
 )
 
-from cde_harvester.CDEComplianceChecker import CDEComplianceChecker
-from cde_harvester.dataset import Dataset
-from cde_harvester.profiles import get_profiles
+from cde_harvester.sources.erddap.compliance import CDEComplianceChecker
+from cde_harvester.sources.erddap.dataset import Dataset
+from cde_harvester.sources.erddap.profiles import get_profiles
 from cde_harvester.core.schemas import SkippedDatasetSchema
 
 

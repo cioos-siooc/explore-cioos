@@ -9,9 +9,9 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 import pandas as pd
-from cde_harvester.base_harvester import BaseHarvester, HarvestResult
-from cde_harvester.CDEComplianceChecker import CDEComplianceChecker
-from cde_harvester.ERDDAP import ERDDAP
+from cde_harvester.sources.base import BaseHarvester, HarvestResult
+from cde_harvester.sources.erddap.compliance import CDEComplianceChecker
+from cde_harvester.sources.erddap.client import ERDDAP
 from cde_harvester.core.schemas import (
     DatasetSchema,
     HarvestAttemptSchema,
@@ -30,8 +30,8 @@ from cde_harvester.core.errors import (
     UNCHANGED,
     UNKNOWN_ERROR,
 )
-from cde_harvester.dataset_state import load_previous_hashes
-from cde_harvester.profiles import get_profiles
+from cde_harvester.sources.erddap.state import load_previous_hashes
+from cde_harvester.sources.erddap.profiles import get_profiles
 from requests.exceptions import HTTPError
 from prefect import task
 

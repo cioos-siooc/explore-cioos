@@ -24,6 +24,7 @@ from cde_harvester.core.config import (
     resolve_harvest_config_file,
 )
 from cde_harvester.core.observability import cleanup_old_logs, run_logger
+from cde_harvester.sources import OBIS_ALIASES
 from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
 from cde_harvester.loading.loader import main as db_loader_main
 from cde_harvester.loading.populate_vernaculars import main as vernaculars_main
@@ -87,10 +88,6 @@ def _publish_log_artifact(log_path):
         # Outside a flow/task run context, or API hiccup — never fail the run for this.
         logger.debug("Could not publish log artifact: %s", e)
 
-
-# OBIS aliases the dashboard / a deployment may pass; kept in sync with
-# cde_harvester.__main__._OBIS_ALIASES.
-_OBIS_ALIASES = {"obis", "https://obis.org", "http://obis.org", "obis.org"}
 
 # Process work pool the worker(s) poll; flows run in-process (no spawned containers).
 POOL_NAME = "cde-process-pool"
@@ -165,7 +162,7 @@ def _prune_server_run_folders(base_folder, keep=KEEP_RUNS_PER_SERVER, protect=()
 
 def deployment_slug(source):
     """Stable per-source slug; must match harvest-dashboard/app/config.deployment_slug."""
-    if not source or str(source).strip().lower() in _OBIS_ALIASES:
+    if not source or str(source).strip().lower() in OBIS_ALIASES:
         return "obis"
     host = urlparse(source if "://" in source else "https://" + source).hostname or str(source)
     return host.lower().replace(".", "-")
