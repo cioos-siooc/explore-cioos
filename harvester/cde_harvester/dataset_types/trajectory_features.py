@@ -166,9 +166,10 @@ def _extract_via_chunked_download(dataset, traj_var, has_depth):
     if pd.isna(start) or pd.isna(end):
         chunks = [""]  # no coverage metadata — single unchunked query
     else:
-        bounds = pd.date_range(
-            start.floor("D"), end.ceil("D") + pd.Timedelta(days=1), freq="365D"
-        )
+        # Yearly chunk starts, plus a final bound past the end so a dataset
+        # shorter than one chunk still yields exactly one query.
+        bounds = list(pd.date_range(start.floor("D"), end.ceil("D"), freq="365D"))
+        bounds.append(end.ceil("D") + pd.Timedelta(days=1))
         chunks = [
             f"&time>={a.strftime('%Y-%m-%dT%H:%M:%SZ')}&time<{b.strftime('%Y-%m-%dT%H:%M:%SZ')}"
             for a, b in zip(bounds[:-1], bounds[1:])
@@ -307,11 +308,14 @@ def extract_cells(dataset, count_profiles=False):
     if cells.empty:
         return cells
 
-    # days + records_per_day feed the download-size estimator (same math as
-    # the profile pipeline: same-day tracks count as one day).
-    days = (cells["time_max"] - cells["time_min"]).dt.days.replace(0, 1)
-    cells["days"] = days
-    cells["records_per_day"] = cells["n_records"] / days
+    # days + records_per_day feed tiles and the download-size estimator.
+    # Match the profiles conventions exactly: the `days` column is
+    # date_part('days', span) + 1 (see process_profile_geometry_and_links),
+    # while records_per_day divides by the raw span floored to one day
+    # (see the profile pipeline in tabledap_features).
+    span_days = (cells["time_max"] - cells["time_min"]).dt.days
+    cells["days"] = span_days + 1
+    cells["records_per_day"] = cells["n_records"] / span_days.replace(0, 1)
 
     log.info(
         "Extracted %d trajectory cells across %d trajectories for %s",

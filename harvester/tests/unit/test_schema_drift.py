@@ -21,6 +21,7 @@ from cde_harvester.core.schemas import (
     ObisCellSchema,
     ProfileSchema,
     SkippedDatasetSchema,
+    TrajectoryCellSchema,
 )
 
 SCHEMA_SQL = Path(__file__).resolve().parents[3] / "database" / "1_schema.sql"
@@ -29,6 +30,7 @@ SCHEMA_SQL = Path(__file__).resolve().parents[3] / "database" / "1_schema.sql"
 SCHEMA_TO_TABLE = {
     ProfileSchema: "profiles",
     ObisCellSchema: "obis_cells",
+    TrajectoryCellSchema: "trajectory_cells",
     DatasetSchema: "datasets",
     SkippedDatasetSchema: "skipped_datasets",
     HarvestRunSchema: "harvest_runs",
