@@ -291,3 +291,83 @@ BEGIN
   PERFORM obis_backfill_aphia_ids();
 END;
 $$ LANGUAGE plpgsql;
+
+
+-- Trajectory-cell post-load processing. Mirrors the obis_* functions above:
+-- trajectory_cells carries a generated geom, so processing is only linking
+-- (dataset_pk, points/point_pk) plus the days derivation used by download
+-- estimates. Must run AFTER profile_process() (which rebuilds cde.points)
+-- and BEFORE create_hexes() (which propagates hex FKs via point_pk).
+
+CREATE OR REPLACE FUNCTION trajectory_link_dataset_pk() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
+  UPDATE cde.trajectory_cells c
+  SET dataset_pk = d.pk
+  FROM cde.datasets d
+  WHERE c.dataset_id = d.dataset_id
+    AND c.erddap_url = d.erddap_url
+    AND c.dataset_pk IS NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION trajectory_insert_points() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
+  INSERT INTO cde.points (geom)
+  SELECT src.new_geom
+    FROM (
+      SELECT DISTINCT
+             ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857) AS new_geom
+        FROM cde.trajectory_cells
+    ) src
+    LEFT JOIN cde.points p ON p.geom = src.new_geom
+   WHERE p.pk IS NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION trajectory_link_point_pk() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
+  -- Relink ALL trajectory_cells by geom (not just point_pk IS NULL):
+  -- profile_process() rebuilds cde.points with new serial pks on every run,
+  -- so stale FKs must be re-matched. Same rationale as obis_link_point_pk().
+  UPDATE cde.trajectory_cells c
+  SET point_pk = p.pk
+  FROM cde.points p
+  WHERE p.geom = c.geom;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION trajectory_update_days() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
+  UPDATE cde.trajectory_cells
+  SET days = date_part('days', time_max - time_min) + 1
+  WHERE days IS NULL
+    AND time_min IS NOT NULL AND time_max IS NOT NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Wrapper used by process_incremental_update(); the full-reload path in the
+-- db-loader invokes the sub-functions individually for per-step timing logs.
+CREATE OR REPLACE FUNCTION trajectory_process() RETURNS VOID AS $$
+BEGIN
+  PERFORM trajectory_link_dataset_pk();
+  PERFORM trajectory_insert_points();
+  PERFORM trajectory_link_point_pk();
+  PERFORM trajectory_update_days();
+END;
+$$ LANGUAGE plpgsql;

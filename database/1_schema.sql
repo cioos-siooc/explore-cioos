@@ -185,6 +185,53 @@ CREATE INDEX obis_cells_aphia_ids_gin         ON cde.obis_cells USING GIN (aphia
 ALTER TABLE cde.obis_cells SET (fillfactor = 80);
 ALTER TABLE cde.points SET (fillfactor = 80);
 
+
+-- Trajectory / TrajectoryProfile coverage cells: one row per (trajectory,
+-- 1/12-degree grid cell) the track passes through, produced by the harvester's
+-- trajectory dataset-type handler via server-side binned ERDDAP queries (no
+-- full-resolution track is ever stored here). Modeled on obis_cells — same
+-- generated geom, same points/hex FK propagation (see trajectory_* functions
+-- in 5_profile_process.sql).
+DROP TABLE IF EXISTS trajectory_cells;
+CREATE TABLE trajectory_cells (
+    pk serial PRIMARY KEY,
+    dataset_pk integer,
+    erddap_url text,
+    dataset_id text,
+    -- cf_role=trajectory_id value (mission/deployment); '' when the dataset
+    -- has a single unnamed trajectory.
+    trajectory_id text DEFAULT '',
+    -- bin-center coordinates, rounded to 8 dp (same convention as obis_cells)
+    latitude double precision,
+    longitude double precision,
+    geom geometry(Point, 3857) GENERATED ALWAYS AS
+      (ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)) STORED,
+    time_min timestamptz,
+    time_max timestamptz,
+    depth_min double precision,
+    depth_max double precision,
+    n_records bigint,
+    -- TrajectoryProfile: distinct profiles observed in this cell. 0 for plain
+    -- Trajectory datasets.
+    n_profiles bigint DEFAULT 0,
+    -- computed at harvest time so the download-estimate math in
+    -- web-api/utils/shapeQuery.js works unchanged on this table
+    records_per_day float,
+    days bigint,
+    -- hex polygon geometries live on cde.hexes_zoom_0/1; only the FK is
+    -- carried here (filled by create_hexes() via cde.points).
+    hex_0_pk integer,
+    hex_1_pk integer,
+    point_pk integer,
+    UNIQUE(erddap_url, dataset_id, trajectory_id, latitude, longitude),
+    FOREIGN KEY (dataset_pk) REFERENCES datasets(pk)
+);
+
+CREATE INDEX trajectory_cells_geom_gist ON trajectory_cells USING GIST (geom);
+CREATE INDEX trajectory_cells_dataset_idx ON trajectory_cells (erddap_url, dataset_id);
+CREATE INDEX trajectory_cells_latlon_idx ON trajectory_cells (latitude, longitude);
+ALTER TABLE cde.trajectory_cells SET (fillfactor = 80);
+
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 DROP MATERIALIZED VIEW IF EXISTS cde.obis_scientific_names;

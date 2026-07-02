@@ -10,6 +10,7 @@ Functions:
 - upsert_datasets_from_temp() - UPSERT datasets from temp_datasets
 - replace_profiles_from_temp() - Replace profiles for updated datasets
 - replace_obis_cells_from_temp() - Replace obis_cells for updated datasets
+- replace_trajectory_cells_from_temp() - Replace trajectory_cells for updated datasets
 - upsert_skipped_datasets_from_temp() - UPSERT skipped datasets
 - process_incremental_update() - Main orchestrator for entire incremental workflow
 
@@ -25,6 +26,10 @@ BEGIN
   CREATE TEMP TABLE IF NOT EXISTS temp_profiles (LIKE cde.profiles INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
   CREATE TEMP TABLE IF NOT EXISTS temp_skipped_datasets (LIKE cde.skipped_datasets INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
   CREATE TEMP TABLE IF NOT EXISTS temp_obis_cells (LIKE cde.obis_cells INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
+  -- LIKE copies the GENERATED expression for geom, which would reject plain
+  -- INSERTs of lat/lon-only rows on some paths; drop the expression so the
+  -- temp table takes NULL geom (the main-table INSERT recomputes it anyway).
+  CREATE TEMP TABLE IF NOT EXISTS temp_trajectory_cells (LIKE cde.trajectory_cells INCLUDING DEFAULTS EXCLUDING CONSTRAINTS EXCLUDING GENERATED);
 
   -- Explicitly drop all NOT NULL constraints from temp tables
   -- These are column-level constraints that EXCLUDING CONSTRAINTS doesn't remove
@@ -156,6 +161,36 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+-- Replace trajectory_cells for datasets that are in temp_datasets
+-- Deletes old cells for those datasets, then inserts new ones from temp
+CREATE OR REPLACE FUNCTION replace_trajectory_cells_from_temp() RETURNS VOID AS $$
+BEGIN
+  DELETE FROM cde.trajectory_cells c
+  USING temp_datasets td
+  WHERE c.dataset_id = td.dataset_id
+    AND c.erddap_url = td.erddap_url;
+
+  INSERT INTO cde.trajectory_cells
+    (erddap_url, dataset_id, trajectory_id, latitude, longitude,
+     time_min, time_max, depth_min, depth_max,
+     n_records, n_profiles, records_per_day, days)
+  SELECT erddap_url, dataset_id, trajectory_id, latitude, longitude,
+         time_min, time_max, depth_min, depth_max,
+         n_records, n_profiles, records_per_day, days
+  FROM temp_trajectory_cells
+  ON CONFLICT (erddap_url, dataset_id, trajectory_id, latitude, longitude) DO UPDATE SET
+    time_min = EXCLUDED.time_min,
+    time_max = EXCLUDED.time_max,
+    depth_min = EXCLUDED.depth_min,
+    depth_max = EXCLUDED.depth_max,
+    n_records = EXCLUDED.n_records,
+    n_profiles = EXCLUDED.n_profiles,
+    records_per_day = EXCLUDED.records_per_day,
+    days = EXCLUDED.days;
+END;
+$$ LANGUAGE plpgsql;
+
+
 -- Main incremental processing function
 -- Orchestrates the entire incremental update workflow
 CREATE OR REPLACE FUNCTION process_incremental_update() RETURNS VOID AS $$
@@ -175,19 +210,25 @@ BEGIN
   -- 5. Replace obis_cells (delete old, insert new)
   PERFORM replace_obis_cells_from_temp();
 
-  -- 6. UPSERT skipped datasets
+  -- 6. Replace trajectory_cells (delete old, insert new)
+  PERFORM replace_trajectory_cells_from_temp();
+
+  -- 7. UPSERT skipped datasets
   PERFORM upsert_skipped_datasets_from_temp();
 
-  -- 7. Run processing functions to populate remaining fields
-  -- Note: profile_process() rebuilds points from profiles; obis_process() must run after
+  -- 8. Run processing functions to populate remaining fields
+  -- Note: profile_process() rebuilds points from profiles; obis_process() and
+  -- trajectory_process() must run after it (they re-add their geoms to points
+  -- and relink point_pk).
   PERFORM ckan_process();
   PERFORM profile_process();
   PERFORM obis_process();
+  PERFORM trajectory_process();
 
-  -- 8. Create hexes for all data
+  -- 9. Create hexes for all data
   PERFORM create_hexes();
 
-  -- 9. Restore constraints
+  -- 10. Restore constraints
   PERFORM set_constraints();
 END;
 $$ LANGUAGE plpgsql;

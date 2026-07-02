@@ -76,6 +76,33 @@ class ObisCellSchema(pa.DataFrameModel):
         strict = False
 
 
+class TrajectoryCellSchema(pa.DataFrameModel):
+    """Schema for the trajectory_cells DataFrame.
+
+    Mirrors cde.trajectory_cells in the database: one row per
+    (trajectory, 1/12-degree grid cell) a Trajectory/TrajectoryProfile
+    dataset's track passes through.
+    """
+
+    erddap_url: Series[str]
+    dataset_id: Series[str]
+    trajectory_id: Series[str] = pa.Field(nullable=True, default="")
+    latitude: Series[float] = pa.Field(ge=-90, le=90)
+    longitude: Series[float] = pa.Field(ge=-180, le=180)
+    time_min: Series[pa.DateTime] = pa.Field(nullable=True)
+    time_max: Series[pa.DateTime] = pa.Field(nullable=True)
+    depth_min: Series[float] = pa.Field(nullable=True)
+    depth_max: Series[float] = pa.Field(nullable=True)
+    n_records: Series[float] = pa.Field(nullable=True)
+    n_profiles: Series[float] = pa.Field(nullable=True)
+    records_per_day: Series[float] = pa.Field(nullable=True)
+    days: Series[float] = pa.Field(nullable=True)
+
+    class Config:
+        coerce = True
+        strict = False
+
+
 class DatasetSchema(pa.DataFrameModel):
     """Schema for the datasets DataFrame.
 

@@ -138,8 +138,9 @@ def _pg_int_array(values):
     return "{" + ",".join(str(int(v)) for v in values) + "}"
 
 
-def load_obis_cells_copy(df, table_name, transaction, schema=None):
-    """Bulk-load an obis_cells DataFrame via COPY FROM STDIN.
+def load_cells_copy(df, table_name, transaction, schema=None):
+    """Bulk-load a cells DataFrame (obis_cells / trajectory_cells) via COPY
+    FROM STDIN.
 
     Replaces the previous to_sql-based loader: COPY runs ~10-50x faster than
     pandas to_sql() for the 100K+ row scale we hit on a full rebuild.
@@ -175,7 +176,41 @@ def load_obis_cells_copy(df, table_name, transaction, schema=None):
             f"FROM STDIN WITH (FORMAT CSV, NULL '\\N')",
             buf,
         )
-    logger.info("  obis_cells: %d rows loaded via COPY", len(df))
+    logger.info("  %s: %d rows loaded via COPY", table_name, len(df))
+
+
+# Backwards-compatible alias (pre-M2 name).
+load_obis_cells_copy = load_cells_copy
+
+
+def prepare_trajectory_cells_dataframe(trajectory_cells):
+    """Clean and prepare trajectory_cells DataFrame for insertion.
+
+    Mirrors prepare_obis_cells_dataframe: round coordinates to 8 dp to avoid
+    float-precision duplicates, then deduplicate on the table's unique key,
+    aggregating extents/counts defensively.
+    """
+    cells = trajectory_cells.copy()
+    cells["trajectory_id"] = cells["trajectory_id"].fillna("").astype(str)
+    cells["latitude"] = cells["latitude"].round(8)
+    cells["longitude"] = cells["longitude"].round(8)
+
+    key_cols = ["erddap_url", "dataset_id", "trajectory_id", "latitude", "longitude"]
+    agg = (
+        cells.groupby(key_cols, dropna=False)
+        .agg(
+            time_min=("time_min", "min"),
+            time_max=("time_max", "max"),
+            depth_min=("depth_min", "min"),
+            depth_max=("depth_max", "max"),
+            n_records=("n_records", "sum"),
+            n_profiles=("n_profiles", "sum"),
+            records_per_day=("records_per_day", "sum"),
+            days=("days", "max"),
+        )
+        .reset_index()
+    )
+    return agg
 
 
 def ensure_organization_pks(datasets):
@@ -205,6 +240,7 @@ def main(folder, incremental=False):
     profiles_file = f"{folder}/profiles.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
     obis_cells_file = f"{folder}/obis_cells.csv"
+    trajectory_cells_file = f"{folder}/trajectory_cells.csv"
     verified_file = f"{folder}/verified.csv"
     harvest_runs_file = f"{folder}/harvest_runs.csv"
     harvest_attempts_file = f"{folder}/harvest_attempts.csv"
@@ -223,6 +259,11 @@ def main(folder, incremental=False):
     if os.path.isfile(obis_cells_file):
         logger.info("Reading %s", obis_cells_file)
         obis_cells = pd.read_csv(obis_cells_file)
+
+    trajectory_cells = None
+    if os.path.isfile(trajectory_cells_file):
+        logger.info("Reading %s", trajectory_cells_file)
+        trajectory_cells = pd.read_csv(trajectory_cells_file)
 
     verified = None
     if os.path.isfile(verified_file) and os.path.getsize(verified_file) > 1:
@@ -356,7 +397,16 @@ def main(folder, incremental=False):
                     logger.info(
                         "Loading obis_cells into temp table (%d rows)", len(prepared)
                     )
-                    load_obis_cells_copy(prepared, "temp_obis_cells", transaction)
+                    load_cells_copy(prepared, "temp_obis_cells", transaction)
+
+            if trajectory_cells is not None:
+                prepared = prepare_trajectory_cells_dataframe(trajectory_cells)
+                with _timed("temp_trajectory_cells COPY", logger):
+                    logger.info(
+                        "Loading trajectory_cells into temp table (%d rows)",
+                        len(prepared),
+                    )
+                    load_cells_copy(prepared, "temp_trajectory_cells", transaction)
 
             if not skipped_datasets.empty:
                 with _timed("temp_skipped_datasets to_sql", logger):
@@ -497,8 +547,16 @@ def main(folder, incremental=False):
                 prepared = prepare_obis_cells_dataframe(obis_cells, name_to_aphia)
                 with _timed("obis_cells COPY", logger):
                     logger.info("Writing obis_cells (%d rows)", len(prepared))
-                    load_obis_cells_copy(
+                    load_cells_copy(
                         prepared, "obis_cells", transaction, schema=schema
+                    )
+
+            if trajectory_cells is not None:
+                prepared = prepare_trajectory_cells_dataframe(trajectory_cells)
+                with _timed("trajectory_cells COPY", logger):
+                    logger.info("Writing trajectory_cells (%d rows)", len(prepared))
+                    load_cells_copy(
+                        prepared, "trajectory_cells", transaction, schema=schema
                     )
 
             with _timed("skipped_datasets to_sql", logger):
@@ -538,6 +596,25 @@ def main(folder, incremental=False):
                 for fn, args in obis_steps:
                     with _timed(fn, logger):
                         n = transaction.execute(text(f"SELECT {fn}{args};")).scalar()
+                        logger.info(
+                            "  %s: %s rows affected", fn, n if n is not None else 0
+                        )
+
+            if trajectory_cells is not None:
+                # Per-step invocation for timing/row-count logs (sub-functions
+                # in 5_profile_process.sql); incremental calls the
+                # trajectory_process() wrapper instead. Must run after
+                # profile_process() (points rebuild) and before create_hexes().
+                trajectory_steps = [
+                    "trajectory_link_dataset_pk",
+                    "trajectory_insert_points",
+                    "trajectory_link_point_pk",
+                    "trajectory_update_days",
+                ]
+                logger.info("Processing trajectory_cells")
+                for fn in trajectory_steps:
+                    with _timed(fn, logger):
+                        n = transaction.execute(text(f"SELECT {fn}();")).scalar()
                         logger.info(
                             "  %s: %s rows affected", fn, n if n is not None else 0
                         )

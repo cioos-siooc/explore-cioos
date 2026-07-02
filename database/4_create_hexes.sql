@@ -58,5 +58,11 @@ CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
   FROM cde.points
   WHERE points.pk = obis_cells.point_pk;
 
+  UPDATE cde.trajectory_cells
+  SET hex_0_pk = points.hex_0_pk,
+      hex_1_pk = points.hex_1_pk
+  FROM cde.points
+  WHERE points.pk = trajectory_cells.point_pk;
+
   END;
 $$ LANGUAGE plpgsql;

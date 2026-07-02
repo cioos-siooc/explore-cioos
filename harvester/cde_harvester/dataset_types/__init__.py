@@ -41,6 +41,12 @@ def extract_features(dataset):
     return handler.extract_features(dataset)
 
 
+def feature_kind_for(cdm_data_type):
+    """Which HarvestResult attribute this type's features land in."""
+    handler = get_handler(cdm_data_type)
+    return handler.feature_kind if handler else "profiles"
+
+
 # Default registrations. Order matters for reproducible skip messages: it is
 # the order supported_cdm_data_types() reports.
 from cde_harvester.dataset_types.timeseries import TimeSeriesHandler  # noqa: E402
@@ -48,7 +54,13 @@ from cde_harvester.dataset_types.profile import ProfileHandler  # noqa: E402
 from cde_harvester.dataset_types.timeseries_profile import (  # noqa: E402
     TimeSeriesProfileHandler,
 )
+from cde_harvester.dataset_types.trajectory import (  # noqa: E402
+    TrajectoryHandler,
+    TrajectoryProfileHandler,
+)
 
 register(TimeSeriesHandler())
 register(ProfileHandler())
 register(TimeSeriesProfileHandler())
+register(TrajectoryHandler())
+register(TrajectoryProfileHandler())

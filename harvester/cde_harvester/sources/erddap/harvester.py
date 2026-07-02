@@ -17,6 +17,7 @@ from cde_harvester.core.schemas import (
     HarvestAttemptSchema,
     ProfileSchema,
     SkippedDatasetSchema,
+    TrajectoryCellSchema,
     VariableSchema,
     VerifiedDatasetSchema,
 )
@@ -32,6 +33,7 @@ from cde_harvester.core.errors import (
 )
 from cde_harvester.dataset_types import (
     extract_features,
+    feature_kind_for,
     supported_cdm_data_types,
     supported_data_structures,
 )
@@ -83,7 +85,10 @@ class DatasetHarvestResult:
 
     status: str                      # "success" | "skipped" | "skipped_unchanged"
     attempt: dict                    # one harvest_attempts.csv row
-    profiles: pd.DataFrame = None    # populated only on success
+    features: pd.DataFrame = None    # populated only on success
+    # Which HarvestResult attribute `features` belongs in: "profiles" for
+    # point-like types, "trajectory_cells" for trajectory coverage cells.
+    feature_kind: str = "profiles"
     dataset_df: pd.DataFrame = None
     variables: pd.DataFrame = None
     skipped_reason_code: str = None  # for the skipped_datasets table, on skip
@@ -133,6 +138,9 @@ class ERDDAPHarvester(BaseHarvester):
 
         df_profiles_all = pd.DataFrame(
             columns=ProfileSchema.to_schema().columns.keys()
+        )
+        df_trajectory_cells_all = pd.DataFrame(
+            columns=TrajectoryCellSchema.to_schema().columns.keys()
         )
         df_datasets_all = pd.DataFrame(
             columns=DatasetSchema.to_schema().columns.keys()
@@ -234,7 +242,12 @@ class ERDDAPHarvester(BaseHarvester):
                 )
                 attempt_records.append(result.attempt)
                 if result.status == "success":
-                    df_profiles_all = pd.concat([df_profiles_all, result.profiles])
+                    if result.feature_kind == "trajectory_cells":
+                        df_trajectory_cells_all = pd.concat(
+                            [df_trajectory_cells_all, result.features]
+                        )
+                    else:
+                        df_profiles_all = pd.concat([df_profiles_all, result.features])
                     df_datasets_all = pd.concat([df_datasets_all, result.dataset_df])
                     df_variables_all = pd.concat([df_variables_all, result.variables])
                 elif result.status == "skipped_unchanged":
@@ -312,6 +325,7 @@ class ERDDAPHarvester(BaseHarvester):
             datasets=df_datasets_all,
             variables=df_variables_all,
             skipped=df_skipped_datasets,
+            trajectory_cells=df_trajectory_cells_all,
             attempts=df_attempts,
             verified=df_verified,
         )
@@ -368,10 +382,11 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
         compliance_checker = CDEComplianceChecker(dataset)
 
         if compliance_checker.passes_all_checks():
-            df_profiles = extract_features(dataset)
+            df_features = extract_features(dataset)
+            feature_kind = feature_kind_for(dataset.cdm_data_type)
             duration_ms = int((time.monotonic() - t0) * 1000)
-            if df_profiles.empty:
-                log.warning("No profiles found")
+            if df_features.empty:
+                log.warning("No %s found", feature_kind)
                 return DatasetHarvestResult(
                     status="skipped",
                     skipped_reason_code=NO_PROFILES_FOUND,
@@ -379,7 +394,7 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                         run_id, erddap_url, dataset_id,
                         status="skipped",
                         reason_code=NO_PROFILES_FOUND,
-                        error_message="Dataset passed compliance but get_profiles returned no rows",
+                        error_message="Dataset passed compliance but feature extraction returned no rows",
                         duration_ms=duration_ms,
                         query_urls=dataset.queried_urls,
                     ),
@@ -387,7 +402,8 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
             log.info("complete")
             return DatasetHarvestResult(
                 status="success",
-                profiles=df_profiles,
+                features=df_features,
+                feature_kind=feature_kind,
                 dataset_df=dataset.get_df(),
                 variables=dataset.df_variables,
                 attempt=_build_attempt(

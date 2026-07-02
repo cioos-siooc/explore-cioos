@@ -164,7 +164,7 @@ def _run_logger():
 @task(task_run_name="merge-and-write-csvs")
 def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skipped,
                          obis_datasets, obis_cells, obis_skipped, df_ckan,
-                         erddap_verified=None):
+                         erddap_verified=None, erddap_trajectory_cells=None):
     """Join CKAN metadata, merge all sources, and write the output CSVs (@task)."""
     logger = _run_logger()
     datasets_file = f"{folder}/datasets.csv"
@@ -172,7 +172,11 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     skipped_datasets_file = f"{folder}/skipped.csv"
     ckan_file = f"{folder}/ckan.csv"
     obis_cells_file = f"{folder}/obis_cells.csv"
+    trajectory_cells_file = f"{folder}/trajectory_cells.csv"
     verified_file = f"{folder}/verified.csv"
+
+    if erddap_trajectory_cells is None:
+        erddap_trajectory_cells = pd.DataFrame()
 
     # --- ERDDAP-specific post-processing ---
     if not erddap_datasets.empty:
@@ -247,7 +251,11 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
             lambda x: x if isinstance(x, list) else []
         )
 
-    logger.info("Adding %s datasets, %s profiles, %s obis_cells", len(datasets), len(erddap_profiles), len(obis_cells))
+    logger.info(
+        "Adding %s datasets, %s profiles, %s obis_cells, %s trajectory_cells",
+        len(datasets), len(erddap_profiles), len(obis_cells),
+        len(erddap_trajectory_cells),
+    )
 
     # Write output CSVs
     datasets.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
@@ -260,6 +268,9 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
 
     if not obis_cells.empty:
         obis_cells.to_csv(obis_cells_file, index=False)
+
+    if not erddap_trajectory_cells.empty:
+        erddap_trajectory_cells.to_csv(trajectory_cells_file, index=False)
 
     # Datasets skipped as unchanged — only their verified_at is bumped by the loader.
     if erddap_verified is not None and not erddap_verified.empty:
@@ -274,6 +285,10 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     logger.info("Wrote %s", " ".join(str(f) for f in written_files))
     if not obis_cells.empty:
         logger.info("Wrote %s (%d cells)", obis_cells_file, len(obis_cells))
+    if not erddap_trajectory_cells.empty:
+        logger.info(
+            "Wrote %s (%d cells)", trajectory_cells_file, len(erddap_trajectory_cells)
+        )
 
     if not skipped_datasets.empty:
         logger.info(
@@ -364,12 +379,16 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
 
         # Collect ERDDAP results
         erddap_profiles = pd.DataFrame()
+        erddap_trajectory_cells = pd.DataFrame()
         erddap_datasets = pd.DataFrame()
         variables = pd.DataFrame()
         erddap_skipped = pd.DataFrame()
 
         for result in erddap_results:
             erddap_profiles = pd.concat([erddap_profiles, result.profiles])
+            erddap_trajectory_cells = pd.concat(
+                [erddap_trajectory_cells, result.trajectory_cells]
+            )
             erddap_datasets = pd.concat([erddap_datasets, result.datasets])
             variables = pd.concat([variables, result.variables])
             erddap_skipped = pd.concat([erddap_skipped, result.skipped])
@@ -479,6 +498,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         folder=folder,
         erddap_datasets=erddap_datasets,
         erddap_profiles=erddap_profiles,
+        erddap_trajectory_cells=erddap_trajectory_cells,
         erddap_skipped=erddap_skipped,
         obis_datasets=obis_datasets,
         obis_cells=obis_cells,
