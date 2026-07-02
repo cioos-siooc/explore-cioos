@@ -36,7 +36,7 @@ from cde_harvester.__main__ import (
     main as harvester_main,
     merge_and_write_csvs,
 )
-from cde_db_loader.__main__ import main as db_main
+from cde_harvester.loading.loader import main as db_main
 
 
 # ---------------------------------------------------------------------------
@@ -280,14 +280,14 @@ def db_load_calls(written_csv_folder):
     sql_calls = []
 
     with (
-        patch("cde_db_loader.__main__.create_engine", return_value=engine),
-        patch("cde_db_loader.__main__.load_dotenv"),
+        patch("cde_harvester.loading.loader.create_engine", return_value=engine),
+        patch("cde_harvester.loading.loader.load_dotenv"),
         patch(
-            "cde_db_loader.__main__.get_run_logger",
+            "cde_harvester.loading.loader.get_run_logger",
             return_value=logging.getLogger("test"),
         ),
         patch(
-            "cde_db_loader.__main__.text",
+            "cde_harvester.loading.loader.text",
             side_effect=lambda s: sql_calls.append(s) or s,
         ),
         patch("pandas.DataFrame.to_sql"),

@@ -1,5 +1,5 @@
 """
-Unit tests for cde_db_loader.__main__.
+Unit tests for cde_harvester.loading.loader.
 
 Tests cover:
 1. Pure helper functions (prepare_profiles_dataframe, ensure_organization_pks)
@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
-from cde_db_loader.__main__ import (
+from cde_harvester.loading.loader import (
     ensure_organization_pks,
     main,
     prepare_profiles_dataframe,
@@ -58,12 +58,12 @@ def _run_main(harvest_folder, mock_engine, mocker, incremental=False):
     Returns the list of SQL strings that were executed.
     """
     engine, conn = mock_engine
-    mocker.patch("cde_db_loader.__main__.create_engine", return_value=engine)
-    mocker.patch("cde_db_loader.__main__.load_dotenv")
-    mocker.patch("cde_db_loader.__main__.get_run_logger", return_value=__import__("logging").getLogger("test"))
+    mocker.patch("cde_harvester.loading.loader.create_engine", return_value=engine)
+    mocker.patch("cde_harvester.loading.loader.load_dotenv")
+    mocker.patch("cde_harvester.loading.loader.get_run_logger", return_value=__import__("logging").getLogger("test"))
     # Capture SQL strings; return the raw string so conn.execute gets it
     mock_text = mocker.patch(
-        "cde_db_loader.__main__.text", side_effect=lambda s: s
+        "cde_harvester.loading.loader.text", side_effect=lambda s: s
     )
     mocker.patch("pandas.DataFrame.to_sql")
 

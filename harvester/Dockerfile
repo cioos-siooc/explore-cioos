@@ -2,8 +2,7 @@ FROM ghcr.io/astral-sh/uv:python3.10-bookworm
 
 WORKDIR /app
 
-# 1. Copy path dependency (db-loader) and manifests for harvester
-COPY ./db-loader /app/db-loader
+# 1. Copy manifests for harvester
 COPY ./harvester/pyproject.toml ./harvester/uv.lock ./harvester/README.md ./harvester/
 
 WORKDIR /app/harvester
@@ -12,8 +11,9 @@ WORKDIR /app/harvester
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project || (echo "Lock mismatch, regenerating" && uv lock && uv sync --no-install-project)
 
-# 3. Copy source code
+# 3. Copy source code (cde_db_loader is the deprecated `python -m cde_db_loader` shim)
 COPY ./harvester/cde_harvester ./cde_harvester
+COPY ./harvester/cde_db_loader ./cde_db_loader
 COPY ./harvester/run.sh ./run.sh
 COPY ./harvester/worker-entrypoint.sh ./worker-entrypoint.sh
 

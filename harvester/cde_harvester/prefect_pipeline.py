@@ -24,7 +24,8 @@ from cde_harvester.__main__ import (
     main as harvester_main,
 )
 from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
-from cde_db_loader.__main__ import main as db_loader_main
+from cde_harvester.loading.loader import main as db_loader_main
+from cde_harvester.loading.populate_vernaculars import main as vernaculars_main
 
 load_dotenv()
 
@@ -651,8 +652,6 @@ def populate_vernaculars_run(
     # so force INFO or the script's progress lines get filtered out.
     for name in ("populate_vernaculars", "cde_db_loader", "cde_harvester"):
         logging.getLogger(name).setLevel(logging.INFO)
-
-    from cde_db_loader.populate_vernaculars import main as vernaculars_main
 
     # populate_vernaculars uses argparse; monkey-patch sys.argv instead of refactoring it.
     argv = ["populate_vernaculars"]
