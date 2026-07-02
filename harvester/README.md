@@ -107,7 +107,31 @@ The harvester generates CSV files in the `harvest/` directory:
 - `ckan.csv` - CKAN metadata
 - `skipped.csv` - Datasets that were skipped (with reasons)
 
-These files are then loaded into the database by the [db-loader](../db-loader/README.md).
+These files are then loaded into the database by the
+[db-loader](cde_harvester/loading/README.md), which lives in this package at
+`cde_harvester.loading` (`python -m cde_harvester.loading --folder harvest`).
+
+## Package layout
+
+```
+cde_harvester/
+├── __main__.py           # harvest CLI (python -m cde_harvester -f config.yaml)
+├── prefect_pipeline.py   # Prefect flows/deployments (harvest -> db-load)
+├── core/                 # shared: schemas (CSV contract), db, observability,
+│                         # config, harvest reason codes
+├── sources/              # one subpackage per harvest source
+│   ├── base.py           # BaseHarvester + HarvestResult
+│   ├── erddap/           # ERDDAP client, harvester, dataset, compliance, state
+│   ├── obis/             # OBIS harvester + geo filter
+│   └── ckan/             # CKAN metadata enrichment
+├── dataset_types/        # one DatasetTypeHandler per cdm_data_type; the
+│                         # registry drives the listing filter + allowlist.
+│                         # New type (Trajectory, griddap) = new handler module.
+└── loading/              # db-loader (CSV folder -> PostgreSQL cde schema)
+```
+
+`cde_db_loader/` is a deprecated shim kept so `python -m cde_db_loader` keeps
+working for one deploy cycle.
 
 ## Configuration
 
