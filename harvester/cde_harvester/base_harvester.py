@@ -5,7 +5,7 @@ import logging
 import pandas as pd
 from pandera.typing import DataFrame
 
-from cde_harvester.schemas import (
+from cde_harvester.core.schemas import (
     DatasetSchema,
     HarvestAttemptSchema,
     ObisCellSchema,

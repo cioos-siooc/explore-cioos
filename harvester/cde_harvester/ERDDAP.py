@@ -18,7 +18,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 from cde_harvester.dataset import Dataset
-from cde_harvester.harvest_errors import (
+from cde_harvester.core.errors import (
     HASH_CROISSANT_HTTP_ERROR,
     HASH_CROISSANT_UNREADABLE,
     HASH_FEDERATED_UNRESOLVED,

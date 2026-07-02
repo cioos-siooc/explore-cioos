@@ -32,7 +32,6 @@ Usage:
 import argparse
 import concurrent.futures
 import logging
-import os
 import sys
 import threading
 import time
@@ -40,9 +39,10 @@ from typing import NamedTuple
 from urllib.parse import urlencode
 
 import requests
-from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from urllib3.util.retry import Retry
+
+from cde_harvester.core.db import create_db_engine, db_host
 
 logging.basicConfig(
     level=logging.INFO,
@@ -119,19 +119,12 @@ SENTINEL_MISSING_CLASSIFICATION = "missing_classification"
 
 
 def build_engine(workers: int = DEFAULT_WORKERS):
-    load_dotenv(os.path.join(os.getcwd(), ".env"))
-    envs = os.environ
-    db_host = envs.get("DB_HOST_EXTERNAL", "localhost")
-    url = (
-        f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{db_host}:"
-        f"{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
-    )
     # Pool sized to the worker count so threads don't contend on connections.
     # We only ever take a connection inside the per-chunk transaction, so
     # `workers + 2` is plenty (one for the main thread + headroom).
-    engine = create_engine(url, pool_size=workers + 2, max_overflow=4)
+    engine = create_db_engine(pool_size=workers + 2, max_overflow=4)
     engine.connect().close()
-    logger.info("Connected to %s", db_host)
+    logger.info("Connected to %s", db_host())
     return engine
 
 

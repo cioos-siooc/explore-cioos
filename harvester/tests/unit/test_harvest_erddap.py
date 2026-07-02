@@ -17,7 +17,7 @@ from conftest import (
     ERDDAP_INFO_NO_EOVS_CSV,
 )
 from cde_harvester.erddap_harvester import harvest_erddap
-from cde_harvester.harvest_errors import (
+from cde_harvester.core.errors import (
     CDM_DATA_TYPE_UNSUPPORTED,
     HTTP_ERROR,
 )

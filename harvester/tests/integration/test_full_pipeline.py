@@ -280,8 +280,7 @@ def db_load_calls(written_csv_folder):
     sql_calls = []
 
     with (
-        patch("cde_harvester.loading.loader.create_engine", return_value=engine),
-        patch("cde_harvester.loading.loader.load_dotenv"),
+        patch("cde_harvester.loading.loader.create_db_engine", return_value=engine),
         patch(
             "cde_harvester.loading.loader.get_run_logger",
             return_value=logging.getLogger("test"),

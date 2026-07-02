@@ -1,6 +1,5 @@
 import argparse
 import base64
-import json
 import logging
 import os
 import queue
@@ -14,21 +13,24 @@ from urllib.parse import urlparse
 
 import numpy as np
 import pandas as pd
-import sentry_sdk
-import yaml
 from cde_harvester.ckan.create_ckan_erddap_link import (
     get_ckan_records,
     unescape_ascii,
     unescape_ascii_list,
 )
+from cde_harvester.core.config import load_config, load_obis_dataset_ids
+from cde_harvester.core.observability import (
+    cleanup_old_logs,
+    init_sentry,
+    setup_logging,
+)
+from cde_harvester.core.schemas import HarvestAttemptSchema
 from cde_harvester.erddap_harvester import harvest_erddap
 from cde_harvester.obis_geo_filter import ObisGeoFilter
 from cde_harvester.obis_harvester import harvest_obis
-from cde_harvester.schemas import HarvestAttemptSchema
 from cde_harvester.utils import cf_standard_names, supported_standard_names
 from dotenv import load_dotenv
 from sentry_sdk.crons import monitor
-from sentry_sdk.integrations.logging import LoggingIntegration
 from prefect import flow, get_run_logger, task
 
 load_dotenv()
@@ -36,81 +38,10 @@ load_dotenv()
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logger = logging.getLogger()
 
-sentry_sdk.init(
-    dsn=os.environ.get("SENTRY_DSN"),
-    integrations=[
-        LoggingIntegration(
-            level=logging.INFO,  # Capture info and above as breadcrumbs
-            event_level=logging.WARNING,  # Send records as events
-        ),
-    ],
-    environment=os.environ.get("ENVIRONMENT", "development"),
-)
+init_sentry()
 
 # Ignored standard names that are not EOVs, mostly coordinate variables
 IGNORED_STANDARD_NAMES= ["latitude", "longitude", "time", "depth", "","altitude","sea_water_pressure","sea_water_pressure_due_to_sea_water"]
-
-def cleanup_old_logs(log_dir, days=30):
-    """Remove log files older than specified days."""
-    if not os.path.exists(log_dir):
-        return
-
-    cutoff_time = time.time() - (days * 86400)  # 86400 seconds in a day
-    removed_count = 0
-
-    for filename in os.listdir(log_dir):
-        if filename.startswith("harvest_") and filename.endswith(".log"):
-            filepath = os.path.join(log_dir, filename)
-            if os.path.isfile(filepath) and os.path.getmtime(filepath) < cutoff_time:
-                try:
-                    os.remove(filepath)
-                    removed_count += 1
-                    logger.info(f"Removed old log file: {filename}")
-                except OSError as e:
-                    logger.warning(f"Warning: Failed to remove old log file {filename}: {e}")
-
-    if removed_count > 0:
-        logger.info(f"Cleaned up {removed_count} log file(s) older than {days} days")
-
-
-def setup_logging(log_time, log_level, log_dir=None):
-    # Clean up old log files before setting up logging
-    if log_dir:
-        cleanup_old_logs(log_dir, days=30)
-
-    # setup logging
-    logger.setLevel(logging.getLevelName(log_level.upper()))
-    logger.handlers.clear()
-
-    # Define log format
-    log_format = (
-        ("%(asctime)s - " if log_time else "")
-        + "%(levelname)-8s - %(name)s : %(message)s"
-    )
-
-    # Add console handler
-    c_handler = logging.StreamHandler()
-    c_handler.setLevel(logging.getLevelName(log_level.upper()))
-    c_format = logging.Formatter(log_format)
-    c_handler.setFormatter(c_format)
-    logger.addHandler(c_handler)
-
-    # Add file handler with timestamped filename if log directory is specified
-    if log_dir:
-        os.makedirs(log_dir, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = os.path.join(log_dir, f"harvest_{timestamp}.log")
-
-        f_handler = logging.FileHandler(log_file)
-        f_handler.setLevel(logging.getLevelName(log_level.upper()))
-        f_format = logging.Formatter(
-            "%(asctime)s - %(levelname)-8s - %(name)s : %(message)s"
-        )
-        f_handler.setFormatter(f_format)
-        logger.addHandler(f_handler)
-        logger.info(f"Logging to file: {log_file}")
-
-    return logger
 
 def _resolve_git_sha():
     """Best-effort git SHA for the harvester source. Returns None if unavailable."""
@@ -626,27 +557,6 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         triggered_source=triggered_source,
         triggered_by=triggered_by,
     )
-
-
-def load_config(config_file):
-    # get config settings from file, eg harvest_config.yaml
-    with open(config_file, "r") as stream:
-        try:
-            config = yaml.safe_load(stream)
-            return config
-
-        except yaml.YAMLError:
-            logger.error("Failed to load config yaml", exc_info=True)
-
-
-def load_obis_dataset_ids(dataset_ids=None, datasets_file=None):
-    """Resolve OBIS dataset IDs, loading from JSON file if needed."""
-    if dataset_ids:
-        return dataset_ids
-    if datasets_file:
-        with open(datasets_file, "r") as f:
-            return json.load(f).get("datasets", [])
-    return []
 
 
 if __name__ == "__main__":

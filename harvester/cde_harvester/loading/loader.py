@@ -9,13 +9,13 @@ from contextlib import contextmanager
 
 import numpy as np
 import pandas as pd
-import sentry_sdk
-from dotenv import load_dotenv
-from sentry_sdk.integrations.logging import LoggingIntegration
-from sqlalchemy import create_engine, text
-from sqlalchemy.dialects.postgresql import ARRAY, INTEGER, TEXT
+from sqlalchemy import text
 
 from prefect import get_run_logger, task
+
+from cde_harvester.core.db import create_db_engine, db_host
+from cde_harvester.core.observability import init_sentry
+from cde_harvester.core.schemas import DATASET_ARRAY_DTYPES, OBIS_ARRAY_DTYPES
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -43,31 +43,7 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 
-sentry_sdk.init(
-    dsn=os.environ.get("SENTRY_DSN"),
-    integrations=[
-        LoggingIntegration(
-            level=logging.INFO,  # Capture info and above as breadcrumbs
-            event_level=logging.WARNING,  # Send records as events
-        ),
-    ],
-    environment=os.environ.get("ENVIRONMENT", "development"),
-)
-
-
-# Constants for array column types
-DATASET_ARRAY_DTYPES = {
-    "eovs": ARRAY(TEXT),
-    "organizations": ARRAY(TEXT),
-    "profile_variables": ARRAY(TEXT),
-    "organization_pks": ARRAY(INTEGER),
-    "obis_nodes": ARRAY(TEXT),
-}
-
-OBIS_ARRAY_DTYPES = {
-    "scientific_names": ARRAY(TEXT),
-    "aphia_ids": ARRAY(INTEGER),
-}
+init_sentry()
 
 
 def prepare_profiles_dataframe(profiles):
@@ -219,17 +195,11 @@ def ensure_organization_pks(datasets):
 def main(folder, incremental=False):
     # setup database connection
     logger = get_run_logger()
-    load_dotenv(os.getcwd() + "/.env")
 
-    envs = os.environ
-
-    db_host = envs.get("DB_HOST_EXTERNAL", "localhost")
-    database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{db_host}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
-
-    engine = create_engine(database_link)
+    engine = create_db_engine()
     # test connection
     engine.connect()
-    logger.info("Connected to %s", db_host)
+    logger.info("Connected to %s", db_host())
 
     datasets_file = f"{folder}/datasets.csv"
     profiles_file = f"{folder}/profiles.csv"

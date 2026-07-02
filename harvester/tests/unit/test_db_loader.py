@@ -54,12 +54,11 @@ def db_env(monkeypatch):
 
 def _run_main(harvest_folder, mock_engine, mocker, incremental=False):
     """
-    Shared helper: patch create_engine and capture SQL strings passed to text().
+    Shared helper: patch create_db_engine and capture SQL strings passed to text().
     Returns the list of SQL strings that were executed.
     """
     engine, conn = mock_engine
-    mocker.patch("cde_harvester.loading.loader.create_engine", return_value=engine)
-    mocker.patch("cde_harvester.loading.loader.load_dotenv")
+    mocker.patch("cde_harvester.loading.loader.create_db_engine", return_value=engine)
     mocker.patch("cde_harvester.loading.loader.get_run_logger", return_value=__import__("logging").getLogger("test"))
     # Capture SQL strings; return the raw string so conn.execute gets it
     mock_text = mocker.patch(

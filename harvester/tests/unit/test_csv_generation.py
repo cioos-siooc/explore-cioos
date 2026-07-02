@@ -29,7 +29,7 @@ from conftest import (
 from cde_harvester.CDEComplianceChecker import CDEComplianceChecker
 from cde_harvester.dataset import Dataset
 from cde_harvester.profiles import get_profiles
-from cde_harvester.schemas import SkippedDatasetSchema
+from cde_harvester.core.schemas import SkippedDatasetSchema
 
 
 # ---------------------------------------------------------------------------

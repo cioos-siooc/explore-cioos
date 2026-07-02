@@ -1,43 +1,20 @@
 """Read-only lookup of previously-harvested dataset content hashes (fail-open)."""
 
 import logging
-import os
 
-from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
-try:
-    from prefect import get_run_logger
-except Exception:
-    get_run_logger = None
+from cde_harvester.core.db import create_db_engine
+from cde_harvester.core.observability import run_logger
 
 _module_logger = logging.getLogger(__name__)
 
 
-def _logger():
-    if get_run_logger is not None:
-        try:
-            return get_run_logger()
-        except Exception:
-            pass
-    return _module_logger
-
-
-def _database_link():
-    load_dotenv(os.getcwd() + "/.env")
-    envs = os.environ
-    db_host = envs.get("DB_HOST_EXTERNAL", "localhost")
-    return (
-        f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}"
-        f"@{db_host}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
-    )
-
-
 def load_previous_hashes(erddap_url):
     """{dataset_id: content_hash} for a server; {} on any error (harvest all)."""
-    logger = _logger()
+    logger = run_logger(_module_logger)
     try:
-        engine = create_engine(_database_link())
+        engine = create_db_engine()
         with engine.connect() as conn:
             rows = conn.execute(
                 text(

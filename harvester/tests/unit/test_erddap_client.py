@@ -128,7 +128,7 @@ class TestErddapCsvToDf:
         mock_resp = MockResponse(text="", url=ERDDAP_URL)
         mock_resp.content = big_content
         erddap.session.get.return_value = mock_resp
-        from cde_harvester.harvest_errors import ResponseTooLargeError
+        from cde_harvester.core.errors import ResponseTooLargeError
         with pytest.raises(ResponseTooLargeError):
             erddap.erddap_csv_to_df("/tabledap/ds.csv")
 

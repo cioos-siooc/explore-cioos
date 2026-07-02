@@ -17,12 +17,13 @@ from prefect.client.schemas.actions import WorkPoolCreate
 from prefect.deployments import run_deployment
 from prefect.exceptions import ObjectNotFound
 
-from cde_harvester.__main__ import (
-    cleanup_old_logs,
+from cde_harvester.__main__ import main as harvester_main
+from cde_harvester.core.config import (
     load_config,
     load_obis_dataset_ids,
-    main as harvester_main,
+    resolve_harvest_config_file,
 )
+from cde_harvester.core.observability import cleanup_old_logs, run_logger
 from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
 from cde_harvester.loading.loader import main as db_loader_main
 from cde_harvester.loading.populate_vernaculars import main as vernaculars_main
@@ -37,10 +38,7 @@ def _run_logger():
 
     The pipeline steps below are plain methods now (not @flow), so some run
     outside a flow context (e.g. init_config on the prod deploy path)."""
-    try:
-        return get_run_logger()
-    except Exception:
-        return logger
+    return run_logger(logger)
 
 # Upload at most this many bytes (tail) of the log into the markdown artifact;
 # Prefect/UI handle large markdown poorly, and the full file stays on disk.
@@ -447,47 +445,6 @@ class PrefectCDEPipeline:
         return harvest_id
 
 
-def _normalize_coolify_multiline(value: str) -> str:
-    """Strip the uniform leading indent Coolify prepends to multi-line env var continuations."""
-    lines = value.split("\n")
-    if len(lines) <= 1:
-        return value
-    continuation = [ln for ln in lines[1:] if ln.strip()]
-    if not continuation:
-        return value
-    min_indent = min(len(ln) - len(ln.lstrip(" ")) for ln in continuation)
-    first_indent = len(lines[0]) - len(lines[0].lstrip(" "))
-    # Only strip when the first line is less-indented than the block (Coolify's signature).
-    if first_indent >= min_indent or min_indent == 0:
-        return value
-    return "\n".join(
-        [lines[0]] + [ln[min_indent:] if ln.strip() else ln for ln in lines[1:]]
-    )
-
-
-def _resolve_harvest_config_file(config_file):
-    """Resolve effective config: HARVEST_CONFIG_YAML env > mounted/baked-in default.
-
-    Also writes OBIS_DATASETS_JSON to /tmp/Obis_Datasets.json when set.
-    """
-    env_config = os.getenv("HARVEST_CONFIG_YAML", "").strip()
-    if env_config:
-        # Coolify indents multi-line env var continuations; strip it so the YAML parses.
-        env_config = _normalize_coolify_multiline(env_config)
-        env_config_path = Path("/tmp/harvest_config_from_env.yaml")
-        env_config_path.write_text(env_config)
-        config_file = str(env_config_path)
-        logger.info(f"Using HARVEST_CONFIG_YAML env var ({len(env_config)} bytes -> {env_config_path})")
-    else:
-        logger.info(f"Using harvest config file: {config_file}")
-
-    env_obis = os.getenv("OBIS_DATASETS_JSON", "").strip()
-    if env_obis:
-        Path("/tmp/Obis_Datasets.json").write_text(env_obis)
-        logger.info(f"Wrote OBIS_DATASETS_JSON env var ({len(env_obis)} bytes -> /tmp/Obis_Datasets.json)")
-    return config_file
-
-
 def _pipeline_run_name():
     """Per-run label: every ERDDAP source -> 'harvest-erddap-{full-host}'
     (host with dots replaced by dashes), OBIS -> 'harvest-obis', full run ->
@@ -512,7 +469,7 @@ def cde_pipeline_run(
 ):
     """Deployable entry point. `source` (None = full) narrows to one ERDDAP url or 'obis';
     `triggered_by` is recorded on the audit row. Single-source runs force incremental db-load."""
-    config_file = _resolve_harvest_config_file(config_file)
+    config_file = resolve_harvest_config_file(config_file)
     pipeline = PrefectCDEPipeline()
     pipeline.init_config(config_file=config_file)
     pipeline.source = source
@@ -602,7 +559,7 @@ def cde_harvest_all_run(
     wait for all, and fail red if any did not complete (a failure doesn't cancel the others)."""
     logger = get_run_logger()
 
-    config_file = _resolve_harvest_config_file(config_file)
+    config_file = resolve_harvest_config_file(config_file)
     config = load_config(config_file)
 
     sources = [u.strip() for u in (config.get("erddap_urls") or []) if u and u.strip()]

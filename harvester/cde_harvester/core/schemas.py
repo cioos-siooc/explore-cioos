@@ -1,11 +1,33 @@
 """Pandera schemas for harvester DataFrames.
 
-These define the column contract that all harvesters must produce.
-Column names and types mirror database/1_schema.sql where applicable.
+These define the column contract that all harvesters must produce and the
+db-loader consumes. Column names and types mirror database/1_schema.sql where
+applicable — a schema change touches three places: this file, 1_schema.sql
+(fresh installs) and an idempotent database/migrations/*.sql (live DBs).
 """
 
 import pandera as pa
 from pandera.typing import Series
+from sqlalchemy.dialects.postgresql import ARRAY, INTEGER, TEXT
+
+# --- Loader-side column metadata ------------------------------------------
+# List-valued columns are serialized by the harvester as Python-repr strings in
+# the CSVs; the loader parses them back (ast.literal_eval) and writes them as
+# PostgreSQL arrays with these dtypes. Kept here, next to the schemas, so the
+# CSV contract has a single home.
+
+DATASET_ARRAY_DTYPES = {
+    "eovs": ARRAY(TEXT),
+    "organizations": ARRAY(TEXT),
+    "profile_variables": ARRAY(TEXT),
+    "organization_pks": ARRAY(INTEGER),
+    "obis_nodes": ARRAY(TEXT),
+}
+
+OBIS_ARRAY_DTYPES = {
+    "scientific_names": ARRAY(TEXT),
+    "aphia_ids": ARRAY(INTEGER),
+}
 
 
 class ProfileSchema(pa.DataFrameModel):

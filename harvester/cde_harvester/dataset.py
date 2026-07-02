@@ -4,10 +4,10 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 import requests
+from cde_harvester.core.observability import run_logger
 from cde_harvester.platform_ioos_to_l06 import platforms_nerc_ioos
 from cde_harvester.utils import eov_to_standard_name, intersection
 from requests.exceptions import HTTPError
-from prefect import get_run_logger
 
 def is_valid_duration(duration):
     try:
@@ -379,7 +379,6 @@ class Dataset(object):
         self.platform = self.get_platform_code()
 
     def get_logger(self):
-        try:
-            return get_run_logger()
-        except Exception:
-            return logging.getLogger(f"{self.erddap_server.domain}.{self.id}")
+        return run_logger(
+            logging.getLogger(f"{self.erddap_server.domain}.{self.id}")
+        )

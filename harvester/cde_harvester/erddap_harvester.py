@@ -12,7 +12,7 @@ import pandas as pd
 from cde_harvester.base_harvester import BaseHarvester, HarvestResult
 from cde_harvester.CDEComplianceChecker import CDEComplianceChecker
 from cde_harvester.ERDDAP import ERDDAP
-from cde_harvester.schemas import (
+from cde_harvester.core.schemas import (
     DatasetSchema,
     HarvestAttemptSchema,
     ProfileSchema,
@@ -20,7 +20,7 @@ from cde_harvester.schemas import (
     VariableSchema,
     VerifiedDatasetSchema,
 )
-from cde_harvester.harvest_errors import (
+from cde_harvester.core.errors import (
     CDM_DATA_TYPE_UNSUPPORTED,
     HTTP_ERROR,
     NO_PROFILES_FOUND,
