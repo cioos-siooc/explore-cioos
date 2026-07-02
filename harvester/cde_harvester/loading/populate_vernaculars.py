@@ -24,7 +24,7 @@ The script is idempotent and resumable: only names missing from the cache table
 (or, with --refresh-status, names whose previous fetch failed) are processed.
 
 Usage:
-    python -m cde_db_loader.populate_vernaculars [--top N] [--limit N]
+    python -m cde_harvester.loading.populate_vernaculars [--top N] [--limit N]
         [--workers N] [--rate R] [--batch-size N]
         [--refresh-status error,not_found]
 """
