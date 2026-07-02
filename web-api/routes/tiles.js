@@ -84,6 +84,11 @@ router.get(
     const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
            time_min, time_max, latitude, longitude, depth_min, depth_max
     FROM cde.profiles`;
+    // Trajectory coverage cells are ERDDAP data: gated with profiles (an
+    // OBIS-only filter can never match them).
+    const trajectoryBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
+           time_min, time_max, latitude, longitude, depth_min, depth_max
+    FROM cde.trajectory_cells`;
     const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
            date_part('days', time_max - time_min) + 1 as record_count,
            time_min, time_max, latitude, longitude, depth_min, depth_max
@@ -91,7 +96,7 @@ router.get(
     WHERE :obisFilters`;
 
     const branches = [];
-    if (includeProfiles) branches.push(profilesBranch);
+    if (includeProfiles) branches.push(profilesBranch, trajectoryBranch);
     if (includeObis) branches.push(obisBranch);
     // Guard: if nothing to show, return an empty CTE that still has the right columns
     const combinedInner = branches.length

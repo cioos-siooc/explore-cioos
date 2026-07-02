@@ -26,6 +26,14 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                profile_id, timeseries_id,
                latitude, longitude, point_pk, geom
         FROM cde.profiles`;
+  // Trajectory coverage cells: ERDDAP data, gated with profiles. The
+  // trajectory_id doubles as the profile_id surrogate so the records list
+  // labels rows by mission/deployment; records_per_day was computed at
+  // harvest so the estimate math below applies unchanged.
+  const trajectoryBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,
+               trajectory_id as profile_id, NULL as timeseries_id,
+               latitude, longitude, point_pk, geom
+        FROM cde.trajectory_cells`;
   const obisBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, 0 as records_per_day,
                NULL as profile_id, NULL as timeseries_id,
                latitude, longitude, point_pk, geom
@@ -33,7 +41,7 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
         WHERE :obisFilters`;
 
   const branches = [];
-  if (includeProfiles) branches.push(profilesBranch);
+  if (includeProfiles) branches.push(profilesBranch, trajectoryBranch);
   if (showObis) branches.push(obisBranch);
   const combinedInner = branches.length
     ? branches.join("\n        UNION ALL\n        ")
