@@ -117,15 +117,22 @@ class ERDDAP(object):
         # df_all_datasets is fetched lazily by the caller via get_all_datasets().
 
     @task(task_run_name="list-datasets-{self.host_slug}", cache_policy=NO_CACHE)
-    def get_all_datasets(self):
-        """Request the ERDDAP allDatasets list (its own @task for UI visibility)."""
-        # allDatasets indexes table and grid datasets
+    def get_all_datasets(self, data_structures=("table",)):
+        """Request the ERDDAP allDatasets list (its own @task for UI visibility).
+
+        allDatasets indexes both table and grid datasets; one request is made
+        per requested dataStructure (the registered dataset-type handlers
+        decide which structures the pipeline harvests — only "table" today)."""
         try:
             self.logger.info("Fetching all datasets from ERDDAP server: %s", self.url)
-            df = self.erddap_csv_to_df(
-                '/tabledap/allDatasets.csv?&accessible="public"&dataStructure="table"',
-                skiprows=[1, 2],
-            )
+            frames = [
+                self.erddap_csv_to_df(
+                    f'/tabledap/allDatasets.csv?&accessible="public"&dataStructure="{structure}"',
+                    skiprows=[1, 2],
+                )
+                for structure in data_structures
+            ]
+            df = frames[0] if len(frames) == 1 else pd.concat(frames, ignore_index=True)
             self.logger.info(f"Found {len(df)} datasets")
             return df
         except requests.exceptions.HTTPError:

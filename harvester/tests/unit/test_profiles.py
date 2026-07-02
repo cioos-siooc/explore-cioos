@@ -1,7 +1,7 @@
 """
-Unit tests for cde_harvester.sources.erddap.profiles.get_profiles.
+Unit tests for the shared tabledap feature pipeline (dataset_types.tabledap_features).
 
-Uses a fully-configured MagicMock dataset so that get_profiles can exercise
+Uses a fully-configured MagicMock dataset so that extract_features can exercise
 its real logic (DataFrame manipulation, bad-geometry filtering, etc.) without
 any HTTP calls.
 """
@@ -15,7 +15,7 @@ from conftest import (
     ERDDAP_URL,
     build_mock_dataset,
 )
-from cde_harvester.sources.erddap.profiles import get_profiles
+from cde_harvester.dataset_types import extract_features as get_profiles
 
 
 # ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@ Each test generates its DataFrame by calling real codebase functions with
 mocked ERDDAP responses — not by constructing fixtures by hand.
 
   datasets.csv  →  Dataset.get_df()      (cde_harvester.sources.erddap.dataset)
-  profiles.csv  →  get_profiles()        (cde_harvester.sources.erddap.profiles)
+  profiles.csv  →  extract_features()    (cde_harvester.dataset_types)
   skipped.csv   →  CDEComplianceChecker  (cde_harvester.sources.erddap.compliance)
                    + harvester skipped-row assembly
 """
@@ -28,7 +28,7 @@ from conftest import (
 
 from cde_harvester.sources.erddap.compliance import CDEComplianceChecker
 from cde_harvester.sources.erddap.dataset import Dataset
-from cde_harvester.sources.erddap.profiles import get_profiles
+from cde_harvester.dataset_types import extract_features as get_profiles
 from cde_harvester.core.schemas import SkippedDatasetSchema
 
 

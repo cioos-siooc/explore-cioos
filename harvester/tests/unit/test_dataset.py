@@ -95,7 +95,7 @@ class TestDatasetEOVMapping:
 
 class TestDatasetGetDf:
     def test_get_df_returns_dataframe(self, mock_erddap_server):
-        from cde_harvester.sources.erddap.profiles import get_profiles
+        from cde_harvester.dataset_types import extract_features as get_profiles
 
         ds = _make_dataset(mock_erddap_server)
         # get_df requires profile_ids to be set; set a minimal value

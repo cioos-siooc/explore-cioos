@@ -30,8 +30,12 @@ from cde_harvester.core.errors import (
     UNCHANGED,
     UNKNOWN_ERROR,
 )
+from cde_harvester.dataset_types import (
+    extract_features,
+    supported_cdm_data_types,
+    supported_data_structures,
+)
 from cde_harvester.sources.erddap.state import load_previous_hashes
-from cde_harvester.sources.erddap.profiles import get_profiles
 from requests.exceptions import HTTPError
 from prefect import task
 
@@ -98,15 +102,6 @@ class DatasetHarvestError(Exception):
 class ERDDAPHarvester(BaseHarvester):
     """Harvester for ERDDAP servers."""
 
-    CDM_DATA_TYPES_SUPPORTED = [
-        # "Point",
-        "TimeSeries",
-        "Profile",
-        "TimeSeriesProfile",
-        # "Trajectory",
-        # "TrajectoryProfile",
-    ]
-
     def __init__(self, erddap_url, limit_dataset_ids=None, cache_requests=False,
                  run_id=None, skip_unchanged=False):
         self.erddap_url = erddap_url
@@ -148,7 +143,9 @@ class ERDDAPHarvester(BaseHarvester):
 
         erddap = ERDDAP(self.erddap_url, self.cache_requests)
         erddap_logger = erddap.get_logger()
-        erddap.df_all_datasets = erddap.get_all_datasets()
+        erddap.df_all_datasets = erddap.get_all_datasets(
+            data_structures=supported_data_structures()
+        )
         df_all_datasets = erddap.df_all_datasets
 
         previous_hashes = (
@@ -172,7 +169,7 @@ class ERDDAPHarvester(BaseHarvester):
                 verified=empty_verified,
             )
 
-        cdm_data_types_supported = self.CDM_DATA_TYPES_SUPPORTED
+        cdm_data_types_supported = supported_cdm_data_types()
         if self.limit_dataset_ids:
             df_all_datasets = df_all_datasets.query(
                 "datasetID in @self.limit_dataset_ids"
@@ -371,7 +368,7 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
         compliance_checker = CDEComplianceChecker(dataset)
 
         if compliance_checker.passes_all_checks():
-            df_profiles = get_profiles(dataset)
+            df_profiles = extract_features(dataset)
             duration_ms = int((time.monotonic() - t0) * 1000)
             if df_profiles.empty:
                 log.warning("No profiles found")
