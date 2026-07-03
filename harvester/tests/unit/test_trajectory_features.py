@@ -194,6 +194,29 @@ class TestPrepareTrajectoryCellsDataframe:
         assert row["depth_max"] == 100.0
         assert row["time_max"] == "2021-01-09"
 
+    def test_bigint_columns_come_out_int64(self):
+        # regression: the orderByCount merge/fillna upcasts n_records to
+        # float64, and Postgres COPY rejects "2.0" for a bigint column
+        df = pd.DataFrame({
+            "erddap_url": [ERDDAP_URL] * 2,
+            "dataset_id": [DATASET_ID] * 2,
+            "trajectory_id": ["m1", "m2"],
+            "latitude": [48.0, 49.0],
+            "longitude": [-125.0, -126.0],
+            "time_min": ["2021-01-01", "2021-02-01"],
+            "time_max": ["2021-01-05", "2021-02-05"],
+            "depth_min": [0.0, 0.0],
+            "depth_max": [50.0, 60.0],
+            "n_records": [2.0, float("nan")],
+            "n_profiles": [1.0, float("nan")],
+            "records_per_day": [2.0, 4.0],
+            "days": [5.0, float("nan")],
+        })
+        out = prepare_trajectory_cells_dataframe(df)
+        for col in ("n_records", "n_profiles", "days"):
+            assert out[col].dtype == "Int64", col
+        assert out.loc[out["trajectory_id"] == "m1", "n_records"].iloc[0] == 2
+
     def test_null_trajectory_id_becomes_empty_string(self):
         df = pd.DataFrame({
             "erddap_url": [ERDDAP_URL],

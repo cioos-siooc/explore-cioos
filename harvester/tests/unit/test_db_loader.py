@@ -14,6 +14,7 @@ import pytest
 
 from cde_harvester.loading.loader import (
     ensure_organization_pks,
+    load_cells_copy,
     main,
     prepare_profiles_dataframe,
 )
@@ -99,6 +100,38 @@ class TestPrepareProfilesDataframe:
     def test_valid_rows_preserved(self, sample_profiles_df):
         result = prepare_profiles_dataframe(sample_profiles_df.copy())
         assert len(result) == len(sample_profiles_df)
+
+
+class TestLoadCellsCopy:
+    def _copy_body(self, df):
+        """Run load_cells_copy against a mocked cursor and return the CSV body
+        handed to copy_expert."""
+        transaction = MagicMock()
+        cur = (
+            transaction.connection.driver_connection.cursor
+            .return_value.__enter__.return_value
+        )
+        captured = {}
+
+        def grab(sql, buf):
+            captured["body"] = buf.read()
+
+        cur.copy_expert.side_effect = grab
+        load_cells_copy(df, "temp_trajectory_cells", transaction)
+        return captured["body"]
+
+    def test_int64_renders_without_decimal_point_and_na_as_null(self):
+        # regression: COPY does no casting, so "2.0" in a bigint column fails
+        df = pd.DataFrame({"n_records": pd.array([2, None], dtype="Int64")})
+        lines = self._copy_body(df).splitlines()
+        assert lines[0] == "2"
+        assert lines[1] == r"\N"
+
+    def test_float_nan_renders_as_null(self):
+        df = pd.DataFrame({"depth_min": [1.5, float("nan")]})
+        lines = self._copy_body(df).splitlines()
+        assert lines[0] == "1.5"
+        assert lines[1] == r"\N"
 
 
 class TestEnsureOrganizationPks:

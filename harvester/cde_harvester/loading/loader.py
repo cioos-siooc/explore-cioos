@@ -109,6 +109,8 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
     else:
         agg["aphia_ids"] = [[] for _ in range(len(agg))]
 
+    # Same bigint/COPY constraint as prepare_trajectory_cells_dataframe.
+    agg["n_records"] = agg["n_records"].round().astype("Int64")
     return agg
 
 
@@ -151,7 +153,7 @@ def load_cells_copy(df, table_name, transaction, schema=None):
     for row in df.itertuples(index=False, name=None):
         out = []
         for col, val in zip(cols, row):
-            if val is None or (isinstance(val, float) and pd.isna(val)):
+            if val is None or val is pd.NA or (isinstance(val, float) and pd.isna(val)):
                 out.append(r"\N")
             elif col == "scientific_names":
                 out.append(
@@ -210,6 +212,11 @@ def prepare_trajectory_cells_dataframe(trajectory_cells):
         )
         .reset_index()
     )
+    # COPY does no casting: these land in bigint columns, and pandas upcasts
+    # counts to float64 ("2.0") as soon as a NaN is involved anywhere upstream.
+    # Nullable Int64 renders as "2" / \N in the COPY buffer.
+    for col in ("n_records", "n_profiles", "days"):
+        agg[col] = agg[col].round().astype("Int64")
     return agg
 
 
