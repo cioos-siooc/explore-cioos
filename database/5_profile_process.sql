@@ -369,5 +369,79 @@ BEGIN
   PERFORM trajectory_insert_points();
   PERFORM trajectory_link_point_pk();
   PERFORM trajectory_update_days();
+  PERFORM trajectory_footprints_link_dataset_pk();
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Coverage-corridor footprints (cde.trajectory_footprints). The harvester
+-- ships WKT corridor skeletons (a decimated line, or a multipoint of cell
+-- centers on the no-orderByClosest fallback) plus a buffer radius; the
+-- geodesic buffering happens here so the harvester needs no geometry deps.
+
+-- Staging table for the WKT skeletons. Called by create_temp_tables() on the
+-- incremental path and directly by the db-loader's full-reload path.
+CREATE OR REPLACE FUNCTION create_temp_trajectory_footprints() RETURNS VOID AS $$
+BEGIN
+  CREATE TEMP TABLE IF NOT EXISTS temp_trajectory_footprints (
+    erddap_url text,
+    dataset_id text,
+    trajectory_id text DEFAULT '',
+    segment_id integer DEFAULT 0,
+    time_min timestamptz,
+    time_max timestamptz,
+    depth_min double precision,
+    depth_max double precision,
+    buffer_m double precision,
+    track_wkt text
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Buffer the staged skeletons into corridor polygons and insert them.
+-- geography-based buffer = true meters at any latitude; the result is clipped
+-- to the web-mercator envelope so a track brushing the poles can't blow up
+-- ST_Transform, then simplified at ~buffer/10 (invisible at the z>=7 zooms
+-- the corridor renders at — the chunky look is deliberate).
+CREATE OR REPLACE FUNCTION trajectory_footprints_insert_from_temp() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
+  INSERT INTO cde.trajectory_footprints
+    (erddap_url, dataset_id, trajectory_id, segment_id,
+     time_min, time_max, depth_min, depth_max, geom)
+  SELECT erddap_url, dataset_id, trajectory_id, segment_id,
+         time_min, time_max, depth_min, depth_max,
+         ST_Multi(ST_SimplifyPreserveTopology(
+           ST_Transform(
+             ST_CollectionExtract(
+               ST_Intersection(
+                 ST_Buffer(
+                   ST_GeomFromText(track_wkt, 4326)::geography,
+                   coalesce(buffer_m, 5000), 4
+                 )::geometry,
+                 ST_MakeEnvelope(-180, -85.05, 180, 85.05, 4326)
+               ), 3),
+             3857),
+           coalesce(buffer_m, 5000) / 10))
+  FROM temp_trajectory_footprints
+  WHERE track_wkt IS NOT NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION trajectory_footprints_link_dataset_pk() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
+  UPDATE cde.trajectory_footprints f
+  SET dataset_pk = d.pk
+  FROM cde.datasets d
+  WHERE f.dataset_id = d.dataset_id
+    AND f.erddap_url = d.erddap_url
+    AND f.dataset_pk IS NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
 END;
 $$ LANGUAGE plpgsql;

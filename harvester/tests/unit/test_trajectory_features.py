@@ -84,6 +84,19 @@ def build_trajectory_dataset(cdm_data_type="Trajectory", with_depth=True,
 
     def fake_query(url):
         plain = unquote(url)
+        if "orderByClosest" in plain:
+            # decimated positions (Stage 1) — used by the corridor builder
+            return pd.DataFrame({
+                "traj_id": ["m1"] * 3,
+                "time": [
+                    "2021-01-01T00:00:00Z",
+                    "2021-01-10T00:00:00Z",
+                    "2021-01-20T00:00:00Z",
+                ],
+                "latitude": [CELL_A[0], CELL_A[0], CELL_B[0]],
+                "longitude": [CELL_A[1], CELL_A[1], CELL_B[1]],
+                "depth": [1.0, 2.0, 3.0],
+            })
         if "orderByMinMax" in plain:
             if fail_server_binning:
                 raise HTTPError("500: No operator found in constraint")
@@ -139,6 +152,16 @@ class TestServerBinnedExtraction:
         cells = extract_features(dataset)
         assert len(cells) == 2
         assert get_handler("Trajectory").feature_kind == "trajectory_cells"
+
+    def test_dispatch_also_builds_corridor_footprints(self):
+        # The handler stashes the corridor skeleton frame on the dataset;
+        # harvest_dataset() picks it up into HarvestResult.trajectory_footprints.
+        dataset = build_trajectory_dataset()
+        extract_features(dataset)
+        footprints = dataset.trajectory_footprints
+        assert not footprints.empty
+        assert set(footprints["dataset_id"]) == {DATASET_ID}
+        assert footprints["track_wkt"].str.startswith(("LINESTRING", "POINT")).all()
 
     def test_no_depth_variable_fills_zero(self):
         cells = extract_cells(build_trajectory_dataset(with_depth=False))

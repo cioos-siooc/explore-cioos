@@ -39,9 +39,20 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                latitude, longitude, point_pk, geom
         FROM cde.obis_cells
         WHERE :obisFilters`;
+  // Coverage-corridor polygons: make a click/selection anywhere inside a
+  // corridor surface the dataset even where sparse fixes left no cell (the
+  // "gap" stretches). records_per_day = 0 so they add nothing to the
+  // download estimate — the cells branch above still carries the real
+  // numbers. NULL latitude/longitude/point_pk keep the shared point-branch
+  // filters from erroring (those filters simply exclude corridor rows).
+  const footprintsBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, 0 as records_per_day,
+               trajectory_id as profile_id, NULL as timeseries_id,
+               NULL::double precision as latitude, NULL::double precision as longitude,
+               NULL::integer as point_pk, geom
+        FROM cde.trajectory_footprints`;
 
   const branches = [];
-  if (includeProfiles) branches.push(profilesBranch, trajectoryBranch);
+  if (includeProfiles) branches.push(profilesBranch, trajectoryBranch, footprintsBranch);
   if (showObis) branches.push(obisBranch);
   const combinedInner = branches.length
     ? branches.join("\n        UNION ALL\n        ")

@@ -265,6 +265,26 @@ export default function CreateMap({
           'pk',
           ...pointsInDataset
         ])
+        // Corridors grey out with the points; the hovered dataset's own
+        // corridor keeps its platform color (features carry pk_url).
+        if (map.current.getLayer('trajectory-footprints')) {
+          const corridorHover = [
+            'case',
+            ['==', ['get', 'pk_url'], pk],
+            colors,
+            'lightgrey'
+          ]
+          map.current.setPaintProperty(
+            'trajectory-footprints',
+            'fill-color',
+            corridorHover
+          )
+          map.current.setPaintProperty(
+            'trajectory-footprints-outline',
+            'line-color',
+            corridorHover
+          )
+        }
       } else {
         map.current.setPaintProperty('hexes', 'fill-color', 'lightgrey')
         const features = map.current.queryRenderedFeatures({
@@ -291,6 +311,18 @@ export default function CreateMap({
         property: 'count',
         stops: colorStops.current
       })
+      if (map.current.getLayer('trajectory-footprints')) {
+        map.current.setPaintProperty(
+          'trajectory-footprints',
+          'fill-color',
+          colors
+        )
+        map.current.setPaintProperty(
+          'trajectory-footprints-outline',
+          'line-color',
+          colors
+        )
+      }
     }
   }
 
@@ -464,6 +496,42 @@ export default function CreateMap({
       const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${
         query !== defaultQuery && q && `?${q}`
       }`
+
+      // Coverage corridors: at point zoom, trajectory datasets render as a
+      // translucent buffered swath per dataset (visibly a coverage envelope,
+      // not a precise track) — their 1/12° cells would read as a dotted line
+      // wherever fixes are sparser than the symbols. Served as a second MVT
+      // layer by /tiles; added first so points/highlights draw on top.
+      map.current.addLayer({
+        id: 'trajectory-footprints',
+        type: 'fill',
+        minzoom: hexMaxZoom,
+        source: {
+          type: 'vector',
+          tiles: [tileQuery]
+        },
+        'source-layer': 'trajectory-footprints',
+        paint: {
+          'fill-color': colors,
+          'fill-opacity': 0.18
+        }
+      })
+
+      map.current.addLayer({
+        id: 'trajectory-footprints-outline',
+        type: 'line',
+        minzoom: hexMaxZoom,
+        source: {
+          type: 'vector',
+          tiles: [tileQuery]
+        },
+        'source-layer': 'trajectory-footprints',
+        paint: {
+          'line-color': colors,
+          'line-opacity': 0.4,
+          'line-width': 1
+        }
+      })
 
       map.current.addLayer({
         id: 'points',
@@ -681,6 +749,41 @@ export default function CreateMap({
       }
     })
 
+    map.current.on('mousemove', 'trajectory-footprints', (e) => {
+      if (draw.getMode().includes('draw')) return
+      // A real point under the cursor wins — its own tooltip is showing.
+      if (
+        map.current.queryRenderedFeatures(e.point, { layers: ['points'] })
+          .length > 0
+      ) {
+        return
+      }
+      map.current.getCanvas().style.cursor = 'pointer'
+      // One line per overlapping corridor (each feature = one dataset).
+      const rows = e.features.slice(0, 3).map((feature) => {
+        const { title, n_trajectories: nTrajectories, days } =
+          feature.properties
+        const safeTitle = String(title)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+        return `<div><b>${safeTitle}</b><br/>${nTrajectories} ${t(
+          'mapTrajectoryTooltipTrajectories'
+        )} &middot; ${days} ${t('mapTrajectoryTooltipDays')}</div>`
+      })
+      popup
+        .setLngLat([e.lngLat.lng, e.lngLat.lat])
+        .setHTML(rows.join('<hr style="margin:4px 0"/>'))
+        .addTo(map.current)
+    })
+
+    map.current.on('mouseleave', 'trajectory-footprints', () => {
+      if (!draw.getMode().includes('draw')) {
+        map.current.getCanvas().style.cursor = 'grab'
+        popup.remove()
+      }
+    })
+
     map.current.on('mousemove', 'hexes', (e) => {
       if (!draw.getMode().includes('draw')) {
         map.current.getCanvas().style.cursor = 'pointer'
@@ -772,9 +875,22 @@ export default function CreateMap({
       }
     })
 
+    // Corridors are selectable exactly like points: reuse the click-bbox →
+    // setPolygon flow (the server-side selection tests the corridor polygon,
+    // so gap stretches with no cells still surface the dataset). Guarded so a
+    // click on a point overlapping a corridor doesn't run the flow twice —
+    // the points handler is registered first and preventDefaults.
+    const handleMapFootprintsOnClick = (e) => {
+      if (e.originalEvent.defaultPrevented) return
+      handleMapPointsOnClick(e)
+    }
+
     // Workaround for https://github.com/mapbox/mapbox-gl-draw/issues/617
     map.current.on('click', 'points', handleMapPointsOnClick)
     map.current.on('touchend', 'points', handleMapPointsOnClick)
+
+    map.current.on('click', 'trajectory-footprints', handleMapFootprintsOnClick)
+    map.current.on('touchend', 'trajectory-footprints', handleMapFootprintsOnClick)
 
     map.current.on('click', 'hexes', handleMapHexesOnClick)
     map.current.on('touchend', 'hexes', handleMapHexesOnClick)

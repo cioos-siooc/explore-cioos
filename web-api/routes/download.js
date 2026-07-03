@@ -118,6 +118,14 @@ router.get(
         SELECT dataset_pk, point_pk, geom, latitude, longitude,
                time_min, time_max, depth_min, depth_max
         FROM cde.trajectory_cells
+        UNION ALL
+        -- corridor polygons: a selection over a gap stretch (no cells) still
+        -- queues the trajectory dataset. NULL lat/lon/point_pk = those
+        -- point-level filters simply exclude corridor rows.
+        SELECT dataset_pk, NULL::integer point_pk, geom,
+               NULL::double precision latitude, NULL::double precision longitude,
+               time_min, time_max, depth_min, depth_max
+        FROM cde.trajectory_footprints
         ),
         profiles_subset AS (
         SELECT d.erddap_url,

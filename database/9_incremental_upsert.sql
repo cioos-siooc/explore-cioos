@@ -30,6 +30,10 @@ BEGIN
   -- INSERTs of lat/lon-only rows on some paths; drop the expression so the
   -- temp table takes NULL geom (the main-table INSERT recomputes it anyway).
   CREATE TEMP TABLE IF NOT EXISTS temp_trajectory_cells (LIKE cde.trajectory_cells INCLUDING DEFAULTS EXCLUDING CONSTRAINTS EXCLUDING GENERATED);
+  -- NOT a LIKE clone: the staging shape (WKT skeleton + buffer radius)
+  -- deliberately differs from cde.trajectory_footprints (polygons); see
+  -- create_temp_trajectory_footprints() in 5_profile_process.sql.
+  PERFORM create_temp_trajectory_footprints();
 
   -- Explicitly drop all NOT NULL constraints from temp tables
   -- These are column-level constraints that EXCLUDING CONSTRAINTS doesn't remove
@@ -191,6 +195,21 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+-- Replace trajectory_footprints (coverage corridors) for datasets that are in
+-- temp_datasets. The buffered insert lives in 5_profile_process.sql
+-- (trajectory_footprints_insert_from_temp) so the full-reload path shares it.
+CREATE OR REPLACE FUNCTION replace_trajectory_footprints_from_temp() RETURNS VOID AS $$
+BEGIN
+  DELETE FROM cde.trajectory_footprints f
+  USING temp_datasets td
+  WHERE f.dataset_id = td.dataset_id
+    AND f.erddap_url = td.erddap_url;
+
+  PERFORM trajectory_footprints_insert_from_temp();
+END;
+$$ LANGUAGE plpgsql;
+
+
 -- Main incremental processing function
 -- Orchestrates the entire incremental update workflow
 CREATE OR REPLACE FUNCTION process_incremental_update() RETURNS VOID AS $$
@@ -212,6 +231,9 @@ BEGIN
 
   -- 6. Replace trajectory_cells (delete old, insert new)
   PERFORM replace_trajectory_cells_from_temp();
+
+  -- 6b. Replace trajectory_footprints (coverage corridors)
+  PERFORM replace_trajectory_footprints_from_temp();
 
   -- 7. UPSERT skipped datasets
   PERFORM upsert_skipped_datasets_from_temp();

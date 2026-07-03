@@ -139,7 +139,11 @@ async function createDBFilter(request) {
   if (polygon) {
     const wktPolygon = polygonJSONToWKT(polygon);
     parameters.wktPolygon = wktPolygon;
-    filters.push("ST_Contains(ST_GeomFromText(:wktPolygon,4326),ST_Transform(geom,4326)) is true");
+    // ST_Intersects, not ST_Contains: identical for the point geometries
+    // (profiles/cells) this historically ran against, but required for the
+    // trajectory_footprints corridor POLYGONS — a selection crossing a
+    // corridor must match even when it doesn't fully contain it.
+    filters.push("ST_Intersects(ST_GeomFromText(:wktPolygon,4326),ST_Transform(geom,4326)) is true");
   }
 
   if (scientificNames) {

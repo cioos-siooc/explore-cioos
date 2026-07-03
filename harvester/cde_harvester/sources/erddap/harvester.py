@@ -18,6 +18,7 @@ from cde_harvester.core.schemas import (
     ProfileSchema,
     SkippedDatasetSchema,
     TrajectoryCellSchema,
+    TrajectoryFootprintSchema,
     VariableSchema,
     VerifiedDatasetSchema,
 )
@@ -89,6 +90,9 @@ class DatasetHarvestResult:
     # Which HarvestResult attribute `features` belongs in: "profiles" for
     # point-like types, "trajectory_cells" for trajectory coverage cells.
     feature_kind: str = "profiles"
+    # Corridor footprint rows (trajectory types only; stashed on the dataset
+    # object by the handler, None for every other type).
+    footprints: pd.DataFrame = None
     dataset_df: pd.DataFrame = None
     variables: pd.DataFrame = None
     skipped_reason_code: str = None  # for the skipped_datasets table, on skip
@@ -141,6 +145,9 @@ class ERDDAPHarvester(BaseHarvester):
         )
         df_trajectory_cells_all = pd.DataFrame(
             columns=TrajectoryCellSchema.to_schema().columns.keys()
+        )
+        df_trajectory_footprints_all = pd.DataFrame(
+            columns=TrajectoryFootprintSchema.to_schema().columns.keys()
         )
         df_datasets_all = pd.DataFrame(
             columns=DatasetSchema.to_schema().columns.keys()
@@ -246,6 +253,10 @@ class ERDDAPHarvester(BaseHarvester):
                         df_trajectory_cells_all = pd.concat(
                             [df_trajectory_cells_all, result.features]
                         )
+                        if result.footprints is not None and not result.footprints.empty:
+                            df_trajectory_footprints_all = pd.concat(
+                                [df_trajectory_footprints_all, result.footprints]
+                            )
                     else:
                         df_profiles_all = pd.concat([df_profiles_all, result.features])
                     df_datasets_all = pd.concat([df_datasets_all, result.dataset_df])
@@ -326,6 +337,7 @@ class ERDDAPHarvester(BaseHarvester):
             variables=df_variables_all,
             skipped=df_skipped_datasets,
             trajectory_cells=df_trajectory_cells_all,
+            trajectory_footprints=df_trajectory_footprints_all,
             attempts=df_attempts,
             verified=df_verified,
         )
@@ -404,6 +416,7 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                 status="success",
                 features=df_features,
                 feature_kind=feature_kind,
+                footprints=getattr(dataset, "trajectory_footprints", None),
                 dataset_df=dataset.get_df(),
                 variables=dataset.df_variables,
                 attempt=_build_attempt(

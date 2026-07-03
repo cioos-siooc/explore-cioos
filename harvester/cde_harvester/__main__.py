@@ -164,7 +164,8 @@ def _run_logger():
 @task(task_run_name="merge-and-write-csvs")
 def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skipped,
                          obis_datasets, obis_cells, obis_skipped, df_ckan,
-                         erddap_verified=None, erddap_trajectory_cells=None):
+                         erddap_verified=None, erddap_trajectory_cells=None,
+                         erddap_trajectory_footprints=None):
     """Join CKAN metadata, merge all sources, and write the output CSVs (@task)."""
     logger = _run_logger()
     datasets_file = f"{folder}/datasets.csv"
@@ -173,10 +174,13 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     ckan_file = f"{folder}/ckan.csv"
     obis_cells_file = f"{folder}/obis_cells.csv"
     trajectory_cells_file = f"{folder}/trajectory_cells.csv"
+    trajectory_footprints_file = f"{folder}/trajectory_footprints.csv"
     verified_file = f"{folder}/verified.csv"
 
     if erddap_trajectory_cells is None:
         erddap_trajectory_cells = pd.DataFrame()
+    if erddap_trajectory_footprints is None:
+        erddap_trajectory_footprints = pd.DataFrame()
 
     # --- ERDDAP-specific post-processing ---
     if not erddap_datasets.empty:
@@ -271,6 +275,13 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
 
     if not erddap_trajectory_cells.empty:
         erddap_trajectory_cells.to_csv(trajectory_cells_file, index=False)
+
+    if not erddap_trajectory_footprints.empty:
+        erddap_trajectory_footprints.to_csv(trajectory_footprints_file, index=False)
+        logger.info(
+            "Wrote %s (%d corridor slices)",
+            trajectory_footprints_file, len(erddap_trajectory_footprints),
+        )
 
     # Datasets skipped as unchanged — only their verified_at is bumped by the loader.
     if erddap_verified is not None and not erddap_verified.empty:
@@ -380,6 +391,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         # Collect ERDDAP results
         erddap_profiles = pd.DataFrame()
         erddap_trajectory_cells = pd.DataFrame()
+        erddap_trajectory_footprints = pd.DataFrame()
         erddap_datasets = pd.DataFrame()
         variables = pd.DataFrame()
         erddap_skipped = pd.DataFrame()
@@ -388,6 +400,9 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             erddap_profiles = pd.concat([erddap_profiles, result.profiles])
             erddap_trajectory_cells = pd.concat(
                 [erddap_trajectory_cells, result.trajectory_cells]
+            )
+            erddap_trajectory_footprints = pd.concat(
+                [erddap_trajectory_footprints, result.trajectory_footprints]
             )
             erddap_datasets = pd.concat([erddap_datasets, result.datasets])
             variables = pd.concat([variables, result.variables])
@@ -499,6 +514,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         erddap_datasets=erddap_datasets,
         erddap_profiles=erddap_profiles,
         erddap_trajectory_cells=erddap_trajectory_cells,
+        erddap_trajectory_footprints=erddap_trajectory_footprints,
         erddap_skipped=erddap_skipped,
         obis_datasets=obis_datasets,
         obis_cells=obis_cells,

@@ -139,6 +139,8 @@
   "downloadDetailsProgressTooltipText": "Les téléchargements sont limités à 100MB",
   "mapPointHoverTooltip": " jours de données. Cliquer pour les détails",
   "mapHexHoverTooltip": " points. Cliquez pour zoomer",
+  "mapTrajectoryTooltipTrajectories": "trajectoire(s)",
+  "mapTrajectoryTooltipDays": "jour(s) de données. Cliquer pour les détails",
   "mapPolygonToolTitle": "Outil polygone",
   "mapDeleteToolTitle": "Effacer",
   "mapZoomInToolTitle": "Zoom avant",

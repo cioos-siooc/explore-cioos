@@ -220,6 +220,25 @@ def prepare_trajectory_cells_dataframe(trajectory_cells):
     return agg
 
 
+def prepare_trajectory_footprints_dataframe(footprints):
+    """Clean and prepare trajectory_footprints (corridor skeleton) rows.
+
+    These COPY into temp_trajectory_footprints as-is; PostGIS buffers the WKT
+    into polygons at insert time (trajectory_footprints_insert_from_temp), so
+    the only obligations here are string/int hygiene for the COPY buffer.
+    """
+    fp = footprints.copy()
+    fp["trajectory_id"] = fp["trajectory_id"].fillna("").astype(str)
+    fp = fp.dropna(subset=["track_wkt", "time_min", "time_max"])
+    # COPY does no casting: segment_id lands in an integer column and pandas
+    # float upcasting would render "2.0" (see prepare_trajectory_cells_dataframe).
+    fp["segment_id"] = (
+        pd.to_numeric(fp["segment_id"], errors="coerce").round().astype("Int64")
+    )
+    fp = fp.dropna(subset=["segment_id"])
+    return fp
+
+
 def ensure_organization_pks(datasets):
     """Ensure organization_pks column has empty arrays instead of null values."""
     if (
@@ -248,6 +267,7 @@ def main(folder, incremental=False):
     skipped_datasets_file = f"{folder}/skipped.csv"
     obis_cells_file = f"{folder}/obis_cells.csv"
     trajectory_cells_file = f"{folder}/trajectory_cells.csv"
+    trajectory_footprints_file = f"{folder}/trajectory_footprints.csv"
     verified_file = f"{folder}/verified.csv"
     harvest_runs_file = f"{folder}/harvest_runs.csv"
     harvest_attempts_file = f"{folder}/harvest_attempts.csv"
@@ -271,6 +291,11 @@ def main(folder, incremental=False):
     if os.path.isfile(trajectory_cells_file):
         logger.info("Reading %s", trajectory_cells_file)
         trajectory_cells = pd.read_csv(trajectory_cells_file)
+
+    trajectory_footprints = None
+    if os.path.isfile(trajectory_footprints_file):
+        logger.info("Reading %s", trajectory_footprints_file)
+        trajectory_footprints = pd.read_csv(trajectory_footprints_file)
 
     verified = None
     if os.path.isfile(verified_file) and os.path.getsize(verified_file) > 1:
@@ -414,6 +439,15 @@ def main(folder, incremental=False):
                         len(prepared),
                     )
                     load_cells_copy(prepared, "temp_trajectory_cells", transaction)
+
+            if trajectory_footprints is not None:
+                prepared = prepare_trajectory_footprints_dataframe(trajectory_footprints)
+                with _timed("temp_trajectory_footprints COPY", logger):
+                    logger.info(
+                        "Loading trajectory_footprints into temp table (%d rows)",
+                        len(prepared),
+                    )
+                    load_cells_copy(prepared, "temp_trajectory_footprints", transaction)
 
             if not skipped_datasets.empty:
                 with _timed("temp_skipped_datasets to_sql", logger):
@@ -564,6 +598,29 @@ def main(folder, incremental=False):
                     logger.info("Writing trajectory_cells (%d rows)", len(prepared))
                     load_cells_copy(
                         prepared, "trajectory_cells", transaction, schema=schema
+                    )
+
+            if trajectory_footprints is not None:
+                # Footprints can't COPY straight into the final table: the CSV
+                # carries WKT skeletons that PostGIS buffers into corridor
+                # polygons at insert time. Stage into the same temp table the
+                # incremental path uses, then buffer+insert and link.
+                prepared = prepare_trajectory_footprints_dataframe(trajectory_footprints)
+                with _timed("trajectory_footprints COPY+buffer", logger):
+                    logger.info(
+                        "Writing trajectory_footprints (%d corridor slices)",
+                        len(prepared),
+                    )
+                    transaction.execute(
+                        text("SELECT create_temp_trajectory_footprints();")
+                    )
+                    load_cells_copy(prepared, "temp_trajectory_footprints", transaction)
+                    n = transaction.execute(
+                        text("SELECT trajectory_footprints_insert_from_temp();")
+                    ).scalar()
+                    logger.info("  trajectory_footprints: %s polygons inserted", n or 0)
+                    transaction.execute(
+                        text("SELECT trajectory_footprints_link_dataset_pk();")
                     )
 
             with _timed("skipped_datasets to_sql", logger):

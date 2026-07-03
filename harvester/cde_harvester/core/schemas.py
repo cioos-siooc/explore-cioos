@@ -103,6 +103,31 @@ class TrajectoryCellSchema(pa.DataFrameModel):
         strict = False
 
 
+class TrajectoryFootprintSchema(pa.DataFrameModel):
+    """Schema for the trajectory_footprints DataFrame.
+
+    Corridor skeletons for Trajectory/TrajectoryProfile datasets: one WKT
+    line (or multipoint fallback) per (trajectory, gap segment, ~30-day time
+    slice). The loader COPYs these into temp_trajectory_footprints; PostGIS
+    buffers them into cde.trajectory_footprints polygons at insert time.
+    """
+
+    erddap_url: Series[str]
+    dataset_id: Series[str]
+    trajectory_id: Series[str] = pa.Field(nullable=True, default="")
+    segment_id: Series[int]
+    time_min: Series[pa.DateTime] = pa.Field(nullable=True)
+    time_max: Series[pa.DateTime] = pa.Field(nullable=True)
+    depth_min: Series[float] = pa.Field(nullable=True)
+    depth_max: Series[float] = pa.Field(nullable=True)
+    buffer_m: Series[float]
+    track_wkt: Series[str]
+
+    class Config:
+        coerce = True
+        strict = False
+
+
 class DatasetSchema(pa.DataFrameModel):
     """Schema for the datasets DataFrame.
 

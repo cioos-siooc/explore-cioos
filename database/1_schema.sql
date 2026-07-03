@@ -232,6 +232,37 @@ CREATE INDEX trajectory_cells_dataset_idx ON trajectory_cells (erddap_url, datas
 CREATE INDEX trajectory_cells_latlon_idx ON trajectory_cells (latitude, longitude);
 ALTER TABLE cde.trajectory_cells SET (fillfactor = 80);
 
+
+-- Coverage-corridor footprints for Trajectory / TrajectoryProfile datasets:
+-- one buffered corridor polygon per (trajectory, gap segment, ~30-day time
+-- slice), rendered as a translucent swath at point zoom (z>=7) where the
+-- coverage cells would read as a dotted track. Built by
+-- trajectory_footprints_insert_from_temp() from WKT skeletons the harvester
+-- ships (see harvester/cde_harvester/dataset_types/trajectory_footprints.py).
+-- Time-sliced so the /tiles time filter trims the corridor spatially and the
+-- hover "days of record" is a cumulative interval merge, never a span.
+DROP TABLE IF EXISTS trajectory_footprints;
+CREATE TABLE trajectory_footprints (
+    pk serial PRIMARY KEY,
+    dataset_pk integer,
+    erddap_url text,
+    dataset_id text,
+    trajectory_id text DEFAULT '',
+    -- gap segment within the trajectory (breaks at >max(4x interval, 12h),
+    -- >200 km, or antimeridian hops — matches the future line geometry)
+    segment_id integer DEFAULT 0,
+    time_min timestamptz,
+    time_max timestamptz,
+    depth_min double precision,
+    depth_max double precision,
+    geom geometry(MultiPolygon, 3857),
+    FOREIGN KEY (dataset_pk) REFERENCES datasets(pk)
+);
+
+CREATE INDEX trajectory_footprints_geom_gist ON trajectory_footprints USING GIST (geom);
+CREATE INDEX trajectory_footprints_dataset_idx ON trajectory_footprints (erddap_url, dataset_id);
+ALTER TABLE cde.trajectory_footprints SET (fillfactor = 90);
+
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 DROP MATERIALIZED VIEW IF EXISTS cde.obis_scientific_names;
