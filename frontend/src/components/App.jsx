@@ -96,6 +96,8 @@ export default function App() {
   const [mapView, setMapView] = useState({})
   const [rangeLevels, setRangeLevels] = useState()
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
+  const [trajectoryRangeLevels, setTrajectoryRangeLevels] = useState()
+  const [currentTrajectoryRangeLevel, setCurrentTrajectoryRangeLevel] = useState()
   const [hoveredDataset, setHoveredDataset] = useState()
   const defaultQuery = {
     startDate: defaultStartDate,
@@ -556,6 +558,7 @@ export default function App() {
       .then((legend) => {
         if (legend) {
           setRangeLevels(legend.recordsCount)
+          setTrajectoryRangeLevels(legend.trajectoryRecordsCount)
         }
       })
       .catch((error) => {
@@ -613,6 +616,7 @@ export default function App() {
         .then((legend) => {
           if (legend) {
             setRangeLevels(legend.recordsCount)
+            setTrajectoryRangeLevels(legend.trajectoryRecordsCount)
           }
         })
     }
@@ -635,6 +639,17 @@ export default function App() {
       setCurrentRangeLevel(getCurrentRangeLevel(rangeLevels, zoom))
     }
   }, [rangeLevels, zoom])
+
+  useEffect(() => {
+    // Trajectory hexes only render at zoom >= 7 (below that, trajectory
+    // counts are merged into the green hex ramp) — hide the legend entry
+    // otherwise.
+    if (trajectoryRangeLevels && zoom >= 7) {
+      setCurrentTrajectoryRangeLevel(trajectoryRangeLevels.zoom1)
+    } else {
+      setCurrentTrajectoryRangeLevel()
+    }
+  }, [trajectoryRangeLevels, zoom])
 
   useEffect(() => {
     setEmailValid(validateEmail(email))
@@ -807,9 +822,11 @@ export default function App() {
           query={query}
           setMapView={setMapView}
           rangeLevels={rangeLevels}
+          trajectoryRangeLevels={trajectoryRangeLevels}
           offsetFlyTo={selectionPanelOpen}
           setHoveredDataset={setHoveredDataset}
           hoveredDataset={hoveredDataset}
+          setDatasetsSelected={setDatasetsSelected}
         />
       )}
       <Controls
@@ -1109,6 +1126,7 @@ export default function App() {
       {currentRangeLevel && (
         <Legend
           currentRangeLevel={currentRangeLevel}
+          currentTrajectoryRangeLevel={currentTrajectoryRangeLevel}
           zoom={zoom}
           selectionPanelOpen={selectionPanelOpen}
           platformsInView={platformsSelected.map((e) => e.title)}

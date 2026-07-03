@@ -25,7 +25,7 @@ import {
   getCurrentRangeLevel,
   updateMapToolTitleLanguage
 } from '../../utilities'
-import { colorScale, defaultQuery } from '../config'
+import { colorScale, trajectoryColorScale, defaultQuery } from '../config'
 import platformColors from '../../components/platformColors'
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
@@ -38,8 +38,10 @@ export default function CreateMap({
   setMapView,
   offsetFlyTo,
   rangeLevels,
+  trajectoryRangeLevels,
   hoveredDataset,
-  setHoveredDataset
+  setHoveredDataset,
+  setDatasetsSelected
 }) {
   const { t } = useTranslation()
 
@@ -144,6 +146,7 @@ export default function CreateMap({
   const largeCircleSize = 6
   const circleOpacity = 0.7
   const hexOpacity = 0.8
+  const trajectoryHexOpacity = 0.45
   const hexMinZoom = 0
   const hexMaxZoom = 7
 
@@ -152,6 +155,7 @@ export default function CreateMap({
   const doFinalCheck = useRef(false)
   const layersLoaded = useRef(false)
   const colorStops = useRef([])
+  const trajectoryColorStops = useRef([])
 
   const [boxSelectStartCoords, setBoxSelectStartCoords] = useState()
   const [boxSelectEndCoords, setBoxSelectEndCoords] = useState()
@@ -174,7 +178,7 @@ export default function CreateMap({
 
   useEffect(() => {
     setColorStops()
-  }, [rangeLevels])
+  }, [rangeLevels, trajectoryRangeLevels])
 
   useEffect(() => {
     if (map.current) {
@@ -231,6 +235,26 @@ export default function CreateMap({
           })
         }
       }
+
+      if (trajectoryRangeLevels) {
+        // Trajectory hexes only ever render at zoom >= hexMaxZoom, where the
+        // hex_1 grid is always used, so there's a single range to apply.
+        trajectoryColorStops.current = generateColorStops(
+          trajectoryColorScale,
+          trajectoryRangeLevels.zoom1
+        ).map((colorStop) => {
+          return [colorStop.stop, colorStop.color]
+        })
+        if (
+          trajectoryColorStops.current.length > 0 &&
+          map.current.getLayer('trajectory-hexes')
+        ) {
+          map.current.setPaintProperty('trajectory-hexes', 'fill-color', {
+            property: 'count',
+            stops: trajectoryColorStops.current
+          })
+        }
+      }
     }
   }
 
@@ -277,6 +301,21 @@ export default function CreateMap({
           .map((feature) => feature.properties.pk)
         map.current.setFilter('hexes-hovered', ['in', 'pk', ...hexesInDataset])
       }
+
+      map.current.setPaintProperty('trajectory-hexes', 'fill-color', 'lightgrey')
+      const trajectoryFeatures = map.current.queryRenderedFeatures({
+        layers: ['trajectory-hexes']
+      })
+      const trajectoryHexesInDataset = trajectoryFeatures
+        .filter((feature) =>
+          JSON.parse(feature.properties.datasets).includes(pk)
+        )
+        .map((feature) => feature.properties.pk)
+      map.current.setFilter('trajectory-hexes-hovered', [
+        'in',
+        'pk',
+        ...trajectoryHexesInDataset
+      ])
     } else {
       map.current.setFilter('points-hovered', ['in', 'pk', ''])
       map.current.setPaintProperty('points', 'circle-color', colors)
@@ -290,6 +329,12 @@ export default function CreateMap({
       map.current.setPaintProperty('hexes', 'fill-color', {
         property: 'count',
         stops: colorStops.current
+      })
+
+      map.current.setFilter('trajectory-hexes-hovered', ['in', 'pk', ''])
+      map.current.setPaintProperty('trajectory-hexes', 'fill-color', {
+        property: 'count',
+        stops: trajectoryColorStops.current
       })
     }
   }
@@ -344,6 +389,9 @@ export default function CreateMap({
     const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${
       query !== defaultQuery && q && `?${q}`
     }`
+    const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${
+      query !== defaultQuery && q && `?${q}`
+    }`
     setPointsToReview()
     setPolygon()
     if (map && map.current && map.current.loaded()) {
@@ -351,14 +399,17 @@ export default function CreateMap({
 
       map.current.getSource('points').tiles = [tileQuery]
       map.current.getSource('hexes').tiles = [tileQuery]
+      map.current.getSource('trajectory-hexes').tiles = [trajectoryTileQuery]
 
       // Remove the tiles for a particular source
       map.current.style.sourceCaches.hexes.clearTiles()
       map.current.style.sourceCaches.points.clearTiles()
+      map.current.style.sourceCaches['trajectory-hexes'].clearTiles()
 
       // Load the new tiles for the current viewport (map.transform -> viewport)
       map.current.style.sourceCaches.hexes.update(map.current.transform)
       map.current.style.sourceCaches.points.update(map.current.transform)
+      map.current.style.sourceCaches['trajectory-hexes'].update(map.current.transform)
 
       // Force a repaint, so that the map will be repainted without you having to touch the map
       map.current.triggerRepaint()
@@ -465,6 +516,10 @@ export default function CreateMap({
         query !== defaultQuery && q && `?${q}`
       }`
 
+      const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${
+        query !== defaultQuery && q && `?${q}`
+      }`
+
       map.current.addLayer({
         id: 'points',
         type: 'circle',
@@ -490,6 +545,54 @@ export default function CreateMap({
           'circle-stroke-width': 10
         }
       })
+
+      // Inserted with beforeId 'points' (which must already exist on the
+      // map — MapLibre throws otherwise) so trajectory hexes sit at the
+      // bottom of the stack, under the points layer. Below hexMaxZoom,
+      // trajectory counts are already merged into the green 'hexes' layer;
+      // this purple layer only takes over once profiles switch to points.
+      map.current.addLayer(
+        {
+          id: 'trajectory-hexes',
+          type: 'fill',
+          minzoom: hexMaxZoom,
+          source: {
+            type: 'vector',
+            tiles: [trajectoryTileQuery]
+          },
+          'source-layer': 'trajectory-hexes-layer',
+          paint: {
+            'fill-opacity': trajectoryHexOpacity,
+            'fill-color': {
+              property: 'count',
+              stops: trajectoryColorStops.current
+            }
+          }
+        },
+        'points'
+      )
+
+      map.current.addLayer(
+        {
+          id: 'trajectory-hexes-hovered',
+          type: 'fill',
+          minzoom: hexMaxZoom,
+          source: {
+            type: 'vector',
+            tiles: [`${server}/tiles/trajectories/{z}/{x}/{y}.mvt`]
+          },
+          'source-layer': 'trajectory-hexes-layer',
+          paint: {
+            'fill-opacity': trajectoryHexOpacity,
+            'fill-color': {
+              property: 'count',
+              stops: trajectoryColorStops.current
+            }
+          },
+          filter: ['in', 'pk', '']
+        },
+        'points'
+      )
 
       map.current.addLayer({
         id: 'hexes',
@@ -653,6 +756,61 @@ export default function CreateMap({
       }
     }
 
+    const handleMapTrajectoryHexesOnClick = (e) => {
+      e.originalEvent.preventDefault()
+      // 'points' renders on top of 'trajectory-hexes' at the same zoom
+      // range — let its own click handler manage the click when the
+      // cursor is directly over a point.
+      if (
+        map.current.queryRenderedFeatures(e.point, { layers: ['points'] })
+          .length > 0
+      ) {
+        return
+      }
+      if (!creatingPolygon.current) {
+        const hexFeature = e.features[0]
+        const trajectoryDatasetPks = JSON.parse(hexFeature.properties.datasets)
+
+        // Non-trajectory (profile/obis) datasets don't have their own hex
+        // feature at this zoom — they render as individual 'points' — so
+        // pull in whichever of those currently-rendered points fall inside
+        // this hex's boundary too.
+        const pointFeatures = map.current
+          .queryRenderedFeatures({ layers: ['points'] })
+          .map((point) => ({
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: point.geometry.coordinates
+            },
+            properties: { ...point.properties }
+          }))
+        const pointsWithinHex = turfPointsWithinPolygon(
+          { type: 'FeatureCollection', features: pointFeatures },
+          hexFeature
+        )
+        const nonTrajectoryDatasetPks = pointsWithinHex.features.flatMap(
+          (feature) => JSON.parse(feature.properties.datasets)
+        )
+
+        const hexDatasetPks = new Set([
+          ...trajectoryDatasetPks,
+          ...nonTrajectoryDatasetPks
+        ])
+        setDatasetsSelected((previousDatasetsSelected) =>
+          previousDatasetsSelected.map((dataset) => ({
+            ...dataset,
+            isSelected: hexDatasetPks.has(dataset.pk)
+          }))
+        )
+      } else if (
+        draw.getMode() === 'simple_select' &&
+        creatingPolygon.current
+      ) {
+        creatingPolygon.current = false
+      }
+    }
+
     map.current.on('mousemove', (e) => {
       setHoveredDataset()
     })
@@ -698,6 +856,33 @@ export default function CreateMap({
       if (!draw.getMode().includes('draw')) {
         map.current.getCanvas().style.cursor = 'grab'
 
+        popup.remove()
+      }
+    })
+
+    map.current.on('mousemove', 'trajectory-hexes', (e) => {
+      // 'points' renders on top of 'trajectory-hexes' at the same zoom
+      // range — defer to its own mousemove/tooltip when the cursor is
+      // directly over a point, instead of clobbering it here.
+      if (
+        !draw.getMode().includes('draw') &&
+        map.current.queryRenderedFeatures(e.point, { layers: ['points'] })
+          .length === 0
+      ) {
+        map.current.getCanvas().style.cursor = 'pointer'
+        const coordinates = [e.lngLat.lng, e.lngLat.lat]
+        const description = e.features[0].properties.count
+
+        popup
+          .setLngLat(coordinates)
+          .setHTML(description + t('mapTrajectoryHexHoverTooltip'))
+          .addTo(map.current)
+      }
+    })
+
+    map.current.on('mouseleave', 'trajectory-hexes', () => {
+      if (!draw.getMode().includes('draw')) {
+        map.current.getCanvas().style.cursor = 'grab'
         popup.remove()
       }
     })
@@ -778,6 +963,9 @@ export default function CreateMap({
 
     map.current.on('click', 'hexes', handleMapHexesOnClick)
     map.current.on('touchend', 'hexes', handleMapHexesOnClick)
+
+    map.current.on('click', 'trajectory-hexes', handleMapTrajectoryHexesOnClick)
+    map.current.on('touchend', 'trajectory-hexes', handleMapTrajectoryHexesOnClick)
 
     map.current.on('click', handleMapOnClick)
     // mobile seems better without handleMapOnClick enabled for touch

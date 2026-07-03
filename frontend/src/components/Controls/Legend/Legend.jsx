@@ -11,7 +11,7 @@ import {
   capitalizeFirstLetter,
   generateColorStops
 } from '../../../utilities.js'
-import { colorScale } from '../../config.js'
+import { colorScale, trajectoryColorScale } from '../../config.js'
 import platformColors from '../../platformColors'
 
 import './styles.css'
@@ -21,6 +21,7 @@ import isEmpty from 'lodash/isEmpty'
 
 export default function Legend({
   currentRangeLevel,
+  currentTrajectoryRangeLevel,
   zoom,
   selectionPanelOpen,
   platformsInView
@@ -134,10 +135,50 @@ export default function Legend({
       )
     }
   }
+  function generateTrajectoryLegendElements() {
+    if (isEmpty(currentTrajectoryRangeLevel)) return null
+
+    // Trajectory coverage always renders as hexes, at every zoom level.
+    const trajectoryColorStops = generateColorStops(
+      trajectoryColorScale,
+      currentTrajectoryRangeLevel
+    )
+    return (
+      <>
+        <hr />
+        <LegendElement
+          title={t('legendSectionTitleTrajectoriesPerHex')}
+          // title='- Trajectories per hexagon'
+          open={legendOpen}
+        >
+          {t('legendSectionColor')}
+          {/* Color */}
+        </LegendElement>
+        {trajectoryColorStops &&
+          trajectoryColorStops.map((colorStop, index) => {
+            const trajectoryCount = `${colorStop.stop}`
+            return (
+              <LegendElement
+                key={index}
+                title={trajectoryCount}
+                open={legendOpen}
+              >
+                <HexagonFill
+                  title={trajectoryCount}
+                  size={15}
+                  fill={colorStop.color}
+                />
+              </LegendElement>
+            )
+          })}
+      </>
+    )
+  }
   const className = classNames('legend', { panelOpen: selectionPanelOpen })
   return (
     <div className={className} onClick={() => setLegendOpen(!legendOpen)}>
       {generateLegendElements()}
+      {generateTrajectoryLegendElements()}
       <LegendElement open={legendOpen}>
         <div
           className='legendToggleButton'
