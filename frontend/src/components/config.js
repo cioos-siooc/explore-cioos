@@ -31,13 +31,13 @@ export const colorScale = [
 ]
 
 export const trajectoryColorScale = [
-  '#B9A7E0',
-  '#A48DD4',
+  '#D5C9EE',
+  '#C4B3E6',
+  '#B29CDD',
+  '#9F86D3',
   '#8C71C7',
-  '#7256B8',
-  '#5A3FA0',
-  '#452F80',
-  '#312260'
+  '#7A5DBA',
+  '#6749AC'
 ]
 
 export const languages = [

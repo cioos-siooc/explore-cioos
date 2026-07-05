@@ -146,9 +146,22 @@ export default function CreateMap({
   const largeCircleSize = 6
   const circleOpacity = 0.7
   const hexOpacity = 0.8
-  const trajectoryHexOpacity = 0.45
   const hexMinZoom = 0
   const hexMaxZoom = 7
+  // 0.55 at the z7 hand-off (where trajectory counts stop being merged into
+  // the green hexes layer), fading to a light coverage wash by z10 so the
+  // point circles stay readable over dense trajectory areas.
+  const trajectoryHexOpacity = [
+    'interpolate',
+    ['linear'],
+    ['zoom'],
+    hexMaxZoom,
+    0.55,
+    hexMaxZoom + 1.5,
+    0.3,
+    hexMaxZoom + 3,
+    0.15
+  ]
 
   const draw = new MapboxDraw(drawControlOptions)
   const drawPolygon = useRef(draw)
@@ -566,7 +579,8 @@ export default function CreateMap({
             'fill-color': {
               property: 'count',
               stops: trajectoryColorStops.current
-            }
+            },
+            'fill-outline-color': '#B29CDD'
           }
         },
         'points'
@@ -587,9 +601,39 @@ export default function CreateMap({
             'fill-color': {
               property: 'count',
               stops: trajectoryColorStops.current
-            }
+            },
+            'fill-outline-color': '#B29CDD'
           },
           filter: ['in', 'pk', '']
+        },
+        'points'
+      )
+
+      // Purely visual white casing under the points so they stay readable
+      // over the trajectory hex fills; all interaction stays on 'points',
+      // which keeps its invisible wide-stroke hit area.
+      map.current.addLayer(
+        {
+          id: 'points-halo',
+          type: 'circle',
+          minzoom: hexMaxZoom,
+          source: {
+            type: 'vector',
+            tiles: [tileQuery]
+          },
+          'source-layer': 'internal-layer-name',
+          paint: {
+            'circle-color': '#ffffff',
+            'circle-opacity': 0.9,
+            'circle-radius': [
+              'case',
+              ['<=', ['get', 'count'], 2],
+              smallCircleSize + 1.25,
+              ['>', ['get', 'count'], 2],
+              largeCircleSize + 1.25,
+              6.25
+            ]
+          }
         },
         'points'
       )
@@ -992,6 +1036,19 @@ export default function CreateMap({
 
     updateMapToolTitleLanguage(t)
   }, [])
+
+  // The hex color stops depend on the zoom band (getCurrentRangeLevel), but
+  // were only applied at load or on legend refresh — so returning below
+  // point level left 'hexes' painted with point-level (zoom2) stops, where
+  // every hex count clamps past the top stop into a single green. Re-apply
+  // on zoomend, re-registering so the handler sees the latest range levels.
+  // Declared after the map-creation effect so map.current exists on mount.
+  useEffect(() => {
+    if (!map.current) return
+    const reapplyColorStops = () => setColorStops()
+    map.current.on('zoomend', reapplyColorStops)
+    return () => map.current.off('zoomend', reapplyColorStops)
+  }, [rangeLevels, trajectoryRangeLevels])
 
   return <div ref={mapContainer} className='map' />
 }
