@@ -170,15 +170,22 @@ BEGIN
   WHERE c.dataset_id = td.dataset_id
     AND c.erddap_url = td.erddap_url;
 
+  -- dataset_pk is resolved here at INSERT time (upsert_datasets_from_temp has
+  -- already run) so trajectory_link_dataset_pk() doesn't have to rewrite every
+  -- freshly-inserted row afterwards. LEFT JOIN keeps rows whose dataset is
+  -- somehow missing; the backfill pass in trajectory_process() catches those.
   INSERT INTO cde.trajectory_cells
-    (erddap_url, dataset_id, trajectory_id, latitude, longitude,
+    (dataset_pk, erddap_url, dataset_id, trajectory_id, latitude, longitude,
      time_min, time_max, depth_min, depth_max,
      n_records, n_profiles, records_per_day, days)
-  SELECT erddap_url, dataset_id, trajectory_id, latitude, longitude,
-         time_min, time_max, depth_min, depth_max,
-         n_records, n_profiles, records_per_day, days
-  FROM temp_trajectory_cells
+  SELECT d.pk, t.erddap_url, t.dataset_id, t.trajectory_id, t.latitude, t.longitude,
+         t.time_min, t.time_max, t.depth_min, t.depth_max,
+         t.n_records, t.n_profiles, t.records_per_day, t.days
+  FROM temp_trajectory_cells t
+  LEFT JOIN cde.datasets d
+    ON d.dataset_id = t.dataset_id AND d.erddap_url = t.erddap_url
   ON CONFLICT (erddap_url, dataset_id, trajectory_id, latitude, longitude) DO UPDATE SET
+    dataset_pk = EXCLUDED.dataset_pk,
     time_min = EXCLUDED.time_min,
     time_max = EXCLUDED.time_max,
     depth_min = EXCLUDED.depth_min,

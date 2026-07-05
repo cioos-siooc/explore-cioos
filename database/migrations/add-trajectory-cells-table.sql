@@ -35,6 +35,14 @@ CREATE TABLE IF NOT EXISTS cde.trajectory_cells (
 );
 
 CREATE INDEX IF NOT EXISTS trajectory_cells_geom_gist ON cde.trajectory_cells USING GIST (geom);
-CREATE INDEX IF NOT EXISTS trajectory_cells_dataset_idx ON cde.trajectory_cells (erddap_url, dataset_id);
 CREATE INDEX IF NOT EXISTS trajectory_cells_latlon_idx ON cde.trajectory_cells (latitude, longitude);
+CREATE INDEX IF NOT EXISTS trajectory_cells_hex_0_idx ON cde.trajectory_cells (hex_0_pk);
+CREATE INDEX IF NOT EXISTS trajectory_cells_hex_1_idx ON cde.trajectory_cells (hex_1_pk);
 ALTER TABLE cde.trajectory_cells SET (fillfactor = 80);
+
+-- Cleanup for databases that applied an earlier revision of this branch:
+-- (erddap_url, dataset_id) is a prefix of the UNIQUE constraint's index, so
+-- the standalone index was redundant; trajectory_link_point_pk() was folded
+-- into create_hexes() (point_pk + hex FKs linked in one UPDATE).
+DROP INDEX IF EXISTS cde.trajectory_cells_dataset_idx;
+DROP FUNCTION IF EXISTS trajectory_link_point_pk();

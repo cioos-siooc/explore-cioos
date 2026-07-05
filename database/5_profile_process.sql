@@ -294,10 +294,10 @@ $$ LANGUAGE plpgsql;
 
 
 -- Trajectory-cell post-load processing. Mirrors the obis_* functions above:
--- trajectory_cells carries a generated geom, so processing is only linking
--- (dataset_pk, points/point_pk) plus the days derivation used by download
--- estimates. Must run AFTER profile_process() (which rebuilds cde.points)
--- and BEFORE create_hexes() (which propagates hex FKs via point_pk).
+-- trajectory_cells carries a generated geom, so processing is only the
+-- dataset_pk backfill, the points insert and the days backfill. Must run
+-- AFTER profile_process() (which rebuilds cde.points) and BEFORE
+-- create_hexes() (which links point_pk + hex FKs by joining points on geom).
 
 CREATE OR REPLACE FUNCTION trajectory_link_dataset_pk() RETURNS bigint AS $$
 DECLARE n bigint;
@@ -332,21 +332,11 @@ END;
 $$ LANGUAGE plpgsql;
 
 
-CREATE OR REPLACE FUNCTION trajectory_link_point_pk() RETURNS bigint AS $$
-DECLARE n bigint;
-BEGIN
-  -- Relink ALL trajectory_cells by geom (not just point_pk IS NULL):
-  -- profile_process() rebuilds cde.points with new serial pks on every run,
-  -- so stale FKs must be re-matched. Same rationale as obis_link_point_pk().
-  UPDATE cde.trajectory_cells c
-  SET point_pk = p.pk
-  FROM cde.points p
-  WHERE p.geom = c.geom;
-  GET DIAGNOSTICS n = ROW_COUNT;
-  RETURN n;
-END;
-$$ LANGUAGE plpgsql;
-
+-- NOTE: there is deliberately no trajectory_link_point_pk(). point_pk is
+-- linked together with the hex FKs in create_hexes() (single UPDATE joining
+-- cde.points by geom) to avoid rewriting every row of the largest cells
+-- table twice per load. The relink covers ALL rows on every run because
+-- profile_process() rebuilds cde.points with new serial pks.
 
 CREATE OR REPLACE FUNCTION trajectory_update_days() RETURNS bigint AS $$
 DECLARE n bigint;
@@ -365,9 +355,12 @@ $$ LANGUAGE plpgsql;
 -- db-loader invokes the sub-functions individually for per-step timing logs.
 CREATE OR REPLACE FUNCTION trajectory_process() RETURNS VOID AS $$
 BEGIN
+  -- dataset_pk is normally set at INSERT time (loader COPY / incremental
+  -- upsert both fill it); this pass only backfills rows that missed it.
   PERFORM trajectory_link_dataset_pk();
   PERFORM trajectory_insert_points();
-  PERFORM trajectory_link_point_pk();
+  -- days is computed at harvest time; this pass only backfills NULLs.
   PERFORM trajectory_update_days();
+  -- point_pk + hex FKs are linked in create_hexes(), which runs after.
 END;
 $$ LANGUAGE plpgsql;

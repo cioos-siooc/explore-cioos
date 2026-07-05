@@ -237,30 +237,40 @@ router.get(
            time_min, time_max, latitude, longitude, depth_min, depth_max
     FROM cde.trajectory_cells`;
 
+    // The tile-envelope test is applied BEFORE the aggregation (hexes are
+    // disjoint, so filtering hexes before or after grouping yields identical
+    // tiles). This bounds each tile request to the cells under the visible
+    // hexes — via the hex_0_pk/hex_1_pk indexes — instead of re-aggregating
+    // the whole trajectory_cells table per tile. Grouping is by hex pk only,
+    // with the polygon joined back afterwards, so the group sort runs over
+    // narrow rows instead of spilling hex geometries to disk.
     const SQL = `
   with combined as (
     ${combinedInner}
   ),
-  relevent_hexes as (
-    SELECT c.zoom_pk pk, count(distinct (c.dataset_pk, c.trajectory_id)) count,
-            array_to_json(array_agg(distinct d.pk_url)) datasets,
-            h.geom AS geom
-    FROM combined c
-    JOIN cde.datasets d ON c.dataset_pk = d.pk
-    JOIN ${hexesTable} h ON h.pk = c.zoom_pk
-    ${filters.hasShared ? "WHERE :filters" : ""}
-    GROUP BY c.zoom_pk, h.geom
-  ),
     te AS (select ST_TileEnvelope(:z, :x, :y) tile_envelope ),
+    tile_hexes AS (
+      SELECT h.pk, h.geom
+      FROM ${hexesTable} h, te
+      WHERE h.geom && te.tile_envelope
+    ),
+    agg as (
+      SELECT c.zoom_pk pk, count(distinct (c.dataset_pk, c.trajectory_id)) count,
+             array_to_json(array_agg(distinct d.pk_url)) datasets
+      FROM combined c
+      JOIN cde.datasets d ON c.dataset_pk = d.pk
+      JOIN tile_hexes th ON th.pk = c.zoom_pk
+      ${filters.hasShared ? "WHERE :filters" : ""}
+      GROUP BY c.zoom_pk
+    ),
     mvtgeom AS (
-      SELECT pk,count,datasets,
+      SELECT a.pk, a.count, a.datasets,
         ST_AsMVTGeom (
-          relevent_hexes.geom,
-          tile_envelope
+          th.geom,
+          te.tile_envelope
         ) AS geom
-      FROM
-        relevent_hexes, te
-      WHERE relevent_hexes.geom && tile_envelope
+      FROM agg a
+      JOIN tile_hexes th ON th.pk = a.pk, te
     )
     SELECT ST_AsMVT(mvtgeom.*, 'trajectory-hexes-layer', 4096, 'geom') AS st_asmvt from mvtgeom;
   `;

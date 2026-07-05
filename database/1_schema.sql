@@ -228,8 +228,15 @@ CREATE TABLE trajectory_cells (
 );
 
 CREATE INDEX trajectory_cells_geom_gist ON trajectory_cells USING GIST (geom);
-CREATE INDEX trajectory_cells_dataset_idx ON trajectory_cells (erddap_url, dataset_id);
+-- No (erddap_url, dataset_id) index: the UNIQUE constraint's index above has
+-- them as its leading columns and serves those lookups (incremental DELETE,
+-- dataset_pk backfill join).
 CREATE INDEX trajectory_cells_latlon_idx ON trajectory_cells (latitude, longitude);
+-- Drive the per-tile lookup in /tiles/trajectories: hexes intersecting the
+-- tile envelope come from the hexes_zoom_* GIST, then these indexes fetch
+-- just the cells under those hexes.
+CREATE INDEX trajectory_cells_hex_0_idx ON trajectory_cells (hex_0_pk);
+CREATE INDEX trajectory_cells_hex_1_idx ON trajectory_cells (hex_1_pk);
 ALTER TABLE cde.trajectory_cells SET (fillfactor = 80);
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;

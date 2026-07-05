@@ -560,6 +560,23 @@ def main(folder, incremental=False):
 
             if trajectory_cells is not None:
                 prepared = prepare_trajectory_cells_dataframe(trajectory_cells)
+                # Resolve dataset_pk at COPY time (datasets were just written
+                # above) so trajectory_link_dataset_pk() doesn't rewrite every
+                # row post-load. Unmatched rows COPY a NULL and are caught by
+                # that backfill pass.
+                pk_rows = transaction.execute(
+                    text("SELECT pk, erddap_url, dataset_id FROM cde.datasets")
+                ).all()
+                pk_map = {(r.erddap_url, r.dataset_id): r.pk for r in pk_rows}
+                prepared["dataset_pk"] = pd.array(
+                    [
+                        pk_map.get(key)
+                        for key in zip(
+                            prepared["erddap_url"], prepared["dataset_id"]
+                        )
+                    ],
+                    dtype="Int64",
+                )
                 with _timed("trajectory_cells COPY", logger):
                     logger.info("Writing trajectory_cells (%d rows)", len(prepared))
                     load_cells_copy(
@@ -611,11 +628,13 @@ def main(folder, incremental=False):
                 # Per-step invocation for timing/row-count logs (sub-functions
                 # in 5_profile_process.sql); incremental calls the
                 # trajectory_process() wrapper instead. Must run after
-                # profile_process() (points rebuild) and before create_hexes().
+                # profile_process() (points rebuild) and before create_hexes()
+                # (which links point_pk + hex FKs in one pass). The two steps
+                # here are backfills that should touch ~0 rows: dataset_pk is
+                # set at COPY time above, days at harvest time.
                 trajectory_steps = [
                     "trajectory_link_dataset_pk",
                     "trajectory_insert_points",
-                    "trajectory_link_point_pk",
                     "trajectory_update_days",
                 ]
                 logger.info("Processing trajectory_cells")
@@ -669,3 +688,16 @@ def main(folder, incremental=False):
             logger.info("Wrote to db: %s", f"{schema}.harvest_runs")
         if harvest_attempts_df is not None:
             logger.info("Wrote to db: %s", f"{schema}.harvest_attempts")
+
+    # Post-commit maintenance (VACUUM can't run inside the transaction).
+    # Every load leaves one dead version per rewritten row (create_hexes()
+    # relinks point_pk/hex FKs on all cells tables), and incremental loads add
+    # DELETE+INSERT churn. Vacuuming right away keeps that space reusable so
+    # the tables plateau instead of growing run-over-run, and refreshes
+    # planner stats for the tile queries.
+    if trajectory_cells is not None:
+        with _timed("post-load VACUUM ANALYZE", logger):
+            with engine.connect().execution_options(
+                isolation_level="AUTOCOMMIT"
+            ) as conn:
+                conn.execute(text("VACUUM ANALYZE cde.trajectory_cells"))
