@@ -43,7 +43,7 @@ _RETRY_STATUSES = (408, 413, 500, 502, 503, 504, 520, 522, 524)
 
 
 _ERDDAP_SOURCE_RE = re.compile(
-    r"(https?://.+?/erddap)/(?:tabledap|griddap)/([^/?.\s]+)"
+    r"(https?://.+?/erddap)/(tabledap|griddap)/([^/?.\s]+)"
 )
 
 
@@ -53,9 +53,11 @@ def _croissant_source_url(doc):
 
 
 def _parse_erddap_source(source_url):
-    """(erddap_base, dataset_id) when source_url is another ERDDAP's data URL."""
+    """(erddap_base, dap, dataset_id) when source_url is another ERDDAP's data
+    URL; dap is "tabledap" or "griddap" so federated hops keep the right
+    endpoint."""
     match = _ERDDAP_SOURCE_RE.match(source_url) if source_url else None
-    return (match.group(1), match.group(2)) if match else None
+    return (match.group(1), match.group(2), match.group(3)) if match else None
 
 
 def _build_retry_session() -> requests.Session:
@@ -125,13 +127,19 @@ class ERDDAP(object):
         decide which structures the pipeline harvests — only "table" today)."""
         try:
             self.logger.info("Fetching all datasets from ERDDAP server: %s", self.url)
-            frames = [
-                self.erddap_csv_to_df(
+            frames = []
+            for structure in data_structures:
+                frame = self.erddap_csv_to_df(
                     f'/tabledap/allDatasets.csv?&accessible="public"&dataStructure="{structure}"',
                     skiprows=[1, 2],
                 )
-                for structure in data_structures
-            ]
+                # Tag the requested structure ourselves — older ERDDAPs omit
+                # the dataStructure column from the listing.
+                if frame is not None and not frame.empty:
+                    frame["dataStructure"] = structure
+                    frames.append(frame)
+            if not frames:
+                return pd.DataFrame()
             df = frames[0] if len(frames) == 1 else pd.concat(frames, ignore_index=True)
             self.logger.info(f"Found {len(df)} datasets")
             return df
@@ -252,7 +260,8 @@ class ERDDAP(object):
             logger.error("Empty response")
             return pd.DataFrame()
 
-    def get_croissant_fingerprint(self, erddap_base, dataset_id, _hops=0):
+    def get_croissant_fingerprint(self, erddap_base, dataset_id, _hops=0,
+                                  dap="tabledap"):
         """Return (content_hash, has_files, reason) from the dataset's Croissant ld+json.
 
         Pulls ERDDAP's generated Croissant straight from the .croissant data
@@ -267,7 +276,7 @@ class ERDDAP(object):
             # Small metadata doc — don't inherit the 1h data-query timeout; a
             # hung .croissant endpoint would otherwise stall every dataset.
             response = self.session.get(
-                f"{erddap_base}/tabledap/{dataset_id}.croissant", timeout=60
+                f"{erddap_base}/{dap}/{dataset_id}.croissant", timeout=60
             )
             if response.status_code != 200:
                 return None, False, HASH_CROISSANT_HTTP_ERROR
@@ -292,13 +301,15 @@ class ERDDAP(object):
             origin = _parse_erddap_source(_croissant_source_url(doc))
             if origin:
                 # Propagate the origin's outcome (hash or its own reason).
-                return self.get_croissant_fingerprint(origin[0], origin[1], _hops + 1)
+                return self.get_croissant_fingerprint(
+                    origin[0], origin[2], _hops + 1, dap=origin[1]
+                )
             return None, False, HASH_NO_FILE_LIST
 
         return None, False, HASH_FEDERATED_UNRESOLVED
 
-    def get_dataset(self, dataset_id):
-        return Dataset(self, dataset_id)
+    def get_dataset(self, dataset_id, data_structure="table"):
+        return Dataset(self, dataset_id, data_structure=data_structure)
 
     def get_logger(self):
         logger = logging.getLogger(self.domain)

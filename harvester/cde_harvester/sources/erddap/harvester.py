@@ -240,12 +240,20 @@ class ERDDAPHarvester(BaseHarvester):
         total = len(df_all_datasets)
         for i, df_dataset_row in enumerate(df_all_datasets.itertuples(index=False)):
             dataset_id = df_dataset_row.datasetID
+            # allDatasets listing extras: which dataStructure the row came from
+            # (tagged by get_all_datasets) and the WMS request URL (griddap
+            # only; empty/NaN when the server has WMS disabled).
+            data_structure = getattr(df_dataset_row, "dataStructure", "table")
+            wms_url = getattr(df_dataset_row, "wms", None)
+            if not isinstance(wms_url, str) or not wms_url:
+                wms_url = None
             try:
                 result = harvest_dataset(
                     erddap, dataset_id,
                     previous_hashes=previous_hashes,
                     skip_unchanged=self.skip_unchanged,
                     run_id=self.run_id, idx=i + 1, total=total,
+                    data_structure=data_structure, wms_url=wms_url,
                 )
                 attempt_records.append(result.attempt)
                 if result.status == "success":
@@ -253,6 +261,10 @@ class ERDDAPHarvester(BaseHarvester):
                         df_trajectory_cells_all = pd.concat(
                             [df_trajectory_cells_all, result.features]
                         )
+                    elif result.feature_kind == "dataset_extent":
+                        # Metadata-only (griddap): the extent lives on the
+                        # dataset row itself, no feature table.
+                        pass
                     else:
                         df_profiles_all = pd.concat([df_profiles_all, result.features])
                     df_datasets_all = pd.concat([df_datasets_all, result.dataset_df])
@@ -339,7 +351,8 @@ class ERDDAPHarvester(BaseHarvester):
 
 
 def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=False,
-                    run_id=None, idx=None, total=None):
+                    run_id=None, idx=None, total=None,
+                    data_structure="table", wms_url=None):
     """Harvest one ERDDAP dataset (plain function; reuses `erddap`, never rebuilds it).
 
     Returns DatasetHarvestResult on success/skip; raises DatasetHarvestError on
@@ -358,7 +371,8 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
     progress = f" {idx}/{total}" if idx and total else ""
     try:
         new_hash, has_files, hash_reason = erddap.get_croissant_fingerprint(
-            erddap_url, dataset_id
+            erddap_url, dataset_id,
+            dap="griddap" if data_structure == "grid" else "tabledap",
         )
         prev_hash = (previous_hashes or {}).get(dataset_id)
         if skip_unchanged and has_files and new_hash and prev_hash == new_hash:
@@ -381,7 +395,8 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
             )
 
         log.info(f"Querying dataset: {dataset_id}{progress}")
-        dataset = erddap.get_dataset(dataset_id)
+        dataset = erddap.get_dataset(dataset_id, data_structure=data_structure)
+        dataset.wms_url = wms_url
         dataset.content_hash = new_hash
         # Record why there's no hash (database-backed, fetch failure, …) so the
         # harvest dashboard can distinguish "correctly unhashed" from "failed".

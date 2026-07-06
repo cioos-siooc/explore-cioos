@@ -22,7 +22,10 @@ Functions:
 CREATE OR REPLACE FUNCTION create_temp_tables() RETURNS VOID AS $$
 BEGIN
   -- Create temp tables with same structure as main tables
-  CREATE TEMP TABLE IF NOT EXISTS temp_datasets (LIKE cde.datasets INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
+  -- EXCLUDING GENERATED: datasets.coverage_bbox is a GENERATED column; LIKE
+  -- would copy its expression and reject plain INSERTs. The main-table INSERT
+  -- recomputes it from the coverage_* columns.
+  CREATE TEMP TABLE IF NOT EXISTS temp_datasets (LIKE cde.datasets INCLUDING DEFAULTS EXCLUDING CONSTRAINTS EXCLUDING GENERATED);
   -- EXCLUDING GENERATED: profiles.bbox is a GENERATED column; LIKE would copy
   -- its expression and reject plain INSERTs. The main-table INSERT recomputes
   -- bbox from the lat/lon min/max columns, so the temp table doesn't carry it.
@@ -69,8 +72,31 @@ $$ LANGUAGE plpgsql;
 -- Uses (dataset_id, erddap_url) as unique key
 CREATE OR REPLACE FUNCTION upsert_datasets_from_temp() RETURNS VOID AS $$
 BEGIN
-  INSERT INTO cde.datasets
-  SELECT * FROM temp_datasets
+  -- Explicit column list (not SELECT *) because cde.datasets has a GENERATED
+  -- coverage_bbox column that temp_datasets omits; pk is left out so the
+  -- target assigns its own serial.
+  INSERT INTO cde.datasets (
+    pk_url, dataset_id, erddap_url, platform, title, title_fr,
+    summary, summary_fr, cdm_data_type, organizations, eovs, ckan_id,
+    timeseries_id_variable, profile_id_variable, trajectory_id_variable,
+    organization_pks, n_profiles, profile_variables, num_columns,
+    first_eov_column, source_type, obis_nodes,
+    content_hash, content_hash_reason, last_updated_at, verified_at,
+    coverage_lat_min, coverage_lat_max, coverage_lon_min, coverage_lon_max,
+    coverage_time_min, coverage_time_max, coverage_depth_min, coverage_depth_max,
+    grid_variables, grid_dimensions, wms_url
+  )
+  SELECT
+    pk_url, dataset_id, erddap_url, platform, title, title_fr,
+    summary, summary_fr, cdm_data_type, organizations, eovs, ckan_id,
+    timeseries_id_variable, profile_id_variable, trajectory_id_variable,
+    organization_pks, n_profiles, profile_variables, num_columns,
+    first_eov_column, source_type, obis_nodes,
+    content_hash, content_hash_reason, last_updated_at, verified_at,
+    coverage_lat_min, coverage_lat_max, coverage_lon_min, coverage_lon_max,
+    coverage_time_min, coverage_time_max, coverage_depth_min, coverage_depth_max,
+    grid_variables, grid_dimensions, wms_url
+  FROM temp_datasets
   ON CONFLICT (dataset_id, erddap_url)
   DO UPDATE SET
     platform = EXCLUDED.platform,
@@ -95,7 +121,18 @@ BEGIN
     content_hash = EXCLUDED.content_hash,
     content_hash_reason = EXCLUDED.content_hash_reason,
     last_updated_at = EXCLUDED.last_updated_at,
-    verified_at = EXCLUDED.verified_at;
+    verified_at = EXCLUDED.verified_at,
+    coverage_lat_min = EXCLUDED.coverage_lat_min,
+    coverage_lat_max = EXCLUDED.coverage_lat_max,
+    coverage_lon_min = EXCLUDED.coverage_lon_min,
+    coverage_lon_max = EXCLUDED.coverage_lon_max,
+    coverage_time_min = EXCLUDED.coverage_time_min,
+    coverage_time_max = EXCLUDED.coverage_time_max,
+    coverage_depth_min = EXCLUDED.coverage_depth_min,
+    coverage_depth_max = EXCLUDED.coverage_depth_max,
+    grid_variables = EXCLUDED.grid_variables,
+    grid_dimensions = EXCLUDED.grid_dimensions,
+    wms_url = EXCLUDED.wms_url;
 END;
 $$ LANGUAGE plpgsql;
 

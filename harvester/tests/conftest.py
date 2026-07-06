@@ -292,7 +292,10 @@ def build_variables_df(csv_text: str = ERDDAP_INFO_CSV) -> pd.DataFrame:
     so unit tests for ComplianceChecker / profiles can use a realistic object.
     """
     df = build_info_df(csv_text)
-    considered_attributes = ["cf_role", "standard_name", "actual_range"]
+    considered_attributes = [
+        "cf_role", "standard_name", "actual_range", "units", "long_name",
+        "axis",
+    ]
 
     data_types = df.query(
         '(`Variable Name`!="NC_GLOBAL" and `Attribute Name`=="")'

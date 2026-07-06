@@ -18,11 +18,14 @@ def is_valid_duration(duration):
 
 
 class Dataset(object):
-    def __init__(self, erddap_server, id):
+    def __init__(self, erddap_server, id, data_structure="table"):
         self.id = id
         self.erddap_server = erddap_server
         self.logger = self.get_logger()
 
+        # ERDDAP allDatasets dataStructure this dataset was listed under
+        # ("table" | "grid"); drives the cdm_data_type fallback for grids.
+        self.data_structure = data_structure
         self.erddap_url = erddap_server.url
         self.erddap_csv_to_df = erddap_server.erddap_csv_to_df
         # Every ERDDAP HTTP request made for this dataset (info, tabledap
@@ -44,6 +47,20 @@ class Dataset(object):
         self.content_hash = None
         # Why content_hash is None (a HASH_* code); None when a hash was produced.
         self.content_hash_reason = None
+
+        # Griddap metadata (set by the Grid handler; None for tabledap types).
+        self.df_info = None
+        self.wms_url = None
+        self.coverage_lat_min = None
+        self.coverage_lat_max = None
+        self.coverage_lon_min = None
+        self.coverage_lon_max = None
+        self.coverage_time_min = None
+        self.coverage_time_max = None
+        self.coverage_depth_min = None
+        self.coverage_depth_max = None
+        self.grid_variables = None
+        self.grid_dimensions = None
 
         self.get_metadata()
 
@@ -71,6 +88,18 @@ class Dataset(object):
                 "content_hash_reason": [self.content_hash_reason],
                 "last_updated_at": [now],
                 "verified_at": [now],
+                # Griddap metadata-only columns (None for tabledap types).
+                "coverage_lat_min": [self.coverage_lat_min],
+                "coverage_lat_max": [self.coverage_lat_max],
+                "coverage_lon_min": [self.coverage_lon_min],
+                "coverage_lon_max": [self.coverage_lon_max],
+                "coverage_time_min": [self.coverage_time_min],
+                "coverage_time_max": [self.coverage_time_max],
+                "coverage_depth_min": [self.coverage_depth_min],
+                "coverage_depth_max": [self.coverage_depth_max],
+                "grid_variables": [self.grid_variables],
+                "grid_dimensions": [self.grid_dimensions],
+                "wms_url": [self.wms_url],
             }
         )
 
@@ -298,7 +327,14 @@ class Dataset(object):
             self.logger.error("Dataset metadata not found")
             return df
 
-        considered_attributes = ["cf_role", "standard_name", "actual_range"]
+        # Keep the raw info frame: the Grid handler reads its Row Type ==
+        # "dimension"/"variable" rows (tabledap types never need it).
+        self.df_info = df
+
+        considered_attributes = [
+            "cf_role", "standard_name", "actual_range", "units", "long_name",
+            "axis",
+        ]
 
         data_types = df.query(
             '(`Variable Name`!="NC_GLOBAL" and `Attribute Name`=="")'
@@ -327,7 +363,12 @@ class Dataset(object):
         globals_dict = df_global["Value"].to_dict()
 
         self.variables_list = df_variables["name"].to_list()
-        self.cdm_data_type = globals_dict["cdm_data_type"]
+        # Griddap datasets may omit the cdm_data_type global; they are always
+        # Grid. Tabledap datasets keep the hard requirement (empty string
+        # fails the supported-type check downstream, as before).
+        self.cdm_data_type = globals_dict.get(
+            "cdm_data_type", "Grid" if self.data_structure == "grid" else ""
+        )
         self.globals = globals_dict
 
         if not "standard_name" in df_variables:

@@ -8,7 +8,7 @@ applicable — a schema change touches three places: this file, 1_schema.sql
 
 import pandera as pa
 from pandera.typing import Series
-from sqlalchemy.dialects.postgresql import ARRAY, INTEGER, TEXT
+from sqlalchemy.dialects.postgresql import ARRAY, INTEGER, JSONB, TEXT
 
 # --- Loader-side column metadata ------------------------------------------
 # List-valued columns are serialized by the harvester as Python-repr strings in
@@ -22,6 +22,9 @@ DATASET_ARRAY_DTYPES = {
     "profile_variables": ARRAY(TEXT),
     "organization_pks": ARRAY(INTEGER),
     "obis_nodes": ARRAY(TEXT),
+    # Griddap metadata: lists of dicts, stored as jsonb.
+    "grid_variables": JSONB,
+    "grid_dimensions": JSONB,
 }
 
 OBIS_ARRAY_DTYPES = {
@@ -139,6 +142,18 @@ class DatasetSchema(pa.DataFrameModel):
     content_hash_reason: Series[str] = pa.Field(nullable=True)
     last_updated_at: Series[pa.DateTime] = pa.Field(nullable=True)
     verified_at: Series[pa.DateTime] = pa.Field(nullable=True)
+    # Griddap (metadata-only) coverage + structure; None for all other types.
+    coverage_lat_min: Series[float] = pa.Field(nullable=True)
+    coverage_lat_max: Series[float] = pa.Field(nullable=True)
+    coverage_lon_min: Series[float] = pa.Field(nullable=True)
+    coverage_lon_max: Series[float] = pa.Field(nullable=True)
+    coverage_time_min: Series[pa.DateTime] = pa.Field(nullable=True)
+    coverage_time_max: Series[pa.DateTime] = pa.Field(nullable=True)
+    coverage_depth_min: Series[float] = pa.Field(nullable=True)
+    coverage_depth_max: Series[float] = pa.Field(nullable=True)
+    grid_variables: Series[object] = pa.Field(nullable=True)  # list of dicts -> jsonb
+    grid_dimensions: Series[object] = pa.Field(nullable=True)  # list of dicts -> jsonb
+    wms_url: Series[str] = pa.Field(nullable=True)
 
     class Config:
         coerce = True

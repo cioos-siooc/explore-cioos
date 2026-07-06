@@ -1,0 +1,62 @@
+.griddapDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.griddapDimensionsTable {
+  width: 100%;
+  font-size: 0.85em;
+  border-collapse: collapse;
+  margin-top: 4px;
+}
+
+.griddapDimensionsTable th,
+.griddapDimensionsTable td {
+  border: 1px solid #dee2e6;
+  padding: 3px 6px;
+  text-align: left;
+}
+
+.griddapDimensionsTable th {
+  background-color: #f3f0ec;
+  font-weight: 600;
+}
+
+.griddapVariablesList {
+  margin: 4px 0 0 0;
+  padding-left: 20px;
+  font-size: 0.9em;
+}
+
+.griddapWmsControls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.griddapVariableSelector .dropdown-menu {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.griddapTimeShown {
+  font-size: 0.85em;
+  color: #555;
+}
+
+.griddapLegendImage {
+  max-width: 100%;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  background-color: #fff;
+}
+
+.griddapLegendUnavailable,
+.griddapNoWms {
+  font-size: 0.9em;
+  color: #555;
+  font-style: italic;
+}

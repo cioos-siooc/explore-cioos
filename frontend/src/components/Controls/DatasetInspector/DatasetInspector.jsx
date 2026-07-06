@@ -7,8 +7,10 @@ import 'react-data-table-component-extensions/dist/index.css'
 
 // import platformColors from '../../platformColors'
 import Loading from '../Loading/Loading.jsx'
+import GriddapDetails from '../GriddapDetails/GriddapDetails.jsx'
 import { server } from '../../../config'
 import { splitLines } from '../../../utilities'
+import { totalGridNodes } from '../../../wmsUtilities'
 import FilterButton from '../Filter/FilterButton/FilterButton.jsx'
 import './styles.css'
 
@@ -19,17 +21,21 @@ export default function DatasetInspector({
   setHoveredDataset,
   setInspectRecordID,
   filterSet,
-  query
+  query,
+  activeWmsOverlay,
+  setActiveWmsOverlay
 }) {
   const { t } = useTranslation()
   const [datasetRecords, setDatasetRecords] = useState()
   const [loading, setLoading] = useState(false)
+  const isGrid = dataset.cdm_data_type === 'Grid'
   // const platformColor = platformColors.filter(
   //   (pc) => pc.platform === dataset.platform
   // )
 
   useEffect(() => {
-    if (dataset.source_type === 'obis') return
+    // no per-record list for OBIS (external) or griddap (metadata-only)
+    if (dataset.source_type === 'obis' || isGrid) return
     setLoading(true)
     const queryParams = new URLSearchParams(query)
     queryParams.set('datasetPKs', dataset.pk)
@@ -167,10 +173,16 @@ export default function DatasetInspector({
               />
             </div>
             <div className='metadataGridItem records'>
-              <strong>{t('datasetInspectorRecordsText')}</strong>
-              {dataset.profiles_count !== dataset.n_profiles
-                ? `${dataset.profiles_count} / ${dataset.n_profiles}`
-                : dataset.profiles_count}
+              <strong>
+                {isGrid
+                  ? t('griddapNodesText')
+                  : t('datasetInspectorRecordsText')}
+              </strong>
+              {isGrid
+                ? totalGridNodes(dataset.grid_dimensions)?.toLocaleString()
+                : dataset.profiles_count !== dataset.n_profiles
+                  ? `${dataset.profiles_count} / ${dataset.n_profiles}`
+                  : dataset.profiles_count}
             </div>
             <div className='metadataGridItem ERDAP'>
               <strong>{dataset.source_type === 'obis' ? 'OBIS' : t('datasetInspectorERDDAPText')}</strong>
@@ -208,7 +220,14 @@ export default function DatasetInspector({
               )}
             </div>
           </div>
-          {dataset.source_type !== 'obis' && (
+          {isGrid && (
+            <GriddapDetails
+              dataset={dataset}
+              activeWmsOverlay={activeWmsOverlay}
+              setActiveWmsOverlay={setActiveWmsOverlay}
+            />
+          )}
+          {dataset.source_type !== 'obis' && !isGrid && (
             <>
               <div className='metadataGridItem recordTable'>
                 <strong>{t('datasetInspectorRecordTable')}</strong>

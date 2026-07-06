@@ -8,12 +8,14 @@ import {
   Download,
   BroadcastPin,
   FileEarmarkSpreadsheet,
+  Grid3x3Gap,
   PinMapFill,
   Server
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import platformColors from '../../platformColors'
 import { formatErddapServerName } from '../../../utilities'
+import { formatGridSize } from '../../../wmsUtilities'
 import erddapServersJSONfile from '../../../erddapServers.json'
 import './styles.css'
 import DataTable from 'react-data-table-component'
@@ -40,8 +42,10 @@ export default function DatasetsTable({
     columns: generateColumns(),
     data: datasets
   })
+  const isGrid = (row) => row.cdm_data_type === 'Grid'
   const checkBoxOnclick = (point) => () => {
-    if (!isDownloadModal || point.internalDownload) {
+    // griddap datasets are metadata-only: never selectable for download
+    if ((!isDownloadModal || point.internalDownload) && !isGrid(point)) {
       handleSelectDataset(point)
     }
   }
@@ -75,14 +79,20 @@ export default function DatasetsTable({
         selector: (row) => row.selected,
         cell: (row) => {
           return (
-            <div title={t('datasetsTableDownloadModalDatasetCheckboxTooltip')}>
+            <div
+              title={
+                isGrid(row)
+                  ? t('griddapNotDownloadableTooltip')
+                  : t('datasetsTableDownloadModalDatasetCheckboxTooltip')
+              }
+            >
               {row.selected ? (
                 <CheckSquare onClick={checkBoxOnclick(row)} size={16} />
               ) : (
                 <Square
                   style={
-                    isDownloadModal &&
-                    !row.internalDownload &&
+                    ((isDownloadModal && !row.internalDownload) ||
+                      isGrid(row)) &&
                     disabledCheckboxStyle
                   }
                   onClick={checkBoxOnclick(row)}
@@ -112,6 +122,16 @@ export default function DatasetsTable({
         center: true,
         selector: (row) => row.platform,
         cell: (point) => {
+          if (isGrid(point)) {
+            return (
+              <Grid3x3Gap
+                title={t('griddapTypeLabel')}
+                className='optionColorCircle'
+                color='#52a79b'
+                size={15}
+              />
+            )
+          }
           const platformColor = platformColors.find(
             (pc) => pc.platform === point.platform
           )
@@ -157,9 +177,11 @@ export default function DatasetsTable({
         name: t('datasetsTableHeaderTypeText'),
         selector: (row) => row.cdm_data_type,
         cell: (row) =>
-          row.cdm_data_type
-            .replace('TimeSeriesProfile', 'Time series / Profile')
-            .replace('TimeSeries', 'Time series'),
+          isGrid(row)
+            ? t('griddapTypeLabel')
+            : row.cdm_data_type
+              .replace('TimeSeriesProfile', 'Time series / Profile')
+              .replace('TimeSeries', 'Time series'),
         wrap: true,
         sortable: true,
         width: '80px',
@@ -174,6 +196,14 @@ export default function DatasetsTable({
         ),
         selector: (row) => row.profiles_count,
         cell: (row) => {
+          if (isGrid(row)) {
+            // grid size (lon × lat nodes) instead of a locations count
+            return (
+              <span title={t('griddapGridSizeTooltip')}>
+                {formatGridSize(row.grid_dimensions) || '—'}
+              </span>
+            )
+          }
           if (row.profiles_count !== row.n_profiles) {
             return `${row.profiles_count} / ${row.n_profiles}`
           } else {

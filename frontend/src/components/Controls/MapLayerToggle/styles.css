@@ -1,0 +1,22 @@
+/* Matches .boxQueryButton (components/styles.css), stacked directly above it */
+.mapLayerToggle {
+  position: absolute;
+  right: 10px;
+  bottom: 286px;
+  width: 42px;
+  height: 42px;
+  border-radius: 4px;
+  border: 0px;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  background-color: #fff;
+  padding: 5px;
+  z-index: 2;
+}
+
+.mapLayerToggle.active {
+  background-color: #c6e3df;
+}
+
+.mapLayerToggle:hover {
+  background-color: #f3f3f3;
+}

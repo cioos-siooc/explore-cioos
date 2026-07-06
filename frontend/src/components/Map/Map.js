@@ -14,6 +14,7 @@ import turfPointsWithinPolygon from '@turf/points-within-polygon'
 import turfBbox from '@turf/bbox'
 
 import DrawRectangle from 'mapbox-gl-draw-rectangle-mode'
+import { debounce } from 'lodash'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import './styles.css'
@@ -25,6 +26,11 @@ import {
   getCurrentRangeLevel,
   updateMapToolTitleLanguage
 } from '../../utilities'
+import {
+  buildWmsGetMapUrl,
+  clampBoundsForWms,
+  warpEquirectToMercator
+} from '../../wmsUtilities'
 import { colorScale, trajectoryColorScale } from '../config'
 import platformColors from '../../components/platformColors'
 
@@ -41,9 +47,11 @@ export default function CreateMap({
   trajectoryRangeLevels,
   hoveredDataset,
   setHoveredDataset,
-  setDatasetsSelected
+  setDatasetsSelected,
+  griddapCoverage,
+  activeWmsOverlay
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   const [searchParams] = useSearchParams()
 
@@ -376,11 +384,147 @@ export default function CreateMap({
     }
   }
 
+  const emptyFeatureCollection = { type: 'FeatureCollection', features: [] }
+  // Latest coverage prop, readable from the map 'load' closure (which would
+  // otherwise capture the initial render's value).
+  const griddapCoverageRef = useRef(null)
+  const wmsMoveHandler = useRef(null)
+  // Bumped whenever the overlay is (re)configured or removed so stale
+  // in-flight GetMap image loads are dropped instead of drawn.
+  const wmsRenderToken = useRef(0)
+
+  // Single-dataset griddap footprint (hover from the list, or pinned while
+  // its WMS overlay is shown).
+  function setGriddapHighlight(geometry) {
+    const source = map.current?.getSource('griddap-highlight')
+    if (!source) return
+    source.setData(
+      geometry
+        ? { type: 'Feature', geometry, properties: {} }
+        : emptyFeatureCollection
+    )
+  }
+
+  function removeWmsOverlay() {
+    wmsRenderToken.current += 1
+    if (wmsMoveHandler.current) {
+      map.current.off('moveend', wmsMoveHandler.current)
+      wmsMoveHandler.current = null
+    }
+    if (map.current.getLayer('wms-overlay')) {
+      map.current.removeLayer('wms-overlay')
+    }
+    if (map.current.getSource('wms-overlay')) {
+      map.current.removeSource('wms-overlay')
+    }
+  }
+
+  // One WMS GetMap for the current viewport: ERDDAP's WMS is EPSG:4326-only,
+  // so the response is requested with extra vertical resolution and warped to
+  // Mercator before it's handed to the image source (see wmsUtilities).
+  function renderWmsImage(overlay) {
+    if (!map.current) return
+    const bounds = clampBoundsForWms(map.current.getBounds())
+    if (bounds.south >= bounds.north || bounds.west >= bounds.east) return
+    const canvasElement = map.current.getCanvas()
+    const outWidth = Math.min(canvasElement.clientWidth, 2048)
+    const outHeight = Math.min(canvasElement.clientHeight, 2048)
+    const url = buildWmsGetMapUrl({
+      wmsUrl: overlay.wmsUrl,
+      datasetId: overlay.datasetId,
+      variable: overlay.variable.name,
+      bounds,
+      width: outWidth,
+      height: Math.min(Math.round(outHeight * 1.75), 2048),
+      time: overlay.time,
+      elevation: overlay.elevation
+    })
+    const token = wmsRenderToken.current
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      if (token !== wmsRenderToken.current || !map.current) return
+      let imageUrl
+      try {
+        imageUrl = warpEquirectToMercator(
+          img,
+          bounds.south,
+          bounds.north,
+          outWidth,
+          outHeight
+        ).toDataURL('image/png')
+      } catch (error) {
+        // canvas tainted (server without CORS headers) — show unwarped
+        console.warn('WMS warp failed, using unwarped image', error)
+        imageUrl = url
+      }
+      const coordinates = [
+        [bounds.west, bounds.north],
+        [bounds.east, bounds.north],
+        [bounds.east, bounds.south],
+        [bounds.west, bounds.south]
+      ]
+      const source = map.current.getSource('wms-overlay')
+      if (source) {
+        source.updateImage({ url: imageUrl, coordinates })
+      } else {
+        map.current.addSource('wms-overlay', {
+          type: 'image',
+          url: imageUrl,
+          coordinates
+        })
+        // Inserted under the bottom-most data layer: basemap below, every
+        // hex/point/coverage layer above the raster.
+        map.current.addLayer(
+          {
+            id: 'wms-overlay',
+            type: 'raster',
+            source: 'wms-overlay',
+            paint: { 'raster-opacity': 0.85, 'raster-fade-duration': 0 }
+          },
+          map.current.getLayer('trajectory-hexes') ? 'trajectory-hexes' : undefined
+        )
+      }
+    }
+    img.onerror = () => console.warn(`WMS GetMap failed: ${url}`)
+    img.src = url
+  }
+
   useEffect(() => {
     if (map.current) {
-      hoverHighlightPoints(hoveredDataset?.pk)
+      if (hoveredDataset?.cdm_data_type === 'Grid') {
+        // A griddap dataset has no map features: highlighting its pk would
+        // grey the whole map with nothing selected. Draw its bbox instead.
+        hoverHighlightPoints()
+        setGriddapHighlight(hoveredDataset.coverage_bbox_geojson)
+      } else {
+        setGriddapHighlight(activeWmsOverlay ? activeWmsOverlay.bbox : null)
+        hoverHighlightPoints(hoveredDataset?.pk)
+      }
     }
-  }, [hoveredDataset])
+  }, [hoveredDataset, activeWmsOverlay])
+
+  useEffect(() => {
+    griddapCoverageRef.current = griddapCoverage
+    const source = map.current?.getSource('griddap-coverage')
+    if (source) source.setData(griddapCoverage || emptyFeatureCollection)
+  }, [griddapCoverage])
+
+  useEffect(() => {
+    if (!map.current) return
+    removeWmsOverlay()
+    if (!activeWmsOverlay) {
+      setGriddapHighlight(null)
+      return
+    }
+    renderWmsImage(activeWmsOverlay)
+    const rerender = debounce(() => renderWmsImage(activeWmsOverlay), 300)
+    wmsMoveHandler.current = rerender
+    map.current.on('moveend', rerender)
+    // pin the dataset's footprint outline while its overlay is shown
+    setGriddapHighlight(activeWmsOverlay.bbox)
+    return () => removeWmsOverlay()
+  }, [activeWmsOverlay])
 
   function highlightPoints(polygon) {
     if (polygon && polygon.length >= 4) {
@@ -751,6 +895,62 @@ export default function CreateMap({
         },
         filter: ['in', 'pk', '']
       })
+
+      // Griddap (gridded, metadata-only) datasets: the optional coverage
+      // layer (all matching bboxes, toggled off by default) and the
+      // single-dataset highlight (hover from the list / pinned while a WMS
+      // overlay is shown). GeoJSON sources — coverage is tens of features
+      // served whole by /griddapCoverage, not tiles. Inserted before
+      // 'points-highlighted' so selection/hover circles stay on top.
+      map.current.addSource('griddap-coverage', {
+        type: 'geojson',
+        data: griddapCoverageRef.current || emptyFeatureCollection
+      })
+      map.current.addSource('griddap-highlight', {
+        type: 'geojson',
+        data: emptyFeatureCollection
+      })
+      map.current.addLayer(
+        {
+          id: 'griddap-coverage-fill',
+          type: 'fill',
+          source: 'griddap-coverage',
+          // near-invisible fill: the hover/click hit area
+          paint: { 'fill-color': '#52a79b', 'fill-opacity': 0.07 }
+        },
+        'points-highlighted'
+      )
+      map.current.addLayer(
+        {
+          id: 'griddap-coverage-line',
+          type: 'line',
+          source: 'griddap-coverage',
+          paint: {
+            'line-color': '#52a79b',
+            'line-width': 1.5,
+            'line-dasharray': [2, 2]
+          }
+        },
+        'points-highlighted'
+      )
+      map.current.addLayer(
+        {
+          id: 'griddap-highlight-fill',
+          type: 'fill',
+          source: 'griddap-highlight',
+          paint: { 'fill-color': '#fbb03b', 'fill-opacity': 0.1 }
+        },
+        'points-highlighted'
+      )
+      map.current.addLayer(
+        {
+          id: 'griddap-highlight-line',
+          type: 'line',
+          source: 'griddap-highlight',
+          paint: { 'line-color': '#fbb03b', 'line-width': 2.5 }
+        },
+        'points-highlighted'
+      )
     })
 
     const handleMapOnClick = (e) => {
@@ -952,6 +1152,62 @@ export default function CreateMap({
       }
     })
 
+    // Griddap coverage rectangles sit under the point/hex layers — defer to
+    // those layers' own handlers whenever one of their features is under the
+    // cursor (same pattern as trajectory-hexes above).
+    const griddapFeatureIsCovered = (e) =>
+      map.current.queryRenderedFeatures(e.point, {
+        layers: ['points', 'hexes'].filter((layer) => map.current.getLayer(layer))
+      }).length > 0
+
+    map.current.on('mousemove', 'griddap-coverage-fill', (e) => {
+      if (draw.getMode().includes('draw') || griddapFeatureIsCovered(e)) return
+      map.current.getCanvas().style.cursor = 'pointer'
+      // nested feature properties arrive JSON-stringified from MapLibre
+      let title = ''
+      try {
+        const titleTranslated = JSON.parse(
+          e.features[0].properties.title_translated
+        )
+        title = titleTranslated[i18n.language] || titleTranslated.en || ''
+      } catch (error) {
+        title = e.features[0].properties.dataset_id || ''
+      }
+      popup
+        .setLngLat([e.lngLat.lng, e.lngLat.lat])
+        .setHTML(`<div>${title}<br/>${t('griddapCoverageTooltip')}</div>`)
+        .addTo(map.current)
+    })
+
+    map.current.on('mouseleave', 'griddap-coverage-fill', () => {
+      if (!draw.getMode().includes('draw')) {
+        map.current.getCanvas().style.cursor = 'grab'
+        popup.remove()
+      }
+    })
+
+    const handleGriddapCoverageOnClick = (e) => {
+      if (griddapFeatureIsCovered(e)) return
+      e.originalEvent.preventDefault()
+      if (!creatingPolygon.current) {
+        const clickedPk = e.features[0].properties.pk
+        // Same mechanism as the trajectory-hex click: narrow the dataset
+        // selection to the clicked dataset, which makes /pointQuery return
+        // one row and SelectionDetails auto-open its inspector.
+        setDatasetsSelected((previousDatasetsSelected) =>
+          previousDatasetsSelected.map((dataset) => ({
+            ...dataset,
+            isSelected: dataset.pk === clickedPk
+          }))
+        )
+      } else if (
+        draw.getMode() === 'simple_select' &&
+        creatingPolygon.current
+      ) {
+        creatingPolygon.current = false
+      }
+    }
+
     map.current.on('draw.create', (e) => {
       setPointsToReview()
       setLoading(true)
@@ -1031,6 +1287,9 @@ export default function CreateMap({
 
     map.current.on('click', 'trajectory-hexes', handleMapTrajectoryHexesOnClick)
     map.current.on('touchend', 'trajectory-hexes', handleMapTrajectoryHexesOnClick)
+
+    map.current.on('click', 'griddap-coverage-fill', handleGriddapCoverageOnClick)
+    map.current.on('touchend', 'griddap-coverage-fill', handleGriddapCoverageOnClick)
 
     map.current.on('click', handleMapOnClick)
     // mobile seems better without handleMapOnClick enabled for touch

@@ -42,10 +42,31 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                latitude, longitude, point_pk, geom, geom AS search_geom
         FROM cde.obis_cells
         WHERE :obisFilters`;
+  // Griddap datasets are metadata-only: no feature rows, their coverage lives
+  // on cde.datasets (coverage_* columns). The coverage_* names are aliased
+  // back to the combined-CTE contract here because dbFilter emits unqualified
+  // time_min/time_max/depth_* predicates that would otherwise be ambiguous.
+  // Timeless (static) grids coalesce to +-infinity so any time filter matches;
+  // NULL point_pk keeps grids out of map-click (pointPKs) queries.
+  const griddapBranch = `SELECT pk AS dataset_pk,
+               coalesce(coverage_time_min, '-infinity'::timestamptz) AS time_min,
+               coalesce(coverage_time_max, 'infinity'::timestamptz) AS time_max,
+               coalesce(coverage_depth_min, 0) AS depth_min,
+               coalesce(coverage_depth_max, 0) AS depth_max,
+               0 AS records_per_day,
+               NULL::text AS profile_id, NULL::text AS timeseries_id,
+               NULL::double precision AS latitude, NULL::double precision AS longitude,
+               NULL::integer AS point_pk, NULL::geometry AS geom,
+               coverage_bbox AS search_geom
+        FROM cde.datasets
+        WHERE cdm_data_type = 'Grid' AND coverage_bbox IS NOT NULL`;
 
   const branches = [];
   if (includeProfiles) branches.push(profilesBranch, trajectoryBranch);
   if (showObis) branches.push(obisBranch);
+  // Grids appear in /pointQuery and /datasetRecordsList but never in the
+  // download-estimate path (metadata-only, downloads happen on ERDDAP).
+  if (includeProfiles && !doEstimate) branches.push(griddapBranch);
   const combinedInner = branches.length
     ? branches.join("\n        UNION ALL\n        ")
     : `${profilesBranch} WHERE FALSE`;
@@ -71,10 +92,20 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                   d.erddap_url AS erddap_server_url,
                   CASE WHEN d.source_type = 'obis'
                            THEN 'https://obis.org/dataset/' || d.dataset_id
+                       WHEN d.cdm_data_type = 'Grid'
+                           THEN d.erddap_url || '/griddap/' || d.dataset_id || '.html'
                            ELSE d.erddap_url || '/tabledap/' || d.dataset_id || '.html'
                   END AS erddap_url,
                   'https://catalogue.cioos.ca/dataset/'
-                           || ckan_id AS ckan_url
+                           || ckan_id AS ckan_url,
+                  d.wms_url,
+                  d.grid_variables,
+                  d.grid_dimensions,
+                  -- griddap footprint for the frontend bbox highlight; NULL
+                  -- for every other type
+                  CASE WHEN d.cdm_data_type = 'Grid'
+                           THEN ST_AsGeoJSON(ST_Transform(d.coverage_bbox, 4326), 6)::json
+                  END AS coverage_bbox_geojson
                   -- replace '0 days' with '1 day' when its a single day profile
                   -- query records count = sum((number of days covered by the query that are in the profile) * profile records per day * fraction of the depth range that profile covers)
                   ${

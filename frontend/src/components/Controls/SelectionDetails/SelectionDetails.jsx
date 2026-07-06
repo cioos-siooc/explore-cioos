@@ -33,6 +33,8 @@ export default function SelectionDetails({
   setShowIntroModal,
   totalNumberOfDatasets,
   resetFilters,
+  activeWmsOverlay,
+  setActiveWmsOverlay,
   children
 }) {
   const { t, i18n } = useTranslation()
@@ -136,6 +138,9 @@ export default function SelectionDetails({
   }, [i18n.language])
 
   function handleSelectDataset(point) {
+    // Griddap datasets are metadata-only: they never enter the download
+    // selection (pointsToReview) — data access is on ERDDAP directly.
+    if (point.cdm_data_type === 'Grid') return
     const dataset = pointsData.filter((p) => p.pk === point.pk)[0]
     dataset.selected = !point.selected
     const result = pointsData.map((p) => {
@@ -153,12 +158,21 @@ export default function SelectionDetails({
       pointsData.map((p) => {
         return {
           ...p,
-          selected: !selectAll
+          selected: p.cdm_data_type === 'Grid' ? false : !selectAll
         }
       })
     )
     setSelectAll(!selectAll)
   }
+
+  // The WMS overlay lives only while its dataset is inspected: navigating
+  // back or to another dataset clears it (the WmsLegend close button is the
+  // other exit).
+  useEffect(() => {
+    if (activeWmsOverlay && activeWmsOverlay.pk !== inspectDataset?.pk) {
+      setActiveWmsOverlay()
+    }
+  }, [inspectDataset])
 
   useEffect(() => {
     if (inspectDataset) {
@@ -236,6 +250,8 @@ export default function SelectionDetails({
             setInspectRecordID={setInspectRecordID}
             filterSet={filterSet}
             query={combinedQueries}
+            activeWmsOverlay={activeWmsOverlay}
+            setActiveWmsOverlay={setActiveWmsOverlay}
           />
         ) : (
           <>

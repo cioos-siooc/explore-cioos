@@ -28,6 +28,8 @@ import DownloadDetails from './Controls/DownloadDetails/DownloadDetails.jsx'
 import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx'
 import Loading from './Controls/Loading/Loading.jsx'
 import Legend from './Controls/Legend/Legend.jsx'
+import MapLayerToggle from './Controls/MapLayerToggle/MapLayerToggle.jsx'
+import WmsLegend from './Controls/WmsLegend/WmsLegend.jsx'
 import IntroModal from './Controls/IntroModal/IntroModal.jsx'
 import Filter from './Controls/Filter/Filter.jsx'
 import MultiCheckboxFilter from './Controls/Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx'
@@ -101,6 +103,12 @@ export default function App() {
   const [trajectoryRangeLevels, setTrajectoryRangeLevels] = useState()
   const [currentTrajectoryRangeLevel, setCurrentTrajectoryRangeLevel] = useState()
   const [hoveredDataset, setHoveredDataset] = useState()
+  // Griddap (gridded, metadata-only) datasets: the optional coverage layer
+  // (off by default) and the on-demand per-dataset WMS overlay
+  // ({pk, datasetId, wmsUrl, variable, time, elevation, bbox} | undefined).
+  const [griddapCoverageVisible, setGriddapCoverageVisible] = useState(false)
+  const [griddapCoverage, setGriddapCoverage] = useState()
+  const [activeWmsOverlay, setActiveWmsOverlay] = useState()
   const defaultQuery = {
     startDate: defaultStartDate,
     endDate: defaultEndDate,
@@ -636,6 +644,25 @@ export default function App() {
     )
   }, [query])
 
+  // Fetch griddap coverage bboxes when the layer is visible, in lockstep
+  // with the same debounced query the tiles and /pointQuery use. Data is
+  // kept when the layer is toggled off so re-showing it is instant.
+  useEffect(() => {
+    if (!griddapCoverageVisible) return
+    const controller = new AbortController()
+    fetch(`${server}/griddapCoverage?${createDataFilterQueryString(query)}`, {
+      signal: controller.signal
+    })
+      .then((response) => (response.ok ? response.json() : undefined))
+      .then((coverage) => {
+        if (coverage) setGriddapCoverage(coverage)
+      })
+      .catch((error) => {
+        if (error.name !== 'AbortError') throw error
+      })
+    return () => controller.abort()
+  }, [query, griddapCoverageVisible])
+
   useEffect(() => {
     if (rangeLevels) {
       setCurrentRangeLevel(getCurrentRangeLevel(rangeLevels, zoom))
@@ -833,6 +860,8 @@ export default function App() {
         setHoveredDataset={setHoveredDataset}
         hoveredDataset={hoveredDataset}
         setDatasetsSelected={setDatasetsSelected}
+        griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
+        activeWmsOverlay={activeWmsOverlay}
       />
       <Controls
         loading={loading}
@@ -858,6 +887,8 @@ export default function App() {
                 setShowIntroModal={setShowIntroModal}
                 totalNumberOfDatasets={totalNumberOfDatasets}
                 resetFilters={resetFilters}
+                activeWmsOverlay={activeWmsOverlay}
+                setActiveWmsOverlay={setActiveWmsOverlay}
               >
                 {DownloadButton()}
               </SelectionDetails>
@@ -1145,6 +1176,18 @@ export default function App() {
       >
         <div className='rectangleIcon' />
       </button>
+      <MapLayerToggle
+        active={griddapCoverageVisible}
+        onToggle={() => setGriddapCoverageVisible(!griddapCoverageVisible)}
+        title={t('griddapCoverageToggleTitle')}
+      />
+      {activeWmsOverlay && (
+        <WmsLegend
+          overlay={activeWmsOverlay}
+          onClose={() => setActiveWmsOverlay()}
+          selectionPanelOpen={selectionPanelOpen}
+        />
+      )}
       <IntroModal showModal={showIntroModal} setShowModal={setShowIntroModal} />
     </ErrorBoundary>
   )
