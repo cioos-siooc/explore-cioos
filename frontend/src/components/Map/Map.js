@@ -25,7 +25,7 @@ import {
   getCurrentRangeLevel,
   updateMapToolTitleLanguage
 } from '../../utilities'
-import { colorScale, trajectoryColorScale, defaultQuery } from '../config'
+import { colorScale, trajectoryColorScale } from '../config'
 import platformColors from '../../components/platformColors'
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
@@ -423,29 +423,29 @@ export default function CreateMap({
 
   useEffect(() => {
     const q = createDataFilterQueryString(query)
-    const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${
-      query !== defaultQuery && q && `?${q}`
-    }`
-    const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${
-      query !== defaultQuery && q && `?${q}`
-    }`
+    const filterSuffix = q ? `?${q}` : ''
+    const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`
+    const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${filterSuffix}`
     setPointsToReview()
     setPolygon()
     if (map && map.current && map.current.loaded()) {
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
 
       map.current.getSource('points').tiles = [tileQuery]
+      map.current.getSource('points-halo').tiles = [tileQuery]
       map.current.getSource('hexes').tiles = [tileQuery]
       map.current.getSource('trajectory-hexes').tiles = [trajectoryTileQuery]
 
       // Remove the tiles for a particular source
       map.current.style.sourceCaches.hexes.clearTiles()
       map.current.style.sourceCaches.points.clearTiles()
+      map.current.style.sourceCaches['points-halo'].clearTiles()
       map.current.style.sourceCaches['trajectory-hexes'].clearTiles()
 
       // Load the new tiles for the current viewport (map.transform -> viewport)
       map.current.style.sourceCaches.hexes.update(map.current.transform)
       map.current.style.sourceCaches.points.update(map.current.transform)
+      map.current.style.sourceCaches['points-halo'].update(map.current.transform)
       map.current.style.sourceCaches['trajectory-hexes'].update(map.current.transform)
 
       // Force a repaint, so that the map will be repainted without you having to touch the map
@@ -548,14 +548,11 @@ export default function CreateMap({
       setColorStops()
 
       const q = createDataFilterQueryString(query)
+      const filterSuffix = q ? `?${q}` : ''
 
-      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${
-        query !== defaultQuery && q && `?${q}`
-      }`
+      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`
 
-      const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${
-        query !== defaultQuery && q && `?${q}`
-      }`
+      const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${filterSuffix}`
 
       map.current.addLayer({
         id: 'points',
