@@ -9,7 +9,67 @@ this module contains no cdm_data_type branches.
 from datetime import datetime
 
 import pandas as pd
+from cde_harvester.dataset_types.geo import classify_profile_location
 from cde_harvester.sources.erddap.client import ERDDAP
+
+
+def _axis_bounds_from_metadata(dataset, axis):
+    """(min, max) for ``latitude``/``longitude`` from a single-feature
+    dataset's metadata: the variable's ``actual_range``, else the
+    ``geospatial_*`` globals. Returns None when neither is usable.
+
+    Lets single-feature datasets skip the two orderByMinMax queries entirely,
+    mirroring how the time/depth min/max uses actual_range.
+    """
+    df_variables = dataset.df_variables
+    if axis in df_variables.index:
+        actual_range = df_variables.loc[axis].get("actual_range")
+        if actual_range:
+            parts = actual_range.split(",")
+            if len(parts) == 2:
+                try:
+                    return float(parts[0]), float(parts[1])
+                except ValueError:
+                    pass
+    key = "lat" if axis == "latitude" else "lon"
+    lo = dataset.globals.get(f"geospatial_{key}_min")
+    hi = dataset.globals.get(f"geospatial_{key}_max")
+    if lo not in (None, "") and hi not in (None, ""):
+        try:
+            return float(lo), float(hi)
+        except ValueError:
+            pass
+    return None
+
+
+def _lat_lon_box(dataset, profiles, profile_variable_list, logger):
+    """Per-feature lat/lon bounding box, indexed by ``profile_variable_list``
+    with columns latitude_min/max, longitude_min/max.
+
+    Single-feature datasets use metadata (no query); otherwise two bounded
+    orderByMinMax queries (one per axis). Returns an empty frame on failure.
+    """
+    if len(profiles) == 1:
+        lat_bounds = _axis_bounds_from_metadata(dataset, "latitude")
+        lon_bounds = _axis_bounds_from_metadata(dataset, "longitude")
+        if lat_bounds and lon_bounds:
+            logger.debug("Using dataset metadata for lat/lon bounding box")
+            idx = profiles.set_index(profile_variable_list).index
+            return pd.DataFrame(
+                {
+                    "latitude_min": lat_bounds[0],
+                    "latitude_max": lat_bounds[1],
+                    "longitude_min": lon_bounds[0],
+                    "longitude_max": lon_bounds[1],
+                },
+                index=idx,
+            )
+
+    lat_mm = dataset.get_max_min(profile_variable_list + ["latitude"])
+    lon_mm = dataset.get_max_min(profile_variable_list + ["longitude"])
+    if lat_mm.empty or lon_mm.empty:
+        return pd.DataFrame()
+    return lat_mm.join(lon_mm)
 
 
 def extract_features(dataset, handler):
@@ -114,6 +174,39 @@ def extract_features(dataset, handler):
                 return profile_min_max
 
         profiles_with_lat_lon = profiles_with_lat_lon.join(profile_min_max)
+
+    # Per-feature lat/lon bounding box. Kept separate from the llat loop above:
+    # lat/lon don't become standalone _min/_max display columns, they combine
+    # into one representative point (exact, or box midpoint) plus a stored bbox
+    # used by spatial search. The min of lat and min of lon separately can be a
+    # point not in the dataset, so we never treat them as a location on their
+    # own — only as box extents + a derived midpoint.
+    box = _lat_lon_box(dataset, profiles, profile_variable_list, logger)
+    if box.empty:
+        logger.error(f"No lat/lon data found for {dataset.id}")
+        return box
+
+    profiles_with_lat_lon = profiles_with_lat_lon.join(box)
+
+    classified = profiles_with_lat_lon.apply(
+        lambda r: classify_profile_location(
+            r["latitude_min"], r["latitude_max"],
+            r["longitude_min"], r["longitude_max"],
+        ),
+        axis="columns",
+        result_type="expand",
+    )
+    profiles_with_lat_lon[["latitude", "longitude", "show_as_point"]] = classified
+    # Drop features whose box had null coordinates (classify returns nan point).
+    profiles_with_lat_lon = profiles_with_lat_lon.dropna(
+        subset=["latitude", "longitude"]
+    )
+    # result_type="expand" leaves these object-typed; the DB columns are
+    # double precision / boolean. lat/lon are re-coerced below with the rest,
+    # but the bool has no later coercion, so fix it here.
+    profiles_with_lat_lon["show_as_point"] = profiles_with_lat_lon[
+        "show_as_point"
+    ].astype(bool)
 
     profiles = profiles_with_lat_lon
 

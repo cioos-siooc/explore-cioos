@@ -154,7 +154,8 @@ async function serverDatasets(erddapUrl, statusFilter = null, q = null) {
                duration_ms,
                attempted_at,
                run_id,
-               query_urls
+               query_urls,
+               warnings
         FROM cde.harvest_attempts ha
         WHERE erddap_url = ?
         ORDER BY erddap_url, dataset_id, attempted_at DESC
@@ -186,6 +187,7 @@ async function serverDatasets(erddapUrl, statusFilter = null, q = null) {
            la.attempted_at,
            la.run_id,
            la.query_urls,
+           la.warnings,
            sp.history_statuses,
            sp.history_times,
            ds.content_hash,
@@ -225,6 +227,7 @@ async function datasetHistory(erddapUrl, datasetId) {
            a.duration_ms,
            a.source,
            a.query_urls,
+           a.warnings,
            r.git_sha,
            r.started_at AS run_started_at
     FROM cde.harvest_attempts a

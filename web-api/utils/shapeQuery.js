@@ -22,9 +22,12 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
   const includeProfiles = !scientificNames && (!obisNodes || Boolean(erddapServers));
   const showObis = includeObis !== 'false';
 
+  // search_geom is the geometry the shared spatial filter (dbFilter) matches
+  // against: the per-feature bbox for profiles (extent search), and the cell
+  // point for the already-fine-grained obis/trajectory cells.
   const profilesBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,
                profile_id, timeseries_id,
-               latitude, longitude, point_pk, geom
+               latitude, longitude, point_pk, geom, bbox AS search_geom
         FROM cde.profiles`;
   // Trajectory coverage cells: ERDDAP data, gated with profiles. The
   // trajectory_id doubles as the profile_id surrogate so the records list
@@ -32,11 +35,11 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
   // harvest so the estimate math below applies unchanged.
   const trajectoryBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,
                trajectory_id as profile_id, NULL as timeseries_id,
-               latitude, longitude, point_pk, geom
+               latitude, longitude, point_pk, geom, geom AS search_geom
         FROM cde.trajectory_cells`;
   const obisBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, 0 as records_per_day,
                NULL as profile_id, NULL as timeseries_id,
-               latitude, longitude, point_pk, geom
+               latitude, longitude, point_pk, geom, geom AS search_geom
         FROM cde.obis_cells
         WHERE :obisFilters`;
 

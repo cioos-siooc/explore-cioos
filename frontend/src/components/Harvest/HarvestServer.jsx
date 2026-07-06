@@ -176,7 +176,9 @@ export default function HarvestServer() {
                     <td>
                       {d.reason_code
                         ? <span title={d.reason_code} style={{ fontSize: '0.8rem' }}>{reasonLabel(t, d.reason_code)}</span>
-                        : <span className="harvest-muted">—</span>
+                        : d.warnings
+                          ? <span className="harvest-warning-text" title={d.warnings}>⚠ {t('harvest.warning.label')}</span>
+                          : <span className="harvest-muted">—</span>
                       }
                     </td>
                     <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDt(d.last_updated_at)}</td>

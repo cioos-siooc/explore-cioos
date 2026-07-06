@@ -273,6 +273,7 @@
   "harvest.col.datasetId": "Dataset ID",
   "harvest.col.recent": "Recent (newest→)",
   "harvest.col.reason": "Reason",
+  "harvest.warning.label": "Warning",
   "harvest.col.lastUpdate": "Last update",
   "harvest.col.lastCheck": "Last check",
   "harvest.col.contentHash": "Content hash",

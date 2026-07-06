@@ -105,18 +105,22 @@ router.get(
     // GROUP BY the hex FK (integer) instead of the polygon geom; the polygon
     // lives on cde.hexes_zoom_0/1 and isn't needed here — only distinct
     // point counts per bucket.
+    // search_geom (bbox for profiles, cell point otherwise) backs the shared
+    // spatial filter, matching tiles/shapeQuery. show_as_point gates profiles
+    // out of every tier (hex and point) so the legend ranges match the tiles,
+    // which keep large-region features off the map entirely.
     const profilesBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, days as record_count,
-               time_min, time_max, latitude, longitude, depth_min, depth_max
-        FROM cde.profiles`;
+               time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
+        FROM cde.profiles WHERE show_as_point`;
     // Trajectory coverage cells merge into the hex-tier ranges (zoom0/zoom1,
     // the green ramp) but not the point-tier range (zoom2) — at that zoom
     // they only render via the dedicated always-hex purple layer below.
     const trajectoryBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, days as record_count,
-               time_min, time_max, latitude, longitude, depth_min, depth_max
+               time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
         FROM cde.trajectory_cells`;
     const obisBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk,
                date_part('days', time_max - time_min) + 1 as record_count,
-               time_min, time_max, latitude, longitude, depth_min, depth_max
+               time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
         FROM cde.obis_cells
         WHERE :obisFilters`;
 

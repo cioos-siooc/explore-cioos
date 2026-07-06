@@ -112,11 +112,11 @@ router.get(
     const SQL = `
         WITH combined AS (
         SELECT dataset_pk, point_pk, geom, latitude, longitude,
-               time_min, time_max, depth_min, depth_max
+               time_min, time_max, depth_min, depth_max, bbox AS search_geom
         FROM cde.profiles
         UNION ALL
         SELECT dataset_pk, point_pk, geom, latitude, longitude,
-               time_min, time_max, depth_min, depth_max
+               time_min, time_max, depth_min, depth_max, geom AS search_geom
         FROM cde.trajectory_cells
         ),
         profiles_subset AS (

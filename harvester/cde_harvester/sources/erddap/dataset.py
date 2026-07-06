@@ -124,7 +124,6 @@ class Dataset(object):
             .query('cf_role != ""')[["cf_role", "name"]]["name"]
             .to_dict()
         )
-        lat_lng = ["latitude", "longitude"]
 
         # sorting so the url is consistent every time for query caching
         profile_variable_list = sorted(list(profile_variables.values()))
@@ -139,37 +138,17 @@ class Dataset(object):
         if not profile_variables:
             return []
 
-        # dropna - for when there are nulls in the lat/lon column leading to a second profile created
+        # Enumerate feature identities only. lat/lon are NOT requested here:
+        # a distinct() including them returns one row per GPS fix on a moving
+        # feature. Per-feature lat/lon min/max (the bounding box) is fetched
+        # separately in tabledap_features via orderByMinMax, which is bounded
+        # by feature count regardless of how much the feature moves.
         profile_ids = self.dataset_tabledap_query(
-            f"{','.join(profile_variable_list + lat_lng)}&distinct()"
+            f"{','.join(profile_variable_list)}&distinct()"
         )
 
         if profile_ids.empty:
             return profile_ids
-
-        profile_ids = profile_ids.dropna(subset=["latitude", "longitude"])
-
-        profile_ids["latlon"] = (
-            profile_ids["latitude"].astype(str)
-            + ","
-            + profile_ids["longitude"].astype(str)
-        )
-        profiles_with_multiple_locations = (
-            profile_ids.groupby(profile_variable_list)
-            .count()[["latlon"]]
-            .query("latlon>1")
-            .index.to_list()
-        )
-
-        del profile_ids["latlon"]
-
-        profile_ids = profile_ids.drop_duplicates(profile_variable_list)
-
-        if profiles_with_multiple_locations:
-            self.logger.warning(
-                "Non unique lat/lon found within profiles:"
-                + str(profiles_with_multiple_locations)
-            )
 
         self.profile_ids = profile_ids
         return profile_ids

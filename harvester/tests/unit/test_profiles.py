@@ -37,14 +37,15 @@ def no_profile_dataset(single_station_dataset):
 
 @pytest.fixture
 def bad_geometry_dataset(single_station_dataset):
-    """Dataset whose single profile has a latitude out of valid range."""
-    bad_ids = pd.DataFrame({
-        "station_id": ["BAD_STATION"],
-        "latitude": [95.0],   # > 90 → invalid
-        "longitude": [-125.0],
-    })
-    single_station_dataset.get_profile_ids.return_value = bad_ids
-    single_station_dataset.profile_ids = bad_ids
+    """Dataset whose single feature has a latitude out of valid range.
+
+    The bad coordinate now comes from the feature's bounding box (the
+    single-feature metadata shortcut), not get_profile_ids — that's where the
+    pipeline sources lat/lon since the bbox change.
+    """
+    df_vars = single_station_dataset.df_variables
+    df_vars.loc["latitude", "actual_range"] = "95.0,95.0"   # > 90 → invalid
+    df_vars.loc["longitude", "actual_range"] = "-125.0,-125.0"
     return single_station_dataset
 
 
@@ -104,6 +105,34 @@ class TestGetProfilesHappyPath:
     def test_records_per_day_is_positive(self, single_station_dataset):
         result = get_profiles(single_station_dataset)
         assert (result["records_per_day"] > 0).all()
+
+
+class TestBoundingBoxAndDisplayFlag:
+    def test_bbox_columns_present(self, single_station_dataset):
+        result = get_profiles(single_station_dataset)
+        for col in ["latitude_min", "latitude_max", "longitude_min",
+                    "longitude_max", "show_as_point"]:
+            assert col in result.columns, f"Missing column: {col}"
+
+    def test_fixed_station_is_a_point(self, single_station_dataset):
+        """A fixed station (lat_min==lat_max) shows as a dot."""
+        result = get_profiles(single_station_dataset)
+        assert result["show_as_point"].all()
+        assert (result["latitude_min"] == result["latitude_max"]).all()
+        assert result["latitude"].iloc[0] == pytest.approx(48.5)
+
+    def test_region_feature_hidden_from_map(self, single_station_dataset):
+        """A feature whose box spans >1 km is kept (searchable) but flagged
+        show_as_point=False so it's not drawn on the map."""
+        df_vars = single_station_dataset.df_variables
+        # ~1 degree of latitude ≈ 111 km — well over the 1 km threshold.
+        df_vars.loc["latitude", "actual_range"] = "48.0,49.0"
+        df_vars.loc["longitude", "actual_range"] = "-125.0,-125.0"
+        result = get_profiles(single_station_dataset)
+        assert not result.empty
+        assert not result["show_as_point"].any()
+        # midpoint stored as the representative point
+        assert result["latitude"].iloc[0] == pytest.approx(48.5)
 
 
 class TestGetProfilesEmptyAndEdgeCases:

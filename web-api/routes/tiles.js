@@ -81,19 +81,24 @@ router.get(
     // At hex zoom we only need the hex FK and point_pk (for distinct counts);
     // the polygon is fetched once per hex via JOIN to hexes_zoom_*. At point
     // zoom we project the actual point geom.
+    // Features spanning a region (show_as_point=false) are kept off the map
+    // entirely — excluded from both the individual dots (z>=7) and the hex
+    // aggregation counts (z<7). They remain searchable via the sidebar
+    // geospatial filters (shapeQuery has no such gate). search_geom (the bbox
+    // for profiles, the cell point otherwise) backs the shared spatial filter.
     const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
-           time_min, time_max, latitude, longitude, depth_min, depth_max
-    FROM cde.profiles`;
+           time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
+    FROM cde.profiles WHERE show_as_point`;
     // Trajectory coverage cells merge into the combined hex counts (z<7,
     // the green ramp) but never appear as individual points (z>=7) — at
     // that zoom they're only shown via the dedicated always-hex purple
     // layer from /tiles/trajectories/:z/:x/:y.mvt.
     const trajectoryBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
-           time_min, time_max, latitude, longitude, depth_min, depth_max
+           time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
     FROM cde.trajectory_cells`;
     const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
            date_part('days', time_max - time_min) + 1 as record_count,
-           time_min, time_max, latitude, longitude, depth_min, depth_max
+           time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
     FROM cde.obis_cells
     WHERE :obisFilters`;
 
@@ -234,7 +239,7 @@ router.get(
     const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
 
     const combinedInner = `SELECT point_pk, dataset_pk, trajectory_id, :zoomPKColumn: as zoom_pk,
-           time_min, time_max, latitude, longitude, depth_min, depth_max
+           time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
     FROM cde.trajectory_cells`;
 
     // The tile-envelope test is applied BEFORE the aggregation (hexes are

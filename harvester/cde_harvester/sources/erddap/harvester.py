@@ -37,6 +37,7 @@ from cde_harvester.dataset_types import (
     supported_cdm_data_types,
     supported_data_structures,
 )
+from cde_harvester.dataset_types.geo import POINT_THRESHOLD_M
 from cde_harvester.sources.erddap.state import load_previous_hashes
 from requests.exceptions import HTTPError
 from prefect import task
@@ -56,9 +57,14 @@ def _attempt_urls(erddap_url, dataset, dataset_id):
 
 
 def _build_attempt(run_id, erddap_url, dataset_id, status, reason_code=None,
-                   error_message=None, duration_ms=None, query_urls=None):
+                   error_message=None, duration_ms=None, query_urls=None,
+                   warnings=None):
     """Build one harvest_attempts.csv row (kept identical to the legacy
-    record_attempt closure so the harvest-dashboard contract is unchanged)."""
+    record_attempt closure so the harvest-dashboard contract is unchanged).
+
+    ``warnings`` is a non-fatal note surfaced on the harvest dashboard for an
+    otherwise-successful dataset (e.g. features hidden from the map because
+    they span a region)."""
     urls = list(query_urls or [])
     return {
         "run_id": run_id,
@@ -76,6 +82,7 @@ def _build_attempt(run_id, erddap_url, dataset_id, status, reason_code=None,
         "duration_ms": duration_ms,
         "attempted_at": datetime.now(timezone.utc),
         "query_urls": "\n".join(urls) if urls else None,
+        "warnings": warnings,
     }
 
 
@@ -400,6 +407,24 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                     ),
                 )
             log.info("complete")
+            # Non-fatal warning: features spanning a region (>POINT_THRESHOLD_M)
+            # are hidden from the map (kept searchable). Surface it per dataset
+            # on the harvest dashboard. Only the profiles pipeline sets
+            # show_as_point; trajectory cells don't carry it.
+            warnings = None
+            if "show_as_point" in df_features.columns:
+                n_hidden = int((~df_features["show_as_point"].astype(bool)).sum())
+                if n_hidden:
+                    log.warning(
+                        "%d of %d features span more than %d m and are hidden "
+                        "from the map (still searchable)",
+                        n_hidden, len(df_features), POINT_THRESHOLD_M,
+                    )
+                    warnings = (
+                        f"{n_hidden} of {len(df_features)} features span more than "
+                        f"{POINT_THRESHOLD_M} m and are hidden from the map "
+                        "(still searchable via geospatial filters)."
+                    )
             return DatasetHarvestResult(
                 status="success",
                 features=df_features,
@@ -411,6 +436,7 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                     status="success",
                     duration_ms=duration_ms,
                     query_urls=dataset.queried_urls,
+                    warnings=warnings,
                 ),
             )
 

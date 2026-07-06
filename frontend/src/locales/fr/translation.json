@@ -274,6 +274,7 @@
   "harvest.col.datasetId": "ID du jeu de données",
   "harvest.col.recent": "Récent (nouveau→ancien)",
   "harvest.col.reason": "Raison",
+  "harvest.warning.label": "Avertissement",
   "harvest.col.lastUpdate": "Dernière mise à jour",
   "harvest.col.lastCheck": "Dernière vérification",
   "harvest.col.contentHash": "Empreinte du contenu",

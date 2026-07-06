@@ -40,8 +40,19 @@ class ProfileSchema(pa.DataFrameModel):
     dataset_id: Series[str]
     timeseries_id: Series[str] = pa.Field(nullable=True, default="")
     profile_id: Series[str] = pa.Field(nullable=True, default="")
+    # Representative display point (exact location, or the bbox midpoint).
     latitude: Series[float] = pa.Field(ge=-90, le=90)
     longitude: Series[float] = pa.Field(ge=-180, le=180)
+    # Per-feature lat/lon bounding box; the DB derives an indexed bbox geometry
+    # from these and spatial search matches against it (feature extent, not the
+    # single display point).
+    latitude_min: Series[float] = pa.Field(ge=-90, le=90)
+    latitude_max: Series[float] = pa.Field(ge=-90, le=90)
+    longitude_min: Series[float] = pa.Field(ge=-180, le=180)
+    longitude_max: Series[float] = pa.Field(ge=-180, le=180)
+    # False = feature spans a region (box diagonal > POINT_THRESHOLD_M): kept
+    # searchable + aggregated in hexes, but not drawn as an individual dot.
+    show_as_point: Series[bool] = pa.Field(nullable=False, default=True)
     depth_min: Series[float] = pa.Field(nullable=True)
     depth_max: Series[float] = pa.Field(nullable=True)
     time_min: Series[pa.DateTime] = pa.Field(nullable=True)
@@ -226,6 +237,9 @@ class HarvestAttemptSchema(pa.DataFrameModel):
     # dtypes; a newline-delimited blob is plenty for "show the admin what
     # we asked for". Splitter lives in the dashboard.
     query_urls: Series[str] = pa.Field(nullable=True)
+    # Non-fatal note for an otherwise-successful dataset, shown on the harvest
+    # dashboard (e.g. features hidden from the map because they span a region).
+    warnings: Series[str] = pa.Field(nullable=True)
 
     class Config:
         coerce = True
