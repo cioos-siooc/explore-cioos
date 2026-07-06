@@ -25,7 +25,7 @@ import {
   getCurrentRangeLevel,
   updateMapToolTitleLanguage
 } from '../../utilities'
-import { colorScale, trajectoryColorScale, defaultQuery } from '../config'
+import { colorScale, trajectoryColorScale } from '../config'
 import platformColors from '../../components/platformColors'
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
@@ -423,12 +423,9 @@ export default function CreateMap({
 
   useEffect(() => {
     const q = createDataFilterQueryString(query)
-    const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${
-      query !== defaultQuery && q && `?${q}`
-    }`
-    const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${
-      query !== defaultQuery && q && `?${q}`
-    }`
+    const filterSuffix = q ? `?${q}` : ''
+    const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`
+    const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${filterSuffix}`
     setPointsToReview()
     setPolygon()
     if (map && map.current && map.current.loaded()) {
@@ -551,14 +548,11 @@ export default function CreateMap({
       setColorStops()
 
       const q = createDataFilterQueryString(query)
+      const filterSuffix = q ? `?${q}` : ''
 
-      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${
-        query !== defaultQuery && q && `?${q}`
-      }`
+      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`
 
-      const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${
-        query !== defaultQuery && q && `?${q}`
-      }`
+      const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${filterSuffix}`
 
       map.current.addLayer({
         id: 'points',
