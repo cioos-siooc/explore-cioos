@@ -813,22 +813,25 @@ export default function App() {
       logoSource={i18n.language === 'en' ? EnglishLogo : FrenchLogo}
     >
       {loading && <Loading />}
-      {rangeLevels && (
-        <Map
-          polygon={polygon}
-          setPolygon={setPolygon}
-          setPointsToReview={setPointsToReview}
-          setLoading={setLoading}
-          query={query}
-          setMapView={setMapView}
-          rangeLevels={rangeLevels}
-          trajectoryRangeLevels={trajectoryRangeLevels}
-          offsetFlyTo={selectionPanelOpen}
-          setHoveredDataset={setHoveredDataset}
-          hoveredDataset={hoveredDataset}
-          setDatasetsSelected={setDatasetsSelected}
-        />
-      )}
+      {/* Mount the map immediately rather than waiting for /legend (the app's
+          heaviest query) to resolve — first paint of the basemap and tile
+          layers no longer blocks on it. The color ramp is applied once
+          rangeLevels/trajectoryRangeLevels arrive via Map's setColorStops
+          effect, which guards against their being undefined until then. */}
+      <Map
+        polygon={polygon}
+        setPolygon={setPolygon}
+        setPointsToReview={setPointsToReview}
+        setLoading={setLoading}
+        query={query}
+        setMapView={setMapView}
+        rangeLevels={rangeLevels}
+        trajectoryRangeLevels={trajectoryRangeLevels}
+        offsetFlyTo={selectionPanelOpen}
+        setHoveredDataset={setHoveredDataset}
+        hoveredDataset={hoveredDataset}
+        setDatasetsSelected={setDatasetsSelected}
+      />
       <Controls
         loading={loading}
         selectionPanel={

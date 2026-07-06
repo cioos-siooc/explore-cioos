@@ -170,6 +170,16 @@ export default function CreateMap({
   const colorStops = useRef([])
   const trajectoryColorStops = useRef([])
 
+  // Placeholder count ranges used only until the /legend request resolves.
+  // The map now mounts before that response arrives, but the count-driven
+  // layers ('hexes'/'trajectory-hexes') must still be created with VALID,
+  // non-empty color stops — MapLibre silently drops any layer whose paint
+  // function has zero stops, which is why creating them from empty stops left
+  // them missing entirely. The real ramp replaces these as soon as the legend
+  // lands (setColorStops re-runs via the [rangeLevels] effect).
+  const defaultRangeLevels = { zoom0: [0, 100], zoom1: [0, 100], zoom2: [0, 100] }
+  const defaultTrajectoryRangeLevels = { zoom0: [0, 100], zoom1: [0, 100] }
+
   const [boxSelectStartCoords, setBoxSelectStartCoords] = useState()
   const [boxSelectEndCoords, setBoxSelectEndCoords] = useState()
 
@@ -231,43 +241,57 @@ export default function CreateMap({
   }
 
   function setColorStops() {
-    if (map.current) {
-      colorStops.current = generateColorStops(
-        colorScale,
-        getCurrentRangeLevel(rangeLevels, map.current.getZoom())
-      ).map((colorStop) => {
-        return [colorStop.stop, colorStop.color]
-      })
-      if (colorStops.current.length > 0) {
-        if (map.current.getZoom() >= 7 && map.current.getLayer('points')) {
-          map.current.setPaintProperty('points', 'circle-color', colors)
-        } else if (map.current.getZoom() < 7 && map.current.getLayer('hexes')) {
-          map.current.setPaintProperty('hexes', 'fill-color', {
-            property: 'count',
-            stops: colorStops.current
-          })
-        }
+    // The map now mounts before the legend request resolves (first paint is
+    // no longer gated on it), so rangeLevels can be undefined on early calls.
+    // getCurrentRangeLevel/generateColorStops both throw on undefined, so bail
+    // until the ranges arrive — the [rangeLevels] effect re-runs this then.
+    if (!map.current) return
+    // Fall back to the placeholder ranges until the legend resolves, so the
+    // count-driven layers are always created and painted with valid stops
+    // (see defaultRangeLevels). The real ranges replace these once /legend
+    // returns and this re-runs via the [rangeLevels] effect.
+    const effectiveRangeLevels = rangeLevels || defaultRangeLevels
+    colorStops.current = generateColorStops(
+      colorScale,
+      getCurrentRangeLevel(effectiveRangeLevels, map.current.getZoom())
+    ).map((colorStop) => {
+      return [colorStop.stop, colorStop.color]
+    })
+    if (colorStops.current.length > 0) {
+      if (map.current.getZoom() >= 7 && map.current.getLayer('points')) {
+        map.current.setPaintProperty('points', 'circle-color', colors)
       }
-
-      if (trajectoryRangeLevels) {
-        // Trajectory hexes only ever render at zoom >= hexMaxZoom, where the
-        // hex_1 grid is always used, so there's a single range to apply.
-        trajectoryColorStops.current = generateColorStops(
-          trajectoryColorScale,
-          trajectoryRangeLevels.zoom1
-        ).map((colorStop) => {
-          return [colorStop.stop, colorStop.color]
+      // Always keep the hexes layer's stops populated, not just when zoomed
+      // into the hex band — a reload while zoomed in (zoom >= 7) would
+      // otherwise leave it unpainted so hexes never appear on zoom-out. It's
+      // hidden above z7 anyway, and zoomend re-runs this to refine the z0/z1
+      // band.
+      if (map.current.getLayer('hexes')) {
+        map.current.setPaintProperty('hexes', 'fill-color', {
+          property: 'count',
+          stops: colorStops.current
         })
-        if (
-          trajectoryColorStops.current.length > 0 &&
-          map.current.getLayer('trajectory-hexes')
-        ) {
-          map.current.setPaintProperty('trajectory-hexes', 'fill-color', {
-            property: 'count',
-            stops: trajectoryColorStops.current
-          })
-        }
       }
+    }
+
+    // Trajectory hexes only ever render at zoom >= hexMaxZoom, where the
+    // hex_1 grid is always used, so there's a single range to apply.
+    const effectiveTrajectoryRangeLevels =
+      trajectoryRangeLevels || defaultTrajectoryRangeLevels
+    trajectoryColorStops.current = generateColorStops(
+      trajectoryColorScale,
+      effectiveTrajectoryRangeLevels.zoom1
+    ).map((colorStop) => {
+      return [colorStop.stop, colorStop.color]
+    })
+    if (
+      trajectoryColorStops.current.length > 0 &&
+      map.current.getLayer('trajectory-hexes')
+    ) {
+      map.current.setPaintProperty('trajectory-hexes', 'fill-color', {
+        property: 'count',
+        stops: trajectoryColorStops.current
+      })
     }
   }
 

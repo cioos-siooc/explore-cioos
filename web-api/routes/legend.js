@@ -163,8 +163,6 @@ router.get(
         SELECT * from sub1,sub2,sub3
         `;
 
-    const rows = await db.raw(sql, { filters: filters.shared, obisFilters: filters.obisOnly });
-
     // Trajectory coverage cells always render as hexes (never points), so
     // they only need a hex_0/hex_1 range — no point-level zoom2 bucket.
     const trajectorySql = `
@@ -181,7 +179,15 @@ router.get(
 
         SELECT * from sub1,sub2
         `;
-    const trajectoryRows = await db.raw(trajectorySql, { filters: filters.shared });
+
+    // Both aggregations scan the same large tables independently; run them
+    // concurrently rather than back-to-back so legend latency is bounded by
+    // the slower of the two, not their sum. The legend gates first map paint,
+    // so this is on the critical path.
+    const [rows, trajectoryRows] = await Promise.all([
+      db.raw(sql, { filters: filters.shared, obisFilters: filters.obisOnly }),
+      db.raw(trajectorySql, { filters: filters.shared }),
+    ]);
 
     res.send(rows && {
       recordsCount: rows.rows[0],
