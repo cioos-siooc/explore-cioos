@@ -435,17 +435,20 @@ export default function CreateMap({
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
 
       map.current.getSource('points').tiles = [tileQuery]
+      map.current.getSource('points-halo').tiles = [tileQuery]
       map.current.getSource('hexes').tiles = [tileQuery]
       map.current.getSource('trajectory-hexes').tiles = [trajectoryTileQuery]
 
       // Remove the tiles for a particular source
       map.current.style.sourceCaches.hexes.clearTiles()
       map.current.style.sourceCaches.points.clearTiles()
+      map.current.style.sourceCaches['points-halo'].clearTiles()
       map.current.style.sourceCaches['trajectory-hexes'].clearTiles()
 
       // Load the new tiles for the current viewport (map.transform -> viewport)
       map.current.style.sourceCaches.hexes.update(map.current.transform)
       map.current.style.sourceCaches.points.update(map.current.transform)
+      map.current.style.sourceCaches['points-halo'].update(map.current.transform)
       map.current.style.sourceCaches['trajectory-hexes'].update(map.current.transform)
 
       // Force a repaint, so that the map will be repainted without you having to touch the map
