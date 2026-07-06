@@ -2,6 +2,12 @@ services:
   db:
     build: ./database
     platform: linux/x86_64
+    # Postgres parallel workers (e.g. VACUUM ANALYZE / parallel scans on
+    # cde.trajectory_cells) allocate shared-memory segments in /dev/shm. The
+    # Docker default is 64MB, which parallel maintenance overruns — Postgres
+    # then reports it as "DiskFull / No space left on device". Raise it well
+    # above the working-set size.
+    shm_size: 1gb
     environment:
       - "PGPORT=${DB_PORT:-5432}"
       - "POSTGRES_DB=$DB_NAME"

@@ -2,6 +2,9 @@ services:
   db:
     image: "postgis/postgis:13-3.1-alpine"
     platform: linux/x86_64
+    # See docker-compose.yaml — Postgres parallel workers overrun the 64MB
+    # Docker /dev/shm default and surface it as "DiskFull".
+    shm_size: 1gb
     ports:
       - "${DB_PORT:-5432}:${DB_PORT:-5432}"
     environment:
