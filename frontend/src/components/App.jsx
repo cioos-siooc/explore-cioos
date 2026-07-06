@@ -72,10 +72,12 @@ if (process.env.NODE_ENV === 'production') {
     dsn: 'https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595',
     integrations: [new Integrations.BrowserTracing()],
 
-    // Set tracesSampleRate to 1.0 to capture 100%
-    // of transactions for performance monitoring.
-    // We recommend adjusting this value in production
-    tracesSampleRate: 1.0
+    // Full tracing (1.0) adds instrumentation overhead to page load. Defaults
+    // to 1.0 in development and 0.1 in production; override at build time with
+    // SENTRY_TRACES_SAMPLE_RATE.
+    tracesSampleRate: process.env.SENTRY_TRACES_SAMPLE_RATE
+      ? Number(process.env.SENTRY_TRACES_SAMPLE_RATE)
+      : (process.env.NODE_ENV === 'production' ? 0.1 : 1.0)
   })
 }
 

@@ -53,7 +53,8 @@ module.exports = {
     }),
     new DefinePlugin({
       'process.env.API_URL': JSON.stringify(process.env.API_URL),
-      'process.env.BASE_URL': JSON.stringify(process.env.BASE_URL || '/')
+      'process.env.BASE_URL': JSON.stringify(process.env.BASE_URL || '/'),
+      'process.env.SENTRY_TRACES_SAMPLE_RATE': JSON.stringify(process.env.SENTRY_TRACES_SAMPLE_RATE)
     })
   ]
 }

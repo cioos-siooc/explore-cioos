@@ -65,6 +65,8 @@ The production build will be generated in the `dist` folder.
 
 **Note**: The `API_URL` environment variable must be set at build time as it gets embedded into the webpack bundle via `DefinePlugin`.
 
+**Sentry tracing**: `SENTRY_TRACES_SAMPLE_RATE` (also a build-time `DefinePlugin` value, `0.0`–`1.0`) controls the fraction of transactions Sentry traces. It is optional and defaults to `1.0` in development and `0.1` in production. Because it is embedded at build time, override it on the build command (e.g. `SENTRY_TRACES_SAMPLE_RATE=1.0 npm run build`) — not at runtime.
+
 ## Deployment to GitHub Pages
 
 Deploy the frontend to GitHub Pages:
