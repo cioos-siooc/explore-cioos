@@ -17,6 +17,13 @@
   z-index: 9999;
 }
 
+/* Variable pickers (X, Y, second variable, color) can list every column,
+   so cap the menu height and let it scroll. Scoped to these dropdowns only. */
+.dropdownButtonLeft .dropdown-menu {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
 .dropdownButtonLeft .dropdown-toggle {
   min-width: 120px !important;
   max-width: 120px !important;

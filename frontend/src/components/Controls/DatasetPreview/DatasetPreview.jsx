@@ -18,7 +18,12 @@ export default function DatasetPreview({
   setRecordLoading
 }) {
   const { t } = useTranslation()
-  const clearAxes = { x: { columnName: null, unit: null }, y: { columnName: null, unit: null } }
+  const clearAxes = {
+    x: { columnName: null, unit: null },
+    y: { columnName: null, unit: null },
+    secondary: null, // { columnName, unit } — optional 2nd variable
+    color: null // { columnName, unit } — optional color-by variable
+  }
   const [plotAxes, setPlotAxes] = useState(clearAxes)
   const [selectedVis, setSelectedVis] = useState('table')
 
