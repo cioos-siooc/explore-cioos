@@ -5,18 +5,18 @@
   bottom: 286px;
   width: 42px;
   height: 42px;
-  border-radius: 4px;
+  border-radius: var(--cioos-radius);
   border: 0px;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
-  background-color: #fff;
+  box-shadow: var(--cioos-shadow-card);
+  background-color: var(--cioos-white);
   padding: 5px;
   z-index: 2;
 }
 
 .mapLayerToggle.active {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
 }
 
 .mapLayerToggle:hover {
-  background-color: #f3f3f3;
+  background-color: var(--cioos-surface-2);
 }

@@ -57,7 +57,7 @@
   top: 10px;
   right: 10px;
   background-image: url(../../Images/NationalLogoEnglish.png);
-  background-color: #fff;
+  background-color: var(--cioos-white);
   background-repeat: no-repeat;
   background-size: contain;
   border-radius: 10px;
@@ -74,7 +74,7 @@
   top: 10px;
   right: 10px;
   background-image: url(../../Images/NationalLogoFrench.png);
-  background-color: #fff;
+  background-color: var(--cioos-white);
   background-repeat: no-repeat;
   background-size: contain;
   border-radius: 10px;
@@ -230,7 +230,7 @@
 }
 
 /* .feedbackButton {
-  background-color: #fff;
+  background-color: var(--cioos-white);
   box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
   border-radius: 40px;
   width: 42px;

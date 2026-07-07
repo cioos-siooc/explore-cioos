@@ -8,8 +8,8 @@
   height: 24px;
   text-align: center;
   margin: auto;
-  background-color: white;
-  border-radius: 5px;
+  background-color: var(--cioos-white);
+  border-radius: var(--cioos-radius-sm);
 }
 
 .languageSelector:hover {

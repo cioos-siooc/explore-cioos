@@ -14,13 +14,13 @@
 
 .griddapDimensionsTable th,
 .griddapDimensionsTable td {
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--cioos-hairline);
   padding: 3px 6px;
   text-align: left;
 }
 
 .griddapDimensionsTable th {
-  background-color: #f3f0ec;
+  background-color: var(--cioos-sand);
   font-weight: 600;
 }
 
@@ -44,19 +44,19 @@
 
 .griddapTimeShown {
   font-size: 0.85em;
-  color: #555;
+  color: var(--cioos-ink-60);
 }
 
 .griddapLegendImage {
   max-width: 100%;
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-  background-color: #fff;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
 }
 
 .griddapLegendUnavailable,
 .griddapNoWms {
   font-size: 0.9em;
-  color: #555;
+  color: var(--cioos-ink-60);
   font-style: italic;
 }

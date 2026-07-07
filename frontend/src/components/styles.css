@@ -91,7 +91,24 @@ body {
   border-radius: 0px 0px var(--cioos-radius) var(--cioos-radius);
 }
 
+/* Polygon-draw button state colors */
+.mapboxgl-draw_ctrl-draw-btn.mapboxgl-draw_polygon {
+  background-color: var(--cioos-white);
+}
 
+.mapboxgl-draw_ctrl-draw-btn.mapboxgl-draw_polygon.active,
+.mapboxgl-draw_ctrl-draw-btn.mapboxgl-draw_polygon.drawing {
+  background-color: var(--cioos-teal-light);
+}
+
+/* Feedback icon colors */
+.submissionFeedback svg.success {
+  color: var(--cioos-primary);
+}
+
+.submissionFeedback svg.error {
+  color: var(--cioos-error);
+}
 
 .submissionFeedback span {
   vertical-align: middle;
