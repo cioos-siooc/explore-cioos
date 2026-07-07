@@ -23,3 +23,11 @@
 .controls .row {
   flex-wrap: nowrap;
 }
+
+/* Desktop: adjust for floating sidebar */
+@media (min-width: 768px) {
+  .controlColumn.col {
+    padding-right: 210px;
+    padding-left: var(--cioos-space-xl);
+  }
+}
