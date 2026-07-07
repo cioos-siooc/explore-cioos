@@ -55,6 +55,7 @@ export default function CreateMap({
   setHoveredDataset,
   setDatasetsSelected,
   griddapCoverage,
+  dataLayersVisible = true,
   activeWmsOverlay
 }) {
   const { t, i18n } = useTranslation()
@@ -413,8 +414,10 @@ export default function CreateMap({
 
   // While a WMS overlay is active every other data layer is hidden so the
   // gridded field reads cleanly; only the basemap, the raster and the
-  // dataset's bbox outline stay visible.
-  const dataLayerIds = [
+  // dataset's bbox outline stay visible. The observation layers (hexes,
+  // points, trajectories) are listed separately from the griddap coverage
+  // layers because the layer picker can hide them independently.
+  const observationLayerIds = [
     'hexes',
     'hexes-hovered',
     'points',
@@ -422,13 +425,15 @@ export default function CreateMap({
     'points-hovered',
     'points-highlighted',
     'trajectory-hexes',
-    'trajectory-hexes-hovered',
-    'griddap-coverage-fill',
-    'griddap-coverage-line'
+    'trajectory-hexes-hovered'
   ]
+  const griddapLayerIds = ['griddap-coverage-fill', 'griddap-coverage-line']
+  // Mirrors the dataLayersVisible prop so removeWmsOverlay (called from map
+  // event handlers) restores the user's toggle instead of forcing layers on.
+  const dataLayersVisibleRef = useRef(true)
 
-  function setDataLayersVisibility(visible) {
-    dataLayerIds.forEach((layerId) => {
+  function setLayersVisibility(layerIds, visible) {
+    layerIds.forEach((layerId) => {
       if (map.current.getLayer(layerId)) {
         map.current.setLayoutProperty(
           layerId,
@@ -437,6 +442,14 @@ export default function CreateMap({
         )
       }
     })
+  }
+
+  function setDataLayersVisibility(visible) {
+    setLayersVisibility(griddapLayerIds, visible)
+    setLayersVisibility(
+      observationLayerIds,
+      visible && dataLayersVisibleRef.current
+    )
   }
 
   function removeWmsOverlay() {
@@ -544,6 +557,15 @@ export default function CreateMap({
     const source = map.current?.getSource('griddap-coverage')
     if (source) source.setData(griddapCoverage || emptyFeatureCollection)
   }, [griddapCoverage])
+
+  // Layer-picker toggle for the observation layers. While a WMS overlay is
+  // up all data layers are hidden anyway; the ref keeps the user's choice so
+  // removeWmsOverlay restores it.
+  useEffect(() => {
+    dataLayersVisibleRef.current = dataLayersVisible
+    if (!map.current || activeWmsOverlay) return
+    setLayersVisibility(observationLayerIds, dataLayersVisible)
+  }, [dataLayersVisible])
 
   useEffect(() => {
     if (!map.current) return
@@ -977,6 +999,12 @@ export default function CreateMap({
         },
         'points-highlighted'
       )
+
+      // Layers are created visible; re-apply the picker state in case the
+      // observation layers were toggled off before the style finished loading.
+      if (!dataLayersVisibleRef.current) {
+        setLayersVisibility(observationLayerIds, false)
+      }
     })
 
     const handleMapOnClick = (e) => {

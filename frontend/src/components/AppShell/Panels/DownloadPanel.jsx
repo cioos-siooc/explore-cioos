@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
+import classNames from 'classnames'
 import isEmpty from 'lodash/isEmpty'
 
 import DownloadDetails from '../../Controls/DownloadDetails/DownloadDetails.jsx'
@@ -66,41 +67,46 @@ export default function DownloadPanel () {
         setSubmissionState={setSubmissionState}
         setShowModal={() => setActivePanel(PANELS.datasets)}
       >
-        <div className='col'>
-          <input
-            disabled={submissionState === 'submitted'}
-            className='emailAddress'
-            type='email'
-            value={email}
-            placeholder='email@email.com'
-            onInput={(e) => handleEmailChange(e.target.value)}
-          />
-          <button
-            className={`submitRequestButton ${
-              (!emailValid ||
+        <div className='downloadSubmit'>
+          <div className='downloadSubmitRow'>
+            <input
+              disabled={submissionState === 'submitted'}
+              className='emailAddress'
+              type='email'
+              value={email}
+              placeholder='email@email.com'
+              aria-label='Email'
+              onInput={(e) => handleEmailChange(e.target.value)}
+            />
+            <button
+              className={classNames('submitRequestButton', {
+                disabled:
+                  !emailValid ||
+                  isEmpty(pointsToDownload) ||
+                  submissionState === 'submitted'
+              })}
+              disabled={
+                !emailValid ||
                 isEmpty(pointsToDownload) ||
-                submissionState === 'submitted') &&
-              'disabled'
-            }`}
-            disabled={
-              !emailValid ||
-              isEmpty(pointsToDownload) ||
-              submissionState === 'submitted'
-            }
-            onClick={() => handleSubmission()}
-          >
-            {(!isEmpty(pointsToDownload) &&
-              submissionFeedback &&
-              submissionState !== 'submitted' &&
-              t('submitRequestButtonResubmitText')) ||
-              (isEmpty(pointsToDownload) &&
-                t('submitRequestButtonSelectDataText')) ||
-              t('submitRequestButtonSubmitText')}
-          </button>
-        </div>
-        <div className='col submissionFeedback'>
-          {submissionFeedback && submissionFeedback.icon}
-          {submissionFeedback && submissionFeedback.text}
+                submissionState === 'submitted'
+              }
+              onClick={() => handleSubmission()}
+            >
+              {(!isEmpty(pointsToDownload) &&
+                submissionFeedback &&
+                submissionState !== 'submitted' &&
+                t('submitRequestButtonResubmitText')) ||
+                (isEmpty(pointsToDownload) &&
+                  t('submitRequestButtonSelectDataText')) ||
+                t('submitRequestButtonSubmitText')}
+            </button>
+          </div>
+          {submissionFeedback && (
+            <div className='submissionFeedback'>
+              {submissionFeedback.icon}
+              {submissionFeedback.text}
+            </div>
+          )}
         </div>
       </DownloadDetails>
     </div>

@@ -10,6 +10,7 @@ import {
   FileEarmarkSpreadsheet,
   Grid3x3Gap,
   PinMapFill,
+  Search,
   Server
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
@@ -82,11 +83,6 @@ export default function DatasetsTable({
   }, [datasets, downloadSizeEstimates, searchText])
 
   function generateColumns() {
-    // const cellPadding = '0px'
-    const disabledCheckboxStyle = {
-      backgroundColor: 'lightgrey'
-    }
-
     const columns = [
       {
         // Sidebar moves "select all" into the search toolbar and keeps just the
@@ -114,14 +110,17 @@ export default function DatasetsTable({
               }
             >
               {row.selected ? (
-                <CheckSquare onClick={checkBoxOnclick(row)} size={16} />
+                <CheckSquare
+                  className='datasetCheckbox checked'
+                  onClick={checkBoxOnclick(row)}
+                  size={16}
+                />
               ) : (
                 <Square
-                  style={
-                    (isDownloadModal && !row.internalDownload) || isGrid(row)
-                      ? disabledCheckboxStyle
-                      : undefined
-                  }
+                  className={classNames('datasetCheckbox', {
+                    disabled:
+                      (isDownloadModal && !row.internalDownload) || isGrid(row)
+                  })}
                   onClick={checkBoxOnclick(row)}
                   size={16}
                 />
@@ -340,7 +339,8 @@ export default function DatasetsTable({
   }
 
   // Sidebar toolbar: full-width search input with the "select all" toggle
-  // pulled in alongside it (replaces the cramped DataTableExtensions filter).
+  // pulled in alongside it (replaces the cramped DataTableExtensions filter),
+  // plus a live count of the rows currently listed.
   const sidebarToolbar = (
     <div className='datasetsTableToolbar'>
       <button
@@ -352,19 +352,92 @@ export default function DatasetsTable({
       >
         {t('datasetsTableHeaderSelectAllTitle')}
       </button>
-      <input
-        className='datasetsTableSearch'
-        type='text'
-        value={searchText}
-        placeholder={t('datasetInspectorFilterText')}
-        onChange={(e) => setSearchText(e.target.value)}
-      />
+      <div className='datasetsTableSearchWrap'>
+        <Search size={13} aria-hidden='true' />
+        <input
+          className='datasetsTableSearch'
+          type='text'
+          value={searchText}
+          placeholder={t('datasetInspectorFilterText')}
+          onChange={(e) => setSearchText(e.target.value)}
+        />
+      </div>
+      <span className='datasetsTableCount'>{tableData.data?.length || 0}</span>
     </div>
   )
 
+  // Design-token driven table chrome: quiet sand header with small-caps
+  // labels, hairline row dividers, and a teal inset accent on hover
+  // (box-shadow, so the row doesn't shift like a border would).
+  const tableStyles = {
+    headRow: {
+      style: {
+        minHeight: '38px',
+        backgroundColor: 'var(--cioos-sand)',
+        borderBottomColor: 'var(--cioos-hairline)'
+      }
+    },
+    headCells: {
+      style: {
+        paddingLeft: '8px',
+        paddingRight: '4px',
+        fontFamily: 'var(--cioos-font-display)',
+        fontSize: '11px',
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        color: 'var(--cioos-ink-60)'
+      }
+    },
+    rows: {
+      style: {
+        minHeight: '52px',
+        fontSize: 'var(--cioos-font-size-base)',
+        color: 'var(--cioos-ink)',
+        '&:not(:last-of-type)': {
+          borderBottomColor: 'var(--cioos-hairline)'
+        }
+      },
+      highlightOnHoverStyle: {
+        backgroundColor: 'var(--cioos-surface-2)',
+        borderBottomColor: 'var(--cioos-hairline)',
+        outline: 'none',
+        boxShadow: 'inset 3px 0 0 var(--cioos-primary)'
+      }
+    },
+    cells: {
+      style: {
+        paddingLeft: '8px',
+        paddingRight: '4px'
+      }
+    },
+    subHeader: {
+      style: {
+        padding: '8px 10px',
+        borderBottom: '1px solid var(--cioos-hairline)'
+      }
+    },
+    pagination: {
+      style: {
+        minHeight: '44px',
+        borderTopColor: 'var(--cioos-hairline)',
+        color: 'var(--cioos-ink-60)',
+        fontSize: 'var(--cioos-font-size-sm)'
+      }
+    }
+  }
+
+  // Rows already picked for download get a light teal wash so the current
+  // selection is scannable without hunting for checkboxes.
+  const selectedRowStyles = [
+    {
+      when: (row) => row.selected,
+      style: { backgroundColor: 'rgba(198, 227, 223, 0.35)' }
+    }
+  ]
+
   const table = (
     <DataTable
-      striped
       columns={tableData.columns}
       data={tableData.data}
       defaultSortFieldId={3}
@@ -384,26 +457,8 @@ export default function DatasetsTable({
         rangeSeparatorText: t('tableComponentOf'),
         selectAllRowsItem: false
       }}
-      // compact
-      customStyles={{
-        rows: {
-          style: {
-            minHeight: '72px', // override the row height
-          },
-        },
-        headCells: {
-          style: {
-            paddingLeft: '5px', // override the cell padding for head cells
-            paddingRight: '0px',
-          },
-        },
-        cells: {
-          style: {
-            paddingLeft: '5px', // override the cell padding for data cells
-            paddingRight: '0px',
-          },
-        },
-      }}
+      customStyles={tableStyles}
+      conditionalRowStyles={selectedRowStyles}
     />
   )
 

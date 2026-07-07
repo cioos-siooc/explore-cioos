@@ -16,6 +16,7 @@ export default function MapContainer () {
     trajectoryRangeLevels,
     griddapCoverageVisible,
     griddapCoverage,
+    dataLayersVisible,
     activeWmsOverlay
   } = useMapState()
   const {
@@ -41,6 +42,7 @@ export default function MapContainer () {
       hoveredDataset={hoveredDataset}
       setDatasetsSelected={setDatasetsSelected}
       griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
+      dataLayersVisible={dataLayersVisible}
       activeWmsOverlay={activeWmsOverlay}
     />
   )

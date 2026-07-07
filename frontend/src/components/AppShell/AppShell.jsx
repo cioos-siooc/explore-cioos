@@ -27,6 +27,7 @@ export default function AppShell () {
     zoom,
     currentRangeLevel,
     currentTrajectoryRangeLevel,
+    legendVisible,
     activeWmsOverlay,
     setActiveWmsOverlay
   } = useMapState()
@@ -49,12 +50,11 @@ export default function AppShell () {
         {!activePanel && <ActiveFilterChips />}
         <BottomDock />
       </div>
-      {currentRangeLevel && (
+      {currentRangeLevel && legendVisible && (
         <Legend
           currentRangeLevel={currentRangeLevel}
           currentTrajectoryRangeLevel={currentTrajectoryRangeLevel}
           zoom={zoom}
-          selectionPanelOpen={false}
           platformsInView={platformsSelected.map((e) => e.title)}
         />
       )}

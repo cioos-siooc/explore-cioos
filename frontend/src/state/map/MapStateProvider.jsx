@@ -32,6 +32,10 @@ export default function MapStateProvider ({ children }) {
   const [griddapCoverageVisible, setGriddapCoverageVisible] = useState(false)
   const [griddapCoverage, setGriddapCoverage] = useState()
   const [activeWmsOverlay, setActiveWmsOverlay] = useState()
+  // Layer-picker visibility switches: the observation layers (hexes/points/
+  // trajectories) and the floating legend card. Both on by default.
+  const [dataLayersVisible, setDataLayersVisible] = useState(true)
+  const [legendVisible, setLegendVisible] = useState(true)
 
   const { zoom } = mapView
 
@@ -116,6 +120,10 @@ export default function MapStateProvider ({ children }) {
     currentTrajectoryRangeLevel,
     griddapCoverageVisible,
     setGriddapCoverageVisible,
+    dataLayersVisible,
+    setDataLayersVisible,
+    legendVisible,
+    setLegendVisible,
     griddapCoverage,
     activeWmsOverlay,
     setActiveWmsOverlay,

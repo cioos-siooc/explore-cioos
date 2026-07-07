@@ -1,8 +1,12 @@
-/* Matches .boxQueryButton (components/styles.css), stacked directly above it */
-.mapLayerToggle {
+/* Anchor matches .boxQueryButton (components/styles.css), stacked above it */
+.mapLayerControl {
   position: absolute;
   right: 10px;
   bottom: 286px;
+  z-index: var(--cioos-z-map-controls, 2);
+}
+
+.mapLayerControl .mapLayerToggle {
   width: 42px;
   height: 42px;
   border-radius: var(--cioos-radius);
@@ -10,13 +14,55 @@
   box-shadow: var(--cioos-shadow-card);
   background-color: var(--cioos-white);
   padding: 5px;
-  z-index: var(--cioos-z-map-controls, 2);
 }
 
-.mapLayerToggle.active {
+.mapLayerControl .mapLayerToggle.active {
   background-color: var(--cioos-teal-light);
 }
 
-.mapLayerToggle:hover {
+.mapLayerControl .mapLayerToggle:hover {
   background-color: var(--cioos-surface-2);
+}
+
+.mapLayerControl .mapLayerToggle:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* The menu opens leftward from the button, bottom-aligned with it. */
+.mapLayerMenu {
+  position: absolute;
+  right: 50px;
+  bottom: 0;
+  min-width: 220px;
+  padding: 8px;
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  box-shadow: var(--cioos-shadow-float);
+}
+
+.mapLayerMenuTitle {
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cioos-ink-60);
+  padding: 2px 8px 6px;
+}
+
+.mapLayerMenuItem {
+  padding: 6px 8px;
+  border-radius: var(--cioos-radius-sm);
+  user-select: none;
+}
+
+.mapLayerMenuItem:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.mapLayerMenuItem .form-check-label {
+  white-space: nowrap;
+  color: var(--cioos-ink);
 }

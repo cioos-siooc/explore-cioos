@@ -12,7 +12,14 @@ import './styles.css'
 // the rectangle-draw mode onto it.
 export default function MapCornerControls () {
   const { t } = useTranslation()
-  const { griddapCoverageVisible, setGriddapCoverageVisible } = useMapState()
+  const {
+    griddapCoverageVisible,
+    setGriddapCoverageVisible,
+    dataLayersVisible,
+    setDataLayersVisible,
+    legendVisible,
+    setLegendVisible
+  } = useMapState()
   const { polygon } = useSelection()
 
   return (
@@ -27,9 +34,26 @@ export default function MapCornerControls () {
         <div className='rectangleIcon' />
       </button>
       <MapLayerToggle
-        active={griddapCoverageVisible}
-        onToggle={() => setGriddapCoverageVisible(!griddapCoverageVisible)}
-        title={t('griddapCoverageToggleTitle')}
+        controls={[
+          {
+            key: 'griddap',
+            label: t('layersGriddedCoverage'),
+            checked: griddapCoverageVisible,
+            onChange: () => setGriddapCoverageVisible(!griddapCoverageVisible)
+          },
+          {
+            key: 'observations',
+            label: t('layersObservations'),
+            checked: dataLayersVisible,
+            onChange: () => setDataLayersVisible(!dataLayersVisible)
+          },
+          {
+            key: 'legend',
+            label: t('layersLegend'),
+            checked: legendVisible,
+            onChange: () => setLegendVisible(!legendVisible)
+          }
+        ]}
       />
     </>
   )

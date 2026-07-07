@@ -224,6 +224,56 @@
   color: var(--cioos-navy);
 }
 
+/* --- Email + submit CTA (rendered by DownloadPanel as children) --- */
+.downloadSubmit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 320px;
+  max-width: 480px;
+}
+
+.downloadSubmitRow {
+  display: flex;
+  gap: 8px;
+}
+
+.downloadSubmit .emailAddress {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 40px;
+  margin: 0;
+}
+
+.submitRequestButton {
+  height: 40px;
+  padding: 0 20px;
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.submitRequestButton:hover:not(:disabled) {
+  background-color: var(--cioos-primary-700);
+}
+
+.submitRequestButton:disabled {
+  background-color: var(--cioos-hairline);
+  color: var(--cioos-ink-40);
+  cursor: not-allowed;
+}
+
+.downloadSubmit .submissionFeedback {
+  display: flex;
+  align-items: center;
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink-60);
+}
+
 .downloadDetails .datasetSizeTotalSpinner {
   opacity: 0.3;
   width: 22px;
@@ -240,5 +290,8 @@
   }
   .downloadDetailsDownloadInfoRow.row {
     justify-content: center;
+  }
+  .downloadSubmit {
+    max-width: 100%;
   }
 }
