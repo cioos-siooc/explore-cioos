@@ -1,0 +1,83 @@
+.wmsLegend {
+  position: absolute;
+  right: 60px;
+  bottom: 40px;
+  z-index: 3;
+  background-color: #fff;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  padding: 8px 10px;
+  max-width: 320px;
+}
+
+.wmsLegendHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wmsLegendTitle {
+  font-weight: 600;
+  font-size: 0.85em;
+  color: #007bff;
+  text-decoration: none;
+}
+
+.wmsLegendTitle:hover {
+  text-decoration: underline;
+}
+
+.wmsLegendVariableSelector {
+  margin: 4px 0;
+}
+
+.wmsLegendVariableSelector .dropdown-menu {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.wmsLegendCloseButton {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #555;
+  flex-shrink: 0;
+}
+
+.wmsLegendCloseButton:hover {
+  color: #000;
+}
+
+.wmsLegendVariable {
+  font-size: 0.8em;
+  color: #555;
+  margin: 2px 0 4px 0;
+}
+
+.wmsLegendSlider {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0;
+}
+
+.wmsLegendSlider label {
+  font-size: 0.8em;
+  color: #555;
+  margin-bottom: 0;
+}
+
+.wmsLegendSlider input[type='range'] {
+  width: 100%;
+  accent-color: #52a79b;
+}
+
+.wmsLegendImage {
+  max-width: 100%;
+}
+
+.wmsLegendUnavailable {
+  font-size: 0.8em;
+  color: #555;
+  font-style: italic;
+}

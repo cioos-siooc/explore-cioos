@@ -1,5 +1,5 @@
 """
-Unit tests for cde_harvester.dataset.Dataset.
+Unit tests for cde_harvester.sources.erddap.dataset.Dataset.
 
 Dataset.__init__ calls get_metadata() immediately, which calls
 erddap_server.erddap_csv_to_df. The mock_erddap_server fixture wires
@@ -28,7 +28,7 @@ def _make_dataset(server, info_csv=ERDDAP_INFO_CSV):
     server.erddap_csv_to_df.side_effect = lambda url, skiprows=None, dataset=None: (
         pd.read_csv(StringIO(info_csv)).fillna("")
     )
-    from cde_harvester.dataset import Dataset
+    from cde_harvester.sources.erddap.dataset import Dataset
     return Dataset(server, DATASET_ID)
 
 
@@ -95,7 +95,7 @@ class TestDatasetEOVMapping:
 
 class TestDatasetGetDf:
     def test_get_df_returns_dataframe(self, mock_erddap_server):
-        from cde_harvester.profiles import get_profiles
+        from cde_harvester.dataset_types import extract_features as get_profiles
 
         ds = _make_dataset(mock_erddap_server)
         # get_df requires profile_ids to be set; set a minimal value

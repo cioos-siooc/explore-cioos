@@ -153,6 +153,26 @@ STATION_002,150.0
 STATION_002,1.0
 """
 
+# orderByMinMax for latitude, 2 stations (each a fixed point → min==max)
+ERDDAP_LAT_MINMAX_CSV = """\
+station_id,latitude
+(String),(degrees_north)
+STATION_001,48.5
+STATION_001,48.5
+STATION_002,49.0
+STATION_002,49.0
+"""
+
+# orderByMinMax for longitude, 2 stations
+ERDDAP_LON_MINMAX_CSV = """\
+station_id,longitude
+(String),(degrees_east)
+STATION_001,-125.0
+STATION_001,-125.0
+STATION_002,-124.5
+STATION_002,-124.5
+"""
+
 # orderByCount for (depth, station_id, time) grouped by station_id
 ERDDAP_COUNT_CSV = """\
 depth,station_id,time
@@ -236,8 +256,13 @@ def _route_erddap_url(url: str) -> str:
     if "distinct()" in decoded:
         return ERDDAP_PROFILE_IDS_CSV
     if "orderByMinMax" in decoded:
-        # distinguish time from depth by what appears before orderByMinMax
+        # distinguish which variable's min/max is being requested by what
+        # appears before orderByMinMax
         pre = decoded.split("orderByMinMax")[0]
+        if ",latitude" in pre or "latitude," in pre:
+            return ERDDAP_LAT_MINMAX_CSV
+        if ",longitude" in pre or "longitude," in pre:
+            return ERDDAP_LON_MINMAX_CSV
         if ",depth" in pre or "depth," in pre:
             return ERDDAP_DEPTH_MINMAX_CSV
         return ERDDAP_TIME_MINMAX_CSV
@@ -267,7 +292,10 @@ def build_variables_df(csv_text: str = ERDDAP_INFO_CSV) -> pd.DataFrame:
     so unit tests for ComplianceChecker / profiles can use a realistic object.
     """
     df = build_info_df(csv_text)
-    considered_attributes = ["cf_role", "standard_name", "actual_range"]
+    considered_attributes = [
+        "cf_role", "standard_name", "actual_range", "units", "long_name",
+        "axis",
+    ]
 
     data_types = df.query(
         '(`Variable Name`!="NC_GLOBAL" and `Attribute Name`=="")'
@@ -368,7 +396,9 @@ def build_mock_dataset(
     # get_profile_ids() returns the same DataFrame
     mock.get_profile_ids.return_value = profile_ids_df.copy()
 
-    # get_max_min() — return per-variable DataFrames
+    # get_max_min() — return per-variable DataFrames. lat/lon now come through
+    # here too (the profile pipeline derives each feature's bbox from their
+    # min/max); STATION_001 is a fixed point so lat_min==lat_max.
     def _get_max_min(vars_list):
         last_var = vars_list[-1]
         index_vars = vars_list[:-1]
@@ -377,6 +407,18 @@ def build_mock_dataset(
                 "station_id": ["STATION_001"],
                 "time_min": ["2020-01-01T00:00:00Z"],
                 "time_max": ["2023-12-31T00:00:00Z"],
+            }
+        elif last_var == "latitude":
+            data = {
+                "station_id": ["STATION_001"],
+                "latitude_min": [48.5],
+                "latitude_max": [48.5],
+            }
+        elif last_var == "longitude":
+            data = {
+                "station_id": ["STATION_001"],
+                "longitude_min": [-125.0],
+                "longitude_max": [-125.0],
             }
         else:
             data = {

@@ -2,6 +2,12 @@ services:
   db:
     build: ./database
     platform: linux/x86_64
+    # Postgres parallel workers (e.g. VACUUM ANALYZE / parallel scans on
+    # cde.trajectory_cells) allocate shared-memory segments in /dev/shm. The
+    # Docker default is 64MB, which parallel maintenance overruns — Postgres
+    # then reports it as "DiskFull / No space left on device". Raise it well
+    # above the working-set size.
+    shm_size: 1gb
     environment:
       - "PGPORT=${DB_PORT:-5432}"
       - "POSTGRES_DB=$DB_NAME"
@@ -31,7 +37,11 @@ services:
   # volume (docker-entrypoint-initdb.d), so schema changes added to 1_schema.sql
   # never reach an existing volume on their own — this closes that gap. The
   # migrations are idempotent (ADD COLUMN IF NOT EXISTS ...), so applying them on
-  # every `up` is safe. Exits cleanly once done (shows as "Exited (0)").
+  # every `up` is safe. After the migrations, the numbered function files
+  # (3_*.sql .. 9_*.sql) are re-applied: they are pure CREATE OR REPLACE
+  # FUNCTION, so live DBs pick up stored-procedure changes without every
+  # migration having to duplicate function bodies. 1_schema.sql is NEVER
+  # applied here (it DROPs tables). Exits cleanly once done ("Exited (0)").
   db_migrate:
     image: postgres:13-alpine
     depends_on:
@@ -45,20 +55,20 @@ services:
       PGPASSWORD: $DB_PASSWORD
       PGDATABASE: $DB_NAME
     volumes:
-      - ./database/migrations:/migrations:ro
+      - ./database:/database:ro
     command:
       - sh
       - -c
       - |
         set -e
         applied=0
-        for f in /migrations/*.sql; do
+        for f in /database/migrations/*.sql /database/[3-9]_*.sql; do
           [ -e "$$f" ] || continue
-          echo "Applying migration: $$f"
+          echo "Applying: $$f"
           psql -v ON_ERROR_STOP=1 -f "$$f"
           applied=$$((applied+1))
         done
-        echo "Migrations applied: $$applied"
+        echo "SQL files applied: $$applied"
 
   web-api:
     build: ./web-api

@@ -58,5 +58,17 @@ CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
   FROM cde.points
   WHERE points.pk = obis_cells.point_pk;
 
+  -- trajectory_cells: link point_pk AND hex FKs in a single pass, joining by
+  -- geom rather than a pre-set point_pk. profiles/obis link point_pk in their
+  -- own process functions; trajectory_cells is by far the largest cells table,
+  -- so folding the two rewrites into one halves its post-load write
+  -- amplification (see trajectory_process() in 5_profile_process.sql).
+  UPDATE cde.trajectory_cells
+  SET point_pk = points.pk,
+      hex_0_pk = points.hex_0_pk,
+      hex_1_pk = points.hex_1_pk
+  FROM cde.points
+  WHERE points.geom = trajectory_cells.geom;
+
   END;
 $$ LANGUAGE plpgsql;

@@ -17,14 +17,17 @@ from prefect.client.schemas.actions import WorkPoolCreate
 from prefect.deployments import run_deployment
 from prefect.exceptions import ObjectNotFound
 
-from cde_harvester.__main__ import (
-    cleanup_old_logs,
+from cde_harvester.__main__ import main as harvester_main
+from cde_harvester.core.config import (
     load_config,
     load_obis_dataset_ids,
-    main as harvester_main,
+    resolve_harvest_config_file,
 )
+from cde_harvester.core.observability import cleanup_old_logs, run_logger
+from cde_harvester.sources import OBIS_ALIASES
 from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
-from cde_db_loader.__main__ import main as db_loader_main
+from cde_harvester.loading.loader import main as db_loader_main
+from cde_harvester.loading.populate_vernaculars import main as vernaculars_main
 
 load_dotenv()
 
@@ -36,10 +39,7 @@ def _run_logger():
 
     The pipeline steps below are plain methods now (not @flow), so some run
     outside a flow context (e.g. init_config on the prod deploy path)."""
-    try:
-        return get_run_logger()
-    except Exception:
-        return logger
+    return run_logger(logger)
 
 # Upload at most this many bytes (tail) of the log into the markdown artifact;
 # Prefect/UI handle large markdown poorly, and the full file stays on disk.
@@ -88,10 +88,6 @@ def _publish_log_artifact(log_path):
         # Outside a flow/task run context, or API hiccup — never fail the run for this.
         logger.debug("Could not publish log artifact: %s", e)
 
-
-# OBIS aliases the dashboard / a deployment may pass; kept in sync with
-# cde_harvester.__main__._OBIS_ALIASES.
-_OBIS_ALIASES = {"obis", "https://obis.org", "http://obis.org", "obis.org"}
 
 # Process work pool the worker(s) poll; flows run in-process (no spawned containers).
 POOL_NAME = "cde-process-pool"
@@ -166,7 +162,7 @@ def _prune_server_run_folders(base_folder, keep=KEEP_RUNS_PER_SERVER, protect=()
 
 def deployment_slug(source):
     """Stable per-source slug; must match harvest-dashboard/app/config.deployment_slug."""
-    if not source or str(source).strip().lower() in _OBIS_ALIASES:
+    if not source or str(source).strip().lower() in OBIS_ALIASES:
         return "obis"
     host = urlparse(source if "://" in source else "https://" + source).hostname or str(source)
     return host.lower().replace(".", "-")
@@ -250,6 +246,13 @@ class PrefectCDEPipeline:
                 )
                 logger.info("Run output folder: %s (shared OBIS cache: %s)", run_folder, obis_folder)
 
+                # Force incremental for single-source runs (full-reload would wipe
+                # other sources). Computed here so skip_unchanged is only set when
+                # the load is incremental — a skipped dataset is omitted from the CSV.
+                effective_incremental = self.incremental or bool(self.source)
+                if self.source and not self.incremental:
+                    logger.warning("Single-source run (source=%s): forcing incremental db-load.", self.source)
+
                 logger.info("Running cde_harvester subflow")
                 try:
                     harvester_main(
@@ -261,17 +264,13 @@ class PrefectCDEPipeline:
                         obis_folder=str(obis_folder),
                         source=self.source,
                         triggered_by=self.triggered_by,
+                        skip_unchanged=effective_incremental,
                     )
                     logger.info("cde_harvester completed successfully")
                 except Exception as e:
                     logger.error(f"cde_harvester failed: {e}", exc_info=True)
                     raise
 
-                # Force incremental for single-source runs: full-reload TRUNCATEs every
-                # table and would wipe the other sources.
-                effective_incremental = self.incremental or bool(self.source)
-                if self.source and not self.incremental:
-                    logger.warning("Single-source run (source=%s): forcing incremental db-load.", self.source)
                 logger.info("Running cde_db_loader subflow")
                 try:
                     db_loader_main(folder=str(run_folder), incremental=effective_incremental)
@@ -443,47 +442,6 @@ class PrefectCDEPipeline:
         return harvest_id
 
 
-def _normalize_coolify_multiline(value: str) -> str:
-    """Strip the uniform leading indent Coolify prepends to multi-line env var continuations."""
-    lines = value.split("\n")
-    if len(lines) <= 1:
-        return value
-    continuation = [ln for ln in lines[1:] if ln.strip()]
-    if not continuation:
-        return value
-    min_indent = min(len(ln) - len(ln.lstrip(" ")) for ln in continuation)
-    first_indent = len(lines[0]) - len(lines[0].lstrip(" "))
-    # Only strip when the first line is less-indented than the block (Coolify's signature).
-    if first_indent >= min_indent or min_indent == 0:
-        return value
-    return "\n".join(
-        [lines[0]] + [ln[min_indent:] if ln.strip() else ln for ln in lines[1:]]
-    )
-
-
-def _resolve_harvest_config_file(config_file):
-    """Resolve effective config: HARVEST_CONFIG_YAML env > mounted/baked-in default.
-
-    Also writes OBIS_DATASETS_JSON to /tmp/Obis_Datasets.json when set.
-    """
-    env_config = os.getenv("HARVEST_CONFIG_YAML", "").strip()
-    if env_config:
-        # Coolify indents multi-line env var continuations; strip it so the YAML parses.
-        env_config = _normalize_coolify_multiline(env_config)
-        env_config_path = Path("/tmp/harvest_config_from_env.yaml")
-        env_config_path.write_text(env_config)
-        config_file = str(env_config_path)
-        logger.info(f"Using HARVEST_CONFIG_YAML env var ({len(env_config)} bytes -> {env_config_path})")
-    else:
-        logger.info(f"Using harvest config file: {config_file}")
-
-    env_obis = os.getenv("OBIS_DATASETS_JSON", "").strip()
-    if env_obis:
-        Path("/tmp/Obis_Datasets.json").write_text(env_obis)
-        logger.info(f"Wrote OBIS_DATASETS_JSON env var ({len(env_obis)} bytes -> /tmp/Obis_Datasets.json)")
-    return config_file
-
-
 def _pipeline_run_name():
     """Per-run label: every ERDDAP source -> 'harvest-erddap-{full-host}'
     (host with dots replaced by dashes), OBIS -> 'harvest-obis', full run ->
@@ -508,7 +466,7 @@ def cde_pipeline_run(
 ):
     """Deployable entry point. `source` (None = full) narrows to one ERDDAP url or 'obis';
     `triggered_by` is recorded on the audit row. Single-source runs force incremental db-load."""
-    config_file = _resolve_harvest_config_file(config_file)
+    config_file = resolve_harvest_config_file(config_file)
     pipeline = PrefectCDEPipeline()
     pipeline.init_config(config_file=config_file)
     pipeline.source = source
@@ -598,7 +556,7 @@ def cde_harvest_all_run(
     wait for all, and fail red if any did not complete (a failure doesn't cancel the others)."""
     logger = get_run_logger()
 
-    config_file = _resolve_harvest_config_file(config_file)
+    config_file = resolve_harvest_config_file(config_file)
     config = load_config(config_file)
 
     sources = [u.strip() for u in (config.get("erddap_urls") or []) if u and u.strip()]
@@ -648,8 +606,6 @@ def populate_vernaculars_run(
     # so force INFO or the script's progress lines get filtered out.
     for name in ("populate_vernaculars", "cde_db_loader", "cde_harvester"):
         logging.getLogger(name).setLevel(logging.INFO)
-
-    from cde_db_loader.populate_vernaculars import main as vernaculars_main
 
     # populate_vernaculars uses argparse; monkey-patch sys.argv instead of refactoring it.
     argv = ["populate_vernaculars"]

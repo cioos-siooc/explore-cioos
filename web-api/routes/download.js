@@ -104,8 +104,22 @@ router.get(
 
     const wktPolygon = polygon ? polygonJSONToWKT(polygon) : null;
 
+    // Trajectory coverage cells are downloadable ERDDAP datasets too — union
+    // them with profiles so a selection over a glider/ship track queues its
+    // dataset. (Pre-M2 this also interpolated the filter OBJECT into the SQL
+    // string instead of binding filters.shared — fixed to match the other
+    // routes.)
     const SQL = `
-        WITH profiles_subset AS (
+        WITH combined AS (
+        SELECT dataset_pk, point_pk, geom, latitude, longitude,
+               time_min, time_max, depth_min, depth_max, bbox AS search_geom
+        FROM cde.profiles
+        UNION ALL
+        SELECT dataset_pk, point_pk, geom, latitude, longitude,
+               time_min, time_max, depth_min, depth_max, geom AS search_geom
+        FROM cde.trajectory_cells
+        ),
+        profiles_subset AS (
         SELECT d.erddap_url,
                d.dataset_id,
                d.title,
@@ -113,18 +127,15 @@ router.get(
                d.cdm_data_type,
                d.ckan_id ckan_id,
                'https://catalogue.cioos.ca/dataset/' ckan_url
-        FROM cde.profiles p
-        JOIN cde.datasets d ON p.dataset_pk =d.pk
-        WHERE
-        ${filters || ""} 
+        FROM combined p
+        JOIN cde.datasets d ON p.dataset_pk = d.pk
+        ${filters.hasShared ? "WHERE :filters" : ""}
         GROUP BY d.pk)
-        SELECT json_agg(t) FROM profiles_subset t;      
+        SELECT json_agg(t) FROM profiles_subset t;
       `;
 
-    console.log(SQL);
-
     try {
-      const tileRaw = await db.raw(SQL);
+      const tileRaw = await db.raw(SQL, { filters: filters.shared });
       const tile = tileRaw.rows[0];
       if (tile.json_agg && tile.json_agg.length) {
         const jobID = uuidv4().substr(0, 6);

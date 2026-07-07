@@ -14,6 +14,7 @@ import turfPointsWithinPolygon from '@turf/points-within-polygon'
 import turfBbox from '@turf/bbox'
 
 import DrawRectangle from 'mapbox-gl-draw-rectangle-mode'
+import { debounce } from 'lodash'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import './styles.css'
@@ -25,7 +26,12 @@ import {
   getCurrentRangeLevel,
   updateMapToolTitleLanguage
 } from '../../utilities'
-import { colorScale, defaultQuery } from '../config'
+import {
+  buildWmsGetMapUrl,
+  clampBoundsForWms,
+  warpEquirectToMercator
+} from '../../wmsUtilities'
+import { colorScale, trajectoryColorScale } from '../config'
 import platformColors from '../../components/platformColors'
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
@@ -38,10 +44,14 @@ export default function CreateMap({
   setMapView,
   offsetFlyTo,
   rangeLevels,
+  trajectoryRangeLevels,
   hoveredDataset,
-  setHoveredDataset
+  setHoveredDataset,
+  setDatasetsSelected,
+  griddapCoverage,
+  activeWmsOverlay
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   const [searchParams] = useSearchParams()
 
@@ -146,12 +156,37 @@ export default function CreateMap({
   const hexOpacity = 0.8
   const hexMinZoom = 0
   const hexMaxZoom = 7
+  // 0.55 at the z7 hand-off (where trajectory counts stop being merged into
+  // the green hexes layer), fading to a light coverage wash by z10 so the
+  // point circles stay readable over dense trajectory areas.
+  const trajectoryHexOpacity = [
+    'interpolate',
+    ['linear'],
+    ['zoom'],
+    hexMaxZoom,
+    0.55,
+    hexMaxZoom + 1.5,
+    0.3,
+    hexMaxZoom + 3,
+    0.15
+  ]
 
   const draw = new MapboxDraw(drawControlOptions)
   const drawPolygon = useRef(draw)
   const doFinalCheck = useRef(false)
   const layersLoaded = useRef(false)
   const colorStops = useRef([])
+  const trajectoryColorStops = useRef([])
+
+  // Placeholder count ranges used only until the /legend request resolves.
+  // The map now mounts before that response arrives, but the count-driven
+  // layers ('hexes'/'trajectory-hexes') must still be created with VALID,
+  // non-empty color stops — MapLibre silently drops any layer whose paint
+  // function has zero stops, which is why creating them from empty stops left
+  // them missing entirely. The real ramp replaces these as soon as the legend
+  // lands (setColorStops re-runs via the [rangeLevels] effect).
+  const defaultRangeLevels = { zoom0: [0, 100], zoom1: [0, 100], zoom2: [0, 100] }
+  const defaultTrajectoryRangeLevels = { zoom0: [0, 100], zoom1: [0, 100] }
 
   const [boxSelectStartCoords, setBoxSelectStartCoords] = useState()
   const [boxSelectEndCoords, setBoxSelectEndCoords] = useState()
@@ -174,7 +209,7 @@ export default function CreateMap({
 
   useEffect(() => {
     setColorStops()
-  }, [rangeLevels])
+  }, [rangeLevels, trajectoryRangeLevels])
 
   useEffect(() => {
     if (map.current) {
@@ -214,23 +249,57 @@ export default function CreateMap({
   }
 
   function setColorStops() {
-    if (map.current) {
-      colorStops.current = generateColorStops(
-        colorScale,
-        getCurrentRangeLevel(rangeLevels, map.current.getZoom())
-      ).map((colorStop) => {
-        return [colorStop.stop, colorStop.color]
-      })
-      if (colorStops.current.length > 0) {
-        if (map.current.getZoom() >= 7 && map.current.getLayer('points')) {
-          map.current.setPaintProperty('points', 'circle-color', colors)
-        } else if (map.current.getZoom() < 7 && map.current.getLayer('hexes')) {
-          map.current.setPaintProperty('hexes', 'fill-color', {
-            property: 'count',
-            stops: colorStops.current
-          })
-        }
+    // The map now mounts before the legend request resolves (first paint is
+    // no longer gated on it), so rangeLevels can be undefined on early calls.
+    // getCurrentRangeLevel/generateColorStops both throw on undefined, so bail
+    // until the ranges arrive — the [rangeLevels] effect re-runs this then.
+    if (!map.current) return
+    // Fall back to the placeholder ranges until the legend resolves, so the
+    // count-driven layers are always created and painted with valid stops
+    // (see defaultRangeLevels). The real ranges replace these once /legend
+    // returns and this re-runs via the [rangeLevels] effect.
+    const effectiveRangeLevels = rangeLevels || defaultRangeLevels
+    colorStops.current = generateColorStops(
+      colorScale,
+      getCurrentRangeLevel(effectiveRangeLevels, map.current.getZoom())
+    ).map((colorStop) => {
+      return [colorStop.stop, colorStop.color]
+    })
+    if (colorStops.current.length > 0) {
+      if (map.current.getZoom() >= 7 && map.current.getLayer('points')) {
+        map.current.setPaintProperty('points', 'circle-color', colors)
       }
+      // Always keep the hexes layer's stops populated, not just when zoomed
+      // into the hex band — a reload while zoomed in (zoom >= 7) would
+      // otherwise leave it unpainted so hexes never appear on zoom-out. It's
+      // hidden above z7 anyway, and zoomend re-runs this to refine the z0/z1
+      // band.
+      if (map.current.getLayer('hexes')) {
+        map.current.setPaintProperty('hexes', 'fill-color', {
+          property: 'count',
+          stops: colorStops.current
+        })
+      }
+    }
+
+    // Trajectory hexes only ever render at zoom >= hexMaxZoom, where the
+    // hex_1 grid is always used, so there's a single range to apply.
+    const effectiveTrajectoryRangeLevels =
+      trajectoryRangeLevels || defaultTrajectoryRangeLevels
+    trajectoryColorStops.current = generateColorStops(
+      trajectoryColorScale,
+      effectiveTrajectoryRangeLevels.zoom1
+    ).map((colorStop) => {
+      return [colorStop.stop, colorStop.color]
+    })
+    if (
+      trajectoryColorStops.current.length > 0 &&
+      map.current.getLayer('trajectory-hexes')
+    ) {
+      map.current.setPaintProperty('trajectory-hexes', 'fill-color', {
+        property: 'count',
+        stops: trajectoryColorStops.current
+      })
     }
   }
 
@@ -277,6 +346,21 @@ export default function CreateMap({
           .map((feature) => feature.properties.pk)
         map.current.setFilter('hexes-hovered', ['in', 'pk', ...hexesInDataset])
       }
+
+      map.current.setPaintProperty('trajectory-hexes', 'fill-color', 'lightgrey')
+      const trajectoryFeatures = map.current.queryRenderedFeatures({
+        layers: ['trajectory-hexes']
+      })
+      const trajectoryHexesInDataset = trajectoryFeatures
+        .filter((feature) =>
+          JSON.parse(feature.properties.datasets).includes(pk)
+        )
+        .map((feature) => feature.properties.pk)
+      map.current.setFilter('trajectory-hexes-hovered', [
+        'in',
+        'pk',
+        ...trajectoryHexesInDataset
+      ])
     } else {
       map.current.setFilter('points-hovered', ['in', 'pk', ''])
       map.current.setPaintProperty('points', 'circle-color', colors)
@@ -291,14 +375,186 @@ export default function CreateMap({
         property: 'count',
         stops: colorStops.current
       })
+
+      map.current.setFilter('trajectory-hexes-hovered', ['in', 'pk', ''])
+      map.current.setPaintProperty('trajectory-hexes', 'fill-color', {
+        property: 'count',
+        stops: trajectoryColorStops.current
+      })
     }
+  }
+
+  const emptyFeatureCollection = { type: 'FeatureCollection', features: [] }
+  // Latest coverage prop, readable from the map 'load' closure (which would
+  // otherwise capture the initial render's value).
+  const griddapCoverageRef = useRef(null)
+  const wmsMoveHandler = useRef(null)
+  // Bumped whenever the overlay is (re)configured or removed so stale
+  // in-flight GetMap image loads are dropped instead of drawn.
+  const wmsRenderToken = useRef(0)
+
+  // Single-dataset griddap footprint (hover from the list, or pinned while
+  // its WMS overlay is shown).
+  function setGriddapHighlight(geometry) {
+    const source = map.current?.getSource('griddap-highlight')
+    if (!source) return
+    source.setData(
+      geometry
+        ? { type: 'Feature', geometry, properties: {} }
+        : emptyFeatureCollection
+    )
+  }
+
+  // While a WMS overlay is active every other data layer is hidden so the
+  // gridded field reads cleanly; only the basemap, the raster and the
+  // dataset's bbox outline stay visible.
+  const dataLayerIds = [
+    'hexes',
+    'hexes-hovered',
+    'points',
+    'points-halo',
+    'points-hovered',
+    'points-highlighted',
+    'trajectory-hexes',
+    'trajectory-hexes-hovered',
+    'griddap-coverage-fill',
+    'griddap-coverage-line'
+  ]
+
+  function setDataLayersVisibility(visible) {
+    dataLayerIds.forEach((layerId) => {
+      if (map.current.getLayer(layerId)) {
+        map.current.setLayoutProperty(
+          layerId,
+          'visibility',
+          visible ? 'visible' : 'none'
+        )
+      }
+    })
+  }
+
+  function removeWmsOverlay() {
+    wmsRenderToken.current += 1
+    if (wmsMoveHandler.current) {
+      map.current.off('moveend', wmsMoveHandler.current)
+      wmsMoveHandler.current = null
+    }
+    if (map.current.getLayer('wms-overlay')) {
+      map.current.removeLayer('wms-overlay')
+    }
+    if (map.current.getSource('wms-overlay')) {
+      map.current.removeSource('wms-overlay')
+    }
+    setDataLayersVisibility(true)
+  }
+
+  // One WMS GetMap for the current viewport: ERDDAP's WMS is EPSG:4326-only,
+  // so the response is requested with extra vertical resolution and warped to
+  // Mercator before it's handed to the image source (see wmsUtilities).
+  function renderWmsImage(overlay) {
+    if (!map.current) return
+    const bounds = clampBoundsForWms(map.current.getBounds())
+    if (bounds.south >= bounds.north || bounds.west >= bounds.east) return
+    const canvasElement = map.current.getCanvas()
+    const outWidth = Math.min(canvasElement.clientWidth, 2048)
+    const outHeight = Math.min(canvasElement.clientHeight, 2048)
+    const url = buildWmsGetMapUrl({
+      wmsUrl: overlay.wmsUrl,
+      datasetId: overlay.datasetId,
+      variable: overlay.variable.name,
+      bounds,
+      width: outWidth,
+      height: Math.min(Math.round(outHeight * 1.75), 2048),
+      time: overlay.time,
+      elevation: overlay.elevation
+    })
+    const token = wmsRenderToken.current
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      if (token !== wmsRenderToken.current || !map.current) return
+      let imageUrl
+      try {
+        imageUrl = warpEquirectToMercator(
+          img,
+          bounds.south,
+          bounds.north,
+          outWidth,
+          outHeight
+        ).toDataURL('image/png')
+      } catch (error) {
+        // canvas tainted (server without CORS headers) — show unwarped
+        console.warn('WMS warp failed, using unwarped image', error)
+        imageUrl = url
+      }
+      const coordinates = [
+        [bounds.west, bounds.north],
+        [bounds.east, bounds.north],
+        [bounds.east, bounds.south],
+        [bounds.west, bounds.south]
+      ]
+      const source = map.current.getSource('wms-overlay')
+      if (source) {
+        source.updateImage({ url: imageUrl, coordinates })
+      } else {
+        map.current.addSource('wms-overlay', {
+          type: 'image',
+          url: imageUrl,
+          coordinates
+        })
+        // Inserted under the bottom-most data layer: basemap below, every
+        // hex/point/coverage layer above the raster.
+        map.current.addLayer(
+          {
+            id: 'wms-overlay',
+            type: 'raster',
+            source: 'wms-overlay',
+            paint: { 'raster-opacity': 0.85, 'raster-fade-duration': 0 }
+          },
+          map.current.getLayer('trajectory-hexes') ? 'trajectory-hexes' : undefined
+        )
+      }
+    }
+    img.onerror = () => console.warn(`WMS GetMap failed: ${url}`)
+    img.src = url
   }
 
   useEffect(() => {
     if (map.current) {
-      hoverHighlightPoints(hoveredDataset?.pk)
+      if (hoveredDataset?.cdm_data_type === 'Grid') {
+        // A griddap dataset has no map features: highlighting its pk would
+        // grey the whole map with nothing selected. Draw its bbox instead.
+        hoverHighlightPoints()
+        setGriddapHighlight(hoveredDataset.coverage_bbox_geojson)
+      } else {
+        setGriddapHighlight(activeWmsOverlay ? activeWmsOverlay.bbox : null)
+        hoverHighlightPoints(hoveredDataset?.pk)
+      }
     }
-  }, [hoveredDataset])
+  }, [hoveredDataset, activeWmsOverlay])
+
+  useEffect(() => {
+    griddapCoverageRef.current = griddapCoverage
+    const source = map.current?.getSource('griddap-coverage')
+    if (source) source.setData(griddapCoverage || emptyFeatureCollection)
+  }, [griddapCoverage])
+
+  useEffect(() => {
+    if (!map.current) return
+    removeWmsOverlay()
+    if (!activeWmsOverlay) {
+      setGriddapHighlight(null)
+      return
+    }
+    renderWmsImage(activeWmsOverlay)
+    const rerender = debounce(() => renderWmsImage(activeWmsOverlay), 300)
+    wmsMoveHandler.current = rerender
+    map.current.on('moveend', rerender)
+    setDataLayersVisibility(false)
+    // pin the dataset's footprint outline while its overlay is shown
+    setGriddapHighlight(activeWmsOverlay.bbox)
+    return () => removeWmsOverlay()
+  }, [activeWmsOverlay])
 
   function highlightPoints(polygon) {
     if (polygon && polygon.length >= 4) {
@@ -341,24 +597,30 @@ export default function CreateMap({
 
   useEffect(() => {
     const q = createDataFilterQueryString(query)
-    const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${
-      query !== defaultQuery && q && `?${q}`
-    }`
+    const filterSuffix = q ? `?${q}` : ''
+    const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`
+    const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${filterSuffix}`
     setPointsToReview()
     setPolygon()
     if (map && map.current && map.current.loaded()) {
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
 
       map.current.getSource('points').tiles = [tileQuery]
+      map.current.getSource('points-halo').tiles = [tileQuery]
       map.current.getSource('hexes').tiles = [tileQuery]
+      map.current.getSource('trajectory-hexes').tiles = [trajectoryTileQuery]
 
       // Remove the tiles for a particular source
       map.current.style.sourceCaches.hexes.clearTiles()
       map.current.style.sourceCaches.points.clearTiles()
+      map.current.style.sourceCaches['points-halo'].clearTiles()
+      map.current.style.sourceCaches['trajectory-hexes'].clearTiles()
 
       // Load the new tiles for the current viewport (map.transform -> viewport)
       map.current.style.sourceCaches.hexes.update(map.current.transform)
       map.current.style.sourceCaches.points.update(map.current.transform)
+      map.current.style.sourceCaches['points-halo'].update(map.current.transform)
+      map.current.style.sourceCaches['trajectory-hexes'].update(map.current.transform)
 
       // Force a repaint, so that the map will be repainted without you having to touch the map
       map.current.triggerRepaint()
@@ -460,10 +722,11 @@ export default function CreateMap({
       setColorStops()
 
       const q = createDataFilterQueryString(query)
+      const filterSuffix = q ? `?${q}` : ''
 
-      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${
-        query !== defaultQuery && q && `?${q}`
-      }`
+      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`
+
+      const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${filterSuffix}`
 
       map.current.addLayer({
         id: 'points',
@@ -490,6 +753,85 @@ export default function CreateMap({
           'circle-stroke-width': 10
         }
       })
+
+      // Inserted with beforeId 'points' (which must already exist on the
+      // map — MapLibre throws otherwise) so trajectory hexes sit at the
+      // bottom of the stack, under the points layer. Below hexMaxZoom,
+      // trajectory counts are already merged into the green 'hexes' layer;
+      // this purple layer only takes over once profiles switch to points.
+      map.current.addLayer(
+        {
+          id: 'trajectory-hexes',
+          type: 'fill',
+          minzoom: hexMaxZoom,
+          source: {
+            type: 'vector',
+            tiles: [trajectoryTileQuery]
+          },
+          'source-layer': 'trajectory-hexes-layer',
+          paint: {
+            'fill-opacity': trajectoryHexOpacity,
+            'fill-color': {
+              property: 'count',
+              stops: trajectoryColorStops.current
+            },
+            'fill-outline-color': '#B29CDD'
+          }
+        },
+        'points'
+      )
+
+      map.current.addLayer(
+        {
+          id: 'trajectory-hexes-hovered',
+          type: 'fill',
+          minzoom: hexMaxZoom,
+          source: {
+            type: 'vector',
+            tiles: [`${server}/tiles/trajectories/{z}/{x}/{y}.mvt`]
+          },
+          'source-layer': 'trajectory-hexes-layer',
+          paint: {
+            'fill-opacity': trajectoryHexOpacity,
+            'fill-color': {
+              property: 'count',
+              stops: trajectoryColorStops.current
+            },
+            'fill-outline-color': '#B29CDD'
+          },
+          filter: ['in', 'pk', '']
+        },
+        'points'
+      )
+
+      // Purely visual white casing under the points so they stay readable
+      // over the trajectory hex fills; all interaction stays on 'points',
+      // which keeps its invisible wide-stroke hit area.
+      map.current.addLayer(
+        {
+          id: 'points-halo',
+          type: 'circle',
+          minzoom: hexMaxZoom,
+          source: {
+            type: 'vector',
+            tiles: [tileQuery]
+          },
+          'source-layer': 'internal-layer-name',
+          paint: {
+            'circle-color': '#ffffff',
+            'circle-opacity': 0.9,
+            'circle-radius': [
+              'case',
+              ['<=', ['get', 'count'], 2],
+              smallCircleSize + 1.25,
+              ['>', ['get', 'count'], 2],
+              largeCircleSize + 1.25,
+              6.25
+            ]
+          }
+        },
+        'points'
+      )
 
       map.current.addLayer({
         id: 'hexes',
@@ -583,6 +925,62 @@ export default function CreateMap({
         },
         filter: ['in', 'pk', '']
       })
+
+      // Griddap (gridded, metadata-only) datasets: the optional coverage
+      // layer (all matching bboxes, toggled off by default) and the
+      // single-dataset highlight (hover from the list / pinned while a WMS
+      // overlay is shown). GeoJSON sources — coverage is tens of features
+      // served whole by /griddapCoverage, not tiles. Inserted before
+      // 'points-highlighted' so selection/hover circles stay on top.
+      map.current.addSource('griddap-coverage', {
+        type: 'geojson',
+        data: griddapCoverageRef.current || emptyFeatureCollection
+      })
+      map.current.addSource('griddap-highlight', {
+        type: 'geojson',
+        data: emptyFeatureCollection
+      })
+      map.current.addLayer(
+        {
+          id: 'griddap-coverage-fill',
+          type: 'fill',
+          source: 'griddap-coverage',
+          // near-invisible fill: the hover/click hit area
+          paint: { 'fill-color': '#52a79b', 'fill-opacity': 0.07 }
+        },
+        'points-highlighted'
+      )
+      map.current.addLayer(
+        {
+          id: 'griddap-coverage-line',
+          type: 'line',
+          source: 'griddap-coverage',
+          paint: {
+            'line-color': '#52a79b',
+            'line-width': 1.5,
+            'line-dasharray': [2, 2]
+          }
+        },
+        'points-highlighted'
+      )
+      map.current.addLayer(
+        {
+          id: 'griddap-highlight-fill',
+          type: 'fill',
+          source: 'griddap-highlight',
+          paint: { 'fill-color': '#fbb03b', 'fill-opacity': 0.1 }
+        },
+        'points-highlighted'
+      )
+      map.current.addLayer(
+        {
+          id: 'griddap-highlight-line',
+          type: 'line',
+          source: 'griddap-highlight',
+          paint: { 'line-color': '#fbb03b', 'line-width': 2.5 }
+        },
+        'points-highlighted'
+      )
     })
 
     const handleMapOnClick = (e) => {
@@ -653,6 +1051,61 @@ export default function CreateMap({
       }
     }
 
+    const handleMapTrajectoryHexesOnClick = (e) => {
+      e.originalEvent.preventDefault()
+      // 'points' renders on top of 'trajectory-hexes' at the same zoom
+      // range — let its own click handler manage the click when the
+      // cursor is directly over a point.
+      if (
+        map.current.queryRenderedFeatures(e.point, { layers: ['points'] })
+          .length > 0
+      ) {
+        return
+      }
+      if (!creatingPolygon.current) {
+        const hexFeature = e.features[0]
+        const trajectoryDatasetPks = JSON.parse(hexFeature.properties.datasets)
+
+        // Non-trajectory (profile/obis) datasets don't have their own hex
+        // feature at this zoom — they render as individual 'points' — so
+        // pull in whichever of those currently-rendered points fall inside
+        // this hex's boundary too.
+        const pointFeatures = map.current
+          .queryRenderedFeatures({ layers: ['points'] })
+          .map((point) => ({
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: point.geometry.coordinates
+            },
+            properties: { ...point.properties }
+          }))
+        const pointsWithinHex = turfPointsWithinPolygon(
+          { type: 'FeatureCollection', features: pointFeatures },
+          hexFeature
+        )
+        const nonTrajectoryDatasetPks = pointsWithinHex.features.flatMap(
+          (feature) => JSON.parse(feature.properties.datasets)
+        )
+
+        const hexDatasetPks = new Set([
+          ...trajectoryDatasetPks,
+          ...nonTrajectoryDatasetPks
+        ])
+        setDatasetsSelected((previousDatasetsSelected) =>
+          previousDatasetsSelected.map((dataset) => ({
+            ...dataset,
+            isSelected: hexDatasetPks.has(dataset.pk)
+          }))
+        )
+      } else if (
+        draw.getMode() === 'simple_select' &&
+        creatingPolygon.current
+      ) {
+        creatingPolygon.current = false
+      }
+    }
+
     map.current.on('mousemove', (e) => {
       setHoveredDataset()
     })
@@ -701,6 +1154,89 @@ export default function CreateMap({
         popup.remove()
       }
     })
+
+    map.current.on('mousemove', 'trajectory-hexes', (e) => {
+      // 'points' renders on top of 'trajectory-hexes' at the same zoom
+      // range — defer to its own mousemove/tooltip when the cursor is
+      // directly over a point, instead of clobbering it here.
+      if (
+        !draw.getMode().includes('draw') &&
+        map.current.queryRenderedFeatures(e.point, { layers: ['points'] })
+          .length === 0
+      ) {
+        map.current.getCanvas().style.cursor = 'pointer'
+        const coordinates = [e.lngLat.lng, e.lngLat.lat]
+        const description = e.features[0].properties.count
+
+        popup
+          .setLngLat(coordinates)
+          .setHTML(description + t('mapTrajectoryHexHoverTooltip'))
+          .addTo(map.current)
+      }
+    })
+
+    map.current.on('mouseleave', 'trajectory-hexes', () => {
+      if (!draw.getMode().includes('draw')) {
+        map.current.getCanvas().style.cursor = 'grab'
+        popup.remove()
+      }
+    })
+
+    // Griddap coverage rectangles sit under the point/hex layers — defer to
+    // those layers' own handlers whenever one of their features is under the
+    // cursor (same pattern as trajectory-hexes above).
+    const griddapFeatureIsCovered = (e) =>
+      map.current.queryRenderedFeatures(e.point, {
+        layers: ['points', 'hexes'].filter((layer) => map.current.getLayer(layer))
+      }).length > 0
+
+    map.current.on('mousemove', 'griddap-coverage-fill', (e) => {
+      if (draw.getMode().includes('draw') || griddapFeatureIsCovered(e)) return
+      map.current.getCanvas().style.cursor = 'pointer'
+      // nested feature properties arrive JSON-stringified from MapLibre
+      let title = ''
+      try {
+        const titleTranslated = JSON.parse(
+          e.features[0].properties.title_translated
+        )
+        title = titleTranslated[i18n.language] || titleTranslated.en || ''
+      } catch (error) {
+        title = e.features[0].properties.dataset_id || ''
+      }
+      popup
+        .setLngLat([e.lngLat.lng, e.lngLat.lat])
+        .setHTML(`<div>${title}<br/>${t('griddapCoverageTooltip')}</div>`)
+        .addTo(map.current)
+    })
+
+    map.current.on('mouseleave', 'griddap-coverage-fill', () => {
+      if (!draw.getMode().includes('draw')) {
+        map.current.getCanvas().style.cursor = 'grab'
+        popup.remove()
+      }
+    })
+
+    const handleGriddapCoverageOnClick = (e) => {
+      if (griddapFeatureIsCovered(e)) return
+      e.originalEvent.preventDefault()
+      if (!creatingPolygon.current) {
+        const clickedPk = e.features[0].properties.pk
+        // Same mechanism as the trajectory-hex click: narrow the dataset
+        // selection to the clicked dataset, which makes /pointQuery return
+        // one row and SelectionDetails auto-open its inspector.
+        setDatasetsSelected((previousDatasetsSelected) =>
+          previousDatasetsSelected.map((dataset) => ({
+            ...dataset,
+            isSelected: dataset.pk === clickedPk
+          }))
+        )
+      } else if (
+        draw.getMode() === 'simple_select' &&
+        creatingPolygon.current
+      ) {
+        creatingPolygon.current = false
+      }
+    }
 
     map.current.on('draw.create', (e) => {
       setPointsToReview()
@@ -779,6 +1315,12 @@ export default function CreateMap({
     map.current.on('click', 'hexes', handleMapHexesOnClick)
     map.current.on('touchend', 'hexes', handleMapHexesOnClick)
 
+    map.current.on('click', 'trajectory-hexes', handleMapTrajectoryHexesOnClick)
+    map.current.on('touchend', 'trajectory-hexes', handleMapTrajectoryHexesOnClick)
+
+    map.current.on('click', 'griddap-coverage-fill', handleGriddapCoverageOnClick)
+    map.current.on('touchend', 'griddap-coverage-fill', handleGriddapCoverageOnClick)
+
     map.current.on('click', handleMapOnClick)
     // mobile seems better without handleMapOnClick enabled for touch
 
@@ -804,6 +1346,19 @@ export default function CreateMap({
 
     updateMapToolTitleLanguage(t)
   }, [])
+
+  // The hex color stops depend on the zoom band (getCurrentRangeLevel), but
+  // were only applied at load or on legend refresh — so returning below
+  // point level left 'hexes' painted with point-level (zoom2) stops, where
+  // every hex count clamps past the top stop into a single green. Re-apply
+  // on zoomend, re-registering so the handler sees the latest range levels.
+  // Declared after the map-creation effect so map.current exists on mount.
+  useEffect(() => {
+    if (!map.current) return
+    const reapplyColorStops = () => setColorStops()
+    map.current.on('zoomend', reapplyColorStops)
+    return () => map.current.off('zoomend', reapplyColorStops)
+  }, [rangeLevels, trajectoryRangeLevels])
 
   return <div ref={mapContainer} className='map' />
 }

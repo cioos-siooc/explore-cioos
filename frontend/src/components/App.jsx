@@ -27,6 +27,8 @@ import DownloadDetails from './Controls/DownloadDetails/DownloadDetails.jsx'
 import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.jsx'
 import Loading from './Controls/Loading/Loading.jsx'
 import Legend from './Controls/Legend/Legend.jsx'
+import MapLayerToggle from './Controls/MapLayerToggle/MapLayerToggle.jsx'
+import WmsLegend from './Controls/WmsLegend/WmsLegend.jsx'
 import IntroModal from './Controls/IntroModal/IntroModal.jsx'
 import Filter from './Controls/Filter/Filter.jsx'
 import FilterMenu from './Controls/Filter/FilterMenu/FilterMenu.jsx'
@@ -73,10 +75,12 @@ if (process.env.NODE_ENV === 'production') {
     dsn: 'https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595',
     integrations: [new Integrations.BrowserTracing()],
 
-    // Set tracesSampleRate to 1.0 to capture 100%
-    // of transactions for performance monitoring.
-    // We recommend adjusting this value in production
-    tracesSampleRate: 1.0
+    // Full tracing (1.0) adds instrumentation overhead to page load. Defaults
+    // to 1.0 in development and 0.1 in production; override at build time with
+    // SENTRY_TRACES_SAMPLE_RATE.
+    tracesSampleRate: process.env.SENTRY_TRACES_SAMPLE_RATE
+      ? Number(process.env.SENTRY_TRACES_SAMPLE_RATE)
+      : (process.env.NODE_ENV === 'production' ? 0.1 : 1.0)
   })
 }
 
@@ -97,7 +101,15 @@ export default function App() {
   const [mapView, setMapView] = useState({})
   const [rangeLevels, setRangeLevels] = useState()
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
+  const [trajectoryRangeLevels, setTrajectoryRangeLevels] = useState()
+  const [currentTrajectoryRangeLevel, setCurrentTrajectoryRangeLevel] = useState()
   const [hoveredDataset, setHoveredDataset] = useState()
+  // Griddap (gridded, metadata-only) datasets: the optional coverage layer
+  // (off by default) and the on-demand per-dataset WMS overlay
+  // ({pk, datasetId, wmsUrl, variable, time, elevation, bbox} | undefined).
+  const [griddapCoverageVisible, setGriddapCoverageVisible] = useState(false)
+  const [griddapCoverage, setGriddapCoverage] = useState()
+  const [activeWmsOverlay, setActiveWmsOverlay] = useState()
   const defaultQuery = {
     startDate: defaultStartDate,
     endDate: defaultEndDate,
@@ -557,6 +569,7 @@ export default function App() {
       .then((legend) => {
         if (legend) {
           setRangeLevels(legend.recordsCount)
+          setTrajectoryRangeLevels(legend.trajectoryRecordsCount)
         }
       })
       .catch((error) => {
@@ -614,6 +627,7 @@ export default function App() {
         .then((legend) => {
           if (legend) {
             setRangeLevels(legend.recordsCount)
+            setTrajectoryRangeLevels(legend.trajectoryRecordsCount)
           }
         })
     }
@@ -631,11 +645,41 @@ export default function App() {
     )
   }, [query])
 
+  // Fetch griddap coverage bboxes when the layer is visible, in lockstep
+  // with the same debounced query the tiles and /pointQuery use. Data is
+  // kept when the layer is toggled off so re-showing it is instant.
+  useEffect(() => {
+    if (!griddapCoverageVisible) return
+    const controller = new AbortController()
+    fetch(`${server}/griddapCoverage?${createDataFilterQueryString(query)}`, {
+      signal: controller.signal
+    })
+      .then((response) => (response.ok ? response.json() : undefined))
+      .then((coverage) => {
+        if (coverage) setGriddapCoverage(coverage)
+      })
+      .catch((error) => {
+        if (error.name !== 'AbortError') throw error
+      })
+    return () => controller.abort()
+  }, [query, griddapCoverageVisible])
+
   useEffect(() => {
     if (rangeLevels) {
       setCurrentRangeLevel(getCurrentRangeLevel(rangeLevels, zoom))
     }
   }, [rangeLevels, zoom])
+
+  useEffect(() => {
+    // Trajectory hexes only render at zoom >= 7 (below that, trajectory
+    // counts are merged into the green hex ramp) — hide the legend entry
+    // otherwise.
+    if (trajectoryRangeLevels && zoom >= 7) {
+      setCurrentTrajectoryRangeLevel(trajectoryRangeLevels.zoom1)
+    } else {
+      setCurrentTrajectoryRangeLevel()
+    }
+  }, [trajectoryRangeLevels, zoom])
 
   useEffect(() => {
     setEmailValid(validateEmail(email))
@@ -979,20 +1023,27 @@ export default function App() {
       logoSource={i18n.language === 'en' ? EnglishLogo : FrenchLogo}
     >
       {loading && <Loading />}
-      {rangeLevels && (
-        <Map
-          polygon={polygon}
-          setPolygon={setPolygon}
-          setPointsToReview={setPointsToReview}
-          setLoading={setLoading}
-          query={query}
-          setMapView={setMapView}
-          rangeLevels={rangeLevels}
-          offsetFlyTo={selectionPanelOpen}
-          setHoveredDataset={setHoveredDataset}
-          hoveredDataset={hoveredDataset}
-        />
-      )}
+      {/* Mount the map immediately rather than waiting for /legend (the app's
+          heaviest query) to resolve — first paint of the basemap and tile
+          layers no longer blocks on it. The color ramp is applied once
+          rangeLevels/trajectoryRangeLevels arrive via Map's setColorStops
+          effect, which guards against their being undefined until then. */}
+      <Map
+        polygon={polygon}
+        setPolygon={setPolygon}
+        setPointsToReview={setPointsToReview}
+        setLoading={setLoading}
+        query={query}
+        setMapView={setMapView}
+        rangeLevels={rangeLevels}
+        trajectoryRangeLevels={trajectoryRangeLevels}
+        offsetFlyTo={selectionPanelOpen}
+        setHoveredDataset={setHoveredDataset}
+        hoveredDataset={hoveredDataset}
+        setDatasetsSelected={setDatasetsSelected}
+        griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
+        activeWmsOverlay={activeWmsOverlay}
+      />
       <Controls
         loading={loading}
         selectionPanel={
@@ -1017,6 +1068,8 @@ export default function App() {
                 setShowIntroModal={setShowIntroModal}
                 totalNumberOfDatasets={totalNumberOfDatasets}
                 resetFilters={resetFilters}
+                activeWmsOverlay={activeWmsOverlay}
+                setActiveWmsOverlay={setActiveWmsOverlay}
               >
                 {DownloadButton()}
               </SelectionDetails>
@@ -1307,6 +1360,7 @@ export default function App() {
       {currentRangeLevel && (
         <Legend
           currentRangeLevel={currentRangeLevel}
+          currentTrajectoryRangeLevel={currentTrajectoryRangeLevel}
           zoom={zoom}
           selectionPanelOpen={selectionPanelOpen}
           platformsInView={platformsSelected.map((e) => e.title)}
@@ -1320,6 +1374,18 @@ export default function App() {
       >
         <div className='rectangleIcon' />
       </button>
+      <MapLayerToggle
+        active={griddapCoverageVisible}
+        onToggle={() => setGriddapCoverageVisible(!griddapCoverageVisible)}
+        title={t('griddapCoverageToggleTitle')}
+      />
+      {activeWmsOverlay && (
+        <WmsLegend
+          overlay={activeWmsOverlay}
+          onClose={() => setActiveWmsOverlay()}
+          setActiveWmsOverlay={setActiveWmsOverlay}
+        />
+      )}
       <IntroModal showModal={showIntroModal} setShowModal={setShowIntroModal} />
     </ErrorBoundary>
   )

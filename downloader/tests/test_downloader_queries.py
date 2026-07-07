@@ -23,7 +23,7 @@ _FAKE_VARS = pd.DataFrame(
 
 
 def _mock_erddap_class():
-    """Mock for cde_harvester.ERDDAP — returns a fake dataset with minimal variable metadata."""
+    """Mock for cde_harvester.sources.erddap.client — returns a fake dataset with minimal variable metadata."""
     instance = MagicMock()
     instance.get_dataset.return_value.df_variables = _FAKE_VARS
     cls = MagicMock(return_value=instance)

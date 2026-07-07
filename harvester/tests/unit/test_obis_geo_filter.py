@@ -1,5 +1,5 @@
 """
-Unit tests for cde_harvester.obis_geo_filter.ObisGeoFilter.
+Unit tests for cde_harvester.sources.obis.geo_filter.ObisGeoFilter.
 
 All tests use a small synthetic WKT polygon (a box over part of BC)
 written to a tmp_path file, avoiding the large Canada EEZ polygon.
@@ -8,7 +8,7 @@ written to a tmp_path file, avoiding the large Canada EEZ polygon.
 import numpy as np
 import pytest
 
-from cde_harvester.obis_geo_filter import ObisGeoFilter, DEFAULT_EXEMPT_NODE_IDS
+from cde_harvester.sources.obis.geo_filter import ObisGeoFilter, DEFAULT_EXEMPT_NODE_IDS
 
 # A small box on the BC coast: lon -130..-120, lat 48..55
 TEST_POLYGON_WKT = (

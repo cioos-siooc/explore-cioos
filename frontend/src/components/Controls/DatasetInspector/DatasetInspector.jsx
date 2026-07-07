@@ -7,8 +7,10 @@ import 'react-data-table-component-extensions/dist/index.css'
 
 // import platformColors from '../../platformColors'
 import Loading from '../Loading/Loading.jsx'
+import GriddapDetails from '../GriddapDetails/GriddapDetails.jsx'
 import { server } from '../../../config'
 import { splitLines } from '../../../utilities'
+import { totalGridNodes } from '../../../wmsUtilities'
 import FilterButton from '../Filter/FilterButton/FilterButton.jsx'
 import './styles.css'
 
@@ -19,12 +21,15 @@ export default function DatasetInspector({
   setHoveredDataset,
   setInspectRecordID,
   filterSet,
-  query
+  query,
+  activeWmsOverlay,
+  setActiveWmsOverlay
 }) {
   const { t } = useTranslation()
   const [datasetRecords, setDatasetRecords] = useState()
   const [loading, setLoading] = useState(false)
   const inspectorRef = useRef(null)
+  const isGrid = dataset.cdm_data_type === 'Grid'
 
   const returnToList = () => {
     setBackClicked(true)
@@ -35,7 +40,8 @@ export default function DatasetInspector({
   // )
 
   useEffect(() => {
-    if (dataset.source_type === 'obis') return
+    // no per-record list for OBIS (external) or griddap (metadata-only)
+    if (dataset.source_type === 'obis' || isGrid) return
     setLoading(true)
     const queryParams = new URLSearchParams(query)
     queryParams.set('datasetPKs', dataset.pk)
@@ -258,12 +264,14 @@ export default function DatasetInspector({
           </div>
           <div className='metaRow'>
             <dt className='metadataLabel'>
-              {t('datasetInspectorRecordsText')}
+              {isGrid ? t('griddapNodesText') : t('datasetInspectorRecordsText')}
             </dt>
             <dd className='metadataValue recordCount'>
-              {dataset.profiles_count !== dataset.n_profiles
-                ? `${dataset.profiles_count} / ${dataset.n_profiles}`
-                : dataset.profiles_count}
+              {isGrid
+                ? totalGridNodes(dataset.grid_dimensions)?.toLocaleString()
+                : dataset.profiles_count !== dataset.n_profiles
+                  ? `${dataset.profiles_count} / ${dataset.n_profiles}`
+                  : dataset.profiles_count}
             </dd>
           </div>
           {dataset.source_type === 'obis' ? (

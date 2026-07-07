@@ -1,5 +1,5 @@
 """
-Unit tests for cde_harvester.CDEComplianceChecker.
+Unit tests for cde_harvester.sources.erddap.compliance.
 
 Each test builds a mock Dataset, sets specific attributes, and verifies
 whether the compliance checker passes or rejects it with the right code.
@@ -14,8 +14,8 @@ from conftest import (
     ERDDAP_INFO_NO_EOVS_CSV,
     build_mock_dataset,
 )
-from cde_harvester.CDEComplianceChecker import CDEComplianceChecker
-from cde_harvester.harvest_errors import (
+from cde_harvester.sources.erddap.compliance import CDEComplianceChecker
+from cde_harvester.core.errors import (
     DEPTH_AND_ALTITUDE,
     INGEST_FLAG_FALSE,
     MISSING_REQUIRED_VARS,

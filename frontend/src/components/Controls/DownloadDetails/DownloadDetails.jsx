@@ -55,9 +55,13 @@ export default function DownloadDetails({
   const { t } = useTranslation()
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState(
-    pointsToReview.map((ptr) => {
-      return { ...ptr, downloadDisabled: false }
-    })
+    pointsToReview
+      // defensive: griddap datasets are metadata-only and must never reach
+      // the size-estimate / download-queue flow
+      .filter((ptr) => ptr.cdm_data_type !== 'Grid')
+      .map((ptr) => {
+        return { ...ptr, downloadDisabled: false }
+      })
   )
   const [dataTotal, setDataTotal] = useState(0)
   const [downloadSizeEstimates, setDownloadSizeEstimates] = useState()

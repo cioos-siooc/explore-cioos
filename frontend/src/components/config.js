@@ -30,6 +30,16 @@ export const colorScale = [
   '#142926'
 ]
 
+export const trajectoryColorScale = [
+  '#D5C9EE',
+  '#C4B3E6',
+  '#B29CDD',
+  '#9F86D3',
+  '#8C71C7',
+  '#7A5DBA',
+  '#6749AC'
+]
+
 export const languages = [
   {
     code: 'en',

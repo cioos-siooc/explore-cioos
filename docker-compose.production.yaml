@@ -2,6 +2,9 @@ services:
   db:
     image: "postgis/postgis:13-3.1-alpine"
     platform: linux/x86_64
+    # See docker-compose.yaml — Postgres parallel workers overrun the 64MB
+    # Docker /dev/shm default and surface it as "DiskFull".
+    shm_size: 1gb
     ports:
       - "${DB_PORT:-5432}:${DB_PORT:-5432}"
     environment:
@@ -25,6 +28,10 @@ services:
   # volume, so schema changes added to 1_schema.sql never reach an existing
   # volume on their own — this closes that gap. Migrations are idempotent
   # (ADD COLUMN IF NOT EXISTS ...), so applying them on every deploy is safe.
+  # After the migrations, the numbered function files (3_*.sql .. 9_*.sql) are
+  # re-applied: they are pure CREATE OR REPLACE FUNCTION, so live DBs pick up
+  # stored-procedure changes without migrations duplicating function bodies.
+  # 1_schema.sql is NEVER applied here (it DROPs tables).
   db_migrate:
     image: postgis/postgis:13-3.1-alpine
     depends_on:
@@ -38,20 +45,20 @@ services:
       PGPASSWORD: $DB_PASSWORD
       PGDATABASE: $DB_NAME
     volumes:
-      - ./database/migrations:/migrations:ro
+      - ./database:/database:ro
     command:
       - sh
       - -c
       - |
         set -e
         applied=0
-        for f in /migrations/*.sql; do
+        for f in /database/migrations/*.sql /database/[3-9]_*.sql; do
           [ -e "$$f" ] || continue
-          echo "Applying migration: $$f"
+          echo "Applying: $$f"
           psql -v ON_ERROR_STOP=1 -f "$$f"
           applied=$$((applied+1))
         done
-        echo "Migrations applied: $$applied"
+        echo "SQL files applied: $$applied"
     networks:
       - explore-cioos_default
 

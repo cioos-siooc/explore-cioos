@@ -1,5 +1,5 @@
 """
-Unit tests for cde_harvester.ERDDAP — the HTTP client that talks to ERDDAP servers.
+Unit tests for cde_harvester.sources.erddap.client — the HTTP client that talks to ERDDAP servers.
 
 All HTTP calls are intercepted by patching requests.Session so no network
 traffic is produced.
@@ -25,13 +25,13 @@ from conftest import (
 
 def _make_erddap(all_datasets_csv=ERDDAP_ALL_DATASETS_CSV):
     """Create an ERDDAP instance with a mocked session.get."""
-    with patch("cde_harvester.ERDDAP.requests") as mock_requests:
+    with patch("cde_harvester.sources.erddap.client.requests") as mock_requests:
         mock_session = MagicMock()
         mock_requests.Session.return_value = mock_session
         mock_session.get.return_value = MockResponse(
             text=all_datasets_csv, url=ERDDAP_URL + "/tabledap/allDatasets.csv"
         )
-        from cde_harvester.ERDDAP import ERDDAP
+        from cde_harvester.sources.erddap.client import ERDDAP
         erddap = ERDDAP(ERDDAP_URL, cache_requests=False)
         erddap.session = mock_session  # expose for further assertions
         # __init__ no longer auto-fetches the dataset list; the caller (harvest())
@@ -72,13 +72,13 @@ class TestERDDAPInit:
 
     def test_empty_response_gives_empty_dataframe(self):
         empty_csv = "datasetID,cdm_data_type\n(String),(String)\n,\n"
-        with patch("cde_harvester.ERDDAP.requests") as mock_requests:
+        with patch("cde_harvester.sources.erddap.client.requests") as mock_requests:
             mock_session = MagicMock()
             mock_requests.Session.return_value = mock_session
             mock_session.get.return_value = MockResponse(
                 text=empty_csv, url=ERDDAP_URL + "/tabledap/allDatasets.csv"
             )
-            from cde_harvester.ERDDAP import ERDDAP
+            from cde_harvester.sources.erddap.client import ERDDAP
             erddap = ERDDAP(ERDDAP_URL, cache_requests=False)
             erddap.df_all_datasets = erddap.get_all_datasets()
         assert erddap.df_all_datasets.empty
@@ -128,26 +128,26 @@ class TestErddapCsvToDf:
         mock_resp = MockResponse(text="", url=ERDDAP_URL)
         mock_resp.content = big_content
         erddap.session.get.return_value = mock_resp
-        from cde_harvester.harvest_errors import ResponseTooLargeError
+        from cde_harvester.core.errors import ResponseTooLargeError
         with pytest.raises(ResponseTooLargeError):
             erddap.erddap_csv_to_df("/tabledap/ds.csv")
 
 
 class TestParseErddapDate:
     def test_iso8601_string(self):
-        from cde_harvester.ERDDAP import ERDDAP
+        from cde_harvester.sources.erddap.client import ERDDAP
         result = ERDDAP.parse_erddap_date("2020-06-15T00:00:00Z")
         assert result.year == 2020
         assert result.month == 6
 
     def test_large_epoch_is_not_timestamp(self):
         """Values like 1577836800.0 do NOT start with '1.' so treated as ISO."""
-        from cde_harvester.ERDDAP import ERDDAP
+        from cde_harvester.sources.erddap.client import ERDDAP
         # A scientific-notation epoch starting with "1." IS a timestamp
         result = ERDDAP.parse_erddap_date("1.5E9")
         assert pd.notna(result)
 
     def test_invalid_string_returns_nat(self):
-        from cde_harvester.ERDDAP import ERDDAP
+        from cde_harvester.sources.erddap.client import ERDDAP
         result = ERDDAP.parse_erddap_date("not-a-date")
         assert pd.isna(result)

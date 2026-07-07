@@ -18,6 +18,7 @@ const oceanVariablesRouter = require("./routes/oceanVariables");
 const previewRouter = require("./routes/preview");
 const platformsRouter = require("./routes/platforms");
 const datasetRecordsListRouter = require("./routes/datasetRecordsList");
+const griddapCoverageRouter = require("./routes/griddapCoverage");
 const downloadEstimateRouter = require("./routes/downloadEstimate");
 const scientificNamesRouter = require("./routes/scientificNames");
 const obisNodesRouter = require("./routes/obisNodes");
@@ -32,12 +33,17 @@ const app = express();
 
 if (process.env.ENVIRONMENT === "production") {
   console.log("Using sentry");
+  // Tracing every request (1.0) adds per-request overhead across the
+  // initial-load burst, so sample only a fraction in production. Defaults to
+  // 1.0 in development and 0.1 in production; override with
+  // SENTRY_TRACES_SAMPLE_RATE (e.g. set it to 1.0 to trace everything).
+  const defaultTracesSampleRate = process.env.ENVIRONMENT === "production" ? 0.1 : 1.0;
+  const tracesSampleRate = process.env.SENTRY_TRACES_SAMPLE_RATE
+    ? Number(process.env.SENTRY_TRACES_SAMPLE_RATE)
+    : defaultTracesSampleRate;
   Sentry.init({
     dsn: "https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595",
-
-    // We recommend adjusting this value in production, or using tracesSampler
-    // for finer control
-    tracesSampleRate: 1.0,
+    tracesSampleRate,
   });
   app.use(Sentry.Handlers.requestHandler());
 }
@@ -103,6 +109,7 @@ app.use("/oceanVariables", oceanVariablesRouter);
 app.use("/preview", previewRouter);
 app.use("/platforms", platformsRouter);
 app.use("/datasetRecordsList", datasetRecordsListRouter);
+app.use("/griddapCoverage", griddapCoverageRouter);
 app.use("/downloadEstimate", downloadEstimateRouter);
 app.use("/scientificNames", scientificNamesRouter);
 app.use("/obisNodes", obisNodesRouter);

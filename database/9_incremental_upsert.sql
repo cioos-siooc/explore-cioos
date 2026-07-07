@@ -10,6 +10,7 @@ Functions:
 - upsert_datasets_from_temp() - UPSERT datasets from temp_datasets
 - replace_profiles_from_temp() - Replace profiles for updated datasets
 - replace_obis_cells_from_temp() - Replace obis_cells for updated datasets
+- replace_trajectory_cells_from_temp() - Replace trajectory_cells for updated datasets
 - upsert_skipped_datasets_from_temp() - UPSERT skipped datasets
 - process_incremental_update() - Main orchestrator for entire incremental workflow
 
@@ -21,10 +22,20 @@ Functions:
 CREATE OR REPLACE FUNCTION create_temp_tables() RETURNS VOID AS $$
 BEGIN
   -- Create temp tables with same structure as main tables
-  CREATE TEMP TABLE IF NOT EXISTS temp_datasets (LIKE cde.datasets INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
-  CREATE TEMP TABLE IF NOT EXISTS temp_profiles (LIKE cde.profiles INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
+  -- EXCLUDING GENERATED: datasets.coverage_bbox is a GENERATED column; LIKE
+  -- would copy its expression and reject plain INSERTs. The main-table INSERT
+  -- recomputes it from the coverage_* columns.
+  CREATE TEMP TABLE IF NOT EXISTS temp_datasets (LIKE cde.datasets INCLUDING DEFAULTS EXCLUDING CONSTRAINTS EXCLUDING GENERATED);
+  -- EXCLUDING GENERATED: profiles.bbox is a GENERATED column; LIKE would copy
+  -- its expression and reject plain INSERTs. The main-table INSERT recomputes
+  -- bbox from the lat/lon min/max columns, so the temp table doesn't carry it.
+  CREATE TEMP TABLE IF NOT EXISTS temp_profiles (LIKE cde.profiles INCLUDING DEFAULTS EXCLUDING CONSTRAINTS EXCLUDING GENERATED);
   CREATE TEMP TABLE IF NOT EXISTS temp_skipped_datasets (LIKE cde.skipped_datasets INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
   CREATE TEMP TABLE IF NOT EXISTS temp_obis_cells (LIKE cde.obis_cells INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
+  -- LIKE copies the GENERATED expression for geom, which would reject plain
+  -- INSERTs of lat/lon-only rows on some paths; drop the expression so the
+  -- temp table takes NULL geom (the main-table INSERT recomputes it anyway).
+  CREATE TEMP TABLE IF NOT EXISTS temp_trajectory_cells (LIKE cde.trajectory_cells INCLUDING DEFAULTS EXCLUDING CONSTRAINTS EXCLUDING GENERATED);
 
   -- Explicitly drop all NOT NULL constraints from temp tables
   -- These are column-level constraints that EXCLUDING CONSTRAINTS doesn't remove
@@ -61,8 +72,31 @@ $$ LANGUAGE plpgsql;
 -- Uses (dataset_id, erddap_url) as unique key
 CREATE OR REPLACE FUNCTION upsert_datasets_from_temp() RETURNS VOID AS $$
 BEGIN
-  INSERT INTO cde.datasets
-  SELECT * FROM temp_datasets
+  -- Explicit column list (not SELECT *) because cde.datasets has a GENERATED
+  -- coverage_bbox column that temp_datasets omits; pk is left out so the
+  -- target assigns its own serial.
+  INSERT INTO cde.datasets (
+    pk_url, dataset_id, erddap_url, platform, title, title_fr,
+    summary, summary_fr, cdm_data_type, organizations, eovs, ckan_id,
+    timeseries_id_variable, profile_id_variable, trajectory_id_variable,
+    organization_pks, n_profiles, profile_variables, num_columns,
+    first_eov_column, source_type, obis_nodes,
+    content_hash, content_hash_reason, last_updated_at, verified_at,
+    coverage_lat_min, coverage_lat_max, coverage_lon_min, coverage_lon_max,
+    coverage_time_min, coverage_time_max, coverage_depth_min, coverage_depth_max,
+    grid_variables, grid_dimensions, wms_url
+  )
+  SELECT
+    pk_url, dataset_id, erddap_url, platform, title, title_fr,
+    summary, summary_fr, cdm_data_type, organizations, eovs, ckan_id,
+    timeseries_id_variable, profile_id_variable, trajectory_id_variable,
+    organization_pks, n_profiles, profile_variables, num_columns,
+    first_eov_column, source_type, obis_nodes,
+    content_hash, content_hash_reason, last_updated_at, verified_at,
+    coverage_lat_min, coverage_lat_max, coverage_lon_min, coverage_lon_max,
+    coverage_time_min, coverage_time_max, coverage_depth_min, coverage_depth_max,
+    grid_variables, grid_dimensions, wms_url
+  FROM temp_datasets
   ON CONFLICT (dataset_id, erddap_url)
   DO UPDATE SET
     platform = EXCLUDED.platform,
@@ -83,7 +117,22 @@ BEGIN
     organization_pks = EXCLUDED.organization_pks,
     n_profiles = EXCLUDED.n_profiles,
     source_type = EXCLUDED.source_type,
-    obis_nodes = EXCLUDED.obis_nodes;
+    obis_nodes = EXCLUDED.obis_nodes,
+    content_hash = EXCLUDED.content_hash,
+    content_hash_reason = EXCLUDED.content_hash_reason,
+    last_updated_at = EXCLUDED.last_updated_at,
+    verified_at = EXCLUDED.verified_at,
+    coverage_lat_min = EXCLUDED.coverage_lat_min,
+    coverage_lat_max = EXCLUDED.coverage_lat_max,
+    coverage_lon_min = EXCLUDED.coverage_lon_min,
+    coverage_lon_max = EXCLUDED.coverage_lon_max,
+    coverage_time_min = EXCLUDED.coverage_time_min,
+    coverage_time_max = EXCLUDED.coverage_time_max,
+    coverage_depth_min = EXCLUDED.coverage_depth_min,
+    coverage_depth_max = EXCLUDED.coverage_depth_max,
+    grid_variables = EXCLUDED.grid_variables,
+    grid_dimensions = EXCLUDED.grid_dimensions,
+    wms_url = EXCLUDED.wms_url;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -98,9 +147,23 @@ BEGIN
   WHERE p.dataset_id = td.dataset_id
     AND p.erddap_url = td.erddap_url;
 
-  -- Insert new profiles from temp table
-  INSERT INTO cde.profiles
-  SELECT * FROM temp_profiles;
+  -- Insert new profiles from temp table. Explicit column list (not SELECT *)
+  -- because cde.profiles has a GENERATED bbox column that temp_profiles omits;
+  -- pk is left out so the target assigns its own serial.
+  INSERT INTO cde.profiles (
+    geom, dataset_pk, erddap_url, dataset_id, timeseries_id, profile_id,
+    time_min, time_max, latitude, longitude,
+    latitude_min, latitude_max, longitude_min, longitude_max, show_as_point,
+    depth_min, depth_max, n_records, records_per_day, n_profiles,
+    hex_0_pk, hex_1_pk, point_pk, days
+  )
+  SELECT
+    geom, dataset_pk, erddap_url, dataset_id, timeseries_id, profile_id,
+    time_min, time_max, latitude, longitude,
+    latitude_min, latitude_max, longitude_min, longitude_max, show_as_point,
+    depth_min, depth_max, n_records, records_per_day, n_profiles,
+    hex_0_pk, hex_1_pk, point_pk, days
+  FROM temp_profiles;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -152,6 +215,43 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+-- Replace trajectory_cells for datasets that are in temp_datasets
+-- Deletes old cells for those datasets, then inserts new ones from temp
+CREATE OR REPLACE FUNCTION replace_trajectory_cells_from_temp() RETURNS VOID AS $$
+BEGIN
+  DELETE FROM cde.trajectory_cells c
+  USING temp_datasets td
+  WHERE c.dataset_id = td.dataset_id
+    AND c.erddap_url = td.erddap_url;
+
+  -- dataset_pk is resolved here at INSERT time (upsert_datasets_from_temp has
+  -- already run) so trajectory_link_dataset_pk() doesn't have to rewrite every
+  -- freshly-inserted row afterwards. LEFT JOIN keeps rows whose dataset is
+  -- somehow missing; the backfill pass in trajectory_process() catches those.
+  INSERT INTO cde.trajectory_cells
+    (dataset_pk, erddap_url, dataset_id, trajectory_id, latitude, longitude,
+     time_min, time_max, depth_min, depth_max,
+     n_records, n_profiles, records_per_day, days)
+  SELECT d.pk, t.erddap_url, t.dataset_id, t.trajectory_id, t.latitude, t.longitude,
+         t.time_min, t.time_max, t.depth_min, t.depth_max,
+         t.n_records, t.n_profiles, t.records_per_day, t.days
+  FROM temp_trajectory_cells t
+  LEFT JOIN cde.datasets d
+    ON d.dataset_id = t.dataset_id AND d.erddap_url = t.erddap_url
+  ON CONFLICT (erddap_url, dataset_id, trajectory_id, latitude, longitude) DO UPDATE SET
+    dataset_pk = EXCLUDED.dataset_pk,
+    time_min = EXCLUDED.time_min,
+    time_max = EXCLUDED.time_max,
+    depth_min = EXCLUDED.depth_min,
+    depth_max = EXCLUDED.depth_max,
+    n_records = EXCLUDED.n_records,
+    n_profiles = EXCLUDED.n_profiles,
+    records_per_day = EXCLUDED.records_per_day,
+    days = EXCLUDED.days;
+END;
+$$ LANGUAGE plpgsql;
+
+
 -- Main incremental processing function
 -- Orchestrates the entire incremental update workflow
 CREATE OR REPLACE FUNCTION process_incremental_update() RETURNS VOID AS $$
@@ -171,19 +271,25 @@ BEGIN
   -- 5. Replace obis_cells (delete old, insert new)
   PERFORM replace_obis_cells_from_temp();
 
-  -- 6. UPSERT skipped datasets
+  -- 6. Replace trajectory_cells (delete old, insert new)
+  PERFORM replace_trajectory_cells_from_temp();
+
+  -- 7. UPSERT skipped datasets
   PERFORM upsert_skipped_datasets_from_temp();
 
-  -- 7. Run processing functions to populate remaining fields
-  -- Note: profile_process() rebuilds points from profiles; obis_process() must run after
+  -- 8. Run processing functions to populate remaining fields
+  -- Note: profile_process() rebuilds points from profiles; obis_process() and
+  -- trajectory_process() must run after it (they re-add their geoms to points
+  -- and relink point_pk).
   PERFORM ckan_process();
   PERFORM profile_process();
   PERFORM obis_process();
+  PERFORM trajectory_process();
 
-  -- 8. Create hexes for all data
+  -- 9. Create hexes for all data
   PERFORM create_hexes();
 
-  -- 9. Restore constraints
+  -- 10. Restore constraints
   PERFORM set_constraints();
 END;
 $$ LANGUAGE plpgsql;

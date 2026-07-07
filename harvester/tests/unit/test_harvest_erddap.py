@@ -1,5 +1,5 @@
 """
-Unit tests for cde_harvester.erddap_harvester.harvest_erddap.
+Unit tests for cde_harvester.sources.erddap.harvester.harvest_erddap.
 
 The ERDDAP class constructor is patched so no HTTP calls are made.
 Individual Dataset objects are returned as pre-built MagicMocks.
@@ -16,8 +16,8 @@ from conftest import (
     build_mock_dataset,
     ERDDAP_INFO_NO_EOVS_CSV,
 )
-from cde_harvester.erddap_harvester import harvest_erddap
-from cde_harvester.harvest_errors import (
+from cde_harvester.sources.erddap.harvester import harvest_erddap
+from cde_harvester.core.errors import (
     CDM_DATA_TYPE_UNSUPPORTED,
     HTTP_ERROR,
 )
@@ -42,6 +42,10 @@ def _make_erddap_mock(datasets: list[tuple], domain: str = "test.erddap.com"):
     # reading a pre-set df_all_datasets attribute, so stub the call too.
     mock_erddap.get_all_datasets.return_value = df
     mock_erddap.get_logger.return_value = __import__("logging").getLogger("test")
+    # Caching: harvest_dataset() unpacks get_croissant_fingerprint() into
+    # (content_hash, has_files, reason). Stub it so the bare MagicMock doesn't
+    # unpack to 0 values; has_files=False means skip_unchanged never triggers.
+    mock_erddap.get_croissant_fingerprint.return_value = (None, False, None)
     return mock_erddap
 
 
@@ -69,13 +73,13 @@ def _run_harvest(erddap_mock, dataset_mock=None, limit=None):
     Uses .fn() to bypass the Prefect @task decorator.
     """
     with (
-        patch("cde_harvester.erddap_harvester.ERDDAP", return_value=erddap_mock),
-        patch("cde_harvester.erddap_harvester.get_profiles") as mock_get_profiles,
+        patch("cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock),
+        patch("cde_harvester.sources.erddap.harvester.extract_features") as mock_extract_features,
     ):
         if dataset_mock is None:
             dataset_mock = build_mock_dataset()
 
-        mock_get_profiles.return_value = _make_profiles_df()
+        mock_extract_features.return_value = _make_profiles_df()
         erddap_mock.get_dataset.return_value = dataset_mock
 
         return harvest_erddap.fn(ERDDAP_URL, limit_dataset_ids=limit)
@@ -132,8 +136,8 @@ class TestHarvestErddapSkipping:
         )
 
         with (
-            patch("cde_harvester.erddap_harvester.ERDDAP", return_value=erddap_mock),
-            patch("cde_harvester.erddap_harvester.get_profiles"),
+            patch("cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock),
+            patch("cde_harvester.sources.erddap.harvester.extract_features"),
         ):
             result = harvest_erddap.fn(ERDDAP_URL)
 

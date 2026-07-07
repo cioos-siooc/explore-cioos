@@ -29,6 +29,15 @@ from conftest import (
     _route_erddap_url,
 )
 
+from cde_harvester.sources.base import HarvestResult
+from cde_harvester.sources.erddap.harvester import harvest_erddap
+from cde_harvester.__main__ import (
+    get_ckan_records,
+    main as harvester_main,
+    merge_and_write_csvs,
+)
+from cde_harvester.loading.loader import main as db_main
+
 
 # ---------------------------------------------------------------------------
 # Session-level mock for all ERDDAP HTTP calls
@@ -60,17 +69,15 @@ def harvest_result(tmp_path_factory):
     Uses harvest_erddap.fn() to bypass the Prefect @task decorator.
     """
     with (
-        patch("cde_harvester.ERDDAP.requests.Session") as mock_session_cls,
+        patch("cde_harvester.sources.erddap.client.requests.Session") as mock_session_cls,
         patch(
-            "cde_harvester.ckan.create_ckan_erddap_link.requests.get",
+            "cde_harvester.sources.ckan.create_ckan_erddap_link.requests.get",
             side_effect=_ckan_side_effects(),
         ),
     ):
         mock_session = MagicMock()
         mock_session.get.side_effect = _erddap_session_get
         mock_session_cls.return_value = mock_session
-
-        from cde_harvester.erddap_harvester import harvest_erddap
 
         result = harvest_erddap.fn(ERDDAP_URL, limit_dataset_ids=[DATASET_ID])
 
@@ -123,6 +130,27 @@ class TestHarvestOutput:
 # Step 4: CSV writing phase
 # ---------------------------------------------------------------------------
 
+def _submit_without_flow(task, *, as_future=False):
+    """Stand-in for Prefect ``Task.submit()`` with no flow context.
+
+    main() is a plain function (the flattened pipeline runs every step under the
+    single cde_pipeline_run @flow), but it still ``.submit()``s its tasks — which
+    needs a task runner that only a flow context provides. Rather than stand up a
+    flow just for the test, run the task's wrapped ``.fn`` synchronously here.
+    The Prefect-only ``wait_for`` kwarg is stripped. ``as_future=True`` wraps the
+    result so the caller's ``.submit(...).result()`` still works.
+    """
+    def _submit(*args, wait_for=None, **kwargs):
+        value = task.fn(*args, **kwargs)
+        if not as_future:
+            return value
+        future = MagicMock()
+        future.result.return_value = value
+        return future
+
+    return _submit
+
+
 @pytest.fixture(scope="module")
 def written_csv_folder(tmp_path_factory, harvest_result):
     """
@@ -132,6 +160,8 @@ def written_csv_folder(tmp_path_factory, harvest_result):
     Patches:
       - harvest_erddap.submit → returns a synchronous mock future holding
         the pre-collected HarvestResult so main() doesn't re-harvest
+      - get_ckan_records.submit / merge_and_write_csvs.submit → run their
+        wrapped fns synchronously (no flow context / task runner needed)
       - get_run_logger → stdlib logger (no Prefect context needed)
       - CKAN requests → fixture data
     """
@@ -139,7 +169,6 @@ def written_csv_folder(tmp_path_factory, harvest_result):
     tmp = tmp_path_factory.mktemp("csv_phase")
     folder = str(tmp)
 
-    from cde_harvester.base_harvester import HarvestResult
     hr = HarvestResult(profiles=profiles, datasets=datasets,
                        variables=variables, skipped=skipped)
 
@@ -147,12 +176,12 @@ def written_csv_folder(tmp_path_factory, harvest_result):
     mock_future.result.return_value = hr
 
     with (
-        patch("cde_harvester.ERDDAP.requests.Session") as mock_session_cls,
+        patch("cde_harvester.sources.erddap.client.requests.Session") as mock_session_cls,
         # CKAN fetching now goes through a requests.Session built by
         # _build_ckan_session() and read with resp.json(), so patch the session
         # builder rather than the (now unused) module-level requests.get.
         patch(
-            "cde_harvester.ckan.create_ckan_erddap_link._build_ckan_session",
+            "cde_harvester.sources.ckan.create_ckan_erddap_link._build_ckan_session",
         ) as mock_ckan_session_builder,
         patch(
             "cde_harvester.__main__.get_run_logger",
@@ -161,6 +190,17 @@ def written_csv_folder(tmp_path_factory, harvest_result):
         patch(
             "cde_harvester.__main__.harvest_erddap"
         ) as mock_harvest_task,
+        # get_ckan_records feeds a real DataFrame into merge; merge writes the
+        # CSVs the assertions read. Run both synchronously so the test drives the
+        # real merge + CSV-write logic without a flow context.
+        patch.object(
+            get_ckan_records, "submit", _submit_without_flow(get_ckan_records)
+        ),
+        patch.object(
+            merge_and_write_csvs,
+            "submit",
+            _submit_without_flow(merge_and_write_csvs, as_future=True),
+        ),
     ):
         mock_session = MagicMock()
         mock_session.get.side_effect = _erddap_session_get
@@ -172,10 +212,10 @@ def written_csv_folder(tmp_path_factory, harvest_result):
 
         mock_harvest_task.submit.return_value = mock_future
 
-        from cde_harvester.__main__ import main as harvester_main
-
-        # main() is now a plain function wrapped by @monitor (Sentry), not a
-        # Prefect @flow, so call it directly rather than via .fn().
+        # main() is a plain function (flattened pipeline: cde_pipeline_run is
+        # the only @flow). The .submit()ed tasks below need a task runner, which
+        # only a flow context provides — so run their wrapped fns synchronously
+        # via the patches above instead of standing up a flow just for the test.
         harvester_main(
             erddap_urls=ERDDAP_URL,
             cache_requests=False,
@@ -240,14 +280,13 @@ def db_load_calls(written_csv_folder):
     sql_calls = []
 
     with (
-        patch("cde_db_loader.__main__.create_engine", return_value=engine),
-        patch("cde_db_loader.__main__.load_dotenv"),
+        patch("cde_harvester.loading.loader.create_db_engine", return_value=engine),
         patch(
-            "cde_db_loader.__main__.get_run_logger",
+            "cde_harvester.loading.loader.get_run_logger",
             return_value=logging.getLogger("test"),
         ),
         patch(
-            "cde_db_loader.__main__.text",
+            "cde_harvester.loading.loader.text",
             side_effect=lambda s: sql_calls.append(s) or s,
         ),
         patch("pandas.DataFrame.to_sql"),
@@ -260,8 +299,6 @@ def db_load_calls(written_csv_folder):
             },
         ),
     ):
-        from cde_db_loader.__main__ import main as db_main
-
         db_main.fn(written_csv_folder, incremental=False)
 
     return sql_calls

@@ -291,3 +291,76 @@ BEGIN
   PERFORM obis_backfill_aphia_ids();
 END;
 $$ LANGUAGE plpgsql;
+
+
+-- Trajectory-cell post-load processing. Mirrors the obis_* functions above:
+-- trajectory_cells carries a generated geom, so processing is only the
+-- dataset_pk backfill, the points insert and the days backfill. Must run
+-- AFTER profile_process() (which rebuilds cde.points) and BEFORE
+-- create_hexes() (which links point_pk + hex FKs by joining points on geom).
+
+CREATE OR REPLACE FUNCTION trajectory_link_dataset_pk() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
+  UPDATE cde.trajectory_cells c
+  SET dataset_pk = d.pk
+  FROM cde.datasets d
+  WHERE c.dataset_id = d.dataset_id
+    AND c.erddap_url = d.erddap_url
+    AND c.dataset_pk IS NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION trajectory_insert_points() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
+  INSERT INTO cde.points (geom)
+  SELECT src.new_geom
+    FROM (
+      SELECT DISTINCT
+             ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857) AS new_geom
+        FROM cde.trajectory_cells
+    ) src
+    LEFT JOIN cde.points p ON p.geom = src.new_geom
+   WHERE p.pk IS NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- NOTE: there is deliberately no trajectory_link_point_pk(). point_pk is
+-- linked together with the hex FKs in create_hexes() (single UPDATE joining
+-- cde.points by geom) to avoid rewriting every row of the largest cells
+-- table twice per load. The relink covers ALL rows on every run because
+-- profile_process() rebuilds cde.points with new serial pks.
+
+CREATE OR REPLACE FUNCTION trajectory_update_days() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
+  UPDATE cde.trajectory_cells
+  SET days = date_part('days', time_max - time_min) + 1
+  WHERE days IS NULL
+    AND time_min IS NOT NULL AND time_max IS NOT NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Wrapper used by process_incremental_update(); the full-reload path in the
+-- db-loader invokes the sub-functions individually for per-step timing logs.
+CREATE OR REPLACE FUNCTION trajectory_process() RETURNS VOID AS $$
+BEGIN
+  -- dataset_pk is normally set at INSERT time (loader COPY / incremental
+  -- upsert both fill it); this pass only backfills rows that missed it.
+  PERFORM trajectory_link_dataset_pk();
+  PERFORM trajectory_insert_points();
+  -- days is computed at harvest time; this pass only backfills NULLs.
+  PERFORM trajectory_update_days();
+  -- point_pk + hex FKs are linked in create_hexes(), which runs after.
+END;
+$$ LANGUAGE plpgsql;

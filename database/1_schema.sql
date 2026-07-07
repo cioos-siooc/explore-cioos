@@ -54,8 +54,53 @@ CREATE TABLE datasets (
     first_eov_column TEXT,
     source_type TEXT DEFAULT 'erddap',
     obis_nodes text[] DEFAULT '{}',
+    -- Croissant file-list hash (set only for file-backed datasets); skip-if-unchanged.
+    content_hash TEXT,
+    -- Why content_hash is NULL (HASH_* code: database-backed, Croissant fetch error, …);
+    -- NULL when a hash was produced. Lets the dashboard explain unhashed datasets.
+    content_hash_reason TEXT,
+    last_updated_at timestamptz,
+    verified_at timestamptz,
+    -- Griddap (metadata-only) coverage; see migrations/add-griddap-dataset-columns.sql
+    -- for semantics. Kept at table end so temp_datasets (LIKE ...) stays aligned
+    -- with migrated live databases.
+    coverage_lat_min double precision,
+    coverage_lat_max double precision,
+    coverage_lon_min double precision,
+    coverage_lon_max double precision,
+    coverage_time_min timestamptz,
+    coverage_time_max timestamptz,
+    coverage_depth_min double precision,
+    coverage_depth_max double precision,
+    grid_variables jsonb,
+    grid_dimensions jsonb,
+    wms_url text,
+    -- lat clamped to +-85.06 (3857 pole blowup); lon_min > lon_max means
+    -- antimeridian-crossing -> split into a two-envelope MultiPolygon.
+    coverage_bbox geometry(Geometry,3857) GENERATED ALWAYS AS (
+      CASE
+        WHEN coverage_lon_min IS NULL OR coverage_lon_max IS NULL
+          OR coverage_lat_min IS NULL OR coverage_lat_max IS NULL THEN NULL
+        WHEN coverage_lon_min <= coverage_lon_max THEN
+          ST_Transform(ST_SetSRID(ST_MakeEnvelope(
+            coverage_lon_min, LEAST(GREATEST(coverage_lat_min, -85.06), 85.06),
+            coverage_lon_max, LEAST(GREATEST(coverage_lat_max, -85.06), 85.06)),
+            4326), 3857)
+        ELSE
+          ST_Transform(ST_SetSRID(ST_Collect(
+            ST_MakeEnvelope(
+              coverage_lon_min, LEAST(GREATEST(coverage_lat_min, -85.06), 85.06),
+              180,              LEAST(GREATEST(coverage_lat_max, -85.06), 85.06)),
+            ST_MakeEnvelope(
+              -180,             LEAST(GREATEST(coverage_lat_min, -85.06), 85.06),
+              coverage_lon_max, LEAST(GREATEST(coverage_lat_max, -85.06), 85.06))),
+            4326), 3857)
+      END) STORED,
     UNIQUE(dataset_id, erddap_url)
 );
+
+CREATE INDEX IF NOT EXISTS datasets_coverage_bbox_gist
+  ON cde.datasets USING GIST (coverage_bbox) WHERE coverage_bbox IS NOT NULL;
 
 -- List of organizations to show in CDE, from CKAN, can be many per dataset
 DROP TABLE IF EXISTS organizations;
@@ -101,8 +146,27 @@ CREATE TABLE profiles (
     profile_id text,
     time_min timestamptz,
     time_max timestamptz,
+    -- Representative display point (exact location, or the bounding-box
+    -- midpoint for features that span a region). geom (above) is the Point
+    -- built from these for the point/hex map layers.
     latitude double precision,
     longitude double precision,
+    -- Per-feature lat/lon bounding box. bbox is the indexed geometry spatial
+    -- search matches against, so a feature is found across its whole extent
+    -- (not just the single display point). ST_MakeEnvelope yields a Point when
+    -- min==max, hence geometry(Geometry,...) rather than Polygon.
+    latitude_min double precision,
+    latitude_max double precision,
+    longitude_min double precision,
+    longitude_max double precision,
+    bbox geometry(Geometry,3857) GENERATED ALWAYS AS
+      (ST_Transform(ST_SetSRID(
+        ST_MakeEnvelope(longitude_min, latitude_min, longitude_max, latitude_max),
+        4326), 3857)) STORED,
+    -- false = feature spans a region (box diagonal > ~1km): still searchable
+    -- and counted in the zoomed-out hexes, but not drawn as an individual dot
+    -- at point zoom. See web-api tiles/legend routes.
+    show_as_point boolean NOT NULL DEFAULT true,
     depth_min double precision,
     depth_max double precision,
     n_records bigint,
@@ -116,6 +180,7 @@ CREATE TABLE profiles (
 );
 
 CREATE INDEX ON profiles USING GIST (geom);
+CREATE INDEX ON profiles USING GIST (bbox);
 CREATE INDEX ON profiles(latitude);
 CREATE INDEX ON profiles(longitude);
 -- Index for efficient filtering by dataset during incremental updates
@@ -177,6 +242,60 @@ CREATE INDEX obis_cells_aphia_ids_gin         ON cde.obis_cells USING GIN (aphia
 -- bloat from those passes; modest effect now that the geom UPDATE is gone.
 ALTER TABLE cde.obis_cells SET (fillfactor = 80);
 ALTER TABLE cde.points SET (fillfactor = 80);
+
+
+-- Trajectory / TrajectoryProfile coverage cells: one row per (trajectory,
+-- 1/12-degree grid cell) the track passes through, produced by the harvester's
+-- trajectory dataset-type handler via server-side binned ERDDAP queries (no
+-- full-resolution track is ever stored here). Modeled on obis_cells — same
+-- generated geom, same points/hex FK propagation (see trajectory_* functions
+-- in 5_profile_process.sql).
+DROP TABLE IF EXISTS trajectory_cells;
+CREATE TABLE trajectory_cells (
+    pk serial PRIMARY KEY,
+    dataset_pk integer,
+    erddap_url text,
+    dataset_id text,
+    -- cf_role=trajectory_id value (mission/deployment); '' when the dataset
+    -- has a single unnamed trajectory.
+    trajectory_id text DEFAULT '',
+    -- bin-center coordinates, rounded to 8 dp (same convention as obis_cells)
+    latitude double precision,
+    longitude double precision,
+    geom geometry(Point, 3857) GENERATED ALWAYS AS
+      (ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)) STORED,
+    time_min timestamptz,
+    time_max timestamptz,
+    depth_min double precision,
+    depth_max double precision,
+    n_records bigint,
+    -- TrajectoryProfile: distinct profiles observed in this cell. 0 for plain
+    -- Trajectory datasets.
+    n_profiles bigint DEFAULT 0,
+    -- computed at harvest time so the download-estimate math in
+    -- web-api/utils/shapeQuery.js works unchanged on this table
+    records_per_day float,
+    days bigint,
+    -- hex polygon geometries live on cde.hexes_zoom_0/1; only the FK is
+    -- carried here (filled by create_hexes() via cde.points).
+    hex_0_pk integer,
+    hex_1_pk integer,
+    point_pk integer,
+    UNIQUE(erddap_url, dataset_id, trajectory_id, latitude, longitude),
+    FOREIGN KEY (dataset_pk) REFERENCES datasets(pk)
+);
+
+CREATE INDEX trajectory_cells_geom_gist ON trajectory_cells USING GIST (geom);
+-- No (erddap_url, dataset_id) index: the UNIQUE constraint's index above has
+-- them as its leading columns and serves those lookups (incremental DELETE,
+-- dataset_pk backfill join).
+CREATE INDEX trajectory_cells_latlon_idx ON trajectory_cells (latitude, longitude);
+-- Drive the per-tile lookup in /tiles/trajectories: hexes intersecting the
+-- tile envelope come from the hexes_zoom_* GIST, then these indexes fetch
+-- just the cells under those hexes.
+CREATE INDEX trajectory_cells_hex_0_idx ON trajectory_cells (hex_0_pk);
+CREATE INDEX trajectory_cells_hex_1_idx ON trajectory_cells (hex_1_pk);
+ALTER TABLE cde.trajectory_cells SET (fillfactor = 80);
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
@@ -313,6 +432,10 @@ CREATE TABLE cde.harvest_attempts (
     -- splits on \n and renders each as a clickable link so an admin can
     -- replay the exact requests to debug a failure.
     query_urls    text,
+    -- Non-fatal note for an otherwise-successful dataset, surfaced on the
+    -- harvest dashboard (e.g. features hidden from the map because they span
+    -- a region larger than the point threshold).
+    warnings      text,
     PRIMARY KEY (run_id, erddap_url, dataset_id)
 );
 CREATE INDEX harvest_attempts_dataset_idx
