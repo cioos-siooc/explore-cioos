@@ -6,7 +6,6 @@ import SelectionPanelHeader from '../SelectionPanelHeader/SelectionPanelHeader.j
 import SearchBar from '../SearchBar/SearchBar.jsx'
 import FilterChips from '../FilterChips/FilterChips.jsx'
 import FunnelVisualization from '../FunnelVisualization/FunnelVisualization.jsx'
-import DownloadCTA from '../DownloadCTA/DownloadCTA.jsx'
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetPreview from '../DatasetPreview/DatasetPreview.jsx'
 import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
