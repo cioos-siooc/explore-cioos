@@ -2,6 +2,8 @@ services:
   db:
     build: ./database
     platform: linux/x86_64
+    ports:
+      - "${DB_PORT:-5432}:${DB_PORT:-5432}"
     environment:
       - "PGPORT=${DB_PORT:-5432}"
       - "POSTGRES_DB=$DB_NAME"
@@ -74,6 +76,8 @@ services:
     build:
         context: ./nginx
         dockerfile: Dockerfile
+    ports:
+      - "${NGINX_PORT:-4000}:4000"
     volumes:
       - nginx_logs:/var/log/nginx
       - nginx_logrotate:/var/lib/logrotate
@@ -126,15 +130,15 @@ services:
     restart: unless-stopped
     command: ["./worker-entrypoint.sh"]
     volumes:
-      # NOTE: the harvest config is NOT bind-mounted here. The image bakes
-      # harvest_config.yaml (from harvest_config.sample.yaml; see harvester
-      # Dockerfile), and the worker reads that baked file. A relative bind-mount
-      # of a repo file doesn't work under Coolify (it resolves the source to an
-      # empty persistent-storage dir and fails "mount dir onto file"). To run a
-      # custom config: locally, mount it via docker-compose.override.yaml (see
-      # docker-compose.override.yaml.sample); under Coolify, use a Persistent
-      # Storage file mount onto /app/harvester/harvest_config.yaml, or bake a
-      # different config into the image.
+      # Local harvest config, editable without rebuilding the image. Create it
+      # first: `cp harvest_config.sample.yaml harvest_config.yaml` (gitignored).
+      # NOTE: this relative bind-mount doesn't work under Coolify (it resolves
+      # the source to an empty persistent-storage dir and fails "mount dir onto
+      # file"), so docker-compose.coolify.yml overrides the volume list to drop
+      # it. Under Coolify (or any host where a bind mount isn't practical — e.g.
+      # a remote worker), set HARVEST_CONFIG_YAML in .env instead: it takes
+      # priority over this mounted/baked-in file whenever set (see .env.sample).
+      - ./harvest_config.yaml:/app/harvester/harvest_config.yaml:ro
       # Shared output sinks — every replica on this host writes here, and nginx
       # serves harvester_logs read-only at /harvester_logs.
       - harvest_data:/app/harvester/harvest          # resulting CSV files
@@ -221,6 +225,8 @@ services:
       PREFECT_UI_API_URL: /api
       PREFECT_UI_URL: http://localhost:4200
       PREFECT_HOME: /root/.prefect
+    ports:
+      - "4200:4200"  # Prefect UI + API
     volumes:
       - prefect_data:/root/.prefect
     depends_on:

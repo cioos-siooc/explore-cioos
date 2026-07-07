@@ -110,6 +110,8 @@ services:
       - tools
     command: ["./worker-entrypoint.sh"]
     volumes:
+      # Alternative: set HARVEST_CONFIG_YAML in .env (full file contents) to
+      # skip this bind mount entirely — it takes priority whenever set.
       - ./harvest_config.yaml:/app/harvester/harvest_config.yaml
       - ./harvester_cache:/app/harvester/harvester_cache
       - ./ckan_harvester_cache:/app/harvester/ckan_harvester_cache
