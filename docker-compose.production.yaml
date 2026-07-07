@@ -17,8 +17,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - explore-cioos_default
 
   # One-shot: applies database/migrations/*.sql to the live DB before any other
   # service reads or writes it. Postgres only runs database/*.sql on a FRESH
@@ -52,8 +50,6 @@ services:
           applied=$$((applied+1))
         done
         echo "Migrations applied: $$applied"
-    networks:
-      - explore-cioos_default
 
   web-api:
     build: ./web-api
@@ -65,8 +61,6 @@ services:
     depends_on:
       db_migrate:
         condition: service_completed_successfully
-    networks:
-      - explore-cioos_default
 
   nginx:
     build:
@@ -82,8 +76,6 @@ services:
       - web-api
     ports:
       - "$NGINX_PORT:4000"
-    networks:
-      - explore-cioos_default
 
   scheduler:
     build:
@@ -96,8 +88,6 @@ services:
       - .env
     volumes:
       - downloads:/usr/src/app/download_scheduler/downloads
-    networks:
-      - explore-cioos_default
 
   frontend:
     build:
@@ -107,8 +97,6 @@ services:
         BASE_URL: $BASE_URL
     expose:
       - "80"
-    networks:
-      - explore-cioos_default
 
   # Prefect PROCESS worker: registers the work pool + deployments on startup
   # (REGISTER_DEPLOYMENTS=true), then runs harvest flows in-process. No spawned
@@ -143,8 +131,6 @@ services:
       prefect:
         condition: service_healthy
     restart: unless-stopped
-    networks:
-      - explore-cioos_default
 
   redis:
     image: "redis:alpine"
@@ -154,8 +140,6 @@ services:
     volumes:
       - redis-data:/var/lib/redis
       - ./redis-config/redis.conf:/usr/local/etc/redis/redis.conf
-    networks:
-      - explore-cioos_default
 
   prefect:
     # Non-conda image ships asyncpg so Prefect uses Postgres (the shared db
@@ -206,15 +190,9 @@ services:
       retries: 30
       start_period: 30s
     restart: unless-stopped
-    networks:
-      - explore-cioos_default
 
 volumes:
   postgres-data:
   redis-data:
   prefect_data:
   downloads:
-
-networks:
-  explore-cioos_default:
-    external: true
