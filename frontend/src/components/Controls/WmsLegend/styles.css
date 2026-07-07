@@ -20,6 +20,21 @@
 .wmsLegendTitle {
   font-weight: 600;
   font-size: 0.85em;
+  color: #007bff;
+  text-decoration: none;
+}
+
+.wmsLegendTitle:hover {
+  text-decoration: underline;
+}
+
+.wmsLegendVariableSelector {
+  margin: 4px 0;
+}
+
+.wmsLegendVariableSelector .dropdown-menu {
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .wmsLegendCloseButton {
@@ -38,6 +53,23 @@
   font-size: 0.8em;
   color: #555;
   margin: 2px 0 4px 0;
+}
+
+.wmsLegendSlider {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0;
+}
+
+.wmsLegendSlider label {
+  font-size: 0.8em;
+  color: #555;
+  margin-bottom: 0;
+}
+
+.wmsLegendSlider input[type='range'] {
+  width: 100%;
+  accent-color: #52a79b;
 }
 
 .wmsLegendImage {

@@ -1,17 +1,14 @@
-import React, { useState } from 'react'
-import { Dropdown, DropdownButton, Form } from 'react-bootstrap'
+import React from 'react'
+import { Form } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 
-import {
-  buildGriddapLegendUrl,
-  defaultElevation,
-  getTimeDimension
-} from '../../../wmsUtilities'
+import { defaultElevation, getTimeDimension } from '../../../wmsUtilities'
 import './styles.css'
 
 // Griddap-specific section of the dataset inspector: grid structure, variable
-// list, and (when the ERDDAP serves WMS) the show-on-map overlay controls
-// with variable picker and colorbar.
+// list, and (when the ERDDAP serves WMS) the show-on-map switch. Variable
+// selection, time/depth sliders and the colorbar live in the floating
+// WmsLegend card over the map.
 export default function GriddapDetails({
   dataset,
   activeWmsOverlay,
@@ -20,8 +17,6 @@ export default function GriddapDetails({
   const { t } = useTranslation()
   const dimensions = dataset.grid_dimensions || []
   const variables = dataset.grid_variables || []
-  const [selectedVariable, setSelectedVariable] = useState(variables[0])
-  const [legendFailed, setLegendFailed] = useState(false)
   const overlayActive = activeWmsOverlay?.pk === dataset.pk
   const timeDimension = getTimeDimension(dimensions)
 
@@ -38,32 +33,21 @@ export default function GriddapDetails({
     return variable.long_name || variable.standard_name || variable.name
   }
 
-  function showOverlay(variable) {
+  function showOverlay() {
     setActiveWmsOverlay({
       pk: dataset.pk,
       datasetId: dataset.dataset_id,
       title: dataset.title,
       wmsUrl: dataset.wms_url,
       erddapUrl: dataset.erddap_url,
-      variable,
+      variable: variables[0],
+      variables,
       time: timeDimension?.max,
       elevation: defaultElevation(dimensions),
       bbox: dataset.coverage_bbox_geojson,
       dimensions
     })
   }
-
-  function handleVariableSelect(variable) {
-    setSelectedVariable(variable)
-    setLegendFailed(false)
-    if (overlayActive) showOverlay(variable)
-  }
-
-  const legendUrl = buildGriddapLegendUrl({
-    erddapUrl: dataset.erddap_url,
-    variable: selectedVariable?.name,
-    dimensions
-  })
 
   return (
     <div className='griddapDetails'>
@@ -106,54 +90,16 @@ export default function GriddapDetails({
       {dataset.wms_url ? (
         <div className='metadataGridItem griddapWmsControls'>
           <strong>{t('griddapMapPreviewTitle')}</strong>
-          <DropdownButton
-            className='griddapVariableSelector'
-            size='sm'
-            variant='outline-secondary'
-            title={`${t('griddapVariableSelect')}: ${
-              selectedVariable ? variableLabel(selectedVariable) : ''
-            }`}
-          >
-            {variables.map((variable) => (
-              <Dropdown.Item
-                key={variable.name}
-                onClick={() => handleVariableSelect(variable)}
-              >
-                {variableLabel(variable)}
-              </Dropdown.Item>
-            ))}
-          </DropdownButton>
           <Form.Check
             type='switch'
             id='griddapShowOnMapSwitch'
             label={t('griddapShowOnMapToggle')}
             checked={overlayActive}
-            disabled={!selectedVariable}
+            disabled={!variables.length}
             onChange={(event) =>
-              event.target.checked
-                ? showOverlay(selectedVariable)
-                : setActiveWmsOverlay()
+              event.target.checked ? showOverlay() : setActiveWmsOverlay()
             }
           />
-          {overlayActive && timeDimension?.max && (
-            <div className='griddapTimeShown'>
-              {t('griddapTimeShown')} {formatDimensionValue(timeDimension.max)}
-            </div>
-          )}
-          {legendUrl && !legendFailed ? (
-            <img
-              className='griddapLegendImage'
-              src={legendUrl}
-              alt={`${selectedVariable?.name} ${t('griddapLegendAltText')}`}
-              onError={() => setLegendFailed(true)}
-            />
-          ) : (
-            legendFailed && (
-              <div className='griddapLegendUnavailable'>
-                {t('griddapLegendUnavailable')}
-              </div>
-            )
-          )}
         </div>
       ) : (
         <div className='metadataGridItem griddapNoWms'>

@@ -405,6 +405,34 @@ export default function CreateMap({
     )
   }
 
+  // While a WMS overlay is active every other data layer is hidden so the
+  // gridded field reads cleanly; only the basemap, the raster and the
+  // dataset's bbox outline stay visible.
+  const dataLayerIds = [
+    'hexes',
+    'hexes-hovered',
+    'points',
+    'points-halo',
+    'points-hovered',
+    'points-highlighted',
+    'trajectory-hexes',
+    'trajectory-hexes-hovered',
+    'griddap-coverage-fill',
+    'griddap-coverage-line'
+  ]
+
+  function setDataLayersVisibility(visible) {
+    dataLayerIds.forEach((layerId) => {
+      if (map.current.getLayer(layerId)) {
+        map.current.setLayoutProperty(
+          layerId,
+          'visibility',
+          visible ? 'visible' : 'none'
+        )
+      }
+    })
+  }
+
   function removeWmsOverlay() {
     wmsRenderToken.current += 1
     if (wmsMoveHandler.current) {
@@ -417,6 +445,7 @@ export default function CreateMap({
     if (map.current.getSource('wms-overlay')) {
       map.current.removeSource('wms-overlay')
     }
+    setDataLayersVisibility(true)
   }
 
   // One WMS GetMap for the current viewport: ERDDAP's WMS is EPSG:4326-only,
@@ -521,6 +550,7 @@ export default function CreateMap({
     const rerender = debounce(() => renderWmsImage(activeWmsOverlay), 300)
     wmsMoveHandler.current = rerender
     map.current.on('moveend', rerender)
+    setDataLayersVisibility(false)
     // pin the dataset's footprint outline while its overlay is shown
     setGriddapHighlight(activeWmsOverlay.bbox)
     return () => removeWmsOverlay()

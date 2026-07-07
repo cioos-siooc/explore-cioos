@@ -1185,7 +1185,7 @@ export default function App() {
         <WmsLegend
           overlay={activeWmsOverlay}
           onClose={() => setActiveWmsOverlay()}
-          selectionPanelOpen={selectionPanelOpen}
+          setActiveWmsOverlay={setActiveWmsOverlay}
         />
       )}
       <IntroModal showModal={showIntroModal} setShowModal={setShowIntroModal} />

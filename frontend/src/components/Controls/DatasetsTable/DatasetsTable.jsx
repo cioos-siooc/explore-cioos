@@ -91,9 +91,9 @@ export default function DatasetsTable({
               ) : (
                 <Square
                   style={
-                    ((isDownloadModal && !row.internalDownload) ||
-                      isGrid(row)) &&
-                    disabledCheckboxStyle
+                    (isDownloadModal && !row.internalDownload) || isGrid(row)
+                      ? disabledCheckboxStyle
+                      : undefined
                   }
                   onClick={checkBoxOnclick(row)}
                   size={16}

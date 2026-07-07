@@ -323,6 +323,8 @@
   "griddapVariableSelect": "Variable",
   "griddapShowOnMapToggle": "Show on map",
   "griddapTimeShown": "Showing time:",
+  "griddapTimeSliderLabel": "Time",
+  "griddapDepthSliderLabel": "Depth",
   "griddapLegendUnavailable": "Legend unavailable",
   "griddapLegendAltText": "legend",
   "griddapNoWmsText": "Map preview is not available for this dataset — access it on ERDDAP",

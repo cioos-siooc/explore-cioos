@@ -113,18 +113,29 @@ export function getTimeDimension(dimensions) {
   return (dimensions || []).find((dim) => dim.name === 'time')
 }
 
-// ERDDAP WMS ELEVATION values are altitude (negative down). Only the range
-// endpoints are known from the harvested metadata; pick the one nearest the
-// surface.
-export function defaultElevation(dimensions) {
-  const verticalDim = (dimensions || []).find(
+export function getVerticalDimension(dimensions) {
+  return (dimensions || []).find(
     (dim) => dim.name === 'depth' || dim.name === 'altitude'
   )
+}
+
+// ERDDAP WMS ELEVATION values are altitude (negative down).
+export function toElevation(verticalDimension, value) {
+  return verticalDimension.name === 'depth' ? -value : value
+}
+
+// Only the range endpoints are known from the harvested metadata; the default
+// level is the endpoint nearest the surface. (ERDDAP snaps TIME/ELEVATION to
+// the nearest grid node, so interpolated slider values are safe too.)
+export function defaultElevation(dimensions) {
+  const verticalDim = getVerticalDimension(dimensions)
   if (!verticalDim || verticalDim.min === null || verticalDim.min === undefined) {
     return undefined
   }
-  const asElevation = (value) => (verticalDim.name === 'depth' ? -value : value)
-  const candidates = [asElevation(verticalDim.min), asElevation(verticalDim.max)]
+  const candidates = [
+    toElevation(verticalDim, verticalDim.min),
+    toElevation(verticalDim, verticalDim.max)
+  ]
   return candidates.reduce((a, b) => (Math.abs(a) <= Math.abs(b) ? a : b))
 }
 
