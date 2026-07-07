@@ -28,7 +28,23 @@ jobs:
           docker compose -f "docker-compose.production.yaml" up -d --build --quiet-pull
 
       - name: Run ERDDAP harvester on sample dataset
-        run: cp ./harvest_config.sample.yaml ./harvest_config.yaml && docker compose -f "docker-compose.production.yaml" up harvester
+        run: |
+          cp ./harvest_config.sample.yaml ./harvest_config.yaml
+          docker compose -f "docker-compose.production.yaml" --profile tools up -d --build prefect_worker
+          # The worker registers the Prefect work pool + deployments on startup;
+          # wait until the harvest-all deployment exists before triggering it.
+          docker compose -f "docker-compose.production.yaml" --profile tools exec -T prefect_worker sh -c '
+            for i in $(seq 1 60); do
+              uv run prefect deployment inspect "Harvest All Sources/cde-harvest-all" >/dev/null 2>&1 && exit 0
+              sleep 5
+            done
+            echo "Timed out waiting for Prefect deployment registration" >&2
+            exit 1
+          '
+          # Trigger a full harvest and block until it completes (fails the job
+          # if the flow run fails).
+          docker compose -f "docker-compose.production.yaml" --profile tools exec -T prefect_worker \
+            uv run prefect deployment run "Harvest All Sources/cde-harvest-all" --watch
 
       - name: Install node
         uses: actions/setup-node@v3
@@ -77,4 +93,4 @@ jobs:
 
       - name: Stop containers
         if: always()
-        run: docker compose -f "docker-compose.production.yaml" down
+        run: docker compose -f "docker-compose.production.yaml" --profile tools down
