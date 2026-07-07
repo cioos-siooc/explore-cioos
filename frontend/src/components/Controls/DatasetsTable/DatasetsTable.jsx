@@ -182,9 +182,11 @@ export default function DatasetsTable({
         cell: (row) => formatErddapServerName(row.erddap_server_url || row.erddap_url, i18n.language, erddapServersJSONfile),
         wrap: true,
         sortable: true,
-        // Sidebar: flex to fill the narrow panel instead of a fixed 120px that
-        // pushes later columns off-screen. Download modal keeps its fixed width.
-        ...(isDownloadModal ? { width: '120px' } : { minWidth: '80px', grow: 1 })
+        // Flex (minWidth + grow) rather than a fixed width in both contexts so
+        // columns share the available width instead of summing past it and
+        // forcing a horizontal scrollbar.
+        minWidth: isDownloadModal ? '100px' : '80px',
+        grow: 1
       },
       {
         name: (
@@ -195,8 +197,9 @@ export default function DatasetsTable({
         selector: (row) => row.title,
         wrap: true,
         sortable: true,
-        // Title takes the lion's share of the remaining space in the sidebar.
-        ...(isDownloadModal ? { width: '280px' } : { minWidth: '140px', grow: 3 })
+        // Title takes the lion's share of the remaining space.
+        minWidth: isDownloadModal ? '160px' : '140px',
+        grow: 3
       },
       {
         name: t('datasetsTableHeaderTypeText'),
@@ -271,9 +274,8 @@ export default function DatasetsTable({
         },
         wrap: true,
         sortable: true,
-        width: '200px',
-        // paddingLeft: cellPadding,
-        // paddingRight: cellPadding
+        minWidth: '140px',
+        grow: 1
       })
       columns.push({
         name: t('datasetTableDownloadModalCDEDownloadableColumnName'),
@@ -308,9 +310,8 @@ export default function DatasetsTable({
         },
         wrap: true,
         sortable: true,
-        width: '170px',
-        // paddingLeft: cellPadding,
-        // paddingRight: cellPadding
+        width: '90px',
+        center: true
       })
       columns.push({
         name: t('datasetTableDownloadModalExternalDownloadColumnName'),
@@ -328,9 +329,8 @@ export default function DatasetsTable({
         },
         wrap: true,
         sortable: true,
-        width: '150px',
-        // paddingLeft: cellPadding,
-        // paddingRight: cellPadding
+        width: '80px',
+        center: true
       })
     }
 
@@ -458,6 +458,12 @@ export default function DatasetsTable({
       }}
       customStyles={tableStyles}
       conditionalRowStyles={selectedRowStyles}
+      // Fill the panel's full height: toolbar/subheader and pagination stay
+      // put; only this scroll area (targeted by className, see styles.css)
+      // grows into the remaining space and scrolls, with a sticky header.
+      className='dtScrollArea'
+      fixedHeader
+      fixedHeaderScrollHeight='100%'
     />
   )
 

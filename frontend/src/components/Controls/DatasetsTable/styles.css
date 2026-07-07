@@ -1,8 +1,21 @@
 /* DatasetsTable — react-data-table-component renders divs (rdt_* classes),
    so table chrome lives in the customStyles prop (DatasetsTable.jsx); this
-   file styles the toolbar, checkboxes and the download-modal cells. */
+   file styles the toolbar, checkboxes and the download-modal cells.
+   Fills its container's height (see DatasetsPanel / DownloadDetails): the
+   toolbar/subheader and pagination footer stay put, and only the row area
+   (.dtScrollArea, the DataTable's fixedHeader responsive wrapper) scrolls —
+   one scroll region instead of the sheet's own overflow taking over. */
 .datasetsTable {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   text-align: left;
+}
+
+.datasetsTable .dtScrollArea {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* --- Row checkboxes --- */

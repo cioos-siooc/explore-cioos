@@ -19,12 +19,17 @@
   overflow: hidden;
 }
 
+/* Datasets and Download both host a data table; give the sheet a real
+   (not just max-) height so the table can flex to fill it exactly, with
+   only the row area scrolling internally — see .datasetsTable. */
 .panelHost[data-panel='datasets'] {
   width: min(760px, calc(100vw - 24px));
+  height: min(62vh, 720px);
 }
 
 .panelHost[data-panel='download'] {
   width: min(1040px, calc(100vw - 24px));
+  height: min(62vh, 720px);
 }
 
 .panelHostHeader {
@@ -191,7 +196,19 @@
   min-height: 300px;
 }
 
+.downloadPanel {
+  height: 100%;
+}
+
+.downloadPanel:not(.downloadPanelEmpty) {
+  display: flex;
+  flex-direction: column;
+}
+
 .downloadPanelEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 40px 24px;
   text-align: center;
   color: var(--cioos-ink-60);

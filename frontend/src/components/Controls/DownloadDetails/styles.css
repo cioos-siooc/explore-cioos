@@ -1,4 +1,7 @@
 .downloadDetails.container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   padding: 0px !important;
   max-width: none !important;
 }
@@ -153,11 +156,20 @@
   cursor: not-allowed;
 }
 
-/* --- Dataset table viewport --- */
-.downloadDataRow {
-  min-height: 300px;
-  max-height: calc(80vh - 220px);
-  overflow-y: auto;
+/* --- Dataset table viewport ---
+   Flexes to fill whatever's left of the panel's fixed height once the
+   filter band / legend / summary rows take theirs; the table itself
+   (fixedHeader + 100% scroll height) owns the one scroll region. */
+.downloadDataRow.row {
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-wrap: nowrap;
+}
+
+.downloadDataRow .col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 /* --- Legend / key: which datasets the CDE can deliver directly --- */
@@ -303,9 +315,6 @@
 }
 
 @media (max-width: 900px) {
-  .downloadDataRow {
-    max-height: 100%;
-  }
   .downloadDetails.container {
     max-width: 100%;
   }
