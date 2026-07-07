@@ -313,12 +313,12 @@ export default function App() {
     )
     if (polygon && !polygonIsRectangle(polygon)) {
       if (elem) {
-        elem.style.backgroundColor = '#c6e3df'
+        elem.style.backgroundColor = 'var(--cioos-teal-light)'
       }
     } else {
       // remove colour from button
       if (elem) {
-        elem.style.backgroundColor = '#ffffff'
+        elem.style.backgroundColor = 'var(--cioos-white)'
       }
     }
     setPolygonFilterActive(!isEmpty(polygon))
@@ -598,14 +598,14 @@ export default function App() {
 
     case 'successful':
       setSubmissionFeedback({
-        icon: <Check2Circle size={30} style={{ color: '#52a79b' }} />,
+        icon: <Check2Circle size={30} className='success' />,
         text: t('submissionStateTextSuccess') // Request successful. Download link will be sent to: ' + email
       })
       break
 
     case 'failed':
       setSubmissionFeedback({
-        icon: <XCircle size={30} style={{ color: '#E25563' }} />,
+        icon: <XCircle size={30} className='error' />,
         text: t('submissionStateTextFailed') // 'Request failed'
       })
       break
