@@ -198,6 +198,7 @@
   "datasetPreviewPlotNone": "Aucune",
   "datasetPreviewPlotTitleVs": "selon",
   "datasetPreviewPlotTitleColoredBy": "coloré par",
+  "datasetPreviewPlotCustomizeLabels": "Personnaliser les noms",
   "datasetPreviewTableText": "Tableau",
   "datasetPreviewPlotText": "Graphique",
   "plotType": "Type de graphique",

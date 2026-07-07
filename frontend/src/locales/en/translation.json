@@ -197,6 +197,7 @@
   "datasetPreviewPlotNone": "None",
   "datasetPreviewPlotTitleVs": "vs",
   "datasetPreviewPlotTitleColoredBy": "colored by",
+  "datasetPreviewPlotCustomizeLabels": "Customize labels",
   "datasetPreviewTableText": "Table",
   "datasetPreviewPlotText": "Plot",
   "plotType": "Plot type",
