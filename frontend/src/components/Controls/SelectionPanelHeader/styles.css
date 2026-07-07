@@ -10,6 +10,8 @@
   position: sticky;
   top: 0;
   z-index: var(--cioos-z-sticky-header);
+  contain: layout style paint;
+  will-change: transform;
 }
 
 .headerLogo {
@@ -84,6 +86,11 @@
   background-color: var(--cioos-surface-2);
   transform: scale(1.05);
   box-shadow: var(--cioos-shadow-sm);
+}
+
+.headerActionButton:focus {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }
 
 .headerActionButton:focus-visible {

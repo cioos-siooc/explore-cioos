@@ -13,10 +13,11 @@
   font-size: var(--cioos-font-size-base);
   font-weight: 600;
   cursor: pointer;
-  transition: all var(--cioos-transition-fast);
+  transition: background-color var(--cioos-transition-fast), box-shadow var(--cioos-transition-fast), transform var(--cioos-transition-fast);
   box-shadow: var(--cioos-shadow-card);
   white-space: nowrap;
   flex-shrink: 0;
+  will-change: background-color, transform, box-shadow;
 }
 
 .downloadCtaButton:hover:not(.disabled) {

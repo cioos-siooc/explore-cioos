@@ -26,8 +26,9 @@
   border: none;
   margin: 0;
   overflow-wrap: break-word;
-  transition: all var(--cioos-transition-normal);
+  transition: background-color var(--cioos-transition-normal), box-shadow var(--cioos-transition-normal);
   height: var(--cioos-row-height);
+  will-change: background-color, box-shadow;
 }
 
 /* Alternating row striping for visual clarity */
