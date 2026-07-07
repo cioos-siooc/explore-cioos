@@ -35,7 +35,8 @@ def _make_erddap(all_datasets_csv=ERDDAP_ALL_DATASETS_CSV):
         erddap = ERDDAP(ERDDAP_URL, cache_requests=False)
         erddap.session = mock_session  # expose for further assertions
         # __init__ no longer auto-fetches the dataset list; the caller (harvest())
-        # now populates it explicitly via get_all_datasets(), so do the same here.
+        # now populates it explicitly via get_all_datasets(). The prefect_test_server
+        # session fixture provides the API so the @task runs normally here.
         erddap.df_all_datasets = erddap.get_all_datasets()
     return erddap
 
@@ -131,6 +132,130 @@ class TestErddapCsvToDf:
         from cde_harvester.harvest_errors import ResponseTooLargeError
         with pytest.raises(ResponseTooLargeError):
             erddap.erddap_csv_to_df("/tabledap/ds.csv")
+
+
+class TestCroissantFingerprint:
+    """Tests for ERDDAP.get_croissant_fingerprint — the Croissant hash logic."""
+
+    def _make_erddap_bare(self):
+        """ERDDAP instance with a controllable mocked session (no allDatasets fetch)."""
+        from cde_harvester.ERDDAP import ERDDAP
+        with patch("cde_harvester.ERDDAP.requests") as mock_requests:
+            mock_session = MagicMock()
+            mock_requests.Session.return_value = mock_session
+            erddap = ERDDAP(ERDDAP_URL, cache_requests=False)
+            erddap.session = mock_session
+        return erddap, mock_session
+
+    def _mock_resp(self, mock_session, status=200, doc=None, exc=None):
+        if exc is not None:
+            mock_session.get.side_effect = exc
+            return
+        resp = MagicMock()
+        resp.status_code = status
+        if doc is not None:
+            resp.json.return_value = doc
+        mock_session.get.return_value = resp
+
+    def test_file_object_returns_hash_and_has_files(self):
+        from cde_harvester.ERDDAP import ERDDAP
+        erddap, mock_session = self._make_erddap_bare()
+        self._mock_resp(mock_session, doc={
+            "distribution": [{"@type": "cr:FileObject", "contentUrl": "s3://bucket/file"}]
+        })
+        content_hash, has_files, reason = erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
+        assert has_files is True
+        assert len(content_hash) == 64  # SHA-256 hex digest
+        assert reason is None
+
+    def test_same_doc_produces_same_hash(self):
+        erddap, mock_session = self._make_erddap_bare()
+        doc = {"distribution": [{"@type": "cr:FileObject", "key": "val"}]}
+        self._mock_resp(mock_session, doc=doc)
+        h1, _, _ = erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
+
+        self._mock_resp(mock_session, doc=doc)
+        h2, _, _ = erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
+        assert h1 == h2
+
+    def test_http_error_returns_croissant_http_error(self):
+        from cde_harvester.harvest_errors import HASH_CROISSANT_HTTP_ERROR
+        erddap, mock_session = self._make_erddap_bare()
+        self._mock_resp(mock_session, status=404)
+        content_hash, has_files, reason = erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
+        assert has_files is False
+        assert content_hash is None
+        assert reason == HASH_CROISSANT_HTTP_ERROR
+
+    def test_network_exception_returns_unreadable(self):
+        from cde_harvester.harvest_errors import HASH_CROISSANT_UNREADABLE
+        erddap, mock_session = self._make_erddap_bare()
+        self._mock_resp(mock_session, exc=Exception("connection refused"))
+        content_hash, has_files, reason = erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
+        assert has_files is False
+        assert content_hash is None
+        assert reason == HASH_CROISSANT_UNREADABLE
+
+    def test_no_file_object_returns_no_file_list(self):
+        from cde_harvester.harvest_errors import HASH_NO_FILE_LIST
+        erddap, mock_session = self._make_erddap_bare()
+        self._mock_resp(mock_session, doc={
+            "distribution": [{"@type": "cr:FileSet", "name": "some-set"}]
+        })
+        content_hash, has_files, reason = erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
+        assert has_files is False
+        assert content_hash is None
+        assert reason == HASH_NO_FILE_LIST
+
+    def test_empty_distribution_returns_no_file_list(self):
+        from cde_harvester.harvest_errors import HASH_NO_FILE_LIST
+        erddap, mock_session = self._make_erddap_bare()
+        self._mock_resp(mock_session, doc={"distribution": []})
+        content_hash, has_files, reason = erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
+        assert has_files is False
+        assert content_hash is None
+        assert reason == HASH_NO_FILE_LIST
+
+    def test_federated_source_is_followed(self):
+        """A doc with a sourceUrl pointing to another ERDDAP triggers a hop."""
+        from cde_harvester.harvest_errors import HASH_NO_FILE_LIST
+        erddap, mock_session = self._make_erddap_bare()
+
+        federated_doc = {
+            "description": "sourceUrl=https://origin.erddap.com/erddap/tabledap/origin_ds",
+            "distribution": [],
+        }
+        origin_doc = {"distribution": []}
+
+        first_resp = MagicMock()
+        first_resp.status_code = 200
+        first_resp.json.return_value = federated_doc
+        second_resp = MagicMock()
+        second_resp.status_code = 200
+        second_resp.json.return_value = origin_doc
+        mock_session.get.side_effect = [first_resp, second_resp]
+
+        _, has_files, reason = erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
+        assert has_files is False
+        assert reason == HASH_NO_FILE_LIST
+        assert mock_session.get.call_count == 2
+
+    def test_max_hops_reached_returns_federated_unresolved(self):
+        """When _hops>=3 the code still fetches but skips federation and returns UNRESOLVED."""
+        from cde_harvester.harvest_errors import HASH_FEDERATED_UNRESOLVED
+        erddap, mock_session = self._make_erddap_bare()
+        # A doc with a sourceUrl but no FileObject; _hops=3 means we can't follow it.
+        doc = {
+            "description": "sourceUrl=https://another.erddap.com/erddap/tabledap/ds2",
+            "distribution": [],
+        }
+        self._mock_resp(mock_session, doc=doc)
+        _, has_files, reason = erddap.get_croissant_fingerprint(
+            ERDDAP_URL, "ds1", _hops=3
+        )
+        assert has_files is False
+        assert reason == HASH_FEDERATED_UNRESOLVED
+        mock_session.get.assert_called_once()
 
 
 class TestParseErddapDate:

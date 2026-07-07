@@ -66,20 +66,17 @@ def harvest_result(tmp_path_factory):
     """
     Run ERDDAPHarvester.harvest() against a fully-mocked ERDDAP server.
     Returns (profiles_df, datasets_df, variables_df, skipped_df).
-    Uses harvest_erddap.fn() to bypass the Prefect @task decorator.
+
+    harvest_erddap and the nested get_all_datasets are both Prefect @tasks;
+    the prefect_test_server session fixture provides the ephemeral API so they
+    can be called directly without any .fn() bypass.
     """
-    with (
-        patch("cde_harvester.ERDDAP.requests.Session") as mock_session_cls,
-        patch(
-            "cde_harvester.ckan.create_ckan_erddap_link.requests.get",
-            side_effect=_ckan_side_effects(),
-        ),
-    ):
+    with patch("cde_harvester.ERDDAP.requests.Session") as mock_session_cls:
         mock_session = MagicMock()
         mock_session.get.side_effect = _erddap_session_get
         mock_session_cls.return_value = mock_session
 
-        result = harvest_erddap.fn(ERDDAP_URL, limit_dataset_ids=[DATASET_ID])
+        result = harvest_erddap(ERDDAP_URL, limit_dataset_ids=[DATASET_ID])
 
     assert not result.datasets.empty, "harvest produced no datasets"
     return result.profiles, result.datasets, result.variables, result.skipped
@@ -133,15 +130,15 @@ class TestHarvestOutput:
 def _submit_without_flow(task, *, as_future=False):
     """Stand-in for Prefect ``Task.submit()`` with no flow context.
 
-    main() is a plain function (the flattened pipeline runs every step under the
-    single cde_pipeline_run @flow), but it still ``.submit()``s its tasks — which
-    needs a task runner that only a flow context provides. Rather than stand up a
-    flow just for the test, run the task's wrapped ``.fn`` synchronously here.
-    The Prefect-only ``wait_for`` kwarg is stripped. ``as_future=True`` wraps the
+    main() is a plain function (not a @flow), but it still ``.submit()``s its
+    tasks — which needs a task runner only a flow context provides. Rather than
+    stand up a full flow, run the task as an autonomous Prefect task here (the
+    prefect_test_server session fixture provides the API server). The
+    Prefect-only ``wait_for`` kwarg is stripped. ``as_future=True`` wraps the
     result so the caller's ``.submit(...).result()`` still works.
     """
     def _submit(*args, wait_for=None, **kwargs):
-        value = task.fn(*args, **kwargs)
+        value = task(*args, **kwargs)
         if not as_future:
             return value
         future = MagicMock()
@@ -300,7 +297,7 @@ def db_load_calls(written_csv_folder):
             },
         ),
     ):
-        db_main.fn(written_csv_folder, incremental=False)
+        db_main(written_csv_folder, incremental=False)
 
     return sql_calls
 
