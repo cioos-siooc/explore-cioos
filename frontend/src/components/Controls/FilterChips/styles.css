@@ -1,0 +1,111 @@
+.filterChipsContainer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cioos-space-md);
+  flex-wrap: wrap;
+}
+
+.filterChipsWrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--cioos-space-sm);
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.filterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cioos-space-xs);
+  padding: var(--cioos-space-sm) var(--cioos-space-md);
+  background-color: var(--cioos-teal-light);
+  border-radius: var(--cioos-radius-pill);
+  border: 1px solid var(--cioos-hairline);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--cioos-primary-700);
+  white-space: nowrap;
+}
+
+.chipLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.chipRemoveButton {
+  background: none;
+  border: none;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--cioos-transition-fast), transform var(--cioos-transition-fast);
+  flex-shrink: 0;
+}
+
+.chipRemoveButton:hover {
+  color: var(--cioos-navy);
+  transform: scale(1.2);
+}
+
+.chipRemoveButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+  border-radius: var(--cioos-radius-pill);
+}
+
+.clearAllFiltersButton {
+  padding: var(--cioos-space-sm) var(--cioos-space-md);
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  transition: all var(--cioos-transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.clearAllFiltersButton:hover {
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink);
+}
+
+.clearAllFiltersButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+  .filterChipsContainer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--cioos-space-sm);
+  }
+
+  .filterChipsWrapper {
+    gap: var(--cioos-space-xs);
+  }
+
+  .filterChip {
+    padding: var(--cioos-space-xs) var(--cioos-space-sm);
+    font-size: var(--cioos-font-size-xs);
+  }
+
+  .chipLabel {
+    max-width: 150px;
+  }
+}

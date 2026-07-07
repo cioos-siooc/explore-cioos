@@ -4,13 +4,13 @@
 }
 
 .pointDetailsInfoRow {
-  height: calc(100% - 130px); 
+  height: calc(100% - var(--cioos-header-height) - 130px);
   overflow-y: auto;
   overflow-x: hidden;
 }
 
 .pointDetailsInfoRow.fullHeight {
-  height: calc(100% - 70px);
+  height: calc(100% - var(--cioos-header-height) - 70px);
 }
 
 @media (max-height: 500px) {
@@ -72,100 +72,6 @@
   margin-top: 100px;
 }
 
-.pointDetailsHeader {
-  height: 66px;
-  display: flex;
-  /* background-color: var(--cioos-sand); */
-  border-bottom: 1px solid var(--cioos-hairline);
-  align-items: center;
-}
-
-.pointDetailsHeaderLogo {
-  padding: 3px 0px;
-}
-
-.pointDetailsHeaderLogo.CIOOS {
-  margin: auto 0px;
-  height: 100%;
-  padding: 10px;
-}
-
-.pointDetailsHeaderLogo.CDE {
-  /* margin: auto 0px auto 70px; */
-  padding: 0px;
-  height: 100%;
-  width: 100%;
-  object-fit:scale-down;
-}
-
-.pointDetailsHeaderLogo.CDE:hover {
-  cursor: pointer;
-  background-color: var(--cioos-teal-light);
-  /* padding: -2px; */
-}
-
-.pointDetailsHeaderLogo.CIOOS:hover {
-  cursor: pointer;
-  background-color: var(--cioos-surface-2);
-  /* padding: -2px; */
-}
-
-.pointDetailsHeaderIntroButton {
-  margin: 10px 10px 10px 0px;
-  pointer-events: all;
-  background-color: var(--cioos-white);
-  /* box-shadow: 0 0 0 2px rgb(0 0 0 / 10%); */
-  border-radius: 4px;
-  border: 0px;
-  height: 42px;
-  width: 42px;
-  text-align: center;
-  z-index: 3;
-}
-
-.pointDetailsHeaderIntroButton:hover {
-  background-color: var(--cioos-surface-2);
-}
-
-.feedbackButtonImage {
-  background-image: url(../../Images/feedbackButton.png);
-}
-
-.feedbackButton {
-  background-color: var(--cioos-white);
-  /* box-shadow: 0 0 0 2px rgb(0 0 0 / 10%); */
-  border-radius: 4px;
-  width: 42px;
-  height: 42px;
-  z-index: 100;
-  padding: 6px 7px 5px 7px;
-  margin: auto 10px;
-}
-
-.feedbackButton:hover {
-  background-color: var(--cioos-surface-2);
-}
-
-.noPosition.languageSelector{
-  position: inherit;
-  top: inherit;
-  right: inherit;
-  margin: 10px;
-  pointer-events: all;
-  z-index: 3;
-  width: 42px;
-  height: 42px;
-  text-align: center;
-  /* margin: auto; */
-  padding:7px 5px 5px 5px;
-  background-color: var(--cioos-white);
-  border-radius: 4px;
-  /* border: 2px solid var(--cioos-hairline); */
-}
-
-.noPosition.languageSelector:hover {
-  background-color: var(--cioos-surface-2);
-}
 
 .pointDetailsSearchBar {
   width: 100%;
@@ -258,27 +164,8 @@
   color: var(--cioos-primary-700);
 }
 
-/* --- Mobile: keep the panel header on one line and the funnel counters
-   readable when the panel goes full-width on a phone. --- */
+/* --- Mobile: funnel counters readable when the panel goes full-width on a phone. --- */
 @media (max-width: 600px) {
-  .pointDetailsHeader {
-    height: 56px;
-  }
-
-  .pointDetailsHeaderLogo.CIOOS {
-    padding: 8px;
-    min-width: 0;
-  }
-
-  .pointDetailsHeaderIntroButton,
-  .feedbackButton,
-  .noPosition.languageSelector {
-    height: 38px;
-    width: 38px;
-    margin: 6px 6px;
-    flex-shrink: 0;
-  }
-
   .funnelCount {
     font-size: 18px;
   }

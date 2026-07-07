@@ -60,6 +60,53 @@
      phones (see media query below). The legend offset and the panel's own
      closed-state transforms all derive from this token so they stay in sync. */
   --cioos-panel-w: clamp(360px, 42vw, 580px);
+
+  /* --- Header & Layout (Modern Sidebar) --- */
+  --cioos-header-height: 70px;
+  --cioos-header-height-mobile: 60px;
+  --cioos-header-padding: 16px 20px;
+  --cioos-content-gap: 12px;
+
+  /* --- Typography Scale --- */
+  --cioos-font-size-xs: 11px;
+  --cioos-font-size-sm: 12px;
+  --cioos-font-size-base: 14px;
+  --cioos-font-size-md: 16px;
+  --cioos-font-size-lg: 18px;
+
+  /* --- Spacing Scale --- */
+  --cioos-space-xs: 4px;
+  --cioos-space-sm: 8px;
+  --cioos-space-md: 12px;
+  --cioos-space-lg: 16px;
+  --cioos-space-xl: 24px;
+  --cioos-space-2xl: 32px;
+
+  /* --- Transitions --- */
+  --cioos-transition-fast: 0.15s ease-out;
+  --cioos-transition-normal: 0.2s ease-in-out;
+  --cioos-transition-slow: 0.3s ease-in-out;
+
+  /* --- Table & Rows --- */
+  --cioos-row-height: 80px;
+  --cioos-row-height-mobile: 72px;
+  --cioos-row-hover-bg: linear-gradient(90deg, var(--cioos-teal-light) 0%, transparent 100%);
+  --cioos-row-stripe-bg: var(--cioos-surface-2);
+
+  /* --- Shadows (Enhanced) --- */
+  --cioos-shadow-sm: 0 1px 3px rgba(21, 47, 55, 0.12);
+  --cioos-shadow-md: 0 2px 8px rgba(21, 47, 55, 0.08);
+  --cioos-shadow-lg: 0 4px 12px rgba(21, 47, 55, 0.10);
+  --cioos-shadow-lift: 0 6px 16px rgba(21, 47, 55, 0.08);
+
+  /* --- Z-Index Stack --- */
+  --cioos-z-sticky-header: 10;
+  --cioos-z-sticky-search: 9;
+  --cioos-z-content: 1;
+
+  /* --- Button States --- */
+  --cioos-button-height-lg: 44px;
+  --cioos-button-hover-scale: 1.02;
 }
 
 /* Phones: the panel takes over the full viewport so the dataset details and
@@ -67,6 +114,9 @@
 @media (max-width: 600px) {
   :root {
     --cioos-panel-w: 100vw;
+    --cioos-header-height: var(--cioos-header-height-mobile);
+    --cioos-row-height: var(--cioos-row-height-mobile);
+    --cioos-space-lg: 12px;
   }
 }
 

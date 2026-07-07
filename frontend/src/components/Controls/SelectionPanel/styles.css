@@ -22,6 +22,8 @@
   border-right: 1px solid var(--cioos-hairline);
   box-shadow: var(--cioos-shadow-float);
   transition: left 1s;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Slide the panel (and its grip) fully off the left edge by exactly its own

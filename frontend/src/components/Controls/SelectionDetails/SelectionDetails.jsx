@@ -1,16 +1,15 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { InfoSquare, ChatDots, ChevronRight } from 'react-bootstrap-icons'
+import { ChevronRight } from 'react-bootstrap-icons'
 
+import SelectionPanelHeader from '../SelectionPanelHeader/SelectionPanelHeader.jsx'
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetPreview from '../DatasetPreview/DatasetPreview.jsx'
 import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
-import LanguageSelector from '../LanguageSelector/LanguageSelector.jsx'
 import Loading from '../Loading/Loading.jsx'
 import CIOOSLogoEN from '../../Images/NationalLogoEnglish.png'
 import CIOOSLogoFR from '../../Images/NationalLogoFrench.png'
-import Logo from '../../logo.js'
 import { server } from '../../../config'
 import './styles.css'
 import {
@@ -114,8 +113,7 @@ export default function SelectionDetails({
       setInspectDataset()
       setLoading(true)
       setCombinedQueries(combinedQueries)
-      const urlString = `${server}/pointQuery${combinedQueries ? '?' + combinedQueries : ''
-        }`
+      const urlString = `${server}/pointQuery${combinedQueries ? '?' + combinedQueries : ''}`
       fetch(urlString).then((response) => {
         if (response.ok) {
           response.json().then((data) => {
@@ -201,40 +199,10 @@ export default function SelectionDetails({
       onMouseEnter={() => setHoveredDataset(inspectDataset)}
       onMouseLeave={() => setHoveredDataset()}
     >
-      <div className='pointDetailsHeader'>
-        <img
-          className='pointDetailsHeaderLogo CIOOS'
-          src={i18n.language === 'en' ? CIOOSLogoEN : CIOOSLogoFR}
-          onClick={() =>
-            i18n.language === 'en'
-              ? window.open('https://www.cioos.ca')
-              : window.open('https://www.siooc.ca/fr/accueil/')
-          }
-          title={t('PointDetailsCIOOSLogoTitleText')}
-        />
-        <Logo lang={i18n.language} />
-        <button
-          className='pointDetailsHeaderIntroButton'
-          onClick={() => setShowIntroModal(true)}
-          title={t('introReopenTitle')} // 'Re-open introduction'
-        >
-          <InfoSquare color='#52A79B' size={'25px'} />
-        </button>
-        <a
-          className='feedbackButton'
-          title={t('feedbackButtonTitle')}
-          href={
-            i18n.language === 'en'
-              ? 'https://docs.google.com/forms/d/e/1FAIpQLScrpW_V0whLXAIy7Vk4Wzd2UAZf-hUxPl455jhUlUoUzQGqvg/viewform?usp=dialog'
-              : 'https://docs.google.com/forms/d/e/1FAIpQLScOHpRSyXeGIwkOCLR9_VLhxs6siSiEuTqEGHG1PVNN0BumsQ/viewform?usp=dialog'
-          }
-          target='_blank'
-          rel='noreferrer'
-        >
-          <ChatDots size='28px' color='#52A79B' />
-        </a>
-        <LanguageSelector className='noPosition' />
-      </div>
+      <SelectionPanelHeader
+        logoSource={i18n.language === 'en' ? CIOOSLogoEN : CIOOSLogoFR}
+        onInfoClick={() => setShowIntroModal(true)}
+      />
       <div
         className={`pointDetailsInfoRow ${inspectDataset ? 'fullHeight' : ''}`}
       >

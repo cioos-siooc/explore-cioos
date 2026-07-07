@@ -1,0 +1,89 @@
+.searchBarContainer {
+  padding: var(--cioos-space-lg);
+  background-color: var(--cioos-white);
+  border-bottom: 1px solid var(--cioos-hairline);
+  position: sticky;
+  top: var(--cioos-header-height);
+  z-index: var(--cioos-z-sticky-search);
+  box-shadow: var(--cioos-shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--cioos-space-md);
+}
+
+.searchBarWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchBarInput {
+  width: 100%;
+  padding: var(--cioos-space-md) var(--cioos-space-lg);
+  padding-right: var(--cioos-space-2xl);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  font-family: var(--cioos-font-body);
+  font-size: var(--cioos-font-size-base);
+  color: var(--cioos-ink);
+  background-color: var(--cioos-white);
+  transition: border-color var(--cioos-transition-fast), box-shadow var(--cioos-transition-fast);
+}
+
+.searchBarInput::placeholder {
+  color: var(--cioos-ink-40);
+}
+
+.searchBarInput:focus {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
+}
+
+.searchBarClearButton {
+  position: absolute;
+  right: var(--cioos-space-md);
+  background: none;
+  border: none;
+  color: var(--cioos-ink-40);
+  cursor: pointer;
+  padding: var(--cioos-space-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--cioos-transition-fast), transform var(--cioos-transition-fast);
+}
+
+.searchBarClearButton:hover {
+  color: var(--cioos-primary);
+  transform: scale(1.1);
+}
+
+.searchBarClearButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+  border-radius: var(--cioos-radius-sm);
+}
+
+.filterCountBadge {
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cioos-ink-40);
+  text-align: center;
+}
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+  .searchBarContainer {
+    padding: var(--cioos-space-md);
+    gap: var(--cioos-space-sm);
+  }
+
+  .searchBarInput {
+    padding: var(--cioos-space-sm) var(--cioos-space-md);
+    padding-right: var(--cioos-space-xl);
+    font-size: var(--cioos-font-size-sm);
+  }
+}
