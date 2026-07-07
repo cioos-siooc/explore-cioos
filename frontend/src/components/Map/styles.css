@@ -23,3 +23,9 @@ background-color: var(--cioos-surface-2) !important;
 .mapboxgl-canvas {
   width: 100%;
 }
+
+@media (max-width: 900px) {
+  .map {
+    min-width: auto;
+  }
+}

@@ -132,3 +132,9 @@
   height: 20px;
   align-self: center;
 }
+
+@media (max-width: 600px) {
+  .filterButtonContainer {
+    font-size: 0.9em;
+  }
+}

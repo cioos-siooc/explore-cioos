@@ -237,3 +237,18 @@
   background-color: var(--cioos-teal-light);
   cursor: pointer;
 }
+
+@media (max-width: 600px) {
+  .datasetInspectorBody {
+    padding: 10px 10px 20px 10px;
+    font-size: 0.9em;
+  }
+
+  .datasetMetaSheet .metadataLabel {
+    flex: 0 0 70px;
+  }
+
+  .datasetTitleBlock .filterButton {
+    font-size: 1rem;
+  }
+}
