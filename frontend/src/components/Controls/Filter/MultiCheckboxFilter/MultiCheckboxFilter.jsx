@@ -3,8 +3,8 @@
 
 import * as React from 'react'
 import { CheckSquare, CircleFill, Square } from 'react-bootstrap-icons'
-import { Tooltip, OverlayTrigger } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
+import Tooltip from '../../../ui/Tooltip.jsx'
 import { capitalizeFirstLetter } from '../../../../utilities'
 import platformColors from '../../../platformColors'
 import './styles.css'
@@ -111,15 +111,11 @@ export default function MultiCheckboxFilter({
 
           // No translation
           return (
-            <OverlayTrigger
+            <Tooltip
               key={index}
               placement='bottom'
-              delay={{ show: 150, hide: 0 }}
-              overlay={
-                <Tooltip style={{ display: hoverText ? '' : 'none' }}>
-                  {hoverText}
-                </Tooltip>
-              }
+              delay={150}
+              content={hoverText}
             >
               <div
                 className={`optionButton ${option.isSelected && 'selected'}`}
@@ -163,7 +159,7 @@ export default function MultiCheckboxFilter({
                   />
                 )}
               </div>
-            </OverlayTrigger>
+            </Tooltip>
           )
         })
       ) : (

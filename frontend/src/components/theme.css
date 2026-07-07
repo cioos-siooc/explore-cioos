@@ -99,10 +99,18 @@
   --cioos-shadow-lg: 0 4px 12px rgba(21, 47, 55, 0.10);
   --cioos-shadow-lift: 0 6px 16px rgba(21, 47, 55, 0.08);
 
-  /* --- Z-Index Stack --- */
-  --cioos-z-sticky-header: 10;
-  --cioos-z-sticky-search: 9;
+  /* --- Z-Index Stack ---
+     map (0) < map corner controls < in-panel chrome < shell (brand/search)
+     < sheet < dock < modal < tooltip. */
   --cioos-z-content: 1;
+  --cioos-z-map-controls: 2;
+  --cioos-z-sticky-search: 9;
+  --cioos-z-sticky-header: 10;
+  --cioos-z-shell: 30;
+  --cioos-z-sheet: 34;
+  --cioos-z-dock: 35;
+  --cioos-z-modal: 1055;
+  --cioos-z-tooltip: 1080;
 
   /* --- Button States --- */
   --cioos-button-height-lg: 44px;
@@ -120,15 +128,85 @@
   }
 }
 
+/* --- Base reset (replaces Bootstrap's reboot, which is no longer loaded) --- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
+  margin: 0;
   font-family: var(--cioos-font-body);
+  font-size: var(--cioos-font-size-base);
+  line-height: 1.5;
   color: var(--cioos-ink);
+  -webkit-text-size-adjust: 100%;
+}
+
+p,
+ul,
+ol {
+  margin-top: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: var(--cioos-primary-700);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+img,
+svg {
+  vertical-align: middle;
+}
+
+/* Minimal flex grid, matching the Bootstrap class names still used in the
+   markup (.container/.row/.col) so component overrides keep working. */
+.container,
+.container-fluid {
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: 12px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.col {
+  flex: 1 0 0%;
+  min-width: 0;
+}
+
+.col-auto {
+  flex: 0 0 auto;
+  width: auto;
 }
 
 h1, h2, h3, h4, h5, h6 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
   font-family: var(--cioos-font-display);
   color: var(--cioos-ink);
   font-weight: 600;
+  line-height: 1.2;
 }
 
 /* Accessible, on-brand keyboard focus for every interactive chrome element.

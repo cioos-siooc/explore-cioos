@@ -16,7 +16,7 @@
 }
 
 .sourceFilter .obisGroupChevron:hover {
-  color: #52a79b;
+  color: var(--cioos-primary);
 }
 
 .sourceFilter .obisGroupChildren {

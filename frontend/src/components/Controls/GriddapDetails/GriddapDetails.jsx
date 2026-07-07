@@ -1,6 +1,6 @@
 import React from 'react'
-import { Form } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
+import Switch from '../../ui/Switch.jsx'
 
 import { defaultElevation, getTimeDimension } from '../../../wmsUtilities'
 import './styles.css'
@@ -90,8 +90,7 @@ export default function GriddapDetails({
       {dataset.wms_url ? (
         <div className='metadataGridItem griddapWmsControls'>
           <strong>{t('griddapMapPreviewTitle')}</strong>
-          <Form.Check
-            type='switch'
+          <Switch
             id='griddapShowOnMapSwitch'
             label={t('griddapShowOnMapToggle')}
             checked={overlayActive}

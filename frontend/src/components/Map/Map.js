@@ -31,8 +31,14 @@ import {
   clampBoundsForWms,
   warpEquirectToMercator
 } from '../../wmsUtilities'
-import { colorScale, trajectoryColorScale } from '../config'
+import { colorScale, trajectoryColorScale, basemap } from '../config'
 import platformColors from '../../components/platformColors'
+import {
+  buildBasemapStyle,
+  getLabelTextField,
+  FIRST_LABEL_LAYER_ID,
+  LABEL_LAYER_IDS
+} from './basemapStyle.js'
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
 export default function CreateMap({
@@ -647,25 +653,12 @@ export default function CreateMap({
     // Create map
     map.current = new maplibreGl.Map({
       container: mapContainer.current,
-      style: {
-        version: 8,
-        sources: {
-          osm: {
-            type: 'raster',
-            // tiles: ['https://process.oceangns.com/img?id=20220915T170823-757_oceanmappy_374&field=SST&model=CIOPS&dir=CIOPS_SST_20220916_12&z=2&x=3&y=0&minOrg=-2&step=0.1&stop=-2&stop=0&stop=0.1&stop=10&stop=10.1&stop=20&stop=20.1&stop=30&stop=30.1&stop=35&color=cc00cc&color=ff99ff&color=0066cc&color=66ffcc&color=009933&color=ccff66&color=ffff00&color=ff9933&color=ff0000&color=ffcccc&dt=1663349145779'],
-            // tiles: ['https://process.oceangns.com/mapTiles/Bathymetry/SRTM/tiles/filledValue/{z}/{x}/{y}.png'],
-            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            tileSize: 256
-          }
-        },
-        layers: [
-          {
-            id: 'osm',
-            type: 'raster',
-            source: 'osm'
-          }
-        ]
-      },
+      // Ocean-first basemap: bathymetry raster + vector rivers/boundaries and
+      // FR/EN labels. Data layers are inserted below the label layers.
+      style: buildBasemapStyle(i18n.language, basemap),
+      // Per-source attributions replace the default control (see the compact
+      // AttributionControl added below).
+      attributionControl: false,
       center: [mapLongitude || -150, mapLatitude || 60], // starting position
       zoom: mapZoom || 2 // starting zoom,
     })
@@ -728,6 +721,9 @@ export default function CreateMap({
 
       const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${filterSuffix}`
 
+      // Every data layer is inserted below the basemap's label layers
+      // (beforeId FIRST_LABEL_LAYER_ID or an existing data layer) so water
+      // and place names stay readable over hexes and points.
       map.current.addLayer({
         id: 'points',
         type: 'circle',
@@ -752,7 +748,7 @@ export default function CreateMap({
           'circle-stroke-opacity': 0.001,
           'circle-stroke-width': 10
         }
-      })
+      }, FIRST_LABEL_LAYER_ID)
 
       // Inserted with beforeId 'points' (which must already exist on the
       // map — MapLibre throws otherwise) so trajectory hexes sit at the
@@ -852,7 +848,7 @@ export default function CreateMap({
             stops: colorStops.current
           }
         }
-      })
+      }, FIRST_LABEL_LAYER_ID)
 
       map.current.addLayer({
         id: 'hexes-hovered',
@@ -874,7 +870,7 @@ export default function CreateMap({
           }
         },
         filter: ['in', 'pk', '']
-      })
+      }, FIRST_LABEL_LAYER_ID)
 
       map.current.addLayer({
         id: 'points-highlighted',
@@ -900,7 +896,7 @@ export default function CreateMap({
           'circle-stroke-width': 0.75
         },
         filter: ['in', 'pk', '']
-      })
+      }, FIRST_LABEL_LAYER_ID)
 
       map.current.addLayer({
         id: 'points-hovered',
@@ -924,7 +920,7 @@ export default function CreateMap({
           ]
         },
         filter: ['in', 'pk', '']
-      })
+      }, FIRST_LABEL_LAYER_ID)
 
       // Griddap (gridded, metadata-only) datasets: the optional coverage
       // layer (all matching bboxes, toggled off by default) and the
@@ -1329,10 +1325,10 @@ export default function CreateMap({
       unit: 'metric'
     })
 
+    // Aggregates the per-source attributions from the basemap style
+    // (EMODnet / GEBCO / OSM + OpenFreeMap).
     const attribution = new AttributionControl({
-      customAttribution:
-        'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>.'
-      // compact: true
+      compact: true
     })
     map.current.addControl(attribution, 'bottom-right')
     map.current.addControl(scale, 'bottom-right')
@@ -1359,6 +1355,22 @@ export default function CreateMap({
     map.current.on('zoomend', reapplyColorStops)
     return () => map.current.off('zoomend', reapplyColorStops)
   }, [rangeLevels, trajectoryRangeLevels])
+
+  // Live-swap basemap label languages on EN⇄FR toggle. The initial language
+  // is baked into buildBasemapStyle at construction, so this only fires on
+  // runtime changes.
+  useEffect(() => {
+    if (!map.current || !map.current.isStyleLoaded()) return
+    LABEL_LAYER_IDS.forEach((id) => {
+      if (map.current.getLayer(id)) {
+        map.current.setLayoutProperty(
+          id,
+          'text-field',
+          getLabelTextField(i18n.language, id)
+        )
+      }
+    })
+  }, [i18n.language])
 
   return <div ref={mapContainer} className='map' />
 }

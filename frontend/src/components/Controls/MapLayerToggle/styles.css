@@ -10,7 +10,7 @@
   box-shadow: var(--cioos-shadow-card);
   background-color: var(--cioos-white);
   padding: 5px;
-  z-index: 2;
+  z-index: var(--cioos-z-map-controls, 2);
 }
 
 .mapLayerToggle.active {

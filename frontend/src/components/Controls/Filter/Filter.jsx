@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { useRef, useState, useEffect } from 'react'
-import { Tooltip, OverlayTrigger } from 'react-bootstrap'
 import {
   ChevronCompactDown,
   ChevronCompactUp,
@@ -11,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import noop from 'lodash/noop'
 
 import { abbreviateString, useOutsideAlerter } from '../../../utilities'
+import Tooltip from '../../ui/Tooltip.jsx'
 
 import './styles.css'
 
@@ -67,13 +67,9 @@ export default function Filter({
           replacing the old "?" help icon. Suppressed while the dropdown is
           open so it doesn't overlap the options. */}
       {tooltip && !filterOpen ? (
-        <OverlayTrigger
-          placement='bottom'
-          trigger={['hover', 'focus']}
-          overlay={<Tooltip>{tooltip}</Tooltip>}
-        >
+        <Tooltip placement='bottom' content={tooltip}>
           {filterButton}
-        </OverlayTrigger>
+        </Tooltip>
       ) : (
         filterButton
       )}

@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
-import { Dropdown, DropdownButton } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
+import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
 import './styles.css'
 
 import Plotly from 'Plotly'

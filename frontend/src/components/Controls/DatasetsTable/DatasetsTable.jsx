@@ -24,7 +24,8 @@ import bytes from 'bytes'
 import isEmpty from 'lodash/isEmpty'
 
 import classNames from 'classnames'
-import { Spinner, OverlayTrigger, Tooltip } from 'react-bootstrap'
+import Spinner from '../../ui/Spinner.jsx'
+import Tooltip from '../../ui/Tooltip.jsx'
 
 export default function DatasetsTable({
   handleSelectAllDatasets,
@@ -267,16 +268,7 @@ export default function DatasetsTable({
               </div>
             )
           } else {
-            return (
-              <Spinner
-                className='datasetsTableSpinner'
-                as='span'
-                animation='border'
-                size={50}
-                role='status'
-                aria-hidden='true'
-              />
-            )
+            return <Spinner className='datasetsTableSpinner' />
           }
         },
         wrap: true,
@@ -291,46 +283,29 @@ export default function DatasetsTable({
         cell: (row) => {
           if (!isEmpty(downloadSizeEstimates)) {
             return row.internalDownload ? (
-              <OverlayTrigger
+              <Tooltip
                 placement='top'
-                overlay={
-                  <Tooltip>
-                    {t(
-                      'datasetTableDownloadModalCDEDownloadableColumnNameTooltip'
-                    )}
-                  </Tooltip>
-                }
+                content={t(
+                  'datasetTableDownloadModalCDEDownloadableColumnNameTooltip'
+                )}
               >
                 <Check2Circle
                   className='downloadableIcon success'
                   size='25'
                 />
-              </OverlayTrigger>
+              </Tooltip>
             ) : (
-              <OverlayTrigger
+              <Tooltip
                 placement='top'
-                overlay={
-                  <Tooltip>
-                    {t(
-                      'datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip'
-                    )}
-                  </Tooltip>
-                }
+                content={t(
+                  'datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip'
+                )}
               >
                 <XCircle className='downloadableIcon error' size='25' />
-              </OverlayTrigger>
+              </Tooltip>
             )
           } else {
-            return (
-              <Spinner
-                className='datasetsTableSpinner'
-                as='span'
-                animation='border'
-                size={50}
-                role='status'
-                aria-hidden='true'
-              />
-            )
+            return <Spinner className='datasetsTableSpinner' />
           }
         },
         wrap: true,
@@ -350,16 +325,7 @@ export default function DatasetsTable({
               </a>
             )
           } else {
-            return (
-              <Spinner
-                className='datasetsTableSpinner'
-                as='span'
-                animation='border'
-                size={50}
-                role='status'
-                aria-hidden='true'
-              />
-            )
+            return <Spinner className='datasetsTableSpinner' />
           }
         },
         wrap: true,

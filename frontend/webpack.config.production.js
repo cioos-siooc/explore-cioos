@@ -9,7 +9,6 @@ module.exports = {
     'createPlotlyComponent': 'createPlotlyComponent',
     'maplibre-gl': 'maplibregl',
     'react': 'React',
-    'react-bootstrap': 'ReactBootstrap',
     'react-dom': 'ReactDOM',
   },
   entry: {

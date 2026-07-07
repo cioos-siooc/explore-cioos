@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Dropdown, DropdownButton } from 'react-bootstrap'
 import { X } from 'react-bootstrap-icons'
+import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
 import { useTranslation } from 'react-i18next'
 
 import { abbreviateString } from '../../../utilities'

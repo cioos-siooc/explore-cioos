@@ -1,0 +1,277 @@
+/* ------------------------------------------------------------------
+ * BottomDock — primary navigation at the bottom center:
+ * Datasets · Filters (prominent, brand-colored) · Download.
+ * Each item stacks its icon above the label + live count.
+ * ------------------------------------------------------------------ */
+.bottomDock {
+  pointer-events: all;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-lg);
+  box-shadow: var(--cioos-shadow-float);
+  padding: 8px 10px;
+}
+
+.dockItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 136px;
+  height: 62px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius);
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--cioos-ink);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast),
+    border-color var(--cioos-transition-fast);
+}
+
+.dockItem .dockItemIcon {
+  display: inline-flex;
+  color: var(--cioos-primary);
+}
+
+.dockItemCaption {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.dockItem:hover:not(:disabled) {
+  background-color: var(--cioos-surface-2);
+  border-color: var(--cioos-hairline);
+}
+
+.dockItem.active {
+  background-color: var(--cioos-teal-light);
+  border-color: var(--cioos-primary);
+}
+
+.dockItem:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.dockItemCount {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-navy);
+  color: var(--cioos-white);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* --- The prominent Filters action: a round, 3D-shaded center button that
+   extends above and below the bar --- */
+.dockItem.prominent {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin: -25px 10px;
+  padding: 0;
+  border-radius: 50%;
+  background: linear-gradient(
+    180deg,
+    #6dbdb1 0%,
+    var(--cioos-primary) 45%,
+    var(--cioos-primary-700) 100%
+  );
+  border: 1px solid var(--cioos-primary-700);
+  box-shadow:
+    0 8px 18px rgba(21, 47, 55, 0.35),
+    inset 0 2px 3px rgba(255, 255, 255, 0.5),
+    inset 0 -4px 6px rgba(15, 45, 40, 0.35);
+  color: var(--cioos-white);
+}
+
+.dockItem.prominent .dockItemIcon {
+  color: var(--cioos-white);
+  filter: drop-shadow(0 1px 1px rgba(21, 47, 55, 0.35));
+}
+
+.dockItem.prominent .dockItemCaption {
+  font-size: var(--cioos-font-size-xs);
+  text-shadow: 0 1px 1px rgba(21, 47, 55, 0.35);
+}
+
+.dockItem.prominent:hover:not(:disabled) {
+  background: linear-gradient(
+    180deg,
+    #5fb3a6 0%,
+    var(--cioos-primary-700) 55%,
+    #2f6a60 100%
+  );
+  border-color: var(--cioos-primary-700);
+}
+
+.dockItem.prominent.active {
+  background: linear-gradient(180deg, var(--cioos-primary-700) 0%, #2f6a60 100%);
+  border-color: var(--cioos-navy);
+  box-shadow:
+    0 4px 10px rgba(21, 47, 55, 0.35),
+    inset 0 3px 6px rgba(15, 45, 40, 0.45);
+}
+
+/* Active-filter count floats at the circle's top-right edge. */
+.dockItem.prominent .dockItemCount {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-700);
+  box-shadow: var(--cioos-shadow-sm);
+}
+
+/* Mobile: tighter items, labels hidden — counts stay under the icons. */
+@media (max-width: 700px) {
+  .dockItemLabel {
+    display: none;
+  }
+
+  .dockItem {
+    width: 84px;
+    height: 54px;
+    padding: 6px 8px;
+  }
+
+  .dockItem.prominent {
+    width: 74px;
+    height: 74px;
+    margin: -18px 6px;
+    padding: 0;
+  }
+}
+
+/* ------------------------------------------------------------------
+ * Active-filter chips (above the dock).
+ * One group per active filter category; the label clears the whole filter,
+ * each value chip clears just that value.
+ * ------------------------------------------------------------------ */
+.activeFilterBullets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+
+.activeFilterGroup {
+  pointer-events: all;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  box-shadow: var(--cioos-shadow-card);
+  padding: 3px 6px 3px 4px;
+}
+
+.activeFilterGroupLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  border-radius: var(--cioos-radius-pill);
+  padding: 2px 6px 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cioos-ink);
+  cursor: pointer;
+}
+
+.activeFilterGroupLabel:hover {
+  color: var(--cioos-error);
+}
+
+.activeFilterItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 170px;
+  background-color: var(--cioos-teal-light);
+  border-radius: var(--cioos-radius-pill);
+  padding: 2px 2px 2px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cioos-ink);
+}
+
+.activeFilterItemLabel {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activeFilterItemRemove {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+.activeFilterItemRemove:hover {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
+}
+
+.activeFilterResetItem {
+  pointer-events: all;
+  display: inline-flex;
+}
+
+/* Reset-all: a subtle text link. */
+.filterMenuReset {
+  pointer-events: all;
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color var(--cioos-transition-fast);
+}
+
+.filterMenuReset:hover:not(:disabled) {
+  color: var(--cioos-error);
+}

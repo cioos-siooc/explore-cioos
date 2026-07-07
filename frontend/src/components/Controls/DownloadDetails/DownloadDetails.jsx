@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
-import { Row, Col, Container, Spinner } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
 import bytes from 'bytes'
@@ -31,6 +30,7 @@ import {
   XCircle
 } from 'react-bootstrap-icons'
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
+import Spinner from '../../ui/Spinner.jsx'
 
 // Note: datasets and points are exchangable terminology
 export default function DownloadDetails({
@@ -269,7 +269,7 @@ export default function DownloadDetails({
   const selectedCount = pointsData.filter((point) => point.selected).length
 
   return (
-    <Container className='downloadDetails'>
+    <div className='container downloadDetails'>
       <div className='downloadDetailsHeader'>
         <button
           className='downloadDetailsBackButton'
@@ -347,8 +347,8 @@ export default function DownloadDetails({
         )}
       </div>
 
-      <Row className='downloadDataRow'>
-        <Col>
+      <div className='row downloadDataRow'>
+        <div className='col'>
           <DatasetsTable
             isDownloadModal
             handleSelectAllDatasets={handleSelectAllDatasets}
@@ -360,8 +360,8 @@ export default function DownloadDetails({
             downloadSizeEstimates={downloadSizeEstimates}
             loading={loading}
           />
-        </Col>
-      </Row>
+        </div>
+      </div>
 
       <div className='downloadLegend'>
         <span className='downloadLegendItem'>
@@ -386,8 +386,8 @@ export default function DownloadDetails({
         </span>
       </div>
 
-      <Row className='downloadDetailsDownloadInfoRow'>
-        <Col xs='auto'>
+      <div className='row downloadDetailsDownloadInfoRow'>
+        <div className='col-auto'>
           <div className='downloadSummary'>
             <div className='downloadSummaryStat'>
               <span className='downloadSummaryLabel'>
@@ -398,13 +398,7 @@ export default function DownloadDetails({
                   {`${selectedCount} / ${pointsData.length}`}
                 </span>
               ) : (
-                <Spinner
-                  className='datasetSizeTotalSpinner'
-                  as='span'
-                  animation='border'
-                  role='status'
-                  aria-hidden='true'
-                />
+                <Spinner className='datasetSizeTotalSpinner' />
               )}
             </div>
             <div className='downloadSummaryStat'>
@@ -416,19 +410,13 @@ export default function DownloadDetails({
                   {`${bytes(dataTotal.filteredSize)} / ${bytes(dataTotal.unfilteredSize)}`}
                 </span>
               ) : (
-                <Spinner
-                  className='datasetSizeTotalSpinner'
-                  as='span'
-                  animation='border'
-                  role='status'
-                  aria-hidden='true'
-                />
+                <Spinner className='datasetSizeTotalSpinner' />
               )}
             </div>
           </div>
-        </Col>
+        </div>
         {children}
-      </Row>
-    </Container>
+      </div>
+    </div>
   )
 }

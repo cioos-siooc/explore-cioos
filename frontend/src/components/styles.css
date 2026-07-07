@@ -9,47 +9,6 @@ body {
   height: 42px;
 }
 
-.row>.selectionPanelColumn {
-  padding-left: 0px;
-  padding-right: 0px;
-}
-
-.logo.english {
-  width: 130px;
-  height: 40px;
-  border: 2px solid transparent;
-  pointer-events: all;
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background-image: url(./Images/NationalLogoEnglish.png);
-  background-color: var(--cioos-white);
-  background-repeat: no-repeat;
-  background-size: contain;
-  border-radius: var(--cioos-radius);
-  box-shadow: var(--cioos-shadow-card);
-}
-
-.logo.french {
-  width: 130px;
-  height: 40px;
-  border: 2px solid transparent;
-  pointer-events: all;
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background-image: url(./Images/NationalLogoFrench.png);
-  background-color: var(--cioos-white);
-  background-repeat: no-repeat;
-  background-size: contain;
-  border-radius: var(--cioos-radius);
-  box-shadow: var(--cioos-shadow-card);
-}
-
-.logo:hover {
-  background-color: var(--cioos-surface-2);
-}
-
 .emailAddress {
   height: 40px;
   width: 100%;
@@ -67,7 +26,7 @@ body {
   box-shadow: var(--cioos-shadow-card);
   background-color: var(--cioos-white);
   padding: 5px;
-  z-index: 2;
+  z-index: var(--cioos-z-map-controls, 2);
 }
 
 .boxQueryButton.active {
@@ -118,30 +77,6 @@ body {
 .submissionFeedback span {
   margin-right: 5px;
   margin-left: 5px;
-}
-
-@media all and (max-width: 915px) {
-  /* .logo {
-    left: calc(900px - 140px);
-  } */
-/* 
-  .feedbackButton {
-    left: 848px;
-  } */
-
-  .boxQueryButton {
-    left: 848px;
-  }
-
-  /* .introButton {
-    left: 848px;
-  } */
-}
-
-@media all and (max-height: 500px) {
-  .boxQueryButton {
-    top: 176px;
-  }
 }
 
 .resetFiltersButton:hover {

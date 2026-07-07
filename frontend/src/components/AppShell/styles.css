@@ -1,0 +1,66 @@
+/* The dock cluster: active-filter chips + the dock itself, centered at the
+   bottom of the viewport. The wrapper is inert so the map stays grabbable
+   around the chips; children re-enable pointer events. */
+/* API failure banner: top center, above everything but modals. */
+.apiErrorBanner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--cioos-z-dock, 35);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+  padding: 10px 16px;
+  background-color: var(--cioos-error-bg);
+  border: 1px solid var(--cioos-error);
+  border-radius: var(--cioos-radius);
+  box-shadow: var(--cioos-shadow-float);
+  color: var(--cioos-ink);
+  font-size: var(--cioos-font-size-sm);
+}
+
+.apiErrorBanner svg {
+  color: var(--cioos-error);
+  flex-shrink: 0;
+}
+
+.apiErrorBanner button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--cioos-error);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font: inherit;
+  font-weight: 600;
+  color: var(--cioos-ink);
+  white-space: nowrap;
+}
+
+.apiErrorBanner button:hover {
+  background-color: var(--cioos-error);
+  color: var(--cioos-white);
+}
+
+.apiErrorBanner button svg {
+  color: currentColor;
+}
+
+.dockCluster {
+  position: fixed;
+  /* clears the round Filters button, which overhangs the bar's bottom edge */
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--cioos-z-dock, 35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* clears the prominent Filters button, which lifts above the dock bar */
+  gap: 22px;
+  max-width: calc(100vw - 24px);
+  pointer-events: none;
+}

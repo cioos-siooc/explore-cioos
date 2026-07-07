@@ -329,7 +329,14 @@ export default function DatasetInspector({
             </>
           )}
         </dl>
-        {dataset.source_type !== 'obis' && (
+        {isGrid && (
+          <GriddapDetails
+            dataset={dataset}
+            activeWmsOverlay={activeWmsOverlay}
+            setActiveWmsOverlay={setActiveWmsOverlay}
+          />
+        )}
+        {dataset.source_type !== 'obis' && !isGrid && (
           <div className='recordSection'>
             <div className='recordSectionHeader'>
               <strong>{t('datasetInspectorRecordTable')}</strong>

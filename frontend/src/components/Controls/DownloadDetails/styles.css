@@ -67,9 +67,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 8px;
-  min-height: 64px;
+  min-height: auto;
   padding: 12px 16px;
   background-color: var(--cioos-surface-2);
 }
@@ -192,12 +192,12 @@
   flex-wrap: wrap;
   gap: 16px;
   margin: 0;
-  padding: 12px 16px;
+  padding: 10px 16px;
 }
 
 .downloadSummary {
   display: flex;
-  gap: 28px;
+  gap: 20px;
 }
 
 .downloadSummaryStat {
@@ -208,7 +208,7 @@
 }
 
 .downloadSummaryLabel {
-  font-size: 9.5px;
+  font-size: 8px;
   font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -219,7 +219,7 @@
 .downloadSummaryValue {
   font-family: var(--cioos-font-display);
   font-weight: 700;
-  font-size: 21px;
+  font-size: 16px;
   line-height: 1.2;
   color: var(--cioos-navy);
 }

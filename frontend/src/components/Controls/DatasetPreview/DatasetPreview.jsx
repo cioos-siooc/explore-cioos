@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { Modal } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
+
+import Modal from '../../ui/Modal.jsx'
 
 import Loading from '../Loading/Loading.jsx'
 import DatasetPreviewPlot from '../DatasetPreviewPlot/DatasetPreviewPlot.jsx'
@@ -57,10 +58,8 @@ export default function DatasetPreview({
     <Modal
       className='dataPreviewModal'
       show={showModal}
-      // fullscreen
       size='xl'
       onHide={onModalClose}
-      onExit={onModalClose}
       centered
       scrollable
     >
@@ -71,7 +70,7 @@ export default function DatasetPreview({
               <>
                 <button
                   className={`toggleButton ${selectedVis === 'table' && 'selected'
-                    }`}
+                  }`}
                   onClick={() => {
                     setSelectedVis('table')
                     // setRecordLoading(true)
@@ -81,7 +80,7 @@ export default function DatasetPreview({
                 </button>
                 <button
                   className={`toggleButton ${selectedVis === 'plot' && 'selected'
-                    }`}
+                  }`}
                   onClick={() => {
                     setSelectedVis('plot')
                     // setRecordLoading(true)
