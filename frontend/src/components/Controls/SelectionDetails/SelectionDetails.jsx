@@ -1,11 +1,12 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight } from 'react-bootstrap-icons'
 
 import SelectionPanelHeader from '../SelectionPanelHeader/SelectionPanelHeader.jsx'
 import SearchBar from '../SearchBar/SearchBar.jsx'
 import FilterChips from '../FilterChips/FilterChips.jsx'
+import FunnelVisualization from '../FunnelVisualization/FunnelVisualization.jsx'
+import DownloadCTA from '../DownloadCTA/DownloadCTA.jsx'
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetPreview from '../DatasetPreview/DatasetPreview.jsx'
 import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
@@ -270,33 +271,11 @@ export default function SelectionDetails({
               } */}
             <div className='pointDetailsControls'>
               <div className='pointDetailsControlRow'>
-                {/* Funnel: All datasets → Filtered → Selected for download.
-                   The flow narrows left-to-right and the colour deepens with
-                   intent (muted ink → teal → navy); the Selected stage chips
-                   to teal-light when it carries a payload, tying it to the
-                   Download CTA on the right. */}
-                <div className='datasetFunnel'>
-                  <div className='funnelStage all'
-                    title={t('pointDetailsControlRowDatasetsSelected')}
-                  >
-                    <span className='funnelLabel'>{t('pointDetailsFunnelAll')}</span>
-                    <span className='funnelCount'>{totalNumberOfDatasets}</span>
-                  </div>
-                  <ChevronRight className='funnelArrow' size={13} aria-hidden='true' />
-                  <div className='funnelStage filtered'
-                    title={t('pointDetailsControlRowFilteredDatasets')}
-                  >
-                    <span className='funnelLabel'>{t('pointDetailsFunnelFiltered')}</span>
-                    <span className='funnelCount'>{pointsData.length}</span>
-                  </div>
-                  <ChevronRight className='funnelArrow' size={13} aria-hidden='true' />
-                  <div className={`funnelStage selected ${datasetsSelected > 0 ? 'active' : ''}`}
-                    title={t('pointDetailsControlRowToDownload')}
-                  >
-                    <span className='funnelLabel'>{t('pointDetailsFunnelSelected')}</span>
-                    <span className='funnelCount'>{datasetsSelected}</span>
-                  </div>
-                </div>
+                <FunnelVisualization
+                  all={totalNumberOfDatasets}
+                  filtered={pointsData.length}
+                  selected={datasetsSelected}
+                />
                 {children}
               </div>
             </div>
