@@ -25,8 +25,6 @@ import {
   ArrowsExpand,
   CalendarWeek,
   Check2Circle,
-  ChevronCompactLeft,
-  Download,
   XCircle
 } from 'react-bootstrap-icons'
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
@@ -270,81 +268,72 @@ export default function DownloadDetails({
 
   return (
     <div className='container downloadDetails'>
-      <div className='downloadDetailsHeader'>
-        <button
-          className='downloadDetailsBackButton'
-          onClick={() => setShowModal(false)}
-        >
-          <ChevronCompactLeft aria-hidden='true' />
-          {t('downloadModalBackButtonText')}
-        </button>
-        <h2 className='downloadDetailsTitle'>
-          <Download size={18} aria-hidden='true' />
-          {t('downloadModalTitleText')}
-        </h2>
-      </div>
-
       <div className='filterDownloadToggles'>
-        <QuestionIconTooltip
-          tooltipText={t('downloadDetailsFilterQuestionTooltipText')}
-          tooltipPlacement={'right'}
-          size={20}
-        />
-        {!timeFilterActive && !depthFilterActive && !polygonFilterActive && (
-          <i className='noFiltersMessage'>
-            {t('downloadDetailsNoFiltersActiveMessage')}
-          </i>
-        )}
-        {timeFilterActive && (
-          <div className={timeFilterToggleClassName}>
-            <button
-              onClick={() => setFilterDownloadByTime(!filterDownloadByTime)}
-              disabled={!timeFilterActive}
-            >
-              <CalendarWeek className='filterToggleIcon' size={16} aria-hidden='true' />
-              <span>{`${query.startDate} – ${query.endDate}`}</span>
-            </button>
-          </div>
-        )}
-        {depthFilterActive && (
-          <div className={depthFilterToggleClassName}>
-            <button
-              onClick={() => setFilterDownloadByDepth(!filterDownloadByDepth)}
-              disabled={!depthFilterActive}
-            >
-              <ArrowsExpand className='filterToggleIcon' size={16} aria-hidden='true' />
-              <span>{`${query.startDepth} – ${query.endDepth} m`}</span>
-            </button>
-          </div>
-        )}
-        {polygonFilterActive && (
-          <div className={polygonFilterToggleClassName}>
-            <button
-              onClick={() => setFilterDownloadByPolygon(!filterDownloadByPolygon)}
-              disabled={!polygonFilterActive}
-            >
-              <div
-                className='mapbox-gl-draw-polygon filterToggleIcon'
-                style={{
-                  display: 'inline',
-                  backgroundImage: `url(${polygonIsRectangle(polygon)
-                    ? rectangleImage
-                    : polygonImage
-                  })`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundSize: '24px 24px',
-                  backgroundPositionX: '8px',
-                  backgroundPositionY: '-3px',
-                  borderRadius: '0px',
-                  height: '34px',
-                  paddingLeft: '38px'
-                }}
+        <span className='filterDownloadTogglesTitle'>
+          {t('downloadDetailsFilterSectionTitle')}
+          <QuestionIconTooltip
+            tooltipText={t('downloadDetailsFilterQuestionTooltipText')}
+            tooltipPlacement={'right'}
+            size={16}
+          />
+        </span>
+        <div className='filterDownloadTogglesChips'>
+          {!timeFilterActive && !depthFilterActive && !polygonFilterActive && (
+            <i className='noFiltersMessage'>
+              {t('downloadDetailsNoFiltersActiveMessage')}
+            </i>
+          )}
+          {timeFilterActive && (
+            <div className={timeFilterToggleClassName}>
+              <button
+                onClick={() => setFilterDownloadByTime(!filterDownloadByTime)}
+                disabled={!timeFilterActive}
               >
-                {polygonFilterText}
-              </div>
-            </button>
-          </div>
-        )}
+                <CalendarWeek className='filterToggleIcon' size={16} aria-hidden='true' />
+                <span>{`${query.startDate} – ${query.endDate}`}</span>
+              </button>
+            </div>
+          )}
+          {depthFilterActive && (
+            <div className={depthFilterToggleClassName}>
+              <button
+                onClick={() => setFilterDownloadByDepth(!filterDownloadByDepth)}
+                disabled={!depthFilterActive}
+              >
+                <ArrowsExpand className='filterToggleIcon' size={16} aria-hidden='true' />
+                <span>{`${query.startDepth} – ${query.endDepth} m`}</span>
+              </button>
+            </div>
+          )}
+          {polygonFilterActive && (
+            <div className={polygonFilterToggleClassName}>
+              <button
+                onClick={() => setFilterDownloadByPolygon(!filterDownloadByPolygon)}
+                disabled={!polygonFilterActive}
+              >
+                <div
+                  className='mapbox-gl-draw-polygon filterToggleIcon'
+                  style={{
+                    display: 'inline',
+                    backgroundImage: `url(${polygonIsRectangle(polygon)
+                      ? rectangleImage
+                      : polygonImage
+                    })`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '24px 24px',
+                    backgroundPositionX: '8px',
+                    backgroundPositionY: '-3px',
+                    borderRadius: '0px',
+                    height: '34px',
+                    paddingLeft: '38px'
+                  }}
+                >
+                  {polygonFilterText}
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className='row downloadDataRow'>

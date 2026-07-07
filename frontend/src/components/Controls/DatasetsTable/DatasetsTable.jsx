@@ -20,7 +20,6 @@ import { formatGridSize } from '../../../wmsUtilities'
 import erddapServersJSONfile from '../../../erddapServers.json'
 import './styles.css'
 import DataTable from 'react-data-table-component'
-import DataTableExtensions from 'react-data-table-component-extensions'
 import bytes from 'bytes'
 import isEmpty from 'lodash/isEmpty'
 
@@ -57,8 +56,8 @@ export default function DatasetsTable({
     handleSelectAllDatasets()
   }
 
-  // Sidebar search: filter across the visible text fields. The download modal
-  // keeps its own DataTableExtensions filter, so this is a no-op there.
+  // Sidebar search: filter across the visible text fields. The download
+  // modal has no search UI, so this is a no-op there.
   function filterBySearch(rows) {
     if (isDownloadModal || isEmpty(searchText)) return rows
     const query = searchText.toLowerCase()
@@ -462,21 +461,5 @@ export default function DatasetsTable({
     />
   )
 
-  return (
-    <div className='datasetsTable'>
-      {isDownloadModal ? (
-        <DataTableExtensions
-          {...tableData}
-          print={false}
-          export={false}
-          filterPlaceholder={t('datasetInspectorFilterText')}
-          filter={true}
-        >
-          {table}
-        </DataTableExtensions>
-      ) : (
-        table
-      )}
-    </div>
-  )
+  return <div className='datasetsTable'>{table}</div>
 }

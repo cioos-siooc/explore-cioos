@@ -154,28 +154,6 @@
   color: var(--cioos-primary-700);
 }
 
-/* DataTableExtensions filter input (download modal only) */
-.datasetsTable .data-table-extensions {
-  padding: 8px 16px 0;
-}
-
-.datasetsTable .data-table-extensions .data-table-extensions-filter {
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  padding: 2px 12px;
-  background-color: var(--cioos-white);
-}
-
-.datasetsTable .data-table-extensions .data-table-extensions-filter:focus-within {
-  border-color: var(--cioos-primary);
-}
-
-.datasetsTable .data-table-extensions .filter-text {
-  border: none !important;
-  outline: none;
-  background: transparent;
-}
-
 @media (max-width: 600px) {
   .datasetsTable .downloadSizeEstimate {
     font-size: 0.85em;

@@ -218,6 +218,7 @@
   "resetFiltersButtonTooltipText": "Réinitialiser tous les filtres et la sélection de polygones aux valeurs par défaut",
   "downloadModalBackButtonText": "Retour",
   "downloadDetailsFilterQuestionTooltipText": "Utilisez les filtres de temps, de profondeur et d'espace pour modifier les tailles de téléchargement des jeux de données. Les filtres actifs sont appliqués à tous les ensembles de données dans un téléchargement. Utilisez les liens ERDDAP™ disponibles pour télécharger de grands ensembles de données.",
+  "downloadDetailsFilterSectionTitle": "Filtres appliqués",
   "downloadDetailsDownloadLimitsNotDownloadableMessagePart1": "Les ensembles de données ",
   "downloadDetailsDownloadLimitsNotDownloadableMessagePart2": "supérieurs à 1GB",
   "downloadDetailsDownloadLimitsNotDownloadableMessagePart3": " ne sont pas téléchargeables ",

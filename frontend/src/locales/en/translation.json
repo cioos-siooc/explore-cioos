@@ -217,6 +217,7 @@
   "resetFiltersButtonTooltipText": "Reset all filters and polygon selection to defaults",
   "downloadModalBackButtonText": "Back",
   "downloadDetailsFilterQuestionTooltipText": "Use Time, Depth and Space filters to change dataset download sizes. Active filters are applied to all datasets in a download. Use the available ERDDAP™ links to download large datasets.",
+  "downloadDetailsFilterSectionTitle": "Applied filters",
   "downloadDetailsDownloadLimitsNotDownloadableMessagePart1": " Datasets ",
   "downloadDetailsDownloadLimitsNotDownloadableMessagePart2": "larger than 1GB",
   "downloadDetailsDownloadLimitsNotDownloadableMessagePart3": " are not CDE downloadable.",
