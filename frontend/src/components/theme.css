@@ -61,12 +61,6 @@
      closed-state transforms all derive from this token so they stay in sync. */
   --cioos-panel-w: clamp(360px, 42vw, 580px);
 
-  /* --- Sidebar floating on desktop ---
-     On desktop (768px+), sidebar floats with padding. On mobile (600px and
-     below), sidebar is full-width overlay and hidden when closed. */
-  --cioos-sidebar-floating: false;
-  --cioos-sidebar-padding: 0px;
-
   /* --- Header & Layout (Modern Sidebar) --- */
   --cioos-header-height: 70px;
   --cioos-header-height-mobile: 60px;
