@@ -17,10 +17,16 @@ export default function DownloadCTA({
       onClick={onClick}
       disabled={isDisabled}
       aria-label={`${label} ${selectedCount} dataset${selectedCount !== 1 ? 's' : ''}`}
+      aria-busy={isLoading}
       title={isDisabled ? 'Select datasets to enable download' : label}
     >
-      {isLoading && <Spinner size={16} className='downloadCtaSpinner' />}
-      {!isLoading && <Download size={18} />}
+      {isLoading && (
+        <>
+          <Spinner size={16} className='downloadCtaSpinner' aria-hidden='true' />
+          <span className='sr-only'>Downloading...</span>
+        </>
+      )}
+      {!isLoading && <Download size={18} aria-hidden='true' />}
       <span className='downloadCtaLabel'>{label}</span>
     </button>
   )

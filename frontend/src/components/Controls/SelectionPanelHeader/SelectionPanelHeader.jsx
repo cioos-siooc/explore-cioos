@@ -12,31 +12,32 @@ export default function SelectionPanelHeader({
   const { i18n } = useTranslation()
 
   return (
-    <div className='selectionPanelHeader'>
-      <img
+    <header className='selectionPanelHeader' role='banner'>
+      <button
         className='headerLogo'
-        src={logoSource}
         onClick={() =>
           i18n.language === 'en'
             ? window.open('https://www.cioos.ca')
             : window.open('https://www.siooc.ca/fr/accueil/')
         }
-        title='Visit CIOOS website'
-        alt='CIOOS Logo'
-      />
+        title={i18n.language === 'en' ? 'Visit CIOOS National' : 'Visitez SIOOC'}
+        aria-label={i18n.language === 'en' ? 'Visit CIOOS National' : 'Visitez SIOOC'}
+      >
+        <img src={logoSource} alt={i18n.language === 'en' ? 'CIOOS' : 'SIOOC'} />
+      </button>
 
       <div className='headerTitle'>
-        <h2>Explore CIOOS</h2>
+        <h1>Explore CIOOS</h1>
       </div>
 
-      <div className='headerActions'>
+      <nav className='headerActions' aria-label='Header actions'>
         <button
           className='headerActionButton'
           onClick={onInfoClick}
           title='Re-open introduction'
-          aria-label='Introduction'
+          aria-label='Re-open introduction'
         >
-          <InfoSquare size={20} />
+          <InfoSquare size={20} aria-hidden='true' />
         </button>
 
         <a
@@ -49,13 +50,13 @@ export default function SelectionPanelHeader({
           }
           target='_blank'
           rel='noreferrer'
-          aria-label='Feedback'
+          aria-label='Send feedback'
         >
-          <ChatDots size={20} />
+          <ChatDots size={20} aria-hidden='true' />
         </a>
 
         <LanguageSelector className='headerLanguageSelector' />
-      </div>
-    </div>
+      </nav>
+    </header>
   )
 }

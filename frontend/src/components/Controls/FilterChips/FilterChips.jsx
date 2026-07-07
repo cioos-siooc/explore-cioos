@@ -12,10 +12,10 @@ export default function FilterChips({
   }
 
   return (
-    <div className='filterChipsContainer'>
+    <div className='filterChipsContainer' role='region' aria-label='Active filters'>
       <div className='filterChipsWrapper'>
         {activeFilters.map((filter, index) => (
-          <div key={index} className='filterChip'>
+          <div key={index} className='filterChip' role='button' tabIndex={0}>
             <span className='chipLabel'>{filter}</span>
             <button
               className='chipRemoveButton'
@@ -23,7 +23,7 @@ export default function FilterChips({
               aria-label={`Remove filter: ${filter}`}
               title={`Remove ${filter}`}
             >
-              <XCircle size={14} />
+              <XCircle size={14} aria-hidden='true' />
             </button>
           </div>
         ))}
@@ -32,7 +32,7 @@ export default function FilterChips({
         <button
           className='clearAllFiltersButton'
           onClick={onClearAll}
-          aria-label='Clear all filters'
+          aria-label={`Clear all ${activeFilters.length} active filter${activeFilters.length !== 1 ? 's' : ''}`}
           title='Clear all filters'
         >
           Clear all

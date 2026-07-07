@@ -10,7 +10,7 @@ export default function SearchBar({
   activeFilterCount = 0
 }) {
   return (
-    <div className='searchBarContainer'>
+    <div className='searchBarContainer' role='search'>
       <div className='searchBarWrapper'>
         <input
           type='text'
@@ -18,7 +18,8 @@ export default function SearchBar({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          aria-label='Search datasets'
+          aria-label='Search datasets by title, type, or source'
+          aria-describedby={activeFilterCount > 0 ? 'filter-status' : undefined}
         />
         {value && (
           <button
@@ -27,12 +28,12 @@ export default function SearchBar({
             aria-label='Clear search'
             title='Clear search'
           >
-            <XCircle size={18} />
+            <XCircle size={18} aria-hidden='true' />
           </button>
         )}
       </div>
       {activeFilterCount > 0 && (
-        <div className='filterCountBadge'>
+        <div className='filterCountBadge' id='filter-status' role='status'>
           {activeFilterCount} filter{activeFilterCount !== 1 ? 's' : ''} active
         </div>
       )}

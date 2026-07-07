@@ -15,15 +15,30 @@
 .headerLogo {
   height: 100%;
   padding: var(--cioos-space-sm);
+  background-color: var(--cioos-white);
+  border: none;
   cursor: pointer;
-  object-fit: contain;
   flex-shrink: 0;
   transition: background-color var(--cioos-transition-fast);
   border-radius: var(--cioos-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .headerLogo:hover {
   background-color: var(--cioos-surface-2);
+}
+
+.headerLogo:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.headerLogo img {
+  height: 100%;
+  width: auto;
+  object-fit: contain;
 }
 
 .headerTitle {
@@ -31,7 +46,7 @@
   min-width: 0;
 }
 
-.headerTitle h2 {
+.headerTitle h1 {
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-lg);
   font-weight: 600;
