@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'react-bootstrap-icons'
 
 import SelectionPanelHeader from '../SelectionPanelHeader/SelectionPanelHeader.jsx'
+import SearchBar from '../SearchBar/SearchBar.jsx'
+import FilterChips from '../FilterChips/FilterChips.jsx'
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import DatasetPreview from '../DatasetPreview/DatasetPreview.jsx'
 import DatasetInspector from '../DatasetInspector/DatasetInspector.jsx'
@@ -49,7 +51,7 @@ export default function SelectionDetails({
   const [recordLoading, setRecordLoading] = useState(false)
   const [backClicked, setBackClicked] = useState(false)
   const [datasetPreview, setDatasetPreview] = useState()
-  const [datasetTitleSearchText] = useState('')
+  const [datasetTitleSearchText, setDatasetTitleSearchText] = useState('')
   const debouncedDatasetTitleSearchText = useDebounce(
     datasetTitleSearchText,
     300
@@ -162,6 +164,14 @@ export default function SelectionDetails({
     setSelectAll(!selectAll)
   }
 
+  function getActiveFilterCount() {
+    let count = 0
+    if (filterSet?.eovFilter?.eovsSelected?.some((e) => e.isSelected)) count++
+    if (filterSet?.platformFilter?.platformsSelected?.some((e) => e.isSelected)) count++
+    if (filterSet?.orgFilter?.orgsSelected?.some((e) => e.isSelected)) count++
+    return count
+  }
+
   // The WMS overlay lives only while its dataset is inspected: navigating
   // back or to another dataset clears it (the WmsLegend close button is the
   // other exit).
@@ -203,6 +213,21 @@ export default function SelectionDetails({
         logoSource={i18n.language === 'en' ? CIOOSLogoEN : CIOOSLogoFR}
         onInfoClick={() => setShowIntroModal(true)}
       />
+      {!inspectDataset && !loading && initialPointsQueryComplete && (
+        <>
+          <SearchBar
+            value={datasetTitleSearchText}
+            onChange={setDatasetTitleSearchText}
+            onClear={() => setDatasetTitleSearchText('')}
+            activeFilterCount={getActiveFilterCount()}
+          />
+          <FilterChips
+            activeFilters={[]}
+            onRemoveFilter={() => {}}
+            onClearAll={() => {}}
+          />
+        </>
+      )}
       <div
         className={`pointDetailsInfoRow ${inspectDataset ? 'fullHeight' : ''}`}
       >
