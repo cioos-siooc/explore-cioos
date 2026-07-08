@@ -27,6 +27,14 @@
   font-size: 0.9em;
 }
 
+/* "Different scale per variable" toggle: checkbox first, then the (longer)
+   label flowing across the row instead of squeezed into the caption column. */
+.controlCheckboxRow {
+  font-size: 0.9em;
+  cursor: pointer;
+  margin: 0;
+}
+
 .controlButtonWrap {
   display: inline-block;
 }
@@ -90,7 +98,7 @@
   white-space: nowrap;
 }
 
-/* Collapsible "Customize labels" panel: rename fields per active variable. */
+/* Collapsible "Customize plot" panel: colorscale controls + rename fields. */
 .labelEditorToggle {
   margin-top: 8px;
   padding: 4px 0;

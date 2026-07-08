@@ -20,6 +20,10 @@ export default function DatasetPreviewPlot({
   // User-provided display names per role (blank = use the raw column name).
   const [customLabels, setCustomLabels] = useState({ x: '', y: '', secondary: '', color: '' })
   const [showLabels, setShowLabels] = useState(false)
+  // Colorscale display prefs (not reset on record switch, like plotType). When a
+  // second variable is present the user can opt into a different scale per trace.
+  const [dualColorscale, setDualColorscale] = useState(false)
+  const [colorscales, setColorscales] = useState({ primary: 'Viridis', secondary: 'Reds' })
 
   const isProfile = inspectDataset.cdm_data_type
     .toLowerCase()
@@ -102,11 +106,11 @@ export default function DatasetPreviewPlot({
     ? (plotType.includes('markers') ? plotType : 'markers+lines')
     : plotType
 
-  // Both traces are colored by the same color value with a single colorscale;
-  // the two variables are told apart by MARKER SHAPE, not by a second colorscale
-  // (shape is an independent channel, so the traces stay distinct at any color
-  // value, in grayscale, and for all color-blindness types). One shared scale
-  // means one colorbar, sitting in the right gutter with a gap from the plot.
+  // Both traces are colored by the color value; marker SHAPE (circle vs diamond)
+  // always tells the two variables apart, so they stay distinct even when they
+  // share a colorscale. The user picks the scale, and may opt into a different
+  // scale per trace (then each trace gets its own colorbar, stacked in the gutter
+  // so a long title can't overlap the neighbour).
   const colorActive = !!(plotAxes.color && data)
   const hasSecondary = !!plotAxes.secondary?.columnName
   // A timeseries second variable puts an axis on the RIGHT side of the plot, so
@@ -114,35 +118,48 @@ export default function DatasetPreviewPlot({
   // profile's second variable goes on the top axis, so no extra gap is needed.
   const rightAxisPresent = hasSecondary && !isProfile
   const gutterX = rightAxisPresent ? 1.16 : 1.06
-  const COLORSCALE = 'Viridis'
+  // Named scales available in the plotly-basic 1.58.5 bundle we ship.
+  const COLORSCALE_OPTIONS = [
+    'Viridis', 'Cividis', 'Blues', 'Greens', 'Reds',
+    'YlGnBu', 'YlOrRd', 'Hot', 'Bluered', 'RdBu',
+    'Portland', 'Jet', 'Electric', 'Earth', 'Greys'
+  ]
   const MARKER_SYMBOLS = ['circle', 'diamond']
+  // Different-scale-per-trace only means anything with a second colored trace.
+  const dualScale = dualColorscale && hasSecondary
+  const scaleFor = (index) =>
+    index === 1 && dualScale ? colorscales.secondary : colorscales.primary
 
-  // Single colorbar, centered in the right gutter.
-  const colorbarFor = () => ({
-    title: axisTitleFor('color', plotAxes.color),
-    titleside: 'top',
-    thickness: 14,
-    x: gutterX,
-    xanchor: 'left',
-    len: 0.7,
-    y: 0.5,
-    yanchor: 'middle'
-  })
+  // One centered colorbar normally; two stacked bars when each trace has its
+  // own scale (same x, so a long title never overlaps the neighbour).
+  const colorbarFor = (index) => {
+    const base = {
+      title: axisTitleFor('color', plotAxes.color),
+      titleside: 'top',
+      thickness: 14,
+      x: gutterX,
+      xanchor: 'left'
+    }
+    if (dualScale) {
+      return { ...base, len: 0.3, y: index === 0 ? 0.82 : 0.42, yanchor: 'top' }
+    }
+    return { ...base, len: 0.7, y: 0.5, yanchor: 'middle' }
+  }
 
-  // Marker props for a trace; `index` selects its shape. Both traces share the
-  // one colorscale/range, so only the first trace draws the colorbar. The color
-  // value rides along as `customdata` so the hover tooltip can show it.
+  // Marker props for a trace; `index` selects its scale + shape. With a shared
+  // scale only the first trace draws the colorbar; with different scales each
+  // trace shows its own. The color value rides along as `customdata` for hover.
   const colorPropsFor = (index) =>
     colorActive
       ? {
         marker: {
           color: colorValues,
-          colorscale: COLORSCALE,
+          colorscale: scaleFor(index),
           cmin,
           cmax,
           symbol: MARKER_SYMBOLS[index] || MARKER_SYMBOLS[0],
-          showscale: index === 0,
-          ...(index === 0 ? { colorbar: colorbarFor() } : {})
+          showscale: dualScale ? true : index === 0,
+          ...((dualScale || index === 0) ? { colorbar: colorbarFor(index) } : {})
         },
         customdata: colorValues
       }
@@ -331,7 +348,30 @@ export default function DatasetPreviewPlot({
     )
   }
 
-  // A rename field for a role, shown in the collapsible "Customize labels" panel.
+  // A caption + fixed-width dropdown for picking a colorscale. Same layout as
+  // variableRow; the button shows the current scale and hovering reveals it.
+  const colorscaleRow = (role, captionKey, value, onSelect) => (
+    <div className="controlRow" key={role}>
+      <span className="controlCaption">{t(captionKey)}</span>
+      <OverlayTrigger
+        placement="right"
+        trigger={['hover', 'focus']}
+        overlay={<Tooltip id={`tooltip-${role}`}>{value}</Tooltip>}
+      >
+        <span className="controlButtonWrap">
+          <DropdownButton className="dropdownButtonLeft" title={value}>
+            {COLORSCALE_OPTIONS.map((scale) => (
+              <Dropdown.Item key={scale} onClick={() => onSelect(scale)}>
+                {scale}
+              </Dropdown.Item>
+            ))}
+          </DropdownButton>
+        </span>
+      </OverlayTrigger>
+    </div>
+  )
+
+  // A rename field for a role, shown in the collapsible "Customize plot" panel.
   const renameField = (role, axis, caption) => (
     <div className="labelEditorRow" key={role}>
       <label htmlFor={`rename-${role}`}>{caption}</label>
@@ -358,10 +398,30 @@ export default function DatasetPreviewPlot({
           className="labelEditorToggle"
           onClick={() => setShowLabels((show) => !show)}
         >
-          {(showLabels ? '▾ ' : '▸ ') + t('datasetPreviewPlotCustomizeLabels')}
+          {(showLabels ? '▾ ' : '▸ ') + t('datasetPreviewPlotCustomizePlot')}
         </button>
         {showLabels && (
           <div className="labelEditor">
+            {colorActive && colorscaleRow(
+              'colorscale', 'datasetPreviewPlotColorScale', colorscales.primary,
+              (scale) => setColorscales((prev) => ({ ...prev, primary: scale })))}
+
+            {colorActive && hasSecondary && (
+              <label className="controlRow controlCheckboxRow" htmlFor="dualColorscale">
+                <input
+                  id="dualColorscale"
+                  type="checkbox"
+                  checked={dualColorscale}
+                  onChange={(e) => setDualColorscale(e.target.checked)}
+                />
+                <span>{t('datasetPreviewPlotDifferentColorScale')}</span>
+              </label>
+            )}
+
+            {colorActive && dualColorscale && hasSecondary && colorscaleRow(
+              'colorscaleSecondary', 'datasetPreviewPlotSecondColorScale', colorscales.secondary,
+              (scale) => setColorscales((prev) => ({ ...prev, secondary: scale })))}
+
             {renameField('x', plotAxes.x, t('datasetPreviewPlotXAxisSelect'))}
             {renameField('y', plotAxes.y, t('datasetPreviewPlotYAxisSelect'))}
             {plotAxes.secondary?.columnName &&
