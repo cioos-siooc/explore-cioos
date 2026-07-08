@@ -23,9 +23,16 @@ import {
   createDataFilterQueryString,
   generateColorStops,
   getCurrentRangeLevel,
-  updateMapToolTitleLanguage
+  updateMapToolTitleLanguage,
+  catmullRomSpline,
+  splitAtAntimeridian
 } from '../../utilities'
-import { colorScale, trajectoryColorScale } from '../config'
+import {
+  colorScale,
+  trajectoryColorScale,
+  trackLineColor,
+  selectedTrackColor
+} from '../config'
 import platformColors from '../../components/platformColors'
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
@@ -41,7 +48,12 @@ export default function CreateMap({
   trajectoryRangeLevels,
   hoveredDataset,
   setHoveredDataset,
-  setDatasetsSelected
+  setDatasetsSelected,
+  tracksMode,
+  scrubTime,
+  trailingDays,
+  smoothTracks,
+  selectedTrajectory
 }) {
   const { t } = useTranslation()
 
@@ -169,6 +181,48 @@ export default function CreateMap({
   const layersLoaded = useRef(false)
   const colorStops = useRef([])
   const trajectoryColorStops = useRef([])
+  // Latest tracks-mode props for the one-shot map 'load' closure (layers are
+  // created once; these refs let it apply the current mode/scrub window).
+  const tracksModeRef = useRef(tracksMode)
+  const scrubTimeRef = useRef(scrubTime)
+  const trailingDaysRef = useRef(trailingDays)
+  // Raw (unsmoothed) selected-track response, cached so toggling smoothing
+  // re-renders without re-fetching.
+  const rawTrackRef = useRef(null)
+
+  // UTC-day-snapped scrub window: [scrub date - N days, scrub date + 1 day).
+  // Day snapping keeps the tile URLs stable so the server's URL-keyed tile
+  // cache gets hits across scrubs and users.
+  function tracksTimeWindow(scrub, trailing) {
+    const MS_PER_DAY = 24 * 60 * 60 * 1000
+    const end = new Date(`${scrub}T00:00:00Z`).getTime()
+    const timeMax = `${new Date(end + MS_PER_DAY).toISOString().split('T')[0]}T00:00:00Z`
+    const timeMin = `${new Date(end - trailing * MS_PER_DAY).toISOString().split('T')[0]}T00:00:00Z`
+    return { timeMin, timeMax }
+  }
+
+  // Tracks tile URL: dataset-level filters from the regular query string,
+  // minus the TimeSelector's timeMin/timeMax (the scrub window must not
+  // fight the date-range filter), plus the day-snapped scrub window.
+  function buildTracksTileUrl(activeQuery, scrub, trailing) {
+    const params = new URLSearchParams(createDataFilterQueryString(activeQuery))
+    params.delete('timeMin')
+    params.delete('timeMax')
+    const { timeMin, timeMax } = tracksTimeWindow(scrub, trailing)
+    params.set('timeMin', timeMin)
+    params.set('timeMax', timeMax)
+    return `${server}/tiles/tracks/{z}/{x}/{y}.mvt?${params.toString()}`
+  }
+
+  function refreshTracksSource(activeQuery, scrub, trailing) {
+    if (!map.current || !map.current.getSource('tracks')) return
+    map.current.getSource('tracks').tiles = [
+      buildTracksTileUrl(activeQuery, scrub, trailing)
+    ]
+    map.current.style.sourceCaches.tracks.clearTiles()
+    map.current.style.sourceCaches.tracks.update(map.current.transform)
+    map.current.triggerRepaint()
+  }
 
   // Placeholder count ranges used only until the /legend request resolves.
   // The map now mounts before that response arrives, but the count-driven
@@ -463,6 +517,104 @@ export default function CreateMap({
     }
   }, [query])
 
+  // Tracks mode: swap the trajectory hex layers for track lines/heads and
+  // (re)load the scrub window's tiles.
+  useEffect(() => {
+    tracksModeRef.current = tracksMode
+    if (!map.current || !map.current.getLayer('track-lines')) return
+    const trackVisibility = tracksMode ? 'visible' : 'none'
+    const hexVisibility = tracksMode ? 'none' : 'visible'
+    ;['track-lines', 'track-heads'].forEach((id) =>
+      map.current.setLayoutProperty(id, 'visibility', trackVisibility)
+    )
+    ;['trajectory-hexes', 'trajectory-hexes-hovered'].forEach((id) =>
+      map.current.setLayoutProperty(id, 'visibility', hexVisibility)
+    )
+    if (tracksMode) {
+      refreshTracksSource(query, scrubTime, trailingDays)
+    }
+  }, [tracksMode])
+
+  // Scrubbing / trailing-window / filter changes re-query the tracks tiles.
+  useEffect(() => {
+    scrubTimeRef.current = scrubTime
+    trailingDaysRef.current = trailingDays
+    if (!tracksMode) return
+    refreshTracksSource(query, scrubTime, trailingDays)
+  }, [query, scrubTime, trailingDays])
+
+  // Selected platform: fetch its full track once, render raw or smoothed
+  // (smoothing is render-only — raw response cached in rawTrackRef), dim the
+  // global track layers, and fit the view to the track.
+  useEffect(() => {
+    async function renderSelectedTrack() {
+      if (!map.current || !map.current.getSource('selected-track')) return
+      const source = map.current.getSource('selected-track')
+
+      if (!selectedTrajectory) {
+        rawTrackRef.current = null
+        source.setData({ type: 'FeatureCollection', features: [] })
+        if (map.current.getLayer('track-lines')) {
+          map.current.setPaintProperty('track-lines', 'line-color', trackLineColor)
+          map.current.setPaintProperty('track-heads', 'circle-color', trackLineColor)
+        }
+        return
+      }
+
+      const { datasetPk, trajectoryId } = selectedTrajectory
+      const cacheKey = `${datasetPk}|${trajectoryId}`
+      if (rawTrackRef.current?.key !== cacheKey) {
+        const response = await fetch(
+          `${server}/trajectories/track?datasetPKs=${datasetPk}&trajectoryId=${encodeURIComponent(trajectoryId)}`
+        )
+        if (!response.ok) return
+        const track = await response.json()
+        rawTrackRef.current = { key: cacheKey, coordinates: track.coordinates }
+      }
+      const rawCoordinates = rawTrackRef.current.coordinates
+      if (!rawCoordinates || rawCoordinates.length === 0) return
+
+      // Split at the antimeridian BEFORE smoothing so the spline never
+      // interpolates across the seam.
+      const runs = splitAtAntimeridian(rawCoordinates)
+      const lineFeatures = runs
+        .filter((run) => run.length >= 2)
+        .map((run) => ({
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: smoothTracks ? catmullRomSpline(run) : run
+          },
+          properties: {}
+        }))
+      const fixFeatures = rawCoordinates.map((coordinate) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: coordinate },
+        properties: {}
+      }))
+      source.setData({
+        type: 'FeatureCollection',
+        features: [...lineFeatures, ...fixFeatures]
+      })
+
+      if (map.current.getLayer('track-lines')) {
+        map.current.setPaintProperty('track-lines', 'line-color', 'lightgrey')
+        map.current.setPaintProperty('track-heads', 'circle-color', 'lightgrey')
+      }
+
+      const longitudes = rawCoordinates.map((c) => c[0])
+      const latitudes = rawCoordinates.map((c) => c[1])
+      map.current.fitBounds(
+        [
+          [Math.min(...longitudes), Math.min(...latitudes)],
+          [Math.max(...longitudes), Math.max(...latitudes)]
+        ],
+        { padding: 80, maxZoom: 9 }
+      )
+    }
+    renderSelectedTrack()
+  }, [selectedTrajectory, smoothTracks])
+
   const mapZoom = searchParams.get('zoom')
   const mapLongitude = searchParams.get('lon')
   const mapLatitude = searchParams.get('lat')
@@ -751,6 +903,96 @@ export default function CreateMap({
         },
         filter: ['in', 'pk', '']
       })
+
+      // --- Tracks mode layers -------------------------------------------
+      // Track lines + head positions from /tiles/tracks, shown only when
+      // tracks mode is on (visibility swaps with the trajectory hex layers).
+      // Created via refs so the current mode/scrub window applies even
+      // though this load handler runs once.
+      const tracksVisibility = tracksModeRef.current ? 'visible' : 'none'
+      map.current.addSource('tracks', {
+        type: 'vector',
+        tiles: [
+          buildTracksTileUrl(
+            query,
+            scrubTimeRef.current,
+            trailingDaysRef.current
+          )
+        ]
+      })
+
+      map.current.addLayer({
+        id: 'track-lines',
+        type: 'line',
+        source: 'tracks',
+        'source-layer': 'track-lines',
+        layout: {
+          visibility: tracksVisibility,
+          'line-cap': 'round',
+          'line-join': 'round'
+        },
+        paint: {
+          'line-color': trackLineColor,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 2, 1, 10, 2.5]
+        }
+      })
+
+      map.current.addLayer({
+        id: 'track-heads',
+        type: 'circle',
+        source: 'tracks',
+        'source-layer': 'track-heads',
+        layout: { visibility: tracksVisibility },
+        paint: {
+          'circle-color': trackLineColor,
+          'circle-radius': 4.5,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 1.5
+        }
+      })
+
+      // One selected platform's full track (GeoJSON from /trajectories/track).
+      // Line features render the (optionally smoothed) path; point features
+      // are ALWAYS the raw fixes, so smoothing is visibly cosmetic.
+      map.current.addSource('selected-track', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      })
+
+      map.current.addLayer({
+        id: 'selected-track-line',
+        type: 'line',
+        source: 'selected-track',
+        filter: ['==', '$type', 'LineString'],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': selectedTrackColor,
+          'line-width': 3
+        }
+      })
+
+      map.current.addLayer({
+        id: 'selected-track-fixes',
+        type: 'circle',
+        source: 'selected-track',
+        filter: ['==', '$type', 'Point'],
+        paint: {
+          'circle-color': '#ffffff',
+          'circle-radius': 3,
+          'circle-stroke-color': selectedTrackColor,
+          'circle-stroke-width': 1.5
+        }
+      })
+
+      // If tracks mode was restored from the URL, hide the hex layers now.
+      if (tracksModeRef.current) {
+        map.current.setLayoutProperty('trajectory-hexes', 'visibility', 'none')
+        map.current.setLayoutProperty(
+          'trajectory-hexes-hovered',
+          'visibility',
+          'none'
+        )
+      }
     })
 
     const handleMapOnClick = (e) => {
@@ -946,6 +1188,51 @@ export default function CreateMap({
     })
 
     map.current.on('mouseleave', 'trajectory-hexes', () => {
+      if (!draw.getMode().includes('draw')) {
+        map.current.getCanvas().style.cursor = 'grab'
+        popup.remove()
+      }
+    })
+
+    map.current.on('mousemove', 'track-heads', (e) => {
+      if (!draw.getMode().includes('draw')) {
+        map.current.getCanvas().style.cursor = 'pointer'
+        const properties = e.features[0].properties
+        const headDate = properties.head_time
+          ? new Date(Number(properties.head_time)).toISOString().split('T')[0]
+          : ''
+        popup
+          .setLngLat([e.lngLat.lng, e.lngLat.lat])
+          .setHTML(
+            `<div><b>${properties.trajectory_id}</b>${headDate ? `<br/>${headDate}` : ''}</div>`
+          )
+          .addTo(map.current)
+      }
+    })
+
+    map.current.on('mouseleave', 'track-heads', () => {
+      if (!draw.getMode().includes('draw')) {
+        map.current.getCanvas().style.cursor = 'grab'
+        popup.remove()
+      }
+    })
+
+    map.current.on('mousemove', 'track-lines', (e) => {
+      // heads sit above lines; let their own tooltip win
+      if (
+        !draw.getMode().includes('draw') &&
+        map.current.queryRenderedFeatures(e.point, { layers: ['track-heads'] })
+          .length === 0
+      ) {
+        map.current.getCanvas().style.cursor = 'pointer'
+        popup
+          .setLngLat([e.lngLat.lng, e.lngLat.lat])
+          .setHTML(`<div><b>${e.features[0].properties.trajectory_id}</b></div>`)
+          .addTo(map.current)
+      }
+    })
+
+    map.current.on('mouseleave', 'track-lines', () => {
       if (!draw.getMode().includes('draw')) {
         map.current.getCanvas().style.cursor = 'grab'
         popup.remove()

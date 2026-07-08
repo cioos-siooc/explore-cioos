@@ -351,6 +351,45 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+-- Track-point post-load processing. trajectory_points carries a generated
+-- geom and no point_pk/hex FKs, so processing is only the dataset_pk
+-- backfill plus the per-trajectory summary rebuild.
+
+CREATE OR REPLACE FUNCTION trajectory_points_link_dataset_pk() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
+  UPDATE cde.trajectory_points p
+  SET dataset_pk = d.pk
+  FROM cde.datasets d
+  WHERE p.dataset_id = d.dataset_id
+    AND p.erddap_url = d.erddap_url
+    AND p.dataset_pk IS NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Rebuild cde.trajectory_track_stats from scratch. Cheap (one grouped scan of
+-- trajectory_points) and always consistent, so no incremental bookkeeping.
+CREATE OR REPLACE FUNCTION trajectory_refresh_track_stats() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
+  TRUNCATE cde.trajectory_track_stats;
+  INSERT INTO cde.trajectory_track_stats
+         (dataset_pk, trajectory_id, time_min, time_max, n_points, bbox)
+  SELECT dataset_pk, trajectory_id, min(time), max(time), count(*),
+         -- ST_Extent returns a box2d with no SRID; restore 3857 for the column
+         ST_SetSRID(ST_Extent(geom)::geometry, 3857)
+    FROM cde.trajectory_points
+   WHERE dataset_pk IS NOT NULL
+   GROUP BY dataset_pk, trajectory_id;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
+
+
 -- Wrapper used by process_incremental_update(); the full-reload path in the
 -- db-loader invokes the sub-functions individually for per-step timing logs.
 CREATE OR REPLACE FUNCTION trajectory_process() RETURNS VOID AS $$
@@ -362,5 +401,7 @@ BEGIN
   -- days is computed at harvest time; this pass only backfills NULLs.
   PERFORM trajectory_update_days();
   -- point_pk + hex FKs are linked in create_hexes(), which runs after.
+  PERFORM trajectory_points_link_dataset_pk();
+  PERFORM trajectory_refresh_track_stats();
 END;
 $$ LANGUAGE plpgsql;

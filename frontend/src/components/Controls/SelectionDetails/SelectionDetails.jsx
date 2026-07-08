@@ -33,6 +33,8 @@ export default function SelectionDetails({
   setShowIntroModal,
   totalNumberOfDatasets,
   resetFilters,
+  selectedTrajectory,
+  setSelectedTrajectory,
   children
 }) {
   const { t, i18n } = useTranslation()
@@ -236,6 +238,8 @@ export default function SelectionDetails({
             setInspectRecordID={setInspectRecordID}
             filterSet={filterSet}
             query={combinedQueries}
+            selectedTrajectory={selectedTrajectory}
+            setSelectedTrajectory={setSelectedTrajectory}
           />
         ) : (
           <>

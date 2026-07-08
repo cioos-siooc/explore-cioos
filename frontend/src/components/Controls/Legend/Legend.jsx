@@ -24,7 +24,9 @@ export default function Legend({
   currentTrajectoryRangeLevel,
   zoom,
   selectionPanelOpen,
-  platformsInView
+  platformsInView,
+  tracksMode,
+  trailingDays
 }) {
   const { t } = useTranslation()
   const [legendOpen, setLegendOpen] = useState(true)
@@ -136,6 +138,41 @@ export default function Legend({
     }
   }
   function generateTrajectoryLegendElements() {
+    // Tracks mode replaces the coverage-hex ramp with the track-line layers.
+    if (tracksMode) {
+      return (
+        <>
+          <hr />
+          <LegendElement
+            title={`${t('legendTrackLine')} (${trailingDays}d)`}
+            open={legendOpen}
+          >
+            <svg width='15' height='15'>
+              <line
+                x1='1'
+                y1='13'
+                x2='14'
+                y2='2'
+                stroke='#6749AC'
+                strokeWidth='2.5'
+                strokeLinecap='round'
+              />
+            </svg>
+          </LegendElement>
+          <LegendElement title={t('legendTrackHead')} open={legendOpen}>
+            <CircleFill
+              size={11}
+              fill='#6749AC'
+              style={{
+                border: '1.5px solid white',
+                borderRadius: '11px',
+                margin: '2px'
+              }}
+            />
+          </LegendElement>
+        </>
+      )
+    }
     if (isEmpty(currentTrajectoryRangeLevel)) return null
 
     // Trajectory coverage always renders as hexes, at every zoom level.

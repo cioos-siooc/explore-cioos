@@ -298,4 +298,181 @@ router.get(
   },
 );
 
+/**
+ * @swagger
+ * /tiles/tracks/{z}/{x}/{y}.mvt:
+ *   get:
+ *     summary: Retrieve a vector tile of trajectory track lines and head positions
+ *     tags: [Tiles]
+ *     description: >
+ *       Returns a Mapbox Vector Tile with TWO layers built from
+ *       cde.trajectory_points: 'track-lines' (per-trajectory LineStrings over
+ *       the requested time window, ordered by time) and 'track-heads' (each
+ *       trajectory's latest fix within the window). timeMin/timeMax are
+ *       REQUIRED — the window is the scrub bar's trailing interval. Clients
+ *       should snap the window to UTC day boundaries so the URL-keyed tile
+ *       cache gets high hit rates across scrubs and users.
+ *     parameters:
+ *       - in: path
+ *         name: z
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: x
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: y
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: timeMin
+ *         required: true
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: timeMax
+ *         required: true
+ *         schema: { type: string, format: date-time }
+ *     responses:
+ *       200:
+ *         description: MVT binary tile (layers track-lines + track-heads).
+ *         content:
+ *           application/x-protobuf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ */
+/* GET /tiles/tracks/:z/:x/:y.mvt */
+/* Trajectory track lines + head positions from cde.trajectory_points */
+router.get(
+  "/tracks/:z/:x/:y.mvt",
+  validatorMiddleware(),
+  cache.route({ binary: true }),
+  async (req, res) => {
+    const { z, x, y } = req.params;
+    const { timeMin, timeMax } = req.query;
+
+    // The scrub window is the whole point of this layer; unbounded queries
+    // would assemble every trajectory's full track on every tile.
+    if (!timeMin || !timeMax) {
+      return res
+        .status(400)
+        .json({ error: "timeMin and timeMax are required for track tiles" });
+    }
+
+    // Only dataset-level filters apply here. The shared filter's per-point
+    // fragments (depth_min/max, lat/lon bounds, polygon-on-geom, pointPKs,
+    // and its OWN time fragments which target time_min/time_max columns)
+    // reference columns cde.trajectory_track_stats doesn't have — the time
+    // window is bound explicitly below instead.
+    const datasetLevelQuery = {};
+    ["eovs", "platforms", "datasetPKs", "organizations", "obisNodes", "erddapServers"]
+      .forEach((k) => { if (req.query[k]) datasetLevelQuery[k] = req.query[k]; });
+
+    let filters;
+    try {
+      filters = await createDBFilter(datasetLevelQuery);
+    } catch (err) {
+      if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+      throw err;
+    }
+
+    // Correctness invariant: lines are assembled from the FULL time window
+    // with no per-point spatial predicate — a segment can cross a tile that
+    // neither of its endpoints is in. Spatial pruning happens only at
+    // trajectory level, against the per-trajectory summary bbox (expanded by
+    // 25% of the tile width so near-boundary tracks aren't missed), and
+    // ST_AsMVTGeom does the actual clipping with its built-in buffer.
+    const SQL = `
+  WITH te AS (SELECT ST_TileEnvelope(:z, :x, :y) tile_envelope),
+    cand AS (
+      SELECT s.dataset_pk, s.trajectory_id
+      FROM cde.trajectory_track_stats s
+      JOIN cde.datasets d ON d.pk = s.dataset_pk, te
+      WHERE s.bbox && ST_Expand(
+              te.tile_envelope,
+              (ST_XMax(te.tile_envelope) - ST_XMin(te.tile_envelope)) * 0.25
+            )
+        AND s.time_max >= :timeMin::timestamptz
+        AND s.time_min <= :timeMax::timestamptz
+        ${filters.hasShared ? "AND :filters" : ""}
+    ),
+    pts AS (
+      SELECT p.dataset_pk, p.trajectory_id, p.time, p.longitude, p.geom, d.pk_url
+      FROM cde.trajectory_points p
+      JOIN cand c ON c.dataset_pk = p.dataset_pk
+                 AND c.trajectory_id = p.trajectory_id
+      JOIN cde.datasets d ON d.pk = p.dataset_pk
+      WHERE p.time >= :timeMin::timestamptz
+        AND p.time <= :timeMax::timestamptz
+    ),
+    -- Split tracks at the antimeridian: consecutive fixes jumping more than
+    -- 180 degrees of longitude start a new segment instead of a line looping
+    -- around the globe.
+    segs AS (
+      SELECT *, sum(brk) OVER (
+        PARTITION BY dataset_pk, trajectory_id ORDER BY time
+      ) AS seg
+      FROM (
+        SELECT *, (abs(longitude - lag(longitude) OVER (
+          PARTITION BY dataset_pk, trajectory_id ORDER BY time
+        )) > 180)::int AS brk
+        FROM pts
+      ) q
+    ),
+    lines AS (
+      SELECT trajectory_id, pk_url, ST_MakeLine(geom ORDER BY time) AS geom
+      FROM segs
+      GROUP BY dataset_pk, trajectory_id, pk_url, seg
+      HAVING count(*) >= 2
+    ),
+    heads AS (
+      SELECT DISTINCT ON (dataset_pk, trajectory_id)
+             trajectory_id, pk_url,
+             (extract(epoch FROM time) * 1000)::bigint AS head_time, geom
+      FROM pts
+      ORDER BY dataset_pk, trajectory_id, time DESC
+    ),
+    line_mvt AS (
+      SELECT l.trajectory_id, l.pk_url,
+             ST_AsMVTGeom(l.geom, te.tile_envelope) AS geom
+      FROM lines l, te
+      WHERE l.geom && te.tile_envelope
+    ),
+    head_mvt AS (
+      SELECT h.trajectory_id, h.pk_url, h.head_time,
+             ST_AsMVTGeom(h.geom, te.tile_envelope) AS geom
+      FROM heads h, te
+      WHERE h.geom && te.tile_envelope
+    )
+    -- A valid MVT is a concatenation of layer messages.
+    SELECT coalesce((SELECT ST_AsMVT(l.*, 'track-lines', 4096, 'geom') FROM line_mvt l), ''::bytea)
+        || coalesce((SELECT ST_AsMVT(h.*, 'track-heads', 4096, 'geom') FROM head_mvt h), ''::bytea)
+        AS st_asmvt;
+  `;
+
+    try {
+      const q = db.raw(SQL, {
+        filters: filters.shared,
+        timeMin,
+        timeMax,
+        z,
+        x,
+        y,
+      });
+
+      const tileRaw = await q;
+      const tile = tileRaw.rows[0];
+
+      res.setHeader("Content-Type", "application/x-protobuf");
+      res.status(200).send(tile.st_asmvt);
+    } catch (e) {
+      console.error(e);
+      res.status(500).send({
+        error: e.toString(),
+      });
+    }
+  },
+);
+
 module.exports = router;

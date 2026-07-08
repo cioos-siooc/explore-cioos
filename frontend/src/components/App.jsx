@@ -35,6 +35,8 @@ import SourceFilter from './Controls/Filter/SourceFilter/SourceFilter.jsx'
 import ScientificNameFilter from './Controls/Filter/ScientificNameFilter/ScientificNameFilter.jsx'
 import TimeSelector from './Controls/Filter/TimeSelector/TimeSelector.jsx'
 import DepthSelector from './Controls/Filter/DepthSelector/DepthSelector.jsx'
+import TracksToggle from './Controls/TracksToggle/TracksToggle.jsx'
+import TimeBar from './Controls/TimeBar/TimeBar.jsx'
 import ErrorBoundary from './ErrorBoundary/ErrorBoundary.jsx'
 import EnglishLogo from './Images/CIOOSNationalLogoBlackEnglish.svg'
 import FrenchLogo from './Images/CIOOSNationalLogoBlackFrench.svg'
@@ -49,7 +51,8 @@ import {
   defaultPlatformsSelected,
   defaultScientificNamesSelected,
   defaultObisNodesSelected,
-  defaultErddapServersSelected
+  defaultErddapServersSelected,
+  defaultTrailingDays
 } from './config.js'
 import {
   capitalizeFirstLetter,
@@ -101,6 +104,21 @@ export default function App() {
   const [trajectoryRangeLevels, setTrajectoryRangeLevels] = useState()
   const [currentTrajectoryRangeLevel, setCurrentTrajectoryRangeLevel] = useState()
   const [hoveredDataset, setHoveredDataset] = useState()
+
+  // Tracks mode (trajectory track lines + time scrub bar)
+  const [tracksMode, setTracksMode] = useState(
+    searchParams.get('tracks') === 'true'
+  )
+  const [scrubTime, setScrubTime] = useState(
+    searchParams.get('scrubTime') || new Date().toISOString().split('T')[0]
+  )
+  const debouncedScrubTime = useDebounce(scrubTime, 250)
+  const [trailingDays, setTrailingDays] = useState(
+    Number.parseInt(searchParams.get('trail')) || defaultTrailingDays
+  )
+  const [smoothTracks, setSmoothTracks] = useState(false)
+  const [selectedTrajectory, setSelectedTrajectory] = useState()
+
   const defaultQuery = {
     startDate: defaultStartDate,
     endDate: defaultEndDate,
@@ -338,9 +356,15 @@ export default function App() {
       ...Object.fromEntries(params2),
       lang
     }
+    // Tracks-mode state persists in the URL only when active/non-default
+    if (tracksMode) {
+      obj.tracks = 'true'
+      obj.scrubTime = scrubTime
+      if (trailingDays !== defaultTrailingDays) obj.trail = trailingDays
+    }
     const combined = new URLSearchParams(obj)
     navigate('?' + combined.toString())
-  }, [query, mapView])
+  }, [query, mapView, tracksMode, debouncedScrubTime, trailingDays])
 
   useEffect(() => {
     document.cookie = `introModalOpen=${showIntroModal}; Secure; max-age=${60 * 60 * 24 * 31}`
@@ -833,6 +857,11 @@ export default function App() {
         setHoveredDataset={setHoveredDataset}
         hoveredDataset={hoveredDataset}
         setDatasetsSelected={setDatasetsSelected}
+        tracksMode={tracksMode}
+        scrubTime={debouncedScrubTime}
+        trailingDays={trailingDays}
+        smoothTracks={smoothTracks}
+        selectedTrajectory={selectedTrajectory}
       />
       <Controls
         loading={loading}
@@ -849,6 +878,8 @@ export default function App() {
                 polygon={polygon}
                 setPolygon={setPolygon}
                 setHoveredDataset={setHoveredDataset}
+                selectedTrajectory={selectedTrajectory}
+                setSelectedTrajectory={setSelectedTrajectory}
                 filterSet={{
                   eovFilter: { eovsSelected, setEovsSelected },
                   platformFilter: { platformsSelected, setPlatformsSelected },
@@ -1135,6 +1166,8 @@ export default function App() {
           zoom={zoom}
           selectionPanelOpen={selectionPanelOpen}
           platformsInView={platformsSelected.map((e) => e.title)}
+          tracksMode={tracksMode}
+          trailingDays={trailingDays}
         />
       )}
       <button
@@ -1145,6 +1178,21 @@ export default function App() {
       >
         <div className='rectangleIcon' />
       </button>
+      <TracksToggle
+        tracksMode={tracksMode}
+        setTracksMode={setTracksMode}
+        loading={loading}
+      />
+      {tracksMode && (
+        <TimeBar
+          scrubTime={scrubTime}
+          setScrubTime={setScrubTime}
+          trailingDays={trailingDays}
+          setTrailingDays={setTrailingDays}
+          smoothTracks={smoothTracks}
+          setSmoothTracks={setSmoothTracks}
+        />
+      )}
       <IntroModal showModal={showIntroModal} setShowModal={setShowIntroModal} />
     </ErrorBoundary>
   )

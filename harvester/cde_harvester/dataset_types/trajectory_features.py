@@ -30,6 +30,15 @@ GRID_DEG = 1 / 12
 # Interval literal sent to ERDDAP (8 dp keeps the URL stable for caching).
 GRID_INTERVAL = f"{GRID_DEG:.8f}"
 
+# Track-point downsampling for plain Trajectory datasets (ships/drifters can
+# report every few seconds): keep the first fix of each UTC day.
+TRACK_INTERVAL = "1day"
+# Hard per-trajectory cap on retained fixes; decimation keeps first/last and
+# an even stride between. At Argo cadence (~1 fix / 10 days) this never bites;
+# it bounds pathological high-frequency trajectories and the
+# /trajectories/track response size.
+MAX_TRACK_POINTS_PER_TRAJECTORY = 5000
+
 
 def _snap(series):
     """Snap coordinates to the canonical cell grid (round-to-nearest, 8 dp).
@@ -147,9 +156,11 @@ def _extract_via_server_binning(dataset, traj_var, has_depth):
     return cells
 
 
-def _extract_via_chunked_download(dataset, traj_var, has_depth):
-    """Fallback for servers without orderBy interval grouping: download only
-    the id/position/time(/depth) columns in yearly chunks and bin locally."""
+def _iter_raw_chunks(dataset, traj_var, has_depth):
+    """Yield raw [traj?, latitude, longitude, time(, depth)] frames in yearly
+    chunks — the shared download loop for both fallback paths (cell binning
+    and track-point downsampling). Each chunk is bounded by MAX_RESPONSE_SIZE;
+    failed chunks are logged and skipped."""
     log = dataset.logger
     request_vars = ([traj_var] if traj_var else []) + ["latitude", "longitude", "time"]
     if has_depth:
@@ -175,7 +186,6 @@ def _extract_via_chunked_download(dataset, traj_var, has_depth):
             for a, b in zip(bounds[:-1], bounds[1:])
         ]
 
-    frames = []
     for time_query in chunks:
         try:
             df = dataset.dataset_tabledap_query(columns + time_query)
@@ -184,7 +194,16 @@ def _extract_via_chunked_download(dataset, traj_var, has_depth):
             continue
         if df.empty:
             continue
-        frames.append(_aggregate(df, traj_var, has_depth))
+        yield df
+
+
+def _extract_via_chunked_download(dataset, traj_var, has_depth):
+    """Fallback for servers without orderBy interval grouping: download only
+    the id/position/time(/depth) columns in yearly chunks and bin locally."""
+    frames = [
+        _aggregate(df, traj_var, has_depth)
+        for df in _iter_raw_chunks(dataset, traj_var, has_depth)
+    ]
 
     if not frames:
         return pd.DataFrame()
@@ -223,6 +242,159 @@ def _profiles_per_cell(dataset, traj_var, profile_var):
         .agg(n_profiles=(profile_var, "nunique"))
         .reset_index()
     )
+
+
+def _first_fix_per_day(df, traj_var):
+    """Reduce a raw [traj?, latitude, longitude, time] frame to the first fix
+    of each (trajectory, UTC day). Expects `time` already parsed to datetime."""
+    df = df.dropna(subset=["latitude", "longitude", "time"]).copy()
+    if df.empty:
+        return df
+    if traj_var:
+        df[traj_var] = df[traj_var].astype(str)
+    group_cols = ([traj_var] if traj_var else []) + [df["time"].dt.floor("D")]
+    return (
+        df.sort_values("time")
+        .groupby(group_cols, dropna=False, group_keys=False)
+        .head(1)
+    )
+
+
+def _decimate_tracks(points, max_points=MAX_TRACK_POINTS_PER_TRAJECTORY):
+    """Cap fixes per trajectory: keep an even stride plus the last fix.
+
+    Expects points sorted by (trajectory_id, time).
+    """
+
+    def _cap(group):
+        n = len(group)
+        if n <= max_points:
+            return group
+        stride = -(-n // max_points)  # ceil
+        kept = group.iloc[::stride]
+        if kept.index[-1] != group.index[-1]:
+            kept = pd.concat([kept, group.iloc[[-1]]])
+        return kept
+
+    return (
+        points.groupby("trajectory_id", dropna=False, group_keys=False)
+        .apply(_cap)
+        .reset_index(drop=True)
+    )
+
+
+def extract_track_points(dataset, per_profile=False):
+    """Ordered, downsampled RAW track fixes for one trajectory dataset.
+
+    Returns a TrajectoryPointSchema-shaped frame (may be empty = no data):
+    one row per retained fix — per-profile fixes for TrajectoryProfile
+    (``per_profile=True``, full fidelity at Argo cadence), first-fix-per-day
+    for plain Trajectory. Unlike extract_cells nothing is grid-snapped; these
+    rows feed cde.trajectory_points for track-line rendering.
+
+    Assumes extract_cells() already ran on this dataset (it populates
+    dataset.trajectory_id_variable / profile_id_variable).
+    """
+    log = dataset.logger
+    traj_var = dataset.trajectory_id_variable
+    profile_var = dataset.profile_id_variable if per_profile else None
+
+    points = pd.DataFrame()
+    try:
+        if profile_var:
+            # One row per (trajectory, profile): the row holding each group's
+            # min time, lat/lon included. Bounded by profile count (same bound
+            # as _profiles_per_cell's distinct() query).
+            request_vars = [v for v in (traj_var, profile_var) if v] + [
+                "time", "latitude", "longitude",
+            ]
+            group = ",".join(v for v in (traj_var, profile_var) if v)
+            url = ",".join(request_vars) + requests.utils.quote(
+                f'&orderByMin("{group},time")'
+            )
+            points = dataset.dataset_tabledap_query(url)
+        else:
+            # First fix of each UTC day per trajectory, grouped server-side
+            # (orderByMin with an interval on its target: min time within each
+            # (traj, day) group, e.g. orderByMin("traj,time/1day")).
+            request_vars = ([traj_var] if traj_var else []) + [
+                "time", "latitude", "longitude",
+            ]
+            group = (f"{traj_var}," if traj_var else "") + f"time/{TRACK_INTERVAL}"
+            url = ",".join(request_vars) + requests.utils.quote(
+                f'&orderByMin("{group}")'
+            )
+            points = dataset.dataset_tabledap_query(url)
+            if not points.empty:
+                points["time"] = ERDDAP.parse_erddap_dates(points["time"])
+                points = _first_fix_per_day(points, traj_var)
+    except HTTPError:
+        log.warning(
+            "Server-side track-point grouping failed for %s; falling back to "
+            "chunked download + local daily downsample", dataset.id,
+        )
+        points = pd.DataFrame()
+
+    if points.empty:
+        # Fallback: same yearly-chunked raw download the cell fallback uses,
+        # reduced locally to first-fix-per-day (also for TrajectoryProfile —
+        # a per-day track is an acceptable degradation when the server lacks
+        # orderBy grouping).
+        frames = []
+        for df in _iter_raw_chunks(dataset, traj_var, has_depth=False):
+            df = df.copy()
+            df["time"] = ERDDAP.parse_erddap_dates(df["time"])
+            reduced = _first_fix_per_day(df, traj_var)
+            if not reduced.empty:
+                frames.append(reduced)
+        points = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+    if points.empty:
+        log.warning("No track points found for %s", dataset.id)
+        return pd.DataFrame()
+
+    if not pd.api.types.is_datetime64_any_dtype(points["time"]):
+        points["time"] = ERDDAP.parse_erddap_dates(points["time"])
+    points["latitude"] = pd.to_numeric(points["latitude"], errors="coerce")
+    points["longitude"] = pd.to_numeric(points["longitude"], errors="coerce")
+    points = points.dropna(subset=["time", "latitude", "longitude"])
+    # Same validity filter as extract_cells — also drops Argo's 99.999 /
+    # 999.999 bad-position sentinels.
+    points = points.query(
+        "latitude > -90 and latitude < 90 and longitude >= -180 and longitude <= 180"
+    ).copy()
+    if points.empty:
+        log.warning("No valid track points remain for %s", dataset.id)
+        return points
+
+    points = points.rename(columns={traj_var: "trajectory_id"} if traj_var else {})
+    if "trajectory_id" not in points:
+        points["trajectory_id"] = ""
+    points["trajectory_id"] = points["trajectory_id"].astype(str)
+    if profile_var and profile_var in points:
+        points = points.rename(columns={profile_var: "profile_id"})
+        points["profile_id"] = points["profile_id"].astype(str)
+    else:
+        points["profile_id"] = None
+
+    points = points.sort_values(["trajectory_id", "time"])
+    # The UNIQUE key is (erddap_url, dataset_id, trajectory_id, time): two
+    # profiles reported at an identical timestamp collapse to one fix.
+    points = points.drop_duplicates(subset=["trajectory_id", "time"], keep="first")
+    points = _decimate_tracks(points)
+
+    points["dataset_id"] = dataset.id
+    points["erddap_url"] = dataset.erddap_url
+    points = points[
+        ["erddap_url", "dataset_id", "trajectory_id", "profile_id",
+         "time", "latitude", "longitude"]
+    ]
+
+    log.info(
+        "Extracted %d track points across %d trajectories for %s",
+        len(points), points["trajectory_id"].nunique(), dataset.id,
+    )
+    return points
 
 
 def extract_cells(dataset, count_profiles=False):

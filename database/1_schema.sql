@@ -239,6 +239,60 @@ CREATE INDEX trajectory_cells_hex_0_idx ON trajectory_cells (hex_0_pk);
 CREATE INDEX trajectory_cells_hex_1_idx ON trajectory_cells (hex_1_pk);
 ALTER TABLE cde.trajectory_cells SET (fillfactor = 80);
 
+-- Ordered, downsampled track fixes for Trajectory / TrajectoryProfile
+-- datasets: one row per (trajectory, retained fix), produced by the
+-- harvester's extract_track_points (per-profile fixes for TrajectoryProfile,
+-- first-fix-per-day for plain Trajectory, capped per trajectory). Unlike
+-- trajectory_cells these are RAW coordinates in time order — the source for
+-- the /tiles/tracks line assembly and the /trajectories/track endpoint.
+-- NOT hex-aggregated: no point_pk/hex FKs by design.
+DROP TABLE IF EXISTS trajectory_points;
+CREATE TABLE trajectory_points (
+    pk serial PRIMARY KEY,
+    dataset_pk integer,
+    erddap_url text,
+    dataset_id text,
+    -- cf_role=trajectory_id value; '' when the dataset has a single unnamed
+    -- trajectory (same convention as trajectory_cells).
+    trajectory_id text DEFAULT '',
+    -- cf_role=profile_id value for TrajectoryProfile fixes; NULL for plain
+    -- Trajectory (per-day) fixes.
+    profile_id text,
+    time timestamptz NOT NULL,
+    -- raw (unsnapped) fix coordinates
+    latitude double precision,
+    longitude double precision,
+    geom geometry(Point, 3857) GENERATED ALWAYS AS
+      (ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)) STORED,
+    UNIQUE (erddap_url, dataset_id, trajectory_id, time),
+    FOREIGN KEY (dataset_pk) REFERENCES datasets(pk)
+);
+
+-- (a) scrub-window queries: prune by time before per-trajectory assembly
+CREATE INDEX trajectory_points_time_idx ON trajectory_points (time);
+-- (b) ordered per-trajectory reads (ST_MakeLine ORDER BY time, full-track endpoint)
+CREATE INDEX trajectory_points_traj_time_idx ON trajectory_points (dataset_pk, trajectory_id, time);
+CREATE INDEX trajectory_points_geom_gist ON trajectory_points USING GIST (geom);
+ALTER TABLE cde.trajectory_points SET (fillfactor = 90);
+
+-- Per-trajectory summary, rebuilt on each load by trajectory_refresh_track_stats()
+-- (5_profile_process.sql). Serves the /trajectories/platforms list and lets the
+-- /tiles/tracks route prune candidate trajectories by bbox before assembling
+-- lines (a per-point spatial filter would break segments at tile borders).
+DROP TABLE IF EXISTS trajectory_track_stats;
+CREATE TABLE trajectory_track_stats (
+    dataset_pk integer,
+    trajectory_id text DEFAULT '',
+    time_min timestamptz,
+    time_max timestamptz,
+    n_points bigint,
+    -- ST_Extent envelope of the track; Geometry (not Polygon) because a
+    -- single-fix track's envelope degenerates to a Point.
+    bbox geometry(Geometry, 3857),
+    PRIMARY KEY (dataset_pk, trajectory_id)
+);
+CREATE INDEX trajectory_track_stats_bbox_gist ON trajectory_track_stats USING GIST (bbox);
+
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 DROP MATERIALIZED VIEW IF EXISTS cde.obis_scientific_names;

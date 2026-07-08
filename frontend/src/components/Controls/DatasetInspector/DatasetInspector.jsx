@@ -19,14 +19,20 @@ export default function DatasetInspector({
   setHoveredDataset,
   setInspectRecordID,
   filterSet,
-  query
+  query,
+  selectedTrajectory,
+  setSelectedTrajectory
 }) {
   const { t } = useTranslation()
   const [datasetRecords, setDatasetRecords] = useState()
   const [loading, setLoading] = useState(false)
+  const [trajectoryPlatforms, setTrajectoryPlatforms] = useState()
   // const platformColor = platformColors.filter(
   //   (pc) => pc.platform === dataset.platform
   // )
+  const isTrajectoryDataset =
+    dataset.source_type !== 'obis' &&
+    (dataset.cdm_data_type || '').includes('Trajectory')
 
   useEffect(() => {
     if (dataset.source_type === 'obis') return
@@ -47,6 +53,19 @@ export default function DatasetInspector({
         setLoading(false)
         throw error
       })
+  }, [dataset])
+
+  // Trajectory datasets: list the platforms (trajectory ids) so one can be
+  // picked to draw its full track on the map.
+  useEffect(() => {
+    if (!isTrajectoryDataset) {
+      setTrajectoryPlatforms()
+      return
+    }
+    fetch(`${server}/trajectories/platforms?datasetPKs=${dataset.pk}`)
+      .then((response) => (response.ok ? response.json() : []))
+      .then((platforms) => setTrajectoryPlatforms(platforms))
+      .catch(() => setTrajectoryPlatforms([]))
   }, [dataset])
 
   const dataColumnWith = '105px'
@@ -95,6 +114,37 @@ export default function DatasetInspector({
     data
   }
 
+  const platformColumns = [
+    {
+      name: splitLines(t('trajectoryPlatformIdText')),
+      selector: (row) => row.trajectory_id,
+      sortable: true,
+      wrap: true,
+      width: '130px'
+    },
+    {
+      name: splitLines(t('timeSelectorStartDate')),
+      selector: (row) => row.time_min?.split('T')[0],
+      sortable: true,
+      wrap: true,
+      width: dataColumnWith
+    },
+    {
+      name: splitLines(t('timeSelectorEndDate')),
+      selector: (row) => row.time_max?.split('T')[0],
+      sortable: true,
+      wrap: true,
+      width: dataColumnWith
+    },
+    {
+      name: splitLines(t('trajectoryPlatformFixesText')),
+      selector: (row) => row.n_points,
+      sortable: true,
+      wrap: true,
+      width: dataColumnWith
+    }
+  ]
+
   const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet
 
   return (
@@ -104,6 +154,7 @@ export default function DatasetInspector({
         onClick={() => {
           setBackClicked(true)
           setInspectDataset()
+          if (setSelectedTrajectory) setSelectedTrajectory()
         }}
         title={t('datasetInspectorBackButtonTitle')} // 'Return to dataset list'
       >
@@ -208,6 +259,59 @@ export default function DatasetInspector({
               )}
             </div>
           </div>
+          {isTrajectoryDataset && trajectoryPlatforms?.length > 0 && (
+            <>
+              <div className='metadataGridItem recordTable'>
+                <strong>{t('trajectoryPlatformsTitle')}</strong>
+              </div>
+              <div className='main'>
+                <div>{t('trajectoryPlatformsClickText')}</div>
+                <DataTableExtensions
+                  columns={platformColumns}
+                  data={trajectoryPlatforms}
+                  print={false}
+                  filterPlaceholder={t('trajectoryPlatformsSearchPlaceholder')}
+                  export={false}
+                >
+                  <DataTable
+                    onRowClicked={(row) =>
+                      setSelectedTrajectory &&
+                      setSelectedTrajectory(
+                        selectedTrajectory?.trajectoryId === row.trajectory_id
+                          ? undefined // click the active row again to clear
+                          : {
+                            datasetPk: dataset.pk,
+                            trajectoryId: row.trajectory_id
+                          }
+                      )
+                    }
+                    striped
+                    pointerOnHover
+                    conditionalRowStyles={[
+                      {
+                        when: (row) =>
+                          selectedTrajectory?.trajectoryId ===
+                          row.trajectory_id,
+                        style: { backgroundColor: '#d5c9ee' }
+                      }
+                    ]}
+                    columns={platformColumns}
+                    data={trajectoryPlatforms}
+                    defaultSortField='trajectory_id'
+                    pagination
+                    paginationPerPage={100}
+                    paginationRowsPerPageOptions={[100, 150, 200, 250]}
+                    paginationComponentOptions={{
+                      rowsPerPageText: t('tableComponentRowsPerPage'),
+                      rangeSeparatorText: t('tableComponentOf'),
+                      selectAllRowsItem: false
+                    }}
+                    highlightOnHover
+                  />
+                </DataTableExtensions>
+              </div>
+            </>
+          )}
           {dataset.source_type !== 'obis' && (
             <>
               <div className='metadataGridItem recordTable'>

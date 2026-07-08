@@ -40,6 +40,14 @@ export const trajectoryColorScale = [
   '#6749AC'
 ]
 
+// Tracks mode (trajectory track lines + time scrub bar)
+export const defaultTrailingDays = 7
+export const trailingWindowOptions = [7, 14, 30, 90]
+// Scrub bar domain start; today is the end. Argo-era default.
+export const tracksMinDate = '2000-01-01'
+export const trackLineColor = '#6749AC'
+export const selectedTrackColor = '#E3285E'
+
 export const languages = [
   {
     code: 'en',

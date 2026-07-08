@@ -1,0 +1,23 @@
+.tracksToggleButton {
+  position: absolute;
+  right: 10px;
+  bottom: 290px;
+  width: 42px;
+  height: 42px;
+  border-radius: 4px;
+  border: 0px;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  background-color: #fff;
+  padding: 5px;
+  z-index: 2;
+  color: #6749ac;
+}
+
+.tracksToggleButton.active {
+  background-color: #6749ac;
+  color: #fff;
+}
+
+.tracksToggleButton:hover:not(.active) {
+  background-color: #f3f3f3;
+}

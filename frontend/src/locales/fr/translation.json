@@ -305,5 +305,17 @@
   "harvest.filter.searchPlaceholder": "Rechercher jeu de données / raison / erreur…",
   "harvest.filter.search": "Rechercher",
   "harvest.filter.clear": "Effacer",
-  "harvest.card.lastAttempt": "Dernière tentative : {{date}}"
+  "harvest.card.lastAttempt": "Dernière tentative : {{date}}",
+  "tracksToggleLabel": "Afficher les trajectoires",
+  "timeBarTrailingWindowLabel": "Trace",
+  "timeBarDays": "jours",
+  "trackSmoothingLabel": "Lisser les trajectoires",
+  "trackSmoothingTooltip": "Trace des courbes lissées entre les positions enregistrées (affichage seulement — les données sous-jacentes sont inchangées; les points montrent les positions réelles)",
+  "trajectoryPlatformsTitle": "Plateformes / Trajectoires",
+  "trajectoryPlatformsClickText": "Cliquez sur une plateforme pour tracer sa trajectoire complète sur la carte",
+  "trajectoryPlatformsSearchPlaceholder": "Filtrer les plateformes",
+  "trajectoryPlatformIdText": "ID de plateforme",
+  "trajectoryPlatformFixesText": "Positions",
+  "legendTrackLine": "Trajectoire",
+  "legendTrackHead": "Position à la date choisie"
 }

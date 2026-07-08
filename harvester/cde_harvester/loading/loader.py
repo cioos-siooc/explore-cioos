@@ -220,6 +220,35 @@ def prepare_trajectory_cells_dataframe(trajectory_cells):
     return agg
 
 
+def prepare_trajectory_points_dataframe(trajectory_points):
+    """Clean and prepare trajectory_points DataFrame for insertion.
+
+    Unlike the cells tables nothing is aggregated or rounded — these are raw
+    ordered fixes. Parse times, drop unusable rows, and deduplicate on the
+    table's unique key (erddap_url, dataset_id, trajectory_id, time).
+    """
+    points = trajectory_points.copy()
+    points["trajectory_id"] = points["trajectory_id"].fillna("").astype(str)
+    points["time"] = pd.to_datetime(points["time"], errors="coerce", utc=True)
+    points = points.dropna(subset=["time", "latitude", "longitude"])
+    if "profile_id" in points.columns:
+        points["profile_id"] = points["profile_id"].astype("string")
+        points.loc[points["profile_id"].str.strip() == "", "profile_id"] = pd.NA
+    else:
+        points["profile_id"] = pd.NA
+
+    key_cols = ["erddap_url", "dataset_id", "trajectory_id", "time"]
+    points = (
+        points.sort_values(key_cols)
+        .drop_duplicates(subset=key_cols, keep="first")
+        .reset_index(drop=True)
+    )
+    return points[
+        ["erddap_url", "dataset_id", "trajectory_id", "profile_id",
+         "time", "latitude", "longitude"]
+    ]
+
+
 def ensure_organization_pks(datasets):
     """Ensure organization_pks column has empty arrays instead of null values."""
     if (
@@ -248,6 +277,7 @@ def main(folder, incremental=False):
     skipped_datasets_file = f"{folder}/skipped.csv"
     obis_cells_file = f"{folder}/obis_cells.csv"
     trajectory_cells_file = f"{folder}/trajectory_cells.csv"
+    trajectory_points_file = f"{folder}/trajectory_points.csv"
     verified_file = f"{folder}/verified.csv"
     harvest_runs_file = f"{folder}/harvest_runs.csv"
     harvest_attempts_file = f"{folder}/harvest_attempts.csv"
@@ -271,6 +301,11 @@ def main(folder, incremental=False):
     if os.path.isfile(trajectory_cells_file):
         logger.info("Reading %s", trajectory_cells_file)
         trajectory_cells = pd.read_csv(trajectory_cells_file)
+
+    trajectory_points = None
+    if os.path.isfile(trajectory_points_file):
+        logger.info("Reading %s", trajectory_points_file)
+        trajectory_points = pd.read_csv(trajectory_points_file)
 
     verified = None
     if os.path.isfile(verified_file) and os.path.getsize(verified_file) > 1:
@@ -415,6 +450,15 @@ def main(folder, incremental=False):
                     )
                     load_cells_copy(prepared, "temp_trajectory_cells", transaction)
 
+            if trajectory_points is not None:
+                prepared = prepare_trajectory_points_dataframe(trajectory_points)
+                with _timed("temp_trajectory_points COPY", logger):
+                    logger.info(
+                        "Loading trajectory_points into temp table (%d rows)",
+                        len(prepared),
+                    )
+                    load_cells_copy(prepared, "temp_trajectory_points", transaction)
+
             if not skipped_datasets.empty:
                 with _timed("temp_skipped_datasets to_sql", logger):
                     logger.info("Loading skipped_datasets into temp table")
@@ -558,16 +602,18 @@ def main(folder, incremental=False):
                         prepared, "obis_cells", transaction, schema=schema
                     )
 
-            if trajectory_cells is not None:
-                prepared = prepare_trajectory_cells_dataframe(trajectory_cells)
+            if trajectory_cells is not None or trajectory_points is not None:
                 # Resolve dataset_pk at COPY time (datasets were just written
-                # above) so trajectory_link_dataset_pk() doesn't rewrite every
+                # above) so the *_link_dataset_pk() passes don't rewrite every
                 # row post-load. Unmatched rows COPY a NULL and are caught by
-                # that backfill pass.
+                # those backfill passes.
                 pk_rows = transaction.execute(
                     text("SELECT pk, erddap_url, dataset_id FROM cde.datasets")
                 ).all()
                 pk_map = {(r.erddap_url, r.dataset_id): r.pk for r in pk_rows}
+
+            if trajectory_cells is not None:
+                prepared = prepare_trajectory_cells_dataframe(trajectory_cells)
                 prepared["dataset_pk"] = pd.array(
                     [
                         pk_map.get(key)
@@ -581,6 +627,23 @@ def main(folder, incremental=False):
                     logger.info("Writing trajectory_cells (%d rows)", len(prepared))
                     load_cells_copy(
                         prepared, "trajectory_cells", transaction, schema=schema
+                    )
+
+            if trajectory_points is not None:
+                prepared = prepare_trajectory_points_dataframe(trajectory_points)
+                prepared["dataset_pk"] = pd.array(
+                    [
+                        pk_map.get(key)
+                        for key in zip(
+                            prepared["erddap_url"], prepared["dataset_id"]
+                        )
+                    ],
+                    dtype="Int64",
+                )
+                with _timed("trajectory_points COPY", logger):
+                    logger.info("Writing trajectory_points (%d rows)", len(prepared))
+                    load_cells_copy(
+                        prepared, "trajectory_points", transaction, schema=schema
                     )
 
             with _timed("skipped_datasets to_sql", logger):
@@ -645,6 +708,22 @@ def main(folder, incremental=False):
                             "  %s: %s rows affected", fn, n if n is not None else 0
                         )
 
+            if trajectory_points is not None:
+                # dataset_pk backfill (~0 rows, set at COPY time) + the
+                # per-trajectory summary rebuild for /tiles/tracks pruning and
+                # the platform list. No hex/point linkage by design.
+                trajectory_point_steps = [
+                    "trajectory_points_link_dataset_pk",
+                    "trajectory_refresh_track_stats",
+                ]
+                logger.info("Processing trajectory_points")
+                for fn in trajectory_point_steps:
+                    with _timed(fn, logger):
+                        n = transaction.execute(text(f"SELECT {fn}();")).scalar()
+                        logger.info(
+                            "  %s: %s rows affected", fn, n if n is not None else 0
+                        )
+
             with _timed("create_hexes", logger):
                 logger.info("Creating hexes")
                 transaction.execute(text("SELECT create_hexes();"))
@@ -695,9 +774,12 @@ def main(folder, incremental=False):
     # DELETE+INSERT churn. Vacuuming right away keeps that space reusable so
     # the tables plateau instead of growing run-over-run, and refreshes
     # planner stats for the tile queries.
-    if trajectory_cells is not None:
+    if trajectory_cells is not None or trajectory_points is not None:
         with _timed("post-load VACUUM ANALYZE", logger):
             with engine.connect().execution_options(
                 isolation_level="AUTOCOMMIT"
             ) as conn:
-                conn.execute(text("VACUUM ANALYZE cde.trajectory_cells"))
+                if trajectory_cells is not None:
+                    conn.execute(text("VACUUM ANALYZE cde.trajectory_cells"))
+                if trajectory_points is not None:
+                    conn.execute(text("VACUUM ANALYZE cde.trajectory_points"))

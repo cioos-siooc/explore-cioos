@@ -304,5 +304,17 @@
   "harvest.filter.searchPlaceholder": "Search dataset / reason / error…",
   "harvest.filter.search": "Search",
   "harvest.filter.clear": "Clear",
-  "harvest.card.lastAttempt": "Last attempt: {{date}}"
+  "harvest.card.lastAttempt": "Last attempt: {{date}}",
+  "tracksToggleLabel": "Show trajectory tracks",
+  "timeBarTrailingWindowLabel": "Trail",
+  "timeBarDays": "days",
+  "trackSmoothingLabel": "Smooth tracks",
+  "trackSmoothingTooltip": "Draw smoothed curves through the recorded positions (display only - the underlying data is unchanged; dots show the real fixes)",
+  "trajectoryPlatformsTitle": "Platforms / Trajectories",
+  "trajectoryPlatformsClickText": "Click a platform to draw its full track on the map",
+  "trajectoryPlatformsSearchPlaceholder": "Filter platforms",
+  "trajectoryPlatformIdText": "Platform ID",
+  "trajectoryPlatformFixesText": "Track fixes",
+  "legendTrackLine": "Track",
+  "legendTrackHead": "Position at selected date"
 }

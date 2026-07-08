@@ -409,3 +409,64 @@ export function splitLines(s) {
     </span>
   )
 }
+
+// Split an ordered [lon, lat] coordinate run where consecutive fixes jump
+// more than 180 degrees of longitude (antimeridian crossing) so a track
+// never draws a line looping around the globe. Returns an array of runs.
+export function splitAtAntimeridian(coords) {
+  if (!coords || coords.length === 0) return []
+  const runs = [[coords[0]]]
+  for (let i = 1; i < coords.length; i++) {
+    if (Math.abs(coords[i][0] - coords[i - 1][0]) > 180) {
+      runs.push([coords[i]])
+    } else {
+      runs[runs.length - 1].push(coords[i])
+    }
+  }
+  return runs
+}
+
+// Centripetal Catmull-Rom spline through an ordered [lon, lat] coordinate
+// array. PURELY COSMETIC, render-time only: the stored/fetched track data is
+// never modified, endpoints are preserved, and the curve passes through every
+// original fix. Returns a new densified coordinate array.
+export function catmullRomSpline(coords, segmentsPerSpan = 8) {
+  if (!coords || coords.length < 3) return coords
+  const alpha = 0.5 // centripetal — no cusps/self-intersections between fixes
+  const out = [coords[0]]
+
+  const dist = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1])
+
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p0 = coords[i - 1] || coords[i]
+    const p1 = coords[i]
+    const p2 = coords[i + 1]
+    const p3 = coords[i + 2] || coords[i + 1]
+
+    // Coincident fixes would collapse a knot interval to zero (division by
+    // zero below), so every increment gets an epsilon floor.
+    const t0 = 0
+    const t1 = t0 + Math.max(Math.pow(dist(p0, p1), alpha), 1e-9)
+    const t2 = t1 + Math.max(Math.pow(dist(p1, p2), alpha), 1e-9)
+    const t3 = t2 + Math.max(Math.pow(dist(p2, p3), alpha), 1e-9)
+
+    for (let s = 1; s <= segmentsPerSpan; s++) {
+      const t = t1 + ((t2 - t1) * s) / segmentsPerSpan
+      const point = [0, 1].map((axis) => {
+        const a1 =
+          ((t1 - t) / (t1 - t0)) * p0[axis] + ((t - t0) / (t1 - t0)) * p1[axis]
+        const a2 =
+          ((t2 - t) / (t2 - t1)) * p1[axis] + ((t - t1) / (t2 - t1)) * p2[axis]
+        const a3 =
+          ((t3 - t) / (t3 - t2)) * p2[axis] + ((t - t2) / (t3 - t2)) * p3[axis]
+        const b1 =
+          ((t2 - t) / (t2 - t0)) * a1 + ((t - t0) / (t2 - t0)) * a2
+        const b2 =
+          ((t3 - t) / (t3 - t1)) * a2 + ((t - t1) / (t3 - t1)) * a3
+        return ((t2 - t) / (t2 - t1)) * b1 + ((t - t1) / (t2 - t1)) * b2
+      })
+      out.push(point)
+    }
+  }
+  return out
+}

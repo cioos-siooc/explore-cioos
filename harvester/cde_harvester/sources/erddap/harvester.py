@@ -18,6 +18,7 @@ from cde_harvester.core.schemas import (
     ProfileSchema,
     SkippedDatasetSchema,
     TrajectoryCellSchema,
+    TrajectoryPointSchema,
     VariableSchema,
     VerifiedDatasetSchema,
 )
@@ -33,6 +34,7 @@ from cde_harvester.core.errors import (
 )
 from cde_harvester.dataset_types import (
     extract_features,
+    extract_track_points,
     feature_kind_for,
     supported_cdm_data_types,
     supported_data_structures,
@@ -89,6 +91,9 @@ class DatasetHarvestResult:
     # Which HarvestResult attribute `features` belongs in: "profiles" for
     # point-like types, "trajectory_cells" for trajectory coverage cells.
     feature_kind: str = "profiles"
+    # Secondary output (trajectory types only): ordered, downsampled track
+    # fixes for HarvestResult.trajectory_points / cde.trajectory_points.
+    track_points: pd.DataFrame = None
     dataset_df: pd.DataFrame = None
     variables: pd.DataFrame = None
     skipped_reason_code: str = None  # for the skipped_datasets table, on skip
@@ -141,6 +146,9 @@ class ERDDAPHarvester(BaseHarvester):
         )
         df_trajectory_cells_all = pd.DataFrame(
             columns=TrajectoryCellSchema.to_schema().columns.keys()
+        )
+        df_trajectory_points_all = pd.DataFrame(
+            columns=TrajectoryPointSchema.to_schema().columns.keys()
         )
         df_datasets_all = pd.DataFrame(
             columns=DatasetSchema.to_schema().columns.keys()
@@ -248,6 +256,10 @@ class ERDDAPHarvester(BaseHarvester):
                         )
                     else:
                         df_profiles_all = pd.concat([df_profiles_all, result.features])
+                    if result.track_points is not None and not result.track_points.empty:
+                        df_trajectory_points_all = pd.concat(
+                            [df_trajectory_points_all, result.track_points]
+                        )
                     df_datasets_all = pd.concat([df_datasets_all, result.dataset_df])
                     df_variables_all = pd.concat([df_variables_all, result.variables])
                 elif result.status == "skipped_unchanged":
@@ -326,6 +338,7 @@ class ERDDAPHarvester(BaseHarvester):
             variables=df_variables_all,
             skipped=df_skipped_datasets,
             trajectory_cells=df_trajectory_cells_all,
+            trajectory_points=df_trajectory_points_all,
             attempts=df_attempts,
             verified=df_verified,
         )
@@ -384,8 +397,8 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
         if compliance_checker.passes_all_checks():
             df_features = extract_features(dataset)
             feature_kind = feature_kind_for(dataset.cdm_data_type)
-            duration_ms = int((time.monotonic() - t0) * 1000)
             if df_features.empty:
+                duration_ms = int((time.monotonic() - t0) * 1000)
                 log.warning("No %s found", feature_kind)
                 return DatasetHarvestResult(
                     status="skipped",
@@ -399,11 +412,24 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                         query_urls=dataset.queried_urls,
                     ),
                 )
+            # Secondary output for trajectory types: ordered track fixes.
+            # Best-effort — a failed track query must never fail a dataset
+            # whose coverage cells succeeded.
+            df_track_points = None
+            try:
+                df_track_points = extract_track_points(dataset)
+            except Exception:
+                log.warning(
+                    "Track-point extraction failed for %s; coverage cells "
+                    "kept, tracks skipped", dataset_id, exc_info=True,
+                )
+            duration_ms = int((time.monotonic() - t0) * 1000)
             log.info("complete")
             return DatasetHarvestResult(
                 status="success",
                 features=df_features,
                 feature_kind=feature_kind,
+                track_points=df_track_points,
                 dataset_df=dataset.get_df(),
                 variables=dataset.df_variables,
                 attempt=_build_attempt(

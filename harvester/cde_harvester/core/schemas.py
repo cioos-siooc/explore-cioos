@@ -103,6 +103,29 @@ class TrajectoryCellSchema(pa.DataFrameModel):
         strict = False
 
 
+class TrajectoryPointSchema(pa.DataFrameModel):
+    """Schema for the trajectory_points DataFrame.
+
+    Mirrors cde.trajectory_points in the database: one row per
+    (trajectory, retained fix) — ordered, downsampled RAW track positions
+    (per-profile fixes for TrajectoryProfile, first-fix-per-day for plain
+    Trajectory). The source for track-line rendering; unlike
+    TrajectoryCellSchema nothing here is grid-snapped or aggregated.
+    """
+
+    erddap_url: Series[str]
+    dataset_id: Series[str]
+    trajectory_id: Series[str] = pa.Field(nullable=True, default="")
+    profile_id: Series[str] = pa.Field(nullable=True)
+    time: Series[pa.DateTime]
+    latitude: Series[float] = pa.Field(ge=-90, le=90)
+    longitude: Series[float] = pa.Field(ge=-180, le=180)
+
+    class Config:
+        coerce = True
+        strict = False
+
+
 class DatasetSchema(pa.DataFrameModel):
     """Schema for the datasets DataFrame.
 
