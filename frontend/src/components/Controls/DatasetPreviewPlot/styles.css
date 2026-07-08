@@ -31,7 +31,7 @@
   display: inline-block;
 }
 
-/* Right side: header (title + plot-type button) on top, plot fills the rest. */
+/* Right side: plot-type button on top, plot fills the rest. */
 .datasetPreviewPlotArea {
   flex: 1;
   min-width: 0;
@@ -41,21 +41,10 @@
 
 .datasetPreviewPlotHeader {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
-}
-
-.datasetPreviewPlotTitle {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  font-size: 1.1em;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .datasetPreviewPlot {
@@ -70,7 +59,7 @@
 }
 
 .datasetPreviewPlot .user-select-none.svg-container {
-  min-height: 450px !important;
+  min-height: 560px !important;
   height: 100% !important;
 }
 

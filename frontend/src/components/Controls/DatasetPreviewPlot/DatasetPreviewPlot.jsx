@@ -77,12 +77,13 @@ export default function DatasetPreviewPlot({
       ? `${axis.columnName}${axis.unit ? ` ( ${axis.unit} )` : ''}`
       : ''
 
-  // Axis / colorbar title: a custom name is used verbatim (the user controls the
-  // wording); otherwise fall back to the "name ( unit )" form.
-  const axisTitleFor = (role, axis) =>
-    (customLabels[role] && customLabels[role].trim())
-      ? customLabels[role].trim()
-      : axisTitle(axis)
+  // Axis / colorbar title: use the custom name when set, otherwise the column
+  // name — and in both cases keep the "( unit )" suffix so the unit never drops.
+  const axisTitleFor = (role, axis) => {
+    const custom = customLabels[role] && customLabels[role].trim()
+    if (!custom) return axisTitle(axis)
+    return `${custom}${axis?.unit ? ` ( ${axis.unit} )` : ''}`
+  }
 
   // Color dimension: precompute the color values and a shared min/max so both
   // traces span the same numeric range.
@@ -102,22 +103,26 @@ export default function DatasetPreviewPlot({
     : plotType
 
   // Each trace gets its own colorscale + colorbar so the two variables are
-  // distinguishable. Colorbars are horizontal and sit at the top of the plot
-  // (one centered, or two side by side when a second variable is active).
+  // distinguishable. The colorbars are vertical and sit in the right gutter,
+  // below the legend, with a gap from the plot (side by side when there are two).
   const colorActive = !!(plotAxes.color && data)
   const hasSecondary = !!plotAxes.secondary?.columnName
+  // A timeseries second variable puts an axis on the RIGHT side of the plot, so
+  // the gutter (legend + colorbars) has to start further right to clear it. A
+  // profile's second variable goes on the top axis, so no extra gap is needed.
+  const rightAxisPresent = hasSecondary && !isProfile
+  const gutterX = rightAxisPresent ? 1.16 : 1.06
   const COLORSCALES = ['Viridis', 'YlOrRd']
 
   const colorbarFor = (index) => ({
     title: axisTitleFor('color', plotAxes.color),
     titleside: 'top',
-    orientation: 'h',
-    thickness: 12,
-    len: hasSecondary ? 0.45 : 0.6,
-    x: hasSecondary ? (index === 0 ? 0 : 1) : 0.5,
-    xanchor: hasSecondary ? (index === 0 ? 'left' : 'right') : 'center',
-    y: 1.02,
-    yanchor: 'bottom'
+    thickness: 14,
+    len: hasSecondary ? 0.5 : 0.7,
+    x: gutterX + index * 0.14,
+    xanchor: 'left',
+    y: hasSecondary ? 0.38 : 0.5,
+    yanchor: 'middle'
   })
 
   // Marker props for a trace; `index` selects its colorscale/colorbar. The color
@@ -203,9 +208,15 @@ export default function DatasetPreviewPlot({
   const layout = {
     uirevision: true,
     autosize: true,
-    // The title is rendered as HTML above the plot (see render), so the whole
-    // top margin is free for the horizontal colorbar(s).
-    margin: { t: colorActive ? 70 : 30 },
+    // Title lives in the layout (so it is part of the saved image). Colorbar(s)
+    // and legend live in the right gutter, so widen the right margin to leave a
+    // clear gap between them and the plot (wider still when a right-side axis
+    // pushes the gutter out).
+    title: plotTitle,
+    margin: {
+      t: 60,
+      r: (colorActive || hasSecondary) ? (rightAxisPresent ? 220 : 170) : 80
+    },
     showlegend: traces.length > 1,
     yaxis: {
       automargin: true,
@@ -220,12 +231,18 @@ export default function DatasetPreviewPlot({
       uirevision: true
     },
     dragmode: 'zoom',
+    // Stack the toolbar vertically in the top-right corner so its icons no longer
+    // sit in the title's horizontal band (the long two-variable title used to
+    // collide with the horizontal toolbar).
     modebar: {
+      orientation: 'v',
       uirevision: true
     }
   }
 
   if (plotAxes.secondary?.columnName) {
+    // Push the trace legend into the right gutter, above the colorbar(s).
+    layout.legend = { x: gutterX, xanchor: 'left', y: 1, yanchor: 'top' }
     if (isProfile) {
       layout.xaxis2 = {
         overlaying: 'x',
@@ -329,7 +346,6 @@ export default function DatasetPreviewPlot({
 
       <div className="datasetPreviewPlotArea">
         <div className="datasetPreviewPlotHeader">
-          <h4 className="datasetPreviewPlotTitle" title={plotTitle}>{plotTitle}</h4>
           <DropdownButton
             className="dropdownButtonRight dropdownButton"
             title={t('plotType') + ': ' + t(plotType)}
