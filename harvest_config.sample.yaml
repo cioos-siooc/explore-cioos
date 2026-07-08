@@ -10,9 +10,11 @@ cache: true
 folder:
 
 # use to test select datasets, eg: dataset_one,dataset_two
+# Leaving this empty harvests the ENTIRE erddap server (very slow); pin to the
+# sample dataset the CI/API tests rely on instead.
 dataset_ids:
-#  - ECCC_MSC_BUOYS
-#  - DFO_MEDS_BUOYS
+  - ECCC_MSC_BUOYS
+  - DFO_MEDS_BUOYS
 
 # defaults to false
 log_time:
