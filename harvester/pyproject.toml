@@ -45,4 +45,9 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests/unit", "tests/integration"]
 addopts = "-v --tb=short"
+filterwarnings = [
+    # Tasks running as autonomous Prefect tasks (outside a flow) can't forward
+    # logs to the API — expected in the test harness, not a real problem.
+    "ignore:Logger 'prefect.task_runs' attempted to send logs:UserWarning",
+]
 

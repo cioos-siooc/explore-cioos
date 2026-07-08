@@ -22,6 +22,19 @@ _sentry_init_patcher = patch("sentry_sdk.init")
 _sentry_init_patcher.start()
 
 # ---------------------------------------------------------------------------
+# Prefect test harness — starts a single ephemeral SQLite-backed Prefect API
+# server for the whole test session so @task and @flow decorated functions can
+# be called directly in tests without needing a running Prefect server and
+# without bypassing Prefect's machinery via .fn().
+# ---------------------------------------------------------------------------
+from prefect.testing.utilities import prefect_test_harness as _prefect_test_harness
+
+@pytest.fixture(scope="session", autouse=True)
+def prefect_test_server():
+    with _prefect_test_harness():
+        yield
+
+# ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
