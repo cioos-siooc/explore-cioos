@@ -102,41 +102,47 @@ export default function DatasetPreviewPlot({
     ? (plotType.includes('markers') ? plotType : 'markers+lines')
     : plotType
 
-  // Each trace gets its own colorscale + colorbar so the two variables are
-  // distinguishable. The colorbars are vertical and sit in the right gutter,
-  // below the legend, with a gap from the plot (side by side when there are two).
+  // Both traces are colored by the same color value with a single colorscale;
+  // the two variables are told apart by MARKER SHAPE, not by a second colorscale
+  // (shape is an independent channel, so the traces stay distinct at any color
+  // value, in grayscale, and for all color-blindness types). One shared scale
+  // means one colorbar, sitting in the right gutter with a gap from the plot.
   const colorActive = !!(plotAxes.color && data)
   const hasSecondary = !!plotAxes.secondary?.columnName
   // A timeseries second variable puts an axis on the RIGHT side of the plot, so
-  // the gutter (legend + colorbars) has to start further right to clear it. A
+  // the gutter (legend + colorbar) has to start further right to clear it. A
   // profile's second variable goes on the top axis, so no extra gap is needed.
   const rightAxisPresent = hasSecondary && !isProfile
   const gutterX = rightAxisPresent ? 1.16 : 1.06
-  const COLORSCALES = ['Viridis', 'YlOrRd']
+  const COLORSCALE = 'Viridis'
+  const MARKER_SYMBOLS = ['circle', 'diamond']
 
-  const colorbarFor = (index) => ({
+  // Single colorbar, centered in the right gutter.
+  const colorbarFor = () => ({
     title: axisTitleFor('color', plotAxes.color),
     titleside: 'top',
     thickness: 14,
-    len: hasSecondary ? 0.5 : 0.7,
-    x: gutterX + index * 0.14,
+    x: gutterX,
     xanchor: 'left',
-    y: hasSecondary ? 0.38 : 0.5,
+    len: 0.7,
+    y: 0.5,
     yanchor: 'middle'
   })
 
-  // Marker props for a trace; `index` selects its colorscale/colorbar. The color
+  // Marker props for a trace; `index` selects its shape. Both traces share the
+  // one colorscale/range, so only the first trace draws the colorbar. The color
   // value rides along as `customdata` so the hover tooltip can show it.
   const colorPropsFor = (index) =>
     colorActive
       ? {
         marker: {
           color: colorValues,
-          colorscale: COLORSCALES[index] || COLORSCALES[0],
+          colorscale: COLORSCALE,
           cmin,
           cmax,
-          showscale: true,
-          colorbar: colorbarFor(index)
+          symbol: MARKER_SYMBOLS[index] || MARKER_SYMBOLS[0],
+          showscale: index === 0,
+          ...(index === 0 ? { colorbar: colorbarFor() } : {})
         },
         customdata: colorValues
       }
@@ -205,6 +211,27 @@ export default function DatasetPreviewPlot({
       : `${inspectRecordID}`
   }
 
+  // Plotly titles don't auto-wrap: break a long one onto as many lines as it
+  // needs at word boundaries (inserting <br>) so it stays inside the plot width
+  // instead of being clipped or colliding with the toolbar.
+  const wrapTitle = (text, maxChars = 60) => {
+    const words = String(text).split(' ')
+    const lines = []
+    let line = ''
+    words.forEach((word) => {
+      if (line && line.length + 1 + word.length > maxChars) {
+        lines.push(line)
+        line = word
+      } else {
+        line = line ? `${line} ${word}` : word
+      }
+    })
+    if (line) lines.push(line)
+    return lines.join('<br>')
+  }
+  const wrappedTitle = wrapTitle(plotTitle)
+  const titleLineCount = wrappedTitle.split('<br>').length
+
   const layout = {
     uirevision: true,
     autosize: true,
@@ -212,9 +239,10 @@ export default function DatasetPreviewPlot({
     // and legend live in the right gutter, so widen the right margin to leave a
     // clear gap between them and the plot (wider still when a right-side axis
     // pushes the gutter out).
-    title: plotTitle,
+    title: wrappedTitle,
     margin: {
-      t: 60,
+      // Extra top room per wrapped title line so multi-line titles never overlap the plot.
+      t: 60 + (titleLineCount - 1) * 24,
       r: (colorActive || hasSecondary) ? (rightAxisPresent ? 220 : 170) : 80
     },
     showlegend: traces.length > 1,
