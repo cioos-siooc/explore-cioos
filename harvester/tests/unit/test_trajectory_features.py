@@ -67,26 +67,18 @@ def _count_df():
     })
 
 
-def _profiles_distinct_df():
-    """distinct() over (traj, profile, lat, lon): 2 profiles in A, 1 in B."""
-    return pd.DataFrame({
-        "traj_id": ["m1", "m1", "m1"],
-        "prof_id": ["p1", "p2", "p3"],
-        "latitude": [CELL_A[0], CELL_A[0], CELL_B[0]],
-        "longitude": [CELL_A[1], CELL_A[1], CELL_B[1]],
-    })
-
-
 def _per_profile_track_df():
-    """orderByMin("traj,prof,time"): one raw (unsnapped) fix per profile."""
+    """orderByMin("traj,prof,time"): one raw (unsnapped) fix per profile.
+    Shared by track extraction AND _profiles_per_cell (same query): p1/p2
+    snap into CELL_A, p3 into CELL_B."""
     return pd.DataFrame({
         "traj_id": ["m1", "m1", "m1"],
         "prof_id": ["p1", "p2", "p3"],
         "time": [
             "2021-01-01T06:00:00Z", "2021-01-11T06:00:00Z", "2021-01-19T06:00:00Z",
         ],
-        "latitude": [48.0132, 48.0451, 48.0972],
-        "longitude": [-125.0021, -125.0388, -125.0779],
+        "latitude": [48.0132, 48.0300, 48.0972],
+        "longitude": [-125.0021, -125.0388, -125.0300],
     })
 
 
@@ -141,15 +133,15 @@ def build_trajectory_dataset(cdm_data_type="Trajectory", with_depth=True,
             return _count_df()
         if plain.startswith("traj_id&distinct"):
             return pd.DataFrame({"traj_id": ["m1"]})
-        if "distinct()" in plain and "prof_id" in plain:
-            return _profiles_distinct_df()
-        # fallback full-column download (chunked)
+        # fallback full-column download (chunked). Longitudes zigzag ~1.5km
+        # (beyond the DP tolerance) so the shape pass keeps every fix, while
+        # still snapping into the same two cells.
         if plain.startswith("traj_id,latitude,longitude,time"):
             n = 6
             return pd.DataFrame({
                 "traj_id": ["m1"] * n,
                 "latitude": [CELL_A[0] + 0.001] * 3 + [CELL_B[0] - 0.001] * 3,
-                "longitude": [CELL_A[1]] * n,
+                "longitude": [CELL_A[1] + 0.02 * (i % 2) for i in range(n)],
                 "time": ["2021-01-0%dT00:00:00Z" % (i + 1) for i in range(n)],
                 "depth": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
             })
@@ -203,6 +195,36 @@ class TestTrajectoryProfile:
 
     def test_plain_trajectory_has_zero_profiles(self):
         cells = extract_cells(build_trajectory_dataset())
+        assert (cells["n_profiles"] == 0).all()
+
+    def test_profile_count_uses_per_profile_query_not_distinct(self):
+        # distinct() over (traj, profile, lat, lon) returns ~one row per
+        # SAMPLE when position varies within a profile (seen live at 255MB);
+        # the count must come from the bounded orderByMin per-profile query.
+        dataset = build_trajectory_dataset(cdm_data_type="TrajectoryProfile")
+        extract_cells(dataset, count_profiles=True)
+        urls = [unquote(c.args[0]) for c in dataset.dataset_tabledap_query.call_args_list]
+        assert any('orderByMin("traj_id,prof_id,time")' in u for u in urls)
+        assert not any("prof_id" in u and "distinct()" in u for u in urls)
+
+    def test_failed_profile_count_keeps_cells(self):
+        # The per-cell profile count is a display enhancement; a too-large
+        # response there must not fail a dataset whose cells succeeded (this
+        # exact failure took out a whole glider dataset in production).
+        from cde_harvester.core.errors import ResponseTooLargeError
+
+        dataset = build_trajectory_dataset(cdm_data_type="TrajectoryProfile")
+        inner = dataset.dataset_tabledap_query.side_effect
+
+        def failing_profile_count(url):
+            plain = unquote(url)
+            if "orderByMin(" in plain and "prof_id" in plain:
+                raise ResponseTooLargeError("Response 254906579 bytes exceeds 200000000")
+            return inner(url)
+
+        dataset.dataset_tabledap_query = MagicMock(side_effect=failing_profile_count)
+        cells = extract_cells(dataset, count_profiles=True)
+        assert len(cells) == 2
         assert (cells["n_profiles"] == 0).all()
 
 
@@ -324,7 +346,7 @@ class TestTrackPointExtraction:
         assert len(points) == 3
         assert points["profile_id"].tolist() == ["p1", "p2", "p3"]
         # raw coordinates, NOT snapped to the cell grid
-        assert points["latitude"].tolist() == [48.0132, 48.0451, 48.0972]
+        assert points["latitude"].tolist() == [48.0132, 48.0300, 48.0972]
         # ordered by time
         assert points["time"].is_monotonic_increasing
         assert set(points["dataset_id"]) == {DATASET_ID}
@@ -341,9 +363,10 @@ class TestTrackPointExtraction:
         assert points["time"].is_monotonic_increasing
         urls = [unquote(c.args[0]) for c in ds.dataset_tabledap_query.call_args_list]
         # Day-level probe, then a finer refine query sized from the probe's
-        # own row count (3 active days -> clamp(3*86400/4000, 60, 86400)=65s).
+        # own row count (3 active days -> clamp(3*86400/150000, 600, 86400),
+        # i.e. floored at the 10-minute minimum bucket).
         assert any('orderByMin("traj_id,time/86400,time")' in u for u in urls)
-        assert any('orderByMin("traj_id,time/65,time")' in u for u in urls)
+        assert any('orderByMin("traj_id,time/600,time")' in u for u in urls)
 
     def test_fallback_downsamples_per_day(self):
         # orderByMin raises -> monthly-chunk raw download, reduced locally.
@@ -406,6 +429,47 @@ class TestDecimateTracks:
         out = _decimate_tracks(df, max_points=10)
         assert len(out[out["trajectory_id"] == "m2"]) == 5
 
+    def test_always_simplify_prunes_under_cap(self):
+        # The binned plain-Trajectory path oversamples on purpose (speed-blind
+        # time buckets), so DP must run even when the count is under the cap:
+        # a vessel idling at dock reports the same position for hours -- those
+        # collapse to the segment endpoints.
+        n = 50
+        df = pd.DataFrame({
+            "trajectory_id": ["m1"] * n,
+            "time": pd.date_range("2021-01-01", periods=n, freq="10min"),
+            "latitude": [48.0] * n,
+            "longitude": [-125.0] * n,
+        })
+        out = _decimate_tracks(df, max_points=1000, always_simplify=True)
+        assert len(out) == 2  # endpoints only
+        # ...but per-profile rows under the cap stay untouched
+        assert len(_decimate_tracks(df, max_points=1000)) == n
+
+    def test_long_chords_densified_after_simplify(self):
+        # A long straight leg: DP alone would collapse ~500km of colinear
+        # fixes to its two endpoints, leaving a chord indistinguishable from
+        # a data outage at render time. Densification must re-add enough of
+        # the dropped candidates that no chord exceeds TRACK_MAX_CHORD_KM.
+        from cde_harvester.dataset_types.trajectory_features import (
+            TRACK_MAX_CHORD_KM,
+            _haversine_km,
+        )
+        n = 100
+        df = pd.DataFrame({
+            "trajectory_id": ["m1"] * n,
+            "time": pd.date_range("2021-01-01", periods=n, freq="30min"),
+            "latitude": 48.0 + 0.045 * pd.Series(range(n)),  # ~5km steps north
+            "longitude": [-125.0] * n,
+        })
+        out = _decimate_tracks(df, max_points=1000, always_simplify=True)
+        assert 2 < len(out) < n
+        chords = _haversine_km(
+            out["latitude"].to_numpy()[:-1], out["longitude"].to_numpy()[:-1],
+            out["latitude"].to_numpy()[1:], out["longitude"].to_numpy()[1:],
+        )
+        assert chords.max() <= TRACK_MAX_CHORD_KM * 1.2  # rounding slack
+
     def test_shape_preserving_cap_keeps_corner(self):
         # An "L"-shaped route: 20 fixes east, then 20 fixes north. Douglas-
         # Peucker should represent this exactly with its 3 defining vertices
@@ -431,18 +495,23 @@ class TestDecimateTracks:
 
 class TestChooseTrackIntervalSeconds:
     def test_typical_cadence_scales_between_floor_and_ceiling(self):
-        # 450 active days (the ferry case from the live findings report) ->
-        # clamp(450*86400/4000, 60, 86400) = 9720s, well inside both bounds.
-        assert _choose_track_interval_seconds(450) == 9720
-        assert _choose_track_interval_seconds(450) < TRACK_DAY_SECONDS
+        # ~10k active trajectory-days (the multi-vessel OGSL TSG case from
+        # the live verification: 3206 vessels) ->
+        # clamp(9947*86400/300000, 600, 86400) = 2865s, inside both bounds.
+        assert _choose_track_interval_seconds(9947) == 2865
+        assert _choose_track_interval_seconds(9947) < TRACK_DAY_SECONDS
 
-    def test_floors_at_minimum_for_very_few_active_days(self):
+    def test_floors_at_minimum_for_short_deployments(self):
+        # The ferry case (450 active days) and anything shorter floors at the
+        # 10-minute bucket: fine-grained candidates are cheap there, and the
+        # Douglas-Peucker pass -- not the bucket -- decides what's kept.
+        assert _choose_track_interval_seconds(450) == TRACK_MIN_INTERVAL_SECONDS
         assert _choose_track_interval_seconds(1) == TRACK_MIN_INTERVAL_SECONDS
 
     def test_ceilings_at_one_day_for_very_long_low_activity_deployments(self):
         # A very long-running, near-daily reporter never gets coarser than the
         # old fixed "1 day" behavior -- no regression there.
-        assert _choose_track_interval_seconds(100_000) == TRACK_MAX_INTERVAL_SECONDS
+        assert _choose_track_interval_seconds(500_000) == TRACK_MAX_INTERVAL_SECONDS
 
     def test_zero_active_days_stays_at_day_level(self):
         assert _choose_track_interval_seconds(0) == TRACK_MAX_INTERVAL_SECONDS
