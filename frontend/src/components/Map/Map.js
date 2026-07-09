@@ -25,7 +25,7 @@ import {
   getCurrentRangeLevel,
   updateMapToolTitleLanguage,
   catmullRomSpline,
-  splitAtAntimeridian
+  splitTrackRuns
 } from '../../utilities'
 import {
   colorScale,
@@ -569,14 +569,19 @@ export default function CreateMap({
         )
         if (!response.ok) return
         const track = await response.json()
-        rawTrackRef.current = { key: cacheKey, coordinates: track.coordinates }
+        rawTrackRef.current = {
+          key: cacheKey,
+          coordinates: track.coordinates,
+          times: track.times
+        }
       }
-      const rawCoordinates = rawTrackRef.current.coordinates
+      const { coordinates: rawCoordinates, times: rawTimes } = rawTrackRef.current
       if (!rawCoordinates || rawCoordinates.length === 0) return
 
-      // Split at the antimeridian BEFORE smoothing so the spline never
-      // interpolates across the seam.
-      const runs = splitAtAntimeridian(rawCoordinates)
+      // Split at the antimeridian and at large time gaps BEFORE smoothing so
+      // the spline never interpolates across the seam or across a data gap
+      // (same segmentation rule as the /tiles/tracks layer).
+      const runs = splitTrackRuns(rawCoordinates, rawTimes)
       const lineFeatures = runs
         .filter((run) => run.length >= 2)
         .map((run) => ({

@@ -386,7 +386,17 @@ router.get(
     const SQL = `
   WITH te AS (SELECT ST_TileEnvelope(:z, :x, :y) tile_envelope),
     cand AS (
-      SELECT s.dataset_pk, s.trajectory_id
+      -- gap_secs: per-trajectory time-gap split threshold — 4x the
+      -- trajectory's typical inter-fix spacing (span / retained fixes),
+      -- floored at 48 hours. An Argo float's ~10-day cycles never split; a
+      -- multi-expedition ship track (months dark between summers) always
+      -- does, instead of drawing a chord across the continent.
+      SELECT s.dataset_pk, s.trajectory_id,
+             GREATEST(
+               extract(epoch FROM s.time_max - s.time_min)
+                 / GREATEST(s.n_points - 1, 1) * 4,
+               172800
+             ) AS gap_secs
       FROM cde.trajectory_track_stats s
       JOIN cde.datasets d ON d.pk = s.dataset_pk, te
       WHERE s.bbox && ST_Expand(
@@ -398,7 +408,8 @@ router.get(
         ${filters.hasShared ? "AND :filters" : ""}
     ),
     pts AS (
-      SELECT p.dataset_pk, p.trajectory_id, p.time, p.longitude, p.geom, d.pk_url
+      SELECT p.dataset_pk, p.trajectory_id, p.time, p.longitude, p.latitude,
+             p.geom, d.pk_url, c.gap_secs
       FROM cde.trajectory_points p
       JOIN cand c ON c.dataset_pk = p.dataset_pk
                  AND c.trajectory_id = p.trajectory_id
@@ -406,18 +417,37 @@ router.get(
       WHERE p.time >= :timeMin::timestamptz
         AND p.time <= :timeMax::timestamptz
     ),
-    -- Split tracks at the antimeridian: consecutive fixes jumping more than
-    -- 180 degrees of longitude start a new segment instead of a line looping
-    -- around the globe.
+    -- Split tracks into segments, three break conditions:
+    --   1. antimeridian: consecutive fixes jumping >180 deg of longitude
+    --      would draw a line looping around the globe;
+    --   2. large time gap (> per-trajectory gap_secs): no data = unknown
+    --      path — draw nothing rather than a chord through possibly-land;
+    --   3. outage chord: >50km between fixes closer than 96h in time. The
+    --      harvester densifies data-backed chords to <=25km
+    --      (TRACK_MAX_CHORD_KM), so a long chord on a sub-96h gap means a
+    --      reporting outage on a fast platform (a ferry dark for a day
+    --      covers hundreds of km) — unknown path again. The 96h guard keeps
+    --      genuinely slow reporters (an Argo float drifts ~30-100km per
+    --      10-day cycle) from being shredded by condition 3; their real
+    --      gaps are handled by condition 2's cadence-scaled threshold.
     segs AS (
       SELECT *, sum(brk) OVER (
         PARTITION BY dataset_pk, trajectory_id ORDER BY time
       ) AS seg
       FROM (
-        SELECT *, (abs(longitude - lag(longitude) OVER (
-          PARTITION BY dataset_pk, trajectory_id ORDER BY time
-        )) > 180)::int AS brk
+        SELECT *, (
+          abs(longitude - lag(longitude) OVER w) > 180
+          OR extract(epoch FROM time - lag(time) OVER w) > gap_secs
+          OR (
+            ST_DistanceSphere(
+              ST_MakePoint(longitude, latitude),
+              ST_MakePoint(lag(longitude) OVER w, lag(latitude) OVER w)
+            ) > 50000
+            AND extract(epoch FROM time - lag(time) OVER w) < 345600
+          )
+        )::int AS brk
         FROM pts
+        WINDOW w AS (PARTITION BY dataset_pk, trajectory_id ORDER BY time)
       ) q
     ),
     lines AS (

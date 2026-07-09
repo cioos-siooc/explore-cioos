@@ -426,6 +426,56 @@ export function splitAtAntimeridian(coords) {
   return runs
 }
 
+// Split an ordered [lon, lat] track into runs, three break conditions
+// (mirrors the segs CTE in web-api /tiles/tracks so the selected-platform
+// view and the tile layer segment identically):
+//   1. antimeridian crossing (consecutive fixes jump >180 deg of longitude);
+//   2. large time gap — over 4x the track's typical inter-fix spacing
+//      (span / fixes), floored at 48h: an Argo float's ~10-day cycles never
+//      split, a ship dark for months between expeditions always does;
+//   3. outage chord — >50km between fixes closer than 96h in time. The
+//      harvester densifies data-backed chords to <=25km, so a long chord on
+//      a sub-96h gap is a reporting outage on a fast platform: the true
+//      path is unknown, draw nothing rather than a chord through
+//      possibly-land. The 96h guard protects slow reporters (Argo drifts
+//      30-100km per cycle) from being shredded by this condition.
+// `times` is the parallel timestamp array from /trajectories/track; without
+// it (or under 2 fixes) this degrades to the antimeridian-only split.
+export function splitTrackRuns(coords, times) {
+  if (!coords || coords.length === 0) return []
+  if (!times || times.length !== coords.length || coords.length < 2) {
+    return splitAtAntimeridian(coords)
+  }
+  const ms = times.map((t) => new Date(t).getTime())
+  const spanMs = ms[ms.length - 1] - ms[0]
+  const gapMs = Math.max((spanMs / (ms.length - 1)) * 4, 48 * 3600 * 1000)
+
+  const chordKm = (a, b) => {
+    const rad = Math.PI / 180
+    const p1 = a[1] * rad
+    const p2 = b[1] * rad
+    const h =
+      Math.sin(((b[1] - a[1]) * rad) / 2) ** 2 +
+      Math.cos(p1) * Math.cos(p2) * Math.sin(((b[0] - a[0]) * rad) / 2) ** 2
+    return 2 * 6371 * Math.asin(Math.sqrt(h))
+  }
+
+  const runs = [[coords[0]]]
+  for (let i = 1; i < coords.length; i++) {
+    const dtMs = ms[i] - ms[i - 1]
+    if (
+      Math.abs(coords[i][0] - coords[i - 1][0]) > 180 ||
+      dtMs > gapMs ||
+      (chordKm(coords[i - 1], coords[i]) > 50 && dtMs < 96 * 3600 * 1000)
+    ) {
+      runs.push([coords[i]])
+    } else {
+      runs[runs.length - 1].push(coords[i])
+    }
+  }
+  return runs
+}
+
 // Centripetal Catmull-Rom spline through an ordered [lon, lat] coordinate
 // array. PURELY COSMETIC, render-time only: the stored/fetched track data is
 // never modified, endpoints are preserved, and the curve passes through every
