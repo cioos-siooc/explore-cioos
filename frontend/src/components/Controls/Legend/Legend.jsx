@@ -11,7 +11,7 @@ import {
   capitalizeFirstLetter,
   generateColorStops
 } from '../../../utilities.js'
-import { colorScale, trajectoryColorScale } from '../../config.js'
+import { colorScale, trajectoryColorScale, TRAIL_ALL } from '../../config.js'
 import platformColors from '../../platformColors'
 
 import './styles.css'
@@ -144,7 +144,9 @@ export default function Legend({
         <>
           <hr />
           <LegendElement
-            title={`${t('legendTrackLine')} (${trailingDays}d)`}
+            title={`${t('legendTrackLine')} (${
+              trailingDays === TRAIL_ALL ? t('timeBarTrailAll') : `${trailingDays}d`
+            })`}
             open={legendOpen}
           >
             <svg width='15' height='15'>

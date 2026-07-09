@@ -4,7 +4,7 @@ import 'rc-slider/assets/index.css'
 import { Dropdown } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 
-import { tracksMinDate, trailingWindowOptions } from '../../config.js'
+import { tracksMinDate, trailingWindowOptions, TRAIL_ALL } from '../../config.js'
 import './styles.css'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -60,7 +60,8 @@ export default function TimeBar({
       <div className='timeBarControls'>
         <Dropdown>
           <Dropdown.Toggle size='sm' variant='outline-secondary'>
-            {t('timeBarTrailingWindowLabel')}: {trailingDays}d
+            {t('timeBarTrailingWindowLabel')}:{' '}
+            {trailingDays === TRAIL_ALL ? t('timeBarTrailAll') : `${trailingDays}d`}
           </Dropdown.Toggle>
           <Dropdown.Menu>
             {trailingWindowOptions.map((days) => (
@@ -69,7 +70,9 @@ export default function TimeBar({
                 active={days === trailingDays}
                 onClick={() => setTrailingDays(days)}
               >
-                {days} {t('timeBarDays')}
+                {days === TRAIL_ALL
+                  ? t('timeBarTrailAll')
+                  : `${days} ${t('timeBarDays')}`}
               </Dropdown.Item>
             ))}
           </Dropdown.Menu>

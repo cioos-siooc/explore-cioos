@@ -308,6 +308,7 @@
   "harvest.card.lastAttempt": "Dernière tentative : {{date}}",
   "tracksToggleLabel": "Afficher les trajectoires",
   "timeBarTrailingWindowLabel": "Trace",
+  "timeBarTrailAll": "Tout",
   "timeBarDays": "jours",
   "trackSmoothingLabel": "Lisser les trajectoires",
   "trackSmoothingTooltip": "Trace des courbes lissées entre les positions enregistrées (affichage seulement — les données sous-jacentes sont inchangées; les points montrent les positions réelles)",

@@ -307,6 +307,7 @@
   "harvest.card.lastAttempt": "Last attempt: {{date}}",
   "tracksToggleLabel": "Show trajectory tracks",
   "timeBarTrailingWindowLabel": "Trail",
+  "timeBarTrailAll": "All time",
   "timeBarDays": "days",
   "trackSmoothingLabel": "Smooth tracks",
   "trackSmoothingTooltip": "Draw smoothed curves through the recorded positions (display only - the underlying data is unchanged; dots show the real fixes)",

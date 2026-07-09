@@ -31,7 +31,9 @@ import {
   colorScale,
   trajectoryColorScale,
   trackLineColor,
-  selectedTrackColor
+  selectedTrackColor,
+  tracksMinDate,
+  TRAIL_ALL
 } from '../config'
 import platformColors from '../../components/platformColors'
 
@@ -190,14 +192,19 @@ export default function CreateMap({
   // re-renders without re-fetching.
   const rawTrackRef = useRef(null)
 
-  // UTC-day-snapped scrub window: [scrub date - N days, scrub date + 1 day).
-  // Day snapping keeps the tile URLs stable so the server's URL-keyed tile
-  // cache gets hits across scrubs and users.
+  // UTC-day-snapped scrub window: [scrub date - N days, scrub date + 1 day),
+  // or [tracksMinDate, scrub date + 1 day) for the 'all' trail (full tracks
+  // up to the scrub date — the default; see config.js). Day snapping keeps
+  // the tile URLs stable so the server's URL-keyed tile cache gets hits
+  // across scrubs and users.
   function tracksTimeWindow(scrub, trailing) {
     const MS_PER_DAY = 24 * 60 * 60 * 1000
     const end = new Date(`${scrub}T00:00:00Z`).getTime()
     const timeMax = `${new Date(end + MS_PER_DAY).toISOString().split('T')[0]}T00:00:00Z`
-    const timeMin = `${new Date(end - trailing * MS_PER_DAY).toISOString().split('T')[0]}T00:00:00Z`
+    const timeMin =
+      trailing === TRAIL_ALL
+        ? `${tracksMinDate}T00:00:00Z`
+        : `${new Date(end - trailing * MS_PER_DAY).toISOString().split('T')[0]}T00:00:00Z`
     return { timeMin, timeMax }
   }
 

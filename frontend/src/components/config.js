@@ -41,8 +41,16 @@ export const trajectoryColorScale = [
 ]
 
 // Tracks mode (trajectory track lines + time scrub bar)
-export const defaultTrailingDays = 7
-export const trailingWindowOptions = [7, 14, 30, 90]
+// 'all' = no trailing cutoff: every platform's full track up to the scrub
+// date. This is the DEFAULT because trajectory datasets are episodic (a
+// 2017-19 ferry, a 2016 glider mission, seasonal ship expeditions): with a
+// days-long trail, whatever the scrub date, most datasets have no data in
+// the window and their tracks are simply invisible unless the user already
+// knows each deployment's dates. Opening with everything visible matches
+// the coverage-hex layers; the day trails then narrow to "recent movement".
+export const TRAIL_ALL = 'all'
+export const defaultTrailingDays = TRAIL_ALL
+export const trailingWindowOptions = [7, 14, 30, 90, TRAIL_ALL]
 // Scrub bar domain start; today is the end. Argo-era default.
 export const tracksMinDate = '2000-01-01'
 export const trackLineColor = '#6749AC'
