@@ -11,6 +11,13 @@ from requests.exceptions import HTTPError
 from cde_harvester.dataset_types import extract_features, get_handler
 from cde_harvester.dataset_types.trajectory_features import (
     GRID_DEG,
+    MAX_TRACK_POINTS_CAP,
+    MIN_TRACK_POINTS_CAP,
+    TRACK_DAY_SECONDS,
+    TRACK_MAX_INTERVAL_SECONDS,
+    TRACK_MIN_INTERVAL_SECONDS,
+    _cap_for_active_days,
+    _choose_track_interval_seconds,
     _decimate_tracks,
     extract_cells,
     extract_track_points,
@@ -311,7 +318,10 @@ class TestTrackPointExtraction:
         assert points["profile_id"].isna().all()
         assert points["time"].is_monotonic_increasing
         urls = [unquote(c.args[0]) for c in ds.dataset_tabledap_query.call_args_list]
-        assert any('orderByMin("traj_id,time/1day")' in u for u in urls)
+        # Day-level probe, then a finer refine query sized from the probe's
+        # own row count (3 active days -> clamp(3*86400/4000, 60, 86400)=65s).
+        assert any('orderByMin("traj_id,time/86400,time")' in u for u in urls)
+        assert any('orderByMin("traj_id,time/65,time")' in u for u in urls)
 
     def test_fallback_downsamples_per_day(self):
         # orderByMin raises -> yearly-chunk raw download, reduced locally.
@@ -341,9 +351,16 @@ class TestDecimateTracks:
         assert len(_decimate_tracks(df, max_points=10)) == 10
 
     def test_over_cap_keeps_first_last_and_stride(self):
+        # A zigzag with a steady longitude trend (baseline chord ~horizontal)
+        # and a latitude swing well beyond the DP tolerance on every step, so
+        # Douglas-Peucker alone can't reduce it below the cap and the even
+        # stride actually has to run.
+        n = 100
         df = pd.DataFrame({
-            "trajectory_id": ["m1"] * 100,
-            "time": pd.date_range("2021-01-01", periods=100, freq="D"),
+            "trajectory_id": ["m1"] * n,
+            "time": pd.date_range("2021-01-01", periods=n, freq="D"),
+            "latitude": 48.0 + 0.02 * (pd.Series(range(n)) % 2),
+            "longitude": -125.0 + 0.01 * pd.Series(range(n)),
         })
         out = _decimate_tracks(df, max_points=10)
         assert len(out) <= 11  # stride keeps ceil(100/10)=10th rows + last
@@ -351,10 +368,13 @@ class TestDecimateTracks:
         assert out["time"].iloc[-1] == df["time"].iloc[-1]
 
     def test_cap_is_per_trajectory(self):
+        n = 100
         df = pd.concat([
             pd.DataFrame({
-                "trajectory_id": ["m1"] * 100,
-                "time": pd.date_range("2021-01-01", periods=100, freq="D"),
+                "trajectory_id": ["m1"] * n,
+                "time": pd.date_range("2021-01-01", periods=n, freq="D"),
+                "latitude": 48.0 + 0.02 * (pd.Series(range(n)) % 2),
+                "longitude": -125.0 + 0.01 * pd.Series(range(n)),
             }),
             pd.DataFrame({
                 "trajectory_id": ["m2"] * 5,
@@ -363,6 +383,79 @@ class TestDecimateTracks:
         ])
         out = _decimate_tracks(df, max_points=10)
         assert len(out[out["trajectory_id"] == "m2"]) == 5
+
+    def test_shape_preserving_cap_keeps_corner(self):
+        # An "L"-shaped route: 20 fixes east, then 20 fixes north. Douglas-
+        # Peucker should represent this exactly with its 3 defining vertices
+        # (start, corner, end) -- an even stride at the same cap would land on
+        # arbitrary fixes and likely miss the corner, cutting the turn short.
+        leg = 20
+        lon1 = -125.0 + 0.01 * pd.Series(range(leg))
+        lat1 = pd.Series([48.0] * leg)
+        corner_lon = lon1.iloc[-1]
+        lon2 = pd.Series([corner_lon] * leg)
+        lat2 = 48.0 + 0.01 * pd.Series(range(1, leg + 1))
+        n = leg * 2
+        df = pd.DataFrame({
+            "trajectory_id": ["m1"] * n,
+            "time": pd.date_range("2021-01-01", periods=n, freq="D"),
+            "latitude": pd.concat([lat1, lat2], ignore_index=True),
+            "longitude": pd.concat([lon1, lon2], ignore_index=True),
+        })
+        out = _decimate_tracks(df, max_points=5)
+        assert len(out) == 3
+        assert any(abs(out["longitude"] - corner_lon) < 1e-9)
+
+
+class TestChooseTrackIntervalSeconds:
+    def test_typical_cadence_scales_between_floor_and_ceiling(self):
+        # 450 active days (the ferry case from the live findings report) ->
+        # clamp(450*86400/4000, 60, 86400) = 9720s, well inside both bounds.
+        assert _choose_track_interval_seconds(450) == 9720
+        assert _choose_track_interval_seconds(450) < TRACK_DAY_SECONDS
+
+    def test_floors_at_minimum_for_very_few_active_days(self):
+        assert _choose_track_interval_seconds(1) == TRACK_MIN_INTERVAL_SECONDS
+
+    def test_ceilings_at_one_day_for_very_long_low_activity_deployments(self):
+        # A very long-running, near-daily reporter never gets coarser than the
+        # old fixed "1 day" behavior -- no regression there.
+        assert _choose_track_interval_seconds(100_000) == TRACK_MAX_INTERVAL_SECONDS
+
+    def test_zero_active_days_stays_at_day_level(self):
+        assert _choose_track_interval_seconds(0) == TRACK_MAX_INTERVAL_SECONDS
+
+    def test_immune_to_a_single_outlier_active_day(self):
+        """A single corrupt-timestamp fix that lands on a day far outside the
+        real deployment window only adds one active day to the count -- unlike
+        a max(time)-min(time) duration, which that same outlier would blow up
+        to years (seen in practice on a live C-PROOF glider dataset, where one
+        fix landed 25 years before an otherwise ~2-week deployment)."""
+        real_deployment_active_days = 14
+        with_one_outlier_day = real_deployment_active_days + 1
+
+        interval_without_outlier = _choose_track_interval_seconds(real_deployment_active_days)
+        interval_with_outlier = _choose_track_interval_seconds(with_one_outlier_day)
+
+        # One extra active day nudges the interval by at most a day's worth of
+        # bucket-width -- nowhere near TRACK_MAX_INTERVAL_SECONDS, which is
+        # what a naive multi-year duration would have forced regardless of
+        # the platform's true reporting cadence.
+        assert abs(interval_with_outlier - interval_without_outlier) <= TRACK_DAY_SECONDS
+        assert interval_with_outlier < TRACK_MAX_INTERVAL_SECONDS
+
+
+class TestCapForActiveDays:
+    def test_floors_at_minimum_for_short_deployments(self):
+        assert _cap_for_active_days(1) == MIN_TRACK_POINTS_CAP
+
+    def test_scales_linearly_in_the_middle(self):
+        # 44 active days (the misclassified-glider deployment from the live
+        # findings report) -> 44*50 = 2200, comfortably inside both bounds.
+        assert _cap_for_active_days(44) == 2200
+
+    def test_ceilings_at_maximum_for_long_deployments(self):
+        assert _cap_for_active_days(1000) == MAX_TRACK_POINTS_CAP
 
 
 class TestPrepareTrajectoryPointsDataframe:

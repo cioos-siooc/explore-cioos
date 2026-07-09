@@ -16,9 +16,11 @@ and binning in pandas (bounded by MAX_RESPONSE_SIZE).
 
 import logging
 
+import numpy as np
 import pandas as pd
 import requests
 from requests.exceptions import HTTPError
+from shapely.geometry import LineString
 
 from cde_harvester.sources.erddap.client import ERDDAP
 
@@ -31,13 +33,33 @@ GRID_DEG = 1 / 12
 GRID_INTERVAL = f"{GRID_DEG:.8f}"
 
 # Track-point downsampling for plain Trajectory datasets (ships/drifters can
-# report every few seconds): keep the first fix of each UTC day.
-TRACK_INTERVAL = "1day"
-# Hard per-trajectory cap on retained fixes; decimation keeps first/last and
-# an even stride between. At Argo cadence (~1 fix / 10 days) this never bites;
-# it bounds pathological high-frequency trajectories and the
-# /trajectories/track response size.
-MAX_TRACK_POINTS_PER_TRAJECTORY = 5000
+# report every few seconds, others every few days): start from a cheap
+# one-fix-per-UTC-day probe (TRACK_DAY_SECONDS), then refine to a finer bucket
+# sized so the candidate set stays near TRACK_TARGET_POINTS regardless of the
+# platform's actual reporting cadence (see _choose_track_interval_seconds).
+# Sizing off the probe's OWN row count (active trajectory-days) rather than a
+# duration/count pulled from dataset metadata means a single corrupt timestamp
+# far outside the real deployment window (seen in practice on a live C-PROOF
+# glider dataset) adds one harmless extra "active day" instead of blowing up
+# the chosen interval.
+TRACK_DAY_SECONDS = 86400
+TRACK_TARGET_POINTS = 4000
+TRACK_MIN_INTERVAL_SECONDS = 60
+TRACK_MAX_INTERVAL_SECONDS = TRACK_DAY_SECONDS
+
+# Hard per-trajectory cap on retained fixes, sized to how many distinct UTC
+# days that trajectory actually has data on — a 44-day deployment and a
+# 708-day one shouldn't share one flat cap. Enforced by _decimate_tracks via
+# shape-preserving (Douglas-Peucker) simplification first, falling back to an
+# even stride only if DP alone doesn't fit under the cap.
+TRACK_POINTS_PER_ACTIVE_DAY = 50
+MIN_TRACK_POINTS_CAP = 1000
+MAX_TRACK_POINTS_CAP = 20000
+# Perpendicular-distance tolerance for the Douglas-Peucker simplification,
+# applied in an equirectangular approximation (longitude scaled by
+# cos(mean latitude)) so a single degree-space tolerance is roughly isotropic.
+TRACK_SIMPLIFY_TOLERANCE_KM = 0.75
+KM_PER_DEGREE_LATITUDE = 111.32
 
 
 def _snap(series):
@@ -244,15 +266,20 @@ def _profiles_per_cell(dataset, traj_var, profile_var):
     )
 
 
-def _first_fix_per_day(df, traj_var):
+def _first_fix_per_interval(df, traj_var, interval_seconds):
     """Reduce a raw [traj?, latitude, longitude, time] frame to the first fix
-    of each (trajectory, UTC day). Expects `time` already parsed to datetime."""
+    within each (trajectory, time-bucket) of the given size, in seconds.
+    Expects `time` already parsed to datetime. Bucket boundaries are aligned
+    to the UTC epoch, so interval_seconds=TRACK_DAY_SECONDS reproduces
+    UTC-midnight-aligned daily buckets."""
     df = df.dropna(subset=["latitude", "longitude", "time"]).copy()
     if df.empty:
         return df
     if traj_var:
         df[traj_var] = df[traj_var].astype(str)
-    group_cols = ([traj_var] if traj_var else []) + [df["time"].dt.floor("D")]
+    epoch_seconds = df["time"].astype("int64") // 10**9
+    bucket = (epoch_seconds // interval_seconds) * interval_seconds
+    group_cols = ([traj_var] if traj_var else []) + [bucket]
     return (
         df.sort_values("time")
         .groupby(group_cols, dropna=False, group_keys=False)
@@ -260,20 +287,104 @@ def _first_fix_per_day(df, traj_var):
     )
 
 
-def _decimate_tracks(points, max_points=MAX_TRACK_POINTS_PER_TRAJECTORY):
-    """Cap fixes per trajectory: keep an even stride plus the last fix.
+def _first_fix_per_day(df, traj_var):
+    """Reduce a raw [traj?, latitude, longitude, time] frame to the first fix
+    of each (trajectory, UTC day). Expects `time` already parsed to datetime."""
+    return _first_fix_per_interval(df, traj_var, TRACK_DAY_SECONDS)
 
-    Expects points sorted by (trajectory_id, time).
+
+def _choose_track_interval_seconds(n_active_groups):
+    """Pick a finer bucket size (seconds) from how many (trajectory, day)
+    groups a cheap day-level probe already found — not from a dataset-level
+    duration, which a single corrupt out-of-range timestamp can blow up to
+    years (seen in practice). More active days -> smaller bucket, so the
+    total candidate count stays near TRACK_TARGET_POINTS; clamped so we never
+    go coarser than a day (no regression vs. the old fixed behavior) or finer
+    than TRACK_MIN_INTERVAL_SECONDS (avoids a pathological bucket explosion
+    for a very long, very active deployment)."""
+    if n_active_groups <= 0:
+        return TRACK_MAX_INTERVAL_SECONDS
+    raw = (n_active_groups * TRACK_DAY_SECONDS) / TRACK_TARGET_POINTS
+    return int(round(min(max(raw, TRACK_MIN_INTERVAL_SECONDS), TRACK_MAX_INTERVAL_SECONDS)))
+
+
+def _cap_for_active_days(n_active_days):
+    """Scale the per-trajectory point cap with how many distinct UTC days
+    that trajectory actually has data on, clamped to
+    [MIN_TRACK_POINTS_CAP, MAX_TRACK_POINTS_CAP] -- a 44-day deployment and a
+    708-day one shouldn't share one flat cap."""
+    return int(
+        min(max(n_active_days * TRACK_POINTS_PER_ACTIVE_DAY, MIN_TRACK_POINTS_CAP),
+            MAX_TRACK_POINTS_CAP)
+    )
+
+
+def _simplify_shape(group, tolerance_km=TRACK_SIMPLIFY_TOLERANCE_KM):
+    """Douglas-Peucker simplification (via shapely/GEOS) of one trajectory's
+    ordered fixes -- keeps turning points (e.g. a ferry's repeated
+    back-and-forth) instead of blindly striding. Longitude is scaled by
+    cos(mean latitude) before simplifying so a single degree-space tolerance
+    is roughly isotropic in km; unscaled after. Always keeps both endpoints.
+    """
+    if len(group) < 3:
+        return group
+
+    lat = group["latitude"].to_numpy()
+    lon = group["longitude"].to_numpy()
+    lon_scale = np.cos(np.radians(lat.mean()))
+    scaled_lon = lon * lon_scale
+    tolerance_deg = tolerance_km / KM_PER_DEGREE_LATITUDE
+
+    line = LineString(np.column_stack([scaled_lon, lat]))
+    simplified_coords = list(line.simplify(tolerance_deg, preserve_topology=False).coords)
+
+    # GEOS simplify only ever drops vertices (never moves or adds them), so a
+    # positional two-pointer scan against the original, ordered coordinates
+    # recovers which ORIGINAL rows were kept. A set/isin match would
+    # mis-handle two different rows sharing an identical fix (e.g. a vessel
+    # idling at dock reporting the same position repeatedly).
+    kept_positions = []
+    j = 0
+    n_simplified = len(simplified_coords)
+    for i in range(len(group)):
+        if j >= n_simplified:
+            break
+        sx, sy = simplified_coords[j]
+        if abs(scaled_lon[i] - sx) < 1e-9 and abs(lat[i] - sy) < 1e-9:
+            kept_positions.append(i)
+            j += 1
+    return group.iloc[kept_positions]
+
+
+def _decimate_tracks(points, max_points=None):
+    """Cap fixes per trajectory: shape-preserving (Douglas-Peucker) first,
+    falling back to an even stride (keeping first/last) only if DP alone
+    doesn't fit under the cap -- DP is deviation-bound, not count-bound, so a
+    very convoluted route can still overshoot a small cap.
+
+    Expects points sorted by (trajectory_id, time). When max_points is None
+    (the normal path) the cap is chosen per trajectory from how many distinct
+    UTC days it actually has data on (_cap_for_active_days); passing an
+    explicit max_points overrides that for every trajectory (used by tests).
     """
 
     def _cap(group):
-        n = len(group)
-        if n <= max_points:
+        cap = max_points
+        if cap is None:
+            n_active_days = group["time"].dt.floor("D").nunique()
+            cap = _cap_for_active_days(n_active_days)
+        if len(group) <= cap:
             return group
-        stride = -(-n // max_points)  # ceil
-        kept = group.iloc[::stride]
-        if kept.index[-1] != group.index[-1]:
-            kept = pd.concat([kept, group.iloc[[-1]]])
+
+        simplified = _simplify_shape(group)
+        if len(simplified) <= cap:
+            return simplified
+
+        n = len(simplified)
+        stride = -(-n // cap)  # ceil
+        kept = simplified.iloc[::stride]
+        if kept.index[-1] != simplified.index[-1]:
+            kept = pd.concat([kept, simplified.iloc[[-1]]])
         return kept
 
     return (
@@ -314,20 +425,43 @@ def extract_track_points(dataset, per_profile=False):
             )
             points = dataset.dataset_tabledap_query(url)
         else:
-            # First fix of each UTC day per trajectory, grouped server-side
-            # (orderByMin with an interval on its target: min time within each
-            # (traj, day) group, e.g. orderByMin("traj,time/1day")).
+            # Two-step adaptive downsample, both fully server-side (never a
+            # local full-resolution download): first probe at one-fix-per-
+            # UTC-day (cheap, response size bounded regardless of reporting
+            # cadence); its OWN row count -- active trajectory-days -- sizes a
+            # second, finer bucket query so the candidate set stays near
+            # TRACK_TARGET_POINTS whether the platform reports every second
+            # or every few days. Sizing off the probe's row count rather than
+            # a dataset-metadata duration means one corrupt out-of-range
+            # timestamp (seen in practice) can't blow up the chosen interval.
+            # ERDDAP requires the min target as an explicit trailing variable
+            # -- omitting it (e.g. orderByMin("traj,time/86400") alone) 404s
+            # on every server tested (2.19-2.28), hence the trailing ",time".
             request_vars = ([traj_var] if traj_var else []) + [
                 "time", "latitude", "longitude",
             ]
-            group = (f"{traj_var}," if traj_var else "") + f"time/{TRACK_INTERVAL}"
-            url = ",".join(request_vars) + requests.utils.quote(
-                f'&orderByMin("{group}")'
-            )
-            points = dataset.dataset_tabledap_query(url)
+            group_prefix = f"{traj_var}," if traj_var else ""
+
+            def _query_at_interval(interval_seconds):
+                url = ",".join(request_vars) + requests.utils.quote(
+                    f'&orderByMin("{group_prefix}time/{interval_seconds},time")'
+                )
+                return dataset.dataset_tabledap_query(url)
+
+            points = _query_at_interval(TRACK_DAY_SECONDS)
             if not points.empty:
                 points["time"] = ERDDAP.parse_erddap_dates(points["time"])
                 points = _first_fix_per_day(points, traj_var)
+
+                finer_interval = _choose_track_interval_seconds(len(points))
+                if finer_interval < TRACK_DAY_SECONDS:
+                    try:
+                        finer_points = _query_at_interval(finer_interval)
+                    except HTTPError:
+                        finer_points = pd.DataFrame()
+                    if not finer_points.empty:
+                        finer_points["time"] = ERDDAP.parse_erddap_dates(finer_points["time"])
+                        points = _first_fix_per_interval(finer_points, traj_var, finer_interval)
     except HTTPError:
         log.warning(
             "Server-side track-point grouping failed for %s; falling back to "
