@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS cde.trajectory_track_stats (
     time_max timestamptz,
     n_points bigint,
     bbox geometry(Geometry, 3857),
+    median_gap_secs double precision,
     PRIMARY KEY (dataset_pk, trajectory_id)
 );
 CREATE INDEX IF NOT EXISTS trajectory_track_stats_bbox_gist ON cde.trajectory_track_stats USING GIST (bbox);

@@ -387,14 +387,19 @@ router.get(
   WITH te AS (SELECT ST_TileEnvelope(:z, :x, :y) tile_envelope),
     cand AS (
       -- gap_secs: per-trajectory time-gap split threshold — 4x the
-      -- trajectory's typical inter-fix spacing (span / retained fixes),
-      -- floored at 48 hours. An Argo float's ~10-day cycles never split; a
-      -- multi-expedition ship track (months dark between summers) always
-      -- does, instead of drawing a chord across the continent.
+      -- trajectory's MEDIAN inter-fix gap (its typical reporting cadence,
+      -- robust to idle periods; the mean fallback covers pre-migration NULL
+      -- rows), floored at 48 hours. An Argo float's ~10-day cycles never
+      -- split; a multi-expedition ship track (months dark between summers)
+      -- or a monitoring vessel idle between short cruises always does,
+      -- instead of drawing a connector chord across the map.
       SELECT s.dataset_pk, s.trajectory_id,
              GREATEST(
-               extract(epoch FROM s.time_max - s.time_min)
-                 / GREATEST(s.n_points - 1, 1) * 4,
+               COALESCE(
+                 s.median_gap_secs,
+                 extract(epoch FROM s.time_max - s.time_min)
+                   / GREATEST(s.n_points - 1, 1)
+               ) * 4,
                172800
              ) AS gap_secs
       FROM cde.trajectory_track_stats s

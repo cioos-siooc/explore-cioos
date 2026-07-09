@@ -430,9 +430,11 @@ export function splitAtAntimeridian(coords) {
 // (mirrors the segs CTE in web-api /tiles/tracks so the selected-platform
 // view and the tile layer segment identically):
 //   1. antimeridian crossing (consecutive fixes jump >180 deg of longitude);
-//   2. large time gap — over 4x the track's typical inter-fix spacing
-//      (span / fixes), floored at 48h: an Argo float's ~10-day cycles never
-//      split, a ship dark for months between expeditions always does;
+//   2. large time gap — over 4x the track's MEDIAN inter-fix gap (its
+//      typical reporting cadence, robust to idle periods — a mean would let
+//      a vessel idle between short cruises draw between-cruise connector
+//      chords), floored at 48h: an Argo float's ~10-day cycles never split,
+//      a ship dark for months between expeditions always does;
 //   3. outage chord — >50km between fixes closer than 96h in time. The
 //      harvester densifies data-backed chords to <=25km, so a long chord on
 //      a sub-96h gap is a reporting outage on a fast platform: the true
@@ -447,8 +449,12 @@ export function splitTrackRuns(coords, times) {
     return splitAtAntimeridian(coords)
   }
   const ms = times.map((t) => new Date(t).getTime())
-  const spanMs = ms[ms.length - 1] - ms[0]
-  const gapMs = Math.max((spanMs / (ms.length - 1)) * 4, 48 * 3600 * 1000)
+  const sortedGaps = ms
+    .slice(1)
+    .map((t, i) => t - ms[i])
+    .sort((a, b) => a - b)
+  const medianGapMs = sortedGaps[Math.floor(sortedGaps.length / 2)]
+  const gapMs = Math.max(medianGapMs * 4, 48 * 3600 * 1000)
 
   const chordKm = (a, b) => {
     const rad = Math.PI / 180

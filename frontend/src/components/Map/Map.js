@@ -938,7 +938,12 @@ export default function CreateMap({
         },
         paint: {
           'line-color': trackLineColor,
-          'line-width': ['interpolate', ['linear'], ['zoom'], 2, 1, 10, 2.5]
+          'line-width': ['interpolate', ['linear'], ['zoom'], 2, 1, 10, 2.5],
+          // Partial opacity so coincident tracks compound: many voyages ply
+          // the same shipping corridor (27 St. Lawrence voyages in a 90-day
+          // window overlap into what full opacity renders as ONE line), and
+          // stacked translucent lines read as a visibly busier corridor.
+          'line-opacity': 0.55
         }
       })
 

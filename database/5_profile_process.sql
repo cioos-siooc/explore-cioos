@@ -383,12 +383,26 @@ DECLARE n bigint;
 BEGIN
   DELETE FROM cde.trajectory_track_stats;
   INSERT INTO cde.trajectory_track_stats
-         (dataset_pk, trajectory_id, time_min, time_max, n_points, bbox)
+         (dataset_pk, trajectory_id, time_min, time_max, n_points, bbox,
+          median_gap_secs)
   SELECT dataset_pk, trajectory_id, min(time), max(time), count(*),
          -- ST_Extent returns a box2d with no SRID; restore 3857 for the column
-         ST_SetSRID(ST_Extent(geom)::geometry, 3857)
-    FROM cde.trajectory_points
-   WHERE dataset_pk IS NOT NULL
+         ST_SetSRID(ST_Extent(geom)::geometry, 3857),
+         -- Median inter-fix gap = the platform's typical reporting cadence,
+         -- robust to idle periods (percentile_cont skips each track's NULL
+         -- first-row gap). A mean would conflate sailing and idle time: a
+         -- vessel sailing a few days per year at ~48min cadence "averages"
+         -- to days-to-weeks, which let between-cruise connector chords
+         -- through the /tiles/tracks gap splitting.
+         percentile_cont(0.5) WITHIN GROUP (ORDER BY gap_secs)
+    FROM (
+      SELECT dataset_pk, trajectory_id, time, geom,
+             extract(epoch FROM time - lag(time) OVER (
+               PARTITION BY dataset_pk, trajectory_id ORDER BY time
+             )) AS gap_secs
+        FROM cde.trajectory_points
+       WHERE dataset_pk IS NOT NULL
+    ) g
    GROUP BY dataset_pk, trajectory_id;
   GET DIAGNOSTICS n = ROW_COUNT;
   RETURN n;

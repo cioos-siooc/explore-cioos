@@ -289,6 +289,10 @@ CREATE TABLE trajectory_track_stats (
     -- ST_Extent envelope of the track; Geometry (not Polygon) because a
     -- single-fix track's envelope degenerates to a Point.
     bbox geometry(Geometry, 3857),
+    -- Median gap between consecutive retained fixes: the platform's TYPICAL
+    -- reporting cadence, robust to long idle periods (a mean would conflate
+    -- sailing and idle time). Drives the /tiles/tracks gap-split threshold.
+    median_gap_secs double precision,
     PRIMARY KEY (dataset_pk, trajectory_id)
 );
 CREATE INDEX trajectory_track_stats_bbox_gist ON trajectory_track_stats USING GIST (bbox);
