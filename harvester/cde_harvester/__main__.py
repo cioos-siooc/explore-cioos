@@ -468,7 +468,11 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             triggered_source=triggered_source,
             triggered_by=triggered_by,
         )
-        sys.exit(1)
+        # Raise, don't sys.exit: main() also runs INSIDE a Prefect flow, where
+        # SystemExit reports as "Crashed" (no message, no failure handling)
+        # instead of a clean Failed. The CLI path still exits non-zero on an
+        # uncaught exception.
+        raise RuntimeError("No datasets harvested from any source")
 
     if erddap_datasets.empty and obis_datasets.empty:
         logging.info(

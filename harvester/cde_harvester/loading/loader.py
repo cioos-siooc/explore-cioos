@@ -3,7 +3,6 @@ import csv
 import io
 import logging
 import os
-import sys
 import time
 from contextlib import contextmanager
 
@@ -24,16 +23,32 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 # nightly full-reload (whose remove_all_data() TRUNCATEs every table), and two
 # incremental loads can't fight over drop/set_constraints + DELETE/INSERT.
 #
-# The lock is NOT taken at the top of the transaction. Incremental loads first
-# populate session-private temp tables (no shared-table contention) WITHOUT the
-# lock, then acquire it only around process_incremental_update() — the phase that
-# actually touches the shared tables. This keeps the lock held for minutes, not the
-# whole bulk upload (~tens of minutes), so concurrent loaders upload in parallel and
-# only serialize on the short processing phase. Full reloads still take the lock for
-# their entire transaction (they TRUNCATE shared tables from the start). A late-
-# acquiring incremental is still correct: the full-reload holds the same lock, so the
-# worst case is the incremental simply waits behind it. pg_advisory_xact_lock auto-
-# releases at COMMIT/ROLLBACK. Arbitrary stable constant ("CDE-LOADER").
+# The lock is NOT taken at the top of the load. Incremental loads first populate
+# session-private temp tables WITHOUT the lock, then acquire it only around
+# process_incremental_update() — the phase that actually touches the shared
+# tables. This keeps the lock held for minutes, not the whole bulk upload
+# (~tens of minutes), so concurrent loaders upload in parallel and only
+# serialize on the short processing phase.
+#
+# CRITICAL ORDERING INVARIANT: the staging phase runs in its OWN transaction,
+# COMMITTED before the advisory lock is requested (see acquire_loader_lock).
+# The staging phase is not lock-free — create_temp_tables()'s
+# CREATE TEMP TABLE (LIKE cde.X) takes AccessShareLock on every shared source
+# table, held to transaction end — while the locked phase takes
+# AccessExclusiveLock on the same tables (drop_constraints ALTERs). If a
+# loader could WAIT on the advisory lock while still HOLDING staging locks,
+# the advisory-lock holder's AccessExclusive requests would queue behind
+# those AccessShare locks: a circular wait. A live three-loader deadlock
+# (two DeadlockDetected + one aborted load) was traced to exactly that.
+# Committing the staging transaction first releases every lock the session
+# holds, so a loader waiting on the advisory lock holds nothing. Temp tables
+# and their rows survive the commit (session-scoped, ON COMMIT PRESERVE ROWS).
+#
+# Full reloads take the lock before any shared-table access in their phase.
+# A late-acquiring incremental is still correct: the full-reload holds the same
+# lock, so the worst case is the incremental simply waits behind it.
+# pg_advisory_xact_lock auto-releases at COMMIT/ROLLBACK. Arbitrary stable
+# constant ("CDE-LOADER").
 DB_LOADER_ADVISORY_LOCK_KEY = 738825001
 
 logging.basicConfig(
@@ -347,9 +362,13 @@ def main(folder, incremental=False):
     if datasets.empty:
         if not incremental:
             # A full reload with zero datasets would TRUNCATE everything and
-            # leave the DB empty — genuinely wrong, so bail out hard.
-            logger.info("No datasets found")
-            sys.exit(1)
+            # leave the DB empty — genuinely wrong, so bail out hard. Raise,
+            # don't sys.exit: this also runs inside a Prefect flow, where
+            # SystemExit reports as "Crashed" instead of a clean Failed (the
+            # CLI wrapper in loading/__main__.py handles the exit code).
+            raise RuntimeError(
+                "Full reload found no datasets; refusing to wipe the database"
+            )
         # Incremental runs legitimately produce an empty datasets.csv when every
         # dataset was unchanged and skipped by the harvester (skip_unchanged).
         # That is a successful no-op, not a crash: fall through so we still bump
@@ -366,13 +385,29 @@ def main(folder, incremental=False):
         # See DB_LOADER_ADVISORY_LOCK_KEY for why this is acquired late (incremental)
         # vs up-front (full reload). Concurrent loaders simply wait here until the one
         # ahead commits/rolls back.
+        #
+        # Commit the staging transaction FIRST: it releases every lock this
+        # session holds (notably create_temp_tables' AccessShareLock on the
+        # shared tables it LIKEs), so no loader ever waits on the advisory
+        # lock while holding a shared-table lock — the lock-order inversion
+        # behind a live three-loader deadlock. Temp tables and their rows are
+        # session-scoped and survive the commit.
+        if transaction.in_transaction():
+            transaction.commit()
         logger.info("Acquiring db-loader advisory lock (serializes concurrent loads)")
         transaction.execute(
             text("SELECT pg_advisory_xact_lock(:k)"),
             {"k": DB_LOADER_ADVISORY_LOCK_KEY},
         )
 
-    with engine.begin() as transaction:
+    # "Commit as you go" connection, NOT engine.begin(): the load is two
+    # transactions — a session-private staging phase (temp tables + uploads,
+    # plus the vernaculars prefetch), committed inside acquire_loader_lock(),
+    # then the advisory-locked shared-table phase, committed at the end. A
+    # staging failure aborts before any shared-table change; a locked-phase
+    # failure rolls back the shared-table work while the already-committed
+    # staging leaves nothing behind (temp tables die with the session).
+    with engine.connect() as transaction:
         logger.info("Writing to DB:")
 
         # Pre-fetch scientific_name → aphia_id mappings from existing
@@ -759,6 +794,11 @@ def main(folder, incremental=False):
                     index=False,
                     method="multi",
                 )
+
+        # Commit the locked phase (engine.connect() does not auto-commit the
+        # way engine.begin() did); this also releases the advisory lock.
+        if transaction.in_transaction():
+            transaction.commit()
 
         logger.info("Wrote to db: %s", f"{schema}.datasets")
         logger.info("Wrote to db: %s", f"{schema}.profiles")

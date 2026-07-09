@@ -372,10 +372,16 @@ $$ LANGUAGE plpgsql;
 
 -- Rebuild cde.trajectory_track_stats from scratch. Cheap (one grouped scan of
 -- trajectory_points) and always consistent, so no incremental bookkeeping.
+-- DELETE, not TRUNCATE: TRUNCATE takes AccessExclusiveLock, which conflicts
+-- with the AccessShareLock every concurrent loader's pre-lock phase holds on
+-- this table (create_temp_tables' LIKE) and with web-api readers — a live
+-- three-loader deadlock was traced to exactly this statement. DELETE takes
+-- RowExclusiveLock and MVCC keeps readers on the old rows until commit; the
+-- table is tiny (one row per trajectory), so no TRUNCATE-speed argument.
 CREATE OR REPLACE FUNCTION trajectory_refresh_track_stats() RETURNS bigint AS $$
 DECLARE n bigint;
 BEGIN
-  TRUNCATE cde.trajectory_track_stats;
+  DELETE FROM cde.trajectory_track_stats;
   INSERT INTO cde.trajectory_track_stats
          (dataset_pk, trajectory_id, time_min, time_max, n_points, bbox)
   SELECT dataset_pk, trajectory_id, min(time), max(time), count(*),
