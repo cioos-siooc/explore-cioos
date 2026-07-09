@@ -179,9 +179,13 @@ def _extract_via_server_binning(dataset, traj_var, has_depth):
 
 
 def _iter_raw_chunks(dataset, traj_var, has_depth):
-    """Yield raw [traj?, latitude, longitude, time(, depth)] frames in yearly
+    """Yield raw [traj?, latitude, longitude, time(, depth)] frames in monthly
     chunks — the shared download loop for both fallback paths (cell binning
-    and track-point downsampling). Each chunk is bounded by MAX_RESPONSE_SIZE;
+    and track-point downsampling), only exercised when a server lacks orderBy
+    interval grouping entirely. A year-wide window can itself exceed
+    MAX_RESPONSE_SIZE for a high-frequency trajectory (seen in practice: a 1Hz
+    glider's full download is ~330MB against a 200MB cap); monthly chunks
+    bound that far more reliably. Each chunk is bounded by MAX_RESPONSE_SIZE;
     failed chunks are logged and skipped."""
     log = dataset.logger
     request_vars = ([traj_var] if traj_var else []) + ["latitude", "longitude", "time"]
@@ -199,9 +203,11 @@ def _iter_raw_chunks(dataset, traj_var, has_depth):
     if pd.isna(start) or pd.isna(end):
         chunks = [""]  # no coverage metadata — single unchunked query
     else:
-        # Yearly chunk starts, plus a final bound past the end so a dataset
+        # Monthly chunk starts, plus a final bound past the end so a dataset
         # shorter than one chunk still yields exactly one query.
-        bounds = list(pd.date_range(start.floor("D"), end.ceil("D"), freq="365D"))
+        bounds = list(
+            pd.date_range(start.floor("D"), end.ceil("D"), freq=pd.DateOffset(months=1))
+        )
         bounds.append(end.ceil("D") + pd.Timedelta(days=1))
         chunks = [
             f"&time>={a.strftime('%Y-%m-%dT%H:%M:%SZ')}&time<{b.strftime('%Y-%m-%dT%H:%M:%SZ')}"

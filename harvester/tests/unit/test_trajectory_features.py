@@ -19,6 +19,7 @@ from cde_harvester.dataset_types.trajectory_features import (
     _cap_for_active_days,
     _choose_track_interval_seconds,
     _decimate_tracks,
+    _iter_raw_chunks,
     extract_cells,
     extract_track_points,
 )
@@ -213,6 +214,27 @@ class TestFallback:
         assert len(cells) == 2
         assert cells["n_records"].sum() == 6
 
+    def test_chunks_by_month_not_year(self):
+        # A high-frequency trajectory's full download can itself exceed
+        # MAX_RESPONSE_SIZE within a single year-wide window (seen in
+        # practice); monthly chunking bounds that far more reliably. Jan 1 ->
+        # Mar 15 spans parts of 3 calendar months -> 3 chunk queries, not the
+        # single query the old yearly chunking would have issued.
+        dataset = MagicMock()
+        dataset.logger = logging.getLogger("test")
+        dataset.globals = {
+            "time_coverage_start": "2021-01-01T00:00:00Z",
+            "time_coverage_end": "2021-03-15T00:00:00Z",
+        }
+        queries = []
+        dataset.dataset_tabledap_query = MagicMock(
+            side_effect=lambda url: (queries.append(url), pd.DataFrame())[1]
+        )
+
+        list(_iter_raw_chunks(dataset, "traj_id", has_depth=False))
+
+        assert len(queries) == 3
+
 
 class TestPrepareTrajectoryCellsDataframe:
     def test_dedup_on_unique_key(self):
@@ -324,7 +346,7 @@ class TestTrackPointExtraction:
         assert any('orderByMin("traj_id,time/65,time")' in u for u in urls)
 
     def test_fallback_downsamples_per_day(self):
-        # orderByMin raises -> yearly-chunk raw download, reduced locally.
+        # orderByMin raises -> monthly-chunk raw download, reduced locally.
         # The raw fixture has 6 fixes on 6 distinct days -> 6 track points.
         points = extract_track_points(
             _dataset_for_tracks("Trajectory", fail_server_binning=True),
