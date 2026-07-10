@@ -130,7 +130,8 @@ export default function App() {
         timeseries: true,
         timeseriesProfile: true,
         obis: true,
-        trajectories: true
+        trajectories: true,
+        hexCells: true
       }
     }
     const on = new Set(layersParam.split(',').filter(Boolean))
@@ -139,7 +140,8 @@ export default function App() {
       timeseries: on.has('timeseries'),
       timeseriesProfile: on.has('timeseriesProfile'),
       obis: on.has('obis'),
-      trajectories: on.has('trajectories')
+      trajectories: on.has('trajectories'),
+      hexCells: on.has('hexCells')
     }
   })
 

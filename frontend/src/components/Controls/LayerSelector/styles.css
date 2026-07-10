@@ -60,10 +60,12 @@
   display: inline-flex;
 }
 
-.layerSelectorSub {
-  margin-left: 22px;
-  padding-top: 6px;
+.layerSelectorDivider {
   border-top: 1px solid #eee;
+  margin: 6px 0 2px;
+}
+
+.layerSelectorSub {
   font-size: 0.82rem;
   color: #555;
 }

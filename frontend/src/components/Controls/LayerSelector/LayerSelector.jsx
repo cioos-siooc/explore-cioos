@@ -69,6 +69,16 @@ export default function LayerSelector({
               <span className='layerSelectorText'>{label}</span>
             </label>
           ))}
+          <div className='layerSelectorDivider' />
+          {/* Display options (how the data draws, not which data shows). */}
+          <label className='layerSelectorRow layerSelectorSub'>
+            <input
+              type='checkbox'
+              checked={dataLayers.hexCells}
+              onChange={() => toggle('hexCells')}
+            />
+            <span className='layerSelectorText'>{t('layerHexCells')}</span>
+          </label>
           {dataLayers.trajectories && (
             <label className='layerSelectorRow layerSelectorSub'>
               <input

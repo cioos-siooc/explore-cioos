@@ -38,16 +38,20 @@ export default function Legend({
     timeseries: true,
     timeseriesProfile: true,
     obis: true,
-    trajectories: true
+    trajectories: true,
+    hexCells: true
   }
   // The combined green ramp / platform points carry the profile-family types
   // + OBIS, plus trajectory coverage when shown as hexes.
-  const showPointRamp =
+  const hasPointData =
     layers.profile ||
     layers.timeseries ||
     layers.timeseriesProfile ||
     layers.obis ||
     (layers.trajectories && !tracksMode)
+  // Below zoom 7 the data draws only as hexes, so the ramp is meaningful only
+  // when hex cells are on; at/above zoom 7 the point layer shows regardless.
+  const showPointRamp = hasPointData && (zoom >= 7 || layers.hexCells)
 
   function generateLegendElements() {
     if (!showPointRamp) return null
@@ -159,6 +163,9 @@ export default function Legend({
   function generateTrajectoryLegendElements() {
     // Trajectory layer hidden entirely — no trajectory legend.
     if (!layers.trajectories) return null
+    // Coverage hexes are hidden when hex cells are off (and it's not tracks
+    // mode), so their ramp shouldn't show either.
+    if (!tracksMode && !layers.hexCells) return null
     // Tracks mode replaces the coverage-hex ramp with the track-line layers.
     if (tracksMode) {
       return (

@@ -312,6 +312,7 @@
   "layerTimeseriesProfile": "Timeseries profiles",
   "layerObis": "OBIS occurrences",
   "layerTrajectories": "Trajectories",
+  "layerHexCells": "Hex cells",
   "layerTracksMode": "Show as track lines",
   "timeBarTrailingWindowLabel": "Trail",
   "timeBarTrailAll": "All time",

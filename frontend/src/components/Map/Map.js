@@ -313,21 +313,30 @@ export default function CreateMap({
     map.current.triggerRepaint()
   }
 
-  // Trajectory layer visibility from both the data-layer toggle and the
-  // tracks/coverage sub-mode: track lines when trajectories are on AND tracks
-  // mode is selected; coverage hexes when on AND not; nothing when off.
-  function applyTrajectoryVisibility() {
+  // Apply layer visibility from the data-layer + display toggles:
+  //  - track lines: trajectories on AND tracks-mode sub-toggle;
+  //  - trajectory coverage hexes: trajectories on, NOT tracks mode, hex cells on;
+  //  - combined (profiles/OBIS/trajectory) hexes: hex cells on.
+  // The "hex cells" toggle hides only the hexagon-aggregation layers, never
+  // the track lines or the high-zoom point layer.
+  function applyLayerVisibility() {
     if (!map.current || !map.current.getLayer('track-lines')) return
     const trajOn = dataLayersRef.current
       ? dataLayersRef.current.trajectories !== false
       : true
+    const hexOn = dataLayersRef.current
+      ? dataLayersRef.current.hexCells !== false
+      : true
     const showTracks = trajOn && tracksModeRef.current
-    const showHexes = trajOn && !tracksModeRef.current
+    const showTrajHexes = trajOn && !tracksModeRef.current && hexOn
     ;['track-lines', 'track-heads', 'track-heads-fixed'].forEach((id) =>
       map.current.setLayoutProperty(id, 'visibility', showTracks ? 'visible' : 'none')
     )
     ;['trajectory-hexes', 'trajectory-hexes-hovered'].forEach((id) =>
-      map.current.setLayoutProperty(id, 'visibility', showHexes ? 'visible' : 'none')
+      map.current.setLayoutProperty(id, 'visibility', showTrajHexes ? 'visible' : 'none')
+    )
+    ;['hexes', 'hexes-hovered'].forEach((id) =>
+      map.current.setLayoutProperty(id, 'visibility', hexOn ? 'visible' : 'none')
     )
   }
 
@@ -608,7 +617,7 @@ export default function CreateMap({
     dataLayersRef.current = dataLayers
     if (!map.current || !map.current.loaded()) return
     refreshCombinedSources(query)
-    applyTrajectoryVisibility()
+    applyLayerVisibility()
   }, [dataLayers])
 
   // Tracks mode: swap the trajectory coverage hexes for track lines/heads
@@ -616,7 +625,7 @@ export default function CreateMap({
   useEffect(() => {
     tracksModeRef.current = tracksMode
     if (!map.current || !map.current.getLayer('track-lines')) return
-    applyTrajectoryVisibility()
+    applyLayerVisibility()
     if (tracksMode) {
       refreshTracksSource(query, scrubTime, trailingDays)
     }
@@ -1172,7 +1181,7 @@ export default function CreateMap({
       // Apply the initial trajectory layer visibility from the URL-restored
       // tracks mode + data-layer selection (track lines vs coverage hexes vs
       // trajectories-off).
-      applyTrajectoryVisibility()
+      applyLayerVisibility()
     })
 
     const handleMapOnClick = (e) => {
