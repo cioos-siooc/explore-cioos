@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { XLg } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import DataTable from 'react-data-table-component'
-import DataTableExtensions from 'react-data-table-component-extensions'
-import 'react-data-table-component-extensions/dist/index.css'
+import TableFilter, { filterRows } from '../../ui/TableFilter.jsx'
 
 // import platformColors from '../../platformColors'
 import Loading from '../Loading/Loading.jsx'
@@ -27,6 +26,7 @@ export default function DatasetInspector({
 }) {
   const { t } = useTranslation()
   const [datasetRecords, setDatasetRecords] = useState()
+  const [recordFilterText, setRecordFilterText] = useState('')
   const [loading, setLoading] = useState(false)
   const inspectorRef = useRef(null)
   const isGrid = dataset.cdm_data_type === 'Grid'
@@ -170,12 +170,7 @@ export default function DatasetInspector({
       width: dataColumnWith
     }
   ]
-  const data = datasetRecords?.profiles
-
-  const tableData = {
-    columns,
-    data
-  }
+  const data = filterRows(datasetRecords?.profiles, recordFilterText)
 
   const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet
 
@@ -350,13 +345,12 @@ export default function DatasetInspector({
               </div>
             ) : (
               <div className='recordTableScroll'>
-                <DataTableExtensions
-                  {...tableData}
-                  print={false}
-                  filterPlaceholder={t('datasetInspectorFilterText')}
-                  export={false}
-                >
-                  <DataTable
+                <TableFilter
+                  value={recordFilterText}
+                  onChange={setRecordFilterText}
+                  placeholder={t('datasetInspectorFilterText')}
+                />
+                <DataTable
                     onRowClicked={(row) => setInspectRecordID(row.profile_id)}
                     striped
                     pointerOnHover
@@ -374,7 +368,6 @@ export default function DatasetInspector({
                     }}
                     highlightOnHover
                   />
-                </DataTableExtensions>
               </div>
             )}
           </div>
