@@ -389,11 +389,13 @@ export function updateMapToolTitleLanguage(t) {
   const deleteToolDiv = document.getElementsByClassName('mapbox-gl-draw_trash')
   deleteToolDiv[0].title = t('mapDeleteToolTitle')
 
-  const zoomInToolDiv = document.getElementsByClassName('mapboxgl-ctrl-zoom-in')
+  const zoomInToolDiv = document.getElementsByClassName(
+    'maplibregl-ctrl-zoom-in'
+  )
   zoomInToolDiv[0].title = t('mapZoomInToolTitle')
 
   const zoomOutToolDiv = document.getElementsByClassName(
-    'mapboxgl-ctrl-zoom-out'
+    'maplibregl-ctrl-zoom-out'
   )
   zoomOutToolDiv[0].title = t('mapZoomOutToolTitle')
 }

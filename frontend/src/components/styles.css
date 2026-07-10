@@ -4,6 +4,10 @@ body {
   color: var(--cioos-ink);
 }
 
+/* mapbox-gl-draw still emits mapboxgl-* classes for its control group while
+   MapLibre v5's own controls (and base CSS) use maplibregl-* only — style
+   both prefixes. */
+.maplibregl-ctrl-group>button,
 .mapboxgl-ctrl-group>button {
   width: 42px;
   height: 42px;
@@ -46,17 +50,47 @@ body {
   background-color: var(--cioos-surface-2);
 }
 
+.maplibregl-ctrl-group,
 .mapboxgl-ctrl-group {
   border-radius: 0px 0px var(--cioos-radius) var(--cioos-radius);
 }
 
+/* MapLibre v5's base CSS only styles maplibregl-ctrl-group; recreate the
+   control chrome for the draw plugin's mapboxgl-prefixed group so it doesn't
+   render unstyled. */
+.mapboxgl-ctrl-group {
+  background: var(--cioos-white);
+}
+
+.mapboxgl-ctrl-group:not(:empty) {
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+}
+
+.mapboxgl-ctrl-group button {
+  background-color: transparent;
+  border: 0;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: block;
+  outline: none;
+  overflow: hidden;
+  padding: 0;
+}
+
+.maplibregl-ctrl-bottom-right .mapboxgl-ctrl {
+  float: right;
+  margin: 0 10px 10px 0;
+  clear: both;
+  pointer-events: auto;
+}
+
 /* Polygon-draw button state colors */
-.mapboxgl-draw_ctrl-draw-btn.mapboxgl-draw_polygon {
+.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon {
   background-color: var(--cioos-white);
 }
 
-.mapboxgl-draw_ctrl-draw-btn.mapboxgl-draw_polygon.active,
-.mapboxgl-draw_ctrl-draw-btn.mapboxgl-draw_polygon.drawing {
+.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon.active,
+.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon.drawing {
   background-color: var(--cioos-teal-light);
 }
 
