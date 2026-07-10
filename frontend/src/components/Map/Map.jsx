@@ -58,7 +58,8 @@ export default function CreateMap({
   setDatasetsSelected,
   griddapCoverage,
   dataLayersVisible = true,
-  activeWmsOverlay
+  activeWmsOverlay,
+  projection = 'mercator'
 }) {
   const { t, i18n } = useTranslation()
 
@@ -568,6 +569,18 @@ export default function CreateMap({
     if (!map.current || activeWmsOverlay) return
     setLayersVisibility(observationLayerIds, dataLayersVisible)
   }, [dataLayersVisible])
+
+  // Layer-picker globe/mercator projection switch. Globe renders high
+  // latitudes without Mercator distortion; MapLibre auto-interpolates back
+  // to mercator at high zoom, so close-up interactions are unaffected. No
+  // setStyle() calls exist (language switch uses setLayoutProperty), so the
+  // projection persists until toggled here.
+  useEffect(() => {
+    if (!map.current) return
+    map.current.setProjection({
+      type: projection === 'globe' ? 'globe' : 'mercator'
+    })
+  }, [projection])
 
   useEffect(() => {
     if (!map.current) return

@@ -17,7 +17,8 @@ export default function MapContainer () {
     griddapCoverageVisible,
     griddapCoverage,
     dataLayersVisible,
-    activeWmsOverlay
+    activeWmsOverlay,
+    projection
   } = useMapState()
   const {
     polygon,
@@ -44,6 +45,7 @@ export default function MapContainer () {
       griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
       dataLayersVisible={dataLayersVisible}
       activeWmsOverlay={activeWmsOverlay}
+      projection={projection}
     />
   )
 }

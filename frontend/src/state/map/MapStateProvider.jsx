@@ -36,6 +36,9 @@ export default function MapStateProvider ({ children }) {
   // trajectories) and the floating legend card. Both on by default.
   const [dataLayersVisible, setDataLayersVisible] = useState(true)
   const [legendVisible, setLegendVisible] = useState(true)
+  // Map projection: 'mercator' (default) or 'globe'. The globe view renders
+  // high latitudes (e.g. the Arctic) without Mercator distortion.
+  const [projection, setProjection] = useState('mercator')
 
   const { zoom } = mapView
 
@@ -124,6 +127,8 @@ export default function MapStateProvider ({ children }) {
     setDataLayersVisible,
     legendVisible,
     setLegendVisible,
+    projection,
+    setProjection,
     griddapCoverage,
     activeWmsOverlay,
     setActiveWmsOverlay,

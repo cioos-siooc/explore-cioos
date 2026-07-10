@@ -18,7 +18,9 @@ export default function MapCornerControls () {
     dataLayersVisible,
     setDataLayersVisible,
     legendVisible,
-    setLegendVisible
+    setLegendVisible,
+    projection,
+    setProjection
   } = useMapState()
   const { polygon } = useSelection()
 
@@ -52,6 +54,13 @@ export default function MapCornerControls () {
             label: t('layersLegend'),
             checked: legendVisible,
             onChange: () => setLegendVisible(!legendVisible)
+          },
+          {
+            key: 'globe',
+            label: t('layersGlobeView'),
+            checked: projection === 'globe',
+            onChange: () =>
+              setProjection(projection === 'globe' ? 'mercator' : 'globe')
           }
         ]}
       />
