@@ -482,6 +482,22 @@ export function splitTrackRuns(coords, times) {
   return runs
 }
 
+// Initial great-circle bearing from [lon, lat] point a to point b, in
+// degrees clockwise from north, [0, 360). Returns null for coincident
+// points (direction undefined). The frontend twin of the ST_Azimuth-based
+// cog the /tiles/tracks heads layer carries.
+export function initialBearing(a, b) {
+  if (a[0] === b[0] && a[1] === b[1]) return null
+  const rad = Math.PI / 180
+  const p1 = a[1] * rad
+  const p2 = b[1] * rad
+  const dl = (b[0] - a[0]) * rad
+  const y = Math.sin(dl) * Math.cos(p2)
+  const x =
+    Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl)
+  return (Math.atan2(y, x) / rad + 360) % 360
+}
+
 // Centripetal Catmull-Rom spline through an ordered [lon, lat] coordinate
 // array. PURELY COSMETIC, render-time only: the stored/fetched track data is
 // never modified, endpoints are preserved, and the curve passes through every

@@ -317,5 +317,5 @@
   "trajectoryPlatformIdText": "Platform ID",
   "trajectoryPlatformFixesText": "Track fixes",
   "legendTrackLine": "Track",
-  "legendTrackHead": "Position at selected date"
+  "legendTrackHead": "Position and direction at selected date"
 }

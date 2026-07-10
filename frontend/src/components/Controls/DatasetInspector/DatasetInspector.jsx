@@ -281,6 +281,7 @@ export default function DatasetInspector({
                           ? undefined // click the active row again to clear
                           : {
                             datasetPk: dataset.pk,
+                            datasetTitle: dataset.title,
                             trajectoryId: row.trajectory_id
                           }
                       )

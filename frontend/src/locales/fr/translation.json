@@ -318,5 +318,5 @@
   "trajectoryPlatformIdText": "ID de plateforme",
   "trajectoryPlatformFixesText": "Positions",
   "legendTrackLine": "Trajectoire",
-  "legendTrackHead": "Position à la date choisie"
+  "legendTrackHead": "Position et direction à la date choisie"
 }

@@ -25,7 +25,8 @@ import {
   getCurrentRangeLevel,
   updateMapToolTitleLanguage,
   catmullRomSpline,
-  splitTrackRuns
+  splitTrackRuns,
+  initialBearing
 } from '../../utilities'
 import {
   colorScale,
@@ -36,6 +37,31 @@ import {
   TRAIL_ALL
 } from '../config'
 import platformColors from '../../components/platformColors'
+
+// North-pointing arrowhead icon for track heads and selected-track fixes;
+// the symbol layers rotate it to each point's course over ground. Drawn at
+// 2x and added with pixelRatio 2 so it stays crisp on hidpi displays.
+function buildHeadArrowImage(fillColor, strokeColor = '#ffffff') {
+  const ratio = 2
+  const size = 16 * ratio
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  ctx.beginPath()
+  ctx.moveTo(size / 2, 1.5 * ratio) // apex (north)
+  ctx.lineTo(size - 2.5 * ratio, size - 2.5 * ratio)
+  ctx.lineTo(size / 2, size - 5.5 * ratio) // tail notch
+  ctx.lineTo(2.5 * ratio, size - 2.5 * ratio)
+  ctx.closePath()
+  ctx.fillStyle = fillColor
+  ctx.fill()
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = 1.5 * ratio
+  ctx.strokeStyle = strokeColor
+  ctx.stroke()
+  return ctx.getImageData(0, 0, size, size)
+}
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
 export default function CreateMap({
@@ -531,7 +557,7 @@ export default function CreateMap({
     if (!map.current || !map.current.getLayer('track-lines')) return
     const trackVisibility = tracksMode ? 'visible' : 'none'
     const hexVisibility = tracksMode ? 'none' : 'visible'
-    ;['track-lines', 'track-heads'].forEach((id) =>
+    ;['track-lines', 'track-heads', 'track-heads-fixed'].forEach((id) =>
       map.current.setLayoutProperty(id, 'visibility', trackVisibility)
     )
     ;['trajectory-hexes', 'trajectory-hexes-hovered'].forEach((id) =>
@@ -563,7 +589,8 @@ export default function CreateMap({
         source.setData({ type: 'FeatureCollection', features: [] })
         if (map.current.getLayer('track-lines')) {
           map.current.setPaintProperty('track-lines', 'line-color', trackLineColor)
-          map.current.setPaintProperty('track-heads', 'circle-color', trackLineColor)
+          map.current.setLayoutProperty('track-heads', 'icon-image', 'track-head-arrow')
+          map.current.setPaintProperty('track-heads-fixed', 'circle-color', trackLineColor)
         }
         return
       }
@@ -599,11 +626,40 @@ export default function CreateMap({
           },
           properties: {}
         }))
-      const fixFeatures = rawCoordinates.map((coordinate) => ({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: coordinate },
-        properties: {}
-      }))
+      // Every raw fix, oriented by course over ground within its run: the
+      // bearing from the previous fix (a run's first fix points toward its
+      // next fix instead; coincident fixes inherit the last known course).
+      // Bearings never span run breaks — direction across a data gap or the
+      // antimeridian seam would be meaningless. cog stays unset when a run
+      // has a single fix, which the -nocog circle layer picks up.
+      // runs partitions rawCoordinates in place (every input point appears
+      // exactly once, in order) so a running cursor recovers each point's
+      // original fix time for the tooltip below.
+      let rawIndex = 0
+      const fixFeatures = runs.flatMap((run) => {
+        let lastCog = null
+        return run.map((coordinate, i) => {
+          const time = rawTimes[rawIndex]
+          rawIndex++
+          const cog =
+            i > 0
+              ? initialBearing(run[i - 1], coordinate)
+              : run.length > 1
+                ? initialBearing(coordinate, run[1])
+                : null
+          if (cog !== null) lastCog = cog
+          return {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: coordinate },
+            properties: {
+              ...(lastCog === null ? {} : { cog: lastCog }),
+              time,
+              trajectory_id: trajectoryId,
+              dataset_title: selectedTrajectory.datasetTitle
+            }
+          }
+        })
+      })
       source.setData({
         type: 'FeatureCollection',
         features: [...lineFeatures, ...fixFeatures]
@@ -611,7 +667,8 @@ export default function CreateMap({
 
       if (map.current.getLayer('track-lines')) {
         map.current.setPaintProperty('track-lines', 'line-color', 'lightgrey')
-        map.current.setPaintProperty('track-heads', 'circle-color', 'lightgrey')
+        map.current.setLayoutProperty('track-heads', 'icon-image', 'track-head-arrow-dim')
+        map.current.setPaintProperty('track-heads-fixed', 'circle-color', 'lightgrey')
       }
 
       const longitudes = rawCoordinates.map((c) => c[0])
@@ -954,11 +1011,41 @@ export default function CreateMap({
         }
       })
 
+      // Heads with a known course over ground render as arrowheads rotated
+      // to the direction of travel; heads where cog is undefined (single-fix
+      // trajectories, stationary platforms) fall back to circles.
+      map.current.addImage('track-head-arrow', buildHeadArrowImage(trackLineColor), {
+        pixelRatio: 2
+      })
+      map.current.addImage('track-head-arrow-dim', buildHeadArrowImage('lightgrey'), {
+        pixelRatio: 2
+      })
+
       map.current.addLayer({
         id: 'track-heads',
+        type: 'symbol',
+        source: 'tracks',
+        'source-layer': 'track-heads',
+        filter: ['has', 'cog'],
+        layout: {
+          visibility: tracksVisibility,
+          'icon-image': 'track-head-arrow',
+          'icon-rotate': ['get', 'cog'],
+          // rotate with the map, not the viewport, so the arrow keeps
+          // pointing along the geographic course
+          'icon-rotation-alignment': 'map',
+          // circles never collided; keep every head visible
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true
+        }
+      })
+
+      map.current.addLayer({
+        id: 'track-heads-fixed',
         type: 'circle',
         source: 'tracks',
         'source-layer': 'track-heads',
+        filter: ['!', ['has', 'cog']],
         layout: { visibility: tracksVisibility },
         paint: {
           'circle-color': trackLineColor,
@@ -988,11 +1075,36 @@ export default function CreateMap({
         }
       })
 
+      // Raw fixes with a known course over ground render as arrowheads
+      // (white fill, selected-track-coloured outline — the inverse of the
+      // global heads, matching the old fix circles); fixes where cog is
+      // undefined (singleton runs) keep circles.
+      map.current.addImage(
+        'selected-fix-arrow',
+        buildHeadArrowImage('#ffffff', selectedTrackColor),
+        { pixelRatio: 2 }
+      )
+
       map.current.addLayer({
         id: 'selected-track-fixes',
+        type: 'symbol',
+        source: 'selected-track',
+        filter: ['all', ['==', '$type', 'Point'], ['has', 'cog']],
+        layout: {
+          'icon-image': 'selected-fix-arrow',
+          'icon-size': 0.75,
+          'icon-rotate': ['get', 'cog'],
+          'icon-rotation-alignment': 'map',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true
+        }
+      })
+
+      map.current.addLayer({
+        id: 'selected-track-fixes-nocog',
         type: 'circle',
         source: 'selected-track',
-        filter: ['==', '$type', 'Point'],
+        filter: ['all', ['==', '$type', 'Point'], ['!', ['has', 'cog']]],
         paint: {
           'circle-color': '#ffffff',
           'circle-radius': 3,
@@ -1211,35 +1323,63 @@ export default function CreateMap({
       }
     })
 
-    map.current.on('mousemove', 'track-heads', (e) => {
-      if (!draw.getMode().includes('draw')) {
-        map.current.getCanvas().style.cursor = 'pointer'
-        const properties = e.features[0].properties
-        const headDate = properties.head_time
-          ? new Date(Number(properties.head_time)).toISOString().split('T')[0]
-          : ''
-        popup
-          .setLngLat([e.lngLat.lng, e.lngLat.lat])
-          .setHTML(
-            `<div><b>${properties.trajectory_id}</b>${headDate ? `<br/>${headDate}` : ''}</div>`
-          )
-          .addTo(map.current)
-      }
+    ;['track-heads', 'track-heads-fixed'].forEach((layerId) => {
+      map.current.on('mousemove', layerId, (e) => {
+        if (!draw.getMode().includes('draw')) {
+          map.current.getCanvas().style.cursor = 'pointer'
+          const properties = e.features[0].properties
+          const headDate = properties.head_time
+            ? new Date(Number(properties.head_time)).toISOString().replace('T', ' ').slice(0, 16)
+            : ''
+          popup
+            .setLngLat([e.lngLat.lng, e.lngLat.lat])
+            .setHTML(
+              `<div>${properties.dataset_title ? `<b>${properties.dataset_title}</b><br/>` : ''}${properties.trajectory_id}${headDate ? `<br/>${headDate}` : ''}</div>`
+            )
+            .addTo(map.current)
+        }
+      })
+
+      map.current.on('mouseleave', layerId, () => {
+        if (!draw.getMode().includes('draw')) {
+          map.current.getCanvas().style.cursor = 'grab'
+          popup.remove()
+        }
+      })
     })
 
-    map.current.on('mouseleave', 'track-heads', () => {
-      if (!draw.getMode().includes('draw')) {
-        map.current.getCanvas().style.cursor = 'grab'
-        popup.remove()
-      }
+    ;['selected-track-fixes', 'selected-track-fixes-nocog'].forEach((layerId) => {
+      map.current.on('mousemove', layerId, (e) => {
+        if (!draw.getMode().includes('draw')) {
+          map.current.getCanvas().style.cursor = 'pointer'
+          const properties = e.features[0].properties
+          const fixDate = properties.time
+            ? properties.time.replace('T', ' ').slice(0, 16)
+            : ''
+          popup
+            .setLngLat([e.lngLat.lng, e.lngLat.lat])
+            .setHTML(
+              `<div>${properties.dataset_title ? `<b>${properties.dataset_title}</b><br/>` : ''}${properties.trajectory_id}${fixDate ? `<br/>${fixDate}` : ''}</div>`
+            )
+            .addTo(map.current)
+        }
+      })
+
+      map.current.on('mouseleave', layerId, () => {
+        if (!draw.getMode().includes('draw')) {
+          map.current.getCanvas().style.cursor = 'grab'
+          popup.remove()
+        }
+      })
     })
 
     map.current.on('mousemove', 'track-lines', (e) => {
       // heads sit above lines; let their own tooltip win
       if (
         !draw.getMode().includes('draw') &&
-        map.current.queryRenderedFeatures(e.point, { layers: ['track-heads'] })
-          .length === 0
+        map.current.queryRenderedFeatures(e.point, {
+          layers: ['track-heads', 'track-heads-fixed']
+        }).length === 0
       ) {
         map.current.getCanvas().style.cursor = 'pointer'
         popup

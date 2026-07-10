@@ -308,7 +308,9 @@ router.get(
  *       Returns a Mapbox Vector Tile with TWO layers built from
  *       cde.trajectory_points: 'track-lines' (per-trajectory LineStrings over
  *       the requested time window, ordered by time) and 'track-heads' (each
- *       trajectory's latest fix within the window). timeMin/timeMax are
+ *       trajectory's latest fix within the window, with 'cog' — course over
+ *       ground in degrees clockwise from north, absent when undefined).
+ *       timeMin/timeMax are
  *       REQUIRED — the window is the scrub bar's trailing interval. Clients
  *       should snap the window to UTC day boundaries so the URL-keyed tile
  *       cache gets high hit rates across scrubs and users.
@@ -414,7 +416,7 @@ router.get(
     ),
     pts AS (
       SELECT p.dataset_pk, p.trajectory_id, p.time, p.longitude, p.latitude,
-             p.geom, d.pk_url, c.gap_secs
+             p.geom, d.pk_url, d.title AS dataset_title, c.gap_secs
       FROM cde.trajectory_points p
       JOIN cand c ON c.dataset_pk = p.dataset_pk
                  AND c.trajectory_id = p.trajectory_id
@@ -462,10 +464,21 @@ router.get(
       HAVING count(*) >= 2
     ),
     heads AS (
+      -- cog: course over ground at the head — spheroid azimuth (degrees
+      -- clockwise from north) from the previous fix to the head fix. NULL
+      -- when undefined: single-fix trajectories (lag is NULL) or a
+      -- stationary platform (coincident fixes make ST_Azimuth NULL); the
+      -- frontend renders those heads as circles instead of arrows.
       SELECT DISTINCT ON (dataset_pk, trajectory_id)
-             trajectory_id, pk_url,
-             (extract(epoch FROM time) * 1000)::bigint AS head_time, geom
+             trajectory_id, pk_url, dataset_title,
+             (extract(epoch FROM time) * 1000)::bigint AS head_time,
+             round(degrees(ST_Azimuth(
+               ST_MakePoint(lag(longitude) OVER w, lag(latitude) OVER w)::geography,
+               ST_MakePoint(longitude, latitude)::geography
+             )))::int AS cog,
+             geom
       FROM pts
+      WINDOW w AS (PARTITION BY dataset_pk, trajectory_id ORDER BY time)
       ORDER BY dataset_pk, trajectory_id, time DESC
     ),
     line_mvt AS (
@@ -475,7 +488,7 @@ router.get(
       WHERE l.geom && te.tile_envelope
     ),
     head_mvt AS (
-      SELECT h.trajectory_id, h.pk_url, h.head_time,
+      SELECT h.trajectory_id, h.pk_url, h.dataset_title, h.head_time, h.cog,
              ST_AsMVTGeom(h.geom, te.tile_envelope) AS geom
       FROM heads h, te
       WHERE h.geom && te.tile_envelope

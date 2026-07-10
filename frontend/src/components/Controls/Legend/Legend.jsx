@@ -162,15 +162,17 @@ export default function Legend({
             </svg>
           </LegendElement>
           <LegendElement title={t('legendTrackHead')} open={legendOpen}>
-            <CircleFill
-              size={11}
-              fill='#6749AC'
-              style={{
-                border: '1.5px solid white',
-                borderRadius: '11px',
-                margin: '2px'
-              }}
-            />
+            {/* same arrowhead the map draws, pointing along the course */}
+            <svg width='15' height='15' viewBox='0 0 16 16'>
+              <path
+                d='M8 1.5 L13.5 13.5 L8 10.5 L2.5 13.5 Z'
+                fill='#6749AC'
+                stroke='#ffffff'
+                strokeWidth='1.5'
+                strokeLinejoin='round'
+                transform='rotate(45 8 8)'
+              />
+            </svg>
           </LegendElement>
         </>
       )
