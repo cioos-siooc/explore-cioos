@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 export default defineConfig(({ mode }) => {
   // Keep the pre-Vite deploy contract: plain API_URL / BASE_URL /
@@ -13,7 +14,12 @@ export default defineConfig(({ mode }) => {
     // serves index.html for the misresolved bundle request and the app never
     // boots on reload. Matches the router basename (BASE_URL).
     base: env.BASE_URL || '/',
-    plugins: [react()],
+    plugins: [
+      react(),
+      // npm run build:analyze -> treemap of bundle composition
+      process.env.ANALYZE &&
+        visualizer({ filename: 'dist/stats.html', open: true, gzipSize: true })
+    ].filter(Boolean),
     define: {
       'process.env.API_URL': JSON.stringify(env.API_URL),
       'process.env.BASE_URL': JSON.stringify(env.BASE_URL || '/'),

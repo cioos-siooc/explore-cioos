@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense, lazy } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import Modal from '../../ui/Modal.jsx'
 
 import Loading from '../Loading/Loading.jsx'
-import DatasetPreviewPlot from '../DatasetPreviewPlot/DatasetPreviewPlot.jsx'
 import DatasetPreviewTable from '../DatasetPreviewTable/DatasetPreviewTable.jsx'
 import './styles.css'
+
+// Lazy so the ~1 MB Plotly chunk only downloads when the Plot tab is opened.
+const DatasetPreviewPlot = lazy(() =>
+  import('../DatasetPreviewPlot/DatasetPreviewPlot.jsx')
+)
 
 export default function DatasetPreview({
   datasetPreview,
@@ -111,14 +115,16 @@ export default function DatasetPreview({
                           data={data}
                         />
                       ) : (
-                        <DatasetPreviewPlot
-                          inspectDataset={inspectDataset}
-                          plotAxes={plotAxes}
-                          datasetPreview={datasetPreview}
-                          setPlotAxes={setPlotAxes}
-                          inspectRecordID={inspectRecordID}
-                          data={data}
-                        />
+                        <Suspense fallback={<Loading />}>
+                          <DatasetPreviewPlot
+                            inspectDataset={inspectDataset}
+                            plotAxes={plotAxes}
+                            datasetPreview={datasetPreview}
+                            setPlotAxes={setPlotAxes}
+                            inspectRecordID={inspectRecordID}
+                            data={data}
+                          />
+                        </Suspense>
                       )}
                     </>
                   ) : (

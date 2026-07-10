@@ -46,6 +46,7 @@
     "eslint-plugin-react": "^7.30.0",
     "eslint-plugin-standard": "^4.1.0",
     "prettier": "^2.7.1",
+    "rollup-plugin-visualizer": "^7.0.1",
     "vite": "^7.0.0"
   },
   "scripts": {
@@ -53,6 +54,7 @@
     "dev": "vite",
     "start": "vite --open",
     "build": "vite build",
+    "build:analyze": "ANALYZE=1 vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .js,.jsx --ignore-path .gitignore",
     "lint:fix": "eslint --fix . --ext .js,.jsx --ignore-path .gitignore"

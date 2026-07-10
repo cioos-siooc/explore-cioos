@@ -351,23 +351,23 @@ export default function DatasetInspector({
                   placeholder={t('datasetInspectorFilterText')}
                 />
                 <DataTable
-                    onRowClicked={(row) => setInspectRecordID(row.profile_id)}
-                    striped
-                    pointerOnHover
-                    columns={columns}
-                    data={data}
-                    defaultSortField='profile_id'
-                    defaultSortAsc={false}
-                    pagination
-                    paginationPerPage={100}
-                    paginationRowsPerPageOptions={[100, 150, 200, 250]}
-                    paginationComponentOptions={{
-                      rowsPerPageText: t('tableComponentRowsPerPage'),
-                      rangeSeparatorText: t('tableComponentOf'),
-                      selectAllRowsItem: false
-                    }}
-                    highlightOnHover
-                  />
+                  onRowClicked={(row) => setInspectRecordID(row.profile_id)}
+                  striped
+                  pointerOnHover
+                  columns={columns}
+                  data={data}
+                  defaultSortField='profile_id'
+                  defaultSortAsc={false}
+                  pagination
+                  paginationPerPage={100}
+                  paginationRowsPerPageOptions={[100, 150, 200, 250]}
+                  paginationComponentOptions={{
+                    rowsPerPageText: t('tableComponentRowsPerPage'),
+                    rangeSeparatorText: t('tableComponentOf'),
+                    selectAllRowsItem: false
+                  }}
+                  highlightOnHover
+                />
               </div>
             )}
           </div>
