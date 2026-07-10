@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
-import { createDataFilterQueryString } from '../utilities.js'
+import { createDataFilterQueryString } from '../utilities.jsx'
 import { useFilters } from './filters/FilterProvider.jsx'
 import { useMapState } from './map/MapStateProvider.jsx'
 

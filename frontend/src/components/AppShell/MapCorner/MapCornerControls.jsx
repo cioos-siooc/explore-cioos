@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
 import MapLayerToggle from '../../Controls/MapLayerToggle/MapLayerToggle.jsx'
-import { polygonIsRectangle } from '../../../utilities.js'
+import { polygonIsRectangle } from '../../../utilities.jsx'
 import { useMapState } from '../../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import './styles.css'

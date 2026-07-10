@@ -1,7 +1,7 @@
-// This is the entry point for Webpack to grab the js files. This is automatically found by webpack.
+// This is the app entry point, loaded as a module script by index.html (Vite).
 // eslint-disable-next-line no-unused-vars
 import React, { Suspense } from 'react'
-import ReactDOM from 'react-dom'
+import { createRoot } from 'react-dom/client'
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
@@ -48,9 +48,9 @@ i18n
     },
     react: { useSuspense: true }
   })
-// This is where react reaches into the DOM, finds the <div id="app"> element, and replaces it with the content of ReactD3Viz's render function JSX.
+// This is where react reaches into the DOM, finds the <div id="app"> element, and renders the app into it.
 const domContainer = document.querySelector('#app')
-ReactDOM.render(
+createRoot(domContainer).render(
   <Suspense fallback={<Loading />}>
     <BrowserRouter basename={process.env.BASE_URL}>
       <Routes>
@@ -61,8 +61,5 @@ ReactDOM.render(
         <Route path='/harvest/run/:runId'                element={<HarvestRun />} />
       </Routes>
     </BrowserRouter>
-    ,{/* <App /> */}
-    {/* </Router> */}
-  </Suspense>,
-  domContainer
+  </Suspense>
 )

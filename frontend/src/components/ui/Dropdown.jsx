@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createContext, useContext, useRef, useState } from 'react'
 
-import { useOutsideAlerter } from '../../utilities.js'
+import { useOutsideAlerter } from '../../utilities.jsx'
 import './dropdownStyles.css'
 
 const DropdownContext = createContext({ close: () => {} })

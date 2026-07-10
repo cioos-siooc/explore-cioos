@@ -3,8 +3,11 @@ import { useTranslation } from 'react-i18next'
 import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
 import './styles.css'
 
-import Plotly from 'Plotly'
-import createPlotlyComponent from 'createPlotlyComponent'
+import Plotly from 'plotly.js-basic-dist-min'
+import createPlotlyComponent from 'react-plotly.js/factory'
+import frLocale from 'plotly.js-locales/fr'
+
+Plotly.register(frLocale)
 const Plot = createPlotlyComponent(Plotly)
 
 export default function DatasetPreviewPlot({
@@ -106,12 +109,12 @@ export default function DatasetPreviewPlot({
                   automargin: true,
                   side: isProfile ? 'top' : undefined,
                   autorange: isProfile ? 'reversed' : undefined,
-                  title: `( ${plotAxes.y.unit} )`,
+                  title: { text: `( ${plotAxes.y.unit} )` },
                   uirevision: true
                 },
                 xaxis: {
                   automargin: true,
-                  title: `( ${plotAxes.x.unit} )`,
+                  title: { text: `( ${plotAxes.x.unit} )` },
                   uirevision: true
                 },
                 dragmode: 'zoom',
@@ -121,7 +124,7 @@ export default function DatasetPreviewPlot({
               }}
               config={{
                 displaylogo: false,
-                modeBarButtonsToRemove: ['select2d', 'lasso2d', 'resetScale', 'pan2d'],
+                modeBarButtonsToRemove: ['select2d', 'lasso2d', 'resetScale2d', 'pan2d'],
                 responsive: true,
                 scrollZoom: true,
                 locale: i18n.language === 'fr' ? 'fr' : 'en',

@@ -16,7 +16,7 @@ import {
   createDataFilterQueryString,
   validateEmail,
   getCookieValue
-} from '../../utilities.js'
+} from '../../utilities.jsx'
 import { useFilters } from '../filters/FilterProvider.jsx'
 import { useSelection } from '../selection/SelectionProvider.jsx'
 

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import {
   generateRangeSelectBadgeTitle
-} from '../../../utilities.js'
+} from '../../../utilities.jsx'
 import {
   defaultStartDate,
   defaultEndDate,

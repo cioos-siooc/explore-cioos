@@ -1,6 +1,6 @@
 import * as React from 'react'
 
-import Map from './Map.js'
+import Map from './Map.jsx'
 import { useFilters } from '../../state/filters/FilterProvider.jsx'
 import { useMapState } from '../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../state/selection/SelectionProvider.jsx'

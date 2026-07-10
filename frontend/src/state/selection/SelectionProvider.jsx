@@ -9,7 +9,7 @@ import {
   createSelectionQueryString,
   polygonIsRectangle,
   useDebounce
-} from '../../utilities.js'
+} from '../../utilities.jsx'
 import { useFilters } from '../filters/FilterProvider.jsx'
 import { useMapState } from '../map/MapStateProvider.jsx'
 

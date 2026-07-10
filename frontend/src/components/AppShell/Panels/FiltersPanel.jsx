@@ -28,7 +28,7 @@ import {
   generateMultipleSelectBadgeTitle,
   generateRangeSelectBadgeTitle,
   setAllOptionsIsSelectedTo
-} from '../../../utilities.js'
+} from '../../../utilities.jsx'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'

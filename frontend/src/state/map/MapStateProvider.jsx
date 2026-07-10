@@ -6,7 +6,7 @@ import { server } from '../../config.js'
 import {
   createDataFilterQueryString,
   getCurrentRangeLevel
-} from '../../utilities.js'
+} from '../../utilities.jsx'
 import fetchJson from '../fetchJson.js'
 import { useFilters } from '../filters/FilterProvider.jsx'
 

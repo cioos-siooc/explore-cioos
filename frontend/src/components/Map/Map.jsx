@@ -5,7 +5,9 @@ import maplibreGl, {
   Popup,
   ScaleControl
 } from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import MapboxDraw from '@mapbox/mapbox-gl-draw'
+import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
 import { useState, useEffect, useRef } from 'react'
 
 import * as helpers from '@turf/helpers'

@@ -2,7 +2,7 @@ import * as React from 'react'
 import { createContext, useContext, useState, useEffect } from 'react'
 import isEmpty from 'lodash/isEmpty'
 
-import { getCookieValue } from '../../utilities.js'
+import { getCookieValue } from '../../utilities.jsx'
 import { useSelection } from '../selection/SelectionProvider.jsx'
 
 const UIContext = createContext()

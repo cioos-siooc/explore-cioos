@@ -12,7 +12,7 @@ import isEmpty from 'lodash/isEmpty'
 import {
   createDataFilterQueryString,
   polygonIsRectangle
-} from '../../../utilities.js'
+} from '../../../utilities.jsx'
 import {
   defaultEndDate,
   defaultEndDepth,

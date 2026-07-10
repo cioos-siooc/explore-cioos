@@ -10,7 +10,7 @@ import {
 import {
   capitalizeFirstLetter,
   generateColorStops
-} from '../../../utilities.js'
+} from '../../../utilities.jsx'
 import { colorScale, trajectoryColorScale } from '../../config.js'
 import platformColors from '../../platformColors'
 

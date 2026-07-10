@@ -1,14 +1,19 @@
 # Stage 1 - the build process
-FROM node:16 AS build-deps
+FROM node:22-alpine AS build-deps
 WORKDIR /usr/src/app
 
 ARG API_URL
 ARG BASE_URL
-ENV API_URL $API_URL
-ENV BASE_URL $BASE_URL
+ARG SENTRY_TRACES_SAMPLE_RATE
+ENV API_URL=$API_URL
+ENV BASE_URL=$BASE_URL
+ENV SENTRY_TRACES_SAMPLE_RATE=$SENTRY_TRACES_SAMPLE_RATE
+
+# Install dependencies first so source changes don't bust the npm ci layer
+COPY package.json package-lock.json ./
+RUN npm ci --quiet
 
 COPY . .
-RUN npm ci --quiet
 RUN npm run build
 
 # Stage 2 - the production environment

@@ -26,7 +26,7 @@ import {
   capitalizeFirstLetter,
   useDebounce,
   setAllOptionsIsSelectedTo
-} from '../../utilities.js'
+} from '../../utilities.jsx'
 
 const FilterContext = createContext()
 
