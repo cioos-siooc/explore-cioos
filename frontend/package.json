@@ -14,7 +14,7 @@
     "@turf/bbox-polygon": "^6.5.0",
     "@turf/points-within-polygon": "^6.5.0",
     "bytes": "^3.1.2",
-    "classnames": "^2.3.1",
+    "classnames": "^2.5.1",
     "d3-scale": "^4.0.2",
     "i18next": "^25.10.10",
     "i18next-browser-languagedetector": "^8.2.1",
@@ -24,14 +24,14 @@
     "plotly.js-basic-dist-min": "^3.0.0",
     "plotly.js-locales": "^3.0.0",
     "prop-types": "^15.8.1",
-    "rc-slider": "^10.0.0",
+    "rc-slider": "^11.1.9",
     "react": "18.3.1",
-    "react-bootstrap-icons": "^1.8.2",
+    "react-bootstrap-icons": "^1.11.6",
     "react-data-table-component": "^7.7.1",
     "react-dom": "18.3.1",
     "react-i18next": "^16.6.6",
     "react-plotly.js": "^2.6.0",
-    "react-router-dom": "^6.4.1"
+    "react-router-dom": "^6.30.4"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.0.0",
