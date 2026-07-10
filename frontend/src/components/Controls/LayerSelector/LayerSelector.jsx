@@ -1,6 +1,13 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Stack, Activity, GeoAltFill, Diagram3Fill } from 'react-bootstrap-icons'
+import {
+  Stack,
+  Activity,
+  GeoAltFill,
+  GraphUp,
+  BarChartSteps,
+  Diagram3Fill
+} from 'react-bootstrap-icons'
 
 import './styles.css'
 
@@ -23,7 +30,13 @@ export default function LayerSelector({
     setDataLayers({ ...dataLayers, [key]: !dataLayers[key] })
 
   const rows = [
-    { key: 'profiles', icon: <GeoAltFill size={16} />, label: t('layerProfiles') },
+    { key: 'profile', icon: <GeoAltFill size={16} />, label: t('layerProfile') },
+    { key: 'timeseries', icon: <GraphUp size={16} />, label: t('layerTimeseries') },
+    {
+      key: 'timeseriesProfile',
+      icon: <BarChartSteps size={16} />,
+      label: t('layerTimeseriesProfile')
+    },
     { key: 'obis', icon: <Diagram3Fill size={16} />, label: t('layerObis') },
     {
       key: 'trajectories',

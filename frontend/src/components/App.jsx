@@ -125,11 +125,19 @@ export default function App() {
   const [dataLayers, setDataLayers] = useState(() => {
     const layersParam = searchParams.get('layers')
     if (layersParam == null) {
-      return { profiles: true, obis: true, trajectories: true }
+      return {
+        profile: true,
+        timeseries: true,
+        timeseriesProfile: true,
+        obis: true,
+        trajectories: true
+      }
     }
     const on = new Set(layersParam.split(',').filter(Boolean))
     return {
-      profiles: on.has('profiles'),
+      profile: on.has('profile'),
+      timeseries: on.has('timeseries'),
+      timeseriesProfile: on.has('timeseriesProfile'),
       obis: on.has('obis'),
       trajectories: on.has('trajectories')
     }
@@ -379,7 +387,7 @@ export default function App() {
       if (trailingDays !== defaultTrailingDays) obj.trail = trailingDays
     }
     // Data-layer selection persists only when not the all-on default.
-    if (!(dataLayers.profiles && dataLayers.obis && dataLayers.trajectories)) {
+    if (!Object.values(dataLayers).every(Boolean)) {
       obj.layers = Object.entries(dataLayers)
         .filter(([, on]) => on)
         .map(([key]) => key)

@@ -33,11 +33,21 @@ export default function Legend({
   const [legendOpen, setLegendOpen] = useState(true)
 
   // Default all-on when the prop is absent (older callers / initial render).
-  const layers = dataLayers || { profiles: true, obis: true, trajectories: true }
-  // The combined green ramp / platform points carry profiles + OBIS, plus
-  // trajectory coverage when shown as hexes.
+  const layers = dataLayers || {
+    profile: true,
+    timeseries: true,
+    timeseriesProfile: true,
+    obis: true,
+    trajectories: true
+  }
+  // The combined green ramp / platform points carry the profile-family types
+  // + OBIS, plus trajectory coverage when shown as hexes.
   const showPointRamp =
-    layers.profiles || layers.obis || (layers.trajectories && !tracksMode)
+    layers.profile ||
+    layers.timeseries ||
+    layers.timeseriesProfile ||
+    layers.obis ||
+    (layers.trajectories && !tracksMode)
 
   function generateLegendElements() {
     if (!showPointRamp) return null

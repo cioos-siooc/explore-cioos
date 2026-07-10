@@ -71,10 +71,18 @@ router.get(
     const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
 
     const includeObis = req.query.includeObis !== 'false';
-    // Data-type layer toggle (map layer selector): an explicit
-    // includeProfiles / includeTrajectory = 'false' hides that type. Defaults
-    // to shown, so callers that omit the params get the pre-toggle behaviour.
-    const profilesToggledOn = req.query.includeProfiles !== 'false';
+    // Data-type layer toggle (map layer selector). Trajectories: an explicit
+    // includeTrajectory=false hides them. Profiles: the profileTypes param is
+    // the comma list of cdm_data_types to show (Profile / TimeSeries /
+    // TimeSeriesProfile — all three share cde.profiles); absent = all three
+    // (pre-toggle behaviour), empty = none. Values are validated against the
+    // fixed set below so they can be inlined into the branch SQL safely.
+    const ALL_PROFILE_TYPES = ['Profile', 'TimeSeries', 'TimeSeriesProfile'];
+    const profileTypes = req.query.profileTypes === undefined
+      ? ALL_PROFILE_TYPES
+      : String(req.query.profileTypes)
+          .split(',')
+          .filter((t) => ALL_PROFILE_TYPES.includes(t));
     const trajectoryToggledOn = req.query.includeTrajectory !== 'false';
     // ERDDAP-sourced data (profiles + trajectory coverage) is hidden wholesale
     // when an OBIS-only filter is active: scientific-name filters are
@@ -83,15 +91,24 @@ router.get(
     // OR'd in the shared dataset filter).
     const erddapVisible = !req.query.scientificNames
       && (!req.query.obisNodes || Boolean(req.query.erddapServers));
-    const includeProfiles = profilesToggledOn && erddapVisible;
+    const includeProfiles = erddapVisible && profileTypes.length > 0;
     const includeTrajectory = trajectoryToggledOn && erddapVisible;
 
     // At hex zoom we only need the hex FK and point_pk (for distinct counts);
     // the polygon is fetched once per hex via JOIN to hexes_zoom_*. At point
     // zoom we project the actual point geom.
+    // When only some profile types are requested, restrict the branch to
+    // datasets of those cdm_data_types (values allowlisted above → safe to
+    // inline). All-three or none → no filter (none never reaches the branch).
+    const profilesTypeFilter =
+      profileTypes.length && profileTypes.length < ALL_PROFILE_TYPES.length
+        ? ` WHERE dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${profileTypes
+            .map((t) => `'${t}'`)
+            .join(',')}))`
+        : '';
     const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
            time_min, time_max, latitude, longitude, depth_min, depth_max
-    FROM cde.profiles`;
+    FROM cde.profiles${profilesTypeFilter}`;
     // Trajectory coverage cells merge into the combined hex counts (z<7,
     // the green ramp) but never appear as individual points (z>=7) — at
     // that zoom they're only shown via the dedicated always-hex purple
@@ -111,10 +128,12 @@ router.get(
     // at point zoom they're shown via the dedicated /tiles/trajectories layer.
     if (includeTrajectory && isHexGrid) branches.push(trajectoryBranch);
     if (includeObis) branches.push(obisBranch);
-    // Guard: if nothing to show, return an empty CTE that still has the right columns
+    // Guard: if nothing to show, return an empty CTE that still has the right
+    // columns. Wrapped in a subquery so it holds even when profilesBranch
+    // carries its own WHERE (profile-type filter).
     const combinedInner = branches.length
       ? branches.join("\n    UNION ALL\n    ")
-      : `${profilesBranch} WHERE FALSE`;
+      : `SELECT * FROM (${profilesBranch}) empty_combined WHERE FALSE`;
 
     const relevantPointsSQL = isHexGrid
       ? `SELECT p.zoom_pk pk, count(distinct p.point_pk) count,

@@ -63,17 +63,31 @@ function buildHeadArrowImage(fillColor, strokeColor = '#ffffff') {
   return ctx.getImageData(0, 0, size, size)
 }
 
+// Data-layer keys that map to profile cdm_data_types (all share cde.profiles).
+const PROFILE_TYPE_KEYS = [
+  ['profile', 'Profile'],
+  ['timeseries', 'TimeSeries'],
+  ['timeseriesProfile', 'TimeSeriesProfile']
+]
+
 // Combine the filter-derived query string with the data-layer selection into
-// a tile-URL suffix. A layer switched off adds includeX=false; the OBIS case
-// ORs with any includeObis=false the Source filter already emitted, so either
-// hiding mechanism wins. Returns '' or '?...'.
+// a tile-URL suffix. OBIS off adds includeObis=false, OR-ed with any the
+// Source filter already emitted; trajectories off adds includeTrajectory=false;
+// a profile-type subset adds profileTypes=<comma list> (empty = none). A param
+// is omitted when its layer(s) are fully on, so the URL stays clean. Returns
+// '' or '?...'.
 function buildTileSuffix(baseQuery, dataLayers) {
   const params = new URLSearchParams(baseQuery)
   if (dataLayers) {
     if (!dataLayers.obis || params.get('includeObis') === 'false') {
       params.set('includeObis', 'false')
     }
-    if (!dataLayers.profiles) params.set('includeProfiles', 'false')
+    const enabledTypes = PROFILE_TYPE_KEYS.filter(
+      ([key]) => dataLayers[key]
+    ).map(([, type]) => type)
+    if (enabledTypes.length < PROFILE_TYPE_KEYS.length) {
+      params.set('profileTypes', enabledTypes.join(','))
+    }
     if (!dataLayers.trajectories) params.set('includeTrajectory', 'false')
   }
   const s = params.toString()
