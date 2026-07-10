@@ -1,6 +1,5 @@
 import React from 'react'
 import * as Sentry from '@sentry/react'
-import { Integrations } from '@sentry/tracing'
 import { useTranslation } from 'react-i18next'
 
 import AppProviders from '../state/AppProviders.jsx'
@@ -14,7 +13,7 @@ import './styles.css'
 if (process.env.NODE_ENV === 'production') {
   Sentry.init({
     dsn: 'https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595',
-    integrations: [new Integrations.BrowserTracing()],
+    integrations: [Sentry.browserTracingIntegration()],
 
     // Full tracing (1.0) adds instrumentation overhead to page load. Defaults
     // to 1.0 in development and 0.1 in production; override at build time with
