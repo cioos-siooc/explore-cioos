@@ -63,6 +63,23 @@ function buildHeadArrowImage(fillColor, strokeColor = '#ffffff') {
   return ctx.getImageData(0, 0, size, size)
 }
 
+// Combine the filter-derived query string with the data-layer selection into
+// a tile-URL suffix. A layer switched off adds includeX=false; the OBIS case
+// ORs with any includeObis=false the Source filter already emitted, so either
+// hiding mechanism wins. Returns '' or '?...'.
+function buildTileSuffix(baseQuery, dataLayers) {
+  const params = new URLSearchParams(baseQuery)
+  if (dataLayers) {
+    if (!dataLayers.obis || params.get('includeObis') === 'false') {
+      params.set('includeObis', 'false')
+    }
+    if (!dataLayers.profiles) params.set('includeProfiles', 'false')
+    if (!dataLayers.trajectories) params.set('includeTrajectory', 'false')
+  }
+  const s = params.toString()
+  return s ? `?${s}` : ''
+}
+
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
 export default function CreateMap({
   query,
@@ -81,7 +98,8 @@ export default function CreateMap({
   scrubTime,
   trailingDays,
   smoothTracks,
-  selectedTrajectory
+  selectedTrajectory,
+  dataLayers
 }) {
   const { t } = useTranslation()
 
@@ -214,6 +232,7 @@ export default function CreateMap({
   const tracksModeRef = useRef(tracksMode)
   const scrubTimeRef = useRef(scrubTime)
   const trailingDaysRef = useRef(trailingDays)
+  const dataLayersRef = useRef(dataLayers)
   // Raw (unsmoothed) selected-track response, cached so toggling smoothing
   // re-renders without re-fetching.
   const rawTrackRef = useRef(null)
@@ -255,6 +274,47 @@ export default function CreateMap({
     map.current.style.sourceCaches.tracks.clearTiles()
     map.current.style.sourceCaches.tracks.update(map.current.transform)
     map.current.triggerRepaint()
+  }
+
+  // Rebuild the combined (profiles + OBIS + trajectory-coverage) and
+  // trajectory-hex source URLs from the current filters AND the data-layer
+  // selection, then force a refetch. Shared by the filter-change and
+  // layer-toggle effects.
+  function refreshCombinedSources(activeQuery) {
+    if (!map.current || !map.current.loaded()) return
+    const suffix = buildTileSuffix(
+      createDataFilterQueryString(activeQuery),
+      dataLayersRef.current
+    )
+    const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${suffix}`
+    const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${suffix}`
+    map.current.getSource('points').tiles = [tileQuery]
+    map.current.getSource('points-halo').tiles = [tileQuery]
+    map.current.getSource('hexes').tiles = [tileQuery]
+    map.current.getSource('trajectory-hexes').tiles = [trajectoryTileQuery]
+    ;['hexes', 'points', 'points-halo', 'trajectory-hexes'].forEach((id) => {
+      map.current.style.sourceCaches[id].clearTiles()
+      map.current.style.sourceCaches[id].update(map.current.transform)
+    })
+    map.current.triggerRepaint()
+  }
+
+  // Trajectory layer visibility from both the data-layer toggle and the
+  // tracks/coverage sub-mode: track lines when trajectories are on AND tracks
+  // mode is selected; coverage hexes when on AND not; nothing when off.
+  function applyTrajectoryVisibility() {
+    if (!map.current || !map.current.getLayer('track-lines')) return
+    const trajOn = dataLayersRef.current
+      ? dataLayersRef.current.trajectories !== false
+      : true
+    const showTracks = trajOn && tracksModeRef.current
+    const showHexes = trajOn && !tracksModeRef.current
+    ;['track-lines', 'track-heads', 'track-heads-fixed'].forEach((id) =>
+      map.current.setLayoutProperty(id, 'visibility', showTracks ? 'visible' : 'none')
+    )
+    ;['trajectory-hexes', 'trajectory-hexes-hovered'].forEach((id) =>
+      map.current.setLayoutProperty(id, 'visibility', showHexes ? 'visible' : 'none')
+    )
   }
 
   // Placeholder count ranges used only until the /legend request resolves.
@@ -509,34 +569,11 @@ export default function CreateMap({
   }
 
   useEffect(() => {
-    const q = createDataFilterQueryString(query)
-    const filterSuffix = q ? `?${q}` : ''
-    const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`
-    const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${filterSuffix}`
     setPointsToReview()
     setPolygon()
     if (map && map.current && map.current.loaded()) {
       map.current.setFilter('points-highlighted', ['in', 'pk', ''])
-
-      map.current.getSource('points').tiles = [tileQuery]
-      map.current.getSource('points-halo').tiles = [tileQuery]
-      map.current.getSource('hexes').tiles = [tileQuery]
-      map.current.getSource('trajectory-hexes').tiles = [trajectoryTileQuery]
-
-      // Remove the tiles for a particular source
-      map.current.style.sourceCaches.hexes.clearTiles()
-      map.current.style.sourceCaches.points.clearTiles()
-      map.current.style.sourceCaches['points-halo'].clearTiles()
-      map.current.style.sourceCaches['trajectory-hexes'].clearTiles()
-
-      // Load the new tiles for the current viewport (map.transform -> viewport)
-      map.current.style.sourceCaches.hexes.update(map.current.transform)
-      map.current.style.sourceCaches.points.update(map.current.transform)
-      map.current.style.sourceCaches['points-halo'].update(map.current.transform)
-      map.current.style.sourceCaches['trajectory-hexes'].update(map.current.transform)
-
-      // Force a repaint, so that the map will be repainted without you having to touch the map
-      map.current.triggerRepaint()
+      refreshCombinedSources(query)
       setLoading(true)
       doFinalCheck.current = true
       if (drawPolygon.current.getAll().features.length > 0) {
@@ -550,19 +587,22 @@ export default function CreateMap({
     }
   }, [query])
 
-  // Tracks mode: swap the trajectory hex layers for track lines/heads and
-  // (re)load the scrub window's tiles.
+  // Data-layer toggle: refetch the combined/trajectory sources with the new
+  // includeProfiles/includeObis/includeTrajectory params and re-apply
+  // trajectory layer visibility.
+  useEffect(() => {
+    dataLayersRef.current = dataLayers
+    if (!map.current || !map.current.loaded()) return
+    refreshCombinedSources(query)
+    applyTrajectoryVisibility()
+  }, [dataLayers])
+
+  // Tracks mode: swap the trajectory coverage hexes for track lines/heads
+  // (respecting the trajectories layer toggle) and load the scrub window.
   useEffect(() => {
     tracksModeRef.current = tracksMode
     if (!map.current || !map.current.getLayer('track-lines')) return
-    const trackVisibility = tracksMode ? 'visible' : 'none'
-    const hexVisibility = tracksMode ? 'none' : 'visible'
-    ;['track-lines', 'track-heads', 'track-heads-fixed'].forEach((id) =>
-      map.current.setLayoutProperty(id, 'visibility', trackVisibility)
-    )
-    ;['trajectory-hexes', 'trajectory-hexes-hovered'].forEach((id) =>
-      map.current.setLayoutProperty(id, 'visibility', hexVisibility)
-    )
+    applyTrajectoryVisibility()
     if (tracksMode) {
       refreshTracksSource(query, scrubTime, trailingDays)
     }
@@ -768,8 +808,10 @@ export default function CreateMap({
 
       setColorStops()
 
-      const q = createDataFilterQueryString(query)
-      const filterSuffix = q ? `?${q}` : ''
+      const filterSuffix = buildTileSuffix(
+        createDataFilterQueryString(query),
+        dataLayersRef.current
+      )
 
       const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`
 
@@ -1113,15 +1155,10 @@ export default function CreateMap({
         }
       })
 
-      // If tracks mode was restored from the URL, hide the hex layers now.
-      if (tracksModeRef.current) {
-        map.current.setLayoutProperty('trajectory-hexes', 'visibility', 'none')
-        map.current.setLayoutProperty(
-          'trajectory-hexes-hovered',
-          'visibility',
-          'none'
-        )
-      }
+      // Apply the initial trajectory layer visibility from the URL-restored
+      // tracks mode + data-layer selection (track lines vs coverage hexes vs
+      // trajectories-off).
+      applyTrajectoryVisibility()
     })
 
     const handleMapOnClick = (e) => {

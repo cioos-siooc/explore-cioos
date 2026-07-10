@@ -26,12 +26,21 @@ export default function Legend({
   selectionPanelOpen,
   platformsInView,
   tracksMode,
-  trailingDays
+  trailingDays,
+  dataLayers
 }) {
   const { t } = useTranslation()
   const [legendOpen, setLegendOpen] = useState(true)
 
+  // Default all-on when the prop is absent (older callers / initial render).
+  const layers = dataLayers || { profiles: true, obis: true, trajectories: true }
+  // The combined green ramp / platform points carry profiles + OBIS, plus
+  // trajectory coverage when shown as hexes.
+  const showPointRamp =
+    layers.profiles || layers.obis || (layers.trajectories && !tracksMode)
+
   function generateLegendElements() {
+    if (!showPointRamp) return null
     if (isEmpty(currentRangeLevel)) {
       // No Data
       return (
@@ -138,6 +147,8 @@ export default function Legend({
     }
   }
   function generateTrajectoryLegendElements() {
+    // Trajectory layer hidden entirely — no trajectory legend.
+    if (!layers.trajectories) return null
     // Tracks mode replaces the coverage-hex ramp with the track-line layers.
     if (tracksMode) {
       return (

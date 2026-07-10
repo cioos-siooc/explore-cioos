@@ -71,12 +71,20 @@ router.get(
     const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
 
     const includeObis = req.query.includeObis !== 'false';
-    // Scientific-name filters are OBIS-only: hide profiles when set. An
-    // OBIS-node selection also hides profiles, unless ERDDAP servers are
-    // selected alongside it (combined Source filter — show both, OR'd in
-    // the shared dataset filter).
-    const includeProfiles = !req.query.scientificNames
+    // Data-type layer toggle (map layer selector): an explicit
+    // includeProfiles / includeTrajectory = 'false' hides that type. Defaults
+    // to shown, so callers that omit the params get the pre-toggle behaviour.
+    const profilesToggledOn = req.query.includeProfiles !== 'false';
+    const trajectoryToggledOn = req.query.includeTrajectory !== 'false';
+    // ERDDAP-sourced data (profiles + trajectory coverage) is hidden wholesale
+    // when an OBIS-only filter is active: scientific-name filters are
+    // OBIS-only, and an OBIS-node selection also hides it, unless ERDDAP
+    // servers are selected alongside it (combined Source filter — show both,
+    // OR'd in the shared dataset filter).
+    const erddapVisible = !req.query.scientificNames
       && (!req.query.obisNodes || Boolean(req.query.erddapServers));
+    const includeProfiles = profilesToggledOn && erddapVisible;
+    const includeTrajectory = trajectoryToggledOn && erddapVisible;
 
     // At hex zoom we only need the hex FK and point_pk (for distinct counts);
     // the polygon is fetched once per hex via JOIN to hexes_zoom_*. At point
@@ -98,10 +106,10 @@ router.get(
     WHERE :obisFilters`;
 
     const branches = [];
-    if (includeProfiles) {
-      branches.push(profilesBranch);
-      if (isHexGrid) branches.push(trajectoryBranch);
-    }
+    if (includeProfiles) branches.push(profilesBranch);
+    // Trajectory coverage cells only join the combined hex counts at hex zoom;
+    // at point zoom they're shown via the dedicated /tiles/trajectories layer.
+    if (includeTrajectory && isHexGrid) branches.push(trajectoryBranch);
     if (includeObis) branches.push(obisBranch);
     // Guard: if nothing to show, return an empty CTE that still has the right columns
     const combinedInner = branches.length

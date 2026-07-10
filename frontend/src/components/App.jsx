@@ -35,7 +35,7 @@ import SourceFilter from './Controls/Filter/SourceFilter/SourceFilter.jsx'
 import ScientificNameFilter from './Controls/Filter/ScientificNameFilter/ScientificNameFilter.jsx'
 import TimeSelector from './Controls/Filter/TimeSelector/TimeSelector.jsx'
 import DepthSelector from './Controls/Filter/DepthSelector/DepthSelector.jsx'
-import TracksToggle from './Controls/TracksToggle/TracksToggle.jsx'
+import LayerSelector from './Controls/LayerSelector/LayerSelector.jsx'
 import TimeBar from './Controls/TimeBar/TimeBar.jsx'
 import ErrorBoundary from './ErrorBoundary/ErrorBoundary.jsx'
 import EnglishLogo from './Images/CIOOSNationalLogoBlackEnglish.svg'
@@ -118,6 +118,22 @@ export default function App() {
   )
   const [smoothTracks, setSmoothTracks] = useState(false)
   const [selectedTrajectory, setSelectedTrajectory] = useState()
+
+  // Data-type layers shown on the map. Absent `layers` param = all on; a
+  // present param is the comma list of enabled layers (so a non-default
+  // selection round-trips through the URL).
+  const [dataLayers, setDataLayers] = useState(() => {
+    const layersParam = searchParams.get('layers')
+    if (layersParam == null) {
+      return { profiles: true, obis: true, trajectories: true }
+    }
+    const on = new Set(layersParam.split(',').filter(Boolean))
+    return {
+      profiles: on.has('profiles'),
+      obis: on.has('obis'),
+      trajectories: on.has('trajectories')
+    }
+  })
 
   const defaultQuery = {
     startDate: defaultStartDate,
@@ -362,9 +378,16 @@ export default function App() {
       obj.scrubTime = scrubTime
       if (trailingDays !== defaultTrailingDays) obj.trail = trailingDays
     }
+    // Data-layer selection persists only when not the all-on default.
+    if (!(dataLayers.profiles && dataLayers.obis && dataLayers.trajectories)) {
+      obj.layers = Object.entries(dataLayers)
+        .filter(([, on]) => on)
+        .map(([key]) => key)
+        .join(',')
+    }
     const combined = new URLSearchParams(obj)
     navigate('?' + combined.toString())
-  }, [query, mapView, tracksMode, debouncedScrubTime, trailingDays])
+  }, [query, mapView, tracksMode, debouncedScrubTime, trailingDays, dataLayers])
 
   useEffect(() => {
     document.cookie = `introModalOpen=${showIntroModal}; Secure; max-age=${60 * 60 * 24 * 31}`
@@ -862,6 +885,7 @@ export default function App() {
         trailingDays={trailingDays}
         smoothTracks={smoothTracks}
         selectedTrajectory={selectedTrajectory}
+        dataLayers={dataLayers}
       />
       <Controls
         loading={loading}
@@ -1168,6 +1192,7 @@ export default function App() {
           platformsInView={platformsSelected.map((e) => e.title)}
           tracksMode={tracksMode}
           trailingDays={trailingDays}
+          dataLayers={dataLayers}
         />
       )}
       <button
@@ -1178,12 +1203,14 @@ export default function App() {
       >
         <div className='rectangleIcon' />
       </button>
-      <TracksToggle
+      <LayerSelector
+        dataLayers={dataLayers}
+        setDataLayers={setDataLayers}
         tracksMode={tracksMode}
         setTracksMode={setTracksMode}
         loading={loading}
       />
-      {tracksMode && (
+      {tracksMode && dataLayers.trajectories && (
         <TimeBar
           scrubTime={scrubTime}
           setScrubTime={setScrubTime}
