@@ -15,7 +15,7 @@
     "@turf/points-within-polygon": "^6.5.0",
     "bytes": "^3.1.2",
     "classnames": "^2.3.1",
-    "d3": "^7.4.4",
+    "d3-scale": "^4.0.2",
     "i18next": "^25.10.10",
     "i18next-browser-languagedetector": "^8.2.1",
     "lodash": "^4.17.21",

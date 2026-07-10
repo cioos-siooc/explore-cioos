@@ -1,5 +1,5 @@
-import * as _ from 'lodash'
-import * as d3 from 'd3'
+import isEmpty from 'lodash/isEmpty'
+import { scaleLinear, scalePow } from 'd3-scale'
 import React, { useState, useEffect } from 'react'
 import { defaultQuery } from './components/config.js'
 import { useTranslation } from 'react-i18next'
@@ -53,7 +53,7 @@ export function generateRangeSelectBadgeTitle(
     optionsSelected[1] === defaults[1]
     ? badgeTitle
     : `${optionsSelected[0]} - ${optionsSelected[1]}` +
-        (!_.isEmpty(units) ? ' ' + units : '')
+        (!isEmpty(units) ? ' ' + units : '')
 }
 
 export function abbreviateString (text, maxLength) {
@@ -204,14 +204,12 @@ export function generateColorStops(colorScale, range) {
   let scale
   if (range[1] <= colorScale.length * 2) {
     colors = colorScale.slice(0, range[1])
-    scale = d3
-      .scaleLinear()
+    scale = scaleLinear()
       .domain([0, colors.length - 1])
       .range(range)
   } else {
     colors = colorScale
-    scale = d3
-      .scalePow()
+    scale = scalePow()
       .exponent(exponent)
       .domain([0, colors.length - 1])
       .range(range)

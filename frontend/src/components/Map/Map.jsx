@@ -16,7 +16,7 @@ import turfPointsWithinPolygon from '@turf/points-within-polygon'
 import turfBbox from '@turf/bbox'
 
 import DrawRectangle from 'mapbox-gl-draw-rectangle-mode'
-import { debounce } from 'lodash'
+import debounce from 'lodash/debounce'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import './styles.css'
