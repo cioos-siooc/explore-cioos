@@ -1,67 +1,82 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  CheckSquare,
-  CircleFill,
-  Square,
-  Check2Circle,
-  XCircle,
-  Download,
-  BroadcastPin,
-  FileEarmarkSpreadsheet,
-  Grid3x3Gap,
-  PinMapFill,
-  Search,
-  Server
+  CaretDownFill,
+  CaretUpFill,
+  Search
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
-import platformColors from '../../platformColors'
-import { formatErddapServerName } from '../../../utilities'
-import { formatGridSize } from '../../../wmsUtilities'
-import erddapServersJSONfile from '../../../erddapServers.json'
-import './styles.css'
-import DataTable from 'react-data-table-component'
-import bytes from 'bytes'
+import classNames from 'classnames'
 import isEmpty from 'lodash/isEmpty'
 
-import classNames from 'classnames'
-import Spinner from '../../ui/Spinner.jsx'
-import Tooltip from '../../ui/Tooltip.jsx'
+import { formatErddapServerName } from '../../../utilities'
+import erddapServersJSONfile from '../../../erddapServers.json'
+import DatasetCard from './DatasetCard.jsx'
+import './styles.css'
 
+// How many cards to render before the incremental "grow on scroll" kicks in.
+// Keeps large result sets cheap to paint on mobile without a pager.
+const PAGE_SIZE = 60
+// Distance (px) from the bottom of the scroll area at which we reveal more.
+const SCROLL_THRESHOLD = 400
+
+// The datasets list, rendered as cards (replaces the old data table). Used in
+// two contexts: the sidebar results list and the download-review modal
+// (isDownloadModal), which surfaces size estimates and download status.
 export default function DatasetsTable({
   handleSelectAllDatasets,
   handleSelectDataset,
   datasets,
   selectAll,
   setInspectDataset,
-  setHoveredDataset = () => { },
+  setHoveredDataset = () => {},
   isDownloadModal,
-  downloadSizeEstimates,
-  loading
+  downloadSizeEstimates
 }) {
   const { t, i18n } = useTranslation()
   const [searchText, setSearchText] = useState('')
-  const isGrid = (row) => row.cdm_data_type === 'Grid'
-  const checkBoxOnclick = (point) => () => {
-    // griddap datasets are metadata-only: never selectable for download
-    if ((!isDownloadModal || point.internalDownload) && !isGrid(point)) {
-      handleSelectDataset(point)
-    }
-  }
-  const selectAllOnclick = (e) => {
-    e.stopPropagation()
-    handleSelectAllDatasets()
-  }
-  // generateColumns closes over the handlers above — keep this initializer
-  // after them, or the download-modal header JSX hits their TDZ.
-  const [tableData, setTableData] = useState({
-    columns: generateColumns(),
-    data: datasets
-  })
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const listRef = useRef(null)
 
-  // Sidebar search: filter across the visible text fields. The download
-  // modal has no search UI, so this is a no-op there.
+  // Sort fields differ by context: the download modal exposes the size and
+  // downloadable status; the sidebar exposes the locations count.
+  const sortFields = useMemo(() => {
+    const base = [
+      { id: 'title', label: t('datasetsTableHeaderTitleText'), type: 'string' },
+      { id: 'type', label: t('datasetsTableHeaderTypeText'), type: 'string' },
+      { id: 'platform', label: t('datasetsCardSortPlatformText'), type: 'string' }
+    ]
+    if (isDownloadModal) {
+      base.push({ id: 'size', label: t('datasetsTableHeaderSizeText'), type: 'number' })
+      base.push({
+        id: 'downloadable',
+        label: t('datasetsCardSortDownloadableText'),
+        type: 'number'
+      })
+    } else {
+      base.push({
+        id: 'locations',
+        label: t('datasetsTableHeaderLocationsText'),
+        type: 'number'
+      })
+    }
+    return base
+  }, [isDownloadModal, i18n.language])
+
+  const [sort, setSort] = useState({ field: 'title', dir: 'asc' })
+
+  // Tap a chip to sort by it; tap the active chip again to flip direction.
+  const handleSortClick = (fieldId) => {
+    setSort((prev) =>
+      prev.field === fieldId
+        ? { field: fieldId, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { field: fieldId, dir: 'asc' }
+    )
+  }
+
+  // Sidebar search: match across the visible text fields. The download modal
+  // has no search UI, so this is a no-op there.
   function filterBySearch(rows) {
-    if (isDownloadModal || isEmpty(searchText)) return rows
+    if (isDownloadModal || isEmpty(searchText)) return rows || []
     const query = searchText.toLowerCase()
     return (rows || []).filter((row) =>
       [
@@ -79,395 +94,139 @@ export default function DatasetsTable({
     )
   }
 
-  useEffect(() => {
-    setTableData({ columns: generateColumns(), data: filterBySearch(datasets) })
-  }, [datasets, downloadSizeEstimates, searchText])
-
-  function generateColumns() {
-    const columns = [
-      {
-        // Sidebar moves "select all" into the search toolbar and keeps just the
-        // download icon as the column header; the download modal keeps it inline.
-        name: isDownloadModal ? (
-          <div title={t('datasetsTableDownloadModalDatasetCheckboxTooltip')}>
-            {selectAll ? (
-              <CheckSquare onClick={selectAllOnclick} size={16} />
-            ) : (
-              <Square onClick={selectAllOnclick} size={16} />
-            )}
-            <Download className='downloadIcon' onClick={selectAllOnclick} size={18} title={t('datasetInspectorDownloadText')} />
-          </div>
-        ) : (
-          <Download size={18} title={t('datasetInspectorDownloadText')} />
-        ),
-        selector: (row) => row.selected,
-        cell: (row) => {
-          return (
-            <div
-              title={
-                isGrid(row)
-                  ? t('griddapNotDownloadableTooltip')
-                  : t('datasetsTableDownloadModalDatasetCheckboxTooltip')
-              }
-            >
-              {row.selected ? (
-                <CheckSquare
-                  className='datasetCheckbox checked'
-                  onClick={checkBoxOnclick(row)}
-                  size={16}
-                />
-              ) : (
-                <Square
-                  className={classNames('datasetCheckbox', {
-                    disabled:
-                      (isDownloadModal && !row.internalDownload) || isGrid(row)
-                  })}
-                  onClick={checkBoxOnclick(row)}
-                  size={16}
-                />
-              )}
-            </div>
-          )
-        },
-        ignoreRowClick: true,
-        sortable: true,
-        width: '40px',
-        // paddingLeft: cellPadding,
-        // paddingRight: cellPadding
-      },
-
-      {
-        name: (
-          <div>
-            <BroadcastPin size={20} title={t('datasetInspectorPlatformText')} />
-          </div>
-        ),
-        compact: true,
-        center: true,
-        selector: (row) => row.platform,
-        cell: (point) => {
-          if (isGrid(point)) {
-            return (
-              <Grid3x3Gap
-                title={t('griddapTypeLabel')}
-                className='optionColorCircle'
-                color='#52a79b'
-                size={15}
-              />
-            )
-          }
-          const platformColor = platformColors.find(
-            (pc) => pc.platform === point.platform
-          )
-
-          return (
-            <CircleFill
-              title={t(point.platform)}
-              className='optionColorCircle'
-              fill={platformColor?.color || '#000000'}
-              size={15}
-            />
-          )
-        },
-        sortable: true,
-        width: '40px',
-        // paddingLeft: cellPadding,
-        // paddingRight: cellPadding
-      },
-      {
-        name: (
-          <div>
-            <Server size={17} title='ERDDAP Server' />
-          </div>
-        ),
-        selector: (row) => row.erddap_server_url || row.erddap_url,
-        cell: (row) => formatErddapServerName(row.erddap_server_url || row.erddap_url, i18n.language, erddapServersJSONfile),
-        wrap: true,
-        sortable: true,
-        // Flex (minWidth + grow) rather than a fixed width in both contexts so
-        // columns share the available width instead of summing past it and
-        // forcing a horizontal scrollbar.
-        minWidth: isDownloadModal ? '100px' : '80px',
-        grow: 1
-      },
-      {
-        name: (
-          <div>
-            <FileEarmarkSpreadsheet size={17} title={t('datasetsTableHeaderTitleText')} />
-          </div>
-        ),
-        selector: (row) => row.title,
-        wrap: true,
-        sortable: true,
-        // Title takes the lion's share of the remaining space.
-        minWidth: isDownloadModal ? '160px' : '140px',
-        grow: 3
-      },
-      {
-        name: t('datasetsTableHeaderTypeText'),
-        selector: (row) => row.cdm_data_type,
-        cell: (row) =>
-          isGrid(row)
-            ? t('griddapTypeLabel')
-            : row.cdm_data_type
-              .replace('TimeSeriesProfile', 'Time series / Profile')
-              .replace('TimeSeries', 'Time series'),
-        wrap: true,
-        sortable: true,
-        width: '80px',
-        // paddingLeft: cellPadding,
-        // paddingRight: cellPadding
-      },
-      {
-        name: (
-          <div>
-            <PinMapFill size={18} title={t('datasetsTableHeaderLocationsText')} />
-          </div>
-        ),
-        selector: (row) => row.profiles_count,
-        cell: (row) => {
-          if (isGrid(row)) {
-            // grid size (lon × lat nodes) instead of a locations count
-            return (
-              <span title={t('griddapGridSizeTooltip')}>
-                {formatGridSize(row.grid_dimensions) || '—'}
-              </span>
-            )
-          }
-          if (row.profiles_count !== row.n_profiles) {
-            return `${row.profiles_count} / ${row.n_profiles}`
-          } else {
-            return row.profiles_count
-          }
-        },
-        wrap: true,
-        sortable: true,
-        width: '60px',
-        // paddingLeft: cellPadding,
-        // paddingRight: cellPadding
-      }
-    ]
-
-    if (isDownloadModal) {
-      columns.push({
-        name: t('datasetsTableDownloadModalEstimateDownloadSizeColumnName'),
-        selector: (row) => row.sizeEstimate.filteredSize,
-        cell: (row) => {
-          const estimatedFilteredDownloadSizeRowClassName = classNames(
-            'downloadSizeEstimateFiltered',
-            { downloadable: row?.sizeEstimate?.filteredSize < 1000000000 }
-          )
-          if (!isEmpty(downloadSizeEstimates)) {
-            return (
-              <div className='downloadSizeEstimate'>
-                {!isEmpty(downloadSizeEstimates) && (
-                  <>
-                    <div className={estimatedFilteredDownloadSizeRowClassName}>
-                      {bytes(row?.sizeEstimate?.filteredSize)}
-                    </div>
-                    {` / ${bytes(row?.sizeEstimate?.unfilteredSize)}`}
-                  </>
-                )}
-              </div>
-            )
-          } else {
-            return <Spinner className='datasetsTableSpinner' />
-          }
-        },
-        wrap: true,
-        sortable: true,
-        minWidth: '140px',
-        grow: 1
-      })
-      columns.push({
-        name: t('datasetTableDownloadModalCDEDownloadableColumnName'),
-        selector: (row) => row.internalDownload,
-        cell: (row) => {
-          if (!isEmpty(downloadSizeEstimates)) {
-            return row.internalDownload ? (
-              <Tooltip
-                placement='top'
-                content={t(
-                  'datasetTableDownloadModalCDEDownloadableColumnNameTooltip'
-                )}
-              >
-                <Check2Circle
-                  className='downloadableIcon success'
-                  size='25'
-                />
-              </Tooltip>
-            ) : (
-              <Tooltip
-                placement='top'
-                content={t(
-                  'datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip'
-                )}
-              >
-                <XCircle className='downloadableIcon error' size='25' />
-              </Tooltip>
-            )
-          } else {
-            return <Spinner className='datasetsTableSpinner' />
-          }
-        },
-        wrap: true,
-        sortable: true,
-        width: '90px',
-        center: true
-      })
-      columns.push({
-        name: t('datasetTableDownloadModalExternalDownloadColumnName'),
-        selector: (row) => row.erddapLink,
-        cell: (row) => {
-          if (!isEmpty(downloadSizeEstimates) && row.erddapLink) {
-            return (
-              <a href={row.erddapLink} target='_blank' rel='noreferrer'>
-                ERDDAP
-              </a>
-            )
-          } else {
-            return <Spinner className='datasetsTableSpinner' />
-          }
-        },
-        wrap: true,
-        sortable: true,
-        width: '80px',
-        center: true
-      })
+  function sortValue(row, field) {
+    const isGrid = row.cdm_data_type === 'Grid'
+    switch (field) {
+    case 'title':
+      return (row.title || '').toLowerCase()
+    case 'type':
+      return (isGrid ? t('griddapTypeLabel') : row.cdm_data_type || '').toLowerCase()
+    case 'platform':
+      return (isGrid ? t('griddapTypeLabel') : row.platform || '').toLowerCase()
+    case 'locations':
+      return isGrid ? -1 : Number(row.profiles_count) || 0
+    case 'size':
+      return Number(row?.sizeEstimate?.filteredSize) || 0
+    case 'downloadable':
+      return row.internalDownload ? 1 : 0
+    default:
+      return 0
     }
-
-    return columns
   }
 
-  // Sidebar toolbar: full-width search input with the "select all" toggle
-  // pulled in alongside it (replaces the cramped DataTableExtensions filter),
-  // plus a live count of the rows currently listed.
-  const sidebarToolbar = (
-    <div className='datasetsTableToolbar'>
-      <button
-        type='button'
-        className={classNames('selectAllToggle', { active: selectAll })}
-        onClick={selectAllOnclick}
-        aria-pressed={selectAll}
-        title={t('datasetsTableHeaderSelectAllTitle')}
-      >
-        {t('datasetsTableHeaderSelectAllTitle')}
-      </button>
-      <div className='datasetsTableSearchWrap'>
-        <Search size={13} aria-hidden='true' />
-        <input
-          className='datasetsTableSearch'
-          type='text'
-          value={searchText}
-          placeholder={t('datasetInspectorFilterText')}
-          onChange={(e) => setSearchText(e.target.value)}
-        />
+  const visibleRows = useMemo(() => {
+    const field = sortFields.find((f) => f.id === sort.field)
+    const filtered = filterBySearch(datasets)
+    const factor = sort.dir === 'asc' ? 1 : -1
+    const sorted = [...filtered].sort((a, b) => {
+      const va = sortValue(a, sort.field)
+      const vb = sortValue(b, sort.field)
+      if (field?.type === 'number') return (va - vb) * factor
+      return String(va).localeCompare(String(vb), i18n.language) * factor
+    })
+    return sorted
+  }, [datasets, searchText, sort, downloadSizeEstimates, isDownloadModal, i18n.language])
+
+  // Reset the render window whenever the result set or ordering changes so we
+  // don't leave a stale partial list scrolled off the top.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE)
+    if (listRef.current) listRef.current.scrollTop = 0
+  }, [searchText, sort, isDownloadModal])
+
+  const handleScroll = (e) => {
+    const el = e.currentTarget
+    if (
+      el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_THRESHOLD &&
+      visibleCount < visibleRows.length
+    ) {
+      setVisibleCount((c) => Math.min(c + PAGE_SIZE, visibleRows.length))
+    }
+  }
+
+  const controls = (
+    <div className='datasetsCardControls'>
+      <div className='datasetsCardToolbar'>
+        <button
+          type='button'
+          className={classNames('selectAllToggle', { active: selectAll })}
+          onClick={handleSelectAllDatasets}
+          aria-pressed={selectAll}
+          title={t('datasetsTableHeaderSelectAllTitle')}
+        >
+          {t('datasetsTableHeaderSelectAllTitle')}
+        </button>
+        {!isDownloadModal && (
+          <div className='datasetsTableSearchWrap'>
+            <Search size={13} aria-hidden='true' />
+            <input
+              className='datasetsTableSearch'
+              type='text'
+              value={searchText}
+              placeholder={t('datasetInspectorFilterText')}
+              onChange={(e) => setSearchText(e.target.value)}
+            />
+          </div>
+        )}
+        <span className='datasetsTableCount'>{visibleRows.length}</span>
       </div>
-      <span className='datasetsTableCount'>{tableData.data?.length || 0}</span>
+
+      <div className='datasetsCardSortRow'>
+        <span className='datasetsCardSortLabel'>{t('datasetsCardSortByLabel')}</span>
+        {sortFields.map((field) => {
+          const active = sort.field === field.id
+          return (
+            <button
+              key={field.id}
+              type='button'
+              className={classNames('datasetsCardSortChip', { active })}
+              onClick={() => handleSortClick(field.id)}
+              aria-pressed={active}
+              title={
+                active
+                  ? sort.dir === 'asc'
+                    ? t('datasetsCardSortAscendingTitle')
+                    : t('datasetsCardSortDescendingTitle')
+                  : undefined
+              }
+            >
+              {field.label}
+              {active &&
+                (sort.dir === 'asc' ? (
+                  <CaretUpFill size={10} aria-hidden='true' />
+                ) : (
+                  <CaretDownFill size={10} aria-hidden='true' />
+                ))}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 
-  // Design-token driven table chrome: quiet sand header with small-caps
-  // labels, hairline row dividers, and a teal inset accent on hover
-  // (box-shadow, so the row doesn't shift like a border would).
-  const tableStyles = {
-    headRow: {
-      style: {
-        minHeight: '38px',
-        backgroundColor: 'var(--cioos-sand)',
-        borderBottomColor: 'var(--cioos-hairline)'
-      }
-    },
-    headCells: {
-      style: {
-        paddingLeft: '8px',
-        paddingRight: '4px',
-        fontFamily: 'var(--cioos-font-display)',
-        fontSize: '11px',
-        fontWeight: 700,
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-        color: 'var(--cioos-ink-60)'
-      }
-    },
-    rows: {
-      style: {
-        minHeight: '52px',
-        fontSize: 'var(--cioos-font-size-base)',
-        color: 'var(--cioos-ink)',
-        '&:not(:last-of-type)': {
-          borderBottomColor: 'var(--cioos-hairline)'
-        }
-      },
-      highlightOnHoverStyle: {
-        backgroundColor: 'var(--cioos-surface-2)',
-        borderBottomColor: 'var(--cioos-hairline)',
-        outline: 'none',
-        boxShadow: 'inset 3px 0 0 var(--cioos-primary)'
-      }
-    },
-    cells: {
-      style: {
-        paddingLeft: '8px',
-        paddingRight: '4px'
-      }
-    },
-    subHeader: {
-      style: {
-        padding: '8px 10px',
-        borderBottom: '1px solid var(--cioos-hairline)'
-      }
-    },
-    pagination: {
-      style: {
-        minHeight: '44px',
-        borderTopColor: 'var(--cioos-hairline)',
-        color: 'var(--cioos-ink-60)',
-        fontSize: 'var(--cioos-font-size-sm)'
-      }
-    }
-  }
-
-  // Rows already picked for download get a light teal wash so the current
-  // selection is scannable without hunting for checkboxes.
-  const selectedRowStyles = [
-    {
-      when: (row) => row.selected,
-      style: { backgroundColor: 'rgba(198, 227, 223, 0.35)' }
-    }
-  ]
-
-  const table = (
-    <DataTable
-      columns={tableData.columns}
-      data={tableData.data}
-      defaultSortFieldId={3}
-      onRowClicked={isDownloadModal ? undefined : setInspectDataset}
-      onRowMouseEnter={setHoveredDataset}
-      onRowMouseLeave={() => setHoveredDataset()}
-      highlightOnHover={!isDownloadModal}
-      pointerOnHover={!isDownloadModal}
-      subHeader={!isDownloadModal}
-      subHeaderAlign='center'
-      subHeaderComponent={!isDownloadModal ? sidebarToolbar : undefined}
-      pagination={tableData.data?.length > 100}
-      paginationPerPage={50}
-      paginationRowsPerPageOptions={[50, 100, 150, 200]}
-      paginationComponentOptions={{
-        rowsPerPageText: t('tableComponentRowsPerPage'),
-        rangeSeparatorText: t('tableComponentOf'),
-        selectAllRowsItem: false
-      }}
-      customStyles={tableStyles}
-      conditionalRowStyles={selectedRowStyles}
-      // Fill the panel's full height: toolbar/subheader and pagination stay
-      // put; only this scroll area (targeted by className, see styles.css)
-      // grows into the remaining space and scrolls, with a sticky header.
-      className='dtScrollArea'
-      fixedHeader
-      fixedHeaderScrollHeight='100%'
-    />
+  return (
+    <div className={classNames('datasetsTable', { downloadModal: isDownloadModal })}>
+      {controls}
+      <div className='datasetsCardList' ref={listRef} onScroll={handleScroll}>
+        {visibleRows.length === 0 ? (
+          <div className='datasetsCardEmpty'>{t('datasetsCardNoResultsText')}</div>
+        ) : (
+          visibleRows.slice(0, visibleCount).map((row) => (
+            <DatasetCard
+              key={row.pk ?? row.dataset_id ?? row.title}
+              row={row}
+              isDownloadModal={isDownloadModal}
+              downloadSizeEstimates={downloadSizeEstimates}
+              onSelect={handleSelectDataset}
+              onInspect={isDownloadModal ? undefined : setInspectDataset}
+              onHover={setHoveredDataset}
+              onHoverEnd={() => setHoveredDataset()}
+              t={t}
+              i18n={i18n}
+            />
+          ))
+        )}
+      </div>
+    </div>
   )
-
-  return <div className='datasetsTable'>{table}</div>
 }

@@ -1,10 +1,7 @@
-/* DatasetsTable — react-data-table-component renders divs (rdt_* classes),
-   so table chrome lives in the customStyles prop (DatasetsTable.jsx); this
-   file styles the toolbar, checkboxes and the download-modal cells.
-   Fills its container's height (see DatasetsPanel / DownloadDetails): the
-   toolbar/subheader and pagination footer stay put, and only the row area
-   (.dtScrollArea, the DataTable's fixedHeader responsive wrapper) scrolls —
-   one scroll region instead of the sheet's own overflow taking over. */
+/* DatasetsTable — the datasets list rendered as cards (DatasetCard.jsx), used
+   in the sidebar and the download-review modal (.downloadModal). Fills its
+   container's height: the controls (search + sort chips) stay put and only the
+   card list (.datasetsCardList) scrolls. */
 .datasetsTable {
   height: 100%;
   display: flex;
@@ -13,48 +10,25 @@
   text-align: left;
 }
 
-.datasetsTable .dtScrollArea {
-  flex: 1 1 auto;
-  min-height: 0;
+/* --- Controls: toolbar (select-all + search + count) and the sort chips --- */
+.datasetsCardControls {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-bottom: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-sand);
 }
 
-/* --- Row checkboxes --- */
-.datasetsTable .datasetCheckbox {
-  color: var(--cioos-ink-60);
-  cursor: pointer;
-  transition: color var(--cioos-transition-fast);
-}
-
-.datasetsTable .datasetCheckbox:hover {
-  color: var(--cioos-primary-700);
-}
-
-.datasetsTable .datasetCheckbox.checked {
-  color: var(--cioos-primary);
-}
-
-.datasetsTable .datasetCheckbox.disabled {
-  color: var(--cioos-hairline);
-  cursor: not-allowed;
-}
-
-.datasetsTable .optionColorCircle {
-  margin-right: 5px;
-}
-
-.datasetsTable .downloadIcon {
-  margin-left: 2px;
-}
-
-/* --- Sidebar toolbar: select-all pill + search field + result count --- */
-.datasetsTable .datasetsTableToolbar {
+.datasetsCardToolbar {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
 }
 
-.datasetsTable .datasetsTableToolbar .selectAllToggle {
+.selectAllToggle {
   flex: 0 0 auto;
   white-space: nowrap;
   background: transparent;
@@ -69,18 +43,18 @@
     color var(--cioos-transition-fast);
 }
 
-.datasetsTable .datasetsTableToolbar .selectAllToggle:hover {
+.selectAllToggle:hover {
   background-color: var(--cioos-teal-light);
   color: var(--cioos-ink);
 }
 
-.datasetsTable .datasetsTableToolbar .selectAllToggle.active {
+.selectAllToggle.active {
   background-color: var(--cioos-primary);
   border-color: var(--cioos-primary);
   color: var(--cioos-white);
 }
 
-.datasetsTable .datasetsTableSearchWrap {
+.datasetsTableSearchWrap {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
@@ -93,16 +67,16 @@
   color: var(--cioos-ink-40);
 }
 
-.datasetsTable .datasetsTableSearchWrap:focus-within {
+.datasetsTableSearchWrap:focus-within {
   border-color: var(--cioos-primary);
   box-shadow: var(--cioos-focus);
 }
 
-.datasetsTable .datasetsTableSearchWrap svg {
+.datasetsTableSearchWrap svg {
   flex: 0 0 auto;
 }
 
-.datasetsTable .datasetsTableSearch {
+.datasetsTableSearch {
   flex: 1 1 auto;
   min-width: 0;
   border: none;
@@ -112,7 +86,7 @@
   color: var(--cioos-ink);
 }
 
-.datasetsTable .datasetsTableCount {
+.datasetsTableCount {
   flex: 0 0 auto;
   min-width: 28px;
   text-align: center;
@@ -124,36 +98,205 @@
   color: var(--cioos-ink-60);
 }
 
-/* --- Download modal cells --- */
-.datasetsTable .datasetsTableSpinner {
-  margin: 0px 40px;
-  opacity: 30%;
-}
-
-.datasetsTable .downloadableIcon {
-  display: block;
-  margin: auto;
-}
-
-.datasetsTable .downloadableIcon.success {
-  color: var(--cioos-success);
-}
-
-.datasetsTable .downloadableIcon.error {
-  color: var(--cioos-error);
-}
-
-/* filtered / unfiltered estimate: the filtered size reads as a status pill */
-.datasetsTable .downloadSizeEstimate {
+/* --- Sort chips: tap to sort, tap again to flip direction --- */
+.datasetsCardSortRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
-  padding: 4px 0;
-  min-width: max-content;
+  gap: 6px;
+}
+
+.datasetsCardSortLabel {
+  font-family: var(--cioos-font-display);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cioos-ink-40);
+  margin-right: 2px;
+}
+
+.datasetsCardSortChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast), border-color var(--cioos-transition-fast);
+}
+
+.datasetsCardSortChip:hover {
+  background-color: var(--cioos-surface-2);
+  border-color: var(--cioos-primary);
+}
+
+.datasetsCardSortChip.active {
+  background-color: var(--cioos-teal-light);
+  border-color: var(--cioos-primary);
+  color: var(--cioos-primary-700);
+}
+
+/* --- Card list: the one scroll region --- */
+.datasetsCardList {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.datasetsCardEmpty {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--cioos-ink-60);
+  font-style: italic;
+}
+
+/* --- Card --- */
+.datasetCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+  box-shadow: var(--cioos-shadow-card);
+  transition: box-shadow var(--cioos-transition-fast),
+    border-color var(--cioos-transition-fast),
+    background-color var(--cioos-transition-fast);
+}
+
+.datasetCard.clickable {
+  cursor: pointer;
+}
+
+.datasetCard.clickable:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-surface-2);
+}
+
+.datasetCard.clickable:focus-visible {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
+}
+
+.datasetCard.selected {
+  background-color: rgba(198, 227, 223, 0.35);
+  border-color: var(--cioos-primary);
+}
+
+/* --- Selection checkbox: pinned to the card's top-left corner so the text
+   content can use the card's full width --- */
+.datasetCardSelect {
+  position: absolute;
+  top: 10px;
+  left: 11px;
+  z-index: 1;
+  display: flex;
+  background-color: var(--cioos-white);
+}
+
+.datasetCheckbox {
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  transition: color var(--cioos-transition-fast);
+}
+
+.datasetCardSelect:hover .datasetCheckbox:not(.disabled) {
+  color: var(--cioos-primary-700);
+}
+
+.datasetCheckbox.checked {
+  color: var(--cioos-primary);
+}
+
+.datasetCheckbox.disabled {
+  color: var(--cioos-hairline);
+  cursor: not-allowed;
+}
+
+/* --- Card body --- */
+.datasetCardBody {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.datasetCardHeadline {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  /* clear the corner checkbox so the title doesn't run under it */
+  padding-left: 26px;
+}
+
+.datasetCardPlatform {
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.datasetCardTitle {
+  font-family: var(--cioos-font-display);
+  font-weight: 700;
+  font-size: var(--cioos-font-size-base);
+  line-height: 1.25;
+  color: var(--cioos-ink);
+  overflow-wrap: anywhere;
+}
+
+.datasetCardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink-60);
 }
 
-.datasetsTable .downloadSizeEstimateFiltered {
+.datasetCardMetaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.datasetCardMetaItem svg {
+  flex: 0 0 auto;
+  color: var(--cioos-ink-40);
+}
+
+/* --- Download-modal extras: size + status --- */
+.datasetCardDownloadInfo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding-top: 4px;
+  margin-top: 2px;
+  border-top: 1px solid var(--cioos-hairline);
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink-60);
+}
+
+.datasetCardSize {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.datasetCardSizePill {
   display: inline-block;
   padding: 2px 8px;
   border-radius: var(--cioos-radius-pill);
@@ -162,17 +305,31 @@
   font-weight: 600;
 }
 
-.datasetsTable .downloadSizeEstimateFiltered.downloadable {
+.datasetCardSizePill.downloadable {
   background-color: var(--cioos-success-bg);
   color: var(--cioos-primary-700);
 }
 
-@media (max-width: 600px) {
-  .datasetsTable .downloadSizeEstimate {
-    font-size: 0.85em;
-  }
+.datasetCardStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
 
-  .datasetsTable .datasetsTableToolbar {
+.downloadableIcon.success {
+  color: var(--cioos-success);
+}
+
+.downloadableIcon.error {
+  color: var(--cioos-error);
+}
+
+.datasetsTableSpinner {
+  opacity: 30%;
+}
+
+@media (max-width: 600px) {
+  .datasetsCardToolbar {
     flex-wrap: wrap;
   }
 }
