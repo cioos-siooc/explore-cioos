@@ -7,6 +7,7 @@ import Loading from '../../Controls/Loading/Loading.jsx'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
 import { useMapState } from '../../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
+import './styles.css'
 
 // The Datasets panel: results list ⇄ single-dataset inspector drill-in.
 // All state lives in the providers, so the panel can unmount freely.

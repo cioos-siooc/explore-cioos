@@ -11,18 +11,18 @@ export function useUI () {
   return useContext(UIContext)
 }
 
-export const PANELS = {
-  filters: 'filters',
-  datasets: 'datasets',
-  download: 'download'
-}
-
 export default function UIProvider ({ children }) {
   const { polygon } = useSelection()
 
-  // The one contextual surface: which bottom-sheet panel is open, if any.
-  const [activePanel, setActivePanel] = useState(null)
-  // Which filter flyout is open inside the Filters panel (one at a time).
+  // The datasets sidebar: open by default on desktop, closed on phones where
+  // it would cover the whole map.
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => window.matchMedia('(min-width: 701px)').matches
+  )
+  // The two modal surfaces: filter management and the download order.
+  const [showFiltersModal, setShowFiltersModal] = useState(false)
+  const [showDownloadModal, setShowDownloadModal] = useState(false)
+  // Which filter flyout is open inside the filters modal (one at a time).
   const [openFilter, setOpenFilter] = useState()
   const introOpenCookie = !getCookieValue('introModalOpen')
   const [showIntroModal, setShowIntroModal] = useState(
@@ -37,17 +37,16 @@ export default function UIProvider ({ children }) {
 
   // A map selection (click or draw) surfaces the matching datasets.
   useEffect(() => {
-    if (!isEmpty(polygon)) setActivePanel(PANELS.datasets)
+    if (!isEmpty(polygon)) setSidebarOpen(true)
   }, [polygon])
 
-  function togglePanel (panel) {
-    setActivePanel((current) => (current === panel ? null : panel))
-  }
-
   const value = {
-    activePanel,
-    setActivePanel,
-    togglePanel,
+    sidebarOpen,
+    setSidebarOpen,
+    showFiltersModal,
+    setShowFiltersModal,
+    showDownloadModal,
+    setShowDownloadModal,
     openFilter,
     setOpenFilter,
     showIntroModal,

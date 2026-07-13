@@ -1,32 +1,25 @@
 import * as React from 'react'
-import {
-  Search,
-  XCircle,
-  InfoSquare,
-  ChatDots
-} from 'react-bootstrap-icons'
+import { InfoSquare, ChatDots } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
+import classNames from 'classnames'
 
 import CIOOSLogoEN from '../../Images/NationalLogoEnglish.png'
 import CIOOSLogoFR from '../../Images/NationalLogoFrench.png'
 import LanguageSelector from '../../Controls/LanguageSelector/LanguageSelector.jsx'
-import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
-import { useUI, PANELS } from '../../../state/ui/UIProvider.jsx'
+import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
 
-// Top-left cluster: the brand card (logo + app title on the first row,
-// intro / feedback / language actions on the second) with the dataset title
-// search floating separately below it. Typing (or focusing) the search
-// surfaces the datasets panel so results are visible.
-export default function BrandSearch () {
+// The brand card: logo, the two-line app title lockup, and the minor actions
+// (intro / feedback / language) all on one row. Lives in the sidebar header
+// while the sidebar is open and floats top-left on its own when it is closed.
+export default function BrandSearch ({ floating = false }) {
   const { t, i18n } = useTranslation()
-  const { datasetTitleSearchText, setDatasetTitleSearchText } = useSelection()
-  const { setActivePanel, setShowIntroModal } = useUI()
+  const { setShowIntroModal } = useUI()
 
   const isFrench = i18n.language === 'fr'
 
   return (
-    <div className='brandSearch'>
+    <div className={classNames('brandSearch', { floating })}>
       <div className='brandCard'>
         <div className='brandCardTop'>
           <a
@@ -43,60 +36,47 @@ export default function BrandSearch () {
               alt={isFrench ? 'SIOOC' : 'CIOOS'}
             />
           </a>
-          <h1 className='brandTitle'>{t('brandTitle')}</h1>
+          {/* Two-line wordmark; the accented line carries the brand italic. */}
+          <h1 className='brandTitle' lang={isFrench ? 'fr' : 'en'}>
+            {isFrench ? (
+              <>
+                <em>EXPLORATEUR</em>
+                <span>DE DONNÉES</span>
+              </>
+            ) : (
+              <>
+                <span>DATA</span>
+                <em>EXPLORER</em>
+              </>
+            )}
+          </h1>
+          <div className='brandMinorItems'>
+            <button
+              type='button'
+              className='brandMinorItem'
+              onClick={() => setShowIntroModal(true)}
+              title={t('dockIntroButtonTitle')}
+              aria-label={t('dockIntroButtonTitle')}
+            >
+              <InfoSquare size={16} aria-hidden='true' />
+            </button>
+            <a
+              className='brandMinorItem'
+              href={
+                isFrench
+                  ? 'https://docs.google.com/forms/d/e/1FAIpQLScOHpRSyXeGIwkOCLR9_VLhxs6siSiEuTqEGHG1PVNN0BumsQ/viewform?usp=dialog'
+                  : 'https://docs.google.com/forms/d/e/1FAIpQLScrpW_V0whLXAIy7Vk4Wzd2UAZf-hUxPl455jhUlUoUzQGqvg/viewform?usp=dialog'
+              }
+              target='_blank'
+              rel='noreferrer'
+              title={t('feedbackButtonTitle')}
+              aria-label={t('feedbackButtonTitle')}
+            >
+              <ChatDots size={16} aria-hidden='true' />
+            </a>
+            <LanguageSelector className='brandMinorItem brandLanguage' />
+          </div>
         </div>
-        <div className='brandMinorItems'>
-          <button
-            type='button'
-            className='brandMinorItem'
-            onClick={() => setShowIntroModal(true)}
-            title={t('dockIntroButtonTitle')}
-            aria-label={t('dockIntroButtonTitle')}
-          >
-            <InfoSquare size={16} aria-hidden='true' />
-          </button>
-          <a
-            className='brandMinorItem'
-            href={
-              isFrench
-                ? 'https://docs.google.com/forms/d/e/1FAIpQLScOHpRSyXeGIwkOCLR9_VLhxs6siSiEuTqEGHG1PVNN0BumsQ/viewform?usp=dialog'
-                : 'https://docs.google.com/forms/d/e/1FAIpQLScrpW_V0whLXAIy7Vk4Wzd2UAZf-hUxPl455jhUlUoUzQGqvg/viewform?usp=dialog'
-            }
-            target='_blank'
-            rel='noreferrer'
-            title={t('feedbackButtonTitle')}
-            aria-label={t('feedbackButtonTitle')}
-          >
-            <ChatDots size={16} aria-hidden='true' />
-          </a>
-          <LanguageSelector className='brandMinorItem brandLanguage' />
-        </div>
-      </div>
-      <div className='brandSearchInputWrapper' role='search'>
-        <Search className='brandSearchIcon' size={15} aria-hidden='true' />
-        <input
-          type='text'
-          className='brandSearchInput'
-          value={datasetTitleSearchText}
-          placeholder={t('brandSearchPlaceholder')}
-          aria-label={t('brandSearchPlaceholder')}
-          onFocus={() => setActivePanel(PANELS.datasets)}
-          onChange={(event) => {
-            setDatasetTitleSearchText(event.target.value)
-            setActivePanel(PANELS.datasets)
-          }}
-        />
-        {datasetTitleSearchText && (
-          <button
-            type='button'
-            className='brandSearchClear'
-            onClick={() => setDatasetTitleSearchText('')}
-            aria-label={t('brandSearchClearLabel')}
-            title={t('brandSearchClearLabel')}
-          >
-            <XCircle size={16} aria-hidden='true' />
-          </button>
-        )}
       </div>
     </div>
   )

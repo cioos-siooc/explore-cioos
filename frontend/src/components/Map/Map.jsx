@@ -710,12 +710,16 @@ export default function CreateMap({
         document.getElementsByClassName('mapbox-gl-draw_polygon').item(0)
       )
 
-      boxQueryElement.onclick = (e) => {
-        map.current.getCanvas().style.cursor = 'crosshair'
-        deleteAllShapes()
-        creatingPolygon.current = true
-        drawPolygon.current.changeMode('draw_rectangle')
-        return false
+      // Portaled in by MapCornerControls; guard so a mount-order surprise
+      // can't break the rest of map init.
+      if (boxQueryElement) {
+        boxQueryElement.onclick = (e) => {
+          map.current.getCanvas().style.cursor = 'crosshair'
+          deleteAllShapes()
+          creatingPolygon.current = true
+          drawPolygon.current.changeMode('draw_rectangle')
+          return false
+        }
       }
       
       polyQueryElement.onclick = (e) => {

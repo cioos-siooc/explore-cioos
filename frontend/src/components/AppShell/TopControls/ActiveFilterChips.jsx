@@ -14,8 +14,8 @@ import {
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 
-// Removable chips for every filter currently constraining the map, docked
-// just above the BottomDock. Each group can be cleared whole (its label) or
+// Removable chips for every filter currently constraining the map, flowing
+// after the Filters button. Each group can be cleared whole (its label) or
 // value-by-value; a trailing link resets everything including the polygon.
 export default function ActiveFilterChips () {
   const { t } = useTranslation()

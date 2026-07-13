@@ -1,0 +1,36 @@
+/* ------------------------------------------------------------------
+ * FiltersModal / DownloadModal — dialog sizing for the two shell modals.
+ * The panel content itself is styled in ../Panels/styles.css.
+ * ------------------------------------------------------------------ */
+.filtersModal .filtersModalDialog {
+  max-width: min(880px, calc(100vw - 24px));
+}
+
+.filtersModal .modal-content {
+  height: min(72vh, 760px);
+}
+
+.downloadModal .downloadModalDialog {
+  max-width: min(1040px, calc(100vw - 24px));
+}
+
+.downloadModal .modal-content {
+  height: min(78vh, 820px);
+}
+
+/* Both modals host panels that manage their own scrolling; the body is the
+   positioned, non-padded frame they fill. */
+.filtersModal .modal-body,
+.downloadModal .modal-body {
+  position: relative;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+@media (max-height: 560px) {
+  .filtersModal .modal-content,
+  .downloadModal .modal-content {
+    height: calc(100vh - 32px);
+  }
+}

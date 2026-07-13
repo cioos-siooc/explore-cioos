@@ -1,9 +1,7 @@
-/* Anchor matches .boxQueryButton (components/styles.css), stacked above it */
+/* Flows inside .mapCornerCluster (AppShell/MapCorner) above .boxQueryButton;
+   relative so the leftward flyout menu anchors to the button. */
 .mapLayerControl {
-  position: absolute;
-  right: 10px;
-  bottom: 286px;
-  z-index: var(--cioos-z-map-controls, 2);
+  position: relative;
 }
 
 .mapLayerControl .mapLayerToggle {

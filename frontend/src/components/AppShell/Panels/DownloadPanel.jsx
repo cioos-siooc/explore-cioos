@@ -7,7 +7,7 @@ import DownloadDetails from '../../Controls/DownloadDetails/DownloadDetails.jsx'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { useDownload } from '../../../state/download/DownloadProvider.jsx'
-import { useUI, PANELS } from '../../../state/ui/UIProvider.jsx'
+import './styles.css'
 
 // The Download panel: order review (DownloadDetails) + email submit.
 export default function DownloadPanel () {
@@ -36,7 +36,6 @@ export default function DownloadPanel () {
     handleEmailChange,
     handleSubmission
   } = useDownload()
-  const { setActivePanel } = useUI()
 
   if (isEmpty(pointsToReview)) {
     return (
@@ -65,7 +64,6 @@ export default function DownloadPanel () {
         filterDownloadByPolygon={filterDownloadByPolygon}
         setFilterDownloadByPolygon={setFilterDownloadByPolygon}
         setSubmissionState={setSubmissionState}
-        setShowModal={() => setActivePanel(PANELS.datasets)}
       >
         <div className='downloadSubmit'>
           <div className='downloadSubmitRow'>

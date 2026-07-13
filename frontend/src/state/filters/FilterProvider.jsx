@@ -187,6 +187,9 @@ export default function FilterProvider ({ children }) {
   // Set when any catalog fetch fails (e.g. API gateway timeouts) so the UI
   // can surface a retry instead of silently empty filters.
   const [catalogError, setCatalogError] = useState(false)
+  // Set once all catalog fetches have settled (successfully or not) — lets
+  // consumers distinguish "still loading" from "loaded but empty".
+  const [catalogLoaded, setCatalogLoaded] = useState(false)
 
   // One-shot catalog fetches, seeded with any selections carried in the URL
   // so share links hydrate the filters. Retryable via loadCatalog().
@@ -375,6 +378,7 @@ export default function FilterProvider ({ children }) {
         (r) => !r.reason?.status || r.reason.status >= 500
       )
       if (serviceDown) setCatalogError(true)
+      setCatalogLoaded(true)
     })
   }
 
@@ -646,6 +650,7 @@ export default function FilterProvider ({ children }) {
     resetFilters,
     buildActiveFilters,
     catalogError,
+    catalogLoaded,
     loadCatalog
   }
 

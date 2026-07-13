@@ -22,7 +22,7 @@ export function useSelection () {
 // Note: datasets and points are exchangable terminology
 export default function SelectionProvider ({ children }) {
   const { i18n } = useTranslation()
-  const { query } = useFilters()
+  const { query, eovsSelected, catalogLoaded } = useFilters()
   const { activeWmsOverlay, setActiveWmsOverlay } = useMapState()
 
   const [polygon, setPolygon] = useState()
@@ -111,6 +111,19 @@ export default function SelectionProvider ({ children }) {
       selected: false
     }
   }
+
+  // The pointQuery below only runs once the catalog has produced EOV options.
+  // If the catalog fetch fails or comes back empty (API down, empty local
+  // database), that never happens — resolve the initial load anyway so the
+  // dataset list shows empty instead of an endless spinner. A later catalog
+  // retry re-populates the EOVs, which re-triggers the query effect.
+  useEffect(() => {
+    if (initialPointsQueryComplete) return
+    if (catalogLoaded && eovsSelected.length === 0) {
+      setSelectionLoading(false)
+      setInitialPointsQueryComplete(true)
+    }
+  }, [catalogLoaded, eovsSelected])
 
   useEffect(() => {
     if (!selectionLoading && query.eovsSelected.length) {

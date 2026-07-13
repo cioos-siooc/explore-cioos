@@ -1,80 +1,7 @@
 /* ------------------------------------------------------------------
- * PanelHost — the bottom sheet rising above the dock.
- * ------------------------------------------------------------------ */
-.panelHost {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  /* clears the dock bar plus the round Filters button overhanging its top */
-  bottom: 132px;
-  z-index: var(--cioos-z-sheet, 34);
-  display: flex;
-  flex-direction: column;
-  width: min(880px, calc(100vw - 24px));
-  max-height: min(62vh, 720px);
-  background-color: var(--cioos-white);
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-lg);
-  box-shadow: var(--cioos-shadow-float);
-  overflow: hidden;
-}
-
-/* Datasets and Download both host a data table; give the sheet a real
-   (not just max-) height so the table can flex to fill it exactly, with
-   only the row area scrolling internally — see .datasetsTable. */
-.panelHost[data-panel='datasets'] {
-  width: min(760px, calc(100vw - 24px));
-  height: min(62vh, 720px);
-}
-
-.panelHost[data-panel='download'] {
-  width: min(1040px, calc(100vw - 24px));
-  height: min(62vh, 720px);
-}
-
-.panelHostHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--cioos-hairline);
-}
-
-.panelHostHeader h2 {
-  margin: 0;
-  font-size: var(--cioos-font-size-md);
-  outline: none;
-}
-
-.panelHostClose {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: none;
-  border-radius: var(--cioos-radius-sm);
-  background: transparent;
-  color: var(--cioos-ink-60);
-  cursor: pointer;
-}
-
-.panelHostClose:hover {
-  background-color: var(--cioos-surface-2);
-  color: var(--cioos-ink);
-}
-
-.panelHostBody {
-  position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-/* ------------------------------------------------------------------
- * FiltersPanel — master (filter rows) / detail (open filter's options).
+ * FiltersPanel — master (filter rows) / detail (open filter's options),
+ * hosted inside the filters modal. The open filter's options anchor to
+ * the modal body (the nearest positioned ancestor).
  * ------------------------------------------------------------------ */
 .filtersPanel {
   display: flex;
@@ -147,7 +74,7 @@
 }
 
 /* The open filter's options fill the detail pane to the right of the list
-   (anchored to .panelHostBody, the nearest positioned ancestor — the list
+   (anchored to the modal body, the nearest positioned ancestor — the list
    column is static so it cannot clip the pane). */
 .filtersPanel .filterOptions {
   position: absolute;
@@ -165,7 +92,7 @@
   padding: 4px 8px 12px;
 }
 
-/* Sections stay compact inside the sheet. */
+/* Sections stay compact inside the modal. */
 .filtersPanel .filterSection + .filterSection {
   margin-top: 6px;
   border-top: 1px solid var(--cioos-hairline);
@@ -189,7 +116,7 @@
 }
 
 /* ------------------------------------------------------------------
- * DatasetsPanel / DownloadPanel
+ * DatasetsPanel (sidebar body) / DownloadPanel (download modal).
  * ------------------------------------------------------------------ */
 .datasetsPanel {
   height: 100%;
@@ -215,20 +142,13 @@
 }
 
 /* ------------------------------------------------------------------
- * Mobile: the sheet becomes full-width and the filters master/detail
- * stacks, options expanding inline under their row.
+ * Mobile: the filters master/detail stacks, options expanding inline
+ * under their row.
  * ------------------------------------------------------------------ */
 @media (max-width: 700px) {
-  .panelHost,
-  .panelHost[data-panel='datasets'],
-  .panelHost[data-panel='download'] {
-    width: calc(100vw - 12px);
-    bottom: 112px;
-    max-height: 65vh;
-  }
-
   .filtersPanel {
     display: block;
+    overflow-y: auto;
   }
 
   .filtersPanelList {
@@ -247,11 +167,5 @@
 
   .filtersPanelPlaceholder {
     display: none;
-  }
-}
-
-@media (max-height: 560px) {
-  .panelHost {
-    max-height: calc(100vh - 140px);
   }
 }

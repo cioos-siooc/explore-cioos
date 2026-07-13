@@ -32,6 +32,7 @@ import {
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
+import './styles.css'
 
 function createOptionSubset (searchTerms, allOptions) {
   if (searchTerms) {

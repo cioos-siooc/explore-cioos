@@ -1,25 +1,32 @@
-/* Top-left cluster: brand card (logo + title, minor actions below) with the
-   dataset search floating separately underneath. */
+/* Brand card: logo + two-line title lockup + minor actions on one row.
+   Static inside the sidebar header; the .floating variant is used while the
+   sidebar is closed (positioning comes from the topControls row). */
 .brandSearch {
-  position: fixed;
-  top: 12px;
-  left: 12px;
-  z-index: var(--cioos-z-shell, 30);
   display: flex;
   flex-direction: column;
+  align-items: stretch;
+}
+
+.brandSearch.floating {
   align-items: flex-start;
-  gap: 10px;
 }
 
 .brandCard {
   display: flex;
   flex-direction: column;
-  gap: 6px;
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
   box-shadow: var(--cioos-shadow-card);
   padding: 8px 12px;
+}
+
+/* Inside the sidebar the card chrome is redundant — the sidebar is the card. */
+.sidebarHeader .brandCard {
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  background: transparent;
 }
 
 .brandCardTop {
@@ -45,22 +52,33 @@
   display: block;
 }
 
+/* Two-line wordmark: DATA / *EXPLORER* (FR: *EXPLORATEUR* / DE DONNÉES);
+   the em line carries the italic accent. */
 .brandTitle {
+  display: flex;
+  flex-direction: column;
   margin: 0;
   font-family: var(--cioos-font-display);
-  font-size: var(--cioos-font-size-md);
-  font-weight: 600;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.08em;
   color: var(--cioos-ink);
   white-space: nowrap;
 }
 
-/* Minor actions (intro / feedback / language): second row of the card. */
+.brandTitle em {
+  font-style: italic;
+  color: var(--cioos-primary);
+}
+
+/* Minor actions (intro / feedback / language): inline, pushed to the row's
+   right edge. */
 .brandMinorItems {
   display: flex;
   align-items: center;
   gap: 4px;
-  border-top: 1px solid var(--cioos-hairline);
-  padding-top: 5px;
+  margin-left: auto;
 }
 
 .brandMinorItem {
@@ -90,73 +108,12 @@
   font-weight: 700;
 }
 
-/* The search: its own floating pill below the card. */
-.brandSearchInputWrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.brandSearchIcon {
-  position: absolute;
-  left: 12px;
-  color: var(--cioos-ink-40);
-  pointer-events: none;
-}
-
-.brandSearchInput {
-  width: min(300px, calc(100vw - 40px));
-  height: 42px;
-  padding: 0 36px 0 34px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
-  box-shadow: var(--cioos-shadow-card);
-  font: inherit;
-  color: var(--cioos-ink);
-}
-
-.brandSearchInput::placeholder {
-  color: var(--cioos-ink-40);
-}
-
-.brandSearchInput:focus {
-  outline: none;
-  border-color: var(--cioos-primary);
-  box-shadow: var(--cioos-focus);
-}
-
-.brandSearchClear {
-  position: absolute;
-  right: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--cioos-ink-40);
-}
-
-.brandSearchClear:hover {
-  background-color: var(--cioos-surface-2);
-  color: var(--cioos-ink);
-}
-
 @media (max-width: 600px) {
   .brandSearchLogo img {
     height: 24px;
   }
 
   .brandTitle {
-    font-size: var(--cioos-font-size-base);
-  }
-
-  .brandSearchInput {
-    height: 38px;
-    width: min(240px, calc(100vw - 40px));
+    font-size: var(--cioos-font-size-xs);
   }
 }

@@ -2,10 +2,10 @@ import * as React from 'react'
 
 import MapContainer from '../Map/MapContainer.jsx'
 import ApiErrorBanner from './ApiErrorBanner.jsx'
-import BrandSearch from './TopLeft/BrandSearch.jsx'
-import BottomDock from './Dock/BottomDock.jsx'
-import ActiveFilterChips from './Dock/ActiveFilterChips.jsx'
-import PanelHost from './Panels/PanelHost.jsx'
+import Sidebar from './Sidebar/Sidebar.jsx'
+import TopControls from './TopControls/TopControls.jsx'
+import FiltersModal from './Modals/FiltersModal.jsx'
+import DownloadModal from './Modals/DownloadModal.jsx'
 import PreviewHost from './Panels/PreviewHost.jsx'
 import MapCornerControls from './MapCorner/MapCornerControls.jsx'
 import Loading from '../Controls/Loading/Loading.jsx'
@@ -17,9 +17,10 @@ import { useMapState } from '../../state/map/MapStateProvider.jsx'
 import { useUI } from '../../state/ui/UIProvider.jsx'
 import './styles.css'
 
-// The map-first shell: full-bleed map with a top-left brand + search cluster,
-// a bottom-center dock (primary navigation) with its sheet, and the map
-// interaction controls lower-right.
+// The map-first shell: full-bleed map with the dataset sidebar on the left
+// (brand + search on top, counts + Download below), the Filters button and
+// active-filter chips beside it, and the map interaction controls
+// lower-right. Filters and Download open as modals.
 export default function AppShell () {
   const { platformsSelected } = useFilters()
   const {
@@ -31,7 +32,7 @@ export default function AppShell () {
     activeWmsOverlay,
     setActiveWmsOverlay
   } = useMapState()
-  const { activePanel, showIntroModal, setShowIntroModal } = useUI()
+  const { showIntroModal, setShowIntroModal } = useUI()
 
   return (
     <>
@@ -43,13 +44,10 @@ export default function AppShell () {
           effect, which guards against their being undefined until then. */}
       <MapContainer />
       <ApiErrorBanner />
-      <BrandSearch />
-      <PanelHost />
-      <div className='dockCluster'>
-        {/* chips hide while a sheet is open — the sheet sits where they live */}
-        {!activePanel && <ActiveFilterChips />}
-        <BottomDock />
-      </div>
+      <Sidebar />
+      <TopControls />
+      <FiltersModal />
+      <DownloadModal />
       {currentRangeLevel && legendVisible && (
         <Legend
           currentRangeLevel={currentRangeLevel}

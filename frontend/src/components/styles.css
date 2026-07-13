@@ -19,18 +19,16 @@ body {
   margin-bottom: 10px;
 }
 
+/* Portaled into the draw plugin's control group (see AppShell/MapCorner) so
+   rectangle / polygon / trash present as one card. The portal appends it
+   last in the DOM; `order` displays it first. */
 .boxQueryButton {
-  position: absolute;
-  right: 10px;
-  bottom: 240px;
   width: 42px;
   height: 42px;
-  border-radius: var(--cioos-radius) var(--cioos-radius) 0px 0px;
   border: 0px;
-  box-shadow: var(--cioos-shadow-card);
   background-color: var(--cioos-white);
   padding: 5px;
-  z-index: var(--cioos-z-map-controls, 2);
+  order: -1;
 }
 
 .boxQueryButton.active {
@@ -50,16 +48,29 @@ body {
   background-color: var(--cioos-surface-2);
 }
 
+/* Each control group is its own rounded card; overflow keeps the squared
+   child buttons from poking out of the rounded corners. */
 .maplibregl-ctrl-group,
 .mapboxgl-ctrl-group {
-  border-radius: 0px 0px var(--cioos-radius) var(--cioos-radius);
+  border-radius: var(--cioos-radius);
+  overflow: hidden;
 }
 
 /* MapLibre v5's base CSS only styles maplibregl-ctrl-group; recreate the
    control chrome for the draw plugin's mapboxgl-prefixed group so it doesn't
-   render unstyled. */
+   render unstyled. Flex so the portaled rectangle button can reorder above
+   the polygon and trash buttons. */
 .mapboxgl-ctrl-group {
+  display: flex;
+  flex-direction: column;
   background: var(--cioos-white);
+}
+
+/* Hairline separators between the visually 2nd and 3rd buttons (polygon,
+   trash) — the rectangle button displays first via `order`. */
+.mapboxgl-ctrl-group .mapbox-gl-draw_polygon,
+.mapboxgl-ctrl-group .mapbox-gl-draw_trash {
+  border-top: 1px solid var(--cioos-hairline);
 }
 
 .mapboxgl-ctrl-group:not(:empty) {

@@ -40,10 +40,6 @@ export default function DatasetsTable({
 }) {
   const { t, i18n } = useTranslation()
   const [searchText, setSearchText] = useState('')
-  const [tableData, setTableData] = useState({
-    columns: generateColumns(),
-    data: datasets
-  })
   const isGrid = (row) => row.cdm_data_type === 'Grid'
   const checkBoxOnclick = (point) => () => {
     // griddap datasets are metadata-only: never selectable for download
@@ -55,6 +51,12 @@ export default function DatasetsTable({
     e.stopPropagation()
     handleSelectAllDatasets()
   }
+  // generateColumns closes over the handlers above — keep this initializer
+  // after them, or the download-modal header JSX hits their TDZ.
+  const [tableData, setTableData] = useState({
+    columns: generateColumns(),
+    data: datasets
+  })
 
   // Sidebar search: filter across the visible text fields. The download
   // modal has no search UI, so this is a no-op there.

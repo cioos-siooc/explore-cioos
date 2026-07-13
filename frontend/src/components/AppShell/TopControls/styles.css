@@ -1,70 +1,59 @@
 /* ------------------------------------------------------------------
- * BottomDock — primary navigation at the bottom center:
- * Datasets · Filters (prominent, brand-colored) · Download.
- * Each item stacks its icon above the label + live count.
+ * TopControls — the control row at the top-left of the map, sitting
+ * beside the sidebar when it is open: Filters button + active-filter
+ * chips, preceded by brand/search + a Datasets button while closed.
  * ------------------------------------------------------------------ */
-.bottomDock {
-  pointer-events: all;
+.topControls {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: var(--cioos-z-dock, 35);
   display: flex;
-  align-items: center;
-  gap: 6px;
-  background-color: var(--cioos-white);
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-lg);
-  box-shadow: var(--cioos-shadow-float);
-  padding: 8px 10px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+  pointer-events: none;
 }
 
-.dockItem {
-  display: flex;
-  flex-direction: column;
+.topControls.withSidebar {
+  left: calc(min(var(--cioos-sidebar-width, 420px), 100vw - 24px) + 24px);
+  max-width: calc(100vw - var(--cioos-sidebar-width, 420px) - 48px);
+}
+
+.topControls > * {
+  pointer-events: all;
+}
+
+.topControlButton {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  width: 136px;
-  height: 62px;
-  padding: 6px 10px;
-  border: 1px solid transparent;
-  border-radius: var(--cioos-radius);
-  background: transparent;
+  gap: 8px;
+  height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  box-shadow: var(--cioos-shadow-card);
   font: inherit;
   font-weight: 600;
   color: var(--cioos-ink);
   cursor: pointer;
+  white-space: nowrap;
   transition: background-color var(--cioos-transition-fast),
     border-color var(--cioos-transition-fast);
 }
 
-.dockItem .dockItemIcon {
-  display: inline-flex;
+.topControlButton svg {
   color: var(--cioos-primary);
 }
 
-.dockItemCaption {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--cioos-font-size-sm);
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.dockItem:hover:not(:disabled) {
+.topControlButton:hover {
   background-color: var(--cioos-surface-2);
-  border-color: var(--cioos-hairline);
-}
-
-.dockItem.active {
-  background-color: var(--cioos-teal-light);
   border-color: var(--cioos-primary);
 }
 
-.dockItem:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.dockItemCount {
+.topControlCount {
   display: inline-flex;
   align-items: center;
   padding: 1px 8px;
@@ -77,89 +66,39 @@
   white-space: nowrap;
 }
 
-/* --- The prominent Filters action: a round, 3D-shaded center button that
-   extends above and below the bar --- */
-.dockItem.prominent {
-  position: relative;
-  width: 96px;
-  height: 96px;
-  margin: -25px 10px;
-  padding: 0;
-  border-radius: 50%;
-  background: linear-gradient(
-    180deg,
-    #6dbdb1 0%,
-    var(--cioos-primary) 45%,
-    var(--cioos-primary-700) 100%
-  );
-  border: 1px solid var(--cioos-primary-700);
-  box-shadow:
-    0 8px 18px rgba(21, 47, 55, 0.35),
-    inset 0 2px 3px rgba(255, 255, 255, 0.5),
-    inset 0 -4px 6px rgba(15, 45, 40, 0.35);
-  color: var(--cioos-white);
-}
-
-.dockItem.prominent .dockItemIcon {
-  color: var(--cioos-white);
-  filter: drop-shadow(0 1px 1px rgba(21, 47, 55, 0.35));
-}
-
-.dockItem.prominent .dockItemCaption {
-  font-size: var(--cioos-font-size-xs);
-  text-shadow: 0 1px 1px rgba(21, 47, 55, 0.35);
-}
-
-.dockItem.prominent:hover:not(:disabled) {
-  background: linear-gradient(
-    180deg,
-    #5fb3a6 0%,
-    var(--cioos-primary-700) 55%,
-    #2f6a60 100%
-  );
+/* The Filters button carries the brand color — it is the primary action. */
+.topControlButton.filtersButton {
+  background-color: var(--cioos-primary);
   border-color: var(--cioos-primary-700);
+  color: var(--cioos-white);
 }
 
-.dockItem.prominent.active {
-  background: linear-gradient(180deg, var(--cioos-primary-700) 0%, #2f6a60 100%);
-  border-color: var(--cioos-navy);
-  box-shadow:
-    0 4px 10px rgba(21, 47, 55, 0.35),
-    inset 0 3px 6px rgba(15, 45, 40, 0.45);
+.topControlButton.filtersButton svg {
+  color: var(--cioos-white);
 }
 
-/* Active-filter count floats at the circle's top-right edge. */
-.dockItem.prominent .dockItemCount {
-  position: absolute;
-  top: 4px;
-  right: 4px;
+.topControlButton.filtersButton:hover {
+  background-color: var(--cioos-primary-700);
+}
+
+.topControlButton.filtersButton .topControlCount {
   background-color: var(--cioos-white);
   color: var(--cioos-primary-700);
-  box-shadow: var(--cioos-shadow-sm);
 }
 
-/* Mobile: tighter items, labels hidden — counts stay under the icons. */
 @media (max-width: 700px) {
-  .dockItemLabel {
+  /* The open sidebar covers the viewport on phones — hide the row. */
+  .topControls.withSidebar {
     display: none;
   }
 
-  .dockItem {
-    width: 84px;
-    height: 54px;
-    padding: 6px 8px;
-  }
-
-  .dockItem.prominent {
-    width: 74px;
-    height: 74px;
-    margin: -18px 6px;
-    padding: 0;
+  .topControlLabel {
+    display: none;
   }
 }
 
 /* ------------------------------------------------------------------
- * Active-filter chips (above the dock).
+ * Active-filter chips, flowing after the Filters button.
  * One group per active filter category; the label clears the whole filter,
  * each value chip clears just that value.
  * ------------------------------------------------------------------ */
@@ -167,10 +106,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
   gap: 6px;
   margin: 0;
-  padding: 0;
+  padding: 6px 0;
   list-style: none;
   pointer-events: none;
 }
@@ -253,7 +191,7 @@
   display: inline-flex;
 }
 
-/* Reset-all: a subtle text link. */
+/* Reset-all: a subtle text link (shared with the filters modal). */
 .filterMenuReset {
   pointer-events: all;
   display: inline-flex;

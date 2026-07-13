@@ -1,0 +1,144 @@
+/* ------------------------------------------------------------------
+ * Sidebar — the left dataset column: brand + search header, dataset
+ * list body, counts + Download footer.
+ * ------------------------------------------------------------------ */
+:root {
+  --cioos-sidebar-width: 420px;
+}
+
+.sidebar {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  bottom: 12px;
+  z-index: var(--cioos-z-shell, 30);
+  display: flex;
+  flex-direction: column;
+  width: min(var(--cioos-sidebar-width), calc(100vw - 24px));
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-lg);
+  box-shadow: var(--cioos-shadow-float);
+  overflow: hidden;
+}
+
+.sidebarHeader {
+  position: relative;
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--cioos-hairline);
+}
+
+/* Keep the brand row clear of the collapse button in the corner. */
+.sidebarHeader .brandCardTop {
+  padding-right: 36px;
+}
+
+.sidebarCollapse {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+}
+
+.sidebarCollapse:hover {
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink);
+}
+
+.sidebarBody {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ------------------------------------------------------------------
+ * Footer: dataset counts on the left, the Download action on the right.
+ * ------------------------------------------------------------------ */
+.sidebarFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-top: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-sand, var(--cioos-surface-2));
+}
+
+.sidebarCounts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink);
+}
+
+.sidebarCountsDatasets {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sidebarCountsSelected {
+  color: var(--cioos-ink-60);
+  white-space: nowrap;
+}
+
+.sidebarDownloadButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border: 1px solid var(--cioos-primary-700);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-primary);
+  font: inherit;
+  font-weight: 700;
+  color: var(--cioos-white);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.sidebarDownloadButton:hover:not(:disabled) {
+  background-color: var(--cioos-primary-700);
+}
+
+.sidebarDownloadButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.sidebarDownloadCount {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-700);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+/* Mobile: the sidebar takes over the viewport. */
+@media (max-width: 700px) {
+  .sidebar {
+    top: 8px;
+    left: 8px;
+    bottom: 8px;
+    width: calc(100vw - 16px);
+  }
+}
