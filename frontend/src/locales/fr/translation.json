@@ -354,6 +354,8 @@
   "sidebarCountsSelected": "{{count}} sélectionnés pour téléchargement",
   "activeFiltersLabel": "Filtres actifs",
   "chipMapSelectionLabel": "Sélection sur la carte",
+  "activeFiltersShow": "Afficher les filtres",
+  "activeFiltersHide": "Masquer les filtres",
   "apiErrorBannerText": "Le service de données ne répond pas — les filtres et les jeux de données n'ont pas pu être chargés.",
   "apiErrorRetryButton": "Réessayer"
 }

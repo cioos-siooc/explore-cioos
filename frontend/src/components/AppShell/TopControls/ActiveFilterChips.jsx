@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useEffect, useState } from 'react'
 import { X } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 
@@ -29,6 +30,19 @@ export default function ActiveFilterChips () {
   } = useFilters()
   const { polygon, setPolygon } = useSelection()
 
+  // The chips can be collapsed behind a Show/Hide toggle. They start hidden on
+  // phones — where they would eat most of the map — and shown on desktop. The
+  // live listener flips the default when the viewport crosses the breakpoint.
+  const [collapsed, setCollapsed] = useState(
+    () => window.matchMedia('(max-width: 700px)').matches
+  )
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 700px)')
+    const onChange = (e) => setCollapsed(e.matches)
+    mql.addEventListener('change', onChange)
+    return () => mql.removeEventListener('change', onChange)
+  }, [])
+
   const timeframesBadgeTitle = generateRangeSelectBadgeTitle(
     t('timeframeFilterName'),
     [startDate, endDate],
@@ -50,7 +64,7 @@ export default function ActiveFilterChips () {
 
   return (
     <ul className='activeFilterBullets' aria-label={t('activeFiltersLabel')}>
-      {activeFilters.map((f) => (
+      {!collapsed && activeFilters.map((f) => (
         <li key={f.key} className='activeFilterGroup'>
           <button
             type='button'
@@ -77,7 +91,7 @@ export default function ActiveFilterChips () {
           ))}
         </li>
       ))}
-      {polygon && (
+      {!collapsed && polygon && (
         <li className='activeFilterGroup'>
           <span className='activeFilterItem'>
             <span className='activeFilterItemLabel'>
@@ -94,21 +108,27 @@ export default function ActiveFilterChips () {
           </span>
         </li>
       )}
-      {(activeFilters.length > 0 || polygon) && (
-        <li className='activeFilterResetItem'>
-          <button
-            type='button'
-            className='filterMenuReset'
-            onClick={() => {
-              resetFilters()
-              setPolygon()
-            }}
-            title={t('resetFiltersButtonTooltipText')}
-          >
-            {t('resetButtonText')}
-          </button>
-        </li>
-      )}
+      <li className='activeFilterResetItem'>
+        <button
+          type='button'
+          className='filterMenuReset'
+          onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
+        >
+          {collapsed ? t('activeFiltersShow') : t('activeFiltersHide')}
+        </button>
+        <button
+          type='button'
+          className='filterMenuReset'
+          onClick={() => {
+            resetFilters()
+            setPolygon()
+          }}
+          title={t('resetFiltersButtonTooltipText')}
+        >
+          {t('resetButtonText')}
+        </button>
+      </li>
     </ul>
   )
 }

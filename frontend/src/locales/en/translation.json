@@ -353,6 +353,8 @@
   "sidebarCountsSelected": "{{count}} selected for download",
   "activeFiltersLabel": "Active filters",
   "chipMapSelectionLabel": "Map selection",
+  "activeFiltersShow": "Show filters",
+  "activeFiltersHide": "Hide filters",
   "apiErrorBannerText": "The data service is not responding — filters and datasets could not be loaded.",
   "apiErrorRetryButton": "Retry"
 }
