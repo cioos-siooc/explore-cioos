@@ -1,6 +1,8 @@
 import * as React from 'react'
-import { ChevronLeft, Download } from 'react-bootstrap-icons'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronDown, Download, ListUl } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
+import classNames from 'classnames'
 import isEmpty from 'lodash/isEmpty'
 
 import BrandSearch from '../TopLeft/BrandSearch.jsx'
@@ -10,72 +12,174 @@ import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
 
-// The left sidebar: brand + search header, the dataset list (or the
-// single-dataset inspector drill-in), and a footer summarizing the counts —
-// datasets shown / total, datasets selected — with the Download action.
+// Height of the collapsed peek on mobile — the sliver of the datasets sheet
+// left visible above the bottom edge. Kept in sync with --sheet-peek in the
+// stylesheet so the drag math and the resting position agree.
+const SHEET_PEEK = 56
+// A pointer has to travel this far before we treat the gesture as a drag
+// rather than a tap on the toggle.
+const DRAG_THRESHOLD = 6
+
+// The left column: a brand card on top and, vertically separated below it, the
+// datasets card — a toggle header that shows/hides the dataset list and the
+// counts + Download footer. On phones the datasets card becomes a bottom sheet
+// that can be dragged up from the base of the screen.
 export default function Sidebar () {
   const { t } = useTranslation()
   const { totalNumberOfDatasets } = useFilters()
   const { pointsData, pointsToReview } = useSelection()
   const { sidebarOpen, setSidebarOpen, setShowDownloadModal } = useUI()
 
-  if (!sidebarOpen) return null
-
+  const expanded = sidebarOpen
   const filteredCount = pointsData?.length ?? 0
   const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length
 
+  // Track the mobile breakpoint so the toggle doubles as a drag handle only
+  // where the datasets card is a bottom sheet.
+  const [isMobile, setIsMobile] = useState(
+    () => window.matchMedia('(max-width: 700px)').matches
+  )
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 700px)')
+    const onChange = (e) => setIsMobile(e.matches)
+    mql.addEventListener('change', onChange)
+    return () => mql.removeEventListener('change', onChange)
+  }, [])
+
+  // Bottom-sheet drag (mobile only). While dragging we follow the finger with
+  // an inline translateY; on release we snap to expanded/collapsed and hand the
+  // resting position back to CSS.
+  const sheetRef = useRef(null)
+  const dragRef = useRef({ startY: 0, base: 0, range: 0, moved: false })
+  const suppressClickRef = useRef(false)
+  const [dragOffset, setDragOffset] = useState(null)
+
+  const onPointerDown = (e) => {
+    if (!isMobile || e.button === 2) return
+    const height = sheetRef.current?.getBoundingClientRect().height ?? 0
+    const range = Math.max(height - SHEET_PEEK, 0)
+    dragRef.current = {
+      startY: e.clientY,
+      base: expanded ? 0 : range,
+      range,
+      moved: false
+    }
+    suppressClickRef.current = false
+    setDragOffset(expanded ? 0 : range)
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  const onPointerMove = (e) => {
+    if (dragOffset === null) return
+    const { startY, base, range } = dragRef.current
+    const delta = e.clientY - startY
+    if (Math.abs(delta) > DRAG_THRESHOLD) dragRef.current.moved = true
+    setDragOffset(Math.min(Math.max(base + delta, 0), range))
+  }
+
+  const onPointerUp = (e) => {
+    if (dragOffset === null) return
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    if (dragRef.current.moved) {
+      // Snap to whichever end is nearer, then suppress the click that a
+      // pointerup would otherwise fire so we don't toggle twice.
+      setSidebarOpen(dragOffset < dragRef.current.range / 2)
+      suppressClickRef.current = true
+    }
+    setDragOffset(null)
+  }
+
+  const onToggleClick = () => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false
+      return
+    }
+    setSidebarOpen(!expanded)
+  }
+
   return (
     <aside className='sidebar' aria-label={t('datasetsFilterName')}>
-      <header className='sidebarHeader'>
+      <div className='sidebarBrand'>
         <BrandSearch />
+      </div>
+      <section
+        ref={sheetRef}
+        className={classNames('sidebarDatasets', { expanded })}
+        style={
+          dragOffset !== null
+            ? { transform: `translateY(${dragOffset}px)`, transition: 'none' }
+            : undefined
+        }
+      >
         <button
           type='button'
-          className='sidebarCollapse'
-          onClick={() => setSidebarOpen(false)}
-          title={t('sidebarCollapseTitle')}
-          aria-label={t('sidebarCollapseTitle')}
+          className='datasetsToggle'
+          onClick={onToggleClick}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          aria-expanded={expanded}
+          title={expanded ? t('sidebarCollapseTitle') : t('sidebarShowTitle')}
         >
-          <ChevronLeft size={16} aria-hidden='true' />
-        </button>
-      </header>
-      <div className='sidebarBody'>
-        <DatasetsPanel />
-      </div>
-      <footer className='sidebarFooter'>
-        <div className='sidebarCounts'>
+          <ListUl size={18} aria-hidden='true' />
+          <span className='datasetsToggleLabel'>{t('datasetsFilterName')}</span>
           <span
-            className='sidebarCountsDatasets'
+            className='datasetsToggleCount'
             title={t('dockDatasetsCountTitle', {
               filtered: filteredCount,
               total: totalNumberOfDatasets || 0
             })}
           >
-            {t('sidebarCountsDatasets', {
-              filtered: filteredCount,
-              total: totalNumberOfDatasets || 0
-            })}
+            {totalNumberOfDatasets
+              ? `${filteredCount} / ${totalNumberOfDatasets}`
+              : filteredCount}
           </span>
-          <span
-            className='sidebarCountsSelected'
+          <ChevronDown
+            className='datasetsToggleChevron'
+            size={16}
+            aria-hidden='true'
+          />
+        </button>
+        <div className='sidebarBody'>
+          <DatasetsPanel />
+        </div>
+        <footer className='sidebarFooter'>
+          <div className='sidebarCounts'>
+            <span
+              className='sidebarCountsDatasets'
+              title={t('dockDatasetsCountTitle', {
+                filtered: filteredCount,
+                total: totalNumberOfDatasets || 0
+              })}
+            >
+              {t('sidebarCountsDatasets', {
+                filtered: filteredCount,
+                total: totalNumberOfDatasets || 0
+              })}
+            </span>
+            <span
+              className='sidebarCountsSelected'
+              title={t('dockDownloadCountTitle', { count: selectedCount })}
+            >
+              {t('sidebarCountsSelected', { count: selectedCount })}
+            </span>
+          </div>
+          <button
+            type='button'
+            className='sidebarDownloadButton'
+            disabled={selectedCount === 0}
+            onClick={() => setShowDownloadModal(true)}
             title={t('dockDownloadCountTitle', { count: selectedCount })}
           >
-            {t('sidebarCountsSelected', { count: selectedCount })}
-          </span>
-        </div>
-        <button
-          type='button'
-          className='sidebarDownloadButton'
-          disabled={selectedCount === 0}
-          onClick={() => setShowDownloadModal(true)}
-          title={t('dockDownloadCountTitle', { count: selectedCount })}
-        >
-          <Download size={16} aria-hidden='true' />
-          {t('downloadModalButtonText')}
-          {selectedCount > 0 && (
-            <span className='sidebarDownloadCount'>{selectedCount}</span>
-          )}
-        </button>
-      </footer>
+            <Download size={16} aria-hidden='true' />
+            {t('downloadModalButtonText')}
+            {selectedCount > 0 && (
+              <span className='sidebarDownloadCount'>{selectedCount}</span>
+            )}
+          </button>
+        </footer>
+      </section>
     </aside>
   )
 }

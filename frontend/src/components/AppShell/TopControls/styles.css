@@ -1,24 +1,18 @@
 /* ------------------------------------------------------------------
- * TopControls — the control row at the top-left of the map, sitting
- * beside the sidebar when it is open: Filters button + active-filter
- * chips, preceded by brand/search + a Datasets button while closed.
+ * TopControls — the control row at the top of the map, sitting beside
+ * the (always-present) sidebar: Filters button + active-filter chips.
  * ------------------------------------------------------------------ */
 .topControls {
   position: fixed;
   top: 12px;
-  left: 12px;
+  left: calc(min(var(--cioos-sidebar-width, 420px), 100vw - 24px) + 24px);
   z-index: var(--cioos-z-dock, 35);
   display: flex;
   align-items: flex-start;
   flex-wrap: wrap;
   gap: 10px;
-  max-width: calc(100vw - 24px);
-  pointer-events: none;
-}
-
-.topControls.withSidebar {
-  left: calc(min(var(--cioos-sidebar-width, 420px), 100vw - 24px) + 24px);
   max-width: calc(100vw - var(--cioos-sidebar-width, 420px) - 48px);
+  pointer-events: none;
 }
 
 .topControls > * {
@@ -67,9 +61,15 @@
 }
 
 @media (max-width: 700px) {
-  /* The open sidebar covers the viewport on phones — hide the row. */
-  .topControls.withSidebar {
-    display: none;
+  /* The brand card floats top-left on phones, so the Filters button and its
+     chips move to the top-right corner, stacking downward. */
+  .topControls {
+    top: 8px;
+    right: 8px;
+    left: auto;
+    max-width: calc(100vw - 16px);
+    flex-direction: column;
+    align-items: flex-end;
   }
 
   .topControlLabel {

@@ -1,20 +1,9 @@
 /* Brand card: logo + two-line title lockup + minor actions on one row.
-   Static inside the sidebar header; the .floating variant is used while the
-   sidebar is closed (positioning comes from the topControls row). */
+   Sits at the top of the sidebar column, above the datasets card. */
 .brandSearch {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-}
-
-.brandSearch.floating {
-  align-items: flex-start;
-}
-
-/* Fixed card width so the buttons that follow in the top row don't shift
-   when the (wider) French wordmark is active. */
-.brandSearch.floating .brandCard {
-  width: min(380px, calc(100vw - 24px));
 }
 
 .brandCard {
@@ -22,17 +11,10 @@
   flex-direction: column;
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius);
-  box-shadow: var(--cioos-shadow-card);
-  padding: 8px 12px;
-}
-
-/* Inside the sidebar the card chrome is redundant — the sidebar is the card. */
-.sidebarHeader .brandCard {
-  border: none;
-  box-shadow: none;
-  padding: 0;
-  background: transparent;
+  /* Match the datasets card below it so the two read as a matched pair. */
+  border-radius: var(--cioos-radius-lg);
+  box-shadow: var(--cioos-shadow-float);
+  padding: 10px 14px;
 }
 
 .brandCardTop {

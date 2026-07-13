@@ -342,6 +342,7 @@
   "dockDownloadEmptyMessage": "Sélectionnez des jeux de données dans la liste ou sur la carte pour préparer un téléchargement.",
   "filtersPanelHint": "Choisissez un filtre à gauche pour afficher ses options ici. Les filtres s'appliquent à la carte dès qu'ils changent.",
   "sidebarCollapseTitle": "Masquer la liste des jeux de données",
+  "sidebarShowTitle": "Afficher la liste des jeux de données",
   "sidebarCountsDatasets": "{{filtered}} / {{total}} jeux de données",
   "sidebarCountsSelected": "{{count}} sélectionnés pour téléchargement",
   "activeFiltersLabel": "Filtres actifs",

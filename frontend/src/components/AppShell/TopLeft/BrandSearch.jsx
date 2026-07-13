@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { InfoSquare, ChatDots } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
-import classNames from 'classnames'
 
 import CIOOSLogoEN from '../../Images/NationalLogoEnglish.png'
 import CIOOSLogoFR from '../../Images/NationalLogoFrench.png'
@@ -10,16 +9,16 @@ import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
 
 // The brand card: logo, the two-line app title lockup, and the minor actions
-// (intro / feedback / language) all on one row. Lives in the sidebar header
-// while the sidebar is open and floats top-left on its own when it is closed.
-export default function BrandSearch ({ floating = false }) {
+// (intro / feedback / language) all on one row. Sits at the top of the
+// sidebar column, above the datasets card.
+export default function BrandSearch () {
   const { t, i18n } = useTranslation()
   const { setShowIntroModal } = useUI()
 
   const isFrench = i18n.language === 'fr'
 
   return (
-    <div className={classNames('brandSearch', { floating })}>
+    <div className='brandSearch'>
       <div className='brandCard'>
         <div className='brandCardTop'>
           <a

@@ -1,19 +1,15 @@
 import * as React from 'react'
-import { Filter, ListUl } from 'react-bootstrap-icons'
+import { Filter } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
-import classNames from 'classnames'
 
-import BrandSearch from '../TopLeft/BrandSearch.jsx'
 import ActiveFilterChips from './ActiveFilterChips.jsx'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
-import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
 
-// The top-left control row beside the sidebar: the prominent Filters button
-// (opens the filter modal) followed by the active-filter chips. While the
-// sidebar is closed, the brand + search cluster and a Datasets button to
-// reopen it lead the row.
+// The control row at the top of the map, beside the sidebar: the Filters
+// button (opens the filter modal) followed by the active-filter chips. The
+// brand + search and the datasets toggle now live permanently in the sidebar.
 export default function TopControls () {
   const { t } = useTranslation()
   const {
@@ -25,11 +21,9 @@ export default function TopControls () {
     obisNodesSelected,
     scientificNamesSelected,
     timeFilterActive,
-    depthFilterActive,
-    totalNumberOfDatasets
+    depthFilterActive
   } = useFilters()
-  const { pointsData } = useSelection()
-  const { sidebarOpen, setSidebarOpen, setShowFiltersModal } = useUI()
+  const { setShowFiltersModal } = useUI()
 
   const activeFilterCount = [
     eovsSelected.some((o) => o.isSelected),
@@ -43,32 +37,8 @@ export default function TopControls () {
     depthFilterActive
   ].filter(Boolean).length
 
-  const filteredCount = pointsData?.length ?? 0
-
   return (
-    <div className={classNames('topControls', { withSidebar: sidebarOpen })}>
-      {!sidebarOpen && (
-        <>
-          <BrandSearch floating />
-          <button
-            type='button'
-            className='topControlButton'
-            onClick={() => setSidebarOpen(true)}
-            title={t('dockDatasetsCountTitle', {
-              filtered: filteredCount,
-              total: totalNumberOfDatasets || 0
-            })}
-          >
-            <ListUl size={18} aria-hidden='true' />
-            <span className='topControlLabel'>{t('datasetsFilterName')}</span>
-            <span className='topControlCount'>
-              {totalNumberOfDatasets
-                ? `${filteredCount} / ${totalNumberOfDatasets}`
-                : filteredCount}
-            </span>
-          </button>
-        </>
-      )}
+    <div className='topControls'>
       <button
         type='button'
         className='topControlButton'

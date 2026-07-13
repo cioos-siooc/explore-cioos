@@ -341,6 +341,7 @@
   "dockDownloadEmptyMessage": "Select datasets from the dataset list or on the map to build a download.",
   "filtersPanelHint": "Pick a filter on the left to see its options here. Filters apply to the map as you change them.",
   "sidebarCollapseTitle": "Hide the dataset list",
+  "sidebarShowTitle": "Show the dataset list",
   "sidebarCountsDatasets": "{{filtered}} / {{total}} datasets",
   "sidebarCountsSelected": "{{count}} selected for download",
   "activeFiltersLabel": "Active filters",
