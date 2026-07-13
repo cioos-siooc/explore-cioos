@@ -1,0 +1,31 @@
+.tableFilterWrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  padding: 0 12px;
+  margin: 6px 0;
+  background-color: var(--cioos-white);
+  color: var(--cioos-ink-40);
+}
+
+.tableFilterWrap:focus-within {
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
+}
+
+.tableFilterWrap svg {
+  flex: 0 0 auto;
+}
+
+.tableFilterInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  padding: 6px 0;
+  color: var(--cioos-ink);
+}

@@ -106,6 +106,9 @@ export default function HarvestDataset() {
           {latest.error_message && (
             <div className="harvest-error-box">{latest.error_message}</div>
           )}
+          {latest.warnings && (
+            <div className="harvest-warning-box">⚠ {latest.warnings}</div>
+          )}
           {latest.query_urls && (
             <details open={latest.status === 'error'}>
               <summary style={{ cursor: 'pointer', fontSize: '0.82rem', color: '#5a7a7f' }}>

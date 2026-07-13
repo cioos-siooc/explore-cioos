@@ -61,8 +61,46 @@ CREATE TABLE datasets (
     content_hash_reason TEXT,
     last_updated_at timestamptz,
     verified_at timestamptz,
+    -- Griddap (metadata-only) coverage; see migrations/add-griddap-dataset-columns.sql
+    -- for semantics. Kept at table end so temp_datasets (LIKE ...) stays aligned
+    -- with migrated live databases.
+    coverage_lat_min double precision,
+    coverage_lat_max double precision,
+    coverage_lon_min double precision,
+    coverage_lon_max double precision,
+    coverage_time_min timestamptz,
+    coverage_time_max timestamptz,
+    coverage_depth_min double precision,
+    coverage_depth_max double precision,
+    grid_variables jsonb,
+    grid_dimensions jsonb,
+    wms_url text,
+    -- lat clamped to +-85.06 (3857 pole blowup); lon_min > lon_max means
+    -- antimeridian-crossing -> split into a two-envelope MultiPolygon.
+    coverage_bbox geometry(Geometry,3857) GENERATED ALWAYS AS (
+      CASE
+        WHEN coverage_lon_min IS NULL OR coverage_lon_max IS NULL
+          OR coverage_lat_min IS NULL OR coverage_lat_max IS NULL THEN NULL
+        WHEN coverage_lon_min <= coverage_lon_max THEN
+          ST_Transform(ST_SetSRID(ST_MakeEnvelope(
+            coverage_lon_min, LEAST(GREATEST(coverage_lat_min, -85.06), 85.06),
+            coverage_lon_max, LEAST(GREATEST(coverage_lat_max, -85.06), 85.06)),
+            4326), 3857)
+        ELSE
+          ST_Transform(ST_SetSRID(ST_Collect(
+            ST_MakeEnvelope(
+              coverage_lon_min, LEAST(GREATEST(coverage_lat_min, -85.06), 85.06),
+              180,              LEAST(GREATEST(coverage_lat_max, -85.06), 85.06)),
+            ST_MakeEnvelope(
+              -180,             LEAST(GREATEST(coverage_lat_min, -85.06), 85.06),
+              coverage_lon_max, LEAST(GREATEST(coverage_lat_max, -85.06), 85.06))),
+            4326), 3857)
+      END) STORED,
     UNIQUE(dataset_id, erddap_url)
 );
+
+CREATE INDEX IF NOT EXISTS datasets_coverage_bbox_gist
+  ON cde.datasets USING GIST (coverage_bbox) WHERE coverage_bbox IS NOT NULL;
 
 -- List of organizations to show in CDE, from CKAN, can be many per dataset
 DROP TABLE IF EXISTS organizations;
@@ -108,8 +146,27 @@ CREATE TABLE profiles (
     profile_id text,
     time_min timestamptz,
     time_max timestamptz,
+    -- Representative display point (exact location, or the bounding-box
+    -- midpoint for features that span a region). geom (above) is the Point
+    -- built from these for the point/hex map layers.
     latitude double precision,
     longitude double precision,
+    -- Per-feature lat/lon bounding box. bbox is the indexed geometry spatial
+    -- search matches against, so a feature is found across its whole extent
+    -- (not just the single display point). ST_MakeEnvelope yields a Point when
+    -- min==max, hence geometry(Geometry,...) rather than Polygon.
+    latitude_min double precision,
+    latitude_max double precision,
+    longitude_min double precision,
+    longitude_max double precision,
+    bbox geometry(Geometry,3857) GENERATED ALWAYS AS
+      (ST_Transform(ST_SetSRID(
+        ST_MakeEnvelope(longitude_min, latitude_min, longitude_max, latitude_max),
+        4326), 3857)) STORED,
+    -- false = feature spans a region (box diagonal > ~1km): still searchable
+    -- and counted in the zoomed-out hexes, but not drawn as an individual dot
+    -- at point zoom. See web-api tiles/legend routes.
+    show_as_point boolean NOT NULL DEFAULT true,
     depth_min double precision,
     depth_max double precision,
     n_records bigint,
@@ -123,6 +180,7 @@ CREATE TABLE profiles (
 );
 
 CREATE INDEX ON profiles USING GIST (geom);
+CREATE INDEX ON profiles USING GIST (bbox);
 CREATE INDEX ON profiles(latitude);
 CREATE INDEX ON profiles(longitude);
 -- Index for efficient filtering by dataset during incremental updates
@@ -432,6 +490,10 @@ CREATE TABLE cde.harvest_attempts (
     -- splits on \n and renders each as a clickable link so an admin can
     -- replay the exact requests to debug a failure.
     query_urls    text,
+    -- Non-fatal note for an otherwise-successful dataset, surfaced on the
+    -- harvest dashboard (e.g. features hidden from the map because they span
+    -- a region larger than the point threshold).
+    warnings      text,
     PRIMARY KEY (run_id, erddap_url, dataset_id)
 );
 CREATE INDEX harvest_attempts_dataset_idx

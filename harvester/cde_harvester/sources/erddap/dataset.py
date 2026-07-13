@@ -18,11 +18,14 @@ def is_valid_duration(duration):
 
 
 class Dataset(object):
-    def __init__(self, erddap_server, id):
+    def __init__(self, erddap_server, id, data_structure="table"):
         self.id = id
         self.erddap_server = erddap_server
         self.logger = self.get_logger()
 
+        # ERDDAP allDatasets dataStructure this dataset was listed under
+        # ("table" | "grid"); drives the cdm_data_type fallback for grids.
+        self.data_structure = data_structure
         self.erddap_url = erddap_server.url
         self.erddap_csv_to_df = erddap_server.erddap_csv_to_df
         # Every ERDDAP HTTP request made for this dataset (info, tabledap
@@ -44,6 +47,20 @@ class Dataset(object):
         self.content_hash = None
         # Why content_hash is None (a HASH_* code); None when a hash was produced.
         self.content_hash_reason = None
+
+        # Griddap metadata (set by the Grid handler; None for tabledap types).
+        self.df_info = None
+        self.wms_url = None
+        self.coverage_lat_min = None
+        self.coverage_lat_max = None
+        self.coverage_lon_min = None
+        self.coverage_lon_max = None
+        self.coverage_time_min = None
+        self.coverage_time_max = None
+        self.coverage_depth_min = None
+        self.coverage_depth_max = None
+        self.grid_variables = None
+        self.grid_dimensions = None
 
         self.get_metadata()
 
@@ -71,6 +88,18 @@ class Dataset(object):
                 "content_hash_reason": [self.content_hash_reason],
                 "last_updated_at": [now],
                 "verified_at": [now],
+                # Griddap metadata-only columns (None for tabledap types).
+                "coverage_lat_min": [self.coverage_lat_min],
+                "coverage_lat_max": [self.coverage_lat_max],
+                "coverage_lon_min": [self.coverage_lon_min],
+                "coverage_lon_max": [self.coverage_lon_max],
+                "coverage_time_min": [self.coverage_time_min],
+                "coverage_time_max": [self.coverage_time_max],
+                "coverage_depth_min": [self.coverage_depth_min],
+                "coverage_depth_max": [self.coverage_depth_max],
+                "grid_variables": [self.grid_variables],
+                "grid_dimensions": [self.grid_dimensions],
+                "wms_url": [self.wms_url],
             }
         )
 
@@ -124,7 +153,6 @@ class Dataset(object):
             .query('cf_role != ""')[["cf_role", "name"]]["name"]
             .to_dict()
         )
-        lat_lng = ["latitude", "longitude"]
 
         # sorting so the url is consistent every time for query caching
         profile_variable_list = sorted(list(profile_variables.values()))
@@ -139,37 +167,17 @@ class Dataset(object):
         if not profile_variables:
             return []
 
-        # dropna - for when there are nulls in the lat/lon column leading to a second profile created
+        # Enumerate feature identities only. lat/lon are NOT requested here:
+        # a distinct() including them returns one row per GPS fix on a moving
+        # feature. Per-feature lat/lon min/max (the bounding box) is fetched
+        # separately in tabledap_features via orderByMinMax, which is bounded
+        # by feature count regardless of how much the feature moves.
         profile_ids = self.dataset_tabledap_query(
-            f"{','.join(profile_variable_list + lat_lng)}&distinct()"
+            f"{','.join(profile_variable_list)}&distinct()"
         )
 
         if profile_ids.empty:
             return profile_ids
-
-        profile_ids = profile_ids.dropna(subset=["latitude", "longitude"])
-
-        profile_ids["latlon"] = (
-            profile_ids["latitude"].astype(str)
-            + ","
-            + profile_ids["longitude"].astype(str)
-        )
-        profiles_with_multiple_locations = (
-            profile_ids.groupby(profile_variable_list)
-            .count()[["latlon"]]
-            .query("latlon>1")
-            .index.to_list()
-        )
-
-        del profile_ids["latlon"]
-
-        profile_ids = profile_ids.drop_duplicates(profile_variable_list)
-
-        if profiles_with_multiple_locations:
-            self.logger.warning(
-                "Non unique lat/lon found within profiles:"
-                + str(profiles_with_multiple_locations)
-            )
 
         self.profile_ids = profile_ids
         return profile_ids
@@ -319,7 +327,14 @@ class Dataset(object):
             self.logger.error("Dataset metadata not found")
             return df
 
-        considered_attributes = ["cf_role", "standard_name", "actual_range"]
+        # Keep the raw info frame: the Grid handler reads its Row Type ==
+        # "dimension"/"variable" rows (tabledap types never need it).
+        self.df_info = df
+
+        considered_attributes = [
+            "cf_role", "standard_name", "actual_range", "units", "long_name",
+            "axis",
+        ]
 
         data_types = df.query(
             '(`Variable Name`!="NC_GLOBAL" and `Attribute Name`=="")'
@@ -348,7 +363,12 @@ class Dataset(object):
         globals_dict = df_global["Value"].to_dict()
 
         self.variables_list = df_variables["name"].to_list()
-        self.cdm_data_type = globals_dict["cdm_data_type"]
+        # Griddap datasets may omit the cdm_data_type global; they are always
+        # Grid. Tabledap datasets keep the hard requirement (empty string
+        # fails the supported-type check downstream, as before).
+        self.cdm_data_type = globals_dict.get(
+            "cdm_data_type", "Grid" if self.data_structure == "grid" else ""
+        )
         self.globals = globals_dict
 
         if not "standard_name" in df_variables:

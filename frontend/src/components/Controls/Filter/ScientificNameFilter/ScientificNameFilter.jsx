@@ -7,7 +7,6 @@ import {
   X
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
-import { Badge } from 'react-bootstrap'
 
 import QuestionIconTooltip from '../../QuestionIconTooltip/QuestionIconTooltip.jsx'
 import { abbreviateString, useOutsideAlerter, useDebounce } from '../../../../utilities'
@@ -180,11 +179,9 @@ export default function ScientificNameFilter({
               {scientificNamesSelected.map((name) => {
                 const vern = vernacularByName[name]
                 return (
-                  <Badge
+                  <span
                     key={name}
-                    bg='light'
-                    text='dark'
-                    className='scientificNameChip'
+                    className='badge scientificNameChip'
                     onClick={() => handleRemove(name)}
                     title={t('scientificNameFilterRemoveTitle')}
                   >
@@ -193,7 +190,7 @@ export default function ScientificNameFilter({
                       <span className='scientificNameChipVernacular'> ({vern})</span>
                     )}
                     <X size={16} />
-                  </Badge>
+                  </span>
                 )
               })}
             </div>

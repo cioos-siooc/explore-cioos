@@ -39,6 +39,7 @@ from cde_harvester.dataset_types import (
     supported_cdm_data_types,
     supported_data_structures,
 )
+from cde_harvester.dataset_types.geo import POINT_THRESHOLD_M
 from cde_harvester.sources.erddap.state import load_previous_hashes
 from requests.exceptions import HTTPError
 from prefect import task
@@ -58,9 +59,14 @@ def _attempt_urls(erddap_url, dataset, dataset_id):
 
 
 def _build_attempt(run_id, erddap_url, dataset_id, status, reason_code=None,
-                   error_message=None, duration_ms=None, query_urls=None):
+                   error_message=None, duration_ms=None, query_urls=None,
+                   warnings=None):
     """Build one harvest_attempts.csv row (kept identical to the legacy
-    record_attempt closure so the harvest-dashboard contract is unchanged)."""
+    record_attempt closure so the harvest-dashboard contract is unchanged).
+
+    ``warnings`` is a non-fatal note surfaced on the harvest dashboard for an
+    otherwise-successful dataset (e.g. features hidden from the map because
+    they span a region)."""
     urls = list(query_urls or [])
     return {
         "run_id": run_id,
@@ -78,6 +84,7 @@ def _build_attempt(run_id, erddap_url, dataset_id, status, reason_code=None,
         "duration_ms": duration_ms,
         "attempted_at": datetime.now(timezone.utc),
         "query_urls": "\n".join(urls) if urls else None,
+        "warnings": warnings,
     }
 
 
@@ -241,12 +248,20 @@ class ERDDAPHarvester(BaseHarvester):
         total = len(df_all_datasets)
         for i, df_dataset_row in enumerate(df_all_datasets.itertuples(index=False)):
             dataset_id = df_dataset_row.datasetID
+            # allDatasets listing extras: which dataStructure the row came from
+            # (tagged by get_all_datasets) and the WMS request URL (griddap
+            # only; empty/NaN when the server has WMS disabled).
+            data_structure = getattr(df_dataset_row, "dataStructure", "table")
+            wms_url = getattr(df_dataset_row, "wms", None)
+            if not isinstance(wms_url, str) or not wms_url:
+                wms_url = None
             try:
                 result = harvest_dataset(
                     erddap, dataset_id,
                     previous_hashes=previous_hashes,
                     skip_unchanged=self.skip_unchanged,
                     run_id=self.run_id, idx=i + 1, total=total,
+                    data_structure=data_structure, wms_url=wms_url,
                 )
                 attempt_records.append(result.attempt)
                 if result.status == "success":
@@ -254,6 +269,10 @@ class ERDDAPHarvester(BaseHarvester):
                         df_trajectory_cells_all = pd.concat(
                             [df_trajectory_cells_all, result.features]
                         )
+                    elif result.feature_kind == "dataset_extent":
+                        # Metadata-only (griddap): the extent lives on the
+                        # dataset row itself, no feature table.
+                        pass
                     else:
                         df_profiles_all = pd.concat([df_profiles_all, result.features])
                     if result.track_points is not None and not result.track_points.empty:
@@ -345,7 +364,8 @@ class ERDDAPHarvester(BaseHarvester):
 
 
 def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=False,
-                    run_id=None, idx=None, total=None):
+                    run_id=None, idx=None, total=None,
+                    data_structure="table", wms_url=None):
     """Harvest one ERDDAP dataset (plain function; reuses `erddap`, never rebuilds it).
 
     Returns DatasetHarvestResult on success/skip; raises DatasetHarvestError on
@@ -364,7 +384,8 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
     progress = f" {idx}/{total}" if idx and total else ""
     try:
         new_hash, has_files, hash_reason = erddap.get_croissant_fingerprint(
-            erddap_url, dataset_id
+            erddap_url, dataset_id,
+            dap="griddap" if data_structure == "grid" else "tabledap",
         )
         prev_hash = (previous_hashes or {}).get(dataset_id)
         if skip_unchanged and has_files and new_hash and prev_hash == new_hash:
@@ -387,7 +408,8 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
             )
 
         log.info(f"Querying dataset: {dataset_id}{progress}")
-        dataset = erddap.get_dataset(dataset_id)
+        dataset = erddap.get_dataset(dataset_id, data_structure=data_structure)
+        dataset.wms_url = wms_url
         dataset.content_hash = new_hash
         # Record why there's no hash (database-backed, fetch failure, …) so the
         # harvest dashboard can distinguish "correctly unhashed" from "failed".
@@ -425,6 +447,24 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                 )
             duration_ms = int((time.monotonic() - t0) * 1000)
             log.info("complete")
+            # Non-fatal warning: features spanning a region (>POINT_THRESHOLD_M)
+            # are hidden from the map (kept searchable). Surface it per dataset
+            # on the harvest dashboard. Only the profiles pipeline sets
+            # show_as_point; trajectory cells don't carry it.
+            warnings = None
+            if "show_as_point" in df_features.columns:
+                n_hidden = int((~df_features["show_as_point"].astype(bool)).sum())
+                if n_hidden:
+                    log.warning(
+                        "%d of %d features span more than %d m and are hidden "
+                        "from the map (still searchable)",
+                        n_hidden, len(df_features), POINT_THRESHOLD_M,
+                    )
+                    warnings = (
+                        f"{n_hidden} of {len(df_features)} features span more than "
+                        f"{POINT_THRESHOLD_M} m and are hidden from the map "
+                        "(still searchable via geospatial filters)."
+                    )
             return DatasetHarvestResult(
                 status="success",
                 features=df_features,
@@ -437,6 +477,7 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                     status="success",
                     duration_ms=duration_ms,
                     query_urls=dataset.queried_urls,
+                    warnings=warnings,
                 ),
             )
 

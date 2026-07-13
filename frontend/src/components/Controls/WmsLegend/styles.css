@@ -1,0 +1,92 @@
+.wmsLegend {
+  position: absolute;
+  right: 60px;
+  bottom: 40px;
+  z-index: 3;
+  background-color: var(--cioos-white);
+  border-radius: var(--cioos-radius-sm);
+  box-shadow: var(--cioos-shadow-float);
+  padding: 8px 10px;
+  max-width: 320px;
+}
+
+.wmsLegendHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wmsLegendTitle {
+  font-weight: 600;
+  font-size: 0.85em;
+  color: var(--cioos-primary);
+  text-decoration: none;
+}
+
+.wmsLegendTitle:hover {
+  text-decoration: underline;
+}
+
+.wmsLegendVariableSelector {
+  margin: 4px 0;
+}
+
+.wmsLegendVariableSelector .dropdown-menu {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.wmsLegendCloseButton {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--cioos-ink-60);
+  flex-shrink: 0;
+}
+
+.wmsLegendCloseButton:hover {
+  color: var(--cioos-ink);
+}
+
+.wmsLegendVariable {
+  font-size: 0.8em;
+  color: var(--cioos-ink-60);
+  margin: 2px 0 4px 0;
+}
+
+.wmsLegendSlider {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0;
+}
+
+.wmsLegendSlider label {
+  font-size: 0.8em;
+  color: var(--cioos-ink-60);
+  margin-bottom: 0;
+}
+
+.wmsLegendSlider input[type='range'] {
+  width: 100%;
+  accent-color: var(--cioos-primary);
+}
+
+.wmsLegendImage {
+  max-width: 100%;
+}
+
+.wmsLegendUnavailable {
+  font-size: 0.8em;
+  color: var(--cioos-ink-60);
+  font-style: italic;
+}
+
+@media (max-width: 600px) {
+  .wmsLegend {
+    right: 10px;
+    bottom: 340px;
+    max-width: 280px;
+    font-size: 0.85em;
+  }
+}

@@ -9,7 +9,7 @@
 
  .backButton {
   text-align: center;
-  border: 2px solid darkgrey;
+  border: 2px solid var(--cioos-hairline);
   border-radius: 10px;
   justify-content: space-between;
   padding: 5px;
@@ -18,7 +18,7 @@
 }
 
 .backButton:hover {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
   cursor: pointer;
 }
 
@@ -32,17 +32,17 @@
   margin: 0px 16.5px;
   background-color: white;
   border-radius: 5px;
-  border: 2px solid darkgrey;
-  color: black;
+  border: 2px solid var(--cioos-hairline);
+  color: var(--cioos-ink);
   line-height: 15px;
 }
 
 .toggleButton:hover {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
 }
 
 .toggleButton.selected {
-  background-color: #52A79B;
+  background-color: var(--cioos-primary);
   color: white;
 }
 
@@ -56,7 +56,7 @@
 }
 
 .tableAndPlotGridItem .dropdown button {
-  background-color: #52A79B;
+  background-color: var(--cioos-primary);
 }
 
 .tableAndPlotGridItem.tableAndPlot {
@@ -106,7 +106,7 @@
 
 .selectedRecordID {
   color: white;
-  background-color: #52A79B;
+  background-color: var(--cioos-primary);
 }
 
 .selectedRecordID:hover {
@@ -131,14 +131,14 @@
   height: 42px;
   background-color: white;
   border-radius: 5px;
-  border: 2px solid darkgrey;
-  color: black;
+  border: 2px solid var(--cioos-hairline);
+  color: var(--cioos-ink);
   line-height: 15px;
   margin: 0px 16.5px;
 }
 
 .deselectRecordButton:hover {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
 }
 
 .tableAndPlot .dropdown {

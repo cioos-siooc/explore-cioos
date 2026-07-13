@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Spinner } from 'react-bootstrap'
+import Spinner from '../../ui/Spinner.jsx'
 import './styles.css'
 
 export default function Loading () {
@@ -11,14 +11,7 @@ export default function Loading () {
       ) : (
         <a className={'spinnerLogo frenchLogo'} />
       )}
-      <Spinner
-        className='spinner'
-        as='span'
-        animation='border'
-        size={70}
-        role='status'
-        aria-hidden='true'
-      />
+      <Spinner className='spinner' />
     </div>
   )
 }

@@ -303,6 +303,21 @@
   word-break: break-word;
 }
 
+/* Non-fatal warning on an otherwise-successful dataset (amber, matches the
+   skipped palette so it reads as "heads-up", not "failure"). */
+.harvest-warning-box {
+  background: #F3ECD6;
+  color: #7a5c00;
+  border: 1px solid #ddd0b0;
+  border-radius: 4px;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.harvest-warning-text { color: #7a5c00; font-size: 0.8rem; }
+
 /* ── Latest attempt card ─────────────────────────────────────────────────── */
 .harvest-latest-card {
   background: #fff;

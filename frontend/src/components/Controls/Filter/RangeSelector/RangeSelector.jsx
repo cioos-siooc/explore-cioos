@@ -21,15 +21,10 @@ export default function RangeSelector({
         max={max}
         value={[start, end]}
         onChange={(value) => onChange(value)}
-        railStyle={{
-          height: 2
-        }}
-        handleStyle={{
-          height: 15,
-          width: 15
-        }}
-        trackStyle={{
-          background: 'none'
+        styles={{
+          rail: { height: 2 },
+          handle: { height: 15, width: 15 },
+          track: { background: 'none' }
         }}
         marks={marks}
       />

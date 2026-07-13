@@ -17,29 +17,31 @@ from cde_harvester.dataset_types.timeseries_profile import TimeSeriesProfileHand
 class TestRegistry:
     def test_supported_cdm_data_types(self):
         # Order matters: first three must match the legacy allowlist so skip
-        # messages stay stable; trajectory types were added in M2.
+        # messages stay stable; trajectory types were added in M2, Grid in M3.
         assert supported_cdm_data_types() == [
             "TimeSeries",
             "Profile",
             "TimeSeriesProfile",
             "Trajectory",
             "TrajectoryProfile",
+            "Grid",
         ]
 
-    def test_only_tabledap_structures_today(self):
-        assert supported_data_structures() == ("table",)
+    def test_supported_data_structures(self):
+        # Grid registration flips the allDatasets listing to both structures.
+        assert supported_data_structures() == ("table", "grid")
 
     def test_get_handler_returns_registered_handler(self):
         handler = get_handler("TimeSeriesProfile")
         assert isinstance(handler, TimeSeriesProfileHandler)
 
     def test_get_handler_unknown_type_returns_none(self):
-        assert get_handler("Grid") is None
+        assert get_handler("Point") is None
 
     def test_extract_features_unknown_type_raises(self):
         dataset = MagicMock()
-        dataset.cdm_data_type = "Grid"
-        with pytest.raises(KeyError, match="Grid"):
+        dataset.cdm_data_type = "Point"
+        with pytest.raises(KeyError, match="Point"):
             extract_features(dataset)
 
     def test_feature_kinds(self):
@@ -47,6 +49,8 @@ class TestRegistry:
             assert get_handler(cdm_type).feature_kind == "profiles"
         for cdm_type in ("Trajectory", "TrajectoryProfile"):
             assert get_handler(cdm_type).feature_kind == "trajectory_cells"
+        assert get_handler("Grid").feature_kind == "dataset_extent"
+        assert get_handler("Grid").data_structure == "grid"
 
 
 class TestAdjustFeatureIdentity:

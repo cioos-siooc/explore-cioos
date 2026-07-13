@@ -1,53 +1,16 @@
 body {
-  font-family: "Montserrat", Sans-serif;
-  line-height: 21pt;
+  font-family: var(--cioos-font-body);
+  line-height: 1.5;
+  color: var(--cioos-ink);
 }
 
+/* mapbox-gl-draw still emits mapboxgl-* classes for its control group while
+   MapLibre v5's own controls (and base CSS) use maplibregl-* only — style
+   both prefixes. */
+.maplibregl-ctrl-group>button,
 .mapboxgl-ctrl-group>button {
   width: 42px;
   height: 42px;
-}
-
-.row>.selectionPanelColumn {
-  padding-left: 0px;
-  padding-right: 0px;
-}
-
-.logo.english {
-  width: 130px;
-  height: 40px;
-  border: 2px solid transparent;
-  pointer-events: all;
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background-image: url(./Images/NationalLogoEnglish.png);
-  background-color: #fff;
-  background-repeat: no-repeat;
-  background-size: contain;
-  border-radius: 10px;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
-}
-
-.logo.french {
-  width: 130px;
-  height: 40px;
-  border: 2px solid transparent;
-  pointer-events: all;
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background-image: url(./Images/NationalLogoFrench.png);
-  background-color: #fff;
-  background-repeat: no-repeat;
-  background-size: contain;
-  border-radius: 10px;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
-}
-
-.logo:hover {
-  background-color: #f3f3f3;
-  /* border: 2px solid lightgray; */
 }
 
 .emailAddress {
@@ -62,16 +25,16 @@ body {
   bottom: 240px;
   width: 42px;
   height: 42px;
-  border-radius: 4px 4px 0px 0px;
+  border-radius: var(--cioos-radius) var(--cioos-radius) 0px 0px;
   border: 0px;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
-  background-color: #fff;
+  box-shadow: var(--cioos-shadow-card);
+  background-color: var(--cioos-white);
   padding: 5px;
-  z-index: 2;
+  z-index: var(--cioos-z-map-controls, 2);
 }
 
 .boxQueryButton.active {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
 }
 
 .rectangleIcon {
@@ -84,14 +47,61 @@ body {
 }
 
 .boxQueryButton:hover {
-  background-color: #f3f3f3;
+  background-color: var(--cioos-surface-2);
 }
 
+.maplibregl-ctrl-group,
 .mapboxgl-ctrl-group {
-  border-radius: 0px 0px 4px 4px;
+  border-radius: 0px 0px var(--cioos-radius) var(--cioos-radius);
 }
 
+/* MapLibre v5's base CSS only styles maplibregl-ctrl-group; recreate the
+   control chrome for the draw plugin's mapboxgl-prefixed group so it doesn't
+   render unstyled. */
+.mapboxgl-ctrl-group {
+  background: var(--cioos-white);
+}
 
+.mapboxgl-ctrl-group:not(:empty) {
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+}
+
+.mapboxgl-ctrl-group button {
+  background-color: transparent;
+  border: 0;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: block;
+  outline: none;
+  overflow: hidden;
+  padding: 0;
+}
+
+.maplibregl-ctrl-bottom-right .mapboxgl-ctrl {
+  float: right;
+  margin: 0 10px 10px 0;
+  clear: both;
+  pointer-events: auto;
+}
+
+/* Polygon-draw button state colors */
+.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon {
+  background-color: var(--cioos-white);
+}
+
+.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon.active,
+.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon.drawing {
+  background-color: var(--cioos-teal-light);
+}
+
+/* Feedback icon colors */
+.submissionFeedback svg.success {
+  color: var(--cioos-primary);
+}
+
+.submissionFeedback svg.error {
+  color: var(--cioos-error);
+}
 
 .submissionFeedback span {
   vertical-align: middle;
@@ -103,32 +113,8 @@ body {
   margin-left: 5px;
 }
 
-@media all and (max-width: 915px) {
-  /* .logo {
-    left: calc(900px - 140px);
-  } */
-/* 
-  .feedbackButton {
-    left: 848px;
-  } */
-
-  .boxQueryButton {
-    left: 848px;
-  }
-
-  /* .introButton {
-    left: 848px;
-  } */
-}
-
-@media all and (max-height: 500px) {
-  .boxQueryButton {
-    top: 176px;
-  }
-}
-
 .resetFiltersButton:hover {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
 }
 
 .resetFiltersButton {

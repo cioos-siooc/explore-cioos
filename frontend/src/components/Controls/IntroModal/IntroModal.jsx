@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useState } from 'react'
-import { Container, Modal, Row } from 'react-bootstrap'
 import { ChatDots } from 'react-bootstrap-icons'
+import Modal from '../../ui/Modal.jsx'
 import { useTranslation } from 'react-i18next'
 
 import polygonImage from '../../Images/polygonIcon.png'
@@ -212,11 +212,11 @@ export default function IntroModal({ showModal, setShowModal }) {
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Container fluid>
-            <Row style={{ marginBottom: '5px' }}>
+          <div className='container-fluid'>
+            <div className='row' style={{ marginBottom: '5px' }}>
               {t('tipInfoHoverHelpHeading')}
-            </Row>
-            <Row>
+            </div>
+            <div className='row'>
               <div className='steps' onMouseOut={() => setHoveredStep()}>
                 <div
                   className={`stepImage filterStep ${i18n.language}`}
@@ -243,9 +243,9 @@ export default function IntroModal({ showModal, setShowModal }) {
                   {t('stepInfoDownload')}
                 </div>
               </div>
-            </Row>
-            <Row className='infoBox'>{generateInfo()}</Row>
-          </Container>
+            </div>
+            <div className='row infoBox'>{generateInfo()}</div>
+          </div>
         </Modal.Body>
       </Modal>
     </div>

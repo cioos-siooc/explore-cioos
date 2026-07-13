@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ChevronCompactLeft,
-  ChevronCompactRight,
+  ChevronCompactDown,
+  ChevronCompactUp,
   CircleFill,
   HexagonFill
 } from 'react-bootstrap-icons'
@@ -10,20 +10,21 @@ import {
 import {
   capitalizeFirstLetter,
   generateColorStops
-} from '../../../utilities.js'
+} from '../../../utilities.jsx'
 import { colorScale, trajectoryColorScale, TRAIL_ALL } from '../../config.js'
 import platformColors from '../../platformColors'
 
 import './styles.css'
-import LegendElement from './LegendElement.jsx/LegendElement.jsx'
 import classNames from 'classnames'
 import isEmpty from 'lodash/isEmpty'
 
+// Compact floating legend card (top-right). A small header collapses the
+// body; the sections switch with zoom (hex ramp below z7, point size +
+// platform colors above).
 export default function Legend({
   currentRangeLevel,
   currentTrajectoryRangeLevel,
   zoom,
-  selectionPanelOpen,
   platformsInView,
   tracksMode,
   trailingDays,
@@ -53,113 +54,103 @@ export default function Legend({
   // when hex cells are on; at/above zoom 7 the point layer shows regardless.
   const showPointRamp = hasPointData && (zoom >= 7 || layers.hexCells)
 
+  function renderRampSection(caption, scale, rangeLevel, key) {
+    const colorStops = generateColorStops(scale, rangeLevel)
+    if (!colorStops) return null
+    return (
+      <div className='legendSection' key={key}>
+        <div className='legendSectionCaption'>{caption}</div>
+        <div className='legendItems'>
+          {colorStops.map((colorStop, index) => (
+            <div className='legendItem' key={index}>
+              <HexagonFill
+                className='legendSwatch'
+                size={12}
+                fill={colorStop.color}
+                aria-hidden='true'
+              />
+              <span className='legendItemLabel'>{colorStop.stop}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   function generateLegendElements() {
     if (!showPointRamp) return null
     if (isEmpty(currentRangeLevel)) {
-      // No Data
       return (
-        <div
-          title={t('legendNoDataWarningTitle')} // 'Choose less restrictive filters to see data'
-        >
+        <div className='legendNoData' title={t('legendNoDataWarningTitle')}>
           {t('legendNoDataWarningText')}
-          {/* No Data */}
         </div>
       )
     } else if (zoom < 7) {
       // Hexes
-      const colorStops = generateColorStops(colorScale, currentRangeLevel)
-      return (
-        <>
-          <LegendElement
-            title={t('legendSectionTitlePointsPerHex')}
-            // title='- Points per hexagon'
-            open={legendOpen}
-          >
-            {t('legendSectionColor')}
-            {/* Color */}
-          </LegendElement>
-          {colorStops &&
-            colorStops.map((colorStop, index) => {
-              const pointCount = `${colorStop.stop}`
-              return (
-                <LegendElement key={index} title={pointCount} open={legendOpen}>
-                  <HexagonFill
-                    title={pointCount}
-                    size={15}
-                    fill={colorStop.color}
-                  />
-                </LegendElement>
-              )
-            })}
-        </>
+      return renderRampSection(
+        t('legendPointsPerHex'),
+        colorScale,
+        currentRangeLevel,
+        'hexes'
       )
-    } else if (zoom >= 7) {
+    } else {
       // Points
       return (
         <>
-          <LegendElement
-            title={t('legendSectionTitleDaysOfData')}
-            // title='- Days of data'
-            open={legendOpen}
-          >
-            {t('legendSectionSize')}
-            {/* Size */}
-          </LegendElement>
-          <LegendElement
-            title={t('legendSectionTitleLessOneDayOfData')}
-            // title='One day of data or less'
-            open={legendOpen}
-          >
-            <CircleFill
-              size={4}
-              fill='white'
-              style={{
-                border: '1px solid black',
-                borderRadius: '15px',
-                margin: '5.5px'
-              }}
-            />
-          </LegendElement>
-          <LegendElement
-            title={t('legendSectionTitleMoreOneDayOfData')}
-            // title='More than one day of data'
-            open={legendOpen}
-          >
-            <CircleFill
-              size={15}
-              fill='white'
-              style={{
-                border: '1px solid black',
-                borderRadius: '15px'
-              }}
-            />
-          </LegendElement>
-          <hr />
-          <LegendElement
-            title={t('legendSectionTitlePlatformType')}
-            // title='- Platform type'
-            open={legendOpen}
-          >
-            {t('legendSectionColor')}
-            {/* Color */}
-          </LegendElement>
-          {platformColors
-            .filter((pc) => platformsInView.includes(pc.platform))
-            .map((pc) => {
-              return (
-                <LegendElement
-                  title={capitalizeFirstLetter(t(pc.platform))}
-                  open={legendOpen}
-                  key={pc.platform}
-                >
-                  <CircleFill size={15} fill={pc.color} />
-                </LegendElement>
-              )
-            })}
+          <div className='legendSection'>
+            <div className='legendSectionCaption'>{t('legendDaysOfData')}</div>
+            <div className='legendItems'>
+              <div
+                className='legendItem'
+                title={t('legendSectionTitleLessOneDayOfData')}
+              >
+                <span className='legendSwatch'>
+                  <span className='legendPointCircle small' />
+                </span>
+                <span className='legendItemLabel'>
+                  {t('legendOneDayOrLess')}
+                </span>
+              </div>
+              <div
+                className='legendItem'
+                title={t('legendSectionTitleMoreOneDayOfData')}
+              >
+                <span className='legendSwatch'>
+                  <span className='legendPointCircle large' />
+                </span>
+                <span className='legendItemLabel'>
+                  {t('legendMoreThanOneDay')}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className='legendSection'>
+            <div className='legendSectionCaption'>
+              {t('legendPlatformType')}
+            </div>
+            <div className='legendItems'>
+              {platformColors
+                .filter((pc) => platformsInView.includes(pc.platform))
+                .map((pc) => (
+                  <div className='legendItem' key={pc.platform}>
+                    <CircleFill
+                      className='legendSwatch'
+                      size={10}
+                      fill={pc.color}
+                      aria-hidden='true'
+                    />
+                    <span className='legendItemLabel'>
+                      {capitalizeFirstLetter(t(pc.platform))}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
         </>
       )
     }
   }
+
   function generateTrajectoryLegendElements() {
     // Trajectory layer hidden entirely — no trajectory legend.
     if (!layers.trajectories) return null
@@ -169,95 +160,78 @@ export default function Legend({
     // Tracks mode replaces the coverage-hex ramp with the track-line layers.
     if (tracksMode) {
       return (
-        <>
-          <hr />
-          <LegendElement
-            title={`${t('legendTrackLine')} (${
-              trailingDays === TRAIL_ALL ? t('timeBarTrailAll') : `${trailingDays}d`
-            })`}
-            open={legendOpen}
-          >
-            <svg width='15' height='15'>
-              <line
-                x1='1'
-                y1='13'
-                x2='14'
-                y2='2'
-                stroke='#6749AC'
-                strokeWidth='2.5'
-                strokeLinecap='round'
-              />
-            </svg>
-          </LegendElement>
-          <LegendElement title={t('legendTrackHead')} open={legendOpen}>
-            {/* same arrowhead the map draws, pointing along the course */}
-            <svg width='15' height='15' viewBox='0 0 16 16'>
-              <path
-                d='M8 1.5 L13.5 13.5 L8 10.5 L2.5 13.5 Z'
-                fill='#6749AC'
-                stroke='#ffffff'
-                strokeWidth='1.5'
-                strokeLinejoin='round'
-                transform='rotate(45 8 8)'
-              />
-            </svg>
-          </LegendElement>
-        </>
+        <div className='legendSection' key='tracks'>
+          <div className='legendSectionCaption'>{t('layerTrajectories')}</div>
+          <div className='legendItems'>
+            <div className='legendItem'>
+              <svg className='legendSwatch' width='12' height='12'>
+                <line
+                  x1='1'
+                  y1='10.5'
+                  x2='11'
+                  y2='1.5'
+                  stroke='#6749AC'
+                  strokeWidth='2.5'
+                  strokeLinecap='round'
+                />
+              </svg>
+              <span className='legendItemLabel'>
+                {`${t('legendTrackLine')} (${
+                  trailingDays === TRAIL_ALL
+                    ? t('timeBarTrailAll')
+                    : `${trailingDays}d`
+                })`}
+              </span>
+            </div>
+            <div className='legendItem'>
+              {/* same arrowhead the map draws, pointing along the course */}
+              <svg className='legendSwatch' width='12' height='12' viewBox='0 0 16 16'>
+                <path
+                  d='M8 1.5 L13.5 13.5 L8 10.5 L2.5 13.5 Z'
+                  fill='#6749AC'
+                  stroke='#ffffff'
+                  strokeWidth='1.5'
+                  strokeLinejoin='round'
+                  transform='rotate(45 8 8)'
+                />
+              </svg>
+              <span className='legendItemLabel'>{t('legendTrackHead')}</span>
+            </div>
+          </div>
+        </div>
       )
     }
     if (isEmpty(currentTrajectoryRangeLevel)) return null
-
     // Trajectory coverage always renders as hexes, at every zoom level.
-    const trajectoryColorStops = generateColorStops(
+    return renderRampSection(
+      t('legendTrajectoriesPerHex'),
       trajectoryColorScale,
-      currentTrajectoryRangeLevel
-    )
-    return (
-      <>
-        <hr />
-        <LegendElement
-          title={t('legendSectionTitleTrajectoriesPerHex')}
-          // title='- Trajectories per hexagon'
-          open={legendOpen}
-        >
-          {t('legendSectionColor')}
-          {/* Color */}
-        </LegendElement>
-        {trajectoryColorStops &&
-          trajectoryColorStops.map((colorStop, index) => {
-            const trajectoryCount = `${colorStop.stop}`
-            return (
-              <LegendElement
-                key={index}
-                title={trajectoryCount}
-                open={legendOpen}
-              >
-                <HexagonFill
-                  title={trajectoryCount}
-                  size={15}
-                  fill={colorStop.color}
-                />
-              </LegendElement>
-            )
-          })}
-      </>
+      currentTrajectoryRangeLevel,
+      'trajectories'
     )
   }
-  const className = classNames('legend', { panelOpen: selectionPanelOpen })
+
   return (
-    <div className={className} onClick={() => setLegendOpen(!legendOpen)}>
-      {generateLegendElements()}
-      {generateTrajectoryLegendElements()}
-      <LegendElement open={legendOpen}>
-        <div
-          className='legendToggleButton'
-          title={legendOpen ? t('closeLegendTooltip') : t('openLegendTooltip')}
-        >
-          {' '}
-          {/* 'Close legend' 'Open legend' */}
-          {legendOpen ? <ChevronCompactLeft /> : <ChevronCompactRight />}
+    <div className={classNames('legend', { closed: !legendOpen })}>
+      <button
+        className='legendHeader'
+        onClick={() => setLegendOpen(!legendOpen)}
+        title={legendOpen ? t('closeLegendTooltip') : t('openLegendTooltip')}
+        aria-expanded={legendOpen}
+      >
+        <span>{t('legendTitle')}</span>
+        {legendOpen ? (
+          <ChevronCompactUp size={14} aria-hidden='true' />
+        ) : (
+          <ChevronCompactDown size={14} aria-hidden='true' />
+        )}
+      </button>
+      {legendOpen && (
+        <div className='legendBody'>
+          {generateLegendElements()}
+          {generateTrajectoryLegendElements()}
         </div>
-      </LegendElement>
+      )}
     </div>
   )
 }

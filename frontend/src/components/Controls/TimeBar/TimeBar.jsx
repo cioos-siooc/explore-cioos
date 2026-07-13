@@ -1,7 +1,6 @@
 import React from 'react'
 import Slider from 'rc-slider'
 import 'rc-slider/assets/index.css'
-import { Dropdown } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 
 import { tracksMinDate, trailingWindowOptions, TRAIL_ALL } from '../../config.js'
@@ -53,30 +52,35 @@ export default function TimeBar({
           value={valueDay}
           onChange={(value) => setScrubTime(epochDayToDate(value))}
           marks={marks}
-          railStyle={{ height: 4 }}
-          handleStyle={{ height: 18, width: 18, marginTop: -7 }}
+          styles={{
+            rail: { height: 4 },
+            handle: { height: 18, width: 18, marginTop: -7 }
+          }}
         />
       </div>
       <div className='timeBarControls'>
-        <Dropdown>
-          <Dropdown.Toggle size='sm' variant='outline-secondary'>
-            {t('timeBarTrailingWindowLabel')}:{' '}
-            {trailingDays === TRAIL_ALL ? t('timeBarTrailAll') : `${trailingDays}d`}
-          </Dropdown.Toggle>
-          <Dropdown.Menu>
+        <label className='timeBarTrail'>
+          {t('timeBarTrailingWindowLabel')}
+          <select
+            className='timeBarTrailSelect'
+            value={trailingDays}
+            onChange={(e) =>
+              setTrailingDays(
+                e.target.value === TRAIL_ALL
+                  ? TRAIL_ALL
+                  : Number(e.target.value)
+              )
+            }
+          >
             {trailingWindowOptions.map((days) => (
-              <Dropdown.Item
-                key={days}
-                active={days === trailingDays}
-                onClick={() => setTrailingDays(days)}
-              >
+              <option key={days} value={days}>
                 {days === TRAIL_ALL
                   ? t('timeBarTrailAll')
                   : `${days} ${t('timeBarDays')}`}
-              </Dropdown.Item>
+              </option>
             ))}
-          </Dropdown.Menu>
-        </Dropdown>
+          </select>
+        </label>
         <label className='timeBarSmoothing' title={t('trackSmoothingTooltip')}>
           <input
             type='checkbox'

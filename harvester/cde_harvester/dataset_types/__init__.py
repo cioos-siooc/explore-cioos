@@ -71,9 +71,11 @@ from cde_harvester.dataset_types.trajectory import (  # noqa: E402
     TrajectoryHandler,
     TrajectoryProfileHandler,
 )
+from cde_harvester.dataset_types.grid import GridHandler  # noqa: E402
 
 register(TimeSeriesHandler())
 register(ProfileHandler())
 register(TimeSeriesProfileHandler())
 register(TrajectoryHandler())
 register(TrajectoryProfileHandler())
+register(GridHandler())

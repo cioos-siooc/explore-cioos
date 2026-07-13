@@ -24,7 +24,12 @@ class CDEComplianceChecker(object):
     def check_required_variables(self):
         # make sure LLAT variables exist. Depth/Altitude is assumed to be 0 if it doesnt exist
         # https://coastwatch.pfeg.noaa.gov/erddap/download/setupDatasetsXml.html#LLAT
-        required_variables = ["time", "latitude", "longitude"]
+        # Grids only need lat/lon: static grids (no time axis) are valid
+        # metadata-only datasets.
+        if self.dataset.cdm_data_type == "Grid":
+            required_variables = ["latitude", "longitude"]
+        else:
+            required_variables = ["time", "latitude", "longitude"]
 
         missing_required_vars = [
             x for x in required_variables if x not in self.dataset.variables_list

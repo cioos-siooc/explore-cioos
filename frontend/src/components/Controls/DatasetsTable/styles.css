@@ -1,100 +1,178 @@
+/* DatasetsTable — react-data-table-component renders divs (rdt_* classes),
+   so table chrome lives in the customStyles prop (DatasetsTable.jsx); this
+   file styles the toolbar, checkboxes and the download-modal cells.
+   Fills its container's height (see DatasetsPanel / DownloadDetails): the
+   toolbar/subheader and pagination footer stay put, and only the row area
+   (.dtScrollArea, the DataTable's fixedHeader responsive wrapper) scrolls —
+   one scroll region instead of the sheet's own overflow taking over. */
 .datasetsTable {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   text-align: left;
 }
 
-.datasetsTable .selectDatasetColumn {
-  width: 50px;
+.datasetsTable .dtScrollArea {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
-.datasetsTable th {
+/* --- Row checkboxes --- */
+.datasetsTable .datasetCheckbox {
+  color: var(--cioos-ink-60);
   cursor: pointer;
+  transition: color var(--cioos-transition-fast);
 }
 
-.datasetsTable thead th {
-  background-color: white;
+.datasetsTable .datasetCheckbox:hover {
+  color: var(--cioos-primary-700);
 }
 
-.datasetsTable tr {
-  border: 2px solid transparent;
-  margin: -2px;
-  overflow-wrap: break-word;
+.datasetsTable .datasetCheckbox.checked {
+  color: var(--cioos-primary);
 }
 
-.datasetsTable thead th:hover {
-  background-color: lightgray;
-}
-
-.datasetsTable tr:hover {
-  background-color: #c6e3df;
-  cursor: pointer;
-}
-
-.datasetsTable td {
-  cursor: pointer;
-}
-
-.datasetsTable .datasetsTableTitleCell {
-  min-width: 150px;
-}
-
-.datasetsTable .inspectButton {
-  text-align: center;
-  margin: 10px 5px 10px 5px;
-  border: 2px solid darkgrey;
-  border-radius: 10px;
-  width: 40px;
-  height: 40px;
-  padding: 5px;
-}
-
-.datasetsTable .inspectButton:hover {
-  background-color: #c6e3df;
-}
-
-.selectAllHeader {
-  display: flex
-}
-
-.selectAllHeader svg {
-  margin-bottom: 5px;
+.datasetsTable .datasetCheckbox.disabled {
+  color: var(--cioos-hairline);
+  cursor: not-allowed;
 }
 
 .datasetsTable .optionColorCircle {
   margin-right: 5px;
 }
 
-.datasetsTable .datasetTableLocationsCell svg {
-  float: right;
-}
-
-.datasetsTable tbody tr td svg:hover {
-  background-color: lightgrey;
-}
-
 .datasetsTable .downloadIcon {
   margin-left: 2px;
 }
 
+/* --- Sidebar toolbar: select-all pill + search field + result count --- */
+.datasetsTable .datasetsTableToolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.datasetsTable .datasetsTableToolbar .selectAllToggle {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  background: transparent;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  padding: 6px 12px;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+.datasetsTable .datasetsTableToolbar .selectAllToggle:hover {
+  background-color: var(--cioos-teal-light);
+  color: var(--cioos-ink);
+}
+
+.datasetsTable .datasetsTableToolbar .selectAllToggle.active {
+  background-color: var(--cioos-primary);
+  border-color: var(--cioos-primary);
+  color: var(--cioos-white);
+}
+
+.datasetsTable .datasetsTableSearchWrap {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  padding: 0 12px;
+  background-color: var(--cioos-white);
+  color: var(--cioos-ink-40);
+}
+
+.datasetsTable .datasetsTableSearchWrap:focus-within {
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
+}
+
+.datasetsTable .datasetsTableSearchWrap svg {
+  flex: 0 0 auto;
+}
+
+.datasetsTable .datasetsTableSearch {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  padding: 6px 0;
+  outline: none;
+  background: transparent;
+  color: var(--cioos-ink);
+}
+
+.datasetsTable .datasetsTableCount {
+  flex: 0 0 auto;
+  min-width: 28px;
+  text-align: center;
+  padding: 3px 8px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-surface-2);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  color: var(--cioos-ink-60);
+}
+
+/* --- Download modal cells --- */
 .datasetsTable .datasetsTableSpinner {
-  /* position: absolute; */
-  margin:0px 40px;
-  /* background-color: lightgray; */
+  margin: 0px 40px;
   opacity: 30%;
 }
 
+.datasetsTable .downloadableIcon {
+  display: block;
+  margin: auto;
+}
+
+.datasetsTable .downloadableIcon.success {
+  color: var(--cioos-success);
+}
+
+.datasetsTable .downloadableIcon.error {
+  color: var(--cioos-error);
+}
+
+/* filtered / unfiltered estimate: the filtered size reads as a status pill */
 .datasetsTable .downloadSizeEstimate {
-  line-height: 30px;
-  padding: 0px 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 0;
   min-width: max-content;
+  color: var(--cioos-ink-60);
 }
 
 .datasetsTable .downloadSizeEstimateFiltered {
-  height: 30px;
-  display: inline;
-  background-color: #e3285e;
-  color: white;
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-error-bg);
+  color: var(--cioos-error);
+  font-weight: 600;
 }
 
 .datasetsTable .downloadSizeEstimateFiltered.downloadable {
-  background-color: #52a79b;
+  background-color: var(--cioos-success-bg);
+  color: var(--cioos-primary-700);
+}
+
+@media (max-width: 600px) {
+  .datasetsTable .downloadSizeEstimate {
+    font-size: 0.85em;
+  }
+
+  .datasetsTable .datasetsTableToolbar {
+    flex-wrap: wrap;
+  }
 }

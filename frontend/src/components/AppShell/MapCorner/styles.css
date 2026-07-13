@@ -1,0 +1,4 @@
+/* Lower-right map interaction cluster. The box-query button and the
+   MapLibre-native controls (zoom / draw / scale) share this corner; their
+   base positioning still lives in components/styles.css and the MapLibre
+   control CSS. This file only hosts shell-specific adjustments. */

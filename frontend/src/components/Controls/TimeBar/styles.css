@@ -1,6 +1,7 @@
 .timeBar {
   position: absolute;
-  bottom: 20px;
+  /* clears the bottom-center dock cluster (fixed at bottom: 22px, ~110px tall) */
+  bottom: 140px;
   left: 50%;
   transform: translateX(-50%);
   width: min(720px, calc(100% - 220px));
@@ -41,6 +42,23 @@
   align-items: center;
   gap: 12px;
   white-space: nowrap;
+}
+
+.timeBarTrail {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.timeBarTrailSelect {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  padding: 3px 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
 }
 
 .timeBarSmoothing {

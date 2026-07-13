@@ -70,23 +70,21 @@ async function createDBFilter(request) {
     filters.push("time_min <= :timeMax::timestamptz");
   }
 
-  // This would be used if there was a rectangle selection for download
-  if (latMin) {
-    parameters.latMin = latMin;
-    filters.push("latitude >= (:latMin)::double precision");
-  }
-  if (latMax) {
-    parameters.latMax = latMax;
-    filters.push("latitude <= (:latMax)::double precision");
-  }
-
-  if (lonMin) {
-    parameters.lonMin = lonMin;
-    filters.push("longitude >= (:lonMin)::double precision");
-  }
-  if (lonMax) {
-    parameters.lonMax = lonMax;
-    filters.push("longitude <= (:lonMax)::double precision");
+  // Rectangle selection (download bbox). Matched against each feature's
+  // extent (search_geom = the profiles bbox, or the cell point for
+  // obis/trajectory) via ST_Intersects, so a feature that passes through the
+  // rectangle is found even if its display point sits outside it. Missing
+  // bounds default to the world extent so a partial rectangle still works.
+  if (latMin || latMax || lonMin || lonMax) {
+    parameters.rectLonMin = lonMin || -180;
+    parameters.rectLatMin = latMin || -90;
+    parameters.rectLonMax = lonMax || 180;
+    parameters.rectLatMax = latMax || 90;
+    filters.push(
+      "ST_Intersects(search_geom, ST_Transform(ST_MakeEnvelope("
+      + "(:rectLonMin)::double precision,(:rectLatMin)::double precision,"
+      + "(:rectLonMax)::double precision,(:rectLatMax)::double precision,4326),3857))",
+    );
   }
 
   // disabled until we get depth data into the database
@@ -139,7 +137,9 @@ async function createDBFilter(request) {
   if (polygon) {
     const wktPolygon = polygonJSONToWKT(polygon);
     parameters.wktPolygon = wktPolygon;
-    filters.push("ST_Contains(ST_GeomFromText(:wktPolygon,4326),ST_Transform(geom,4326)) is true");
+    // Extent-based: a feature matches when its search_geom intersects the drawn
+    // polygon (was ST_Contains on the single point).
+    filters.push("ST_Intersects(search_geom, ST_Transform(ST_GeomFromText(:wktPolygon,4326),3857)) is true");
   }
 
   if (scientificNames) {

@@ -1,7 +1,8 @@
 .layerSelector {
   position: absolute;
   right: 10px;
-  bottom: 290px;
+  /* stacks directly under the MapLayerToggle button (bottom: 286px) */
+  bottom: 236px;
   z-index: 2;
 }
 
