@@ -9,9 +9,10 @@ import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
 
 // The brand card: logo, the two-line app title lockup, and the minor actions
-// (intro / feedback / language) all on one row. Sits at the top of the
-// sidebar column, above the datasets card.
-export default function BrandSearch () {
+// (intro / feedback / language) on the top row. The centered top bar passes
+// the merged Datasets/Filters control in as children, so it renders as a
+// second row welded into this same card.
+export default function BrandSearch ({ children }) {
   const { t, i18n } = useTranslation()
   const { setShowIntroModal } = useUI()
 
@@ -76,6 +77,7 @@ export default function BrandSearch () {
             <LanguageSelector className='brandMinorItem brandLanguage' />
           </div>
         </div>
+        {children}
       </div>
     </div>
   )

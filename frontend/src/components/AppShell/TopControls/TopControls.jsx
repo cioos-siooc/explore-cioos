@@ -1,15 +1,20 @@
 import * as React from 'react'
-import { Filter } from 'react-bootstrap-icons'
+import { Filter, ListUl } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
+import classNames from 'classnames'
 
+import BrandSearch from '../TopLeft/BrandSearch.jsx'
 import ActiveFilterChips from './ActiveFilterChips.jsx'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
+import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
 
-// The control row at the top of the map, beside the sidebar: the Filters
-// button (opens the filter modal) followed by the active-filter chips. The
-// brand + search and the datasets toggle now live permanently in the sidebar.
+// Centered top header. First layer: the brand bar. Second layer, merged into a
+// single segmented pill directly below it: the Datasets toggle (opens/closes
+// the left datasets sidebar) and the Filters button (opens the filters modal).
+// Both segments carry a dimmed-primary wash so they read as the map's primary
+// entry points. The active-filter chips flow beneath, staying centered.
 export default function TopControls () {
   const { t } = useTranslation()
   const {
@@ -21,9 +26,11 @@ export default function TopControls () {
     obisNodesSelected,
     scientificNamesSelected,
     timeFilterActive,
-    depthFilterActive
+    depthFilterActive,
+    totalNumberOfDatasets
   } = useFilters()
-  const { setShowFiltersModal } = useUI()
+  const { pointsData } = useSelection()
+  const { setShowFiltersModal, sidebarOpen, setSidebarOpen } = useUI()
 
   const activeFilterCount = [
     eovsSelected.some((o) => o.isSelected),
@@ -37,20 +44,44 @@ export default function TopControls () {
     depthFilterActive
   ].filter(Boolean).length
 
+  const filteredCount = pointsData?.length ?? 0
+
   return (
-    <div className='topControls'>
-      <button
-        type='button'
-        className='topControlButton'
-        onClick={() => setShowFiltersModal(true)}
-        title={t('dockFiltersCountTitle', { count: activeFilterCount })}
-      >
-        <Filter size={20} aria-hidden='true' />
-        <span className='topControlLabel'>{t('filtersMenuButton')}</span>
-        {activeFilterCount > 0 && (
-          <span className='topControlCount'>{activeFilterCount}</span>
-        )}
-      </button>
+    <div className='topBar'>
+      <BrandSearch>
+        <div className='topBarActions'>
+          <button
+            type='button'
+            className={classNames('topBarButton', { active: sidebarOpen })}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-pressed={sidebarOpen}
+            title={t('dockDatasetsCountTitle', {
+              filtered: filteredCount,
+              total: totalNumberOfDatasets || 0
+            })}
+          >
+            <ListUl size={18} aria-hidden='true' />
+            <span className='topBarButtonLabel'>{t('datasetsFilterName')}</span>
+            <span className='topBarCount'>
+              {totalNumberOfDatasets
+                ? `${filteredCount} / ${totalNumberOfDatasets}`
+                : filteredCount}
+            </span>
+          </button>
+          <button
+            type='button'
+            className='topBarButton'
+            onClick={() => setShowFiltersModal(true)}
+            title={t('dockFiltersCountTitle', { count: activeFilterCount })}
+          >
+            <Filter size={18} aria-hidden='true' />
+            <span className='topBarButtonLabel'>{t('filtersMenuButton')}</span>
+            {activeFilterCount > 0 && (
+              <span className='topBarCount'>{activeFilterCount}</span>
+            )}
+          </button>
+        </div>
+      </BrandSearch>
       <ActiveFilterChips />
     </div>
   )

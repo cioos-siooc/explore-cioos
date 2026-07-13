@@ -1,53 +1,92 @@
 /* ------------------------------------------------------------------
- * TopControls — the control row at the top of the map, sitting beside
- * the (always-present) sidebar: Filters button + active-filter chips.
+ * TopBar — the centered top header floating over the map. First layer:
+ * the brand bar. Second layer: the merged Datasets/Filters segmented
+ * pill. Active-filter chips flow beneath. Everything stays centered on
+ * the horizontal midline of the viewport.
  * ------------------------------------------------------------------ */
-.topControls {
+.topBar {
   position: fixed;
   top: 12px;
-  left: calc(min(var(--cioos-sidebar-width, 420px), 100vw - 24px) + 24px);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: var(--cioos-z-dock, 35);
   display: flex;
-  align-items: flex-start;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
   gap: 10px;
-  max-width: calc(100vw - var(--cioos-sidebar-width, 420px) - 48px);
+  max-width: calc(100vw - 24px);
   pointer-events: none;
 }
 
-.topControls > * {
-  pointer-events: all;
+.topBar > * {
+  pointer-events: auto;
 }
 
-.topControlButton {
+/* Merged tabs, pulled out full-bleed from below the brand row: two
+   equal-width segments (1fr 1fr — the columns grow to fit the widest label,
+   so both stay the same width) that bleed 1px past the card on the left,
+   right and bottom to cover its border, leaving no line around them. */
+.topBarActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  margin: 0 -1px -1px;
+  border-top: 1px solid var(--cioos-hairline);
+  border-bottom-left-radius: var(--cioos-radius-lg);
+  border-bottom-right-radius: var(--cioos-radius-lg);
+  overflow: hidden;
+}
+
+.topBarButton {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  height: 42px;
-  padding: 0 16px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
-  box-shadow: var(--cioos-shadow-card);
+  min-width: 0;
+  height: 40px;
+  padding: 0 14px;
+  border: none;
+  /* Dimmed primary: a translucent teal wash that highlights the two entry
+     points without competing with the white brand row above them. */
+  background-color: rgba(82, 167, 155, 0.14);
   font: inherit;
   font-weight: 600;
-  color: var(--cioos-ink);
+  color: var(--cioos-primary-700);
   cursor: pointer;
   white-space: nowrap;
   transition: background-color var(--cioos-transition-fast),
-    border-color var(--cioos-transition-fast);
+    color var(--cioos-transition-fast);
 }
 
-.topControlButton svg {
+/* Hairline weld between the two tabs. */
+.topBarButton + .topBarButton {
+  border-left: 1px solid rgba(82, 167, 155, 0.32);
+}
+
+.topBarButton svg {
   color: var(--cioos-primary);
 }
 
-.topControlButton:hover {
-  background-color: var(--cioos-surface-2);
-  border-color: var(--cioos-primary);
+.topBarButton:hover {
+  background-color: rgba(82, 167, 155, 0.24);
 }
 
-.topControlCount {
+/* Pressed/open state (Datasets sidebar showing): fill with solid primary. */
+.topBarButton.active {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
+}
+
+.topBarButton.active svg {
+  color: var(--cioos-white);
+}
+
+.topBarButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.topBarCount {
   display: inline-flex;
   align-items: center;
   padding: 1px 8px;
@@ -60,20 +99,27 @@
   white-space: nowrap;
 }
 
+/* On the active (teal) tab the count stays white too — a translucent white
+   pill keeps the number legible without a dark-on-white patch. */
+.topBarButton.active .topBarCount {
+  background-color: rgba(255, 255, 255, 0.24);
+  color: var(--cioos-white);
+}
+
 @media (max-width: 700px) {
-  /* The brand card floats top-left on phones, so the Filters button and its
-     chips move to the top-right corner, stacking downward. */
-  .topControls {
+  .topBar {
     top: 8px;
-    right: 8px;
-    left: auto;
     max-width: calc(100vw - 16px);
-    flex-direction: column;
-    align-items: flex-end;
   }
 
-  .topControlLabel {
-    display: none;
+  .topBarButtonLabel {
+    /* Keep labels — the merged pill is the only dataset/filter entry point on
+       phones now — but tighten the padding so both segments fit. */
+    display: inline;
+  }
+
+  .topBarButton {
+    padding: 0 14px;
   }
 }
 
@@ -86,9 +132,10 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   margin: 0;
-  padding: 6px 0;
+  padding: 0;
   list-style: none;
   pointer-events: none;
 }
@@ -166,9 +213,13 @@
   color: var(--cioos-white);
 }
 
+/* Reset-all drops onto its own full-width row, centered below the applied
+   filter chips. */
 .activeFilterResetItem {
   pointer-events: all;
-  display: inline-flex;
+  flex-basis: 100%;
+  display: flex;
+  justify-content: center;
 }
 
 /* Reset-all: a subtle text link (shared with the filters modal). */

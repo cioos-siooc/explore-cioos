@@ -1,9 +1,9 @@
 /* ------------------------------------------------------------------
- * Sidebar — the left column, two vertically separated cards: the brand
- * card on top and the datasets card below it (a toggle header that
- * shows/hides the dataset list body and the counts + Download footer).
- * On phones the datasets card becomes a bottom sheet draggable up from
- * the base of the screen.
+ * Sidebar — the left column holding the datasets card (a toggle header
+ * that shows/hides the dataset list body and the counts + Download
+ * footer). The brand + Datasets/Filters entry points live in the
+ * centered top bar. On phones the datasets card becomes a bottom sheet
+ * draggable up from the base of the screen.
  * ------------------------------------------------------------------ */
 :root {
   --cioos-sidebar-width: 420px;
@@ -31,11 +31,6 @@
   pointer-events: auto;
 }
 
-/* Brand card sits at the top at its natural height. */
-.sidebarBrand {
-  flex: 0 0 auto;
-}
-
 /* ------------------------------------------------------------------
  * Datasets card: toggle header + list body + counts/Download footer.
  * ------------------------------------------------------------------ */
@@ -59,6 +54,16 @@
 .sidebarDatasets:not(.expanded) .sidebarBody,
 .sidebarDatasets:not(.expanded) .sidebarFooter {
   display: none;
+}
+
+/* On desktop the datasets card is opened from the top-bar Datasets button, so
+   when collapsed the whole card (banner included) disappears from the left —
+   the map is unobstructed. When expanded its banner stays clickable to hide
+   it again. (Phones keep the draggable bottom-sheet peek; see below.) */
+@media (min-width: 701px) {
+  .sidebarDatasets:not(.expanded) {
+    display: none;
+  }
 }
 
 .datasetsToggle {
@@ -204,12 +209,6 @@
   .sidebar {
     inset: 8px;
     width: auto;
-  }
-
-  /* Brand card shrinks to its content so the top-right controls have room. */
-  .sidebarBrand {
-    align-self: flex-start;
-    max-width: calc(100vw - 16px);
   }
 
   .sidebarDatasets {

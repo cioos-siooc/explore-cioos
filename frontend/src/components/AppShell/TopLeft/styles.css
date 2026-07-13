@@ -9,23 +9,36 @@
 .brandCard {
   display: flex;
   flex-direction: column;
+  /* Size to content (capped to the viewport) so the wider French labels —
+     "Jeux de données" — fit the tabs without clipping. The tab grid below is
+     the widest row, so it sets the card width and the brand row centers
+     within it. */
+  width: max-content;
+  max-width: calc(100vw - 24px);
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
-  /* Match the datasets card below it so the two read as a matched pair. */
   border-radius: var(--cioos-radius-lg);
   box-shadow: var(--cioos-shadow-float);
-  padding: 10px 14px;
+  /* No padding on the card itself: the brand row carries its own, and the
+     tab strip below is full-bleed, bleeding over the card border. */
+  padding: 0;
 }
 
+/* Symmetric three-track grid so the title is centered in the card: the logo
+   and the minor-actions cluster occupy equal-width side columns (1fr each),
+   with the wordmark auto-sized and centered between them. */
 .brandCardTop {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 12px;
+  padding: 10px 14px;
 }
 
 .brandSearchLogo {
   display: flex;
   align-items: center;
+  justify-self: start;
   border-radius: var(--cioos-radius-sm);
   transition: background-color var(--cioos-transition-fast);
 }
@@ -47,10 +60,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* Flexible centered slot between the fixed-width logo and buttons: both
-     wordmarks center in the same space, so the buttons never shift with the
-     language. */
-  flex: 1 1 auto;
+  /* Auto-sized centre column of the grid; the equal 1fr side columns keep it
+     centered in the card regardless of the language's word length. */
+  justify-self: center;
   min-width: 0;
   margin: 0;
   /* Montserrat light to match the CIOOS wordmark — Sora (font-display) only
@@ -79,13 +91,13 @@
   font-weight: 500;
 }
 
-/* Minor actions (intro / feedback / language): inline, pushed to the row's
-   right edge. */
+/* Minor actions (intro / feedback / language): right-hand side column,
+   mirroring the logo column's width so the wordmark stays centered. */
 .brandMinorItems {
   display: flex;
   align-items: center;
+  justify-self: end;
   gap: 4px;
-  margin-left: auto;
 }
 
 .brandMinorItem {

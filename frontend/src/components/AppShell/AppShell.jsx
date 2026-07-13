@@ -18,10 +18,11 @@ import { useMapState } from '../../state/map/MapStateProvider.jsx'
 import { useUI } from '../../state/ui/UIProvider.jsx'
 import './styles.css'
 
-// The map-first shell: full-bleed map with the dataset sidebar on the left
-// (brand + search on top, counts + Download below), the Filters button and
-// active-filter chips beside it, and the map interaction controls
-// lower-right. Filters and Download open as modals.
+// The map-first shell: full-bleed map with a centered top bar (brand on the
+// first layer, the merged Datasets/Filters segmented control on the second,
+// active-filter chips beneath), the datasets sidebar on the left (list +
+// counts + Download), and the map interaction controls lower-right. Filters
+// and Download open as modals.
 export default function AppShell () {
   const { t } = useTranslation()
   const { platformsSelected } = useFilters()

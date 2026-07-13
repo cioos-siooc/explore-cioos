@@ -185,6 +185,24 @@
   color: var(--cioos-ink);
 }
 
+/* On narrower viewports the centered top bar (brand + merged
+   Datasets/Filters pill) reaches far enough right to collide with the
+   top-right legend, so drop the legend below the bar instead of beside it. */
+@media (max-width: 900px) {
+  .legend {
+    top: 124px;
+    max-height: calc(100vh - 148px);
+  }
+}
+
+@media (max-width: 700px) {
+  .legend {
+    top: 116px;
+    right: 8px;
+    max-height: calc(100vh - 132px);
+  }
+}
+
 @media (max-height: 500px) {
   .legend {
     max-height: calc(100vh - 80px);

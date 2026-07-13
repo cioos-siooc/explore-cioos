@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
 import isEmpty from 'lodash/isEmpty'
 
-import BrandSearch from '../TopLeft/BrandSearch.jsx'
 import DatasetsPanel from '../Panels/DatasetsPanel.jsx'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
@@ -20,10 +19,11 @@ const SHEET_PEEK = 56
 // rather than a tap on the toggle.
 const DRAG_THRESHOLD = 6
 
-// The left column: a brand card on top and, vertically separated below it, the
-// datasets card — a toggle header that shows/hides the dataset list and the
-// counts + Download footer. On phones the datasets card becomes a bottom sheet
-// that can be dragged up from the base of the screen.
+// The left column: the datasets card — a toggle header that shows/hides the
+// dataset list and the counts + Download footer. (The brand and the
+// Datasets/Filters entry points now live in the centered top bar.) On phones
+// the datasets card becomes a bottom sheet dragged up from the base of the
+// screen.
 export default function Sidebar () {
   const { t } = useTranslation()
   const { totalNumberOfDatasets } = useFilters()
@@ -99,9 +99,6 @@ export default function Sidebar () {
 
   return (
     <aside className='sidebar' aria-label={t('datasetsFilterName')}>
-      <div className='sidebarBrand'>
-        <BrandSearch />
-      </div>
       <section
         ref={sheetRef}
         className={classNames('sidebarDatasets', { expanded })}
