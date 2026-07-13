@@ -50,7 +50,11 @@ export default function Legend({
 }) {
   const { t } = useTranslation()
   const [legendOpen, setLegendOpen] = useState(true)
-  const [layersOpen, setLayersOpen] = useState(true)
+  // Layers section starts collapsed on narrow viewports (where the legend
+  // moves to the bottom-left corner) to keep the corner card compact.
+  const [layersOpen, setLayersOpen] = useState(
+    () => !window.matchMedia('(max-width: 900px)').matches
+  )
 
   // Continuous color bar for a hex ramp. The hex counts follow a non-linear
   // (power/log) scale, so the colors are spaced evenly by their scale index

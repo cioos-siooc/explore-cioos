@@ -187,19 +187,15 @@
 
 /* On narrower viewports the centered top bar (brand + merged
    Datasets/Filters pill) reaches far enough right to collide with the
-   top-right legend, so drop the legend below the bar instead of beside it. */
+   top-right legend, so move the legend to the bottom-left corner — clear of
+   the brand section — instead of leaving it beside the bar. */
 @media (max-width: 900px) {
   .legend {
-    top: 124px;
+    top: auto;
+    right: auto;
+    bottom: 12px;
+    left: 8px;
     max-height: calc(100vh - 148px);
-  }
-}
-
-@media (max-width: 700px) {
-  .legend {
-    top: 116px;
-    right: 8px;
-    max-height: calc(100vh - 132px);
   }
 }
 
