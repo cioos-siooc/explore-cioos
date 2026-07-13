@@ -204,6 +204,7 @@
   left: 11px;
   z-index: 1;
   display: flex;
+  border-radius: 50%;
   background-color: var(--cioos-white);
 }
 

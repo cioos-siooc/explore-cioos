@@ -1,7 +1,7 @@
 import React from 'react'
 import {
-  CheckSquare,
-  Square,
+  CheckCircleFill,
+  Circle,
   CircleFill,
   Grid3x3Gap,
   Check2Circle,
@@ -97,9 +97,9 @@ export default function DatasetCard({
     >
       <div className='datasetCardSelect' title={selectTitle} onClick={handleSelect}>
         {row.selected ? (
-          <CheckSquare className='datasetCheckbox checked' size={18} />
+          <CheckCircleFill className='datasetCheckbox checked' size={18} />
         ) : (
-          <Square
+          <Circle
             className={classNames('datasetCheckbox', { disabled: selectDisabled })}
             size={18}
           />
