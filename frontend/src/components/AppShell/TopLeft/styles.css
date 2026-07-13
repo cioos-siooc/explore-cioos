@@ -11,6 +11,12 @@
   align-items: flex-start;
 }
 
+/* Fixed card width so the buttons that follow in the top row don't shift
+   when the (wider) French wordmark is active. */
+.brandSearch.floating .brandCard {
+  width: min(380px, calc(100vw - 24px));
+}
+
 .brandCard {
   display: flex;
   flex-direction: column;
@@ -47,29 +53,47 @@
 }
 
 .brandSearchLogo img {
-  height: 32px;
+  height: 26px;
   width: auto;
   display: block;
 }
 
-/* Two-line wordmark: DATA / *EXPLORER* (FR: *EXPLORATEUR* / DE DONNÉES);
-   the em line carries the italic accent. */
+/* Two-line wordmark lockup, lines centered on each other: the secondary
+   word(s) (span — DATA / DE DONNÉES) small and widely tracked, the main word
+   (em — EXPLORER / EXPLORATEUR) large and light. */
 .brandTitle {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  /* Flexible centered slot between the fixed-width logo and buttons: both
+     wordmarks center in the same space, so the buttons never shift with the
+     language. */
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
-  font-family: var(--cioos-font-display);
-  font-size: var(--cioos-font-size-sm);
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: 0.08em;
+  /* Montserrat light to match the CIOOS wordmark — Sora (font-display) only
+     ships in 600/700 here and would synthesize a heavy fake-light. */
+  font-family: var(--cioos-font-body);
+  font-weight: 300;
   color: var(--cioos-ink);
   white-space: nowrap;
 }
 
+.brandTitle span {
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.28em;
+  /* optically recenter: tracking adds a trailing space after the last glyph */
+  margin-right: -0.28em;
+}
+
 .brandTitle em {
-  font-style: italic;
-  color: var(--cioos-primary);
+  font-style: normal;
+  /* sized so EXPLORATEUR fits the slot the sidebar leaves for the title */
+  font-size: 17px;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  margin-right: -0.06em;
 }
 
 /* Minor actions (intro / feedback / language): inline, pushed to the row's
@@ -113,7 +137,11 @@
     height: 24px;
   }
 
-  .brandTitle {
-    font-size: var(--cioos-font-size-xs);
+  .brandTitle span {
+    font-size: 8px;
+  }
+
+  .brandTitle em {
+    font-size: 15px;
   }
 }

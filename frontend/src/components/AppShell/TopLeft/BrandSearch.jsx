@@ -36,7 +36,7 @@ export default function BrandSearch ({ floating = false }) {
               alt={isFrench ? 'SIOOC' : 'CIOOS'}
             />
           </a>
-          {/* Two-line wordmark; the accented line carries the brand italic. */}
+          {/* Two-line wordmark; the em word gets the large treatment. */}
           <h1 className='brandTitle' lang={isFrench ? 'fr' : 'en'}>
             {isFrench ? (
               <>
