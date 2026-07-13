@@ -58,7 +58,7 @@
 }
 
 .brandSearchLogo img {
-  height: 26px;
+  height: 34px;
   width: auto;
   display: block;
 }
@@ -139,7 +139,7 @@
 
 @media (max-width: 600px) {
   .brandSearchLogo img {
-    height: 24px;
+    height: 30px;
   }
 
   .brandTitle span {
