@@ -1,12 +1,4 @@
-/* Lower-right map interaction cluster. The layer picker lives in
-   .mapCornerCluster, a custom entry portaled into MapLibre's bottom-right
-   control container so it flows with the native draw / zoom / scale stack
-   instead of tracking it with hardcoded offsets (the box-query button portals
-   into the draw group itself). Button chrome lives in components/styles.css
-   and MapLayerToggle/styles.css. */
-.mapCornerCluster {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  pointer-events: auto;
-}
+/* Lower-right map interaction cluster. The box-query (rectangle) button
+   portals into MapLibre's draw group so it flows with the native draw / zoom /
+   scale stack instead of tracking it with hardcoded offsets. Button chrome
+   lives in components/styles.css. */

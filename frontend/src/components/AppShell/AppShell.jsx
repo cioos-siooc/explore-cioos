@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useTranslation } from 'react-i18next'
 
 import MapContainer from '../Map/MapContainer.jsx'
 import ApiErrorBanner from './ApiErrorBanner.jsx'
@@ -22,17 +23,46 @@ import './styles.css'
 // active-filter chips beside it, and the map interaction controls
 // lower-right. Filters and Download open as modals.
 export default function AppShell () {
+  const { t } = useTranslation()
   const { platformsSelected } = useFilters()
   const {
     loading,
     zoom,
     currentRangeLevel,
     currentTrajectoryRangeLevel,
-    legendVisible,
+    griddapCoverageVisible,
+    setGriddapCoverageVisible,
+    dataLayersVisible,
+    setDataLayersVisible,
+    projection,
+    setProjection,
     activeWmsOverlay,
     setActiveWmsOverlay
   } = useMapState()
   const { showIntroModal, setShowIntroModal } = useUI()
+
+  // Map-layer switches, rendered inside the legend card.
+  const layerControls = [
+    {
+      key: 'griddap',
+      label: t('layersGriddedCoverage'),
+      checked: griddapCoverageVisible,
+      onChange: () => setGriddapCoverageVisible(!griddapCoverageVisible)
+    },
+    {
+      key: 'observations',
+      label: t('layersObservations'),
+      checked: dataLayersVisible,
+      onChange: () => setDataLayersVisible(!dataLayersVisible)
+    },
+    {
+      key: 'globe',
+      label: t('layersGlobeView'),
+      checked: projection === 'globe',
+      onChange: () =>
+        setProjection(projection === 'globe' ? 'mercator' : 'globe')
+    }
+  ]
 
   return (
     <>
@@ -48,14 +78,13 @@ export default function AppShell () {
       <TopControls />
       <FiltersModal />
       <DownloadModal />
-      {currentRangeLevel && legendVisible && (
-        <Legend
-          currentRangeLevel={currentRangeLevel}
-          currentTrajectoryRangeLevel={currentTrajectoryRangeLevel}
-          zoom={zoom}
-          platformsInView={platformsSelected.map((e) => e.title)}
-        />
-      )}
+      <Legend
+        currentRangeLevel={currentRangeLevel}
+        currentTrajectoryRangeLevel={currentTrajectoryRangeLevel}
+        zoom={zoom}
+        platformsInView={platformsSelected.map((e) => e.title)}
+        layerControls={layerControls}
+      />
       <MapCornerControls />
       {activeWmsOverlay && (
         <WmsLegend

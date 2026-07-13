@@ -32,10 +32,9 @@ export default function MapStateProvider ({ children }) {
   const [griddapCoverageVisible, setGriddapCoverageVisible] = useState(false)
   const [griddapCoverage, setGriddapCoverage] = useState()
   const [activeWmsOverlay, setActiveWmsOverlay] = useState()
-  // Layer-picker visibility switches: the observation layers (hexes/points/
-  // trajectories) and the floating legend card. Both on by default.
+  // Layer visibility switch for the observation layers (hexes / points /
+  // trajectories). On by default.
   const [dataLayersVisible, setDataLayersVisible] = useState(true)
-  const [legendVisible, setLegendVisible] = useState(true)
   // Map projection: 'mercator' (default) or 'globe'. The globe view renders
   // high latitudes (e.g. the Arctic) without Mercator distortion.
   const [projection, setProjection] = useState('mercator')
@@ -125,8 +124,6 @@ export default function MapStateProvider ({ children }) {
     setGriddapCoverageVisible,
     dataLayersVisible,
     setDataLayersVisible,
-    legendVisible,
-    setLegendVisible,
     projection,
     setProjection,
     griddapCoverage,

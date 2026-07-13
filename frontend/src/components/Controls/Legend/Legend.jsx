@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   ChevronCompactDown,
   ChevronCompactUp,
-  CircleFill,
-  HexagonFill
+  CircleFill
 } from 'react-bootstrap-icons'
 
 import {
@@ -13,41 +12,84 @@ import {
 } from '../../../utilities.jsx'
 import { colorScale, trajectoryColorScale } from '../../config.js'
 import platformColors from '../../platformColors'
+import Switch from '../../ui/Switch.jsx'
 
 import './styles.css'
 import classNames from 'classnames'
 import isEmpty from 'lodash/isEmpty'
 
-// Compact floating legend card (top-right). A small header collapses the
-// body; the sections switch with zoom (hex ramp below z7, point size +
-// platform colors above).
+// Abbreviate large counts so the color-bar ticks stay short (e.g. 12345 -> 12k).
+function formatCount(value) {
+  if (value >= 1000) {
+    const k = value / 1000
+    return `${k >= 10 ? Math.round(k) : k.toFixed(1).replace(/\.0$/, '')}k`
+  }
+  return `${value}`
+}
+
+// Choose which stop indices get a tick label. Keeps every stop when there are
+// few, otherwise thins to an evenly spaced subset (always including the first
+// and last) so labels don't overlap on the compact bar.
+function pickTickIndices(n, maxTicks = 5) {
+  if (n <= maxTicks) return Array.from({ length: n }, (_, i) => i)
+  const step = (n - 1) / (maxTicks - 1)
+  const indices = new Set()
+  for (let i = 0; i < maxTicks; i++) indices.add(Math.round(i * step))
+  return [...indices]
+}
+
+// Compact floating legend card (top-right). Two independently collapsible
+// groups: the legend proper (a hex color bar below z7, point size + platform
+// colors above) and the map-layer switches.
 export default function Legend({
   currentRangeLevel,
   currentTrajectoryRangeLevel,
   zoom,
-  platformsInView
+  platformsInView,
+  layerControls = []
 }) {
   const { t } = useTranslation()
   const [legendOpen, setLegendOpen] = useState(true)
+  const [layersOpen, setLayersOpen] = useState(true)
 
-  function renderRampSection(caption, scale, rangeLevel, key) {
+  // Continuous color bar for a hex ramp. The hex counts follow a non-linear
+  // (power/log) scale, so the colors are spaced evenly by their scale index
+  // rather than by value — a linear-value axis would collapse the ramp into
+  // the dominant high-count color. Count ticks are drawn at each stop (thinned
+  // to keep the compact bar legible), which naturally reads as a log axis.
+  function renderColorBar(caption, scale, rangeLevel, key) {
     const colorStops = generateColorStops(scale, rangeLevel)
-    if (!colorStops) return null
+    if (!colorStops || !colorStops.length) return null
+    const n = colorStops.length
+    const denom = n > 1 ? n - 1 : 1
+    const gradient =
+      n === 1
+        ? colorStops[0].color
+        : `linear-gradient(to right, ${colorStops
+          .map((cs, i) => `${cs.color} ${((i / denom) * 100).toFixed(1)}%`)
+          .join(', ')})`
+    const tickIndices = pickTickIndices(n)
     return (
       <div className='legendSection' key={key}>
         <div className='legendSectionCaption'>{caption}</div>
-        <div className='legendItems'>
-          {colorStops.map((colorStop, index) => (
-            <div className='legendItem' key={index}>
-              <HexagonFill
-                className='legendSwatch'
-                size={12}
-                fill={colorStop.color}
-                aria-hidden='true'
-              />
-              <span className='legendItemLabel'>{colorStop.stop}</span>
-            </div>
-          ))}
+        <div
+          className='legendColorBar'
+          style={{ background: gradient }}
+          aria-hidden='true'
+        />
+        <div className='legendColorBarTicks'>
+          {tickIndices.map((i) => {
+            const align = i === 0 ? 'start' : i === n - 1 ? 'end' : 'mid'
+            return (
+              <span
+                key={i}
+                className={`legendTick ${align}`}
+                style={{ left: `${(i / denom) * 100}%` }}
+              >
+                {formatCount(colorStops[i].stop)}
+              </span>
+            )
+          })}
         </div>
       </div>
     )
@@ -62,7 +104,7 @@ export default function Legend({
       )
     } else if (zoom < 7) {
       // Hexes
-      return renderRampSection(
+      return renderColorBar(
         t('legendPointsPerHex'),
         colorScale,
         currentRangeLevel,
@@ -129,7 +171,7 @@ export default function Legend({
   function generateTrajectoryLegendElements() {
     if (isEmpty(currentTrajectoryRangeLevel)) return null
     // Trajectory coverage always renders as hexes, at every zoom level.
-    return renderRampSection(
+    return renderColorBar(
       t('legendTrajectoriesPerHex'),
       trajectoryColorScale,
       currentTrajectoryRangeLevel,
@@ -137,25 +179,61 @@ export default function Legend({
     )
   }
 
-  return (
-    <div className={classNames('legend', { closed: !legendOpen })}>
+  function renderGroupHeader(title, open, onToggle, tooltip) {
+    return (
       <button
-        className='legendHeader'
-        onClick={() => setLegendOpen(!legendOpen)}
-        title={legendOpen ? t('closeLegendTooltip') : t('openLegendTooltip')}
-        aria-expanded={legendOpen}
+        className='legendGroupHeader'
+        onClick={onToggle}
+        title={tooltip}
+        aria-expanded={open}
       >
-        <span>{t('legendTitle')}</span>
-        {legendOpen ? (
+        <span>{title}</span>
+        {open ? (
           <ChevronCompactUp size={14} aria-hidden='true' />
         ) : (
           <ChevronCompactDown size={14} aria-hidden='true' />
         )}
       </button>
-      {legendOpen && (
-        <div className='legendBody'>
-          {generateLegendElements()}
-          {generateTrajectoryLegendElements()}
+    )
+  }
+
+  return (
+    <div className='legend'>
+      <div className={classNames('legendGroup', { closed: !legendOpen })}>
+        {renderGroupHeader(
+          t('legendTitle'),
+          legendOpen,
+          () => setLegendOpen(!legendOpen),
+          legendOpen ? t('closeLegendTooltip') : t('openLegendTooltip')
+        )}
+        {legendOpen && (
+          <div className='legendGroupBody'>
+            {generateLegendElements()}
+            {generateTrajectoryLegendElements()}
+          </div>
+        )}
+      </div>
+
+      {layerControls.length > 0 && (
+        <div className={classNames('legendGroup', { closed: !layersOpen })}>
+          {renderGroupHeader(t('layersMenuTitle'), layersOpen, () =>
+            setLayersOpen(!layersOpen)
+          )}
+          {layersOpen && (
+            <div className='legendGroupBody'>
+              <div className='legendLayerItems'>
+                {layerControls.map((control) => (
+                  <Switch
+                    key={control.key}
+                    id={`mapLayer-${control.key}`}
+                    label={control.label}
+                    checked={control.checked}
+                    onChange={control.onChange}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
