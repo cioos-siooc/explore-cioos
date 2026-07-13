@@ -71,7 +71,7 @@ export default function TopControls () {
       )}
       <button
         type='button'
-        className='topControlButton filtersButton'
+        className='topControlButton'
         onClick={() => setShowFiltersModal(true)}
         title={t('dockFiltersCountTitle', { count: activeFilterCount })}
       >

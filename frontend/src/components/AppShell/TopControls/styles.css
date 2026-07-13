@@ -66,26 +66,6 @@
   white-space: nowrap;
 }
 
-/* The Filters button carries the brand color — it is the primary action. */
-.topControlButton.filtersButton {
-  background-color: var(--cioos-primary);
-  border-color: var(--cioos-primary-700);
-  color: var(--cioos-white);
-}
-
-.topControlButton.filtersButton svg {
-  color: var(--cioos-white);
-}
-
-.topControlButton.filtersButton:hover {
-  background-color: var(--cioos-primary-700);
-}
-
-.topControlButton.filtersButton .topControlCount {
-  background-color: var(--cioos-white);
-  color: var(--cioos-primary-700);
-}
-
 @media (max-width: 700px) {
   /* The open sidebar covers the viewport on phones — hide the row. */
   .topControls.withSidebar {
