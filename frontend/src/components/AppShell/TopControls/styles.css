@@ -91,7 +91,7 @@
   align-items: center;
   padding: 1px 8px;
   border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-navy);
+  background-color: var(--cioos-primary);
   color: var(--cioos-white);
   font-size: var(--cioos-font-size-xs);
   font-weight: 700;
