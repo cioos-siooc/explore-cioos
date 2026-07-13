@@ -7,9 +7,9 @@
  * ------------------------------------------------------------------ */
 :root {
   --cioos-sidebar-width: 420px;
-  /* Sliver of the collapsed datasets sheet left visible on mobile —
-     kept in sync with SHEET_PEEK in Sidebar.jsx. */
-  --sheet-peek: 56px;
+  /* Sliver of the collapsed datasets sheet left visible on mobile — just a
+     slim grab handle. Kept in sync with SHEET_PEEK in Sidebar.jsx. */
+  --sheet-peek: 28px;
 }
 
 /* Transparent positioning shell: the two cards inside carry the chrome,
@@ -249,7 +249,7 @@
   .datasetsToggle::before {
     content: '';
     position: absolute;
-    top: 8px;
+    top: 10px;
     left: 50%;
     transform: translateX(-50%);
     width: 40px;
@@ -260,6 +260,32 @@
 
   /* The chevron is redundant next to the grab handle on the sheet. */
   .datasetsToggleChevron {
+    display: none;
+  }
+
+  /* Collapsed at the base: the sheet is fully hidden. Only an invisible
+     strip stays at the bottom edge as a drag zone — no handle, no label, no
+     chrome — so the map reads edge-to-edge. Swipe/drag up from the edge to
+     reveal the list; all the sheet chrome returns once it's expanded. */
+  .sidebarDatasets:not(.expanded) {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .sidebarDatasets:not(.expanded) .datasetsToggle {
+    padding: 0;
+    min-height: var(--sheet-peek);
+  }
+
+  .sidebarDatasets:not(.expanded) .datasetsToggle:hover {
+    background: transparent;
+  }
+
+  .sidebarDatasets:not(.expanded) .datasetsToggle::before,
+  .sidebarDatasets:not(.expanded) .datasetsToggle > svg:first-child,
+  .sidebarDatasets:not(.expanded) .datasetsToggleLabel,
+  .sidebarDatasets:not(.expanded) .datasetsToggleCount {
     display: none;
   }
 }

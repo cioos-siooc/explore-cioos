@@ -11,10 +11,12 @@ import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
 
-// Height of the collapsed peek on mobile — the sliver of the datasets sheet
-// left visible above the bottom edge. Kept in sync with --sheet-peek in the
-// stylesheet so the drag math and the resting position agree.
-const SHEET_PEEK = 56
+// Height of the collapsed drag zone on mobile — an invisible strip of the
+// datasets sheet left at the bottom edge to catch the swipe-up. Nothing is
+// drawn there (no handle, no chrome); it only exists to start the drag that
+// reveals the list. Kept in sync with --sheet-peek in the stylesheet so the
+// drag math and the resting position agree.
+const SHEET_PEEK = 28
 // A pointer has to travel this far before we treat the gesture as a drag
 // rather than a tap on the toggle.
 const DRAG_THRESHOLD = 6
