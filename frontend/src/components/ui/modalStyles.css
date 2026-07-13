@@ -15,18 +15,18 @@ body.cioos-modal-open {
   overflow: hidden;
 }
 
+/* All dialogs are vertically centered by default; tall content still scrolls
+   because .modal keeps overflow-y auto. .modal-dialog-centered stays valid
+   as a (now redundant) Bootstrap-compat alias. */
 .modal-dialog {
   position: relative;
+  display: flex;
+  align-items: center;
   width: auto;
   margin: var(--cioos-space-lg, 16px) auto;
   max-width: 500px;
-  pointer-events: none;
-}
-
-.modal-dialog-centered {
-  display: flex;
-  align-items: center;
   min-height: calc(100% - 2 * var(--cioos-space-lg, 16px));
+  pointer-events: none;
 }
 
 .modal-lg {
