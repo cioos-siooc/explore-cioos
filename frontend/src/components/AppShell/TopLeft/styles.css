@@ -18,10 +18,20 @@
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-lg);
-  box-shadow: var(--cioos-shadow-float);
   /* No padding on the card itself: the brand row carries its own, and the
      tab strip below is full-bleed, bleeding over the card border. */
   padding: 0;
+  /* 3D depth (shared tokens; see theme.css). preserve-3d additionally lets the
+     inner lockup items lift off the card face. */
+  transform: var(--cioos-perspective);
+  transform-style: preserve-3d;
+  box-shadow: var(--cioos-shadow-3d);
+}
+
+/* Float the interactive lockup items well above the card face so the depth is
+   strongly layered, not a single flat plane. */
+.brandCard .brandCardTop > * {
+  transform: translateZ(28px);
 }
 
 /* Symmetric three-track grid so the title is centered in the card: the logo

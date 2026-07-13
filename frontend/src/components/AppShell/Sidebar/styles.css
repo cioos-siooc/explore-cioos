@@ -41,8 +41,11 @@
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-lg);
-  box-shadow: var(--cioos-shadow-float);
   overflow: hidden;
+  /* 3D depth (shared tokens; see theme.css). The panel clips its content, so
+     preserve-3d/inner-lift can't apply here; the shadow ladder carries it. */
+  transform: var(--cioos-perspective);
+  box-shadow: var(--cioos-shadow-3d);
 }
 
 /* Expanded: fill the remaining height so the list can scroll. */

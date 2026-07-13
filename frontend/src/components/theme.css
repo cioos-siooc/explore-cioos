@@ -38,6 +38,25 @@
   --cioos-shadow-card:    0 2px 8px rgba(21, 47, 55, 0.08);
   --cioos-shadow-float:   0 4px 16px rgba(21, 47, 55, 0.16);
   --cioos-ring:           0 0 0 2px rgba(21, 47, 55, 0.10); /* default chrome ring */
+  /* 3D depth: a bright inset top-highlight + darker inset base sculpt the
+     element's edge thickness, and the graduated ambient spread lifts it
+     strongly off the map. Pair with `--cioos-perspective` on the same element
+     for the raised, physical read. `-3d` is for cards/panels, `-3d-sm` for
+     chips/pills. */
+  --cioos-shadow-3d:
+    inset 0 1px 0 rgba(255, 255, 255, 0.90),
+    inset 0 -2px 3px rgba(21, 47, 55, 0.08),
+    0 1px 2px rgba(21, 47, 55, 0.14),
+    0 4px 8px rgba(21, 47, 55, 0.16),
+    0 10px 20px rgba(21, 47, 55, 0.18),
+    0 20px 40px rgba(21, 47, 55, 0.20);
+  --cioos-shadow-3d-sm:
+    inset 0 1px 0 rgba(255, 255, 255, 0.90),
+    inset 0 -1px 2px rgba(21, 47, 55, 0.08),
+    0 1px 2px rgba(21, 47, 55, 0.14),
+    0 3px 6px rgba(21, 47, 55, 0.16),
+    0 6px 14px rgba(21, 47, 55, 0.18);
+  --cioos-perspective:    perspective(800px) translateZ(0);
 
   /* --- Shape --- */
   --cioos-radius-lg:   16px;  /* floating panels / menus */

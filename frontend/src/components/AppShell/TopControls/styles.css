@@ -149,8 +149,17 @@
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
-  box-shadow: var(--cioos-shadow-card);
   padding: 3px 6px 3px 4px;
+  /* 3D depth (shared tokens; see theme.css) — the chip-scale ladder.
+     preserve-3d floats the inner value chips above the pill face. */
+  transform: var(--cioos-perspective);
+  transform-style: preserve-3d;
+  box-shadow: var(--cioos-shadow-3d-sm);
+}
+
+/* Float the inner value chips above the pill face for layered depth. */
+.activeFilterGroup > * {
+  transform: translateZ(10px);
 }
 
 .activeFilterGroupLabel {
