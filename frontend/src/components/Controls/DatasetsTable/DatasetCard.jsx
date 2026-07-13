@@ -104,6 +104,11 @@ export default function DatasetCard({
             size={18}
           />
         )}
+        {!selectDisabled && (
+          <span className='datasetCardSelectLabel'>
+            {t('datasetsCardSelectForDownloadText')}
+          </span>
+        )}
       </div>
 
       <div className='datasetCardBody'>

@@ -99,6 +99,7 @@
   "datasetsCardSortAscendingTitle": "Tri croissant — appuyer pour inverser",
   "datasetsCardSortDescendingTitle": "Tri décroissant — appuyer pour inverser",
   "datasetsCardNoResultsText": "Aucun jeu de données ne correspond à votre recherche.",
+  "datasetsCardSelectForDownloadText": "Sélectionner pour téléchargement",
   "datasetsTableSelectTitle": "Sélectionner le jeu de données pour téléchargement",
   "datasetsTableTypeTitle": "Type de jeu de données",
   "datasetsTableLocationsTitle": "Ratio des emplacements sélectionnés à partir de l'ensemble de données",

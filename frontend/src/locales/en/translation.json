@@ -99,6 +99,7 @@
   "datasetsCardSortAscendingTitle": "Sorted ascending — tap to reverse",
   "datasetsCardSortDescendingTitle": "Sorted descending — tap to reverse",
   "datasetsCardNoResultsText": "No datasets match your search.",
+  "datasetsCardSelectForDownloadText": "Select for download",
   "datasetsTableSelectTitle": "Select dataset for download",
   "datasetsTableTypeTitle": "Dataset type",
   "datasetsTableLocationsTitle": "Ratio of selected locations from dataset",
