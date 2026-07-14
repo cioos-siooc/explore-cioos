@@ -5,6 +5,7 @@ import classNames from 'classnames'
 
 import BrandSearch from '../TopLeft/BrandSearch.jsx'
 import ActiveFilterChips from './ActiveFilterChips.jsx'
+import { formatDatasetCount } from '../../../utilities'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
@@ -63,9 +64,7 @@ export default function TopControls () {
             <ListUl size={18} aria-hidden='true' />
             <span className='topBarButtonLabel'>{t('datasetsFilterName')}</span>
             <span className='topBarCount'>
-              {totalNumberOfDatasets
-                ? `${filteredCount} / ${totalNumberOfDatasets}`
-                : filteredCount}
+              {formatDatasetCount(filteredCount, totalNumberOfDatasets)}
             </span>
           </button>
           <button

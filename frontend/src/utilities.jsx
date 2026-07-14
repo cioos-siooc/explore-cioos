@@ -232,6 +232,14 @@ export function generateColorStops(colorScale, range) {
   return result
 }
 
+// The dataset count shown on the Datasets entry points: "filtered / total"
+// while a filter narrows the catalog, and just the total once nothing is
+// filtered out (or before the total is known).
+export function formatDatasetCount (filtered, total) {
+  if (!total || filtered === total) return String(total || filtered)
+  return `${filtered} / ${total}`
+}
+
 export function useDebounce (value, delay) {
   // State and setters for debounced value
   const [debouncedValue, setDebouncedValue] = useState(value)

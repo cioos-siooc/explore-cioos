@@ -6,6 +6,7 @@ import classNames from 'classnames'
 import isEmpty from 'lodash/isEmpty'
 
 import DatasetsPanel from '../Panels/DatasetsPanel.jsx'
+import { formatDatasetCount } from '../../../utilities'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
@@ -35,6 +36,10 @@ export default function Sidebar () {
   const expanded = sidebarOpen
   const filteredCount = pointsData?.length ?? 0
   const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length
+  // Nothing filtered out (or the total isn't in yet): the "filtered / total"
+  // split is noise, so both the pill and the footer state the total alone.
+  const allDatasetsShown =
+    !totalNumberOfDatasets || filteredCount === totalNumberOfDatasets
 
   // Track the mobile breakpoint so the toggle doubles as a drag handle only
   // where the datasets card is a bottom sheet.
@@ -130,9 +135,7 @@ export default function Sidebar () {
               total: totalNumberOfDatasets || 0
             })}
           >
-            {totalNumberOfDatasets
-              ? `${filteredCount} / ${totalNumberOfDatasets}`
-              : filteredCount}
+            {formatDatasetCount(filteredCount, totalNumberOfDatasets)}
           </span>
           <ChevronDown
             className='datasetsToggleChevron'
@@ -152,10 +155,14 @@ export default function Sidebar () {
                 total: totalNumberOfDatasets || 0
               })}
             >
-              {t('sidebarCountsDatasets', {
-                filtered: filteredCount,
-                total: totalNumberOfDatasets || 0
-              })}
+              {allDatasetsShown
+                ? t('sidebarCountsDatasetsAll', {
+                  total: totalNumberOfDatasets || filteredCount
+                })
+                : t('sidebarCountsDatasets', {
+                  filtered: filteredCount,
+                  total: totalNumberOfDatasets
+                })}
             </span>
             <span
               className='sidebarCountsSelected'

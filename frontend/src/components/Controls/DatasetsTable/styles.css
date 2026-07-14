@@ -273,13 +273,17 @@
 
 .datasetCardHeadline {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   gap: 7px;
 }
 
+/* Platform dot: a box exactly one title line tall, so the dot sits centered on
+   the title's first line rather than drifting down on wrapped titles. */
 .datasetCardPlatform {
   flex: 0 0 auto;
-  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  height: calc(var(--cioos-font-size-base) * 1.25);
 }
 
 .datasetCardTitle {

@@ -174,7 +174,8 @@
   flex-shrink: 0;
   padding: 8px 16px;
   border: 1px solid var(--cioos-primary-700);
-  border-radius: var(--cioos-radius-pill);
+  /* Same corner radius as the dataset cards it sits under. */
+  border-radius: var(--cioos-radius);
   background-color: var(--cioos-primary);
   font: inherit;
   font-weight: 700;

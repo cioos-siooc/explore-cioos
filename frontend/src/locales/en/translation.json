@@ -352,6 +352,7 @@
   "sidebarCollapseTitle": "Hide the dataset list",
   "sidebarShowTitle": "Show the dataset list",
   "sidebarCountsDatasets": "{{filtered}} / {{total}} datasets",
+  "sidebarCountsDatasetsAll": "{{total}} datasets",
   "sidebarCountsSelected": "{{count}} selected for download",
   "activeFiltersLabel": "Active filters",
   "chipMapSelectionLabel": "Map selection",

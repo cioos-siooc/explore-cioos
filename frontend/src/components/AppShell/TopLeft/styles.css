@@ -1,5 +1,11 @@
 /* Brand card: logo + two-line title lockup + minor actions on one row.
    Sits at the top of the sidebar column, above the datasets card. */
+:root {
+  /* Fixed brand-card width, sized off the longest row in either language (the
+     French Datasets/Filters tabs) so EN and FR render the same card. */
+  --cioos-brand-width: 400px;
+}
+
 .brandSearch {
   display: flex;
   flex-direction: column;
@@ -9,12 +15,10 @@
 .brandCard {
   display: flex;
   flex-direction: column;
-  /* Size to content (capped to the viewport) so the wider French labels —
-     "Jeux de données" — fit the tabs without clipping. The tab grid below is
-     the widest row, so it sets the card width and the brand row centers
-     within it. */
-  width: max-content;
-  max-width: calc(100vw - 24px);
+  /* Fixed width (capped to the viewport) rather than sized to content: the
+     card must not resize when the language changes, and it is wide enough for
+     the longer French labels — "Jeux de données", "EXPLORATEUR". */
+  width: min(var(--cioos-brand-width), calc(100vw - 24px));
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-lg);

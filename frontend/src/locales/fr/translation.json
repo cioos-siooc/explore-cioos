@@ -353,6 +353,7 @@
   "sidebarCollapseTitle": "Masquer la liste des jeux de données",
   "sidebarShowTitle": "Afficher la liste des jeux de données",
   "sidebarCountsDatasets": "{{filtered}} / {{total}} jeux de données",
+  "sidebarCountsDatasetsAll": "{{total}} jeux de données",
   "sidebarCountsSelected": "{{count}} sélectionnés pour téléchargement",
   "activeFiltersLabel": "Filtres actifs",
   "chipMapSelectionLabel": "Sélection sur la carte",

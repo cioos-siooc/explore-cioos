@@ -28,7 +28,12 @@ export default function SelectionProvider ({ children }) {
   const [polygon, setPolygon] = useState()
   const [pointsToReview, setPointsToReview] = useState()
   const [pointsToDownload, setPointsToDownload] = useState()
-  const [hoveredDataset, setHoveredDataset] = useState()
+  // Hovering the dataset list drives a map highlight (see Map.jsx). Sweeping
+  // the cursor across the list would otherwise repaint the highlight once per
+  // card crossed — and flash the "all datasets" state in the gaps between
+  // cards — so the map follows a settled hover rather than every transit.
+  const [hoveredDatasetTarget, setHoveredDataset] = useState()
+  const hoveredDataset = useDebounce(hoveredDatasetTarget, 120)
 
   const [selectAll, setSelectAll] = useState(false)
   const [pointsData, setPointsData] = useState([])

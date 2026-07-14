@@ -113,27 +113,29 @@ export default function DatasetCard({
 
       <div className='datasetCardBody'>
         <div className='datasetCardHeadline'>
+          {/* The wrapper is the height of the title's first line, so the dot
+              stays centered on that line however the title wraps. */}
+          <span className='datasetCardPlatform'>
+            {isGrid ? (
+              <Grid3x3Gap
+                title={t('griddapTypeLabel')}
+                color='#52a79b'
+                size={15}
+              />
+            ) : (
+              <CircleFill
+                title={t(row.platform)}
+                fill={platformColor?.color || '#000000'}
+                size={13}
+              />
+            )}
+          </span>
           <span className='datasetCardTitle' title={row.title}>
             {row.title}
           </span>
         </div>
 
         <div className='datasetCardMeta'>
-          {isGrid ? (
-            <Grid3x3Gap
-              title={t('griddapTypeLabel')}
-              className='datasetCardPlatform'
-              color='#52a79b'
-              size={15}
-            />
-          ) : (
-            <CircleFill
-              title={t(row.platform)}
-              className='datasetCardPlatform'
-              fill={platformColor?.color || '#000000'}
-              size={13}
-            />
-          )}
           <span className='datasetCardMetaItem' title='ERDDAP™ Server'>
             <Server size={13} aria-hidden='true' />
             {serverName}

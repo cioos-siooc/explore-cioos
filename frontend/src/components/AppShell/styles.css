@@ -1,7 +1,8 @@
-/* API failure banner: top center, above everything but modals. */
+/* API failure banner: bottom center, above everything but modals — the top
+   center is the brand/Datasets/Filters bar. */
 .apiErrorBanner {
   position: fixed;
-  top: 12px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
   z-index: var(--cioos-z-dock, 35);
