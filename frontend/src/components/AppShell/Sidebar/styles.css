@@ -10,6 +10,11 @@
   /* Sliver of the collapsed datasets sheet left visible on mobile — just a
      slim grab handle. Kept in sync with SHEET_PEEK in Sidebar.jsx. */
   --sheet-peek: 28px;
+  /* Clearance held below the brand card so the datasets list's top edge rests
+     just under it (logo row + Datasets/Filters pill) instead of sliding behind
+     it. Used on mobile (sheet height) and on narrow desktop widths where the
+     centered brand card drifts left over the sidebar. */
+  --sheet-top-gap: 110px;
 }
 
 /* Transparent positioning shell: the two cards inside carry the chrome,
@@ -66,6 +71,18 @@
 @media (min-width: 701px) {
   .sidebarDatasets:not(.expanded) {
     display: none;
+  }
+}
+
+/* Narrow desktop widths: the brand card is centered on the viewport, so as the
+   screen narrows it drifts left until it overlaps the top of the left sidebar.
+   The crossover (with the 420px sidebar + 400px brand card) is ~1264px, so up
+   to ~1300px push the datasets card's top down to clear the brand card — the
+   same clearance the mobile sheet holds. Above ~1300px the centered card no
+   longer reaches the sidebar, so no push is needed. */
+@media (min-width: 701px) and (max-width: 1300px) {
+  .sidebarDatasets {
+    margin-top: var(--sheet-top-gap);
   }
 }
 
@@ -220,8 +237,11 @@
     left: 0;
     right: 0;
     bottom: 0;
-    height: 82vh;
-    max-height: 82vh;
+    /* Full height minus the brand-card clearance at the top, so the expanded
+       sheet reaches nearly the top of the screen while stopping below the
+       brand card. */
+    height: calc(100dvh - var(--sheet-top-gap));
+    max-height: calc(100dvh - var(--sheet-top-gap));
     border-radius: var(--cioos-radius-lg) var(--cioos-radius-lg) 0 0;
     box-shadow: var(--cioos-shadow-lift, var(--cioos-shadow-float));
     /* Collapsed rest position: only the handle peeks above the edge. */
