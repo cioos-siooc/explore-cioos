@@ -30,7 +30,6 @@
   min-width: 0;
   padding: 6px 8px;
   border: 1px solid var(--cioos-hairline);
-  border-left: 3px solid var(--cioos-teal-light, var(--cioos-primary));
   border-radius: var(--cioos-radius-sm);
   background-color: var(--cioos-white);
 }
