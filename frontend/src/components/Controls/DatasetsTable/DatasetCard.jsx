@@ -28,6 +28,7 @@ export default function DatasetCard({
   row,
   isDownloadModal,
   downloadSizeEstimates,
+  inViewport = false,
   onSelect,
   onInspect,
   onHover = () => { },
@@ -85,6 +86,7 @@ export default function DatasetCard({
     <div
       className={classNames('datasetCard', {
         selected: row.selected,
+        inViewport,
         clickable,
         downloadModal: isDownloadModal
       })}

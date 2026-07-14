@@ -1,6 +1,7 @@
 import * as React from 'react'
 import {
   ArrowsExpand,
+  BoundingBox,
   Building,
   CalendarWeek,
   FileEarmarkSpreadsheet,
@@ -91,8 +92,16 @@ export default function FiltersPanel () {
     obisDataAvailable,
     resetFilters
   } = useFilters()
-  const { setPolygon, setDatasetTitleSearchText } = useSelection()
+  const {
+    setPolygon,
+    setDatasetTitleSearchText,
+    onlyInView,
+    setOnlyInView,
+    inViewCount
+  } = useSelection()
   const { openFilter, setOpenFilter } = useUI()
+
+  const inViewFilterName = t('datasetsCardOnlyInViewText')
 
   const eovsFilterTranslationKey = 'oceanVariablesFiltername'
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(
@@ -402,6 +411,29 @@ export default function FiltersPanel () {
               setEndDepth={setEndDepth}
             />
           </Filter>
+          <Filter
+            active={onlyInView}
+            badgeTitle={t('datasetsCardOnlyInViewText')}
+            tooltip={t('datasetsCardOnlyInViewTitle')}
+            icon={<BoundingBox />}
+            controlled
+            filterName={inViewFilterName}
+            openFilter={openFilter === inViewFilterName}
+            setOpenFilter={setOpenFilter}
+            resetButton={onlyInView ? () => setOnlyInView(false) : undefined}
+          >
+            <label className='inViewFilterToggle'>
+              <input
+                type='checkbox'
+                checked={onlyInView}
+                onChange={(e) => setOnlyInView(e.target.checked)}
+              />
+              <span>{t('datasetsCardOnlyInViewTitle')}</span>
+            </label>
+            <div className='inViewFilterCount'>
+              {t('datasetsCardInViewCountText', { count: inViewCount })}
+            </div>
+          </Filter>
         </FilterSection>
         {obisDataAvailable && (
           <FilterSection title={t('filterGroupBiodiversity')}>
@@ -427,6 +459,7 @@ export default function FiltersPanel () {
             resetFilters()
             setPolygon()
             setDatasetTitleSearchText('')
+            setOnlyInView(false)
           }}
           title={t('resetFiltersButtonTooltipText')}
         >

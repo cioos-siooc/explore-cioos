@@ -13,6 +13,8 @@ import isEmpty from 'lodash/isEmpty'
 
 import { server } from '../../config.js'
 import {
+  boundsFromGeoJson,
+  boundsIntersect,
   createDataFilterQueryString,
   createSelectionQueryString,
   datasetMatchesUrlKey,
@@ -39,7 +41,8 @@ export default function SelectionProvider ({ children }) {
     setActiveWmsOverlay,
     zoomToGeometry,
     pendingDatasetZoom,
-    setPendingDatasetZoom
+    setPendingDatasetZoom,
+    mapView
   } = useMapState()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -69,16 +72,51 @@ export default function SelectionProvider ({ children }) {
   const [datasetTitleSearchText, setDatasetTitleSearchText] = useState('')
   const [datasetsSelectedCount, setDatasetsSelectedCount] = useState()
   const [combinedQueries, setCombinedQueries] = useState([])
+  // "Only in view": restrict the list to datasets whose extent overlaps the
+  // current map viewport. Lifted here (like the title search) so it also drives
+  // the shared counters and surfaces as a removable chip in ActiveFilterChips.
+  const [onlyInView, setOnlyInView] = useState(false)
+
+  // Per-dataset bbox, computed once per result set from the filtered extent
+  // (falls back to the coverage bbox, the only one grids carry).
+  const datasetBounds = useMemo(
+    () =>
+      pointsData.map((row) => ({
+        pk: row.pk,
+        bounds: boundsFromGeoJson(
+          row.filtered_bbox_geojson || row.coverage_bbox_geojson
+        )
+      })),
+    [pointsData]
+  )
+
+  // The live viewport changes on every pan; debounce it so a continuous drag
+  // recomputes the in-view set once it settles rather than every frame.
+  const viewportBounds = useDebounce(mapView?.bounds, 150)
+
+  // pks whose extent overlaps the current viewport. Recomputed only when the
+  // result set or the settled viewport changes.
+  const datasetsInViewPks = useMemo(() => {
+    const inView = new Set()
+    if (!viewportBounds) return inView
+    for (const { pk, bounds } of datasetBounds) {
+      if (boundsIntersect(bounds, viewportBounds)) inView.add(pk)
+    }
+    return inView
+  }, [datasetBounds, viewportBounds])
 
   // pointsData narrowed by the title search, matched the same way
   // DatasetsTable's search box used to match locally: title, dataset type,
   // and data-portal name. Derived here (rather than inside DatasetsTable) so
   // the datasets counters (Sidebar, TopControls) reflect it too.
   const filteredDatasets = useMemo(() => {
-    if (isEmpty(datasetTitleSearchText)) return pointsData
     const query = datasetTitleSearchText.toLowerCase()
-    return pointsData.filter((row) =>
-      [
+    const hasSearch = !isEmpty(datasetTitleSearchText)
+    if (!hasSearch && !onlyInView) return pointsData
+    return pointsData.filter((row) => {
+      if (onlyInView && !datasetsInViewPks.has(row.pk)) return false
+      if (!hasSearch) return true
+      return [
         row.title,
         row.cdm_data_type,
         formatErddapServerName(
@@ -90,8 +128,8 @@ export default function SelectionProvider ({ children }) {
         .join(' ')
         .toLowerCase()
         .includes(query)
-    )
-  }, [pointsData, datasetTitleSearchText, i18n.language])
+    })
+  }, [pointsData, datasetTitleSearchText, onlyInView, datasetsInViewPks, i18n.language])
 
   // The open dataset page lives in the URL (?dataset=…&server=…) rather than in
   // component state, so Back/Forward move through it natively and the page can
@@ -340,6 +378,10 @@ export default function SelectionProvider ({ children }) {
     datasetTitleSearchText,
     setDatasetTitleSearchText,
     filteredDatasets,
+    datasetsInViewPks,
+    inViewCount: datasetsInViewPks.size,
+    onlyInView,
+    setOnlyInView,
     datasetsSelectedCount,
     combinedQueries,
     handleSelectDataset,

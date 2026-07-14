@@ -35,7 +35,8 @@ export default function DatasetsPanel () {
     handleSelectDataset,
     handleSelectAllDatasets,
     setHoveredDataset,
-    combinedQueries
+    combinedQueries,
+    datasetsInViewPks
   } = useSelection()
 
   const filterSet = {
@@ -82,6 +83,7 @@ export default function DatasetsPanel () {
           setDatasets={setPointsData}
           datasets={filteredDatasets}
           setHoveredDataset={setHoveredDataset}
+          datasetsInViewPks={datasetsInViewPks}
         />
       )}
     </div>

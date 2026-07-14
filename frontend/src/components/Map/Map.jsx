@@ -1427,14 +1427,21 @@ export default function CreateMap({
         }
       }
     })
-    map.current.on('moveend', (e) => {
+    // bounds feeds the "datasets in view" highlight/filter (SelectionProvider);
+    // toArray() is [[west,south],[east,north]], the shape boundsIntersect wants.
+    const pushMapView = () => {
       const center = map.current.getCenter()
       setMapView({
         lat: center.lat,
         lon: center.lng,
-        zoom: map.current.getZoom()
+        zoom: map.current.getZoom(),
+        bounds: map.current.getBounds().toArray()
       })
-    })
+    }
+    map.current.on('moveend', pushMapView)
+    // moveend doesn't fire until the first interaction, so seed bounds once the
+    // initial camera settles — otherwise the in-view set is empty until a pan.
+    map.current.once('idle', pushMapView)
     map.current.on('mousedown', (e) => {
       if (e.originalEvent.shiftKey) {
         shiftBoxCreate.current = true

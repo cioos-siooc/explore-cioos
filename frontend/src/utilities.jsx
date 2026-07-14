@@ -315,6 +315,18 @@ export function boundsFromGeoJson(geometry) {
   ]
 }
 
+// Axis-aligned overlap test for two bounds in [[west,south],[east,north]] form
+// — the shape both boundsFromGeoJson and MapLibre's getBounds().toArray()
+// produce. Used to flag which datasets fall inside the current map view.
+// Antimeridian-crossing extents aren't special-cased (neither is the rest of
+// the bbox code); a dataset straddling 180° is treated by its raw min/max.
+export function boundsIntersect(a, b) {
+  if (!a || !b) return false
+  const [[aw, as], [ae, an]] = a
+  const [[bw, bs], [be, bn]] = b
+  return aw <= be && ae >= bw && as <= bn && an >= bs
+}
+
 // Camera the "zoom to dataset" action asks for. The map canvas is full-bleed
 // and the datasets sidebar floats on top of its left edge, so a plain centred
 // fit would push half the extent underneath the sidebar: pad the fit by the

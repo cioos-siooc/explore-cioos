@@ -50,8 +50,14 @@ export default function ActiveFilterChips () {
     startDepth,
     endDepth
   } = useFilters()
-  const { polygon, setPolygon, datasetTitleSearchText, setDatasetTitleSearchText } =
-    useSelection()
+  const {
+    polygon,
+    setPolygon,
+    datasetTitleSearchText,
+    setDatasetTitleSearchText,
+    onlyInView,
+    setOnlyInView
+  } = useSelection()
   const { setShowFiltersModal, setOpenFilter, setSidebarOpen } = useUI()
 
   // The chips can be collapsed behind a Show/Hide toggle. They start hidden on
@@ -91,6 +97,22 @@ export default function ActiveFilterChips () {
           id: 'search',
           label: datasetTitleSearchText,
           remove: () => setDatasetTitleSearchText('')
+        }
+      ]
+    },
+    onlyInView && {
+      key: 'onlyInView',
+      label: t('datasetsCardOnlyInViewText'),
+      goToFilter: () => {
+        setOpenFilter(t('datasetsCardOnlyInViewText'))
+        setShowFiltersModal(true)
+      },
+      removeAll: () => setOnlyInView(false),
+      items: [
+        {
+          id: 'onlyInView',
+          label: t('datasetsCardOnlyInViewChipText'),
+          remove: () => setOnlyInView(false)
         }
       ]
     }

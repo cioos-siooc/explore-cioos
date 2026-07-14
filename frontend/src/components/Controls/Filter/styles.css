@@ -41,6 +41,13 @@
   height: 28px;
 }
 
+/* Centre the label text within its fixed-height box so it lines up with the
+   icon and chevron rather than sitting at the top. */
+.filterHeader > .badgeTitle {
+  display: flex;
+  align-items: center;
+}
+
 /* The variable / org / dataset icon picks up the brand teal. */
 .filterHeader > svg {
   color: var(--cioos-primary);
@@ -131,6 +138,31 @@
   width: 20px;
   height: 20px;
   align-self: center;
+}
+
+/* --- "In view" filter flyout: a single labelled checkbox plus a live count
+   of datasets in the current map view. --- */
+.inViewFilterToggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 2px;
+  cursor: pointer;
+  color: var(--cioos-ink);
+  font-weight: 600;
+}
+
+.inViewFilterToggle input {
+  margin-top: 2px;
+  flex: 0 0 auto;
+  accent-color: var(--cioos-primary);
+  cursor: pointer;
+}
+
+.inViewFilterCount {
+  padding: 4px 2px 2px;
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-sm);
 }
 
 @media (max-width: 600px) {
