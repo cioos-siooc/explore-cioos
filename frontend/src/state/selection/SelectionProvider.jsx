@@ -29,6 +29,15 @@ import { useMapState } from '../map/MapStateProvider.jsx'
 
 const SelectionContext = createContext()
 
+// cdm_data_types that never render as platform-coloured point markers: grids
+// draw as a coverage footprint / WMS overlay, trajectories as their own hex
+// layer. See platformsAvailable below.
+const PLATFORMLESS_DATASET_TYPES = new Set([
+  'Grid',
+  'Trajectory',
+  'TrajectoryProfile'
+])
+
 export function useSelection () {
   return useContext(SelectionContext)
 }
@@ -87,6 +96,30 @@ export default function SelectionProvider ({ children }) {
           row.filtered_bbox_geojson || row.coverage_bbox_geojson
         )
       })),
+    [pointsData]
+  )
+
+  // Platform types present in the current result set — i.e. every platform the
+  // map can draw a platform-coloured marker for under the active filters, at
+  // any zoom or camera. The legend's platform swatches key off this rather than
+  // the full catalog of platform types, so it never advertises a colour that
+  // isn't on the map.
+  //
+  // Grids and trajectories are excluded because neither renders as a point:
+  // grids show as a coverage footprint / WMS overlay, trajectories as the
+  // dedicated hex layer. Their platforms are otherwise smuggled into the
+  // legend — 'spacecraft' belongs only to grid datasets, and was showing a
+  // swatch for a marker that is never drawn.
+  const platformsAvailable = useMemo(
+    () =>
+      [
+        ...new Set(
+          pointsData
+            .filter((row) => !PLATFORMLESS_DATASET_TYPES.has(row.cdm_data_type))
+            .map((row) => row.platform)
+            .filter(Boolean)
+        )
+      ].sort(),
     [pointsData]
   )
 
@@ -378,6 +411,7 @@ export default function SelectionProvider ({ children }) {
     datasetTitleSearchText,
     setDatasetTitleSearchText,
     filteredDatasets,
+    platformsAvailable,
     datasetsInViewPks,
     inViewCount: datasetsInViewPks.size,
     onlyInView,

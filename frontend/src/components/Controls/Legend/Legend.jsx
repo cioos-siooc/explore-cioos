@@ -46,7 +46,7 @@ export default function Legend({
   currentRangeLevel,
   currentTrajectoryRangeLevel,
   zoom,
-  platformsInView,
+  platformsAvailable = [],
   layerControls = [],
   basemapOptions = [],
   basemap,
@@ -103,6 +103,12 @@ export default function Legend({
     )
   }
 
+  // Only the platform types the current result set actually contains — the
+  // catalog's full palette would otherwise promise markers the map never draws.
+  const platformSwatches = platformColors.filter((pc) =>
+    platformsAvailable.includes(pc.platform)
+  )
+
   function generateLegendElements() {
     if (isEmpty(currentRangeLevel)) {
       return (
@@ -149,14 +155,13 @@ export default function Legend({
               </div>
             </div>
           </div>
-          <div className='legendSection'>
-            <div className='legendSectionCaption'>
-              {t('legendPlatformType')}
-            </div>
-            <div className='legendItems'>
-              {platformColors
-                .filter((pc) => platformsInView.includes(pc.platform))
-                .map((pc) => (
+          {platformSwatches.length > 0 && (
+            <div className='legendSection'>
+              <div className='legendSectionCaption'>
+                {t('legendPlatformType')}
+              </div>
+              <div className='legendItems'>
+                {platformSwatches.map((pc) => (
                   <div className='legendItem' key={pc.platform}>
                     <CircleFill
                       className='legendSwatch'
@@ -169,8 +174,9 @@ export default function Legend({
                     </span>
                   </div>
                 ))}
+              </div>
             </div>
-          </div>
+          )}
         </>
       )
     }

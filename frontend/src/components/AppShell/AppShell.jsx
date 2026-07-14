@@ -15,7 +15,6 @@ import Legend from '../Controls/Legend/Legend.jsx'
 import WmsLegend from '../Controls/WmsLegend/WmsLegend.jsx'
 import IntroModal from '../Controls/IntroModal/IntroModal.jsx'
 import { BASEMAP_OPTIONS } from '../Map/basemapStyle.js'
-import { useFilters } from '../../state/filters/FilterProvider.jsx'
 import { useMapState } from '../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../state/ui/UIProvider.jsx'
@@ -28,7 +27,6 @@ import './styles.css'
 // and Download open as modals.
 export default function AppShell () {
   const { t } = useTranslation()
-  const { platformsSelected } = useFilters()
   const {
     loading,
     zoom,
@@ -46,7 +44,7 @@ export default function AppShell () {
     setActiveWmsOverlay
   } = useMapState()
   const { showIntroModal, setShowIntroModal, sidebarOpen } = useUI()
-  const { inspectDataset } = useSelection()
+  const { inspectDataset, platformsAvailable } = useSelection()
 
   // The WMS legend lives inside the dataset page while that page is open (see
   // GriddapDetails); it only floats over the map — bottom-left — once the
@@ -100,7 +98,7 @@ export default function AppShell () {
         currentRangeLevel={currentRangeLevel}
         currentTrajectoryRangeLevel={currentTrajectoryRangeLevel}
         zoom={zoom}
-        platformsInView={platformsSelected.map((e) => e.title)}
+        platformsAvailable={platformsAvailable}
         layerControls={layerControls}
         basemapOptions={basemapOptions}
         basemap={basemap}
