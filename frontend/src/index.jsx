@@ -38,11 +38,15 @@ i18n
   .init({
     resources,
     supportedLngs: ['en', 'fr'],
-    lng: urlLanguage,
+    // A ?lang= in the link always wins; without one the detector falls back to
+    // the last language the user chose here (localStorage), so the choice
+    // survives a reload. Both caches are written on every changeLanguage.
+    lng: urlLanguage || undefined,
     fallbackLng: ['en', 'fr'],
     detection: {
-      order: ['path', 'cookie', 'htmlTag', 'localStorage'],
-      caches: ['cookie']
+      order: ['querystring', 'localStorage', 'cookie', 'htmlTag'],
+      lookupQuerystring: 'lang',
+      caches: ['localStorage', 'cookie']
     },
     react: { useSuspense: true }
   })

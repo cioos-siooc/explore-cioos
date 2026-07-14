@@ -65,7 +65,17 @@ export default function DatasetInspector({
   // the spinner appears.
   const [loading, setLoading] = useState(hasRecordList)
 
+  // Opening this page usually narrows the datasets filter to a single dataset
+  // (clicking a hex or a griddap footprint does exactly that), so closing it
+  // drops that filter as well — otherwise the user lands back on a list that
+  // is still silently restricted to the dataset they just left.
   const returnToList = () => {
+    const { datasetsSelected, setDatasetsSelected } = filterSet.datasetFilter
+    if (datasetsSelected.some((d) => d.isSelected)) {
+      setDatasetsSelected(
+        datasetsSelected.map((d) => ({ ...d, isSelected: false }))
+      )
+    }
     setBackClicked(true)
     setInspectDataset()
   }

@@ -17,10 +17,13 @@ import { useMapState } from './map/MapStateProvider.jsx'
 // string from scratch on every map pan).
 export default function UrlSync () {
   const [searchParams] = useSearchParams()
-  const lang = searchParams.get('lang') || 'en'
+  const { i18n } = useTranslation()
+  // No ?lang= in the link means "whatever the user last chose" — i18n has
+  // already resolved that from localStorage — not a reset to English, which
+  // would undo the stored preference on the first sync.
+  const lang = searchParams.get('lang') || i18n.resolvedLanguage
   const dataset = searchParams.get('dataset')
   const server = searchParams.get('server')
-  const { i18n } = useTranslation()
   const navigate = useNavigate()
 
   const { query } = useFilters()

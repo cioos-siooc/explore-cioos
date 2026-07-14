@@ -823,7 +823,15 @@ export default function CreateMap({
       container: mapContainer.current,
       // Ocean-first basemap: bathymetry raster + vector rivers/boundaries and
       // FR/EN labels. Data layers are inserted below the label layers.
-      style: buildBasemapStyle(i18n.language, basemap),
+      //
+      // The projection is part of the style in MapLibre 5, and it has to be
+      // set here rather than left to the effect above: that effect's first run
+      // happens while map.current is still null, and projection doesn't change
+      // again, so a globe restored from localStorage would never be applied.
+      style: {
+        ...buildBasemapStyle(i18n.language, basemap),
+        projection: { type: projection === 'globe' ? 'globe' : 'mercator' }
+      },
       // Per-source attributions replace the default control (see the compact
       // AttributionControl added below).
       attributionControl: false,

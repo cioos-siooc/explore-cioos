@@ -377,7 +377,6 @@ export default function DatasetsTable({
                 isDownloadModal={isDownloadModal}
                 downloadSizeEstimates={downloadSizeEstimates}
                 estimatesLoading={estimatesLoading}
-                inViewport={datasetsInViewPks.has(item.row.pk)}
                 onSelect={handleSelectDataset}
                 onInspect={isDownloadModal ? undefined : setInspectDataset}
                 onHover={setHoveredDataset}

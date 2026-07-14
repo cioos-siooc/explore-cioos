@@ -16,6 +16,7 @@ import {
   getCurrentRangeLevel
 } from '../../utilities.jsx'
 import fetchJson from '../fetchJson.js'
+import usePersistentState from '../usePersistentState.js'
 import { useFilters } from '../filters/FilterProvider.jsx'
 
 const MapStateContext = createContext()
@@ -45,21 +46,36 @@ export default function MapStateProvider ({ children }) {
   const [trajectoryRangeLevels, setTrajectoryRangeLevels] = useState()
   const [currentTrajectoryRangeLevel, setCurrentTrajectoryRangeLevel] =
     useState()
+  // The four map-appearance switches below are preferences rather than
+  // shareable state: they persist in localStorage so a reload comes back to
+  // the map the user left, while the camera and filters keep living in the URL.
+  //
   // Griddap (gridded, metadata-only) datasets: the optional coverage layer
   // (off by default) and the on-demand per-dataset WMS overlay
   // ({pk, datasetId, wmsUrl, variable, time, elevation, bbox} | undefined).
-  const [griddapCoverageVisible, setGriddapCoverageVisible] = useState(false)
+  // The overlay itself is per-dataset and dies with the dataset page, so it
+  // is deliberately not persisted.
+  const [griddapCoverageVisible, setGriddapCoverageVisible] = usePersistentState(
+    'griddapCoverageVisible',
+    false
+  )
   const [griddapCoverage, setGriddapCoverage] = useState()
   const [activeWmsOverlay, setActiveWmsOverlay] = useState()
   // Layer visibility switch for the observation layers (hexes / points /
   // trajectories). On by default.
-  const [dataLayersVisible, setDataLayersVisible] = useState(true)
+  const [dataLayersVisible, setDataLayersVisible] = usePersistentState(
+    'dataLayersVisible',
+    true
+  )
   // Map projection: 'mercator' (default) or 'globe'. The globe view renders
   // high latitudes (e.g. the Arctic) without Mercator distortion.
-  const [projection, setProjection] = useState('mercator')
+  const [projection, setProjection] = usePersistentState(
+    'projection',
+    'mercator'
+  )
   // Basemap raster: 'emodnet' (default) or 'arcgis-ocean'.
   // See components/Map/basemapStyle.js.
-  const [basemap, setBasemap] = useState(defaultBasemap)
+  const [basemap, setBasemap] = usePersistentState('basemap', defaultBasemap)
   // One-shot "frame this geometry" request for the Map. The nonce lets the
   // same extent be re-requested (clicking zoom again after panning away).
   const [zoomTarget, setZoomTarget] = useState()

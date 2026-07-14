@@ -218,15 +218,6 @@
   border-color: var(--cioos-primary);
 }
 
-/* --- In-viewport highlight: a subtle 1px border in the in-view blue plus a
-   faint wash, kept distinct from the teal download-selection state. Scoped to
-   :not(.selected) so a selected card keeps its stronger treatment. Always on
-   so the list quietly mirrors what the map is currently showing. --- */
-.datasetCard.inViewport:not(.selected) {
-  border-color: var(--cioos-info);
-  background-color: rgba(15, 109, 142, 0.045);
-}
-
 /* --- Group headers: sticky within the scroll region so the current group
    stays labelled while scrolling; the whole row toggles collapse. --- */
 .datasetsCardGroupHeader {
