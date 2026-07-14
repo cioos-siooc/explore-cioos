@@ -105,7 +105,15 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                   -- for every other type
                   CASE WHEN d.cdm_data_type = 'Grid'
                            THEN ST_AsGeoJSON(ST_Transform(d.coverage_bbox, 4326), 6)::json
-                  END AS coverage_bbox_geojson
+                  END AS coverage_bbox_geojson,
+                  -- Extent of the features this query actually matched (profile
+                  -- bboxes / obis + trajectory cells / the grid footprint), so
+                  -- the frontend can frame the dataset as currently filtered
+                  -- rather than its full-catalogue footprint. Degenerate (a
+                  -- point) for a single-location dataset — fitBounds handles it.
+                  ST_AsGeoJSON(
+                    ST_Transform(ST_SetSRID(ST_Extent(p.search_geom)::geometry, 3857), 4326), 6
+                  )::json AS filtered_bbox_geojson
                   -- replace '0 days' with '1 day' when its a single day profile
                   -- query records count = sum((number of days covered by the query that are in the profile) * profile records per day * fraction of the depth range that profile covers)
                   ${

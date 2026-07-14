@@ -96,7 +96,7 @@ export default function AppShell () {
         layerControls={layerControls}
       />
       <MapCornerControls />
-      <ZoomToDataset />
+      <ZoomToDataset variant='floating' />
       {activeWmsOverlay && !wmsLegendIsInline && (
         <WmsLegend
           overlay={activeWmsOverlay}

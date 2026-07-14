@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useRef, useState, useEffect } from 'react'
 import isEmpty from 'lodash/isEmpty'
 
 import { server } from '../../config.js'
@@ -41,6 +41,10 @@ export default function MapStateProvider ({ children }) {
   // One-shot "frame this geometry" request for the Map. The nonce lets the
   // same extent be re-requested (clicking zoom again after panning away).
   const [zoomTarget, setZoomTarget] = useState()
+  // The MapLibre instance, handed over by Map.jsx once created. ZoomToDataset
+  // needs it to ask what camera a footprint would produce (cameraForBounds
+  // depends on the canvas size, which only the map knows).
+  const mapRef = useRef(null)
 
   function zoomToGeometry (geometry) {
     if (geometry) setZoomTarget({ geometry, nonce: Date.now() })
@@ -138,6 +142,7 @@ export default function MapStateProvider ({ children }) {
     setActiveWmsOverlay,
     zoomTarget,
     zoomToGeometry,
+    mapRef,
     loadLegend: () => loadLegend(createDataFilterQueryString(query))
   }
 

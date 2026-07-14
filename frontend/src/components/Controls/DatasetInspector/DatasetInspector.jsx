@@ -11,6 +11,7 @@ import { server } from '../../../config'
 import { splitLines } from '../../../utilities'
 import { gridNodeFactors, totalGridNodes } from '../../../wmsUtilities'
 import FilterButton from '../Filter/FilterButton/FilterButton.jsx'
+import ZoomToDataset from '../../AppShell/ZoomToDataset/ZoomToDataset.jsx'
 import './styles.css'
 
 // The grid's node count spelled out as the product of its axes —
@@ -253,6 +254,9 @@ export default function DatasetInspector({
           optionsSelected={datasetFilter.datasetsSelected}
           option={dataset}
         />
+        {/* Same action as the pill floating over the map, and it vanishes the
+            same way once the map is already framed on this dataset. */}
+        <ZoomToDataset variant='inline' />
       </div>
       <div className='datasetInspectorBody'>
         <dl className='datasetMetaSheet'>

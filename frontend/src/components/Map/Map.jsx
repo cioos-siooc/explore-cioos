@@ -27,7 +27,8 @@ import {
   createDataFilterQueryString,
   generateColorStops,
   getCurrentRangeLevel,
-  updateMapToolTitleLanguage
+  updateMapToolTitleLanguage,
+  zoomToDatasetCamera
 } from '../../utilities'
 import {
   buildWmsGetMapUrl,
@@ -63,7 +64,8 @@ export default function CreateMap({
   dataLayersVisible = true,
   activeWmsOverlay,
   projection = 'mercator',
-  zoomTarget
+  zoomTarget,
+  mapRef
 }) {
   const { t, i18n } = useTranslation()
 
@@ -191,6 +193,14 @@ export default function CreateMap({
   const layersLoaded = useRef(false)
   const colorStops = useRef([])
   const trajectoryColorStops = useRef([])
+  // pk of the dataset the map is currently singling out (hovered in the list,
+  // or the one whose page is open). Held in a ref because the map's own event
+  // handlers — zoomend, sourcedata, idle — need the current value, not the one
+  // captured when they were registered.
+  const focusedDatasetPk = useRef(undefined)
+  // Signature of the focus state last written to the map, so re-applying an
+  // unchanged focus costs nothing (see hoverHighlightPoints).
+  const appliedFocus = useRef('')
 
   // Placeholder count ranges used only until the /legend request resolves.
   // The map now mounts before that response arrives, but the count-driven
@@ -279,6 +289,29 @@ export default function CreateMap({
     ).map((colorStop) => {
       return [colorStop.stop, colorStop.color]
     })
+
+    // Trajectory hexes only ever render at zoom >= hexMaxZoom, where the
+    // hex_1 grid is always used, so there's a single range to apply.
+    const effectiveTrajectoryRangeLevels =
+      trajectoryRangeLevels || defaultTrajectoryRangeLevels
+    trajectoryColorStops.current = generateColorStops(
+      trajectoryColorScale,
+      effectiveTrajectoryRangeLevels.zoom1
+    ).map((colorStop) => {
+      return [colorStop.stop, colorStop.color]
+    })
+
+    // A focused dataset outranks the count ramp: greying everything else is
+    // what makes that dataset legible, so painting the ramp back over it here
+    // would silently undo the focus. This runs on zoomend and on every legend
+    // refetch — both of which a "zoom to dataset" click triggers — so without
+    // this the map un-greyed itself the moment the camera settled. The stops
+    // above are still refreshed, ready for when the focus clears.
+    if (focusedDatasetPk.current && layersLoaded.current) {
+      hoverHighlightPoints(focusedDatasetPk.current)
+      return
+    }
+
     if (colorStops.current.length > 0) {
       if (map.current.getZoom() >= 7 && map.current.getLayer('points')) {
         map.current.setPaintProperty('points', 'circle-color', colors)
@@ -296,16 +329,6 @@ export default function CreateMap({
       }
     }
 
-    // Trajectory hexes only ever render at zoom >= hexMaxZoom, where the
-    // hex_1 grid is always used, so there's a single range to apply.
-    const effectiveTrajectoryRangeLevels =
-      trajectoryRangeLevels || defaultTrajectoryRangeLevels
-    trajectoryColorStops.current = generateColorStops(
-      trajectoryColorScale,
-      effectiveTrajectoryRangeLevels.zoom1
-    ).map((colorStop) => {
-      return [colorStop.stop, colorStop.color]
-    })
     if (
       trajectoryColorStops.current.length > 0 &&
       map.current.getLayer('trajectory-hexes')
@@ -320,8 +343,39 @@ export default function CreateMap({
   function hoverHighlightPoints(pk) {
     if (!map.current || !layersLoaded.current) return
 
+    // Which of the currently rendered features belong to the focused dataset.
+    // queryRenderedFeatures only sees what is on screen now, which is why this
+    // has to be re-run every time new tiles land (see the sourcedata handler).
+    const pointLevel = map.current.getZoom() >= 7
+    const featurePksInDataset = (layer) =>
+      map.current
+        .queryRenderedFeatures({ layers: [layer] })
+        .filter((feature) =>
+          JSON.parse(feature.properties.datasets).includes(pk)
+        )
+        .map((feature) => feature.properties.pk)
+
+    const focusedPks = pk
+      ? featurePksInDataset(pointLevel ? 'points' : 'hexes')
+      : []
+    const focusedTrajectoryPks = pk
+      ? featurePksInDataset('trajectory-hexes')
+      : []
+
+    // Repainting makes the map fire the very events that re-run this, so a
+    // no-op has to stay a no-op or the map spins in a render loop. The zoom
+    // band is part of the signature because it decides which layer is greyed.
+    const signature = JSON.stringify([
+      pk,
+      pointLevel,
+      focusedPks,
+      focusedTrajectoryPks
+    ])
+    if (signature === appliedFocus.current) return
+    appliedFocus.current = signature
+
     if (pk) {
-      if (map.current.getZoom() >= 7) {
+      if (pointLevel) {
         map.current.setPaintProperty('points', 'circle-color', 'lightgrey')
         map.current.setPaintProperty(
           'points-highlighted',
@@ -333,47 +387,17 @@ export default function CreateMap({
           'circle-stroke-width',
           0
         )
-
-        const features = map.current.queryRenderedFeatures({
-          layers: ['points']
-        })
-        const pointsInDataset = features
-          .filter((feature) => {
-            const featureDatasetPKs = JSON.parse(feature.properties.datasets)
-            return featureDatasetPKs.includes(pk)
-          })
-          .map((feature) => feature.properties.pk)
-        map.current.setFilter('points-hovered', [
-          'in',
-          'pk',
-          ...pointsInDataset
-        ])
+        map.current.setFilter('points-hovered', ['in', 'pk', ...focusedPks])
       } else {
         map.current.setPaintProperty('hexes', 'fill-color', 'lightgrey')
-        const features = map.current.queryRenderedFeatures({
-          layers: ['hexes']
-        })
-        const hexesInDataset = features
-          .filter((feature) =>
-            JSON.parse(feature.properties.datasets).includes(pk)
-          )
-          .map((feature) => feature.properties.pk)
-        map.current.setFilter('hexes-hovered', ['in', 'pk', ...hexesInDataset])
+        map.current.setFilter('hexes-hovered', ['in', 'pk', ...focusedPks])
       }
 
       map.current.setPaintProperty('trajectory-hexes', 'fill-color', 'lightgrey')
-      const trajectoryFeatures = map.current.queryRenderedFeatures({
-        layers: ['trajectory-hexes']
-      })
-      const trajectoryHexesInDataset = trajectoryFeatures
-        .filter((feature) =>
-          JSON.parse(feature.properties.datasets).includes(pk)
-        )
-        .map((feature) => feature.properties.pk)
       map.current.setFilter('trajectory-hexes-hovered', [
         'in',
         'pk',
-        ...trajectoryHexesInDataset
+        ...focusedTrajectoryPks
       ])
     } else {
       map.current.setFilter('points-hovered', ['in', 'pk', ''])
@@ -581,9 +605,11 @@ export default function CreateMap({
       if (focusedDataset?.cdm_data_type === 'Grid') {
         // A griddap dataset has no map features: highlighting its pk would
         // grey the whole map with nothing selected. Draw its bbox instead.
+        focusedDatasetPk.current = undefined
         hoverHighlightPoints()
         setGriddapHighlight(focusedDataset.coverage_bbox_geojson)
       } else {
+        focusedDatasetPk.current = focusedDataset?.pk
         setGriddapHighlight(activeWmsOverlay ? activeWmsOverlay.bbox : null)
         hoverHighlightPoints(focusedDataset?.pk)
       }
@@ -617,15 +643,15 @@ export default function CreateMap({
     })
   }, [projection])
 
-  // "Zoom to dataset": frame the requested footprint. maxZoom keeps a
-  // pin-sized extent from slamming the camera to street level.
+  // "Zoom to dataset": frame the requested footprint. The camera settings are
+  // shared with ZoomToDataset, which compares them against the live camera to
+  // decide whether the button still has anything to do.
   useEffect(() => {
     if (!map.current || !zoomTarget?.geometry) return
     const bounds = boundsFromGeoJson(zoomTarget.geometry)
     if (!bounds) return
     map.current.fitBounds(bounds, {
-      padding: 60,
-      maxZoom: 9,
+      ...zoomToDatasetCamera(map.current),
       duration: 1000
     })
   }, [zoomTarget])
@@ -738,6 +764,8 @@ export default function CreateMap({
       center: [mapLongitude || -150, mapLatitude || 60], // starting position
       zoom: mapZoom || 2 // starting zoom,
     })
+    // Share the instance with MapStateProvider (see mapRef there).
+    if (mapRef) mapRef.current = map.current
 
     // disable map rotation using right click + drag
     map.current.dragRotate.disable()
@@ -1339,8 +1367,27 @@ export default function CreateMap({
       // }
     })
 
+    // New tiles — a filter change, or the camera moving into fresh data —
+    // arrive as features the focus filters were never computed against (they
+    // come from queryRenderedFeatures, a snapshot of whatever was on screen at
+    // the time). Re-apply the focus as soon as each data source finishes
+    // loading, so the unselected datasets are already grey on the first frame
+    // of the new data instead of only after the next hover.
+    const dataSourceIds = ['points', 'points-halo', 'hexes', 'trajectory-hexes']
+    map.current.on('sourcedata', (e) => {
+      if (!focusedDatasetPk.current) return
+      if (!e.isSourceLoaded || !dataSourceIds.includes(e.sourceId)) return
+      hoverHighlightPoints(focusedDatasetPk.current)
+    })
+
     map.current.on('idle', (e) => {
       layersLoaded.current = true
+      // 'sourcedata' can land before the new tiles have been rendered, and
+      // queryRenderedFeatures only sees rendered ones — so settle the focus
+      // here too, where everything is guaranteed on screen.
+      if (focusedDatasetPk.current) {
+        hoverHighlightPoints(focusedDatasetPk.current)
+      }
       if (
         doFinalCheck.current &&
         drawPolygon.current.getAll().features.length > 0 &&

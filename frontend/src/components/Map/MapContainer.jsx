@@ -19,7 +19,8 @@ export default function MapContainer () {
     dataLayersVisible,
     activeWmsOverlay,
     projection,
-    zoomTarget
+    zoomTarget,
+    mapRef
   } = useMapState()
   const {
     polygon,
@@ -50,6 +51,7 @@ export default function MapContainer () {
       activeWmsOverlay={activeWmsOverlay}
       projection={projection}
       zoomTarget={zoomTarget}
+      mapRef={mapRef}
     />
   )
 }
