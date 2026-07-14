@@ -203,33 +203,36 @@ export default function DatasetInspector({
   const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet
 
   return (
-    <div className='datasetInspector' ref={inspectorRef}>
-      <div
-        className='datasetInspectorBody'
-        onMouseEnter={() => setHoveredDataset(dataset)}
-        onMouseLeave={() => setHoveredDataset()}
-      >
-        <div className='datasetTitleBlock'>
-          <div className='datasetTitleTop'>
-            <span className='metadataLabel'>
-              {t('datasetInspectorTitleText')}
-            </span>
-            <button
-              type='button'
-              className='closeButton'
-              onClick={returnToList}
-              title={t('datasetInspectorBackButtonTitle')} // 'Return to dataset list'
-              aria-label={t('datasetInspectorBackButtonTitle')}
-            >
-              <XLg />
-            </button>
-          </div>
-          <FilterButton
-            setOptionsSelected={datasetFilter.setDatasetsSelected}
-            optionsSelected={datasetFilter.datasetsSelected}
-            option={dataset}
-          />
+    <div
+      className='datasetInspector'
+      ref={inspectorRef}
+      onMouseEnter={() => setHoveredDataset(dataset)}
+      onMouseLeave={() => setHoveredDataset()}
+    >
+      {/* The title block is pinned: it names the page, so it stays put while
+          the metadata sheet and record table scroll under it. */}
+      <div className='datasetTitleBlock'>
+        <div className='datasetTitleTop'>
+          <span className='metadataLabel'>
+            {t('datasetInspectorTitleText')}
+          </span>
+          <button
+            type='button'
+            className='closeButton'
+            onClick={returnToList}
+            title={t('datasetInspectorBackButtonTitle')} // 'Return to dataset list'
+            aria-label={t('datasetInspectorBackButtonTitle')}
+          >
+            <XLg />
+          </button>
         </div>
+        <FilterButton
+          setOptionsSelected={datasetFilter.setDatasetsSelected}
+          optionsSelected={datasetFilter.datasetsSelected}
+          option={dataset}
+        />
+      </div>
+      <div className='datasetInspectorBody'>
         <dl className='datasetMetaSheet'>
           <div className='metaRow'>
             <dt className='metadataLabel'>
