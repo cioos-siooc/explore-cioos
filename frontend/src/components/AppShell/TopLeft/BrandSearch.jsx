@@ -1,9 +1,10 @@
 import * as React from 'react'
-import { InfoSquare, ChatDots } from 'react-bootstrap-icons'
+import { InfoSquare } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 
 import CIOOSLogoEN from '../../Images/NationalLogoEnglish.png'
 import CIOOSLogoFR from '../../Images/NationalLogoFrench.png'
+import FeedbackButton from '../../Controls/FeedbackButton/FeedbackButton.jsx'
 import LanguageSelector from '../../Controls/LanguageSelector/LanguageSelector.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
@@ -60,20 +61,7 @@ export default function BrandSearch ({ children }) {
             >
               <InfoSquare size={16} aria-hidden='true' />
             </button>
-            <a
-              className='brandMinorItem'
-              href={
-                isFrench
-                  ? 'https://docs.google.com/forms/d/e/1FAIpQLScOHpRSyXeGIwkOCLR9_VLhxs6siSiEuTqEGHG1PVNN0BumsQ/viewform?usp=dialog'
-                  : 'https://docs.google.com/forms/d/e/1FAIpQLScrpW_V0whLXAIy7Vk4Wzd2UAZf-hUxPl455jhUlUoUzQGqvg/viewform?usp=dialog'
-              }
-              target='_blank'
-              rel='noreferrer'
-              title={t('feedbackButtonTitle')}
-              aria-label={t('feedbackButtonTitle')}
-            >
-              <ChatDots size={16} aria-hidden='true' />
-            </a>
+            <FeedbackButton className='brandMinorItem' size={16} />
             <LanguageSelector className='brandMinorItem brandLanguage' />
           </div>
         </div>
