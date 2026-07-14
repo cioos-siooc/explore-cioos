@@ -144,9 +144,15 @@
 .activeFilterGroup {
   pointer-events: all;
   display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
+  /* The label (left) and clear-all (right) are fixed rails that stretch to
+     the group's full height; only the value chips in the middle wrap, so the
+     group grows taller with the rails following suit. */
+  align-items: stretch;
+  flex-wrap: nowrap;
   gap: 4px;
+  /* Don't let a group sprawl across the map; past this width the value chips
+     wrap in the middle lane (below). */
+  max-width: min(360px, calc(100vw - 32px));
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
@@ -164,18 +170,37 @@
 }
 
 .activeFilterGroupLabel {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   background: transparent;
   border: none;
-  border-radius: var(--cioos-radius-pill);
+  border-radius: var(--cioos-radius-sm);
   padding: 2px 6px 2px 8px;
   font: inherit;
   font-size: 12px;
   font-weight: 700;
   color: var(--cioos-ink);
   cursor: pointer;
+}
+
+/* Middle lane: the value chips live here and are the only part of the group
+   that wraps, flowing onto new lines between the two full-height rails. */
+.activeFilterItems {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: center;
+  gap: 4px;
+  /* Cap the lane at ~three rows of chips; anything beyond scrolls vertically
+     so the group stays compact while the two rails hold their full height. */
+  max-height: 78px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
 }
 
 .activeFilterGroupLabel:hover {
@@ -188,15 +213,15 @@
    it drops the whole group in one click. */
 .activeFilterGroupRemove {
   flex: 0 0 auto;
+  align-self: stretch;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 18px;
-  height: 18px;
   padding: 0;
   background: transparent;
   border: none;
-  border-radius: 50%;
+  border-radius: var(--cioos-radius-sm);
   color: var(--cioos-ink-60);
   cursor: pointer;
   transition: background-color var(--cioos-transition-fast),

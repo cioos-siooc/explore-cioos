@@ -120,21 +120,23 @@ export default function ActiveFilterChips () {
           >
             {f.label}
           </button>
-          {f.items.map((item) => (
-            <span key={item.id} className='activeFilterItem'>
-              <span className='activeFilterItemLabel' title={item.label}>
-                {item.label}
+          <div className='activeFilterItems'>
+            {f.items.map((item) => (
+              <span key={item.id} className='activeFilterItem'>
+                <span className='activeFilterItemLabel' title={item.label}>
+                  {item.label}
+                </span>
+                <button
+                  type='button'
+                  className='activeFilterItemRemove'
+                  onClick={item.remove}
+                  title={t('activeFilterRemoveItemTitle')}
+                >
+                  <X size={14} aria-hidden='true' />
+                </button>
               </span>
-              <button
-                type='button'
-                className='activeFilterItemRemove'
-                onClick={item.remove}
-                title={t('activeFilterRemoveItemTitle')}
-              >
-                <X size={14} aria-hidden='true' />
-              </button>
-            </span>
-          ))}
+            ))}
+          </div>
           <button
             type='button'
             className='activeFilterGroupRemove'

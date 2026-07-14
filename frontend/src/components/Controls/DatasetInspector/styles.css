@@ -76,10 +76,16 @@
   margin-bottom: 4px;
 }
 
-/* Match the rest of the inspector: moderate ~8px corners on the filter
-   chips instead of the global pill shape. */
+/* Metadata chips read as informational values that can wrap to two lines
+   (long organization / variable names). Give the wrapped text room to breathe
+   and use a tighter corner so a taller, multi-line chip reads as a neat
+   rounded rectangle rather than an oversized lozenge. */
 .datasetInspector .filterButton {
-  border-radius: var(--cioos-radius);
+  padding: 3px 10px;
+  border-radius: var(--cioos-radius-sm);
+  white-space: normal;
+  text-align: left;
+  line-height: 1.3;
 }
 
 /* These chips double as filter toggles, but here they read as informational
@@ -165,6 +171,12 @@
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;
+  /* Chips flow beside the label and wrap onto new lines when there are many;
+     top-align them so the label stays alone at the row's top-left and each
+     wrapped row of chips lines up cleanly. */
+  align-items: flex-start;
+  align-content: flex-start;
+  gap: 5px;
 }
 
 /* Chips sit flush inside their row; the row's gap handles spacing. */
