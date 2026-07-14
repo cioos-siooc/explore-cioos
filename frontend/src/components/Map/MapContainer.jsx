@@ -15,6 +15,7 @@ export default function MapContainer () {
     setMapView,
     rangeLevels,
     trajectoryRangeLevels,
+    obisRangeLevels,
     griddapCoverageVisible,
     griddapCoverage,
     dataLayersVisible,
@@ -43,6 +44,7 @@ export default function MapContainer () {
       setMapView={setMapView}
       rangeLevels={rangeLevels}
       trajectoryRangeLevels={trajectoryRangeLevels}
+      obisRangeLevels={obisRangeLevels}
       offsetFlyTo={false}
       setHoveredDataset={setHoveredDataset}
       hoveredDataset={hoveredDataset}

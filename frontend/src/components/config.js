@@ -44,6 +44,30 @@ export const trajectoryColorScale = [
   '#6749AC'
 ]
 
+// OBIS occurrence coverage hexes. Amber, to stay legible against the green
+// profile ramp, the purple trajectory ramp and the teal griddap outlines.
+export const obisColorScale = [
+  '#FBE3BE',
+  '#F6CE92',
+  '#EFB566',
+  '#E39B3D',
+  '#CE8025',
+  '#B06718',
+  '#8C4F0F'
+]
+
+// Hexes holding BOTH trajectory and OBIS cells. A plum/rose family reading as
+// purple + amber, so a mixed hex is never mistaken for either pure ramp.
+export const mixedColorScale = [
+  '#F0D3DC',
+  '#E3B4C4',
+  '#D394AC',
+  '#BE7594',
+  '#A55B7D',
+  '#894567',
+  '#6B3350'
+]
+
 export const languages = [
   {
     code: 'en',

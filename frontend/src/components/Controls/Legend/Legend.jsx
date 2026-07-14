@@ -10,7 +10,12 @@ import {
   capitalizeFirstLetter,
   generateColorStops
 } from '../../../utilities.jsx'
-import { colorScale, trajectoryColorScale } from '../../config.js'
+import {
+  colorScale,
+  trajectoryColorScale,
+  obisColorScale,
+  mixedColorScale
+} from '../../config.js'
 import platformColors from '../../platformColors'
 import Spinner from '../../ui/Spinner.jsx'
 import Switch from '../../ui/Switch.jsx'
@@ -46,6 +51,7 @@ function pickTickIndices(n, maxTicks = 5) {
 export default function Legend({
   currentRangeLevel,
   currentTrajectoryRangeLevel,
+  currentObisRangeLevel,
   loading,
   zoom,
   platformsAvailable = [],
@@ -195,14 +201,36 @@ export default function Legend({
     }
   }
 
-  function generateTrajectoryLegendElements() {
-    if (isEmpty(currentTrajectoryRangeLevel)) return null
-    // Trajectory coverage always renders as hexes, at every zoom level.
-    return renderColorBar(
-      t('legendTrajectoriesPerHex'),
-      trajectoryColorScale,
-      currentTrajectoryRangeLevel,
-      'trajectories'
+  // Trajectory and OBIS coverage always render as hexes, and share one map
+  // layer — a hex is coloured by which of the two it holds, or by a third
+  // ramp when it holds both. The mixed ramp runs on the occurrence count (see
+  // coverageHexFillColor in Map.jsx), so it reuses the OBIS range.
+  function generateCoverageLegendElements() {
+    return (
+      <>
+        {!isEmpty(currentTrajectoryRangeLevel) &&
+          renderColorBar(
+            t('legendTrajectoriesPerHex'),
+            trajectoryColorScale,
+            currentTrajectoryRangeLevel,
+            'trajectories'
+          )}
+        {!isEmpty(currentObisRangeLevel) &&
+          renderColorBar(
+            t('legendOccurrencesPerHex'),
+            obisColorScale,
+            currentObisRangeLevel,
+            'occurrences'
+          )}
+        {!isEmpty(currentTrajectoryRangeLevel) &&
+          !isEmpty(currentObisRangeLevel) &&
+          renderColorBar(
+            t('legendMixedPerHex'),
+            mixedColorScale,
+            currentObisRangeLevel,
+            'mixed'
+          )}
+      </>
     )
   }
 
@@ -236,7 +264,7 @@ export default function Legend({
         {legendOpen && (
           <div className='legendGroupBody'>
             {generateLegendElements()}
-            {generateTrajectoryLegendElements()}
+            {generateCoverageLegendElements()}
           </div>
         )}
       </div>

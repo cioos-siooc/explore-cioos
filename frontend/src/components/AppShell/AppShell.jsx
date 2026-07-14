@@ -34,6 +34,7 @@ export default function AppShell () {
     zoom,
     currentRangeLevel,
     currentTrajectoryRangeLevel,
+    currentObisRangeLevel,
     legendLoading,
     griddapCoverageVisible,
     setGriddapCoverageVisible,
@@ -104,6 +105,7 @@ export default function AppShell () {
       <Legend
         currentRangeLevel={currentRangeLevel}
         currentTrajectoryRangeLevel={currentTrajectoryRangeLevel}
+        currentObisRangeLevel={currentObisRangeLevel}
         loading={legendLoading}
         zoom={zoom}
         platformsAvailable={platformsAvailable}

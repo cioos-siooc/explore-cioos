@@ -81,6 +81,19 @@ const createDBFilter = require("../utils/dbFilter");
  *                     zoom1:
  *                       type: array
  *                       items: { type: integer }
+ *                 obisRecordsCount:
+ *                   type: object
+ *                   description: >
+ *                     Occurrence-record count ranges per hex tier. Like
+ *                     trajectories, OBIS cells always render as hexes, so
+ *                     there's no zoom2/point tier.
+ *                   properties:
+ *                     zoom0:
+ *                       type: array
+ *                       items: { type: integer }
+ *                     zoom1:
+ *                       type: array
+ *                       items: { type: integer }
  */
 router.get(
   "/",
@@ -112,9 +125,10 @@ router.get(
     const profilesBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, days as record_count,
                time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
         FROM cde.profiles WHERE show_as_point`;
-    // Trajectory coverage cells merge into the hex-tier ranges (zoom0/zoom1,
-    // the green ramp) but not the point-tier range (zoom2) — at that zoom
-    // they only render via the dedicated always-hex purple layer below.
+    // Trajectory and OBIS coverage cells merge into the hex-tier ranges
+    // (zoom0/zoom1, the green ramp) but not the point-tier range (zoom2) — at
+    // that zoom they only render via the dedicated always-hex coverage layer,
+    // whose own ranges come from the second query below.
     const trajectoryBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, days as record_count,
                time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
         FROM cde.trajectory_cells`;
@@ -131,11 +145,11 @@ router.get(
       ? hexBranches.join("\n        UNION ALL\n        ")
       : `${profilesBranch} WHERE FALSE`;
 
-    const pointBranches = [];
-    if (includeProfiles) pointBranches.push(profilesBranch);
-    if (includeObis) pointBranches.push(obisBranch);
-    const combinedPointInner = pointBranches.length
-      ? pointBranches.join("\n        UNION ALL\n        ")
+    // Only profiles reach the point tier: both cell tables are drawn as hexes
+    // at every zoom, so counting them here would ramp the point circles
+    // against data they don't contain.
+    const combinedPointInner = includeProfiles
+      ? profilesBranch
       : `${profilesBranch} WHERE FALSE`;
 
     const sql = `
@@ -167,8 +181,11 @@ router.get(
         SELECT * from sub1,sub2,sub3
         `;
 
-    // Trajectory coverage cells always render as hexes (never points), so
-    // they only need a hex_0/hex_1 range — no point-level zoom2 bucket.
+    // Both cell tables always render as hexes (never points), so they only
+    // need hex_0/hex_1 ranges — no point-level zoom2 bucket. Each ramps on
+    // its own quantity, and each range is taken over only the hexes that
+    // actually hold that kind of cell, so a hex holding only the other kind
+    // doesn't drag the minimum to zero.
     const trajectorySql = `
         WITH records AS (
         SELECT hex_0_pk, hex_1_pk, dataset_pk, trajectory_id
@@ -184,18 +201,35 @@ router.get(
         SELECT * from sub1,sub2
         `;
 
-    // Both aggregations scan the same large tables independently; run them
-    // concurrently rather than back-to-back so legend latency is bounded by
-    // the slower of the two, not their sum. The legend gates first map paint,
-    // so this is on the critical path.
-    const [rows, trajectoryRows] = await Promise.all([
+    const obisSql = `
+        WITH records AS (
+        SELECT hex_0_pk, hex_1_pk, p.n_records
+        FROM cde.obis_cells p
+        JOIN cde.datasets d
+        ON p.dataset_pk = d.pk
+        WHERE :obisFilters ${filters.hasShared ? "AND :filters" : ""}
+        ),
+
+        sub1 AS (SELECT json_build_array(min(count),max(count)) zoom0 FROM (SELECT sum(records.n_records) count FROM records GROUP BY hex_0_pk) s),
+        sub2 AS (SELECT json_build_array(min(count),max(count)) zoom1 FROM (SELECT sum(records.n_records) count FROM records GROUP BY hex_1_pk) s)
+
+        SELECT * from sub1,sub2
+        `;
+
+    // All three aggregations scan the same large tables independently; run
+    // them concurrently rather than back-to-back so legend latency is bounded
+    // by the slowest, not their sum. The legend gates first map paint, so this
+    // is on the critical path.
+    const [rows, trajectoryRows, obisRows] = await Promise.all([
       db.raw(sql, { filters: filters.shared, obisFilters: filters.obisOnly }),
       db.raw(trajectorySql, { filters: filters.shared }),
+      db.raw(obisSql, { filters: filters.shared, obisFilters: filters.obisOnly }),
     ]);
 
     res.send(rows && {
       recordsCount: rows.rows[0],
       trajectoryRecordsCount: trajectoryRows.rows[0],
+      obisRecordsCount: obisRows.rows[0],
     });
   },
 );

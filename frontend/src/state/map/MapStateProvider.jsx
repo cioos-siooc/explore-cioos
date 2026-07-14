@@ -63,6 +63,8 @@ export default function MapStateProvider ({ children }) {
   const [trajectoryRangeLevels, setTrajectoryRangeLevels] = useState()
   const [currentTrajectoryRangeLevel, setCurrentTrajectoryRangeLevel] =
     useState()
+  const [obisRangeLevels, setObisRangeLevels] = useState()
+  const [currentObisRangeLevel, setCurrentObisRangeLevel] = useState()
   // The four map-appearance switches below are preferences rather than
   // shareable state: they persist in localStorage so a reload comes back to
   // the map the user left, while the camera and filters keep living in the URL.
@@ -131,6 +133,7 @@ export default function MapStateProvider ({ children }) {
         if (legend) {
           setRangeLevels(legend.recordsCount)
           setTrajectoryRangeLevels(legend.trajectoryRecordsCount)
+          setObisRangeLevels(legend.obisRecordsCount)
         }
       })
       .catch((error) => {
@@ -183,15 +186,23 @@ export default function MapStateProvider ({ children }) {
   }, [rangeLevels, zoom])
 
   useEffect(() => {
-    // Trajectory hexes only render at zoom >= 7 (below that, trajectory
-    // counts are merged into the green hex ramp) — hide the legend entry
-    // otherwise.
+    // Coverage hexes (trajectory and OBIS cells) only render at zoom >= 7 —
+    // below that, their counts are merged into the green hex ramp — so hide
+    // both legend entries otherwise.
     if (trajectoryRangeLevels && zoom >= 7) {
       setCurrentTrajectoryRangeLevel(trajectoryRangeLevels.zoom1)
     } else {
       setCurrentTrajectoryRangeLevel()
     }
   }, [trajectoryRangeLevels, zoom])
+
+  useEffect(() => {
+    if (obisRangeLevels && zoom >= 7) {
+      setCurrentObisRangeLevel(obisRangeLevels.zoom1)
+    } else {
+      setCurrentObisRangeLevel()
+    }
+  }, [obisRangeLevels, zoom])
 
   const value = {
     loading,
@@ -203,8 +214,10 @@ export default function MapStateProvider ({ children }) {
     rangeLevels,
     legendLoading,
     trajectoryRangeLevels,
+    obisRangeLevels,
     currentRangeLevel,
     currentTrajectoryRangeLevel,
+    currentObisRangeLevel,
     griddapCoverageVisible,
     setGriddapCoverageVisible,
     dataLayersVisible,

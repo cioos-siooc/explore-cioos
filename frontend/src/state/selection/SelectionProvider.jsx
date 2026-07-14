@@ -32,13 +32,19 @@ import { GROUP_NONE, hiddenDatasetPksFor } from '../datasetGroups.js'
 const SelectionContext = createContext()
 
 // cdm_data_types that never render as platform-coloured point markers: grids
-// draw as a coverage footprint / WMS overlay, trajectories as their own hex
-// layer. See platformsAvailable below.
+// draw as a coverage footprint / WMS overlay, trajectories as coverage hexes.
+// See platformsAvailable below.
 const PLATFORMLESS_DATASET_TYPES = new Set([
   'Grid',
   'Trajectory',
   'TrajectoryProfile'
 ])
+
+// OBIS datasets draw as coverage hexes too, but they carry cdm_data_type
+// 'Point' — which an ERDDAP dataset can legitimately be as well — so they're
+// matched on source rather than type.
+const isPlatformlessDataset = (row) =>
+  PLATFORMLESS_DATASET_TYPES.has(row.cdm_data_type) || row.source_type === 'obis'
 
 export function useSelection () {
   return useContext(SelectionContext)
@@ -151,7 +157,7 @@ export default function SelectionProvider ({ children }) {
       [
         ...new Set(
           pointsData
-            .filter((row) => !PLATFORMLESS_DATASET_TYPES.has(row.cdm_data_type))
+            .filter((row) => !isPlatformlessDataset(row))
             .map((row) => row.platform)
             .filter(Boolean)
         )
