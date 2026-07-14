@@ -444,6 +444,11 @@
   opacity: 30%;
 }
 
+.datasetCardSizeUnavailable {
+  color: var(--cioos-ink-40);
+  font-size: var(--cioos-font-size-xs);
+}
+
 @media (max-width: 600px) {
   .datasetsCardToolbar {
     flex-wrap: wrap;

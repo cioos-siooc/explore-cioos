@@ -179,6 +179,13 @@
   white-space: nowrap;
 }
 
+/* A refetch is in flight: the numbers on screen are the previous ones, so fade
+   them rather than swapping in a spinner and making the counters flicker. */
+.datasetsToggleCount.updating,
+.sidebarCountsDatasets.updating {
+  opacity: 0.55;
+}
+
 .sidebarCountsSelected {
   color: var(--cioos-ink-60);
   white-space: nowrap;

@@ -61,6 +61,22 @@
   padding: 1px 0 3px;
 }
 
+/* Waiting on /legend — stands in for the color bar, so the card keeps its
+   shape instead of collapsing and then jumping back open. */
+.legendLoading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+  padding: 1px 0 3px;
+}
+
+.legendLoading .spinner-border {
+  color: var(--cioos-primary);
+}
+
 .legendSection + .legendSection {
   margin-top: 5px;
   border-top: 1px solid var(--cioos-hairline);

@@ -15,6 +15,15 @@
   border-width: 0.2em;
 }
 
+/* Stand-in for a dataset counter whose number hasn't arrived yet: sized to sit
+   inside a count pill without changing its height. */
+.spinner-border.countSpinner {
+  width: 11px;
+  height: 11px;
+  border-width: 2px;
+  margin: 3px 0;
+}
+
 @keyframes cioos-spinner-border {
   to {
     transform: rotate(360deg);

@@ -28,6 +28,7 @@ export default function DatasetCard({
   row,
   isDownloadModal,
   downloadSizeEstimates,
+  estimatesLoading,
   inViewport = false,
   onSelect,
   onInspect,
@@ -41,6 +42,9 @@ export default function DatasetCard({
   // when the CDE can deliver it (internalDownload).
   const selectDisabled = isGrid || (isDownloadModal && !row.internalDownload)
   const estimatesReady = !isEmpty(downloadSizeEstimates)
+  // Estimates that failed to load: the size and download status are unknown,
+  // and no amount of waiting will produce them — say so instead of spinning.
+  const estimatesFailed = !estimatesLoading && !estimatesReady
 
   const handleSelect = (e) => {
     e.stopPropagation()
@@ -208,6 +212,10 @@ export default function DatasetCard({
                   </Tooltip>
                 )}
               </>
+            ) : estimatesFailed ? (
+              <span className='datasetCardSizeUnavailable'>
+                {t('downloadSizeUnavailableTitle')}
+              </span>
             ) : (
               <Spinner className='datasetsTableSpinner' />
             )}

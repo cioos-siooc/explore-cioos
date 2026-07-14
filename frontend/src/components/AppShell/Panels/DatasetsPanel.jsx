@@ -46,10 +46,11 @@ export default function DatasetsPanel () {
     datasetFilter: { datasetsSelected, setDatasetsSelected }
   }
 
-  if (selectionLoading || !initialPointsQueryComplete) {
+  // Before the first /pointQuery lands there is no list to show at all.
+  if (!initialPointsQueryComplete) {
     return (
       <div className='datasetsPanel'>
-        <Loading />
+        <Loading variant='inline' />
       </div>
     )
   }
@@ -60,6 +61,10 @@ export default function DatasetsPanel () {
       onMouseEnter={() => setHoveredDataset(inspectDataset)}
       onMouseLeave={() => setHoveredDataset()}
     >
+      {/* A refetch (filters changed, polygon redrawn) keeps the current
+          results readable underneath rather than blanking the panel — the
+          scrim just marks them as about to be replaced. */}
+      {selectionLoading && <Loading variant='inline' />}
       {inspectDataset ? (
         <DatasetInspector
           dataset={inspectDataset}

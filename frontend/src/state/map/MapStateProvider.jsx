@@ -1,5 +1,12 @@
 import * as React from 'react'
-import { createContext, useContext, useRef, useState, useEffect } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useRef,
+  useState,
+  useEffect
+} from 'react'
 import isEmpty from 'lodash/isEmpty'
 
 import { server } from '../../config.js'
@@ -20,9 +27,20 @@ export function useMapState () {
 export default function MapStateProvider ({ children }) {
   const { query } = useFilters()
 
-  const [loading, setLoading] = useState(true)
+  // The map is "loading" whenever it's redrawing (initial style + tiles, a
+  // filter change, a new selection polygon); Map.jsx flips it back on 'idle'.
+  // mapLoaded records that it has settled at least once — the first load is a
+  // blank screen and earns the full splash, every later redraw happens over a
+  // usable map and only earns the quiet MapBusy pill.
+  const [loading, setLoadingState] = useState(true)
+  const [mapLoaded, setMapLoaded] = useState(false)
+  const setLoading = useCallback((value) => {
+    setLoadingState(value)
+    if (!value) setMapLoaded(true)
+  }, [])
   const [mapView, setMapView] = useState({})
   const [rangeLevels, setRangeLevels] = useState()
+  const [legendLoading, setLegendLoading] = useState(true)
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
   const [trajectoryRangeLevels, setTrajectoryRangeLevels] = useState()
   const [currentTrajectoryRangeLevel, setCurrentTrajectoryRangeLevel] =
@@ -68,7 +86,13 @@ export default function MapStateProvider ({ children }) {
   // A failed legend fetch (e.g. gateway timeout) just leaves the current
   // color ramp in place — the map itself keeps working — so failures log
   // instead of crashing, and loadLegend() is exposed for the retry banner.
+  //
+  // legendLoading exists because "no range levels yet" and "no data matches the
+  // filters" are indistinguishable from the values alone, and /legend is the
+  // app's slowest query: without it the legend card claimed "No Data" for the
+  // first few seconds of every load.
   function loadLegend (legendQuery) {
+    setLegendLoading(true)
     fetchJson(`${server}/legend${legendQuery ? '?' + legendQuery : ''}`)
       .then((legend) => {
         if (legend) {
@@ -79,6 +103,7 @@ export default function MapStateProvider ({ children }) {
       .catch((error) => {
         console.error('legend fetch failed:', error)
       })
+      .finally(() => setLegendLoading(false))
   }
 
   // Initial map view from a share link, and the initial legend values.
@@ -137,10 +162,12 @@ export default function MapStateProvider ({ children }) {
   const value = {
     loading,
     setLoading,
+    mapLoaded,
     mapView,
     setMapView,
     zoom,
     rangeLevels,
+    legendLoading,
     trajectoryRangeLevels,
     currentRangeLevel,
     currentTrajectoryRangeLevel,

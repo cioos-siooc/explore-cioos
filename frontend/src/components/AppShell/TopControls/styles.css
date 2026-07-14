@@ -101,6 +101,11 @@
 
 /* On the active (teal) tab the count stays white too — a translucent white
    pill keeps the number legible without a dark-on-white patch. */
+/* Stale count during a refetch — see the sidebar counters. */
+.topBarCount.updating {
+  opacity: 0.55;
+}
+
 .topBarButton.active .topBarCount {
   background-color: rgba(255, 255, 255, 0.24);
   color: var(--cioos-white);

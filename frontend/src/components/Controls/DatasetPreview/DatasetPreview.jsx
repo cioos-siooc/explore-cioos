@@ -104,7 +104,7 @@ export default function DatasetPreview({
           <Modal.Body>
             <div className='tableAndPlotGridItem tableAndPlot'>
               {recordLoading ? (
-                <Loading />
+                <Loading variant='inline' />
               ) : (
                 <>
                   {datasetPreview?.table?.rows ? (
@@ -115,7 +115,7 @@ export default function DatasetPreview({
                           data={data}
                         />
                       ) : (
-                        <Suspense fallback={<Loading />}>
+                        <Suspense fallback={<Loading variant='inline' />}>
                           <DatasetPreviewPlot
                             inspectDataset={inspectDataset}
                             plotAxes={plotAxes}

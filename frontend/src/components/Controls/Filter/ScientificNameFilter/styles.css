@@ -83,3 +83,13 @@
   color: var(--cioos-ink-60);
   font-size: 13px;
 }
+
+.scientificNameLoading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scientificNameLoading .spinner-border {
+  color: var(--cioos-primary);
+}

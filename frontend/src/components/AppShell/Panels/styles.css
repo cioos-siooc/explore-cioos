@@ -119,6 +119,7 @@
  * DatasetsPanel (sidebar body) / DownloadPanel (download modal).
  * ------------------------------------------------------------------ */
 .datasetsPanel {
+  position: relative; /* anchors the refetch scrim (Loading) */
   height: 100%;
   min-height: 300px;
 }

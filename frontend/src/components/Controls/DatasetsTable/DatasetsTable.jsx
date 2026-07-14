@@ -36,6 +36,7 @@ export default function DatasetsTable({
   setHoveredDataset = () => {},
   isDownloadModal,
   downloadSizeEstimates,
+  estimatesLoading,
   datasetsInViewPks = EMPTY_SET
 }) {
   const { t, i18n } = useTranslation()
@@ -375,6 +376,7 @@ export default function DatasetsTable({
                 row={item.row}
                 isDownloadModal={isDownloadModal}
                 downloadSizeEstimates={downloadSizeEstimates}
+                estimatesLoading={estimatesLoading}
                 inViewport={datasetsInViewPks.has(item.row.pk)}
                 onSelect={handleSelectDataset}
                 onInspect={isDownloadModal ? undefined : setInspectDataset}

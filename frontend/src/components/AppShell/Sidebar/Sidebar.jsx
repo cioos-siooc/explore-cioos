@@ -6,8 +6,8 @@ import classNames from 'classnames'
 import isEmpty from 'lodash/isEmpty'
 
 import DatasetsPanel from '../Panels/DatasetsPanel.jsx'
-import { formatDatasetCount } from '../../../utilities'
-import { useFilters } from '../../../state/filters/FilterProvider.jsx'
+import Spinner from '../../ui/Spinner.jsx'
+import useDatasetCounts from '../../../state/useDatasetCounts.js'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
@@ -29,19 +29,29 @@ const DRAG_THRESHOLD = 6
 // screen.
 export default function Sidebar () {
   const { t } = useTranslation()
-  const { totalNumberOfDatasets } = useFilters()
-  const { filteredDatasets, pointsToReview } = useSelection()
+  const { pointsToReview } = useSelection()
   const { sidebarOpen, setSidebarOpen, setShowDownloadModal } = useUI()
+  // Until `ready`, there is no dataset count to show — not even a zero. See
+  // useDatasetCounts.
+  const {
+    ready: countsReady,
+    updating: countsUpdating,
+    filteredCount,
+    total,
+    allDatasetsShown,
+    label: countLabel
+  } = useDatasetCounts()
 
   const expanded = sidebarOpen
-  // Reflects the title-search narrowing too, not just the server-side
-  // filters, so the counter agrees with what the list below actually shows.
-  const filteredCount = filteredDatasets?.length ?? 0
   const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length
-  // Nothing filtered out (or the total isn't in yet): the "filtered / total"
-  // split is noise, so both the pill and the footer state the total alone.
-  const allDatasetsShown =
-    !totalNumberOfDatasets || filteredCount === totalNumberOfDatasets
+  const countsTitle = countsReady
+    ? t('dockDatasetsCountTitle', {
+      filtered: filteredCount,
+      // A failed /datasets leaves no catalog total; the filtered count is
+      // then all we know, and all the label shows.
+      total: total ?? filteredCount
+    })
+    : t('datasetsCountLoadingTitle')
 
   // Track the mobile breakpoint so the toggle doubles as a drag handle only
   // where the datasets card is a bottom sheet.
@@ -131,13 +141,16 @@ export default function Sidebar () {
           <ListUl size={18} aria-hidden='true' />
           <span className='datasetsToggleLabel'>{t('datasetsFilterName')}</span>
           <span
-            className='datasetsToggleCount'
-            title={t('dockDatasetsCountTitle', {
-              filtered: filteredCount,
-              total: totalNumberOfDatasets || 0
+            className={classNames('datasetsToggleCount', {
+              updating: countsUpdating
             })}
+            title={countsTitle}
           >
-            {formatDatasetCount(filteredCount, totalNumberOfDatasets)}
+            {countsReady ? (
+              countLabel
+            ) : (
+              <Spinner size='sm' className='countSpinner' />
+            )}
           </span>
           <ChevronDown
             className='datasetsToggleChevron'
@@ -151,20 +164,23 @@ export default function Sidebar () {
         <footer className='sidebarFooter'>
           <div className='sidebarCounts'>
             <span
-              className='sidebarCountsDatasets'
-              title={t('dockDatasetsCountTitle', {
-                filtered: filteredCount,
-                total: totalNumberOfDatasets || 0
+              className={classNames('sidebarCountsDatasets', {
+                updating: countsUpdating
               })}
+              title={countsTitle}
             >
-              {allDatasetsShown
-                ? t('sidebarCountsDatasetsAll', {
-                  total: totalNumberOfDatasets || filteredCount
+              {!countsReady ? (
+                <Spinner size='sm' className='countSpinner' />
+              ) : allDatasetsShown ? (
+                t('sidebarCountsDatasetsAll', {
+                  total: total ?? filteredCount
                 })
-                : t('sidebarCountsDatasets', {
+              ) : (
+                t('sidebarCountsDatasets', {
                   filtered: filteredCount,
-                  total: totalNumberOfDatasets
-                })}
+                  total
+                })
+              )}
             </span>
             <span
               className='sidebarCountsSelected'

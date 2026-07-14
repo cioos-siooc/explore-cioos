@@ -4,6 +4,7 @@
 }
 
 .tableAndPlotGridItem.tableAndPlot {
+  position: relative; /* anchors the loading scrim to the preview area */
   min-height: 100px;
 }
 

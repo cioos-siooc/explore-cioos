@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import MapContainer from '../Map/MapContainer.jsx'
 import ApiErrorBanner from './ApiErrorBanner.jsx'
+import MapBusy from './MapBusy.jsx'
 import Sidebar from './Sidebar/Sidebar.jsx'
 import TopControls from './TopControls/TopControls.jsx'
 import FiltersModal from './Modals/FiltersModal.jsx'
@@ -29,9 +30,11 @@ export default function AppShell () {
   const { t } = useTranslation()
   const {
     loading,
+    mapLoaded,
     zoom,
     currentRangeLevel,
     currentTrajectoryRangeLevel,
+    legendLoading,
     griddapCoverageVisible,
     setGriddapCoverageVisible,
     dataLayersVisible,
@@ -82,7 +85,10 @@ export default function AppShell () {
 
   return (
     <>
-      {loading && <Loading />}
+      {/* The splash covers the first map load only; a redraw after that (new
+          filters, a new polygon) happens over a map the user can already see
+          and read, so it gets the MapBusy pill instead of a full-screen dim. */}
+      {loading && !mapLoaded && <Loading />}
       {/* Mount the map immediately rather than waiting for /legend (the app's
           heaviest query) to resolve — first paint of the basemap and tile
           layers no longer blocks on it. The color ramp is applied once
@@ -90,6 +96,7 @@ export default function AppShell () {
           effect, which guards against their being undefined until then. */}
       <MapContainer />
       <ApiErrorBanner />
+      {loading && mapLoaded && <MapBusy />}
       <Sidebar />
       <TopControls />
       <FiltersModal />
@@ -97,6 +104,7 @@ export default function AppShell () {
       <Legend
         currentRangeLevel={currentRangeLevel}
         currentTrajectoryRangeLevel={currentTrajectoryRangeLevel}
+        loading={legendLoading}
         zoom={zoom}
         platformsAvailable={platformsAvailable}
         layerControls={layerControls}

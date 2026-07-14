@@ -5,9 +5,9 @@ import classNames from 'classnames'
 
 import BrandSearch from '../TopLeft/BrandSearch.jsx'
 import ActiveFilterChips from './ActiveFilterChips.jsx'
-import { formatDatasetCount } from '../../../utilities'
+import Spinner from '../../ui/Spinner.jsx'
+import useDatasetCounts from '../../../state/useDatasetCounts.js'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
-import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
 
@@ -27,11 +27,17 @@ export default function TopControls () {
     obisNodesSelected,
     scientificNamesSelected,
     timeFilterActive,
-    depthFilterActive,
-    totalNumberOfDatasets
+    depthFilterActive
   } = useFilters()
-  const { filteredDatasets } = useSelection()
   const { setShowFiltersModal, sidebarOpen, setSidebarOpen } = useUI()
+  // No count is shown until there is a real one — see useDatasetCounts.
+  const {
+    ready: countsReady,
+    updating: countsUpdating,
+    filteredCount,
+    total,
+    label: countLabel
+  } = useDatasetCounts()
 
   const activeFilterCount = [
     eovsSelected.some((o) => o.isSelected),
@@ -45,10 +51,6 @@ export default function TopControls () {
     depthFilterActive
   ].filter(Boolean).length
 
-  // Reflects the title-search narrowing too, not just the server-side
-  // filters, so the badge agrees with what the Datasets list actually shows.
-  const filteredCount = filteredDatasets?.length ?? 0
-
   return (
     <div className='topBar'>
       <BrandSearch>
@@ -58,15 +60,27 @@ export default function TopControls () {
             className={classNames('topBarButton', { active: sidebarOpen })}
             onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-pressed={sidebarOpen}
-            title={t('dockDatasetsCountTitle', {
-              filtered: filteredCount,
-              total: totalNumberOfDatasets || 0
-            })}
+            title={
+              countsReady
+                ? t('dockDatasetsCountTitle', {
+                  filtered: filteredCount,
+                  total: total ?? filteredCount
+                })
+                : t('datasetsCountLoadingTitle')
+            }
           >
             <ListUl size={18} aria-hidden='true' />
             <span className='topBarButtonLabel'>{t('datasetsFilterName')}</span>
-            <span className='topBarCount'>
-              {formatDatasetCount(filteredCount, totalNumberOfDatasets)}
+            <span
+              className={classNames('topBarCount', {
+                updating: countsUpdating
+              })}
+            >
+              {countsReady ? (
+                countLabel
+              ) : (
+                <Spinner size='sm' className='countSpinner' />
+              )}
             </span>
           </button>
           <button

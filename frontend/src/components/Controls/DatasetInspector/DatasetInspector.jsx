@@ -56,9 +56,14 @@ export default function DatasetInspector({
   const { t } = useTranslation()
   const [datasetRecords, setDatasetRecords] = useState()
   const [recordFilterText, setRecordFilterText] = useState('')
-  const [loading, setLoading] = useState(false)
   const inspectorRef = useRef(null)
   const isGrid = dataset.cdm_data_type === 'Grid'
+  // no per-record list for OBIS (external) or griddap (metadata-only)
+  const hasRecordList = dataset.source_type !== 'obis' && !isGrid
+  // Start loading rather than false: the fetch below is fired from an effect,
+  // so an initial false would paint one frame of an empty record table before
+  // the spinner appears.
+  const [loading, setLoading] = useState(hasRecordList)
 
   const returnToList = () => {
     setBackClicked(true)
@@ -69,25 +74,37 @@ export default function DatasetInspector({
   // )
 
   useEffect(() => {
-    // no per-record list for OBIS (external) or griddap (metadata-only)
-    if (dataset.source_type === 'obis' || isGrid) return
+    if (!hasRecordList) {
+      setLoading(false)
+      return
+    }
+    let cancelled = false
     setLoading(true)
     const queryParams = new URLSearchParams(query)
     queryParams.set('datasetPKs', dataset.pk)
 
     fetch(`${server}/datasetRecordsList?${queryParams.toString()}`)
       .then((response) => {
-        if (response.ok) {
-          response.json().then((data) => {
-            setDatasetRecords(data)
-            setLoading(false)
-          })
+        if (!response.ok) {
+          throw new Error(`datasetRecordsList failed: ${response.status}`)
         }
+        return response.json()
+      })
+      .then((data) => {
+        if (!cancelled) setDatasetRecords(data)
       })
       .catch((error) => {
-        setLoading(false)
-        throw error
+        // An error response used to leave the spinner running forever. Land on
+        // an empty record table instead — the rest of the page still reads.
+        console.error('datasetRecordsList failed:', error)
+        if (!cancelled) setDatasetRecords([])
       })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [dataset])
 
   // Browser Back needs no handling here: the open dataset lives in the URL
@@ -390,7 +407,7 @@ export default function DatasetInspector({
             setActiveWmsOverlay={setActiveWmsOverlay}
           />
         )}
-        {dataset.source_type !== 'obis' && !isGrid && (
+        {hasRecordList && (
           <div className='recordSection'>
             <div className='recordSectionHeader'>
               <strong>{t('datasetInspectorRecordTable')}</strong>
@@ -400,7 +417,7 @@ export default function DatasetInspector({
             </div>
             {loading ? (
               <div className='datasetInspectorLoadingContainer'>
-                <Loading />
+                <Loading variant='inline' />
               </div>
             ) : (
               <div className='recordTableScroll'>

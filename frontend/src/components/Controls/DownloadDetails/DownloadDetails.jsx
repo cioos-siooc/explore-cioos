@@ -63,81 +63,77 @@ export default function DownloadDetails({
   )
   const [dataTotal, setDataTotal] = useState(0)
   const [downloadSizeEstimates, setDownloadSizeEstimates] = useState()
-  const [loading, setLoading] = useState(false)
+  // Three states, not two: estimates in flight (spinner), estimates in
+  // (sizes), estimates failed (no sizes, no spinner). The old code threw from
+  // its catch handlers, which skipped the setLoading(false) chained after
+  // them — a failing /downloadEstimate spun forever, in every card and in the
+  // order summary.
+  const [estimatesLoading, setEstimatesLoading] = useState(true)
 
   useEffect(() => {
-    setLoading(true)
+    let cancelled = false
+    setEstimatesLoading(true)
     setDownloadSizeEstimates()
-    let url = `${server}/downloadEstimate?`
-    let unfilteredSizeEstimates
-    let filteredAndUnfilteredSizeEstimates
-    if (pointsData) {
-      url += `&datasetPKs=${pointsData.map((ds) => ds.pk).join(',')}`
-    }
-    fetch(url)
-      .then((response) => response.ok && response.json())
-      .then((ufse) => {
-        unfilteredSizeEstimates = ufse
-      })
-      .then(() => {
-        if (
-          filterDownloadByPolygon ||
-          filterDownloadByTime ||
-          filterDownloadByDepth
-        ) {
-          if (polygon && filterDownloadByPolygon) {
-            url += `&polygon=${JSON.stringify(polygon)}`
-          }
-          if (query) {
-            const tempQuery = { ...query }
-            if (!filterDownloadByTime) {
-              tempQuery.startDate = defaultStartDate
-              tempQuery.endDate = defaultEndDate
-            }
-            if (!filterDownloadByDepth) {
-              tempQuery.startDepth = defaultStartDepth
-              tempQuery.endDepth = defaultEndDepth
-            }
-            url += `&${createDataFilterQueryString(tempQuery)}`
-          }
-          fetch(url)
-            .then((response) => {
-              if (response.ok) return response.json()
-            })
-            .then((estimates) => {
-              filteredAndUnfilteredSizeEstimates = estimates.map((e) => {
-                return {
-                  ...e,
-                  unfilteredSize: unfilteredSizeEstimates.filter(
-                    (ufse) => ufse.pk === e.pk
-                  )[0].size
-                }
-              })
-              setDownloadSizeEstimates(filteredAndUnfilteredSizeEstimates)
-            })
-            .catch((error) => {
-              throw error
-            })
-            .then(() => setLoading(false))
-        } else {
-          filteredAndUnfilteredSizeEstimates = unfilteredSizeEstimates.map(
-            (e) => {
-              return {
-                ...e,
-                unfilteredSize: unfilteredSizeEstimates.filter(
-                  (ufse) => ufse.pk === e.pk
-                )[0].size
-              }
-            }
-          )
-          setDownloadSizeEstimates(filteredAndUnfilteredSizeEstimates)
+
+    const unfilteredUrl = `${server}/downloadEstimate?&datasetPKs=${pointsData
+      .map((ds) => ds.pk)
+      .join(',')}`
+    // The download can be narrowed by any of the active filters; when none of
+    // them applies, the unfiltered estimate is the estimate.
+    const isFiltered =
+      filterDownloadByPolygon || filterDownloadByTime || filterDownloadByDepth
+    let filteredUrl = unfilteredUrl
+    if (isFiltered) {
+      if (polygon && filterDownloadByPolygon) {
+        filteredUrl += `&polygon=${JSON.stringify(polygon)}`
+      }
+      if (query) {
+        const tempQuery = { ...query }
+        if (!filterDownloadByTime) {
+          tempQuery.startDate = defaultStartDate
+          tempQuery.endDate = defaultEndDate
         }
+        if (!filterDownloadByDepth) {
+          tempQuery.startDepth = defaultStartDepth
+          tempQuery.endDepth = defaultEndDepth
+        }
+        filteredUrl += `&${createDataFilterQueryString(tempQuery)}`
+      }
+    }
+
+    const fetchEstimates = (url) =>
+      fetch(url).then((response) => {
+        if (!response.ok) {
+          throw new Error(`downloadEstimate failed: ${response.status}`)
+        }
+        return response.json()
+      })
+
+    Promise.all([
+      fetchEstimates(unfilteredUrl),
+      isFiltered ? fetchEstimates(filteredUrl) : undefined
+    ])
+      .then(([unfiltered, filtered]) => {
+        if (cancelled) return
+        const unfilteredSizeByPk = new Map(unfiltered.map((e) => [e.pk, e.size]))
+        setDownloadSizeEstimates(
+          (filtered || unfiltered).map((e) => ({
+            ...e,
+            unfilteredSize: unfilteredSizeByPk.get(e.pk) ?? e.size
+          }))
+        )
       })
       .catch((error) => {
-        throw error
+        console.error('download size estimate failed:', error)
       })
-      .then(() => setLoading(false))
+      .finally(() => {
+        if (!cancelled) setEstimatesLoading(false)
+      })
+
     setSubmissionState()
+    return () => {
+      cancelled = true
+    }
   }, [
     query,
     polygon,
@@ -150,10 +146,13 @@ export default function DownloadDetails({
     if (downloadSizeEstimates) {
       let tempDataTotal = 0
       let tempDataDownloadable = 0
+      const estimateByPk = new Map(
+        downloadSizeEstimates.map((dse) => [dse.pk, dse])
+      )
       const tempData = pointsData.map((ds) => {
-        const tempDS = downloadSizeEstimates.filter(
-          (dse) => dse.pk === ds.pk
-        )[0]
+        // A dataset the estimate response didn't cover reads as 0 bytes rather
+        // than throwing — it stays listed, just without a usable size.
+        const tempDS = estimateByPk.get(ds.pk) || { size: 0, unfilteredSize: 0 }
         const estimates = {
           filteredSize: tempDS.size,
           unfilteredSize: tempDS.unfilteredSize
@@ -347,7 +346,7 @@ export default function DownloadDetails({
             datasets={pointsData}
             setHoveredDataset={setHoveredDataset}
             downloadSizeEstimates={downloadSizeEstimates}
-            loading={loading}
+            estimatesLoading={estimatesLoading}
           />
         </div>
       </div>
@@ -371,14 +370,18 @@ export default function DownloadDetails({
 
       <div className='downloadOrderBar'>
         <div className='downloadSummary'>
+          {/* The estimates decide which datasets are downloadable, hence how
+              many stay selected — so both stats wait for them rather than
+              showing a count that is about to change under the user. If they
+              fail outright, the sizes are unknowable but the counts aren't. */}
           <div className='downloadSummaryStat'>
-            {downloadSizeEstimates ? (
+            {estimatesLoading ? (
+              <Spinner className='datasetSizeTotalSpinner' />
+            ) : (
               <span className='downloadSummaryValue'>
                 {selectedCount}
                 <span className='downloadSummaryValueMuted'>{` / ${pointsData.length}`}</span>
               </span>
-            ) : (
-              <Spinner className='datasetSizeTotalSpinner' />
             )}
             <span className='downloadSummaryLabel'>
               {t('downloadDetailsDownloadInfoDatasets')}
@@ -386,13 +389,20 @@ export default function DownloadDetails({
           </div>
           <div className='downloadSummaryDivider' aria-hidden='true' />
           <div className='downloadSummaryStat'>
-            {downloadSizeEstimates ? (
+            {estimatesLoading ? (
+              <Spinner className='datasetSizeTotalSpinner' />
+            ) : downloadSizeEstimates ? (
               <span className='downloadSummaryValue'>
                 {bytes(dataTotal.filteredSize) || '0B'}
                 <span className='downloadSummaryValueMuted'>{` / ${bytes(dataTotal.unfilteredSize) || '0B'}`}</span>
               </span>
             ) : (
-              <Spinner className='datasetSizeTotalSpinner' />
+              <span
+                className='downloadSummaryValue downloadSummaryValueMuted'
+                title={t('downloadSizeUnavailableTitle')}
+              >
+                {t('downloadSizeUnavailable')}
+              </span>
             )}
             <span className='downloadSummaryLabel'>
               {t('downloadDetailsDownloadInfoDownloadSize')}

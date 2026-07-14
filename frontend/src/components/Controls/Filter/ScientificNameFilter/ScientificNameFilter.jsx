@@ -9,6 +9,7 @@ import {
 import { useTranslation } from 'react-i18next'
 
 import QuestionIconTooltip from '../../QuestionIconTooltip/QuestionIconTooltip.jsx'
+import Spinner from '../../../ui/Spinner.jsx'
 import { abbreviateString, useOutsideAlerter, useDebounce } from '../../../../utilities'
 import { server } from '../../../../config.js'
 
@@ -204,7 +205,12 @@ export default function ScientificNameFilter({
             placeholder={searchPlaceholder}
           />
           <div className='scientificNameSuggestions'>
-            {loading && <div className='scientificNameLoading'>…</div>}
+            {loading && (
+              <div className='scientificNameLoading'>
+                <Spinner size='sm' />
+                {t('scientificNameFilterLoading')}
+              </div>
+            )}
             {!loading && filteredSuggestions.length === 0 && (
               <div className='scientificNameEmpty'>
                 {t('scientificNameFilterNoResults')}

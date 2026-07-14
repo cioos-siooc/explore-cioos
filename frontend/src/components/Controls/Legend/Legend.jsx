@@ -12,6 +12,7 @@ import {
 } from '../../../utilities.jsx'
 import { colorScale, trajectoryColorScale } from '../../config.js'
 import platformColors from '../../platformColors'
+import Spinner from '../../ui/Spinner.jsx'
 import Switch from '../../ui/Switch.jsx'
 import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
 
@@ -45,6 +46,7 @@ function pickTickIndices(n, maxTicks = 5) {
 export default function Legend({
   currentRangeLevel,
   currentTrajectoryRangeLevel,
+  loading,
   zoom,
   platformsAvailable = [],
   layerControls = [],
@@ -110,7 +112,18 @@ export default function Legend({
   )
 
   function generateLegendElements() {
-    if (isEmpty(currentRangeLevel)) {
+    // /legend is still in flight and there's no ramp from a previous query to
+    // fall back on: the counts are unknown, not zero. Saying "No Data" here
+    // (as this did) tells the user their filters excluded everything, which is
+    // a guess — and usually a wrong one.
+    if (loading && isEmpty(currentRangeLevel)) {
+      return (
+        <div className='legendLoading'>
+          <Spinner size='sm' />
+          <span>{t('legendLoadingText')}</span>
+        </div>
+      )
+    } else if (isEmpty(currentRangeLevel)) {
       return (
         <div className='legendNoData' title={t('legendNoDataWarningTitle')}>
           {t('legendNoDataWarningText')}
