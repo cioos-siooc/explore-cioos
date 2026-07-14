@@ -332,6 +332,8 @@
   "griddapDimensionResolution": "Résolution",
   "griddapNodesText": "Nœuds de grille",
   "griddapVariablesTitle": "Variables",
+  "zoomToDatasetText": "Zoomer sur le jeu de données",
+  "zoomToDatasetTitle": "Zoomer la carte sur l'étendue de ce jeu de données",
   "griddapMapPreviewTitle": "Aperçu cartographique (WMS)",
   "griddapVariableSelect": "Variable",
   "griddapShowOnMapToggle": "Afficher sur la carte",

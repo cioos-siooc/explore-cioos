@@ -16,6 +16,15 @@ import re
 import pandas as pd
 from cde_harvester.dataset_types.base import DatasetTypeHandler
 from cde_harvester.dataset_types.tabledap_features import _axis_bounds_from_metadata
+from cde_harvester.utils import eov_to_standard_name
+
+# Reverse of eov_to_standard_name: CF standard name -> list of EOV keys, so a
+# grid variable can be tagged with the ocean variables it represents (the same
+# EOV mapping get_eovs() uses at the dataset level).
+_standard_name_to_eovs = {}
+for _eov, _standard_names in eov_to_standard_name.items():
+    for _standard_name in _standard_names:
+        _standard_name_to_eovs.setdefault(_standard_name, []).append(_eov)
 
 _N_VALUES_RE = re.compile(r"nValues=(\d+)")
 _EVENLY_SPACED_RE = re.compile(r"evenlySpaced=(true|false)")
@@ -131,8 +140,11 @@ def _extract_dimensions(dataset):
 
 
 def _extract_variables(dataset):
-    """[{name, standard_name, long_name, units}] for the data variables
-    (``Row Type == "variable"`` — dimensions excluded)."""
+    """[{name, standard_name, long_name, units, eovs}] for the data variables
+    (``Row Type == "variable"`` — dimensions excluded). ``eovs`` is the list of
+    EOV keys the variable's standard_name maps to (empty when it maps to none),
+    letting the frontend default the WMS overlay to the first EOV-related
+    variable."""
     df_info = dataset.df_info
     names = (
         df_info.query('`Row Type` == "variable"')["Variable Name"].unique().tolist()
@@ -144,12 +156,14 @@ def _extract_variables(dataset):
             if name in dataset.df_variables.index
             else {}
         )
+        standard_name = var_meta.get("standard_name") or None
         variables.append(
             {
                 "name": name,
-                "standard_name": var_meta.get("standard_name") or None,
+                "standard_name": standard_name,
                 "long_name": var_meta.get("long_name") or None,
                 "units": var_meta.get("units") or None,
+                "eovs": _standard_name_to_eovs.get(standard_name, []),
             }
         )
     return variables

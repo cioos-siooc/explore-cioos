@@ -3,31 +3,106 @@
   flex-direction: column;
   gap: 12px;
   margin-top: 10px;
+  /* Long variable names and ISO timestamps would otherwise push the griddap
+     section wider than the sidebar column. */
+  min-width: 0;
 }
 
-.griddapDimensionsTable {
-  width: 100%;
-  font-size: 0.85em;
-  border-collapse: collapse;
-  margin-top: 4px;
+.griddapDetails > .metadataGridItem {
+  min-width: 0;
 }
 
-.griddapDimensionsTable th,
-.griddapDimensionsTable td {
-  border: 1px solid var(--cioos-hairline);
-  padding: 3px 6px;
-  text-align: left;
-}
-
-.griddapDimensionsTable th {
-  background-color: var(--cioos-sand);
-  font-weight: 600;
-}
-
+/* Axis and variable cards: at the sidebar's width a 5-column table collapsed
+   into unreadable slivers, so each axis/variable gets its own stacked card. */
+.griddapDimensionsList,
 .griddapVariablesList {
-  margin: 4px 0 0 0;
-  padding-left: 20px;
-  font-size: 0.9em;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0 0 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.griddapDimension,
+.griddapVariable {
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--cioos-hairline);
+  border-left: 3px solid var(--cioos-teal-light, var(--cioos-primary));
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
+}
+
+.griddapDimensionHead,
+.griddapVariableHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.griddapDimensionHead {
+  justify-content: space-between;
+}
+
+.griddapVariableHead {
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.griddapDimensionName,
+.griddapVariableLabel {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--cioos-ink);
+  overflow-wrap: anywhere;
+}
+
+.griddapDimensionNodes {
+  flex-shrink: 0;
+  font-size: 0.72em;
+  color: var(--cioos-ink-60);
+  white-space: nowrap;
+}
+
+.griddapDimensionRange {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: 2px;
+  font-size: 0.78em;
+  color: var(--cioos-ink);
+}
+
+.griddapDimensionBound {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.griddapDimensionArrow,
+.griddapDimensionUnits,
+.griddapVariableUnits {
+  color: var(--cioos-ink-60);
+}
+
+.griddapVariableUnits {
+  font-size: 0.75em;
+  white-space: nowrap;
+}
+
+.griddapDimensionSpacing,
+.griddapVariableName {
+  margin-top: 2px;
+  font-size: 0.72em;
+  color: var(--cioos-ink-60);
+  overflow-wrap: anywhere;
+}
+
+.griddapVariableName {
+  display: inline-block;
 }
 
 .griddapWmsControls {

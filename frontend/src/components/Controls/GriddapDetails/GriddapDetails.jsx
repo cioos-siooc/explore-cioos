@@ -1,24 +1,45 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import Switch from '../../ui/Switch.jsx'
 
-import { defaultElevation, getTimeDimension } from '../../../wmsUtilities'
+import { buildWmsOverlay } from '../../../wmsUtilities'
+import { useFilters } from '../../../state/filters/FilterProvider.jsx'
+import { useUI } from '../../../state/ui/UIProvider.jsx'
+import WmsLegend from '../WmsLegend/WmsLegend.jsx'
 import './styles.css'
 
 // Griddap-specific section of the dataset inspector: grid structure, variable
-// list, and (when the ERDDAP serves WMS) the show-on-map switch. Variable
-// selection, time/depth sliders and the colorbar live in the floating
-// WmsLegend card over the map.
+// list, and (when the ERDDAP serves WMS) the show-on-map switch. While the
+// dataset page is open the WmsLegend (variable picker, time/depth sliders,
+// colorbar) renders inline here; when the sidebar is collapsed it moves to the
+// floating card over the map (rendered by AppShell).
 export default function GriddapDetails({
   dataset,
   activeWmsOverlay,
   setActiveWmsOverlay
 }) {
   const { t } = useTranslation()
+  const { eovsSelected } = useFilters()
+  const { sidebarOpen } = useUI()
   const dimensions = dataset.grid_dimensions || []
   const variables = dataset.grid_variables || []
   const overlayActive = activeWmsOverlay?.pk === dataset.pk
-  const timeDimension = getTimeDimension(dimensions)
+
+  const selectedEovTitles = (eovsSelected || [])
+    .filter((eov) => eov.isSelected)
+    .map((eov) => eov.title)
+
+  function showOverlay() {
+    setActiveWmsOverlay(buildWmsOverlay(dataset, selectedEovTitles))
+  }
+
+  // Auto-show the WMS overlay when a griddap dataset with a WMS endpoint is
+  // inspected. Deliberately keyed on the dataset pk alone: toggling the overlay
+  // off must not immediately re-show it, so the effect only re-runs when a
+  // different dataset is inspected.
+  useEffect(() => {
+    if (dataset.wms_url && variables.length) showOverlay()
+  }, [dataset.pk])
 
   function formatDimensionValue(value) {
     if (value === null || value === undefined) return '—'
@@ -33,56 +54,59 @@ export default function GriddapDetails({
     return variable.long_name || variable.standard_name || variable.name
   }
 
-  function showOverlay() {
-    setActiveWmsOverlay({
-      pk: dataset.pk,
-      datasetId: dataset.dataset_id,
-      title: dataset.title,
-      wmsUrl: dataset.wms_url,
-      erddapUrl: dataset.erddap_url,
-      variable: variables[0],
-      variables,
-      time: timeDimension?.max,
-      elevation: defaultElevation(dimensions),
-      bbox: dataset.coverage_bbox_geojson,
-      dimensions
-    })
-  }
-
   return (
     <div className='griddapDetails'>
       <div className='metadataGridItem'>
         <strong>{t('griddapDimensionsTitle')}</strong>
-        <table className='griddapDimensionsTable'>
-          <thead>
-            <tr>
-              <th>{t('griddapDimensionName')}</th>
-              <th>{t('griddapDimensionNodes')}</th>
-              <th>{t('griddapDimensionMin')}</th>
-              <th>{t('griddapDimensionMax')}</th>
-              <th>{t('griddapDimensionResolution')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {dimensions.map((dim) => (
-              <tr key={dim.name}>
-                <td>{dim.name}</td>
-                <td>{dim.n_values?.toLocaleString()}</td>
-                <td>{formatDimensionValue(dim.min)}</td>
-                <td>{formatDimensionValue(dim.max)}</td>
-                <td>{dim.spacing || '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {/* One card per axis rather than a 5-column table: at the sidebar's
+            width the table's columns collapsed into unreadable slivers. */}
+        <ul className='griddapDimensionsList'>
+          {dimensions.map((dim) => (
+            <li key={dim.name} className='griddapDimension'>
+              <div className='griddapDimensionHead'>
+                <span className='griddapDimensionName'>{dim.name}</span>
+                <span className='griddapDimensionNodes'>
+                  {dim.n_values?.toLocaleString()}{' '}
+                  {t('griddapDimensionNodes').toLowerCase()}
+                </span>
+              </div>
+              <div className='griddapDimensionRange'>
+                <span className='griddapDimensionBound'>
+                  {formatDimensionValue(dim.min)}
+                </span>
+                <span className='griddapDimensionArrow'>→</span>
+                <span className='griddapDimensionBound'>
+                  {formatDimensionValue(dim.max)}
+                </span>
+                {dim.units && (
+                  <span className='griddapDimensionUnits'>{dim.units}</span>
+                )}
+              </div>
+              {dim.spacing && (
+                <div className='griddapDimensionSpacing'>
+                  {t('griddapDimensionResolution')}: {dim.spacing}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
       </div>
       <div className='metadataGridItem'>
         <strong>{t('griddapVariablesTitle')}</strong>
         <ul className='griddapVariablesList'>
           {variables.map((variable) => (
-            <li key={variable.name}>
-              {variableLabel(variable)}
-              {variable.units ? ` (${variable.units})` : ''}
+            <li key={variable.name} className='griddapVariable'>
+              <div className='griddapVariableHead'>
+                <span className='griddapVariableLabel'>
+                  {variableLabel(variable)}
+                </span>
+                {variable.units && (
+                  <span className='griddapVariableUnits'>
+                    ({variable.units})
+                  </span>
+                )}
+              </div>
+              <code className='griddapVariableName'>{variable.name}</code>
             </li>
           ))}
         </ul>
@@ -99,6 +123,14 @@ export default function GriddapDetails({
               event.target.checked ? showOverlay() : setActiveWmsOverlay()
             }
           />
+          {overlayActive && sidebarOpen && (
+            <WmsLegend
+              overlay={activeWmsOverlay}
+              variant='inline'
+              onClose={() => setActiveWmsOverlay()}
+              setActiveWmsOverlay={setActiveWmsOverlay}
+            />
+          )}
         </div>
       ) : (
         <div className='metadataGridItem griddapNoWms'>

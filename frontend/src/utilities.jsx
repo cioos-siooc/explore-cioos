@@ -275,6 +275,38 @@ export function getPointsDataSize (pointsData) {
 }
 
 // returns true for rectangles, false for rotated rectangles
+// [[west, south], [east, north]] for any GeoJSON geometry (the coordinate
+// nesting differs per type, so just walk down to the [lng, lat] positions).
+// Returns null when the geometry carries no coordinates.
+export function boundsFromGeoJson(geometry) {
+  const positions = []
+  const collect = (coordinates) => {
+    if (!Array.isArray(coordinates)) return
+    if (typeof coordinates[0] === 'number') {
+      positions.push(coordinates)
+      return
+    }
+    coordinates.forEach(collect)
+  }
+  collect(geometry?.coordinates)
+  if (!positions.length) return null
+
+  let west = Infinity
+  let south = Infinity
+  let east = -Infinity
+  let north = -Infinity
+  for (const [lng, lat] of positions) {
+    if (lng < west) west = lng
+    if (lng > east) east = lng
+    if (lat < south) south = lat
+    if (lat > north) north = lat
+  }
+  return [
+    [west, south],
+    [east, north]
+  ]
+}
+
 export function polygonIsRectangle(polygon) {
   if (polygon.length !== 5) return false
   const p = polygon.slice(0, 4)

@@ -157,6 +157,7 @@ class TestExtractGridExtent:
                 "standard_name": "concentration_of_chlorophyll_in_sea_water",
                 "long_name": "Chlorophyll-a",
                 "units": "mg m-3",
+                "eovs": ["phytoplanktonBiomassAndDiversity", "oceanColour"],
             }
         ]
 

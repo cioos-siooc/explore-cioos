@@ -23,6 +23,7 @@ import './styles.css'
 
 import { server } from '../../config'
 import {
+  boundsFromGeoJson,
   createDataFilterQueryString,
   generateColorStops,
   getCurrentRangeLevel,
@@ -31,6 +32,7 @@ import {
 import {
   buildWmsGetMapUrl,
   clampBoundsForWms,
+  intersectBoundsWithPolygonBbox,
   warpEquirectToMercator
 } from '../../wmsUtilities'
 import { colorScale, trajectoryColorScale, basemap } from '../config'
@@ -55,11 +57,13 @@ export default function CreateMap({
   trajectoryRangeLevels,
   hoveredDataset,
   setHoveredDataset,
+  inspectDataset,
   setDatasetsSelected,
   griddapCoverage,
   dataLayersVisible = true,
   activeWmsOverlay,
-  projection = 'mercator'
+  projection = 'mercator',
+  zoomTarget
 }) {
   const { t, i18n } = useTranslation()
 
@@ -402,6 +406,9 @@ export default function CreateMap({
   // Bumped whenever the overlay is (re)configured or removed so stale
   // in-flight GetMap image loads are dropped instead of drawn.
   const wmsRenderToken = useRef(0)
+  // Latest spatial filter, readable from the debounced moveend handler (which
+  // would otherwise capture the polygon as of the overlay's last render).
+  const polygonRef = useRef(null)
 
   // Single-dataset griddap footprint (hover from the list, or pinned while
   // its WMS overlay is shown).
@@ -473,10 +480,34 @@ export default function CreateMap({
   // One WMS GetMap for the current viewport: ERDDAP's WMS is EPSG:4326-only,
   // so the response is requested with extra vertical resolution and warped to
   // Mercator before it's handed to the image source (see wmsUtilities).
+  // A spatial filter narrows the overlay to the selection: the raster is only
+  // requested and drawn over the filter's bounding box, so what's on the map
+  // is the subset of the grid the filter actually selects. Read through a ref
+  // so the debounced moveend handler always clips with the current polygon.
   function renderWmsImage(overlay) {
     if (!map.current) return
-    const bounds = clampBoundsForWms(map.current.getBounds())
-    if (bounds.south >= bounds.north || bounds.west >= bounds.east) return
+    const viewportBounds = clampBoundsForWms(map.current.getBounds())
+    if (
+      viewportBounds.south >= viewportBounds.north ||
+      viewportBounds.west >= viewportBounds.east
+    ) {
+      return
+    }
+    const bounds = intersectBoundsWithPolygonBbox(
+      viewportBounds,
+      polygonRef.current
+    )
+    // filter selection is entirely off-screen: nothing to draw
+    if (!bounds) {
+      const emptySource = map.current.getSource('wms-overlay')
+      if (emptySource && map.current.getLayer('wms-overlay')) {
+        map.current.setLayoutProperty('wms-overlay', 'visibility', 'none')
+      }
+      return
+    }
+    if (map.current.getLayer('wms-overlay')) {
+      map.current.setLayoutProperty('wms-overlay', 'visibility', 'visible')
+    }
     const canvasElement = map.current.getCanvas()
     const outWidth = Math.min(canvasElement.clientWidth, 2048)
     const outHeight = Math.min(canvasElement.clientHeight, 2048)
@@ -541,19 +572,23 @@ export default function CreateMap({
     img.src = url
   }
 
+  // The single dataset the map singles out: whatever the cursor is over in the
+  // list, else the dataset whose page is open. Inspecting a dataset therefore
+  // pins the same highlight hovering gives, until it's closed.
   useEffect(() => {
     if (map.current) {
-      if (hoveredDataset?.cdm_data_type === 'Grid') {
+      const focusedDataset = hoveredDataset || inspectDataset
+      if (focusedDataset?.cdm_data_type === 'Grid') {
         // A griddap dataset has no map features: highlighting its pk would
         // grey the whole map with nothing selected. Draw its bbox instead.
         hoverHighlightPoints()
-        setGriddapHighlight(hoveredDataset.coverage_bbox_geojson)
+        setGriddapHighlight(focusedDataset.coverage_bbox_geojson)
       } else {
         setGriddapHighlight(activeWmsOverlay ? activeWmsOverlay.bbox : null)
-        hoverHighlightPoints(hoveredDataset?.pk)
+        hoverHighlightPoints(focusedDataset?.pk)
       }
     }
-  }, [hoveredDataset, activeWmsOverlay])
+  }, [hoveredDataset, inspectDataset, activeWmsOverlay])
 
   useEffect(() => {
     griddapCoverageRef.current = griddapCoverage
@@ -582,8 +617,24 @@ export default function CreateMap({
     })
   }, [projection])
 
+  // "Zoom to dataset": frame the requested footprint. maxZoom keeps a
+  // pin-sized extent from slamming the camera to street level.
+  useEffect(() => {
+    if (!map.current || !zoomTarget?.geometry) return
+    const bounds = boundsFromGeoJson(zoomTarget.geometry)
+    if (!bounds) return
+    map.current.fitBounds(bounds, {
+      padding: 60,
+      maxZoom: 9,
+      duration: 1000
+    })
+  }, [zoomTarget])
+
+  // Re-runs when the spatial filter changes too, so the overlay is re-requested
+  // clipped to the new selection.
   useEffect(() => {
     if (!map.current) return
+    polygonRef.current = polygon
     removeWmsOverlay()
     if (!activeWmsOverlay) {
       setGriddapHighlight(null)
@@ -597,7 +648,7 @@ export default function CreateMap({
     // pin the dataset's footprint outline while its overlay is shown
     setGriddapHighlight(activeWmsOverlay.bbox)
     return () => removeWmsOverlay()
-  }, [activeWmsOverlay])
+  }, [activeWmsOverlay, polygon])
 
   function highlightPoints(polygon) {
     if (polygon && polygon.length >= 4) {

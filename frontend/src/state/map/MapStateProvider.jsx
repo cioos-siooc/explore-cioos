@@ -38,6 +38,13 @@ export default function MapStateProvider ({ children }) {
   // Map projection: 'mercator' (default) or 'globe'. The globe view renders
   // high latitudes (e.g. the Arctic) without Mercator distortion.
   const [projection, setProjection] = useState('mercator')
+  // One-shot "frame this geometry" request for the Map. The nonce lets the
+  // same extent be re-requested (clicking zoom again after panning away).
+  const [zoomTarget, setZoomTarget] = useState()
+
+  function zoomToGeometry (geometry) {
+    if (geometry) setZoomTarget({ geometry, nonce: Date.now() })
+  }
 
   const { zoom } = mapView
 
@@ -129,6 +136,8 @@ export default function MapStateProvider ({ children }) {
     griddapCoverage,
     activeWmsOverlay,
     setActiveWmsOverlay,
+    zoomTarget,
+    zoomToGeometry,
     loadLegend: () => loadLegend(createDataFilterQueryString(query))
   }
 

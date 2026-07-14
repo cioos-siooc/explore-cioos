@@ -22,8 +22,8 @@ export function useSelection () {
 // Note: datasets and points are exchangable terminology
 export default function SelectionProvider ({ children }) {
   const { i18n } = useTranslation()
-  const { query, eovsSelected, catalogLoaded } = useFilters()
-  const { activeWmsOverlay, setActiveWmsOverlay } = useMapState()
+  const { query, catalogLoaded } = useFilters()
+  const { setActiveWmsOverlay } = useMapState()
 
   const [polygon, setPolygon] = useState()
   const [pointsToReview, setPointsToReview] = useState()
@@ -112,21 +112,14 @@ export default function SelectionProvider ({ children }) {
     }
   }
 
-  // The pointQuery below only runs once the catalog has produced EOV options.
-  // If the catalog fetch fails or comes back empty (API down, empty local
-  // database), that never happens — resolve the initial load anyway so the
-  // dataset list shows empty instead of an endless spinner. A later catalog
-  // retry re-populates the EOVs, which re-triggers the query effect.
+  // The pointQuery waits for the catalog so the filters it sends are hydrated
+  // from the URL first. It must not wait for a non-empty EOV list: OBIS
+  // datasets carry no EOVs, so a database holding only OBIS data produces an
+  // empty /oceanVariables and would never query at all. catalogLoaded resolves
+  // even when the fetches fail, so a dead API lands on an empty list rather
+  // than an endless spinner.
   useEffect(() => {
-    if (initialPointsQueryComplete) return
-    if (catalogLoaded && eovsSelected.length === 0) {
-      setSelectionLoading(false)
-      setInitialPointsQueryComplete(true)
-    }
-  }, [catalogLoaded, eovsSelected])
-
-  useEffect(() => {
-    if (!selectionLoading && query.eovsSelected.length) {
+    if (!selectionLoading && catalogLoaded) {
       const filtersQuery = createDataFilterQueryString(query)
       let shapeQuery = []
       if (polygon) {
@@ -161,7 +154,7 @@ export default function SelectionProvider ({ children }) {
         })
     }
     setBackClicked(false)
-  }, [query, polygon])
+  }, [query, polygon, catalogLoaded])
 
   useEffect(() => {
     if (!selectionLoading) {
@@ -199,11 +192,14 @@ export default function SelectionProvider ({ children }) {
 
   // The WMS overlay lives only while its dataset is inspected: navigating
   // back or to another dataset clears it (the WmsLegend close button is the
-  // other exit).
+  // other exit). Functional update on purpose — GriddapDetails auto-shows the
+  // overlay for a newly inspected dataset from a child effect, which runs
+  // before this one, so reading activeWmsOverlay from this render's closure
+  // would see the stale value and clear the overlay that was just set.
   useEffect(() => {
-    if (activeWmsOverlay && activeWmsOverlay.pk !== inspectDataset?.pk) {
-      setActiveWmsOverlay()
-    }
+    setActiveWmsOverlay((current) =>
+      current && current.pk !== inspectDataset?.pk ? undefined : current
+    )
   }, [inspectDataset])
 
   useEffect(() => {

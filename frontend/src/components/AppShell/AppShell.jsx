@@ -9,12 +9,14 @@ import FiltersModal from './Modals/FiltersModal.jsx'
 import DownloadModal from './Modals/DownloadModal.jsx'
 import PreviewHost from './Panels/PreviewHost.jsx'
 import MapCornerControls from './MapCorner/MapCornerControls.jsx'
+import ZoomToDataset from './ZoomToDataset/ZoomToDataset.jsx'
 import Loading from '../Controls/Loading/Loading.jsx'
 import Legend from '../Controls/Legend/Legend.jsx'
 import WmsLegend from '../Controls/WmsLegend/WmsLegend.jsx'
 import IntroModal from '../Controls/IntroModal/IntroModal.jsx'
 import { useFilters } from '../../state/filters/FilterProvider.jsx'
 import { useMapState } from '../../state/map/MapStateProvider.jsx'
+import { useSelection } from '../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../state/ui/UIProvider.jsx'
 import './styles.css'
 
@@ -40,7 +42,14 @@ export default function AppShell () {
     activeWmsOverlay,
     setActiveWmsOverlay
   } = useMapState()
-  const { showIntroModal, setShowIntroModal } = useUI()
+  const { showIntroModal, setShowIntroModal, sidebarOpen } = useUI()
+  const { inspectDataset } = useSelection()
+
+  // The WMS legend lives inside the dataset page while that page is open (see
+  // GriddapDetails); it only floats over the map — bottom-left — once the
+  // datasets sidebar is collapsed, so it's never shown twice.
+  const wmsLegendIsInline =
+    sidebarOpen && activeWmsOverlay?.pk === inspectDataset?.pk
 
   // Map-layer switches, rendered inside the legend card.
   const layerControls = [
@@ -87,9 +96,11 @@ export default function AppShell () {
         layerControls={layerControls}
       />
       <MapCornerControls />
-      {activeWmsOverlay && (
+      <ZoomToDataset />
+      {activeWmsOverlay && !wmsLegendIsInline && (
         <WmsLegend
           overlay={activeWmsOverlay}
+          variant='floating'
           onClose={() => setActiveWmsOverlay()}
           setActiveWmsOverlay={setActiveWmsOverlay}
         />

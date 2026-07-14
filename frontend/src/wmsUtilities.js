@@ -77,6 +77,73 @@ export function buildGriddapLegendUrl({ erddapUrl, variable, dimensions }) {
   return `${pngUrl}?${encodeURIComponent(variable + dimQuery)}&.legend=Only`
 }
 
+// The WMS default: the first variable representing a currently-selected EOV,
+// then the first representing any of the dataset's EOVs, then the first
+// variable. `variable.eovs` is attached at harvest time (empty on datasets
+// harvested before that change, so the final fallback keeps the overlay usable).
+export function pickDefaultVariable(variables, selectedEovTitles) {
+  const list = variables || []
+  const selected = selectedEovTitles || []
+  return (
+    list.find((variable) =>
+      (variable.eovs || []).some((eov) => selected.includes(eov))
+    ) ||
+    list.find((variable) => (variable.eovs || []).length > 0) ||
+    list[0]
+  )
+}
+
+// The griddap overlay descriptor consumed by the Map image source and the
+// WmsLegend card. Shared by the auto-show-on-inspect effect and the manual
+// "show on map" toggle so both default the variable the same way.
+export function buildWmsOverlay(dataset, selectedEovTitles) {
+  const dimensions = dataset.grid_dimensions || []
+  const variables = dataset.grid_variables || []
+  const timeDimension = getTimeDimension(dimensions)
+  return {
+    pk: dataset.pk,
+    datasetId: dataset.dataset_id,
+    title: dataset.title,
+    wmsUrl: dataset.wms_url,
+    erddapUrl: dataset.erddap_url,
+    variable: pickDefaultVariable(variables, selectedEovTitles),
+    variables,
+    time: timeDimension?.max,
+    elevation: defaultElevation(dimensions),
+    bbox: dataset.coverage_bbox_geojson,
+    dimensions
+  }
+}
+
+// Clip the WMS request/display extent to the active spatial filter: the
+// intersection of the current viewport bounds and the filter polygon's
+// bounding box. Returns null when the filter lies outside the viewport (the
+// caller skips the render). `polygonRing` is a [lng, lat][] ring, as stored by
+// SelectionProvider.
+export function intersectBoundsWithPolygonBbox(bounds, polygonRing) {
+  if (!polygonRing || polygonRing.length < 4) return bounds
+  let west = Infinity
+  let south = Infinity
+  let east = -Infinity
+  let north = -Infinity
+  for (const [lng, lat] of polygonRing) {
+    if (lng < west) west = lng
+    if (lng > east) east = lng
+    if (lat < south) south = lat
+    if (lat > north) north = lat
+  }
+  const clipped = {
+    west: Math.max(bounds.west, west),
+    south: Math.max(bounds.south, south),
+    east: Math.min(bounds.east, east),
+    north: Math.min(bounds.north, north)
+  }
+  if (clipped.west >= clipped.east || clipped.south >= clipped.north) {
+    return null
+  }
+  return clipped
+}
+
 function mercatorY(latDeg) {
   const lat = (latDeg * Math.PI) / 180
   return Math.log(Math.tan(Math.PI / 4 + lat / 2))
@@ -145,6 +212,27 @@ export function formatGridSize(dimensions) {
   const lat = (dimensions || []).find((dim) => dim.name === 'latitude')
   if (!lon?.n_values || !lat?.n_values) return null
   return `${lon.n_values}×${lat.n_values}`
+}
+
+// Node count broken down into its factors, e.g. longitude × latitude × time ×
+// depth. Spatial axes lead (the order the count is usually quoted in); any
+// dimension the grid doesn't have is simply absent.
+const GRID_NODE_DIMENSION_ORDER = [
+  'longitude',
+  'latitude',
+  'time',
+  'depth',
+  'altitude'
+]
+
+export function gridNodeFactors(dimensions) {
+  const rank = (name) => {
+    const index = GRID_NODE_DIMENSION_ORDER.indexOf(name)
+    return index === -1 ? GRID_NODE_DIMENSION_ORDER.length : index
+  }
+  return (dimensions || [])
+    .filter((dim) => dim.n_values)
+    .sort((a, b) => rank(a.name) - rank(b.name))
 }
 
 export function totalGridNodes(dimensions) {

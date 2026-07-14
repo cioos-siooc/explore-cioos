@@ -9,9 +9,37 @@ import Loading from '../Loading/Loading.jsx'
 import GriddapDetails from '../GriddapDetails/GriddapDetails.jsx'
 import { server } from '../../../config'
 import { splitLines } from '../../../utilities'
-import { totalGridNodes } from '../../../wmsUtilities'
+import { gridNodeFactors, totalGridNodes } from '../../../wmsUtilities'
 import FilterButton from '../Filter/FilterButton/FilterButton.jsx'
 import './styles.css'
+
+// The grid's node count spelled out as the product of its axes —
+// longitude × latitude × time × depth = total — so the number is traceable to
+// the grid's shape rather than dropped on the reader as a bare total.
+function GridNodeCount({ dimensions }) {
+  const factors = gridNodeFactors(dimensions)
+  const total = totalGridNodes(dimensions)
+  if (!factors.length) return total?.toLocaleString() ?? null
+
+  return (
+    <span className='gridNodeCount'>
+      <span className='gridNodeFactors'>
+        {factors.map((dim, index) => (
+          <React.Fragment key={dim.name}>
+            {index > 0 && <span className='gridNodeOperator'>×</span>}
+            <span className='gridNodeFactor' title={dim.name}>
+              <span className='gridNodeFactorValue'>
+                {dim.n_values.toLocaleString()}
+              </span>
+              <span className='gridNodeFactorName'>{dim.name}</span>
+            </span>
+          </React.Fragment>
+        ))}
+      </span>
+      <span className='gridNodeTotal'>= {total?.toLocaleString()}</span>
+    </span>
+  )
+}
 
 export default function DatasetInspector({
   dataset,
@@ -262,11 +290,13 @@ export default function DatasetInspector({
               {isGrid ? t('griddapNodesText') : t('datasetInspectorRecordsText')}
             </dt>
             <dd className='metadataValue recordCount'>
-              {isGrid
-                ? totalGridNodes(dataset.grid_dimensions)?.toLocaleString()
-                : dataset.profiles_count !== dataset.n_profiles
-                  ? `${dataset.profiles_count} / ${dataset.n_profiles}`
-                  : dataset.profiles_count}
+              {isGrid ? (
+                <GridNodeCount dimensions={dataset.grid_dimensions} />
+              ) : dataset.profiles_count !== dataset.n_profiles ? (
+                `${dataset.profiles_count} / ${dataset.n_profiles}`
+              ) : (
+                dataset.profiles_count
+              )}
             </dd>
           </div>
           {dataset.source_type === 'obis' ? (

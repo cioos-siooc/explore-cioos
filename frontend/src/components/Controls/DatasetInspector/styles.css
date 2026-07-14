@@ -172,6 +172,55 @@
   color: var(--cioos-ink);
 }
 
+/* Grid node count: the axis factors read as small stacked value/name pairs,
+   with the total as the bold figure the row is really about. */
+.gridNodeCount {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.gridNodeFactors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.gridNodeFactor {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+
+.gridNodeFactorValue {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cioos-ink);
+}
+
+.gridNodeFactorName {
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--cioos-ink-60);
+}
+
+.gridNodeOperator {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--cioos-ink-60);
+}
+
+.gridNodeTotal {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--cioos-ink);
+  white-space: nowrap;
+}
+
 /* Source links (ERDDAP / CKAN / OBIS) as quiet, citation-style inline links
    rather than boxed buttons — keeps the sheet flat and dense. */
 .metadataLink {

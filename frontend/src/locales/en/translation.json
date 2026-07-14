@@ -331,6 +331,8 @@
   "griddapDimensionResolution": "Resolution",
   "griddapNodesText": "Grid nodes",
   "griddapVariablesTitle": "Variables",
+  "zoomToDatasetText": "Zoom to dataset",
+  "zoomToDatasetTitle": "Zoom the map to this dataset's extent",
   "griddapMapPreviewTitle": "Map preview (WMS)",
   "griddapVariableSelect": "Variable",
   "griddapShowOnMapToggle": "Show on map",

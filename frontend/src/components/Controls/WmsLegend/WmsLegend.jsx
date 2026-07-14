@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { X } from 'react-bootstrap-icons'
+import classNames from 'classnames'
 import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
 import { useTranslation } from 'react-i18next'
 
@@ -20,7 +21,12 @@ const MAX_SLIDER_STEPS = 500
 // always-available off switch. Slider values are linearly interpolated
 // between the harvested axis endpoints — ERDDAP's WMS snaps TIME/ELEVATION
 // to the nearest grid node, so intermediate values are safe.
-export default function WmsLegend({ overlay, onClose, setActiveWmsOverlay }) {
+export default function WmsLegend({
+  overlay,
+  onClose,
+  setActiveWmsOverlay,
+  variant = 'floating'
+}) {
   const { t } = useTranslation()
   const [legendFailed, setLegendFailed] = useState(false)
 
@@ -79,8 +85,12 @@ export default function WmsLegend({ overlay, onClose, setActiveWmsOverlay }) {
     })
   }
 
+  // "long_name (units)" on a single line — the units are folded into the
+  // picker label rather than shown on a separate line beneath it.
   function variableLabel(variable) {
-    return variable.long_name || variable.standard_name || variable.name
+    const name =
+      variable.long_name || variable.standard_name || variable.name
+    return variable.units ? `${name} (${variable.units})` : name
   }
 
   const legendUrl = buildGriddapLegendUrl({
@@ -90,7 +100,7 @@ export default function WmsLegend({ overlay, onClose, setActiveWmsOverlay }) {
   })
 
   return (
-    <div className='wmsLegend'>
+    <div className={classNames('wmsLegend', variant)}>
       <div className='wmsLegendHeader'>
         <a
           className='wmsLegendTitle'
@@ -130,9 +140,6 @@ export default function WmsLegend({ overlay, onClose, setActiveWmsOverlay }) {
         <div className='wmsLegendVariable'>
           {overlay.variable && variableLabel(overlay.variable)}
         </div>
-      )}
-      {overlay.variable?.units && (
-        <div className='wmsLegendVariable'>({overlay.variable.units})</div>
       )}
       {hasTimeSlider && (
         <div className='wmsLegendSlider'>

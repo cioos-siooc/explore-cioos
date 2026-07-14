@@ -1,13 +1,28 @@
-.wmsLegend {
-  position: absolute;
-  right: 60px;
-  bottom: 40px;
-  z-index: 3;
+/* Floating variant: shown over the map only while the datasets sidebar is
+   collapsed (otherwise the legend renders inline in the dataset page). The
+   bottom-left corner is the free one — the collapsed sidebar card sits at the
+   top-left and the data legend at the top-right. */
+.wmsLegend.floating {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: var(--cioos-z-shell, 30);
   background-color: var(--cioos-white);
   border-radius: var(--cioos-radius-sm);
   box-shadow: var(--cioos-shadow-float);
   padding: 8px 10px;
   max-width: 320px;
+}
+
+/* Inline variant: renders inside the griddap section of the dataset page, so
+   it drops the floating card chrome and flows with the surrounding content.
+   Full width because its parent (.griddapWmsControls) is align-items:
+   flex-start, which would otherwise shrink it to its content. */
+.wmsLegend.inline {
+  align-self: stretch;
+  width: 100%;
+  min-width: 0;
+  margin-top: 8px;
 }
 
 .wmsLegendHeader {
@@ -83,9 +98,11 @@
 }
 
 @media (max-width: 600px) {
-  .wmsLegend {
+  /* Clear the collapsed datasets bottom sheet. */
+  .wmsLegend.floating {
+    left: 10px;
     right: 10px;
-    bottom: 340px;
+    bottom: 48px;
     max-width: 280px;
     font-size: 0.85em;
   }

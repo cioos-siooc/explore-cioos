@@ -18,14 +18,16 @@ export default function MapContainer () {
     griddapCoverage,
     dataLayersVisible,
     activeWmsOverlay,
-    projection
+    projection,
+    zoomTarget
   } = useMapState()
   const {
     polygon,
     setPolygon,
     setPointsToReview,
     hoveredDataset,
-    setHoveredDataset
+    setHoveredDataset,
+    inspectDataset
   } = useSelection()
 
   return (
@@ -41,11 +43,13 @@ export default function MapContainer () {
       offsetFlyTo={false}
       setHoveredDataset={setHoveredDataset}
       hoveredDataset={hoveredDataset}
+      inspectDataset={inspectDataset}
       setDatasetsSelected={setDatasetsSelected}
       griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
       dataLayersVisible={dataLayersVisible}
       activeWmsOverlay={activeWmsOverlay}
       projection={projection}
+      zoomTarget={zoomTarget}
     />
   )
 }
