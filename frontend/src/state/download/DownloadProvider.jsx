@@ -78,14 +78,14 @@ export default function DownloadProvider ({ children }) {
 
     case 'successful':
       setSubmissionFeedback({
-        icon: <Check2Circle size={30} className='success' />,
+        icon: <Check2Circle size={18} className='success' />,
         text: t('submissionStateTextSuccess') // Request successful. Download link will be sent to: ' + email
       })
       break
 
     case 'failed':
       setSubmissionFeedback({
-        icon: <XCircle size={30} className='error' />,
+        icon: <XCircle size={18} className='error' />,
         text: t('submissionStateTextFailed') // 'Request failed'
       })
       break

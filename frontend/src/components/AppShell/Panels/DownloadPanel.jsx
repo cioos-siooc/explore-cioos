@@ -10,7 +10,7 @@ import { useDownload } from '../../../state/download/DownloadProvider.jsx'
 import './styles.css'
 
 // The Download panel: order review (DownloadDetails) + email submit.
-export default function DownloadPanel () {
+export default function DownloadPanel() {
   const { t } = useTranslation()
   const { query, timeFilterActive, depthFilterActive } = useFilters()
   const {
@@ -66,8 +66,12 @@ export default function DownloadPanel () {
         setSubmissionState={setSubmissionState}
       >
         <div className='downloadSubmit'>
+          <label className='downloadSubmitLabel' htmlFor='downloadEmailInput'>
+            {t('downloadEmailLabelText')}
+          </label>
           <div className='downloadSubmitRow'>
             <input
+              id='downloadEmailInput'
               disabled={submissionState === 'submitted'}
               className='emailAddress'
               type='email'
@@ -99,12 +103,19 @@ export default function DownloadPanel () {
                 t('submitRequestButtonSubmitText')}
             </button>
           </div>
-          {submissionFeedback && (
-            <div className='submissionFeedback'>
-              {submissionFeedback.icon}
-              {submissionFeedback.text}
-            </div>
-          )}
+          <div
+            className={classNames('submissionFeedback', {
+              success: submissionState === 'successful',
+              error: submissionState === 'failed'
+            })}
+          >
+            {submissionFeedback && (
+              <>
+                {submissionFeedback.icon}
+                {submissionFeedback.text}
+              </>
+            )}
+          </div>
         </div>
       </DownloadDetails>
     </div>

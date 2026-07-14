@@ -169,7 +169,9 @@ export default function DatasetCard({
                   >
                     {bytes(row?.sizeEstimate?.filteredSize)}
                   </span>
-                  {` / ${bytes(row?.sizeEstimate?.unfilteredSize)}`}
+                  {row?.sizeEstimate?.filteredSize !==
+                    row?.sizeEstimate?.unfilteredSize &&
+                    ` / ${bytes(row?.sizeEstimate?.unfilteredSize)}`}
                 </span>
                 {row.internalDownload ? (
                   <Tooltip

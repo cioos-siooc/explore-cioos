@@ -354,54 +354,49 @@ export default function DownloadDetails({
 
       <div className='downloadLegend'>
         <span className='downloadLegendItem'>
-          <Check2Circle className='legendIcon success' size={18} aria-hidden='true' />
-          <span>
-            {t('downloadDetailsDownloadLimitsDownloadableMessagePart1')}
-            <span className='legendBadge success'>
-              {t('downloadDetailsDownloadLimitsDownloadableMessagePart2')}
-            </span>
-            {t('downloadDetailsDownloadLimitsDownloadableMessagePart3')}
+          <Check2Circle className='legendIcon success' size={16} aria-hidden='true' />
+          <span className='legendBadge success'>
+            {t('downloadDetailsDownloadLimitsDownloadableMessagePart2')}
           </span>
+          {t('downloadDetailsDownloadLimitsDownloadableMessagePart3')}
         </span>
         <span className='downloadLegendItem'>
-          <XCircle className='legendIcon error' size={18} aria-hidden='true' />
-          <span>
-            {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart1')}
-            <span className='legendBadge error'>
-              {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart2')}
-            </span>
-            {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart3')}
+          <XCircle className='legendIcon error' size={16} aria-hidden='true' />
+          <span className='legendBadge error'>
+            {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart2')}
           </span>
+          {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart3')}
         </span>
       </div>
 
-      <div className='row downloadDetailsDownloadInfoRow'>
-        <div className='col-auto'>
-          <div className='downloadSummary'>
-            <div className='downloadSummaryStat'>
-              <span className='downloadSummaryLabel'>
-                {t('downloadDetailsDownloadInfoDatasets')}
+      <div className='downloadOrderBar'>
+        <div className='downloadSummary'>
+          <div className='downloadSummaryStat'>
+            {downloadSizeEstimates ? (
+              <span className='downloadSummaryValue'>
+                {selectedCount}
+                <span className='downloadSummaryValueMuted'>{` / ${pointsData.length}`}</span>
               </span>
-              {downloadSizeEstimates ? (
-                <span className='downloadSummaryValue'>
-                  {`${selectedCount} / ${pointsData.length}`}
-                </span>
-              ) : (
-                <Spinner className='datasetSizeTotalSpinner' />
-              )}
-            </div>
-            <div className='downloadSummaryStat'>
-              <span className='downloadSummaryLabel'>
-                {t('downloadDetailsDownloadInfoDownloadSize')}
+            ) : (
+              <Spinner className='datasetSizeTotalSpinner' />
+            )}
+            <span className='downloadSummaryLabel'>
+              {t('downloadDetailsDownloadInfoDatasets')}
+            </span>
+          </div>
+          <div className='downloadSummaryDivider' aria-hidden='true' />
+          <div className='downloadSummaryStat'>
+            {downloadSizeEstimates ? (
+              <span className='downloadSummaryValue'>
+                {bytes(dataTotal.filteredSize) || '0B'}
+                <span className='downloadSummaryValueMuted'>{` / ${bytes(dataTotal.unfilteredSize) || '0B'}`}</span>
               </span>
-              {downloadSizeEstimates ? (
-                <span className='downloadSummaryValue'>
-                  {`${bytes(dataTotal.filteredSize)} / ${bytes(dataTotal.unfilteredSize)}`}
-                </span>
-              ) : (
-                <Spinner className='datasetSizeTotalSpinner' />
-              )}
-            </div>
+            ) : (
+              <Spinner className='datasetSizeTotalSpinner' />
+            )}
+            <span className='downloadSummaryLabel'>
+              {t('downloadDetailsDownloadInfoDownloadSize')}
+            </span>
           </div>
         </div>
         {children}

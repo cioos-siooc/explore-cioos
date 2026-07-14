@@ -23,6 +23,8 @@
   "submitRequestButtonSubmitText": "Submit Download Request",
   "submitRequestButtonSelectDataText": "Select Data",
   "submitRequestButtonResubmitText": "Resubmit Download Request",
+  "downloadModalSubtitleText": "Review your selection — we'll email you a download link.",
+  "downloadEmailLabelText": "Email download link to",
   "languageSelectorTitle": "Change language",
   "rectangleToolTitle": "Rectangle tool",
   "feedbackButtonTitle": "Please provide feedback on your experience using CIOOS Data Explorer",

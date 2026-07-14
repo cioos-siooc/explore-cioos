@@ -6,10 +6,6 @@
   max-width: none !important;
 }
 
-.downloadDetails .row {
-  padding: 5px 0px;
-}
-
 .downloadDetails .col {
   padding: 0px 0px;
   margin-left: 0px;
@@ -65,7 +61,8 @@
   color: var(--cioos-primary);
 }
 
-/* --- Filter band: the time / depth / space filters applied to the order --- */
+/* --- Filter band: the time / depth / space filters applied to the order.
+   Sits under the header as part of the top "chrome" zone (sand). --- */
 .filterDownloadToggles {
   display: flex;
   flex-wrap: wrap;
@@ -73,7 +70,9 @@
   justify-content: space-between;
   gap: 8px;
   min-height: auto;
-  padding: 12px 16px;
+  padding: 8px 16px;
+  background-color: var(--cioos-sand);
+  border-bottom: 1px solid var(--cioos-hairline);
 }
 
 .filterDownloadTogglesTitle {
@@ -172,22 +171,24 @@
   min-height: 0;
 }
 
-/* --- Legend / key: which datasets the CDE can deliver directly --- */
+/* --- Legend / key: which datasets the CDE can deliver directly. A quiet
+   single-line key sitting just above the order bar. --- */
 .downloadLegend {
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
-  gap: 8px 24px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--cioos-hairline);
+  gap: 4px 18px;
+  padding: 7px 16px;
   color: var(--cioos-ink-60);
-  font-size: 0.875rem;
+  font-size: var(--cioos-font-size-sm);
 }
 
 .downloadLegendItem {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .downloadLegendItem .legendIcon.success {
@@ -199,8 +200,8 @@
 }
 
 .legendBadge {
-  border-radius: var(--cioos-radius-sm);
-  padding: 1px 6px;
+  border-radius: var(--cioos-radius-pill);
+  padding: 1px 8px;
   font-weight: 600;
 }
 
@@ -214,60 +215,87 @@
   color: var(--cioos-error);
 }
 
-/* --- Order summary + submit row ---
-   Echoes the SelectionDetails funnel: small uppercase caption stacked over a
-   display-font value, so the count + size read as the order total feeding the
-   Submit CTA on the right. */
-.downloadDetailsDownloadInfoRow.row {
+/* --- Order bar: the sand "checkout" zone at the foot of the modal.
+   Order summary (count + size) on the left, email + submit CTA on the right,
+   so it reads as an order total feeding the action. --- */
+.downloadOrderBar {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 16px;
-  margin: 0;
-  padding: 10px 16px;
+  gap: 12px 24px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-white);
 }
 
 .downloadSummary {
   display: flex;
-  gap: 20px;
+  align-items: center;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.downloadSummaryDivider {
+  align-self: stretch;
+  width: 1px;
+  min-height: 30px;
+  background-color: var(--cioos-hairline);
 }
 
 .downloadSummaryStat {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   white-space: nowrap;
-}
-
-.downloadSummaryLabel {
-  font-size: 8px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  line-height: 1;
-  color: var(--cioos-ink-40);
 }
 
 .downloadSummaryValue {
   font-family: var(--cioos-font-display);
   font-weight: 700;
-  font-size: 16px;
-  line-height: 1.2;
+  font-size: 20px;
+  line-height: 1.1;
   color: var(--cioos-navy);
+}
+
+.downloadSummaryValueMuted {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cioos-ink-40);
+}
+
+.downloadSummaryLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: var(--cioos-ink-60);
 }
 
 /* --- Email + submit CTA (rendered by DownloadPanel as children) --- */
 .downloadSubmit {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  flex: 1 1 320px;
-  max-width: 480px;
+  gap: 4px;
+  flex: 1 1 300px;
+  max-width: 460px;
+}
+
+.downloadSubmitLabel {
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cioos-ink-60);
 }
 
 .downloadSubmitRow {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
 
@@ -276,6 +304,7 @@
   min-width: 0;
   height: 40px;
   margin: 0;
+  background-color: var(--cioos-white);
 }
 
 .submitRequestButton {
@@ -303,25 +332,47 @@
 .downloadSubmit .submissionFeedback {
   display: flex;
   align-items: center;
+  gap: 5px;
+  min-height: 18px;
   font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink-60);
+}
+
+.downloadSubmit .submissionFeedback.success {
+  color: var(--cioos-primary-700);
+}
+
+.downloadSubmit .submissionFeedback.error {
+  color: var(--cioos-error);
 }
 
 .downloadDetails .datasetSizeTotalSpinner {
   opacity: 0.3;
   width: 22px;
   height: 22px;
-  margin-top: 2px;
 }
 
 @media (max-width: 900px) {
   .downloadDetails.container {
     max-width: 100%;
   }
-  .downloadDetailsDownloadInfoRow.row {
+}
+
+@media (max-width: 600px) {
+  .downloadOrderBar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .downloadSummary {
     justify-content: center;
   }
   .downloadSubmit {
+    flex: 0 0 auto;
     max-width: 100%;
+  }
+  .downloadSubmit .emailAddress,
+  .submitRequestButton {
+    flex: 1 1 100%;
   }
 }

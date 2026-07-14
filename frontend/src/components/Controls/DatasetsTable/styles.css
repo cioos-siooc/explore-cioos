@@ -18,7 +18,7 @@
   gap: 8px;
   padding: 10px;
   border-bottom: 1px solid var(--cioos-hairline);
-  background-color: var(--cioos-sand);
+  background-color: var(--cioos-white);
 }
 
 .datasetsCardToolbar {

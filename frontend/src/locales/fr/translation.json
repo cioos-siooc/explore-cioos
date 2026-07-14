@@ -23,6 +23,8 @@
   "submitRequestButtonSubmitText": "Soumettre la demande",
   "submitRequestButtonSelectDataText": "Sélectionnez les données",
   "submitRequestButtonResubmitText": "Resoumettre la demande",
+  "downloadModalSubtitleText": "Vérifiez votre sélection — nous vous enverrons un lien de téléchargement par courriel.",
+  "downloadEmailLabelText": "Envoyer le lien de téléchargement à",
   "languageSelectorTitle": "Changer de langue",
   "rectangleToolTitle": "Outil rectangle",
   "feedbackButtonTitle": "Veuillez nous fournir des commentaires sur votre expérience d'utilisation de l'explorateur de données du SIOOC",

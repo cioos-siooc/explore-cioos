@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
+import { CloudArrowDownFill } from 'react-bootstrap-icons'
 
 import Modal from '../../ui/Modal.jsx'
 import DownloadPanel from '../Panels/DownloadPanel.jsx'
@@ -22,7 +23,17 @@ export default function DownloadModal () {
     >
       <Modal.Header closeButton>
         <Modal.Title id='downloadModalTitle'>
-          {t('downloadModalTitleText')}
+          <span className='downloadModalTitleIcon' aria-hidden='true'>
+            <CloudArrowDownFill size={20} />
+          </span>
+          <span className='downloadModalTitleText'>
+            <span className='downloadModalTitleHeading'>
+              {t('downloadModalTitleText')}
+            </span>
+            <span className='downloadModalTitleSubtitle'>
+              {t('downloadModalSubtitleText')}
+            </span>
+          </span>
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
