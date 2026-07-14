@@ -14,6 +14,7 @@ import Loading from '../Controls/Loading/Loading.jsx'
 import Legend from '../Controls/Legend/Legend.jsx'
 import WmsLegend from '../Controls/WmsLegend/WmsLegend.jsx'
 import IntroModal from '../Controls/IntroModal/IntroModal.jsx'
+import { BASEMAP_OPTIONS } from '../Map/basemapStyle.js'
 import { useFilters } from '../../state/filters/FilterProvider.jsx'
 import { useMapState } from '../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../state/selection/SelectionProvider.jsx'
@@ -39,6 +40,8 @@ export default function AppShell () {
     setDataLayersVisible,
     projection,
     setProjection,
+    basemap,
+    setBasemap,
     activeWmsOverlay,
     setActiveWmsOverlay
   } = useMapState()
@@ -74,6 +77,11 @@ export default function AppShell () {
     }
   ]
 
+  const basemapOptions = BASEMAP_OPTIONS.map((option) => ({
+    key: option.key,
+    label: t(option.translationKey)
+  }))
+
   return (
     <>
       {loading && <Loading />}
@@ -94,6 +102,9 @@ export default function AppShell () {
         zoom={zoom}
         platformsInView={platformsSelected.map((e) => e.title)}
         layerControls={layerControls}
+        basemapOptions={basemapOptions}
+        basemap={basemap}
+        onBasemapChange={setBasemap}
       />
       <MapCornerControls />
       <ZoomToDataset variant='floating' />

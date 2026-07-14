@@ -20,9 +20,8 @@ export const defaultQuery = {
   obisNodesSelected: defaultObisNodesSelected
 }
 
-// Basemap selection: 'emodnet' (bathymetry raster + vector labels, default),
-// 'gebco' (GEBCO WMS bathymetry fallback), or 'osm' (plain OSM raster,
-// last-resort fallback). See components/Map/basemapStyle.js.
+// Basemap selection: 'emodnet' (bathymetry raster + vector labels, default)
+// or 'arcgis-ocean' (Esri World Ocean Base). See components/Map/basemapStyle.js.
 export const basemap = 'emodnet'
 
 export const colorScale = [

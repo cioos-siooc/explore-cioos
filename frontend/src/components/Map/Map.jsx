@@ -36,9 +36,10 @@ import {
   intersectBoundsWithPolygonBbox,
   warpEquirectToMercator
 } from '../../wmsUtilities'
-import { colorScale, trajectoryColorScale, basemap } from '../config'
+import { colorScale, trajectoryColorScale } from '../config'
 import platformColors from '../../components/platformColors'
 import {
+  applyBasemap,
   buildBasemapStyle,
   getLabelTextField,
   FIRST_LABEL_LAYER_ID,
@@ -64,6 +65,7 @@ export default function CreateMap({
   dataLayersVisible = true,
   activeWmsOverlay,
   projection = 'mercator',
+  basemap = 'emodnet',
   zoomTarget,
   mapRef
 }) {
@@ -642,6 +644,17 @@ export default function CreateMap({
       type: projection === 'globe' ? 'globe' : 'mercator'
     })
   }, [projection])
+
+  // Layer-picker basemap switch. Swaps only the bathymetry/water-tint layers
+  // in place (see applyBasemap) rather than map.setStyle(), which would drop
+  // every data layer added imperatively below. map.current is still null on
+  // this effect's first run (the map-creation effect further down hasn't
+  // fired yet), so the initial basemap — already baked into the style passed
+  // to `new maplibreGl.Map(...)` — is never redundantly re-applied here.
+  useEffect(() => {
+    if (!map.current) return
+    applyBasemap(map.current, basemap)
+  }, [basemap])
 
   // "Zoom to dataset": frame the requested footprint. The camera settings are
   // shared with ZoomToDataset, which compares them against the live camera to
@@ -1459,7 +1472,7 @@ export default function CreateMap({
     })
 
     // Aggregates the per-source attributions from the basemap style
-    // (EMODnet / GEBCO / OSM + OpenFreeMap).
+    // (EMODnet / Esri + OpenFreeMap).
     const attribution = new AttributionControl({
       compact: true
     })

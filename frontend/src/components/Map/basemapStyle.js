@@ -5,8 +5,8 @@
  * depth shading with muted grey land) under a slim OpenMapTiles-schema vector
  * overlay (OpenFreeMap) that contributes the CIOOS water tint, rivers,
  * boundaries, and FR/EN water & place labels. No API keys; all endpoints are
- * CORS-open. Fallbacks (see `basemap` in components/config.js): GEBCO WMS,
- * then plain OSM raster.
+ * CORS-open. Fallback (see `basemap` in components/config.js): Esri's World
+ * Ocean Base.
  *
  * Data layers (hexes/points/trajectories/griddap/WMS) are inserted by Map.js
  * *below* FIRST_LABEL_LAYER_ID so labels always stay readable on top.
@@ -17,12 +17,12 @@ const OFM_GLYPHS = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf'
 
 const EMODNET_TILES =
   'https://tiles.emodnet-bathymetry.eu/2020/baselayer/web_mercator/{z}/{x}/{y}.png'
-const GEBCO_WMS =
-  'https://wms.gebco.net/mapserv?service=WMS&version=1.3.0&request=GetMap' +
-  '&layers=gebco_latest&styles=&crs=EPSG:3857&format=image/png' +
-  '&width=256&height=256&bbox={bbox-epsg-3857}'
-const OSM_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+// Esri tile REST convention is {z}/{y}/{x} (y before x), unlike XYZ schemes.
+const ARCGIS_OCEAN_TILES =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}'
 
+// Attribution for OpenFreeMap's OSM-derived vector data (rivers, boundaries,
+// labels) — unrelated to basemap raster choice.
 const OSM_ATTRIBUTION =
   '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 
@@ -30,6 +30,21 @@ export const LABEL_LAYER_IDS = ['label-waterway', 'label-water', 'label-place']
 // Anchor for every data layer Map.js adds: insert *before* this id so data
 // renders under the labels.
 export const FIRST_LABEL_LAYER_ID = 'label-waterway'
+
+// Selectable basemap options, in menu order. `key` matches the values
+// switched on in basemapSources()/hasOwnCartography() below and the
+// `basemap` default in components/config.js.
+export const BASEMAP_OPTIONS = [
+  { key: 'emodnet', translationKey: 'basemapEmodnet' },
+  { key: 'arcgis-ocean', translationKey: 'basemapArcgisOcean' }
+]
+
+// The Esri ocean basemap ships its own finished cartography (water color,
+// place styling); skip the CIOOS retint/overlay applied to the bare
+// EMODnet bathymetry raster.
+export function hasOwnCartography (basemap) {
+  return basemap === 'arcgis-ocean'
+}
 
 // text-field expression per label layer. Water-body names are bilingual
 // (both languages when they differ — oceans/seas read naturally that way);
@@ -55,22 +70,15 @@ export function getLabelTextField (lang, layerId) {
 
 function basemapSources (basemap) {
   switch (basemap) {
-  case 'gebco':
+  case 'arcgis-ocean':
     return {
       bathymetry: {
         type: 'raster',
-        tiles: [GEBCO_WMS],
+        tiles: [ARCGIS_OCEAN_TILES],
         tileSize: 256,
-        attribution: 'Imagery reproduced from the GEBCO 2024 Grid'
-      }
-    }
-  case 'osm':
-    return {
-      bathymetry: {
-        type: 'raster',
-        tiles: [OSM_TILES],
-        tileSize: 256,
-        attribution: OSM_ATTRIBUTION
+        maxzoom: 13,
+        attribution:
+          'Esri, GEBCO, NOAA, National Geographic, Garmin, HERE, Geonames.org, and other contributors'
       }
     }
   case 'emodnet':
@@ -89,37 +97,41 @@ function basemapSources (basemap) {
   }
 }
 
-export function buildBasemapStyle (lang = 'en', basemap = 'emodnet') {
-  const isOsm = basemap === 'osm'
+// Shared between the initial style build and applyBasemap()'s live swap, so
+// the two paths can never drift apart.
+function bathymetryLayer (basemap) {
+  return {
+    id: 'bathymetry',
+    type: 'raster',
+    source: 'bathymetry',
+    paint: hasOwnCartography(basemap) ? {} : { 'raster-saturation': -0.15 }
+  }
+}
 
+// Pulls the sea toward CIOOS teal and unifies the raster palette. Omitted
+// entirely over basemaps that paint their own water color.
+function waterTintLayer () {
+  return {
+    id: 'water-tint',
+    type: 'fill',
+    source: 'ofm',
+    'source-layer': 'water',
+    paint: {
+      'fill-color': '#52A79B',
+      'fill-opacity': 0.1
+    }
+  }
+}
+
+export function buildBasemapStyle (lang = 'en', basemap = 'emodnet') {
   const layers = [
     {
       id: 'background',
       type: 'background',
       paint: { 'background-color': '#DCE8E5' }
     },
-    {
-      id: 'bathymetry',
-      type: 'raster',
-      source: 'bathymetry',
-      paint: isOsm ? {} : { 'raster-saturation': -0.15 }
-    },
-    // Pull the sea toward CIOOS teal and unify the raster palette. Skipped
-    // over OSM, which paints its own water color.
-    ...(isOsm
-      ? []
-      : [
-        {
-          id: 'water-tint',
-          type: 'fill',
-          source: 'ofm',
-          'source-layer': 'water',
-          paint: {
-            'fill-color': '#52A79B',
-            'fill-opacity': 0.1
-          }
-        }
-      ]),
+    bathymetryLayer(basemap),
+    ...(hasOwnCartography(basemap) ? [] : [waterTintLayer()]),
     {
       id: 'waterway',
       type: 'line',
@@ -261,5 +273,24 @@ export function buildBasemapStyle (lang = 'en', basemap = 'emodnet') {
       }
     },
     layers
+  }
+}
+
+// Live basemap swap on an already-built map, without map.setStyle() — that
+// call diffs the *entire* style against the new one and drops any layer not
+// present in it, which would wipe every data layer Map.js adds imperatively
+// after 'load' (hexes/points/trajectories/griddap/WMS). Instead, only the two
+// layers that actually differ between basemap options (bathymetry,
+// water-tint) are removed and re-added in place, right before 'waterway' —
+// their original position — leaving everything else untouched.
+export function applyBasemap (map, basemap) {
+  if (map.getLayer('water-tint')) map.removeLayer('water-tint')
+  if (map.getLayer('bathymetry')) map.removeLayer('bathymetry')
+  if (map.getSource('bathymetry')) map.removeSource('bathymetry')
+
+  map.addSource('bathymetry', basemapSources(basemap).bathymetry)
+  map.addLayer(bathymetryLayer(basemap), 'waterway')
+  if (!hasOwnCartography(basemap)) {
+    map.addLayer(waterTintLayer(), 'waterway')
   }
 }

@@ -3,6 +3,7 @@ import { createContext, useContext, useRef, useState, useEffect } from 'react'
 import isEmpty from 'lodash/isEmpty'
 
 import { server } from '../../config.js'
+import { basemap as defaultBasemap } from '../../components/config.js'
 import {
   createDataFilterQueryString,
   getCurrentRangeLevel
@@ -38,6 +39,9 @@ export default function MapStateProvider ({ children }) {
   // Map projection: 'mercator' (default) or 'globe'. The globe view renders
   // high latitudes (e.g. the Arctic) without Mercator distortion.
   const [projection, setProjection] = useState('mercator')
+  // Basemap raster: 'emodnet' (default) or 'arcgis-ocean'.
+  // See components/Map/basemapStyle.js.
+  const [basemap, setBasemap] = useState(defaultBasemap)
   // One-shot "frame this geometry" request for the Map. The nonce lets the
   // same extent be re-requested (clicking zoom again after panning away).
   const [zoomTarget, setZoomTarget] = useState()
@@ -146,6 +150,8 @@ export default function MapStateProvider ({ children }) {
     setDataLayersVisible,
     projection,
     setProjection,
+    basemap,
+    setBasemap,
     griddapCoverage,
     activeWmsOverlay,
     setActiveWmsOverlay,

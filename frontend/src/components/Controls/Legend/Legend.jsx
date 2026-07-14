@@ -13,6 +13,7 @@ import {
 import { colorScale, trajectoryColorScale } from '../../config.js'
 import platformColors from '../../platformColors'
 import Switch from '../../ui/Switch.jsx'
+import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
 
 import './styles.css'
 import classNames from 'classnames'
@@ -46,7 +47,10 @@ export default function Legend({
   currentTrajectoryRangeLevel,
   zoom,
   platformsInView,
-  layerControls = []
+  layerControls = [],
+  basemapOptions = [],
+  basemap,
+  onBasemapChange
 }) {
   const { t } = useTranslation()
   const [legendOpen, setLegendOpen] = useState(true)
@@ -218,13 +222,39 @@ export default function Legend({
         )}
       </div>
 
-      {layerControls.length > 0 && (
+      {(layerControls.length > 0 || basemapOptions.length > 0) && (
         <div className={classNames('legendGroup', { closed: !layersOpen })}>
           {renderGroupHeader(t('layersMenuTitle'), layersOpen, () =>
             setLayersOpen(!layersOpen)
           )}
           {layersOpen && (
             <div className='legendGroupBody'>
+              {basemapOptions.length > 0 && (
+                <div className='legendBasemapSelector'>
+                  <span className='legendSectionCaption'>
+                    {t('basemapLabel')}
+                  </span>
+                  <DropdownButton
+                    className='legendBasemapDropdown'
+                    size='sm'
+                    variant='outline-secondary'
+                    title={
+                      basemapOptions.find((option) => option.key === basemap)
+                        ?.label
+                    }
+                  >
+                    {basemapOptions.map((option) => (
+                      <Dropdown.Item
+                        key={option.key}
+                        active={option.key === basemap}
+                        onClick={() => onBasemapChange(option.key)}
+                      >
+                        {option.label}
+                      </Dropdown.Item>
+                    ))}
+                  </DropdownButton>
+                </div>
+              )}
               <div className='legendLayerItems'>
                 {layerControls.map((control) => (
                   <Switch

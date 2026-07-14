@@ -156,6 +156,34 @@
   transform: translateX(-100%);
 }
 
+/* Basemap picker, above the layer switches. */
+.legendBasemapSelector {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.legendBasemapSelector .dropdown {
+  display: block;
+}
+
+.legendBasemapDropdown.btn,
+.legendBasemapDropdown .btn {
+  width: 100%;
+  justify-content: space-between;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Labels wrap instead of scrolling — the legend card clips horizontal
+   overflow (it scrolls vertically only), so a too-wide nowrap item would be
+   unreachable rather than just untidy. */
+.legendBasemapSelector .dropdown-item {
+  white-space: normal;
+}
+
 /* Map-layer switches, integrated into the legend card. Scoped-down switch
    chrome keeps the section compact alongside the color bar. */
 .legendLayerItems {
