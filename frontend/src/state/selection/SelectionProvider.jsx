@@ -1,5 +1,13 @@
 import * as React from 'react'
-import { createContext, useContext, useState, useEffect } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useState,
+  useEffect,
+  useMemo
+} from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import isEmpty from 'lodash/isEmpty'
 
@@ -7,6 +15,8 @@ import { server } from '../../config.js'
 import {
   createDataFilterQueryString,
   createSelectionQueryString,
+  datasetMatchesUrlKey,
+  datasetUrlKey,
   polygonIsRectangle,
   useDebounce
 } from '../../utilities.jsx'
@@ -24,6 +34,7 @@ export default function SelectionProvider ({ children }) {
   const { i18n } = useTranslation()
   const { query, catalogLoaded } = useFilters()
   const { setActiveWmsOverlay } = useMapState()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [polygon, setPolygon] = useState()
   const [pointsToReview, setPointsToReview] = useState()
@@ -37,7 +48,6 @@ export default function SelectionProvider ({ children }) {
 
   const [selectAll, setSelectAll] = useState(false)
   const [pointsData, setPointsData] = useState([])
-  const [inspectDataset, setInspectDataset] = useState()
   const [selectionLoading, setSelectionLoading] = useState(true)
   const [initialPointsQueryComplete, setInitialPointsQueryComplete] =
     useState(false)
@@ -54,6 +64,41 @@ export default function SelectionProvider ({ children }) {
   const [datasetsSelectedCount, setDatasetsSelectedCount] = useState()
   const [filteredDatasets, setFilteredDatasets] = useState([])
   const [combinedQueries, setCombinedQueries] = useState([])
+
+  // The open dataset page lives in the URL (?dataset=…&server=…) rather than in
+  // component state, so Back/Forward move through it natively and the page can
+  // be linked to. useSearchParams re-renders on popstate, which is what makes
+  // the browser's Back button close the page for free.
+  const inspectDataset = useMemo(
+    () => pointsData.find((point) => datasetMatchesUrlKey(point, searchParams)),
+    [pointsData, searchParams]
+  )
+
+  // Opening or closing a dataset page is a navigation the user made, so it
+  // pushes an entry that Back reverses. Automatic opens/closes (auto-inspecting
+  // a lone result, dropping a dataset the filters just excluded) pass
+  // replace: true — Back should skip a step the user never took.
+  const setInspectDataset = useCallback(
+    (dataset, { replace = false } = {}) => {
+      setSearchParams(
+        (previous) => {
+          const next = new URLSearchParams(previous)
+          const key = datasetUrlKey(dataset)
+          if (key) {
+            next.set('dataset', key.dataset)
+            if (key.server) next.set('server', key.server)
+            else next.delete('server')
+          } else {
+            next.delete('dataset')
+            next.delete('server')
+          }
+          return next
+        },
+        { replace }
+      )
+    },
+    [setSearchParams]
+  )
 
   // Mark the polygon-draw control active for free-form polygons (rectangles
   // have their own #boxQueryButton active state).
@@ -105,7 +150,17 @@ export default function SelectionProvider ({ children }) {
     setSelectionLoading(false)
     if (pointsData.length === 1 && !backClicked) {
       // Auto load single selected dataset
-      setInspectDataset(pointsData[0])
+      setInspectDataset(pointsData[0], { replace: true })
+    } else if (
+      !isEmpty(pointsData) &&
+      searchParams.get('dataset') &&
+      !pointsData.some((point) => datasetMatchesUrlKey(point, searchParams))
+    ) {
+      // The results just changed under an open dataset page and the dataset is
+      // no longer among them (a filter excluded it, say): the page has already
+      // closed itself — inspectDataset stopped resolving — so clear the params
+      // it left behind rather than carry a dead key in the URL.
+      setInspectDataset(undefined, { replace: true })
     }
   }, [pointsData])
 
@@ -133,7 +188,9 @@ export default function SelectionProvider ({ children }) {
       const combinedQueries = [filtersQuery, shapeQuery]
         .filter((e) => e)
         .join('&')
-      setInspectDataset()
+      // An open dataset page is deliberately NOT closed here: it survives a
+      // filter change as long as the dataset is still in the results. If it
+      // isn't, it closes when the new results land (see the pointsData effect).
       setSelectionLoading(true)
       setCombinedQueries(combinedQueries)
       const urlString = `${server}/pointQuery${

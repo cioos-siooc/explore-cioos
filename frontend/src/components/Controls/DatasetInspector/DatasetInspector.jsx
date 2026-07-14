@@ -89,6 +89,28 @@ export default function DatasetInspector({
       })
   }, [dataset])
 
+  // Browser Back needs no handling here: the open dataset lives in the URL
+  // (?dataset=…&server=…, owned by SelectionProvider), so popping that history
+  // entry closes the page through the router.
+
+  // Backspace backs out to the list, unless the cursor is in a field —
+  // there it still means "delete a character" (e.g. the record filter box).
+  useEffect(() => {
+    const typingIn = (target) =>
+      target instanceof Element &&
+      (target.isContentEditable ||
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+
+    const onKeyDown = (e) => {
+      if (e.key !== 'Backspace' || typingIn(e.target)) return
+      e.preventDefault()
+      returnToList()
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   // Swipe left (touch, trackpad two-finger, or mouse horizontal wheel) to
   // return to the dataset list. Swipes work everywhere, including over the
   // record table: while the table still has room to scroll left the gesture

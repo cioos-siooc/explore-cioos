@@ -417,6 +417,48 @@ export function formatErddapServerName(url, lang = 'en', serversData = null) {
     return url
   }
 }
+// --- The open dataset page, as URL params -----------------------------------
+// A dataset is addressed by `?dataset=<dataset_id>&server=<server-slug>`. Both
+// halves come from the source (the server's own id for the dataset, and the
+// server's URL), never from our database, so a link survives a full re-harvest —
+// unlike the dataset's pk. dataset_id alone is not enough: it is only unique
+// within one ERDDAP server, and OBIS ids are a separate namespace.
+//
+// Both directions go through these helpers, so switching to, say, a hash of the
+// pair would be a change to this block alone.
+
+// The server URL as a readable slug, matching the convention the harvest
+// dashboard already uses (slugify() in web-api/routes/harvest.js): scheme
+// dropped, '.' and '/' replaced with '-'. OBIS datasets carry a sentinel
+// erddap_url of https://obis.org, so they slug to 'obis-org' and need no
+// special case.
+export function erddapServerSlug (url) {
+  if (!url) return ''
+  return url
+    .replace(/^[a-z]+:\/\//i, '')
+    .replace(/\/+$/, '')
+    .replace(/[./]/g, '-')
+}
+
+export function datasetUrlKey (row) {
+  if (!row?.dataset_id) return undefined
+  return {
+    dataset: row.dataset_id,
+    server: erddapServerSlug(row.erddap_server_url || row.erddap_url)
+  }
+}
+
+// Does this dataset row correspond to the dataset the URL points at? Links
+// shared before the server slug existed carry `dataset` alone; those still
+// resolve, on the dataset_id by itself.
+export function datasetMatchesUrlKey (row, searchParams) {
+  const dataset = searchParams.get('dataset')
+  if (!dataset || row?.dataset_id !== dataset) return false
+  const server = searchParams.get('server')
+  if (!server) return true
+  return datasetUrlKey(row)?.server === server
+}
+
 export function updateMapToolTitleLanguage(t) {
   // const { t } = useTranslation()
   const polygonToolDiv = document.getElementsByClassName(
