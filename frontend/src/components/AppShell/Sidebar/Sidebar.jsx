@@ -30,11 +30,13 @@ const DRAG_THRESHOLD = 6
 export default function Sidebar () {
   const { t } = useTranslation()
   const { totalNumberOfDatasets } = useFilters()
-  const { pointsData, pointsToReview } = useSelection()
+  const { filteredDatasets, pointsToReview } = useSelection()
   const { sidebarOpen, setSidebarOpen, setShowDownloadModal } = useUI()
 
   const expanded = sidebarOpen
-  const filteredCount = pointsData?.length ?? 0
+  // Reflects the title-search narrowing too, not just the server-side
+  // filters, so the counter agrees with what the list below actually shows.
+  const filteredCount = filteredDatasets?.length ?? 0
   const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length
   // Nothing filtered out (or the total isn't in yet): the "filtered / total"
   // split is noise, so both the pill and the footer state the total alone.

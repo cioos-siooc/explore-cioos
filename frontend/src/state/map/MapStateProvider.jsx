@@ -41,6 +41,15 @@ export default function MapStateProvider ({ children }) {
   // One-shot "frame this geometry" request for the Map. The nonce lets the
   // same extent be re-requested (clicking zoom again after panning away).
   const [zoomTarget, setZoomTarget] = useState()
+  // A share link can carry ?dataset=… with no lat/lon/zoom (the user only
+  // meant to point at the dataset, not a specific camera). SelectionProvider
+  // consumes this once the dataset resolves, framing its footprint instead of
+  // falling back to the default world view.
+  const [pendingDatasetZoom, setPendingDatasetZoom] = useState(() => {
+    const params = new URL(window.location.href).searchParams
+    return Boolean(params.get('dataset')) &&
+      !(params.get('lat') || params.get('lon') || params.get('zoom'))
+  })
   // The MapLibre instance, handed over by Map.jsx once created. ZoomToDataset
   // needs it to ask what camera a footprint would produce (cameraForBounds
   // depends on the canvas size, which only the map knows).
@@ -142,6 +151,8 @@ export default function MapStateProvider ({ children }) {
     setActiveWmsOverlay,
     zoomTarget,
     zoomToGeometry,
+    pendingDatasetZoom,
+    setPendingDatasetZoom,
     mapRef,
     loadLegend: () => loadLegend(createDataFilterQueryString(query))
   }

@@ -6,10 +6,8 @@ import {
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
-import isEmpty from 'lodash/isEmpty'
 
-import { formatErddapServerName } from '../../../utilities'
-import erddapServersJSONfile from '../../../erddapServers.json'
+import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import DatasetCard from './DatasetCard.jsx'
 import './styles.css'
 
@@ -33,7 +31,10 @@ export default function DatasetsTable({
   downloadSizeEstimates
 }) {
   const { t, i18n } = useTranslation()
-  const [searchText, setSearchText] = useState('')
+  // Lifted to SelectionProvider so it can surface as a removable chip
+  // (ActiveFilterChips) alongside the rest of the active filters.
+  const { datasetTitleSearchText: searchText, setDatasetTitleSearchText: setSearchText } =
+    useSelection()
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const listRef = useRef(null)
 
@@ -73,27 +74,6 @@ export default function DatasetsTable({
     )
   }
 
-  // Sidebar search: match across the visible text fields. The download modal
-  // has no search UI, so this is a no-op there.
-  function filterBySearch(rows) {
-    if (isDownloadModal || isEmpty(searchText)) return rows || []
-    const query = searchText.toLowerCase()
-    return (rows || []).filter((row) =>
-      [
-        row.title,
-        row.cdm_data_type,
-        formatErddapServerName(
-          row.erddap_server_url || row.erddap_url,
-          i18n.language,
-          erddapServersJSONfile
-        )
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
-    )
-  }
-
   function sortValue(row, field) {
     const isGrid = row.cdm_data_type === 'Grid'
     switch (field) {
@@ -114,25 +94,27 @@ export default function DatasetsTable({
     }
   }
 
+  // Search filtering happens upstream (SelectionProvider's filteredDatasets),
+  // so it's reflected in the shared dataset counters too — this just sorts
+  // whatever it's handed.
   const visibleRows = useMemo(() => {
     const field = sortFields.find((f) => f.id === sort.field)
-    const filtered = filterBySearch(datasets)
     const factor = sort.dir === 'asc' ? 1 : -1
-    const sorted = [...filtered].sort((a, b) => {
+    const sorted = [...(datasets || [])].sort((a, b) => {
       const va = sortValue(a, sort.field)
       const vb = sortValue(b, sort.field)
       if (field?.type === 'number') return (va - vb) * factor
       return String(va).localeCompare(String(vb), i18n.language) * factor
     })
     return sorted
-  }, [datasets, searchText, sort, downloadSizeEstimates, isDownloadModal, i18n.language])
+  }, [datasets, sort, downloadSizeEstimates, i18n.language])
 
   // Reset the render window whenever the result set or ordering changes so we
   // don't leave a stale partial list scrolled off the top.
   useEffect(() => {
     setVisibleCount(PAGE_SIZE)
     if (listRef.current) listRef.current.scrollTop = 0
-  }, [searchText, sort, isDownloadModal])
+  }, [datasets, sort, isDownloadModal])
 
   const handleScroll = (e) => {
     const el = e.currentTarget

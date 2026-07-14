@@ -17,9 +17,11 @@ import {
   createSelectionQueryString,
   datasetMatchesUrlKey,
   datasetUrlKey,
+  formatErddapServerName,
   polygonIsRectangle,
   useDebounce
 } from '../../utilities.jsx'
+import erddapServersJSONfile from '../../erddapServers.json'
 import { useFilters } from '../filters/FilterProvider.jsx'
 import { useMapState } from '../map/MapStateProvider.jsx'
 
@@ -33,7 +35,12 @@ export function useSelection () {
 export default function SelectionProvider ({ children }) {
   const { i18n } = useTranslation()
   const { query, catalogLoaded } = useFilters()
-  const { setActiveWmsOverlay } = useMapState()
+  const {
+    setActiveWmsOverlay,
+    zoomToGeometry,
+    pendingDatasetZoom,
+    setPendingDatasetZoom
+  } = useMapState()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [polygon, setPolygon] = useState()
@@ -56,14 +63,35 @@ export default function SelectionProvider ({ children }) {
   const [recordLoading, setRecordLoading] = useState(false)
   const [backClicked, setBackClicked] = useState(false)
   const [datasetPreview, setDatasetPreview] = useState()
+  // Free-text title search for the datasets list (DatasetsTable's search
+  // box). Lifted out of that component so it can also surface as a
+  // removable chip in ActiveFilterChips.
   const [datasetTitleSearchText, setDatasetTitleSearchText] = useState('')
-  const debouncedDatasetTitleSearchText = useDebounce(
-    datasetTitleSearchText,
-    300
-  )
   const [datasetsSelectedCount, setDatasetsSelectedCount] = useState()
-  const [filteredDatasets, setFilteredDatasets] = useState([])
   const [combinedQueries, setCombinedQueries] = useState([])
+
+  // pointsData narrowed by the title search, matched the same way
+  // DatasetsTable's search box used to match locally: title, dataset type,
+  // and data-portal name. Derived here (rather than inside DatasetsTable) so
+  // the datasets counters (Sidebar, TopControls) reflect it too.
+  const filteredDatasets = useMemo(() => {
+    if (isEmpty(datasetTitleSearchText)) return pointsData
+    const query = datasetTitleSearchText.toLowerCase()
+    return pointsData.filter((row) =>
+      [
+        row.title,
+        row.cdm_data_type,
+        formatErddapServerName(
+          row.erddap_server_url || row.erddap_url,
+          i18n.language,
+          erddapServersJSONfile
+        )
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(query)
+    )
+  }, [pointsData, datasetTitleSearchText, i18n.language])
 
   // The open dataset page lives in the URL (?dataset=…&server=…) rather than in
   // component state, so Back/Forward move through it natively and the page can
@@ -73,6 +101,17 @@ export default function SelectionProvider ({ children }) {
     () => pointsData.find((point) => datasetMatchesUrlKey(point, searchParams)),
     [pointsData, searchParams]
   )
+
+  // A share link that named a dataset but no camera: frame its footprint as
+  // soon as it resolves out of pointsData, same as the "Zoom to dataset"
+  // button would. Consumed once — later re-inspections don't re-trigger it.
+  useEffect(() => {
+    if (!pendingDatasetZoom || !inspectDataset) return
+    const footprint =
+      inspectDataset.filtered_bbox_geojson || inspectDataset.coverage_bbox_geojson
+    if (footprint) zoomToGeometry(footprint)
+    setPendingDatasetZoom(false)
+  }, [pendingDatasetZoom, inspectDataset])
 
   // Opening or closing a dataset page is a navigation the user made, so it
   // pushes an entry that Back reverses. Automatic opens/closes (auto-inspecting
@@ -123,20 +162,6 @@ export default function SelectionProvider ({ children }) {
       setPointsToDownload()
     }
   }, [pointsToReview])
-
-  useEffect(() => {
-    if (!isEmpty(debouncedDatasetTitleSearchText)) {
-      setFilteredDatasets(
-        pointsData.filter((dataset) => {
-          return `${dataset.title}`
-            .toLowerCase()
-            .includes(`${debouncedDatasetTitleSearchText}`.toLowerCase())
-        })
-      )
-    } else {
-      setFilteredDatasets(pointsData)
-    }
-  }, [debouncedDatasetTitleSearchText])
 
   useEffect(() => {
     if (!isEmpty(pointsData)) {
@@ -314,9 +339,8 @@ export default function SelectionProvider ({ children }) {
     setDatasetPreview,
     datasetTitleSearchText,
     setDatasetTitleSearchText,
-    debouncedDatasetTitleSearchText,
-    datasetsSelectedCount,
     filteredDatasets,
+    datasetsSelectedCount,
     combinedQueries,
     handleSelectDataset,
     handleSelectAllDatasets

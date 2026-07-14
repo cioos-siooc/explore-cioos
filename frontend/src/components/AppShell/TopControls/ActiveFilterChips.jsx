@@ -14,10 +14,32 @@ import {
 } from '../../config.js'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
+import { useUI } from '../../../state/ui/UIProvider.jsx'
+
+// Maps each active-filter group key to the filterName FiltersPanel opens it
+// under (see FiltersPanel.jsx — most groups key off a stable i18n key, but
+// time/depth key off their own translated label, so those two are computed
+// with t() rather than hardcoded).
+function filterNameForKey (key, t) {
+  switch (key) {
+  case 'eovs': return 'oceanVariablesFiltername'
+  case 'platforms': return 'platformsFilterName'
+  case 'orgs': return 'organizationFilterName'
+  case 'datasets': return 'datasetsFilterName'
+  case 'sources': return 'sourceFilterName'
+  case 'time': return t('timeframeFilterName')
+  case 'depth': return t('depthRangeFilterName')
+  case 'scientificName': return 'scientificNameFilterName'
+  default: return undefined
+  }
+}
 
 // Removable chips for every filter currently constraining the map, flowing
-// after the Filters button. Each group can be cleared whole (its label) or
-// value-by-value; a trailing link resets everything including the polygon.
+// after the Filters button. Clicking a group's label jumps to that filter's
+// page (the Filters modal, or the datasets sidebar for the text search);
+// the trailing x on each chip clears the whole group, and each value can
+// still be dropped on its own. A final link resets everything including the
+// polygon.
 export default function ActiveFilterChips () {
   const { t } = useTranslation()
   const {
@@ -28,7 +50,9 @@ export default function ActiveFilterChips () {
     startDepth,
     endDepth
   } = useFilters()
-  const { polygon, setPolygon } = useSelection()
+  const { polygon, setPolygon, datasetTitleSearchText, setDatasetTitleSearchText } =
+    useSelection()
+  const { setShowFiltersModal, setOpenFilter, setSidebarOpen } = useUI()
 
   // The chips can be collapsed behind a Show/Hide toggle. They start hidden on
   // phones — where they would eat most of the map — and shown on desktop. The
@@ -55,10 +79,32 @@ export default function ActiveFilterChips () {
     '(m)'
   )
 
-  const activeFilters = buildActiveFilters({
-    timeframesBadgeTitle,
-    depthRangeBadgeTitle
-  })
+  const activeFilters = [
+    ...buildActiveFilters({ timeframesBadgeTitle, depthRangeBadgeTitle }),
+    datasetTitleSearchText && {
+      key: 'search',
+      label: t('textSearchFilterName'),
+      goToFilter: () => setSidebarOpen(true),
+      removeAll: () => setDatasetTitleSearchText(''),
+      items: [
+        {
+          id: 'search',
+          label: datasetTitleSearchText,
+          remove: () => setDatasetTitleSearchText('')
+        }
+      ]
+    }
+  ]
+    .filter(Boolean)
+    .map((f) => ({
+      ...f,
+      goToFilter:
+        f.goToFilter ||
+        (() => {
+          setOpenFilter(filterNameForKey(f.key, t))
+          setShowFiltersModal(true)
+        })
+    }))
 
   if (activeFilters.length === 0 && !polygon) return null
 
@@ -69,8 +115,8 @@ export default function ActiveFilterChips () {
           <button
             type='button'
             className='activeFilterGroupLabel'
-            onClick={f.removeAll}
-            title={t('activeFilterRemoveAllTitle', { filter: f.label })}
+            onClick={f.goToFilter}
+            title={t('activeFilterGoToFilterTitle', { filter: f.label })}
           >
             {f.label}
           </button>
@@ -89,6 +135,14 @@ export default function ActiveFilterChips () {
               </button>
             </span>
           ))}
+          <button
+            type='button'
+            className='activeFilterGroupRemove'
+            onClick={f.removeAll}
+            title={t('activeFilterRemoveAllTitle', { filter: f.label })}
+          >
+            <X size={14} aria-hidden='true' />
+          </button>
         </li>
       ))}
       {!collapsed && polygon && (
@@ -123,6 +177,7 @@ export default function ActiveFilterChips () {
           onClick={() => {
             resetFilters()
             setPolygon()
+            setDatasetTitleSearchText('')
           }}
           title={t('resetFiltersButtonTooltipText')}
         >

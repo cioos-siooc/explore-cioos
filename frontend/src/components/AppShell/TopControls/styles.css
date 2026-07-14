@@ -125,8 +125,9 @@
 
 /* ------------------------------------------------------------------
  * Active-filter chips, flowing after the Filters button.
- * One group per active filter category; the label clears the whole filter,
- * each value chip clears just that value.
+ * One group per active filter category; the label opens that filter's page,
+ * each value chip clears just that value, and the trailing x clears the
+ * whole group.
  * ------------------------------------------------------------------ */
 .activeFilterBullets {
   display: flex;
@@ -148,7 +149,7 @@
   gap: 4px;
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
+  border-radius: var(--cioos-radius);
   padding: 3px 6px 3px 4px;
   /* 3D depth (shared tokens; see theme.css) — the chip-scale ladder.
      preserve-3d floats the inner value chips above the pill face. */
@@ -178,7 +179,33 @@
 }
 
 .activeFilterGroupLabel:hover {
-  color: var(--cioos-error);
+  color: var(--cioos-primary);
+  text-decoration: underline;
+}
+
+/* Group-level clear-all, trailing the value chips. Visually paired with the
+   per-item remove buttons, but a step more prominent (solid on hover) since
+   it drops the whole group in one click. */
+.activeFilterGroupRemove {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+.activeFilterGroupRemove:hover {
+  background-color: var(--cioos-error);
+  color: var(--cioos-white);
 }
 
 .activeFilterItem {

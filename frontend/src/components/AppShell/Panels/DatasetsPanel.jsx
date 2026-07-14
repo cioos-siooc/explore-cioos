@@ -1,5 +1,4 @@
 import * as React from 'react'
-import isEmpty from 'lodash/isEmpty'
 
 import DatasetsTable from '../../Controls/DatasetsTable/DatasetsTable.jsx'
 import DatasetInspector from '../../Controls/DatasetInspector/DatasetInspector.jsx'
@@ -24,7 +23,6 @@ export default function DatasetsPanel () {
   } = useFilters()
   const { activeWmsOverlay, setActiveWmsOverlay } = useMapState()
   const {
-    pointsData,
     setPointsData,
     filteredDatasets,
     inspectDataset,
@@ -33,7 +31,6 @@ export default function DatasetsPanel () {
     initialPointsQueryComplete,
     setInspectRecordID,
     setBackClicked,
-    debouncedDatasetTitleSearchText,
     selectAll,
     handleSelectDataset,
     handleSelectAllDatasets,
@@ -83,11 +80,7 @@ export default function DatasetsPanel () {
           filterSet={filterSet}
           selectAll={selectAll}
           setDatasets={setPointsData}
-          datasets={
-            isEmpty(debouncedDatasetTitleSearchText)
-              ? pointsData
-              : filteredDatasets
-          }
+          datasets={filteredDatasets}
           setHoveredDataset={setHoveredDataset}
         />
       )}

@@ -91,7 +91,7 @@ export default function FiltersPanel () {
     obisDataAvailable,
     resetFilters
   } = useFilters()
-  const { setPolygon } = useSelection()
+  const { setPolygon, setDatasetTitleSearchText } = useSelection()
   const { openFilter, setOpenFilter } = useUI()
 
   const eovsFilterTranslationKey = 'oceanVariablesFiltername'
@@ -426,6 +426,7 @@ export default function FiltersPanel () {
           onClick={() => {
             resetFilters()
             setPolygon()
+            setDatasetTitleSearchText('')
           }}
           title={t('resetFiltersButtonTooltipText')}
         >

@@ -30,7 +30,7 @@ export default function TopControls () {
     depthFilterActive,
     totalNumberOfDatasets
   } = useFilters()
-  const { pointsData } = useSelection()
+  const { filteredDatasets } = useSelection()
   const { setShowFiltersModal, sidebarOpen, setSidebarOpen } = useUI()
 
   const activeFilterCount = [
@@ -45,7 +45,9 @@ export default function TopControls () {
     depthFilterActive
   ].filter(Boolean).length
 
-  const filteredCount = pointsData?.length ?? 0
+  // Reflects the title-search narrowing too, not just the server-side
+  // filters, so the badge agrees with what the Datasets list actually shows.
+  const filteredCount = filteredDatasets?.length ?? 0
 
   return (
     <div className='topBar'>
