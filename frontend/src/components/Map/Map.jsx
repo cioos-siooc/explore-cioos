@@ -174,6 +174,9 @@ export default function CreateMap({
   const hexOpacity = 0.8
   const hexMinZoom = 0
   const hexMaxZoom = 7
+  // Zoom at which griddap coverage rectangles take hover/click priority over
+  // the hex aggregates (which stop being drawn at hexMaxZoom anyway).
+  const griddapPriorityZoom = 5
   // 0.55 at the z7 hand-off (where trajectory counts stop being merged into
   // the green hexes layer), fading to a light coverage wash by z10 so the
   // point circles stay readable over dense trajectory areas.
@@ -221,6 +224,15 @@ export default function CreateMap({
     closeButton: false,
     closeOnClick: true,
     maxWidth: '400px'
+  })
+
+  // Stays open (unlike the hover popup) so a dataset can be picked out of a
+  // stack of overlapping coverage rectangles.
+  const griddapPicker = new Popup({
+    closeButton: true,
+    closeOnClick: false,
+    className: 'griddap-picker-popup',
+    maxWidth: '380px'
   })
 
   const colors = ['match', ['get', 'platform']]
@@ -446,6 +458,47 @@ export default function CreateMap({
         ? { type: 'Feature', geometry, properties: {} }
         : emptyFeatureCollection
     )
+  }
+
+  // Coverage rectangles under the cursor, deduped by dataset: a stack of
+  // gridded datasets covering the same water is the norm, not the exception.
+  const hoveredGriddapIds = useRef([])
+
+  function griddapFeaturesAt(point) {
+    const features = map.current.queryRenderedFeatures(point, {
+      layers: ['griddap-coverage-fill']
+    })
+    const byPk = new Map()
+    features.forEach((feature) => {
+      if (!byPk.has(feature.properties.pk)) byPk.set(feature.properties.pk, feature)
+    })
+    return [...byPk.values()]
+  }
+
+  function setGriddapHovered(features) {
+    if (!map.current?.getSource('griddap-coverage')) return
+    const setHovered = (id, hovered) =>
+      map.current.setFeatureState(
+        { source: 'griddap-coverage', id },
+        { hovered }
+      )
+    hoveredGriddapIds.current.forEach((id) => setHovered(id, false))
+    hoveredGriddapIds.current = features.map((feature) => feature.id)
+    hoveredGriddapIds.current.forEach((id) => setHovered(id, true))
+  }
+
+  // nested feature properties arrive JSON-stringified from MapLibre
+  function griddapTitle(feature) {
+    try {
+      const titleTranslated = JSON.parse(feature.properties.title_translated)
+      return (
+        titleTranslated[i18n.language] ||
+        titleTranslated.en ||
+        feature.properties.dataset_id
+      )
+    } catch (error) {
+      return feature.properties.dataset_id || ''
+    }
   }
 
   // While a WMS overlay is active every other data layer is hidden so the
@@ -1051,6 +1104,9 @@ export default function CreateMap({
       // 'points-highlighted' so selection/hover circles stay on top.
       map.current.addSource('griddap-coverage', {
         type: 'geojson',
+        // pk as the feature id so the hover feature-state below can address
+        // individual rectangles.
+        promoteId: 'pk',
         data: griddapCoverageRef.current || emptyFeatureCollection
       })
       map.current.addSource('griddap-highlight', {
@@ -1062,8 +1118,19 @@ export default function CreateMap({
           id: 'griddap-coverage-fill',
           type: 'fill',
           source: 'griddap-coverage',
-          // near-invisible fill: the hover/click hit area
-          paint: { 'fill-color': '#52a79b', 'fill-opacity': 0.07 }
+          // Light wash at rest, a touch stronger on hover. Kept low because
+          // overlapping rectangles composite: a dozen grids stacked over the
+          // same water turn any generous fill into a solid slab, so the hover
+          // affordance leans on the outline below rather than the fill.
+          paint: {
+            'fill-color': '#52a79b',
+            'fill-opacity': [
+              'case',
+              ['boolean', ['feature-state', 'hovered'], false],
+              0.12,
+              0.07
+            ]
+          }
         },
         'points-highlighted'
       )
@@ -1073,8 +1140,18 @@ export default function CreateMap({
           type: 'line',
           source: 'griddap-coverage',
           paint: {
-            'line-color': '#52a79b',
-            'line-width': 1.5,
+            'line-color': [
+              'case',
+              ['boolean', ['feature-state', 'hovered'], false],
+              '#fbb03b',
+              '#52a79b'
+            ],
+            'line-width': [
+              'case',
+              ['boolean', ['feature-state', 'hovered'], false],
+              2.5,
+              1.5
+            ],
             'line-dasharray': [2, 2]
           }
         },
@@ -1157,6 +1234,7 @@ export default function CreateMap({
     }
 
     const handleMapHexesOnClick = (e) => {
+      if (griddapOutranksHexes(e)) return
       e.originalEvent.preventDefault()
       if (!creatingPolygon.current) {
         map.current.flyTo({
@@ -1258,6 +1336,7 @@ export default function CreateMap({
     })
 
     map.current.on('mousemove', 'hexes', (e) => {
+      if (griddapOutranksHexes(e)) return
       if (!draw.getMode().includes('draw')) {
         map.current.getCanvas().style.cursor = 'pointer'
         const coordinates = [e.lngLat.lng, e.lngLat.lat]
@@ -1305,54 +1384,151 @@ export default function CreateMap({
       }
     })
 
-    // Griddap coverage rectangles sit under the point/hex layers — defer to
-    // those layers' own handlers whenever one of their features is under the
-    // cursor (same pattern as trajectory-hexes above).
+    // Griddap coverage rectangles normally defer to the point/hex layers, so a
+    // click meant for an observation isn't swallowed by the grid drawn over it
+    // (same pattern as trajectory-hexes above). Past griddapPriorityZoom the
+    // rectangles outrank the hex aggregates instead: the hexes are a coarse
+    // backdrop by then, and someone zoomed in that far is working with a
+    // specific grid. Individual points stay precise targets at every zoom.
     const griddapFeatureIsCovered = (e) =>
       map.current.queryRenderedFeatures(e.point, {
-        layers: ['points', 'hexes'].filter((layer) => map.current.getLayer(layer))
+        layers: (map.current.getZoom() >= griddapPriorityZoom
+          ? ['points']
+          : ['points', 'hexes']
+        ).filter((layer) => map.current.getLayer(layer))
       }).length > 0
 
-    map.current.on('mousemove', 'griddap-coverage-fill', (e) => {
-      if (draw.getMode().includes('draw') || griddapFeatureIsCovered(e)) return
-      map.current.getCanvas().style.cursor = 'pointer'
-      // nested feature properties arrive JSON-stringified from MapLibre
-      let title = ''
-      try {
-        const titleTranslated = JSON.parse(
-          e.features[0].properties.title_translated
+    // The other side of that hand-off: a hex hover/click stands aside once the
+    // rectangles have priority, otherwise both handlers fire on the same event
+    // and the hex's zoom-in fights the rectangle's dataset selection.
+    const griddapOutranksHexes = (e) =>
+      map.current.getZoom() >= griddapPriorityZoom &&
+      map.current.getLayer('griddap-coverage-fill') &&
+      map.current.queryRenderedFeatures(e.point, {
+        layers: ['griddap-coverage-fill']
+      }).length > 0
+
+    // Rebuilding the tooltip on every mousemove made it flicker, so the content
+    // is settled on a short debounce. Crossing into a rectangle whose stack is
+    // unchanged only moves the popup — no DOM rebuild, no feature-state churn.
+    const showGriddapTooltip = debounce((e, features) => {
+      const sameStack =
+        features.length === hoveredGriddapIds.current.length &&
+        features.every(
+          (feature, index) => feature.id === hoveredGriddapIds.current[index]
         )
-        title = titleTranslated[i18n.language] || titleTranslated.en || ''
-      } catch (error) {
-        title = e.features[0].properties.dataset_id || ''
-      }
+      popup.setLngLat([e.lngLat.lng, e.lngLat.lat])
+      if (sameStack && popup.isOpen()) return
+
+      setGriddapHovered(features)
+      // A dozen bilingual titles would fill the map, so the tooltip previews a
+      // few (each clamped to two lines) and the picker (on click) lists the rest.
+      const previewed = features.slice(0, 3)
+      const titles = previewed
+        .map(
+          (feature) =>
+            `<div class="griddap-tooltip-item">${griddapTitle(feature)}</div>`
+        )
+        .join('')
+      const remaining = features.length - previewed.length
+      const hint =
+        features.length > 1
+          ? t('griddapCoverageStackTooltip', { n: features.length })
+          : t('griddapCoverageTooltip')
+      const more = remaining
+        ? `<div class="griddap-tooltip-more">${t('griddapCoverageMore', {
+          n: remaining
+        })}</div>`
+        : ''
       popup
-        .setLngLat([e.lngLat.lng, e.lngLat.lat])
-        .setHTML(`<div>${title}<br/>${t('griddapCoverageTooltip')}</div>`)
+        .setHTML(
+          `<div class="griddap-tooltip">${titles}${more}<div class="griddap-tooltip-hint">${hint}</div></div>`
+        )
         .addTo(map.current)
+    }, 80)
+
+    map.current.on('mousemove', 'griddap-coverage-fill', (e) => {
+      if (draw.getMode().includes('draw') || griddapFeatureIsCovered(e)) {
+        showGriddapTooltip.cancel()
+        setGriddapHovered([])
+        return
+      }
+      map.current.getCanvas().style.cursor = 'pointer'
+      showGriddapTooltip(e, griddapFeaturesAt(e.point))
     })
 
     map.current.on('mouseleave', 'griddap-coverage-fill', () => {
+      showGriddapTooltip.cancel()
+      setGriddapHovered([])
       if (!draw.getMode().includes('draw')) {
         map.current.getCanvas().style.cursor = 'grab'
         popup.remove()
       }
     })
 
+    // Same mechanism as the trajectory-hex click: narrow the dataset selection
+    // to one dataset, which makes /pointQuery return one row and
+    // SelectionDetails auto-open its inspector.
+    const selectGriddapDataset = (pk) =>
+      setDatasetsSelected((previousDatasetsSelected) =>
+        previousDatasetsSelected.map((dataset) => ({
+          ...dataset,
+          isSelected: dataset.pk === pk
+        }))
+      )
+
+    // Overlapping rectangles can't be told apart by clicking, so a stack opens
+    // a picker listing every dataset under the click instead of silently
+    // selecting the topmost one.
+    const openGriddapPicker = (lngLat, features) => {
+      const picker = document.createElement('div')
+      picker.className = 'griddap-picker'
+      const heading = document.createElement('div')
+      heading.className = 'griddap-picker-heading'
+      heading.textContent = t('griddapCoveragePickerTitle', {
+        n: features.length
+      })
+      // The heading sits outside the scroller so it stays put while a long
+      // stack scrolls.
+      const list = document.createElement('div')
+      list.className = 'griddap-picker-list'
+      picker.append(heading, list)
+      features.forEach((feature) => {
+        const card = document.createElement('button')
+        card.type = 'button'
+        card.className = 'griddap-picker-item'
+        const title = griddapTitle(feature)
+        // The title lives in its own element because Chromium won't line-clamp
+        // a button's own box. The full title stays reachable as the native
+        // tooltip.
+        const label = document.createElement('span')
+        label.className = 'griddap-picker-item-title'
+        label.textContent = title
+        card.appendChild(label)
+        card.title = title
+        card.addEventListener('mouseenter', () => setGriddapHovered([feature]))
+        card.addEventListener('click', () => {
+          selectGriddapDataset(feature.properties.pk)
+          griddapPicker.remove()
+        })
+        list.appendChild(card)
+      })
+      griddapPicker.setLngLat(lngLat).setDOMContent(picker).addTo(map.current)
+    }
+
+    griddapPicker.on('close', () => setGriddapHovered([]))
+
     const handleGriddapCoverageOnClick = (e) => {
       if (griddapFeatureIsCovered(e)) return
       e.originalEvent.preventDefault()
       if (!creatingPolygon.current) {
-        const clickedPk = e.features[0].properties.pk
-        // Same mechanism as the trajectory-hex click: narrow the dataset
-        // selection to the clicked dataset, which makes /pointQuery return
-        // one row and SelectionDetails auto-open its inspector.
-        setDatasetsSelected((previousDatasetsSelected) =>
-          previousDatasetsSelected.map((dataset) => ({
-            ...dataset,
-            isSelected: dataset.pk === clickedPk
-          }))
-        )
+        const features = griddapFeaturesAt(e.point)
+        if (features.length > 1) {
+          popup.remove()
+          openGriddapPicker(e.lngLat, features)
+        } else if (features.length === 1) {
+          selectGriddapDataset(features[0].properties.pk)
+        }
       } else if (
         draw.getMode() === 'simple_select' &&
         creatingPolygon.current
