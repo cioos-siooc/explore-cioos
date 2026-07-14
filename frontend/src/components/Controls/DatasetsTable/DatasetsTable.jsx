@@ -3,12 +3,23 @@ import {
   CaretDownFill,
   CaretRightFill,
   CaretUpFill,
+  Eye,
+  EyeSlash,
   Search
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
 
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
+import {
+  GROUP_NONE,
+  HIDEABLE_DIMENSIONS,
+  groupKeysFor,
+  groupLabel,
+  groupOptions,
+  isGroupDimension,
+  sortGroupKeys
+} from '../../../state/datasetGroups.js'
 import DatasetCard from './DatasetCard.jsx'
 import './styles.css'
 
@@ -20,9 +31,6 @@ const SCROLL_THRESHOLD = 400
 // Stable default so an absent datasetsInViewPks prop (e.g. the download modal)
 // doesn't create a new Set every render and thrash memo deps.
 const EMPTY_SET = new Set()
-// Group-by dimensions. 'none' is the flat default; the array-valued dims
-// (organization, eov) place a dataset under each of its values.
-const GROUP_NONE = 'none'
 
 // The datasets list, rendered as cards (replaces the old data table). Used in
 // two contexts: the sidebar results list and the download-review modal
@@ -41,9 +49,21 @@ export default function DatasetsTable({
 }) {
   const { t, i18n } = useTranslation()
   // Lifted to SelectionProvider so it can surface as a removable chip
-  // (ActiveFilterChips) alongside the rest of the active filters.
-  const { datasetTitleSearchText: searchText, setDatasetTitleSearchText: setSearchText } =
-    useSelection()
+  // (ActiveFilterChips) alongside the rest of the active filters. The grouping
+  // lives there too: the hidden groups decide what the map draws, and both are
+  // carried in the URL.
+  const {
+    datasetTitleSearchText: searchText,
+    setDatasetTitleSearchText: setSearchText,
+    groupBy: selectedGroupBy,
+    setGroupBy,
+    hiddenGroups,
+    toggleGroupHidden,
+    showAllGroups
+  } = useSelection()
+  // The download modal is a flat review list — it never groups, whatever the
+  // sidebar is grouped by.
+  const groupBy = isDownloadModal ? GROUP_NONE : selectedGroupBy
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const listRef = useRef(null)
 
@@ -73,59 +93,12 @@ export default function DatasetsTable({
   }, [isDownloadModal, i18n.language])
 
   const [sort, setSort] = useState({ field: 'title', dir: 'asc' })
-  // Group-by: 'none' plus the five category dimensions. Not offered in the
-  // download modal, which is a flat review list.
-  const [groupBy, setGroupBy] = useState(GROUP_NONE)
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set())
 
-  const groupOptions = useMemo(
-    () => [
-      { id: GROUP_NONE, label: t('datasetsCardGroupNoneText') },
-      { id: 'type', label: t('datasetsTableHeaderTypeText') },
-      { id: 'platform', label: t('datasetsCardSortPlatformText') },
-      { id: 'organization', label: t('datasetsCardGroupOrganizationText') },
-      { id: 'eov', label: t('datasetsCardGroupEovText') },
-      { id: 'source', label: t('datasetsCardGroupSourceText') },
-      { id: 'inView', label: t('datasetsCardOnlyInViewText') }
-    ],
-    [i18n.language]
-  )
-
-  const otherLabel = t('datasetsCardGroupOtherText')
-  const uncategorizedLabel = t('datasetsCardGroupUncategorizedText')
-
-  // The group label(s) a dataset belongs to under the active dimension.
-  // Array-valued dims return several so a dataset shows under each of its
-  // organizations / EOVs; scalar dims return one.
-  function groupKeysFor(row) {
-    const isGrid = row.cdm_data_type === 'Grid'
-    switch (groupBy) {
-    case 'type':
-      return [
-        isGrid
-          ? t('griddapTypeLabel')
-          : (row.cdm_data_type || otherLabel)
-            .replace('TimeSeriesProfile', 'Time series / Profile')
-            .replace('TimeSeries', 'Time series')
-      ]
-    case 'platform':
-      return [isGrid ? t('griddapTypeLabel') : row.platform || otherLabel]
-    case 'source':
-      return [row.source_type === 'obis' ? 'OBIS' : 'ERDDAP']
-    case 'organization':
-      return row.organizations?.length ? row.organizations : [uncategorizedLabel]
-    case 'eov':
-      return row.eovs?.length ? row.eovs : [uncategorizedLabel]
-    case 'inView':
-      return [
-        datasetsInViewPks.has(row.pk)
-          ? t('datasetsCardOnlyInViewText')
-          : t('datasetsCardGroupOutOfViewText')
-      ]
-    default:
-      return []
-    }
-  }
+  const groupByOptions = useMemo(() => groupOptions(t), [i18n.language])
+  // Hiding a group takes its datasets off the map. Not offered for the
+  // viewport-based dimension ('inView'), whose membership changes on every pan.
+  const canHideGroups = HIDEABLE_DIMENSIONS.has(groupBy)
 
   // Tap a chip to sort by it; tap the active chip again to flip direction.
   const handleSortClick = (fieldId) => {
@@ -173,33 +146,32 @@ export default function DatasetsTable({
 
   // Flat render list: without grouping it's just the sorted rows; with grouping
   // it's the rows bucketed under headers. Each entry is either
-  // { header, group, count } or { row, group }. Rows stay in their sorted order
-  // within a group; groups are alphabetical with Other/Uncategorized last.
-  // Array-valued dims place a dataset under each of its values, so the total
-  // row entries can exceed the unique dataset count (the toolbar count stays
-  // unique — see below).
+  // { header, group, count } or { row, group }, where group is the stable group
+  // key (see state/datasetGroups.js — labels are derived at render time). Rows
+  // stay in their sorted order within a group; groups are alphabetical by label
+  // with Other/Uncategorized last. Array-valued dims place a dataset under each
+  // of its values, so the total row entries can exceed the unique dataset count
+  // (the toolbar count stays unique — see below).
   const renderItems = useMemo(() => {
-    if (groupBy === GROUP_NONE) return visibleRows.map((row) => ({ row }))
+    if (!isGroupDimension(groupBy)) return visibleRows.map((row) => ({ row }))
     const byGroup = new Map()
     for (const row of visibleRows) {
-      for (const g of groupKeysFor(row)) {
-        if (!byGroup.has(g)) byGroup.set(g, [])
-        byGroup.get(g).push(row)
+      for (const key of groupKeysFor(row, groupBy, datasetsInViewPks)) {
+        if (!byGroup.has(key)) byGroup.set(key, [])
+        byGroup.get(key).push(row)
       }
     }
-    const lastGroups = new Set([otherLabel, uncategorizedLabel])
-    const groups = [...byGroup.keys()].sort((a, b) => {
-      const aLast = lastGroups.has(a)
-      const bLast = lastGroups.has(b)
-      if (aLast !== bLast) return aLast ? 1 : -1
-      return a.localeCompare(b, i18n.language)
-    })
     const items = []
-    for (const g of groups) {
-      const rows = byGroup.get(g)
-      items.push({ header: true, group: g, count: rows.length })
-      if (!collapsedGroups.has(g)) {
-        for (const row of rows) items.push({ row, group: g })
+    for (const key of sortGroupKeys(
+      byGroup.keys(),
+      groupBy,
+      t,
+      i18n.language
+    )) {
+      const rows = byGroup.get(key)
+      items.push({ header: true, group: key, count: rows.length })
+      if (!collapsedGroups.has(key)) {
+        for (const row of rows) items.push({ row, group: key })
       }
     }
     return items
@@ -333,12 +305,22 @@ export default function DatasetsTable({
             value={groupBy}
             onChange={(e) => setGroupBy(e.target.value)}
           >
-            {groupOptions.map((opt) => (
+            {groupByOptions.map((opt) => (
               <option key={opt.id} value={opt.id}>
                 {opt.label}
               </option>
             ))}
           </select>
+          {hiddenGroups.size > 0 && (
+            <button
+              type='button'
+              className='datasetsCardShowAllGroups'
+              onClick={showAllGroups}
+            >
+              <Eye size={12} aria-hidden='true' />
+              {t('datasetsCardGroupShowAllText', { count: hiddenGroups.size })}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -351,41 +333,73 @@ export default function DatasetsTable({
         {visibleRows.length === 0 ? (
           <div className='datasetsCardEmpty'>{t('datasetsCardNoResultsText')}</div>
         ) : (
-          shownItems.map((item) =>
-            item.header ? (
-              <button
+          shownItems.map((item) => {
+            if (!item.header) {
+              return (
+                <DatasetCard
+                  key={`${item.group ?? ''}:${item.row.pk ?? item.row.dataset_id ?? item.row.title}`}
+                  row={item.row}
+                  isDownloadModal={isDownloadModal}
+                  downloadSizeEstimates={downloadSizeEstimates}
+                  estimatesLoading={estimatesLoading}
+                  onSelect={handleSelectDataset}
+                  onInspect={isDownloadModal ? undefined : setInspectDataset}
+                  onHover={setHoveredDataset}
+                  onHoverEnd={() => setHoveredDataset()}
+                  hiddenFromMap={
+                    item.group !== undefined && hiddenGroups.has(item.group)
+                  }
+                  t={t}
+                  i18n={i18n}
+                />
+              )
+            }
+            const collapsed = collapsedGroups.has(item.group)
+            const hidden = hiddenGroups.has(item.group)
+            const label = groupLabel(item.group, groupBy, t)
+            return (
+              <div
                 key={`group:${item.group}`}
-                type='button'
-                className='datasetsCardGroupHeader'
-                onClick={() => toggleGroupCollapsed(item.group)}
-                aria-expanded={!collapsedGroups.has(item.group)}
+                className={classNames('datasetsCardGroupHeader', { hidden })}
               >
-                {collapsedGroups.has(item.group) ? (
-                  <CaretRightFill size={10} aria-hidden='true' />
-                ) : (
-                  <CaretDownFill size={10} aria-hidden='true' />
+                <button
+                  type='button'
+                  className='datasetsCardGroupToggle'
+                  onClick={() => toggleGroupCollapsed(item.group)}
+                  aria-expanded={!collapsed}
+                >
+                  {collapsed ? (
+                    <CaretRightFill size={10} aria-hidden='true' />
+                  ) : (
+                    <CaretDownFill size={10} aria-hidden='true' />
+                  )}
+                  <span className='datasetsCardGroupTitle' title={label}>
+                    {label}
+                  </span>
+                  <span className='datasetsCardGroupCount'>{item.count}</span>
+                </button>
+                {canHideGroups && (
+                  <button
+                    type='button'
+                    className='datasetsCardGroupHide'
+                    onClick={() => toggleGroupHidden(item.group)}
+                    aria-pressed={hidden}
+                    title={
+                      hidden
+                        ? t('datasetsCardGroupShowOnMapTitle')
+                        : t('datasetsCardGroupHideFromMapTitle')
+                    }
+                  >
+                    {hidden ? (
+                      <EyeSlash size={13} aria-hidden='true' />
+                    ) : (
+                      <Eye size={13} aria-hidden='true' />
+                    )}
+                  </button>
                 )}
-                <span className='datasetsCardGroupTitle' title={item.group}>
-                  {item.group}
-                </span>
-                <span className='datasetsCardGroupCount'>{item.count}</span>
-              </button>
-            ) : (
-              <DatasetCard
-                key={`${item.group ?? ''}:${item.row.pk ?? item.row.dataset_id ?? item.row.title}`}
-                row={item.row}
-                isDownloadModal={isDownloadModal}
-                downloadSizeEstimates={downloadSizeEstimates}
-                estimatesLoading={estimatesLoading}
-                onSelect={handleSelectDataset}
-                onInspect={isDownloadModal ? undefined : setInspectDataset}
-                onHover={setHoveredDataset}
-                onHoverEnd={() => setHoveredDataset()}
-                t={t}
-                i18n={i18n}
-              />
+              </div>
             )
-          )
+          })
         )}
       </div>
     </div>

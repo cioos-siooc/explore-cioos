@@ -33,6 +33,9 @@ export default function DatasetCard({
   onInspect,
   onHover = () => { },
   onHoverEnd = () => { },
+  // The card's group is hidden from the map: the dataset stays in the list
+  // (and downloadable), so it's dimmed rather than dropped.
+  hiddenFromMap,
   t,
   i18n
 }) {
@@ -90,7 +93,8 @@ export default function DatasetCard({
       className={classNames('datasetCard', {
         selected: row.selected,
         clickable,
-        downloadModal: isDownloadModal
+        downloadModal: isDownloadModal,
+        hiddenFromMap
       })}
       onClick={handleCardClick}
       onMouseEnter={() => onHover(row)}

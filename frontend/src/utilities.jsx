@@ -407,6 +407,55 @@ export function createSelectionQueryString (polygon) {
   return 'polygon=' + JSON.stringify(polygon)
 }
 
+// Inverse of createSelectionQueryString: rebuild the drawn selection from a
+// share link, either from the rectangle bounds or the polygon ring. Returns the
+// coordinate ring the app carries as `polygon`, or undefined when the link
+// holds no selection.
+export function selectionFromSearchParams (searchParams) {
+  const polygon = searchParams.get('polygon')
+  if (polygon) {
+    try {
+      const ring = JSON.parse(polygon)
+      if (Array.isArray(ring) && ring.length >= 4) return ring
+    } catch (error) {
+      console.warn('ignoring unparseable polygon in url:', error)
+    }
+    return undefined
+  }
+
+  const bounds = ['latMin', 'lonMin', 'latMax', 'lonMax'].map((key) =>
+    Number.parseFloat(searchParams.get(key))
+  )
+  if (bounds.some((value) => Number.isNaN(value))) return undefined
+  const [latMin, lonMin, latMax, lonMax] = bounds
+  return [
+    [lonMin, latMin],
+    [lonMax, latMin],
+    [lonMax, latMax],
+    [lonMin, latMax],
+    [lonMin, latMin]
+  ]
+}
+
+// No dataset carries pk 0, so this is how the map asks for nothing at all —
+// an empty datasetPKs would read as "no dataset filter" and draw everything.
+const NO_DATASETS_PK = '0'
+
+// Map-only narrowing of a filter query string (tiles, legend, griddap
+// coverage) to the datasets whose group is still shown. The datasets list
+// keeps the hidden groups — this is a map visibility toggle, not a filter — so
+// the narrowing is applied to the map's queries alone. mapDatasetPKs is
+// undefined while nothing is hidden, which leaves the query untouched.
+export function applyMapDatasetPKs (queryString, mapDatasetPKs) {
+  if (!mapDatasetPKs) return queryString
+  const params = new URLSearchParams(queryString)
+  params.set(
+    'datasetPKs',
+    mapDatasetPKs.length > 0 ? mapDatasetPKs.join(',') : NO_DATASETS_PK
+  )
+  return params.toString()
+}
+
 export function filterObjectPropertyByPropertyList(
   objectToFilter,
   allowedProperties

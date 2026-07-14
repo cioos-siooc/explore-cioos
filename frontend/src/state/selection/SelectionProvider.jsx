@@ -21,11 +21,13 @@ import {
   datasetUrlKey,
   formatErddapServerName,
   polygonIsRectangle,
+  selectionFromSearchParams,
   useDebounce
 } from '../../utilities.jsx'
 import erddapServersJSONfile from '../../erddapServers.json'
 import { useFilters } from '../filters/FilterProvider.jsx'
 import { useMapState } from '../map/MapStateProvider.jsx'
+import { GROUP_NONE, hiddenDatasetPksFor } from '../datasetGroups.js'
 
 const SelectionContext = createContext()
 
@@ -51,11 +53,24 @@ export default function SelectionProvider ({ children }) {
     zoomToGeometry,
     pendingDatasetZoom,
     setPendingDatasetZoom,
-    mapView
+    mapView,
+    setMapDatasetPKs
   } = useMapState()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const [polygon, setPolygon] = useState()
+  // Everything below that is seeded from the URL is read once, from the
+  // address the app was opened at — UrlSync owns the URL from then on and
+  // rewrites it from this state, so re-reading it here would be circular.
+  const initialParams = useState(
+    () => new URL(window.location.href).searchParams
+  )[0]
+
+  // The drawn selection (rectangle or free-form polygon) is part of a share
+  // link: Map re-draws it into the draw control on load, this seeds the state
+  // the /pointQuery is built from.
+  const [polygon, setPolygon] = useState(() =>
+    selectionFromSearchParams(initialParams)
+  )
   const [pointsToReview, setPointsToReview] = useState()
   const [pointsToDownload, setPointsToDownload] = useState()
   // Hovering the dataset list drives a map highlight (see Map.jsx). Sweeping
@@ -78,13 +93,34 @@ export default function SelectionProvider ({ children }) {
   // Free-text title search for the datasets list (DatasetsTable's search
   // box). Lifted out of that component so it can also surface as a
   // removable chip in ActiveFilterChips.
-  const [datasetTitleSearchText, setDatasetTitleSearchText] = useState('')
+  const [datasetTitleSearchText, setDatasetTitleSearchText] = useState(
+    () => initialParams.get('search') || ''
+  )
   const [datasetsSelectedCount, setDatasetsSelectedCount] = useState()
   const [combinedQueries, setCombinedQueries] = useState([])
   // "Only in view": restrict the list to datasets whose extent overlaps the
   // current map viewport. Lifted here (like the title search) so it also drives
   // the shared counters and surfaces as a removable chip in ActiveFilterChips.
-  const [onlyInView, setOnlyInView] = useState(false)
+  const [onlyInView, setOnlyInView] = useState(
+    () => initialParams.get('onlyInView') === 'true'
+  )
+
+  // Grouping of the datasets list, and the groups the user has hidden from the
+  // map. Both live here rather than in DatasetsTable: the hidden groups decide
+  // what the map draws (see mapDatasetPKs below), and both are shareable — the
+  // list can unmount (the inspector takes over the panel) without losing them.
+  const [groupBy, setGroupByState] = useState(
+    () => initialParams.get('groupBy') || GROUP_NONE
+  )
+  const [hiddenGroups, setHiddenGroups] = useState(
+    () =>
+      new Set(
+        (initialParams.get('hiddenGroups') || '')
+          .split(',')
+          .map((key) => decodeURIComponent(key))
+          .filter(Boolean)
+      )
+  )
 
   // Per-dataset bbox, computed once per result set from the filtered extent
   // (falls back to the coverage bbox, the only one grids carry).
@@ -163,6 +199,51 @@ export default function SelectionProvider ({ children }) {
         .includes(query)
     })
   }, [pointsData, datasetTitleSearchText, onlyInView, datasetsInViewPks, i18n.language])
+
+  // Group keys are only meaningful within one dimension, so switching
+  // dimensions drops whatever was hidden under the old one.
+  const setGroupBy = useCallback((dimension) => {
+    setGroupByState(dimension)
+    setHiddenGroups(new Set())
+  }, [])
+
+  const toggleGroupHidden = useCallback((group) => {
+    setHiddenGroups((previous) => {
+      const next = new Set(previous)
+      if (next.has(group)) next.delete(group)
+      else next.add(group)
+      return next
+    })
+  }, [])
+
+  const showAllGroups = useCallback(() => setHiddenGroups(new Set()), [])
+
+  // Datasets hidden from the map by their group. The list still shows them —
+  // this is a visibility toggle, not a filter.
+  const hiddenDatasetPks = useMemo(
+    () =>
+      hiddenDatasetPksFor(
+        pointsData,
+        groupBy,
+        hiddenGroups,
+        datasetsInViewPks
+      ),
+    [pointsData, groupBy, hiddenGroups, datasetsInViewPks]
+  )
+
+  // Hand the map the datasets it may draw. The tile/legend/coverage queries
+  // take an include list (datasetPKs), so the exclusion is expressed as its
+  // complement over the current results; undefined while nothing is hidden
+  // leaves those queries as the filters wrote them.
+  useEffect(() => {
+    setMapDatasetPKs(
+      hiddenDatasetPks.size === 0
+        ? undefined
+        : pointsData
+          .filter((row) => !hiddenDatasetPks.has(row.pk))
+          .map((row) => row.pk)
+    )
+  }, [hiddenDatasetPks, pointsData])
 
   // The open dataset page lives in the URL (?dataset=…&server=…) rather than in
   // component state, so Back/Forward move through it natively and the page can
@@ -416,6 +497,12 @@ export default function SelectionProvider ({ children }) {
     inViewCount: datasetsInViewPks.size,
     onlyInView,
     setOnlyInView,
+    groupBy,
+    setGroupBy,
+    hiddenGroups,
+    toggleGroupHidden,
+    showAllGroups,
+    hiddenDatasetPks,
     datasetsSelectedCount,
     combinedQueries,
     handleSelectDataset,

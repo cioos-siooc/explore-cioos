@@ -24,9 +24,9 @@ import './styles.css'
 import { server } from '../../config'
 import {
   boundsFromGeoJson,
-  createDataFilterQueryString,
   generateColorStops,
   getCurrentRangeLevel,
+  selectionFromSearchParams,
   updateMapToolTitleLanguage,
   zoomToDatasetCamera
 } from '../../utilities'
@@ -48,7 +48,10 @@ import {
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
 export default function CreateMap({
-  query,
+  // The query string the map draws from: the filters, narrowed to the dataset
+  // groups still shown (MapStateProvider assembles it — the sidebar list keeps
+  // the hidden groups, the tiles don't).
+  mapQueryString,
   setPointsToReview,
   polygon,
   setPolygon,
@@ -781,35 +784,48 @@ export default function CreateMap({
     }
   }
 
-  useEffect(() => {
-    const q = createDataFilterQueryString(query)
-    const filterSuffix = q ? `?${q}` : ''
-    const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`
-    const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${filterSuffix}`
-    setPointsToReview()
-    setPolygon()
-    if (map && map.current && map.current.loaded()) {
-      map.current.setFilter('points-highlighted', ['in', 'pk', ''])
+  // Latest map query, readable from the map 'load' closure (which would
+  // otherwise build its tile URLs from the query as of the first render).
+  const mapQueryRef = useRef(mapQueryString)
+  mapQueryRef.current = mapQueryString
 
-      // Swap the tile URLs (with the new filter query) and re-render via the
-      // public setTiles API — it clears the source's tile cache and reloads
-      // the viewport tiles internally.
-      map.current.getSource('points').setTiles([tileQuery])
-      map.current.getSource('points-halo').setTiles([tileQuery])
-      map.current.getSource('hexes').setTiles([tileQuery])
-      map.current.getSource('trajectory-hexes').setTiles([trajectoryTileQuery])
-      setLoading(true)
-      doFinalCheck.current = true
-      if (drawPolygon.current.getAll().features.length > 0) {
-        highlightPoints(
-          drawPolygon.current.getAll().features[0].geometry.coordinates[0]
-        )
-        setPolygon(
-          drawPolygon.current.getAll().features[0].geometry.coordinates[0]
-        )
-      }
+  const tileUrls = (queryString) => {
+    const filterSuffix = queryString ? `?${queryString}` : ''
+    return {
+      tileQuery: `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`,
+      trajectoryTileQuery: `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${filterSuffix}`
     }
-  }, [query])
+  }
+
+  useEffect(() => {
+    const { tileQuery, trajectoryTileQuery } = tileUrls(mapQueryString)
+    // Before the map exists there is nothing to swap and nothing to reset —
+    // the 'load' handler below builds the layers from the current query, and
+    // resetting here would wipe a selection restored from a share link.
+    if (!map.current || !map.current.loaded()) return
+
+    setPointsToReview()
+    map.current.setFilter('points-highlighted', ['in', 'pk', ''])
+
+    // Swap the tile URLs (with the new filter query) and re-render via the
+    // public setTiles API — it clears the source's tile cache and reloads
+    // the viewport tiles internally.
+    map.current.getSource('points').setTiles([tileQuery])
+    map.current.getSource('points-halo').setTiles([tileQuery])
+    map.current.getSource('hexes').setTiles([tileQuery])
+    map.current.getSource('trajectory-hexes').setTiles([trajectoryTileQuery])
+    setLoading(true)
+    doFinalCheck.current = true
+
+    const drawnShape = drawPolygon.current.getAll().features[0]
+    if (drawnShape) {
+      const ring = drawnShape.geometry.coordinates[0]
+      highlightPoints(ring)
+      setPolygon(ring)
+    } else {
+      setPolygon()
+    }
+  }, [mapQueryString])
 
   const mapZoom = searchParams.get('zoom')
   const mapLongitude = searchParams.get('lon')
@@ -896,12 +912,7 @@ export default function CreateMap({
 
       setColorStops()
 
-      const q = createDataFilterQueryString(query)
-      const filterSuffix = q ? `?${q}` : ''
-
-      const tileQuery = `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`
-
-      const trajectoryTileQuery = `${server}/tiles/trajectories/{z}/{x}/{y}.mvt${filterSuffix}`
+      const { tileQuery, trajectoryTileQuery } = tileUrls(mapQueryRef.current)
 
       // Every data layer is inserted below the basemap's label layers
       // (beforeId FIRST_LABEL_LAYER_ID or an existing data layer) so water
@@ -1188,6 +1199,22 @@ export default function CreateMap({
       // observation layers were toggled off before the style finished loading.
       if (!dataLayersVisibleRef.current) {
         setLayersVisibility(observationLayerIds, false)
+      }
+
+      // A share link can carry the spatial selection (rectangle bounds or a
+      // polygon ring). SelectionProvider has already seeded it into the app
+      // state — this puts the shape back into the draw control so it is drawn,
+      // editable, and survives the next filter change (which re-derives the
+      // selection from whatever the draw control holds).
+      const sharedSelection = selectionFromSearchParams(
+        new URL(window.location.href).searchParams
+      )
+      if (sharedSelection) {
+        drawPolygon.current.add({
+          type: 'Feature',
+          geometry: { type: 'Polygon', coordinates: [sharedSelection] }
+        })
+        highlightPoints(sharedSelection)
       }
     })
 

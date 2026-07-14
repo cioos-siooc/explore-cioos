@@ -12,6 +12,7 @@ import isEmpty from 'lodash/isEmpty'
 import { server } from '../../config.js'
 import { basemap as defaultBasemap } from '../../components/config.js'
 import {
+  applyMapDatasetPKs,
   createDataFilterQueryString,
   getCurrentRangeLevel
 } from '../../utilities.jsx'
@@ -40,6 +41,22 @@ export default function MapStateProvider ({ children }) {
     if (!value) setMapLoaded(true)
   }, [])
   const [mapView, setMapView] = useState({})
+  // The datasets the map is allowed to draw, when the user has hidden some
+  // groups in the datasets list (see SelectionProvider, which owns the
+  // grouping and pushes the resulting pk list here — it lives downstream of
+  // this provider, so it can't be read from it). undefined means "no group
+  // hidden": every dataset the filters allow is drawn.
+  //
+  // It lands here rather than in the filter query because it is deliberately
+  // map-only: the sidebar list, its counts and the download selection all keep
+  // the hidden datasets.
+  const [mapDatasetPKs, setMapDatasetPKs] = useState()
+  // Every map query (tiles, legend, coverage) is the filter query narrowed to
+  // the shown groups.
+  const mapQueryString = applyMapDatasetPKs(
+    createDataFilterQueryString(query),
+    mapDatasetPKs
+  )
   const [rangeLevels, setRangeLevels] = useState()
   const [legendLoading, setLegendLoading] = useState(true)
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
@@ -129,15 +146,16 @@ export default function MapStateProvider ({ children }) {
     )
     if (lat || lon || zoom) setMapView({ lat, lon, zoom })
 
-    loadLegend(createDataFilterQueryString(query))
+    loadLegend(mapQueryString)
   }, [])
 
-  // Refetch the legend whenever the (debounced) query changes.
+  // Refetch the legend whenever the (debounced) query changes, or a group is
+  // hidden from / restored to the map — the ramp counts what the map draws.
   useEffect(() => {
     if (!loading && !isEmpty(rangeLevels)) {
-      loadLegend(createDataFilterQueryString(query))
+      loadLegend(mapQueryString)
     }
-  }, [query])
+  }, [mapQueryString])
 
   // Fetch griddap coverage bboxes when the layer is visible, in lockstep
   // with the same debounced query the tiles and /pointQuery use. Data is
@@ -145,7 +163,7 @@ export default function MapStateProvider ({ children }) {
   useEffect(() => {
     if (!griddapCoverageVisible) return
     const controller = new AbortController()
-    fetch(`${server}/griddapCoverage?${createDataFilterQueryString(query)}`, {
+    fetch(`${server}/griddapCoverage?${mapQueryString}`, {
       signal: controller.signal
     })
       .then((response) => (response.ok ? response.json() : undefined))
@@ -156,7 +174,7 @@ export default function MapStateProvider ({ children }) {
         if (error.name !== 'AbortError') throw error
       })
     return () => controller.abort()
-  }, [query, griddapCoverageVisible])
+  }, [mapQueryString, griddapCoverageVisible])
 
   useEffect(() => {
     if (rangeLevels) {
@@ -203,7 +221,10 @@ export default function MapStateProvider ({ children }) {
     pendingDatasetZoom,
     setPendingDatasetZoom,
     mapRef,
-    loadLegend: () => loadLegend(createDataFilterQueryString(query))
+    mapDatasetPKs,
+    setMapDatasetPKs,
+    mapQueryString,
+    loadLegend: () => loadLegend(mapQueryString)
   }
 
   return (

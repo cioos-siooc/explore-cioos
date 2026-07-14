@@ -8,8 +8,9 @@ import { useSelection } from '../../state/selection/SelectionProvider.jsx'
 // Single adapter between the state providers and the imperative Map
 // component — Map.js keeps its prop-based interface untouched.
 export default function MapContainer () {
-  const { query, setDatasetsSelected } = useFilters()
+  const { setDatasetsSelected } = useFilters()
   const {
+    mapQueryString,
     setLoading,
     setMapView,
     rangeLevels,
@@ -38,7 +39,7 @@ export default function MapContainer () {
       setPolygon={setPolygon}
       setPointsToReview={setPointsToReview}
       setLoading={setLoading}
-      query={query}
+      mapQueryString={mapQueryString}
       setMapView={setMapView}
       rangeLevels={rangeLevels}
       trajectoryRangeLevels={trajectoryRangeLevels}
