@@ -12,7 +12,7 @@
   min-width: 124px;
   max-width: 190px;
   max-height: calc(100vh - 120px);
-  overflow-y: auto;
+  overflow: hidden auto;
   /* 3D depth (shared tokens; see theme.css). The card scrolls, so
      preserve-3d/inner-lift can't apply here; the shadow ladder carries it. */
   transform: var(--cioos-perspective);
