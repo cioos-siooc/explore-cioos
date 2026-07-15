@@ -13,7 +13,7 @@ on:
 jobs:
   docker:
     name: Build and test
-    timeout-minutes: 15
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -28,7 +28,97 @@ jobs:
           docker compose -f "docker-compose.production.yaml" up -d --build --quiet-pull
 
       - name: Run ERDDAP harvester on sample dataset
-        run: cp ./harvest_config.sample.yaml ./harvest_config.yaml && docker compose -f "docker-compose.production.yaml" up harvester
+        run: |
+          cp ./harvest_config.sample.yaml ./harvest_config.yaml
+          docker compose -f "docker-compose.production.yaml" --profile tools up -d --build prefect_worker
+          # The worker registers the Prefect work pool + deployments on startup;
+          # wait until the harvest-all deployment exists before triggering it.
+          docker compose -f "docker-compose.production.yaml" --profile tools exec -T prefect_worker sh -c '
+            for i in $(seq 1 60); do
+              uv run prefect deployment inspect "Harvest All Sources/cde-harvest-all" >/dev/null 2>&1 && exit 0
+              sleep 5
+            done
+            echo "Timed out waiting for Prefect deployment registration" >&2
+            exit 1
+          '
+          # Trigger a full harvest and block until it completes (fails the job
+          # if the flow run fails).
+          docker compose -f "docker-compose.production.yaml" --profile tools exec -T prefect_worker \
+            uv run prefect deployment run "Harvest All Sources/cde-harvest-all" --watch
+
+      # Gate: the UI, DB and downloader tests below only make sense against a
+      # successfully harvested database, so explicitly verify the Prefect flow
+      # run AND the run the harvester recorded before running anything else.
+      - name: Verify Prefect harvest run succeeded
+        run: |
+          # 1) Ask the Prefect API for the latest "Harvest All Sources" flow
+          #    run and require a COMPLETED end state.
+          docker compose -f "docker-compose.production.yaml" --profile tools exec -T prefect_worker \
+            uv run python - <<'PY'
+          import asyncio
+
+          from prefect.client.orchestration import get_client
+          from prefect.client.schemas.filters import FlowFilter, FlowFilterName
+          from prefect.client.schemas.sorting import FlowRunSort
+
+          async def main():
+              async with get_client() as client:
+                  runs = await client.read_flow_runs(
+                      flow_filter=FlowFilter(name=FlowFilterName(any_=["Harvest All Sources"])),
+                      sort=FlowRunSort.START_TIME_DESC,
+                      limit=1,
+                  )
+                  if not runs:
+                      raise SystemExit("No 'Harvest All Sources' flow run found in Prefect")
+                  run = runs[0]
+                  state = getattr(run.state_type, "value", run.state_type)
+                  print(f"Flow run {run.name}: state={state} ({run.state_name})")
+                  if state != "COMPLETED":
+                      raise SystemExit(f"Flow run {run.name} ended in state {state}, expected COMPLETED")
+
+          asyncio.run(main())
+          PY
+
+          # 2) The harvester records every run in cde.harvest_runs
+          #    ('ok' | 'failed'); require the latest run to be 'ok'.
+          #    DB credentials come from .env.sample (copied to .env above).
+          docker compose -f "docker-compose.production.yaml" exec -T db \
+            psql -U postgres -d cde -v ON_ERROR_STOP=1 <<'SQL'
+          SELECT run_id, status, scope, prefect_flow_run_id, error_message
+            FROM cde.harvest_runs ORDER BY started_at DESC LIMIT 1;
+          DO $$
+          DECLARE latest_status text;
+          BEGIN
+            SELECT status INTO latest_status
+              FROM cde.harvest_runs ORDER BY started_at DESC LIMIT 1;
+            IF latest_status IS DISTINCT FROM 'ok' THEN
+              RAISE EXCEPTION 'Latest harvest run status is %, expected ok',
+                COALESCE(latest_status, 'missing');
+            END IF;
+          END $$;
+          SQL
+
+      - name: Test database content
+        run: |
+          # The harvest must have actually loaded data the API/frontend rely on.
+          docker compose -f "docker-compose.production.yaml" exec -T db \
+            psql -U postgres -d cde -v ON_ERROR_STOP=1 <<'SQL'
+          SELECT (SELECT count(*) FROM cde.datasets) AS datasets,
+                 (SELECT count(*) FROM cde.profiles) AS profiles,
+                 (SELECT count(*) FROM cde.points)   AS points;
+          DO $$
+          BEGIN
+            IF (SELECT count(*) FROM cde.datasets) = 0 THEN
+              RAISE EXCEPTION 'harvest produced no rows in cde.datasets';
+            END IF;
+            IF (SELECT count(*) FROM cde.profiles) = 0 THEN
+              RAISE EXCEPTION 'harvest produced no rows in cde.profiles';
+            END IF;
+            IF (SELECT count(*) FROM cde.points) = 0 THEN
+              RAISE EXCEPTION 'harvest produced no rows in cde.points';
+            END IF;
+          END $$;
+          SQL
 
       - name: Install node
         uses: actions/setup-node@v3
@@ -75,6 +165,54 @@ jobs:
           CI: "true"
         run: node frontend_loads_without_errors.js
 
+      - name: Test downloader end-to-end
+        run: |
+          dbq() {
+            docker compose -f "docker-compose.production.yaml" exec -T db \
+              psql -U postgres -d cde -tAc "$1" | tr -d '[:space:]'
+          }
+
+          # Submit a download job through the API using the same bounding box
+          # as the API tests (matches the harvested sample data).
+          RESPONSE=$(curl -sf "http://localhost:8098/api/download?latMin=49.3194&lonMin=-123.7531&latMax=49.3552&lonMax=-123.6982&timeMin=1900-01-01&timeMax=2026-12-31&depthMin=0&depthMax=12000&email=ci-test@example.com")
+          echo "API response: $RESPONSE"
+          COUNT=$(echo "$RESPONSE" | jq -r '.count // 0')
+          if [ "$COUNT" -lt 1 ]; then
+            echo "Download job was not created (count=$COUNT)" >&2
+            exit 1
+          fi
+
+          # The scheduler service picks the job up from cde.download_jobs and
+          # runs the erddap_downloader; wait for a terminal status.
+          STATUS=open
+          for i in $(seq 1 60); do
+            STATUS=$(dbq "SELECT status FROM cde.download_jobs ORDER BY time DESC LIMIT 1")
+            echo "download job status: $STATUS"
+            case "$STATUS" in
+              completed|failed|no-data|over-limit) break ;;
+            esac
+            sleep 10
+          done
+
+          if [ "$STATUS" != "completed" ]; then
+            echo "Download job finished with status '$STATUS', expected 'completed'" >&2
+            docker compose -f "docker-compose.production.yaml" exec -T db \
+              psql -U postgres -d cde -c \
+              "SELECT status, downloader_output, erddap_report FROM cde.download_jobs ORDER BY time DESC LIMIT 1"
+            docker compose -f "docker-compose.production.yaml" logs scheduler
+            exit 1
+          fi
+
+          # The zip must be served by nginx from the downloads volume and
+          # contain at least one CSV.
+          JOB_ID=$(dbq "SELECT job_id FROM cde.download_jobs ORDER BY time DESC LIMIT 1")
+          curl -sf -o /tmp/cde_download.zip "http://localhost:8098/downloads/cde_download_${JOB_ID}.zip"
+          unzip -l /tmp/cde_download.zip
+          if ! unzip -l /tmp/cde_download.zip | grep -q "\.csv"; then
+            echo "No CSV file inside the download zip" >&2
+            exit 1
+          fi
+
       - name: Stop containers
         if: always()
-        run: docker compose -f "docker-compose.production.yaml" down
+        run: docker compose -f "docker-compose.production.yaml" --profile tools down

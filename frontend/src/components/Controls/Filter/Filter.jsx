@@ -47,7 +47,7 @@ export default function Filter({
   // Using tabIndex to enable onBlur() focus loss capturing: https://stackoverflow.com/a/37491578
   return (
     <div className='filter' ref={wrapperRef}>
-      <div
+      <button
         className={`filterHeader ${active && 'active'}`}
         onClick={() => {
           setFilterOpen(!filterOpen)
@@ -66,7 +66,7 @@ export default function Filter({
           {abbreviateString(badgeTitle, 35)}
         </div>
         {filterOpen ? <ChevronCompactUp /> : <ChevronCompactDown />}
-      </div>
+      </button>
       {(controlled ? filterOpen && openFilter : filterOpen) && (
         <div className='filterOptions'>
           {searchable && (

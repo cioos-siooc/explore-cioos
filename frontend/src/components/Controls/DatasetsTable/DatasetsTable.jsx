@@ -8,10 +8,13 @@ import {
   Download,
   BroadcastPin,
   FileEarmarkSpreadsheet,
-  PinMapFill
+  PinMapFill,
+  Server
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import platformColors from '../../platformColors'
+import { formatErddapServerName } from '../../../utilities'
+import erddapServersJSONfile from '../../../erddapServers.json'
 import './styles.css'
 import DataTable from 'react-data-table-component'
 import DataTableExtensions from 'react-data-table-component-extensions'
@@ -32,7 +35,7 @@ export default function DatasetsTable({
   downloadSizeEstimates,
   loading
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [tableData, setTableData] = useState({
     columns: generateColumns(),
     data: datasets
@@ -126,6 +129,18 @@ export default function DatasetsTable({
         width: '60px',
         // paddingLeft: cellPadding,
         // paddingRight: cellPadding
+      },
+      {
+        name: (
+          <div>
+            <Server size={17} title='ERDDAP Server' />
+          </div>
+        ),
+        selector: (row) => row.erddap_server_url || row.erddap_url,
+        cell: (row) => formatErddapServerName(row.erddap_server_url || row.erddap_url, i18n.language, erddapServersJSONfile),
+        wrap: true,
+        sortable: true,
+        width: '120px'
       },
       {
         name: (

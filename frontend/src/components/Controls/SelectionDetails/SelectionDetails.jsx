@@ -94,7 +94,7 @@ export default function SelectionDetails({
   function datasetsInLanguage(point) {
     return {
       ...point,
-      title: point.title_translated[i18n.language] || point.title,
+      title: point.title_translated?.[i18n.language] || point.title,
       selected: false
     }
   }

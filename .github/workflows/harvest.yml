@@ -35,7 +35,12 @@ jobs:
         run: |
           SSH_CMD="ssh -i ~/.ssh/deploy_key github-runner@${{ secrets.SERVER_IP }}"
           STACK="explore-cioos-${{ github.ref_name == 'master' && 'production' || 'development' }}"
-          ${SSH_CMD} "cd /srv/services/explore-cioos && docker compose -p ${STACK} -f docker-compose.production.yaml --profile tools run -d --rm harvester"
+          COMPOSE="docker compose -p ${STACK} -f docker-compose.production.yaml --profile tools"
+          # Make sure the Prefect worker is up (it registers the work pool and
+          # deployments on startup), then trigger a full harvest. The flow runs
+          # on the worker, so no need to keep this job alive (same
+          # fire-and-forget behaviour as the old detached harvester run).
+          ${SSH_CMD} "cd /srv/services/explore-cioos && ${COMPOSE} up -d prefect_worker && ${COMPOSE} exec -T prefect_worker uv run prefect deployment run 'Harvest All Sources/cde-harvest-all'"
 
       - name: Tear down WireGuard
         if: always()

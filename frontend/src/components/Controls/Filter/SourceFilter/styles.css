@@ -1,0 +1,24 @@
+.sourceFilter .obisGroupButton {
+  display: flex;
+  align-items: center;
+}
+
+.sourceFilter .obisGroupButton svg {
+  flex-shrink: 0;
+}
+
+.sourceFilter .obisGroupButton .optionName {
+  flex-grow: 1;
+}
+
+.sourceFilter .obisGroupChevron {
+  padding: 0px 8px;
+}
+
+.sourceFilter .obisGroupChevron:hover {
+  color: #52a79b;
+}
+
+.sourceFilter .obisGroupChildren {
+  margin-left: 25px;
+}

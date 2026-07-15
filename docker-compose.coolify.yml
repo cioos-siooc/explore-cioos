@@ -1,0 +1,54 @@
+# Coolify-specific overrides — layered on top of the base docker-compose.yaml.
+#
+#   docker compose -f docker-compose.yaml -f docker-compose.coolify.yml up -d
+#
+# (In Coolify, point the resource at docker-compose.yaml and add this file as an
+# additional/override compose file.)
+#
+# This override does two things for Coolify:
+#
+#   1. SERVICE_FQDN_* / SERVICE_URL_* "magic" env vars: Coolify reads these at
+#      deploy time to auto-generate a public FQDN for the service and proxy
+#      external traffic to the named port. They are meaningless outside Coolify.
+#
+#   2. Drops every published host port. The base docker-compose.yaml publishes
+#      db / nginx / prefect on the host for standalone use; under Coolify the
+#      proxy reaches each container over the internal network via the FQDN vars
+#      above, so host ports are unnecessary (and would collide on the host).
+#      `!reset` clears the base file's `ports` list (compose overrides can only
+#      add to lists, not remove — the !reset tag is how you drop them).
+#
+#   3. Drops the harvest_config.yaml bind-mount from prefect_worker. Coolify
+#      resolves relative bind sources to an empty persistent-storage dir and
+#      fails with "mount dir onto file". `!override` replaces the base volume
+#      list wholesale, keeping only the named volumes. To supply a custom
+#      config under Coolify, set the HARVEST_CONFIG_YAML environment variable
+#      (paste the full harvest_config.yaml contents — see .env.sample) rather
+#      than trying to mount a file; it takes priority over the baked-in
+#      default whenever set. A Persistent Storage file mount onto
+#      /app/harvester/harvest_config.yaml also works if you'd rather manage it
+#      as a file.
+services:
+  db:
+    ports: !reset []
+
+  nginx:
+    ports: !reset []
+    environment:
+      - SERVICE_FQDN_NGINX_4000
+
+  scheduler:
+    environment:
+      # APP_DOMAIN auto-derives from Coolify's injected SERVICE_URL_NGINX when
+      # present; falls back to APP_DOMAIN from .env otherwise.
+      - "DOWNLOAD_WAF_URL=${SERVICE_URL_NGINX:-${APP_DOMAIN}}/downloads"
+
+  prefect:
+    ports: !reset []
+
+  prefect_worker:
+    volumes: !override
+      - harvest_data:/app/harvester/harvest
+      - harvester_logs:/app/harvester/logs
+      - harvester_cache:/app/harvester/harvester_cache
+      - obis_cache:/app/harvester/obis_cache

@@ -1,0 +1,55 @@
+name: Unit Tests
+
+on:
+  push:
+    paths:
+      - "harvester/**"
+      - "db-loader/**"
+      - "downloader/**"
+  pull_request:
+    paths:
+      - "harvester/**"
+      - "db-loader/**"
+      - "downloader/**"
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: changes
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            harvester:
+              - 'harvester/**'
+            db-loader:
+              - 'db-loader/**'
+            downloader:
+              - 'downloader/**'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.22"
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Run harvester tests
+        if: steps.changes.outputs.harvester == 'true'
+        run: uv run pytest harvester
+
+      - name: Run db-loader tests
+        if: steps.changes.outputs.db-loader == 'true'
+        run: uv run pytest db-loader
+
+      - name: Run downloader tests
+        if: steps.changes.outputs.downloader == 'true'
+        run: uv run pytest downloader

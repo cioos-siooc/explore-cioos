@@ -81,8 +81,15 @@ function objectToURL (obj) {
 }
 
 export function createDataFilterQueryString(query) {
-  const { orgsSelected, eovsSelected, platformsSelected, datasetsSelected } =
-    query
+  const {
+    orgsSelected,
+    eovsSelected,
+    platformsSelected,
+    datasetsSelected,
+    scientificNamesSelected,
+    obisNodesSelected,
+    erddapServersSelected
+  } = query
 
   // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
   const queryWithoutDefaults = Object.keys(defaultQuery).reduce(
@@ -131,16 +138,59 @@ export function createDataFilterQueryString(query) {
   }
   const { startDepth, endDepth, startDate, endDate } = queryWithoutDefaults
 
+  const scientificNames = (scientificNamesSelected && scientificNamesSelected.length)
+    ? scientificNamesSelected.map(encodeURIComponent).join(',')
+    : ''
+
+  // Combined "Data Source" filter (ERDDAP servers + OBIS nodes). No selection
+  // — or everything selected — means no source filtering. A server-only
+  // selection hides OBIS via includeObis=false; node names are always emitted
+  // when any node is picked (even all of them) because their presence is what
+  // tells the API to keep OBIS rows while servers are also filtered, and to
+  // hide ERDDAP profiles when no servers are selected.
+  const selectedServers = (erddapServersSelected || []).filter((s) => s.isSelected)
+  const selectedNodes = (obisNodesSelected || []).filter((n) => n.isSelected)
+  const allServersSelected =
+    erddapServersSelected?.length > 0 &&
+    selectedServers.length === erddapServersSelected.length
+  const allNodesSelected =
+    obisNodesSelected?.length > 0 &&
+    selectedNodes.length === obisNodesSelected.length
+
+  let erddapServers = ''
+  let obisNodes = ''
+  let includeObis = ''
+  const sourceFilterActive =
+    (selectedServers.length > 0 || selectedNodes.length > 0) &&
+    !(allServersSelected && allNodesSelected)
+  if (sourceFilterActive) {
+    if (selectedNodes.length > 0) {
+      obisNodes = selectedNodes.map((n) => encodeURIComponent(n.title)).join(',')
+      if (selectedServers.length > 0) {
+        erddapServers = selectedServers.map((s) => s.url).join()
+      }
+    } else {
+      includeObis = 'false'
+      if (!allServersSelected) {
+        erddapServers = selectedServers.map((s) => s.url).join()
+      }
+    }
+  }
+
   const apiMappedQuery = {
     // These properties are specified by the API's schema
     eovs,
     platforms,
     datasetPKs,
     organizations: orgPKs,
+    erddapServers,
     timeMin: startDate,
     timeMax: endDate,
     depthMin: startDepth,
-    depthMax: endDepth
+    depthMax: endDepth,
+    includeObis,
+    scientificNames,
+    obisNodes
   }
 
   return objectToURL(apiMappedQuery)
@@ -305,6 +355,30 @@ export function getCookieValue (cookieName) {
   }
 }
 
+export function formatErddapServerName(url, lang = 'en', serversData = null) {
+  if (!url) return ''
+  
+  // If serversData is provided, use it to look up the server name
+  if (serversData && Array.isArray(serversData)) {
+    const server = serversData.find(s => s.url === url)
+    if (server) {
+      return lang === 'fr' ? server.label_fr : server.label_en
+    }
+  }
+  
+  // Fallback: extract domain from URL
+  try {
+    const urlObj = new URL(url)
+    return urlObj.hostname
+  } catch (e) {
+    // If URL parsing fails, try to extract domain manually
+    const match = url.match(/:\/\/([^/]+)/)
+    if (match && match[1]) {
+      return match[1]
+    }
+    return url
+  }
+}
 export function updateMapToolTitleLanguage(t) {
   // const { t } = useTranslation()
   const polygonToolDiv = document.getElementsByClassName(

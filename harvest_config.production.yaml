@@ -1,28 +1,34 @@
 # list of erddap URLs. Should end in /erddap
 erddap_urls:
-  - https://data.cioospacific.ca/erddap
-  - https://seagull-erddap.glos.org/erddap
-  - https://erddap.amundsenscience.com/erddap
-  - https://erddap.ogsl.ca/erddap
-  - https://www.smartatlantic.ca/erddap
-  - https://catalogue.hakai.org/erddap
-  - https://dap.oceannetworks.ca/erddap
-  - https://data.ceotr.ca/erddap
-  - https://cioosatlantic.ca/erddap
+    - https://erddap.amundsenscience.com/erddap/
+    - https://data.cioospacific.ca/erddap
+    - https://seagull-erddap.glos.org/erddap
+    - https://erddap.ogsl.ca/erddap
+    - https://www.smartatlantic.ca/erddap
+    - https://catalogue.hakai.org/erddap
+    - https://cioosatlantic.ca/erddap
+    - https://dap.oceannetworks.ca/erddap
+    - https://data.ceotr.ca/erddap
+  
 
-# set to true to test with caching. Not available in production docker compose file
+# set to true to test with caching. Turn to False for production. 
 # defaults to false
-cache: false
+cache: False
 
 # defaults to 'harvest'
 folder:
 
 # use to test select datasets, eg: dataset_one,dataset_two
 dataset_ids:
-# defaults to false
-log_time: true
+#   - amundsen798,amundsen796,amundsen11975_aquadopp,amundsen13109_compact_lw,amundsen13107_isus,SMA_halifax,SMA_MAMKA_Buoy
 
-# Directory to save log files (optional)
-# Use absolute path for Docker: /app/harvester/logs
-# Use relative path for local: ../harvester_logs
-log_dir: ../harvester_logs
+# defaults to false
+log_time:
+
+#defaults to false
+flush_redis: True
+
+#defaults to false
+incremental: False
+
+obis_datasets_file: ./Obis_Datasets.json

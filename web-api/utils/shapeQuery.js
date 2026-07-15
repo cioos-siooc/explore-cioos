@@ -4,13 +4,45 @@ const { changePKtoPkURL } = require("./misc");
 const createDBFilter = require("./dbFilter");
 
 async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
-  const filters = createDBFilter(query);
+  // Caller propagates ScientificNameSelectionTooBroadError as a 400.
+  const filters = await createDBFilter(query);
 
   const {
     timeMin = null, timeMax = null, depthMin = null, depthMax = null,
+    includeObis = 'true',
+    scientificNames,
+    obisNodes,
+    erddapServers,
   } = query;
 
-  const sql = `WITH sub AS
+  // Scientific-name filters are OBIS-only: hide profiles when set. An
+  // OBIS-node selection also hides profiles, unless ERDDAP servers are
+  // selected alongside it (combined Source filter — show both, OR'd in the
+  // shared dataset filter).
+  const includeProfiles = !scientificNames && (!obisNodes || Boolean(erddapServers));
+  const showObis = includeObis !== 'false';
+
+  const profilesBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,
+               profile_id, timeseries_id,
+               latitude, longitude, point_pk, geom
+        FROM cde.profiles`;
+  const obisBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, 0 as records_per_day,
+               NULL as profile_id, NULL as timeseries_id,
+               latitude, longitude, point_pk, geom
+        FROM cde.obis_cells
+        WHERE :obisFilters`;
+
+  const branches = [];
+  if (includeProfiles) branches.push(profilesBranch);
+  if (showObis) branches.push(obisBranch);
+  const combinedInner = branches.length
+    ? branches.join("\n        UNION ALL\n        ")
+    : `${profilesBranch} WHERE FALSE`;
+
+  const sql = `WITH combined AS (
+        ${combinedInner}
+  ),
+  sub AS
         (SELECT   d.pk,
                   d.pk_url,
                   d.dataset_id,
@@ -24,10 +56,12 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                   d.eovs                                          eovs,
                   organizations,
                   count(p.*)::integer profiles_count,
-                  d.erddap_url
-                           || '/tabledap/'
-                           || d.dataset_id
-                           || '.html' AS erddap_url,
+                  d.source_type,
+                  d.erddap_url AS erddap_server_url,
+                  CASE WHEN d.source_type = 'obis'
+                           THEN 'https://obis.org/dataset/' || d.dataset_id
+                           ELSE d.erddap_url || '/tabledap/' || d.dataset_id || '.html'
+                  END AS erddap_url,
                   'https://catalogue.cioos.ca/dataset/'
                            || ckan_id AS ckan_url
                   -- replace '0 days' with '1 day' when its a single day profile
@@ -46,8 +80,8 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
     ? ",json_agg(json_build_object( 'profile_id',coalesce(p.profile_id, p.timeseries_id), 'time_min',p.time_min::DATE, 'time_max',p.time_max::DATE, 'depth_min',p.depth_min, 'depth_max',p.depth_max ) ORDER BY time_min DESC ) AS profiles"
     : ""
 }
-                  
-         FROM     cde.profiles p
+
+         FROM     combined p
          JOIN     cde.datasets d
          ON       p.dataset_pk = d.pk
          WHERE :filters
@@ -63,12 +97,12 @@ FROM   sub`;
       timeMax,
       depthMin,
       depthMax,
-      filters,
+      filters: filters.shared,
+      obisFilters: filters.obisOnly,
       adder: 0,
       multiplier: 10,
     };
-  } else queryParams = { filters };
-  if (!queryParams.filters?.sql) queryParams.filters = "TRUE";
+  } else queryParams = { filters: filters.shared, obisFilters: filters.obisOnly };
 
   const q = db.raw(sql, queryParams);
 

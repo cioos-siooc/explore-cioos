@@ -33,7 +33,13 @@ const { getShapeQuery } = require("../utils/shapeQuery");
  */
 
 router.get("/", async (req, res, next) => {
-  const shapeQueryResponse = await getShapeQuery(req.query, true, false);
+  let shapeQueryResponse;
+  try {
+    shapeQueryResponse = await getShapeQuery(req.query, true, false);
+  } catch (err) {
+    if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+    throw err;
+  }
   res.send(
     shapeQueryResponse.map((row) => ({
       pk: row.pk_url,

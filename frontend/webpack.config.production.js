@@ -21,7 +21,13 @@ module.exports = {
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: '[name].[chunkhash].js'
+    filename: '[name].[chunkhash].js',
+    // Absolute publicPath so the injected bundle/asset URLs resolve from the
+    // document root, not relative to the current route. Without this, reloading
+    // a deep route like /harvest/server/:slug requests the bundle under that
+    // path, nginx's try_files serves index.html for it, and the app never boots
+    // (blank page). Matches the router basename (BASE_URL).
+    publicPath: process.env.BASE_URL || '/'
   },
   mode: 'production',
   module: {

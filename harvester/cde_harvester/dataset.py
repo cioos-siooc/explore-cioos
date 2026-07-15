@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -7,7 +7,7 @@ import requests
 from cde_harvester.platform_ioos_to_l06 import platforms_nerc_ioos
 from cde_harvester.utils import eov_to_standard_name, intersection
 from requests.exceptions import HTTPError
-
+from prefect import get_run_logger
 
 def is_valid_duration(duration):
     try:
@@ -25,6 +25,11 @@ class Dataset(object):
 
         self.erddap_url = erddap_server.url
         self.erddap_csv_to_df = erddap_server.erddap_csv_to_df
+        # Every ERDDAP HTTP request made for this dataset (info, tabledap
+        # queries, distinct(), orderByMinMax(), …) is appended here by
+        # ERDDAP.erddap_csv_to_df so harvest_attempts can record exactly
+        # what was fired. Lets an ERDDAP admin reproduce the failure.
+        self.queried_urls = []
         self.cdm_data_type = ""
         self.globals = {}
         self.platform = "unknown"
@@ -36,11 +41,15 @@ class Dataset(object):
         self.trajectory_id_variable = ""
         self.num_columns = 0
         self.first_eov_column = ""
+        self.content_hash = None
+        # Why content_hash is None (a HASH_* code); None when a hash was produced.
+        self.content_hash_reason = None
 
         self.get_metadata()
 
     def get_df(self):
 
+        now = datetime.now(timezone.utc)
         self.df = pd.DataFrame(
             {
                 "title": [self.globals["title"]],
@@ -58,6 +67,10 @@ class Dataset(object):
                 "trajectory_id_variable": self.trajectory_id_variable,
                 "num_columns": len(self.df_variables),
                 "first_eov_column": self.first_eov_column,
+                "content_hash": [self.content_hash],
+                "content_hash_reason": [self.content_hash_reason],
+                "last_updated_at": [now],
+                "verified_at": [now],
             }
         )
 
@@ -171,10 +184,12 @@ class Dataset(object):
         """
         time_query = ""
         is_single_profile_dataset = len(self.profile_ids) == 1
+        # parse_erddap_date returns tz-aware UTC; the fallback must match or
+        # the subtraction below raises tz-naive/tz-aware TypeError.
         if str(time_min) == "NaT":
-            time_min = datetime.now().isoformat()
+            time_min = datetime.now(timezone.utc).isoformat()
         if str(time_max) == "NaT":
-            time_max = datetime.now().isoformat()
+            time_max = datetime.now(timezone.utc).isoformat()
         days_in_dataset = (pd.to_datetime(time_max) - pd.to_datetime(time_min)).days
 
         # Estimate records count per profile using time_coverage_resolution
@@ -364,5 +379,7 @@ class Dataset(object):
         self.platform = self.get_platform_code()
 
     def get_logger(self):
-        logger = logging.getLogger(f"{self.erddap_server.domain} - {self.id}")
-        return logger
+        try:
+            return get_run_logger()
+        except Exception:
+            return logging.getLogger(f"{self.erddap_server.domain}.{self.id}")
