@@ -25,6 +25,10 @@ jobs:
       - name: Start containers
         run: |
           mv .env.sample .env
+          # docker-compose.production.yaml attaches to the externally-managed
+          # explore-cioos_default network (provided by the platform in prod).
+          # A fresh CI runner has no such network, so create it first.
+          docker network create explore-cioos_default || true
           docker compose -f "docker-compose.production.yaml" up -d --build --quiet-pull
 
       - name: Run ERDDAP harvester on sample dataset
