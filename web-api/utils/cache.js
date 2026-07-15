@@ -3,25 +3,21 @@ const redisClient = require('./redis');
 
 let middleware; // initialized on first request
 
-function apicacheOptions() {
-  return {
-    // Don’t leak internal headers; set a sane default Cache-Control if route didn’t set one
-    headers: {
-      'cache-control': (req, res) => res.get('Cache-Control') || 'public, max-age=300',
-    },
-  };
-}
-
+// No `headers` override: apicache's `headers` option only takes literal header
+// strings (a function here gets stringified into the response, producing an
+// invalid Cache-Control the browser discards — so tiles were re-fetched on
+// every map pan). Left unset, apicache emits a valid
+// `cache-control: max-age=<duration>` on its own.
 async function ensureReady() {
   if (middleware) return middleware;
 
   try {
     await redisClient.connect(); // redis@4 connect is idempotent
-    middleware = apicache.options({ ...apicacheOptions(), redisClient }).middleware;
+    middleware = apicache.options({ redisClient }).middleware;
     console.log('Cache: using Redis backend');
   } catch (e) {
     console.warn('Cache: Redis unavailable, using in-memory cache:', e.message);
-    middleware = apicache.options(apicacheOptions()).middleware;
+    middleware = apicache.middleware;
   }
   return middleware;
 }

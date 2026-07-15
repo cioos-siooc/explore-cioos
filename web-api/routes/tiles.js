@@ -53,7 +53,7 @@ const cache = require("../utils/cache");
 router.get(
   "/:z/:x/:y.mvt",
   validatorMiddleware(),
-  cache.route({ binary: true }),
+  cache.route(),
   async (req, res) => {
     const { z, x, y } = req.params;
 
@@ -225,7 +225,7 @@ router.get(
 router.get(
   "/cells/:z/:x/:y.mvt",
   validatorMiddleware(),
-  cache.route({ binary: true }),
+  cache.route(),
   async (req, res) => {
     const { z, x, y } = req.params;
 

@@ -879,10 +879,8 @@ export default function CreateMap({
     // Swap the tile URLs (with the new filter query) and re-render via the
     // public setTiles API — it clears the source's tile cache and reloads
     // the viewport tiles internally.
-    map.current.getSource('points').setTiles([tileQuery])
-    map.current.getSource('points-halo').setTiles([tileQuery])
-    map.current.getSource('hexes').setTiles([tileQuery])
-    map.current.getSource('coverage-hexes').setTiles([cellTileQuery])
+    map.current.getSource('cde-tiles').setTiles([tileQuery])
+    map.current.getSource('cde-cells').setTiles([cellTileQuery])
     setLoading(true)
     doFinalCheck.current = true
 
@@ -917,6 +915,10 @@ export default function CreateMap({
         ...buildBasemapStyle(i18n.language, basemap),
         projection: { type: projection === 'globe' ? 'globe' : 'mercator' }
       },
+      // MapLibre defaults to powerPreference 'high-performance', which wakes
+      // the discrete GPU on dual-GPU laptops. The map is circles and fills —
+      // the integrated GPU renders it fine, so hint 'low-power'.
+      canvasContextAttributes: { powerPreference: 'low-power' },
       // Per-source attributions replace the default control (see the compact
       // AttributionControl added below).
       attributionControl: false,
@@ -983,6 +985,21 @@ export default function CreateMap({
 
       const { tileQuery, cellTileQuery } = tileUrls(mapQueryRef.current)
 
+      // Two shared vector sources for all point/hex layers. Each layer used to
+      // carry its own inline source — six separate copies of the same two tile
+      // pyramids, each fetched and parsed independently on every pan. The
+      // hover/highlight layers render nothing until a pk filter is set, and
+      // those pks always come from queryRenderedFeatures on the filtered
+      // layers, so sharing the filtered sources loses nothing.
+      map.current.addSource('cde-tiles', {
+        type: 'vector',
+        tiles: [tileQuery]
+      })
+      map.current.addSource('cde-cells', {
+        type: 'vector',
+        tiles: [cellTileQuery]
+      })
+
       // Every data layer is inserted below the basemap's label layers
       // (beforeId FIRST_LABEL_LAYER_ID or an existing data layer) so water
       // and place names stay readable over hexes and points.
@@ -990,10 +1007,7 @@ export default function CreateMap({
         id: 'points',
         type: 'circle',
         minzoom: hexMaxZoom,
-        source: {
-          type: 'vector',
-          tiles: [tileQuery]
-        },
+        source: 'cde-tiles',
         'source-layer': 'internal-layer-name',
         paint: {
           'circle-opacity': circleOpacity,
@@ -1024,10 +1038,7 @@ export default function CreateMap({
           id: 'coverage-hexes',
           type: 'fill',
           minzoom: hexMaxZoom,
-          source: {
-            type: 'vector',
-            tiles: [cellTileQuery]
-          },
+          source: 'cde-cells',
           'source-layer': 'coverage-hexes-layer',
           paint: {
             'fill-opacity': coverageHexOpacity,
@@ -1043,10 +1054,7 @@ export default function CreateMap({
           id: 'coverage-hexes-hovered',
           type: 'fill',
           minzoom: hexMaxZoom,
-          source: {
-            type: 'vector',
-            tiles: [`${server}/tiles/cells/{z}/{x}/{y}.mvt`]
-          },
+          source: 'cde-cells',
           'source-layer': 'coverage-hexes-layer',
           paint: {
             'fill-opacity': coverageHexOpacity,
@@ -1066,10 +1074,7 @@ export default function CreateMap({
           id: 'points-halo',
           type: 'circle',
           minzoom: hexMaxZoom,
-          source: {
-            type: 'vector',
-            tiles: [tileQuery]
-          },
+          source: 'cde-tiles',
           'source-layer': 'internal-layer-name',
           paint: {
             'circle-color': '#ffffff',
@@ -1092,11 +1097,7 @@ export default function CreateMap({
         type: 'fill',
         minzoom: hexMinZoom,
         maxzoom: hexMaxZoom,
-
-        source: {
-          type: 'vector',
-          tiles: [tileQuery]
-        },
+        source: 'cde-tiles',
         'source-layer': 'internal-layer-name',
 
         paint: {
@@ -1113,11 +1114,7 @@ export default function CreateMap({
         type: 'fill',
         minzoom: hexMinZoom,
         maxzoom: hexMaxZoom,
-
-        source: {
-          type: 'vector',
-          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`]
-        },
+        source: 'cde-tiles',
         'source-layer': 'internal-layer-name',
 
         paint: {
@@ -1134,10 +1131,7 @@ export default function CreateMap({
         id: 'points-highlighted',
         type: 'circle',
         minzoom: hexMaxZoom,
-        source: {
-          type: 'vector',
-          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`]
-        },
+        source: 'cde-tiles',
         'source-layer': 'internal-layer-name',
         paint: {
           'circle-color': colors,
@@ -1160,10 +1154,7 @@ export default function CreateMap({
         id: 'points-hovered',
         type: 'circle',
         minzoom: hexMaxZoom,
-        source: {
-          type: 'vector',
-          tiles: [`${server}/tiles/{z}/{x}/{y}.mvt`]
-        },
+        source: 'cde-tiles',
         'source-layer': 'internal-layer-name',
         paint: {
           'circle-color': colors,
@@ -1670,7 +1661,7 @@ export default function CreateMap({
     // the time). Re-apply the focus as soon as each data source finishes
     // loading, so the unselected datasets are already grey on the first frame
     // of the new data instead of only after the next hover.
-    const dataSourceIds = ['points', 'points-halo', 'hexes', 'coverage-hexes']
+    const dataSourceIds = ['cde-tiles', 'cde-cells']
     map.current.on('sourcedata', (e) => {
       if (!focusedDatasetPk.current) return
       if (!e.isSourceLoaded || !dataSourceIds.includes(e.sourceId)) return
