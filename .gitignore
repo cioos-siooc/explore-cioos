@@ -31,3 +31,4 @@ log
 
 most_common_queries
 harvester_logs
+nginx/logs/*.log

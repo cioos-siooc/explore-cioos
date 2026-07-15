@@ -13,6 +13,7 @@ import requests
 import shapely.wkt
 from erddap_downloader.download_pdf import download_pdf
 from erddapy import ERDDAP
+from loguru import logger
 from shapely.geometry import Point
 
 ONE_MB = 10**6
@@ -260,7 +261,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
                 continue
 
             # Download data
-            print(f"Download {download_url}")
+            logger.info(f"Download {download_url}")
             data_downloaded = b""
             with requests.get(download_url, stream=True) as response:
                 # Make sure the connection is working otherswise make a warning and send the error.
@@ -271,6 +272,17 @@ def get_datasets(json_query, output_path="", create_pdf=False):
                         download_status = FAILED
 
                     erddap_error = response.text
+                    logger.error(
+                        "ERDDAP downloader download error: HTTP {} - {}",
+                        response.status_code,
+                        dataset["erddap_url"],
+                        extra={
+                            "erddap_url": dataset["erddap_url"],
+                            "dataset_id": dataset["dataset_id"],
+                            "download_url": download_url,
+                            "status_code": response.status_code,
+                        }
+                    )
                     continue
 
                 # Download data up to maximum size allowed

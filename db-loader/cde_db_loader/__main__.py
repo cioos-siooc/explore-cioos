@@ -7,7 +7,6 @@ import sys
 import numpy as np
 import pandas as pd
 import sentry_sdk
-from cde_harvester.utils import df_cde_eov_to_standard_name
 from dotenv import load_dotenv
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sqlalchemy import create_engine, text

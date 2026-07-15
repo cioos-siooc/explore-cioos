@@ -42,6 +42,7 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./harvester_logs:/usr/share/nginx/html/harvester_logs:ro
+      - downloads:/usr/share/nginx/html/downloads:ro
     depends_on:
       - web-api
     ports:
@@ -87,6 +88,7 @@ services:
     environment:
       - "DB_HOST_EXTERNAL=$DB_HOST_EXTERNAL"
       - "HARVESTER_LOG_DIR=/app/harvester/logs"
+      - "HARVEST_CONFIG_FILE=/app/harvester/harvest_config.yaml"
     env_file:
       - .env
 volumes:
