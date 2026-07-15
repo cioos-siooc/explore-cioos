@@ -3,34 +3,13 @@ import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import HarvestLayout from './HarvestLayout.jsx'
 import StatusBadge from './StatusBadge.jsx'
+import HarvestModeBadge from './HarvestModeBadge.jsx'
 import Sparkline from './Sparkline.jsx'
 import useHarvestFetch from './useHarvestFetch.js'
-import { unslug, slugify } from './slug.js'
-
-function hostname(url) {
-  try { return new URL(url).hostname || url } catch { return url }
-}
-
-function fmtDt(val) {
-  if (!val) return '—'
-  const d = val instanceof Date ? val : new Date(val)
-  if (isNaN(d.getTime())) return String(val)
-  return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-function fmtDuration(ms) {
-  if (ms == null) return '—'
-  return (ms / 1000).toFixed(1) + 's'
-}
-
-function datasetLink(erddapUrl, datasetId, source) {
-  if (source === 'obis') return `https://obis.org/dataset/${datasetId}`
-  try {
-    return `${erddapUrl.replace(/\/$/, '')}/tabledap/${datasetId}.html`
-  } catch {
-    return '#'
-  }
-}
+import reasonLabel from './reasonLabel.js'
+import { harvestMode } from './harvestMode.js'
+import { slugify } from './slug.js'
+import { hostname, fmtDt, fmtDurationMs, datasetLink } from './format.js'
 
 export default function HarvestServer() {
   const { t } = useTranslation()
@@ -38,9 +17,6 @@ export default function HarvestServer() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '')
   const [q, setQ] = useState(searchParams.get('q') || '')
-
-  const erddapUrl = unslug(slug)
-  const host = hostname(erddapUrl)
 
   const qs = new URLSearchParams()
   if (statusFilter) qs.set('status', statusFilter)
@@ -51,6 +27,10 @@ export default function HarvestServer() {
     `/servers/${slug}${queryStr ? '?' + queryStr : ''}`,
     [slug, statusFilter, q]
   )
+  // The slug is a transformed source URL; the full erddap_url (and a clean
+  // hostname for display) come from the dataset rows once loaded.
+  const erddapUrl = (datasets && datasets[0] && datasets[0].erddap_url) || ''
+  const host = hostname(erddapUrl) || slug
   const { data: reasons } = useHarvestFetch(`/reasons/${slug}`, [slug])
 
   function applyFilters(newStatus, newQ) {
@@ -64,6 +44,7 @@ export default function HarvestServer() {
     (acc, d) => { acc[d.status] = (acc[d.status] || 0) + 1; acc.total++; return acc },
     { success: 0, skipped: 0, error: 0, total: 0 }
   )
+  const nIncremental = (datasets || []).filter(d => harvestMode(d) === 'incremental').length
 
   const breadcrumbs = (
     <><Link to="/harvest">{t('harvest.title')}</Link> / {host}</>
@@ -73,7 +54,9 @@ export default function HarvestServer() {
     <HarvestLayout breadcrumbs={breadcrumbs}>
       <h1 className="harvest-page-title">{host}</h1>
       <p className="harvest-page-sub">
-        <a href={erddapUrl} target="_blank" rel="noreferrer" className="harvest-link">{erddapUrl}</a>
+        {erddapUrl && (
+          <a href={erddapUrl} target="_blank" rel="noreferrer" className="harvest-link">{erddapUrl}</a>
+        )}
       </p>
 
       <div className="harvest-summary">
@@ -85,6 +68,17 @@ export default function HarvestServer() {
         </span>
       </div>
 
+      {nIncremental > 0 && (
+        <div className="harvest-summary">
+          <span
+            className="harvest-count-pill harvest-count-files"
+            title={t('harvest.mode.incremental.tip')}
+          >
+            📁 {t('harvest.server.incrementalCount', { count: nIncremental })}
+          </span>
+        </div>
+      )}
+
       {reasons && reasons.length > 0 && (
         <details style={{ marginBottom: '1rem' }}>
           <summary style={{ cursor: 'pointer', fontSize: '0.88rem', color: '#5a7a7f' }}>
@@ -94,7 +88,7 @@ export default function HarvestServer() {
             <tbody>
               {reasons.map(r => (
                 <tr key={r.reason_code}>
-                  <td className="harvest-mono">{r.reason_code}</td>
+                  <td title={r.reason_code}>{reasonLabel(t, r.reason_code)}</td>
                   <td style={{ textAlign: 'right', fontWeight: 600 }}>{r.n}</td>
                 </tr>
               ))}
@@ -143,10 +137,11 @@ export default function HarvestServer() {
               <tr>
                 <th>{t('harvest.col.status')}</th>
                 <th>{t('harvest.col.datasetId')}</th>
+                <th>{t('harvest.col.hashable')}</th>
                 <th>{t('harvest.col.recent')}</th>
                 <th>{t('harvest.col.reason')}</th>
-                <th>{t('harvest.col.lastAttempt')}</th>
-                <th>{t('harvest.col.lastSuccess')}</th>
+                <th>{t('harvest.col.lastUpdate')}</th>
+                <th>{t('harvest.col.lastCheck')}</th>
                 <th>{t('harvest.col.duration')}</th>
               </tr>
             </thead>
@@ -176,27 +171,23 @@ export default function HarvestServer() {
                         ↗
                       </a>
                     </td>
+                    <td><HarvestModeBadge dataset={d} /></td>
                     <td><Sparkline statuses={d.history_statuses} /></td>
                     <td>
                       {d.reason_code
-                        ? <span className="harvest-mono" style={{ fontSize: '0.8rem' }}>{d.reason_code}</span>
+                        ? <span title={d.reason_code} style={{ fontSize: '0.8rem' }}>{reasonLabel(t, d.reason_code)}</span>
                         : <span className="harvest-muted">—</span>
                       }
                     </td>
+                    <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDt(d.last_updated_at)}</td>
                     <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDt(d.attempted_at)}</td>
-                    <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>
-                      {d.last_success_at
-                        ? fmtDt(d.last_success_at)
-                        : <span style={{ color: '#E25563' }}>{t('harvest.server.neverOk')}</span>
-                      }
-                    </td>
-                    <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDuration(d.duration_ms)}</td>
+                    <td className="harvest-muted" style={{ fontSize: '0.82rem' }}>{fmtDurationMs(d.duration_ms)}</td>
                   </tr>
                 )
               })}
               {!loading && (!datasets || datasets.length === 0) && (
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '1.5rem', color: '#8a9ea2' }}>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '1.5rem', color: '#8a9ea2' }}>
                     {t('harvest.server.noDatasets')}
                   </td>
                 </tr>

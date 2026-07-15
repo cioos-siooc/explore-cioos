@@ -75,6 +75,22 @@ class DatasetSchema(pa.DataFrameModel):
     num_columns: Series[float] = pa.Field(nullable=True)
     first_eov_column: Series[str] = pa.Field(nullable=True)
     source_type: Series[str] = pa.Field(nullable=True, default="erddap")
+    content_hash: Series[str] = pa.Field(nullable=True)
+    content_hash_reason: Series[str] = pa.Field(nullable=True)
+    last_updated_at: Series[pa.DateTime] = pa.Field(nullable=True)
+    verified_at: Series[pa.DateTime] = pa.Field(nullable=True)
+
+    class Config:
+        coerce = True
+        strict = False
+
+
+class VerifiedDatasetSchema(pa.DataFrameModel):
+    """Datasets skipped as unchanged; drives the db-loader's verified_at bump."""
+
+    erddap_url: Series[str]
+    dataset_id: Series[str]
+    verified_at: Series[pa.DateTime]
 
     class Config:
         coerce = True

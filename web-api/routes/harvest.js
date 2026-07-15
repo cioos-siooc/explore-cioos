@@ -6,6 +6,20 @@ const cache = require('../utils/cache')
 
 const SPARKLINE_DEPTH = 10
 
+// A hash-unchanged skip (status='skipped', reason_code='UNCHANGED') means the
+// dataset was verified as up to date — one HTTP request, nothing re-uploaded.
+// In the dataset-centric dashboard views that counts as a healthy "success"
+// with no failure reason; the fact that nothing was re-uploaded is conveyed by
+// "Last update" lagging "Last check", not by a skipped status. These SQL
+// fragments normalise an attempt's status/reason accordingly. (Per-run audit
+// views deliberately keep the raw 'skipped' so a run still shows what it did.)
+const NORM_STATUS = col =>
+  `CASE WHEN ${col}.status = 'skipped' AND ${col}.reason_code = 'UNCHANGED' THEN 'success' ELSE ${col}.status END`
+const NORM_REASON = col =>
+  `CASE WHEN ${col}.status = 'skipped' AND ${col}.reason_code = 'UNCHANGED' THEN NULL ELSE ${col}.reason_code END`
+const NORM_ERRMSG = col =>
+  `CASE WHEN ${col}.status = 'skipped' AND ${col}.reason_code = 'UNCHANGED' THEN NULL ELSE ${col}.error_message END`
+
 // ── URL helpers ───────────────────────────────────────────────────────────────
 
 function slugify(url) {
@@ -22,6 +36,30 @@ function unslug(slug) {
     padded.replace(/-/g, '+').replace(/_/g, '/'),
     'base64'
   ).toString('utf8')
+}
+
+// Slugs are a readable form of the source URL: scheme dropped, '.' and '/'
+// replaced with '-' (e.g. erddap-ogsl-ca-erddap). Resolve one back to the full
+// stored erddap_url by applying the same transform to the stored URLs. Legacy
+// base64-encoded slugs (full URLs) are still honoured so old links keep working.
+async function resolveErddapUrl(slug) {
+  try {
+    const decoded = unslug(slug)
+    if (/^https?:\/\//i.test(decoded)) return decoded
+  } catch { /* not a base64 slug — fall through to the transform lookup */ }
+  // NB: avoid '?' in the regexes — knex treats it as a positional binding.
+  const sql = `
+    SELECT erddap_url
+    FROM (SELECT DISTINCT erddap_url FROM cde.harvest_attempts) u
+    WHERE translate(
+            regexp_replace(regexp_replace(erddap_url, '^[a-z]+://', '', 'i'), '/+$', ''),
+            './', '--'
+          ) = ?
+    ORDER BY erddap_url
+    LIMIT 1
+  `
+  const result = await db.raw(sql, [slug])
+  return result.rows[0] ? result.rows[0].erddap_url : slug
 }
 
 // ── SQL query helpers ─────────────────────────────────────────────────────────
@@ -48,8 +86,8 @@ async function listServers() {
            s.source,
            s.last_attempted_at,
            s.last_run_id,
-           COUNT(*) FILTER (WHERE a.status = 'success') AS n_success,
-           COUNT(*) FILTER (WHERE a.status = 'skipped') AS n_skipped,
+           COUNT(*) FILTER (WHERE ${NORM_STATUS('a')} = 'success') AS n_success,
+           COUNT(*) FILTER (WHERE ${NORM_STATUS('a')} = 'skipped') AS n_skipped,
            COUNT(*) FILTER (WHERE a.status = 'error')   AS n_error,
            COUNT(*) AS n_total
     FROM latest_run_per_server s
@@ -64,7 +102,18 @@ async function listServers() {
 }
 
 async function recentRuns(limit = 20) {
+  // Limit the runs BEFORE joining attempts — the audit tables are append-only,
+  // so aggregating every historical attempt just to show the latest 20 runs
+  // gets slower forever. Unchanged (hash-verified) skips are counted apart from
+  // real skips so an incremental run doesn't read as hundreds of failures.
   const sql = `
+    WITH recent AS (
+        SELECT run_id, started_at, finished_at, git_sha, status, error_message,
+               scope, triggered_source, triggered_by
+        FROM cde.harvest_runs
+        ORDER BY started_at DESC
+        LIMIT ?
+    )
     SELECT r.run_id,
            r.started_at,
            r.finished_at,
@@ -76,15 +125,17 @@ async function recentRuns(limit = 20) {
            r.triggered_by,
            EXTRACT(EPOCH FROM (r.finished_at::timestamptz - r.started_at::timestamptz))::int AS duration_s,
            COUNT(a.*) FILTER (WHERE a.status = 'success') AS n_success,
-           COUNT(a.*) FILTER (WHERE a.status = 'skipped') AS n_skipped,
+           COUNT(a.*) FILTER (WHERE a.status = 'skipped'
+                                AND a.reason_code = 'UNCHANGED') AS n_unchanged,
+           COUNT(a.*) FILTER (WHERE a.status = 'skipped'
+                                AND a.reason_code IS DISTINCT FROM 'UNCHANGED') AS n_skipped,
            COUNT(a.*) FILTER (WHERE a.status = 'error')   AS n_error,
            COUNT(a.*) AS n_total
-    FROM cde.harvest_runs r
+    FROM recent r
     LEFT JOIN cde.harvest_attempts a USING (run_id)
     GROUP BY r.run_id, r.started_at, r.finished_at, r.git_sha,
              r.status, r.error_message, r.scope, r.triggered_source, r.triggered_by
     ORDER BY r.started_at DESC
-    LIMIT ?
   `
   const result = await db.raw(sql, [limit])
   return result.rows
@@ -97,22 +148,16 @@ async function serverDatasets(erddapUrl, statusFilter = null, q = null) {
                erddap_url,
                dataset_id,
                source,
-               status,
-               reason_code,
-               error_message,
+               ${NORM_STATUS('ha')} AS status,
+               ${NORM_REASON('ha')} AS reason_code,
+               ${NORM_ERRMSG('ha')} AS error_message,
                duration_ms,
                attempted_at,
                run_id,
                query_urls
-        FROM cde.harvest_attempts
+        FROM cde.harvest_attempts ha
         WHERE erddap_url = ?
         ORDER BY erddap_url, dataset_id, attempted_at DESC
-    ),
-    last_success AS (
-        SELECT erddap_url, dataset_id, MAX(attempted_at) AS last_success_at
-        FROM cde.harvest_attempts
-        WHERE erddap_url = ? AND status = 'success'
-        GROUP BY erddap_url, dataset_id
     ),
     sparkline AS (
         SELECT erddap_url,
@@ -120,10 +165,12 @@ async function serverDatasets(erddapUrl, statusFilter = null, q = null) {
                array_agg(status ORDER BY attempted_at DESC) AS history_statuses,
                array_agg(attempted_at ORDER BY attempted_at DESC) AS history_times
         FROM (
-            SELECT erddap_url, dataset_id, status, attempted_at,
+            SELECT erddap_url, dataset_id,
+                   ${NORM_STATUS('ha')} AS status,
+                   attempted_at,
                    ROW_NUMBER() OVER (PARTITION BY erddap_url, dataset_id
                                       ORDER BY attempted_at DESC) AS rn
-            FROM cde.harvest_attempts
+            FROM cde.harvest_attempts ha
             WHERE erddap_url = ?
         ) ranked
         WHERE rn <= ?
@@ -139,12 +186,16 @@ async function serverDatasets(erddapUrl, statusFilter = null, q = null) {
            la.attempted_at,
            la.run_id,
            la.query_urls,
-           ls.last_success_at,
            sp.history_statuses,
-           sp.history_times
+           sp.history_times,
+           ds.content_hash,
+           ds.content_hash_reason,
+           ds.last_updated_at
     FROM latest_attempt la
-    LEFT JOIN last_success ls USING (erddap_url, dataset_id)
     LEFT JOIN sparkline   sp USING (erddap_url, dataset_id)
+    LEFT JOIN cde.datasets ds
+        ON ds.dataset_id = la.dataset_id
+       AND rtrim(ds.erddap_url, '/') = rtrim(la.erddap_url, '/')
     WHERE (CAST(? AS text) IS NULL OR la.status = ?)
       AND (
             CAST(? AS text) IS NULL
@@ -157,7 +208,7 @@ async function serverDatasets(erddapUrl, statusFilter = null, q = null) {
       la.dataset_id
   `
   const result = await db.raw(sql, [
-    erddapUrl, erddapUrl, erddapUrl, SPARKLINE_DEPTH,
+    erddapUrl, erddapUrl, SPARKLINE_DEPTH,
     statusFilter, statusFilter,
     q, q, q, q,
   ])
@@ -168,9 +219,9 @@ async function datasetHistory(erddapUrl, datasetId) {
   const sql = `
     SELECT a.run_id,
            a.attempted_at,
-           a.status,
-           a.reason_code,
-           a.error_message,
+           ${NORM_STATUS('a')} AS status,
+           ${NORM_REASON('a')} AS reason_code,
+           ${NORM_ERRMSG('a')} AS error_message,
            a.duration_ms,
            a.source,
            a.query_urls,
@@ -184,6 +235,18 @@ async function datasetHistory(erddapUrl, datasetId) {
   `
   const result = await db.raw(sql, [erddapUrl, datasetId])
   return result.rows
+}
+
+async function datasetMeta(erddapUrl, datasetId) {
+  const sql = `
+    SELECT content_hash, content_hash_reason, last_updated_at
+    FROM cde.datasets
+    WHERE dataset_id = ?
+      AND rtrim(erddap_url, '/') = rtrim(?, '/')
+    LIMIT 1
+  `
+  const result = await db.raw(sql, [datasetId, erddapUrl])
+  return result.rows[0] || null
 }
 
 async function runDetail(runId) {
@@ -214,7 +277,10 @@ async function runAttempts(runId) {
     WHERE run_id = ?
     ORDER BY
       erddap_url,
-      CASE status WHEN 'error' THEN 0 WHEN 'skipped' THEN 1 ELSE 2 END,
+      CASE WHEN status = 'error' THEN 0
+           WHEN status = 'skipped' AND reason_code IS DISTINCT FROM 'UNCHANGED' THEN 1
+           WHEN status = 'skipped' THEN 2
+           ELSE 3 END,
       dataset_id
   `
   const result = await db.raw(sql, [runId])
@@ -225,8 +291,10 @@ async function reasonBreakdown(erddapUrl = null) {
   const sql = `
     WITH latest_attempt AS (
         SELECT DISTINCT ON (erddap_url, dataset_id)
-               erddap_url, dataset_id, status, reason_code
-        FROM cde.harvest_attempts
+               erddap_url, dataset_id,
+               ${NORM_STATUS('ha')} AS status,
+               ${NORM_REASON('ha')} AS reason_code
+        FROM cde.harvest_attempts ha
         WHERE (CAST(? AS text) IS NULL OR erddap_url = ?)
         ORDER BY erddap_url, dataset_id, attempted_at DESC
     )
@@ -254,7 +322,7 @@ router.get('/servers', cache.route('2 minutes'), async (req, res, next) => {
 
 router.get('/servers/:slug', cache.route('30 seconds'), async (req, res, next) => {
   try {
-    const erddapUrl = unslug(req.params.slug)
+    const erddapUrl = await resolveErddapUrl(req.params.slug)
     const status = req.query.status || null
     const q = req.query.q || null
     res.json(await serverDatasets(erddapUrl, status, q))
@@ -265,10 +333,11 @@ router.get('/servers/:slug', cache.route('30 seconds'), async (req, res, next) =
 
 router.get('/dataset/:slug/:datasetId', cache.route('1 minute'), async (req, res, next) => {
   try {
-    const erddapUrl = unslug(req.params.slug)
+    const erddapUrl = await resolveErddapUrl(req.params.slug)
     const history = await datasetHistory(erddapUrl, req.params.datasetId)
     if (!history.length) return res.status(404).json({ error: 'No harvest history found' })
-    res.json(history)
+    const meta = await datasetMeta(erddapUrl, req.params.datasetId)
+    res.json({ history, meta, erddap_url: erddapUrl })
   } catch (err) {
     next(err)
   }
@@ -305,7 +374,7 @@ router.get('/reasons', cache.route('2 minutes'), async (req, res, next) => {
 
 router.get('/reasons/:slug', cache.route('2 minutes'), async (req, res, next) => {
   try {
-    const erddapUrl = unslug(req.params.slug)
+    const erddapUrl = await resolveErddapUrl(req.params.slug)
     res.json(await reasonBreakdown(erddapUrl))
   } catch (err) {
     next(err)

@@ -12,6 +12,7 @@ from cde_harvester.schemas import (
     ProfileSchema,
     SkippedDatasetSchema,
     VariableSchema,
+    VerifiedDatasetSchema,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,12 +28,15 @@ class HarvestResult:
     skipped: DataFrame[SkippedDatasetSchema]
     obis_cells: DataFrame[ObisCellSchema] = None
     attempts: DataFrame[HarvestAttemptSchema] = None
+    verified: DataFrame[VerifiedDatasetSchema] = None
 
     def __post_init__(self):
         if self.obis_cells is None:
             self.obis_cells = pd.DataFrame(columns=ObisCellSchema.to_schema().columns.keys())
         if self.attempts is None:
             self.attempts = pd.DataFrame(columns=HarvestAttemptSchema.to_schema().columns.keys())
+        if self.verified is None:
+            self.verified = pd.DataFrame(columns=VerifiedDatasetSchema.to_schema().columns.keys())
 
     def validate(self):
         """Validate all DataFrames against their schemas."""

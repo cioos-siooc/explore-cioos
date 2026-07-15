@@ -3,29 +3,10 @@ import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import HarvestLayout from './HarvestLayout.jsx'
 import StatusBadge from './StatusBadge.jsx'
+import HarvestModeBadge from './HarvestModeBadge.jsx'
 import useHarvestFetch from './useHarvestFetch.js'
-import { unslug, slugify } from './slug.js'
-
-function hostname(url) {
-  try { return new URL(url).hostname || url } catch { return url }
-}
-
-function fmtDt(val) {
-  if (!val) return '—'
-  const d = val instanceof Date ? val : new Date(val)
-  if (isNaN(d.getTime())) return String(val)
-  return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-function fmtDuration(ms) {
-  if (ms == null) return '—'
-  return (ms / 1000).toFixed(1) + 's'
-}
-
-function datasetLink(erddapUrl, datasetId, source) {
-  if (source === 'obis') return `https://obis.org/dataset/${datasetId}`
-  return `${erddapUrl.replace(/\/$/, '')}/tabledap/${datasetId}.html`
-}
+import reasonLabel from './reasonLabel.js'
+import { hostname, fmtDt, fmtDurationMs, datasetLink } from './format.js'
 
 function QueryUrls({ blob, isError }) {
   if (!blob) return null
@@ -53,15 +34,19 @@ function QueryUrls({ blob, isError }) {
 export default function HarvestDataset() {
   const { t } = useTranslation()
   const { slug, datasetId } = useParams()
-  const erddapUrl = unslug(slug)
-  const host = hostname(erddapUrl)
 
-  const { data: history, loading, error } = useHarvestFetch(
+  const { data, loading, error } = useHarvestFetch(
     `/dataset/${slug}/${encodeURIComponent(datasetId)}`,
     [slug, datasetId]
   )
 
-  const latest = history && history[0]
+  const history = (data && data.history) || []
+  const meta = data && data.meta
+  const latest = history[0]
+  // The slug is a transformed source URL; the full erddap_url (and a clean
+  // hostname for display) come from the API response.
+  const erddapUrl = (data && data.erddap_url) || ''
+  const host = hostname(erddapUrl) || slug
   const sourceUrl = latest ? datasetLink(erddapUrl, datasetId, latest.source) : '#'
   const viewOnLabel = latest?.source === 'obis'
     ? t('harvest.dataset.viewOnObis')
@@ -95,13 +80,29 @@ export default function HarvestDataset() {
         <div className="harvest-latest-card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
             <StatusBadge status={latest.status} />
+            {meta && <HarvestModeBadge dataset={meta} />}
             {latest.reason_code && (
-              <span className="harvest-mono" style={{ fontSize: '0.85rem' }}>{latest.reason_code}</span>
+              <span title={latest.reason_code} style={{ fontSize: '0.85rem' }}>{reasonLabel(t, latest.reason_code)}</span>
             )}
             <span className="harvest-muted" style={{ fontSize: '0.82rem' }}>
-              {fmtDt(latest.attempted_at)}
+              {t('harvest.col.lastCheck')}: {fmtDt(latest.attempted_at)}
             </span>
           </div>
+          {meta && (meta.content_hash || meta.content_hash_reason || meta.last_updated_at) && (
+            <div className="harvest-muted" style={{ fontSize: '0.8rem', marginBottom: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '1.25rem' }}>
+              {meta.last_updated_at && <span>{t('harvest.col.lastUpdate')}: {fmtDt(meta.last_updated_at)}</span>}
+              {meta.content_hash && (
+                <span title={meta.content_hash}>
+                  {t('harvest.col.contentHash')}: <span className="harvest-mono">{meta.content_hash.slice(0, 16)}…</span>
+                </span>
+              )}
+              {!meta.content_hash && meta.content_hash_reason && (
+                <span title={meta.content_hash_reason}>
+                  {t('harvest.col.contentHash')}: {t(`harvest.hashReason.${meta.content_hash_reason}`, meta.content_hash_reason)}
+                </span>
+              )}
+            </div>
+          )}
           {latest.error_message && (
             <div className="harvest-error-box">{latest.error_message}</div>
           )}
@@ -134,7 +135,7 @@ export default function HarvestDataset() {
               <td><StatusBadge status={row.status} /></td>
               <td>
                 {row.reason_code && (
-                  <span className="harvest-mono" style={{ fontSize: '0.8rem' }}>{row.reason_code}</span>
+                  <span title={row.reason_code} style={{ fontSize: '0.8rem' }}>{reasonLabel(t, row.reason_code)}</span>
                 )}
                 {row.error_message && (
                   <details style={{ marginTop: '0.25rem' }}>
@@ -150,7 +151,7 @@ export default function HarvestDataset() {
                   </details>
                 )}
               </td>
-              <td style={{ fontSize: '0.82rem' }}>{fmtDuration(row.duration_ms)}</td>
+              <td style={{ fontSize: '0.82rem' }}>{fmtDurationMs(row.duration_ms)}</td>
               <td>
                 <Link to={`/harvest/run/${row.run_id}`} className="harvest-link harvest-mono" style={{ fontSize: '0.78rem' }}>
                   {row.git_sha ? row.git_sha.slice(0, 7) : row.run_id.slice(0, 8)}
