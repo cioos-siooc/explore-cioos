@@ -15,6 +15,7 @@
 - [ ] Remove duplicated rows in dataset table.
 
 ## New features
+- [ ] Add Optional Banner to present to user the very first time for form or question with markdown and date limit option.
 
 ### Dataset types & integrations
 - [ ] Integrate full trajectory dataset view from Richard.
