@@ -15,7 +15,6 @@ WORKDIR /usr/src/app
 COPY download_scheduler ./download_scheduler
 COPY downloader ./downloader
 COPY harvester ./harvester
-COPY db-loader ./db-loader
 
 WORKDIR /usr/src/app/download_scheduler
 RUN --mount=type=cache,target=/root/.cache/uv \
