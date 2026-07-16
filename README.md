@@ -18,21 +18,24 @@ If you just want to see how a dataset is harvested by CDE:
 1. Install [Docker](https://docs.docker.com/get-docker/) and [Docker compose](https://docs.docker.com/compose/install/). New versions of Docker include `docker compose`
 2. Rename file `.env.sample` to `.env` and change any settings if needed. If you are running on your local machine these settings don't need to change
 3. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and modify if needed.
-4. Run locally with docker compose:
+4. Copy `docker-compose.override.yaml.sample` to `docker-compose.override.yaml`. The base `docker-compose.yaml` publishes **no** host ports (so it can be deployed as-is behind a proxy such as Coolify); the override publishes nginx and Prefect locally. Ports are configurable via `NGINX_PORT` (default 8098) and `PREFECT_PORT` (default 4200) in `.env`.
+5. Run locally with docker compose:
     1. Development environment: `docker compose up -d`
     2. Production environment: `docker compose -f docker-compose.production.yaml up -d`
-5. See website at <http://localhost:8098>
-6. See Prefect Dashboard at <http://localhost:4200> (Manage flows and deployments)
+6. See website at <http://localhost:8098>
+7. See Prefect Dashboard at <http://localhost:4200> (Manage flows and deployments)
 
 ### Data Harvesting with Prefect
 
 The harvester is now orchestrated by Prefect. The Docker Compose stack includes:
-- **Prefect Server**: Manage flows, view logs, and trigger runs.
-- **Prefect Worker**: Executes scheduled flows in Docker containers.
+- **Prefect Server** (`prefect`): Manage flows, view logs, and trigger runs.
+- **Prefect Worker** (`prefect_worker`): Runs harvest flows **in-process** on a `process` work pool (no per-run containers).
 
-To deploy the harvester flow (create/update schedule):
+The worker registers the work pool and all deployments automatically on startup
+(`REGISTER_DEPLOYMENTS=true`), so a plain `docker compose up -d` is enough — no
+separate deploy step. To (re)register after a config change, restart the worker:
 ```bash
-docker compose up harvester
+docker compose up -d prefect_worker
 ```
 *Note: Set `INCREMENTAL_MODE=true` in your `.env` to make the deployment default to incremental harvesting (faster, only updates changed datasets).*
 
@@ -154,13 +157,32 @@ For complete local development with all services running outside Docker (advance
 
 Pushes to `master` and `development` automatically deploy to the corresponding environment via the [Deploy workflow](.github/workflows/deploy.yml). The workflow connects to the remote server over WireGuard VPN, syncs the repository to the exact commit that triggered the run, injects secrets from 1Password, and brings up the Docker Compose stack.
 
+## Deploying with Coolify (dev/staging)
+
+Coolify routes traffic through its own proxy over the docker network, so no host
+ports must be published. Create a **Docker Compose** resource pointing at
+`docker-compose.yaml` — that file publishes no host ports and already carries
+the Coolify "magic" variables:
+
+- `SERVICE_FQDN_NGINX_4000` (on `nginx`): Coolify generates a public FQDN and
+  proxies it to nginx's container port 4000.
+- `SERVICE_URL_NGINX`: injected by Coolify and used as the scheduler's
+  `DOWNLOAD_WAF_URL` base (falls back to `APP_DOMAIN` outside Coolify).
+
+Coolify ignores `docker-compose.override.yaml` (and only supports a single
+compose file per resource), so local-dev port publishing never leaks into a
+Coolify deploy.
+
 ## Production deployment
 
-Deploy CDE to production using Docker Compose with the production configuration file.
+Deploy CDE to production using Docker Compose with the production configuration
+file (no Coolify). Published host ports are configurable via `.env`:
+`NGINX_PORT` (default 8098), `PREFECT_PORT` (default 4200) and `DB_PORT`
+(default 5432 — also sets Postgres' internal `PGPORT`).
 
 ### Initial Setup
 
-1. Rename `.env.sample` to `production.env` and configure with production settings.
+1. Rename `.env.sample` to `.env` and configure with production settings (docker compose only auto-loads `.env`). The deploy workflow renders these from `.env.production` via 1Password.
 
 2. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and configure the datasets to harvest.
 
