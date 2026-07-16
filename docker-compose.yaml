@@ -16,6 +16,11 @@ services:
     # then reports it as "DiskFull / No space left on device". Raise it well
     # above the working-set size.
     shm_size: 1gb
+    # log_lock_waits: log any session that waits >deadlock_timeout (1s) for a
+    # lock, with holder/waiter pids. Near-zero cost; makes lock contention
+    # between the harvester's db-loader and live web-api reads diagnosable
+    # straight from `docker logs` instead of reconstructing it after the fact.
+    command: ["postgres", "-c", "log_lock_waits=on"]
     environment:
       - "PGPORT=${DB_PORT:-5432}"
       - "POSTGRES_DB=$DB_NAME"
