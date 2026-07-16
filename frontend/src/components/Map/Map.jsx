@@ -349,30 +349,20 @@ export default function CreateMap({
     map.current.getSource('cde-cells').setTiles([cellTileQuery])
   }
 
-  // Apply layer visibility from the data-layer + display toggles:
-  //  - track lines: trajectories on AND tracks-mode sub-toggle;
-  //  - hex aggregates (green combined hexes AND coverage cells): hex cells on.
-  // The "hex cells" toggle hides only the hexagon-aggregation layers, never
-  // the track lines or the high-zoom point layer. Which data feeds the hexes
-  // (trajectories in/out of the coverage cells, OBIS on/off, profile types)
-  // is decided server-side via the tile-URL params — see buildTileSuffix.
+  // Apply the tracks-mode layer visibility: track lines/heads show only when
+  // trajectories are on AND tracks mode is active. Which data feeds the hex
+  // layers (trajectories in/out of the coverage cells, OBIS on/off, profile
+  // types) is decided server-side via the tile-URL params — see
+  // buildTileSuffix; the blanket "Hexes & points" picker switch owns whole-map
+  // observation-layer visibility (setLayersVisibility).
   function applyLayerVisibility() {
     if (!map.current || !map.current.getLayer('track-lines')) return
     const trajOn = dataLayersRef.current
       ? dataLayersRef.current.trajectories !== false
       : true
-    const hexOn = dataLayersRef.current
-      ? dataLayersRef.current.hexCells !== false
-      : true
     const showTracks = trajOn && tracksModeRef.current
     ;['track-lines', 'track-heads', 'track-heads-fixed'].forEach((id) =>
       map.current.setLayoutProperty(id, 'visibility', showTracks ? 'visible' : 'none')
-    )
-    ;['coverage-hexes', 'coverage-hexes-hovered'].forEach((id) =>
-      map.current.setLayoutProperty(id, 'visibility', hexOn ? 'visible' : 'none')
-    )
-    ;['hexes', 'hexes-hovered'].forEach((id) =>
-      map.current.setLayoutProperty(id, 'visibility', hexOn ? 'visible' : 'none')
     )
   }
 

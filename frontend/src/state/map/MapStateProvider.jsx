@@ -29,8 +29,7 @@ const ALL_DATA_LAYERS = {
   timeseries: true,
   timeseriesProfile: true,
   obis: true,
-  trajectories: true,
-  hexCells: true
+  trajectories: true
 }
 
 const MapStateContext = createContext()

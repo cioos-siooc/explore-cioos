@@ -368,7 +368,6 @@
   "layerTimeseriesProfile": "Profils de séries temporelles",
   "layerObis": "Occurrences OBIS",
   "layerTrajectories": "Trajectoires",
-  "layerHexCells": "Cellules hexagonales",
   "layerTracksMode": "Afficher en lignes de trajet",
   "timeBarTrailingWindowLabel": "Trace",
   "timeBarTrailAll": "Tout",

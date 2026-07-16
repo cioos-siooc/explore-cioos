@@ -217,6 +217,12 @@
   border-top: 1px solid var(--cioos-hairline);
 }
 
+/* A display option nested under its parent layer switch (e.g. "Show as track
+   lines" under Trajectories). */
+.legendLayerSub {
+  padding-left: 18px;
+}
+
 .legendLayerItems .form-check.form-switch {
   gap: 6px;
 }

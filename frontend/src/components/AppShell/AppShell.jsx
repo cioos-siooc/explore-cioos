@@ -89,9 +89,9 @@ export default function AppShell () {
   ]
 
   // Data-type layer switches (which data families draw on the map), shown in
-  // the legend card under the map-layer switches. Hex cells and tracks mode
-  // are display options: how the data draws, not which data shows — the
-  // tracks-mode switch only applies (and only shows) while trajectories are on.
+  // the legend card under the map-layer switches. Tracks mode is a display
+  // option on trajectories — how they draw, not whether they show — so its
+  // switch renders indented under (and only while) Trajectories is on.
   const toggleDataLayer = (key) =>
     setDataLayers({ ...dataLayers, [key]: !dataLayers[key] })
   const dataLayerControls = [
@@ -99,8 +99,7 @@ export default function AppShell () {
     { key: 'timeseries', label: t('layerTimeseries') },
     { key: 'timeseriesProfile', label: t('layerTimeseriesProfile') },
     { key: 'obis', label: t('layerObis') },
-    { key: 'trajectories', label: t('layerTrajectories') },
-    { key: 'hexCells', label: t('layerHexCells') }
+    { key: 'trajectories', label: t('layerTrajectories') }
   ].map(({ key, label }) => ({
     key,
     label,
@@ -108,11 +107,15 @@ export default function AppShell () {
     onChange: () => toggleDataLayer(key)
   }))
   if (dataLayers.trajectories) {
-    dataLayerControls.push({
+    const trajectoriesIndex = dataLayerControls.findIndex(
+      (control) => control.key === 'trajectories'
+    )
+    dataLayerControls.splice(trajectoriesIndex + 1, 0, {
       key: 'tracksMode',
       label: t('layerTracksMode'),
       checked: tracksMode,
-      onChange: () => setTracksMode(!tracksMode)
+      onChange: () => setTracksMode(!tracksMode),
+      sub: true
     })
   }
 

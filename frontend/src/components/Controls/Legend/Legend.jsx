@@ -79,20 +79,16 @@ export default function Legend({
     timeseries: true,
     timeseriesProfile: true,
     obis: true,
-    trajectories: true,
-    hexCells: true
+    trajectories: true
   }
   // The combined green ramp / platform points carry the profile-family types
   // + OBIS, plus trajectory coverage when shown as hexes.
-  const hasPointData =
+  const showPointRamp =
     layers.profile ||
     layers.timeseries ||
     layers.timeseriesProfile ||
     layers.obis ||
     (layers.trajectories && !tracksMode)
-  // Below zoom 7 the data draws only as hexes, so the ramp is meaningful only
-  // when hex cells are on; at/above zoom 7 the point layer shows regardless.
-  const showPointRamp = hasPointData && (zoom >= 7 || layers.hexCells)
 
   // Continuous color bar for a hex ramp. The hex counts follow a non-linear
   // (power/log) scale, so the colors are spaced evenly by their scale index
@@ -235,9 +231,6 @@ export default function Legend({
   function generateTrajectoryLegendElements() {
     // Trajectory layer hidden entirely — no trajectory legend.
     if (!layers.trajectories) return null
-    // Coverage hexes are hidden when hex cells are off (and it's not tracks
-    // mode), so their ramp shouldn't show either.
-    if (!tracksMode && !layers.hexCells) return null
     // Tracks mode replaces the coverage-hex ramp with the track-line layers.
     if (tracksMode) {
       return (
@@ -299,12 +292,10 @@ export default function Legend({
   // mode the trajectory counts leave the cells tiles (track lines replace
   // them), so only the OBIS ramp can apply then.
   function generateCoverageLegendElements() {
-    const showObisRamp =
-      layers.obis && layers.hexCells && !isEmpty(currentObisRangeLevel)
+    const showObisRamp = layers.obis && !isEmpty(currentObisRangeLevel)
     const showTrajectoryHexes =
       layers.trajectories &&
       !tracksMode &&
-      layers.hexCells &&
       !isEmpty(currentTrajectoryRangeLevel)
     return (
       <>
@@ -416,13 +407,17 @@ export default function Legend({
                   </span>
                   <div className='legendLayerItems'>
                     {dataLayerControls.map((control) => (
-                      <Switch
+                      <div
                         key={control.key}
-                        id={`dataLayer-${control.key}`}
-                        label={control.label}
-                        checked={control.checked}
-                        onChange={control.onChange}
-                      />
+                        className={control.sub ? 'legendLayerSub' : undefined}
+                      >
+                        <Switch
+                          id={`dataLayer-${control.key}`}
+                          label={control.label}
+                          checked={control.checked}
+                          onChange={control.onChange}
+                        />
+                      </div>
                     ))}
                   </div>
                 </>
