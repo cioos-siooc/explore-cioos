@@ -1,9 +1,11 @@
+/* Viewport-centered like the Datasets/Filters card at the top, so the two
+   read as one centered column over the map. */
 .timeBar {
   position: fixed;
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(720px, calc(100% - 48px));
+  width: min(720px, calc(100vw - 24px));
   background-color: #fff;
   border-radius: 6px;
   box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
@@ -12,16 +14,6 @@
   display: flex;
   align-items: center;
   gap: 16px;
-}
-
-/* Desktop with the datasets sidebar open: center over the visible map area
-   (the sidebar card is ~420px + 12px gutters on the left) instead of the
-   viewport, so the bar never slides under the sidebar. */
-@media (min-width: 1050px) {
-  .timeBar.sidebarOpen {
-    left: calc(50% + 216px);
-    width: min(720px, calc(100% - 490px));
-  }
 }
 
 /* Clear the datasets bottom sheet on phones (same offset as the

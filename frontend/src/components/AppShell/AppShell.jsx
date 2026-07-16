@@ -167,7 +167,6 @@ export default function AppShell () {
           setScrubTime={setScrubTime}
           trailingDays={trailingDays}
           setTrailingDays={setTrailingDays}
-          sidebarOpen={sidebarOpen}
         />
       )}
       <ZoomToDataset variant='floating' />

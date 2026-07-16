@@ -24,8 +24,7 @@ export default function TimeBar({
   scrubTime,
   setScrubTime,
   trailingDays,
-  setTrailingDays,
-  sidebarOpen
+  setTrailingDays
 }) {
   const { t } = useTranslation()
 
@@ -42,7 +41,7 @@ export default function TimeBar({
   }
 
   return (
-    <div className={`timeBar ${sidebarOpen ? 'sidebarOpen' : ''}`}>
+    <div className='timeBar'>
       <div className='timeBarDate'>{scrubTime}</div>
       <div className='timeBarSlider'>
         <Slider
