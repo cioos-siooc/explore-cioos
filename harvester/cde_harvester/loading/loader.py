@@ -233,7 +233,14 @@ def ensure_organization_pks(datasets):
         )
     return datasets
 
-@task(name="cde-db-loader")
+# timeout_seconds: hard ceiling well above any observed load (full reload incl.
+# hex build runs tens of minutes). A run that exceeds it is genuinely wedged —
+# Prefect marks it Failed instead of leaving it Running forever, complementing
+# the server-side idle_in_transaction/lock timeouts set inside the transaction.
+# No retries here on purpose: the transaction is atomic, but the next scheduled
+# harvest re-covers the data anyway, and auto-retrying a resource-starved DB
+# just piles on load.
+@task(name="cde-db-loader", timeout_seconds=7200)
 def main(folder, incremental=False):
     # setup database connection
     logger = get_run_logger()
@@ -356,15 +363,45 @@ def main(folder, incremental=False):
         # Transaction-scoped lock that serializes loads over the shared cde tables.
         # See DB_LOADER_ADVISORY_LOCK_KEY for why this is acquired late (incremental)
         # vs up-front (full reload). Concurrent loaders simply wait here until the one
-        # ahead commits/rolls back.
+        # ahead commits/rolls back — that wait is expected to exceed the session
+        # lock_timeout (set at transaction start), so lift the timeout for this one
+        # statement and restore it after. A zombie lock-holder can't wedge us:
+        # its idle_in_transaction_session_timeout kills it and releases the lock.
         logger.info("Acquiring db-loader advisory lock (serializes concurrent loads)")
+        transaction.execute(text("SET lock_timeout = 0"))
         transaction.execute(
             text("SELECT pg_advisory_xact_lock(:k)"),
             {"k": DB_LOADER_ADVISORY_LOCK_KEY},
         )
+        transaction.execute(text("SET lock_timeout = '2min'"))
 
     with engine.begin() as transaction:
         logger.info("Writing to DB:")
+
+        # Session-level safety timeouts for the load transaction.
+        #
+        # idle_in_transaction_session_timeout: if this container dies mid-load
+        # (redeploy, OOM-kill) Postgres can keep the session alive as
+        # idle-in-transaction, holding the advisory lock — which would queue every
+        # future harvest forever at acquire_loader_lock(). 10 min never fires
+        # during real work (the gaps between Python-driven statements are
+        # milliseconds) but auto-kills such orphans, rolling their transaction back.
+        #
+        # lock_timeout: the load path is pure DML and normally never waits on
+        # DDL, but a manual psql ALTER, a live-applied migration, or pg_repack
+        # can still queue it indefinitely and silently. 2 min turns that into a
+        # clean, logged failure Prefect can surface. NOTE: lock_timeout also
+        # governs pg_advisory_xact_lock() waits, and a loader legitimately
+        # waiting behind another load may need far longer than 2 min —
+        # acquire_loader_lock() temporarily lifts the timeout for exactly that
+        # wait (the zombie-holder case is covered by the idle timeout above,
+        # so the wait still can't be infinite in practice).
+        transaction.execute(
+            text(
+                "SET idle_in_transaction_session_timeout = '10min'; "
+                "SET lock_timeout = '2min';"
+            )
+        )
 
         # Pre-fetch scientific_name → aphia_id mappings from existing
         # vernaculars so prepare_obis_cells_dataframe can populate
@@ -725,6 +762,13 @@ def main(folder, incremental=False):
     # the tables plateau instead of growing run-over-run, and refreshes
     # planner stats for the tile queries.
     if trajectory_cells is not None:
+        # Announce before starting: VACUUM emits no output until it finishes, so
+        # without this line a multi-minute vacuum right after the final "Wrote to
+        # db" logs looks like a hung run.
+        logger.info(
+            "Data committed. Running post-load VACUUM ANALYZE on "
+            "cde.trajectory_cells (may take several minutes, no output until done)"
+        )
         with _timed("post-load VACUUM ANALYZE", logger):
             with engine.connect().execution_options(
                 isolation_level="AUTOCOMMIT"
