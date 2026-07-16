@@ -20,6 +20,14 @@ ONE_MB = 10**6
 DATASET_SIZE_LIMIT = 1000 * ONE_MB
 QUERY_SIZE_LIMIT = 5000 * ONE_MB
 
+# Some ERDDAP servers (e.g. data.cioospacific.ca) sit behind a WAF that blocks
+# urllib's default "Python-urllib/x.y" User-Agent with HTTP 403. pandas'
+# read_csv(url) uses urllib, so metadata fetches must go through requests with
+# an explicit UA instead. Reuse this UA on the data requests too.
+REQUEST_HEADERS = {
+    "User-Agent": "CIOOS-CDE-Downloader/1.0 (+https://catalogue.cioos.ca)"
+}
+
 DOWNLOADING = "DOWNLOADING"
 COMPLETED = "COMPLETED"
 PARTIAL = "PARTIAL"
@@ -141,8 +149,11 @@ def save_erddap_metadata(dataset, output_path, file_name="erddap_metadata.csv"):
     # Retrieve info url
     metadata_url = e.get_info_url()
 
-    # Retrieve metadata and add server url and dataset_id
-    df_meta = pd.read_csv(metadata_url)
+    # Fetch via requests (not pd.read_csv, which uses urllib and gets 403 from
+    # WAF-protected servers), then parse the CSV from memory.
+    resp = requests.get(metadata_url, headers=REQUEST_HEADERS, timeout=60)
+    resp.raise_for_status()
+    df_meta = pd.read_csv(io.StringIO(resp.text))
     df_meta.insert(loc=0, column="erddap_url", value=dataset["erddap_url"])
     df_meta.insert(loc=1, column="dataset_id", value=dataset["dataset_id"])
 
@@ -421,7 +432,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
             # Download data
             logger.info(f"Download {download_url}")
             data_downloaded = b""
-            with requests.get(download_url, stream=True) as response:
+            with requests.get(download_url, headers=REQUEST_HEADERS, stream=True) as response:
                 # Make sure the connection is working otherswise make a warning and send the error.
                 if response.status_code != 200:
                     if response.status_code == 404:
