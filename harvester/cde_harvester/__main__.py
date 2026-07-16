@@ -164,7 +164,8 @@ def _run_logger():
 @task(task_run_name="merge-and-write-csvs")
 def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skipped,
                          obis_datasets, obis_cells, obis_skipped, df_ckan,
-                         erddap_verified=None, erddap_trajectory_cells=None):
+                         erddap_verified=None, erddap_trajectory_cells=None,
+                         erddap_trajectory_points=None):
     """Join CKAN metadata, merge all sources, and write the output CSVs (@task)."""
     logger = _run_logger()
     datasets_file = f"{folder}/datasets.csv"
@@ -173,10 +174,13 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     ckan_file = f"{folder}/ckan.csv"
     obis_cells_file = f"{folder}/obis_cells.csv"
     trajectory_cells_file = f"{folder}/trajectory_cells.csv"
+    trajectory_points_file = f"{folder}/trajectory_points.csv"
     verified_file = f"{folder}/verified.csv"
 
     if erddap_trajectory_cells is None:
         erddap_trajectory_cells = pd.DataFrame()
+    if erddap_trajectory_points is None:
+        erddap_trajectory_points = pd.DataFrame()
 
     # --- ERDDAP-specific post-processing ---
     if not erddap_datasets.empty:
@@ -252,9 +256,10 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
         )
 
     logger.info(
-        "Adding %s datasets, %s profiles, %s obis_cells, %s trajectory_cells",
+        "Adding %s datasets, %s profiles, %s obis_cells, %s trajectory_cells, "
+        "%s trajectory_points",
         len(datasets), len(erddap_profiles), len(obis_cells),
-        len(erddap_trajectory_cells),
+        len(erddap_trajectory_cells), len(erddap_trajectory_points),
     )
 
     # Write output CSVs
@@ -272,6 +277,9 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     if not erddap_trajectory_cells.empty:
         erddap_trajectory_cells.to_csv(trajectory_cells_file, index=False)
 
+    if not erddap_trajectory_points.empty:
+        erddap_trajectory_points.to_csv(trajectory_points_file, index=False)
+
     # Datasets skipped as unchanged — only their verified_at is bumped by the loader.
     if erddap_verified is not None and not erddap_verified.empty:
         erddap_verified.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
@@ -288,6 +296,11 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     if not erddap_trajectory_cells.empty:
         logger.info(
             "Wrote %s (%d cells)", trajectory_cells_file, len(erddap_trajectory_cells)
+        )
+    if not erddap_trajectory_points.empty:
+        logger.info(
+            "Wrote %s (%d track points)",
+            trajectory_points_file, len(erddap_trajectory_points),
         )
 
     if not skipped_datasets.empty:
@@ -380,6 +393,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         # Collect ERDDAP results
         erddap_profiles = pd.DataFrame()
         erddap_trajectory_cells = pd.DataFrame()
+        erddap_trajectory_points = pd.DataFrame()
         erddap_datasets = pd.DataFrame()
         variables = pd.DataFrame()
         erddap_skipped = pd.DataFrame()
@@ -388,6 +402,9 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             erddap_profiles = pd.concat([erddap_profiles, result.profiles])
             erddap_trajectory_cells = pd.concat(
                 [erddap_trajectory_cells, result.trajectory_cells]
+            )
+            erddap_trajectory_points = pd.concat(
+                [erddap_trajectory_points, result.trajectory_points]
             )
             erddap_datasets = pd.concat([erddap_datasets, result.datasets])
             variables = pd.concat([variables, result.variables])
@@ -451,7 +468,11 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             triggered_source=triggered_source,
             triggered_by=triggered_by,
         )
-        sys.exit(1)
+        # Raise, don't sys.exit: main() also runs INSIDE a Prefect flow, where
+        # SystemExit reports as "Crashed" (no message, no failure handling)
+        # instead of a clean Failed. The CLI path still exits non-zero on an
+        # uncaught exception.
+        raise RuntimeError("No datasets harvested from any source")
 
     if erddap_datasets.empty and obis_datasets.empty:
         logging.info(
@@ -499,6 +520,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         erddap_datasets=erddap_datasets,
         erddap_profiles=erddap_profiles,
         erddap_trajectory_cells=erddap_trajectory_cells,
+        erddap_trajectory_points=erddap_trajectory_points,
         erddap_skipped=erddap_skipped,
         obis_datasets=obis_datasets,
         obis_cells=obis_cells,

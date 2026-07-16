@@ -86,6 +86,10 @@ export default function SelectionProvider ({ children }) {
   const [hoveredDatasetTarget, setHoveredDataset] = useState()
   const hoveredDataset = useDebounce(hoveredDatasetTarget, 120)
 
+  // One platform (trajectory id) picked in the dataset inspector to draw its
+  // full track on the map: {datasetPk, datasetTitle, trajectoryId} | undefined.
+  const [selectedTrajectory, setSelectedTrajectory] = useState()
+
   const [selectAll, setSelectAll] = useState(false)
   const [pointsData, setPointsData] = useState([])
   const [selectionLoading, setSelectionLoading] = useState(true)
@@ -445,6 +449,11 @@ export default function SelectionProvider ({ children }) {
     setActiveWmsOverlay((current) =>
       current && current.pk !== inspectDataset?.pk ? undefined : current
     )
+    // The selected track follows the inspected dataset: leaving the inspector
+    // (or moving to another dataset) clears it from the map.
+    setSelectedTrajectory((current) =>
+      current && current.datasetPk !== inspectDataset?.pk ? undefined : current
+    )
   }, [inspectDataset])
 
   useEffect(() => {
@@ -479,6 +488,8 @@ export default function SelectionProvider ({ children }) {
     setPointsToDownload,
     hoveredDataset,
     setHoveredDataset,
+    selectedTrajectory,
+    setSelectedTrajectory,
     selectAll,
     pointsData,
     setPointsData,

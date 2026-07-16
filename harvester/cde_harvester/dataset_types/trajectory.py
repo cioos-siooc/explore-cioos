@@ -17,6 +17,11 @@ class TrajectoryHandler(DatasetTypeHandler):
     def extract_features(self, dataset):
         return trajectory_features.extract_cells(dataset, count_profiles=False)
 
+    def extract_track_points(self, dataset):
+        # Secondary output: first-fix-per-day ordered positions for
+        # cde.trajectory_points (track-line rendering).
+        return trajectory_features.extract_track_points(dataset, per_profile=False)
+
 
 class TrajectoryProfileHandler(DatasetTypeHandler):
     """Profiles along a track (glider dives). Emits coverage cells with a
@@ -28,3 +33,8 @@ class TrajectoryProfileHandler(DatasetTypeHandler):
 
     def extract_features(self, dataset):
         return trajectory_features.extract_cells(dataset, count_profiles=True)
+
+    def extract_track_points(self, dataset):
+        # Secondary output: one fix per profile (full fidelity at Argo
+        # cadence) for cde.trajectory_points (track-line rendering).
+        return trajectory_features.extract_track_points(dataset, per_profile=True)

@@ -1,0 +1,71 @@
+.timeBar {
+  position: absolute;
+  /* clears the bottom-center dock cluster (fixed at bottom: 22px, ~110px tall) */
+  bottom: 140px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(720px, calc(100% - 220px));
+  background-color: #fff;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  padding: 10px 20px 18px 20px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.timeBarDate {
+  font-weight: 600;
+  font-size: 0.95rem;
+  min-width: 92px;
+  color: #6749ac;
+}
+
+.timeBarSlider {
+  flex: 1;
+  padding: 0 6px;
+  /* leave room for the year marks under the rail */
+  margin-bottom: 4px;
+}
+
+.timeBarSlider .rc-slider-track {
+  background-color: #6749ac;
+}
+
+.timeBarSlider .rc-slider-handle {
+  border-color: #6749ac;
+}
+
+.timeBarControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.timeBarTrail {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.timeBarTrailSelect {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  padding: 3px 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.timeBarSmoothing {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 0.85rem;
+  cursor: pointer;
+}

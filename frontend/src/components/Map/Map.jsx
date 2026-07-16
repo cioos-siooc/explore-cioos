@@ -28,7 +28,10 @@ import {
   getCurrentRangeLevel,
   selectionFromSearchParams,
   updateMapToolTitleLanguage,
-  zoomToDatasetCamera
+  zoomToDatasetCamera,
+  catmullRomSpline,
+  splitTrackRuns,
+  initialBearing
 } from '../../utilities'
 import {
   buildWmsGetMapUrl,
@@ -40,7 +43,11 @@ import {
   colorScale,
   trajectoryColorScale,
   obisColorScale,
-  mixedColorScale
+  mixedColorScale,
+  trackLineColor,
+  selectedTrackColor,
+  tracksMinDate,
+  TRAIL_ALL
 } from '../config'
 import platformColors from '../../components/platformColors'
 import {
@@ -50,6 +57,67 @@ import {
   FIRST_LABEL_LAYER_ID,
   LABEL_LAYER_IDS
 } from './basemapStyle.js'
+
+// North-pointing arrowhead icon for track heads and selected-track fixes;
+// the symbol layers rotate it to each point's course over ground. Drawn at
+// 2x and added with pixelRatio 2 so it stays crisp on hidpi displays.
+function buildHeadArrowImage(fillColor, strokeColor = '#ffffff') {
+  const ratio = 2
+  const size = 16 * ratio
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  ctx.beginPath()
+  ctx.moveTo(size / 2, 1.5 * ratio) // apex (north)
+  ctx.lineTo(size - 2.5 * ratio, size - 2.5 * ratio)
+  ctx.lineTo(size / 2, size - 5.5 * ratio) // tail notch
+  ctx.lineTo(2.5 * ratio, size - 2.5 * ratio)
+  ctx.closePath()
+  ctx.fillStyle = fillColor
+  ctx.fill()
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = 1.5 * ratio
+  ctx.strokeStyle = strokeColor
+  ctx.stroke()
+  return ctx.getImageData(0, 0, size, size)
+}
+
+// Data-layer keys that map to profile cdm_data_types (all share cde.profiles).
+const PROFILE_TYPE_KEYS = [
+  ['profile', 'Profile'],
+  ['timeseries', 'TimeSeries'],
+  ['timeseriesProfile', 'TimeSeriesProfile']
+]
+
+// Combine the filter-derived query string with the data-layer selection into
+// a tile-URL suffix. OBIS off adds includeObis=false, OR-ed with any the
+// Source filter already emitted; trajectories off adds includeTrajectory=false;
+// a profile-type subset adds profileTypes=<comma list> (empty = none). A param
+// is omitted when its layer(s) are fully on, so the URL stays clean. Returns
+// '' or '?...'.
+//
+// excludeTrajectories forces includeTrajectory=false regardless of the layer
+// toggle — used for the coverage-cells URL in tracks mode, where track lines
+// replace the trajectory hexes but the OBIS cells stay.
+function buildTileSuffix(baseQuery, dataLayers, excludeTrajectories = false) {
+  const params = new URLSearchParams(baseQuery)
+  if (dataLayers) {
+    if (!dataLayers.obis || params.get('includeObis') === 'false') {
+      params.set('includeObis', 'false')
+    }
+    const enabledTypes = PROFILE_TYPE_KEYS.filter(
+      ([key]) => dataLayers[key]
+    ).map(([, type]) => type)
+    if (enabledTypes.length < PROFILE_TYPE_KEYS.length) {
+      params.set('profileTypes', enabledTypes.join(','))
+    }
+    if (!dataLayers.trajectories) params.set('includeTrajectory', 'false')
+  }
+  if (excludeTrajectories) params.set('includeTrajectory', 'false')
+  const s = params.toString()
+  return s ? `?${s}` : ''
+}
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
 export default function CreateMap({
@@ -70,6 +138,12 @@ export default function CreateMap({
   setHoveredDataset,
   inspectDataset,
   setDatasetsSelected,
+  tracksMode,
+  scrubTime,
+  trailingDays,
+  smoothTracks,
+  selectedTrajectory,
+  dataLayers,
   griddapCoverage,
   dataLayersVisible = true,
   activeWmsOverlay,
@@ -217,6 +291,93 @@ export default function CreateMap({
   // Signature of the focus state last written to the map, so re-applying an
   // unchanged focus costs nothing (see hoverHighlightPoints).
   const appliedFocus = useRef('')
+  // Latest tracks-mode props for the one-shot map 'load' closure (layers are
+  // created once; these refs let it apply the current mode/scrub window).
+  const tracksModeRef = useRef(tracksMode)
+  const scrubTimeRef = useRef(scrubTime)
+  const trailingDaysRef = useRef(trailingDays)
+  const dataLayersRef = useRef(dataLayers)
+  // Raw (unsmoothed) selected-track response, cached so toggling smoothing
+  // re-renders without re-fetching.
+  const rawTrackRef = useRef(null)
+
+  // UTC-day-snapped scrub window: [scrub date - N days, scrub date + 1 day),
+  // or [tracksMinDate, scrub date + 1 day) for the 'all' trail (full tracks
+  // up to the scrub date — the default; see config.js). Day snapping keeps
+  // the tile URLs stable so the server's URL-keyed tile cache gets hits
+  // across scrubs and users.
+  function tracksTimeWindow(scrub, trailing) {
+    const MS_PER_DAY = 24 * 60 * 60 * 1000
+    const end = new Date(`${scrub}T00:00:00Z`).getTime()
+    const timeMax = `${new Date(end + MS_PER_DAY).toISOString().split('T')[0]}T00:00:00Z`
+    const timeMin =
+      trailing === TRAIL_ALL
+        ? `${tracksMinDate}T00:00:00Z`
+        : `${new Date(end - trailing * MS_PER_DAY).toISOString().split('T')[0]}T00:00:00Z`
+    return { timeMin, timeMax }
+  }
+
+  // Tracks tile URL: dataset-level filters from the regular map query string,
+  // minus the TimeSelector's timeMin/timeMax (the scrub window must not
+  // fight the date-range filter), plus the day-snapped scrub window.
+  function buildTracksTileUrl(queryString, scrub, trailing) {
+    const params = new URLSearchParams(queryString)
+    params.delete('timeMin')
+    params.delete('timeMax')
+    const { timeMin, timeMax } = tracksTimeWindow(scrub, trailing)
+    params.set('timeMin', timeMin)
+    params.set('timeMax', timeMax)
+    return `${server}/tiles/tracks/{z}/{x}/{y}.mvt?${params.toString()}`
+  }
+
+  function refreshTracksSource(queryString, scrub, trailing) {
+    if (!map.current || !map.current.getSource('tracks')) return
+    // Swap the tile URL and re-render via the public setTiles API — it
+    // clears the source's tile cache and reloads the viewport tiles.
+    map.current
+      .getSource('tracks')
+      .setTiles([buildTracksTileUrl(queryString, scrub, trailing)])
+  }
+
+  // Rebuild the shared point/hex and coverage-cell source URLs from the
+  // current filters AND the data-layer selection (plus tracks mode, which
+  // pulls trajectory coverage out of the cells tiles), then force a refetch.
+  // Shared by the filter-change, layer-toggle and tracks-mode effects.
+  function refreshCombinedSources(queryString) {
+    if (!map.current || !map.current.loaded()) return
+    const { tileQuery, cellTileQuery } = tileUrls(queryString)
+    // Swap the tile URLs and re-render via the public setTiles API — it
+    // clears each source's tile cache and reloads the viewport tiles.
+    map.current.getSource('cde-tiles').setTiles([tileQuery])
+    map.current.getSource('cde-cells').setTiles([cellTileQuery])
+  }
+
+  // Apply layer visibility from the data-layer + display toggles:
+  //  - track lines: trajectories on AND tracks-mode sub-toggle;
+  //  - hex aggregates (green combined hexes AND coverage cells): hex cells on.
+  // The "hex cells" toggle hides only the hexagon-aggregation layers, never
+  // the track lines or the high-zoom point layer. Which data feeds the hexes
+  // (trajectories in/out of the coverage cells, OBIS on/off, profile types)
+  // is decided server-side via the tile-URL params — see buildTileSuffix.
+  function applyLayerVisibility() {
+    if (!map.current || !map.current.getLayer('track-lines')) return
+    const trajOn = dataLayersRef.current
+      ? dataLayersRef.current.trajectories !== false
+      : true
+    const hexOn = dataLayersRef.current
+      ? dataLayersRef.current.hexCells !== false
+      : true
+    const showTracks = trajOn && tracksModeRef.current
+    ;['track-lines', 'track-heads', 'track-heads-fixed'].forEach((id) =>
+      map.current.setLayoutProperty(id, 'visibility', showTracks ? 'visible' : 'none')
+    )
+    ;['coverage-hexes', 'coverage-hexes-hovered'].forEach((id) =>
+      map.current.setLayoutProperty(id, 'visibility', hexOn ? 'visible' : 'none')
+    )
+    ;['hexes', 'hexes-hovered'].forEach((id) =>
+      map.current.setLayoutProperty(id, 'visibility', hexOn ? 'visible' : 'none')
+    )
+  }
 
   // Placeholder count ranges used only until the /legend request resolves.
   // The map now mounts before that response arrives, but the count-driven
@@ -586,7 +747,13 @@ export default function CreateMap({
     'points-hovered',
     'points-highlighted',
     'coverage-hexes',
-    'coverage-hexes-hovered'
+    'coverage-hexes-hovered',
+    'track-lines',
+    'track-heads',
+    'track-heads-fixed',
+    'selected-track-line',
+    'selected-track-fixes',
+    'selected-track-fixes-nocog'
   ]
   const griddapLayerIds = ['griddap-coverage-fill', 'griddap-coverage-line']
   // Mirrors the dataLayersVisible prop so removeWmsOverlay (called from map
@@ -611,6 +778,9 @@ export default function CreateMap({
       observationLayerIds,
       visible && dataLayersVisibleRef.current
     )
+    // The blanket show clobbers the tracks-vs-coverage-hexes split; re-apply
+    // the per-data-type toggles on top of it.
+    if (visible && dataLayersVisibleRef.current) applyLayerVisibility()
   }
 
   function removeWmsOverlay() {
@@ -756,6 +926,8 @@ export default function CreateMap({
     dataLayersVisibleRef.current = dataLayersVisible
     if (!map.current || activeWmsOverlay) return
     setLayersVisibility(observationLayerIds, dataLayersVisible)
+    // Blanket show clobbers the tracks-vs-coverage-hexes split; re-apply it.
+    if (dataLayersVisible) applyLayerVisibility()
   }, [dataLayersVisible])
 
   // Layer-picker globe/mercator projection switch. Globe renders high
@@ -858,16 +1030,23 @@ export default function CreateMap({
   const mapQueryRef = useRef(mapQueryString)
   mapQueryRef.current = mapQueryString
 
+  // The filter query and the data-layer selection (plus tracks mode, which
+  // pulls trajectory coverage out of the cells tiles) combine into the two
+  // shared source URLs — see buildTileSuffix.
   const tileUrls = (queryString) => {
-    const filterSuffix = queryString ? `?${queryString}` : ''
+    const filterSuffix = buildTileSuffix(queryString, dataLayersRef.current)
+    const cellFilterSuffix = buildTileSuffix(
+      queryString,
+      dataLayersRef.current,
+      tracksModeRef.current
+    )
     return {
       tileQuery: `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`,
-      cellTileQuery: `${server}/tiles/cells/{z}/{x}/{y}.mvt${filterSuffix}`
+      cellTileQuery: `${server}/tiles/cells/{z}/{x}/{y}.mvt${cellFilterSuffix}`
     }
   }
 
   useEffect(() => {
-    const { tileQuery, cellTileQuery } = tileUrls(mapQueryString)
     // Before the map exists there is nothing to swap and nothing to reset —
     // the 'load' handler below builds the layers from the current query, and
     // resetting here would wipe a selection restored from a share link.
@@ -876,11 +1055,7 @@ export default function CreateMap({
     setPointsToReview()
     map.current.setFilter('points-highlighted', ['in', 'pk', ''])
 
-    // Swap the tile URLs (with the new filter query) and re-render via the
-    // public setTiles API — it clears the source's tile cache and reloads
-    // the viewport tiles internally.
-    map.current.getSource('cde-tiles').setTiles([tileQuery])
-    map.current.getSource('cde-cells').setTiles([cellTileQuery])
+    refreshCombinedSources(mapQueryString)
     setLoading(true)
     doFinalCheck.current = true
 
@@ -893,6 +1068,147 @@ export default function CreateMap({
       setPolygon()
     }
   }, [mapQueryString])
+
+  // Data-layer toggle: refetch the combined/coverage-cell sources with the
+  // new profileTypes/includeObis/includeTrajectory params and re-apply
+  // layer visibility.
+  useEffect(() => {
+    dataLayersRef.current = dataLayers
+    if (!map.current || !map.current.loaded()) return
+    refreshCombinedSources(mapQueryString)
+    applyLayerVisibility()
+  }, [dataLayers])
+
+  // Tracks mode: swap the trajectory coverage hexes for track lines/heads
+  // (respecting the trajectories layer toggle) and load the scrub window.
+  // The coverage-cells source refetches too: in tracks mode the trajectory
+  // counts leave the cells tiles (track lines replace them) while the OBIS
+  // cells stay — see tileUrls.
+  useEffect(() => {
+    tracksModeRef.current = tracksMode
+    if (!map.current || !map.current.getLayer('track-lines')) return
+    applyLayerVisibility()
+    refreshCombinedSources(mapQueryString)
+    if (tracksMode) {
+      refreshTracksSource(mapQueryString, scrubTime, trailingDays)
+    }
+  }, [tracksMode])
+
+  // Scrubbing / trailing-window / filter changes re-query the tracks tiles.
+  useEffect(() => {
+    scrubTimeRef.current = scrubTime
+    trailingDaysRef.current = trailingDays
+    if (!tracksMode) return
+    refreshTracksSource(mapQueryString, scrubTime, trailingDays)
+  }, [mapQueryString, scrubTime, trailingDays])
+
+  // Selected platform: fetch its full track once, render raw or smoothed
+  // (smoothing is render-only — raw response cached in rawTrackRef), dim the
+  // global track layers, and fit the view to the track.
+  useEffect(() => {
+    async function renderSelectedTrack() {
+      if (!map.current || !map.current.getSource('selected-track')) return
+      const source = map.current.getSource('selected-track')
+
+      if (!selectedTrajectory) {
+        rawTrackRef.current = null
+        source.setData({ type: 'FeatureCollection', features: [] })
+        if (map.current.getLayer('track-lines')) {
+          map.current.setPaintProperty('track-lines', 'line-color', trackLineColor)
+          map.current.setLayoutProperty('track-heads', 'icon-image', 'track-head-arrow')
+          map.current.setPaintProperty('track-heads-fixed', 'circle-color', trackLineColor)
+        }
+        return
+      }
+
+      const { datasetPk, trajectoryId } = selectedTrajectory
+      const cacheKey = `${datasetPk}|${trajectoryId}`
+      if (rawTrackRef.current?.key !== cacheKey) {
+        const response = await fetch(
+          `${server}/trajectories/track?datasetPKs=${datasetPk}&trajectoryId=${encodeURIComponent(trajectoryId)}`
+        )
+        if (!response.ok) return
+        const track = await response.json()
+        rawTrackRef.current = {
+          key: cacheKey,
+          coordinates: track.coordinates,
+          times: track.times
+        }
+      }
+      const { coordinates: rawCoordinates, times: rawTimes } = rawTrackRef.current
+      if (!rawCoordinates || rawCoordinates.length === 0) return
+
+      // Split at the antimeridian and at large time gaps BEFORE smoothing so
+      // the spline never interpolates across the seam or across a data gap
+      // (same segmentation rule as the /tiles/tracks layer).
+      const runs = splitTrackRuns(rawCoordinates, rawTimes)
+      const lineFeatures = runs
+        .filter((run) => run.length >= 2)
+        .map((run) => ({
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: smoothTracks ? catmullRomSpline(run) : run
+          },
+          properties: {}
+        }))
+      // Every raw fix, oriented by course over ground within its run: the
+      // bearing from the previous fix (a run's first fix points toward its
+      // next fix instead; coincident fixes inherit the last known course).
+      // Bearings never span run breaks — direction across a data gap or the
+      // antimeridian seam would be meaningless. cog stays unset when a run
+      // has a single fix, which the -nocog circle layer picks up.
+      // runs partitions rawCoordinates in place (every input point appears
+      // exactly once, in order) so a running cursor recovers each point's
+      // original fix time for the tooltip below.
+      let rawIndex = 0
+      const fixFeatures = runs.flatMap((run) => {
+        let lastCog = null
+        return run.map((coordinate, i) => {
+          const time = rawTimes[rawIndex]
+          rawIndex++
+          const cog =
+            i > 0
+              ? initialBearing(run[i - 1], coordinate)
+              : run.length > 1
+                ? initialBearing(coordinate, run[1])
+                : null
+          if (cog !== null) lastCog = cog
+          return {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: coordinate },
+            properties: {
+              ...(lastCog === null ? {} : { cog: lastCog }),
+              time,
+              trajectory_id: trajectoryId,
+              dataset_title: selectedTrajectory.datasetTitle
+            }
+          }
+        })
+      })
+      source.setData({
+        type: 'FeatureCollection',
+        features: [...lineFeatures, ...fixFeatures]
+      })
+
+      if (map.current.getLayer('track-lines')) {
+        map.current.setPaintProperty('track-lines', 'line-color', 'lightgrey')
+        map.current.setLayoutProperty('track-heads', 'icon-image', 'track-head-arrow-dim')
+        map.current.setPaintProperty('track-heads-fixed', 'circle-color', 'lightgrey')
+      }
+
+      const longitudes = rawCoordinates.map((c) => c[0])
+      const latitudes = rawCoordinates.map((c) => c[1])
+      map.current.fitBounds(
+        [
+          [Math.min(...longitudes), Math.min(...latitudes)],
+          [Math.max(...longitudes), Math.max(...latitudes)]
+        ],
+        { padding: 80, maxZoom: 9 }
+      )
+    }
+    renderSelectedTrack()
+  }, [selectedTrajectory, smoothTracks])
 
   const mapZoom = searchParams.get('zoom')
   const mapLongitude = searchParams.get('lon')
@@ -1251,6 +1567,153 @@ export default function CreateMap({
         'points-highlighted'
       )
 
+      // --- Tracks mode layers -------------------------------------------
+      // Track lines + head positions from /tiles/tracks, shown only when
+      // tracks mode is on (visibility swaps with the trajectory hex layers).
+      // Created via refs so the current mode/scrub window applies even
+      // though this load handler runs once.
+      const tracksVisibility = tracksModeRef.current ? 'visible' : 'none'
+      map.current.addSource('tracks', {
+        type: 'vector',
+        tiles: [
+          buildTracksTileUrl(
+            mapQueryRef.current,
+            scrubTimeRef.current,
+            trailingDaysRef.current
+          )
+        ]
+      })
+
+      map.current.addLayer({
+        id: 'track-lines',
+        type: 'line',
+        source: 'tracks',
+        'source-layer': 'track-lines',
+        layout: {
+          visibility: tracksVisibility,
+          'line-cap': 'round',
+          'line-join': 'round'
+        },
+        paint: {
+          'line-color': trackLineColor,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 2, 1, 10, 2.5],
+          // Partial opacity so coincident tracks compound: many voyages ply
+          // the same shipping corridor (27 St. Lawrence voyages in a 90-day
+          // window overlap into what full opacity renders as ONE line), and
+          // stacked translucent lines read as a visibly busier corridor.
+          'line-opacity': 0.55
+        }
+      })
+
+      // Heads with a known course over ground render as arrowheads rotated
+      // to the direction of travel; heads where cog is undefined (single-fix
+      // trajectories, stationary platforms) fall back to circles.
+      map.current.addImage('track-head-arrow', buildHeadArrowImage(trackLineColor), {
+        pixelRatio: 2
+      })
+      map.current.addImage('track-head-arrow-dim', buildHeadArrowImage('lightgrey'), {
+        pixelRatio: 2
+      })
+
+      map.current.addLayer({
+        id: 'track-heads',
+        type: 'symbol',
+        source: 'tracks',
+        'source-layer': 'track-heads',
+        filter: ['has', 'cog'],
+        layout: {
+          visibility: tracksVisibility,
+          'icon-image': 'track-head-arrow',
+          'icon-rotate': ['get', 'cog'],
+          // rotate with the map, not the viewport, so the arrow keeps
+          // pointing along the geographic course
+          'icon-rotation-alignment': 'map',
+          // circles never collided; keep every head visible
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true
+        }
+      })
+
+      map.current.addLayer({
+        id: 'track-heads-fixed',
+        type: 'circle',
+        source: 'tracks',
+        'source-layer': 'track-heads',
+        filter: ['!', ['has', 'cog']],
+        layout: { visibility: tracksVisibility },
+        paint: {
+          'circle-color': trackLineColor,
+          'circle-radius': 4.5,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 1.5
+        }
+      })
+
+      // One selected platform's full track (GeoJSON from /trajectories/track).
+      // Line features render the (optionally smoothed) path; point features
+      // are ALWAYS the raw fixes, so smoothing is visibly cosmetic.
+      map.current.addSource('selected-track', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      })
+
+      map.current.addLayer({
+        id: 'selected-track-line',
+        type: 'line',
+        source: 'selected-track',
+        filter: ['==', ['geometry-type'], 'LineString'],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': selectedTrackColor,
+          'line-width': 3
+        }
+      })
+
+      // Raw fixes with a known course over ground render as arrowheads
+      // (white fill, selected-track-coloured outline — the inverse of the
+      // global heads, matching the old fix circles); fixes where cog is
+      // undefined (singleton runs) keep circles.
+      map.current.addImage(
+        'selected-fix-arrow',
+        buildHeadArrowImage('#ffffff', selectedTrackColor),
+        { pixelRatio: 2 }
+      )
+
+      map.current.addLayer({
+        id: 'selected-track-fixes',
+        type: 'symbol',
+        source: 'selected-track',
+        // full expression syntax ('geometry-type', not the legacy '$type'):
+        // MapLibre 5 rejects filters that mix legacy and expression operators
+        filter: ['all', ['==', ['geometry-type'], 'Point'], ['has', 'cog']],
+        layout: {
+          'icon-image': 'selected-fix-arrow',
+          'icon-size': 0.75,
+          'icon-rotate': ['get', 'cog'],
+          'icon-rotation-alignment': 'map',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true
+        }
+      })
+
+      map.current.addLayer({
+        id: 'selected-track-fixes-nocog',
+        type: 'circle',
+        source: 'selected-track',
+        filter: ['all', ['==', ['geometry-type'], 'Point'], ['!', ['has', 'cog']]],
+        paint: {
+          'circle-color': '#ffffff',
+          'circle-radius': 3,
+          'circle-stroke-color': selectedTrackColor,
+          'circle-stroke-width': 1.5
+        }
+      })
+
+      // Apply the initial trajectory layer visibility from the URL-restored
+      // tracks mode + data-layer selection (track lines vs coverage hexes vs
+      // trajectories-off).
+      applyLayerVisibility()
+
       // Layers are created visible; re-apply the picker state in case the
       // observation layers were toggled off before the style finished loading.
       if (!dataLayersVisibleRef.current) {
@@ -1477,6 +1940,79 @@ export default function CreateMap({
     })
 
     map.current.on('mouseleave', 'coverage-hexes', () => {
+      if (!draw.getMode().includes('draw')) {
+        map.current.getCanvas().style.cursor = 'grab'
+        popup.remove()
+      }
+    })
+
+    ;['track-heads', 'track-heads-fixed'].forEach((layerId) => {
+      map.current.on('mousemove', layerId, (e) => {
+        if (!draw.getMode().includes('draw')) {
+          map.current.getCanvas().style.cursor = 'pointer'
+          const properties = e.features[0].properties
+          const headDate = properties.head_time
+            ? new Date(Number(properties.head_time)).toISOString().replace('T', ' ').slice(0, 16)
+            : ''
+          popup
+            .setLngLat([e.lngLat.lng, e.lngLat.lat])
+            .setHTML(
+              `<div>${properties.dataset_title ? `<b>${properties.dataset_title}</b><br/>` : ''}${properties.trajectory_id}${headDate ? `<br/>${headDate}` : ''}</div>`
+            )
+            .addTo(map.current)
+        }
+      })
+
+      map.current.on('mouseleave', layerId, () => {
+        if (!draw.getMode().includes('draw')) {
+          map.current.getCanvas().style.cursor = 'grab'
+          popup.remove()
+        }
+      })
+    })
+
+    ;['selected-track-fixes', 'selected-track-fixes-nocog'].forEach((layerId) => {
+      map.current.on('mousemove', layerId, (e) => {
+        if (!draw.getMode().includes('draw')) {
+          map.current.getCanvas().style.cursor = 'pointer'
+          const properties = e.features[0].properties
+          const fixDate = properties.time
+            ? properties.time.replace('T', ' ').slice(0, 16)
+            : ''
+          popup
+            .setLngLat([e.lngLat.lng, e.lngLat.lat])
+            .setHTML(
+              `<div>${properties.dataset_title ? `<b>${properties.dataset_title}</b><br/>` : ''}${properties.trajectory_id}${fixDate ? `<br/>${fixDate}` : ''}</div>`
+            )
+            .addTo(map.current)
+        }
+      })
+
+      map.current.on('mouseleave', layerId, () => {
+        if (!draw.getMode().includes('draw')) {
+          map.current.getCanvas().style.cursor = 'grab'
+          popup.remove()
+        }
+      })
+    })
+
+    map.current.on('mousemove', 'track-lines', (e) => {
+      // heads sit above lines; let their own tooltip win
+      if (
+        !draw.getMode().includes('draw') &&
+        map.current.queryRenderedFeatures(e.point, {
+          layers: ['track-heads', 'track-heads-fixed']
+        }).length === 0
+      ) {
+        map.current.getCanvas().style.cursor = 'pointer'
+        popup
+          .setLngLat([e.lngLat.lng, e.lngLat.lat])
+          .setHTML(`<div><b>${e.features[0].properties.trajectory_id}</b></div>`)
+          .addTo(map.current)
+      }
+    })
+
+    map.current.on('mouseleave', 'track-lines', () => {
       if (!draw.getMode().includes('draw')) {
         map.current.getCanvas().style.cursor = 'grab'
         popup.remove()

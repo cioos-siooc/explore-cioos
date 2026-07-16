@@ -596,3 +596,136 @@ export function splitLines(s) {
     </span>
   )
 }
+
+// Split an ordered [lon, lat] coordinate run where consecutive fixes jump
+// more than 180 degrees of longitude (antimeridian crossing) so a track
+// never draws a line looping around the globe. Returns an array of runs.
+export function splitAtAntimeridian(coords) {
+  if (!coords || coords.length === 0) return []
+  const runs = [[coords[0]]]
+  for (let i = 1; i < coords.length; i++) {
+    if (Math.abs(coords[i][0] - coords[i - 1][0]) > 180) {
+      runs.push([coords[i]])
+    } else {
+      runs[runs.length - 1].push(coords[i])
+    }
+  }
+  return runs
+}
+
+// Split an ordered [lon, lat] track into runs, three break conditions
+// (mirrors the segs CTE in web-api /tiles/tracks so the selected-platform
+// view and the tile layer segment identically):
+//   1. antimeridian crossing (consecutive fixes jump >180 deg of longitude);
+//   2. large time gap — over 4x the track's MEDIAN inter-fix gap (its
+//      typical reporting cadence, robust to idle periods — a mean would let
+//      a vessel idle between short cruises draw between-cruise connector
+//      chords), floored at 48h: an Argo float's ~10-day cycles never split,
+//      a ship dark for months between expeditions always does;
+//   3. outage chord — >50km between fixes closer than 96h in time. The
+//      harvester densifies data-backed chords to <=25km, so a long chord on
+//      a sub-96h gap is a reporting outage on a fast platform: the true
+//      path is unknown, draw nothing rather than a chord through
+//      possibly-land. The 96h guard protects slow reporters (Argo drifts
+//      30-100km per cycle) from being shredded by this condition.
+// `times` is the parallel timestamp array from /trajectories/track; without
+// it (or under 2 fixes) this degrades to the antimeridian-only split.
+export function splitTrackRuns(coords, times) {
+  if (!coords || coords.length === 0) return []
+  if (!times || times.length !== coords.length || coords.length < 2) {
+    return splitAtAntimeridian(coords)
+  }
+  const ms = times.map((t) => new Date(t).getTime())
+  const sortedGaps = ms
+    .slice(1)
+    .map((t, i) => t - ms[i])
+    .sort((a, b) => a - b)
+  const medianGapMs = sortedGaps[Math.floor(sortedGaps.length / 2)]
+  const gapMs = Math.max(medianGapMs * 4, 48 * 3600 * 1000)
+
+  const chordKm = (a, b) => {
+    const rad = Math.PI / 180
+    const p1 = a[1] * rad
+    const p2 = b[1] * rad
+    const h =
+      Math.sin(((b[1] - a[1]) * rad) / 2) ** 2 +
+      Math.cos(p1) * Math.cos(p2) * Math.sin(((b[0] - a[0]) * rad) / 2) ** 2
+    return 2 * 6371 * Math.asin(Math.sqrt(h))
+  }
+
+  const runs = [[coords[0]]]
+  for (let i = 1; i < coords.length; i++) {
+    const dtMs = ms[i] - ms[i - 1]
+    if (
+      Math.abs(coords[i][0] - coords[i - 1][0]) > 180 ||
+      dtMs > gapMs ||
+      (chordKm(coords[i - 1], coords[i]) > 50 && dtMs < 96 * 3600 * 1000)
+    ) {
+      runs.push([coords[i]])
+    } else {
+      runs[runs.length - 1].push(coords[i])
+    }
+  }
+  return runs
+}
+
+// Initial great-circle bearing from [lon, lat] point a to point b, in
+// degrees clockwise from north, [0, 360). Returns null for coincident
+// points (direction undefined). The frontend twin of the ST_Azimuth-based
+// cog the /tiles/tracks heads layer carries.
+export function initialBearing(a, b) {
+  if (a[0] === b[0] && a[1] === b[1]) return null
+  const rad = Math.PI / 180
+  const p1 = a[1] * rad
+  const p2 = b[1] * rad
+  const dl = (b[0] - a[0]) * rad
+  const y = Math.sin(dl) * Math.cos(p2)
+  const x =
+    Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl)
+  return (Math.atan2(y, x) / rad + 360) % 360
+}
+
+// Centripetal Catmull-Rom spline through an ordered [lon, lat] coordinate
+// array. PURELY COSMETIC, render-time only: the stored/fetched track data is
+// never modified, endpoints are preserved, and the curve passes through every
+// original fix. Returns a new densified coordinate array.
+export function catmullRomSpline(coords, segmentsPerSpan = 8) {
+  if (!coords || coords.length < 3) return coords
+  const alpha = 0.5 // centripetal — no cusps/self-intersections between fixes
+  const out = [coords[0]]
+
+  const dist = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1])
+
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p0 = coords[i - 1] || coords[i]
+    const p1 = coords[i]
+    const p2 = coords[i + 1]
+    const p3 = coords[i + 2] || coords[i + 1]
+
+    // Coincident fixes would collapse a knot interval to zero (division by
+    // zero below), so every increment gets an epsilon floor.
+    const t0 = 0
+    const t1 = t0 + Math.max(Math.pow(dist(p0, p1), alpha), 1e-9)
+    const t2 = t1 + Math.max(Math.pow(dist(p1, p2), alpha), 1e-9)
+    const t3 = t2 + Math.max(Math.pow(dist(p2, p3), alpha), 1e-9)
+
+    for (let s = 1; s <= segmentsPerSpan; s++) {
+      const t = t1 + ((t2 - t1) * s) / segmentsPerSpan
+      const point = [0, 1].map((axis) => {
+        const a1 =
+          ((t1 - t) / (t1 - t0)) * p0[axis] + ((t - t0) / (t1 - t0)) * p1[axis]
+        const a2 =
+          ((t2 - t) / (t2 - t1)) * p1[axis] + ((t - t1) / (t2 - t1)) * p2[axis]
+        const a3 =
+          ((t3 - t) / (t3 - t2)) * p2[axis] + ((t - t2) / (t3 - t2)) * p3[axis]
+        const b1 =
+          ((t2 - t) / (t2 - t0)) * a1 + ((t - t0) / (t2 - t0)) * a2
+        const b2 =
+          ((t3 - t) / (t3 - t1)) * a2 + ((t - t1) / (t3 - t1)) * a3
+        return ((t2 - t) / (t2 - t1)) * b1 + ((t - t1) / (t2 - t1)) * b2
+      })
+      out.push(point)
+    }
+  }
+  return out
+}

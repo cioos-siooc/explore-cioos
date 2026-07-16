@@ -10,15 +10,28 @@ import {
 import isEmpty from 'lodash/isEmpty'
 
 import { server } from '../../config.js'
-import { basemap as defaultBasemap } from '../../components/config.js'
+import {
+  basemap as defaultBasemap,
+  defaultTrailingDays
+} from '../../components/config.js'
 import {
   applyMapDatasetPKs,
   createDataFilterQueryString,
-  getCurrentRangeLevel
+  getCurrentRangeLevel,
+  useDebounce
 } from '../../utilities.jsx'
 import fetchJson from '../fetchJson.js'
 import usePersistentState from '../usePersistentState.js'
 import { useFilters } from '../filters/FilterProvider.jsx'
+
+const ALL_DATA_LAYERS = {
+  profile: true,
+  timeseries: true,
+  timeseriesProfile: true,
+  obis: true,
+  trajectories: true,
+  hexCells: true
+}
 
 const MapStateContext = createContext()
 
@@ -115,6 +128,34 @@ export default function MapStateProvider ({ children }) {
   function zoomToGeometry (geometry) {
     if (geometry) setZoomTarget({ geometry, nonce: Date.now() })
   }
+
+  // Tracks mode (trajectory track lines + time scrub bar) and the data-type
+  // layer selection, both restored from share-link params (UrlSync writes
+  // them back).
+  const urlParams = new URL(window.location.href).searchParams
+  const [tracksMode, setTracksMode] = useState(
+    urlParams.get('tracks') === 'true'
+  )
+  const [scrubTime, setScrubTime] = useState(
+    urlParams.get('scrubTime') || new Date().toISOString().split('T')[0]
+  )
+  const debouncedScrubTime = useDebounce(scrubTime, 250)
+  const [trailingDays, setTrailingDays] = useState(
+    Number.parseInt(urlParams.get('trail')) || defaultTrailingDays
+  )
+  const [smoothTracks, setSmoothTracks] = useState(false)
+
+  // Data-type layers shown on the map. Absent `layers` param = all on; a
+  // present param is the comma list of enabled layers (so a non-default
+  // selection round-trips through the URL).
+  const [dataLayers, setDataLayers] = useState(() => {
+    const layersParam = urlParams.get('layers')
+    if (layersParam == null) return ALL_DATA_LAYERS
+    const on = new Set(layersParam.split(',').filter(Boolean))
+    return Object.fromEntries(
+      Object.keys(ALL_DATA_LAYERS).map((key) => [key, on.has(key)])
+    )
+  })
 
   const { zoom } = mapView
 
@@ -226,6 +267,17 @@ export default function MapStateProvider ({ children }) {
     setProjection,
     basemap,
     setBasemap,
+    tracksMode,
+    setTracksMode,
+    scrubTime,
+    setScrubTime,
+    debouncedScrubTime,
+    trailingDays,
+    setTrailingDays,
+    smoothTracks,
+    setSmoothTracks,
+    dataLayers,
+    setDataLayers,
     griddapCoverage,
     activeWmsOverlay,
     setActiveWmsOverlay,

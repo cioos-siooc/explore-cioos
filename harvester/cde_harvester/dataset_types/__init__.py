@@ -47,6 +47,19 @@ def feature_kind_for(cdm_data_type):
     return handler.feature_kind if handler else "profiles"
 
 
+def extract_track_points(dataset):
+    """Dispatch the secondary track-point extraction (trajectory types only).
+
+    Returns a TrajectoryPointSchema-shaped frame, or None for types without
+    track output. Call after extract_features() — the trajectory extraction
+    relies on the CF-role variables it resolves.
+    """
+    handler = get_handler(dataset.cdm_data_type)
+    if handler is None:
+        return None
+    return handler.extract_track_points(dataset)
+
+
 # Default registrations. Order matters for reproducible skip messages: it is
 # the order supported_cdm_data_types() reports.
 from cde_harvester.dataset_types.timeseries import TimeSeriesHandler  # noqa: E402

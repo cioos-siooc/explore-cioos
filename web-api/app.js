@@ -24,6 +24,7 @@ const scientificNamesRouter = require("./routes/scientificNames");
 const obisNodesRouter = require("./routes/obisNodes");
 const erddapServersRouter = require("./routes/erddapServers");
 const harvestRouter = require("./routes/harvest");
+const trajectoriesRouter = require("./routes/trajectories");
 const swaggerSpec = require('./swagger');
 const swaggerUi = require('swagger-ui-express');
 
@@ -115,6 +116,7 @@ app.use("/scientificNames", scientificNamesRouter);
 app.use("/obisNodes", obisNodesRouter);
 app.use("/erddapServers", erddapServersRouter);
 app.use("/harvest", harvestRouter);
+app.use("/trajectories", trajectoriesRouter);
 
 // Swagger docs - conditionally enabled via ENABLE_API_DOCS environment variable
 if (process.env.ENABLE_API_DOCS !== 'false') {

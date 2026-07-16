@@ -14,7 +14,8 @@ import {
   colorScale,
   trajectoryColorScale,
   obisColorScale,
-  mixedColorScale
+  mixedColorScale,
+  TRAIL_ALL
 } from '../../config.js'
 import platformColors from '../../platformColors'
 import Spinner from '../../ui/Spinner.jsx'
@@ -58,7 +59,10 @@ export default function Legend({
   layerControls = [],
   basemapOptions = [],
   basemap,
-  onBasemapChange
+  onBasemapChange,
+  tracksMode,
+  trailingDays,
+  dataLayers
 }) {
   const { t } = useTranslation()
   const [legendOpen, setLegendOpen] = useState(true)
@@ -67,6 +71,27 @@ export default function Legend({
   const [layersOpen, setLayersOpen] = useState(
     () => !window.matchMedia('(max-width: 900px)').matches
   )
+
+  // Default all-on when the prop is absent (older callers / initial render).
+  const layers = dataLayers || {
+    profile: true,
+    timeseries: true,
+    timeseriesProfile: true,
+    obis: true,
+    trajectories: true,
+    hexCells: true
+  }
+  // The combined green ramp / platform points carry the profile-family types
+  // + OBIS, plus trajectory coverage when shown as hexes.
+  const hasPointData =
+    layers.profile ||
+    layers.timeseries ||
+    layers.timeseriesProfile ||
+    layers.obis ||
+    (layers.trajectories && !tracksMode)
+  // Below zoom 7 the data draws only as hexes, so the ramp is meaningful only
+  // when hex cells are on; at/above zoom 7 the point layer shows regardless.
+  const showPointRamp = hasPointData && (zoom >= 7 || layers.hexCells)
 
   // Continuous color bar for a hex ramp. The hex counts follow a non-linear
   // (power/log) scale, so the colors are spaced evenly by their scale index
@@ -118,6 +143,9 @@ export default function Legend({
   )
 
   function generateLegendElements() {
+    // The point/hex data types are all toggled off — nothing for this ramp to
+    // describe (the coverage sections below have their own gating).
+    if (!showPointRamp) return null
     // /legend is still in flight and there's no ramp from a previous query to
     // fall back on: the counts are unknown, not zero. Saying "No Data" here
     // (as this did) tells the user their filters excluded everything, which is
@@ -201,29 +229,94 @@ export default function Legend({
     }
   }
 
+  // The trajectory entry: in tracks mode a track-line/arrowhead key, otherwise
+  // the coverage-hex ramp (gated on the trajectories + hex-cells toggles).
+  function generateTrajectoryLegendElements() {
+    // Trajectory layer hidden entirely — no trajectory legend.
+    if (!layers.trajectories) return null
+    // Coverage hexes are hidden when hex cells are off (and it's not tracks
+    // mode), so their ramp shouldn't show either.
+    if (!tracksMode && !layers.hexCells) return null
+    // Tracks mode replaces the coverage-hex ramp with the track-line layers.
+    if (tracksMode) {
+      return (
+        <div className='legendSection' key='tracks'>
+          <div className='legendSectionCaption'>{t('layerTrajectories')}</div>
+          <div className='legendItems'>
+            <div className='legendItem'>
+              <svg className='legendSwatch' width='12' height='12'>
+                <line
+                  x1='1'
+                  y1='10.5'
+                  x2='11'
+                  y2='1.5'
+                  stroke='#6749AC'
+                  strokeWidth='2.5'
+                  strokeLinecap='round'
+                />
+              </svg>
+              <span className='legendItemLabel'>
+                {`${t('legendTrackLine')} (${
+                  trailingDays === TRAIL_ALL
+                    ? t('timeBarTrailAll')
+                    : `${trailingDays}d`
+                })`}
+              </span>
+            </div>
+            <div className='legendItem'>
+              {/* same arrowhead the map draws, pointing along the course */}
+              <svg className='legendSwatch' width='12' height='12' viewBox='0 0 16 16'>
+                <path
+                  d='M8 1.5 L13.5 13.5 L8 10.5 L2.5 13.5 Z'
+                  fill='#6749AC'
+                  stroke='#ffffff'
+                  strokeWidth='1.5'
+                  strokeLinejoin='round'
+                  transform='rotate(45 8 8)'
+                />
+              </svg>
+              <span className='legendItemLabel'>{t('legendTrackHead')}</span>
+            </div>
+          </div>
+        </div>
+      )
+    }
+    if (isEmpty(currentTrajectoryRangeLevel)) return null
+    // Trajectory coverage always renders as hexes, at every zoom level.
+    return renderColorBar(
+      t('legendTrajectoriesPerHex'),
+      trajectoryColorScale,
+      currentTrajectoryRangeLevel,
+      'trajectories'
+    )
+  }
+
   // Trajectory and OBIS coverage always render as hexes, and share one map
   // layer — a hex is coloured by which of the two it holds, or by a third
   // ramp when it holds both. The mixed ramp runs on the occurrence count (see
-  // coverageHexFillColor in Map.jsx), so it reuses the OBIS range.
+  // coverageHexFillColor in Map.jsx), so it reuses the OBIS range. In tracks
+  // mode the trajectory counts leave the cells tiles (track lines replace
+  // them), so only the OBIS ramp can apply then.
   function generateCoverageLegendElements() {
+    const showObisRamp =
+      layers.obis && layers.hexCells && !isEmpty(currentObisRangeLevel)
+    const showTrajectoryHexes =
+      layers.trajectories &&
+      !tracksMode &&
+      layers.hexCells &&
+      !isEmpty(currentTrajectoryRangeLevel)
     return (
       <>
-        {!isEmpty(currentTrajectoryRangeLevel) &&
-          renderColorBar(
-            t('legendTrajectoriesPerHex'),
-            trajectoryColorScale,
-            currentTrajectoryRangeLevel,
-            'trajectories'
-          )}
-        {!isEmpty(currentObisRangeLevel) &&
+        {generateTrajectoryLegendElements()}
+        {showObisRamp &&
           renderColorBar(
             t('legendOccurrencesPerHex'),
             obisColorScale,
             currentObisRangeLevel,
             'occurrences'
           )}
-        {!isEmpty(currentTrajectoryRangeLevel) &&
-          !isEmpty(currentObisRangeLevel) &&
+        {showTrajectoryHexes &&
+          showObisRamp &&
           renderColorBar(
             t('legendMixedPerHex'),
             mixedColorScale,

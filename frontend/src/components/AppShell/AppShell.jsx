@@ -13,6 +13,8 @@ import MapCornerControls from './MapCorner/MapCornerControls.jsx'
 import ZoomToDataset from './ZoomToDataset/ZoomToDataset.jsx'
 import Loading from '../Controls/Loading/Loading.jsx'
 import Legend from '../Controls/Legend/Legend.jsx'
+import LayerSelector from '../Controls/LayerSelector/LayerSelector.jsx'
+import TimeBar from '../Controls/TimeBar/TimeBar.jsx'
 import WmsLegend from '../Controls/WmsLegend/WmsLegend.jsx'
 import IntroModal from '../Controls/IntroModal/IntroModal.jsx'
 import { BASEMAP_OPTIONS } from '../Map/basemapStyle.js'
@@ -45,7 +47,17 @@ export default function AppShell () {
     basemap,
     setBasemap,
     activeWmsOverlay,
-    setActiveWmsOverlay
+    setActiveWmsOverlay,
+    tracksMode,
+    setTracksMode,
+    scrubTime,
+    setScrubTime,
+    trailingDays,
+    setTrailingDays,
+    smoothTracks,
+    setSmoothTracks,
+    dataLayers,
+    setDataLayers
   } = useMapState()
   const { showIntroModal, setShowIntroModal, sidebarOpen } = useUI()
   const { inspectDataset, platformsAvailable } = useSelection()
@@ -113,9 +125,29 @@ export default function AppShell () {
         basemapOptions={basemapOptions}
         basemap={basemap}
         onBasemapChange={setBasemap}
+        tracksMode={tracksMode}
+        trailingDays={trailingDays}
+        dataLayers={dataLayers}
       />
       <MapCornerControls />
+      <LayerSelector
+        dataLayers={dataLayers}
+        setDataLayers={setDataLayers}
+        tracksMode={tracksMode}
+        setTracksMode={setTracksMode}
+        loading={loading}
+      />
       <ZoomToDataset variant='floating' />
+      {tracksMode && dataLayers.trajectories && (
+        <TimeBar
+          scrubTime={scrubTime}
+          setScrubTime={setScrubTime}
+          trailingDays={trailingDays}
+          setTrailingDays={setTrailingDays}
+          smoothTracks={smoothTracks}
+          setSmoothTracks={setSmoothTracks}
+        />
+      )}
       {activeWmsOverlay && !wmsLegendIsInline && (
         <WmsLegend
           overlay={activeWmsOverlay}

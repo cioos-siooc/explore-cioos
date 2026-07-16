@@ -39,3 +39,10 @@ class DatasetTypeHandler(ABC):
         extraction. Default = no-op. TimeSeriesProfile overrides this with
         its collapse-to-timeseries logic."""
         return profiles_with_lat_lon, profile_variables, profile_variable_list
+
+    def extract_track_points(self, dataset):
+        """Hook: secondary output — ordered, downsampled track fixes
+        (TrajectoryPointSchema-shaped) for track-line rendering. Default =
+        None (no track output). Only the trajectory handlers override this;
+        it runs AFTER extract_features for the same dataset."""
+        return None
