@@ -17,7 +17,7 @@ If you just want to see how a dataset is harvested by CDE:
 
 1. Install [Docker](https://docs.docker.com/get-docker/) and [Docker compose](https://docs.docker.com/compose/install/). New versions of Docker include `docker compose`
 2. Rename file `.env.sample` to `.env` and change any settings if needed. If you are running on your local machine these settings don't need to change
-3. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and modify if needed.
+3. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and modify if needed. This step is required — the config is not baked into the image, and the worker refuses to start without one (see [Harvest configuration](#harvest-configuration)).
 4. Copy `docker-compose.override.yaml.sample` to `docker-compose.override.yaml`. The base `docker-compose.yaml` publishes **no** host ports (so it can be deployed as-is behind a proxy such as Coolify); the override publishes nginx and Prefect locally. Ports are configurable via `NGINX_PORT` (default 8098) and `PREFECT_PORT` (default 4200) in `.env`.
 5. Run locally with docker compose:
     1. Development environment: `docker compose up -d`
@@ -39,7 +39,36 @@ docker compose up -d prefect_worker
 ```
 *Note: Set `INCREMENTAL_MODE=true` in your `.env` to make the deployment default to incremental harvesting (faster, only updates changed datasets).*
 
-*Note: Set `HARVEST_CONFIG_FILE` to use a different harvest configuration without passing `-f` (e.g. `-e HARVEST_CONFIG_FILE=/app/harvester/custom_config.yaml`); defaults to `harvest_config.yaml`.*
+#### Harvest configuration
+
+The harvest config (`harvest_config.yaml`) is **not baked into the image** — it
+is provided at runtime, so config changes never require an image rebuild. The
+worker resolves it in priority order (both when registering deployments at
+startup and again at the start of every flow run):
+
+1. **`HARVEST_CONFIG_YAML`** env var — the *full YAML content* inline
+   (Coolify-friendly: editable in the UI, applied on redeploy/recreate).
+2. **`HARVEST_CONFIG_FILE`** env var — path to a config file mounted into the
+   container (set to `/app/harvester/harvest_config.yaml` in the compose files).
+3. A file mounted at `/app/harvester/harvest_config.yaml` — locally via
+   `docker-compose.override.yaml`, in production via the bind mount in
+   `docker-compose.production.yaml`.
+
+If none is found, the worker **refuses to start** with a message listing these
+options — there is no baked fallback, so a misconfigured deploy fails loudly
+instead of silently harvesting the sample servers.
+
+**Updating the config on a running deployment:**
+
+| What changed | What's needed |
+|---|---|
+| Values in the mounted file (`cache`, `incremental`, `dataset_ids`, …) | Nothing — the next flow run re-reads the file |
+| `erddap_urls` / OBIS list in the mounted file | `docker compose restart prefect_worker` — startup re-registers the per-source deployments |
+| Anything set via env (`HARVEST_CONFIG_YAML`, `HARVESTER_CRON`, `.env` values) | `docker compose up -d --force-recreate prefect_worker` — a plain `restart` reuses the old container **and its old environment** (on Coolify: redeploy the resource) |
+
+Remote workers (`docker-compose.worker.yaml`) execute flows too, so they need
+the *same* config as the primary stack — via `HARVEST_CONFIG_YAML` in their
+`.env` or a local file mount (see the comments in that compose file).
 
 This will register the flow with the Prefect server. You can then trigger runs from the UI or let the schedule take over.
 
@@ -173,6 +202,20 @@ Coolify ignores `docker-compose.override.yaml` (and only supports a single
 compose file per resource), so local-dev port publishing never leaks into a
 Coolify deploy.
 
+**Harvest config under Coolify:** relative bind mounts of repo files don't work
+under Coolify (the source resolves to an empty persistent-storage dir), and the
+image no longer bakes a config (the old `BAKED_HARVEST_CONFIG` build variable
+is gone). Provide the config one of two ways:
+
+- Set the **`HARVEST_CONFIG_YAML`** env var on the resource to the full YAML
+  content (multi-line values are supported — the indentation Coolify adds is
+  stripped automatically). Edit it in the UI and redeploy to apply.
+- Or add a **Persistent Storage file mount** onto
+  `/app/harvester/harvest_config.yaml`.
+
+Without one of these the `prefect_worker` container exits at startup with a
+message explaining the options.
+
 ## Production deployment
 
 Deploy CDE to production using Docker Compose with the production configuration
@@ -184,7 +227,7 @@ file (no Coolify). Published host ports are configurable via `.env`:
 
 1. Rename `.env.sample` to `.env` and configure with production settings (docker compose only auto-loads `.env`). The deploy workflow renders these from `.env.production` via 1Password.
 
-2. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and configure the datasets to harvest.
+2. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and configure the datasets to harvest. The file is bind-mounted into the worker (not baked into the image), so it can be edited on the host at any time — see [Harvest configuration](#harvest-configuration) for how changes are picked up.
 
 3. Delete old redis and postgres data (if needed):
 

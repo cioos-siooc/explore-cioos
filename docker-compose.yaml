@@ -150,15 +150,18 @@ services:
     restart: unless-stopped
     command: ["./worker-entrypoint.sh"]
     volumes:
-      # NOTE: the harvest config is NOT bind-mounted here. The image bakes
-      # harvest_config.yaml (from harvest_config.sample.yaml; see harvester
-      # Dockerfile), and the worker reads that baked file. A relative bind-mount
-      # of a repo file doesn't work under Coolify (it resolves the source to an
-      # empty persistent-storage dir and fails "mount dir onto file"). To run a
-      # custom config: locally, mount it via docker-compose.override.yaml (see
-      # docker-compose.override.yaml.sample); under Coolify, use a Persistent
-      # Storage file mount onto /app/harvester/harvest_config.yaml, or bake a
-      # different config into the image.
+      # NOTE: the harvest config is NOT bind-mounted here, and the image does
+      # NOT bake one — it must be provided at runtime (startup fails with
+      # instructions otherwise). A relative bind-mount of a repo file doesn't
+      # work under Coolify (it resolves the source to an empty
+      # persistent-storage dir and fails "mount dir onto file"), so:
+      #   - under Coolify: set the HARVEST_CONFIG_YAML env var to the full YAML
+      #     (editable in the UI; applied on redeploy/recreate), or add a
+      #     Persistent Storage FILE mount onto /app/harvester/harvest_config.yaml;
+      #   - locally: mount ./harvest_config.yaml via docker-compose.override.yaml
+      #     (see docker-compose.override.yaml.sample).
+      # Config is re-read on every container start (deployments re-register) and
+      # on every flow run, so updates never require an image rebuild.
       # Shared output sinks — every replica on this host writes here, and nginx
       # serves harvester_logs read-only at /harvester_logs.
       - harvest_data:/app/harvester/harvest          # resulting CSV files

@@ -17,16 +17,13 @@ COPY ./harvester/cde_db_loader ./cde_db_loader
 COPY ./harvester/run.sh ./run.sh
 COPY ./harvester/worker-entrypoint.sh ./worker-entrypoint.sh
 
-# Bake a harvest config and the OBIS dataset list so the image is self-contained
-# (a worker that doesn't mount a config — e.g. a remote worker, or any Coolify
-# compose deploy where host bind-mounts of repo files don't work — still has a
-# working config). BAKED_HARVEST_CONFIG selects WHICH committed config to bake;
-# it defaults to the sample for local/dev builds. Deployments that want the full
-# production set point it at harvest_config.production.yaml via a build arg (e.g.
-# a Coolify "build variable"). This is build-time only and is distinct from the
-# runtime HARVEST_CONFIG_FILE env var the harvester reads.
-ARG BAKED_HARVEST_CONFIG=harvest_config.sample.yaml
-COPY ./${BAKED_HARVEST_CONFIG} ./harvest_config.yaml
+# The harvest config is deliberately NOT baked into the image — it is provided
+# at runtime so config changes never require a rebuild. Resolution order (see
+# cde_harvester/core/config.py:resolve_harvest_config_file):
+#   1. HARVEST_CONFIG_YAML env var (full YAML content; Coolify UI friendly)
+#   2. HARVEST_CONFIG_FILE env var (path to a mounted file)
+#   3. a file mounted at /app/harvester/harvest_config.yaml
+# Startup fails with an actionable error when none is provided.
 COPY ./Obis_Datasets.json ./Obis_Datasets.json
 
 # 4. Install project itself

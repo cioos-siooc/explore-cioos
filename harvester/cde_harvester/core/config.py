@@ -50,11 +50,19 @@ def normalize_coolify_multiline(value: str) -> str:
 
 
 def resolve_harvest_config_file(config_file):
-    """Resolve effective config: HARVEST_CONFIG_YAML env > mounted/baked-in default.
+    """Resolve the effective harvest config, in priority order:
 
+    1. HARVEST_CONFIG_YAML — full YAML content in an env var (Coolify-friendly:
+       editable in the UI, applied on container recreate).
+    2. HARVEST_CONFIG_FILE — path to a config file mounted into the container.
+    3. `config_file` argument — the mounted/default path.
+
+    The image no longer bakes a config, so the resolved file MUST exist —
+    fail here with an actionable error rather than deep inside the harvest.
     Also writes OBIS_DATASETS_JSON to /tmp/Obis_Datasets.json when set.
     """
     env_config = os.getenv("HARVEST_CONFIG_YAML", "").strip()
+    env_config_file = os.getenv("HARVEST_CONFIG_FILE", "").strip()
     if env_config:
         # Coolify indents multi-line env var continuations; strip it so the YAML parses.
         env_config = normalize_coolify_multiline(env_config)
@@ -62,8 +70,20 @@ def resolve_harvest_config_file(config_file):
         env_config_path.write_text(env_config)
         config_file = str(env_config_path)
         logger.info(f"Using HARVEST_CONFIG_YAML env var ({len(env_config)} bytes -> {env_config_path})")
+    elif env_config_file:
+        config_file = env_config_file
+        logger.info(f"Using HARVEST_CONFIG_FILE env var: {config_file}")
     else:
         logger.info(f"Using harvest config file: {config_file}")
+
+    if not config_file or not Path(config_file).is_file():
+        raise FileNotFoundError(
+            f"Harvest config not found: {config_file!r}. The image does not bake a "
+            "config; provide one via (1) HARVEST_CONFIG_YAML env var with the full "
+            "YAML content, (2) a file mounted at /app/harvester/harvest_config.yaml "
+            "(docker-compose volume, or a Coolify Persistent Storage file mount), or "
+            "(3) HARVEST_CONFIG_FILE env var pointing at a mounted file."
+        )
 
     env_obis = os.getenv("OBIS_DATASETS_JSON", "").strip()
     if env_obis:
