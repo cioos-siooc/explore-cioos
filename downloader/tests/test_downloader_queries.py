@@ -79,3 +79,69 @@ def test_downloader_query(query, tmp_path):
     assert result is not None
     assert isinstance(result["erddap_report"], list)
     assert len(result["erddap_report"]) == len(query_data["cache_filtered"])
+
+
+# One point inside the query polygon (deep + shallow) and one clearly outside it.
+# date_start/date_end are epoch-ms (2015-06-01), inside the query time window.
+_OBIS_DF = pd.DataFrame(
+    {
+        "id": ["a", "b", "c"],
+        "scientificName": ["Gadus morhua", "Gadus morhua", "Pandalus borealis"],
+        "latitude": [52.0, 53.0, 10.0],
+        "longitude": [-130.0, -128.0, 100.0],
+        "date_start": [1433116800000, 1433116800000, 1433116800000],
+        "date_end": [1433116800000, 1433116800000, 1433116800000],
+        "minimumDepthInMeters": [5.0, 10.0, 5.0],
+        "maximumDepthInMeters": [20.0, 50.0, 20.0],
+    }
+)
+
+
+def test_obis_download_parquet(tmp_path):
+    """The OBIS source_type path reads occurrences via DuckDB and writes a
+    polygon-filtered CSV (no ERDDAP/tabledap involvement)."""
+    query_data = json.loads((Path(__file__).parent / "obis_query.json").read_text())
+
+    duck_result = MagicMock()
+    duck_result.df.return_value = _OBIS_DF.copy()
+
+    with patch("duckdb.sql", return_value=duck_result) as duck_sql:
+        result = downloader_wrapper.run_download_query(
+            download_query=query_data,
+            output_folder=tmp_path,
+            create_pdf=False,
+        )
+
+    # DuckDB was used to read the parquet (not the tabledap path).
+    assert duck_sql.called
+    parquet_url = duck_sql.call_args[0][0]
+    assert ".parquet" in parquet_url and "obis-open-data" in parquet_url
+
+    assert len(result["erddap_report"]) == 1
+    entry = result["erddap_report"][0]
+    assert entry["status"] == "COMPLETED"
+    assert entry["no_data"] is False
+    # Row "c" (lon 100, lat 10) is outside the polygon → dropped; 2 rows written.
+    assert entry["n_records"] == 2
+    assert not result["empty_download"]
+    assert result["path"].endswith(".zip")
+
+
+def test_obis_download_empty(tmp_path):
+    """An OBIS dataset with no rows inside the selection reports EMPTY, not a crash."""
+    query_data = json.loads((Path(__file__).parent / "obis_query.json").read_text())
+
+    duck_result = MagicMock()
+    duck_result.df.return_value = _OBIS_DF.iloc[2:].copy()  # only the out-of-polygon row
+
+    with patch("duckdb.sql", return_value=duck_result):
+        result = downloader_wrapper.run_download_query(
+            download_query=query_data,
+            output_folder=tmp_path,
+            create_pdf=False,
+        )
+
+    entry = result["erddap_report"][0]
+    assert entry["status"] == "EMPTY"
+    assert entry["no_data"] is True
+    assert result["empty_download"] is True

@@ -37,15 +37,24 @@ def erddap_server_to_name(server):
     return urlparse(server).netloc.replace(".", "_")
 
 
-def get_variable_list(df_variables: list):
+def get_variable_list(df_variables: list, all_variables: bool = True):
     """
-    Retrieve the list of variables needed within an ERDDAP dataset based on the mandatory variables required.
-    :param erddap_metadata: erddap dataset attributes dataframe
+    Retrieve the list of variables to download from an ERDDAP dataset.
+
+    By default returns ALL variables, so science/payload columns (e.g. a
+    glider's temperature/salinity, which have no cf_role) are included — the
+    previous "mandatory + cf_role only" reduction silently dropped them,
+    leaving trajectory downloads with just time/lat/lon/depth + trajectory_id.
+    Set all_variables=False to fall back to that reduced set.
+    :param df_variables: erddap dataset attributes dataframe
+    :param all_variables: keep every variable (default) vs. mandatory + cf_role
     :return: list of variables to download from erddap
     """
-    # Get a list of mandatory variables to be present if available
-    mandatory_variables = ["time", "latitude", "longitude", "depth"]
+    if all_variables:
+        return df_variables["name"].to_list()
 
+    # Reduced set: mandatory coordinates plus any cf_role-tagged variable.
+    mandatory_variables = ["time", "latitude", "longitude", "depth"]
     variables_to_download = df_variables.query(
         "(name in @mandatory_variables) or (cf_role != '')"
     )["name"].to_list()
@@ -158,6 +167,142 @@ def get_file_name_output(dataset_info, output_path, extension):
     return os.path.join(output_path, f"{file_name}.{extension}")
 
 
+OBIS_PARQUET_URL = "https://obis-open-data.s3.amazonaws.com/occurrence/{dataset_id}.parquet"
+
+
+def download_obis_parquet(dataset, user_query, output_path, polygon_regions):
+    """
+    Download an OBIS dataset's occurrence records for the user's spatial/time/depth
+    selection, reading the OBIS open-data GeoParquet export directly with DuckDB
+    (same source the harvester ingests from) and writing a filtered CSV.
+
+    OBIS datasets are not ERDDAP-backed (erddap_url is the https://obis.org
+    sentinel), so the tabledap path can't serve them. Returns a per-dataset report
+    entry with the same shape as the ERDDAP path so the scheduler/email logic is
+    unchanged.
+    """
+    dataset_id = dataset["dataset_id"]
+    url = OBIS_PARQUET_URL.format(dataset_id=dataset_id)
+
+    # Bounding box for the DuckDB read: the polygon envelope if drawn, else the
+    # user's rectangle, else the whole (web-mercator-valid) world. Bounding the
+    # read server-side keeps the transfer small.
+    def _coord(key, default):
+        # Only fall back on missing/None — 0.0 is a valid coordinate, so `or`
+        # defaulting would be wrong here.
+        val = user_query.get(key)
+        if val is None or (isinstance(val, float) and pd.isna(val)) or val == "":
+            return default
+        return float(val)
+
+    if polygon_regions:
+        lons = [b for r in polygon_regions for b in (r.bounds[0], r.bounds[2])]
+        lats = [b for r in polygon_regions for b in (r.bounds[1], r.bounds[3])]
+        lon_min, lon_max = max(min(lons), -180), min(max(lons), 180)
+        lat_min, lat_max = max(min(lats), -85.06), min(max(lats), 85.06)
+    else:
+        lon_min = max(_coord("lon_min", -180), -180)
+        lon_max = min(_coord("lon_max", 180), 180)
+        lat_min = max(_coord("lat_min", -85.06), -85.06)
+        lat_max = min(_coord("lat_max", 85.06), 85.06)
+
+    # Columns pulled from the `interpreted` struct + _id — the proven set the
+    # harvester reads (sources/obis/harvester.py); reliably present across OBIS
+    # parquet exports.
+    query = f"""
+        SELECT
+            _id                              AS id,
+            interpreted.scientificName       AS scientificName,
+            interpreted.decimalLatitude      AS latitude,
+            interpreted.decimalLongitude     AS longitude,
+            interpreted.date_start           AS date_start,
+            interpreted.date_end             AS date_end,
+            interpreted.minimumDepthInMeters AS minimumDepthInMeters,
+            interpreted.maximumDepthInMeters AS maximumDepthInMeters
+        FROM read_parquet('{url}')
+        WHERE interpreted.decimalLatitude  BETWEEN {lat_min} AND {lat_max}
+          AND interpreted.decimalLongitude BETWEEN {lon_min} AND {lon_max}
+    """
+
+    download_status = DOWNLOADING
+    file_size = 0
+    n_records = 0
+    obis_error = ""
+    try:
+        import duckdb
+
+        df = duckdb.sql(query).df()
+
+        # Depth filter (numeric columns).
+        depth_min = user_query.get("depth_min")
+        depth_max = user_query.get("depth_max")
+        if depth_max not in (None, "") and not pd.isna(depth_max):
+            df = df[df["minimumDepthInMeters"].fillna(0).astype(float) <= float(depth_max)]
+        if depth_min not in (None, "") and not pd.isna(depth_min):
+            df = df[df["maximumDepthInMeters"].fillna(0).astype(float) >= float(depth_min)]
+
+        # Time filter — date_start/date_end are epoch milliseconds in the OBIS
+        # export. Best-effort: skip if the columns don't parse as numeric.
+        try:
+            for bound, col, op in (
+                ("time_min", "date_end", "ge"),
+                ("time_max", "date_start", "le"),
+            ):
+                val = user_query.get(bound)
+                if val:
+                    ts = pd.to_datetime(val, utc=True)
+                    coldt = pd.to_datetime(df[col], unit="ms", utc=True, errors="coerce")
+                    df = df[coldt.ge(ts) if op == "ge" else coldt.le(ts)]
+        except Exception as e:
+            logger.warning("OBIS time filter skipped for {}: {}", dataset_id, e)
+
+        # Refine to the drawn polygon(s) row-by-row: keep a record if it falls
+        # inside ANY region (regions include the ±360 antimeridian duplicates
+        # built by get_datasets).
+        if polygon_regions and not df.empty:
+            df[["latitude", "longitude"]] = df[["latitude", "longitude"]].astype(float)
+            inside = df.apply(
+                lambda x: any(
+                    r.contains(Point(x.longitude, x.latitude)) for r in polygon_regions
+                ),
+                axis=1,
+            )
+            df = df[inside]
+
+        n_records = len(df)
+        if not df.empty:
+            output_file_path = get_file_name_output(dataset, output_path, "csv")
+            df.to_csv(output_file_path, index=False, lineterminator="\n")
+            file_size = os.stat(output_file_path).st_size
+            download_status = COMPLETED
+        else:
+            download_status = EMPTY
+    except Exception as e:
+        download_status = FAILED
+        obis_error = str(e)
+        logger.error(
+            "OBIS parquet download error for {}: {}",
+            dataset_id,
+            e,
+            extra={"dataset_id": dataset_id, "parquet_url": url},
+        )
+
+    return {
+        "erddap_url": dataset["erddap_url"],
+        "dataset_id": dataset_id,
+        "ckan_id": dataset.get("ckan_id"),
+        "download_url_list": [url],
+        "status": download_status,
+        "file_size": file_size,
+        "bytes_downloaded": file_size,
+        "no_data": download_status in (EMPTY, FAILED),
+        "dataset_limit_hit": False,
+        "query_limit_hit": False,
+        "erddap_error": obis_error,
+        "n_records": n_records,
+    }
+
+
 def filter_polygon_region(data, polygone):
     """
     ERDDAP is only compatible with a box method to filter lat/long data.
@@ -214,6 +359,19 @@ def get_datasets(json_query, output_path="", create_pdf=False):
 
     # Download data to drive, down
     for dataset in json_query["cache_filtered"]:
+        # OBIS datasets aren't ERDDAP-backed — pull their occurrences from the
+        # OBIS parquet export instead of the tabledap path.
+        if dataset.get("source_type") == "obis":
+            obis_report = download_obis_parquet(
+                dataset, json_query["user_query"], output_path, polygon_regions
+            )
+            if not obis_report["no_data"]:
+                report["empty_download"] = False
+            report["total_size"] += obis_report["file_size"]
+            obis_report["total_size_so_far"] = report["total_size"]
+            report["erddap_report"] += [obis_report]
+            continue
+
         # If metadata for the dataset is not available retrieve it
         if (
             "erddap_metadata" not in dataset
