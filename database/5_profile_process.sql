@@ -114,9 +114,12 @@ $$ LANGUAGE plpgsql;
 -- obis_process() at the bottom preserves the previous calling convention used
 -- by process_incremental_update().
 --
--- Drop the previous 0-arg signature if present from an earlier deploy. Without
--- this the old single-shot obis_process() can coexist with the wrapper.
+-- Drop earlier signatures if present from a prior deploy, so the new overloads
+-- below (obis_process gained a rebuild_indexes arg; obis_backfill_aphia_ids
+-- gained one too) replace them instead of coexisting as ambiguous overloads.
 DROP FUNCTION IF EXISTS obis_process();
+DROP FUNCTION IF EXISTS obis_process(BOOLEAN);
+DROP FUNCTION IF EXISTS obis_backfill_aphia_ids();
 
 
 -- geom is now a GENERATED ALWAYS AS … STORED column on obis_cells (computed
@@ -230,14 +233,23 @@ $$ LANGUAGE plpgsql;
 -- catches up) leave aphia_ids as default '{}' and fall back to literal-name
 -- matching in dbFilter.js until the next vernacular populate + reprocess.
 --
--- Performance: the GIN index on aphia_ids is dropped before the bulk UPDATE
--- and rebuilt after — rewriting it from scratch is much faster than 100K+
--- incremental insertions. The UPDATE itself is a single hash-join via two
+-- Performance: on a full reload the GIN index on aphia_ids is dropped before the
+-- bulk UPDATE and rebuilt after — rewriting it from scratch is much faster than
+-- 100K+ incremental insertions. The UPDATE itself is a single hash-join via two
 -- CTEs (cell_names → cell_aphias) instead of a per-row correlated subquery.
-CREATE OR REPLACE FUNCTION obis_backfill_aphia_ids() RETURNS bigint AS $$
+--
+-- rebuild_indexes: pass FALSE from the incremental path. DROP INDEX takes an
+-- ACCESS EXCLUSIVE lock on cde.obis_cells, which deadlocks with live web-api
+-- reads (the same class of bug as the old constraint DDL); incremental touches
+-- few rows, so updating with the GIN in place is cheap and lock-safe. The
+-- partial scientific_names GIN is maintained automatically by Postgres as rows
+-- gain aphia_ids, so it needs no manual rebuild in that mode either.
+CREATE OR REPLACE FUNCTION obis_backfill_aphia_ids(rebuild_indexes BOOLEAN DEFAULT TRUE) RETURNS bigint AS $$
 DECLARE n bigint;
 BEGIN
-  DROP INDEX IF EXISTS cde.obis_cells_aphia_ids_gin;
+  IF rebuild_indexes THEN
+    DROP INDEX IF EXISTS cde.obis_cells_aphia_ids_gin;
+  END IF;
 
   WITH cell_names AS (
     SELECT pk, unnest(scientific_names) AS sn
@@ -259,18 +271,20 @@ BEGIN
    WHERE c.pk = ca.pk;
   GET DIAGNOSTICS n = ROW_COUNT;
 
-  CREATE INDEX obis_cells_aphia_ids_gin
-    ON cde.obis_cells USING GIN (aphia_ids);
+  IF rebuild_indexes THEN
+    CREATE INDEX obis_cells_aphia_ids_gin
+      ON cde.obis_cells USING GIN (aphia_ids);
 
-  -- Partial scientific_names GIN: only indexes cells whose aphia_ids are
-  -- still empty (the literal-name fallback in dbFilter.js is the only path
-  -- that uses this index; once aphia_ids is populated, the integer-set GIN
-  -- covers the filter). Drop+rebuild keeps the partial predicate consistent
-  -- with the rows that just got their aphia_ids set above.
-  DROP INDEX IF EXISTS cde.obis_cells_scientific_names_gin;
-  CREATE INDEX obis_cells_scientific_names_gin
-    ON cde.obis_cells USING GIN (scientific_names)
-    WHERE coalesce(array_length(aphia_ids, 1), 0) = 0;
+    -- Partial scientific_names GIN: only indexes cells whose aphia_ids are
+    -- still empty (the literal-name fallback in dbFilter.js is the only path
+    -- that uses this index; once aphia_ids is populated, the integer-set GIN
+    -- covers the filter). Drop+rebuild keeps the partial predicate consistent
+    -- with the rows that just got their aphia_ids set above.
+    DROP INDEX IF EXISTS cde.obis_cells_scientific_names_gin;
+    CREATE INDEX obis_cells_scientific_names_gin
+      ON cde.obis_cells USING GIN (scientific_names)
+      WHERE coalesce(array_length(aphia_ids, 1), 0) = 0;
+  END IF;
 
   RETURN n;
 END;
@@ -280,7 +294,13 @@ $$ LANGUAGE plpgsql;
 -- Wrapper preserved for incremental callers (process_incremental_update calls
 -- obis_process() directly). Full-reload path in db-loader/__main__.py invokes
 -- the sub-functions individually so each gets its own _timed log line.
-CREATE OR REPLACE FUNCTION obis_process(concurrent_refresh BOOLEAN DEFAULT TRUE) RETURNS VOID AS $$
+-- rebuild_indexes is forwarded to obis_backfill_aphia_ids(): the incremental
+-- caller (process_incremental_update) passes FALSE to avoid the ACCESS EXCLUSIVE
+-- DROP INDEX against live readers; full reloads leave it TRUE.
+CREATE OR REPLACE FUNCTION obis_process(
+  concurrent_refresh BOOLEAN DEFAULT TRUE,
+  rebuild_indexes BOOLEAN DEFAULT TRUE
+) RETURNS VOID AS $$
 BEGIN
   PERFORM obis_set_geom();
   PERFORM obis_link_dataset_pk();
@@ -288,7 +308,7 @@ BEGIN
   PERFORM obis_link_point_pk();
   PERFORM obis_update_n_profiles();
   PERFORM obis_refresh_matviews(concurrent_refresh);
-  PERFORM obis_backfill_aphia_ids();
+  PERFORM obis_backfill_aphia_ids(rebuild_indexes);
 END;
 $$ LANGUAGE plpgsql;
 

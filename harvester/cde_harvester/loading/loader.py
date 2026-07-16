@@ -22,7 +22,7 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 # Transaction-scoped advisory lock key. Loads must run STRICTLY one-at-a-time over
 # the SHARED cde tables: a single-source incremental can never interleave with the
 # nightly full-reload (whose remove_all_data() TRUNCATEs every table), and two
-# incremental loads can't fight over drop/set_constraints + DELETE/INSERT.
+# incremental loads can't fight over each other's DELETE/INSERT churn.
 #
 # The lock is NOT taken at the top of the transaction. Incremental loads first
 # populate session-private temp tables (no shared-table contention) WITHOUT the
@@ -52,7 +52,7 @@ def prepare_profiles_dataframe(profiles):
     # Both time bounds are NOT NULL in cde.profiles. Drop either-null rows here,
     # mirroring the harvester's filter (profiles.py): a time_max that passes the
     # harvester's null check but fails parse_erddap_dates' coerce becomes NaT and
-    # would otherwise slip through and fail set_constraints().
+    # would otherwise slip through and fail validate_loaded_data().
     profiles = profiles.drop(
         columns=["altitude_min", "altitude_max", "scientific_names"], errors="ignore"
     ).dropna(subset=["time_min", "time_max"])
@@ -454,10 +454,11 @@ def main(folder, incremental=False):
 
             # Temp-table uploads above are session-private and contend with nothing,
             # so they ran lock-free. Take the lock now: process_incremental_update()
-            # is the phase that touches the shared cde tables (drop/set constraints,
-            # DELETE/INSERT) and must not interleave with another load or the
-            # full-reload TRUNCATE. The lock auto-releases at COMMIT, covering the
-            # harvest-audit appends below and the commit itself.
+            # is the phase that touches the shared cde tables (DELETE/INSERT churn)
+            # and must not interleave with another load or the full-reload TRUNCATE.
+            # It runs as pure DML (no ACCESS EXCLUSIVE DDL), so it no longer
+            # deadlocks with live web-api readers. The lock auto-releases at COMMIT,
+            # covering the harvest-audit appends below and the commit itself.
             acquire_loader_lock()
 
             # Process and UPSERT all data using SQL functions
@@ -541,10 +542,10 @@ def main(folder, incremental=False):
             """)
             )
 
-            with _timed("drop_constraints", logger):
-                logger.info("Dropping constraints")
-                transaction.execute(text("SELECT drop_constraints();"))
-
+            # No drop_constraints() step: the backfilled columns are permanently
+            # NULL-able and the hex FKs are DEFERRABLE INITIALLY DEFERRED (checked
+            # at COMMIT), so nothing needs toggling before the load. See
+            # 7_contraints.sql / validate_loaded_data().
             with _timed("remove_all_data", logger):
                 logger.info("Clearing tables")
                 transaction.execute(text("SELECT remove_all_data();"))
@@ -675,10 +676,12 @@ def main(folder, incremental=False):
                 logger.info("Creating hexes")
                 transaction.execute(text("SELECT create_hexes();"))
 
-            with _timed("set_constraints", logger):
-                # This ensures that all fields were set successfully
-                logger.info("Setting constraints")
-                transaction.execute(text("SELECT set_constraints();"))
+            with _timed("validate_loaded_data", logger):
+                # Ensures every required field was populated (replaces the old
+                # set_constraints() NOT NULL re-add). A plain SELECT — the hex FKs
+                # are validated by the DEFERRABLE constraint at COMMIT.
+                logger.info("Validating loaded data")
+                transaction.execute(text("SELECT validate_loaded_data();"))
 
         # Harvest audit: append-only. Same writes in both incremental and
         # full-reload paths since these tables are never truncated.

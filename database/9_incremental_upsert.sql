@@ -262,10 +262,11 @@ BEGIN
   -- 2. UPSERT datasets
   PERFORM upsert_datasets_from_temp();
 
-  -- 3. Temporarily drop constraints to allow NULL hex values
-  PERFORM drop_constraints();
-
-  -- 4. Replace profiles (delete old, insert new)
+  -- 3. Replace profiles (delete old, insert new). No constraint toggling: the
+  -- backfilled columns are permanently NULL-able and the hex FKs are DEFERRABLE
+  -- INITIALLY DEFERRED (validated at COMMIT), so this whole function stays on DML
+  -- (ROW EXCLUSIVE) and never takes the ACCESS EXCLUSIVE lock that deadlocked
+  -- with live web-api reads. See 7_contraints.sql / validate_loaded_data().
   PERFORM replace_profiles_from_temp();
 
   -- 5. Replace obis_cells (delete old, insert new)
@@ -283,13 +284,19 @@ BEGIN
   -- and relink point_pk).
   PERFORM ckan_process();
   PERFORM profile_process();
-  PERFORM obis_process();
+  -- obis_process(concurrent_refresh => TRUE, rebuild_indexes => FALSE):
+  -- concurrent matview refresh (live readers), and UPDATE aphia_ids in place
+  -- rather than DROP/CREATE INDEX. The drop+rebuild is a full-reload throughput
+  -- optimization; in incremental it would take ACCESS EXCLUSIVE on obis_cells
+  -- (another reader deadlock source) to save work on a small row set.
+  PERFORM obis_process(TRUE, FALSE);
   PERFORM trajectory_process();
 
   -- 9. Create hexes for all data
   PERFORM create_hexes();
 
-  -- 10. Restore constraints
-  PERFORM set_constraints();
+  -- 10. Validate that every required column got populated (replaces the old
+  -- set_constraints() NOT NULL re-add; a plain SELECT, no ACCESS EXCLUSIVE).
+  PERFORM validate_loaded_data();
 END;
 $$ LANGUAGE plpgsql;

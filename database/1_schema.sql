@@ -122,8 +122,13 @@ CREATE TABLE points (
     -- these values are copied back into profiles
     hex_zoom_0 geometry(Polygon,3857),
     hex_zoom_1 geometry(Polygon,3857),
-    hex_0_pk integer,
-    hex_1_pk integer
+    -- FKs are DEFERRABLE INITIALLY DEFERRED: create_hexes() wipes and rebuilds
+    -- hexes_zoom_* then relinks these columns within one transaction, so the
+    -- reference is only valid again at COMMIT (checked there, not per-statement).
+    -- Deferring also keeps loads off ALTER TABLE / ACCESS EXCLUSIVE, which used
+    -- to deadlock with live web-api reads (see migrations/relax-shared-table-constraints.sql).
+    hex_0_pk integer CONSTRAINT hexes_zoom_0_points_foreign REFERENCES hexes_zoom_0(pk) DEFERRABLE INITIALLY DEFERRED,
+    hex_1_pk integer CONSTRAINT hexes_zoom_1_points_foreign REFERENCES hexes_zoom_1(pk) DEFERRABLE INITIALLY DEFERRED
 );
 
 CREATE INDEX ON points USING GIST (geom);
@@ -172,8 +177,12 @@ CREATE TABLE profiles (
     n_records bigint,
     records_per_day float,
     n_profiles bigint,
-    hex_0_pk integer,
-    hex_1_pk integer,
+    -- Hex FKs are DEFERRABLE INITIALLY DEFERRED for the same reason as on
+    -- cde.points above: create_hexes() rebuilds+relinks within the transaction
+    -- and the reference is validated at COMMIT, keeping loads off ACCESS
+    -- EXCLUSIVE DDL that deadlocked with live reads.
+    hex_0_pk integer CONSTRAINT hexes_zoom_0_foreign REFERENCES hexes_zoom_0(pk) DEFERRABLE INITIALLY DEFERRED,
+    hex_1_pk integer CONSTRAINT hexes_zoom_1_foreign REFERENCES hexes_zoom_1(pk) DEFERRABLE INITIALLY DEFERRED,
     point_pk INTEGER,
     days bigint,
     UNIQUE(erddap_url,dataset_id,timeseries_id,profile_id)

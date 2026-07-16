@@ -219,12 +219,12 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     datasets = pd.concat([erddap_datasets, obis_datasets], ignore_index=True)
     skipped_datasets = pd.concat([erddap_skipped, obis_skipped], ignore_index=True)
 
-    # Safety net: cde.datasets has NOT NULL on `title` (set_constraints), but
-    # upstream metadata occasionally lacks one — an ERDDAP dataset with no
-    # title attr + no matching CKAN record, or an OBIS dataset whose metadata
-    # fetch returned an empty dict. Without this, the WHOLE harvest rolls
-    # back at the final ALTER TABLE step. Fall back to dataset_id (always
-    # populated) and log a WARNING so the source data quality issue is
+    # Safety net: title is a required column on cde.datasets (checked by
+    # validate_loaded_data()), but upstream metadata occasionally lacks one — an
+    # ERDDAP dataset with no title attr + no matching CKAN record, or an OBIS
+    # dataset whose metadata fetch returned an empty dict. Without this, the WHOLE
+    # harvest rolls back at the final validation step. Fall back to dataset_id
+    # (always populated) and log a WARNING so the source data quality issue is
     # visible without blocking ingest.
     _missing_title = datasets["title"].isna() | (
         datasets["title"].astype(str).str.strip() == ""

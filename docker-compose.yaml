@@ -237,6 +237,11 @@ services:
     env_file:
       - .env  # DB_USER / DB_PASSWORD / DB_NAME / DB_PORT for the connection URL
     environment:
+      # Under Coolify: declare a domain for the UI (port 4200) so the proxy
+      # routes to it, mirroring SERVICE_FQDN_NGINX_4000 on nginx. Empty value =>
+      # Coolify auto-generates an FQDN; set a value in the UI to pin it. Inert
+      # outside Coolify (base compose still publishes no host ports).
+      SERVICE_FQDN_PREFECT_4200:
       # Use the shared Postgres (db service), isolated in its own `prefect` DB.
       PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT:-5432}/prefect
       PREFECT_API_URL: http://127.0.0.1:4200/api
@@ -246,7 +251,9 @@ services:
       # points at the container's own loopback and fails silently. Relative
       # path works on local + remote Coolify without knowing the FQDN.
       PREFECT_UI_API_URL: /api
-      PREFECT_UI_URL: http://localhost:4200
+      # Coolify injects SERVICE_URL_PREFECT (the public URL) once the FQDN above
+      # is declared; falls back to loopback for standalone local runs.
+      PREFECT_UI_URL: ${SERVICE_URL_PREFECT:-http://localhost:4200}
       PREFECT_HOME: /root/.prefect
     volumes:
       - prefect_data:/root/.prefect
