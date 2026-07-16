@@ -58,7 +58,7 @@
 - [ ] Should we default to globe view?
 - [ ] Group by source should separate by the different ERDDAP servers.
 - [ ] Review UI logic of dataset selected / filter activated / defaults / WMS servers.
-
+- [ ] Should we add a link to the harvest pages in the main ui?
 ---
 
 ## ✅ Completed

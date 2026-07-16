@@ -1,3 +1,11 @@
+# Base compose file — publishes NO host ports by design.
+#
+# This is the single file deployed by Coolify (point the Coolify resource at
+# docker-compose.yaml): its proxy reaches nginx on container port 4000 over the
+# internal docker network via SERVICE_FQDN_NGINX_4000, so host ports would only
+# collide. For standalone local development, host ports (nginx / prefect) come
+# from docker-compose.override.yaml — see docker-compose.override.yaml.sample.
+# For non-Coolify production, use docker-compose.production.yaml.
 services:
   db:
     build: ./database
@@ -86,6 +94,10 @@ services:
       - nginx_logrotate:/var/lib/logrotate
       - harvester_logs:/usr/share/nginx/html/harvester_logs:ro
       - downloads:/usr/share/nginx/html/downloads:ro
+    environment:
+      # Coolify "magic" var: tells Coolify to generate a public FQDN for this
+      # service and proxy it to container port 4000. Inert outside Coolify.
+      - SERVICE_FQDN_NGINX_4000
     depends_on:
       - web-api
   scheduler:
@@ -100,7 +112,9 @@ services:
     env_file:
       - .env
     environment:
-      - "DOWNLOAD_WAF_URL=${APP_DOMAIN}/downloads"
+      # Under Coolify, SERVICE_URL_NGINX is injected with nginx's public URL;
+      # elsewhere it is unset and APP_DOMAIN from .env is used.
+      - "DOWNLOAD_WAF_URL=${SERVICE_URL_NGINX:-${APP_DOMAIN}}/downloads"
     volumes:
       - downloads:/usr/src/app/download_scheduler/downloads
   frontend:
@@ -133,15 +147,18 @@ services:
     restart: unless-stopped
     command: ["./worker-entrypoint.sh"]
     volumes:
-      # NOTE: the harvest config is NOT bind-mounted here. The image bakes
-      # harvest_config.yaml (from harvest_config.sample.yaml; see harvester
-      # Dockerfile), and the worker reads that baked file. A relative bind-mount
-      # of a repo file doesn't work under Coolify (it resolves the source to an
-      # empty persistent-storage dir and fails "mount dir onto file"). To run a
-      # custom config: locally, mount it via docker-compose.override.yaml (see
-      # docker-compose.override.yaml.sample); under Coolify, use a Persistent
-      # Storage file mount onto /app/harvester/harvest_config.yaml, or bake a
-      # different config into the image.
+      # NOTE: the harvest config is NOT bind-mounted here, and the image does
+      # NOT bake one — it must be provided at runtime (startup fails with
+      # instructions otherwise). A relative bind-mount of a repo file doesn't
+      # work under Coolify (it resolves the source to an empty
+      # persistent-storage dir and fails "mount dir onto file"), so:
+      #   - under Coolify: set the HARVEST_CONFIG_YAML env var to the full YAML
+      #     (editable in the UI; applied on redeploy/recreate), or add a
+      #     Persistent Storage FILE mount onto /app/harvester/harvest_config.yaml;
+      #   - locally: mount ./harvest_config.yaml via docker-compose.override.yaml
+      #     (see docker-compose.override.yaml.sample).
+      # Config is re-read on every container start (deployments re-register) and
+      # on every flow run, so updates never require an image rebuild.
       # Shared output sinks — every replica on this host writes here, and nginx
       # serves harvester_logs read-only at /harvester_logs.
       - harvest_data:/app/harvester/harvest          # resulting CSV files

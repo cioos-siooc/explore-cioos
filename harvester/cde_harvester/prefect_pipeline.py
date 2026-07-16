@@ -645,17 +645,23 @@ def main():
     if not args.file:
         logger.error("No config file provided. Use -f to specify harvest_config.yaml")
         sys.exit(1)
+    # Honor HARVEST_CONFIG_YAML (e.g. from Coolify) at registration time too, not
+    # just at flow runtime. Registration derives the per-source deployment list
+    # from this config, so if it ignored the env var the per-source deployments
+    # would reflect the baked config while the orchestrator resolves the env var
+    # at run time — a mismatch that makes every per-source trigger fail.
+    config_file = resolve_harvest_config_file(args.file)
     try:
         if args.deployment == "prod":
             # 'prod' only REGISTERS deployments and exits; the worker runs them.
             pipeline = PrefectCDEPipeline()
-            pipeline.init_config(config_file=args.file)
+            pipeline.init_config(config_file=config_file)
             deploy(pipeline)
         else:
             # Local full run: go through the Harvest Source flow so init/harvest/
             # load all execute inside a flow context (the harvest .submit() tasks
             # need a task runner).
-            cde_pipeline_run(config_file=args.file)
+            cde_pipeline_run(config_file=config_file)
     except Exception as e:
         logger.error(f"CDE Pipeline failed: {e}", exc_info=True)
         sys.exit(1)

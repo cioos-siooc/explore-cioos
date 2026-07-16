@@ -77,7 +77,19 @@ python -m cde_harvester --urls https://catalogue.hakai.org/erddap --cache
 
 The harvester is typically run via Docker Compose. See the main [README](../README.md) for details.
 
-The `HARVEST_CONFIG_FILE` environment variable is automatically set in the docker-compose files to `/app/harvester/harvest_config.yaml`. This allows the harvester to automatically use the mounted config file without needing the `-f` flag.
+The harvest config is **not baked into the image** — it must be provided at
+runtime. It is resolved in priority order (see
+`cde_harvester/core/config.py:resolve_harvest_config_file`):
+
+1. `HARVEST_CONFIG_YAML` env var — full YAML content inline (used on Coolify).
+2. `HARVEST_CONFIG_FILE` env var — path to a mounted config file. The
+   docker-compose files set this to `/app/harvester/harvest_config.yaml`, so
+   the mounted config is used without needing the `-f` flag.
+3. A file mounted at `/app/harvester/harvest_config.yaml`.
+
+If none exists, startup fails with an error listing these options. See the main
+[README](../README.md#harvest-configuration) for how config changes propagate
+to a running deployment.
 
 ### Full Reload Mode (default)
 Clears all existing data and reloads everything from scratch:
