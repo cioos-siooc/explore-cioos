@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from sentry_sdk.integrations.loguru import LoguruIntegration
 from erddap_downloader import downloader_wrapper
 from jinja2 import Environment, FileSystemLoader
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 from loguru import logger
 
@@ -61,9 +61,12 @@ def get_a_download_job():
     session = Session(engine)
 
     rs = session.execute(
-        "SELECT * FROM cde.download_jobs WHERE status='open' ORDER BY time ASC LIMIT 1 FOR UPDATE SKIP LOCKED"
+        text(
+            "SELECT * FROM cde.download_jobs WHERE status='open' ORDER BY time ASC LIMIT 1 FOR UPDATE SKIP LOCKED"
+        )
     )
-    row = rs.fetchone()
+    # .mappings() so columns remain accessible by name (row["pk"]) under SQLAlchemy 2.0
+    row = rs.mappings().fetchone()
 
     if row:
         pk = row["pk"]
@@ -234,7 +237,14 @@ def run_download(row):
     )
 
 
-def update_download_jobs(pk, row, session=engine):
+def update_download_jobs(pk, row, session=None):
     params = ",".join([f"{key}='{value}'" for key, value in row.items()])
     sql = f"UPDATE cde.download_jobs SET {params} WHERE PK={pk}"
-    session.execute(sql)
+    if session is not None:
+        # Caller owns the transaction/commit (see get_a_download_job).
+        session.execute(text(sql))
+    else:
+        # SQLAlchemy 2.0 removed Engine.execute(); run in an auto-committing
+        # transaction via engine.begin().
+        with engine.begin() as conn:
+            conn.execute(text(sql))
