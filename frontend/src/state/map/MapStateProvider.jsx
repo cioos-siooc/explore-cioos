@@ -143,7 +143,6 @@ export default function MapStateProvider ({ children }) {
   const [trailingDays, setTrailingDays] = useState(
     Number.parseInt(urlParams.get('trail')) || defaultTrailingDays
   )
-  const [smoothTracks, setSmoothTracks] = useState(false)
 
   // Data-type layers shown on the map. Absent `layers` param = all on; a
   // present param is the comma list of enabled layers (so a non-default
@@ -274,8 +273,6 @@ export default function MapStateProvider ({ children }) {
     debouncedScrubTime,
     trailingDays,
     setTrailingDays,
-    smoothTracks,
-    setSmoothTracks,
     dataLayers,
     setDataLayers,
     griddapCoverage,

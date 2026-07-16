@@ -25,8 +25,7 @@ export default function TimeBar({
   setScrubTime,
   trailingDays,
   setTrailingDays,
-  smoothTracks,
-  setSmoothTracks
+  sidebarOpen
 }) {
   const { t } = useTranslation()
 
@@ -43,7 +42,7 @@ export default function TimeBar({
   }
 
   return (
-    <div className='timeBar'>
+    <div className={`timeBar ${sidebarOpen ? 'sidebarOpen' : ''}`}>
       <div className='timeBarDate'>{scrubTime}</div>
       <div className='timeBarSlider'>
         <Slider
@@ -76,18 +75,12 @@ export default function TimeBar({
               <option key={days} value={days}>
                 {days === TRAIL_ALL
                   ? t('timeBarTrailAll')
-                  : `${days} ${t('timeBarDays')}`}
+                  : days === 365
+                    ? t('timeBarOneYear')
+                    : `${days} ${t('timeBarDays')}`}
               </option>
             ))}
           </select>
-        </label>
-        <label className='timeBarSmoothing' title={t('trackSmoothingTooltip')}>
-          <input
-            type='checkbox'
-            checked={smoothTracks}
-            onChange={(e) => setSmoothTracks(e.target.checked)}
-          />
-          {t('trackSmoothingLabel')}
         </label>
       </div>
     </div>

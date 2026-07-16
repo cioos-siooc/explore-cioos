@@ -29,7 +29,6 @@ import {
   selectionFromSearchParams,
   updateMapToolTitleLanguage,
   zoomToDatasetCamera,
-  catmullRomSpline,
   splitTrackRuns,
   initialBearing
 } from '../../utilities'
@@ -141,7 +140,6 @@ export default function CreateMap({
   tracksMode,
   scrubTime,
   trailingDays,
-  smoothTracks,
   selectedTrajectory,
   dataLayers,
   griddapCoverage,
@@ -297,8 +295,7 @@ export default function CreateMap({
   const scrubTimeRef = useRef(scrubTime)
   const trailingDaysRef = useRef(trailingDays)
   const dataLayersRef = useRef(dataLayers)
-  // Raw (unsmoothed) selected-track response, cached so toggling smoothing
-  // re-renders without re-fetching.
+  // Raw selected-track response, cached so re-renders don't re-fetch.
   const rawTrackRef = useRef(null)
 
   // UTC-day-snapped scrub window: [scrub date - N days, scrub date + 1 day),
@@ -1102,9 +1099,8 @@ export default function CreateMap({
     refreshTracksSource(mapQueryString, scrubTime, trailingDays)
   }, [mapQueryString, scrubTime, trailingDays])
 
-  // Selected platform: fetch its full track once, render raw or smoothed
-  // (smoothing is render-only — raw response cached in rawTrackRef), dim the
-  // global track layers, and fit the view to the track.
+  // Selected platform: fetch its full track once (cached in rawTrackRef), dim
+  // the global track layers, and fit the view to the track.
   useEffect(() => {
     async function renderSelectedTrack() {
       if (!map.current || !map.current.getSource('selected-track')) return
@@ -1138,9 +1134,9 @@ export default function CreateMap({
       const { coordinates: rawCoordinates, times: rawTimes } = rawTrackRef.current
       if (!rawCoordinates || rawCoordinates.length === 0) return
 
-      // Split at the antimeridian and at large time gaps BEFORE smoothing so
-      // the spline never interpolates across the seam or across a data gap
-      // (same segmentation rule as the /tiles/tracks layer).
+      // Split at the antimeridian and at large time gaps so a line never
+      // spans the seam or a data gap (same segmentation rule as the
+      // /tiles/tracks layer).
       const runs = splitTrackRuns(rawCoordinates, rawTimes)
       const lineFeatures = runs
         .filter((run) => run.length >= 2)
@@ -1148,7 +1144,7 @@ export default function CreateMap({
           type: 'Feature',
           geometry: {
             type: 'LineString',
-            coordinates: smoothTracks ? catmullRomSpline(run) : run
+            coordinates: run
           },
           properties: {}
         }))
@@ -1208,7 +1204,7 @@ export default function CreateMap({
       )
     }
     renderSelectedTrack()
-  }, [selectedTrajectory, smoothTracks])
+  }, [selectedTrajectory])
 
   const mapZoom = searchParams.get('zoom')
   const mapLongitude = searchParams.get('lon')
@@ -1650,8 +1646,7 @@ export default function CreateMap({
       })
 
       // One selected platform's full track (GeoJSON from /trajectories/track).
-      // Line features render the (optionally smoothed) path; point features
-      // are ALWAYS the raw fixes, so smoothing is visibly cosmetic.
+      // Line features render the path; point features are the raw fixes.
       map.current.addSource('selected-track', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] }

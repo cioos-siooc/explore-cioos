@@ -53,8 +53,6 @@ export default function AppShell () {
     setScrubTime,
     trailingDays,
     setTrailingDays,
-    smoothTracks,
-    setSmoothTracks,
     dataLayers,
     setDataLayers
   } = useMapState()
@@ -158,17 +156,18 @@ export default function AppShell () {
         dataLayers={dataLayers}
       />
       <MapCornerControls />
-      <ZoomToDataset variant='floating' />
+      {/* TimeBar renders before the zoom pill: they share the bottom-center
+          spot, and a CSS sibling rule lifts the pill while the bar is shown. */}
       {tracksMode && dataLayers.trajectories && (
         <TimeBar
           scrubTime={scrubTime}
           setScrubTime={setScrubTime}
           trailingDays={trailingDays}
           setTrailingDays={setTrailingDays}
-          smoothTracks={smoothTracks}
-          setSmoothTracks={setSmoothTracks}
+          sidebarOpen={sidebarOpen}
         />
       )}
+      <ZoomToDataset variant='floating' />
       {activeWmsOverlay && !wmsLegendIsInline && (
         <WmsLegend
           overlay={activeWmsOverlay}

@@ -27,7 +27,6 @@ export default function MapContainer () {
     tracksMode,
     debouncedScrubTime,
     trailingDays,
-    smoothTracks,
     dataLayers
   } = useMapState()
   const {
@@ -59,7 +58,6 @@ export default function MapContainer () {
       tracksMode={tracksMode}
       scrubTime={debouncedScrubTime}
       trailingDays={trailingDays}
-      smoothTracks={smoothTracks}
       selectedTrajectory={selectedTrajectory}
       dataLayers={dataLayers}
       griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}

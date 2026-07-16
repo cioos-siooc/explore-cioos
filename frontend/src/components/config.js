@@ -78,7 +78,7 @@ export const mixedColorScale = [
 // the coverage-hex layers; the day trails then narrow to "recent movement".
 export const TRAIL_ALL = 'all'
 export const defaultTrailingDays = TRAIL_ALL
-export const trailingWindowOptions = [7, 14, 30, 90, TRAIL_ALL]
+export const trailingWindowOptions = [7, 14, 30, 90, 180, 365, TRAIL_ALL]
 // Scrub bar domain start; today is the end. Argo-era default.
 export const tracksMinDate = '2000-01-01'
 export const trackLineColor = '#6749AC'

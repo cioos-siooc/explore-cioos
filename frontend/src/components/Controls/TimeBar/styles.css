@@ -1,10 +1,9 @@
 .timeBar {
-  position: absolute;
-  /* clears the bottom-center dock cluster (fixed at bottom: 22px, ~110px tall) */
-  bottom: 140px;
+  position: fixed;
+  bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(720px, calc(100% - 220px));
+  width: min(720px, calc(100% - 48px));
   background-color: #fff;
   border-radius: 6px;
   box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
@@ -13,6 +12,30 @@
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+/* Desktop with the datasets sidebar open: center over the visible map area
+   (the sidebar card is ~420px + 12px gutters on the left) instead of the
+   viewport, so the bar never slides under the sidebar. */
+@media (min-width: 1050px) {
+  .timeBar.sidebarOpen {
+    left: calc(50% + 216px);
+    width: min(720px, calc(100% - 490px));
+  }
+}
+
+/* Clear the datasets bottom sheet on phones (same offset as the
+   zoom-to-dataset pill). */
+@media (max-width: 700px) {
+  .timeBar {
+    bottom: 64px;
+  }
+}
+
+/* The zoom-to-dataset pill shares the bottom-center spot; while the time bar
+   is shown (it renders just before the pill), lift the pill above it. */
+.timeBar ~ .zoomToDatasetButton.floating {
+  bottom: 110px;
 }
 
 .timeBarDate {
