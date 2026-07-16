@@ -13,7 +13,6 @@ import MapCornerControls from './MapCorner/MapCornerControls.jsx'
 import ZoomToDataset from './ZoomToDataset/ZoomToDataset.jsx'
 import Loading from '../Controls/Loading/Loading.jsx'
 import Legend from '../Controls/Legend/Legend.jsx'
-import LayerSelector from '../Controls/LayerSelector/LayerSelector.jsx'
 import TimeBar from '../Controls/TimeBar/TimeBar.jsx'
 import WmsLegend from '../Controls/WmsLegend/WmsLegend.jsx'
 import IntroModal from '../Controls/IntroModal/IntroModal.jsx'
@@ -91,6 +90,34 @@ export default function AppShell () {
     }
   ]
 
+  // Data-type layer switches (which data families draw on the map), shown in
+  // the legend card under the map-layer switches. Hex cells and tracks mode
+  // are display options: how the data draws, not which data shows — the
+  // tracks-mode switch only applies (and only shows) while trajectories are on.
+  const toggleDataLayer = (key) =>
+    setDataLayers({ ...dataLayers, [key]: !dataLayers[key] })
+  const dataLayerControls = [
+    { key: 'profile', label: t('layerProfile') },
+    { key: 'timeseries', label: t('layerTimeseries') },
+    { key: 'timeseriesProfile', label: t('layerTimeseriesProfile') },
+    { key: 'obis', label: t('layerObis') },
+    { key: 'trajectories', label: t('layerTrajectories') },
+    { key: 'hexCells', label: t('layerHexCells') }
+  ].map(({ key, label }) => ({
+    key,
+    label,
+    checked: dataLayers[key],
+    onChange: () => toggleDataLayer(key)
+  }))
+  if (dataLayers.trajectories) {
+    dataLayerControls.push({
+      key: 'tracksMode',
+      label: t('layerTracksMode'),
+      checked: tracksMode,
+      onChange: () => setTracksMode(!tracksMode)
+    })
+  }
+
   const basemapOptions = BASEMAP_OPTIONS.map((option) => ({
     key: option.key,
     label: t(option.translationKey)
@@ -122,6 +149,7 @@ export default function AppShell () {
         zoom={zoom}
         platformsAvailable={platformsAvailable}
         layerControls={layerControls}
+        dataLayerControls={dataLayerControls}
         basemapOptions={basemapOptions}
         basemap={basemap}
         onBasemapChange={setBasemap}
@@ -130,13 +158,6 @@ export default function AppShell () {
         dataLayers={dataLayers}
       />
       <MapCornerControls />
-      <LayerSelector
-        dataLayers={dataLayers}
-        setDataLayers={setDataLayers}
-        tracksMode={tracksMode}
-        setTracksMode={setTracksMode}
-        loading={loading}
-      />
       <ZoomToDataset variant='floating' />
       {tracksMode && dataLayers.trajectories && (
         <TimeBar

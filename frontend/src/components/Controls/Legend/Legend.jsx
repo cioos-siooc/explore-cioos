@@ -57,6 +57,7 @@ export default function Legend({
   zoom,
   platformsAvailable = [],
   layerControls = [],
+  dataLayerControls = [],
   basemapOptions = [],
   basemap,
   onBasemapChange,
@@ -362,7 +363,9 @@ export default function Legend({
         )}
       </div>
 
-      {(layerControls.length > 0 || basemapOptions.length > 0) && (
+      {(layerControls.length > 0 ||
+        dataLayerControls.length > 0 ||
+        basemapOptions.length > 0) && (
         <div className={classNames('legendGroup', { closed: !layersOpen })}>
           {renderGroupHeader(t('layersMenuTitle'), layersOpen, () =>
             setLayersOpen(!layersOpen)
@@ -406,6 +409,24 @@ export default function Legend({
                   />
                 ))}
               </div>
+              {dataLayerControls.length > 0 && (
+                <>
+                  <span className='legendSectionCaption'>
+                    {t('layerSelectorLabel')}
+                  </span>
+                  <div className='legendLayerItems'>
+                    {dataLayerControls.map((control) => (
+                      <Switch
+                        key={control.key}
+                        id={`dataLayer-${control.key}`}
+                        label={control.label}
+                        checked={control.checked}
+                        onChange={control.onChange}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
