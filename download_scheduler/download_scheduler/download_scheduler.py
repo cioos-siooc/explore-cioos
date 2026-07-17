@@ -100,7 +100,10 @@ def email_user(email, status, zip_filename, downloader_output, language):
 
             dataset_urls += [out]
 
-    download_url = envs["DOWNLOAD_WAF_URL"] + zip_filename
+    # Join with a single "/" — DOWNLOAD_WAF_URL has no trailing slash (compose
+    # sets "<domain>/downloads"), so plain concatenation produced
+    # ".../downloadscde_download_xxx.zip".
+    download_url = envs["DOWNLOAD_WAF_URL"].rstrip("/") + "/" + zip_filename
 
     email_subject = {
         "completed": {
