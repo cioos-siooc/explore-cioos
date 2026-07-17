@@ -71,9 +71,47 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
     ? branches.join("\n        UNION ALL\n        ")
     : `${profilesBranch} WHERE FALSE`;
 
+  // The record list is one row per *record* (profile / trajectory / OBIS
+  // dataset), not one per matched feature. Trajectory and OBIS coverage is
+  // stored as grid cells, so a mission crossing 40 cells is 40 rows in
+  // `filtered` all carrying the same trajectory_id (or '' / NULL when the
+  // record is unnamed) — collapsing them here is what keeps the inspector's
+  // table from repeating the same ID down the page. The time/depth extents are
+  // unioned across the cells. profiles_count and the size estimate below still
+  // count features, which is what they mean.
+  const recordsCte = `records AS (
+        SELECT   dataset_pk,
+                 json_agg(json_build_object(
+                   'profile_id', profile_id,
+                   'time_min',   time_min,
+                   'time_max',   time_max,
+                   'depth_min',  depth_min,
+                   'depth_max',  depth_max
+                 ) ORDER BY time_min DESC) AS profiles
+        FROM     (SELECT   dataset_pk,
+                           coalesce(profile_id, timeseries_id) AS profile_id,
+                           min(time_min)::DATE  AS time_min,
+                           max(time_max)::DATE  AS time_max,
+                           min(depth_min)       AS depth_min,
+                           max(depth_max)       AS depth_max
+                  FROM     filtered
+                  GROUP BY dataset_pk, coalesce(profile_id, timeseries_id)) r
+        GROUP BY dataset_pk
+  ),`;
+
   const sql = `WITH combined AS (
         ${combinedInner}
   ),
+  -- Filtering happens once, here, so the record list and the per-dataset
+  -- aggregates below agree on which features matched.
+  filtered AS (
+        SELECT p.*
+        FROM   combined p
+        JOIN   cde.datasets d
+        ON     p.dataset_pk = d.pk
+        WHERE  :filters
+  ),
+  ${getRecordsList ? recordsCte : ""}
   sub AS
         (SELECT   d.pk,
                   d.pk_url,
@@ -125,20 +163,16 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                   coalesce(nullif(range_intersection_length(numrange(:depthMin,:depthMax),numrange(p.depth_min::NUMERIC,p.depth_max::NUMERIC)),0),1) / (coalesce(nullif(p.depth_max-p.depth_min,0),1)) ) AS records_count`
     : ""
 }
-                  ${
-  getRecordsList
-    ? ",json_agg(json_build_object( 'profile_id',coalesce(p.profile_id, p.timeseries_id), 'time_min',p.time_min::DATE, 'time_max',p.time_max::DATE, 'depth_min',p.depth_min, 'depth_max',p.depth_max ) ORDER BY time_min DESC ) AS profiles"
-    : ""
-}
 
-         FROM     combined p
+         FROM     filtered p
          JOIN     cde.datasets d
          ON       p.dataset_pk = d.pk
-         WHERE :filters
          GROUP BY d.pk)
-SELECT *
+SELECT sub.*
+       ${getRecordsList ? ",coalesce(records.profiles, '[]'::json) AS profiles" : ""}
        ${doEstimate ? ",round(:adder + records_count * num_columns * :multiplier) AS SIZE" : ""}
-FROM   sub`;
+FROM   sub
+       ${getRecordsList ? "LEFT JOIN records ON records.dataset_pk = sub.pk" : ""}`;
   let queryParams;
 
   if (doEstimate) {

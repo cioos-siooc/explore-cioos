@@ -11,9 +11,6 @@
 - [ ] Points
 - [ ] OBIS
 
-## UI polish
-- [ ] Remove duplicated rows in dataset table.
-
 ## New features
 - [ ] Add Optional Banner to present to user the very first time for form or question with markdown and date limit option.
 
@@ -73,6 +70,7 @@
 - [x] Review download modal.
 
 ### UI polish
+- [x] Remove duplicated rows in dataset table.
 - [x] In dataset cards make the dot inline with the first line of the title.
 - [x] Add debounce when hover over dataset list and map highlight to avoid flickering all/one dataset.
 - [x] Make download button border radius match the dataset list border radius.
