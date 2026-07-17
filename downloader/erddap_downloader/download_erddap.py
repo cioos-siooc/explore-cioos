@@ -3,6 +3,7 @@ download_erddap regroup a set of tool used by CDE to download ERDDAP datasets.
 """
 
 import io
+import json
 import os
 import sys
 from urllib.parse import urlparse
@@ -185,6 +186,27 @@ def get_file_name_output(dataset_info, output_path, extension):
 
 
 OBIS_PARQUET_URL = "https://obis-open-data.s3.amazonaws.com/occurrence/{dataset_id}.parquet"
+OBIS_DATASET_API = "https://api.obis.org/v3/dataset/{dataset_id}"
+
+
+def save_obis_metadata(dataset_id, output_path):
+    """Write the OBIS dataset-level metadata (title, abstract, node, extent,
+    record counts, etc.) alongside the occurrence CSV. Mirrors the harvester's
+    metadata source. Best-effort — a failure here must not fail the download."""
+    try:
+        resp = requests.get(
+            OBIS_DATASET_API.format(dataset_id=dataset_id),
+            headers=REQUEST_HEADERS,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        results = resp.json().get("results", [])
+        metadata = results[0] if results else {}
+        out_path = os.path.join(output_path, f"{dataset_id}_obis_metadata.json")
+        with open(out_path, "w") as f:
+            json.dump(metadata, f, indent=2)
+    except Exception as e:
+        logger.warning("Failed to fetch OBIS metadata for {}: {}", dataset_id, e)
 
 
 def download_obis_parquet(dataset, user_query, output_path, polygon_regions):
@@ -291,6 +313,7 @@ def download_obis_parquet(dataset, user_query, output_path, polygon_regions):
             output_file_path = get_file_name_output(dataset, output_path, "csv")
             df.to_csv(output_file_path, index=False, lineterminator="\n")
             file_size = os.stat(output_file_path).st_size
+            save_obis_metadata(dataset_id, output_path)
             download_status = COMPLETED
         else:
             download_status = EMPTY

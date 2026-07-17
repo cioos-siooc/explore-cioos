@@ -105,7 +105,10 @@ def test_obis_download_parquet(tmp_path):
     duck_result = MagicMock()
     duck_result.df.return_value = _OBIS_DF.copy()
 
-    with patch("duckdb.sql", return_value=duck_result) as duck_sql:
+    with (
+        patch("duckdb.sql", return_value=duck_result) as duck_sql,
+        patch("erddap_downloader.download_erddap.save_obis_metadata") as save_meta,
+    ):
         result = downloader_wrapper.run_download_query(
             download_query=query_data,
             output_folder=tmp_path,
@@ -114,6 +117,8 @@ def test_obis_download_parquet(tmp_path):
 
     # DuckDB was used to read the parquet (not the tabledap path).
     assert duck_sql.called
+    # OBIS dataset metadata is fetched and saved for a successful download.
+    assert save_meta.called
     parquet_url = duck_sql.call_args[0][0]
     assert ".parquet" in parquet_url and "obis-open-data" in parquet_url
 
@@ -134,7 +139,10 @@ def test_obis_download_empty(tmp_path):
     duck_result = MagicMock()
     duck_result.df.return_value = _OBIS_DF.iloc[2:].copy()  # only the out-of-polygon row
 
-    with patch("duckdb.sql", return_value=duck_result):
+    with (
+        patch("duckdb.sql", return_value=duck_result),
+        patch("erddap_downloader.download_erddap.save_obis_metadata"),
+    ):
         result = downloader_wrapper.run_download_query(
             download_query=query_data,
             output_folder=tmp_path,
