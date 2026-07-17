@@ -188,7 +188,9 @@ services:
       PREFECT_LOGGING_EXTRA_LOGGERS: populate_vernaculars,cde_db_loader,cde_harvester
       # This worker registers the pool + deployments on startup.
       REGISTER_DEPLOYMENTS: "true"
-      # Optional: fire one full harvest immediately on (re)deploy. Off by default.
+      # Optional: fire a harvest on (re)deploy. Off by default.
+      #   false = never; true/once = only when the DB is empty (new install);
+      #   always = every deploy, regardless of DB contents.
       RUN_ON_DEPLOY: ${RUN_ON_DEPLOY:-false}
 
   prefect:
