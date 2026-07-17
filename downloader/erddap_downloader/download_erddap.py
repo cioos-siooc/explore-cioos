@@ -389,19 +389,43 @@ def get_datasets(json_query, output_path="", create_pdf=False):
             report["erddap_report"] += [obis_report]
             continue
 
-        # If metadata for the dataset is not available retrieve it
-        if (
-            "erddap_metadata" not in dataset
-            or "globals" not in dataset["erddap_metadata"]
-            or "variables" not in dataset["erddap_metadata"]
-            or dataset["erddap_metadata"]["variables"] == []
-        ):
+        # If metadata for the dataset is not available retrieve it. A failure
+        # here (unreachable/unresolvable ERDDAP server, etc.) must not abort the
+        # whole job — record this dataset as FAILED and move on to the rest.
+        try:
+            if (
+                "erddap_metadata" not in dataset
+                or "globals" not in dataset["erddap_metadata"]
+                or "variables" not in dataset["erddap_metadata"]
+                or dataset["erddap_metadata"]["variables"] == []
+            ):
 
-            harvest_erddap = cde_harvester.ERDDAP(dataset["erddap_url"])
+                harvest_erddap = cde_harvester.ERDDAP(dataset["erddap_url"])
 
-            harvester_dataset = harvest_erddap.get_dataset(dataset["dataset_id"])
+                harvester_dataset = harvest_erddap.get_dataset(dataset["dataset_id"])
 
-            dataset["erddap_metadata"] = harvester_dataset.df_variables
+                dataset["erddap_metadata"] = harvester_dataset.df_variables
+        except Exception as e:
+            logger.exception(
+                "Failed to fetch ERDDAP metadata for {} ({})",
+                dataset["dataset_id"],
+                dataset["erddap_url"],
+            )
+            report["erddap_report"] += [{
+                "erddap_url": dataset["erddap_url"],
+                "dataset_id": dataset["dataset_id"],
+                "ckan_id": dataset.get("ckan_id"),
+                "download_url_list": [],
+                "status": FAILED,
+                "file_size": 0,
+                "bytes_downloaded": 0,
+                "no_data": True,
+                "dataset_limit_hit": False,
+                "query_limit_hit": False,
+                "erddap_error": str(e),
+                "total_size_so_far": report["total_size"],
+            }]
+            continue
 
         # Get variable list to download
         variable_list = get_variable_list(dataset["erddap_metadata"])
