@@ -28,7 +28,12 @@ log_time:
 #defaults to false
 flush_redis: True
 
-#defaults to false
-incremental: False
+# defaults to false. Incremental now fully replaces routine full reloads:
+# it is delta-proportional, prunes datasets that disappeared upstream
+# (prune_stale_datasets), and never TRUNCATEs — so the site keeps serving
+# during loads. A full reload (False) TRUNCATEs every table and holds an
+# ACCESS EXCLUSIVE lock for the whole rebuild, taking the site down; keep it
+# for disaster recovery only.
+incremental: True
 
 obis_datasets_file: ./Obis_Datasets.json

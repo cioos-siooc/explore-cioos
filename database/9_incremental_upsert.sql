@@ -255,6 +255,8 @@ $$ LANGUAGE plpgsql;
 -- Main incremental processing function
 -- Orchestrates the entire incremental update workflow
 CREATE OR REPLACE FUNCTION process_incremental_update() RETURNS VOID AS $$
+DECLARE
+  has_obis_delta boolean;
 BEGIN
   -- 1. Process temp tables to populate computed fields
   PERFORM process_temp_profiles();
@@ -279,17 +281,39 @@ BEGIN
   PERFORM upsert_skipped_datasets_from_temp();
 
   -- 8. Run processing functions to populate remaining fields
-  -- Note: profile_process() rebuilds points from profiles; obis_process() and
-  -- trajectory_process() must run after it (they re-add their geoms to points
-  -- and relink point_pk).
+  -- Note: cde.points is append-only; profile_process() adds new profile
+  -- geometries first, then obis_process()/trajectory_process() add theirs and
+  -- backfill point_pk on the rows this load replaced (point pks are stable,
+  -- so rows from previous runs keep their links).
   PERFORM ckan_process();
   PERFORM profile_process();
-  -- obis_process(concurrent_refresh => TRUE, rebuild_indexes => FALSE):
-  -- concurrent matview refresh (live readers), and UPDATE aphia_ids in place
-  -- rather than DROP/CREATE INDEX. The drop+rebuild is a full-reload throughput
-  -- optimization; in incremental it would take ACCESS EXCLUSIVE on obis_cells
-  -- (another reader deadlock source) to save work on a small row set.
-  PERFORM obis_process(TRUE, FALSE);
+
+  -- OBIS steps only when this load actually touched OBIS data. The two
+  -- scientific-name matviews read only scientific_names/n_records from
+  -- obis_cells, so they stay valid whenever no OBIS cells changed — and their
+  -- full refresh (~1s+, growing with OBIS volume) was the single largest
+  -- fixed cost of a non-OBIS incremental load.
+  SELECT EXISTS (SELECT 1 FROM temp_obis_cells)
+      OR EXISTS (SELECT 1 FROM temp_datasets td
+                 JOIN cde.datasets d ON d.dataset_id = td.dataset_id
+                 WHERE d.source_type = 'obis')
+    INTO has_obis_delta;
+  IF has_obis_delta THEN
+    -- obis_process(concurrent_refresh => TRUE, rebuild_indexes => FALSE):
+    -- concurrent matview refresh (live readers), and UPDATE aphia_ids in place
+    -- rather than DROP/CREATE INDEX. The drop+rebuild is a full-reload
+    -- throughput optimization; in incremental it would take ACCESS EXCLUSIVE
+    -- on obis_cells (another reader deadlock source) to save work on a small
+    -- row set.
+    PERFORM obis_process(TRUE, FALSE);
+  ELSE
+    -- No OBIS delta: links and matviews are already valid. Still run the
+    -- aphia backfill (cheap — scoped to cells with empty aphia_ids) so
+    -- vernaculars added since the last OBIS load reach obis_cells without
+    -- waiting for one; it doesn't touch what the matviews read.
+    PERFORM obis_backfill_aphia_ids(FALSE);
+  END IF;
+
   PERFORM trajectory_process();
 
   -- 9. Create hexes for all data
@@ -298,5 +322,89 @@ BEGIN
   -- 10. Validate that every required column got populated (replaces the old
   -- set_constraints() NOT NULL re-add; a plain SELECT, no ACCESS EXCLUSIVE).
   PERFORM validate_loaded_data();
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Remove datasets that disappeared upstream, giving the incremental path
+-- full-reload semantics without the TRUNCATE (whose ACCESS EXCLUSIVE lock
+-- blanked the whole site for the duration of a reload).
+--
+-- Coverage: a harvest run fully enumerates each source it touches — every
+-- dataset lands in temp_datasets (changed), temp_verified (skipped as
+-- unchanged) or temp_skipped_datasets (errored / filtered out). So a
+-- cde.datasets row of a covered source that appears in NONE of the three is
+-- gone upstream and can be deleted, along with its profiles/cells rows.
+-- Sources absent from this run are never touched, so concurrent per-source
+-- harvesters each prune only their own source.
+--
+-- Guard: if more than max_fraction of a source's datasets would vanish at
+-- once, that smells like a harvester bug / partial enumeration rather than a
+-- real mass-removal — the source is skipped with a WARNING and nothing is
+-- deleted for it. datasets_lookup is intentionally kept (append-only so
+-- pk_url stays stable if a dataset returns); orphaned points/hexes/
+-- organizations are collected post-commit by gc_orphan_points_and_hexes().
+CREATE OR REPLACE FUNCTION prune_stale_datasets(max_fraction float8 DEFAULT 0.5)
+RETURNS bigint AS $$
+DECLARE
+  src record;
+  n_db bigint;
+  n bigint;
+BEGIN
+  -- The db-loader creates+fills temp_verified when the harvest reported
+  -- unchanged datasets; create it empty here otherwise (also keeps this
+  -- function callable against a loader too old to know about it).
+  CREATE TEMP TABLE IF NOT EXISTS temp_verified
+    (erddap_url text, dataset_id text, verified_at timestamptz);
+
+  DROP TABLE IF EXISTS _prune_candidates;
+  CREATE TEMP TABLE _prune_candidates ON COMMIT DROP AS
+  SELECT d.pk, d.dataset_id, d.erddap_url, d.source_type
+  FROM cde.datasets d
+  JOIN (
+    SELECT DISTINCT erddap_url FROM (
+      SELECT erddap_url FROM temp_datasets
+      UNION ALL SELECT erddap_url FROM temp_verified
+      UNION ALL SELECT erddap_url FROM temp_skipped_datasets
+    ) u WHERE erddap_url IS NOT NULL
+  ) covered ON covered.erddap_url = d.erddap_url
+  WHERE NOT EXISTS (SELECT 1 FROM temp_datasets t
+                    WHERE t.dataset_id = d.dataset_id AND t.erddap_url = d.erddap_url)
+    AND NOT EXISTS (SELECT 1 FROM temp_verified v
+                    WHERE v.dataset_id = d.dataset_id AND v.erddap_url = d.erddap_url)
+    AND NOT EXISTS (SELECT 1 FROM temp_skipped_datasets s
+                    WHERE s.dataset_id = d.dataset_id AND s.erddap_url = d.erddap_url);
+
+  FOR src IN SELECT erddap_url, count(*) AS n_stale
+             FROM _prune_candidates GROUP BY erddap_url
+  LOOP
+    SELECT count(*) INTO n_db FROM cde.datasets d
+    WHERE d.erddap_url = src.erddap_url;
+    IF src.n_stale::float8 / n_db > max_fraction THEN
+      RAISE WARNING
+        'prune_stale_datasets: refusing to prune %/% dataset(s) of % (exceeds max_fraction %); harvester bug or partial enumeration?',
+        src.n_stale, n_db, src.erddap_url, max_fraction;
+      DELETE FROM _prune_candidates WHERE erddap_url = src.erddap_url;
+    ELSE
+      RAISE NOTICE 'prune_stale_datasets: pruning % stale dataset(s) of %',
+        src.n_stale, src.erddap_url;
+    END IF;
+  END LOOP;
+
+  DELETE FROM cde.profiles p USING _prune_candidates c
+  WHERE p.dataset_id = c.dataset_id AND p.erddap_url = c.erddap_url;
+
+  DELETE FROM cde.obis_cells o USING _prune_candidates c
+  WHERE o.dataset_id = c.dataset_id AND c.source_type = 'obis';
+
+  DELETE FROM cde.trajectory_cells t USING _prune_candidates c
+  WHERE t.dataset_id = c.dataset_id AND t.erddap_url = c.erddap_url;
+
+  DELETE FROM cde.skipped_datasets s USING _prune_candidates c
+  WHERE s.dataset_id = c.dataset_id AND s.erddap_url = c.erddap_url;
+
+  DELETE FROM cde.datasets d USING _prune_candidates c WHERE d.pk = c.pk;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
 END;
 $$ LANGUAGE plpgsql;

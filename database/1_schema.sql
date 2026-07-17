@@ -10,21 +10,35 @@ CREATE schema cde;
 
 SET search_path TO cde, public;
 
+-- (i, j) are the cell coordinates in PostGIS's origin-anchored hexagon grid
+-- (ST_HexagonGrid/ST_Hexagon): geom is fully determined by (i, j) and the cell
+-- size (100 km for zoom_0, 10 km for zoom_1). This natural key is what keeps
+-- hex pks stable across loads — create_hexes() upserts on (i, j) and never
+-- deletes, so a cell that already exists keeps its pk forever. Nullable (not
+-- NOT NULL) so a load straddling a deploy can't fail mid-migration; rows that
+-- somehow miss (i, j) are backfilled by migrations/stable-hex-grid.sql on the
+-- next deploy.
 DROP TABLE IF EXISTS hexes_zoom_0;
 CREATE TABLE hexes_zoom_0 (
     pk serial PRIMARY KEY,
+    i integer,
+    j integer,
     geom geometry(Polygon,3857)
 );
 
 CREATE INDEX ON cde.hexes_zoom_0 USING GIST (geom);
+CREATE UNIQUE INDEX hexes_zoom_0_ij_key ON cde.hexes_zoom_0 (i, j);
 
 DROP TABLE IF EXISTS hexes_zoom_1;
 CREATE TABLE hexes_zoom_1 (
     pk serial PRIMARY KEY,
+    i integer,
+    j integer,
     geom geometry(Polygon,3857)
   );
 
 CREATE INDEX ON cde.hexes_zoom_1 USING GIST (geom);
+CREATE UNIQUE INDEX hexes_zoom_1_ij_key ON cde.hexes_zoom_1 (i, j);
 
  
 
@@ -119,21 +133,22 @@ DROP TABLE IF EXISTS points;
 CREATE TABLE points (
     pk serial PRIMARY KEY,
     geom geometry(Point,3857),
-    -- these values are copied back into profiles
-    hex_zoom_0 geometry(Polygon,3857),
-    hex_zoom_1 geometry(Polygon,3857),
-    -- FKs are DEFERRABLE INITIALLY DEFERRED: create_hexes() wipes and rebuilds
-    -- hexes_zoom_* then relinks these columns within one transaction, so the
-    -- reference is only valid again at COMMIT (checked there, not per-statement).
-    -- Deferring also keeps loads off ALTER TABLE / ACCESS EXCLUSIVE, which used
-    -- to deadlock with live web-api reads (see migrations/relax-shared-table-constraints.sql).
+    -- FKs are DEFERRABLE INITIALLY DEFERRED: profiles are inserted with NULL
+    -- hex pks and backfilled by create_hexes() within the load transaction, so
+    -- the reference is only valid again at COMMIT (checked there, not
+    -- per-statement). Deferring also keeps loads off ALTER TABLE / ACCESS
+    -- EXCLUSIVE, which used to deadlock with live web-api reads (see
+    -- migrations/relax-shared-table-constraints.sql).
     hex_0_pk integer CONSTRAINT hexes_zoom_0_points_foreign REFERENCES hexes_zoom_0(pk) DEFERRABLE INITIALLY DEFERRED,
     hex_1_pk integer CONSTRAINT hexes_zoom_1_points_foreign REFERENCES hexes_zoom_1(pk) DEFERRABLE INITIALLY DEFERRED
 );
 
 CREATE INDEX ON points USING GIST (geom);
-CREATE INDEX hex_zoom_0 ON cde.points USING GIST (hex_zoom_0);
-CREATE INDEX hex_zoom_1 ON cde.points USING GIST (hex_zoom_1);
+-- geom is the point's identity: the table is append-only (loads insert unseen
+-- geometries with ON CONFLICT (geom) DO NOTHING, never delete or renumber),
+-- which is what keeps point pks — and everything linked through them —
+-- stable across loads. Orphans are GC'd by gc_orphan_points_and_hexes().
+CREATE UNIQUE INDEX points_geom_key ON cde.points (geom);
 
 
 -- profiles/timeseries per dataset
@@ -305,6 +320,21 @@ CREATE INDEX trajectory_cells_latlon_idx ON trajectory_cells (latitude, longitud
 CREATE INDEX trajectory_cells_hex_0_idx ON trajectory_cells (hex_0_pk);
 CREATE INDEX trajectory_cells_hex_1_idx ON trajectory_cells (hex_1_pk);
 ALTER TABLE cde.trajectory_cells SET (fillfactor = 80);
+
+-- Aggressive autovacuum on the load-churned tables. Incremental loads
+-- DELETE+INSERT each changed dataset's rows; at the default scale factor
+-- (0.2) a 780k-row table accrues ~156k dead tuples before autovacuum reacts,
+-- which then bursts IO against live web-api traffic. 0.02 makes cleanup
+-- small and frequent instead (autovacuum's cost-based throttling paces the
+-- IO). Same values as migrations/autovacuum-churned-tables.sql.
+ALTER TABLE cde.profiles SET (
+  autovacuum_vacuum_scale_factor = 0.02, autovacuum_analyze_scale_factor = 0.02);
+ALTER TABLE cde.obis_cells SET (
+  autovacuum_vacuum_scale_factor = 0.02, autovacuum_analyze_scale_factor = 0.02);
+ALTER TABLE cde.trajectory_cells SET (
+  autovacuum_vacuum_scale_factor = 0.02, autovacuum_analyze_scale_factor = 0.02);
+ALTER TABLE cde.points SET (
+  autovacuum_vacuum_scale_factor = 0.02, autovacuum_analyze_scale_factor = 0.02);
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 

@@ -427,6 +427,13 @@ def main(folder, incremental=False):
                 "Using INCREMENTAL mode - will load to temp tables, process, then UPSERT"
             )
 
+            # Deprioritize this load relative to live web-api traffic: without
+            # this, the merge phase's larger scans can fan out across every
+            # core and starve public queries. Single-threaded is fine here —
+            # the processing phase is delta-sized — and the full-reload path
+            # deliberately keeps parallelism (it runs with the site down).
+            transaction.execute(text("SET max_parallel_workers_per_gather = 0"))
+
             # Incremental approach using temporary tables:
             # 1. Load all data into temporary tables (no constraints)
             # 2. Run all processing functions on temp tables
@@ -505,13 +512,15 @@ def main(folder, incremental=False):
                 logger.info("Incremental update complete")
 
             # Skipped-unchanged datasets: advance only verified_at.
+            # IF NOT EXISTS because prune_stale_datasets() below reads
+            # temp_verified as part of the run's coverage and creates it empty
+            # when this block didn't run first.
             if verified is not None and not verified.empty:
                 with _timed("verified_at bump", logger):
                     logger.info("Bumping verified_at for %d unchanged datasets", len(verified))
                     transaction.execute(text(
-                        "CREATE TEMP TABLE temp_verified "
-                        "(erddap_url text, dataset_id text, verified_at timestamptz) "
-                        "ON COMMIT DROP"
+                        "CREATE TEMP TABLE IF NOT EXISTS temp_verified "
+                        "(erddap_url text, dataset_id text, verified_at timestamptz)"
                     ))
                     verified[["erddap_url", "dataset_id", "verified_at"]].to_sql(
                         "temp_verified",
@@ -526,6 +535,23 @@ def main(folder, incremental=False):
                         "WHERE d.dataset_id = v.dataset_id "
                         "AND d.erddap_url = v.erddap_url"
                     ))
+
+            # Prune datasets that disappeared upstream. A harvest fully
+            # enumerates each source it covers (changed -> temp_datasets,
+            # unchanged -> temp_verified, errored/filtered -> temp_skipped),
+            # so anything of a covered source in none of the three is gone
+            # upstream. This gives incremental loads full-reload semantics
+            # without the TRUNCATE, so routine runs never need the full-reload
+            # path (and its site-blocking ACCESS EXCLUSIVE lock) at all. A
+            # per-source guard inside the function refuses mass-removals
+            # (> 50% of a source) as a harvester-bug precaution.
+            if os.environ.get("CDE_PRUNE_STALE", "1").lower() not in ("0", "false", "no"):
+                with _timed("prune_stale_datasets", logger):
+                    n_pruned = transaction.execute(
+                        text("SELECT prune_stale_datasets();")
+                    ).scalar()
+                    if n_pruned:
+                        logger.info("Pruned %d dataset(s) no longer present upstream", n_pruned)
 
         else:
             # Original full reload logic
@@ -754,6 +780,28 @@ def main(folder, incremental=False):
             logger.info("Wrote to db: %s", f"{schema}.harvest_runs")
         if harvest_attempts_df is not None:
             logger.info("Wrote to db: %s", f"{schema}.harvest_attempts")
+
+    # Post-commit maintenance, part 1: GC of orphaned points/hex cells.
+    # cde.points and hexes_zoom_* are append-only during loads (stable pks);
+    # rows orphaned by shrinking/removed datasets are collected here instead,
+    # OUTSIDE the load transaction so they never extend it. Runs under the
+    # loader advisory lock so it can't interleave with another load's linking
+    # phase — but with try-lock: if another load is already queued/running,
+    # skip and let a later run collect (orphans are invisible to the API
+    # meanwhile, so deferral is free).
+    with engine.begin() as tx:
+        got_lock = tx.execute(
+            text("SELECT pg_try_advisory_xact_lock(:k)"),
+            {"k": DB_LOADER_ADVISORY_LOCK_KEY},
+        ).scalar()
+        if got_lock:
+            with _timed("gc_orphan_points_and_hexes", logger):
+                n_gc = tx.execute(
+                    text("SELECT gc_orphan_points_and_hexes();")
+                ).scalar()
+                logger.info("GC removed %d orphaned point/hex row(s)", n_gc)
+        else:
+            logger.info("Skipping orphan GC: another load holds the loader lock")
 
     # Post-commit maintenance (VACUUM can't run inside the transaction).
     # Every load leaves one dead version per rewritten row (create_hexes()
