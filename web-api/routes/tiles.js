@@ -513,7 +513,9 @@ router.get(
         PARTITION BY dataset_pk, trajectory_id ORDER BY time
       ) AS seg
       FROM (
-        SELECT *, (
+        -- coalesce: each trajectory's first fix has no lag row, so the OR is
+        -- NULL — left as-is it would sum() into a NULL seg discarded below.
+        SELECT *, coalesce((
           abs(longitude - lag(longitude) OVER w) > 180
           OR extract(epoch FROM time - lag(time) OVER w) > gap_secs
           OR (
@@ -523,7 +525,7 @@ router.get(
             ) > 50000
             AND extract(epoch FROM time - lag(time) OVER w) < 345600
           )
-        )::int AS brk
+        )::int, 0) AS brk
         FROM pts
         WINDOW w AS (PARTITION BY dataset_pk, trajectory_id ORDER BY time)
       ) q
@@ -544,8 +546,8 @@ router.get(
              trajectory_id, pk_url, dataset_title,
              (extract(epoch FROM time) * 1000)::bigint AS head_time,
              round(degrees(ST_Azimuth(
-               ST_MakePoint(lag(longitude) OVER w, lag(latitude) OVER w)::geography,
-               ST_MakePoint(longitude, latitude)::geography
+               ST_SetSRID(ST_MakePoint(lag(longitude) OVER w, lag(latitude) OVER w), 4326)::geography,
+               ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography
              )))::int AS cog,
              geom
       FROM pts

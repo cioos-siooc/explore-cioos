@@ -7,7 +7,8 @@ const cache = require("../utils/cache");
 const { errorHandler } = require("../utils/validatorMiddlewares");
 
 // datasetPKs here is a single dataset's pk_url (same key the tile/filter
-// queries use); trajectoryId is the cf_role=trajectory_id value ('' for
+// queries use — the plural name kept for consistency, but only one pk is
+// accepted); trajectoryId is the cf_role=trajectory_id value ('' for
 // datasets with one unnamed trajectory). The charset stays permissive for
 // glider mission names; length-capped as a safety net.
 const trajectoryIdCheck = check("trajectoryId")
@@ -56,12 +57,12 @@ router.get(
       SELECT s.trajectory_id, s.time_min, s.time_max, s.n_points
       FROM cde.trajectory_track_stats s
       JOIN cde.datasets d ON d.pk = s.dataset_pk
-      WHERE d.pk_url = ANY(:datasetPKs)
+      WHERE d.pk_url = :datasetPK
       ORDER BY s.trajectory_id`;
 
     try {
       const rows = (
-        await db.raw(SQL, { datasetPKs: datasetPKs.split(",") })
+        await db.raw(SQL, { datasetPK: parseInt(datasetPKs, 10) })
       ).rows;
       res.send(rows);
     } catch (e) {
@@ -129,13 +130,13 @@ router.get(
       SELECT p.longitude, p.latitude, p.time, p.profile_id
       FROM cde.trajectory_points p
       JOIN cde.datasets d ON d.pk = p.dataset_pk
-      WHERE d.pk_url = ANY(:datasetPKs)
+      WHERE d.pk_url = :datasetPK
         AND p.trajectory_id = :trajectoryId
       ORDER BY p.time`;
 
     try {
       const rows = (
-        await db.raw(SQL, { datasetPKs: datasetPKs.split(","), trajectoryId })
+        await db.raw(SQL, { datasetPK: parseInt(datasetPKs, 10), trajectoryId })
       ).rows;
       res.send({
         trajectory_id: trajectoryId,

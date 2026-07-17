@@ -66,6 +66,18 @@ export function abbreviateString (text, maxLength) {
   }
 }
 
+// For strings interpolated into popup.setHTML() markup: dataset titles and
+// trajectory ids come from harvested (third-party) metadata, so anything
+// markup-significant must be neutralized before it reaches the DOM.
+export function escapeHtml (text) {
+  return String(text ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
 export function validateEmail(email) {
   const re =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/

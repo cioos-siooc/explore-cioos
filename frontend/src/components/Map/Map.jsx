@@ -24,6 +24,7 @@ import './styles.css'
 import { server } from '../../config'
 import {
   boundsFromGeoJson,
+  escapeHtml,
   generateColorStops,
   getCurrentRangeLevel,
   selectionFromSearchParams,
@@ -1942,7 +1943,7 @@ export default function CreateMap({
           popup
             .setLngLat([e.lngLat.lng, e.lngLat.lat])
             .setHTML(
-              `<div>${properties.dataset_title ? `<b>${properties.dataset_title}</b><br/>` : ''}${properties.trajectory_id}${headDate ? `<br/>${headDate}` : ''}</div>`
+              `<div>${properties.dataset_title ? `<b>${escapeHtml(properties.dataset_title)}</b><br/>` : ''}${escapeHtml(properties.trajectory_id)}${headDate ? `<br/>${headDate}` : ''}</div>`
             )
             .addTo(map.current)
         }
@@ -1967,7 +1968,7 @@ export default function CreateMap({
           popup
             .setLngLat([e.lngLat.lng, e.lngLat.lat])
             .setHTML(
-              `<div>${properties.dataset_title ? `<b>${properties.dataset_title}</b><br/>` : ''}${properties.trajectory_id}${fixDate ? `<br/>${fixDate}` : ''}</div>`
+              `<div>${properties.dataset_title ? `<b>${escapeHtml(properties.dataset_title)}</b><br/>` : ''}${escapeHtml(properties.trajectory_id)}${fixDate ? `<br/>${fixDate}` : ''}</div>`
             )
             .addTo(map.current)
         }
@@ -1992,7 +1993,7 @@ export default function CreateMap({
         map.current.getCanvas().style.cursor = 'pointer'
         popup
           .setLngLat([e.lngLat.lng, e.lngLat.lat])
-          .setHTML(`<div><b>${e.features[0].properties.trajectory_id}</b></div>`)
+          .setHTML(`<div><b>${escapeHtml(e.features[0].properties.trajectory_id)}</b></div>`)
           .addTo(map.current)
       }
     })
@@ -2047,7 +2048,7 @@ export default function CreateMap({
       const titles = previewed
         .map(
           (feature) =>
-            `<div class="griddap-tooltip-item">${griddapTitle(feature)}</div>`
+            `<div class="griddap-tooltip-item">${escapeHtml(griddapTitle(feature))}</div>`
         )
         .join('')
       const remaining = features.length - previewed.length
