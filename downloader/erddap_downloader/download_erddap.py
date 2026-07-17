@@ -93,6 +93,12 @@ def get_erddap_download_url(
 
     e.response = response
     e.dataset_id = dataset_info["dataset_id"]
+    # Request the variables explicitly. Without this the URL is ".csv?" when no
+    # constraints apply (no time/space/depth filter), which ERDDAP rejects with a
+    # 302 redirect to its info page — pandas then fails parsing the HTML. Listing
+    # the variables makes it a valid ".csv?var1,var2,..." request.
+    if variables_list:
+        e.variables = variables_list
     e.constraints = {}
 
     # Add constraint for time range
