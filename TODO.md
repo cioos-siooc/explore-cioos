@@ -30,7 +30,7 @@
 - [ ] Review prefect-worker container.
 - [ ] Test redis caching refresh.
 - [ ] Review DB partial load of table and improve efficiency and stability.
-- [ ] Drop log message "i18next is made possible by our own product, Locize".
+- [x] Drop log message "i18next is made possible by our own product, Locize".
 
 ### Database & harvesting (see docs for reference)
 - [ ] Improve dataset incremental upload to db.
