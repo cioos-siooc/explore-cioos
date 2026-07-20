@@ -442,6 +442,18 @@ BEGIN
   DELETE FROM cde.trajectory_cells t USING _prune_candidates c
   WHERE t.dataset_id = c.dataset_id AND t.erddap_url = c.erddap_url;
 
+  -- trajectory_points has an FK to datasets(pk); it must be cleared before the
+  -- datasets DELETE below or pruning a trajectory dataset raises a
+  -- ForeignKeyViolation (see replace_trajectory_points_from_temp()).
+  DELETE FROM cde.trajectory_points t USING _prune_candidates c
+  WHERE t.dataset_id = c.dataset_id AND t.erddap_url = c.erddap_url;
+
+  -- trajectory_track_stats has no FK (no crash) but is keyed on dataset_pk;
+  -- clear it too so pruned datasets leave no orphaned rows behind the
+  -- /trajectories/platforms list.
+  DELETE FROM cde.trajectory_track_stats s USING _prune_candidates c
+  WHERE s.dataset_pk = c.pk;
+
   DELETE FROM cde.skipped_datasets s USING _prune_candidates c
   WHERE s.dataset_id = c.dataset_id AND s.erddap_url = c.erddap_url;
 
