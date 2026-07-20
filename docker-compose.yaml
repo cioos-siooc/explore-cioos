@@ -85,6 +85,13 @@ services:
     restart: always
     env_file:
       - .env
+    environment:
+      # Docker-network service names so the API reaches Postgres/Redis without a
+      # repo .env (Coolify supplies DB_NAME/USER/PASSWORD/PORT but not the hosts).
+      # web-api/db.js reads DB_HOST and utils/redis.js reads REDIS_HOST; both
+      # default to localhost when unset. Mirrors the prefect_worker service.
+      DB_HOST: db
+      REDIS_HOST: redis
     expose:
       - "5000"
     depends_on:
