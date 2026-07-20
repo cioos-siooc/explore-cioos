@@ -1,5 +1,10 @@
 # Speed up `process_incremental_update()` — it is not actually incremental, and it takes the site down
 
+> **Status (2026-07):** items C, E and parts of D are implemented (no DDL in
+> the load path, advisory-lock serialization, session timeouts, COPY loading,
+> post-load VACUUM). Items A and B — the global points/hex rebuild — remain and
+> are covered, with the follow-on plan, in `incremental-update-v2-plan.md`.
+
 ## Summary
 
 `process_incremental_update()` (`database/9_incremental_upsert.sql:257`) only ingests incrementally. Its **processing** phase (steps 8–9) is a **full global rebuild of every derived table**, regardless of how few datasets changed.

@@ -305,8 +305,10 @@ def db_load_calls(written_csv_folder):
 
 
 class TestDbLoadPhase:
-    def test_drop_constraints_called(self, db_load_calls):
-        assert any("drop_constraints" in c for c in db_load_calls)
+    def test_no_constraint_ddl_toggling(self, db_load_calls):
+        # Constraints are permanent now (NULL-able columns + DEFERRABLE hex FKs),
+        # so the full reload no longer drops/re-adds them via ALTER TABLE.
+        assert not any("drop_constraints" in c for c in db_load_calls)
 
     def test_remove_all_data_called(self, db_load_calls):
         assert any("remove_all_data" in c for c in db_load_calls)
@@ -317,5 +319,5 @@ class TestDbLoadPhase:
     def test_create_hexes_called(self, db_load_calls):
         assert any("create_hexes" in c for c in db_load_calls)
 
-    def test_set_constraints_called(self, db_load_calls):
-        assert any("set_constraints" in c for c in db_load_calls)
+    def test_validate_loaded_data_called(self, db_load_calls):
+        assert any("validate_loaded_data" in c for c in db_load_calls)
