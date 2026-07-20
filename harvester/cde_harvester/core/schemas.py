@@ -2,8 +2,9 @@
 
 These define the column contract that all harvesters must produce and the
 db-loader consumes. Column names and types mirror database/1_schema.sql where
-applicable — a schema change touches three places: this file, 1_schema.sql
-(fresh installs) and an idempotent database/migrations/*.sql (live DBs).
+applicable — a schema change touches two places: this file and 1_schema.sql
+(the canonical DDL, applied only on a fresh volume; table changes require a
+volume reset + re-harvest, there are no incremental table migrations).
 """
 
 import pandera as pa

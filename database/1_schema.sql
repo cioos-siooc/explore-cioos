@@ -15,9 +15,8 @@ SET search_path TO cde, public;
 -- size (100 km for zoom_0, 10 km for zoom_1). This natural key is what keeps
 -- hex pks stable across loads — create_hexes() upserts on (i, j) and never
 -- deletes, so a cell that already exists keeps its pk forever. Nullable (not
--- NOT NULL) so a load straddling a deploy can't fail mid-migration; rows that
--- somehow miss (i, j) are backfilled by migrations/stable-hex-grid.sql on the
--- next deploy.
+-- NOT NULL) so create_hexes() can insert a cell and set (i, j) within the same
+-- load without a mid-transaction constraint failure.
 DROP TABLE IF EXISTS hexes_zoom_0;
 CREATE TABLE hexes_zoom_0 (
     pk serial PRIMARY KEY,
@@ -75,9 +74,8 @@ CREATE TABLE datasets (
     content_hash_reason TEXT,
     last_updated_at timestamptz,
     verified_at timestamptz,
-    -- Griddap (metadata-only) coverage; see migrations/add-griddap-dataset-columns.sql
-    -- for semantics. Kept at table end so temp_datasets (LIKE ...) stays aligned
-    -- with migrated live databases.
+    -- Griddap (metadata-only) coverage. Kept at table end so temp_datasets
+    -- (LIKE ...) column order stays stable.
     coverage_lat_min double precision,
     coverage_lat_max double precision,
     coverage_lon_min double precision,
@@ -137,8 +135,7 @@ CREATE TABLE points (
     -- hex pks and backfilled by create_hexes() within the load transaction, so
     -- the reference is only valid again at COMMIT (checked there, not
     -- per-statement). Deferring also keeps loads off ALTER TABLE / ACCESS
-    -- EXCLUSIVE, which used to deadlock with live web-api reads (see
-    -- migrations/relax-shared-table-constraints.sql).
+    -- EXCLUSIVE, which used to deadlock with live web-api reads.
     hex_0_pk integer CONSTRAINT hexes_zoom_0_points_foreign REFERENCES hexes_zoom_0(pk) DEFERRABLE INITIALLY DEFERRED,
     hex_1_pk integer CONSTRAINT hexes_zoom_1_points_foreign REFERENCES hexes_zoom_1(pk) DEFERRABLE INITIALLY DEFERRED
 );
@@ -384,7 +381,7 @@ CREATE INDEX trajectory_track_stats_bbox_gist ON trajectory_track_stats USING GI
 -- (0.2) a 780k-row table accrues ~156k dead tuples before autovacuum reacts,
 -- which then bursts IO against live web-api traffic. 0.02 makes cleanup
 -- small and frequent instead (autovacuum's cost-based throttling paces the
--- IO). Same values as migrations/autovacuum-churned-tables.sql.
+-- IO).
 ALTER TABLE cde.profiles SET (
   autovacuum_vacuum_scale_factor = 0.02, autovacuum_analyze_scale_factor = 0.02);
 ALTER TABLE cde.obis_cells SET (
