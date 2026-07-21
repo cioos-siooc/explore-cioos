@@ -1562,6 +1562,14 @@ export default function CreateMap({
       const tracksVisibility = tracksModeRef.current ? 'visible' : 'none'
       map.current.addSource('tracks', {
         type: 'vector',
+        // Zoom limits bound the per-tile cost. Without a minzoom, a zoomed-out
+        // map requests z0/z1 track tiles that assemble every trajectory over
+        // the whole time window into one tile (100k+ features, multi-MB) and
+        // crash the tab; below minzoom the trajectory coverage hexes carry the
+        // low-zoom view instead. maxzoom lets maplibre overzoom rather than
+        // re-fetch expensive tiles at every zoom level in.
+        minzoom: 3,
+        maxzoom: 8,
         tiles: [
           buildTracksTileUrl(
             mapQueryRef.current,
@@ -1614,10 +1622,11 @@ export default function CreateMap({
           'icon-rotate': ['get', 'cog'],
           // rotate with the map, not the viewport, so the arrow keeps
           // pointing along the geographic course
-          'icon-rotation-alignment': 'map',
-          // circles never collided; keep every head visible
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true
+          'icon-rotation-alignment': 'map'
+          // No allow-overlap/ignore-placement: at full-catalogue scale a tile
+          // can carry 100k+ heads, and forcing every one to render (no
+          // collision culling) overwhelms the tab. Let maplibre drop
+          // overlapping arrows — zooming in reveals the ones that were culled.
         }
       })
 

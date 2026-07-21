@@ -70,14 +70,17 @@ export const mixedColorScale = [
 
 // Tracks mode (trajectory track lines + time scrub bar)
 // 'all' = no trailing cutoff: every platform's full track up to the scrub
-// date. This is the DEFAULT because trajectory datasets are episodic (a
-// 2017-19 ferry, a 2016 glider mission, seasonal ship expeditions): with a
-// days-long trail, whatever the scrub date, most datasets have no data in
-// the window and their tracks are simply invisible unless the user already
-// knows each deployment's dates. Opening with everything visible matches
-// the coverage-hex layers; the day trails then narrow to "recent movement".
+// date. Episodic trajectory datasets (a 2017-19 ferry, a 2016 glider
+// mission, seasonal ship expeditions) are invisible in a short trail unless
+// the user already knows each deployment's dates, so 'all' is the most
+// discoverable trail. It is NOT the default, though: at full-catalogue scale
+// 'all' assembles every platform's entire multi-decade track into each tile
+// (100k+ line features, 400k+ vertices at low zoom) and overwhelms the
+// renderer. A bounded default keeps the tiles ~20x smaller; users who want
+// full history opt into 'all' (see the source zoom limits in Map.jsx and the
+// head-symbol culling, which keep 'all' from crashing the browser tab).
 export const TRAIL_ALL = 'all'
-export const defaultTrailingDays = TRAIL_ALL
+export const defaultTrailingDays = 90
 export const trailingWindowOptions = [7, 14, 30, 90, 180, 365, TRAIL_ALL]
 // Scrub bar domain start; today is the end. Argo-era default.
 export const tracksMinDate = '2000-01-01'
