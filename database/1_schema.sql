@@ -208,6 +208,10 @@ CREATE INDEX ON profiles(longitude);
 CREATE INDEX ON profiles(erddap_url, dataset_id);
 -- Index for faster lookups when joining with specific profile/timeseries IDs
 CREATE INDEX ON profiles(erddap_url, dataset_id, timeseries_id, profile_id);
+-- Every tile/legend/shape query joins profiles.dataset_pk = datasets.pk; the
+-- (erddap_url, dataset_id) index above does not serve a dataset_pk lookup, so
+-- without this a single-dataset / Source-filter drilldown seq-scans profiles.
+CREATE INDEX ON profiles(dataset_pk);
 
 
 
@@ -249,6 +253,14 @@ CREATE TABLE obis_cells (
 CREATE INDEX ON obis_cells USING GIST (geom);
 CREATE INDEX ON obis_cells (dataset_id);
 CREATE INDEX ON obis_cells (latitude, longitude);
+-- Tile/legend/shape queries join obis_cells.dataset_pk = datasets.pk; (dataset_id)
+-- above serves the incremental DELETE, not this integer-pk join.
+CREATE INDEX ON obis_cells (dataset_pk);
+-- /tiles/cells joins the visible hexes (tile_hexes) to cells on zoom_pk. Without
+-- these, only trajectory_cells could index-prune and the OBIS half full-scanned
+-- the whole table per coverage tile. Mirror trajectory_cells' hex indexes.
+CREATE INDEX ON obis_cells (hex_0_pk);
+CREATE INDEX ON obis_cells (hex_1_pk);
 -- Partial GIN: only cells whose aphia_ids are still empty (i.e. WoRMS hasn't
 -- resolved any of their scientific_names yet). The literal-name predicate in
 -- web-api/utils/dbFilter.js fires only for those rows; once aphia_ids is
@@ -311,6 +323,10 @@ CREATE INDEX trajectory_cells_geom_gist ON trajectory_cells USING GIST (geom);
 -- them as its leading columns and serves those lookups (incremental DELETE,
 -- dataset_pk backfill join).
 CREATE INDEX trajectory_cells_latlon_idx ON trajectory_cells (latitude, longitude);
+-- Tile/legend/shape queries join trajectory_cells.dataset_pk = datasets.pk; the
+-- UNIQUE(erddap_url, dataset_id, trajectory_id, ...) index cannot serve a bare
+-- dataset_pk lookup, so add one.
+CREATE INDEX trajectory_cells_dataset_pk_idx ON trajectory_cells (dataset_pk);
 -- Drive the per-tile lookup in /tiles/trajectories: hexes intersecting the
 -- tile envelope come from the hexes_zoom_* GIST, then these indexes fetch
 -- just the cells under those hexes.

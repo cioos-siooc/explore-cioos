@@ -3,6 +3,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useRef,
   useState,
   useEffect
@@ -64,10 +65,13 @@ export default function MapStateProvider ({ children }) {
   // the hidden datasets.
   const [mapDatasetPKs, setMapDatasetPKs] = useState()
   // Every map query (tiles, legend, coverage) is the filter query narrowed to
-  // the shown groups.
-  const mapQueryString = applyMapDatasetPKs(
-    createDataFilterQueryString(query),
-    mapDatasetPKs
+  // the shown groups. Memoized: this provider re-renders on every moveend/zoom
+  // (mapView), and createDataFilterQueryString does full passes over every
+  // filter array — recomputing it per interaction was wasted work and produced
+  // a new string identity that could churn downstream effects.
+  const mapQueryString = useMemo(
+    () => applyMapDatasetPKs(createDataFilterQueryString(query), mapDatasetPKs),
+    [query, mapDatasetPKs]
   )
   const [rangeLevels, setRangeLevels] = useState()
   const [legendLoading, setLegendLoading] = useState(true)

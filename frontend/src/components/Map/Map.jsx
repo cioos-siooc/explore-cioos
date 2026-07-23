@@ -1640,11 +1640,19 @@ export default function CreateMap({
           'icon-rotate': ['get', 'cog'],
           // rotate with the map, not the viewport, so the arrow keeps
           // pointing along the geographic course
-          'icon-rotation-alignment': 'map'
-          // No allow-overlap/ignore-placement: at full-catalogue scale a tile
-          // can carry 100k+ heads, and forcing every one to render (no
-          // collision culling) overwhelms the tab. Let maplibre drop
-          // overlapping arrows — zooming in reveals the ones that were culled.
+          'icon-rotation-alignment': 'map',
+          // Collision culling is zoom-gated at hexMaxZoom (7). Below it a tile
+          // can carry ~100k heads (whole catalogue at low zoom) — forcing every
+          // one to render overwhelms the tab, so let maplibre drop overlapping
+          // arrows there. At/above z7 a tile covers a small enough area that the
+          // head count is a few hundred, so overlap/ignore-placement are safe
+          // and every heading stays visible (the /tiles/tracks per-tile cap also
+          // bounds the count). z7 is the same breakpoint hexes→points use.
+          'icon-allow-overlap': ['step', ['zoom'], false, hexMaxZoom, true],
+          'icon-ignore-placement': ['step', ['zoom'], false, hexMaxZoom, true],
+          // When culling (below z7), keep the most recent heads deterministically
+          // rather than an arbitrary subset.
+          'symbol-sort-key': ['-', 0, ['coalesce', ['get', 'head_time'], 0]]
         }
       })
 
