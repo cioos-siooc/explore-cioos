@@ -388,9 +388,10 @@ router.get(
  *     summary: Retrieve a vector tile of trajectory track lines and head positions
  *     tags: [Tiles]
  *     description: >
- *       Returns a Mapbox Vector Tile with TWO layers built from
+ *       Returns a Mapbox Vector Tile with THREE layers built from
  *       cde.trajectory_points: 'track-lines' (per-trajectory LineStrings over
- *       the requested time window, ordered by time) and 'track-heads' (each
+ *       the requested time window, ordered by time), 'track-points' (one fix
+ *       per trajectory per UTC day — breadcrumb dots), and 'track-heads' (each
  *       trajectory's latest fix within the window, with 'cog' — course over
  *       ground in degrees clockwise from north, absent when undefined).
  *       timeMin/timeMax are
@@ -420,7 +421,7 @@ router.get(
  *         schema: { type: string, format: date-time }
  *     responses:
  *       200:
- *         description: MVT binary tile (layers track-lines + track-heads).
+ *         description: MVT binary tile (layers track-lines + track-points + track-heads).
  *         content:
  *           application/x-protobuf:
  *             schema:
@@ -591,9 +592,27 @@ router.get(
              ST_AsMVTGeom(h.geom, te.tile_envelope) AS geom
       FROM heads h, te
       WHERE h.geom && te.tile_envelope
+    ),
+    -- 'track-points': one fix per trajectory per UTC day — the "dots for the
+    -- other days" breadcrumb (the head arrow above marks the latest position).
+    -- Deduped to a daily cadence so hourly-reporting platforms don't emit
+    -- hundreds of coincident dots; bounded overall by the cand cap. The
+    -- frontend shows these only from z5 up.
+    day_points AS (
+      SELECT DISTINCT ON (dataset_pk, trajectory_id, (time AT TIME ZONE 'UTC')::date)
+             trajectory_id, pk_url, geom
+      FROM pts
+      ORDER BY dataset_pk, trajectory_id, (time AT TIME ZONE 'UTC')::date, time DESC
+    ),
+    point_mvt AS (
+      SELECT dp.trajectory_id, dp.pk_url,
+             ST_AsMVTGeom(dp.geom, te.tile_envelope) AS geom
+      FROM day_points dp, te
+      WHERE dp.geom && te.tile_envelope
     )
     -- A valid MVT is a concatenation of layer messages.
     SELECT coalesce((SELECT ST_AsMVT(l.*, 'track-lines', 4096, 'geom') FROM line_mvt l), ''::bytea)
+        || coalesce((SELECT ST_AsMVT(pt.*, 'track-points', 4096, 'geom') FROM point_mvt pt), ''::bytea)
         || coalesce((SELECT ST_AsMVT(h.*, 'track-heads', 4096, 'geom') FROM head_mvt h), ''::bytea)
         AS st_asmvt;
   `;

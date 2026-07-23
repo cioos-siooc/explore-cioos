@@ -373,7 +373,7 @@ export default function CreateMap({
       ? dataLayersRef.current.trajectories !== false
       : true
     const showTracks = trajOn && tracksModeRef.current
-    ;['track-lines', 'track-heads', 'track-heads-fixed'].forEach((id) =>
+    ;['track-lines', 'track-points', 'track-heads', 'track-heads-fixed'].forEach((id) =>
       map.current.setLayoutProperty(id, 'visibility', showTracks ? 'visible' : 'none')
     )
   }
@@ -748,6 +748,7 @@ export default function CreateMap({
     'coverage-hexes',
     'coverage-hexes-hovered',
     'track-lines',
+    'track-points',
     'track-heads',
     'track-heads-fixed',
     'selected-track-line',
@@ -1120,6 +1121,7 @@ export default function CreateMap({
           map.current.setPaintProperty('track-lines', 'line-color', trackLineColor)
           map.current.setLayoutProperty('track-heads', 'icon-image', 'track-head-arrow')
           map.current.setPaintProperty('track-heads-fixed', 'circle-color', trackLineColor)
+          map.current.setPaintProperty('track-points', 'circle-stroke-color', trackLineColor)
         }
         return
       }
@@ -1198,6 +1200,7 @@ export default function CreateMap({
         map.current.setPaintProperty('track-lines', 'line-color', 'lightgrey')
         map.current.setLayoutProperty('track-heads', 'icon-image', 'track-head-arrow-dim')
         map.current.setPaintProperty('track-heads-fixed', 'circle-color', 'lightgrey')
+        map.current.setPaintProperty('track-points', 'circle-stroke-color', 'lightgrey')
       }
 
       const longitudes = rawCoordinates.map((c) => c[0])
@@ -1615,6 +1618,27 @@ export default function CreateMap({
           // window overlap into what full opacity renders as ONE line), and
           // stacked translucent lines read as a visibly busier corridor.
           'line-opacity': 0.55
+        }
+      })
+
+      // Per-day breadcrumb dots along each track ('track-points' layer: one fix
+      // per trajectory per day). Shown from z5 up — at lower zoom the dots
+      // would smear into the line and pile onto the tile, so lines + head
+      // arrows carry the zoomed-out view. Drawn under the head arrows (added
+      // next) so the direction arrow sits on top of its day's dot.
+      map.current.addLayer({
+        id: 'track-points',
+        type: 'circle',
+        source: 'tracks',
+        'source-layer': 'track-points',
+        minzoom: 5,
+        layout: { visibility: tracksVisibility },
+        paint: {
+          'circle-color': '#ffffff',
+          'circle-stroke-color': trackLineColor,
+          // grow gently with zoom so dots read as a breadcrumb, not clutter
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 1.5, 10, 3],
+          'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 5, 0.75, 10, 1.5]
         }
       })
 
