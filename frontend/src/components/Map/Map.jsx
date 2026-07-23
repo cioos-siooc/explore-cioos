@@ -1578,13 +1578,15 @@ export default function CreateMap({
       const tracksVisibility = tracksModeRef.current ? 'visible' : 'none'
       map.current.addSource('tracks', {
         type: 'vector',
-        // Zoom limits bound the per-tile cost. Without a minzoom, a zoomed-out
-        // map requests z0/z1 track tiles that assemble every trajectory over
-        // the whole time window into one tile (100k+ features, multi-MB) and
-        // crash the tab; below minzoom the trajectory coverage hexes carry the
-        // low-zoom view instead. maxzoom lets maplibre overzoom rather than
-        // re-fetch expensive tiles at every zoom level in.
-        minzoom: 3,
+        // No minzoom: track lines/heads render at every zoom level, including
+        // fully zoomed out. maxzoom caps the fetched tile zoom at 8 and lets
+        // maplibre overzoom past it rather than re-fetch expensive tiles at
+        // every zoom level in. NOTE: at low zoom a single tile can assemble
+        // every trajectory over the whole time window (100k+ features,
+        // multi-MB) — the bounded default trail (defaultTrailingDays, see
+        // config.js) keeps that in check; the 'all' trail while zoomed out is
+        // the heavy case. If it regresses, add server-side low-zoom
+        // simplification in web-api/routes/tiles.js rather than a minzoom.
         maxzoom: 8,
         tiles: [
           buildTracksTileUrl(

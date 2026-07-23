@@ -6,6 +6,18 @@ const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { validatorMiddleware } = require("../utils/validatorMiddlewares");
 const cache = require("../utils/cache");
+
+// Per-tile cap on how many trajectories a single /tiles/tracks tile assembles.
+// A low-zoom tile spans a huge area: with a long trail (e.g. "All time") its
+// candidate set is ~the whole catalogue (measured ~107k of 107k trajectories in
+// one z3 tile → a ~5 MB tile that OOMs the browser tab). The cap is applied at
+// the candidate stage (before any point is pulled), so it bounds BOTH the
+// payload and the server-side assembly cost. It is self-scaling: at high zoom a
+// tile covers a small area with far fewer than the cap, so it never bites there
+// (full detail when zoomed in); it only trims the low-zoom smear, keeping the
+// most recently-active trajectories. Coverage hexes convey overall density at
+// low zoom.
+const TRACKS_MAX_PER_TILE = 2500;
 /**
  * /tiles/z/x/y/.mvt
  *
@@ -484,6 +496,10 @@ router.get(
         AND s.time_max >= :timeMin::timestamptz
         AND s.time_min <= :timeMax::timestamptz
         ${filters.hasShared ? "AND :filters" : ""}
+      -- Cap per tile (see TRACKS_MAX_PER_TILE): keep the most recently-active
+      -- trajectories; tie-break on the pk for deterministic, cache-stable tiles.
+      ORDER BY s.time_max DESC, s.dataset_pk, s.trajectory_id
+      LIMIT :maxTracksPerTile
     ),
     pts AS (
       SELECT p.dataset_pk, p.trajectory_id, p.time, p.longitude, p.latitude,
@@ -555,8 +571,18 @@ router.get(
       ORDER BY dataset_pk, trajectory_id, time DESC
     ),
     line_mvt AS (
+      -- Zoom-aware simplify before MVT encoding: tolerance = one MVT grid unit
+      -- (tile width / 4096), the resolution ST_AsMVTGeom snaps to anyway, so it
+      -- drops vertices that would collapse on encode — visually lossless, fewer
+      -- vertices to encode/transfer at low zoom where tracks carry long history.
       SELECT l.trajectory_id, l.pk_url,
-             ST_AsMVTGeom(l.geom, te.tile_envelope) AS geom
+             ST_AsMVTGeom(
+               ST_Simplify(
+                 l.geom,
+                 (ST_XMax(te.tile_envelope) - ST_XMin(te.tile_envelope)) / 4096.0
+               ),
+               te.tile_envelope
+             ) AS geom
       FROM lines l, te
       WHERE l.geom && te.tile_envelope
     ),
@@ -577,6 +603,7 @@ router.get(
         filters: filters.shared,
         timeMin,
         timeMax,
+        maxTracksPerTile: TRACKS_MAX_PER_TILE,
         z,
         x,
         y,

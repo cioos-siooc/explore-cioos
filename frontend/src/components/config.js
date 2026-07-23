@@ -77,8 +77,10 @@ export const mixedColorScale = [
 // 'all' assembles every platform's entire multi-decade track into each tile
 // (100k+ line features, 400k+ vertices at low zoom) and overwhelms the
 // renderer. A bounded default keeps the tiles ~20x smaller; users who want
-// full history opt into 'all' (see the source zoom limits in Map.jsx and the
-// head-symbol culling, which keep 'all' from crashing the browser tab).
+// full history opt into 'all'. The tracks source has no minzoom (lines render
+// at every zoom), so 'all' while zoomed out is the heavy case the bounded
+// default guards against — see the maxzoom cap in Map.jsx and the head-symbol
+// culling, which keep the common case from crashing the browser tab.
 export const TRAIL_ALL = 'all'
 export const defaultTrailingDays = 90
 export const trailingWindowOptions = [7, 14, 30, 90, 180, 365, TRAIL_ALL]
