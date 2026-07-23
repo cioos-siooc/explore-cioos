@@ -3,6 +3,7 @@ const express = require("express");
 
 const router = express.Router();
 const { getShapeQuery } = require("../utils/shapeQuery");
+const cache = require("../utils/cache");
 
 /**
  * @swagger
@@ -32,7 +33,7 @@ const { getShapeQuery } = require("../utils/shapeQuery");
  *                   size: { type: number }
  */
 
-router.get("/", async (req, res, next) => {
+router.get("/", cache.route(), async (req, res, next) => {
   let shapeQueryResponse;
   try {
     shapeQueryResponse = await getShapeQuery(req.query, true, false);

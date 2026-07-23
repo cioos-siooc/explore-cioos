@@ -1,6 +1,7 @@
 const express = require("express");
 const db = require("../db");
 const { getShapeQuery } = require("../utils/shapeQuery");
+const cache = require("../utils/cache");
 
 const router = express.Router();
 const { datasetDetailsMiddleware } = require("../utils/validatorMiddlewares");
@@ -38,7 +39,7 @@ const { datasetDetailsMiddleware } = require("../utils/validatorMiddlewares");
  *
  * Shape is not required
  */
-router.get("/", datasetDetailsMiddleware(), async (req, res, next) => {
+router.get("/", datasetDetailsMiddleware(), cache.route(), async (req, res, next) => {
   let rows;
   try {
     rows = await getShapeQuery(req.query, false, true);
