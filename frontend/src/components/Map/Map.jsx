@@ -342,7 +342,18 @@ export default function CreateMap({
   // pulls trajectory coverage out of the cells tiles), then force a refetch.
   // Shared by the filter-change, layer-toggle and tracks-mode effects.
   function refreshCombinedSources(queryString) {
-    if (!map.current || !map.current.loaded()) return
+    // Guard on source existence, NOT map.loaded(): loaded() is false whenever
+    // any tile is still in flight, and on this deployment the coverage/track
+    // tiles are heavy enough that the map is rarely idle — gating on it
+    // silently dropped filter changes that landed mid-load. The sources are
+    // created together in the 'load' handler, so their presence is the real
+    // precondition, and setTiles works fine while other tiles load.
+    if (
+      !map.current ||
+      !map.current.getSource('cde-tiles') ||
+      !map.current.getSource('cde-cells')
+    )
+      return
     const { tileQuery, cellTileQuery } = tileUrls(queryString)
     // Swap the tile URLs and re-render via the public setTiles API — it
     // clears each source's tile cache and reloads the viewport tiles.
@@ -1035,10 +1046,14 @@ export default function CreateMap({
   }
 
   useEffect(() => {
-    // Before the map exists there is nothing to swap and nothing to reset —
-    // the 'load' handler below builds the layers from the current query, and
-    // resetting here would wipe a selection restored from a share link.
-    if (!map.current || !map.current.loaded()) return
+    // Guard on source existence, not map.loaded(): the sources and layers are
+    // all created together in the 'load' handler, so getSource('cde-tiles')
+    // being present means the layers this effect touches (points-highlighted)
+    // exist too. loaded() additionally requires no tiles in flight, which on a
+    // heavy trajectory deployment dropped filter changes that arrived while
+    // tiles were still loading (the reported "filters don't update the hexes"
+    // bug). Before the map/sources exist there is nothing to swap.
+    if (!map.current || !map.current.getSource('cde-tiles')) return
 
     setPointsToReview()
     map.current.setFilter('points-highlighted', ['in', 'pk', ''])
@@ -1062,7 +1077,8 @@ export default function CreateMap({
   // layer visibility.
   useEffect(() => {
     dataLayersRef.current = dataLayers
-    if (!map.current || !map.current.loaded()) return
+    // Source existence, not map.loaded() — see the filter effect above.
+    if (!map.current || !map.current.getSource('cde-tiles')) return
     refreshCombinedSources(mapQueryString)
     applyLayerVisibility()
   }, [dataLayers])
