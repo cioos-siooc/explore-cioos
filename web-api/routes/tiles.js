@@ -18,6 +18,32 @@ const cache = require("../utils/cache");
 // most recently-active trajectories. Coverage hexes convey overall density at
 // low zoom.
 const TRACKS_MAX_PER_TILE = 2500;
+
+// Spatial prefilter for the hex-aggregation tile queries (/tiles and
+// /tiles/cells). Without it each tile UNIONs and GROUP BYs the ENTIRE cell
+// tables (trajectory_cells ~860k rows / 3 GB, obis_cells, profiles) and only
+// clips to the tile at the very end — ~2.5 s of CPU per tile on every request
+// (measured, buffers warm), which shows up as half-painted tiles and slow
+// layer toggles (each toggle changes the tile URL and cold-refetches). This
+// prunes each branch's scan to the tile region up front via the tables' geom
+// GiST indexes. Hex membership stays the exact authority (the tile_hexes join
+// in /tiles/cells; the final `h.geom && tile_envelope` in /tiles), so the
+// prefilter only has to be a SUPERSET of the cells under the tile's hexes:
+// expand the envelope by >= one hex diameter (hex_0 ~200 km for z<5, hex_1
+// ~20 km for z>=5) so no cell of a hex straddling the tile edge is dropped.
+// Verified byte-identical to the unfiltered query across z3-z10. Below
+// PREFILTER_MIN_ZOOM the tile covers so much of the world that the GiST scan
+// loses to a plain seq scan (measured a ~3x regression at z2), so return null
+// there and leave the query unchanged.
+const PREFILTER_MIN_ZOOM = 3;
+function tileCellPrefilter(z) {
+  const zi = Number(z);
+  if (zi < PREFILTER_MIN_ZOOM) return null;
+  const hexDiameterM = zi < 5 ? 250000 : 25000; // > true diameter (hex_0 200km / hex_1 20km)
+  const tileWidthM = 40075016.686 / 2 ** zi;
+  const expandM = Math.ceil(Math.max(tileWidthM * 0.25, hexDiameterM));
+  return `geom && ST_Expand(ST_TileEnvelope(:z, :x, :y), ${expandM})`;
+}
 /**
  * /tiles/z/x/y/.mvt
  *
@@ -81,6 +107,8 @@ router.get(
     const isHexGrid = z < 7;
     const zoomPKColumn = z < 5 ? "hex_0_pk" : "hex_1_pk";
     const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
+    // Prune each branch's scan to the tile region (see tileCellPrefilter).
+    const cellPrefilter = tileCellPrefilter(z);
 
     const includeObis = req.query.includeObis !== 'false';
     // Data-type layer toggle (map layer selector). Trajectories: an explicit
@@ -126,7 +154,7 @@ router.get(
         : '';
     const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
            time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
-    FROM cde.profiles WHERE show_as_point${profilesTypeFilter}`;
+    FROM cde.profiles WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
     // Both cell tables (trajectory coverage cells and OBIS occurrence cells)
     // merge into the combined hex counts (z<7, the green ramp) but never
     // appear as individual points (z>=7). Their cell spacing is a grid
@@ -135,12 +163,12 @@ router.get(
     // /tiles/cells/:z/:x/:y.mvt.
     const trajectoryBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_cells`;
+    FROM cde.trajectory_cells${cellPrefilter ? ` WHERE ${cellPrefilter}` : ''}`;
     const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
            date_part('days', time_max - time_min) + 1 as record_count,
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
     FROM cde.obis_cells
-    WHERE :obisFilters`;
+    WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
 
     const branches = [];
     if (includeProfiles) branches.push(profilesBranch);
@@ -281,6 +309,8 @@ router.get(
     // reused uncapped past zoom 6 so coverage cells never become points.
     const zoomPKColumn = z < 5 ? "hex_0_pk" : "hex_1_pk";
     const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
+    // Prune each branch's scan to the tile region (see tileCellPrefilter).
+    const cellPrefilter = tileCellPrefilter(z);
 
     const includeObis = req.query.includeObis !== 'false';
     // Same gating as the main tile route: scientific-name filters are
@@ -301,12 +331,12 @@ router.get(
     const trajectoryBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'trajectory' as src,
            trajectory_id, 0::bigint as n_records,
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_cells`;
+    FROM cde.trajectory_cells${cellPrefilter ? ` WHERE ${cellPrefilter}` : ''}`;
     const obisBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'obis' as src,
            NULL as trajectory_id, n_records,
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
     FROM cde.obis_cells
-    WHERE :obisFilters`;
+    WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
 
     const branches = [];
     if (includeProfiles) branches.push(trajectoryBranch);
