@@ -36,7 +36,8 @@ export default function MapContainer () {
     hoveredDataset,
     setHoveredDataset,
     inspectDataset,
-    selectedTrajectory
+    selectedTrajectory,
+    selectTrajectoryFromMap
   } = useSelection()
 
   return (
@@ -59,6 +60,7 @@ export default function MapContainer () {
       scrubTime={debouncedScrubTime}
       trailingDays={trailingDays}
       selectedTrajectory={selectedTrajectory}
+      selectTrajectoryFromMap={selectTrajectoryFromMap}
       dataLayers={dataLayers}
       griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
       dataLayersVisible={dataLayersVisible}

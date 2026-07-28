@@ -12,7 +12,7 @@ export function useUI () {
 }
 
 export default function UIProvider ({ children }) {
-  const { polygon } = useSelection()
+  const { polygon, selectedTrajectory } = useSelection()
 
   // The datasets sidebar: open by default on desktop, closed on phones where
   // it would cover the whole map.
@@ -39,6 +39,12 @@ export default function UIProvider ({ children }) {
   useEffect(() => {
     if (!isEmpty(polygon)) setSidebarOpen(true)
   }, [polygon])
+
+  // Clicking a track on the map opens that dataset's page — surface the panel
+  // holding it, which a phone (or a collapsed sidebar) would otherwise hide.
+  useEffect(() => {
+    if (selectedTrajectory) setSidebarOpen(true)
+  }, [selectedTrajectory])
 
   const value = {
     sidebarOpen,

@@ -380,6 +380,7 @@
   "trajectoryPlatformFixesText": "Positions",
   "legendTrackLine": "Trajectoire",
   "legendTrackHead": "Position et direction à la date choisie",
+  "trackLineClickText": "Cliquez pour afficher la trajectoire complète de la plateforme",
   "griddapTypeLabel": "Maillé",
   "griddapCoverageToggleTitle": "Afficher la couverture des jeux de données maillés",
   "griddapCoverageTooltip": "Jeu de données maillé — cliquer pour les détails",

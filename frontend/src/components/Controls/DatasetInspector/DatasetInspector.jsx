@@ -60,6 +60,9 @@ export default function DatasetInspector({
   const [recordFilterText, setRecordFilterText] = useState('')
   const [trajectoryPlatforms, setTrajectoryPlatforms] = useState()
   const [platformFilterText, setPlatformFilterText] = useState('')
+  // Mirrors the platform table's rows-per-page so the page holding a
+  // map-picked platform is computed against the size the user is actually on.
+  const [platformRowsPerPage, setPlatformRowsPerPage] = useState(100)
   const inspectorRef = useRef(null)
   const isGrid = dataset.cdm_data_type === 'Grid'
   // no per-record list for OBIS (external) or griddap (metadata-only)
@@ -302,6 +305,25 @@ export default function DatasetInspector({
     }
   ]
 
+  // A platform picked on the map (rather than from this table) can sit on any
+  // page of it — turn to the page holding it, so the highlighted row is one the
+  // user can actually see. Rows render in the order the API returned them, so a
+  // row's index is its position in this list; a column sort the user applied
+  // reorders them and can land the jump a page off, which paging fixes.
+  // filterRows passes a null row list straight through, and this runs before the
+  // platforms fetch resolves (and for datasets that never have any).
+  const platformRows = filterRows(trajectoryPlatforms, platformFilterText) || []
+  const selectedPlatformIndex =
+    selectedTrajectory?.datasetPk === dataset.pk
+      ? platformRows.findIndex(
+        (row) => row.trajectory_id === selectedTrajectory.trajectoryId
+      )
+      : -1
+  const selectedPlatformPage =
+    selectedPlatformIndex < 0
+      ? 1
+      : Math.floor(selectedPlatformIndex / platformRowsPerPage) + 1
+
   const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet
 
   return (
@@ -501,15 +523,18 @@ export default function DatasetInspector({
                 conditionalRowStyles={[
                   {
                     when: (row) =>
+                      selectedTrajectory?.datasetPk === dataset.pk &&
                       selectedTrajectory?.trajectoryId === row.trajectory_id,
                     style: { backgroundColor: '#d5c9ee' }
                   }
                 ]}
                 columns={platformColumns}
-                data={filterRows(trajectoryPlatforms, platformFilterText)}
+                data={platformRows}
                 defaultSortField='trajectory_id'
                 pagination
-                paginationPerPage={100}
+                paginationPerPage={platformRowsPerPage}
+                paginationDefaultPage={selectedPlatformPage}
+                onChangeRowsPerPage={setPlatformRowsPerPage}
                 paginationRowsPerPageOptions={[100, 150, 200, 250]}
                 paginationComponentOptions={{
                   rowsPerPageText: t('tableComponentRowsPerPage'),

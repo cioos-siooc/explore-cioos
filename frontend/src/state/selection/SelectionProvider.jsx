@@ -301,6 +301,47 @@ export default function SelectionProvider ({ children }) {
     [setSearchParams]
   )
 
+  // A track clicked on the map does what clicking a platform row in the dataset
+  // inspector does (DatasetInspector's onRowClicked): open that dataset's page
+  // AND draw the platform's full history. Both writes happen in this one call so
+  // React batches them into a single render — which is what stops the
+  // [inspectDataset] effect below from clearing the selection it just made (it
+  // sees the new inspectDataset and the matching selectedTrajectory together).
+  const selectTrajectoryFromMap = useCallback(
+    (datasetPk, trajectoryId, datasetTitle) => {
+      // Re-clicking the selected track is a no-op, not a toggle: track-lines
+      // stays hit-testable (just dimmed) under the selected track drawn over it,
+      // so a toggle would clear the selection on any click along it — including
+      // a click meant to read a fix tooltip. Clearing stays the platform row.
+      if (
+        selectedTrajectory?.datasetPk === datasetPk &&
+        selectedTrajectory?.trajectoryId === trajectoryId
+      ) {
+        return
+      }
+
+      // The page can only open for a dataset the current results contain —
+      // inspectDataset resolves out of pointsData. The tracks tiles apply only
+      // the dataset-level filters, so they can carry a dataset that pointQuery's
+      // depth/bbox/polygon predicates dropped; draw its track anyway and leave
+      // the URL alone. Never setInspectDataset(undefined) here — that would
+      // close whatever page was open and take the new selection down with it.
+      const dataset = pointsData.find((row) => row.pk === datasetPk)
+      // Skipped when this dataset's page is already open, so repeat clicks don't
+      // each push a history entry Back has to walk through.
+      if (dataset && inspectDataset?.pk !== datasetPk && datasetUrlKey(dataset)) {
+        setInspectDataset(dataset)
+      }
+
+      setSelectedTrajectory({
+        datasetPk,
+        datasetTitle: dataset?.title || datasetTitle,
+        trajectoryId
+      })
+    },
+    [pointsData, inspectDataset, selectedTrajectory, setInspectDataset]
+  )
+
   // Mark the polygon-draw control active for free-form polygons (rectangles
   // have their own #boxQueryButton active state).
   useEffect(() => {
@@ -490,6 +531,7 @@ export default function SelectionProvider ({ children }) {
     setHoveredDataset,
     selectedTrajectory,
     setSelectedTrajectory,
+    selectTrajectoryFromMap,
     selectAll,
     pointsData,
     setPointsData,

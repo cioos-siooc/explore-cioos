@@ -379,6 +379,7 @@
   "trajectoryPlatformFixesText": "Track fixes",
   "legendTrackLine": "Track",
   "legendTrackHead": "Position and direction at selected date",
+  "trackLineClickText": "Click to show this platform's full track",
   "griddapTypeLabel": "Gridded",
   "griddapCoverageToggleTitle": "Show gridded dataset coverage",
   "griddapCoverageTooltip": "Gridded dataset — click for details",
