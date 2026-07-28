@@ -1,0 +1,18 @@
+.cioosTooltip {
+  position: fixed;
+  z-index: var(--cioos-z-tooltip, 1080);
+  max-width: 260px;
+  pointer-events: none;
+}
+
+.cioosTooltip .tooltip-inner {
+  padding: 6px 10px;
+  background-color: var(--cioos-navy, #152f37);
+  color: var(--cioos-white, #fff);
+  font-family: var(--cioos-font-body, sans-serif);
+  font-size: var(--cioos-font-size-xs, 11px);
+  line-height: 1.4;
+  border-radius: var(--cioos-radius-sm, 6px);
+  box-shadow: var(--cioos-shadow-md, 0 2px 8px rgba(21, 47, 55, 0.2));
+  text-align: center;
+}

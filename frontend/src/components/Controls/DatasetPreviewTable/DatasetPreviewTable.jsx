@@ -1,15 +1,16 @@
-import React from 'react'
+import React, { useState } from 'react'
 
 import './styles.css'
 import DataTable from 'react-data-table-component'
-import DataTableExtensions from 'react-data-table-component-extensions'
 import { useTranslation } from 'react-i18next'
+import TableFilter, { filterRows } from '../../ui/TableFilter.jsx'
 import { splitLines } from '../../../utilities'
 
 export default function DatasetPreviewTable({ datasetPreview, data }) {
   if (!datasetPreview) return <div />
 
   const { t } = useTranslation()
+  const [filterText, setFilterText] = useState('')
 
   const { columnNames, columnUnits } = datasetPreview.table || {
     rows: [],
@@ -26,23 +27,20 @@ export default function DatasetPreviewTable({ datasetPreview, data }) {
     sortable: true
   }))
 
-  const tableData = {
-    columns,
-    data
-  }
+  const filteredData = filterRows(data, filterText)
 
   return (
-    <DataTableExtensions
-      {...tableData}
-      print={false}
-      export={false}
-      filterPlaceholder={t('datasetInspectorFilterText')}
-    >
+    <>
+      <TableFilter
+        value={filterText}
+        onChange={setFilterText}
+        placeholder={t('datasetInspectorFilterText')}
+      />
       <DataTable
         striped
         columns={columns}
-        data={data}
-        pagination={data?.length > 10}
+        data={filteredData}
+        pagination={filteredData?.length > 10}
         paginationPerPage={10}
         paginationRowsPerPageOptions={[10, 100, 150, 200, 250]}
         paginationComponentOptions={{
@@ -52,6 +50,6 @@ export default function DatasetPreviewTable({ datasetPreview, data }) {
         }}
         dense
       />
-    </DataTableExtensions>
+    </>
   )
 }

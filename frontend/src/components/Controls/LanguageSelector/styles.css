@@ -1,24 +1,8 @@
+/* EN⇄FR toggle. Positioning comes from its host (the dock's minor-item
+   cluster); this file only keeps it clickable and legible. */
 .languageSelector {
-  position: absolute;
-  top: 10px;
-  right: 150px;
   pointer-events: all;
-  z-index: 3;
-  width: 24px;
-  height: 24px;
   text-align: center;
-  margin: auto;
-  background-color: white;
-  border-radius: 5px;
-}
-
-.languageSelector:hover {
-  background-color: #c6e3df;
   cursor: pointer;
-}
-
-@media (max-width: 900px) {
-  .languageSelector {
-    left: 725px;
-  }
+  user-select: none;
 }

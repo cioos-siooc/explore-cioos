@@ -4,13 +4,115 @@ const { changePKtoPkURL } = require("./misc");
 const createDBFilter = require("./dbFilter");
 
 async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
-  const filters = createDBFilter(query);
+  // Caller propagates ScientificNameSelectionTooBroadError as a 400.
+  const filters = await createDBFilter(query);
 
   const {
     timeMin = null, timeMax = null, depthMin = null, depthMax = null,
+    includeObis = 'true',
+    scientificNames,
+    obisNodes,
+    erddapServers,
   } = query;
 
-  const sql = `WITH sub AS
+  // Scientific-name filters are OBIS-only: hide profiles when set. An
+  // OBIS-node selection also hides profiles, unless ERDDAP servers are
+  // selected alongside it (combined Source filter — show both, OR'd in the
+  // shared dataset filter).
+  const includeProfiles = !scientificNames && (!obisNodes || Boolean(erddapServers));
+  const showObis = includeObis !== 'false';
+
+  // search_geom is the geometry the shared spatial filter (dbFilter) matches
+  // against: the per-feature bbox for profiles (extent search), and the cell
+  // point for the already-fine-grained obis/trajectory cells.
+  const profilesBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,
+               profile_id, timeseries_id,
+               latitude, longitude, point_pk, geom, bbox AS search_geom
+        FROM cde.profiles`;
+  // Trajectory coverage cells: ERDDAP data, gated with profiles. The
+  // trajectory_id doubles as the profile_id surrogate so the records list
+  // labels rows by mission/deployment; records_per_day was computed at
+  // harvest so the estimate math below applies unchanged.
+  const trajectoryBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,
+               trajectory_id as profile_id, NULL as timeseries_id,
+               latitude, longitude, point_pk, geom, geom AS search_geom
+        FROM cde.trajectory_cells`;
+  const obisBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, 0 as records_per_day,
+               NULL as profile_id, NULL as timeseries_id,
+               latitude, longitude, point_pk, geom, geom AS search_geom
+        FROM cde.obis_cells
+        WHERE :obisFilters`;
+  // Griddap datasets are metadata-only: no feature rows, their coverage lives
+  // on cde.datasets (coverage_* columns). The coverage_* names are aliased
+  // back to the combined-CTE contract here because dbFilter emits unqualified
+  // time_min/time_max/depth_* predicates that would otherwise be ambiguous.
+  // Timeless (static) grids coalesce to +-infinity so any time filter matches;
+  // NULL point_pk keeps grids out of map-click (pointPKs) queries.
+  const griddapBranch = `SELECT pk AS dataset_pk,
+               coalesce(coverage_time_min, '-infinity'::timestamptz) AS time_min,
+               coalesce(coverage_time_max, 'infinity'::timestamptz) AS time_max,
+               coalesce(coverage_depth_min, 0) AS depth_min,
+               coalesce(coverage_depth_max, 0) AS depth_max,
+               0 AS records_per_day,
+               NULL::text AS profile_id, NULL::text AS timeseries_id,
+               NULL::double precision AS latitude, NULL::double precision AS longitude,
+               NULL::integer AS point_pk, NULL::geometry AS geom,
+               coverage_bbox AS search_geom
+        FROM cde.datasets
+        WHERE cdm_data_type = 'Grid' AND coverage_bbox IS NOT NULL`;
+
+  const branches = [];
+  if (includeProfiles) branches.push(profilesBranch, trajectoryBranch);
+  if (showObis) branches.push(obisBranch);
+  // Grids appear in /pointQuery and /datasetRecordsList but never in the
+  // download-estimate path (metadata-only, downloads happen on ERDDAP).
+  if (includeProfiles && !doEstimate) branches.push(griddapBranch);
+  const combinedInner = branches.length
+    ? branches.join("\n        UNION ALL\n        ")
+    : `${profilesBranch} WHERE FALSE`;
+
+  // The record list is one row per *record* (profile / trajectory / OBIS
+  // dataset), not one per matched feature. Trajectory and OBIS coverage is
+  // stored as grid cells, so a mission crossing 40 cells is 40 rows in
+  // `filtered` all carrying the same trajectory_id (or '' / NULL when the
+  // record is unnamed) — collapsing them here is what keeps the inspector's
+  // table from repeating the same ID down the page. The time/depth extents are
+  // unioned across the cells. profiles_count and the size estimate below still
+  // count features, which is what they mean.
+  const recordsCte = `records AS (
+        SELECT   dataset_pk,
+                 json_agg(json_build_object(
+                   'profile_id', profile_id,
+                   'time_min',   time_min,
+                   'time_max',   time_max,
+                   'depth_min',  depth_min,
+                   'depth_max',  depth_max
+                 ) ORDER BY time_min DESC) AS profiles
+        FROM     (SELECT   dataset_pk,
+                           coalesce(profile_id, timeseries_id) AS profile_id,
+                           min(time_min)::DATE  AS time_min,
+                           max(time_max)::DATE  AS time_max,
+                           min(depth_min)       AS depth_min,
+                           max(depth_max)       AS depth_max
+                  FROM     filtered
+                  GROUP BY dataset_pk, coalesce(profile_id, timeseries_id)) r
+        GROUP BY dataset_pk
+  ),`;
+
+  const sql = `WITH combined AS (
+        ${combinedInner}
+  ),
+  -- Filtering happens once, here, so the record list and the per-dataset
+  -- aggregates below agree on which features matched.
+  filtered AS (
+        SELECT p.*
+        FROM   combined p
+        JOIN   cde.datasets d
+        ON     p.dataset_pk = d.pk
+        WHERE  :filters
+  ),
+  ${getRecordsList ? recordsCte : ""}
+  sub AS
         (SELECT   d.pk,
                   d.pk_url,
                   d.dataset_id,
@@ -24,12 +126,32 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                   d.eovs                                          eovs,
                   organizations,
                   count(p.*)::integer profiles_count,
-                  d.erddap_url
-                           || '/tabledap/'
-                           || d.dataset_id
-                           || '.html' AS erddap_url,
+                  d.source_type,
+                  d.erddap_url AS erddap_server_url,
+                  CASE WHEN d.source_type = 'obis'
+                           THEN 'https://obis.org/dataset/' || d.dataset_id
+                       WHEN d.cdm_data_type = 'Grid'
+                           THEN d.erddap_url || '/griddap/' || d.dataset_id || '.html'
+                           ELSE d.erddap_url || '/tabledap/' || d.dataset_id || '.html'
+                  END AS erddap_url,
                   'https://catalogue.cioos.ca/dataset/'
-                           || ckan_id AS ckan_url
+                           || ckan_id AS ckan_url,
+                  d.wms_url,
+                  d.grid_variables,
+                  d.grid_dimensions,
+                  -- griddap footprint for the frontend bbox highlight; NULL
+                  -- for every other type
+                  CASE WHEN d.cdm_data_type = 'Grid'
+                           THEN ST_AsGeoJSON(ST_Transform(d.coverage_bbox, 4326), 6)::json
+                  END AS coverage_bbox_geojson,
+                  -- Extent of the features this query actually matched (profile
+                  -- bboxes / obis + trajectory cells / the grid footprint), so
+                  -- the frontend can frame the dataset as currently filtered
+                  -- rather than its full-catalogue footprint. Degenerate (a
+                  -- point) for a single-location dataset — fitBounds handles it.
+                  ST_AsGeoJSON(
+                    ST_Transform(ST_SetSRID(ST_Extent(p.search_geom)::geometry, 3857), 4326), 6
+                  )::json AS filtered_bbox_geojson
                   -- replace '0 days' with '1 day' when its a single day profile
                   -- query records count = sum((number of days covered by the query that are in the profile) * profile records per day * fraction of the depth range that profile covers)
                   ${
@@ -41,20 +163,16 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                   coalesce(nullif(range_intersection_length(numrange(:depthMin,:depthMax),numrange(p.depth_min::NUMERIC,p.depth_max::NUMERIC)),0),1) / (coalesce(nullif(p.depth_max-p.depth_min,0),1)) ) AS records_count`
     : ""
 }
-                  ${
-  getRecordsList
-    ? ",json_agg(json_build_object( 'profile_id',coalesce(p.profile_id, p.timeseries_id), 'time_min',p.time_min::DATE, 'time_max',p.time_max::DATE, 'depth_min',p.depth_min, 'depth_max',p.depth_max ) ORDER BY time_min DESC ) AS profiles"
-    : ""
-}
-                  
-         FROM     cde.profiles p
+
+         FROM     filtered p
          JOIN     cde.datasets d
          ON       p.dataset_pk = d.pk
-         WHERE :filters
          GROUP BY d.pk)
-SELECT *
+SELECT sub.*
+       ${getRecordsList ? ",coalesce(records.profiles, '[]'::json) AS profiles" : ""}
        ${doEstimate ? ",round(:adder + records_count * num_columns * :multiplier) AS SIZE" : ""}
-FROM   sub`;
+FROM   sub
+       ${getRecordsList ? "LEFT JOIN records ON records.dataset_pk = sub.pk" : ""}`;
   let queryParams;
 
   if (doEstimate) {
@@ -63,12 +181,12 @@ FROM   sub`;
       timeMax,
       depthMin,
       depthMax,
-      filters,
+      filters: filters.shared,
+      obisFilters: filters.obisOnly,
       adder: 0,
       multiplier: 10,
     };
-  } else queryParams = { filters };
-  if (!queryParams.filters?.sql) queryParams.filters = "TRUE";
+  } else queryParams = { filters: filters.shared, obisFilters: filters.obisOnly };
 
   const q = db.raw(sql, queryParams);
 

@@ -77,7 +77,19 @@ python -m cde_harvester --urls https://catalogue.hakai.org/erddap --cache
 
 The harvester is typically run via Docker Compose. See the main [README](../README.md) for details.
 
-The `HARVEST_CONFIG_FILE` environment variable is automatically set in the docker-compose files to `/app/harvester/harvest_config.yaml`. This allows the harvester to automatically use the mounted config file without needing the `-f` flag.
+The harvest config is **not baked into the image** — it must be provided at
+runtime. It is resolved in priority order (see
+`cde_harvester/core/config.py:resolve_harvest_config_file`):
+
+1. `HARVEST_CONFIG_YAML` env var — full YAML content inline (used on Coolify).
+2. `HARVEST_CONFIG_FILE` env var — path to a mounted config file. The
+   docker-compose files set this to `/app/harvester/harvest_config.yaml`, so
+   the mounted config is used without needing the `-f` flag.
+3. A file mounted at `/app/harvester/harvest_config.yaml`.
+
+If none exists, startup fails with an error listing these options. See the main
+[README](../README.md#harvest-configuration) for how config changes propagate
+to a running deployment.
 
 ### Full Reload Mode (default)
 Clears all existing data and reloads everything from scratch:
@@ -107,7 +119,31 @@ The harvester generates CSV files in the `harvest/` directory:
 - `ckan.csv` - CKAN metadata
 - `skipped.csv` - Datasets that were skipped (with reasons)
 
-These files are then loaded into the database by the [db-loader](../db-loader/README.md).
+These files are then loaded into the database by the
+[db-loader](cde_harvester/loading/README.md), which lives in this package at
+`cde_harvester.loading` (`python -m cde_harvester.loading --folder harvest`).
+
+## Package layout
+
+```
+cde_harvester/
+├── __main__.py           # harvest CLI (python -m cde_harvester -f config.yaml)
+├── prefect_pipeline.py   # Prefect flows/deployments (harvest -> db-load)
+├── core/                 # shared: schemas (CSV contract), db, observability,
+│                         # config, harvest reason codes
+├── sources/              # one subpackage per harvest source
+│   ├── base.py           # BaseHarvester + HarvestResult
+│   ├── erddap/           # ERDDAP client, harvester, dataset, compliance, state
+│   ├── obis/             # OBIS harvester + geo filter
+│   └── ckan/             # CKAN metadata enrichment
+├── dataset_types/        # one DatasetTypeHandler per cdm_data_type; the
+│                         # registry drives the listing filter + allowlist.
+│                         # New type (Trajectory, griddap) = new handler module.
+└── loading/              # db-loader (CSV folder -> PostgreSQL cde schema)
+```
+
+`cde_db_loader/` is a deprecated shim kept so `python -m cde_db_loader` keeps
+working for one deploy cycle.
 
 ## Configuration
 
@@ -147,6 +183,16 @@ DB_NAME=cde
 SENTRY_DSN=your_sentry_dsn_here
 ENVIRONMENT=development  # or production
 
+# Path to your project root on the host machine (required for Docker volume mounting)
+HOST_ROOT=/path/to/your/workspace/explore-cioos
+
+# Optional: Harvester schedule (defaults to None unset)
+HARVESTER_CRON=10 0 */3 * *
+# Optional: WoRMS vernaculars backfill schedule (unset = none)
+VERNACULARS_CRON=
+# Optional: fire one harvest immediately on (re)deploy (default false)
+RUN_ON_DEPLOY=false
+
 # Harvest config file path (optional)
 # When set, automatically uses this config file without needing -f flag
 # Defaults to harvest_config.yaml if not provided
@@ -155,6 +201,23 @@ HARVEST_CONFIG_FILE=/app/harvester/harvest_config.yaml
 # Harvester log directory (optional)
 HARVESTER_LOG_DIR=/app/harvester/logs
 ```
+
+The `prefect_worker` runs harvest flows in-process on the `cde-process-pool`
+work pool and registers all deployments on startup. Scale with
+`docker compose up -d --scale prefect_worker=N`; run extra workers on another
+host via `docker-compose.worker.yaml` (set `REGISTER_DEPLOYMENTS=false` there).
+
+On each `HARVESTER_CRON` tick the **`cde-harvest-all`** orchestrator deployment
+fans out into **one harvest job per server**: it triggers the per-source
+deployment (`cde-harvester-<slug>`) for every configured ERDDAP url plus `obis`,
+so each server runs as its own Prefect flow run (own subprocess) with its own
+per-server log (`harvest_<ts>_<slug>.log`) and data folder
+(`harvest/<slug>/<timestamp>/`), and each loads its own data to the DB
+incrementally. Because the orchestrator waits on all of them concurrently, the
+worker must allow enough concurrency to run them alongside it — the default
+process worker has no `--limit`, which satisfies this. The single-run
+`cde-harvester-deployment` (all sources in one flow run) remains registered as an
+on-demand fallback with no schedule.
 
 ### Configuration File
 

@@ -1,78 +1,253 @@
+/* Compact floating legend card, top-right corner of the map. */
 .legend {
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  background-color: white;
-  border-radius: 10px;
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: var(--cioos-z-map-controls, 2);
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
   display: flex;
   flex-direction: column;
-  padding: 2.5px 5px 2.5px 5px;
-  overflow-y: auto;
-  transition: left 1s;
-  font-size: small;
-  max-height: max-content;
+  min-width: 124px;
+  max-width: 190px;
+  max-height: calc(100vh - 120px);
+  overflow: hidden auto;
+  /* 3D depth (shared tokens; see theme.css). The card scrolls, so
+     preserve-3d/inner-lift can't apply here; the shadow ladder carries it. */
+  transform: var(--cioos-perspective);
+  box-shadow: var(--cioos-shadow-3d);
 }
 
-.legend:hover {
-  background-color: #f3f3f3;
+/* Each independently collapsible group (legend proper, map layers). */
+.legendGroup + .legendGroup {
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+.legendGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 9px;
+  border: none;
+  background: transparent;
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cioos-ink-60);
   cursor: pointer;
 }
 
-.legend.panelOpen {
+.legendGroupHeader:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.legendGroupHeader:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.legendGroupBody {
+  padding: 0 9px 6px;
+}
+
+.legendNoData {
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+  padding: 1px 0 3px;
+}
+
+/* Waiting on /legend — stands in for the color bar, so the card keeps its
+   shape instead of collapsing and then jumping back open. */
+.legendLoading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+  padding: 1px 0 3px;
+}
+
+.legendLoading .spinner-border {
+  color: var(--cioos-primary);
+}
+
+.legendSection + .legendSection {
+  margin-top: 5px;
+  border-top: 1px solid var(--cioos-hairline);
+  padding-top: 5px;
+}
+
+.legendSectionCaption {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cioos-ink-40);
+  margin-bottom: 2px;
+  white-space: nowrap;
+}
+
+.legendItems {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 15px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink);
+  line-height: 1.15;
+}
+
+.legendItem .legendSwatch {
+  flex: 0 0 auto;
+  width: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.legendPointCircle {
+  display: inline-block;
+  border-radius: 50%;
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-ink);
+}
+
+.legendPointCircle.small {
+  width: 6px;
+  height: 6px;
+}
+
+.legendPointCircle.large {
+  width: 12px;
+  height: 12px;
+}
+
+.legendItemLabel {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Continuous color bar for hex ramps, drawn in the scale's (log-like) space
+   with count ticks at each stop. */
+.legendColorBar {
+  height: 10px;
+  border-radius: 3px;
+  border: 1px solid var(--cioos-hairline);
+}
+
+.legendColorBarTicks {
+  position: relative;
+  height: 12px;
+  margin-top: 3px;
+}
+
+.legendColorBarTicks .legendTick {
   position: absolute;
-  left: 570px;
-  bottom: 10px;
+  top: 0;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--cioos-ink-60);
+  white-space: nowrap;
+  transform: translateX(-50%);
 }
 
-.legend hr {
-  margin: 10px 0px;
-  border: none;
+.legendColorBarTicks .legendTick.start {
+  transform: translateX(0);
 }
 
-.legendToggleButton {
-  border-radius: 10px;
-  min-height: 20px;
-  min-width: 30px;
-  background-color: #d3d3d3;
-  padding: 3px;
+.legendColorBarTicks .legendTick.end {
+  transform: translateX(-100%);
 }
 
-.legendToggleButton svg {
-  margin: auto;
+/* Basemap picker, above the layer switches. */
+.legendBasemapSelector {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.legendBasemapSelector .dropdown {
   display: block;
 }
 
-.legendToggleButton:hover {
-  background-color: #c4c4c4;
-  cursor: pointer;
+.legendBasemapDropdown.btn,
+.legendBasemapDropdown .btn {
+  width: 100%;
+  justify-content: space-between;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-@media (max-height: 650px) and (max-width:900px) {
-  .legend {
-    max-height: calc(100% - 250px);
-  }
+/* Labels wrap instead of scrolling — the legend card clips horizontal
+   overflow (it scrolls vertically only), so a too-wide nowrap item would be
+   unreachable rather than just untidy. */
+.legendBasemapSelector .dropdown-item {
+  white-space: normal;
+}
 
-  .legend.panelOpen {
-    max-height: 100px;
+/* Map-layer switches, integrated into the legend card. Scoped-down switch
+   chrome keeps the section compact alongside the color bar. */
+.legendLayerItems {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.legendLayerItems .form-check.form-switch {
+  gap: 6px;
+}
+
+.legendLayerItems .form-switch .form-check-input {
+  width: 28px;
+  height: 16px;
+}
+
+.legendLayerItems .form-switch .form-check-input::before {
+  width: 12px;
+  height: 12px;
+}
+
+.legendLayerItems .form-switch .form-check-input:checked::before {
+  transform: translateX(12px);
+}
+
+.legendLayerItems .form-check-label {
+  font-size: var(--cioos-font-size-xs);
+  line-height: 1.15;
+  color: var(--cioos-ink);
+}
+
+/* On narrower viewports the centered top bar (brand + merged
+   Datasets/Filters pill) reaches far enough right to collide with the
+   top-right legend, so move the legend to the bottom-left corner — clear of
+   the brand section — instead of leaving it beside the bar. */
+@media (max-width: 900px) {
+  .legend {
+    top: auto;
+    right: auto;
+    bottom: 12px;
+    left: 8px;
+    max-height: calc(100vh - 148px);
   }
 }
 
 @media (max-height: 500px) {
   .legend {
-    max-height: calc(100% - 250px);
-    bottom: 10px;
-    min-height: 100px;
-  }
-
-  .legend.panelOpen {
-    max-height: 100px;
-    bottom: 10px;
-    min-height: 100px;
-  }
-}
-
-@media (max-height: 650px) {
-  .legend.panelOpen {
-    max-height: calc(100% - 350px)
+    max-height: calc(100vh - 80px);
   }
 }

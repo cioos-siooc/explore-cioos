@@ -68,33 +68,169 @@ const createDBFilter = require("../utils/dbFilter");
  *                     zoom2:
  *                       type: array
  *                       items: { type: integer }
+ *                 trajectoryRecordsCount:
+ *                   type: object
+ *                   description: >
+ *                     Distinct-trajectory count ranges per hex tier
+ *                     (trajectories always render as hexes, so there's no
+ *                     zoom2/point tier).
+ *                   properties:
+ *                     zoom0:
+ *                       type: array
+ *                       items: { type: integer }
+ *                     zoom1:
+ *                       type: array
+ *                       items: { type: integer }
+ *                 obisRecordsCount:
+ *                   type: object
+ *                   description: >
+ *                     Occurrence-record count ranges per hex tier. Like
+ *                     trajectories, OBIS cells always render as hexes, so
+ *                     there's no zoom2/point tier.
+ *                   properties:
+ *                     zoom0:
+ *                       type: array
+ *                       items: { type: integer }
+ *                     zoom1:
+ *                       type: array
+ *                       items: { type: integer }
  */
 router.get(
   "/",
   cache.route(),
   validatorMiddleware(),
   async (req, res, next) => {
-    const filters = createDBFilter(req.query);
-    const hasFilter = filters.toSQL().sql;
+    let filters;
+    try {
+      filters = await createDBFilter(req.query);
+    } catch (err) {
+      if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+      throw err;
+    }
+    const includeObis = req.query.includeObis !== 'false';
+    // Scientific-name filters are OBIS-only: hide profiles when set. An
+    // OBIS-node selection also hides profiles, unless ERDDAP servers are
+    // selected alongside it (combined Source filter — show both, OR'd in
+    // the shared dataset filter).
+    const includeProfiles = !req.query.scientificNames
+      && (!req.query.obisNodes || Boolean(req.query.erddapServers));
+
+    // GROUP BY the hex FK (integer) instead of the polygon geom; the polygon
+    // lives on cde.hexes_zoom_0/1 and isn't needed here — only distinct
+    // point counts per bucket.
+    // search_geom (bbox for profiles, cell point otherwise) backs the shared
+    // spatial filter, matching tiles/shapeQuery. show_as_point gates profiles
+    // out of every tier (hex and point) so the legend ranges match the tiles,
+    // which keep large-region features off the map entirely.
+    const profilesBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, days as record_count,
+               time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
+        FROM cde.profiles WHERE show_as_point`;
+    // Trajectory and OBIS coverage cells merge into the hex-tier ranges
+    // (zoom0/zoom1, the green ramp) but not the point-tier range (zoom2) — at
+    // that zoom they only render via the dedicated always-hex coverage layer,
+    // whose own ranges come from the second query below.
+    const trajectoryBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, days as record_count,
+               time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
+        FROM cde.trajectory_cells`;
+    const obisBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk,
+               date_part('days', time_max - time_min) + 1 as record_count,
+               time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
+        FROM cde.obis_cells
+        WHERE :obisFilters`;
+
+    const hexBranches = [];
+    if (includeProfiles) hexBranches.push(profilesBranch, trajectoryBranch);
+    if (includeObis) hexBranches.push(obisBranch);
+    const combinedHexInner = hexBranches.length
+      ? hexBranches.join("\n        UNION ALL\n        ")
+      : `${profilesBranch} WHERE FALSE`;
+
+    // Only profiles reach the point tier: both cell tables are drawn as hexes
+    // at every zoom, so counting them here would ramp the point circles
+    // against data they don't contain.
+    const combinedPointInner = includeProfiles
+      ? profilesBranch
+      : `${profilesBranch} WHERE FALSE`;
+
     const sql = `
-        WITH records AS (
-        SELECT hex_zoom_0, hex_zoom_1, point_pk, days
-        FROM cde.profiles p
+        WITH combined_hex AS (
+        ${combinedHexInner}
+        ),
+        combined_point AS (
+        ${combinedPointInner}
+        ),
+        hex_records AS (
+        SELECT hex_0_pk, hex_1_pk, point_pk
+        FROM combined_hex p
         JOIN cde.datasets d
         ON p.dataset_pk = d.pk
-        ${hasFilter ? "WHERE :filters" : ""}
+        ${filters.hasShared ? "WHERE :filters" : ""}
+        ),
+        point_records AS (
+        SELECT point_pk
+        FROM combined_point p
+        JOIN cde.datasets d
+        ON p.dataset_pk = d.pk
+        ${filters.hasShared ? "WHERE :filters" : ""}
         ),
 
-        sub1 AS (SELECT json_build_array(min(count),max(count)) zoom0 FROM (SELECT count(distinct records.point_pk) count FROM records GROUP BY hex_zoom_0) s),
-        sub2 AS (SELECT json_build_array(min(count),max(count)) zoom1 FROM (SELECT count(distinct records.point_pk) count FROM records GROUP BY hex_zoom_1) s),
-        sub3 AS (SELECT json_build_array(min(count),max(count)) zoom2 FROM (SELECT count(distinct records.point_pk) count FROM records GROUP BY point_pk) s)
-        
+        sub1 AS (SELECT json_build_array(min(count),max(count)) zoom0 FROM (SELECT count(distinct hex_records.point_pk) count FROM hex_records GROUP BY hex_0_pk) s),
+        sub2 AS (SELECT json_build_array(min(count),max(count)) zoom1 FROM (SELECT count(distinct hex_records.point_pk) count FROM hex_records GROUP BY hex_1_pk) s),
+        sub3 AS (SELECT json_build_array(min(count),max(count)) zoom2 FROM (SELECT count(distinct point_records.point_pk) count FROM point_records GROUP BY point_pk) s)
+
         SELECT * from sub1,sub2,sub3
         `;
 
-    const rows = await db.raw(sql, { filters });
+    // Both cell tables always render as hexes (never points), so they only
+    // need hex_0/hex_1 ranges — no point-level zoom2 bucket. Each ramps on
+    // its own quantity, and each range is taken over only the hexes that
+    // actually hold that kind of cell, so a hex holding only the other kind
+    // doesn't drag the minimum to zero.
+    const trajectorySql = `
+        WITH records AS (
+        SELECT hex_0_pk, hex_1_pk, dataset_pk, trajectory_id
+        FROM cde.trajectory_cells p
+        JOIN cde.datasets d
+        ON p.dataset_pk = d.pk
+        ${filters.hasShared ? "WHERE :filters" : ""}
+        ),
 
-    res.send(rows && { recordsCount: rows.rows[0] });
+        sub1 AS (SELECT json_build_array(min(count),max(count)) zoom0 FROM (SELECT count(distinct (records.dataset_pk, records.trajectory_id)) count FROM records GROUP BY hex_0_pk) s),
+        sub2 AS (SELECT json_build_array(min(count),max(count)) zoom1 FROM (SELECT count(distinct (records.dataset_pk, records.trajectory_id)) count FROM records GROUP BY hex_1_pk) s)
+
+        SELECT * from sub1,sub2
+        `;
+
+    const obisSql = `
+        WITH records AS (
+        SELECT hex_0_pk, hex_1_pk, p.n_records
+        FROM cde.obis_cells p
+        JOIN cde.datasets d
+        ON p.dataset_pk = d.pk
+        WHERE :obisFilters ${filters.hasShared ? "AND :filters" : ""}
+        ),
+
+        sub1 AS (SELECT json_build_array(min(count),max(count)) zoom0 FROM (SELECT sum(records.n_records) count FROM records GROUP BY hex_0_pk) s),
+        sub2 AS (SELECT json_build_array(min(count),max(count)) zoom1 FROM (SELECT sum(records.n_records) count FROM records GROUP BY hex_1_pk) s)
+
+        SELECT * from sub1,sub2
+        `;
+
+    // All three aggregations scan the same large tables independently; run
+    // them concurrently rather than back-to-back so legend latency is bounded
+    // by the slowest, not their sum. The legend gates first map paint, so this
+    // is on the critical path.
+    const [rows, trajectoryRows, obisRows] = await Promise.all([
+      db.raw(sql, { filters: filters.shared, obisFilters: filters.obisOnly }),
+      db.raw(trajectorySql, { filters: filters.shared }),
+      db.raw(obisSql, { filters: filters.shared, obisFilters: filters.obisOnly }),
+    ]);
+
+    res.send(rows && {
+      recordsCount: rows.rows[0],
+      trajectoryRecordsCount: trajectoryRows.rows[0],
+      obisRecordsCount: obisRows.rows[0],
+    });
   },
 );
 

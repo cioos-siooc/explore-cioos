@@ -1,9 +1,9 @@
 import React from 'react'
-import { OverlayTrigger, Tooltip } from 'react-bootstrap'
 import { X } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import isEmpty from 'lodash/isEmpty'
 
+import Tooltip from '../../../ui/Tooltip.jsx'
 import './styles.css'
 
 export default function FilterButton({ setOptionsSelected, optionsSelected, option }) {
@@ -14,15 +14,7 @@ export default function FilterButton({ setOptionsSelected, optionsSelected, opti
   const filterOptionSelected = !isEmpty(optionsSelected.filter(opt => option.pk === opt.pk && opt.isSelected))
 
   return (
-    <OverlayTrigger
-      placement='bottom'
-      delay={{ show: 150, hide: 0 }}
-      overlay={
-        <Tooltip style={{ display: tooltipText ? '' : 'none' }}>
-          {tooltipText}
-        </Tooltip>
-      }
-    >
+    <Tooltip placement='bottom' delay={150} content={tooltipText}>
       <button
         className={`filterButton ${filterOptionSelected && 'selected'}`}
         onClick={() => {
@@ -38,6 +30,6 @@ export default function FilterButton({ setOptionsSelected, optionsSelected, opti
       >
         {t(option.title)}{filterOptionSelected && <X size='25' color='darkgrey' />}
       </button>
-    </OverlayTrigger>
+    </Tooltip>
   )
 }

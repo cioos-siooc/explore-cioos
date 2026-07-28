@@ -1,0 +1,156 @@
+/* Brand card: logo + two-line title lockup + minor actions on one row.
+   Sits at the top of the sidebar column, above the datasets card. */
+:root {
+  /* Fixed brand-card width, sized off the longest row in either language (the
+     French Datasets/Filters tabs) so EN and FR render the same card. */
+  --cioos-brand-width: 400px;
+}
+
+.brandSearch {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.brandCard {
+  display: flex;
+  flex-direction: column;
+  /* Fixed width (capped to the viewport) rather than sized to content: the
+     card must not resize when the language changes, and it is wide enough for
+     the longer French labels — "Jeux de données", "EXPLORATEUR". */
+  width: min(var(--cioos-brand-width), calc(100vw - 24px));
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-lg);
+  /* No padding on the card itself: the brand row carries its own, and the
+     tab strip below is full-bleed, bleeding over the card border. */
+  padding: 0;
+  /* 3D depth (shared tokens; see theme.css). preserve-3d additionally lets the
+     inner lockup items lift off the card face. */
+  transform: var(--cioos-perspective);
+  transform-style: preserve-3d;
+  box-shadow: var(--cioos-shadow-3d);
+}
+
+/* Float the interactive lockup items well above the card face so the depth is
+   strongly layered, not a single flat plane. */
+.brandCard .brandCardTop > * {
+  transform: translateZ(28px);
+}
+
+/* Symmetric three-track grid so the title is centered in the card: the logo
+   and the minor-actions cluster occupy equal-width side columns (1fr each),
+   with the wordmark auto-sized and centered between them. */
+.brandCardTop {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+.brandSearchLogo {
+  display: flex;
+  align-items: center;
+  justify-self: start;
+  border-radius: var(--cioos-radius-sm);
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.brandSearchLogo:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.brandSearchLogo img {
+  height: 34px;
+  width: auto;
+  display: block;
+}
+
+/* Two-line wordmark lockup, lines centered on each other: the secondary
+   word(s) (span — DATA / DE DONNÉES) small and widely tracked, the main word
+   (em — EXPLORER / EXPLORATEUR) large and light. */
+.brandTitle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Auto-sized centre column of the grid; the equal 1fr side columns keep it
+     centered in the card regardless of the language's word length. */
+  justify-self: center;
+  min-width: 0;
+  margin: 0;
+  /* Montserrat light to match the CIOOS wordmark — Sora (font-display) only
+     ships in 600/700 here and would synthesize a heavy fake-light. */
+  font-family: var(--cioos-font-body);
+  font-weight: 300;
+  color: var(--cioos-ink);
+  white-space: nowrap;
+}
+
+.brandTitle span {
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.28em;
+  /* optically recenter: tracking adds a trailing space after the last glyph */
+  margin-right: -0.28em;
+}
+
+.brandTitle em {
+  font-style: normal;
+  /* sized so EXPLORATEUR fits the slot the sidebar leaves for the title */
+  font-size: 17px;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  margin-right: -0.06em;
+  font-weight: 500;
+}
+
+/* Minor actions (intro / feedback / language): right-hand side column,
+   mirroring the logo column's width so the wordmark stays centered. */
+.brandMinorItems {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 4px;
+}
+
+.brandMinorItem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+.brandMinorItem:hover {
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink);
+  text-decoration: none;
+}
+
+.brandLanguage {
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  .brandSearchLogo img {
+    height: 30px;
+  }
+
+  .brandTitle span {
+    font-size: 8px;
+  }
+
+  .brandTitle em {
+    font-size: 15px;
+  }
+}

@@ -19,23 +19,27 @@
   line-height: 30px;
 }
 
+.multiCheckboxFilter .optionButton {
+  border-radius: var(--cioos-radius-sm);
+}
+
 .multiCheckboxFilter .optionButton:hover {
-  background-color: #c6e3df;
+  background-color: var(--cioos-surface-2);
 }
 
 .multiCheckboxFilter .optionButton.selected {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
 }
 
 .multiCheckboxFilter .searchResultsButton {
-  background-color: white;
+  background-color: var(--cioos-white);
   margin-left: 10px;
   position: sticky;
   top: 0px;
 }
 
 .disabled .multiCheckboxFilter .searchResultsButton {
-  background-color: lightgrey;
+  background-color: var(--cioos-hairline);
 }
 
 .multiCheckboxFilter .searchResultsButton svg {
@@ -48,8 +52,8 @@
 
 .multiCheckboxFilter .searchResultsButton:hover {
   cursor: pointer;
-  background-color: #52a79b;
-  color: white;
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
 }
 
 .multiCheckboxFilter .optionColorCircle {

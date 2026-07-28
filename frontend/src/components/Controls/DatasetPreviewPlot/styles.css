@@ -71,17 +71,10 @@
   height: 100% !important;
 }
 
-.dropdown-menu {
-  z-index: 9999;
-}
-
-/* Variable pickers (X, Y, second variable, color) can list every column,
-   so cap the menu height and let it scroll. Scoped to these dropdowns only. */
-.dropdownButtonLeft .dropdown-menu {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
+/* The variable pickers can list every column, but the menu height cap lives in
+   ui/dropdownStyles.css rather than here: ui/Dropdown portals the menu into
+   document.body, so it is not a descendant of .dropdownButtonLeft and cannot be
+   styled from this file. Layering is handled there too, via --cioos-z-dropdown. */
 .dropdownButtonLeft .dropdown-toggle {
   min-width: 120px !important;
   max-width: 120px !important;

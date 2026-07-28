@@ -1,0 +1,318 @@
+/* ------------------------------------------------------------------
+ * TopBar — the centered top header floating over the map. First layer:
+ * the brand bar. Second layer: the merged Datasets/Filters segmented
+ * pill. Active-filter chips flow beneath. Everything stays centered on
+ * the horizontal midline of the viewport.
+ * ------------------------------------------------------------------ */
+.topBar {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--cioos-z-dock, 35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+  pointer-events: none;
+}
+
+.topBar > * {
+  pointer-events: auto;
+}
+
+/* Merged tabs, pulled out full-bleed from below the brand row: two
+   equal-width segments (1fr 1fr — the columns grow to fit the widest label,
+   so both stay the same width) that bleed 1px past the card on the left,
+   right and bottom to cover its border, leaving no line around them. */
+.topBarActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  margin: 0 -1px -1px;
+  border-top: 1px solid var(--cioos-hairline);
+  border-bottom-left-radius: var(--cioos-radius-lg);
+  border-bottom-right-radius: var(--cioos-radius-lg);
+  overflow: hidden;
+}
+
+.topBarButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 14px;
+  border: none;
+  /* Dimmed primary: a translucent teal wash that highlights the two entry
+     points without competing with the white brand row above them. */
+  background-color: rgba(82, 167, 155, 0.14);
+  font: inherit;
+  font-weight: 600;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+/* Hairline weld between the two tabs. */
+.topBarButton + .topBarButton {
+  border-left: 1px solid rgba(82, 167, 155, 0.32);
+}
+
+.topBarButton svg {
+  color: var(--cioos-primary);
+}
+
+.topBarButton:hover {
+  background-color: rgba(82, 167, 155, 0.24);
+}
+
+/* Pressed/open state (Datasets sidebar showing): fill with solid primary. */
+.topBarButton.active {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
+}
+
+.topBarButton.active svg {
+  color: var(--cioos-white);
+}
+
+.topBarButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.topBarCount {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* On the active (teal) tab the count stays white too — a translucent white
+   pill keeps the number legible without a dark-on-white patch. */
+/* Stale count during a refetch — see the sidebar counters. */
+.topBarCount.updating {
+  opacity: 0.55;
+}
+
+.topBarButton.active .topBarCount {
+  background-color: rgba(255, 255, 255, 0.24);
+  color: var(--cioos-white);
+}
+
+@media (max-width: 700px) {
+  .topBar {
+    top: 8px;
+    max-width: calc(100vw - 16px);
+  }
+
+  .topBarButtonLabel {
+    /* Keep labels — the merged pill is the only dataset/filter entry point on
+       phones now — but tighten the padding so both segments fit. */
+    display: inline;
+  }
+
+  .topBarButton {
+    padding: 0 14px;
+  }
+}
+
+/* ------------------------------------------------------------------
+ * Active-filter chips, flowing after the Filters button.
+ * One group per active filter category; the label opens that filter's page,
+ * each value chip clears just that value, and the trailing x clears the
+ * whole group.
+ * ------------------------------------------------------------------ */
+.activeFilterBullets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+
+.activeFilterGroup {
+  pointer-events: all;
+  display: inline-flex;
+  /* The label (left) and clear-all (right) are fixed rails that stretch to
+     the group's full height; only the value chips in the middle wrap, so the
+     group grows taller with the rails following suit. */
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 4px;
+  /* Don't let a group sprawl across the map; past this width the value chips
+     wrap in the middle lane (below). */
+  max-width: min(360px, calc(100vw - 32px));
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  padding: 3px 6px 3px 4px;
+  /* 3D depth (shared tokens; see theme.css) — the chip-scale ladder.
+     preserve-3d floats the inner value chips above the pill face. */
+  transform: var(--cioos-perspective);
+  transform-style: preserve-3d;
+  box-shadow: var(--cioos-shadow-3d-sm);
+}
+
+/* Float the inner value chips above the pill face for layered depth. */
+.activeFilterGroup > * {
+  transform: translateZ(10px);
+}
+
+.activeFilterGroupLabel {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  padding: 2px 6px 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cioos-ink);
+  cursor: pointer;
+}
+
+/* Middle lane: the value chips live here and are the only part of the group
+   that wraps, flowing onto new lines between the two full-height rails. */
+.activeFilterItems {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  /* Centre the chips both ways while they fit. The `safe` keyword is load-bearing:
+     plain `center` alignment centres the overflow too, pushing the first rows above
+     the scroll origin where they can't be reached. `safe` falls back to flex-start
+     once the content overflows so every row stays scrollable. */
+  justify-content: safe center;
+  align-content: safe center;
+  gap: 4px;
+  /* Cap the lane at ~three rows of chips; anything beyond scrolls vertically
+     so the group stays compact while the two rails hold their full height. */
+  max-height: 78px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+
+.activeFilterGroupLabel:hover {
+  color: var(--cioos-primary);
+  text-decoration: underline;
+}
+
+/* Group-level clear-all, trailing the value chips. Visually paired with the
+   per-item remove buttons, but a step more prominent (solid on hover) since
+   it drops the whole group in one click. */
+.activeFilterGroupRemove {
+  flex: 0 0 auto;
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+.activeFilterGroupRemove:hover {
+  background-color: var(--cioos-error);
+  color: var(--cioos-white);
+}
+
+.activeFilterItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 170px;
+  background-color: var(--cioos-teal-light);
+  border-radius: var(--cioos-radius-pill);
+  padding: 2px 2px 2px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cioos-ink);
+}
+
+.activeFilterItemLabel {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activeFilterItemRemove {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+.activeFilterItemRemove:hover {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
+}
+
+/* Reset-all drops onto its own full-width row, centered below the applied
+   filter chips. */
+.activeFilterResetItem {
+  pointer-events: all;
+  flex-basis: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* Reset-all: a subtle text link (shared with the filters modal). */
+.filterMenuReset {
+  pointer-events: all;
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color var(--cioos-transition-fast);
+}
+
+.filterMenuReset:hover:not(:disabled) {
+  color: var(--cioos-error);
+}

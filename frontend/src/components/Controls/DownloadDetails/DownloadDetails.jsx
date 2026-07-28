@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
-import { Row, Col, Container, Spinner } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
 import bytes from 'bytes'
@@ -13,7 +12,7 @@ import isEmpty from 'lodash/isEmpty'
 import {
   createDataFilterQueryString,
   polygonIsRectangle
-} from '../../../utilities.js'
+} from '../../../utilities.jsx'
 import {
   defaultEndDate,
   defaultEndDepth,
@@ -26,10 +25,10 @@ import {
   ArrowsExpand,
   CalendarWeek,
   Check2Circle,
-  ChevronCompactLeft,
   XCircle
 } from 'react-bootstrap-icons'
 import QuestionIconTooltip from '../QuestionIconTooltip/QuestionIconTooltip.jsx'
+import Spinner from '../../ui/Spinner.jsx'
 
 // Note: datasets and points are exchangable terminology
 export default function DownloadDetails({
@@ -54,87 +53,87 @@ export default function DownloadDetails({
   const { t } = useTranslation()
   const [selectAll, setSelectAll] = useState(true)
   const [pointsData, setPointsData] = useState(
-    pointsToReview.map((ptr) => {
-      return { ...ptr, downloadDisabled: false }
-    })
+    pointsToReview
+      // defensive: griddap datasets are metadata-only and must never reach
+      // the size-estimate / download-queue flow
+      .filter((ptr) => ptr.cdm_data_type !== 'Grid')
+      .map((ptr) => {
+        return { ...ptr, downloadDisabled: false }
+      })
   )
   const [dataTotal, setDataTotal] = useState(0)
   const [downloadSizeEstimates, setDownloadSizeEstimates] = useState()
-  const [loading, setLoading] = useState(false)
+  // Three states, not two: estimates in flight (spinner), estimates in
+  // (sizes), estimates failed (no sizes, no spinner). The old code threw from
+  // its catch handlers, which skipped the setLoading(false) chained after
+  // them — a failing /downloadEstimate spun forever, in every card and in the
+  // order summary.
+  const [estimatesLoading, setEstimatesLoading] = useState(true)
 
   useEffect(() => {
-    setLoading(true)
+    let cancelled = false
+    setEstimatesLoading(true)
     setDownloadSizeEstimates()
-    let url = `${server}/downloadEstimate?`
-    let unfilteredSizeEstimates
-    let filteredAndUnfilteredSizeEstimates
-    if (pointsData) {
-      url += `&datasetPKs=${pointsData.map((ds) => ds.pk).join(',')}`
-    }
-    fetch(url)
-      .then((response) => response.ok && response.json())
-      .then((ufse) => {
-        unfilteredSizeEstimates = ufse
-      })
-      .then(() => {
-        if (
-          filterDownloadByPolygon ||
-          filterDownloadByTime ||
-          filterDownloadByDepth
-        ) {
-          if (polygon && filterDownloadByPolygon) {
-            url += `&polygon=${JSON.stringify(polygon)}`
-          }
-          if (query) {
-            const tempQuery = { ...query }
-            if (!filterDownloadByTime) {
-              tempQuery.startDate = defaultStartDate
-              tempQuery.endDate = defaultEndDate
-            }
-            if (!filterDownloadByDepth) {
-              tempQuery.startDepth = defaultStartDepth
-              tempQuery.endDepth = defaultEndDepth
-            }
-            url += `&${createDataFilterQueryString(tempQuery)}`
-          }
-          fetch(url)
-            .then((response) => {
-              if (response.ok) return response.json()
-            })
-            .then((estimates) => {
-              filteredAndUnfilteredSizeEstimates = estimates.map((e) => {
-                return {
-                  ...e,
-                  unfilteredSize: unfilteredSizeEstimates.filter(
-                    (ufse) => ufse.pk === e.pk
-                  )[0].size
-                }
-              })
-              setDownloadSizeEstimates(filteredAndUnfilteredSizeEstimates)
-            })
-            .catch((error) => {
-              throw error
-            })
-            .then(() => setLoading(false))
-        } else {
-          filteredAndUnfilteredSizeEstimates = unfilteredSizeEstimates.map(
-            (e) => {
-              return {
-                ...e,
-                unfilteredSize: unfilteredSizeEstimates.filter(
-                  (ufse) => ufse.pk === e.pk
-                )[0].size
-              }
-            }
-          )
-          setDownloadSizeEstimates(filteredAndUnfilteredSizeEstimates)
+
+    const unfilteredUrl = `${server}/downloadEstimate?&datasetPKs=${pointsData
+      .map((ds) => ds.pk)
+      .join(',')}`
+    // The download can be narrowed by any of the active filters; when none of
+    // them applies, the unfiltered estimate is the estimate.
+    const isFiltered =
+      filterDownloadByPolygon || filterDownloadByTime || filterDownloadByDepth
+    let filteredUrl = unfilteredUrl
+    if (isFiltered) {
+      if (polygon && filterDownloadByPolygon) {
+        filteredUrl += `&polygon=${JSON.stringify(polygon)}`
+      }
+      if (query) {
+        const tempQuery = { ...query }
+        if (!filterDownloadByTime) {
+          tempQuery.startDate = defaultStartDate
+          tempQuery.endDate = defaultEndDate
         }
+        if (!filterDownloadByDepth) {
+          tempQuery.startDepth = defaultStartDepth
+          tempQuery.endDepth = defaultEndDepth
+        }
+        filteredUrl += `&${createDataFilterQueryString(tempQuery)}`
+      }
+    }
+
+    const fetchEstimates = (url) =>
+      fetch(url).then((response) => {
+        if (!response.ok) {
+          throw new Error(`downloadEstimate failed: ${response.status}`)
+        }
+        return response.json()
+      })
+
+    Promise.all([
+      fetchEstimates(unfilteredUrl),
+      isFiltered ? fetchEstimates(filteredUrl) : undefined
+    ])
+      .then(([unfiltered, filtered]) => {
+        if (cancelled) return
+        const unfilteredSizeByPk = new Map(unfiltered.map((e) => [e.pk, e.size]))
+        setDownloadSizeEstimates(
+          (filtered || unfiltered).map((e) => ({
+            ...e,
+            unfilteredSize: unfilteredSizeByPk.get(e.pk) ?? e.size
+          }))
+        )
       })
       .catch((error) => {
-        throw error
+        console.error('download size estimate failed:', error)
       })
-      .then(() => setLoading(false))
+      .finally(() => {
+        if (!cancelled) setEstimatesLoading(false)
+      })
+
     setSubmissionState()
+    return () => {
+      cancelled = true
+    }
   }, [
     query,
     polygon,
@@ -147,10 +146,13 @@ export default function DownloadDetails({
     if (downloadSizeEstimates) {
       let tempDataTotal = 0
       let tempDataDownloadable = 0
+      const estimateByPk = new Map(
+        downloadSizeEstimates.map((dse) => [dse.pk, dse])
+      )
       const tempData = pointsData.map((ds) => {
-        const tempDS = downloadSizeEstimates.filter(
-          (dse) => dse.pk === ds.pk
-        )[0]
+        // A dataset the estimate response didn't cover reads as 0 bytes rather
+        // than throwing — it stays listed, just without a usable size.
+        const tempDS = estimateByPk.get(ds.pk) || { size: 0, unfilteredSize: 0 }
         const estimates = {
           filteredSize: tempDS.size,
           unfilteredSize: tempDS.unfilteredSize
@@ -261,113 +263,80 @@ export default function DownloadDetails({
       }
     })
   }
+  const selectedCount = pointsData.filter((point) => point.selected).length
+
   return (
-    <Container className='downloadDetails'>
-      <button
-        className='downloadDetailsBackButton'
-        onClick={() => setShowModal(false)}
-      >
-        <ChevronCompactLeft />
-        {t('downloadModalBackButtonText')}
-      </button>
-      <Row style={{ padding: '0px' }}>
-        <Col>
-          <div className='filterDownloadToggles'>
-            {!timeFilterActive && !depthFilterActive && !polygonFilterActive && (
-              <>
-                <QuestionIconTooltip
-                  tooltipText={t('downloadDetailsFilterQuestionTooltipText')}
-                  tooltipPlacement={'left'}
-                  size={20}
-                />
-                <i>{t('downloadDetailsNoFiltersActiveMessage')}</i>
-              </>
-            )}
-            {(timeFilterActive || depthFilterActive || polygonFilterActive) && (
-              <QuestionIconTooltip
-                tooltipText={t('downloadDetailsFilterQuestionTooltipText')}
-                tooltipPlacement={'left'}
-                size={20}
-                className='helpIconWithMarginTop'
-              />
-            )}
-            {timeFilterActive && (
-              <div className={timeFilterToggleClassName}>
-                <>
-                  <button
-                    onClick={() =>
-                      setFilterDownloadByTime(!filterDownloadByTime)
-                    }
-                    disabled={!timeFilterActive}
-                  >
-                    <CalendarWeek
-                      style={{
-                        margin: '0px 15px',
-                        height: '30px'
-                      }}
-                    />
-                    {`${query.startDate} - ${query.endDate}`}
-                  </button>
-                </>
-              </div>
-            )}
-            {depthFilterActive && (
-              <div className={depthFilterToggleClassName}>
-                <>
-                  <button
-                    onClick={() =>
-                      setFilterDownloadByDepth(!filterDownloadByDepth)
-                    }
-                    disabled={!depthFilterActive}
-                  >
-                    <ArrowsExpand
-                      style={{
-                        margin: '0px 15px',
-                        height: '30px'
-                      }}
-                    />
-                    {`${query.startDepth} - ${query.endDepth}(m)`}
-                  </button>
-                </>
-              </div>
-            )}
-            {polygonFilterActive && (
-              <div className={polygonFilterToggleClassName}>
-                <>
-                  <button
-                    onClick={() =>
-                      setFilterDownloadByPolygon(!filterDownloadByPolygon)
-                    }
-                    disabled={!polygonFilterActive}
-                  >
-                    <div
-                      className='mapbox-gl-draw-polygon'
-                      style={{
-                        display: 'inline',
-                        backgroundImage: `url(${polygonIsRectangle(polygon)
-                          ? rectangleImage
-                          : polygonImage
-                        })`,
-                        backgroundRepeat: 'no-repeat',
-                        backgroundSize: '30px 30px',
-                        backgroundPositionX: '10px',
-                        backgroundPositionY: '-5px',
-                        borderRadius: '0px',
-                        height: '42px',
-                        paddingLeft: '45px'
-                      }}
-                    >
-                      {polygonFilterText}
-                    </div>
-                  </button>
-                </>
-              </div>
-            )}
-          </div>
-        </Col>
-      </Row>
-      <Row className='downloadDataRow'>
-        <Col>
+    <div className='container downloadDetails'>
+      <div className='filterDownloadToggles'>
+        <span className='filterDownloadTogglesTitle'>
+          {t('downloadDetailsFilterSectionTitle')}
+          <QuestionIconTooltip
+            tooltipText={t('downloadDetailsFilterQuestionTooltipText')}
+            tooltipPlacement={'right'}
+            size={16}
+          />
+        </span>
+        <div className='filterDownloadTogglesChips'>
+          {!timeFilterActive && !depthFilterActive && !polygonFilterActive && (
+            <i className='noFiltersMessage'>
+              {t('downloadDetailsNoFiltersActiveMessage')}
+            </i>
+          )}
+          {timeFilterActive && (
+            <div className={timeFilterToggleClassName}>
+              <button
+                onClick={() => setFilterDownloadByTime(!filterDownloadByTime)}
+                disabled={!timeFilterActive}
+              >
+                <CalendarWeek className='filterToggleIcon' size={16} aria-hidden='true' />
+                <span>{`${query.startDate} – ${query.endDate}`}</span>
+              </button>
+            </div>
+          )}
+          {depthFilterActive && (
+            <div className={depthFilterToggleClassName}>
+              <button
+                onClick={() => setFilterDownloadByDepth(!filterDownloadByDepth)}
+                disabled={!depthFilterActive}
+              >
+                <ArrowsExpand className='filterToggleIcon' size={16} aria-hidden='true' />
+                <span>{`${query.startDepth} – ${query.endDepth} m`}</span>
+              </button>
+            </div>
+          )}
+          {polygonFilterActive && (
+            <div className={polygonFilterToggleClassName}>
+              <button
+                onClick={() => setFilterDownloadByPolygon(!filterDownloadByPolygon)}
+                disabled={!polygonFilterActive}
+              >
+                <div
+                  className='mapbox-gl-draw-polygon filterToggleIcon'
+                  style={{
+                    display: 'inline',
+                    backgroundImage: `url(${polygonIsRectangle(polygon)
+                      ? rectangleImage
+                      : polygonImage
+                    })`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '24px 24px',
+                    backgroundPositionX: '8px',
+                    backgroundPositionY: '-3px',
+                    borderRadius: '0px',
+                    height: '34px',
+                    paddingLeft: '38px'
+                  }}
+                >
+                  {polygonFilterText}
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className='row downloadDataRow'>
+        <div className='col'>
           <DatasetsTable
             isDownloadModal
             handleSelectAllDatasets={handleSelectAllDatasets}
@@ -377,74 +346,71 @@ export default function DownloadDetails({
             datasets={pointsData}
             setHoveredDataset={setHoveredDataset}
             downloadSizeEstimates={downloadSizeEstimates}
-            loading={loading}
+            estimatesLoading={estimatesLoading}
           />
-        </Col>
-      </Row>
-      <Row className='downloadDetailsDownloadLimits'>
-        <Col style={{ textAlign: 'center', margin: '15px 0px' }}>
-          <div>
-            <Check2Circle color='#52a79b' size='25' />
-            {t('downloadDetailsDownloadLimitsDownloadableMessagePart1')}
-            <strong style={{ color: 'white', backgroundColor: '#52a79b' }}>
-              {t('downloadDetailsDownloadLimitsDownloadableMessagePart2')}
-            </strong>
-            {t('downloadDetailsDownloadLimitsDownloadableMessagePart3')}{' '}
-            <XCircle color='#e3285e' size='25' />
-            {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart1')}
-            <strong style={{ color: 'white', backgroundColor: '#e3285e' }}>
-              {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart2')}
-            </strong>
-            {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart3')}
-          </div>
-        </Col>
-      </Row>
-      <Row className='downloadDetailsDownloadInfoRow'>
-        <Col>
-          <div className='downloadDetailsDownloadInfoItem'>
-            <Check2Circle
-              color='#52a79b'
-              size='25'
-            />
-            {' '}
-            {t('downloadDetailsDownloadInfoDatasets')}
-            {downloadSizeEstimates ? (
-              <strong>
-                {`${pointsData.filter((point) => point.selected).length} / ${pointsData.length
-                }`}
-              </strong>
+        </div>
+      </div>
+
+      <div className='downloadLegend'>
+        <span className='downloadLegendItem'>
+          <Check2Circle className='legendIcon success' size={16} aria-hidden='true' />
+          <span className='legendBadge success'>
+            {t('downloadDetailsDownloadLimitsDownloadableMessagePart2')}
+          </span>
+          {t('downloadDetailsDownloadLimitsDownloadableMessagePart3')}
+        </span>
+        <span className='downloadLegendItem'>
+          <XCircle className='legendIcon error' size={16} aria-hidden='true' />
+          <span className='legendBadge error'>
+            {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart2')}
+          </span>
+          {t('downloadDetailsDownloadLimitsNotDownloadableMessagePart3')}
+        </span>
+      </div>
+
+      <div className='downloadOrderBar'>
+        <div className='downloadSummary'>
+          {/* The estimates decide which datasets are downloadable, hence how
+              many stay selected — so both stats wait for them rather than
+              showing a count that is about to change under the user. If they
+              fail outright, the sizes are unknowable but the counts aren't. */}
+          <div className='downloadSummaryStat'>
+            {estimatesLoading ? (
+              <Spinner className='datasetSizeTotalSpinner' />
             ) : (
-              <Spinner
-                className='datasetSizeTotalSpinner'
-                as='span'
-                animation='border'
-                size={30}
-                role='status'
-                aria-hidden='true'
-              />
+              <span className='downloadSummaryValue'>
+                {selectedCount}
+                <span className='downloadSummaryValueMuted'>{` / ${pointsData.length}`}</span>
+              </span>
             )}
+            <span className='downloadSummaryLabel'>
+              {t('downloadDetailsDownloadInfoDatasets')}
+            </span>
           </div>
-          <div className='downloadDetailsDownloadInfoItem'>
-            {t('downloadDetailsDownloadInfoDownloadSize')}
-            {downloadSizeEstimates ? (
-              <strong>
-                {`${bytes(dataTotal.filteredSize)} /
-                ${bytes(dataTotal.unfilteredSize)}`}
-              </strong>
+          <div className='downloadSummaryDivider' aria-hidden='true' />
+          <div className='downloadSummaryStat'>
+            {estimatesLoading ? (
+              <Spinner className='datasetSizeTotalSpinner' />
+            ) : downloadSizeEstimates ? (
+              <span className='downloadSummaryValue'>
+                {bytes(dataTotal.filteredSize) || '0B'}
+                <span className='downloadSummaryValueMuted'>{` / ${bytes(dataTotal.unfilteredSize) || '0B'}`}</span>
+              </span>
             ) : (
-              <Spinner
-                className='datasetSizeTotalSpinner'
-                as='span'
-                animation='border'
-                size={30}
-                role='status'
-                aria-hidden='true'
-              />
+              <span
+                className='downloadSummaryValue downloadSummaryValueMuted'
+                title={t('downloadSizeUnavailableTitle')}
+              >
+                {t('downloadSizeUnavailable')}
+              </span>
             )}
+            <span className='downloadSummaryLabel'>
+              {t('downloadDetailsDownloadInfoDownloadSize')}
+            </span>
           </div>
-        </Col>
+        </div>
         {children}
-      </Row>
-    </Container>
+      </div>
+    </div>
   )
 }

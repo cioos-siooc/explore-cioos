@@ -5,28 +5,43 @@ description = "CIOOS Explorer Harvester"
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
 dependencies = [
-    "db-loader",
+    "duckdb>=1.0.0",
     "diskcache>=5.6.3",
     "erddapy>=2.2.0",
     "lxml>=5.1.0",
     "numpy<2.0.0",
+    "pandera>=0.18.0,<0.19.0",
     "pandas<2.0.0",
-    "psycopg2-binary>=2.9.9",
-    "python-dotenv>=1.0.1",
+    "prefect>=3.6.23",
+    "prefect-docker>=0.6.0",
+    "psycopg2-binary>=2.9.10",
+    "python-dotenv>=1.1.1",
     "pyyaml>=6.0.1",
+    "redis>=6.4.0",
     "requests>=2.31.0",
-    "sentry-sdk>=1.43.0",
+    "sentry-sdk>=2.38.0",
     "shapely>=2.0.3",
-    "sqlalchemy<2.0.0",
+    "sqlalchemy>=2.0.0,<3.0.0",
 ]
 
 [build-system]
 requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 
+# cde_db_loader is a deprecated thin shim over cde_harvester.loading, kept so
+# `python -m cde_db_loader` survives one deploy cycle. Drop it from here when
+# the shim is deleted.
 [tool.hatch.build.targets.wheel]
-packages = ["cde_harvester"]
+packages = ["cde_harvester", "cde_db_loader"]
 
-[tool.uv.sources]
-db-loader = { path = "../db-loader" }
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-mock>=3.15.1",
+    "pytest-cov>=5.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit", "tests/integration"]
+addopts = "-v --tb=short"
 

@@ -53,43 +53,96 @@ const cache = require("../utils/cache");
 router.get(
   "/:z/:x/:y.mvt",
   validatorMiddleware(),
-  cache.route({ binary: true }),
+  cache.route(),
   async (req, res) => {
     const { z, x, y } = req.params;
 
-    const filters = createDBFilter(req.query);
-    const hasFilter = filters.toSQL().sql;
+    let filters;
+    try {
+      filters = await createDBFilter(req.query);
+    } catch (err) {
+      if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+      throw err;
+    }
 
     // zoom levels: 0-4,5-6,7+
     const isHexGrid = z < 7;
-    const zoomColumn = z < 5 ? "hex_zoom_0" : "hex_zoom_1";
     const zoomPKColumn = z < 5 ? "hex_0_pk" : "hex_1_pk";
+    const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
 
-    // calculate the bounding polygon for this tile
-    const sqlQuery = {
-      table: "cde.profiles",
-      // if its a zoom level where hexes are show, return the hex shapes, otherwise return a point
-      geom_column: isHexGrid ? zoomColumn : "geom",
-    };
-    // not joining to cde.points to get hexagons as that could be slower
+    const includeObis = req.query.includeObis !== 'false';
+    // Scientific-name filters are OBIS-only: hide profiles when set. An
+    // OBIS-node selection also hides profiles, unless ERDDAP servers are
+    // selected alongside it (combined Source filter — show both, OR'd in
+    // the shared dataset filter).
+    const includeProfiles = !req.query.scientificNames
+      && (!req.query.obisNodes || Boolean(req.query.erddapServers));
+
+    // At hex zoom we only need the hex FK and point_pk (for distinct counts);
+    // the polygon is fetched once per hex via JOIN to hexes_zoom_*. At point
+    // zoom we project the actual point geom.
+    // Features spanning a region (show_as_point=false) are kept off the map
+    // entirely — excluded from both the individual dots (z>=7) and the hex
+    // aggregation counts (z<7). They remain searchable via the sidebar
+    // geospatial filters (shapeQuery has no such gate). search_geom (the bbox
+    // for profiles, the cell point otherwise) backs the shared spatial filter.
+    const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
+           time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
+    FROM cde.profiles WHERE show_as_point`;
+    // Both cell tables (trajectory coverage cells and OBIS occurrence cells)
+    // merge into the combined hex counts (z<7, the green ramp) but never
+    // appear as individual points (z>=7). Their cell spacing is a grid
+    // artifact, not a measurement location, so at point zoom they're shown
+    // only via the dedicated always-hex coverage layer from
+    // /tiles/cells/:z/:x/:y.mvt.
+    const trajectoryBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
+           time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
+    FROM cde.trajectory_cells`;
+    const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
+           date_part('days', time_max - time_min) + 1 as record_count,
+           time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
+    FROM cde.obis_cells
+    WHERE :obisFilters`;
+
+    const branches = [];
+    if (includeProfiles) {
+      branches.push(profilesBranch);
+      if (isHexGrid) branches.push(trajectoryBranch);
+    }
+    if (includeObis && isHexGrid) branches.push(obisBranch);
+    // Guard: if nothing to show, return an empty CTE that still has the right columns
+    const combinedInner = branches.length
+      ? branches.join("\n    UNION ALL\n    ")
+      : `${profilesBranch} WHERE FALSE`;
+
+    const relevantPointsSQL = isHexGrid
+      ? `SELECT p.zoom_pk pk, count(distinct p.point_pk) count,
+                array_to_json(array_agg(distinct d.pk_url)) datasets,
+                h.geom AS geom
+         FROM combined p
+         JOIN cde.datasets d ON p.dataset_pk = d.pk
+         JOIN ${hexesTable} h ON h.pk = p.zoom_pk
+         ${filters.hasShared ? "WHERE :filters" : ""}
+         GROUP BY p.zoom_pk, h.geom`
+      : `SELECT p.point_pk pk, d.platform as platform, sum(p.record_count)::bigint count,
+                array_to_json(array_agg(distinct d.pk_url)) datasets,
+                p.point_geom AS geom
+         FROM combined p
+         JOIN cde.datasets d ON p.dataset_pk = d.pk
+         ${filters.hasShared ? "WHERE :filters" : ""}
+         GROUP BY p.point_geom, p.point_pk, d.platform`;
+
+    // Combine profiles and obis_cells so both appear on the map
     const SQL = `
-  with relevent_points as (
-    ${
-  isHexGrid
-    ? "SELECT :zoomPKColumn: pk,count(distinct point_pk) count,"
-    : "SELECT point_pk pk, d.platform as platform,sum(p.days)::bigint count,"
-} array_to_json(array_agg(distinct d.pk_url)) datasets,     
-      p.:geom_column: AS geom FROM cde.profiles p
-        -- used for organizations filtering
-        JOIN cde.datasets d
-        ON p.dataset_pk = d.pk 
-       ${hasFilter ? "WHERE :filters" : ""}
-        ${
-  isHexGrid ? "GROUP BY :zoomPKColumn:,p.:geom_column:" : "GROUP BY geom,point_pk,platform"
-} ),
+  with combined as (
+    ${combinedInner}
+  ),
+  relevent_points as (
+    ${relevantPointsSQL}
+  ),
     te AS (select ST_TileEnvelope(:z, :x, :y) tile_envelope ),
     mvtgeom AS (
-      SELECT pk,count, 
+      SELECT pk,count,
        ${isHexGrid ? "" : "platform,"} datasets,
         ST_AsMVTGeom (
           relevent_points.geom,
@@ -104,9 +157,167 @@ router.get(
 
     try {
       const q = db.raw(SQL, {
-        filters,
+        filters: filters.shared,
+        obisFilters: filters.obisOnly,
         zoomPKColumn,
-        geom_column: sqlQuery.geom_column,
+        z,
+        x,
+        y,
+      });
+
+      const tileRaw = await q;
+      const tile = tileRaw.rows[0];
+
+      res.setHeader("Content-Type", "application/x-protobuf");
+      res.status(200).send(tile.st_asmvt);
+    } catch (e) {
+      console.error(e);
+      res.status(500).send({
+        error: e.toString(),
+      });
+    }
+  },
+);
+
+/**
+ * @swagger
+ * /tiles/cells/{z}/{x}/{y}.mvt:
+ *   get:
+ *     summary: Retrieve a vector tile of coverage-cell hexes (trajectory + OBIS)
+ *     tags: [Tiles]
+ *     description: >
+ *       Returns a Mapbox Vector Tile of trajectory and OBIS dataset coverage,
+ *       always aggregated as hexagons — unlike /tiles/{z}/{x}/{y}.mvt this
+ *       never falls back to individual points at high zoom. Each hex carries
+ *       both a trajectory_count (distinct trajectories) and an obis_count
+ *       (occurrence records), so a hex holding both can be drawn and labelled
+ *       differently from one holding only one kind.
+ *     parameters:
+ *       - in: path
+ *         name: z
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: x
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: y
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: timeMin
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: timeMax
+ *         schema: { type: string, format: date-time }
+ *     responses:
+ *       200:
+ *         description: MVT binary tile.
+ *         content:
+ *           application/x-protobuf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ */
+/* GET /tiles/cells/:z/:x/:y.mvt */
+/* Trajectory + OBIS coverage cells, always rendered as hexagons regardless of zoom */
+router.get(
+  "/cells/:z/:x/:y.mvt",
+  validatorMiddleware(),
+  cache.route(),
+  async (req, res) => {
+    const { z, x, y } = req.params;
+
+    let filters;
+    try {
+      filters = await createDBFilter(req.query);
+    } catch (err) {
+      if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+      throw err;
+    }
+
+    // Only two hex grids exist (hex_0 for z<5, hex_1 for z>=5); hex_1 is
+    // reused uncapped past zoom 6 so coverage cells never become points.
+    const zoomPKColumn = z < 5 ? "hex_0_pk" : "hex_1_pk";
+    const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
+
+    const includeObis = req.query.includeObis !== 'false';
+    // Same gating as the main tile route: scientific-name filters are
+    // OBIS-only, so they hide the (ERDDAP) trajectory cells; an OBIS-node
+    // selection does too, unless ERDDAP servers are selected alongside it.
+    const includeProfiles = !req.query.scientificNames
+      && (!req.query.obisNodes || Boolean(req.query.erddapServers));
+
+    // A `src` discriminator lets one pass over the union produce a separate
+    // count per kind, so a hex can report (and be coloured by) exactly what
+    // it holds. n_records is meaningless for trajectory cells and
+    // trajectory_id for OBIS cells; each is only ever read behind its own
+    // FILTER below.
+    const trajectoryBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'trajectory' as src,
+           trajectory_id, 0::bigint as n_records,
+           time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
+    FROM cde.trajectory_cells`;
+    const obisBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'obis' as src,
+           NULL as trajectory_id, n_records,
+           time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
+    FROM cde.obis_cells
+    WHERE :obisFilters`;
+
+    const branches = [];
+    if (includeProfiles) branches.push(trajectoryBranch);
+    if (includeObis) branches.push(obisBranch);
+    // Guard: if nothing to show, return an empty CTE that still has the right columns
+    const combinedInner = branches.length
+      ? branches.join("\n    UNION ALL\n    ")
+      : `${trajectoryBranch} WHERE FALSE`;
+
+    // The tile-envelope test is applied BEFORE the aggregation (hexes are
+    // disjoint, so filtering hexes before or after grouping yields identical
+    // tiles). This bounds each tile request to the cells under the visible
+    // hexes — via the hex_0_pk/hex_1_pk indexes — instead of re-aggregating
+    // the whole cell tables per tile. Grouping is by hex pk only, with the
+    // polygon joined back afterwards, so the group sort runs over narrow rows
+    // instead of spilling hex geometries to disk.
+    const SQL = `
+  with combined as (
+    ${combinedInner}
+  ),
+    te AS (select ST_TileEnvelope(:z, :x, :y) tile_envelope ),
+    tile_hexes AS (
+      SELECT h.pk, h.geom
+      FROM ${hexesTable} h, te
+      WHERE h.geom && te.tile_envelope
+    ),
+    agg as (
+      SELECT c.zoom_pk pk,
+             count(distinct (c.dataset_pk, c.trajectory_id))
+               FILTER (WHERE c.src = 'trajectory') trajectory_count,
+             coalesce(sum(c.n_records) FILTER (WHERE c.src = 'obis'), 0)::bigint obis_count,
+             array_to_json(array_agg(distinct d.pk_url)) datasets
+      FROM combined c
+      JOIN cde.datasets d ON c.dataset_pk = d.pk
+      JOIN tile_hexes th ON th.pk = c.zoom_pk
+      ${filters.hasShared ? "WHERE :filters" : ""}
+      GROUP BY c.zoom_pk
+    ),
+    mvtgeom AS (
+      SELECT a.pk, a.trajectory_count, a.obis_count, a.datasets,
+        ST_AsMVTGeom (
+          th.geom,
+          te.tile_envelope
+        ) AS geom
+      FROM agg a
+      JOIN tile_hexes th ON th.pk = a.pk, te
+    )
+    SELECT ST_AsMVT(mvtgeom.*, 'coverage-hexes-layer', 4096, 'geom') AS st_asmvt from mvtgeom;
+  `;
+
+    try {
+      const q = db.raw(SQL, {
+        filters: filters.shared,
+        obisFilters: filters.obisOnly,
+        zoomPKColumn,
         z,
         x,
         y,

@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react'
-import { Dropdown, DropdownButton, OverlayTrigger, Tooltip } from 'react-bootstrap'
 import { useTranslation } from 'react-i18next'
+import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
+import Tooltip from '../../ui/Tooltip.jsx'
 import './styles.css'
 
-import Plotly from 'Plotly'
-import createPlotlyComponent from 'createPlotlyComponent'
+import Plotly from 'plotly.js-basic-dist-min'
+import createPlotlyComponent from 'react-plotly.js/factory'
+import frLocale from 'plotly.js-locales/fr'
+
+Plotly.register(frLocale)
 const Plot = createPlotlyComponent(Plotly)
 
 export default function DatasetPreviewPlot({
@@ -118,7 +122,7 @@ export default function DatasetPreviewPlot({
   // profile's second variable goes on the top axis, so no extra gap is needed.
   const rightAxisPresent = hasSecondary && !isProfile
   const gutterX = rightAxisPresent ? 1.16 : 1.06
-  // Named scales available in the plotly-basic 1.58.5 bundle we ship.
+  // Named scales, all of which ship in the plotly-basic 3.x bundle.
   const COLORSCALE_OPTIONS = [
     'Viridis', 'Cividis', 'Blues', 'Greens', 'Reds',
     'YlGnBu', 'YlOrRd', 'Hot', 'Bluered', 'RdBu',
@@ -134,8 +138,7 @@ export default function DatasetPreviewPlot({
   // own scale (same x, so a long title never overlaps the neighbour).
   const colorbarFor = (index) => {
     const base = {
-      title: axisTitleFor('color', plotAxes.color),
-      titleside: 'top',
+      title: { text: axisTitleFor('color', plotAxes.color), side: 'top' },
       thickness: 14,
       x: gutterX,
       xanchor: 'left'
@@ -256,7 +259,7 @@ export default function DatasetPreviewPlot({
     // and legend live in the right gutter, so widen the right margin to leave a
     // clear gap between them and the plot (wider still when a right-side axis
     // pushes the gutter out).
-    title: wrappedTitle,
+    title: { text: wrappedTitle },
     margin: {
       // Extra top room per wrapped title line so multi-line titles never overlap the plot.
       t: 60 + (titleLineCount - 1) * 24,
@@ -267,12 +270,12 @@ export default function DatasetPreviewPlot({
       automargin: true,
       side: isProfile ? 'top' : undefined,
       autorange: isProfile ? 'reversed' : undefined,
-      title: axisTitleFor('y', plotAxes.y),
+      title: { text: axisTitleFor('y', plotAxes.y) },
       uirevision: true
     },
     xaxis: {
       automargin: true,
-      title: axisTitleFor('x', plotAxes.x),
+      title: { text: axisTitleFor('x', plotAxes.x) },
       uirevision: true
     },
     dragmode: 'zoom',
@@ -293,7 +296,7 @@ export default function DatasetPreviewPlot({
         overlaying: 'x',
         side: 'top',
         automargin: true,
-        title: axisTitleFor('secondary', plotAxes.secondary),
+        title: { text: axisTitleFor('secondary', plotAxes.secondary) },
         uirevision: true
       }
     } else {
@@ -301,7 +304,7 @@ export default function DatasetPreviewPlot({
         overlaying: 'y',
         side: 'right',
         automargin: true,
-        title: axisTitleFor('secondary', plotAxes.secondary),
+        title: { text: axisTitleFor('secondary', plotAxes.secondary) },
         uirevision: true
       }
     }
@@ -314,11 +317,7 @@ export default function DatasetPreviewPlot({
     return (
       <div className="controlRow" key={role}>
         <span className="controlCaption">{t(captionKey)}</span>
-        <OverlayTrigger
-          placement="right"
-          trigger={['hover', 'focus']}
-          overlay={<Tooltip id={`tooltip-${role}`}>{value}</Tooltip>}
-        >
+        <Tooltip placement="right" content={value}>
           <span className="controlButtonWrap">
             <DropdownButton className="dropdownButtonLeft" title={value}>
               {includeNone && (
@@ -343,7 +342,7 @@ export default function DatasetPreviewPlot({
                 ))}
             </DropdownButton>
           </span>
-        </OverlayTrigger>
+        </Tooltip>
       </div>
     )
   }
@@ -353,11 +352,7 @@ export default function DatasetPreviewPlot({
   const colorscaleRow = (role, captionKey, value, onSelect) => (
     <div className="controlRow" key={role}>
       <span className="controlCaption">{t(captionKey)}</span>
-      <OverlayTrigger
-        placement="right"
-        trigger={['hover', 'focus']}
-        overlay={<Tooltip id={`tooltip-${role}`}>{value}</Tooltip>}
-      >
+      <Tooltip placement="right" content={value}>
         <span className="controlButtonWrap">
           <DropdownButton className="dropdownButtonLeft" title={value}>
             {COLORSCALE_OPTIONS.map((scale) => (
@@ -367,7 +362,7 @@ export default function DatasetPreviewPlot({
             ))}
           </DropdownButton>
         </span>
-      </OverlayTrigger>
+      </Tooltip>
     </div>
   )
 
@@ -456,7 +451,7 @@ export default function DatasetPreviewPlot({
               layout={layout}
               config={{
                 displaylogo: false,
-                modeBarButtonsToRemove: ['select2d', 'lasso2d', 'resetScale', 'pan2d'],
+                modeBarButtonsToRemove: ['select2d', 'lasso2d', 'resetScale2d', 'pan2d'],
                 responsive: true,
                 scrollZoom: true,
                 locale: i18n.language === 'fr' ? 'fr' : 'en',

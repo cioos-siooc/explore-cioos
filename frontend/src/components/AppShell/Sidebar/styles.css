@@ -1,0 +1,322 @@
+/* ------------------------------------------------------------------
+ * Sidebar — the left column holding the datasets card (a toggle header
+ * that shows/hides the dataset list body and the counts + Download
+ * footer). The brand + Datasets/Filters entry points live in the
+ * centered top bar. On phones the datasets card becomes a bottom sheet
+ * draggable up from the base of the screen.
+ * ------------------------------------------------------------------ */
+:root {
+  --cioos-sidebar-width: 420px;
+  /* Sliver of the collapsed datasets sheet left visible on mobile — just a
+     slim grab handle. Kept in sync with SHEET_PEEK in Sidebar.jsx. */
+  --sheet-peek: 28px;
+  /* Clearance held below the brand card so the datasets list's top edge rests
+     just under it (logo row + Datasets/Filters pill) instead of sliding behind
+     it. Used on mobile (sheet height) and on narrow desktop widths where the
+     centered brand card drifts left over the sidebar. */
+  --sheet-top-gap: 110px;
+}
+
+/* Transparent positioning shell: the two cards inside carry the chrome,
+   and the empty space between/below them stays click-through to the map. */
+.sidebar {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  bottom: 12px;
+  z-index: var(--cioos-z-shell, 30);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(var(--cioos-sidebar-width), calc(100vw - 24px));
+  pointer-events: none;
+}
+
+.sidebar > * {
+  pointer-events: auto;
+}
+
+/* ------------------------------------------------------------------
+ * Datasets card: toggle header + list body + counts/Download footer.
+ * ------------------------------------------------------------------ */
+.sidebarDatasets {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-lg);
+  overflow: hidden;
+  /* 3D depth (shared tokens; see theme.css). The panel clips its content, so
+     preserve-3d/inner-lift can't apply here; the shadow ladder carries it. */
+  transform: var(--cioos-perspective);
+  box-shadow: var(--cioos-shadow-3d);
+}
+
+/* Expanded: fill the remaining height so the list can scroll. */
+.sidebarDatasets.expanded {
+  flex: 1 1 auto;
+}
+
+/* Collapsed: only the toggle header shows; hide the list + footer. */
+.sidebarDatasets:not(.expanded) .sidebarBody,
+.sidebarDatasets:not(.expanded) .sidebarFooter {
+  display: none;
+}
+
+/* On desktop the datasets card is opened from the top-bar Datasets button, so
+   when collapsed the whole card (banner included) disappears from the left —
+   the map is unobstructed. When expanded its banner stays clickable to hide
+   it again. (Phones keep the draggable bottom-sheet peek; see below.) */
+@media (min-width: 701px) {
+  .sidebarDatasets:not(.expanded) {
+    display: none;
+  }
+}
+
+/* Narrow desktop widths: the brand card is centered on the viewport, so as the
+   screen narrows it drifts left until it overlaps the top of the left sidebar.
+   The crossover (with the 420px sidebar + 400px brand card) is ~1264px, so up
+   to ~1300px push the datasets card's top down to clear the brand card — the
+   same clearance the mobile sheet holds. Above ~1300px the centered card no
+   longer reaches the sidebar, so no push is needed. */
+@media (min-width: 701px) and (max-width: 1300px) {
+  .sidebarDatasets {
+    margin-top: var(--sheet-top-gap);
+  }
+}
+
+.datasetsToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  color: var(--cioos-ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.datasetsToggle:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.datasetsToggle > svg:first-child {
+  color: var(--cioos-primary);
+  flex-shrink: 0;
+}
+
+.datasetsToggleLabel {
+  flex-shrink: 0;
+}
+
+.datasetsToggleCount {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-navy);
+  color: var(--cioos-white);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* Chevron pushed to the far edge; points down when collapsed, flips up
+   once the list is open. */
+.datasetsToggleChevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--cioos-ink-60);
+  transition: transform var(--cioos-transition-fast);
+}
+
+.sidebarDatasets.expanded .datasetsToggleChevron {
+  transform: rotate(180deg);
+}
+
+/* The list body sits below the toggle, visually separated by a hairline. */
+.sidebarBody {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+/* ------------------------------------------------------------------
+ * Footer: dataset counts on the left, the Download action on the right.
+ * ------------------------------------------------------------------ */
+.sidebarFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-top: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-sand, var(--cioos-surface-2));
+}
+
+.sidebarCounts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink);
+}
+
+.sidebarCountsDatasets {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* A refetch is in flight: the numbers on screen are the previous ones, so fade
+   them rather than swapping in a spinner and making the counters flicker. */
+.datasetsToggleCount.updating,
+.sidebarCountsDatasets.updating {
+  opacity: 0.55;
+}
+
+.sidebarCountsSelected {
+  color: var(--cioos-ink-60);
+  white-space: nowrap;
+}
+
+.sidebarDownloadButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border: 1px solid var(--cioos-primary-700);
+  /* Same corner radius as the dataset cards it sits under. */
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-primary);
+  font: inherit;
+  font-weight: 700;
+  color: var(--cioos-white);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.sidebarDownloadButton:hover:not(:disabled) {
+  background-color: var(--cioos-primary-700);
+}
+
+.sidebarDownloadButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.sidebarDownloadCount {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-700);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+/* ------------------------------------------------------------------
+ * Mobile: brand card floats top-left; the datasets card becomes a
+ * bottom sheet, dragged up from the base of the screen by its handle.
+ * ------------------------------------------------------------------ */
+@media (max-width: 700px) {
+  .sidebar {
+    inset: 8px;
+    width: auto;
+  }
+
+  .sidebarDatasets {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* Full height minus the brand-card clearance at the top, so the expanded
+       sheet reaches nearly the top of the screen while stopping below the
+       brand card. */
+    height: calc(100dvh - var(--sheet-top-gap));
+    max-height: calc(100dvh - var(--sheet-top-gap));
+    border-radius: var(--cioos-radius-lg) var(--cioos-radius-lg) 0 0;
+    box-shadow: var(--cioos-shadow-lift, var(--cioos-shadow-float));
+    /* Collapsed rest position: only the handle peeks above the edge. */
+    transform: translateY(calc(100% - var(--sheet-peek)));
+    transition: transform var(--cioos-transition-normal, 0.25s ease);
+    touch-action: none;
+  }
+
+  .sidebarDatasets.expanded {
+    flex: none;
+    transform: translateY(0);
+  }
+
+  /* On mobile the list is part of the sheet, always mounted — reveal it
+     by dragging rather than by remounting. */
+  .sidebarDatasets:not(.expanded) .sidebarBody,
+  .sidebarDatasets:not(.expanded) .sidebarFooter {
+    display: flex;
+  }
+
+  /* Grab handle: a short centered pill above the toggle label. */
+  .datasetsToggle {
+    position: relative;
+    justify-content: center;
+    padding-top: 20px;
+    min-height: var(--sheet-peek);
+  }
+
+  .datasetsToggle::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    border-radius: var(--cioos-radius-pill);
+    background-color: var(--cioos-ink-40, var(--cioos-hairline));
+  }
+
+  /* The chevron is redundant next to the grab handle on the sheet. */
+  .datasetsToggleChevron {
+    display: none;
+  }
+
+  /* Collapsed at the base: the sheet is fully hidden. Only an invisible
+     strip stays at the bottom edge as a drag zone — no handle, no label, no
+     chrome — so the map reads edge-to-edge. Swipe/drag up from the edge to
+     reveal the list; all the sheet chrome returns once it's expanded. */
+  .sidebarDatasets:not(.expanded) {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .sidebarDatasets:not(.expanded) .datasetsToggle {
+    padding: 0;
+    min-height: var(--sheet-peek);
+  }
+
+  .sidebarDatasets:not(.expanded) .datasetsToggle:hover {
+    background: transparent;
+  }
+
+  .sidebarDatasets:not(.expanded) .datasetsToggle::before,
+  .sidebarDatasets:not(.expanded) .datasetsToggle > svg:first-child,
+  .sidebarDatasets:not(.expanded) .datasetsToggleLabel,
+  .sidebarDatasets:not(.expanded) .datasetsToggleCount {
+    display: none;
+  }
+}

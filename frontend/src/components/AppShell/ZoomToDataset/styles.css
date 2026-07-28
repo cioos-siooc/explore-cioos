@@ -1,0 +1,55 @@
+/* Shared pill. The two variants differ only in how they're placed: `floating`
+   sits over the map, `inline` sits in the dataset page's title block. */
+.zoomToDatasetButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: 999px;
+  background-color: var(--cioos-white);
+
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cioos-primary-700, var(--cioos-primary));
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.zoomToDatasetButton:hover {
+  background-color: var(--cioos-sand);
+}
+
+/* Lower-center of the map, clear of the datasets sidebar (left) and the map
+   interaction controls (lower-right). */
+.zoomToDatasetButton.floating {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: var(--cioos-z-map-controls, 2);
+  box-shadow: var(--cioos-shadow-float);
+}
+
+.zoomToDatasetButton.floating:active {
+  transform: translateX(-50%) translateY(1px);
+}
+
+/* In the dataset page: sits in the flow under the title, so it stays with the
+   dataset it acts on while the metadata sheet scrolls. */
+.zoomToDatasetButton.inline {
+  margin-top: 8px;
+  padding: 5px 12px;
+  font-size: 0.8rem;
+}
+
+.zoomToDatasetButton.inline:active {
+  transform: translateY(1px);
+}
+
+/* Clear the datasets bottom sheet on phones. */
+@media (max-width: 700px) {
+  .zoomToDatasetButton.floating {
+    bottom: 64px;
+  }
+}
