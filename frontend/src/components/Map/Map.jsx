@@ -50,6 +50,7 @@ import {
   TRAIL_ALL
 } from '../config'
 import platformColors from '../../components/platformColors'
+import { PROFILE_TYPE_KEYS } from '../../state/dataLayers.js'
 import {
   applyBasemap,
   buildBasemapStyle,
@@ -82,13 +83,6 @@ function buildHeadArrowImage(fillColor, strokeColor = '#ffffff') {
   ctx.stroke()
   return ctx.getImageData(0, 0, size, size)
 }
-
-// Data-layer keys that map to profile cdm_data_types (all share cde.profiles).
-const PROFILE_TYPE_KEYS = [
-  ['profile', 'Profile'],
-  ['timeseries', 'TimeSeries'],
-  ['timeseriesProfile', 'TimeSeriesProfile']
-]
 
 // Combine the filter-derived query string with the data-layer selection into
 // a tile-URL suffix. OBIS off adds includeObis=false, OR-ed with any the

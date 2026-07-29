@@ -17,6 +17,7 @@ import TimeBar from '../Controls/TimeBar/TimeBar.jsx'
 import WmsLegend from '../Controls/WmsLegend/WmsLegend.jsx'
 import IntroModal from '../Controls/IntroModal/IntroModal.jsx'
 import { BASEMAP_OPTIONS } from '../Map/basemapStyle.js'
+import { DATA_LAYER_LABEL_KEYS } from '../../state/dataLayers.js'
 import { useMapState } from '../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../state/ui/UIProvider.jsx'
@@ -94,18 +95,14 @@ export default function AppShell () {
   // switch renders indented under (and only while) Trajectories is on.
   const toggleDataLayer = (key) =>
     setDataLayers({ ...dataLayers, [key]: !dataLayers[key] })
-  const dataLayerControls = [
-    { key: 'profile', label: t('layerProfile') },
-    { key: 'timeseries', label: t('layerTimeseries') },
-    { key: 'timeseriesProfile', label: t('layerTimeseriesProfile') },
-    { key: 'obis', label: t('layerObis') },
-    { key: 'trajectories', label: t('layerTrajectories') }
-  ].map(({ key, label }) => ({
-    key,
-    label,
-    checked: dataLayers[key],
-    onChange: () => toggleDataLayer(key)
-  }))
+  const dataLayerControls = Object.entries(DATA_LAYER_LABEL_KEYS).map(
+    ([key, labelKey]) => ({
+      key,
+      label: t(labelKey),
+      checked: dataLayers[key],
+      onChange: () => toggleDataLayer(key)
+    })
+  )
   if (dataLayers.trajectories) {
     const trajectoriesIndex = dataLayerControls.findIndex(
       (control) => control.key === 'trajectories'

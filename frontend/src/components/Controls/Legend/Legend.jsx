@@ -18,6 +18,7 @@ import {
   TRAIL_ALL
 } from '../../config.js'
 import platformColors from '../../platformColors'
+import { ALL_DATA_LAYERS } from '../../../state/dataLayers.js'
 import Spinner from '../../ui/Spinner.jsx'
 import Switch from '../../ui/Switch.jsx'
 import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
@@ -74,13 +75,7 @@ export default function Legend({
   )
 
   // Default all-on when the prop is absent (older callers / initial render).
-  const layers = dataLayers || {
-    profile: true,
-    timeseries: true,
-    timeseriesProfile: true,
-    obis: true,
-    trajectories: true
-  }
+  const layers = dataLayers || ALL_DATA_LAYERS
   // The combined green ramp / platform points carry the profile-family types
   // + OBIS, plus trajectory coverage when shown as hexes.
   const showPointRamp =

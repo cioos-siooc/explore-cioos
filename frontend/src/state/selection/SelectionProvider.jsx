@@ -28,6 +28,7 @@ import erddapServersJSONfile from '../../erddapServers.json'
 import { useFilters } from '../filters/FilterProvider.jsx'
 import { useMapState } from '../map/MapStateProvider.jsx'
 import { GROUP_NONE, hiddenDatasetPksFor } from '../datasetGroups.js'
+import { allDataLayersOn, datasetInDataLayers } from '../dataLayers.js'
 
 const SelectionContext = createContext()
 
@@ -60,7 +61,8 @@ export default function SelectionProvider ({ children }) {
     pendingDatasetZoom,
     setPendingDatasetZoom,
     mapView,
-    setMapDatasetPKs
+    setMapDatasetPKs,
+    dataLayers
   } = useMapState()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -188,11 +190,18 @@ export default function SelectionProvider ({ children }) {
   // DatasetsTable's search box used to match locally: title, dataset type,
   // and data-portal name. Derived here (rather than inside DatasetsTable) so
   // the datasets counters (Sidebar, TopControls) reflect it too.
+  //
+  // The data-layer switches narrow it as well: turning a data type off stops
+  // the map drawing it, so the list would otherwise keep offering datasets
+  // that have no presence on the map (see state/dataLayers.js for which
+  // switch owns which dataset — Grid datasets belong to none and always stay).
   const filteredDatasets = useMemo(() => {
     const query = datasetTitleSearchText.toLowerCase()
     const hasSearch = !isEmpty(datasetTitleSearchText)
-    if (!hasSearch && !onlyInView) return pointsData
+    const layersNarrowed = !allDataLayersOn(dataLayers)
+    if (!hasSearch && !onlyInView && !layersNarrowed) return pointsData
     return pointsData.filter((row) => {
+      if (layersNarrowed && !datasetInDataLayers(row, dataLayers)) return false
       if (onlyInView && !datasetsInViewPks.has(row.pk)) return false
       if (!hasSearch) return true
       return [
@@ -208,7 +217,14 @@ export default function SelectionProvider ({ children }) {
         .toLowerCase()
         .includes(query)
     })
-  }, [pointsData, datasetTitleSearchText, onlyInView, datasetsInViewPks, i18n.language])
+  }, [
+    pointsData,
+    datasetTitleSearchText,
+    onlyInView,
+    datasetsInViewPks,
+    dataLayers,
+    i18n.language
+  ])
 
   // Group keys are only meaningful within one dimension, so switching
   // dimensions drops whatever was hidden under the old one.

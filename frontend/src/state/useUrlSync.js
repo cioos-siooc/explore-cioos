@@ -6,6 +6,7 @@ import {
   createDataFilterQueryString,
   createSelectionQueryString
 } from '../utilities.jsx'
+import { allDataLayersOn } from './dataLayers.js'
 import { GROUP_NONE } from './datasetGroups.js'
 import { defaultTrailingDays } from '../components/config.js'
 import { useFilters } from './filters/FilterProvider.jsx'
@@ -91,7 +92,7 @@ export default function UrlSync () {
       if (trailingDays !== defaultTrailingDays) obj.trail = trailingDays
     }
     // Data-layer selection persists only when not the all-on default.
-    if (!Object.values(dataLayers).every(Boolean)) {
+    if (!allDataLayersOn(dataLayers)) {
       obj.layers = Object.entries(dataLayers)
         .filter(([, on]) => on)
         .map(([key]) => key)

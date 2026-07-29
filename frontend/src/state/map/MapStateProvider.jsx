@@ -24,14 +24,7 @@ import {
 import fetchJson from '../fetchJson.js'
 import usePersistentState from '../usePersistentState.js'
 import { useFilters } from '../filters/FilterProvider.jsx'
-
-const ALL_DATA_LAYERS = {
-  profile: true,
-  timeseries: true,
-  timeseriesProfile: true,
-  obis: true,
-  trajectories: true
-}
+import { ALL_DATA_LAYERS } from '../dataLayers.js'
 
 const MapStateContext = createContext()
 
