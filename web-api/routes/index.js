@@ -8,7 +8,7 @@ const router = express.Router();
  *   get:
  *     summary: Health check
  *     tags: [Meta]
- *     description: Returns a simple rendered page confirming the API is running.
+ *     description: Returns a small JSON payload confirming the API is running.
  *     responses:
  *       200:
  *         description: API is running.
@@ -23,7 +23,7 @@ const router = express.Router();
  */
 
 router.get("/", (req, res, next) => {
-  res.render("index", { title: "CDE API" });
+  res.json({ status: "ok", service: "CDE API" });
 });
 
 router.get("/sentry-test", (req, res, next) => {
