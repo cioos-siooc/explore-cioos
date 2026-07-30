@@ -86,15 +86,16 @@ function buildHeadArrowImage(fillColor, strokeColor = '#ffffff') {
 
 // Combine the filter-derived query string with the data-layer selection into
 // a tile-URL suffix. OBIS off adds includeObis=false, OR-ed with any the
-// Source filter already emitted; trajectories off adds includeTrajectory=false;
-// a profile-type subset adds profileTypes=<comma list> (empty = none). A param
-// is omitted when its layer(s) are fully on, so the URL stays clean. Returns
-// '' or '?...'.
+// Source filter already emitted; a profile-type subset adds
+// profileTypes=<comma list> (empty = none). A param is omitted when its
+// layer(s) are fully on, so the URL stays clean. Returns '' or '?...'.
 //
-// excludeTrajectories forces includeTrajectory=false regardless of the layer
-// toggle — used for the coverage-cells URL in tracks mode, where track lines
-// replace the trajectory hexes but the OBIS cells stay.
-function buildTileSuffix(baseQuery, dataLayers, excludeTrajectories = false) {
+// Trajectory coverage cells are requested only when the trajectories layer is
+// on AND its hex view is selected. The two trajectory views are independent —
+// the track lines come from a separate source (/tiles/tracks) and never depend
+// on this — so the hex switch is the only thing that decides whether the
+// trajectory counts appear in these tiles.
+function buildTileSuffix(baseQuery, dataLayers, trajectoryHexes = false) {
   const params = new URLSearchParams(baseQuery)
   if (dataLayers) {
     if (!dataLayers.obis || params.get('includeObis') === 'false') {
@@ -106,9 +107,10 @@ function buildTileSuffix(baseQuery, dataLayers, excludeTrajectories = false) {
     if (enabledTypes.length < PROFILE_TYPE_KEYS.length) {
       params.set('profileTypes', enabledTypes.join(','))
     }
-    if (!dataLayers.trajectories) params.set('includeTrajectory', 'false')
+    if (!dataLayers.trajectories || !trajectoryHexes) {
+      params.set('includeTrajectory', 'false')
+    }
   }
-  if (excludeTrajectories) params.set('includeTrajectory', 'false')
   const s = params.toString()
   return s ? `?${s}` : ''
 }
@@ -133,6 +135,7 @@ export default function CreateMap({
   inspectDataset,
   setDatasetsSelected,
   tracksMode,
+  trajectoryHexes = false,
   scrubTime,
   trailingDays,
   selectedTrajectory,
@@ -288,6 +291,7 @@ export default function CreateMap({
   // Latest tracks-mode props for the one-shot map 'load' closure (layers are
   // created once; these refs let it apply the current mode/scrub window).
   const tracksModeRef = useRef(tracksMode)
+  const trajectoryHexesRef = useRef(trajectoryHexes)
   const scrubTimeRef = useRef(scrubTime)
   const trailingDaysRef = useRef(trailingDays)
   const dataLayersRef = useRef(dataLayers)
@@ -333,9 +337,9 @@ export default function CreateMap({
   }
 
   // Rebuild the shared point/hex and coverage-cell source URLs from the
-  // current filters AND the data-layer selection (plus tracks mode, which
-  // pulls trajectory coverage out of the cells tiles), then force a refetch.
-  // Shared by the filter-change, layer-toggle and tracks-mode effects.
+  // current filters AND the data-layer selection (including the trajectory hex
+  // switch), then force a refetch. Shared by the filter-change and
+  // layer-toggle effects.
   function refreshCombinedSources(queryString) {
     // Guard on source existence, NOT map.loaded(): loaded() is false whenever
     // any tile is still in flight, and on this deployment the coverage/track
@@ -356,12 +360,13 @@ export default function CreateMap({
     map.current.getSource('cde-cells').setTiles([cellTileQuery])
   }
 
-  // Apply the tracks-mode layer visibility: track lines/heads show only when
-  // trajectories are on AND tracks mode is active. Which data feeds the hex
-  // layers (trajectories in/out of the coverage cells, OBIS on/off, profile
-  // types) is decided server-side via the tile-URL params — see
-  // buildTileSuffix; the blanket "Hexes & points" picker switch owns whole-map
-  // observation-layer visibility (setLayersVisibility).
+  // Apply the track-line visibility: the track layers show only when
+  // trajectories are on AND the track-lines switch is on. This is the ONLY
+  // thing that hides them — the blanket "Hexes & points" picker owns the hex
+  // and point layers alone (observationLayerIds), so turning it off no longer
+  // takes the tracks with it. Which data feeds the hex layers (trajectory hexes
+  // on/off, OBIS on/off, profile types) is decided server-side via the tile-URL
+  // params — see buildTileSuffix.
   function applyLayerVisibility() {
     if (!map.current || !map.current.getLayer('track-lines')) return
     const trajOn = dataLayersRef.current
@@ -741,7 +746,15 @@ export default function CreateMap({
     'points-hovered',
     'points-highlighted',
     'coverage-hexes',
-    'coverage-hexes-hovered',
+    'coverage-hexes-hovered'
+  ]
+  // The track layers are deliberately NOT in observationLayerIds: the picker
+  // switch reads as "hexes and points", and it used to hide the tracks too, so
+  // unchecking it silently threw away the user's track lines. They are owned by
+  // the trajectories layer and its track-lines switch instead
+  // (applyLayerVisibility) — this list exists only for the WMS overlay, which
+  // hides everything regardless of who owns it.
+  const trackLayerIds = [
     'track-lines',
     'track-heads',
     'track-heads-fixed',
@@ -766,15 +779,19 @@ export default function CreateMap({
     })
   }
 
+  // WMS overlay show/hide. Hiding takes everything with it, including the
+  // tracks; restoring hands each group back to its own owner — the picker for
+  // the hex/point layers, applyLayerVisibility for the tracks.
   function setDataLayersVisibility(visible) {
     setLayersVisibility(griddapLayerIds, visible)
-    setLayersVisibility(
-      observationLayerIds,
-      visible && dataLayersVisibleRef.current
-    )
-    // The blanket show clobbers the tracks-vs-coverage-hexes split; re-apply
-    // the per-data-type toggles on top of it.
-    if (visible && dataLayersVisibleRef.current) applyLayerVisibility()
+    if (!visible) {
+      setLayersVisibility(observationLayerIds, false)
+      setLayersVisibility(trackLayerIds, false)
+      return
+    }
+    setLayersVisibility(observationLayerIds, dataLayersVisibleRef.current)
+    setLayersVisibility(trackLayerIds, true)
+    applyLayerVisibility()
   }
 
   function removeWmsOverlay() {
@@ -916,12 +933,13 @@ export default function CreateMap({
   // Layer-picker toggle for the observation layers. While a WMS overlay is
   // up all data layers are hidden anyway; the ref keeps the user's choice so
   // removeWmsOverlay restores it.
+  // The "Hexes & points" picker. It owns the hex and point layers only — the
+  // track layers belong to the trajectories switch (see trackLayerIds), so
+  // hiding the hexes leaves any track lines drawn.
   useEffect(() => {
     dataLayersVisibleRef.current = dataLayersVisible
     if (!map.current || activeWmsOverlay) return
     setLayersVisibility(observationLayerIds, dataLayersVisible)
-    // Blanket show clobbers the tracks-vs-coverage-hexes split; re-apply it.
-    if (dataLayersVisible) applyLayerVisibility()
   }, [dataLayersVisible])
 
   // Layer-picker globe/mercator projection switch. Globe renders high
@@ -1040,19 +1058,21 @@ export default function CreateMap({
       ? ''
       : `<div class='map-tooltip-hint'>${t('trackLineClickText')}</div>`
 
-  // The filter query and the data-layer selection (plus tracks mode, which
-  // pulls trajectory coverage out of the cells tiles) combine into the two
-  // shared source URLs — see buildTileSuffix.
+  // The filter query and the data-layer selection combine into one suffix
+  // shared by both source URLs — see buildTileSuffix. The two routes split the
+  // zoom range for the same selection: /tiles folds the trajectory counts into
+  // the combined green hexes below z7, /tiles/cells carries the dedicated
+  // trajectory/OBIS coverage ramp at and above it. They take the same params so
+  // the hex switch can't leave trajectory counts showing in one and not the other.
   const tileUrls = (queryString) => {
-    const filterSuffix = buildTileSuffix(queryString, dataLayersRef.current)
-    const cellFilterSuffix = buildTileSuffix(
+    const filterSuffix = buildTileSuffix(
       queryString,
       dataLayersRef.current,
-      tracksModeRef.current
+      trajectoryHexesRef.current
     )
     return {
       tileQuery: `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`,
-      cellTileQuery: `${server}/tiles/cells/{z}/{x}/{y}.mvt${cellFilterSuffix}`
+      cellTileQuery: `${server}/tiles/cells/{z}/{x}/{y}.mvt${filterSuffix}`
     }
   }
 
@@ -1083,27 +1103,27 @@ export default function CreateMap({
     }
   }, [mapQueryString])
 
-  // Data-layer toggle: refetch the combined/coverage-cell sources with the
-  // new profileTypes/includeObis/includeTrajectory params and re-apply
-  // layer visibility.
+  // Data-layer toggle, and the trajectory hex switch alongside it: both change
+  // the tile-URL params (profileTypes/includeObis/includeTrajectory), so both
+  // refetch the combined/coverage-cell sources and re-apply layer visibility.
   useEffect(() => {
     dataLayersRef.current = dataLayers
+    trajectoryHexesRef.current = trajectoryHexes
     // Source existence, not map.loaded() — see the filter effect above.
     if (!map.current || !map.current.getSource('cde-tiles')) return
     refreshCombinedSources(mapQueryString)
     applyLayerVisibility()
-  }, [dataLayers])
+  }, [dataLayers, trajectoryHexes])
 
-  // Tracks mode: swap the trajectory coverage hexes for track lines/heads
-  // (respecting the trajectories layer toggle) and load the scrub window.
-  // The coverage-cells source refetches too: in tracks mode the trajectory
-  // counts leave the cells tiles (track lines replace them) while the OBIS
-  // cells stay — see tileUrls.
+  // Track-lines switch: show/hide the track layers and load the scrub window.
+  // No source refetch — the track lines come from their own /tiles/tracks
+  // source, and unlike the old tracks *mode* this switch no longer pulls the
+  // trajectory counts out of the hex tiles (that is the hex switch's job now),
+  // so the combined sources are untouched.
   useEffect(() => {
     tracksModeRef.current = tracksMode
     if (!map.current || !map.current.getLayer('track-lines')) return
     applyLayerVisibility()
-    refreshCombinedSources(mapQueryString)
     if (tracksMode) {
       refreshTracksSource(mapQueryString, scrubTime, trailingDays)
     }
@@ -1605,11 +1625,11 @@ export default function CreateMap({
         'points-highlighted'
       )
 
-      // --- Tracks mode layers -------------------------------------------
-      // Track lines + head positions from /tiles/tracks, shown only when
-      // tracks mode is on (visibility swaps with the trajectory hex layers).
-      // Created via refs so the current mode/scrub window applies even
-      // though this load handler runs once.
+      // --- Track-line layers ---------------------------------------------
+      // Track lines + head positions from /tiles/tracks, shown only when the
+      // track-lines switch is on. Independent of the trajectory hex layers —
+      // both can draw at once. Created via refs so the current switch state and
+      // scrub window apply even though this load handler runs once.
       const tracksVisibility = tracksModeRef.current ? 'visible' : 'none'
       map.current.addSource('tracks', {
         type: 'vector',
@@ -1769,13 +1789,13 @@ export default function CreateMap({
         }
       })
 
-      // Apply the initial trajectory layer visibility from the URL-restored
-      // tracks mode + data-layer selection (track lines vs coverage hexes vs
-      // trajectories-off).
+      // Apply the initial track-layer visibility from the URL-restored
+      // track-lines switch + data-layer selection.
       applyLayerVisibility()
 
-      // Layers are created visible; re-apply the picker state in case the
-      // observation layers were toggled off before the style finished loading.
+      // Layers are created visible; re-apply the picker state in case the hex
+      // and point layers were toggled off before the style finished loading.
+      // The track layers are not the picker's to hide, so they are left alone.
       if (!dataLayersVisibleRef.current) {
         setLayersVisibility(observationLayerIds, false)
       }
@@ -1855,9 +1875,10 @@ export default function CreateMap({
     }
 
     const handleMapHexesOnClick = (e) => {
-      // A track under the cursor wins: the hexes keep their trajectory counts in
-      // tracks mode, so a hex sits under every track line, and this handler's
-      // zoom-to-7 flyTo would fight the fit the track selection is about to do.
+      // A track under the cursor wins: a hex sits under a track line whenever
+      // the hex layers are drawn (the trajectory hexes if that switch is on,
+      // otherwise a profile or OBIS hex), and this handler's zoom-to-7 flyTo
+      // would fight the fit the track selection is about to do.
       if (griddapOutranksHexes(e) || trackFeatureAt(e.point)) return
       e.originalEvent.preventDefault()
       if (!creatingPolygon.current) {
@@ -1972,8 +1993,8 @@ export default function CreateMap({
     // the same cursor resolve the same way every time (the track-lines hover
     // handler makes the same hand-off). Doubles as the "is a track under the
     // cursor" test the hex and griddap handlers use to stand aside: hidden
-    // layers aren't hit-testable, so this is empty whenever tracks mode is off
-    // and no tracksMode check is needed.
+    // layers aren't hit-testable, so this is empty whenever the track-lines
+    // switch is off and no tracksMode check is needed.
     const trackFeatureAt = (point) =>
       renderedFeatures(point, trackClickLayers)
         .sort(

@@ -22,6 +22,26 @@ export const ALL_DATA_LAYERS = Object.fromEntries(
   DATA_LAYER_KEYS.map((key) => [key, true])
 )
 
+// What a first visit shows. The three profile-family types are the cheap,
+// broadly useful default; OBIS and trajectories are opt-in because each pulls
+// its own heavy tile set (trajectories additionally bring the track tiles and
+// the time scrub bar), and neither reads as "ocean observations" to a visitor
+// who came for CTD/mooring data. Off here means off everywhere — the map, the
+// datasets panel and the counts (see datasetInDataLayers).
+export const DEFAULT_DATA_LAYERS = {
+  ...ALL_DATA_LAYERS,
+  obis: false,
+  trajectories: false
+}
+
+// How the trajectories layer draws when it is switched on. Track lines are the
+// more legible first view of a voyage; the coverage hexes are the density
+// reading you opt into on top. Both are independent — see the two sub-switches
+// in AppShell — and these constants are also the state the parent switch
+// restores when it is re-enabled.
+export const DEFAULT_TRACKS_MODE = true
+export const DEFAULT_TRAJECTORY_HEXES = false
+
 // The cdm_data_types that share cde.profiles. The tile query names them
 // directly (profileTypes=<comma list>), so this doubles as the wire mapping.
 export const PROFILE_TYPE_KEYS = [
@@ -55,5 +75,15 @@ export function datasetInDataLayers (row, dataLayers) {
   return key === undefined || dataLayers[key] !== false
 }
 
+// Is every layer on? SelectionProvider uses this to skip per-row filtering
+// entirely, so it stays a plain all-on test — it is NOT the default any more.
 export const allDataLayersOn = (dataLayers) =>
   !dataLayers || Object.values(dataLayers).every(Boolean)
+
+// Is this the default selection? Only a non-default selection is worth writing
+// to the URL (see useUrlSync), and an absent ?layers= restores the default.
+export const dataLayersAreDefault = (dataLayers) =>
+  !dataLayers ||
+  DATA_LAYER_KEYS.every(
+    (key) => Boolean(dataLayers[key]) === DEFAULT_DATA_LAYERS[key]
+  )

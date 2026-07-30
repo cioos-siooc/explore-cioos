@@ -25,6 +25,7 @@ export default function MapContainer () {
     zoomTarget,
     mapRef,
     tracksMode,
+    trajectoryHexes,
     debouncedScrubTime,
     trailingDays,
     dataLayers
@@ -57,6 +58,7 @@ export default function MapContainer () {
       inspectDataset={inspectDataset}
       setDatasetsSelected={setDatasetsSelected}
       tracksMode={tracksMode}
+      trajectoryHexes={trajectoryHexes}
       scrubTime={debouncedScrubTime}
       trailingDays={trailingDays}
       selectedTrajectory={selectedTrajectory}
