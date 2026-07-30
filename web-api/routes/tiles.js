@@ -6,6 +6,11 @@ const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { validatorMiddleware } = require("../utils/validatorMiddlewares");
 const cache = require("../utils/cache");
+const {
+  parseMetric,
+  recordCountExpr,
+  countAggregate,
+} = require("../utils/hexMetric");
 
 // Per-tile cap on how many trajectories a single /tiles/tracks tile assembles.
 // A low-zoom tile spans a huge area: with a long trail (e.g. "All time") its
@@ -77,6 +82,14 @@ function tileCellPrefilter(z) {
  *       - in: query
  *         name: timeMax
  *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: metric
+ *         description: >
+ *           What the `count` property counts, and therefore what the colour
+ *           ramp represents. `records` sums measurement/occurrence/fix counts;
+ *           `days` sums each feature's day span; `datasets` counts distinct
+ *           datasets. Anything else falls back to `records`. Must match the metric passed to /legend.
+ *         schema: { type: string, enum: [records, days, datasets], default: records }
  *     responses:
  *       200:
  *         description: MVT binary tile.
@@ -111,6 +124,9 @@ router.get(
     const cellPrefilter = tileCellPrefilter(z);
 
     const includeObis = req.query.includeObis !== 'false';
+    // What the hex/point `count` property means — see utils/hexMetric.js. The
+    // same metric must reach /legend, or the ramp domain won't match the tiles.
+    const metric = parseMetric(req.query.metric);
     // Data-type layer toggle (map layer selector). Trajectories: an explicit
     // includeTrajectory=false hides them. Profiles: the profileTypes param is
     // the comma list of cdm_data_types to show (Profile / TimeSeries /
@@ -152,7 +168,7 @@ router.get(
             .map((t) => `'${t}'`)
             .join(',')}))`
         : '';
-    const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
+    const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${recordCountExpr('profiles', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
     FROM cde.profiles WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
     // Both cell tables (trajectory coverage cells and OBIS occurrence cells)
@@ -161,11 +177,11 @@ router.get(
     // artifact, not a measurement location, so at point zoom they're shown
     // only via the dedicated always-hex coverage layer from
     // /tiles/cells/:z/:x/:y.mvt.
-    const trajectoryBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
+    const trajectoryBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${recordCountExpr('trajectory_cells', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
     FROM cde.trajectory_cells${cellPrefilter ? ` WHERE ${cellPrefilter}` : ''}`;
     const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
-           date_part('days', time_max - time_min) + 1 as record_count,
+           ${recordCountExpr('obis_cells', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
     FROM cde.obis_cells
     WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
@@ -183,8 +199,13 @@ router.get(
       ? branches.join("\n    UNION ALL\n    ")
       : `SELECT * FROM (${profilesBranch}) empty_combined WHERE FALSE`;
 
+    // `count` is the same quantity at both tiers — the summed metric. It used
+    // to be count(distinct point_pk) at hex zoom and sum(record_count) at point
+    // zoom, so the property changed meaning mid-zoom and the hex ramp ranked a
+    // 20-year mooring level with a single CTD cast. Summing at both tiers fixes
+    // the ramp and drops a distinct-aggregate at the same time.
     const relevantPointsSQL = isHexGrid
-      ? `SELECT p.zoom_pk pk, count(distinct p.point_pk) count,
+      ? `SELECT p.zoom_pk pk, ${countAggregate(metric, 'p')} count,
                 array_to_json(array_agg(distinct d.pk_url)) datasets,
                 h.geom AS geom
          FROM combined p
@@ -192,7 +213,7 @@ router.get(
          JOIN ${hexesTable} h ON h.pk = p.zoom_pk
          ${filters.hasShared ? "WHERE :filters" : ""}
          GROUP BY p.zoom_pk, h.geom`
-      : `SELECT p.point_pk pk, d.platform as platform, sum(p.record_count)::bigint count,
+      : `SELECT p.point_pk pk, d.platform as platform, ${countAggregate(metric, 'p')} count,
                 array_to_json(array_agg(distinct d.pk_url)) datasets,
                 p.point_geom AS geom
          FROM combined p
@@ -257,9 +278,11 @@ router.get(
  *       Returns a Mapbox Vector Tile of trajectory and OBIS dataset coverage,
  *       always aggregated as hexagons — unlike /tiles/{z}/{x}/{y}.mvt this
  *       never falls back to individual points at high zoom. Each hex carries
- *       both a trajectory_count (distinct trajectories) and an obis_count
- *       (occurrence records), so a hex holding both can be drawn and labelled
- *       differently from one holding only one kind.
+ *       `count` — the summed metric over both kinds of cell, which is what the
+ *       colour ramp reads — plus trajectory_count (distinct trajectories) and
+ *       obis_count (the metric over OBIS cells alone) for the hover tooltip,
+ *       which is where the per-source breakdown stays reachable now that the
+ *       ramp folds the two together.
  *     parameters:
  *       - in: path
  *         name: z
@@ -279,6 +302,14 @@ router.get(
  *       - in: query
  *         name: timeMax
  *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: metric
+ *         description: >
+ *           What the `count` property counts, and therefore what the colour
+ *           ramp represents. `records` sums measurement/occurrence/fix counts;
+ *           `days` sums each feature's day span. Anything else falls back to
+ *           `records`. Must match the metric passed to /legend.
+ *         schema: { type: string, enum: [records, days, datasets], default: records }
  *     responses:
  *       200:
  *         description: MVT binary tile.
@@ -313,6 +344,7 @@ router.get(
     const cellPrefilter = tileCellPrefilter(z);
 
     const includeObis = req.query.includeObis !== 'false';
+    const metric = parseMetric(req.query.metric);
     // Same gating as the main tile route: scientific-name filters are
     // OBIS-only, so they hide the (ERDDAP) trajectory cells; an OBIS-node
     // selection does too, unless ERDDAP servers are selected alongside it.
@@ -323,17 +355,16 @@ router.get(
       && !req.query.scientificNames
       && (!req.query.obisNodes || Boolean(req.query.erddapServers));
 
-    // A `src` discriminator lets one pass over the union produce a separate
-    // count per kind, so a hex can report (and be coloured by) exactly what
-    // it holds. n_records is meaningless for trajectory cells and
-    // trajectory_id for OBIS cells; each is only ever read behind its own
-    // FILTER below.
+    // A `src` discriminator lets one pass over the union produce both the
+    // unified count that colours the hex AND the per-kind figures the hover
+    // tooltip names. trajectory_id is meaningless for OBIS cells and is only
+    // ever read behind its own FILTER below.
     const trajectoryBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'trajectory' as src,
-           trajectory_id, 0::bigint as n_records,
+           trajectory_id, ${recordCountExpr('trajectory_cells', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
     FROM cde.trajectory_cells${cellPrefilter ? ` WHERE ${cellPrefilter}` : ''}`;
     const obisBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'obis' as src,
-           NULL as trajectory_id, n_records,
+           NULL as trajectory_id, ${recordCountExpr('obis_cells', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
     FROM cde.obis_cells
     WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
@@ -365,9 +396,16 @@ router.get(
     ),
     agg as (
       SELECT c.zoom_pk pk,
+             -- What colours the hex: one ramp over both kinds of coverage
+             -- cell, the same quantity the main /tiles layer emits.
+             ${countAggregate(metric, 'c')} count,
+             -- Kept for the hover tooltip only. The ramp folds the two kinds
+             -- together; the tooltip is where the breakdown stays reachable,
+             -- since a trajectory fix and an occurrence record aren't the
+             -- same unit.
              count(distinct (c.dataset_pk, c.trajectory_id))
                FILTER (WHERE c.src = 'trajectory') trajectory_count,
-             coalesce(sum(c.n_records) FILTER (WHERE c.src = 'obis'), 0)::bigint obis_count,
+             coalesce(sum(c.record_count) FILTER (WHERE c.src = 'obis'), 0)::bigint obis_count,
              array_to_json(array_agg(distinct d.pk_url)) datasets
       FROM combined c
       JOIN cde.datasets d ON c.dataset_pk = d.pk
@@ -376,7 +414,7 @@ router.get(
       GROUP BY c.zoom_pk
     ),
     mvtgeom AS (
-      SELECT a.pk, a.trajectory_count, a.obis_count, a.datasets,
+      SELECT a.pk, a.count, a.trajectory_count, a.obis_count, a.datasets,
         ST_AsMVTGeom (
           th.geom,
           te.tile_envelope

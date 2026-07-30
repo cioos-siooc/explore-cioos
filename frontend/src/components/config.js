@@ -24,6 +24,16 @@ export const defaultQuery = {
 // or 'arcgis-ocean' (Esri World Ocean Base). See components/Map/basemapStyle.js.
 export const basemap = 'emodnet'
 
+// The one hex ramp. Every hexagon on the map — the combined hexes below z7 and
+// the trajectory/OBIS coverage hexes at and above it — is painted from this,
+// so hex darkness means the same thing at every zoom.
+//
+// It used to be four ramps: this green one plus purple for trajectory-only
+// hexes, amber for OBIS-only and plum for hexes holding both. Together with
+// the 12-colour platform palette on the point markers that put four colour
+// families on screen at once above z7, and a reader had to decode hue before
+// they could read density. What a hex holds now lives in its hover tooltip and
+// in the layer toggles; colour is reserved for how much.
 export const colorScale = [
   '#52A79B',
   '#4A968C',
@@ -34,39 +44,17 @@ export const colorScale = [
   '#142926'
 ]
 
-export const trajectoryColorScale = [
-  '#D5C9EE',
-  '#C4B3E6',
-  '#B29CDD',
-  '#9F86D3',
-  '#8C71C7',
-  '#7A5DBA',
-  '#6749AC'
-]
-
-// OBIS occurrence coverage hexes. Amber, to stay legible against the green
-// profile ramp, the purple trajectory ramp and the teal griddap outlines.
-export const obisColorScale = [
-  '#FBE3BE',
-  '#F6CE92',
-  '#EFB566',
-  '#E39B3D',
-  '#CE8025',
-  '#B06718',
-  '#8C4F0F'
-]
-
-// Hexes holding BOTH trajectory and OBIS cells. A plum/rose family reading as
-// purple + amber, so a mixed hex is never mistaken for either pure ramp.
-export const mixedColorScale = [
-  '#F0D3DC',
-  '#E3B4C4',
-  '#D394AC',
-  '#BE7594',
-  '#A55B7D',
-  '#894567',
-  '#6B3350'
-]
+// What the hex ramp counts. 'records' is the amount of data actually collected
+// (measurements / occurrence records / position fixes); 'days' is the span
+// covered; 'datasets' is how many distinct datasets a hexagon holds. See
+// web-api/utils/hexMetric.js — the wire values must match.
+//
+// 'datasets' is the one to reach for when the record counts bunch up: they run
+// over eight orders of magnitude and are dominated by a few high-rate
+// instruments, whereas dataset counts are small integers and spread evenly
+// across the ramp.
+export const HEX_METRICS = ['records', 'days', 'datasets']
+export const DEFAULT_HEX_METRIC = 'records'
 
 // Tracks mode (trajectory track lines + time scrub bar)
 // 'all' = no trailing cutoff: every platform's full track up to the scrub

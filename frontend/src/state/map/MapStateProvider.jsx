@@ -13,6 +13,7 @@ import isEmpty from 'lodash/isEmpty'
 import { server } from '../../config.js'
 import {
   basemap as defaultBasemap,
+  DEFAULT_HEX_METRIC,
   defaultTrailingDays,
   TRAIL_ALL
 } from '../../components/config.js'
@@ -75,11 +76,16 @@ export default function MapStateProvider ({ children }) {
   const [rangeLevels, setRangeLevels] = useState()
   const [legendLoading, setLegendLoading] = useState(true)
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
-  const [trajectoryRangeLevels, setTrajectoryRangeLevels] = useState()
-  const [currentTrajectoryRangeLevel, setCurrentTrajectoryRangeLevel] =
-    useState()
-  const [obisRangeLevels, setObisRangeLevels] = useState()
-  const [currentObisRangeLevel, setCurrentObisRangeLevel] = useState()
+  // The always-hex coverage layer (trajectory + OBIS cells) at zoom >= 7. One
+  // range, because both kinds now share one ramp — it was three, one per
+  // colour scale.
+  const [coverageRangeLevels, setCoverageRangeLevels] = useState()
+  const [currentCoverageRangeLevel, setCurrentCoverageRangeLevel] = useState()
+  // What the hex ramp counts: 'records' (how much data was collected) or
+  // 'days' (how long it spans). A display preference, so localStorage rather
+  // than the URL — same as the switches below. It is computed server-side, so
+  // it also goes into the tile and /legend query strings.
+  const [metric, setMetric] = usePersistentState('hexMetric', DEFAULT_HEX_METRIC)
   // The four map-appearance switches below are preferences rather than
   // shareable state: they persist in localStorage so a reload comes back to
   // the map the user left, while the camera and filters keep living in the URL.
@@ -208,14 +214,25 @@ export default function MapStateProvider ({ children }) {
   // filters" are indistinguishable from the values alone, and /legend is the
   // app's slowest query: without it the legend card claimed "No Data" for the
   // first few seconds of every load.
-  function loadLegend (legendQuery) {
+  // The metric decides what /legend counts, so it has to travel with the
+  // filters — a range taken over days can't scale a ramp painted over
+  // measurement counts. Omitted at the default so the common case keeps the
+  // URL (and cache key) it had before the switcher existed, matching
+  // buildTileSuffix in Map.jsx.
+  function legendUrl (legendQuery, hexMetric) {
+    const params = new URLSearchParams(legendQuery || '')
+    if (hexMetric !== DEFAULT_HEX_METRIC) params.set('metric', hexMetric)
+    const s = params.toString()
+    return `${server}/legend${s ? '?' + s : ''}`
+  }
+
+  function loadLegend (legendQuery, hexMetric = metric) {
     setLegendLoading(true)
-    fetchJson(`${server}/legend${legendQuery ? '?' + legendQuery : ''}`)
+    fetchJson(legendUrl(legendQuery, hexMetric))
       .then((legend) => {
         if (legend) {
           setRangeLevels(legend.recordsCount)
-          setTrajectoryRangeLevels(legend.trajectoryRecordsCount)
-          setObisRangeLevels(legend.obisRecordsCount)
+          setCoverageRangeLevels(legend.coverageCount)
         }
       })
       .catch((error) => {
@@ -236,11 +253,13 @@ export default function MapStateProvider ({ children }) {
 
   // Refetch the legend whenever the (debounced) query changes, or a group is
   // hidden from / restored to the map — the ramp counts what the map draws.
+  // The metric is in here too: it changes what /legend counts, and a stale
+  // range would scale the new numbers against the old domain.
   useEffect(() => {
     if (!loading && !isEmpty(rangeLevels)) {
       loadLegend(mapQueryString)
     }
-  }, [mapQueryString])
+  }, [mapQueryString, metric])
 
   // Fetch griddap coverage bboxes when the layer is visible, in lockstep
   // with the same debounced query the tiles and /pointQuery use. Data is
@@ -269,22 +288,14 @@ export default function MapStateProvider ({ children }) {
 
   useEffect(() => {
     // Coverage hexes (trajectory and OBIS cells) only render at zoom >= 7 —
-    // below that, their counts are merged into the green hex ramp — so hide
-    // both legend entries otherwise.
-    if (trajectoryRangeLevels && zoom >= 7) {
-      setCurrentTrajectoryRangeLevel(trajectoryRangeLevels.zoom1)
+    // below that, their counts are merged into the main hex ramp — so hide the
+    // legend entry otherwise.
+    if (coverageRangeLevels && zoom >= 7) {
+      setCurrentCoverageRangeLevel(coverageRangeLevels.zoom1)
     } else {
-      setCurrentTrajectoryRangeLevel()
+      setCurrentCoverageRangeLevel()
     }
-  }, [trajectoryRangeLevels, zoom])
-
-  useEffect(() => {
-    if (obisRangeLevels && zoom >= 7) {
-      setCurrentObisRangeLevel(obisRangeLevels.zoom1)
-    } else {
-      setCurrentObisRangeLevel()
-    }
-  }, [obisRangeLevels, zoom])
+  }, [coverageRangeLevels, zoom])
 
   const value = {
     loading,
@@ -295,11 +306,11 @@ export default function MapStateProvider ({ children }) {
     zoom,
     rangeLevels,
     legendLoading,
-    trajectoryRangeLevels,
-    obisRangeLevels,
+    coverageRangeLevels,
     currentRangeLevel,
-    currentTrajectoryRangeLevel,
-    currentObisRangeLevel,
+    currentCoverageRangeLevel,
+    metric,
+    setMetric,
     griddapCoverageVisible,
     setGriddapCoverageVisible,
     dataLayersVisible,

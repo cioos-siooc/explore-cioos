@@ -41,9 +41,7 @@ import {
 } from '../../wmsUtilities'
 import {
   colorScale,
-  trajectoryColorScale,
-  obisColorScale,
-  mixedColorScale,
+  DEFAULT_HEX_METRIC,
   trackLineColor,
   selectedTrackColor,
   tracksMinDate,
@@ -96,8 +94,16 @@ function buildHeadArrowImage(fillColor, strokeColor = '#ffffff') {
 // the track lines come from a separate source (/tiles/tracks) and never depend
 // on this — so the hex switch is the only thing that decides whether the
 // trajectory counts appear in these tiles.
-function buildTileSuffix(baseQuery, dataLayers, trajectoryHexes = false) {
+function buildTileSuffix(
+  baseQuery,
+  dataLayers,
+  trajectoryHexes = false,
+  metric = DEFAULT_HEX_METRIC
+) {
   const params = new URLSearchParams(baseQuery)
+  // Omitted at the default so the common case keeps the URL (and therefore the
+  // tile cache key) it had before the metric switcher existed.
+  if (metric !== DEFAULT_HEX_METRIC) params.set('metric', metric)
   if (dataLayers) {
     if (!dataLayers.obis || params.get('includeObis') === 'false') {
       params.set('includeObis', 'false')
@@ -129,8 +135,8 @@ export default function CreateMap({
   setMapView,
   offsetFlyTo,
   rangeLevels,
-  trajectoryRangeLevels,
-  obisRangeLevels,
+  coverageRangeLevels,
+  metric = DEFAULT_HEX_METRIC,
   hoveredDataset,
   setHoveredDataset,
   inspectDataset,
@@ -278,9 +284,10 @@ export default function CreateMap({
   const doFinalCheck = useRef(false)
   const layersLoaded = useRef(false)
   const colorStops = useRef([])
-  const trajectoryColorStops = useRef([])
-  const obisColorStops = useRef([])
-  const mixedColorStops = useRef([])
+  const coverageColorStops = useRef([])
+  // Point-tier count range, kept so the circle-radius ramp can be rebuilt on
+  // the layers whenever the metric or the filters change (see setColorStops).
+  const pointRadiusRange = useRef(null)
   // pk of the dataset the map is currently singling out (hovered in the list,
   // or the one whose page is open). Held in a ref because the map's own event
   // handlers — zoomend, sourcedata, idle — need the current value, not the one
@@ -296,6 +303,7 @@ export default function CreateMap({
   const scrubTimeRef = useRef(scrubTime)
   const trailingDaysRef = useRef(trailingDays)
   const dataLayersRef = useRef(dataLayers)
+  const metricRef = useRef(metric)
   // Raw selected-track response, cached so re-renders don't re-fetch.
   const rawTrackRef = useRef(null)
 
@@ -395,9 +403,8 @@ export default function CreateMap({
   // function has zero stops, which is why creating them from empty stops left
   // them missing entirely. The real ramp replaces these as soon as the legend
   // lands (setColorStops re-runs via the [rangeLevels] effect).
-  const defaultRangeLevels = { zoom0: [0, 100], zoom1: [0, 100], zoom2: [0, 100] }
-  const defaultTrajectoryRangeLevels = { zoom0: [0, 100], zoom1: [0, 100] }
-  const defaultObisRangeLevels = { zoom0: [0, 100], zoom1: [0, 100] }
+  const defaultRangeLevels = { zoom0: [1, 100], zoom1: [1, 100], zoom2: [1, 100] }
+  const defaultCoverageRangeLevels = { zoom1: [1, 100] }
 
   const [boxSelectStartCoords, setBoxSelectStartCoords] = useState()
   const [boxSelectEndCoords, setBoxSelectEndCoords] = useState()
@@ -429,7 +436,7 @@ export default function CreateMap({
 
   useEffect(() => {
     setColorStops()
-  }, [rangeLevels, trajectoryRangeLevels, obisRangeLevels])
+  }, [rangeLevels, coverageRangeLevels])
 
   useEffect(() => {
     if (map.current) {
@@ -468,48 +475,85 @@ export default function CreateMap({
     setPolygon()
   }
 
-  // The coverage-hex fill has to choose between three ramps per feature, and a
-  // 'case' expression can't contain the legacy { property, stops } paint
-  // function form the 'hexes' layer still uses — so these ramps are built as
-  // real expressions instead. A single-stop ramp (a range of one value, e.g. a
-  // filter that leaves one hex) can't be interpolated: fall back to the flat
-  // color, since there's nothing to interpolate between.
+  // The one hex ramp, shared by the combined 'hexes' layer below z7 and the
+  // 'coverage-hexes' layer at and above it. Both read the same 'count'
+  // property (the summed metric — see web-api/utils/hexMetric.js), so hex
+  // darkness means the same thing at every zoom.
+  //
+  // The stops are log-spaced by generateColorStops, but the interpolation
+  // between them is linear: the non-linearity lives in where the stops sit,
+  // not in how MapLibre blends across them.
+  //
+  // A single-stop ramp (a range of one value, e.g. a filter that leaves one
+  // hex) can't be interpolated: fall back to the flat color, since there's
+  // nothing to interpolate between.
   const rampExpression = (stops, property) => {
     if (stops.length === 0) return 'lightgrey'
     if (stops.length === 1) return stops[0][1]
     return ['interpolate', ['linear'], ['get', property], ...stops.flat()]
   }
 
-  // Which of the three ramps a hex gets, and therefore what it says it holds:
-  // trajectories, occurrence records, or both. Mixed hexes ramp on obis_count
-  // (not the sum — trajectories and occurrence records aren't the same unit,
-  // so adding them would produce a number in no unit at all); the hover
-  // tooltip carries both exact figures.
-  const coverageHexFillColor = () => [
-    'case',
-    [
-      'all',
-      ['>', ['get', 'trajectory_count'], 0],
-      ['>', ['get', 'obis_count'], 0]
-    ],
-    rampExpression(mixedColorStops.current, 'obis_count'),
-    ['>', ['get', 'trajectory_count'], 0],
-    rampExpression(trajectoryColorStops.current, 'trajectory_count'),
-    rampExpression(obisColorStops.current, 'obis_count')
-  ]
+  const hexFillColor = () => rampExpression(colorStops.current, 'count')
 
-  const coverageHexOutlineColor = () => [
-    'case',
-    [
-      'all',
-      ['>', ['get', 'trajectory_count'], 0],
-      ['>', ['get', 'obis_count'], 0]
-    ],
-    mixedColorScale[2],
-    ['>', ['get', 'trajectory_count'], 0],
-    trajectoryColorScale[2],
-    obisColorScale[2]
+  // Hover wording has to follow the metric: the same `count` property is a
+  // measurement count in one mode and a day span in the other, and a tooltip
+  // that says "measurements" over a day count is worse than no tooltip.
+  // Numbers are locale-formatted — a bare 1738204 is unreadable at a glance.
+  // Note the interpolation variable is `total`, not `count`: i18next treats a
+  // numeric `count` option as a pluralization trigger and would go looking for
+  // _one/_other variants that don't exist.
+  const metricCountLabel = (value) =>
+    t(
+      {
+        days: 'mapHexCountDays',
+        datasets: 'mapHexCountDatasets'
+      }[metricRef.current] || 'mapHexCountRecords',
+      { total: Number(value || 0).toLocaleString(i18n.language) }
+    )
+
+  // Point markers size by the same metric the hexes colour by, log-spaced over
+  // the point-tier range so the marker for a long mooring record reads bigger
+  // than one for a single cast. Log because the range spans orders of
+  // magnitude — linear would leave every marker at the minimum but one.
+  //
+  // `padding` is the halo's extra radius: it sits under the markers and has to
+  // grow with them or it stops being a halo.
+  //
+  // A degenerate range (every point the same count, or the legend not back
+  // yet) has nothing to ramp: use the small radius flat.
+  const radiusExpression = (range, padding = 0) => {
+    const lo = Math.max(range?.[0] ?? 1, 1)
+    const hi = range?.[1]
+    if (!Number.isFinite(hi) || hi <= lo) return smallCircleSize + padding
+    return [
+      'interpolate',
+      ['linear'],
+      ['log10', ['max', ['get', 'count'], 1]],
+      Math.log10(lo),
+      smallCircleSize + padding,
+      Math.log10(hi),
+      largeCircleSize + padding
+    ]
+  }
+
+  // The four layers that draw the same point features, and the halo's extra
+  // radius. They share one paint, so a radius change has to reach all of them
+  // or the halo/highlight desync from the markers they sit under.
+  const POINT_LAYERS = [
+    ['points', 0],
+    ['points-halo', 1.25],
+    ['points-highlighted', 0],
+    ['points-hovered', 0]
   ]
+  // Coverage hexes ramp on their own domain (coverageColorStops) rather than
+  // the main one: they cover a different population of hexes, and sharing the
+  // main tier's min/max flattened them.
+  const coverageHexFillColor = () =>
+    rampExpression(coverageColorStops.current, 'count')
+
+  // A fixed mid-ramp outline, so a coverage hex still reads as a discrete cell
+  // where the fill is nearly transparent (the layer fades out with zoom).
+  const coverageHexOutlineColor = () => colorScale[2]
 
   function setColorStops() {
     // The map now mounts before the legend request resolves (first paint is
@@ -530,30 +574,24 @@ export default function CreateMap({
     })
 
     // Coverage hexes only ever render at zoom >= hexMaxZoom, where the hex_1
-    // grid is always used, so there's a single range to apply per ramp. The
-    // mixed ramp shares the OBIS range because it ramps on obis_count.
-    const effectiveTrajectoryRangeLevels =
-      trajectoryRangeLevels || defaultTrajectoryRangeLevels
-    trajectoryColorStops.current = generateColorStops(
-      trajectoryColorScale,
-      effectiveTrajectoryRangeLevels.zoom1
+    // grid is always used, so there's a single range to apply.
+    const effectiveCoverageRangeLevels =
+      coverageRangeLevels || defaultCoverageRangeLevels
+    coverageColorStops.current = generateColorStops(
+      colorScale,
+      effectiveCoverageRangeLevels.zoom1
     ).map((colorStop) => {
       return [colorStop.stop, colorStop.color]
     })
 
-    const effectiveObisRangeLevels = obisRangeLevels || defaultObisRangeLevels
-    obisColorStops.current = generateColorStops(
-      obisColorScale,
-      effectiveObisRangeLevels.zoom1
-    ).map((colorStop) => {
-      return [colorStop.stop, colorStop.color]
-    })
-    mixedColorStops.current = generateColorStops(
-      mixedColorScale,
-      effectiveObisRangeLevels.zoom1
-    ).map((colorStop) => {
-      return [colorStop.stop, colorStop.color]
-    })
+    // Point radius now has to be a ramp too. It used to be a hardcoded
+    // `count <= 2 ? small : large` split, which meant "one day of data or
+    // more than one" — a threshold that says nothing once count is a
+    // measurement count in the millions (every point would be large).
+    pointRadiusRange.current = getCurrentRangeLevel(
+      effectiveRangeLevels,
+      hexMaxZoom
+    )
 
     // A focused dataset outranks the count ramp: greying everything else is
     // what makes that dataset legible, so painting the ramp back over it here
@@ -576,12 +614,22 @@ export default function CreateMap({
       // hidden above z7 anyway, and zoomend re-runs this to refine the z0/z1
       // band.
       if (map.current.getLayer('hexes')) {
-        map.current.setPaintProperty('hexes', 'fill-color', {
-          property: 'count',
-          stops: colorStops.current
-        })
+        map.current.setPaintProperty('hexes', 'fill-color', hexFillColor())
       }
     }
+
+    // The circle-radius ramp tracks the same metric as the fill, so it has to
+    // be re-applied whenever the ranges change — on all four point layers,
+    // which share one paint.
+    POINT_LAYERS.forEach(([layer, padding]) => {
+      if (map.current.getLayer(layer)) {
+        map.current.setPaintProperty(
+          layer,
+          'circle-radius',
+          radiusExpression(pointRadiusRange.current, padding)
+        )
+      }
+    })
 
     if (map.current.getLayer('coverage-hexes')) {
       map.current.setPaintProperty(
@@ -664,10 +712,7 @@ export default function CreateMap({
         1
       )
       map.current.setFilter('hexes-hovered', ['in', 'pk', ''])
-      map.current.setPaintProperty('hexes', 'fill-color', {
-        property: 'count',
-        stops: colorStops.current
-      })
+      map.current.setPaintProperty('hexes', 'fill-color', hexFillColor())
 
       map.current.setFilter('coverage-hexes-hovered', ['in', 'pk', ''])
       map.current.setPaintProperty(
@@ -1078,7 +1123,8 @@ export default function CreateMap({
     const filterSuffix = buildTileSuffix(
       queryString,
       dataLayersRef.current,
-      trajectoryHexesRef.current
+      trajectoryHexesRef.current,
+      metricRef.current
     )
     return {
       tileQuery: `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`,
@@ -1124,6 +1170,17 @@ export default function CreateMap({
     refreshCombinedSources(mapQueryString)
     applyLayerVisibility()
   }, [dataLayers, trajectoryHexes])
+
+  // Colour-by switch. The metric is computed server-side (it decides what the
+  // tiles' `count` property sums), so flipping it has to refetch both sources
+  // — repainting alone would ramp the old numbers against the new domain. The
+  // matching /legend refetch happens in MapStateProvider; setColorStops picks
+  // up the new ranges from the [rangeLevels] effect.
+  useEffect(() => {
+    metricRef.current = metric
+    if (!map.current || !map.current.getSource('cde-tiles')) return
+    refreshCombinedSources(mapQueryString)
+  }, [metric])
 
   // Track-lines switch: show/hide the track layers and load the scrub window.
   // No source refetch — the track lines come from their own /tiles/tracks
@@ -1395,14 +1452,7 @@ export default function CreateMap({
         'source-layer': 'internal-layer-name',
         paint: {
           'circle-opacity': circleOpacity,
-          'circle-radius': [
-            'case',
-            ['<=', ['get', 'count'], 2],
-            smallCircleSize,
-            ['>', ['get', 'count'], 2],
-            largeCircleSize,
-            5
-          ],
+          'circle-radius': radiusExpression(pointRadiusRange.current),
           'circle-color': colors,
           'circle-stroke-color': colors,
           'circle-stroke-opacity': 0.001,
@@ -1463,14 +1513,7 @@ export default function CreateMap({
           paint: {
             'circle-color': '#ffffff',
             'circle-opacity': 0.9,
-            'circle-radius': [
-              'case',
-              ['<=', ['get', 'count'], 2],
-              smallCircleSize + 1.25,
-              ['>', ['get', 'count'], 2],
-              largeCircleSize + 1.25,
-              6.25
-            ]
+            'circle-radius': radiusExpression(pointRadiusRange.current, 1.25)
           }
         },
         'points'
@@ -1486,10 +1529,7 @@ export default function CreateMap({
 
         paint: {
           'fill-opacity': hexOpacity,
-          'fill-color': {
-            property: 'count',
-            stops: colorStops.current
-          }
+          'fill-color': hexFillColor()
         }
       }, FIRST_LABEL_LAYER_ID)
 
@@ -1503,10 +1543,7 @@ export default function CreateMap({
 
         paint: {
           'fill-opacity': hexOpacity,
-          'fill-color': {
-            property: 'count',
-            stops: colorStops.current
-          }
+          'fill-color': hexFillColor()
         },
         filter: ['in', 'pk', '']
       }, FIRST_LABEL_LAYER_ID)
@@ -1520,14 +1557,7 @@ export default function CreateMap({
         paint: {
           'circle-color': colors,
           'circle-opacity': circleOpacity,
-          'circle-radius': [
-            'case',
-            ['<=', ['get', 'count'], 2],
-            smallCircleSize,
-            ['>', ['get', 'count'], 2],
-            largeCircleSize,
-            5
-          ],
+          'circle-radius': radiusExpression(pointRadiusRange.current),
           'circle-stroke-color': 'black',
           'circle-stroke-width': 0.75
         },
@@ -2097,10 +2127,9 @@ export default function CreateMap({
         popup
           .setLngLat(coordinates)
           .setHTML(
-            ` <div>
-                  ${e.features[0].properties.count} ${t('mapPointHoverTooltip')}
-                </div> 
-              `
+            `<div>${metricCountLabel(
+              e.features[0].properties.count
+            )}. ${t('mapClickForDetails')}</div>`
           )
           .addTo(map.current)
       }
@@ -2119,11 +2148,14 @@ export default function CreateMap({
       if (!draw.getMode().includes('draw')) {
         map.current.getCanvas().style.cursor = 'pointer'
         const coordinates = [e.lngLat.lng, e.lngLat.lat]
-        const description = e.features[0].properties.count
 
         popup
           .setLngLat(coordinates)
-          .setHTML(description + t('mapHexHoverTooltip'))
+          .setHTML(
+            `<div>${metricCountLabel(
+              e.features[0].properties.count
+            )}. ${t('mapClickToZoom')}</div>`
+          )
           .addTo(map.current)
       }
     })
@@ -2147,24 +2179,50 @@ export default function CreateMap({
       ) {
         map.current.getCanvas().style.cursor = 'pointer'
         const coordinates = [e.lngLat.lng, e.lngLat.lat]
-        const { trajectory_count: trajectories, obis_count: occurrences } =
-          e.features[0].properties
+        const {
+          count,
+          trajectory_count: trajectories,
+          obis_count: occurrences
+        } = e.features[0].properties
 
-        // Name what's actually in the hex: the two kinds of coverage cell
-        // share this layer, and a hex can hold both.
-        let description
-        if (trajectories > 0 && occurrences > 0) {
-          description = t('mapCoverageHexBothHoverTooltip', {
-            trajectories,
-            occurrences
-          })
-        } else if (trajectories > 0) {
-          description = t('mapTrajectoryHexHoverTooltip', { trajectories })
-        } else {
-          description = t('mapObisHexHoverTooltip', { occurrences })
+        // The ramp folds trajectory and OBIS coverage into one colour, so this
+        // is the only place the two are still told apart. Lead with the total
+        // (what the colour shows), then name what's actually in the hex —
+        // a trajectory fix and an occurrence record are summed above but they
+        // aren't the same unit, and this is where that stays visible.
+        const breakdown = []
+        if (trajectories > 0) {
+          // Distinct missions/deployments — the one figure here that doesn't
+          // change with the metric.
+          breakdown.push(
+            t('mapCoverageTrajectories', {
+              trajectories: Number(trajectories).toLocaleString(i18n.language)
+            })
+          )
+        }
+        if (occurrences > 0) {
+          // obis_count carries the same metric as `count`, so its noun has to
+          // follow suit — "occurrence records" over a day span would be wrong.
+          breakdown.push(
+            t(
+              {
+                days: 'mapCoverageObisDays',
+                datasets: 'mapCoverageObisDatasets'
+              }[metricRef.current] || 'mapCoverageObisRecords',
+              { total: Number(occurrences).toLocaleString(i18n.language) }
+            )
+          )
         }
 
-        popup.setLngLat(coordinates).setHTML(description).addTo(map.current)
+        popup
+          .setLngLat(coordinates)
+          .setHTML(
+            `<div>${metricCountLabel(count)}. ${t('mapClickToZoom')}</div>` +
+              (breakdown.length
+                ? `<div class='map-tooltip-hint'>${breakdown.join(' · ')}</div>`
+                : '')
+          )
+          .addTo(map.current)
       }
     })
 
@@ -2572,7 +2630,7 @@ export default function CreateMap({
     const reapplyColorStops = () => setColorStops()
     map.current.on('zoomend', reapplyColorStops)
     return () => map.current.off('zoomend', reapplyColorStops)
-  }, [rangeLevels, trajectoryRangeLevels, obisRangeLevels])
+  }, [rangeLevels, coverageRangeLevels])
 
   // Live-swap basemap label languages on EN⇄FR toggle. The initial language
   // is baked into buildBasemapStyle at construction, so this only fires on

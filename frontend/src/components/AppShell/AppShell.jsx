@@ -35,8 +35,9 @@ export default function AppShell () {
     mapLoaded,
     zoom,
     currentRangeLevel,
-    currentTrajectoryRangeLevel,
-    currentObisRangeLevel,
+    currentCoverageRangeLevel,
+    metric,
+    setMetric,
     legendLoading,
     griddapCoverageVisible,
     setGriddapCoverageVisible,
@@ -144,7 +145,7 @@ export default function AppShell () {
       {/* Mount the map immediately rather than waiting for /legend (the app's
           heaviest query) to resolve — first paint of the basemap and tile
           layers no longer blocks on it. The color ramp is applied once
-          rangeLevels/trajectoryRangeLevels arrive via Map's setColorStops
+          rangeLevels/coverageRangeLevels arrive via Map's setColorStops
           effect, which guards against their being undefined until then. */}
       <MapContainer />
       <ApiErrorBanner />
@@ -155,8 +156,9 @@ export default function AppShell () {
       <DownloadModal />
       <Legend
         currentRangeLevel={currentRangeLevel}
-        currentTrajectoryRangeLevel={currentTrajectoryRangeLevel}
-        currentObisRangeLevel={currentObisRangeLevel}
+        currentCoverageRangeLevel={currentCoverageRangeLevel}
+        metric={metric}
+        onMetricChange={setMetric}
         loading={legendLoading}
         zoom={zoom}
         platformsAvailable={platformsAvailable}

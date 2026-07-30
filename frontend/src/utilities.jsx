@@ -1,5 +1,5 @@
 import isEmpty from 'lodash/isEmpty'
-import { scaleLinear, scalePow } from 'd3-scale'
+import { scaleLinear, scaleLog } from 'd3-scale'
 import React, { useState, useEffect } from 'react'
 import { defaultQuery } from './components/config.js'
 import { useTranslation } from 'react-i18next'
@@ -208,27 +208,60 @@ export function createDataFilterQueryString(query) {
   return objectToURL(apiMappedQuery)
 }
 
+// How many times bigger the max has to be than the min before the ramp goes
+// log instead of linear.
+const LOG_SCALE_MIN_RATIO = 100
+
 // returns an array of {stop: num, color: string} objects
+//
+// Two shapes, picked by how wide the range is rather than how big its maximum
+// is. There used to be a third — a power curve with exponent 5 — from when the
+// ramp counted distinct locations per hex; every current metric is better
+// served by one of these two, and the power curve actively hurt them (over a
+// [1, 15] dataset-count range it collapsed to stops 1|2|6|15, putting almost
+// every hexagon in the lightest shade).
 export function generateColorStops(colorScale, range) {
-  // check if fewer points than colors
-  const exponent = 5
+  // Ranges arrive from /legend and can be absent (still in flight), or [null,
+  // null] when the filters match nothing. Neither is a scale.
+  if (!range || !Number.isFinite(range[1]) || range[1] <= 0) return []
   let colors
   let scale
-  if (range[1] <= colorScale.length * 2) {
-    colors = colorScale.slice(0, range[1])
+  // scaleLog cannot have 0 in its domain, so the low end is clamped to 1 —
+  // safe because these are counts, and a hex that survives the aggregation
+  // holds at least one thing.
+  const lo = Math.max(Number.isFinite(range[0]) ? range[0] : 1, 1)
+  const hi = range[1]
+  if (hi / lo >= LOG_SCALE_MIN_RATIO) {
+    // Measurement and day counts span five to eight orders of magnitude. Any
+    // linear spacing over that puts all but a handful of hexes in the lightest
+    // color, which reads as "there's nothing here" across most of the map. Log
+    // spacing is what makes the middle of the distribution visible.
+    //
+    // The scale is built value -> index and inverted, since the caller wants
+    // index -> value and a log domain of [0, n-1] would be the illegal
+    // direction.
+    colors = colorScale
+    const logScale = scaleLog()
+      .domain([lo, hi])
+      .range([0, colors.length - 1])
+    scale = (index) => logScale.invert(index)
+  } else {
+    // Narrow ranges — dataset counts run about 1..19 — spread evenly. When
+    // there are fewer distinct values than colors, drop the extra colors so
+    // each value gets its own shade instead of two shades sharing a value.
+    const span = Math.floor(hi) - Math.floor(lo) + 1
+    colors = span < colorScale.length ? colorScale.slice(0, span) : colorScale
     scale = scaleLinear()
       .domain([0, colors.length - 1])
-      .range(range)
-  } else {
-    colors = colorScale
-    scale = scalePow()
-      .exponent(exponent)
-      .domain([0, colors.length - 1])
-      .range(range)
+      .range([lo, hi])
   }
   const colorStops = colors.map((color, index) => {
     return {
-      stop: Math.floor(scale(index)),
+      // The top stop is pinned to the range max rather than floored: on the
+      // log scale invert() lands a hair under it (499.999... for a max of
+      // 500), and a legend whose last tick reads one less than the real
+      // maximum looks like a bug.
+      stop: index === colors.length - 1 ? hi : Math.floor(scale(index)),
       color
     }
   })

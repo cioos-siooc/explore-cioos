@@ -61,6 +61,20 @@
   padding: 1px 0 3px;
 }
 
+/* The "counts are approximate" caveat under the color bars. Deliberately
+   quiet — it qualifies the ramp, it isn't a warning about it. Wraps, unlike
+   the rest of the card, since it's a sentence rather than a label. */
+.legendFootnote {
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--cioos-ink-40);
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--cioos-hairline);
+  max-width: 210px;
+  white-space: normal;
+}
+
 /* Waiting on /legend — stands in for the color bar, so the card keeps its
    shape instead of collapsing and then jumping back open. */
 .legendLoading {
