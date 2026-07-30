@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
 import './styles.css'
 
-import Plotly from 'plotly.js-basic-dist-min'
+// The cartesian partial bundle: shared with CoverageHistogramPlot so only one
+// Plotly bundle ever ships.
+import Plotly from 'plotly.js-cartesian-dist-min'
 import createPlotlyComponent from 'react-plotly.js/factory'
 import frLocale from 'plotly.js-locales/fr'
 

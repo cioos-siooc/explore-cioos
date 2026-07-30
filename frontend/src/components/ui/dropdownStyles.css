@@ -37,7 +37,11 @@
 .dropdown-menu {
   /* position/top/left/min-width are set inline (DropdownButton computes them
      from the toggle's bounding rect — the menu portals into document.body). */
-  z-index: 1000;
+  /* Above the modal surface (--cioos-z-modal: 1055) but below tooltips
+     (1080): the menu portals to body alongside modals, so a dropdown opened
+     from inside a modal (e.g. the coverage figure's Colour-by control) must
+     win the stacking order against it. */
+  z-index: 1060;
   max-height: 260px;
   overflow-y: auto;
   padding: 4px 0;

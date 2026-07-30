@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Filter, ListUl } from 'react-bootstrap-icons'
+import { Filter, GraphUp, ListUl } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
 
@@ -29,7 +29,12 @@ export default function TopControls () {
     timeFilterActive,
     depthFilterActive
   } = useFilters()
-  const { setShowFiltersModal, sidebarOpen, setSidebarOpen } = useUI()
+  const {
+    setShowFiltersModal,
+    setShowCoverageModal,
+    sidebarOpen,
+    setSidebarOpen
+  } = useUI()
   // No count is shown until there is a real one — see useDatasetCounts.
   const {
     ready: countsReady,
@@ -94,6 +99,15 @@ export default function TopControls () {
             {activeFilterCount > 0 && (
               <span className='topBarCount'>{activeFilterCount}</span>
             )}
+          </button>
+          <button
+            type='button'
+            className='topBarButton'
+            onClick={() => setShowCoverageModal(true)}
+            title={t('coverageButtonTitle')}
+          >
+            <GraphUp size={18} aria-hidden='true' />
+            <span className='topBarButtonLabel'>{t('coverageButton')}</span>
           </button>
         </div>
       </BrandSearch>

@@ -8,6 +8,7 @@ import Sidebar from './Sidebar/Sidebar.jsx'
 import TopControls from './TopControls/TopControls.jsx'
 import FiltersModal from './Modals/FiltersModal.jsx'
 import DownloadModal from './Modals/DownloadModal.jsx'
+import CoverageModal from './Modals/CoverageModal.jsx'
 import PreviewHost from './Panels/PreviewHost.jsx'
 import MapCornerControls from './MapCorner/MapCornerControls.jsx'
 import ZoomToDataset from './ZoomToDataset/ZoomToDataset.jsx'
@@ -102,6 +103,7 @@ export default function AppShell () {
       <TopControls />
       <FiltersModal />
       <DownloadModal />
+      <CoverageModal />
       <Legend
         currentRangeLevel={currentRangeLevel}
         currentTrajectoryRangeLevel={currentTrajectoryRangeLevel}

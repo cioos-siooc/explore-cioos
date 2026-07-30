@@ -21,7 +21,7 @@
     "lodash": "^4.17.21",
     "mapbox-gl-draw-rectangle-mode": "^1.0.4",
     "maplibre-gl": "^5.24.0",
-    "plotly.js-basic-dist-min": "^3.0.0",
+    "plotly.js-cartesian-dist-min": "^3.7.0",
     "plotly.js-locales": "^3.0.0",
     "prop-types": "^15.8.1",
     "rc-slider": "^11.1.9",

@@ -37,7 +37,7 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             maplibre: ['maplibre-gl'],
-            plotly: ['plotly.js-basic-dist-min']
+            plotly: ['plotly.js-cartesian-dist-min']
           }
         }
       }

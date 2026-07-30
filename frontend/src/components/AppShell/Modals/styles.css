@@ -68,6 +68,100 @@
   color: var(--cioos-ink-60);
 }
 
+/* Dataset-coverage figure: a wide dialog whose body holds a small toolbar
+   (the Colour-by control) above the stacked histogram. The header reuses the
+   download modal's icon-tile + title treatment. */
+.coverageModal .coverageModalDialog {
+  max-width: min(1040px, calc(100vw - 24px));
+}
+
+.coverageModal .modal-content {
+  height: min(72vh, 720px);
+  overflow: hidden;
+}
+
+.coverageModal .modal-header {
+  background-color: var(--cioos-white);
+  align-items: flex-start;
+}
+
+.coverageModal .modal-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.coverageModal .modal-body {
+  position: relative;
+  min-height: 0;
+  padding: var(--cioos-space-sm) var(--cioos-space-lg) var(--cioos-space-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Toolbar: "Colour by" label + the grouping dropdown, right-aligned above the
+   plot. */
+.coverageToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--cioos-space-sm);
+  flex: 0 0 auto;
+  padding-bottom: var(--cioos-space-sm);
+}
+
+.coverageToolbarLabel {
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink-60);
+}
+
+.coverageToolbar .dropdown-toggle {
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
+  color: var(--cioos-ink);
+  padding: 6px 12px;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 500;
+}
+
+.coverageToolbar .dropdown-toggle:hover {
+  border-color: var(--cioos-primary);
+}
+
+/* The plot fills the remaining height below the toolbar. */
+.coveragePlotArea {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Loading / error / empty states centered in the plot area. */
+.coverageModalStatus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-md);
+}
+
+@media (max-width: 600px) {
+  .coverageModal .coverageModalDialog {
+    width: 100vw;
+    max-width: 100vw;
+    min-height: 100vh;
+    margin: 0;
+  }
+
+  .coverageModal .modal-content {
+    height: 100vh;
+    max-height: none;
+    border-radius: 0;
+  }
+}
+
 /* Both modals host panels that manage their own scrolling; the body is the
    positioned, non-padded frame they fill. */
 .filtersModal .modal-body,
