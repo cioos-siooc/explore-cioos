@@ -379,6 +379,7 @@
   "trajectoryPlatformIdText": "Platform ID",
   "trajectoryPlatformFixesText": "Track fixes",
   "legendTrackLine": "Track",
+  "legendTrackTrailZoomGated": "Zoomed out, tracks load at most one year. Zoom in to load the full window.",
   "legendTrackHead": "Position and direction at selected date",
   "trackLineClickText": "Click to show this platform's full track",
   "griddapTypeLabel": "Gridded",

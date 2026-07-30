@@ -47,7 +47,8 @@ import {
   trackLineColor,
   selectedTrackColor,
   tracksMinDate,
-  TRAIL_ALL
+  TRAIL_ALL,
+  effectiveTrailingDays
 } from '../config'
 import platformColors from '../../components/platformColors'
 import { PROFILE_TYPE_KEYS } from '../../state/dataLayers.js'
@@ -300,40 +301,49 @@ export default function CreateMap({
 
   // UTC-day-snapped scrub window: [scrub date - N days, scrub date + 1 day),
   // or [tracksMinDate, scrub date + 1 day) for the 'all' trail (full tracks
-  // up to the scrub date — the default; see config.js). Day snapping keeps
-  // the tile URLs stable so the server's URL-keyed tile cache gets hits
-  // across scrubs and users.
-  function tracksTimeWindow(scrub, trailing) {
+  // up to the scrub date; see config.js). Day snapping keeps the tile URLs
+  // stable so the server's URL-keyed tile cache gets hits across scrubs and
+  // users. The requested trail is clamped by zoom first — a long window costs
+  // far more zoomed out, where one tile can carry the whole catalogue (see
+  // effectiveTrailingDays).
+  function tracksTimeWindow(scrub, trailing, zoom) {
     const MS_PER_DAY = 24 * 60 * 60 * 1000
+    const days = effectiveTrailingDays(trailing, zoom)
     const end = new Date(`${scrub}T00:00:00Z`).getTime()
     const timeMax = `${new Date(end + MS_PER_DAY).toISOString().split('T')[0]}T00:00:00Z`
     const timeMin =
-      trailing === TRAIL_ALL
+      days === TRAIL_ALL
         ? `${tracksMinDate}T00:00:00Z`
-        : `${new Date(end - trailing * MS_PER_DAY).toISOString().split('T')[0]}T00:00:00Z`
+        : `${new Date(end - days * MS_PER_DAY).toISOString().split('T')[0]}T00:00:00Z`
     return { timeMin, timeMax }
   }
 
   // Tracks tile URL: dataset-level filters from the regular map query string,
   // minus the TimeSelector's timeMin/timeMax (the scrub window must not
   // fight the date-range filter), plus the day-snapped scrub window.
-  function buildTracksTileUrl(queryString, scrub, trailing) {
+  function buildTracksTileUrl(queryString, scrub, trailing, zoom) {
     const params = new URLSearchParams(queryString)
     params.delete('timeMin')
     params.delete('timeMax')
-    const { timeMin, timeMax } = tracksTimeWindow(scrub, trailing)
+    const { timeMin, timeMax } = tracksTimeWindow(scrub, trailing, zoom)
     params.set('timeMin', timeMin)
     params.set('timeMax', timeMax)
     return `${server}/tiles/tracks/{z}/{x}/{y}.mvt?${params.toString()}`
   }
 
+  // The effective trail the tracks source was last built with, so the zoomend
+  // handler can tell a gate crossing (refetch) from any other zoom change (no-op).
+  const appliedTrailRef = useRef(null)
+
   function refreshTracksSource(queryString, scrub, trailing) {
     if (!map.current || !map.current.getSource('tracks')) return
+    const zoom = map.current.getZoom()
+    appliedTrailRef.current = effectiveTrailingDays(trailing, zoom)
     // Swap the tile URL and re-render via the public setTiles API — it
     // clears the source's tile cache and reloads the viewport tiles.
     map.current
       .getSource('tracks')
-      .setTiles([buildTracksTileUrl(queryString, scrub, trailing)])
+      .setTiles([buildTracksTileUrl(queryString, scrub, trailing, zoom)])
   }
 
   // Rebuild the shared point/hex and coverage-cell source URLs from the
@@ -1638,18 +1648,40 @@ export default function CreateMap({
         // maplibre overzoom past it rather than re-fetch expensive tiles at
         // every zoom level in. NOTE: at low zoom a single tile can assemble
         // every trajectory over the whole time window (100k+ features,
-        // multi-MB) — the bounded default trail (defaultTrailingDays, see
-        // config.js) keeps that in check; the 'all' trail while zoomed out is
-        // the heavy case. If it regresses, add server-side low-zoom
+        // multi-MB) — the bounded default trail (defaultTrailingDays) and the
+        // long-trail zoom gate (effectiveTrailingDays, both in config.js) keep
+        // that in check. If it regresses, add server-side low-zoom
         // simplification in web-api/routes/tiles.js rather than a minzoom.
         maxzoom: 8,
         tiles: [
           buildTracksTileUrl(
             mapQueryRef.current,
             scrubTimeRef.current,
-            trailingDaysRef.current
+            trailingDaysRef.current,
+            map.current.getZoom()
           )
         ]
+      })
+      appliedTrailRef.current = effectiveTrailingDays(
+        trailingDaysRef.current,
+        map.current.getZoom()
+      )
+
+      // Crossing the long-trail zoom gate changes the window the tracks tiles
+      // carry, so the source is rebuilt — but only on an actual crossing, not
+      // on every zoomend, since setTiles drops the whole tile cache.
+      map.current.on('zoomend', () => {
+        if (!tracksModeRef.current || !map.current.getSource('tracks')) return
+        const effective = effectiveTrailingDays(
+          trailingDaysRef.current,
+          map.current.getZoom()
+        )
+        if (effective === appliedTrailRef.current) return
+        refreshTracksSource(
+          mapQueryRef.current,
+          scrubTimeRef.current,
+          trailingDaysRef.current
+        )
       })
 
       map.current.addLayer({

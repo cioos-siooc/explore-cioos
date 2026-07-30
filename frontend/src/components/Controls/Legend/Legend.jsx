@@ -15,7 +15,8 @@ import {
   trajectoryColorScale,
   obisColorScale,
   mixedColorScale,
-  TRAIL_ALL
+  TRAIL_ALL,
+  effectiveTrailingDays
 } from '../../config.js'
 import platformColors from '../../platformColors'
 import { DEFAULT_DATA_LAYERS } from '../../../state/dataLayers.js'
@@ -244,13 +245,23 @@ export default function Legend({
     )
   }
 
-  // The track-line + heading-arrow swatches, matching what the map draws.
+  // The track-line + heading-arrow swatches, matching what the map draws. The
+  // window shown is the one actually loaded, not the one requested: zoomed out,
+  // the long trails are clamped (see effectiveTrailingDays), and a key that
+  // still claimed "All time" there would be wrong.
   function renderTrackLineKey() {
+    const loadedTrail = effectiveTrailingDays(trailingDays, zoom)
+    const zoomClamped = loadedTrail !== trailingDays
+    const trailLabel =
+      loadedTrail === TRAIL_ALL ? t('timeBarTrailAll') : `${loadedTrail}d`
     return (
       <div className='legendSection' key='tracks'>
         <div className='legendSectionCaption'>{t('layerTrajectories')}</div>
         <div className='legendItems'>
-          <div className='legendItem'>
+          <div
+            className='legendItem'
+            title={zoomClamped ? t('legendTrackTrailZoomGated') : undefined}
+          >
             <svg className='legendSwatch' width='12' height='12'>
               <line
                 x1='1'
@@ -263,11 +274,7 @@ export default function Legend({
               />
             </svg>
             <span className='legendItemLabel'>
-              {`${t('legendTrackLine')} (${
-                trailingDays === TRAIL_ALL
-                  ? t('timeBarTrailAll')
-                  : `${trailingDays}d`
-              })`}
+              {`${t('legendTrackLine')} (${trailLabel}${zoomClamped ? '*' : ''})`}
             </span>
           </div>
           <div className='legendItem'>

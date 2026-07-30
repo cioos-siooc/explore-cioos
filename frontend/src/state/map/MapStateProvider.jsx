@@ -13,7 +13,8 @@ import isEmpty from 'lodash/isEmpty'
 import { server } from '../../config.js'
 import {
   basemap as defaultBasemap,
-  defaultTrailingDays
+  defaultTrailingDays,
+  TRAIL_ALL
 } from '../../components/config.js'
 import {
   applyMapDatasetPKs,
@@ -149,9 +150,14 @@ export default function MapStateProvider ({ children }) {
     urlParams.get('scrubTime') || new Date().toISOString().split('T')[0]
   )
   const debouncedScrubTime = useDebounce(scrubTime, 250)
-  const [trailingDays, setTrailingDays] = useState(
-    Number.parseInt(urlParams.get('trail')) || defaultTrailingDays
-  )
+  // The trail is either a day count or the TRAIL_ALL sentinel, which UrlSync
+  // writes verbatim — parseInt('all') is NaN, so it needs matching before the
+  // numeric parse or the 'all' trail silently reverts to the default on reload.
+  const [trailingDays, setTrailingDays] = useState(() => {
+    const trail = urlParams.get('trail')
+    if (trail === TRAIL_ALL) return TRAIL_ALL
+    return Number.parseInt(trail) || defaultTrailingDays
+  })
 
   // Data-type layers shown on the map. Absent `layers` param = the default
   // selection (OBIS and trajectories off — see DEFAULT_DATA_LAYERS); a present

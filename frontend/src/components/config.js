@@ -78,12 +78,34 @@ export const mixedColorScale = [
 // (100k+ line features, 400k+ vertices at low zoom) and overwhelms the
 // renderer. A bounded default keeps the tiles ~20x smaller; users who want
 // full history opt into 'all'. The tracks source has no minzoom (lines render
-// at every zoom), so 'all' while zoomed out is the heavy case the bounded
-// default guards against — see the maxzoom cap in Map.jsx and the head-symbol
-// culling, which keep the common case from crashing the browser tab.
+// at every zoom), so 'all' while zoomed out is the heavy case — guarded by the
+// bounded default, the zoom gate below, the maxzoom cap in Map.jsx and the
+// head-symbol culling, which keep the common case from crashing the tab.
 export const TRAIL_ALL = 'all'
 export const defaultTrailingDays = 90
 export const trailingWindowOptions = [7, 14, 30, 90, 180, 365, TRAIL_ALL]
+
+// Zoom gate for the long trails. Tile cost grows superlinearly with the window
+// and is worst zoomed out, where one tile can assemble the whole catalogue.
+// Measured per uncached tile at z2-z5: 90 days ~7 KB / 11 ms, one year
+// ~14 KB / 70 ms, 'all' ~380 KB / 1.8 s. Dropping the long windows outright
+// would be wrong — the trajectory hexes draw all-time coverage, so tracks that
+// cannot reach as far back read as broken — so instead the long windows are
+// clamped to longTrailMaxDays below longTrailMinZoom, and load in full at or
+// above it, where a tile covers a small enough area to afford them. z5 is also
+// where the head-symbol collision culling starts to matter (see Map.jsx).
+export const longTrailMinZoom = 5
+export const longTrailMaxDays = 365
+
+// The trail actually loaded at this zoom: the requested window at or above
+// longTrailMinZoom, clamped to longTrailMaxDays below it. Shared by the tracks
+// tile URL builder and the legend/TimeBar, so the UI never claims a window the
+// map is not drawing. An unknown zoom clamps, which is the cheap, honest guess.
+export function effectiveTrailingDays (trailing, zoom) {
+  if (zoom != null && zoom >= longTrailMinZoom) return trailing
+  if (trailing === TRAIL_ALL) return longTrailMaxDays
+  return Math.min(trailing, longTrailMaxDays)
+}
 // Scrub bar domain start; today is the end. Argo-era default.
 export const tracksMinDate = '2000-01-01'
 export const trackLineColor = '#6749AC'

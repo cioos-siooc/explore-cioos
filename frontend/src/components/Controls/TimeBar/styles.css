@@ -67,6 +67,15 @@
   font-size: 0.85rem;
 }
 
+/* Marks a trail that the zoom gate is currently clamping; the label carries
+   the explanation as a tooltip. */
+.timeBarTrailClamped {
+  margin-left: -3px;
+  color: #6749ac;
+  font-weight: 700;
+  cursor: help;
+}
+
 .timeBarTrailSelect {
   border: 1px solid #ccc;
   border-radius: 4px;

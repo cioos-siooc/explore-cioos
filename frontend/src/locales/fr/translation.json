@@ -380,6 +380,7 @@
   "trajectoryPlatformIdText": "ID de plateforme",
   "trajectoryPlatformFixesText": "Positions",
   "legendTrackLine": "Trajectoire",
+  "legendTrackTrailZoomGated": "En vue élargie, les trajets se limitent à un an. Zoomez pour charger la période complète.",
   "legendTrackHead": "Position et direction à la date choisie",
   "trackLineClickText": "Cliquez pour afficher la trajectoire complète de la plateforme",
   "griddapTypeLabel": "Maillé",
