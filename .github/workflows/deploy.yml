@@ -17,14 +17,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - uses: cioos-siooc/cioos-deploy-docker-compose@main
+      # Production (master) runs on the Juno fleet (cioos-co-prod-explore).
+      - name: Deploy to Juno
+        uses: cioos-siooc/cioos-deploy-docker-compose@main
+        if: ${{ (github.event.workflow_run.head_branch || github.ref_name) == 'master' }}
+        with:
+          wg_config: ${{ secrets.JUNO_WIREGUARD_VPN_CONFIG }}
+          ssh_host: "${{ secrets.SERVER_IP }}"
+          ssh_username: "runner"
+          ssh_key: ${{ secrets.JUNO_RUNNER_PRIVATE_KEY }}
+          deploy_path: "/srv/services/explore-cioos"
+          stack_name: "explore-cioos-production"
+          compose_files: "docker-compose.production.yaml"
+          op_secret_files: ".env.production:.env"
+          op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
+          docker_compose_down: "true"
+
+      # Development still runs on Beluga.
+      - name: Deploy to Beluga
+        uses: cioos-siooc/cioos-deploy-docker-compose@main
+        if: ${{ (github.event.workflow_run.head_branch || github.ref_name) != 'master' }}
         with:
           wg_config: ${{ secrets.BELUGA_WIREGUARD_VPN_CONFIG }}
           ssh_host: "${{ secrets.SERVER_IP }}"
           ssh_username: "runner"
           ssh_key: ${{ secrets.BELUGA_RUNNER_PRIVATE_KEY }}
           deploy_path: "/srv/services/explore-cioos"
-          stack_name: "explore-cioos-${{ (github.event.workflow_run.head_branch || github.ref_name) == 'master' && 'production' || 'development' }}"
+          stack_name: "explore-cioos-development"
           compose_files: "docker-compose.production.yaml"
           op_secret_files: ".env.production:.env"
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
