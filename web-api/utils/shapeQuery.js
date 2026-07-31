@@ -69,7 +69,7 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
   if (includeProfiles && !doEstimate) branches.push(griddapBranch);
   const combinedInner = branches.length
     ? branches.join("\n        UNION ALL\n        ")
-    : `${profilesBranch} WHERE FALSE`;
+    : `SELECT * FROM (${profilesBranch}) empty_combined WHERE FALSE`;
 
   // The record list is one row per *record* (profile / trajectory / OBIS
   // dataset), not one per matched feature. Trajectory and OBIS coverage is

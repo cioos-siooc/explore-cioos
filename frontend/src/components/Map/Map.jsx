@@ -41,6 +41,7 @@ import {
 } from '../../wmsUtilities'
 import {
   colorScale,
+  hexOutlineColor,
   DEFAULT_HEX_METRIC,
   trackLineColor,
   selectedTrackColor,
@@ -258,6 +259,9 @@ export default function CreateMap({
   const smallCircleSize = 2.75
   const largeCircleSize = 6
   const circleOpacity = 0.7
+  // One transparency for the whole ramp: the hex colours are opaque, so this is
+  // the only thing letting the basemap through, and it lets it through equally
+  // at every count. Count is carried by colour alone.
   const hexOpacity = 0.8
   const hexMinZoom = 0
   const hexMaxZoom = 7
@@ -551,9 +555,9 @@ export default function CreateMap({
   const coverageHexFillColor = () =>
     rampExpression(coverageColorStops.current, 'count')
 
-  // A fixed mid-ramp outline, so a coverage hex still reads as a discrete cell
-  // where the fill is nearly transparent (the layer fades out with zoom).
-  const coverageHexOutlineColor = () => colorScale[2]
+  // A fixed outline, so a coverage hex still reads as a discrete cell where the
+  // fill is nearly transparent (the layer fades out with zoom).
+  const coverageHexOutlineColor = () => hexOutlineColor
 
   function setColorStops() {
     // The map now mounts before the legend request resolves (first paint is

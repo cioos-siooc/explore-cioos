@@ -247,10 +247,24 @@ export function generateColorStops(colorScale, range) {
     scale = (index) => logScale.invert(index)
   } else {
     // Narrow ranges — dataset counts run about 1..19 — spread evenly. When
-    // there are fewer distinct values than colors, drop the extra colors so
-    // each value gets its own shade instead of two shades sharing a value.
+    // there are fewer distinct values than colors, thin the ramp so each value
+    // gets its own shade instead of two shades sharing a value. Thin by
+    // sampling across the whole ramp rather than taking a prefix: a prefix of a
+    // 12-stop ramp that starts in pale sand would paint a 1..3 range entirely
+    // in the near-transparent end, and "3 datasets" would look like nothing.
     const span = Math.floor(hi) - Math.floor(lo) + 1
-    colors = span < colorScale.length ? colorScale.slice(0, span) : colorScale
+    // A one-value range takes the middle of the ramp, not its first stop: with
+    // nothing to compare against, the honest shade is a mid one.
+    colors =
+      span < colorScale.length
+        ? Array.from({ length: span }, (_, i) =>
+          colorScale[
+            Math.round(
+              (span === 1 ? 0.5 : i / (span - 1)) * (colorScale.length - 1)
+            )
+          ]
+        )
+        : colorScale
     scale = scaleLinear()
       .domain([0, colors.length - 1])
       .range([lo, hi])

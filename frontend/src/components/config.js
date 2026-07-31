@@ -34,15 +34,35 @@ export const basemap = 'emodnet'
 // families on screen at once above z7, and a reader had to decode hue before
 // they could read density. What a hex holds now lives in its hover tooltip and
 // in the layer toggles; colour is reserved for how much.
+//
+// Twelve stops, not seven, so MapLibre's interpolation between them reads as
+// one continuous wash rather than a set of bands. The colours are fully
+// opaque: the whole ramp is drawn at a single layer transparency (hexOpacity in
+// Map.jsx), so a hexagon's alpha says nothing about its count and only its
+// colour does.
+//
+// The path is sand -> teal-light -> primary -> navy, all CIOOS tokens, sampled
+// at even L* steps (~6.7 apart) so no two neighbouring stops read as the same
+// shade. The sand head means the sparsest hexes sit against the water as a warm
+// shore tint instead of arriving already teal.
 export const colorScale = [
-  '#52A79B',
-  '#4A968C',
-  '#3D7B73',
-  '#2F6059',
-  '#224440',
-  '#1B3733',
-  '#142926'
+  '#F5EACB', // sand
+  '#BDDED9',
+  '#9ECDC6',
+  '#7FBDB4',
+  '#5EADA1',
+  '#4A9B8E',
+  '#3F887C',
+  '#36756D',
+  '#2D635F',
+  '#255151',
+  '#1D3F44',
+  '#152F37' // navy
 ]
+
+// Hex outline colour. White reads as a cell separator against every part of the
+// ramp — a mid-ramp teal disappeared into the fills it was meant to divide.
+export const hexOutlineColor = '#FFFFFF'
 
 // What the hex ramp counts. 'records' is the amount of data actually collected
 // (measurements / occurrence records / position fixes); 'days' is the span

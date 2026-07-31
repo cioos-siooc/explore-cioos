@@ -132,7 +132,10 @@ router.get(
       filters = await createDBFilter(req.query);
     } catch (err) {
       if (err.statusCode === 400) return res.status(400).json({ error: err.message });
-      throw err;
+      // Rethrowing would reject the async handler, which Express 4 leaves
+      // unhandled — that kills the process, not just this request.
+      console.error(err);
+      return res.status(500).json({ error: err.toString() });
     }
     const includeObis = req.query.includeObis !== 'false';
     // Must match the metric the tiles were requested with, or the ramp domain
@@ -171,16 +174,18 @@ router.get(
     const hexBranches = [];
     if (includeProfiles) hexBranches.push(profilesBranch, trajectoryBranch);
     if (includeObis) hexBranches.push(obisBranch);
+    // Wrapped in a subquery so the guard holds even though profilesBranch
+    // carries its own WHERE (show_as_point).
     const combinedHexInner = hexBranches.length
       ? hexBranches.join("\n        UNION ALL\n        ")
-      : `${profilesBranch} WHERE FALSE`;
+      : `SELECT * FROM (${profilesBranch}) empty_hex WHERE FALSE`;
 
     // Only profiles reach the point tier: both cell tables are drawn as hexes
     // at every zoom, so counting them here would ramp the point circles
     // against data they don't contain.
     const combinedPointInner = includeProfiles
       ? profilesBranch
-      : `${profilesBranch} WHERE FALSE`;
+      : `SELECT * FROM (${profilesBranch}) empty_point WHERE FALSE`;
 
     const sql = `
         WITH combined_hex AS (
@@ -263,15 +268,25 @@ router.get(
     // concurrently rather than back-to-back so legend latency is bounded by
     // the slower, not their sum. The legend gates first map paint, so this is
     // on the critical path.
-    const [rows, coverageRows] = await Promise.all([
-      db.raw(sql, { filters: filters.shared, obisFilters: filters.obisOnly }),
-      db.raw(coverageSql, { filters: filters.shared, obisFilters: filters.obisOnly }),
-    ]);
+    // Express 4 does not forward rejections from async handlers, so an
+    // uncaught DB error here takes down the whole API process rather than
+    // failing the one request. Contained the same way the tile routes do it.
+    try {
+      const [rows, coverageRows] = await Promise.all([
+        db.raw(sql, { filters: filters.shared, obisFilters: filters.obisOnly }),
+        db.raw(coverageSql, { filters: filters.shared, obisFilters: filters.obisOnly }),
+      ]);
 
-    res.send(rows && {
-      recordsCount: rows.rows[0],
-      coverageCount: coverageRows.rows[0],
-    });
+      res.send(rows && {
+        recordsCount: rows.rows[0],
+        coverageCount: coverageRows.rows[0],
+      });
+    } catch (e) {
+      console.error(e);
+      res.status(500).send({
+        error: e.toString(),
+      });
+    }
   },
 );
 
