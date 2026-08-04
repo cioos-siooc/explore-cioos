@@ -84,5 +84,13 @@ if [ "${REGISTER_DEPLOYMENTS:-true}" = "true" ]; then
   fi
 fi
 
-echo "[worker-entrypoint] Starting process worker on pool ${POOL_NAME}"
-exec uv run prefect worker start --pool "${POOL_NAME}" --type process
+# Cap how many flow runs this worker executes at once. "Harvest All Sources"
+# fans out one child run per configured source (10+), and under `--type process`
+# each becomes a separate OS process. Unbounded, ten parallel harvests (the OBIS
+# parquet path being the heaviest) exhausted RAM + all swap on a 15.7 GB host on
+# 2026-08-04 and livelocked it. Raise deliberately, with headroom to match.
+WORKER_LIMIT="${HARVEST_WORKER_LIMIT:-2}"
+
+echo "[worker-entrypoint] Starting process worker on pool ${POOL_NAME} (concurrency limit ${WORKER_LIMIT})"
+exec uv run prefect worker start --pool "${POOL_NAME}" --type process \
+  --limit "${WORKER_LIMIT}"
