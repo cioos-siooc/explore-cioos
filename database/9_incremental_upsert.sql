@@ -11,6 +11,7 @@ Functions:
 - replace_profiles_from_temp() - Replace profiles for updated datasets
 - replace_obis_cells_from_temp() - Replace obis_cells for updated datasets
 - replace_trajectory_cells_from_temp() - Replace trajectory_cells for updated datasets
+- replace_trajectory_points_from_temp() - Replace trajectory_points for updated datasets
 - upsert_skipped_datasets_from_temp() - UPSERT skipped datasets
 - process_incremental_update() - Main orchestrator for entire incremental workflow
 
@@ -36,6 +37,9 @@ BEGIN
   -- INSERTs of lat/lon-only rows on some paths; drop the expression so the
   -- temp table takes NULL geom (the main-table INSERT recomputes it anyway).
   CREATE TEMP TABLE IF NOT EXISTS temp_trajectory_cells (LIKE cde.trajectory_cells INCLUDING DEFAULTS EXCLUDING CONSTRAINTS EXCLUDING GENERATED);
+  CREATE TEMP TABLE IF NOT EXISTS temp_trajectory_points (LIKE cde.trajectory_points INCLUDING DEFAULTS EXCLUDING CONSTRAINTS EXCLUDING GENERATED);
+  ALTER TABLE temp_trajectory_points
+    ALTER COLUMN time DROP NOT NULL;
 
   -- Explicitly drop all NOT NULL constraints from temp tables
   -- These are column-level constraints that EXCLUDING CONSTRAINTS doesn't remove
@@ -252,6 +256,40 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+-- Replace trajectory_points for updated datasets.
+-- Unlike the cells tables, the DELETE is scoped to datasets that actually
+-- shipped NEW track points this run (not all of temp_datasets): track
+-- extraction is best-effort in the harvester — a transient track-query
+-- failure yields cells but no points, and must not wipe the dataset's
+-- existing (still valid) track. Stale tracks self-heal on the next
+-- successful harvest of that dataset.
+CREATE OR REPLACE FUNCTION replace_trajectory_points_from_temp() RETURNS VOID AS $$
+BEGIN
+  DELETE FROM cde.trajectory_points p
+  USING (SELECT DISTINCT dataset_id, erddap_url FROM temp_trajectory_points) tp
+  WHERE p.dataset_id = tp.dataset_id
+    AND p.erddap_url = tp.erddap_url;
+
+  -- dataset_pk resolved at INSERT time, same rationale as
+  -- replace_trajectory_cells_from_temp() above.
+  INSERT INTO cde.trajectory_points
+    (dataset_pk, erddap_url, dataset_id, trajectory_id, profile_id,
+     time, latitude, longitude)
+  SELECT d.pk, t.erddap_url, t.dataset_id, t.trajectory_id, t.profile_id,
+         t.time, t.latitude, t.longitude
+  FROM temp_trajectory_points t
+  LEFT JOIN cde.datasets d
+    ON d.dataset_id = t.dataset_id AND d.erddap_url = t.erddap_url
+  WHERE t.time IS NOT NULL
+  ON CONFLICT (erddap_url, dataset_id, trajectory_id, time) DO UPDATE SET
+    dataset_pk = EXCLUDED.dataset_pk,
+    profile_id = EXCLUDED.profile_id,
+    latitude = EXCLUDED.latitude,
+    longitude = EXCLUDED.longitude;
+END;
+$$ LANGUAGE plpgsql;
+
+
 -- Main incremental processing function
 -- Orchestrates the entire incremental update workflow
 CREATE OR REPLACE FUNCTION process_incremental_update() RETURNS VOID AS $$
@@ -276,6 +314,10 @@ BEGIN
 
   -- 6. Replace trajectory_cells (delete old, insert new)
   PERFORM replace_trajectory_cells_from_temp();
+
+  -- 6b. Replace trajectory_points (delete old, insert new); track stats are
+  -- rebuilt afterwards inside trajectory_process().
+  PERFORM replace_trajectory_points_from_temp();
 
   -- 7. UPSERT skipped datasets
   PERFORM upsert_skipped_datasets_from_temp();
@@ -399,6 +441,18 @@ BEGIN
 
   DELETE FROM cde.trajectory_cells t USING _prune_candidates c
   WHERE t.dataset_id = c.dataset_id AND t.erddap_url = c.erddap_url;
+
+  -- trajectory_points has an FK to datasets(pk); it must be cleared before the
+  -- datasets DELETE below or pruning a trajectory dataset raises a
+  -- ForeignKeyViolation (see replace_trajectory_points_from_temp()).
+  DELETE FROM cde.trajectory_points t USING _prune_candidates c
+  WHERE t.dataset_id = c.dataset_id AND t.erddap_url = c.erddap_url;
+
+  -- trajectory_track_stats has no FK (no crash) but is keyed on dataset_pk;
+  -- clear it too so pruned datasets leave no orphaned rows behind the
+  -- /trajectories/platforms list.
+  DELETE FROM cde.trajectory_track_stats s USING _prune_candidates c
+  WHERE s.dataset_pk = c.pk;
 
   DELETE FROM cde.skipped_datasets s USING _prune_candidates c
   WHERE s.dataset_id = c.dataset_id AND s.erddap_url = c.erddap_url;

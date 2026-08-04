@@ -6,7 +6,9 @@ import {
   createDataFilterQueryString,
   createSelectionQueryString
 } from '../utilities.jsx'
+import { dataLayersAreDefault } from './dataLayers.js'
 import { GROUP_NONE } from './datasetGroups.js'
+import { defaultTrailingDays } from '../components/config.js'
 import { useFilters } from './filters/FilterProvider.jsx'
 import { useMapState } from './map/MapStateProvider.jsx'
 import { useSelection } from './selection/SelectionProvider.jsx'
@@ -37,7 +39,15 @@ export default function UrlSync () {
   const navigate = useNavigate()
 
   const { query } = useFilters()
-  const { mapView } = useMapState()
+  const {
+    mapView,
+    tracksMode,
+    trajectoryHexes,
+    scrubTime,
+    debouncedScrubTime,
+    trailingDays,
+    dataLayers
+  } = useMapState()
   const {
     polygon,
     datasetTitleSearchText,
@@ -76,6 +86,25 @@ export default function UrlSync () {
       ...(dataset ? { dataset } : {}),
       ...(dataset && server ? { server } : {})
     }
+    // The trajectory view switches only mean anything while the layer is on,
+    // and each param records its non-default state: track lines default on, so
+    // 'tracks=false' is what needs saying; hexes default off, so 'trajHexes=true'.
+    if (dataLayers.trajectories) {
+      if (!tracksMode) obj.tracks = 'false'
+      if (trajectoryHexes) obj.trajHexes = 'true'
+    }
+    // The scrub window only drives the track tiles, so it rides along with them.
+    if (tracksMode && dataLayers.trajectories) {
+      obj.scrubTime = scrubTime
+      if (trailingDays !== defaultTrailingDays) obj.trail = trailingDays
+    }
+    // Data-layer selection persists only when not the default selection.
+    if (!dataLayersAreDefault(dataLayers)) {
+      obj.layers = Object.entries(dataLayers)
+        .filter(([, on]) => on)
+        .map(([key]) => key)
+        .join(',')
+    }
     const combined = new URLSearchParams(obj)
     // Replace, never push: this mirrors state the app never reads back out of
     // the URL, so an entry per map pan would only bury the history entries
@@ -88,7 +117,12 @@ export default function UrlSync () {
     datasetTitleSearchText,
     onlyInView,
     groupBy,
-    hiddenGroupsParam
+    hiddenGroupsParam,
+    tracksMode,
+    trajectoryHexes,
+    debouncedScrubTime,
+    trailingDays,
+    dataLayers
   ])
 
   useEffect(() => {

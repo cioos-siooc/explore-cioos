@@ -2,8 +2,9 @@
 
 These define the column contract that all harvesters must produce and the
 db-loader consumes. Column names and types mirror database/1_schema.sql where
-applicable — a schema change touches three places: this file, 1_schema.sql
-(fresh installs) and an idempotent database/migrations/*.sql (live DBs).
+applicable — a schema change touches two places: this file and 1_schema.sql
+(the canonical DDL, applied only on a fresh volume; table changes require a
+volume reset + re-harvest, there are no incremental table migrations).
 """
 
 import pandera as pa
@@ -111,6 +112,29 @@ class TrajectoryCellSchema(pa.DataFrameModel):
     n_profiles: Series[float] = pa.Field(nullable=True)
     records_per_day: Series[float] = pa.Field(nullable=True)
     days: Series[float] = pa.Field(nullable=True)
+
+    class Config:
+        coerce = True
+        strict = False
+
+
+class TrajectoryPointSchema(pa.DataFrameModel):
+    """Schema for the trajectory_points DataFrame.
+
+    Mirrors cde.trajectory_points in the database: one row per
+    (trajectory, retained fix) — ordered, downsampled RAW track positions
+    (per-profile fixes for TrajectoryProfile, first-fix-per-day for plain
+    Trajectory). The source for track-line rendering; unlike
+    TrajectoryCellSchema nothing here is grid-snapped or aggregated.
+    """
+
+    erddap_url: Series[str]
+    dataset_id: Series[str]
+    trajectory_id: Series[str] = pa.Field(nullable=True, default="")
+    profile_id: Series[str] = pa.Field(nullable=True)
+    time: Series[pa.DateTime]
+    latitude: Series[float] = pa.Field(ge=-90, le=90)
+    longitude: Series[float] = pa.Field(ge=-180, le=180)
 
     class Config:
         coerce = True

@@ -36,7 +36,9 @@ export default function DatasetsPanel () {
     handleSelectAllDatasets,
     setHoveredDataset,
     combinedQueries,
-    datasetsInViewPks
+    datasetsInViewPks,
+    selectedTrajectory,
+    setSelectedTrajectory
   } = useSelection()
 
   const filterSet = {
@@ -74,6 +76,8 @@ export default function DatasetsPanel () {
           setInspectRecordID={setInspectRecordID}
           filterSet={filterSet}
           query={combinedQueries}
+          selectedTrajectory={selectedTrajectory}
+          setSelectedTrajectory={setSelectedTrajectory}
           activeWmsOverlay={activeWmsOverlay}
           setActiveWmsOverlay={setActiveWmsOverlay}
         />

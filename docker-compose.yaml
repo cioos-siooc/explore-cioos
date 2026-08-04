@@ -45,16 +45,13 @@ services:
       # the grace well above that so expected early failures don't mark unhealthy.
       start_period: 180s
 
-  # One-shot: applies database/migrations/*.sql to the live DB before any other
-  # service reads or writes it. Postgres only runs database/*.sql on a FRESH
-  # volume (docker-entrypoint-initdb.d), so schema changes added to 1_schema.sql
-  # never reach an existing volume on their own — this closes that gap. The
-  # migrations are idempotent (ADD COLUMN IF NOT EXISTS ...), so applying them on
-  # every `up` is safe. After the migrations, the numbered function files
-  # (3_*.sql .. 9_*.sql) are re-applied: they are pure CREATE OR REPLACE
-  # FUNCTION, so live DBs pick up stored-procedure changes without every
-  # migration having to duplicate function bodies. 1_schema.sql is NEVER
-  # applied here (it DROPs tables). Exits cleanly once done ("Exited (0)").
+  # One-shot: re-applies the numbered function files (3_*.sql .. 9_*.sql)
+  # before any other service reads or writes the DB. They are pure CREATE OR
+  # REPLACE FUNCTION, so a live DB picks up stored-procedure changes on every
+  # `up`. Schema (table) changes are NOT migrated: 1_schema.sql only runs on a
+  # fresh volume (docker-entrypoint-initdb.d) — a schema change means dropping
+  # the volume and re-harvesting. 1_schema.sql is NEVER applied here (it DROPs
+  # tables). Exits cleanly once done ("Exited (0)").
   db_migrate:
     image: postgres:13-alpine
     depends_on:
@@ -75,7 +72,7 @@ services:
       - |
         set -e
         applied=0
-        for f in /database/migrations/*.sql /database/[3-9]_*.sql; do
+        for f in /database/[3-9]_*.sql; do
           [ -e "$$f" ] || continue
           echo "Applying: $$f"
           psql -v ON_ERROR_STOP=1 -f "$$f"
@@ -88,6 +85,13 @@ services:
     restart: always
     env_file:
       - .env
+    environment:
+      # Docker-network service names so the API reaches Postgres/Redis without a
+      # repo .env (Coolify supplies DB_NAME/USER/PASSWORD/PORT but not the hosts).
+      # web-api/db.js reads DB_HOST and utils/redis.js reads REDIS_HOST; both
+      # default to localhost when unset. Mirrors the prefect_worker service.
+      DB_HOST: db
+      REDIS_HOST: redis
     expose:
       - "5000"
     depends_on:

@@ -22,6 +22,7 @@ from cde_harvester.core.schemas import (
     ProfileSchema,
     SkippedDatasetSchema,
     TrajectoryCellSchema,
+    TrajectoryPointSchema,
 )
 
 SCHEMA_SQL = Path(__file__).resolve().parents[3] / "database" / "1_schema.sql"
@@ -31,6 +32,7 @@ SCHEMA_TO_TABLE = {
     ProfileSchema: "profiles",
     ObisCellSchema: "obis_cells",
     TrajectoryCellSchema: "trajectory_cells",
+    TrajectoryPointSchema: "trajectory_points",
     DatasetSchema: "datasets",
     SkippedDatasetSchema: "skipped_datasets",
     HarvestRunSchema: "harvest_runs",

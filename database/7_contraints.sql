@@ -14,8 +14,8 @@
    * the backfilled columns stay NULL-able and their "must be filled by
      end-of-load" guarantee is enforced by validate_loaded_data() below — a plain
      SELECT (ACCESS SHARE), so it never blocks or deadlocks readers;
-   * the hex FKs are DEFERRABLE INITIALLY DEFERRED (see 1_schema.sql +
-     migrations/relax-shared-table-constraints.sql), checked once at COMMIT.
+   * the hex FKs are DEFERRABLE INITIALLY DEFERRED (see 1_schema.sql), checked
+     once at COMMIT.
 
  With no per-run ALTER TABLE, the whole load path is DML (ROW EXCLUSIVE) and runs
  concurrently with readers. set_constraints()/drop_constraints() are retained as

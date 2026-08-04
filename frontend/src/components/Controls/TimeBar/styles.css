@@ -1,0 +1,95 @@
+/* Viewport-centered like the Datasets/Filters card at the top, so the two
+   read as one centered column over the map. */
+.timeBar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(720px, calc(100vw - 24px));
+  background-color: #fff;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  padding: 10px 20px 18px 20px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Clear the datasets bottom sheet on phones (same offset as the
+   zoom-to-dataset pill). */
+@media (max-width: 700px) {
+  .timeBar {
+    bottom: 64px;
+  }
+}
+
+/* The zoom-to-dataset pill shares the bottom-center spot; while the time bar
+   is shown (it renders just before the pill), lift the pill above it. */
+.timeBar ~ .zoomToDatasetButton.floating {
+  bottom: 110px;
+}
+
+.timeBarDate {
+  font-weight: 600;
+  font-size: 0.95rem;
+  min-width: 92px;
+  color: #6749ac;
+}
+
+.timeBarSlider {
+  flex: 1;
+  padding: 0 6px;
+  /* leave room for the year marks under the rail */
+  margin-bottom: 4px;
+}
+
+.timeBarSlider .rc-slider-track {
+  background-color: #6749ac;
+}
+
+.timeBarSlider .rc-slider-handle {
+  border-color: #6749ac;
+}
+
+.timeBarControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.timeBarTrail {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+/* Marks a trail that the zoom gate is currently clamping; the label carries
+   the explanation as a tooltip. */
+.timeBarTrailClamped {
+  margin-left: -3px;
+  color: #6749ac;
+  font-weight: 700;
+  cursor: help;
+}
+
+.timeBarTrailSelect {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  padding: 3px 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.timeBarSmoothing {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 0.85rem;
+  cursor: pointer;
+}

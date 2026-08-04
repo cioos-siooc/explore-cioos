@@ -12,6 +12,7 @@ from cde_harvester.core.schemas import (
     ProfileSchema,
     SkippedDatasetSchema,
     TrajectoryCellSchema,
+    TrajectoryPointSchema,
     VariableSchema,
     VerifiedDatasetSchema,
 )
@@ -29,6 +30,7 @@ class HarvestResult:
     skipped: DataFrame[SkippedDatasetSchema]
     obis_cells: DataFrame[ObisCellSchema] = None
     trajectory_cells: DataFrame[TrajectoryCellSchema] = None
+    trajectory_points: DataFrame[TrajectoryPointSchema] = None
     attempts: DataFrame[HarvestAttemptSchema] = None
     verified: DataFrame[VerifiedDatasetSchema] = None
 
@@ -38,6 +40,10 @@ class HarvestResult:
         if self.trajectory_cells is None:
             self.trajectory_cells = pd.DataFrame(
                 columns=TrajectoryCellSchema.to_schema().columns.keys()
+            )
+        if self.trajectory_points is None:
+            self.trajectory_points = pd.DataFrame(
+                columns=TrajectoryPointSchema.to_schema().columns.keys()
             )
         if self.attempts is None:
             self.attempts = pd.DataFrame(columns=HarvestAttemptSchema.to_schema().columns.keys())
@@ -53,6 +59,7 @@ class HarvestResult:
             ("skipped", SkippedDatasetSchema),
             ("obis_cells", ObisCellSchema),
             ("trajectory_cells", TrajectoryCellSchema),
+            ("trajectory_points", TrajectoryPointSchema),
             ("attempts", HarvestAttemptSchema),
         ]:
             df = getattr(self, name)

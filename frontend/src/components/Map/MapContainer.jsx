@@ -23,7 +23,12 @@ export default function MapContainer () {
     projection,
     basemap,
     zoomTarget,
-    mapRef
+    mapRef,
+    tracksMode,
+    trajectoryHexes,
+    debouncedScrubTime,
+    trailingDays,
+    dataLayers
   } = useMapState()
   const {
     polygon,
@@ -31,7 +36,9 @@ export default function MapContainer () {
     setPointsToReview,
     hoveredDataset,
     setHoveredDataset,
-    inspectDataset
+    inspectDataset,
+    selectedTrajectory,
+    selectTrajectoryFromMap
   } = useSelection()
 
   return (
@@ -50,6 +57,13 @@ export default function MapContainer () {
       hoveredDataset={hoveredDataset}
       inspectDataset={inspectDataset}
       setDatasetsSelected={setDatasetsSelected}
+      tracksMode={tracksMode}
+      trajectoryHexes={trajectoryHexes}
+      scrubTime={debouncedScrubTime}
+      trailingDays={trailingDays}
+      selectedTrajectory={selectedTrajectory}
+      selectTrajectoryFromMap={selectTrajectoryFromMap}
+      dataLayers={dataLayers}
       griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
       dataLayersVisible={dataLayersVisible}
       activeWmsOverlay={activeWmsOverlay}

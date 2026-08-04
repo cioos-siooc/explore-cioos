@@ -66,6 +66,18 @@ export function abbreviateString (text, maxLength) {
   }
 }
 
+// For strings interpolated into popup.setHTML() markup: dataset titles and
+// trajectory ids come from harvested (third-party) metadata, so anything
+// markup-significant must be neutralized before it reaches the DOM.
+export function escapeHtml (text) {
+  return String(text ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
 export function validateEmail(email) {
   const re =
     /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
@@ -595,4 +607,92 @@ export function splitLines(s) {
       {split.slice(1).join(' ')}
     </span>
   )
+}
+
+// Split an ordered [lon, lat] coordinate run where consecutive fixes jump
+// more than 180 degrees of longitude (antimeridian crossing) so a track
+// never draws a line looping around the globe. Returns an array of runs.
+export function splitAtAntimeridian(coords) {
+  if (!coords || coords.length === 0) return []
+  const runs = [[coords[0]]]
+  for (let i = 1; i < coords.length; i++) {
+    if (Math.abs(coords[i][0] - coords[i - 1][0]) > 180) {
+      runs.push([coords[i]])
+    } else {
+      runs[runs.length - 1].push(coords[i])
+    }
+  }
+  return runs
+}
+
+// Split an ordered [lon, lat] track into runs, three break conditions
+// (mirrors the segs CTE in web-api /tiles/tracks so the selected-platform
+// view and the tile layer segment identically):
+//   1. antimeridian crossing (consecutive fixes jump >180 deg of longitude);
+//   2. large time gap — over 4x the track's MEDIAN inter-fix gap (its
+//      typical reporting cadence, robust to idle periods — a mean would let
+//      a vessel idle between short cruises draw between-cruise connector
+//      chords), floored at 48h: an Argo float's ~10-day cycles never split,
+//      a ship dark for months between expeditions always does;
+//   3. outage chord — >50km between fixes closer than 96h in time. The
+//      harvester densifies data-backed chords to <=25km, so a long chord on
+//      a sub-96h gap is a reporting outage on a fast platform: the true
+//      path is unknown, draw nothing rather than a chord through
+//      possibly-land. The 96h guard protects slow reporters (Argo drifts
+//      30-100km per cycle) from being shredded by this condition.
+// `times` is the parallel timestamp array from /trajectories/track; without
+// it (or under 2 fixes) this degrades to the antimeridian-only split.
+export function splitTrackRuns(coords, times) {
+  if (!coords || coords.length === 0) return []
+  if (!times || times.length !== coords.length || coords.length < 2) {
+    return splitAtAntimeridian(coords)
+  }
+  const ms = times.map((t) => new Date(t).getTime())
+  const sortedGaps = ms
+    .slice(1)
+    .map((t, i) => t - ms[i])
+    .sort((a, b) => a - b)
+  const medianGapMs = sortedGaps[Math.floor(sortedGaps.length / 2)]
+  const gapMs = Math.max(medianGapMs * 4, 48 * 3600 * 1000)
+
+  const chordKm = (a, b) => {
+    const rad = Math.PI / 180
+    const p1 = a[1] * rad
+    const p2 = b[1] * rad
+    const h =
+      Math.sin(((b[1] - a[1]) * rad) / 2) ** 2 +
+      Math.cos(p1) * Math.cos(p2) * Math.sin(((b[0] - a[0]) * rad) / 2) ** 2
+    return 2 * 6371 * Math.asin(Math.sqrt(h))
+  }
+
+  const runs = [[coords[0]]]
+  for (let i = 1; i < coords.length; i++) {
+    const dtMs = ms[i] - ms[i - 1]
+    if (
+      Math.abs(coords[i][0] - coords[i - 1][0]) > 180 ||
+      dtMs > gapMs ||
+      (chordKm(coords[i - 1], coords[i]) > 50 && dtMs < 96 * 3600 * 1000)
+    ) {
+      runs.push([coords[i]])
+    } else {
+      runs[runs.length - 1].push(coords[i])
+    }
+  }
+  return runs
+}
+
+// Initial great-circle bearing from [lon, lat] point a to point b, in
+// degrees clockwise from north, [0, 360). Returns null for coincident
+// points (direction undefined). The frontend twin of the ST_Azimuth-based
+// cog the /tiles/tracks heads layer carries.
+export function initialBearing(a, b) {
+  if (a[0] === b[0] && a[1] === b[1]) return null
+  const rad = Math.PI / 180
+  const p1 = a[1] * rad
+  const p2 = b[1] * rad
+  const dl = (b[0] - a[0]) * rad
+  const y = Math.sin(dl) * Math.cos(p2)
+  const x =
+    Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl)
+  return (Math.atan2(y, x) / rad + 360) % 360
 }

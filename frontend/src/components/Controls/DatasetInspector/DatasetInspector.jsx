@@ -50,12 +50,19 @@ export default function DatasetInspector({
   setInspectRecordID,
   filterSet,
   query,
+  selectedTrajectory,
+  setSelectedTrajectory,
   activeWmsOverlay,
   setActiveWmsOverlay
 }) {
   const { t } = useTranslation()
   const [datasetRecords, setDatasetRecords] = useState()
   const [recordFilterText, setRecordFilterText] = useState('')
+  const [trajectoryPlatforms, setTrajectoryPlatforms] = useState()
+  const [platformFilterText, setPlatformFilterText] = useState('')
+  // Mirrors the platform table's rows-per-page so the page holding a
+  // map-picked platform is computed against the size the user is actually on.
+  const [platformRowsPerPage, setPlatformRowsPerPage] = useState(100)
   const inspectorRef = useRef(null)
   const isGrid = dataset.cdm_data_type === 'Grid'
   // no per-record list for OBIS (external) or griddap (metadata-only)
@@ -78,10 +85,14 @@ export default function DatasetInspector({
     }
     setBackClicked(true)
     setInspectDataset()
+    if (setSelectedTrajectory) setSelectedTrajectory()
   }
   // const platformColor = platformColors.filter(
   //   (pc) => pc.platform === dataset.platform
   // )
+  const isTrajectoryDataset =
+    dataset.source_type !== 'obis' &&
+    (dataset.cdm_data_type || '').includes('Trajectory')
 
   useEffect(() => {
     if (!hasRecordList) {
@@ -115,6 +126,19 @@ export default function DatasetInspector({
     return () => {
       cancelled = true
     }
+  }, [dataset])
+
+  // Trajectory datasets: list the platforms (trajectory ids) so one can be
+  // picked to draw its full track on the map.
+  useEffect(() => {
+    if (!isTrajectoryDataset) {
+      setTrajectoryPlatforms()
+      return
+    }
+    fetch(`${server}/trajectories/platforms?datasetPKs=${dataset.pk}`)
+      .then((response) => (response.ok ? response.json() : []))
+      .then((platforms) => setTrajectoryPlatforms(platforms))
+      .catch(() => setTrajectoryPlatforms([]))
   }, [dataset])
 
   // Browser Back needs no handling here: the open dataset lives in the URL
@@ -249,6 +273,56 @@ export default function DatasetInspector({
     }
   ]
   const data = filterRows(datasetRecords?.profiles, recordFilterText)
+
+  const platformColumns = [
+    {
+      name: splitLines(t('trajectoryPlatformIdText')),
+      selector: (row) => row.trajectory_id,
+      sortable: true,
+      wrap: true,
+      width: '130px'
+    },
+    {
+      name: splitLines(t('timeSelectorStartDate')),
+      selector: (row) => row.time_min?.split('T')[0],
+      sortable: true,
+      wrap: true,
+      width: dataColumnWith
+    },
+    {
+      name: splitLines(t('timeSelectorEndDate')),
+      selector: (row) => row.time_max?.split('T')[0],
+      sortable: true,
+      wrap: true,
+      width: dataColumnWith
+    },
+    {
+      name: splitLines(t('trajectoryPlatformFixesText')),
+      selector: (row) => row.n_points,
+      sortable: true,
+      wrap: true,
+      width: dataColumnWith
+    }
+  ]
+
+  // A platform picked on the map (rather than from this table) can sit on any
+  // page of it — turn to the page holding it, so the highlighted row is one the
+  // user can actually see. Rows render in the order the API returned them, so a
+  // row's index is its position in this list; a column sort the user applied
+  // reorders them and can land the jump a page off, which paging fixes.
+  // filterRows passes a null row list straight through, and this runs before the
+  // platforms fetch resolves (and for datasets that never have any).
+  const platformRows = filterRows(trajectoryPlatforms, platformFilterText) || []
+  const selectedPlatformIndex =
+    selectedTrajectory?.datasetPk === dataset.pk
+      ? platformRows.findIndex(
+        (row) => row.trajectory_id === selectedTrajectory.trajectoryId
+      )
+      : -1
+  const selectedPlatformPage =
+    selectedPlatformIndex < 0
+      ? 1
+      : Math.floor(selectedPlatformIndex / platformRowsPerPage) + 1
 
   const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet
 
@@ -416,6 +490,61 @@ export default function DatasetInspector({
             activeWmsOverlay={activeWmsOverlay}
             setActiveWmsOverlay={setActiveWmsOverlay}
           />
+        )}
+        {isTrajectoryDataset && trajectoryPlatforms?.length > 0 && (
+          <div className='recordSection'>
+            <div className='recordSectionHeader'>
+              <strong>{t('trajectoryPlatformsTitle')}</strong>
+              <span className='recordHint'>
+                {t('trajectoryPlatformsClickText')}
+              </span>
+            </div>
+            <div className='recordTableScroll'>
+              <TableFilter
+                value={platformFilterText}
+                onChange={setPlatformFilterText}
+                placeholder={t('trajectoryPlatformsSearchPlaceholder')}
+              />
+              <DataTable
+                onRowClicked={(row) =>
+                  setSelectedTrajectory &&
+                  setSelectedTrajectory(
+                    selectedTrajectory?.trajectoryId === row.trajectory_id
+                      ? undefined // click the active row again to clear
+                      : {
+                        datasetPk: dataset.pk,
+                        datasetTitle: dataset.title,
+                        trajectoryId: row.trajectory_id
+                      }
+                  )
+                }
+                striped
+                pointerOnHover
+                conditionalRowStyles={[
+                  {
+                    when: (row) =>
+                      selectedTrajectory?.datasetPk === dataset.pk &&
+                      selectedTrajectory?.trajectoryId === row.trajectory_id,
+                    style: { backgroundColor: '#d5c9ee' }
+                  }
+                ]}
+                columns={platformColumns}
+                data={platformRows}
+                defaultSortField='trajectory_id'
+                pagination
+                paginationPerPage={platformRowsPerPage}
+                paginationDefaultPage={selectedPlatformPage}
+                onChangeRowsPerPage={setPlatformRowsPerPage}
+                paginationRowsPerPageOptions={[100, 150, 200, 250]}
+                paginationComponentOptions={{
+                  rowsPerPageText: t('tableComponentRowsPerPage'),
+                  rangeSeparatorText: t('tableComponentOf'),
+                  selectAllRowsItem: false
+                }}
+                highlightOnHover
+              />
+            </div>
+          </div>
         )}
         {hasRecordList && (
           <div className='recordSection'>

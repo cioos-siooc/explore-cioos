@@ -14,9 +14,12 @@ import {
   colorScale,
   trajectoryColorScale,
   obisColorScale,
-  mixedColorScale
+  mixedColorScale,
+  TRAIL_ALL,
+  effectiveTrailingDays
 } from '../../config.js'
 import platformColors from '../../platformColors'
+import { DEFAULT_DATA_LAYERS } from '../../../state/dataLayers.js'
 import Spinner from '../../ui/Spinner.jsx'
 import Switch from '../../ui/Switch.jsx'
 import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
@@ -56,9 +59,14 @@ export default function Legend({
   zoom,
   platformsAvailable = [],
   layerControls = [],
+  dataLayerControls = [],
   basemapOptions = [],
   basemap,
-  onBasemapChange
+  onBasemapChange,
+  tracksMode,
+  trajectoryHexes,
+  trailingDays,
+  dataLayers
 }) {
   const { t } = useTranslation()
   const [legendOpen, setLegendOpen] = useState(true)
@@ -67,6 +75,18 @@ export default function Legend({
   const [layersOpen, setLayersOpen] = useState(
     () => !window.matchMedia('(max-width: 900px)').matches
   )
+
+  // Fall back to the default selection when the prop is absent (older callers /
+  // initial render) — all-on would claim legend entries the map isn't drawing.
+  const layers = dataLayers || DEFAULT_DATA_LAYERS
+  // The combined green ramp / platform points carry the profile-family types
+  // + OBIS, plus trajectory coverage when its hex view is on.
+  const showPointRamp =
+    layers.profile ||
+    layers.timeseries ||
+    layers.timeseriesProfile ||
+    layers.obis ||
+    (layers.trajectories && trajectoryHexes)
 
   // Continuous color bar for a hex ramp. The hex counts follow a non-linear
   // (power/log) scale, so the colors are spaced evenly by their scale index
@@ -118,6 +138,9 @@ export default function Legend({
   )
 
   function generateLegendElements() {
+    // The point/hex data types are all toggled off — nothing for this ramp to
+    // describe (the coverage sections below have their own gating).
+    if (!showPointRamp) return null
     // /legend is still in flight and there's no ramp from a previous query to
     // fall back on: the counts are unknown, not zero. Saying "No Data" here
     // (as this did) tells the user their filters excluded everything, which is
@@ -201,29 +224,102 @@ export default function Legend({
     }
   }
 
-  // Trajectory and OBIS coverage always render as hexes, and share one map
-  // layer — a hex is coloured by which of the two it holds, or by a third
-  // ramp when it holds both. The mixed ramp runs on the occurrence count (see
-  // coverageHexFillColor in Map.jsx), so it reuses the OBIS range.
-  function generateCoverageLegendElements() {
+  // The trajectory entries: a track-line/arrowhead key and a coverage-hex ramp,
+  // one per view switch. Both switches are independent, so this emits both keys
+  // when both are on and nothing when neither is.
+  function generateTrajectoryLegendElements() {
+    // Trajectory layer hidden entirely — no trajectory legend.
+    if (!layers.trajectories) return null
     return (
       <>
-        {!isEmpty(currentTrajectoryRangeLevel) &&
+        {tracksMode && renderTrackLineKey()}
+        {trajectoryHexes &&
+          !isEmpty(currentTrajectoryRangeLevel) &&
           renderColorBar(
             t('legendTrajectoriesPerHex'),
             trajectoryColorScale,
             currentTrajectoryRangeLevel,
             'trajectories'
           )}
-        {!isEmpty(currentObisRangeLevel) &&
+      </>
+    )
+  }
+
+  // The track-line + heading-arrow swatches, matching what the map draws. The
+  // window shown is the one actually loaded, not the one requested: zoomed out,
+  // the long trails are clamped (see effectiveTrailingDays), and a key that
+  // still claimed "All time" there would be wrong.
+  function renderTrackLineKey() {
+    const loadedTrail = effectiveTrailingDays(trailingDays, zoom)
+    const zoomClamped = loadedTrail !== trailingDays
+    const trailLabel =
+      loadedTrail === TRAIL_ALL ? t('timeBarTrailAll') : `${loadedTrail}d`
+    return (
+      <div className='legendSection' key='tracks'>
+        <div className='legendSectionCaption'>{t('layerTrajectories')}</div>
+        <div className='legendItems'>
+          <div
+            className='legendItem'
+            title={zoomClamped ? t('legendTrackTrailZoomGated') : undefined}
+          >
+            <svg className='legendSwatch' width='12' height='12'>
+              <line
+                x1='1'
+                y1='10.5'
+                x2='11'
+                y2='1.5'
+                stroke='#6749AC'
+                strokeWidth='2.5'
+                strokeLinecap='round'
+              />
+            </svg>
+            <span className='legendItemLabel'>
+              {`${t('legendTrackLine')} (${trailLabel}${zoomClamped ? '*' : ''})`}
+            </span>
+          </div>
+          <div className='legendItem'>
+            {/* same arrowhead the map draws, pointing along the course */}
+            <svg className='legendSwatch' width='12' height='12' viewBox='0 0 16 16'>
+              <path
+                d='M8 1.5 L13.5 13.5 L8 10.5 L2.5 13.5 Z'
+                fill='#6749AC'
+                stroke='#ffffff'
+                strokeWidth='1.5'
+                strokeLinejoin='round'
+                transform='rotate(45 8 8)'
+              />
+            </svg>
+            <span className='legendItemLabel'>{t('legendTrackHead')}</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Trajectory and OBIS coverage both render as hexes, and share one map
+  // layer — a hex is coloured by which of the two it holds, or by a third
+  // ramp when it holds both. The mixed ramp runs on the occurrence count (see
+  // coverageHexFillColor in Map.jsx), so it reuses the OBIS range. With the
+  // trajectory hex view off the cells tiles carry no trajectory counts, so only
+  // the OBIS ramp can apply then.
+  function generateCoverageLegendElements() {
+    const showObisRamp = layers.obis && !isEmpty(currentObisRangeLevel)
+    const showTrajectoryHexes =
+      layers.trajectories &&
+      trajectoryHexes &&
+      !isEmpty(currentTrajectoryRangeLevel)
+    return (
+      <>
+        {generateTrajectoryLegendElements()}
+        {showObisRamp &&
           renderColorBar(
             t('legendOccurrencesPerHex'),
             obisColorScale,
             currentObisRangeLevel,
             'occurrences'
           )}
-        {!isEmpty(currentTrajectoryRangeLevel) &&
-          !isEmpty(currentObisRangeLevel) &&
+        {showTrajectoryHexes &&
+          showObisRamp &&
           renderColorBar(
             t('legendMixedPerHex'),
             mixedColorScale,
@@ -269,7 +365,9 @@ export default function Legend({
         )}
       </div>
 
-      {(layerControls.length > 0 || basemapOptions.length > 0) && (
+      {(layerControls.length > 0 ||
+        dataLayerControls.length > 0 ||
+        basemapOptions.length > 0) && (
         <div className={classNames('legendGroup', { closed: !layersOpen })}>
           {renderGroupHeader(t('layersMenuTitle'), layersOpen, () =>
             setLayersOpen(!layersOpen)
@@ -313,6 +411,28 @@ export default function Legend({
                   />
                 ))}
               </div>
+              {dataLayerControls.length > 0 && (
+                <>
+                  <span className='legendSectionCaption'>
+                    {t('layerSelectorLabel')}
+                  </span>
+                  <div className='legendLayerItems'>
+                    {dataLayerControls.map((control) => (
+                      <div
+                        key={control.key}
+                        className={control.sub ? 'legendLayerSub' : undefined}
+                      >
+                        <Switch
+                          id={`dataLayer-${control.key}`}
+                          label={control.label}
+                          checked={control.checked}
+                          onChange={control.onChange}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
