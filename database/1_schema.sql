@@ -3,6 +3,15 @@
  
  */
 
+-- NOTE: Postgres runs this file ONCE, on a fresh volume, and db_migrate never
+-- re-applies it (the DROP TABLEs below would wipe live data). So a column added
+-- here reaches new databases only.
+-- THIS PROJECT IS FRESH-ONLY: there are no incremental table migrations. A
+-- schema change here means a volume reset + re-harvest, not a migration file.
+-- The cost of forgetting that is real — datasets.source_type / .obis_nodes went
+-- missing on a database carried across a schema change and took down /obisNodes
+-- + /erddapServers, so redeploy against a fresh volume rather than an old one.
+
 
 -- We are using features from PostGIS 3
 CREATE EXTENSION IF NOT EXISTS postgis;
@@ -523,9 +532,8 @@ CREATE TABLE cde.harvest_runs (
 );
 CREATE INDEX harvest_runs_started_at_idx
     ON cde.harvest_runs (started_at DESC);
--- NOTE: applying this file DROP/CREATEs harvest_runs (wiping audit history). To
--- add the columns above to a LIVE database without dropping it, run the
--- idempotent migration in database/migrations/add-harvest-run-prefect-columns.sql.
+-- NOTE: applying this file DROP/CREATEs harvest_runs, wiping audit history —
+-- expected under the fresh-only model (see the note at the top of this file).
 
 CREATE TABLE cde.harvest_attempts (
     run_id        uuid NOT NULL REFERENCES cde.harvest_runs(run_id) ON DELETE CASCADE,
