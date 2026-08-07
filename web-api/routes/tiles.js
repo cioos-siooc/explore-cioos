@@ -341,10 +341,12 @@ router.get(
     const branches = [];
     if (includeProfiles) branches.push(trajectoryBranch);
     if (includeObis) branches.push(obisBranch);
-    // Guard: if nothing to show, return an empty CTE that still has the right columns
+    // Guard: if nothing to show, return an empty CTE that still has the right
+    // columns. Wrapped in a subquery so it holds even when trajectoryBranch
+    // carries its own WHERE (the tile prefilter, present from z3 up).
     const combinedInner = branches.length
       ? branches.join("\n    UNION ALL\n    ")
-      : `${trajectoryBranch} WHERE FALSE`;
+      : `SELECT * FROM (${trajectoryBranch}) empty_combined WHERE FALSE`;
 
     // The tile-envelope test is applied BEFORE the aggregation (hexes are
     // disjoint, so filtering hexes before or after grouping yields identical
