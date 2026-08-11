@@ -27,6 +27,7 @@ import fetchJson from '../fetchJson.js'
 import usePersistentState from '../usePersistentState.js'
 import { useFilters } from '../filters/FilterProvider.jsx'
 import {
+  ALL_DATA_LAYERS,
   DATA_LAYER_KEYS,
   DEFAULT_DATA_LAYERS,
   DEFAULT_TRACKS_MODE,
@@ -178,7 +179,7 @@ export default function MapStateProvider ({ children }) {
   })
 
   // Data-type layers shown on the map. Absent `layers` param = the default
-  // selection (OBIS and trajectories off — see DEFAULT_DATA_LAYERS); a present
+  // selection (everything but trajectories — see DEFAULT_DATA_LAYERS); a present
   // param is the comma list of enabled layers, so a non-default selection
   // round-trips through the URL. An empty param means all off, which is why
   // this tests for null rather than falsiness.
@@ -215,6 +216,25 @@ export default function MapStateProvider ({ children }) {
     setTrajectoryViews(!tracksMode, trajectoryHexes)
   const toggleTrajectoryHexes = () =>
     setTrajectoryViews(tracksMode, !trajectoryHexes)
+
+  // Back to the default selection, and to the default trajectory views with it
+  // — the sub-switches are part of what "reset" means here, and leaving them on
+  // whatever the user last chose would make the reset only half true. Backs the
+  // filter row's Reset and the data-layer chip's remove-all.
+  function resetDataLayers () {
+    setDataLayers(DEFAULT_DATA_LAYERS)
+    setTracksMode(DEFAULT_TRACKS_MODE)
+    setTrajectoryHexes(DEFAULT_TRAJECTORY_HEXES)
+  }
+
+  // Every layer on. The trajectory views come along for the same reason they do
+  // on the single toggle: a trajectories layer drawing neither representation
+  // would be on in name only.
+  function showAllDataLayers () {
+    setDataLayers(ALL_DATA_LAYERS)
+    setTracksMode(DEFAULT_TRACKS_MODE)
+    setTrajectoryHexes(DEFAULT_TRAJECTORY_HEXES)
+  }
 
   const { zoom } = mapView
 
@@ -334,6 +354,8 @@ export default function MapStateProvider ({ children }) {
     setTrailingDays,
     dataLayers,
     toggleDataLayer,
+    resetDataLayers,
+    showAllDataLayers,
     griddapCoverage,
     activeWmsOverlay,
     setActiveWmsOverlay,

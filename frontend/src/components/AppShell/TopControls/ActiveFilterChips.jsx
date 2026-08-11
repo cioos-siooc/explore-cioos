@@ -12,7 +12,13 @@ import {
   defaultStartDepth,
   defaultEndDepth
 } from '../../config.js'
+import {
+  DATA_LAYER_KEYS,
+  DATA_LAYER_LABEL_KEYS,
+  dataLayersAreDefault
+} from '../../../state/dataLayers.js'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
+import { useMapState } from '../../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
 
@@ -30,6 +36,7 @@ function filterNameForKey (key, t) {
   case 'time': return t('timeframeFilterName')
   case 'depth': return t('depthRangeFilterName')
   case 'scientificName': return 'scientificNameFilterName'
+  case 'dataLayers': return 'layerSelectorLabel'
   default: return undefined
   }
 }
@@ -59,6 +66,7 @@ export default function ActiveFilterChips () {
     setOnlyInView
   } = useSelection()
   const { setShowFiltersModal, setOpenFilter, setSidebarOpen } = useUI()
+  const { dataLayers, toggleDataLayer, resetDataLayers } = useMapState()
 
   // The chips can be collapsed behind a Show/Hide toggle. They start hidden on
   // phones — where they would eat most of the map — and shown on desktop. The
@@ -85,7 +93,42 @@ export default function ActiveFilterChips () {
     '(m)'
   )
 
+  // The data-layer selection, announced only when it is not the default — the
+  // default is the map everyone gets, and a chip for it would be permanent
+  // furniture rather than a filter the user set.
+  //
+  // The items are the layers being HELD BACK, not the ones drawn. Most of the
+  // five are on in any normal selection, so listing what shows would put a
+  // five-item scroller in the chip row to report a one-switch change, and the
+  // deviation is both shorter and the thing actually worth saying. It also
+  // gives the x a sane meaning — dropping a "Trajectories" chip stops hiding
+  // trajectories, the same way dropping any other chip widens the query.
+  // Nothing hidden (everything on) is still non-default, and says so in one
+  // item rather than listing all five.
+  const hiddenDataLayers = DATA_LAYER_KEYS.filter((key) => !dataLayers[key])
+  const dataLayersFilter = !dataLayersAreDefault(dataLayers) && {
+    key: 'dataLayers',
+    label: hiddenDataLayers.length
+      ? t('dataLayersHiddenChip')
+      : t('layerSelectorLabel'),
+    removeAll: resetDataLayers,
+    items: hiddenDataLayers.length
+      ? hiddenDataLayers.map((key) => ({
+        id: key,
+        label: t(DATA_LAYER_LABEL_KEYS[key]),
+        remove: () => toggleDataLayer(key)
+      }))
+      : [
+        {
+          id: 'all',
+          label: t('dataLayersAllChip'),
+          remove: resetDataLayers
+        }
+      ]
+  }
+
   const activeFilters = [
+    dataLayersFilter,
     ...buildActiveFilters({ timeframesBadgeTitle, depthRangeBadgeTitle }),
     datasetTitleSearchText && {
       key: 'search',
@@ -200,6 +243,7 @@ export default function ActiveFilterChips () {
           className='filterMenuReset'
           onClick={() => {
             resetFilters()
+            resetDataLayers()
             setPolygon()
             setDatasetTitleSearchText('')
           }}

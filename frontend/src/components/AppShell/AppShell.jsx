@@ -16,7 +16,6 @@ import Legend from '../Controls/Legend/Legend.jsx'
 import TimeBar from '../Controls/TimeBar/TimeBar.jsx'
 import WmsLegend from '../Controls/WmsLegend/WmsLegend.jsx'
 import IntroModal from '../Controls/IntroModal/IntroModal.jsx'
-import { DATA_LAYER_LABEL_KEYS } from '../../state/dataLayers.js'
 import { useMapState } from '../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../state/ui/UIProvider.jsx'
@@ -47,14 +46,11 @@ export default function AppShell () {
     setActiveWmsOverlay,
     tracksMode,
     trajectoryHexes,
-    toggleTrackLines,
-    toggleTrajectoryHexes,
     scrubTime,
     setScrubTime,
     trailingDays,
     setTrailingDays,
-    dataLayers,
-    toggleDataLayer
+    dataLayers
   } = useMapState()
   const { showIntroModal, setShowIntroModal, sidebarOpen } = useUI()
   const { inspectDataset, platformsAvailable } = useSelection()
@@ -88,44 +84,12 @@ export default function AppShell () {
     }
   ]
 
-  // Data-type layer switches (which data families draw on the map), shown in
-  // the legend card under the map-layer switches. Trajectories carry two
-  // display options — the track lines and the coverage hexes — which are how
-  // they draw rather than whether they show, so both render indented under (and
-  // only while) Trajectories is on. They are independent: either, both, or
-  // neither, and clearing the last one turns the parent switch off (see
-  // toggleTrackLines/toggleTrajectoryHexes in MapStateProvider).
-  const dataLayerControls = Object.entries(DATA_LAYER_LABEL_KEYS).map(
-    ([key, labelKey]) => ({
-      key,
-      label: t(labelKey),
-      checked: dataLayers[key],
-      onChange: () => toggleDataLayer(key)
-    })
-  )
-  if (dataLayers.trajectories) {
-    const trajectoriesIndex = dataLayerControls.findIndex(
-      (control) => control.key === 'trajectories'
-    )
-    dataLayerControls.splice(
-      trajectoriesIndex + 1,
-      0,
-      {
-        key: 'tracksMode',
-        label: t('layerTracksMode'),
-        checked: tracksMode,
-        onChange: toggleTrackLines,
-        sub: true
-      },
-      {
-        key: 'trajectoryHexes',
-        label: t('layerTrajectoryHexes'),
-        checked: trajectoryHexes,
-        onChange: toggleTrajectoryHexes,
-        sub: true
-      }
-    )
-  }
+  // The data-type switches (which families of data draw at all) used to sit
+  // below these, in the same card. They are a filter — the selection gates the
+  // datasets list and the counts as well as the map — so they now live in the
+  // Filters panel with the rest, and the legend keeps only the map-appearance
+  // switches. The legend still reads the selection to know which colour keys it
+  // is entitled to claim, which is what the props below are for.
 
   return (
     <>
@@ -153,7 +117,6 @@ export default function AppShell () {
         zoom={zoom}
         platformsAvailable={platformsAvailable}
         layerControls={layerControls}
-        dataLayerControls={dataLayerControls}
         tracksMode={tracksMode}
         trajectoryHexes={trajectoryHexes}
         trailingDays={trailingDays}

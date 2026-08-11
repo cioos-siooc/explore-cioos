@@ -197,21 +197,6 @@
   gap: 4px;
 }
 
-/* The data-layers group sits below the map-layer switches in the same card;
-   its caption doubles as the separator between the two switch groups. */
-.legendLayerItems + .legendSectionCaption {
-  display: block;
-  margin-top: 8px;
-  padding-top: 6px;
-  border-top: 1px solid var(--cioos-hairline);
-}
-
-/* A display option nested under its parent layer switch (e.g. "Show as track
-   lines" under Trajectories). */
-.legendLayerSub {
-  padding-left: 18px;
-}
-
 .legendLayerItems .form-check.form-switch {
   gap: 6px;
 }

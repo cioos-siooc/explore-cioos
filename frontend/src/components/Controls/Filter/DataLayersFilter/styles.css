@@ -1,0 +1,12 @@
+/* The layer list is short and fully visible — no scroll cap, unlike the
+   catalog-driven filters this shares .multiCheckboxFilter with. */
+.dataLayersFilter {
+  max-height: none;
+}
+
+/* The trajectory display options, nested under their parent layer. The indent
+   matches the OBIS node group in SourceFilter so the two nested lists in the
+   filter menu read the same way. */
+.dataLayersFilter .dataLayerSubOptions {
+  margin-left: 25px;
+}

@@ -68,7 +68,10 @@ function pickTickIndices(n, maxTicks = 5) {
 
 // Compact floating legend card (top-right). Two independently collapsible
 // groups: the legend proper (a hex color bar below z7, point size + platform
-// colors above) and the map-layer switches.
+// colors above) and the map-layer switches — how the map is drawn. Which data
+// families are drawn at all is a filter, and lives in the Filters panel; the
+// dataLayers prop is read here only to decide which colour keys this card is
+// entitled to show.
 export default function Legend({
   currentRangeLevel,
   currentTrajectoryRangeLevel,
@@ -77,7 +80,6 @@ export default function Legend({
   zoom,
   platformsAvailable = [],
   layerControls = [],
-  dataLayerControls = [],
   tracksMode,
   trajectoryHexes,
   trailingDays,
@@ -441,7 +443,7 @@ export default function Legend({
         )}
       </div>
 
-      {(layerControls.length > 0 || dataLayerControls.length > 0) && (
+      {layerControls.length > 0 && (
         <div className={classNames('legendGroup', { closed: !layersOpen })}>
           {renderGroupHeader(t('layersMenuTitle'), layersOpen, () =>
             setLayersOpen(!layersOpen)
@@ -459,28 +461,6 @@ export default function Legend({
                   />
                 ))}
               </div>
-              {dataLayerControls.length > 0 && (
-                <>
-                  <span className='legendSectionCaption'>
-                    {t('layerSelectorLabel')}
-                  </span>
-                  <div className='legendLayerItems'>
-                    {dataLayerControls.map((control) => (
-                      <div
-                        key={control.key}
-                        className={control.sub ? 'legendLayerSub' : undefined}
-                      >
-                        <Switch
-                          id={`dataLayer-${control.key}`}
-                          label={control.label}
-                          checked={control.checked}
-                          onChange={control.onChange}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
             </div>
           )}
         </div>

@@ -22,15 +22,16 @@ export const ALL_DATA_LAYERS = Object.fromEntries(
   DATA_LAYER_KEYS.map((key) => [key, true])
 )
 
-// What a first visit shows. The three profile-family types are the cheap,
-// broadly useful default; OBIS and trajectories are opt-in because each pulls
-// its own heavy tile set (trajectories additionally bring the track tiles and
-// the time scrub bar), and neither reads as "ocean observations" to a visitor
-// who came for CTD/mooring data. Off here means off everywhere — the map, the
-// datasets panel and the counts (see datasetInDataLayers).
+// What a first visit shows. The three profile-family types plus OBIS: the
+// biodiversity occurrences are a headline part of what the catalog holds, and
+// leaving them off meant a first visit under-reported the data by default.
+// Trajectories stay opt-in — they pull the heaviest tile set of the five (track
+// tiles on top of the coverage hexes) and bring the time scrub bar with them,
+// which is a different mode of reading the map rather than one more layer on
+// it. Off here means off everywhere — the map, the datasets panel and the
+// counts (see datasetInDataLayers).
 export const DEFAULT_DATA_LAYERS = {
   ...ALL_DATA_LAYERS,
-  obis: false,
   trajectories: false
 }
 
