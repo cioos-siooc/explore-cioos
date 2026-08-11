@@ -19,6 +19,8 @@
  * *below* FIRST_LABEL_LAYER_ID so labels always stay readable on top.
  */
 
+import { server } from '../../config'
+
 const OFM_TILEJSON = 'https://tiles.openfreemap.org/planet'
 const OFM_GLYPHS = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf'
 
@@ -28,6 +30,18 @@ const EMODNET_TILES =
 // Esri tile REST convention is {z}/{y}/{x} (y before x), unlike XYZ schemes.
 const ESRI_IMAGERY_TILES =
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+
+// CHS NONNA bathymetry, through our own API rather than direct. CHS allowlists
+// request origins exactly and 403s every other one — including the CORS
+// preflight — and MapLibre always sends an Origin for cross-origin tiles, so
+// the browser cannot fetch these itself. web-api/routes/nonna.js fetches them
+// server-side (no Origin header) and re-serves them same-origin; the reasoning
+// is written out there.
+const NONNA_100_TILES = `${server}/nonna/100/{z}/{x}/{y}.png`
+const NONNA_10_TILES = `${server}/nonna/10/{z}/{x}/{y}.png`
+
+const CHS_ATTRIBUTION =
+  'Bathymetry © <a href="https://www.charts.gc.ca/data-gestion/index-eng.html">Canadian Hydrographic Service</a> (NONNA)'
 
 // Attribution for OpenFreeMap's OSM-derived vector data (coastline, rivers,
 // boundaries, labels).
@@ -110,6 +124,39 @@ export function buildBasemapStyle (lang = 'en') {
         // Matches the bathymetry's muting so full-colour imagery doesn't shout
         // against the pastel palette everything else in the style shares.
         'raster-saturation': -0.15
+      }
+    },
+    // Depth, back on top of the satellite. NONNA is transparent over land and
+    // anywhere CHS holds no soundings, so unlike the EMODnet raster it can be
+    // laid straight over the imagery without needing to be clipped to water —
+    // which MapLibre cannot do for a raster anyway. That is what makes the
+    // ocean readable at zooms where EMODnet has already faded out.
+    //
+    // Two products, because their coverage and resolution trade off: NONNA 100
+    // (100 m) is the broad one and carries the whole fade, NONNA 10 (10 m) is
+    // sharp enough to show wharves and dredged channels but only exists over
+    // surveyed ground, so it joins at z13 where 100 m starts looking blocky and
+    // simply contributes nothing where it has no data.
+    //
+    // The rainbow ramp is CHS's own, baked into the tiles: the layer is
+    // published as pre-rendered RGB rather than raw depths, so an SLD colour
+    // map cannot restyle it server-side. Opacity is the tuning knob for now.
+    {
+      id: 'bathymetry-nonna-100',
+      type: 'raster',
+      source: 'nonna100',
+      minzoom: 10,
+      paint: {
+        'raster-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0, 12, 0.7]
+      }
+    },
+    {
+      id: 'bathymetry-nonna-10',
+      type: 'raster',
+      source: 'nonna10',
+      minzoom: 13,
+      paint: {
+        'raster-opacity': ['interpolate', ['linear'], ['zoom'], 13, 0, 14, 0.7]
       }
     },
     // Pulls the sea toward CIOOS teal and unifies the raster palette while
@@ -447,6 +494,21 @@ export function buildBasemapStyle (lang = 'en') {
         maxzoom: 17,
         attribution:
           'Imagery © <a href="https://www.esri.com">Esri</a>, Vantor, Earthstar Geographics'
+      },
+      // maxzoom 17 matches the camera cap; both products are served through the
+      // proxy, which answers a transparent tile wherever CHS has nothing.
+      nonna100: {
+        type: 'raster',
+        tiles: [NONNA_100_TILES],
+        tileSize: 256,
+        maxzoom: 17,
+        attribution: CHS_ATTRIBUTION
+      },
+      nonna10: {
+        type: 'raster',
+        tiles: [NONNA_10_TILES],
+        tileSize: 256,
+        maxzoom: 17
       },
       ofm: {
         type: 'vector',
