@@ -425,6 +425,38 @@ export default function CreateMap({
   }, colors)
   colors.push('#000000')
 
+  // --- Focused-dataset dimming -------------------------------------------
+  // Singling out one dataset greys every feature that doesn't belong to it.
+  // That used to be done by repainting the base layers flat grey and drawing
+  // the focused subset back on top through a filtered copy of each layer. Both
+  // halves of that are expensive in the same way: setFilter always reports the
+  // change as requiring a relayout, and setPaintProperty does too whenever the
+  // property is data-driven — which every colour ramp here is (MapLibre returns
+  // `isDataDriven || wasDataDriven` regardless of which direction the swap
+  // goes). A relayout re-sends every loaded tile of the source to the worker
+  // and rebuilds its buckets, so sweeping the dataset list re-tessellated the
+  // whole viewport once per row.
+  //
+  // Instead the grey is a feature-state flag the paint expressions carry from
+  // the start. The paint properties are set once at addLayer and never touched
+  // for focus, so a focus change is applied GPU-side with no worker round trip.
+  // It is the same mechanism griddap-coverage already uses for its hover, and
+  // it retires the three '-hovered' layers whose only job was to redraw the
+  // focused subset in colour over the greyed base.
+  const IS_DIMMED = ['boolean', ['feature-state', 'dimmed'], false]
+  const dimmable = (color) => ['case', IS_DIMMED, 'lightgrey', color]
+
+  // setFeatureState addresses a source and source-layer, not a style layer, so
+  // this maps the layers a focus can dim onto where their features live.
+  const focusTargets = {
+    points: { source: 'cde-tiles', sourceLayer: 'internal-layer-name' },
+    hexes: { source: 'cde-tiles', sourceLayer: 'internal-layer-name' },
+    'coverage-hexes': {
+      source: 'cde-cells',
+      sourceLayer: 'coverage-hexes-layer'
+    }
+  }
+
   useEffect(() => {
     setColorStops()
   }, [rangeLevels, trajectoryRangeLevels, obisRangeLevels])
@@ -553,20 +585,15 @@ export default function CreateMap({
       return [colorStop.stop, colorStop.color]
     })
 
-    // A focused dataset outranks the count ramp: greying everything else is
-    // what makes that dataset legible, so painting the ramp back over it here
-    // would silently undo the focus. This runs on zoomend and on every legend
-    // refetch — both of which a "zoom to dataset" click triggers — so without
-    // this the map un-greyed itself the moment the camera settled. The stops
-    // above are still refreshed, ready for when the focus clears.
-    if (focusedDatasetPk.current && layersLoaded.current) {
-      hoverHighlightPoints(focusedDatasetPk.current)
-      return
-    }
-
+    // The ramps and the focus used to fight each other: this runs on zoomend
+    // and on every legend refetch, so repainting the ramp here un-greyed a
+    // focused map the moment the camera settled, and the fix was to bail out
+    // early and re-apply the focus instead. Neither is needed now — the grey is
+    // a feature-state branch inside the ramp expressions (see dimmable), so a
+    // ramp refresh carries the focus through untouched.
     if (colorStops.current.length > 0) {
       if (map.current.getZoom() >= 7 && map.current.getLayer('points')) {
-        map.current.setPaintProperty('points', 'circle-color', colors)
+        map.current.setPaintProperty('points', 'circle-color', dimmable(colors))
       }
       // Always keep the hexes layer's stops populated, not just when zoomed
       // into the hex band — a reload while zoomed in (zoom >= 7) would
@@ -574,10 +601,11 @@ export default function CreateMap({
       // hidden above z7 anyway, and zoomend re-runs this to refine the z0/z1
       // band.
       if (map.current.getLayer('hexes')) {
-        map.current.setPaintProperty('hexes', 'fill-color', {
-          property: 'count',
-          stops: colorStops.current
-        })
+        map.current.setPaintProperty(
+          'hexes',
+          'fill-color',
+          dimmable(rampExpression(colorStops.current, 'count'))
+        )
       }
     }
 
@@ -585,7 +613,7 @@ export default function CreateMap({
       map.current.setPaintProperty(
         'coverage-hexes',
         'fill-color',
-        coverageHexFillColor()
+        dimmable(coverageHexFillColor())
       )
       map.current.setPaintProperty(
         'coverage-hexes',
@@ -598,82 +626,58 @@ export default function CreateMap({
   function hoverHighlightPoints(pk) {
     if (!map.current || !layersLoaded.current) return
 
-    // Which of the currently rendered features belong to the focused dataset.
-    // queryRenderedFeatures only sees what is on screen now, which is why this
-    // has to be re-run every time new tiles land (see the sourcedata handler).
+    // Which rendered features do NOT belong to the focused dataset — those are
+    // the ones that go grey. queryRenderedFeatures only sees what is on screen
+    // now, which is why this has to be re-run every time new tiles land (see
+    // the sourcedata handler). Below z7 a dataset's profiles are merged into
+    // the green 'hexes' aggregate; above it they are individual points.
     const pointLevel = map.current.getZoom() >= 7
-    const featurePksInDataset = (layer) =>
-      map.current
-        .queryRenderedFeatures({ layers: [layer] })
-        .filter((feature) =>
-          JSON.parse(feature.properties.datasets).includes(pk)
+    const dimmedLayers = [pointLevel ? 'points' : 'hexes', 'coverage-hexes']
+
+    const dimmed = {}
+    dimmedLayers.forEach((layerId) => {
+      if (!pk || !map.current.getLayer(layerId)) {
+        dimmed[layerId] = []
+        return
+      }
+      dimmed[layerId] = map.current
+        .queryRenderedFeatures({ layers: [layerId] })
+        .filter(
+          (feature) => !JSON.parse(feature.properties.datasets).includes(pk)
         )
-        .map((feature) => feature.properties.pk)
+        // promoteId puts pk on the feature id, which is what setFeatureState
+        // addresses.
+        .map((feature) => feature.id)
+    })
 
-    const focusedPks = pk
-      ? featurePksInDataset(pointLevel ? 'points' : 'hexes')
-      : []
-    const focusedCoveragePks = pk ? featurePksInDataset('coverage-hexes') : []
-
-    // Repainting makes the map fire the very events that re-run this, so a
-    // no-op has to stay a no-op or the map spins in a render loop. The zoom
-    // band is part of the signature because it decides which layer is greyed.
-    const signature = JSON.stringify([
+    // Writing the state makes the map fire the very events that re-run this
+    // (sourcedata, idle), so a no-op has to stay a no-op or the map spins in a
+    // render loop. The zoom band is part of the signature because it decides
+    // which layer is dimmed.
+    const signature = [
       pk,
       pointLevel,
-      focusedPks,
-      focusedCoveragePks
-    ])
+      ...dimmedLayers.map((layerId) => dimmed[layerId].join(','))
+    ].join('|')
     if (signature === appliedFocus.current) return
     appliedFocus.current = signature
 
-    if (pk) {
-      if (pointLevel) {
-        map.current.setPaintProperty('points', 'circle-color', 'lightgrey')
-        map.current.setPaintProperty(
-          'points-highlighted',
-          'circle-color',
-          'lightgrey'
-        )
-        map.current.setPaintProperty(
-          'points-highlighted',
-          'circle-stroke-width',
-          0
-        )
-        map.current.setFilter('points-hovered', ['in', 'pk', ...focusedPks])
-      } else {
-        map.current.setPaintProperty('hexes', 'fill-color', 'lightgrey')
-        map.current.setFilter('hexes-hovered', ['in', 'pk', ...focusedPks])
-      }
+    // Cleared wholesale rather than by tracking what was set last time: two
+    // calls, and they cannot drift out of step with the map. Both source layers
+    // are cleared every time, so the aggregate that isn't dimmed at this zoom
+    // can't keep stale state from the other side of the z7 hand-off. ('points'
+    // and 'hexes' share a source layer, so clearing one clears both.)
+    map.current.removeFeatureState(focusTargets.points)
+    map.current.removeFeatureState(focusTargets['coverage-hexes'])
 
-      map.current.setPaintProperty('coverage-hexes', 'fill-color', 'lightgrey')
-      map.current.setFilter('coverage-hexes-hovered', [
-        'in',
-        'pk',
-        ...focusedCoveragePks
-      ])
-    } else {
-      map.current.setFilter('points-hovered', ['in', 'pk', ''])
-      map.current.setPaintProperty('points', 'circle-color', colors)
-      map.current.setPaintProperty('points-highlighted', 'circle-color', colors)
-      map.current.setPaintProperty(
-        'points-highlighted',
-        'circle-stroke-width',
-        1
+    dimmedLayers.forEach((layerId) =>
+      dimmed[layerId].forEach((id) =>
+        map.current.setFeatureState(
+          { ...focusTargets[layerId], id },
+          { dimmed: true }
+        )
       )
-      map.current.setFilter('hexes-hovered', ['in', 'pk', ''])
-      map.current.setPaintProperty('hexes', 'fill-color', {
-        property: 'count',
-        stops: colorStops.current
-      })
-
-      map.current.setFilter('coverage-hexes-hovered', ['in', 'pk', ''])
-      map.current.setPaintProperty(
-        'coverage-hexes',
-        'fill-color',
-        coverageHexFillColor()
-      )
-    }
+    )
   }
 
   const emptyFeatureCollection = { type: 'FeatureCollection', features: [] }
@@ -704,15 +708,20 @@ export default function CreateMap({
   // gridded datasets covering the same water is the norm, not the exception.
   const hoveredGriddapIds = useRef([])
 
-  function griddapFeaturesAt(point) {
-    const features = map.current.queryRenderedFeatures(point, {
-      layers: ['griddap-coverage-fill']
-    })
+  function dedupeGriddapByPk(features) {
     const byPk = new Map()
     features.forEach((feature) => {
       if (!byPk.has(feature.properties.pk)) byPk.set(feature.properties.pk, feature)
     })
     return [...byPk.values()]
+  }
+
+  function griddapFeaturesAt(point) {
+    return dedupeGriddapByPk(
+      map.current.queryRenderedFeatures(point, {
+        layers: ['griddap-coverage-fill']
+      })
+    )
   }
 
   function setGriddapHovered(features) {
@@ -748,13 +757,10 @@ export default function CreateMap({
   // layers because the layer picker can hide them independently.
   const observationLayerIds = [
     'hexes',
-    'hexes-hovered',
     'points',
     'points-halo',
-    'points-hovered',
     'points-highlighted',
-    'coverage-hexes',
-    'coverage-hexes-hovered'
+    'coverage-hexes'
   ]
   // The track layers are deliberately NOT in observationLayerIds: the picker
   // switch reads as "hexes and points", and it used to hide the tracks too, so
@@ -1365,16 +1371,33 @@ export default function CreateMap({
       // Two shared vector sources for all point/hex layers. Each layer used to
       // carry its own inline source — six separate copies of the same two tile
       // pyramids, each fetched and parsed independently on every pan. The
-      // hover/highlight layers render nothing until a pk filter is set, and
-      // those pks always come from queryRenderedFeatures on the filtered
-      // layers, so sharing the filtered sources loses nothing.
+      // highlight layer renders nothing until a pk filter is set, and those pks
+      // always come from queryRenderedFeatures on the filtered layers, so
+      // sharing the filtered sources loses nothing.
+      //
+      // maxzoom stops at the level past which the server has nothing new to
+      // say: routes/tiles.js selects individual points for any z >= 7, so a z17
+      // tile is the same content as its z14 parent cut into 64 pieces — 64
+      // ST_AsMVT queries for one tile's worth of data. Capping the source lets
+      // MapLibre overzoom instead. Precision is unaffected in practice:
+      // ST_AsMVTGeom at extent 4096 over a z14 tile is ~0.42 m/unit at 45°N,
+      // finer than a z17 pixel (0.84 m). It matters more than the tile count
+      // suggests, because every filter change calls setTiles below, which drops
+      // the whole cache and refetches from scratch.
+      //
+      // promoteId lifts each feature's pk to its feature id, which is what
+      // setFeatureState addresses — see the focus dimming above.
       map.current.addSource('cde-tiles', {
         type: 'vector',
-        tiles: [tileQuery]
+        tiles: [tileQuery],
+        maxzoom: 14,
+        promoteId: 'pk'
       })
       map.current.addSource('cde-cells', {
         type: 'vector',
-        tiles: [cellTileQuery]
+        tiles: [cellTileQuery],
+        maxzoom: 14,
+        promoteId: 'pk'
       })
 
       // Every data layer is inserted below the basemap's label layers
@@ -1396,8 +1419,8 @@ export default function CreateMap({
             largeCircleSize,
             5
           ],
-          'circle-color': colors,
-          'circle-stroke-color': colors,
+          'circle-color': dimmable(colors),
+          'circle-stroke-color': dimmable(colors),
           'circle-stroke-opacity': 0.001,
           'circle-stroke-width': 10
         }
@@ -1419,26 +1442,9 @@ export default function CreateMap({
           'source-layer': 'coverage-hexes-layer',
           paint: {
             'fill-opacity': coverageHexOpacity,
-            'fill-color': coverageHexFillColor(),
+            'fill-color': dimmable(coverageHexFillColor()),
             'fill-outline-color': coverageHexOutlineColor()
           }
-        },
-        'points'
-      )
-
-      map.current.addLayer(
-        {
-          id: 'coverage-hexes-hovered',
-          type: 'fill',
-          minzoom: hexMaxZoom,
-          source: 'cde-cells',
-          'source-layer': 'coverage-hexes-layer',
-          paint: {
-            'fill-opacity': coverageHexOpacity,
-            'fill-color': coverageHexFillColor(),
-            'fill-outline-color': coverageHexOutlineColor()
-          },
-          filter: ['in', 'pk', '']
         },
         'points'
       )
@@ -1479,29 +1485,12 @@ export default function CreateMap({
 
         paint: {
           'fill-opacity': hexOpacity,
-          'fill-color': {
-            property: 'count',
-            stops: colorStops.current
-          }
+          // A real interpolate expression rather than the legacy
+          // { property, stops } paint function, because that form cannot be
+          // nested inside the 'case' dimmable wraps it in — the same reason
+          // coverageHexFillColor builds its ramps through rampExpression.
+          'fill-color': dimmable(rampExpression(colorStops.current, 'count'))
         }
-      }, FIRST_LABEL_LAYER_ID)
-
-      map.current.addLayer({
-        id: 'hexes-hovered',
-        type: 'fill',
-        minzoom: hexMinZoom,
-        maxzoom: hexMaxZoom,
-        source: 'cde-tiles',
-        'source-layer': 'internal-layer-name',
-
-        paint: {
-          'fill-opacity': hexOpacity,
-          'fill-color': {
-            property: 'count',
-            stops: colorStops.current
-          }
-        },
-        filter: ['in', 'pk', '']
       }, FIRST_LABEL_LAYER_ID)
 
       map.current.addLayer({
@@ -1511,7 +1500,7 @@ export default function CreateMap({
         source: 'cde-tiles',
         'source-layer': 'internal-layer-name',
         paint: {
-          'circle-color': colors,
+          'circle-color': dimmable(colors),
           'circle-opacity': circleOpacity,
           'circle-radius': [
             'case',
@@ -1522,28 +1511,10 @@ export default function CreateMap({
             5
           ],
           'circle-stroke-color': 'black',
-          'circle-stroke-width': 0.75
-        },
-        filter: ['in', 'pk', '']
-      }, FIRST_LABEL_LAYER_ID)
-
-      map.current.addLayer({
-        id: 'points-hovered',
-        type: 'circle',
-        minzoom: hexMaxZoom,
-        source: 'cde-tiles',
-        'source-layer': 'internal-layer-name',
-        paint: {
-          'circle-color': colors,
-          'circle-opacity': circleOpacity,
-          'circle-radius': [
-            'case',
-            ['<=', ['get', 'count'], 2],
-            smallCircleSize,
-            ['>', ['get', 'count'], 2],
-            largeCircleSize,
-            5
-          ]
+          // The selection ring is dropped on dimmed points: a focused dataset
+          // greys the rest of the map, and a black ring around a grey circle
+          // would still read as picked out.
+          'circle-stroke-width': ['case', IS_DIMMED, 0, 0.75]
         },
         filter: ['in', 'pk', '']
       }, FIRST_LABEL_LAYER_ID)
@@ -2000,33 +1971,44 @@ export default function CreateMap({
     // (where points appear) anywhere profiles are dense, which is most of the
     // coast. A track yields only to the circle the user can see, plus a pixel
     // or two of grace.
+    // These precedence tests come in pairs: an `…In` form that reads an
+    // already-queried set of features, and a wrapper that queries for it. The
+    // hover path runs one query per frame and uses the `…In` forms throughout
+    // (see the dispatcher below); the click handlers, which fire rarely enough
+    // for it not to matter, keep querying per test.
     const POINT_HIT_GRACE_PX = 2
+    const isOnAPointIn = (hits, point) =>
+      hits
+        .filter((feature) => feature.layer.id === 'points')
+        .some((feature) => {
+          const centre = map.current.project(feature.geometry.coordinates)
+          const radius =
+            (feature.properties.count <= 2 ? smallCircleSize : largeCircleSize) +
+            POINT_HIT_GRACE_PX
+          return (
+            (centre.x - point.x) ** 2 + (centre.y - point.y) ** 2 <= radius ** 2
+          )
+        })
     const isOnAPoint = (e) =>
-      renderedFeatures(e.point, ['points']).some((feature) => {
-        const centre = map.current.project(feature.geometry.coordinates)
-        const radius =
-          (feature.properties.count <= 2 ? smallCircleSize : largeCircleSize) +
-          POINT_HIT_GRACE_PX
-        return (
-          (centre.x - e.point.x) ** 2 + (centre.y - e.point.y) ** 2 <=
-          radius ** 2
-        )
-      })
+      isOnAPointIn(renderedFeatures(e.point, ['points']), e.point)
 
     // The track feature under a point, ranked by trackClickLayers rather than by
     // render order, so a head from one trajectory and a line from another under
-    // the same cursor resolve the same way every time (the track-lines hover
-    // handler makes the same hand-off). Doubles as the "is a track under the
+    // the same cursor resolve the same way every time (the hover dispatcher
+    // makes the same hand-off). Doubles as the "is a track under the
     // cursor" test the hex and griddap handlers use to stand aside: hidden
     // layers aren't hit-testable, so this is empty whenever the track-lines
     // switch is off and no tracksMode check is needed.
-    const trackFeatureAt = (point) =>
-      renderedFeatures(point, trackClickLayers)
+    const trackFeatureIn = (hits) =>
+      hits
+        .filter((feature) => trackClickLayers.includes(feature.layer.id))
         .sort(
           (a, b) =>
             trackClickLayers.indexOf(a.layer.id) -
             trackClickLayers.indexOf(b.layer.id)
         )[0]
+    const trackFeatureAt = (point) =>
+      trackFeatureIn(renderedFeatures(point, trackClickLayers))
 
     // One listener per track layer means a click on a head arrow sitting on its
     // own line delivers the same DOM event twice. Both deliveries land before
@@ -2079,179 +2061,6 @@ export default function CreateMap({
       )
     }
 
-    map.current.on('mousemove', (e) => {
-      setHoveredDataset()
-    })
-
-    map.current.on('mousemove', 'points', (e) => {
-      if (!draw.getMode().includes('draw')) {
-        map.current.getCanvas().style.cursor = 'pointer'
-        const coordinates = e.features[0].geometry.coordinates.slice()
-        popup
-          .setLngLat(coordinates)
-          .setHTML(
-            ` <div>
-                  ${e.features[0].properties.count} ${t('mapPointHoverTooltip')}
-                </div> 
-              `
-          )
-          .addTo(map.current)
-      }
-    })
-
-    map.current.on('mouseleave', 'points', () => {
-      if (!draw.getMode().includes('draw')) {
-        map.current.getCanvas().style.cursor = 'grab'
-
-        popup.remove()
-      }
-    })
-
-    map.current.on('mousemove', 'hexes', (e) => {
-      if (griddapOutranksHexes(e)) return
-      if (!draw.getMode().includes('draw')) {
-        map.current.getCanvas().style.cursor = 'pointer'
-        const coordinates = [e.lngLat.lng, e.lngLat.lat]
-        const description = e.features[0].properties.count
-
-        popup
-          .setLngLat(coordinates)
-          .setHTML(description + t('mapHexHoverTooltip'))
-          .addTo(map.current)
-      }
-    })
-
-    map.current.on('mouseleave', 'hexes', () => {
-      if (!draw.getMode().includes('draw')) {
-        map.current.getCanvas().style.cursor = 'grab'
-
-        popup.remove()
-      }
-    })
-
-    map.current.on('mousemove', 'coverage-hexes', (e) => {
-      // 'points' renders on top of 'coverage-hexes' at the same zoom
-      // range — defer to its own mousemove/tooltip when the cursor is
-      // directly over a point, instead of clobbering it here.
-      if (
-        !draw.getMode().includes('draw') &&
-        map.current.queryRenderedFeatures(e.point, { layers: ['points'] })
-          .length === 0
-      ) {
-        map.current.getCanvas().style.cursor = 'pointer'
-        const coordinates = [e.lngLat.lng, e.lngLat.lat]
-        const { trajectory_count: trajectories, obis_count: occurrences } =
-          e.features[0].properties
-
-        // Name what's actually in the hex: the two kinds of coverage cell
-        // share this layer, and a hex can hold both.
-        let description
-        if (trajectories > 0 && occurrences > 0) {
-          description = t('mapCoverageHexBothHoverTooltip', {
-            trajectories,
-            occurrences
-          })
-        } else if (trajectories > 0) {
-          description = t('mapTrajectoryHexHoverTooltip', { trajectories })
-        } else {
-          description = t('mapObisHexHoverTooltip', { occurrences })
-        }
-
-        popup.setLngLat(coordinates).setHTML(description).addTo(map.current)
-      }
-    })
-
-    map.current.on('mouseleave', 'coverage-hexes', () => {
-      if (!draw.getMode().includes('draw')) {
-        map.current.getCanvas().style.cursor = 'grab'
-        popup.remove()
-      }
-    })
-
-    ;['track-heads', 'track-heads-fixed'].forEach((layerId) => {
-      map.current.on('mousemove', layerId, (e) => {
-        // These tooltips are registered after the 'points' one, so they would
-        // otherwise paint over it and offer a click hint where the click will
-        // go to the point instead (see isOnAPoint).
-        if (!draw.getMode().includes('draw') && !isOnAPoint(e)) {
-          map.current.getCanvas().style.cursor = 'pointer'
-          const properties = e.features[0].properties
-          const headDate = properties.head_time
-            ? new Date(Number(properties.head_time)).toISOString().replace('T', ' ').slice(0, 16)
-            : ''
-          popup
-            .setLngLat([e.lngLat.lng, e.lngLat.lat])
-            .setHTML(
-              `<div>${properties.dataset_title ? `<b>${escapeHtml(properties.dataset_title)}</b><br/>` : ''}${escapeHtml(properties.trajectory_id)}${headDate ? `<br/>${headDate}` : ''}${trackClickHint(properties)}</div>`
-            )
-            .addTo(map.current)
-        }
-      })
-
-      map.current.on('mouseleave', layerId, () => {
-        if (!draw.getMode().includes('draw')) {
-          map.current.getCanvas().style.cursor = 'grab'
-          popup.remove()
-        }
-      })
-    })
-
-    ;['selected-track-fixes', 'selected-track-fixes-nocog'].forEach((layerId) => {
-      map.current.on('mousemove', layerId, (e) => {
-        if (!draw.getMode().includes('draw')) {
-          map.current.getCanvas().style.cursor = 'pointer'
-          const properties = e.features[0].properties
-          const fixDate = properties.time
-            ? properties.time.replace('T', ' ').slice(0, 16)
-            : ''
-          popup
-            .setLngLat([e.lngLat.lng, e.lngLat.lat])
-            .setHTML(
-              `<div>${properties.dataset_title ? `<b>${escapeHtml(properties.dataset_title)}</b><br/>` : ''}${escapeHtml(properties.trajectory_id)}${fixDate ? `<br/>${fixDate}` : ''}</div>`
-            )
-            .addTo(map.current)
-        }
-      })
-
-      map.current.on('mouseleave', layerId, () => {
-        if (!draw.getMode().includes('draw')) {
-          map.current.getCanvas().style.cursor = 'grab'
-          popup.remove()
-        }
-      })
-    })
-
-    map.current.on('mousemove', 'track-lines', (e) => {
-      // Heads sit above lines, and the selected track's own fixes above both —
-      // let whichever is under the cursor keep its more specific tooltip (the
-      // head's date, the fix's timestamp).
-      if (
-        !draw.getMode().includes('draw') &&
-        !isOnAPoint(e) &&
-        renderedFeatures(e.point, [
-          'track-heads',
-          'track-heads-fixed',
-          ...selectedTrackLayers
-        ]).length === 0
-      ) {
-        map.current.getCanvas().style.cursor = 'pointer'
-        const properties = e.features[0].properties
-        popup
-          .setLngLat([e.lngLat.lng, e.lngLat.lat])
-          .setHTML(
-            `<div>${properties.dataset_title ? `<b>${escapeHtml(properties.dataset_title)}</b><br/>` : ''}${escapeHtml(properties.trajectory_id)}${trackClickHint(properties)}</div>`
-          )
-          .addTo(map.current)
-      }
-    })
-
-    map.current.on('mouseleave', 'track-lines', () => {
-      if (!draw.getMode().includes('draw')) {
-        map.current.getCanvas().style.cursor = 'grab'
-        popup.remove()
-      }
-    })
-
     // Griddap coverage rectangles normally defer to the point/hex layers, so a
     // click meant for an observation isn't swallowed by the grid drawn over it
     // (same pattern as coverage-hexes above). Past griddapPriorityZoom the
@@ -2278,6 +2087,23 @@ export default function CreateMap({
       map.current.queryRenderedFeatures(e.point, {
         layers: ['griddap-coverage-fill']
       }).length > 0
+
+    // The same two tests against an already-queried set, for the hover
+    // dispatcher (see the `…In` pairs above).
+    const griddapCoveredIn = (hits) => {
+      const covering =
+        map.current.getZoom() >= griddapPriorityZoom
+          ? ['points']
+          : ['points', 'hexes']
+      return (
+        hits.some((feature) => covering.includes(feature.layer.id)) ||
+        Boolean(trackFeatureIn(hits))
+      )
+    }
+
+    const griddapOutranksHexesIn = (hits) =>
+      map.current.getZoom() >= griddapPriorityZoom &&
+      hits.some((feature) => feature.layer.id === 'griddap-coverage-fill')
 
     // Rebuilding the tooltip on every mousemove made it flicker, so the content
     // is settled on a short debounce. Crossing into a rectangle whose stack is
@@ -2318,17 +2144,230 @@ export default function CreateMap({
         .addTo(map.current)
     }, 80)
 
-    map.current.on('mousemove', 'griddap-coverage-fill', (e) => {
-      if (draw.getMode().includes('draw') || griddapFeatureIsCovered(e)) {
+    // --- Hover -------------------------------------------------------------
+    // One handler, one hit-test, once per frame.
+    //
+    // MapLibre implements a per-layer listener by running its own
+    // queryRenderedFeatures on every raw mousemove, and a 'mouseleave'
+    // registration installs a querying 'mousemove' delegate of its own — so the
+    // nine hover layers here cost eighteen hit-tests per mouse event before a
+    // single handler body ran, plus the half-dozen more the bodies fired at each
+    // other to settle precedence. Over dense coastline at z16 that was the most
+    // expensive thing the map did, and it ran at the mouse's polling rate.
+    //
+    // The precedence those handlers encoded — partly through mutual stand-aside
+    // checks, partly through registration order, since the last one to run won
+    // the popup — is written out here instead and resolved against a single set
+    // of features. Highest priority first:
+    //
+    //   1. griddap rectangles, unless an observation or a track is under the
+    //      cursor (griddapCoveredIn). They come first because their handler was
+    //      registered last and so overwrote everything that had already written
+    //      a tooltip — including the selected fixes, which their covered-test
+    //      does not look at.
+    //   2. the selected platform's own fixes: drawn over the tile layers and
+    //      deliberately unguarded, so they keep their timestamp tooltip
+    //   3. track lines, unless a point, a head or a selected fix is
+    //   4. track heads, unless a point is
+    //   5. points
+    //   6. coverage hexes, unless a point is — points draw over them
+    //   7. profile hexes, unless the rectangles outrank them at this zoom
+    const hoverRules = [
+      {
+        id: 'griddap',
+        layers: ['griddap-coverage-fill'],
+        when: (hits) => !griddapCoveredIn(hits),
+        show: (e, features) => showGriddapTooltip(e, dedupeGriddapByPk(features))
+      },
+      {
+        id: 'selected-fixes',
+        layers: ['selected-track-fixes', 'selected-track-fixes-nocog'],
+        show: (e, features) => {
+          const properties = features[0].properties
+          const fixDate = properties.time
+            ? properties.time.replace('T', ' ').slice(0, 16)
+            : ''
+          popup
+            .setLngLat([e.lngLat.lng, e.lngLat.lat])
+            .setHTML(
+              `<div>${properties.dataset_title ? `<b>${escapeHtml(properties.dataset_title)}</b><br/>` : ''}${escapeHtml(properties.trajectory_id)}${fixDate ? `<br/>${fixDate}` : ''}</div>`
+            )
+            .addTo(map.current)
+        }
+      },
+      {
+        id: 'track-lines',
+        layers: ['track-lines'],
+        when: (hits, point) =>
+          !isOnAPointIn(hits, point) &&
+          !hits.some((feature) =>
+            ['track-heads', 'track-heads-fixed', ...selectedTrackLayers].includes(
+              feature.layer.id
+            )
+          ),
+        show: (e, features) => {
+          const properties = features[0].properties
+          popup
+            .setLngLat([e.lngLat.lng, e.lngLat.lat])
+            .setHTML(
+              `<div>${properties.dataset_title ? `<b>${escapeHtml(properties.dataset_title)}</b><br/>` : ''}${escapeHtml(properties.trajectory_id)}${trackClickHint(properties)}</div>`
+            )
+            .addTo(map.current)
+        }
+      },
+      {
+        id: 'track-heads',
+        layers: ['track-heads', 'track-heads-fixed'],
+        when: (hits, point) => !isOnAPointIn(hits, point),
+        show: (e, features) => {
+          const properties = features[0].properties
+          const headDate = properties.head_time
+            ? new Date(Number(properties.head_time)).toISOString().replace('T', ' ').slice(0, 16)
+            : ''
+          popup
+            .setLngLat([e.lngLat.lng, e.lngLat.lat])
+            .setHTML(
+              `<div>${properties.dataset_title ? `<b>${escapeHtml(properties.dataset_title)}</b><br/>` : ''}${escapeHtml(properties.trajectory_id)}${headDate ? `<br/>${headDate}` : ''}${trackClickHint(properties)}</div>`
+            )
+            .addTo(map.current)
+        }
+      },
+      {
+        id: 'points',
+        layers: ['points'],
+        show: (e, features) => {
+          popup
+            // the circle's own centre, not the cursor, so the tooltip sits on
+            // the point it describes
+            .setLngLat(features[0].geometry.coordinates.slice())
+            .setHTML(
+              ` <div>
+                  ${features[0].properties.count} ${t('mapPointHoverTooltip')}
+                </div>
+              `
+            )
+            .addTo(map.current)
+        }
+      },
+      {
+        id: 'coverage-hexes',
+        layers: ['coverage-hexes'],
+        when: (hits) => !hits.some((feature) => feature.layer.id === 'points'),
+        show: (e, features) => {
+          const { trajectory_count: trajectories, obis_count: occurrences } =
+            features[0].properties
+
+          // Name what's actually in the hex: the two kinds of coverage cell
+          // share this layer, and a hex can hold both.
+          let description
+          if (trajectories > 0 && occurrences > 0) {
+            description = t('mapCoverageHexBothHoverTooltip', {
+              trajectories,
+              occurrences
+            })
+          } else if (trajectories > 0) {
+            description = t('mapTrajectoryHexHoverTooltip', { trajectories })
+          } else {
+            description = t('mapObisHexHoverTooltip', { occurrences })
+          }
+
+          popup
+            .setLngLat([e.lngLat.lng, e.lngLat.lat])
+            .setHTML(description)
+            .addTo(map.current)
+        }
+      },
+      {
+        id: 'hexes',
+        layers: ['hexes'],
+        when: (hits) => !griddapOutranksHexesIn(hits),
+        show: (e, features) => {
+          popup
+            .setLngLat([e.lngLat.lng, e.lngLat.lat])
+            .setHTML(features[0].properties.count + t('mapHexHoverTooltip'))
+            .addTo(map.current)
+        }
+      }
+    ]
+
+    // Every layer the rules render, plus the ones only their guards read:
+    // 'selected-track-line' has no tooltip of its own but track-lines stands
+    // aside for it.
+    const hoverLayerIds = [
+      ...new Set([
+        ...hoverRules.flatMap((rule) => rule.layers),
+        'selected-track-line'
+      ])
+    ]
+
+    const handleHover = (e) => {
+      // Drawing owns the cursor and the canvas; leave the popup exactly as the
+      // last hover left it, which is what the per-layer handlers did too.
+      if (draw.getMode().includes('draw')) {
         showGriddapTooltip.cancel()
         setGriddapHovered([])
         return
       }
+
+      const layers = hoverLayerIds.filter((id) => map.current.getLayer(id))
+      const hits = layers.length
+        ? map.current.queryRenderedFeatures(e.point, { layers })
+        : []
+
+      const winner = hoverRules.find((rule) => {
+        const features = hits.filter((feature) =>
+          rule.layers.includes(feature.layer.id)
+        )
+        return (
+          features.length > 0 && (!rule.when || rule.when(hits, e.point))
+        )
+      })
+
+      // The rectangles' hover outline is feature-state, not a popup, so it has
+      // to be released whenever they aren't the winner — the old mouseleave
+      // handler's job.
+      if (winner?.id !== 'griddap') {
+        showGriddapTooltip.cancel()
+        setGriddapHovered([])
+      }
+
+      if (!winner) {
+        map.current.getCanvas().style.cursor = 'grab'
+        popup.remove()
+        return
+      }
+
       map.current.getCanvas().style.cursor = 'pointer'
-      showGriddapTooltip(e, griddapFeaturesAt(e.point))
+      winner.show(
+        e,
+        hits.filter((feature) => winner.layers.includes(feature.layer.id))
+      )
+    }
+
+    // Coalesced to one hit-test per frame, on the newest cursor position rather
+    // than the first of the batch.
+    let pendingHover = null
+    let hoverFrame = null
+    map.current.on('mousemove', (e) => {
+      setHoveredDataset()
+      pendingHover = e
+      if (hoverFrame !== null) return
+      hoverFrame = requestAnimationFrame(() => {
+        hoverFrame = null
+        const event = pendingHover
+        pendingHover = null
+        if (event && map.current) handleHover(event)
+      })
     })
 
-    map.current.on('mouseleave', 'griddap-coverage-fill', () => {
+    // No mousemove fires once the cursor leaves the canvas, so the popup would
+    // otherwise stay behind.
+    map.current.on('mouseout', () => {
+      if (hoverFrame !== null) {
+        cancelAnimationFrame(hoverFrame)
+        hoverFrame = null
+      }
+      pendingHover = null
       showGriddapTooltip.cancel()
       setGriddapHovered([])
       if (!draw.getMode().includes('draw')) {

@@ -141,39 +141,56 @@ Use **feature-state**, which is what `griddap-coverage` already does correctly
 branch in the paint expression. Feature-state changes are applied GPU-side with no
 worker round trip and no re-tessellation.
 
-Because MapLibre 5.24 also supports **global-state** expressions
-(`map.setGlobalStateProperty`, `maplibre-gl-dev.js:71486`), the "is any dataset
-focused" flag can live in the expression too, so the paint property is set **once**
-at `addLayer` and never touched again:
+The flag has to be *which features are dimmed*, not *whether a focus is active*.
+MapLibre 5.24 does support **global-state** expressions, and putting the
+focus-active flag there looks tempting — but it does not help: a global-state change
+that touches a paint property is applied by calling `_updatePaintProperty`
+(`maplibre-gl-dev.js:59919-59922`), which is the same function that reports a
+relayout for data-driven properties, so it lands right back on the reload path.
+Encoding the whole decision in feature-state keeps the paint expression genuinely
+static:
 
 ```js
 // on the sources
 map.current.addSource('cde-tiles', { type: 'vector', tiles: [tileQuery], promoteId: 'pk' })
 map.current.addSource('cde-cells', { type: 'vector', tiles: [cellTileQuery], promoteId: 'pk' })
 
-// static paint, set once
-'circle-color': [
-  'case',
-  ['!', ['global-state', 'focusActive']], colors,
-  ['boolean', ['feature-state', 'focused'], false], colors,
-  'lightgrey'
-]
+// static paint, set once at addLayer and never touched for focus
+const IS_DIMMED = ['boolean', ['feature-state', 'dimmed'], false]
+const dimmable = (color) => ['case', IS_DIMMED, 'lightgrey', color]
+'circle-color': dimmable(colors)
 
 // focus changes become:
-map.current.setGlobalStateProperty('focusActive', Boolean(pk))
-focusedPks.forEach((id) =>
-  map.current.setFeatureState({ source: 'cde-tiles', id }, { focused: true }))
+map.current.removeFeatureState({ source: 'cde-tiles', sourceLayer: 'internal-layer-name' })
+dimmedIds.forEach((id) =>
+  map.current.setFeatureState(
+    { source: 'cde-tiles', sourceLayer: 'internal-layer-name', id },
+    { dimmed: true }
+  ))
 ```
 
-Deriving `focusedPks` still needs the `queryRenderedFeatures` pass at
-`Map.jsx:605-611` (the `datasets` property is a JSON *string* in the MVT, so an
-`['in', …]` expression would substring-match `"1"` against `"10"` — don't). But
-that pass is cheap compared to the tile re-parse it currently triggers.
+Deriving the ids still needs the `queryRenderedFeatures` pass at `Map.jsx:605-611`
+(the `datasets` property is a JSON *string* in the MVT, so an `['in', …]` expression
+would substring-match `"1"` against `"10"` — don't). It now collects the
+*complement* — the features to grey rather than the ones to keep — which is a larger
+list, but it is the same O(rendered features) walk that already happens, and it
+replaces a worker re-parse of every loaded tile.
 
 **This also lets three layers be deleted**: `points-hovered`, `hexes-hovered` and
 `coverage-hexes-hovered` exist only to redraw the focused subset in colour over a
 greyed base, which a feature-state branch on the base layer does directly. Three
 fewer draw passes over every point on screen, and three fewer `setFilter` calls.
+
+Two knock-on simplifications come with it. `setColorStops` no longer has to bail out
+early and re-apply the focus to stop a ramp refresh from un-greying the map — the
+grey now lives *inside* the ramp expression, so a refresh carries it through. And
+`hexes` moves off the legacy `{ property, stops }` paint function onto a real
+`interpolate` expression, because the legacy form cannot be nested inside a `case`
+(the same constraint `coverageHexFillColor` already works around).
+
+Ramp changes themselves — a legend refetch, or crossing a zoom band — still cost a
+reload, because a genuinely different ramp is a genuinely different expression.
+That is rare, and unrelated to hover.
 
 ---
 
@@ -318,8 +335,25 @@ fewer of them.
 | 1 | One rAF-throttled `mousemove` + one hit-test | low, mechanical | highest (interaction latency) |
 | 3 | NONNA source `maxzoom` 11 / 14 | low, verify visually | high (network, proxy, CHS) |
 | 5 | `cde-tiles`/`cde-cells` source `maxzoom` 14 | low | high (DB load, cold start) |
-| 2 | Feature-state + global-state focus; drop 3 layers | medium — real refactor | high (hover jank) |
+| 2 | Feature-state focus; drop 3 layers | medium — real refactor | high (hover jank) |
 
 Items 3, 4 and 5 are one-line-each and independently revertible. Item 1 is a
 consolidation that should leave behaviour identical. Item 2 is the only one that
 restructures anything, and it removes more code than it adds.
+
+## Status
+
+All five are implemented, along with `raster-fade-duration: 0` on the two NONNA
+layers. Two things to watch when this is next run against real data:
+
+- **Item 3 is the one that can change how the map looks.** Overzoomed NONNA is
+  MapLibre linearly upsampling a coarser texture, where before GeoServer rendered
+  each level; cell edges may read softer at z15+. `maxzoom: 12` / `15` is the
+  conservative fallback if so.
+- **Item 2 normalises one inconsistency.** `points-highlighted` was created with
+  `circle-stroke-width: 0.75` but restored to `1` after a focus cleared, so the
+  selection ring quietly thickened the first time a dataset was hovered and
+  unhovered. It is now `0.75` in both states.
+
+The remaining "smaller items" (`maxTileCacheSize`, the draw control's 14 always-on
+layers) are untouched.

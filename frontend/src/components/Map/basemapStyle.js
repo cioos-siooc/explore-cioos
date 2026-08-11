@@ -102,10 +102,22 @@ export function buildBasemapStyle (lang = 'en') {
     // it, so a harbour view showed where the water ended and nothing about what
     // it ended against. Esri's imagery is the opposite: nothing useful at world
     // scale, everything from z12 in.
+    //
+    // Every layer here that fades to nothing carries the maxzoom that matches
+    // its fade. MapLibre skips *drawing* a layer once its opacity reaches 0,
+    // but that is all it skips: whether a layer's geometry gets built at all is
+    // decided by minzoom/maxzoom/visibility and nothing else, so an invisible
+    // layer with no zoom bound is still fetched, parsed and tessellated on
+    // every tile all the way to z17. The bounds below are set to the zoom each
+    // fade already ends at, so nothing changes on screen — they only stop the
+    // work being done for pixels that were never going to be drawn.
     {
       id: 'bathymetry',
       type: 'raster',
       source: 'bathymetry',
+      // Also stops EMODnet tiles being fetched and cached past the hand-off: a
+      // layer outside its zoom range marks its source unused.
+      maxzoom: 12,
       paint: {
         'raster-opacity': ['interpolate', ['linear'], ['zoom'], 10, 1, 12, 0],
         'raster-saturation': -0.15
@@ -154,7 +166,13 @@ export function buildBasemapStyle (lang = 'en') {
       source: 'nonna100',
       minzoom: 10,
       paint: {
-        'raster-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0, 12, 0.7]
+        'raster-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0, 12, 0.7],
+        // Three raster sources are stacked here, and the default 300 ms
+        // cross-fade draws both the outgoing and incoming tile for its
+        // duration. These two are translucent and sit over the satellite, so
+        // that is the most overdrawn part of the map; fading instantly also
+        // lets the parent tiles be released sooner.
+        'raster-fade-duration': 0
       }
     },
     {
@@ -163,7 +181,8 @@ export function buildBasemapStyle (lang = 'en') {
       source: 'nonna10',
       minzoom: 10,
       paint: {
-        'raster-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0, 12, 0.7]
+        'raster-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0, 12, 0.7],
+        'raster-fade-duration': 0
       }
     },
     // Pulls the sea toward CIOOS teal and unifies the raster palette while
@@ -177,6 +196,7 @@ export function buildBasemapStyle (lang = 'en') {
       type: 'fill',
       source: 'ofm',
       'source-layer': 'water',
+      maxzoom: 13,
       paint: {
         'fill-color': '#52A79B',
         'fill-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.1, 13, 0]
@@ -193,12 +213,19 @@ export function buildBasemapStyle (lang = 'en') {
     // Both fade out by z12. They were the answer to a blurred raster shore, and
     // past z12 there is no raster shore left to fix — the satellite has its own,
     // and a drawn line beside it would only be a second, wrong one.
+    //
+    // These two are why the maxzoom note above matters most: they turn the OSM
+    // water polygons into *line* geometry, which is the most expensive thing
+    // MapLibre builds, and they do it twice over — and a harbour at z16 is
+    // dense with ponds, docks and river polygons. Without the bound all of that
+    // was tessellated on every tile and then not drawn.
     {
       id: 'coastline-casing',
       type: 'line',
       source: 'ofm',
       'source-layer': 'water',
       filter: SHORELINE_FILTER,
+      maxzoom: 12,
       layout: { 'line-join': 'round' },
       paint: {
         'line-color': '#F3F0EC',
@@ -237,6 +264,7 @@ export function buildBasemapStyle (lang = 'en') {
       source: 'ofm',
       'source-layer': 'water',
       filter: SHORELINE_FILTER,
+      maxzoom: 12,
       layout: { 'line-join': 'round' },
       paint: {
         // Slate-teal rather than near-black: dark enough to hold the edge
@@ -502,20 +530,32 @@ export function buildBasemapStyle (lang = 'en') {
         attribution:
           'Imagery © <a href="https://www.esri.com">Esri</a>, Vantor, Earthstar Geographics'
       },
-      // maxzoom 17 matches the camera cap; both products are served through the
-      // proxy, which answers a transparent tile wherever CHS has nothing.
+      // Both products are served through the proxy, which answers a transparent
+      // tile wherever CHS has nothing.
+      //
+      // maxzoom is set to where each product runs out of actual soundings, not
+      // to the camera cap. Ground resolution at 45°N is 110692 / 2^z m/px, so
+      // z10 is 108 m/px and z13 is 13.5 m/px: a 100 m grid has nothing left to
+      // say past z10, and a 10 m grid nothing past z13. The values below give
+      // each one a further 2x of headroom and then let MapLibre overzoom.
+      //
+      // Asking for the deeper levels was requesting GeoServer to upsample the
+      // same cells for us — no extra information, but one proxy round trip and
+      // one 256x256 texture per tile per level. At z16 the pair went from ~60
+      // tile requests per viewport to ~6, and because a coarse tile covers 32x
+      // (100) or 4x (10) more ground, panning stops re-triggering them at all.
       nonna100: {
         type: 'raster',
         tiles: [NONNA_100_TILES],
         tileSize: 256,
-        maxzoom: 17,
+        maxzoom: 11,
         attribution: CHS_ATTRIBUTION
       },
       nonna10: {
         type: 'raster',
         tiles: [NONNA_10_TILES],
         tileSize: 256,
-        maxzoom: 17
+        maxzoom: 14
       },
       ofm: {
         type: 'vector',
