@@ -36,6 +36,8 @@ export default function TopControls () {
     updating: countsUpdating,
     filteredCount,
     total,
+    // "1832 / 1834", collapsing to a single number when nothing is filtered
+    // out — the same string the sidebar footer shows.
     label: countLabel
   } = useDatasetCounts()
 
@@ -70,17 +72,25 @@ export default function TopControls () {
             }
           >
             <ListUl size={18} aria-hidden='true' />
-            <span className='topBarButtonLabel'>{t('datasetsFilterName')}</span>
-            <span
-              className={classNames('topBarCount', {
-                updating: countsUpdating
-              })}
-            >
-              {countsReady ? (
-                countLabel
-              ) : (
-                <Spinner size='sm' className='countSpinner' />
-              )}
+            {/* Label over counts, not label beside counts: on its own line the
+                "shown / total" pair has the segment's full width, so it stays
+                legible as one horizontal reading in both languages instead of
+                being folded to fit next to "Jeux de données". */}
+            <span className='topBarButtonStack'>
+              <span className='topBarButtonLabel'>
+                {t('topBarDatasetsLabel')}
+              </span>
+              <span
+                className={classNames('topBarCounts', {
+                  updating: countsUpdating
+                })}
+              >
+                {countsReady ? (
+                  countLabel
+                ) : (
+                  <Spinner size='sm' className='countSpinner' />
+                )}
+              </span>
             </span>
           </button>
           <button
