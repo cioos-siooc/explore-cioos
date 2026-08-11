@@ -31,7 +31,9 @@ import {
   DATA_LAYER_KEYS,
   DEFAULT_DATA_LAYERS,
   DEFAULT_TRACKS_MODE,
-  DEFAULT_TRAJECTORY_HEXES
+  DEFAULT_TRAJECTORY_HEXES,
+  TRAJECTORY_LAYER_KEYS,
+  anyTrajectoryLayerOn
 } from '../dataLayers.js'
 
 const MapStateContext = createContext()
@@ -190,26 +192,42 @@ export default function MapStateProvider ({ children }) {
     return Object.fromEntries(DATA_LAYER_KEYS.map((key) => [key, on.has(key)]))
   })
 
-  // The data-layer switches, and the two trajectory sub-switches. These live
-  // together because the trajectory ones are coupled to the parent switch in
-  // both directions: a trajectories layer showing nothing is a dead end, so
-  // clearing the last sub-switch turns the parent off, and turning the parent
+  // The geometry switches, and the two trajectory view sub-switches. These live
+  // together because the view switches are coupled to the trajectory ones in
+  // both directions: a trajectory layer showing nothing is a dead end, so
+  // clearing the last view turns the trajectory layers off, and switching one
   // back on restores the default pair rather than the empty state.
+  //
+  // The views belong to Trajectory and TrajectoryProfile jointly — they are one
+  // set of track/coverage layers fed by both — so the coupling is written
+  // against "is either on", not against a single key.
   function toggleDataLayer (key) {
     const on = !dataLayers[key]
     setDataLayers({ ...dataLayers, [key]: on })
-    if (key === 'trajectories' && on) {
+    // Restore the default views only when this switch is what brings the
+    // trajectory layers back; with the other one already on, the user's current
+    // view choice is deliberate and stays.
+    if (
+      on &&
+      TRAJECTORY_LAYER_KEYS.includes(key) &&
+      !anyTrajectoryLayerOn(dataLayers)
+    ) {
       setTracksMode(DEFAULT_TRACKS_MODE)
       setTrajectoryHexes(DEFAULT_TRAJECTORY_HEXES)
     }
   }
 
-  // Flip one sub-switch, dropping the parent when that would leave neither
-  // representation drawing anything.
+  // Flip one sub-switch, dropping both trajectory layers when that would leave
+  // neither representation drawing anything.
   function setTrajectoryViews (tracks, hexes) {
     setTracksMode(tracks)
     setTrajectoryHexes(hexes)
-    if (!tracks && !hexes) setDataLayers({ ...dataLayers, trajectories: false })
+    if (!tracks && !hexes) {
+      setDataLayers({
+        ...dataLayers,
+        ...Object.fromEntries(TRAJECTORY_LAYER_KEYS.map((key) => [key, false]))
+      })
+    }
   }
 
   const toggleTrackLines = () =>

@@ -44,6 +44,33 @@ function tileCellPrefilter(z) {
   const expandM = Math.ceil(Math.max(tileWidthM * 0.25, hexDiameterM));
   return `geom && ST_Expand(ST_TileEnvelope(:z, :x, :y), ${expandM})`;
 }
+
+// The cdm_data_types that share cde.trajectory_cells / cde.trajectory_points.
+// They are separate layers in the map's geometry selector, so the routes below
+// take a trajectoryTypes param that works exactly like profileTypes: absent =
+// both (pre-split behaviour, and what any older client sends), a comma list =
+// only those, empty = neither. Values are matched against this fixed set, which
+// is what makes them safe to inline into the branch SQL.
+const ALL_TRAJECTORY_TYPES = ["Trajectory", "TrajectoryProfile"];
+
+function requestedTrajectoryTypes(query) {
+  if (query.trajectoryTypes === undefined) return ALL_TRAJECTORY_TYPES;
+  return String(query.trajectoryTypes)
+    .split(",")
+    .filter((t) => ALL_TRAJECTORY_TYPES.includes(t));
+}
+
+// A predicate restricting a trajectory table to the requested types, or '' when
+// the restriction would be a no-op. Both types requested needs no filter; none
+// requested never reaches a branch (callers drop it instead), so the emptiness
+// check here is belt-and-braces rather than a live case.
+function trajectoryTypePredicate(types) {
+  if (!types.length || types.length === ALL_TRAJECTORY_TYPES.length) return "";
+  return `dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${types
+    .map((t) => `'${t}'`)
+    .join(",")}))`;
+}
+
 /**
  * /tiles/z/x/y/.mvt
  *
@@ -124,6 +151,7 @@ router.get(
           .split(',')
           .filter((t) => ALL_PROFILE_TYPES.includes(t));
     const trajectoryToggledOn = req.query.includeTrajectory !== 'false';
+    const trajectoryTypes = requestedTrajectoryTypes(req.query);
     // ERDDAP-sourced data (profiles + trajectory coverage) is hidden wholesale
     // when an OBIS-only filter is active: scientific-name filters are
     // OBIS-only, and an OBIS-node selection also hides it, unless ERDDAP
@@ -132,7 +160,8 @@ router.get(
     const erddapVisible = !req.query.scientificNames
       && (!req.query.obisNodes || Boolean(req.query.erddapServers));
     const includeProfiles = erddapVisible && profileTypes.length > 0;
-    const includeTrajectory = trajectoryToggledOn && erddapVisible;
+    const includeTrajectory = trajectoryToggledOn
+      && erddapVisible && trajectoryTypes.length > 0;
 
     // At hex zoom we only need the hex FK and point_pk (for distinct counts);
     // the polygon is fetched once per hex via JOIN to hexes_zoom_*. At point
@@ -161,9 +190,16 @@ router.get(
     // artifact, not a measurement location, so at point zoom they're shown
     // only via the dedicated always-hex coverage layer from
     // /tiles/cells/:z/:x/:y.mvt.
+    // Same shape as profilesTypeFilter above: restrict to the requested
+    // geometries when only some are on, and combine with the tile prefilter
+    // into one WHERE (either, both, or neither can be present).
+    const trajectoryConds = [
+      cellPrefilter,
+      trajectoryTypePredicate(trajectoryTypes),
+    ].filter(Boolean);
     const trajectoryBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_cells${cellPrefilter ? ` WHERE ${cellPrefilter}` : ''}`;
+    FROM cde.trajectory_cells${trajectoryConds.length ? ` WHERE ${trajectoryConds.join(' AND ')}` : ''}`;
     const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
            date_part('days', time_max - time_min) + 1 as record_count,
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
@@ -319,7 +355,11 @@ router.get(
     // On top of that, an explicit includeTrajectory=false hides them — the
     // trajectories layer toggle, and tracks mode (where track lines replace
     // the coverage hexes but OBIS cells stay).
+    // ...and, since the two trajectory geometries are separate layers, the
+    // requested subset of them; with neither on there is nothing to draw.
+    const trajectoryTypes = requestedTrajectoryTypes(req.query);
     const includeProfiles = req.query.includeTrajectory !== 'false'
+      && trajectoryTypes.length > 0
       && !req.query.scientificNames
       && (!req.query.obisNodes || Boolean(req.query.erddapServers));
 
@@ -328,10 +368,14 @@ router.get(
     // it holds. n_records is meaningless for trajectory cells and
     // trajectory_id for OBIS cells; each is only ever read behind its own
     // FILTER below.
+    const trajectoryConds = [
+      cellPrefilter,
+      trajectoryTypePredicate(trajectoryTypes),
+    ].filter(Boolean);
     const trajectoryBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'trajectory' as src,
            trajectory_id, 0::bigint as n_records,
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_cells${cellPrefilter ? ` WHERE ${cellPrefilter}` : ''}`;
+    FROM cde.trajectory_cells${trajectoryConds.length ? ` WHERE ${trajectoryConds.join(' AND ')}` : ''}`;
     const obisBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'obis' as src,
            NULL as trajectory_id, n_records,
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
@@ -486,6 +530,19 @@ router.get(
     ["eovs", "platforms", "datasetPKs", "organizations", "obisNodes", "erddapServers"]
       .forEach((k) => { if (req.query[k]) datasetLevelQuery[k] = req.query[k]; });
 
+    // Track lines are drawn for whichever trajectory geometries are switched
+    // on. With neither on the client stops asking for this layer at all, but
+    // answer honestly rather than serving every track if a request arrives.
+    const trajectoryTypes = requestedTrajectoryTypes(req.query);
+    if (!trajectoryTypes.length) {
+      return res.status(204).send();
+    }
+    // The cand CTE already joins cde.datasets, so the type test rides along
+    // there — filtering candidate trajectories before any fix is pulled.
+    const trackTypeFilter = trajectoryTypes.length < ALL_TRAJECTORY_TYPES.length
+      ? ` AND d.cdm_data_type IN (${trajectoryTypes.map((t) => `'${t}'`).join(",")})`
+      : "";
+
     let filters;
     try {
       filters = await createDBFilter(datasetLevelQuery);
@@ -527,6 +584,7 @@ router.get(
             )
         AND s.time_max >= :timeMin::timestamptz
         AND s.time_min <= :timeMax::timestamptz
+        ${trackTypeFilter}
         ${filters.hasShared ? "AND :filters" : ""}
       -- Cap per tile (see TRACKS_MAX_PER_TILE): keep the most recently-active
       -- trajectories; tie-break on the pk for deterministic, cache-stable tiles.

@@ -25,7 +25,10 @@ import {
   effectiveTrailingDays
 } from '../../config.js'
 import platformColors from '../../platformColors'
-import { DEFAULT_DATA_LAYERS } from '../../../state/dataLayers.js'
+import {
+  DEFAULT_DATA_LAYERS,
+  anyTrajectoryLayerOn
+} from '../../../state/dataLayers.js'
 import Spinner from '../../ui/Spinner.jsx'
 import Switch from '../../ui/Switch.jsx'
 
@@ -103,7 +106,7 @@ export default function Legend({
     layers.timeseries ||
     layers.timeseriesProfile ||
     layers.obis ||
-    (layers.trajectories && trajectoryHexes)
+    (anyTrajectoryLayerOn(layers) && trajectoryHexes)
 
   // Continuous color bar for a hex ramp. The hex counts follow a non-linear
   // (power/log) scale, so the colors are spaced evenly by their scale index
@@ -306,7 +309,7 @@ export default function Legend({
   // when both are on and nothing when neither is.
   function generateTrajectoryLegendElements() {
     // Trajectory layer hidden entirely — no trajectory legend.
-    if (!layers.trajectories) return null
+    if (!anyTrajectoryLayerOn(layers)) return null
     return (
       <>
         {tracksMode && renderTrackLineKey()}
@@ -382,7 +385,7 @@ export default function Legend({
   function generateCoverageLegendElements() {
     const showObisRamp = layers.obis && rangeLevelHasData(currentObisRangeLevel)
     const showTrajectoryHexes =
-      layers.trajectories &&
+      anyTrajectoryLayerOn(layers) &&
       trajectoryHexes &&
       rangeLevelHasData(currentTrajectoryRangeLevel)
     return (

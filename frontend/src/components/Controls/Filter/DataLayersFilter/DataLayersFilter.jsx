@@ -5,22 +5,31 @@ import { CheckSquare, Square } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 
 import {
+  DATA_LAYER_HINT_KEYS,
   DATA_LAYER_KEYS,
-  DATA_LAYER_LABEL_KEYS
+  DATA_LAYER_LABEL_KEYS,
+  TRAJECTORY_LAYER_KEYS,
+  anyTrajectoryLayerOn
 } from '../../../../state/dataLayers.js'
 import { useMapState } from '../../../../state/map/MapStateProvider.jsx'
 import './styles.css'
 
-// Which families of data draw on the map, and — for trajectories — how they
-// draw. This was a column of switches in the legend card; inside the filter
-// menu it takes the same checkbox idiom as every other filter, because that is
-// what it does: the selection gates the map tiles, the datasets list and the
-// counts alike (see datasetInDataLayers).
+// Which observation geometries the map draws, and — for the two path-sampling
+// ones — how they draw. This was a column of switches in the legend card;
+// inside the filter menu it takes the same checkbox idiom as every other
+// filter, because that is what it does: the selection gates the map tiles, the
+// datasets list and the counts alike (see datasetInDataLayers).
 //
-// The two trajectory options are a display choice rather than a data choice, so
-// they render indented under Trajectories and only while it is on. They are
-// independent — either, both, or neither — and clearing the last one turns the
-// parent off (see setTrajectoryViews in MapStateProvider).
+// Each row carries a hint line: what the geometry means in plain terms and the
+// platforms that typically produce it. "TimeSeriesProfile" tells a data manager
+// exactly what it is and a visitor nothing at all, and the hint is what closes
+// that gap without renaming the CF types.
+//
+// The track/coverage view options belong to Trajectory and TrajectoryProfile
+// jointly — one set of map layers fed by both — so they render once, after the
+// pair, and only while at least one of them is on. They are independent, and
+// clearing the last one switches both geometries off (see setTrajectoryViews
+// in MapStateProvider).
 export default function DataLayersFilter () {
   const { t } = useTranslation()
   const {
@@ -32,16 +41,20 @@ export default function DataLayersFilter () {
     toggleTrajectoryHexes
   } = useMapState()
 
-  function option (key, label, checked, onToggle, title) {
+  const lastTrajectoryKey = TRAJECTORY_LAYER_KEYS[TRAJECTORY_LAYER_KEYS.length - 1]
+
+  function option (key, label, hint, checked, onToggle) {
     return (
       <div
         key={key}
         className={`optionButton ${checked ? 'selected' : ''}`}
-        title={title || label}
         onClick={onToggle}
       >
         {checked ? <CheckSquare /> : <Square />}
-        <span className='optionName'>{label}</span>
+        <span className='optionName'>
+          {label}
+          {hint && <span className='optionHint'>{hint}</span>}
+        </span>
       </div>
     )
   }
@@ -53,20 +66,26 @@ export default function DataLayersFilter () {
           {option(
             key,
             t(DATA_LAYER_LABEL_KEYS[key]),
+            t(DATA_LAYER_HINT_KEYS[key]),
             Boolean(dataLayers[key]),
             () => toggleDataLayer(key)
           )}
-          {key === 'trajectories' && dataLayers.trajectories && (
+          {key === lastTrajectoryKey && anyTrajectoryLayerOn(dataLayers) && (
             <div className='dataLayerSubOptions'>
+              <div className='dataLayerSubHeading'>
+                {t('layerTrajectoryViewsLabel')}
+              </div>
               {option(
                 'tracksMode',
                 t('layerTracksMode'),
+                null,
                 tracksMode,
                 toggleTrackLines
               )}
               {option(
                 'trajectoryHexes',
                 t('layerTrajectoryHexes'),
+                null,
                 trajectoryHexes,
                 toggleTrajectoryHexes
               )}

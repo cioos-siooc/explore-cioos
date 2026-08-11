@@ -16,6 +16,7 @@ import Legend from '../Controls/Legend/Legend.jsx'
 import TimeBar from '../Controls/TimeBar/TimeBar.jsx'
 import WmsLegend from '../Controls/WmsLegend/WmsLegend.jsx'
 import IntroModal from '../Controls/IntroModal/IntroModal.jsx'
+import { anyTrajectoryLayerOn } from '../../state/dataLayers.js'
 import { useMapState } from '../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../state/ui/UIProvider.jsx'
@@ -125,7 +126,7 @@ export default function AppShell () {
       <MapCornerControls />
       {/* TimeBar renders before the zoom pill: they share the bottom-center
           spot, and a CSS sibling rule lifts the pill while the bar is shown. */}
-      {tracksMode && dataLayers.trajectories && (
+      {tracksMode && anyTrajectoryLayerOn(dataLayers) && (
         <TimeBar
           scrubTime={scrubTime}
           setScrubTime={setScrubTime}

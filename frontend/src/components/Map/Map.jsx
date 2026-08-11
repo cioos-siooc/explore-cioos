@@ -53,7 +53,11 @@ import {
   effectiveTrailingDays
 } from '../config'
 import platformColors from '../../components/platformColors'
-import { PROFILE_TYPE_KEYS } from '../../state/dataLayers.js'
+import {
+  PROFILE_TYPE_KEYS,
+  TRAJECTORY_TYPE_KEYS,
+  anyTrajectoryLayerOn
+} from '../../state/dataLayers.js'
 import {
   buildBasemapStyle,
   getLabelTextField,
@@ -86,16 +90,17 @@ function buildHeadArrowImage(fillColor, strokeColor = '#ffffff') {
   return ctx.getImageData(0, 0, size, size)
 }
 
-// Combine the filter-derived query string with the data-layer selection into
-// a tile-URL suffix. OBIS off adds includeObis=false, OR-ed with any the
-// Source filter already emitted; a profile-type subset adds
-// profileTypes=<comma list> (empty = none). A param is omitted when its
-// layer(s) are fully on, so the URL stays clean. Returns '' or '?...'.
+// Combine the filter-derived query string with the geometry selection into a
+// tile-URL suffix. OBIS off adds includeObis=false, OR-ed with any the Source
+// filter already emitted; a profile-type subset adds profileTypes=<comma list>
+// and a trajectory-type subset trajectoryTypes=<comma list> (empty = none). A
+// param is omitted when its layer(s) are fully on, so the URL stays clean.
+// Returns '' or '?...'.
 //
-// Trajectory coverage cells are requested only when the trajectories layer is
-// on AND its hex view is selected. The two trajectory views are independent —
-// the track lines come from a separate source (/tiles/tracks) and never depend
-// on this — so the hex switch is the only thing that decides whether the
+// Trajectory coverage cells are requested only when a trajectory layer is on
+// AND the hex view is selected. The two trajectory views are independent — the
+// track lines come from a separate source (/tiles/tracks) and never depend on
+// this — so the hex switch is the only thing that decides whether the
 // trajectory counts appear in these tiles.
 function buildTileSuffix(baseQuery, dataLayers, trajectoryHexes = false) {
   const params = new URLSearchParams(baseQuery)
@@ -109,7 +114,13 @@ function buildTileSuffix(baseQuery, dataLayers, trajectoryHexes = false) {
     if (enabledTypes.length < PROFILE_TYPE_KEYS.length) {
       params.set('profileTypes', enabledTypes.join(','))
     }
-    if (!dataLayers.trajectories || !trajectoryHexes) {
+    const enabledTrajectoryTypes = TRAJECTORY_TYPE_KEYS.filter(
+      ([key]) => dataLayers[key]
+    ).map(([, type]) => type)
+    if (enabledTrajectoryTypes.length < TRAJECTORY_TYPE_KEYS.length) {
+      params.set('trajectoryTypes', enabledTrajectoryTypes.join(','))
+    }
+    if (!enabledTrajectoryTypes.length || !trajectoryHexes) {
       params.set('includeTrajectory', 'false')
     }
   }
@@ -321,6 +332,12 @@ export default function CreateMap({
   // Tracks tile URL: dataset-level filters from the regular map query string,
   // minus the TimeSelector's timeMin/timeMax (the scrub window must not
   // fight the date-range filter), plus the day-snapped scrub window.
+  //
+  // Trajectory and TrajectoryProfile are separate switches drawing into the
+  // same track layers, so which of them the tiles carry is a server-side
+  // decision like everything else — the selection rides along as
+  // trajectoryTypes, omitted when both are on. Read from the ref rather than
+  // taken as an argument so every existing caller keeps working unchanged.
   function buildTracksTileUrl(queryString, scrub, trailing, zoom) {
     const params = new URLSearchParams(queryString)
     params.delete('timeMin')
@@ -328,6 +345,15 @@ export default function CreateMap({
     const { timeMin, timeMax } = tracksTimeWindow(scrub, trailing, zoom)
     params.set('timeMin', timeMin)
     params.set('timeMax', timeMax)
+    const layers = dataLayersRef.current
+    if (layers) {
+      const enabled = TRAJECTORY_TYPE_KEYS.filter(([key]) => layers[key]).map(
+        ([, type]) => type
+      )
+      if (enabled.length < TRAJECTORY_TYPE_KEYS.length) {
+        params.set('trajectoryTypes', enabled.join(','))
+      }
+    }
     return `${server}/tiles/tracks/{z}/{x}/{y}.mvt?${params.toString()}`
   }
 
@@ -370,18 +396,16 @@ export default function CreateMap({
     map.current.getSource('cde-cells').setTiles([cellTileQuery])
   }
 
-  // Apply the track-line visibility: the track layers show only when
-  // trajectories are on AND the track-lines switch is on. This is the ONLY
-  // thing that hides them — the blanket "Hexes & points" picker owns the hex
-  // and point layers alone (observationLayerIds), so turning it off no longer
-  // takes the tracks with it. Which data feeds the hex layers (trajectory hexes
-  // on/off, OBIS on/off, profile types) is decided server-side via the tile-URL
-  // params — see buildTileSuffix.
+  // Apply the track-line visibility: the track layers show only when at least
+  // one trajectory geometry is on AND the track-lines switch is on. This is the
+  // ONLY thing that hides them — the blanket "Hexes & points" picker owns the
+  // hex and point layers alone (observationLayerIds), so turning it off no
+  // longer takes the tracks with it. WHICH tracks are drawn (Trajectory,
+  // TrajectoryProfile or both) is decided server-side from the tile-URL params,
+  // the same as the hex layers — see buildTileSuffix.
   function applyLayerVisibility() {
     if (!map.current || !map.current.getLayer('track-lines')) return
-    const trajOn = dataLayersRef.current
-      ? dataLayersRef.current.trajectories !== false
-      : true
+    const trajOn = anyTrajectoryLayerOn(dataLayersRef.current)
     const showTracks = trajOn && tracksModeRef.current
     ;['track-lines', 'track-heads', 'track-heads-fixed'].forEach((id) =>
       map.current.setLayoutProperty(id, 'visibility', showTracks ? 'visible' : 'none')
@@ -1108,15 +1132,21 @@ export default function CreateMap({
     }
   }, [mapQueryString])
 
-  // Data-layer toggle, and the trajectory hex switch alongside it: both change
-  // the tile-URL params (profileTypes/includeObis/includeTrajectory), so both
-  // refetch the combined/coverage-cell sources and re-apply layer visibility.
+  // Geometry toggle, and the trajectory hex switch alongside it: both change
+  // the tile-URL params (profileTypes/trajectoryTypes/includeObis/
+  // includeTrajectory), so both refetch the combined/coverage-cell sources and
+  // re-apply layer visibility. The track tiles carry trajectoryTypes too, so
+  // they refetch here as well — otherwise switching one trajectory geometry off
+  // would leave its lines on screen until the next scrub or filter change.
   useEffect(() => {
     dataLayersRef.current = dataLayers
     trajectoryHexesRef.current = trajectoryHexes
     // Source existence, not map.loaded() — see the filter effect above.
     if (!map.current || !map.current.getSource('cde-tiles')) return
     refreshCombinedSources(mapQueryString)
+    if (tracksModeRef.current && anyTrajectoryLayerOn(dataLayers)) {
+      refreshTracksSource(mapQueryString, scrubTimeRef.current, trailingDaysRef.current)
+    }
     applyLayerVisibility()
   }, [dataLayers, trajectoryHexes])
 
