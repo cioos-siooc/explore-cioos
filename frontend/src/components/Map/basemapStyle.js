@@ -4,8 +4,8 @@
  * Stack: a bathymetry raster (EMODnet World Base Layer — global GEBCO-derived
  * depth shading with muted grey land) under a slim OpenMapTiles-schema vector
  * overlay (OpenFreeMap) that contributes the CIOOS water tint, a drawn
- * coastline, rivers, boundaries, and FR/EN water & place labels. No API keys;
- * all endpoints are CORS-open.
+ * coastline, rivers and streams, boundaries, and FR/EN water & place labels.
+ * No API keys; all endpoints are CORS-open.
  *
  * Data layers (hexes/points/trajectories/griddap/WMS) are inserted by Map.js
  * *below* FIRST_LABEL_LAYER_ID so labels always stay readable on top.
@@ -122,9 +122,9 @@ export function buildBasemapStyle (lang = 'en') {
           4,
           0,
           7,
-          0.5,
+          0.35,
           11,
-          0.7
+          0.5
         ],
         'line-width': [
           'interpolate',
@@ -149,19 +149,22 @@ export function buildBasemapStyle (lang = 'en') {
       filter: SHORELINE_FILTER,
       layout: { 'line-join': 'round' },
       paint: {
-        'line-color': '#152F37',
+        // Slate-teal rather than near-black: dark enough to hold the edge
+        // against pale land, but it sits in the basemap's own hue range
+        // instead of reading as ink drawn over the top of it.
+        'line-color': '#33555F',
         'line-opacity': [
           'interpolate',
           ['linear'],
           ['zoom'],
           2,
-          0.35,
+          0.3,
           6,
-          0.65,
+          0.55,
           10,
-          0.85,
+          0.72,
           14,
-          0.95
+          0.82
         ],
         'line-width': [
           'interpolate',
@@ -177,6 +180,47 @@ export function buildBasemapStyle (lang = 'en') {
           2.2,
           18,
           3
+        ]
+      }
+    },
+    // Streams (and the drains/ditches OSM lumps with them) are their own layer
+    // below the rivers rather than another class in the filter below: they only
+    // exist in the tiles from z12, they are dense enough to read as noise at
+    // any wider view, and they want a thinner, lighter line than a river gets.
+    {
+      id: 'waterway-stream',
+      type: 'line',
+      source: 'ofm',
+      'source-layer': 'waterway',
+      minzoom: 12,
+      filter: [
+        'match',
+        ['get', 'class'],
+        ['stream', 'drain', 'ditch'],
+        true,
+        false
+      ],
+      paint: {
+        'line-color': '#3C8377',
+        'line-opacity': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          12,
+          0.35,
+          14,
+          0.5
+        ],
+        'line-width': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          12,
+          0.5,
+          14,
+          1,
+          18,
+          2
         ]
       }
     },
