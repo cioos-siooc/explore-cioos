@@ -133,11 +133,11 @@ export function buildBasemapStyle (lang = 'en') {
           4,
           1.2,
           10,
-          3,
+          2.4,
           14,
-          5,
+          3,
           18,
-          7
+          3.6
         ]
       }
     },
@@ -166,6 +166,9 @@ export function buildBasemapStyle (lang = 'en') {
           14,
           0.82
         ],
+        // Kept close to a hairline as it zooms in: past z12 the line is the
+        // only shore there is, so it has to stay crisp, but it should read as
+        // a drawn edge rather than a band laid over the coast.
         'line-width': [
           'interpolate',
           ['linear'],
@@ -175,18 +178,31 @@ export function buildBasemapStyle (lang = 'en') {
           6,
           0.8,
           10,
-          1.4,
+          1.2,
           14,
-          2.2,
+          1.5,
           18,
-          3
+          1.8
         ]
       }
     },
-    // Streams (and the drains/ditches OSM lumps with them) are their own layer
-    // below the rivers rather than another class in the filter below: they only
-    // exist in the tiles from z12, they are dense enough to read as noise at
-    // any wider view, and they want a thinner, lighter line than a river gets.
+    // Watercourse centrelines — rivers, canals, and the streams/drains/ditches
+    // below them — are a z12+ detail only.
+    //
+    // OSM carries a river centreline right through wide estuaries: the
+    // Saint-Laurent is a single waterway=river all the way from the Great
+    // Lakes out to the gulf, so it drew a solid line down the middle of 30 km
+    // of open water at every zoom from 3 up. The tiles expose no flag for "this
+    // line runs inside a water polygon" (class, brunnel, intermittent and name
+    // are the only fields), so there is nothing to filter on — but any river
+    // wide enough to look wrong as a line is already mapped as a water polygon,
+    // which the coastline layer above outlines. Gating the centrelines to the
+    // zooms where you are looking at local land detail keeps them where they
+    // are the only representation of a watercourse and drops them where the
+    // polygon has it covered.
+    //
+    // Streams stay a separate layer, under the rivers: they only exist in the
+    // tiles from z12 anyway, and they want a thinner, lighter line.
     {
       id: 'waterway-stream',
       type: 'line',
@@ -229,6 +245,7 @@ export function buildBasemapStyle (lang = 'en') {
       type: 'line',
       source: 'ofm',
       'source-layer': 'waterway',
+      minzoom: 12,
       filter: [
         'match',
         ['get', 'class'],
@@ -243,12 +260,12 @@ export function buildBasemapStyle (lang = 'en') {
           'interpolate',
           ['linear'],
           ['zoom'],
-          6,
-          0.6,
-          10,
-          1.6,
+          12,
+          1,
           14,
-          3
+          1.6,
+          18,
+          2.6
         ]
       }
     },
@@ -257,7 +274,17 @@ export function buildBasemapStyle (lang = 'en') {
       type: 'line',
       source: 'ofm',
       'source-layer': 'boundary',
-      filter: ['<=', ['get', 'admin_level'], 4],
+      // Land boundaries only. The maritime halves of the same borders run
+      // clean across open water — the provincial lines through the Gulf of
+      // St Lawrence and Cabot Strait — which is noise on an ocean map. The
+      // tiles flag them, so unlike the river centrelines these can just be
+      // filtered out. `maritime` is absent on plenty of features, and a
+      // missing property compares unequal here, so those still draw.
+      filter: [
+        'all',
+        ['<=', ['get', 'admin_level'], 4],
+        ['!=', ['get', 'maritime'], 1]
+      ],
       paint: {
         'line-color': 'rgba(21, 47, 55, 0.3)',
         'line-width': 1,
@@ -269,7 +296,10 @@ export function buildBasemapStyle (lang = 'en') {
       type: 'symbol',
       source: 'ofm',
       'source-layer': 'waterway',
-      minzoom: 6,
+      // Matches the centreline it is placed along: without this the estuary
+      // still reads "Saint Lawrence River" across open water on an invisible
+      // line. Big water bodies keep their name via label-water regardless.
+      minzoom: 12,
       filter: ['match', ['get', 'class'], ['river', 'canal'], true, false],
       layout: {
         'symbol-placement': 'line',
