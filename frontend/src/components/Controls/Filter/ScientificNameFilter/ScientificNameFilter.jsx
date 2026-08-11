@@ -236,13 +236,12 @@ export default function ScientificNameFilter({
             ))}
           </div>
           {scientificNamesSelected.length > 0 && (
-            <button onClick={() => setScientificNamesSelected([])}>
-              {t('resetButtonText')}
-            </button>
+            <div className='filterOptionsActions'>
+              <button onClick={() => setScientificNamesSelected([])}>
+                {t('resetButtonText')}
+              </button>
+            </div>
           )}
-          <button onClick={() => setFilterOpen(false)}>
-            {t('closeButtonText')}
-          </button>
         </div>
       )}
     </div>

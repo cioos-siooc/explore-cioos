@@ -46,21 +46,64 @@ export default function SourceFilter({
   const showObisGroup =
     obisNodesSelected.length > 0 && (!search || nodesShown.length > 0)
 
+  // Nothing ticked anywhere constrains nothing, so it asks for the same data
+  // as everything ticked and draws that way — see MultiCheckboxFilter for the
+  // reasoning. The test spans both lists because they are one filter: a
+  // selection in either is a constraint on sources overall.
+  const nothingSelected =
+    !erddapServersSelected.some((server) => server.isSelected) &&
+    !obisNodesSelected.some((node) => node.isSelected)
+  const isChecked = (option) => nothingSelected || option.isSelected
+
+  // Ticking one while everything is implicitly on means "just this one", so
+  // the other list is cleared alongside the untouched entries in this one.
+  function selectOnly(servers, nodes) {
+    setErddapServersSelected(servers)
+    setObisNodesSelected(nodes)
+  }
+
+  const clearedServers = () =>
+    erddapServersSelected.map((s) => ({ ...s, isSelected: false }))
+  const clearedNodes = () =>
+    obisNodesSelected.map((n) => ({ ...n, isSelected: false }))
+
+  // Everything ticked collapses back to the empty representation, so the last
+  // tick lands on the same state Reset gives rather than a synonym of it.
+  function commit(servers, nodes) {
+    const all =
+      servers.every((s) => s.isSelected) && nodes.every((n) => n.isSelected)
+    if (all) return selectOnly(clearedServers(), clearedNodes())
+    return selectOnly(servers, nodes)
+  }
+
   const allNodesSelected =
-    obisNodesSelected.length > 0 &&
-    obisNodesSelected.every((node) => node.isSelected)
-  const someNodesSelected = obisNodesSelected.some((node) => node.isSelected)
+    obisNodesSelected.length > 0 && obisNodesSelected.every(isChecked)
+  const someNodesSelected = obisNodesSelected.some(isChecked)
 
   function toggleServer(pk) {
-    setErddapServersSelected(
+    if (nothingSelected) {
+      return selectOnly(
+        erddapServersSelected.map((s) => ({ ...s, isSelected: s.pk === pk })),
+        clearedNodes()
+      )
+    }
+    return commit(
       erddapServersSelected.map((server) =>
         server.pk === pk ? { ...server, isSelected: !server.isSelected } : server
-      )
+      ),
+      obisNodesSelected
     )
   }
 
   function toggleNode(pk) {
-    setObisNodesSelected(
+    if (nothingSelected) {
+      return selectOnly(
+        clearedServers(),
+        obisNodesSelected.map((n) => ({ ...n, isSelected: n.pk === pk }))
+      )
+    }
+    return commit(
+      erddapServersSelected,
       obisNodesSelected.map((node) =>
         node.pk === pk ? { ...node, isSelected: !node.isSelected } : node
       )
@@ -68,7 +111,14 @@ export default function SourceFilter({
   }
 
   function toggleAllNodes() {
-    setObisNodesSelected(
+    if (nothingSelected) {
+      return selectOnly(
+        clearedServers(),
+        obisNodesSelected.map((n) => ({ ...n, isSelected: true }))
+      )
+    }
+    return commit(
+      erddapServersSelected,
       obisNodesSelected.map((node) => ({
         ...node,
         isSelected: !allNodesSelected
@@ -91,11 +141,11 @@ export default function SourceFilter({
       {serversShown.map((server) => (
         <div
           key={server.pk}
-          className={`optionButton ${server.isSelected && 'selected'}`}
+          className={`optionButton ${isChecked(server) && 'selected'}`}
           title={server.title}
           onClick={() => toggleServer(server.pk)}
         >
-          {server.isSelected ? <CheckSquare /> : <Square />}
+          {isChecked(server) ? <CheckSquare /> : <Square />}
           <span className='optionName'>
             {capitalizeFirstLetter(server.title)}
           </span>
@@ -131,11 +181,11 @@ export default function SourceFilter({
               {nodesShown.map((node) => (
                 <div
                   key={node.pk}
-                  className={`optionButton ${node.isSelected && 'selected'}`}
+                  className={`optionButton ${isChecked(node) && 'selected'}`}
                   title={node.title}
                   onClick={() => toggleNode(node.pk)}
                 >
-                  {node.isSelected ? <CheckSquare /> : <Square />}
+                  {isChecked(node) ? <CheckSquare /> : <Square />}
                   <span className='optionName'>{node.title}</span>
                 </div>
               ))}

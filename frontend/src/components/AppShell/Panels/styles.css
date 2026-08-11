@@ -75,21 +75,98 @@
 
 /* The open filter's options fill the detail pane to the right of the list
    (anchored to the modal body, the nearest positioned ancestor — the list
-   column is static so it cannot clip the pane). */
+   column is static so it cannot clip the pane).
+
+   The pane is a column: search on top, options taking whatever is left, and
+   the actions pinned under them. The pane itself never scrolls in either
+   direction — the options do, vertically — so the actions stay reachable
+   however long the list is, and nothing can push the modal sideways. */
 .filtersPanel .filterOptions {
   position: absolute;
   top: 12px;
   left: 296px;
   right: 12px;
   bottom: 12px;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   max-width: none;
   max-height: none;
-  overflow-y: auto;
+  overflow: hidden;
   border: none;
   border-radius: 0;
   box-shadow: none;
   padding: 4px 8px 12px;
+}
+
+.filtersPanel .filterOptionsBody {
+  flex: 1 1 auto;
+  /* min-*: 0 lets a flex item shrink below its content size — without it the
+     list refuses to shrink and overflows the pane instead of scrolling. */
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.filtersPanel .filterOptionsActions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+/* The filter bodies each brought their own scroll box and minimum width, sized
+   for the old free-floating dropdown. Inside the pane that meant a second
+   scrollbar, a list capped well short of the space available, and — with the
+   negative margin below — a horizontal scrollbar on every filter. The pane now
+   owns the scrolling and the width; the bodies just fill it. */
+.filtersPanel .filterOptionsBody > *,
+.filtersPanel .multiCheckboxFilter,
+.filtersPanel .scientificNameSuggestions,
+.filtersPanel .scientificNameChips,
+.filtersPanel .depthSelector {
+  max-height: none;
+  min-width: 0;
+  max-width: none;
+  overflow: visible;
+  margin-right: 0;
+}
+
+/* Long names (dataset titles above all) wrap instead of widening the pane. */
+.filtersPanel .optionButton {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.35;
+  padding: 6px 8px;
+  min-width: 0;
+}
+
+.filtersPanel .optionButton > svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.filtersPanel .optionName {
+  margin-left: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Was pinned to the pane's bottom-right, where it now lands on top of the
+   actions row it belongs in. */
+.filtersPanel .filterInfoButton {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 0 8px;
+  height: 30px;
 }
 
 /* Sections stay compact inside the modal. */
@@ -158,12 +235,20 @@
     border-right: none;
   }
 
+  /* Stacked inline under its row, the pane has no height of its own to
+     distribute, so it flows normally and the whole panel scrolls instead. */
   .filtersPanel .filterOptions {
     position: static;
+    display: block;
+    overflow: visible;
     margin: 4px 0 8px;
     border: 1px solid var(--cioos-hairline);
     border-radius: var(--cioos-radius);
     padding: 12px;
+  }
+
+  .filtersPanel .filterOptionsBody {
+    overflow: visible;
   }
 
   .filtersPanelPlaceholder {

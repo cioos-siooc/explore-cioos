@@ -1,31 +1,7 @@
-/* The geometry list is short and fully visible — no scroll cap, unlike the
-   catalog-driven filters this shares .multiCheckboxFilter with. */
-.dataLayersFilter {
-  max-height: none;
-}
-
-/* Two-line rows (name + hint), so the shared 30px single-line height and its
-   line-height have to go. */
-.dataLayersFilter .optionButton {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  line-height: 1.35;
-  padding: 6px 8px;
-  margin-bottom: 4px;
-}
-
-.dataLayersFilter .optionButton > svg {
-  flex-shrink: 0;
-  /* nudge the checkbox onto the name's baseline rather than the row's top */
-  margin-top: 1px;
-}
-
-.dataLayersFilter .optionName {
-  /* the shared rule indents the name from the checkbox; the flex gap does
-     that here, for both lines at once */
-  margin-left: 0;
-}
+/* The two-line row layout (name + hint) and the wrapping are shared with every
+   other filter body — see .filtersPanel .optionButton in Panels/styles.css.
+   What is specific to this filter is the hint itself and the nested trajectory
+   view options. */
 
 .dataLayersFilter .optionHint {
   display: block;

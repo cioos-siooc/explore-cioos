@@ -12,7 +12,6 @@ import './styles.css'
 export default function MultiCheckboxFilter({
   optionsSelected,
   setOptionsSelected,
-  searchable,
   translatable,
   colored,
   allOptions
@@ -23,36 +22,60 @@ export default function MultiCheckboxFilter({
     t(a.title).localeCompare(t(b.title), i18n.language)
   )
 
-  function setIsSelectedTo(isSelected, allOptions, listOfPKs) {
-    return allOptions.map((option) => {
-      if (listOfPKs.includes(option.pk)) {
-        return {
-          ...option,
-          isSelected
-        }
-      } else {
-        return option
-      }
-    })
+  // These filters constrain nothing when nothing is ticked, so "none ticked"
+  // and "all ticked" ask for exactly the same data. Showing that state as a
+  // column of empty boxes said the opposite — it read as "no variables
+  // included" when every variable was — so an empty selection draws as fully
+  // ticked instead, and none-ticked stays the canonical way to store it (a
+  // short URL, and newly harvested options are picked up automatically rather
+  // than being absent from a frozen list of everything).
+  const universe = allOptions || optionsSelected
+  const nothingSelected = !universe.some((option) => option.isSelected)
+  const isChecked = (option) => nothingSelected || option.isSelected
+
+  // Collapse a fully-ticked list back to the empty representation, so ticking
+  // the last box lands on the same state Reset gives rather than a synonym of
+  // it that the badge would report as a filter.
+  const canonical = (options) =>
+    options.every((option) => option.isSelected)
+      ? options.map((option) => ({ ...option, isSelected: false }))
+      : options
+
+  // Ticking a box while everything is implicitly on means "just this one",
+  // not "this one on top of all the others" — untick the rest.
+  function toggleOption (option) {
+    if (nothingSelected) {
+      setOptionsSelected(
+        universe.map((opt) => ({ ...opt, isSelected: opt.pk === option.pk }))
+      )
+      return
+    }
+    setOptionsSelected(
+      canonical(
+        universe.map((opt) =>
+          opt.pk === option.pk ? { ...opt, isSelected: !opt.isSelected } : opt
+        )
+      )
+    )
   }
 
   function selectAllSearchResultsToggle () {
-    // Get a list of all the pks in the optionsSelected subset of allOptions
-    const listOfPKs = optionsSelected.reduce(
-      (accumulatedPKs, currentOption) => {
-        accumulatedPKs.push(currentOption.pk)
-        return accumulatedPKs
-      },
-      []
+    const listOfPKs = optionsSelected.map((option) => option.pk)
+    const allShownChecked = optionsSelected.every(isChecked)
+    // Starting from "all implicitly on", the base has to be materialised
+    // before the search subset can be subtracted from it.
+    const base = nothingSelected
+      ? universe.map((option) => ({ ...option, isSelected: true }))
+      : universe
+    setOptionsSelected(
+      canonical(
+        base.map((option) =>
+          listOfPKs.includes(option.pk)
+            ? { ...option, isSelected: !allShownChecked }
+            : option
+        )
+      )
     )
-
-    // Set all isSelected to false if all isSelected === true
-    if (optionsSelected.every((option) => option.isSelected)) {
-      setOptionsSelected(setIsSelectedTo(false, allOptions, listOfPKs))
-    } else {
-      // Set all isSelected to true if some isSelected === false
-      setOptionsSelected(setIsSelectedTo(true, allOptions, listOfPKs))
-    }
   }
 
   return (
@@ -64,11 +87,7 @@ export default function MultiCheckboxFilter({
             className='searchResultsButton'
             onClick={() => selectAllSearchResultsToggle()}
           >
-            {optionsSelected.every((option) => option.isSelected) ? (
-              <CheckSquare />
-            ) : (
-              <Square />
-            )}
+            {optionsSelected.every(isChecked) ? <CheckSquare /> : <Square />}
             {t('multiCheckboxFilterSelectSearchResults')}{' '}
             {`(${optionsSelected.length})`}
             <hr />
@@ -118,36 +137,12 @@ export default function MultiCheckboxFilter({
               content={hoverText}
             >
               <div
-                className={`optionButton ${option.isSelected && 'selected'}`}
+                className={`optionButton ${isChecked(option) && 'selected'}`}
                 key={index}
                 title={hoverText ? '' : t(title)}
-                onClick={() => {
-                  if (searchable) {
-                    setOptionsSelected(
-                      allOptions.map((opt) => {
-                        if (opt.pk === option.pk) {
-                          return {
-                            ...opt,
-                            isSelected: !opt.isSelected
-                          }
-                        } else return opt
-                      })
-                    )
-                  } else {
-                    setOptionsSelected(
-                      optionsSelected.map((opt) => {
-                        if (opt.pk === option.pk) {
-                          return {
-                            ...opt,
-                            isSelected: !opt.isSelected
-                          }
-                        } else return opt
-                      })
-                    )
-                  }
-                }}
+                onClick={() => toggleOption(option)}
               >
-                {option.isSelected ? <CheckSquare /> : <Square />}
+                {isChecked(option) ? <CheckSquare /> : <Square />}
                 <span className='optionName'>
                   {capitalizeFirstLetter(title)}
                 </span>

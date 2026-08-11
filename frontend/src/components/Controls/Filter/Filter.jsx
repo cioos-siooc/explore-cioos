@@ -96,33 +96,41 @@ export default function Filter({
               )}
             </>
           )}
-          {children}
-          {selectAllButton && (
-            <button onClick={() => selectAllButton()}>
-              {t('selectAllButtonText', {
-                total: numberOfOptions
-              })}
-            </button>
-          )}
-          {resetButton && (
-            <button onClick={() => resetButton()}>
-              {t('resetButtonText')}
-            </button>
-          )}
-          <button onClick={() => setFilterOpen(false)}>
-            {t('closeButtonText')}
-          </button>
-          {infoButton && (
-            <a
-              className='filterInfoButton'
-              href={infoButton}
-              target='_blank'
-              title={t('filterInfoButtonTitle')}
-              rel='noreferrer'
-            >
-              Info&nbsp;
-              <BoxArrowUpRight color='#52A79B' size={17.5} />
-            </a>
+          {/* The options themselves are the one scrolling region: the pane
+              fills the modal, so the list grows into it and the actions below
+              stay put instead of being pushed off the end of a long list. */}
+          <div className='filterOptionsBody'>{children}</div>
+          {(selectAllButton || resetButton || infoButton) && (
+            <div className='filterOptionsActions'>
+              {selectAllButton && (
+                <button onClick={() => selectAllButton()}>
+                  {t('selectAllButtonText', {
+                    total: numberOfOptions
+                  })}
+                </button>
+              )}
+              {resetButton && (
+                <button onClick={() => resetButton()}>
+                  {t('resetButtonText')}
+                </button>
+              )}
+              {/* No Close button: the filter row toggles itself shut, clicking
+                  outside closes it, and filters apply live — so a button whose
+                  only job was to dismiss a pane you can leave by looking away
+                  was just one more thing between the user and the options. */}
+              {infoButton && (
+                <a
+                  className='filterInfoButton'
+                  href={infoButton}
+                  target='_blank'
+                  title={t('filterInfoButtonTitle')}
+                  rel='noreferrer'
+                >
+                  Info&nbsp;
+                  <BoxArrowUpRight color='#52A79B' size={17.5} />
+                </a>
+              )}
+            </div>
           )}
         </div>
       )}
