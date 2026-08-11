@@ -13,6 +13,7 @@ import {
 import {
   colorScale,
   DEFAULT_HEX_METRIC,
+  isMarkerTier,
   TRAIL_ALL,
   effectiveTrailingDays
 } from '../../config.js'
@@ -62,8 +63,11 @@ function pickTickIndices(n, maxTicks = 5) {
 }
 
 // Compact floating legend card (top-right). Two independently collapsible
-// groups: the legend proper (a hex color bar below z7, point size + platform
-// colors above) and the map-layer switches.
+// groups: the legend proper — the ramp's title (which is the metric picker),
+// the ramp with its tick labels, and the keys for whatever else the map is
+// drawing (platform colours above the hex band, track lines, the coverage
+// ramp) — and the map-layer switches. Each group is all-or-nothing: its header
+// shows the whole key or none of it.
 export default function Legend({
   currentRangeLevel,
   currentCoverageRangeLevel,
@@ -83,6 +87,9 @@ export default function Legend({
   dataLayers
 }) {
   const { t } = useTranslation()
+  // The header's collapse, and the only thing that hides any of this: open, the
+  // section shows its whole key — title, ramp, ticks, platform colours, track
+  // lines, the coverage ramp; closed, it is the header row alone.
   const [legendOpen, setLegendOpen] = useState(true)
   // Layers section starts collapsed on narrow viewports (where the legend
   // moves to the bottom-left corner) to keep the corner card compact.
@@ -101,6 +108,12 @@ export default function Legend({
     layers.timeseriesProfile ||
     layers.obis ||
     (layers.trajectories && trajectoryHexes)
+  // Trajectory and OBIS coverage share one hex layer and one ramp.
+  // currentCoverageRangeLevel is only set at the marker tier (MapStateProvider),
+  // which is the only place that layer draws, so it doubles as the zoom gate.
+  const showCoverageRamp =
+    (layers.obis || (layers.trajectories && trajectoryHexes)) &&
+    !isEmpty(currentCoverageRangeLevel)
 
   // Every ramp caption names the metric, because the ramp itself doesn't
   // change — only what it counts does. A bar that looks identical in both
@@ -137,9 +150,11 @@ export default function Legend({
 
   // Continuous color bar for a hex ramp. The hex counts follow a non-linear
   // (power/log) scale, so the colors are spaced evenly by their scale index
-  // rather than by value — a linear-value axis would collapse the ramp into
-  // the dominant high-count color. Count ticks are drawn at each stop (thinned
-  // to keep the compact bar legible), which naturally reads as a log axis.
+  // rather than by value — a linear-value axis would collapse the ramp into the
+  // dominant high-count color. Count ticks are drawn at each stop (thinned to
+  // keep the compact bar legible), which naturally reads as a log axis.
+  // `caption` is omitted for the primary ramp, which the metric picker above
+  // already titles.
   function renderColorBar(caption, scale, rangeLevel, key) {
     const colorStops = generateColorStops(scale, rangeLevel)
     if (!colorStops || !colorStops.length) return null
@@ -159,7 +174,7 @@ export default function Legend({
     const clamped = rangeLevel?.[2] > rangeLevel?.[1]
     return (
       <div className='legendSection' key={key}>
-        <div className='legendSectionCaption'>{caption}</div>
+        {caption && <div className='legendSectionCaption'>{caption}</div>}
         <div
           className='legendColorBar'
           style={{ background: gradient }}
@@ -219,19 +234,22 @@ export default function Legend({
           {t('legendNoDataWarningText')}
         </div>
       )
-    } else if (zoom < 7) {
-      // Hexes
-      return renderColorBar(hexCaption, colorScale, currentRangeLevel, 'hexes')
+    } else if (!isMarkerTier(zoom)) {
+      // Hexes. No caption — the metric dropdown above titles this ramp.
+      return renderColorBar(null, colorScale, currentRangeLevel, 'hexes')
     } else {
-      // Points. Marker size ramps on the same metric the hexes colour by, so
-      // the key is the two ends of that ramp rather than the old fixed
-      // "one day or less / more than one day" split, which stopped meaning
-      // anything once the count became a measurement count.
+      // Points, always keyed to days of data (MARKER_METRIC): the two ends of
+      // the size ramp the markers actually use.
       const [lo, hi] = currentRangeLevel
+      // radiusExpression (Map.jsx) drops to one flat radius when the range is
+      // degenerate — every location holding the same number of days, which is
+      // common zoomed right in, where the answer is usually "1". Two circles
+      // then promise a ramp the map isn't drawing, and label both ends "1".
+      const ramped = Number.isFinite(lo) && Number.isFinite(hi) && hi > lo
       return (
         <>
           <div className='legendSection'>
-            <div className='legendSectionCaption'>{pointCaption}</div>
+            {/* titled by the metric dropdown above, like the hex ramp */}
             <div className='legendItems'>
               <div className='legendItem'>
                 <span className='legendSwatch'>
@@ -243,16 +261,14 @@ export default function Legend({
                     : t('legendPointSizeLess')}
                 </span>
               </div>
-              <div className='legendItem'>
-                <span className='legendSwatch'>
-                  <span className='legendPointCircle large' />
-                </span>
-                <span className='legendItemLabel'>
-                  {Number.isFinite(hi)
-                    ? formatCount(hi)
-                    : t('legendPointSizeMore')}
-                </span>
-              </div>
+              {ramped && (
+                <div className='legendItem'>
+                  <span className='legendSwatch'>
+                    <span className='legendPointCircle large' />
+                  </span>
+                  <span className='legendItemLabel'>{formatCount(hi)}</span>
+                </div>
+              )}
             </div>
           </div>
           {platformSwatches.length > 0 && (
@@ -342,17 +358,10 @@ export default function Legend({
     )
   }
 
-  // Trajectory and OBIS coverage both render as hexes and share one map layer,
-  // and now one ramp — so one bar, not the three (trajectory / occurrence /
-  // mixed) this used to emit. What a hex actually holds is in its hover
-  // tooltip; colour is reserved for how much.
-  //
-  // currentCoverageRangeLevel is only set at zoom >= 7 (MapStateProvider),
-  // which is the only place this layer draws, so it doubles as the zoom gate.
+  // One bar, not the three (trajectory / occurrence / mixed) this used to
+  // emit. What a hex actually holds is in its hover tooltip; colour is
+  // reserved for how much.
   function generateCoverageLegendElements() {
-    const showCoverageRamp =
-      (layers.obis || (layers.trajectories && trajectoryHexes)) &&
-      !isEmpty(currentCoverageRangeLevel)
     return (
       <>
         {generateTrajectoryLegendElements()}
@@ -364,6 +373,53 @@ export default function Legend({
             'coverage'
           )}
       </>
+    )
+  }
+
+  // The metric picker doubles as the ramp's title: the bar looks the same
+  // whatever it counts, so the line naming what it counts is the only thing
+  // that changes — make that line the control.
+  function renderMetricTitle() {
+    // Nothing on the map is keyed to a count (tracks only, say): a title for a
+    // ramp that isn't there names nothing.
+    if (!showPointRamp && !showCoverageRamp) return null
+    const caption = isMarkerTier(zoom) ? pointCaption : hexCaption
+    // The counts mix units and some are extrapolated from sampling rate rather
+    // than measured. That caveat used to be a footnote under the ramp, which
+    // spent three lines of a card this small on a sentence most people read
+    // once — it hangs off the label it qualifies instead.
+    const tooltip =
+      metric === 'records'
+        ? t('legendCountsApproximate')
+        : metricOptions.find((option) => option.key === metric)?.title
+    // No handler = the metric is pinned (the marker tier always counts days of
+    // data). Say why, rather than describing a metric the user didn't pick.
+    if (!onMetricChange) {
+      return (
+        <div className='legendSectionCaption' title={t('legendMarkerDaysPinned')}>
+          {caption}
+        </div>
+      )
+    }
+    return (
+      <DropdownButton
+        className='legendMetricDropdown'
+        size='sm'
+        variant='outline-secondary'
+        title={caption}
+        tooltip={tooltip}
+      >
+        {metricOptions.map((option) => (
+          <Dropdown.Item
+            key={option.key}
+            active={option.key === metric}
+            title={option.title}
+            onClick={() => onMetricChange(option.key)}
+          >
+            {option.label}
+          </Dropdown.Item>
+        ))}
+      </DropdownButton>
     )
   }
 
@@ -396,42 +452,9 @@ export default function Legend({
         )}
         {legendOpen && (
           <div className='legendGroupBody'>
-            {/* What the ramp counts. Sits above the bars because it changes
-                what every one of them means. */}
-            {onMetricChange && (
-              <div className='legendBasemapSelector'>
-                <span className='legendSectionCaption'>
-                  {t('legendColourBy')}
-                </span>
-                <DropdownButton
-                  className='legendBasemapDropdown'
-                  size='sm'
-                  variant='outline-secondary'
-                  title={
-                    metricOptions.find((option) => option.key === metric)?.label
-                  }
-                >
-                  {metricOptions.map((option) => (
-                    <Dropdown.Item
-                      key={option.key}
-                      active={option.key === metric}
-                      title={option.title}
-                      onClick={() => onMetricChange(option.key)}
-                    >
-                      {option.label}
-                    </Dropdown.Item>
-                  ))}
-                </DropdownButton>
-              </div>
-            )}
+            {renderMetricTitle()}
             {generateLegendElements()}
             {generateCoverageLegendElements()}
-            {/* The counts mix units and some are extrapolated from sampling
-                rate rather than measured — say so once, here, instead of
-                implying an exactness the harvest doesn't have. */}
-            {metric === 'records' && showPointRamp && (
-              <div className='legendFootnote'>{t('legendCountsApproximate')}</div>
-            )}
           </div>
         )}
       </div>

@@ -77,6 +77,30 @@ export const hexOutlineColor = '#FFFFFF'
 export const HEX_METRICS = ['records', 'days', 'datasets']
 export const DEFAULT_HEX_METRIC = 'records'
 
+// Where the hex aggregates give way to individual markers. Was a bare 7 in
+// Map.jsx (hexMaxZoom), MapStateProvider and the Legend; the marker tier's
+// pinned metric below makes those three agree by necessity rather than by
+// coincidence, so the number lives in one place.
+export const MARKER_MIN_ZOOM = 7
+
+// Is the camera in the marker tier? Not inlined as a comparison because the two
+// obvious spellings disagree on the two non-numeric zooms this actually sees:
+// mapView starts as {} (zoom undefined, before the map reports its first view)
+// and a share link's ?zoom= arrives as a string. `undefined < 7` is false, so
+// the "hexes" test silently reads the world view as the marker tier, while
+// `undefined >= 7` is also false, so the "markers" test reads it correctly —
+// two call sites, two answers, for the same camera. Coerce, and treat an
+// unknown zoom as the hex tier: the default camera is the whole world.
+export const isMarkerTier = (zoom) => Number(zoom) >= MARKER_MIN_ZOOM
+
+// The marker tier ignores the metric above and always counts days of data.
+// Marker *size* is the only "how much" channel a point has, and area is a weak
+// one: measurement counts run over eight orders of magnitude, so a log radius
+// ramp over them leaves nearly every marker at the same size. Days of data
+// spans three or four orders instead, which a radius can actually show. The
+// hex ramp keeps the metric switcher — colour has the range to carry it.
+export const MARKER_METRIC = 'days'
+
 // Tracks mode (trajectory track lines + time scrub bar)
 // 'all' = no trailing cutoff: every platform's full track up to the scrub
 // date. Episodic trajectory datasets (a 2017-19 ferry, a 2016 glider

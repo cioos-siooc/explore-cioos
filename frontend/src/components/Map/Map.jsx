@@ -43,6 +43,7 @@ import {
   colorScale,
   hexOutlineColor,
   DEFAULT_HEX_METRIC,
+  MARKER_MIN_ZOOM,
   trackLineColor,
   selectedTrackColor,
   tracksMinDate,
@@ -264,7 +265,10 @@ export default function CreateMap({
   // at every count. Count is carried by colour alone.
   const hexOpacity = 0.8
   const hexMinZoom = 0
-  const hexMaxZoom = 7
+  // Shared with MapStateProvider (which pins the metric above this zoom) and
+  // the Legend (which switches its key here): the hex band ending and the
+  // marker tier starting are the same boundary, and they must not drift.
+  const hexMaxZoom = MARKER_MIN_ZOOM
   // Zoom at which griddap coverage rectangles take hover/click priority over
   // the hex aggregates (which stop being drawn at hexMaxZoom anyway).
   const griddapPriorityZoom = 5

@@ -15,6 +15,8 @@ import {
   basemap as defaultBasemap,
   DEFAULT_HEX_METRIC,
   defaultTrailingDays,
+  isMarkerTier,
+  MARKER_METRIC,
   TRAIL_ALL
 } from '../../components/config.js'
 import {
@@ -74,6 +76,9 @@ export default function MapStateProvider ({ children }) {
     [query, mapDatasetPKs]
   )
   const [rangeLevels, setRangeLevels] = useState()
+  // Which metric the ranges in flight / on hand were requested for, so a metric
+  // change can be told apart from a filter change (see the refetch effect).
+  const loadedMetric = useRef()
   const [legendLoading, setLegendLoading] = useState(true)
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
   // The always-hex coverage layer (trajectory + OBIS cells) at zoom >= 7. One
@@ -206,6 +211,14 @@ export default function MapStateProvider ({ children }) {
 
   const { zoom } = mapView
 
+  // The marker tier always counts days of data, whatever the switcher says —
+  // see MARKER_METRIC for why. This is the value everything downstream uses
+  // (tile URLs, /legend, the hover tooltips, the legend card), so the pin can't
+  // drift out of sync with what the map is actually painting; `metric` stays
+  // the user's choice, remembered for when they zoom back out to the hexes.
+  const metricPinned = isMarkerTier(zoom)
+  const effectiveMetric = metricPinned ? MARKER_METRIC : metric
+
   // A failed legend fetch (e.g. gateway timeout) just leaves the current
   // color ramp in place — the map itself keeps working — so failures log
   // instead of crashing, and loadLegend() is exposed for the retry banner.
@@ -226,7 +239,8 @@ export default function MapStateProvider ({ children }) {
     return `${server}/legend${s ? '?' + s : ''}`
   }
 
-  function loadLegend (legendQuery, hexMetric = metric) {
+  function loadLegend (legendQuery, hexMetric = effectiveMetric) {
+    loadedMetric.current = hexMetric
     setLegendLoading(true)
     fetchJson(legendUrl(legendQuery, hexMetric))
       .then((legend) => {
@@ -255,11 +269,24 @@ export default function MapStateProvider ({ children }) {
   // hidden from / restored to the map — the ramp counts what the map draws.
   // The metric is in here too: it changes what /legend counts, and a stale
   // range would scale the new numbers against the old domain.
+  //
+  // It's the *effective* metric, so crossing MARKER_MIN_ZOOM refetches — one
+  // /legend response covers every zoom tier of a single metric, and the marker
+  // tier is pinned to a different one than the hexes. Both URLs cache, so it's
+  // one extra fetch per (filters x metric), not one per zoom.
+  //
+  // A metric change refetches even mid-load, unlike a query change. Changing
+  // the metric *causes* a load (the tiles reload to carry the new count), so
+  // the old `!loading` guard skipped the one refetch that mattered and never
+  // retried — the bar kept the previous metric's numbers under the new
+  // metric's tiles. A query change can wait: whatever is in flight already
+  // carries the new filters, whereas an in-flight request cannot retroactively
+  // have asked for a metric that was chosen after it was issued.
   useEffect(() => {
-    if (!loading && !isEmpty(rangeLevels)) {
-      loadLegend(mapQueryString)
-    }
-  }, [mapQueryString, metric])
+    if (isEmpty(rangeLevels)) return
+    if (loading && loadedMetric.current === effectiveMetric) return
+    loadLegend(mapQueryString)
+  }, [mapQueryString, effectiveMetric])
 
   // Fetch griddap coverage bboxes when the layer is visible, in lockstep
   // with the same debounced query the tiles and /pointQuery use. Data is
@@ -287,10 +314,10 @@ export default function MapStateProvider ({ children }) {
   }, [rangeLevels, zoom])
 
   useEffect(() => {
-    // Coverage hexes (trajectory and OBIS cells) only render at zoom >= 7 —
-    // below that, their counts are merged into the main hex ramp — so hide the
-    // legend entry otherwise.
-    if (coverageRangeLevels && zoom >= 7) {
+    // Coverage hexes (trajectory and OBIS cells) only render at the marker
+    // tier — below that, their counts are merged into the main hex ramp — so
+    // hide the legend entry otherwise.
+    if (coverageRangeLevels && isMarkerTier(zoom)) {
       setCurrentCoverageRangeLevel(coverageRangeLevels.zoom1)
     } else {
       setCurrentCoverageRangeLevel()
@@ -309,7 +336,10 @@ export default function MapStateProvider ({ children }) {
     coverageRangeLevels,
     currentRangeLevel,
     currentCoverageRangeLevel,
-    metric,
+    // The pinned value, not the raw preference — see effectiveMetric. Callers
+    // that paint or label the map want what the map is counting.
+    metric: effectiveMetric,
+    metricPinned,
     setMetric,
     griddapCoverageVisible,
     setGriddapCoverageVisible,

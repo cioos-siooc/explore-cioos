@@ -55,24 +55,47 @@
   padding: 0 9px 6px;
 }
 
+/* Styled as the caption it replaces, not as a button — it reads as the ramp's
+   title, and the caret is what says it can be changed. */
+.legendMetricDropdown {
+  display: block;
+  margin-bottom: 3px;
+}
+
+.legendMetricDropdown .btn,
+.legendMetricDropdown .btn-sm {
+  width: 100%;
+  justify-content: space-between;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--cioos-ink-40);
+}
+
+.legendMetricDropdown .btn:hover {
+  background: transparent;
+  color: var(--cioos-ink);
+}
+
+.legendMetricDropdown .btn:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* Same reason as the basemap menu: the card clips horizontal overflow. */
+.legendMetricDropdown .dropdown-item {
+  white-space: normal;
+}
+
 .legendNoData {
   font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink-60);
   padding: 1px 0 3px;
-}
-
-/* The "counts are approximate" caveat under the color bars. Deliberately
-   quiet — it qualifies the ramp, it isn't a warning about it. Wraps, unlike
-   the rest of the card, since it's a sentence rather than a label. */
-.legendFootnote {
-  font-size: 10px;
-  line-height: 1.35;
-  color: var(--cioos-ink-40);
-  margin-top: 8px;
-  padding-top: 6px;
-  border-top: 1px solid var(--cioos-hairline);
-  max-width: 210px;
-  white-space: normal;
 }
 
 /* Waiting on /legend — stands in for the color bar, so the card keeps its

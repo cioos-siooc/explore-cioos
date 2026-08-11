@@ -20,8 +20,10 @@ const DropdownContext = createContext({ close: () => {} })
 // transformed ancestor, which clips an in-place absolutely-positioned menu
 // no matter its own position value. Positioning is computed from the
 // toggle's bounding rect instead of relying on CSS containment.
+// `title` is the toggle's *content*; `tooltip` is the HTML title attribute.
 export function DropdownButton ({
   title,
+  tooltip,
   className = '',
   size,
   variant,
@@ -72,6 +74,7 @@ export function DropdownButton ({
         type='button'
         ref={buttonRef}
         className={buttonClasses}
+        title={tooltip}
         aria-expanded={open}
         aria-haspopup='listbox'
         onClick={() => setOpen(!open)}

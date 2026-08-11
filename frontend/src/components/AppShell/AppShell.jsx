@@ -37,6 +37,7 @@ export default function AppShell () {
     currentRangeLevel,
     currentCoverageRangeLevel,
     metric,
+    metricPinned,
     setMetric,
     legendLoading,
     griddapCoverageVisible,
@@ -158,7 +159,10 @@ export default function AppShell () {
         currentRangeLevel={currentRangeLevel}
         currentCoverageRangeLevel={currentCoverageRangeLevel}
         metric={metric}
-        onMetricChange={setMetric}
+        // Withheld at the marker tier, where the metric is pinned to days of
+        // data: no handler means the Legend titles the ramp with a plain
+        // caption instead of a picker that couldn't change anything.
+        onMetricChange={metricPinned ? undefined : setMetric}
         loading={legendLoading}
         zoom={zoom}
         platformsAvailable={platformsAvailable}
