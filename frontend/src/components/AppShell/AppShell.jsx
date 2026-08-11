@@ -70,6 +70,17 @@ export default function AppShell () {
   const wmsLegendIsInline =
     sidebarOpen && activeWmsOverlay?.pk === inspectDataset?.pk
 
+  // The hex/point layer's own visibility, which rides on the legend's ramp
+  // title rather than sitting with the switches below: the ramp describes that
+  // layer and nothing else, so the control that hides it belongs on the thing
+  // it hides.
+  const observationsControl = {
+    key: 'observations',
+    label: t('layersObservations'),
+    checked: dataLayersVisible,
+    onChange: () => setDataLayersVisible(!dataLayersVisible)
+  }
+
   // Map-layer switches, rendered inside the legend card.
   const layerControls = [
     {
@@ -77,12 +88,6 @@ export default function AppShell () {
       label: t('layersGriddedCoverage'),
       checked: griddapCoverageVisible,
       onChange: () => setGriddapCoverageVisible(!griddapCoverageVisible)
-    },
-    {
-      key: 'observations',
-      label: t('layersObservations'),
-      checked: dataLayersVisible,
-      onChange: () => setDataLayersVisible(!dataLayersVisible)
     },
     {
       key: 'globe',
@@ -166,6 +171,7 @@ export default function AppShell () {
         loading={legendLoading}
         zoom={zoom}
         platformsAvailable={platformsAvailable}
+        observationsControl={observationsControl}
         layerControls={layerControls}
         dataLayerControls={dataLayerControls}
         basemapOptions={basemapOptions}

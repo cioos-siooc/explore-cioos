@@ -55,6 +55,31 @@
   padding: 0 9px 6px;
 }
 
+/* The ramp's title line: the hex/point visibility switch, then the caption
+   (which is the metric picker when the metric is switchable). The switch keeps
+   its intrinsic width and the caption takes the rest, so a long caption
+   ellipsizes rather than squeezing the control. */
+.legendMetricRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  /* the row owns the gap to the ramp below, since its children are zeroed */
+  margin-bottom: 3px;
+}
+
+.legendMetricRow .form-check.form-switch {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.legendMetricRow > .legendSectionCaption,
+.legendMetricRow > .legendMetricDropdown {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
 /* Styled as the caption it replaces, not as a button — it reads as the ramp's
    title, and the caret is what says it can be changed. */
 .legendMetricDropdown {
@@ -120,6 +145,15 @@
   padding-top: 5px;
 }
 
+/* A key whose layer is switched off (the Hexes & points toggle in the ramp
+   title row). Desaturated as well as faded: colour is the encoding that has
+   stopped applying, so draining it says more than fading alone. The title row
+   is never dimmed — it holds the switch that turns this back on. */
+.legendDimmed {
+  opacity: 0.45;
+  filter: grayscale(0.9);
+}
+
 .legendSectionCaption {
   font-size: 10px;
   font-weight: 600;
@@ -146,7 +180,22 @@
   line-height: 1.15;
 }
 
-.legendItem .legendSwatch {
+/* The marker size key, laid out on one line: "○ ≤ 1 < ●". Horizontal because
+   it is a single scale read left to right, not a list of independent entries
+   like the platform colours below it. */
+.legendSizeKey {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  min-height: 15px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink);
+  line-height: 1.15;
+}
+
+.legendItem .legendSwatch,
+.legendSizeKey .legendSwatch {
   flex: 0 0 auto;
   width: 12px;
   display: inline-flex;
@@ -260,25 +309,28 @@
   padding-left: 18px;
 }
 
-.legendLayerItems .form-check.form-switch {
+/* Scoped to the whole card, not just .legendLayerItems: the hex/point
+   visibility switch now sits up in the ramp title row and has to match the
+   switches further down. */
+.legend .form-check.form-switch {
   gap: 6px;
 }
 
-.legendLayerItems .form-switch .form-check-input {
+.legend .form-switch .form-check-input {
   width: 28px;
   height: 16px;
 }
 
-.legendLayerItems .form-switch .form-check-input::before {
+.legend .form-switch .form-check-input::before {
   width: 12px;
   height: 12px;
 }
 
-.legendLayerItems .form-switch .form-check-input:checked::before {
+.legend .form-switch .form-check-input:checked::before {
   transform: translateX(12px);
 }
 
-.legendLayerItems .form-check-label {
+.legend .form-check-label {
   font-size: var(--cioos-font-size-xs);
   line-height: 1.15;
   color: var(--cioos-ink);

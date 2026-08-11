@@ -36,13 +36,16 @@ const COUNT_UNITS = [
   [1e6, 'M'],
   [1e3, 'k']
 ]
-function formatCount(value) {
+// `singleDigit` drops the fraction — "4k", never "4.2k". The marker size key
+// lays its two values out side by side, where width is the scarce dimension and
+// a decimal buys precision nobody reads off a pair of circles.
+function formatCount(value, singleDigit = false) {
   if (!Number.isFinite(value)) return ''
   for (const [size, suffix] of COUNT_UNITS) {
     if (value >= size) {
       const scaled = value / size
       return `${
-        scaled >= 10
+        scaled >= 10 || singleDigit
           ? Math.round(scaled)
           : scaled.toFixed(1).replace(/\.0$/, '')
       }${suffix}`
@@ -76,6 +79,7 @@ export default function Legend({
   loading,
   zoom,
   platformsAvailable = [],
+  observationsControl,
   layerControls = [],
   dataLayerControls = [],
   basemapOptions = [],
@@ -115,21 +119,6 @@ export default function Legend({
     (layers.obis || (layers.trajectories && trajectoryHexes)) &&
     !isEmpty(currentCoverageRangeLevel)
 
-  // Every ramp caption names the metric, because the ramp itself doesn't
-  // change — only what it counts does. A bar that looks identical in both
-  // modes has to say which one it's in.
-  const hexCaption = t(
-    {
-      days: 'legendDaysPerHex',
-      datasets: 'legendDatasetsPerHex'
-    }[metric] || 'legendMeasurementsPerHex'
-  )
-  const pointCaption = t(
-    {
-      days: 'legendDaysPerLocation',
-      datasets: 'legendDatasetsPerLocation'
-    }[metric] || 'legendMeasurementsPerLocation'
-  )
   const metricOptions = [
     {
       key: 'records',
@@ -147,6 +136,25 @@ export default function Legend({
       title: t('legendMetricDatasetsTitle')
     }
   ]
+  const activeMetric = metricOptions.find((option) => option.key === metric)
+  // The hex/point layer is switched off (the toggle in the ramp title row).
+  // Its key stays put — the switch has to keep something to sit beside, and the
+  // numbers are still worth reading — but muted: a fully saturated ramp under
+  // an off switch reads as a live layer. Scoped to what the switch actually
+  // hides (hexes, points, coverage hexes); the track lines are deliberately not
+  // in observationLayerIds, so their key keeps its colour.
+  const observationsHidden = observationsControl
+    ? !observationsControl.checked
+    : false
+  const dimClass = classNames('legendSection', {
+    legendDimmed: observationsHidden
+  })
+  // The caption is the metric and nothing else — no "per hexagon" / "per
+  // location" qualifier. Which shape is carrying the count is obvious from the
+  // map and from the swatches right below it, and spelling it out made the one
+  // line in this card that changes with the zoom read as if the *metric* had
+  // changed when only the geometry had.
+  const metricCaption = activeMetric?.label || t('legendMetricRecords')
 
   // Continuous color bar for a hex ramp. The hex counts follow a non-linear
   // (power/log) scale, so the colors are spaced evenly by their scale index
@@ -173,7 +181,7 @@ export default function Legend({
     // real maximum — say "264k+", not "264k".
     const clamped = rangeLevel?.[2] > rangeLevel?.[1]
     return (
-      <div className='legendSection' key={key}>
+      <div className={dimClass} key={key}>
         {caption && <div className='legendSectionCaption'>{caption}</div>}
         <div
           className='legendColorBar'
@@ -238,41 +246,43 @@ export default function Legend({
       // Hexes. No caption — the metric dropdown above titles this ramp.
       return renderColorBar(null, colorScale, currentRangeLevel, 'hexes')
     } else {
-      // Points, always keyed to days of data (MARKER_METRIC): the two ends of
-      // the size ramp the markers actually use.
+      // Points, always keyed to days of data (MARKER_METRIC). One line rather
+      // than a stacked pair, and one number rather than both ends of the ramp:
+      // "○ ≤ 1 < ●" — at or below the ramp's floor a marker is drawn at the
+      // small radius, and it grows from there. radiusExpression (Map.jsx)
+      // clamps below `lo`, so the floor is the value worth naming; the top of
+      // the ramp is what "bigger circle" already says.
       const [lo, hi] = currentRangeLevel
-      // radiusExpression (Map.jsx) drops to one flat radius when the range is
+      // That same expression drops to one flat radius when the range is
       // degenerate — every location holding the same number of days, which is
-      // common zoomed right in, where the answer is usually "1". Two circles
-      // then promise a ramp the map isn't drawing, and label both ends "1".
+      // common zoomed right in, where the answer is usually "1". There is no
+      // "grows from there" to show then, so the large circle goes away.
       const ramped = Number.isFinite(lo) && Number.isFinite(hi) && hi > lo
       return (
         <>
-          <div className='legendSection'>
+          <div className={dimClass}>
             {/* titled by the metric dropdown above, like the hex ramp */}
-            <div className='legendItems'>
-              <div className='legendItem'>
-                <span className='legendSwatch'>
-                  <span className='legendPointCircle small' />
-                </span>
-                <span className='legendItemLabel'>
-                  {Number.isFinite(lo)
-                    ? formatCount(lo)
-                    : t('legendPointSizeLess')}
-                </span>
-              </div>
+            <div className='legendSizeKey'>
+              <span className='legendSwatch'>
+                <span className='legendPointCircle small' />
+              </span>
+              <span className='legendItemLabel'>
+                {Number.isFinite(lo)
+                  ? `≤ ${formatCount(lo, true)}`
+                  : t('legendPointSizeLess')}
+              </span>
               {ramped && (
-                <div className='legendItem'>
+                <>
+                  <span className='legendItemLabel'>&lt;</span>
                   <span className='legendSwatch'>
                     <span className='legendPointCircle large' />
                   </span>
-                  <span className='legendItemLabel'>{formatCount(hi)}</span>
-                </div>
+                </>
               )}
             </div>
           </div>
           {platformSwatches.length > 0 && (
-            <div className='legendSection'>
+            <div className={dimClass}>
               <div className='legendSectionCaption'>
                 {t('legendPlatformType')}
               </div>
@@ -365,9 +375,14 @@ export default function Legend({
     return (
       <>
         {generateTrajectoryLegendElements()}
+        {/* Captioned by the layer it keys, not by its metric: it counts the same
+            metric as the ramp above, so repeating that name would put two bars
+            with different domains under one title. Naming the layer is also
+            what tells them apart, now that the "per hexagon" / "per location"
+            qualifier is gone. */}
         {showCoverageRamp &&
           renderColorBar(
-            hexCaption,
+            t('legendCoverageRamp'),
             colorScale,
             currentCoverageRangeLevel,
             'coverage'
@@ -383,7 +398,18 @@ export default function Legend({
     // Nothing on the map is keyed to a count (tracks only, say): a title for a
     // ramp that isn't there names nothing.
     if (!showPointRamp && !showCoverageRamp) return null
-    const caption = isMarkerTier(zoom) ? pointCaption : hexCaption
+    // The hex/point layer's visibility switch, unlabelled: the caption beside it
+    // is the label. It rides here rather than with the other layer switches
+    // because the ramp describes that one layer, so this is the control that
+    // turns off what the ramp is a key to.
+    const visibilitySwitch = observationsControl && (
+      <Switch
+        id={`mapLayer-${observationsControl.key}`}
+        title={observationsControl.label}
+        checked={observationsControl.checked}
+        onChange={observationsControl.onChange}
+      />
+    )
     // The counts mix units and some are extrapolated from sampling rate rather
     // than measured. That caveat used to be a footnote under the ramp, which
     // spent three lines of a card this small on a sentence most people read
@@ -396,30 +422,39 @@ export default function Legend({
     // data). Say why, rather than describing a metric the user didn't pick.
     if (!onMetricChange) {
       return (
-        <div className='legendSectionCaption' title={t('legendMarkerDaysPinned')}>
-          {caption}
+        <div className='legendMetricRow'>
+          {visibilitySwitch}
+          <div
+            className='legendSectionCaption'
+            title={t('legendMarkerDaysPinned')}
+          >
+            {metricCaption}
+          </div>
         </div>
       )
     }
     return (
-      <DropdownButton
-        className='legendMetricDropdown'
-        size='sm'
-        variant='outline-secondary'
-        title={caption}
-        tooltip={tooltip}
-      >
-        {metricOptions.map((option) => (
-          <Dropdown.Item
-            key={option.key}
-            active={option.key === metric}
-            title={option.title}
-            onClick={() => onMetricChange(option.key)}
-          >
-            {option.label}
-          </Dropdown.Item>
-        ))}
-      </DropdownButton>
+      <div className='legendMetricRow'>
+        {visibilitySwitch}
+        <DropdownButton
+          className='legendMetricDropdown'
+          size='sm'
+          variant='outline-secondary'
+          title={metricCaption}
+          tooltip={tooltip}
+        >
+          {metricOptions.map((option) => (
+            <Dropdown.Item
+              key={option.key}
+              active={option.key === metric}
+              title={option.title}
+              onClick={() => onMetricChange(option.key)}
+            >
+              {option.label}
+            </Dropdown.Item>
+          ))}
+        </DropdownButton>
+      </div>
     )
   }
 
