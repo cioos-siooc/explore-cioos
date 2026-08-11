@@ -1,6 +1,8 @@
 require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
+const { RESP_TYPES } = require("redis");
+const redisClient = require("../utils/redis");
 
 const router = express.Router();
 
@@ -73,20 +75,29 @@ const BROWSER_MAX_AGE_S = 604800;
 const ERROR_MAX_AGE_S = 60;
 
 /*
- * Deliberately not utils/cache (apicache + redis) like the vector-tile routes.
- * That path stores values through an adapter that does
- * `typeof value === 'string' ? value : String(value)`, and String()-ing a
- * Buffer decodes it as UTF-8 — which mangles binary PNG bytes. A small bounded
- * in-process cache avoids the question entirely and is enough: it absorbs the
- * repeat requests a shared viewport generates, and the browser Cache-Control
- * above handles the rest.
+ * Two cache levels: a small in-process map (L1) in front of redis (L2).
  *
- * Sizing: measured tiles run ~5-40 KB, so the 3000 default is ~120 MB at the
+ * L2 is redis directly rather than utils/cache. The apicache path there stores
+ * through an adapter doing `typeof value === 'string' ? value : String(value)`,
+ * and String()-ing a Buffer decodes it as UTF-8, which mangles PNG bytes —
+ * measured: an 18,896-byte tile came back as a 34,517-byte string with a
+ * different md5. Talking to redis directly avoids that, but only if the read
+ * side is told to hand back Buffers: node-redis decodes replies as strings by
+ * default and would corrupt them the same way. Hence the type mapping below —
+ * verified byte-identical (md5 match) on a round trip through redis 5.8.
+ * Note `commandOptions({ returnBuffers: true })`, the node-redis v4 idiom, no
+ * longer exists in v5; it is `undefined`, so it would fail silently.
+ *
+ * L2 is what makes pre-warming a region worthwhile: it survives restarts, is
+ * shared across API instances, and is bounded by redis's own maxmemory policy
+ * rather than this process's heap. Warming a whole region needs redis sized for
+ * it — the full pyramid for both products is a few hundred GB, so warm regions,
+ * not the country.
+ *
+ * L1 sizing: measured tiles run ~5-40 KB, so the 3000 default is ~120 MB at the
  * absolute worst (every entry a dense 40 KB NONNA 10 tile) and more like 40-60
- * MB in practice. Both products are now requested across the same zoom range,
- * so a session pulls roughly twice the tiles it used to and the cache has to be
- * correspondingly bigger to still absorb a shared viewport. Override with
- * NONNA_TILE_CACHE_MAX where the container is memory-tight.
+ * MB in practice. Override with NONNA_TILE_CACHE_MAX where the container is
+ * memory-tight.
  */
 const TILE_CACHE_MAX = Number(process.env.NONNA_TILE_CACHE_MAX) > 0
   ? Number(process.env.NONNA_TILE_CACHE_MAX)
@@ -113,6 +124,107 @@ function cacheSet(key, body) {
     tileCache.delete(oldest);
   }
   tileCache.set(key, { body, expires: Date.now() + TILE_CACHE_TTL_MS });
+}
+
+// Tiles are static: CHS republishes NONNA on a slow cycle, so a month is safe
+// and keeps a warmed region warm.
+const REDIS_TTL_S = 30 * 24 * 60 * 60;
+const redisKey = (key) => `nonna:tile:${key}`;
+
+/*
+ * Every redis call is bounded. node-redis keeps retrying a refused connection
+ * under its default reconnect strategy, so an un-raced `await connect()` never
+ * settles when redis is down — which stalls the tile request behind it and
+ * hangs the layer. The cache is an optimisation; it must fail in milliseconds,
+ * not hold the map hostage.
+ */
+const REDIS_CONNECT_TIMEOUT_MS = 2000;
+const REDIS_OP_TIMEOUT_MS = 1000;
+// After a failure, stop trying for a while rather than paying the timeout on
+// every tile — but do retry eventually, so a redis that comes back is picked up
+// without restarting the API.
+const REDIS_RETRY_AFTER_MS = 60000;
+
+let redisReadyPromise = null;
+let redisUnavailableUntil = 0;
+
+function withTimeout(promise, ms, label) {
+  let timer;
+  const bell = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    // Don't let a pending timer keep the process alive.
+    if (timer.unref) timer.unref();
+  });
+  return Promise.race([promise, bell]).finally(() => clearTimeout(timer));
+}
+
+function markRedisDown(reason) {
+  console.warn("NONNA: redis unavailable, serving without it:", reason);
+  redisUnavailableUntil = Date.now() + REDIS_RETRY_AFTER_MS;
+  redisReadyPromise = null;
+}
+
+/*
+ * Resolves to a redis client that returns Buffers, or null if redis is not
+ * usable right now.
+ *
+ * The connect is single-flight for the reason utils/cache documents: redis@5
+ * throws "Socket already opened" on a second connect(). That module races this
+ * one at startup on the SAME shared client, so `isOpen` can still be false
+ * while its connect is in flight — hence catching that specific error and
+ * carrying on rather than treating it as a failure.
+ */
+function ensureRedis() {
+  if (Date.now() < redisUnavailableUntil) return Promise.resolve(null);
+  if (redisReadyPromise) return redisReadyPromise;
+  redisReadyPromise = (async () => {
+    try {
+      if (!redisClient.isOpen) {
+        await withTimeout(
+          redisClient.connect(),
+          REDIS_CONNECT_TIMEOUT_MS,
+          "redis connect",
+        );
+      }
+    } catch (e) {
+      if (!/already opened/i.test(e.message) || !redisClient.isOpen) {
+        markRedisDown(e.message);
+        return null;
+      }
+    }
+    return redisClient.withTypeMapping({ [RESP_TYPES.BLOB_STRING]: Buffer });
+  })();
+  return redisReadyPromise;
+}
+
+async function redisGet(key) {
+  try {
+    const client = await ensureRedis();
+    if (!client) return null;
+    const body = await withTimeout(
+      client.get(redisKey(key)),
+      REDIS_OP_TIMEOUT_MS,
+      "redis get",
+    );
+    return Buffer.isBuffer(body) && body.length ? body : null;
+  } catch (e) {
+    markRedisDown(`read failed: ${e.message}`);
+    return null;
+  }
+}
+
+async function redisSet(key, body) {
+  try {
+    const client = await ensureRedis();
+    if (!client) return;
+    await withTimeout(
+      client.setEx(redisKey(key), REDIS_TTL_S, body),
+      REDIS_OP_TIMEOUT_MS,
+      "redis set",
+    );
+  } catch (e) {
+    markRedisDown(`write failed: ${e.message}`);
+  }
 }
 
 function sendTile(res, body, maxAgeSeconds) {
@@ -201,6 +313,14 @@ router.get("/:layer/:z/:x/:y.png", async (req, res) => {
     return sendTile(res, cached, BROWSER_MAX_AGE_S);
   }
 
+  // L2. Promote into L1 on the way out so a region being panned around does not
+  // pay the redis round trip per tile.
+  const fromRedis = await redisGet(key);
+  if (fromRedis) {
+    cacheSet(key, fromRedis);
+    return sendTile(res, fromRedis, BROWSER_MAX_AGE_S);
+  }
+
   try {
     const upstream = await axios.get(NONNA_WMTS, {
       params: {
@@ -221,6 +341,9 @@ router.get("/:layer/:z/:x/:y.png", async (req, res) => {
 
     const body = Buffer.from(upstream.data);
     cacheSet(key, body);
+    // Not awaited: the tile is already in hand, and a slow or dead redis must
+    // not hold up the response. redisSet swallows its own errors.
+    redisSet(key, body);
     return sendTile(res, body, BROWSER_MAX_AGE_S);
   } catch (e) {
     // A 403 here means CHS changed the allowlist or the gateway rules; anything
