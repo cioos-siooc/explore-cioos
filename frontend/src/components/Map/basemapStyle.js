@@ -132,11 +132,18 @@ export function buildBasemapStyle (lang = 'en') {
     // which MapLibre cannot do for a raster anyway. That is what makes the
     // ocean readable at zooms where EMODnet has already faded out.
     //
-    // Two products, because their coverage and resolution trade off: NONNA 100
-    // (100 m) is the broad one and carries the whole fade, NONNA 10 (10 m) is
-    // sharp enough to show wharves and dredged channels but only exists over
-    // surveyed ground, so it joins at z13 where 100 m starts looking blocky and
-    // simply contributes nothing where it has no data.
+    // Two products stacked best-resolution-last: NONNA 100 (100 m) is the broad
+    // one, NONNA 10 (10 m) draws over it and wins wherever it has data — sharp
+    // enough at z16 to show wharves and dredged channels. Both fade in together
+    // so the pair always shows the finest soundings available for a spot rather
+    // than holding the good ones back to an arbitrary zoom.
+    //
+    // Stacking them costs nothing visually even though both are translucent:
+    // they share one colour ramp, so where 10 m covers 100 m it is the same
+    // depth painted the same colour, and the blend just smooths the 100 m
+    // blockiness. Where 10 m has no soundings its tile is transparent there and
+    // the 100 m simply shows through. It does mean two tile requests per view,
+    // which is what the proxy's in-process cache is sized for.
     //
     // The rainbow ramp is CHS's own, baked into the tiles: the layer is
     // published as pre-rendered RGB rather than raw depths, so an SLD colour
@@ -154,9 +161,9 @@ export function buildBasemapStyle (lang = 'en') {
       id: 'bathymetry-nonna-10',
       type: 'raster',
       source: 'nonna10',
-      minzoom: 13,
+      minzoom: 10,
       paint: {
-        'raster-opacity': ['interpolate', ['linear'], ['zoom'], 13, 0, 14, 0.7]
+        'raster-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0, 12, 0.7]
       }
     },
     // Pulls the sea toward CIOOS teal and unifies the raster palette while

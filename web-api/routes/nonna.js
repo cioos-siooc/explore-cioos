@@ -81,9 +81,16 @@ const ERROR_MAX_AGE_S = 60;
  * repeat requests a shared viewport generates, and the browser Cache-Control
  * above handles the rest.
  *
- * Measured tiles run ~5–40 KB, so 500 entries is roughly 20 MB worst case.
+ * Sizing: measured tiles run ~5-40 KB, so the 3000 default is ~120 MB at the
+ * absolute worst (every entry a dense 40 KB NONNA 10 tile) and more like 40-60
+ * MB in practice. Both products are now requested across the same zoom range,
+ * so a session pulls roughly twice the tiles it used to and the cache has to be
+ * correspondingly bigger to still absorb a shared viewport. Override with
+ * NONNA_TILE_CACHE_MAX where the container is memory-tight.
  */
-const TILE_CACHE_MAX = 500;
+const TILE_CACHE_MAX = Number(process.env.NONNA_TILE_CACHE_MAX) > 0
+  ? Number(process.env.NONNA_TILE_CACHE_MAX)
+  : 3000;
 const TILE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const tileCache = new Map();
 
