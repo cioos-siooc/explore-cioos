@@ -250,8 +250,8 @@ export function generateColorStops(colorScale, range) {
     // there are fewer distinct values than colors, thin the ramp so each value
     // gets its own shade instead of two shades sharing a value. Thin by
     // sampling across the whole ramp rather than taking a prefix: a prefix of a
-    // 12-stop ramp that starts in pale sand would paint a 1..3 range entirely
-    // in the near-transparent end, and "3 datasets" would look like nothing.
+    // 12-stop ramp that starts in pale teal would paint a 1..3 range entirely
+    // in the lightest end, and "3 datasets" would look like nothing.
     const span = Math.floor(hi) - Math.floor(lo) + 1
     // A one-value range takes the middle of the ramp, not its first stop: with
     // nothing to compare against, the honest shade is a mid one.

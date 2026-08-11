@@ -41,22 +41,23 @@ export const basemap = 'emodnet'
 // Map.jsx), so a hexagon's alpha says nothing about its count and only its
 // colour does.
 //
-// The path is sand -> teal-light -> primary -> navy, all CIOOS tokens, sampled
-// at even L* steps (~6.7 apart) so no two neighbouring stops read as the same
-// shade. The sand head means the sparsest hexes sit against the water as a warm
-// shore tint instead of arriving already teal.
+// The path is teal-light -> primary -> navy, all CIOOS tokens, sampled at even
+// L* steps (~6.4 apart) so no two neighbouring stops read as the same shade.
+// It starts at --cioos-teal-light (#C6E3DF) rather than the near-white sand it
+// used to open with: the pale head washed out over the basemap, so the sparsest
+// hexes read as a gap in the data instead of as one count.
 export const colorScale = [
-  '#F5EACB', // sand
-  '#BDDED9',
-  '#9ECDC6',
-  '#7FBDB4',
-  '#5EADA1',
-  '#4A9B8E',
-  '#3F887C',
-  '#36756D',
-  '#2D635F',
-  '#255151',
-  '#1D3F44',
+  '#C6E3DF', // teal-light
+  '#AAD3CD',
+  '#8DC4BC',
+  '#6EB5AA',
+  '#55A598',
+  '#469387',
+  '#3C8277',
+  '#347069',
+  '#2B5F5C',
+  '#244F4F',
+  '#1D3E43',
   '#152F37' // navy
 ]
 
