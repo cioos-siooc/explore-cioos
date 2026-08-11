@@ -11,11 +11,7 @@ import {
 import isEmpty from 'lodash/isEmpty'
 
 import { server } from '../../config.js'
-import {
-  basemap as defaultBasemap,
-  defaultTrailingDays,
-  TRAIL_ALL
-} from '../../components/config.js'
+import { defaultTrailingDays, TRAIL_ALL } from '../../components/config.js'
 import {
   applyMapDatasetPKs,
   createDataFilterQueryString,
@@ -107,9 +103,6 @@ export default function MapStateProvider ({ children }) {
     'projection',
     'mercator'
   )
-  // Basemap raster: 'emodnet' (default) or 'arcgis-ocean'.
-  // See components/Map/basemapStyle.js.
-  const [basemap, setBasemap] = usePersistentState('basemap', defaultBasemap)
   // One-shot "frame this geometry" request for the Map. The nonce lets the
   // same extent be re-requested (clicking zoom again after panning away).
   const [zoomTarget, setZoomTarget] = useState()
@@ -306,8 +299,6 @@ export default function MapStateProvider ({ children }) {
     setDataLayersVisible,
     projection,
     setProjection,
-    basemap,
-    setBasemap,
     // Read-only outside this provider: the layer switches and the two
     // trajectory sub-switches are coupled (clearing both sub-switches drops the
     // parent), so callers go through the toggles rather than the raw setters.

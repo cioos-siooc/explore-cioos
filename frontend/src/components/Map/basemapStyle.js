@@ -3,10 +3,9 @@
  *
  * Stack: a bathymetry raster (EMODnet World Base Layer — global GEBCO-derived
  * depth shading with muted grey land) under a slim OpenMapTiles-schema vector
- * overlay (OpenFreeMap) that contributes the CIOOS water tint, rivers,
- * boundaries, and FR/EN water & place labels. No API keys; all endpoints are
- * CORS-open. Fallback (see `basemap` in components/config.js): Esri's World
- * Ocean Base.
+ * overlay (OpenFreeMap) that contributes the CIOOS water tint, a drawn
+ * coastline, rivers, boundaries, and FR/EN water & place labels. No API keys;
+ * all endpoints are CORS-open.
  *
  * Data layers (hexes/points/trajectories/griddap/WMS) are inserted by Map.js
  * *below* FIRST_LABEL_LAYER_ID so labels always stay readable on top.
@@ -17,12 +16,9 @@ const OFM_GLYPHS = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf'
 
 const EMODNET_TILES =
   'https://tiles.emodnet-bathymetry.eu/2020/baselayer/web_mercator/{z}/{x}/{y}.png'
-// Esri tile REST convention is {z}/{y}/{x} (y before x), unlike XYZ schemes.
-const ARCGIS_OCEAN_TILES =
-  'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}'
 
-// Attribution for OpenFreeMap's OSM-derived vector data (rivers, boundaries,
-// labels) — unrelated to basemap raster choice.
+// Attribution for OpenFreeMap's OSM-derived vector data (coastline, rivers,
+// boundaries, labels).
 const OSM_ATTRIBUTION =
   '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 
@@ -30,21 +26,6 @@ export const LABEL_LAYER_IDS = ['label-waterway', 'label-water', 'label-place']
 // Anchor for every data layer Map.js adds: insert *before* this id so data
 // renders under the labels.
 export const FIRST_LABEL_LAYER_ID = 'label-waterway'
-
-// Selectable basemap options, in menu order. `key` matches the values
-// switched on in basemapSources()/hasOwnCartography() below and the
-// `basemap` default in components/config.js.
-export const BASEMAP_OPTIONS = [
-  { key: 'emodnet', translationKey: 'basemapEmodnet' },
-  { key: 'arcgis-ocean', translationKey: 'basemapArcgisOcean' }
-]
-
-// The Esri ocean basemap ships its own finished cartography (water color,
-// place styling); skip the CIOOS retint/overlay applied to the bare
-// EMODnet bathymetry raster.
-export function hasOwnCartography (basemap) {
-  return basemap === 'arcgis-ocean'
-}
 
 // text-field expression per label layer. Water-body names are bilingual
 // (both languages when they differ — oceans/seas read naturally that way);
@@ -68,70 +49,137 @@ export function getLabelTextField (lang, layerId) {
   return primary
 }
 
-function basemapSources (basemap) {
-  switch (basemap) {
-  case 'arcgis-ocean':
-    return {
-      bathymetry: {
-        type: 'raster',
-        tiles: [ARCGIS_OCEAN_TILES],
-        tileSize: 256,
-        maxzoom: 13,
-        attribution:
-          'Esri, GEBCO, NOAA, National Geographic, Garmin, HERE, Geonames.org, and other contributors'
-      }
-    }
-  case 'emodnet':
-  default:
-    return {
-      bathymetry: {
-        type: 'raster',
-        tiles: [EMODNET_TILES],
-        tileSize: 256,
-        // pre-rendered up to z12; overzoom covers deeper levels
-        maxzoom: 12,
-        attribution:
-          '© <a href="https://emodnet.ec.europa.eu/en/bathymetry">EMODnet Bathymetry Consortium</a>'
-      }
-    }
-  }
-}
+// Water polygons whose outline reads as a shoreline. Docks and pools are
+// building-scale artifacts that would only add noise at high zoom.
+const SHORELINE_FILTER = [
+  'match',
+  ['get', 'class'],
+  ['swimming_pool', 'dock'],
+  false,
+  true
+]
 
-// Shared between the initial style build and applyBasemap()'s live swap, so
-// the two paths can never drift apart.
-function bathymetryLayer (basemap) {
-  return {
-    id: 'bathymetry',
-    type: 'raster',
-    source: 'bathymetry',
-    paint: hasOwnCartography(basemap) ? {} : { 'raster-saturation': -0.15 }
-  }
-}
-
-// Pulls the sea toward CIOOS teal and unifies the raster palette. Omitted
-// entirely over basemaps that paint their own water color.
-function waterTintLayer () {
-  return {
-    id: 'water-tint',
-    type: 'fill',
-    source: 'ofm',
-    'source-layer': 'water',
-    paint: {
-      'fill-color': '#52A79B',
-      'fill-opacity': 0.1
-    }
-  }
-}
-
-export function buildBasemapStyle (lang = 'en', basemap = 'emodnet') {
+export function buildBasemapStyle (lang = 'en') {
   const layers = [
     {
       id: 'background',
       type: 'background',
       paint: { 'background-color': '#DCE8E5' }
     },
-    bathymetryLayer(basemap),
-    ...(hasOwnCartography(basemap) ? [] : [waterTintLayer()]),
+    {
+      id: 'bathymetry',
+      type: 'raster',
+      source: 'bathymetry',
+      paint: { 'raster-saturation': -0.15 }
+    },
+    // Pulls the sea toward CIOOS teal and unifies the raster palette. The tint
+    // deepens past z12: that's where the raster stops carrying real detail and
+    // washes out to near-white on both sides of the shore, so without it a
+    // harbour view gives no cue which side of the coastline is water. Stays
+    // light at low zoom, where the bathymetry shading does that job itself.
+    {
+      id: 'water-tint',
+      type: 'fill',
+      source: 'ofm',
+      'source-layer': 'water',
+      paint: {
+        'fill-color': '#52A79B',
+        'fill-opacity': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          10,
+          0.1,
+          13,
+          0.16,
+          16,
+          0.24
+        ]
+      }
+    },
+    // Coastline. The EMODnet raster is pre-rendered only to z12 and its
+    // land/sea edge is a soft grey-to-blue gradient, so past z12 the overzoomed
+    // shoreline blurs away — worst in fjords, inlets and archipelagos where the
+    // grey land and the shallow-shelf blue are nearly the same value. These two
+    // vector lines (OSM water polygons, crisp at any zoom because vector tiles
+    // overzoom losslessly) redraw that edge on top of the raster: a pale casing
+    // for contrast against dark water, and a dark line for contrast against
+    // land. Width ramps with zoom so the world view stays a hairline while a
+    // harbour view gets a definite edge.
+    {
+      id: 'coastline-casing',
+      type: 'line',
+      source: 'ofm',
+      'source-layer': 'water',
+      filter: SHORELINE_FILTER,
+      layout: { 'line-join': 'round' },
+      paint: {
+        'line-color': '#F3F0EC',
+        'line-opacity': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          4,
+          0,
+          7,
+          0.5,
+          11,
+          0.7
+        ],
+        'line-width': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          4,
+          1.2,
+          10,
+          3,
+          14,
+          5,
+          18,
+          7
+        ]
+      }
+    },
+    {
+      id: 'coastline',
+      type: 'line',
+      source: 'ofm',
+      'source-layer': 'water',
+      filter: SHORELINE_FILTER,
+      layout: { 'line-join': 'round' },
+      paint: {
+        'line-color': '#152F37',
+        'line-opacity': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          2,
+          0.35,
+          6,
+          0.65,
+          10,
+          0.85,
+          14,
+          0.95
+        ],
+        'line-width': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          2,
+          0.4,
+          6,
+          0.8,
+          10,
+          1.4,
+          14,
+          2.2,
+          18,
+          3
+        ]
+      }
+    },
     {
       id: 'waterway',
       type: 'line',
@@ -263,7 +311,15 @@ export function buildBasemapStyle (lang = 'en', basemap = 'emodnet') {
     version: 8,
     glyphs: OFM_GLYPHS,
     sources: {
-      ...basemapSources(basemap),
+      bathymetry: {
+        type: 'raster',
+        tiles: [EMODNET_TILES],
+        tileSize: 256,
+        // pre-rendered up to z12; overzoom covers deeper levels
+        maxzoom: 12,
+        attribution:
+          '© <a href="https://emodnet.ec.europa.eu/en/bathymetry">EMODnet Bathymetry Consortium</a>'
+      },
       ofm: {
         type: 'vector',
         url: OFM_TILEJSON,
@@ -273,24 +329,5 @@ export function buildBasemapStyle (lang = 'en', basemap = 'emodnet') {
       }
     },
     layers
-  }
-}
-
-// Live basemap swap on an already-built map, without map.setStyle() — that
-// call diffs the *entire* style against the new one and drops any layer not
-// present in it, which would wipe every data layer Map.js adds imperatively
-// after 'load' (hexes/points/trajectories/griddap/WMS). Instead, only the two
-// layers that actually differ between basemap options (bathymetry,
-// water-tint) are removed and re-added in place, right before 'waterway' —
-// their original position — leaving everything else untouched.
-export function applyBasemap (map, basemap) {
-  if (map.getLayer('water-tint')) map.removeLayer('water-tint')
-  if (map.getLayer('bathymetry')) map.removeLayer('bathymetry')
-  if (map.getSource('bathymetry')) map.removeSource('bathymetry')
-
-  map.addSource('bathymetry', basemapSources(basemap).bathymetry)
-  map.addLayer(bathymetryLayer(basemap), 'waterway')
-  if (!hasOwnCartography(basemap)) {
-    map.addLayer(waterTintLayer(), 'waterway')
   }
 }

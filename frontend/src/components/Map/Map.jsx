@@ -53,7 +53,6 @@ import {
 import platformColors from '../../components/platformColors'
 import { PROFILE_TYPE_KEYS } from '../../state/dataLayers.js'
 import {
-  applyBasemap,
   buildBasemapStyle,
   getLabelTextField,
   FIRST_LABEL_LAYER_ID,
@@ -146,7 +145,6 @@ export default function CreateMap({
   dataLayersVisible = true,
   activeWmsOverlay,
   projection = 'mercator',
-  basemap = 'emodnet',
   zoomTarget,
   mapRef
 }) {
@@ -964,17 +962,6 @@ export default function CreateMap({
     })
   }, [projection])
 
-  // Layer-picker basemap switch. Swaps only the bathymetry/water-tint layers
-  // in place (see applyBasemap) rather than map.setStyle(), which would drop
-  // every data layer added imperatively below. map.current is still null on
-  // this effect's first run (the map-creation effect further down hasn't
-  // fired yet), so the initial basemap — already baked into the style passed
-  // to `new maplibreGl.Map(...)` — is never redundantly re-applied here.
-  useEffect(() => {
-    if (!map.current) return
-    applyBasemap(map.current, basemap)
-  }, [basemap])
-
   // "Zoom to dataset": frame the requested footprint. The camera settings are
   // shared with ZoomToDataset, which compares them against the live camera to
   // decide whether the button still has anything to do.
@@ -1296,7 +1283,7 @@ export default function CreateMap({
       // happens while map.current is still null, and projection doesn't change
       // again, so a globe restored from localStorage would never be applied.
       style: {
-        ...buildBasemapStyle(i18n.language, basemap),
+        ...buildBasemapStyle(i18n.language),
         projection: { type: projection === 'globe' ? 'globe' : 'mercator' }
       },
       // MapLibre defaults to powerPreference 'high-performance', which wakes

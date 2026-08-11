@@ -16,7 +16,6 @@ import Legend from '../Controls/Legend/Legend.jsx'
 import TimeBar from '../Controls/TimeBar/TimeBar.jsx'
 import WmsLegend from '../Controls/WmsLegend/WmsLegend.jsx'
 import IntroModal from '../Controls/IntroModal/IntroModal.jsx'
-import { BASEMAP_OPTIONS } from '../Map/basemapStyle.js'
 import { DATA_LAYER_LABEL_KEYS } from '../../state/dataLayers.js'
 import { useMapState } from '../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../state/selection/SelectionProvider.jsx'
@@ -44,8 +43,6 @@ export default function AppShell () {
     setDataLayersVisible,
     projection,
     setProjection,
-    basemap,
-    setBasemap,
     activeWmsOverlay,
     setActiveWmsOverlay,
     tracksMode,
@@ -130,11 +127,6 @@ export default function AppShell () {
     )
   }
 
-  const basemapOptions = BASEMAP_OPTIONS.map((option) => ({
-    key: option.key,
-    label: t(option.translationKey)
-  }))
-
   return (
     <>
       {/* The splash covers the first map load only; a redraw after that (new
@@ -162,9 +154,6 @@ export default function AppShell () {
         platformsAvailable={platformsAvailable}
         layerControls={layerControls}
         dataLayerControls={dataLayerControls}
-        basemapOptions={basemapOptions}
-        basemap={basemap}
-        onBasemapChange={setBasemap}
         tracksMode={tracksMode}
         trajectoryHexes={trajectoryHexes}
         trailingDays={trailingDays}

@@ -20,10 +20,6 @@ export const defaultQuery = {
   obisNodesSelected: defaultObisNodesSelected
 }
 
-// Basemap selection: 'emodnet' (bathymetry raster + vector labels, default)
-// or 'arcgis-ocean' (Esri World Ocean Base). See components/Map/basemapStyle.js.
-export const basemap = 'emodnet'
-
 export const colorScale = [
   '#52A79B',
   '#4A968C',
