@@ -20,6 +20,7 @@
  */
 
 import { server } from '../../config'
+import { bathymetryFadeInZoom, bathymetryFullZoom } from '../config.js'
 
 const OFM_TILEJSON = 'https://tiles.openfreemap.org/planet'
 const OFM_GLYPHS = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf'
@@ -160,13 +161,23 @@ export function buildBasemapStyle (lang = 'en') {
     // The rainbow ramp is CHS's own, baked into the tiles: the layer is
     // published as pre-rendered RGB rather than raw depths, so an SLD colour
     // map cannot restyle it server-side. Opacity is the tuning knob for now.
+    // That same pre-rendering is why the legend's depth axis had to be
+    // calibrated from the tiles — see bathymetryColorScale in config.js.
     {
       id: 'bathymetry-nonna-100',
       type: 'raster',
       source: 'nonna100',
-      minzoom: 10,
+      minzoom: bathymetryFadeInZoom,
       paint: {
-        'raster-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0, 12, 0.7],
+        'raster-opacity': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          bathymetryFadeInZoom,
+          0,
+          bathymetryFullZoom,
+          0.7
+        ],
         // Three raster sources are stacked here, and the default 300 ms
         // cross-fade draws both the outgoing and incoming tile for its
         // duration. These two are translucent and sit over the satellite, so
@@ -179,9 +190,17 @@ export function buildBasemapStyle (lang = 'en') {
       id: 'bathymetry-nonna-10',
       type: 'raster',
       source: 'nonna10',
-      minzoom: 10,
+      minzoom: bathymetryFadeInZoom,
       paint: {
-        'raster-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0, 12, 0.7],
+        'raster-opacity': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          bathymetryFadeInZoom,
+          0,
+          bathymetryFullZoom,
+          0.7
+        ],
         'raster-fade-duration': 0
       }
     },

@@ -99,6 +99,20 @@
   gap: 0;
 }
 
+/* A pair of short entries that belong on one row (the point-size key). Wraps
+   rather than overflowing if a translation runs long. */
+.legendItems.inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+}
+
+/* Those labels are the whole point of the row, so let them size themselves
+   instead of inheriting the ellipsis the stacked entries want. */
+.legendItems.inline .legendItemLabel {
+  overflow: visible;
+}
+
 .legendItem {
   display: flex;
   align-items: center;

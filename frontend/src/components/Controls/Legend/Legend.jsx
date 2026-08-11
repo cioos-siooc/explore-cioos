@@ -15,6 +15,11 @@ import {
   trajectoryColorScale,
   obisColorScale,
   mixedColorScale,
+  bathymetryColorScale,
+  bathymetryLegendMinZoom,
+  bathymetryScaleMin,
+  bathymetryScaleMax,
+  bathymetryTicks,
   TRAIL_ALL,
   effectiveTrailingDays
 } from '../../config.js'
@@ -34,6 +39,20 @@ function formatCount(value) {
     return `${k >= 10 ? Math.round(k) : k.toFixed(1).replace(/\.0$/, '')}k`
   }
   return `${value}`
+}
+
+// Abbreviate the depth ticks the same way, so "1000" doesn't run into the end
+// of the compact bar.
+function formatDepth(metres) {
+  return metres >= 1000 ? `${metres / 1000}k` : `${metres}`
+}
+
+// Position along the bathymetry bar, 0..1, for a depth in metres. The bar is
+// logarithmic (see bathymetryColorScale) so this is a log interpolation.
+const LOG_MIN = Math.log10(bathymetryScaleMin)
+const LOG_SPAN = Math.log10(bathymetryScaleMax) - LOG_MIN
+function depthPosition(metres) {
+  return (Math.log10(metres) - LOG_MIN) / LOG_SPAN
 }
 
 // Choose which stop indices get a tick label. Keeps every stop when there are
@@ -127,6 +146,57 @@ export default function Legend({
     )
   }
 
+  // The CHS NONNA depth ramp. Unlike the hex ramps this one is not derived
+  // from the current query — it describes a basemap raster, so it appears
+  // whenever that raster is drawn (and only then) rather than following the
+  // data layers. Colours are CHS's own; the depth axis is calibrated, which is
+  // what the caption's tooltip is there to say.
+  function renderBathymetryBar() {
+    // zoom is undefined until the map first reports its view, and `undefined <
+    // n` is false — so test for the zoom being known as well, or the bar
+    // flashes on before the raster it describes exists.
+    if (!Number.isFinite(zoom) || zoom < bathymetryLegendMinZoom) return null
+    // Anchors sit at their own depths, so the gradient is uneven by design:
+    // the first stop's colour flats out to the left edge (everything shallower
+    // than it is that red) and the last stop's to the right edge.
+    const gradient = `linear-gradient(to right, ${bathymetryColorScale
+      .map(
+        ({ depth, color }) =>
+          `${color} ${(depthPosition(depth) * 100).toFixed(1)}%`
+      )
+      .join(', ')})`
+    return (
+      <div className='legendSection' key='bathymetry'>
+        <div
+          className='legendSectionCaption'
+          title={t('legendBathymetryTitle')}
+        >
+          {t('legendBathymetry')}
+        </div>
+        <div
+          className='legendColorBar'
+          style={{ background: gradient }}
+          aria-hidden='true'
+        />
+        <div className='legendColorBarTicks'>
+          {bathymetryTicks.map((metres, i) => {
+            const align =
+              i === 0 ? 'start' : i === bathymetryTicks.length - 1 ? 'end' : 'mid'
+            return (
+              <span
+                key={metres}
+                className={`legendTick ${align}`}
+                style={{ left: `${depthPosition(metres) * 100}%` }}
+              >
+                {formatDepth(metres)}
+              </span>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
   // Only the platform types the current result set actually contains — the
   // catalog's full palette would otherwise promise markers the map never draws.
   const platformSwatches = platformColors.filter((pc) =>
@@ -168,7 +238,10 @@ export default function Legend({
         <>
           <div className='legendSection'>
             <div className='legendSectionCaption'>{t('legendDaysOfData')}</div>
-            <div className='legendItems'>
+            {/* Two short labels either side of a size cue — they read as a
+                single "small vs large" comparison, so they share one row
+                rather than stacking. */}
+            <div className='legendItems inline'>
               <div
                 className='legendItem'
                 title={t('legendSectionTitleLessOneDayOfData')}
@@ -357,6 +430,7 @@ export default function Legend({
           <div className='legendGroupBody'>
             {generateLegendElements()}
             {generateCoverageLegendElements()}
+            {renderBathymetryBar()}
           </div>
         )}
       </div>

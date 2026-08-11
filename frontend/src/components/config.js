@@ -64,6 +64,66 @@ export const mixedColorScale = [
   '#6B3350'
 ]
 
+// CHS NONNA bathymetry (see basemapStyle.js). The zooms the two NONNA raster
+// layers fade across; exported so the layers and the legend entry that
+// describes them cannot drift apart.
+export const bathymetryFadeInZoom = 10
+export const bathymetryFullZoom = 12
+// Only claim the ramp once the raster is at least half opaque — at the fade-in
+// zoom itself it is drawn at zero opacity, and a legend for an invisible layer
+// is worse than none.
+export const bathymetryLegendMinZoom =
+  (bathymetryFadeInZoom + bathymetryFullZoom) / 2
+
+// The NONNA depth ramp, as (metres, colour) anchors.
+//
+// CHS publishes NONNA as pre-rendered RGB — the GeoServer style is a plain
+// "Opaque Raster" and GetFeatureInfo returns three colour bands, not depths —
+// so there is no colour map to read from the service and no GetLegendGraphic
+// worth requesting. These anchors were instead recovered from the tiles: ~730
+// NONNA 100 pixels sampled across the Scotian Shelf and slope, the Labrador
+// Sea, the Gulf of St. Lawrence, the BC shelf and slope, the Bay of Fundy and
+// three harbours, each paired with the GMRT depth at the same coordinate, then
+// reduced to the median colour per log-spaced depth band. The ramp came back
+// monotone and consistent between coasts, which is what makes a single legend
+// legitimate: red at the surface through green and teal across the first ~25 m,
+// into blue that darkens the rest of the way to the abyssal plain.
+//
+// So the colours are exactly CHS's, but the depth axis is calibrated rather
+// than declared — good to the band, not to the metre. legendBathymetryTitle
+// says as much to the user.
+export const bathymetryColorScale = [
+  { depth: 2, color: '#c31800' },
+  { depth: 4, color: '#c36200' },
+  { depth: 8, color: '#c39200' },
+  { depth: 12, color: '#0cba00' },
+  { depth: 17, color: '#03ae1e' },
+  { depth: 22, color: '#068a60' },
+  { depth: 28, color: '#0966b9' },
+  { depth: 35, color: '#0961bd' },
+  { depth: 45, color: '#075bb8' },
+  { depth: 60, color: '#0551ae' },
+  { depth: 85, color: '#0346a1' },
+  { depth: 120, color: '#003794' },
+  { depth: 175, color: '#003491' },
+  { depth: 250, color: '#00308e' },
+  { depth: 390, color: '#002786' },
+  { depth: 610, color: '#001a7d' },
+  { depth: 870, color: '#000a72' },
+  { depth: 1200, color: '#00006a' },
+  { depth: 1750, color: '#000062' },
+  { depth: 2450, color: '#00005b' },
+  { depth: 3450, color: '#000052' },
+  { depth: 4500, color: '#000045' }
+]
+
+// The bar is drawn in log-depth space: the ramp spends its whole bright half on
+// the first 25 m, which a linear axis would crush into an invisible sliver.
+// Decade ticks then fall at even spacings and read as the log axis they are.
+export const bathymetryScaleMin = 1
+export const bathymetryScaleMax = 5000
+export const bathymetryTicks = [1, 10, 100, 1000, 5000]
+
 // Tracks mode (trajectory track lines + time scrub bar)
 // 'all' = no trailing cutoff: every platform's full track up to the scrub
 // date. Episodic trajectory datasets (a 2017-19 ferry, a 2016 glider

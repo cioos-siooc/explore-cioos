@@ -234,6 +234,8 @@
   "legendPlatformType": "Platform type",
   "legendOneDayOrLess": "≤ 1 day",
   "legendMoreThanOneDay": "> 1 day",
+  "legendBathymetry": "Depth (m)",
+  "legendBathymetryTitle": "Seafloor depth from CHS NONNA bathymetry. The Canadian Hydrographic Service publishes these tiles as pre-rendered colour rather than depth values, so the scale is calibrated from the imagery — read it as approximate bands, not exact contours.",
   "layersMenuTitle": "Map layers",
   "layersGriddedCoverage": "Gridded data coverage",
   "layersObservations": "Hexes & points",
