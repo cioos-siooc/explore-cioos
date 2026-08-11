@@ -1294,7 +1294,13 @@ export default function CreateMap({
       // AttributionControl added below).
       attributionControl: false,
       center: [mapLongitude || -150, mapLatitude || 60], // starting position
-      zoom: mapZoom || 2 // starting zoom,
+      zoom: mapZoom || 2, // starting zoom,
+      // Stop at the deepest level the satellite imagery actually exists at
+      // everywhere it matters: Esri is cached to z17 on remote Arctic coasts
+      // (z19 in cities), and past its coverage it serves a grey "map data not
+      // yet available" tile rather than a 404. Capping the camera here means
+      // that tile is never reached on land, without masking anything off.
+      maxZoom: 17
     })
     // Share the instance with MapStateProvider (see mapRef there).
     if (mapRef) mapRef.current = map.current
@@ -2531,7 +2537,7 @@ export default function CreateMap({
     })
 
     // Aggregates the per-source attributions from the basemap style
-    // (EMODnet / Esri + OpenFreeMap).
+    // (EMODnet bathymetry, Esri imagery, OpenFreeMap vector).
     const attribution = new AttributionControl({
       compact: true
     })

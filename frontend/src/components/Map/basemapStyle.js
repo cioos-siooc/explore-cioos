@@ -1,10 +1,18 @@
 /*
  * Ocean-first basemap for the CDE map.
  *
- * Stack: a bathymetry raster (EMODnet World Base Layer — global GEBCO-derived
- * depth shading with muted grey land) under a slim OpenMapTiles-schema vector
- * overlay (OpenFreeMap) that contributes the CIOOS water tint, a drawn
- * coastline, rivers and streams, boundaries, and FR/EN water & place labels.
+ * Two base rasters that hand over to each other across z10–z12: a bathymetry
+ * raster (EMODnet World Base Layer — global GEBCO-derived depth shading with
+ * muted grey land) for the world view, satellite imagery (Esri World Imagery)
+ * for the local view. Under them sits a slim OpenMapTiles-schema vector overlay
+ * (OpenFreeMap) contributing rivers and streams, boundaries, and FR/EN water &
+ * place labels.
+ *
+ * The drawn cartography that existed to compensate for the blurred raster —
+ * the CIOOS water tint and the coastline stroke — lifts off across the same
+ * window. Both were answering "which side of this edge is water?", and once
+ * the satellite is in, it answers that itself; leaving the stroke on would only
+ * draw an OSM shoreline a few tens of metres beside the visible one.
  * No API keys; all endpoints are CORS-open.
  *
  * Data layers (hexes/points/trajectories/griddap/WMS) are inserted by Map.js
@@ -16,6 +24,10 @@ const OFM_GLYPHS = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf'
 
 const EMODNET_TILES =
   'https://tiles.emodnet-bathymetry.eu/2020/baselayer/web_mercator/{z}/{x}/{y}.png'
+
+// Esri tile REST convention is {z}/{y}/{x} (y before x), unlike XYZ schemes.
+const ESRI_IMAGERY_TILES =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 
 // Attribution for OpenFreeMap's OSM-derived vector data (coastline, rivers,
 // boundaries, labels).
@@ -66,17 +78,46 @@ export function buildBasemapStyle (lang = 'en') {
       type: 'background',
       paint: { 'background-color': '#DCE8E5' }
     },
+    // The two base rasters cross-fade over z10–z12: EMODnet owns the world
+    // view, satellite owns the local view, and neither is blended into the
+    // other once the hand-off is done.
+    //
+    // The hand-off sits there because that is where each source runs out or
+    // starts. EMODnet is pre-rendered only to z12 — past it the shading is
+    // overzoom, and its land was always a flat muted grey with no features in
+    // it, so a harbour view showed where the water ended and nothing about what
+    // it ended against. Esri's imagery is the opposite: nothing useful at world
+    // scale, everything from z12 in.
     {
       id: 'bathymetry',
       type: 'raster',
       source: 'bathymetry',
-      paint: { 'raster-saturation': -0.15 }
+      paint: {
+        'raster-opacity': ['interpolate', ['linear'], ['zoom'], 10, 1, 12, 0],
+        'raster-saturation': -0.15
+      }
     },
-    // Pulls the sea toward CIOOS teal and unifies the raster palette. The tint
-    // deepens past z12: that's where the raster stops carrying real detail and
-    // washes out to near-white on both sides of the shore, so without it a
-    // harbour view gives no cue which side of the coastline is water. Stays
-    // light at low zoom, where the bathymetry shading does that job itself.
+    // minzoom is what stops imagery tiles being fetched at low zoom; the
+    // opacity ramp starting at 0 on that same zoom means they are already warm
+    // by the time they become visible.
+    {
+      id: 'imagery',
+      type: 'raster',
+      source: 'imagery',
+      minzoom: 10,
+      paint: {
+        'raster-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0, 12, 1],
+        // Matches the bathymetry's muting so full-colour imagery doesn't shout
+        // against the pastel palette everything else in the style shares.
+        'raster-saturation': -0.15
+      }
+    },
+    // Pulls the sea toward CIOOS teal and unifies the raster palette while
+    // EMODnet is the base. It used to deepen with zoom, to keep a cue about
+    // which side of the shore was water once the overzoomed raster washed out;
+    // the satellite answers that question on its own, so the tint now lifts off
+    // over the same window the imagery arrives in and leaves the water reading
+    // as it actually looks.
     {
       id: 'water-tint',
       type: 'fill',
@@ -84,28 +125,20 @@ export function buildBasemapStyle (lang = 'en') {
       'source-layer': 'water',
       paint: {
         'fill-color': '#52A79B',
-        'fill-opacity': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          10,
-          0.1,
-          13,
-          0.16,
-          16,
-          0.24
-        ]
+        'fill-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.1, 13, 0]
       }
     },
-    // Coastline. The EMODnet raster is pre-rendered only to z12 and its
-    // land/sea edge is a soft grey-to-blue gradient, so past z12 the overzoomed
-    // shoreline blurs away — worst in fjords, inlets and archipelagos where the
-    // grey land and the shallow-shelf blue are nearly the same value. These two
-    // vector lines (OSM water polygons, crisp at any zoom because vector tiles
-    // overzoom losslessly) redraw that edge on top of the raster: a pale casing
-    // for contrast against dark water, and a dark line for contrast against
-    // land. Width ramps with zoom so the world view stays a hairline while a
-    // harbour view gets a definite edge.
+    // Coastline, for the zooms EMODnet owns. Its land/sea edge is a soft
+    // grey-to-blue gradient rather than a drawn line, and it reads worst in
+    // fjords, inlets and archipelagos where the grey land and the shallow-shelf
+    // blue sit at nearly the same value. These two vector lines (OSM water
+    // polygons, crisp at any zoom because vector tiles overzoom losslessly)
+    // draw that edge on top of the raster: a pale casing for contrast against
+    // dark water, and a dark line for contrast against land.
+    //
+    // Both fade out by z12. They were the answer to a blurred raster shore, and
+    // past z12 there is no raster shore left to fix — the satellite has its own,
+    // and a drawn line beside it would only be a second, wrong one.
     {
       id: 'coastline-casing',
       type: 'line',
@@ -115,6 +148,7 @@ export function buildBasemapStyle (lang = 'en') {
       layout: { 'line-join': 'round' },
       paint: {
         'line-color': '#F3F0EC',
+        // Off by z12, with the imagery fully in — see the coastline layer below.
         'line-opacity': [
           'interpolate',
           ['linear'],
@@ -123,8 +157,10 @@ export function buildBasemapStyle (lang = 'en') {
           0,
           7,
           0.35,
-          11,
-          0.5
+          10,
+          0.5,
+          12,
+          0
         ],
         'line-width': [
           'interpolate',
@@ -153,6 +189,11 @@ export function buildBasemapStyle (lang = 'en') {
         // against pale land, but it sits in the basemap's own hue range
         // instead of reading as ink drawn over the top of it.
         'line-color': '#33555F',
+        // Lifts off as the imagery arrives. This stroke exists because the
+        // overzoomed EMODnet shore blurred away; the satellite draws its own
+        // shore, and the OSM polygon it follows can sit tens of metres off the
+        // visible waterline at z15+, so keeping it would add a second, wrong
+        // coastline next to the real one.
         'line-opacity': [
           'interpolate',
           ['linear'],
@@ -163,12 +204,10 @@ export function buildBasemapStyle (lang = 'en') {
           0.55,
           10,
           0.72,
-          14,
-          0.82
+          12,
+          0
         ],
-        // Kept close to a hairline as it zooms in: past z12 the line is the
-        // only shore there is, so it has to stay crisp, but it should read as
-        // a drawn edge rather than a band laid over the coast.
+        // Width still ramps for the zooms where the line is visible at all.
         'line-width': [
           'interpolate',
           ['linear'],
@@ -393,6 +432,21 @@ export function buildBasemapStyle (lang = 'en') {
         maxzoom: 12,
         attribution:
           '© <a href="https://emodnet.ec.europa.eu/en/bathymetry">EMODnet Bathymetry Consortium</a>'
+      },
+      imagery: {
+        type: 'raster',
+        tiles: [ESRI_IMAGERY_TILES],
+        tileSize: 256,
+        // Declared to z23, but only actually cached that deep in populated
+        // areas: Halifax has imagery to z19, Ellesmere Island only to z17.
+        // Past its coverage the service doesn't 404 — it serves a grey "map
+        // data not yet available" tile, which would land on exactly the remote
+        // Arctic shorelines where imagery is most wanted. Cap at the level that
+        // exists everywhere and let MapLibre overzoom: soft, but never broken.
+        // z17 is ~0.8 m/px at 45°N and ~0.4 m/px at 70°N.
+        maxzoom: 17,
+        attribution:
+          'Imagery © <a href="https://www.esri.com">Esri</a>, Vantor, Earthstar Geographics'
       },
       ofm: {
         type: 'vector',
