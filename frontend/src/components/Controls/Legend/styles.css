@@ -90,7 +90,10 @@
   text-transform: uppercase;
   color: var(--cioos-ink-40);
   margin-bottom: 2px;
-  white-space: nowrap;
+  /* Wraps rather than nowrap: the card is capped at 190px and the longer
+     captions (the French ones above all — "Trajectoires par hexagone") ran
+     past it, where the card's overflow simply cut them off mid-word. */
+  line-height: 1.25;
 }
 
 .legendItems {

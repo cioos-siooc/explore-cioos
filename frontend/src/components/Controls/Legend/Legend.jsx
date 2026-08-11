@@ -8,7 +8,8 @@ import {
 
 import {
   capitalizeFirstLetter,
-  generateColorStops
+  generateColorStops,
+  rangeLevelHasData
 } from '../../../utilities.jsx'
 import {
   colorScale,
@@ -30,7 +31,6 @@ import Switch from '../../ui/Switch.jsx'
 
 import './styles.css'
 import classNames from 'classnames'
-import isEmpty from 'lodash/isEmpty'
 
 // Abbreviate large counts so the color-bar ticks stay short (e.g. 12345 -> 12k).
 function formatCount(value) {
@@ -207,18 +207,24 @@ export default function Legend({
     // The point/hex data types are all toggled off — nothing for this ramp to
     // describe (the coverage sections below have their own gating).
     if (!showPointRamp) return null
-    // /legend is still in flight and there's no ramp from a previous query to
-    // fall back on: the counts are unknown, not zero. Saying "No Data" here
-    // (as this did) tells the user their filters excluded everything, which is
-    // a guess — and usually a wrong one.
-    if (loading && isEmpty(currentRangeLevel)) {
+    // "No Data" is a claim about the user's filters, so it is only ever made
+    // about a /legend answer that came back holding nothing (a null max — see
+    // rangeLevelHasData). Anything else the ramp can't be built from — the
+    // query still in flight, a failed fetch — is a state the app is in, not
+    // something the user did, and says so instead.
+    const hasRange = rangeLevelHasData(currentRangeLevel)
+    if (!hasRange && loading) {
       return (
         <div className='legendLoading'>
           <Spinner size='sm' />
           <span>{t('legendLoadingText')}</span>
         </div>
       )
-    } else if (isEmpty(currentRangeLevel)) {
+    } else if (!currentRangeLevel) {
+      // No answer at all — the fetch failed (ApiErrorBanner has already said
+      // so). Nothing truthful to put here, so put nothing.
+      return null
+    } else if (!hasRange) {
       return (
         <div className='legendNoData' title={t('legendNoDataWarningTitle')}>
           {t('legendNoDataWarningText')}
@@ -303,7 +309,7 @@ export default function Legend({
       <>
         {tracksMode && renderTrackLineKey()}
         {trajectoryHexes &&
-          !isEmpty(currentTrajectoryRangeLevel) &&
+          rangeLevelHasData(currentTrajectoryRangeLevel) &&
           renderColorBar(
             t('legendTrajectoriesPerHex'),
             trajectoryColorScale,
@@ -372,11 +378,11 @@ export default function Legend({
   // trajectory hex view off the cells tiles carry no trajectory counts, so only
   // the OBIS ramp can apply then.
   function generateCoverageLegendElements() {
-    const showObisRamp = layers.obis && !isEmpty(currentObisRangeLevel)
+    const showObisRamp = layers.obis && rangeLevelHasData(currentObisRangeLevel)
     const showTrajectoryHexes =
       layers.trajectories &&
       trajectoryHexes &&
-      !isEmpty(currentTrajectoryRangeLevel)
+      rangeLevelHasData(currentTrajectoryRangeLevel)
     return (
       <>
         {generateTrajectoryLegendElements()}

@@ -273,15 +273,25 @@ export function useDebounce (value, delay) {
   return debouncedValue
 }
 
+// Which of the three tiers the ramp is drawn from, for a zoom. Every zoom maps
+// onto one: an unknown zoom (the map hasn't reported its camera yet) takes the
+// widest tier rather than falling out of the switch — a caller that got
+// `undefined` back could only read it as "no data", which is a different thing
+// entirely.
 export function getCurrentRangeLevel (rangeLevels, zoom) {
-  switch (true) {
-  case zoom < 5:
-    return rangeLevels.zoom0
-  case zoom >= 5 && zoom < 7:
-    return rangeLevels.zoom1
-  case zoom >= 7:
-    return rangeLevels.zoom2
-  }
+  if (!rangeLevels) return undefined
+  const level = Number(zoom)
+  if (!Number.isFinite(level) || level < 5) return rangeLevels.zoom0
+  if (level < 7) return rangeLevels.zoom1
+  return rangeLevels.zoom2
+}
+
+// Does a [min, max] range describe any data? The API answers a query that
+// matched nothing with [null, null] (min/max over no rows), so "empty" isn't
+// enough of a test — and a null max would otherwise render as an empty ramp
+// with no explanation.
+export function rangeLevelHasData (rangeLevel) {
+  return Array.isArray(rangeLevel) && Number.isFinite(rangeLevel[1])
 }
 
 export function getPointsDataSize (pointsData) {

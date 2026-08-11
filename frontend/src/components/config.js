@@ -11,6 +11,14 @@ export const defaultEndDepth = 12000
 export const defaultScientificNamesSelected = []
 export const defaultObisNodesSelected = []
 
+// The camera a visit without ?lat/?lon/?zoom opens at. Map.jsx builds the
+// MapLibre instance from these, and MapStateProvider seeds its own view state
+// from them: the map only reports its camera once it has finished loading, and
+// everything keyed off the zoom (the legend ramps above all) would otherwise
+// have to treat "not loaded yet" as "no zoom".
+export const defaultMapCenter = { lat: 60, lon: -150 }
+export const defaultMapZoom = 2
+
 export const defaultQuery = {
   startDate: defaultStartDate,
   endDate: defaultEndDate,

@@ -11,7 +11,12 @@ import {
 import isEmpty from 'lodash/isEmpty'
 
 import { server } from '../../config.js'
-import { defaultTrailingDays, TRAIL_ALL } from '../../components/config.js'
+import {
+  defaultMapCenter,
+  defaultMapZoom,
+  defaultTrailingDays,
+  TRAIL_ALL
+} from '../../components/config.js'
 import {
   applyMapDatasetPKs,
   createDataFilterQueryString,
@@ -48,7 +53,27 @@ export default function MapStateProvider ({ children }) {
     setLoadingState(value)
     if (!value) setMapLoaded(true)
   }, [])
-  const [mapView, setMapView] = useState({})
+  // The camera, as the map reports it (numbers, plus bounds once it has
+  // settled). Seeded from the share link — or the default view when the link
+  // carries no camera — rather than left empty: MapLibre only pushes a view on
+  // 'idle'/'moveend', so an empty seed means every zoom-keyed consumer sees
+  // `undefined` for as long as the basemap takes to load. The legend read that
+  // as "no data matched" and said so. Number() rather than the raw params: they
+  // are strings, and Number.isFinite('12') is false.
+  const [mapView, setMapView] = useState(() => {
+    const params = new URL(window.location.href).searchParams
+    const asNumber = (name, fallback) => {
+      const value = Number(params.get(name))
+      return Number.isFinite(value) && params.get(name) !== null
+        ? value
+        : fallback
+    }
+    return {
+      lat: asNumber('lat', defaultMapCenter.lat),
+      lon: asNumber('lon', defaultMapCenter.lon),
+      zoom: asNumber('zoom', defaultMapZoom)
+    }
+  })
   // The datasets the map is allowed to draw, when the user has hidden some
   // groups in the datasets list (see SelectionProvider, which owns the
   // grouping and pushes the resulting pk list here — it lives downstream of
@@ -217,13 +242,9 @@ export default function MapStateProvider ({ children }) {
       .finally(() => setLegendLoading(false))
   }
 
-  // Initial map view from a share link, and the initial legend values.
+  // The initial legend values. (The camera from the share link is read where
+  // mapView is declared, so it is numeric from the first render.)
   useEffect(() => {
-    const { lat, lon, zoom } = Object.fromEntries(
-      new URL(window.location.href).searchParams
-    )
-    if (lat || lon || zoom) setMapView({ lat, lon, zoom })
-
     loadLegend(mapQueryString)
   }, [])
 

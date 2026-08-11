@@ -47,6 +47,8 @@ import {
   trackLineColor,
   selectedTrackColor,
   tracksMinDate,
+  defaultMapCenter,
+  defaultMapZoom,
   TRAIL_ALL,
   effectiveTrailingDays
 } from '../config'
@@ -1299,8 +1301,14 @@ export default function CreateMap({
       // Per-source attributions replace the default control (see the compact
       // AttributionControl added below).
       attributionControl: false,
-      center: [mapLongitude || -150, mapLatitude || 60], // starting position
-      zoom: mapZoom || 2, // starting zoom,
+      // Starting camera. The same share-link params and the same fallbacks
+      // MapStateProvider seeds its mapView from — the two have to agree, or
+      // the legend describes a zoom the map isn't at until the first moveend.
+      center: [
+        mapLongitude || defaultMapCenter.lon,
+        mapLatitude || defaultMapCenter.lat
+      ],
+      zoom: mapZoom || defaultMapZoom,
       // Stop at the deepest level the satellite imagery actually exists at
       // everywhere it matters: Esri is cached to z17 on remote Arctic coasts
       // (z19 in cities), and past its coverage it serves a grey "map data not
