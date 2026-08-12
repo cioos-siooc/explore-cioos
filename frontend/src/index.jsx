@@ -13,6 +13,8 @@ import HarvestOverview from './components/Harvest/HarvestOverview.jsx'
 import HarvestServer   from './components/Harvest/HarvestServer.jsx'
 import HarvestDataset  from './components/Harvest/HarvestDataset.jsx'
 import HarvestRun      from './components/Harvest/HarvestRun.jsx'
+import HarvestDownloads   from './components/Harvest/HarvestDownloads.jsx'
+import HarvestDownloadJob from './components/Harvest/HarvestDownloadJob.jsx'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
 // CIOOS National design tokens + base typography. Imported first so the
@@ -61,6 +63,8 @@ createRoot(domContainer).render(
         <Route path='/harvest/server/:slug'              element={<HarvestServer />} />
         <Route path='/harvest/dataset/:slug/:datasetId'  element={<HarvestDataset />} />
         <Route path='/harvest/run/:runId'                element={<HarvestRun />} />
+        <Route path='/harvest/downloads'                 element={<HarvestDownloads />} />
+        <Route path='/harvest/downloads/:jobId'          element={<HarvestDownloadJob />} />
       </Routes>
     </BrowserRouter>
   </Suspense>

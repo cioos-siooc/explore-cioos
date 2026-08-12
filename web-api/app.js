@@ -24,6 +24,7 @@ const scientificNamesRouter = require("./routes/scientificNames");
 const obisNodesRouter = require("./routes/obisNodes");
 const erddapServersRouter = require("./routes/erddapServers");
 const harvestRouter = require("./routes/harvest");
+const harvestDownloadsRouter = require("./routes/harvestDownloads");
 const trajectoriesRouter = require("./routes/trajectories");
 const swaggerSpec = require('./swagger');
 const swaggerUi = require('swagger-ui-express');
@@ -115,6 +116,9 @@ app.use("/downloadEstimate", downloadEstimateRouter);
 app.use("/scientificNames", scientificNamesRouter);
 app.use("/obisNodes", obisNodesRouter);
 app.use("/erddapServers", erddapServersRouter);
+// Mounted before /harvest so its literal paths aren't matched by that
+// router's /:runId-style routes.
+app.use("/harvest/downloads", harvestDownloadsRouter);
 app.use("/harvest", harvestRouter);
 app.use("/trajectories", trajectoriesRouter);
 
