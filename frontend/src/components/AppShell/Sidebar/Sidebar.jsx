@@ -117,7 +117,10 @@ export default function Sidebar () {
   }
 
   return (
-    <aside className='sidebar' aria-label={t('datasetsFilterName')}>
+    <aside
+      className={classNames('sidebar', { sheetExpanded: expanded })}
+      aria-label={t('datasetsFilterName')}
+    >
       <section
         ref={sheetRef}
         className={classNames('sidebarDatasets', { expanded })}

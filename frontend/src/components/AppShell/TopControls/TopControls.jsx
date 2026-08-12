@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useRef } from 'react'
 import { Filter, ListUl } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
@@ -7,9 +8,27 @@ import BrandSearch from '../TopLeft/BrandSearch.jsx'
 import ActiveFilterChips from './ActiveFilterChips.jsx'
 import Spinner from '../../ui/Spinner.jsx'
 import useDatasetCounts from '../../../state/useDatasetCounts.js'
+import usePublishedFootprint from '../../../state/ui/usePublishedFootprint.js'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
+
+// Gap held between the bottom of the top bar and whatever it pushes down.
+const TOP_BAR_GAP = 12
+
+// How far down the top bar reaches over the datasets column on the left. The bar
+// is centered and grows downward as active-filter chips wrap onto new rows, so
+// with a few filters applied it hangs well below the brand card and over the top
+// of that column — hence a measurement rather than a fixed clearance.
+//
+// It only reaches the column on narrower viewports: once the screen is wide
+// enough for the centered bar to sit clear of it, this is 0 and the datasets
+// card starts at the top of the map again.
+function measureTopBarSpace (rect) {
+  const column = document.querySelector('.sidebar')?.getBoundingClientRect()
+  if (column && rect.left >= column.right) return 0
+  return rect.bottom + TOP_BAR_GAP
+}
 
 // Centered top header. First layer: the brand bar. Second layer, merged into a
 // single segmented pill directly below it: the Datasets toggle (opens/closes
@@ -41,6 +60,9 @@ export default function TopControls () {
     label: countLabel
   } = useDatasetCounts()
 
+  const barRef = useRef(null)
+  usePublishedFootprint(barRef, '--cioos-top-bar-space', measureTopBarSpace)
+
   const activeFilterCount = [
     eovsSelected.some((o) => o.isSelected),
     orgsSelected.some((o) => o.isSelected),
@@ -54,7 +76,7 @@ export default function TopControls () {
   ].filter(Boolean).length
 
   return (
-    <div className='topBar'>
+    <div className='topBar' ref={barRef}>
       <BrandSearch>
         <div className='topBarActions'>
           <button

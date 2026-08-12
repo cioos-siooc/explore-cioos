@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import Slider from 'rc-slider'
 import 'rc-slider/assets/index.css'
 import { useTranslation } from 'react-i18next'
@@ -9,9 +9,19 @@ import {
   TRAIL_ALL,
   effectiveTrailingDays
 } from '../../config.js'
+import usePublishedFootprint from '../../../state/ui/usePublishedFootprint.js'
 import './styles.css'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
+
+// How far up the bar reaches from the bottom of the viewport: its own offset
+// plus its height, which changes with the locale's label lengths and with the
+// tighter phone layout. Everything else sitting over the lower map — the
+// datasets sidebar, the legend on narrow screens, the zoom-to-dataset pill —
+// holds clearance from this rather than from a hardcoded height.
+function measureBarSpace ({ top, height }) {
+  return Math.max(window.innerHeight - top, height)
+}
 
 function dateToEpochDay(isoDate) {
   return Math.floor(new Date(`${isoDate}T00:00:00Z`).getTime() / MS_PER_DAY)
@@ -34,6 +44,9 @@ export default function TimeBar({
 }) {
   const { t } = useTranslation()
 
+  const barRef = useRef(null)
+  usePublishedFootprint(barRef, '--cioos-time-bar-space', measureBarSpace)
+
   // Zoomed out, the long windows load clamped (see effectiveTrailingDays), so
   // say so on the picker rather than let the choice look like it did nothing.
   const zoomClamped = effectiveTrailingDays(trailingDays, zoom) !== trailingDays
@@ -51,7 +64,7 @@ export default function TimeBar({
   }
 
   return (
-    <div className='timeBar'>
+    <div className='timeBar' ref={barRef}>
       <div className='timeBarDate'>{scrubTime}</div>
       <div className='timeBarSlider'>
         <Slider

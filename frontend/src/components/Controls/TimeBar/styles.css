@@ -2,7 +2,10 @@
    read as one centered column over the map. */
 .timeBar {
   position: fixed;
-  bottom: 24px;
+  /* Sits on the bottom edge of the map, keeping just the screen margin the
+     other floating chrome uses — everything that has to clear the bar measures
+     it, so a tighter offset buys back map for all of them. */
+  bottom: 8px;
   left: 50%;
   transform: translateX(-50%);
   width: min(720px, calc(100vw - 24px));
@@ -16,18 +19,36 @@
   gap: 16px;
 }
 
-/* Clear the datasets bottom sheet on phones (same offset as the
-   zoom-to-dataset pill). */
+/* Phones: same bottom edge, but the datasets sheet is down there too. */
 @media (max-width: 700px) {
   .timeBar {
-    bottom: 64px;
+    /* The collapsed sheet's drag strip keeps that edge too, and it is both
+       invisible and full-width, so the bar has to sit above the shell layer
+       (30) to stay clickable through it. Once the sheet is expanded it raises
+       itself past the bar and covers it — see .sidebar.sheetExpanded in the
+       Sidebar stylesheet — because on a phone the list takes the screen. */
+    z-index: calc(var(--cioos-z-shell, 30) + 1);
   }
 }
 
 /* The zoom-to-dataset pill shares the bottom-center spot; while the time bar
-   is shown (it renders just before the pill), lift the pill above it. */
+   is shown (it renders just before the pill), lift the pill above it — by the
+   bar's measured footprint, so the gap holds at any bar height or offset. */
 .timeBar ~ .zoomToDatasetButton.floating {
-  bottom: 110px;
+  bottom: calc(var(--cioos-time-bar-space, 0px) + 12px);
+}
+
+/* MapLibre's bottom-right stack — the scale bar and the attribution/info
+   button, with the draw tools above them — stands in a corner the centered bar
+   reaches into on narrower screens: the 720px bar's right edge passes the left
+   edge of the ~160px scale bar below ~1040px, and narrower still the bar spans
+   nearly the full width. Lift the whole corner by the bar's measured footprint
+   so nothing hides under it. --cioos-time-bar-space is 0 when no bar is shown,
+   leaving MapLibre's own corner offsets untouched. */
+@media (max-width: 1040px) {
+  .maplibregl-ctrl-bottom-right {
+    margin-bottom: var(--cioos-time-bar-space, 0px);
+  }
 }
 
 .timeBarDate {

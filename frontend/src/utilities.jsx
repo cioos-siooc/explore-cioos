@@ -642,16 +642,8 @@ export function updateMapToolTitleLanguage(t) {
 
   const deleteToolDiv = document.getElementsByClassName('mapbox-gl-draw_trash')
   deleteToolDiv[0].title = t('mapDeleteToolTitle')
-
-  const zoomInToolDiv = document.getElementsByClassName(
-    'maplibregl-ctrl-zoom-in'
-  )
-  zoomInToolDiv[0].title = t('mapZoomInToolTitle')
-
-  const zoomOutToolDiv = document.getElementsByClassName(
-    'maplibregl-ctrl-zoom-out'
-  )
-  zoomOutToolDiv[0].title = t('mapZoomOutToolTitle')
+  // The zoom in/out buttons are gone (scroll, pinch and double-tap all zoom),
+  // so there are no titles to translate for them.
 }
 
 // make table column headers more readable

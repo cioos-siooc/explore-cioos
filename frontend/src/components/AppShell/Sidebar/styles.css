@@ -10,10 +10,10 @@
   /* Sliver of the collapsed datasets sheet left visible on mobile — just a
      slim grab handle. Kept in sync with SHEET_PEEK in Sidebar.jsx. */
   --sheet-peek: 28px;
-  /* Clearance held below the brand card so the datasets list's top edge rests
-     just under it (logo row + Datasets/Filters pill) instead of sliding behind
-     it. Used on mobile (sheet height) and on narrow desktop widths where the
-     centered brand card drifts left over the sidebar. */
+  /* Floor for the clearance held below the top bar on mobile, so the sheet's
+     top edge rests under it (logo row + Datasets/Filters pill) instead of
+     sliding behind it. The measured --cioos-top-bar-space takes over whenever
+     it is larger — with filter chips wrapped under the bar, it usually is. */
   --sheet-top-gap: 110px;
 }
 
@@ -21,9 +21,19 @@
    and the empty space between/below them stays click-through to the map. */
 .sidebar {
   position: fixed;
-  top: 12px;
+  /* Start below the centered top bar whenever it reaches over this column —
+     which it does on narrower screens, and does further down the more
+     active-filter chips are wrapped under it. TopControls publishes that reach
+     as --cioos-top-bar-space and leaves it at 0 once the bar sits clear, where
+     the column goes back to starting at the top of the map. */
+  top: max(12px, var(--cioos-top-bar-space, 0px));
   left: 12px;
-  bottom: 12px;
+  /* Stop above the tracks-mode time bar rather than running under it: the bar
+     is centered on the viewport and wide, so on anything narrower than ~1580px
+     it reaches into this column. --cioos-time-bar-space is 0 unless the bar is
+     mounted (TimeBar publishes its measured footprint), so with the bar absent
+     this is the plain 12px inset. */
+  bottom: calc(12px + var(--cioos-time-bar-space, 0px));
   z-index: var(--cioos-z-shell, 30);
   display: flex;
   flex-direction: column;
@@ -71,18 +81,6 @@
 @media (min-width: 701px) {
   .sidebarDatasets:not(.expanded) {
     display: none;
-  }
-}
-
-/* Narrow desktop widths: the brand card is centered on the viewport, so as the
-   screen narrows it drifts left until it overlaps the top of the left sidebar.
-   The crossover (with the 420px sidebar + 400px brand card) is ~1264px, so up
-   to ~1300px push the datasets card's top down to clear the brand card — the
-   same clearance the mobile sheet holds. Above ~1300px the centered card no
-   longer reaches the sidebar, so no push is needed. */
-@media (min-width: 701px) and (max-width: 1300px) {
-  .sidebarDatasets {
-    margin-top: var(--sheet-top-gap);
   }
 }
 
@@ -239,19 +237,36 @@
     width: auto;
   }
 
+  /* Expanded, the sheet owns the screen — including the time bar, which sits a
+     layer above the resting sheet so the collapsed list doesn't cover it. */
+  .sidebar.sheetExpanded {
+    z-index: var(--cioos-z-sheet, 34);
+  }
+
   .sidebarDatasets {
     position: fixed;
     left: 0;
     right: 0;
+    /* The sheet owns the screen here: expanded it rises over the time bar
+       instead of holding clearance from it the way the desktop column does. */
     bottom: 0;
-    /* Full height minus the brand-card clearance at the top, so the expanded
-       sheet reaches nearly the top of the screen while stopping below the
-       brand card. */
-    height: calc(100dvh - var(--sheet-top-gap));
-    max-height: calc(100dvh - var(--sheet-top-gap));
+    /* Full height minus the top-bar clearance, so the expanded sheet reaches
+       nearly the top of the screen while stopping below the bar (and below the
+       filter chips wrapped under it, which is what pushes the measured
+       --cioos-top-bar-space past the floor). */
+    height: calc(
+      100dvh - max(var(--sheet-top-gap), var(--cioos-top-bar-space, 0px))
+    );
+    max-height: calc(
+      100dvh - max(var(--sheet-top-gap), var(--cioos-top-bar-space, 0px))
+    );
     border-radius: var(--cioos-radius-lg) var(--cioos-radius-lg) 0 0;
     box-shadow: var(--cioos-shadow-lift, var(--cioos-shadow-float));
-    /* Collapsed rest position: only the handle peeks above the edge. */
+    /* Collapsed rest position: only the drag strip peeks above the bottom edge,
+       with the rest of the list parked below the screen. The strip keeps the
+       edge — the time bar crosses it but sits a layer above (see the TimeBar
+       stylesheet), so the bar stays usable and nothing else on the bottom of
+       the map has to dodge an invisible strip. */
     transform: translateY(calc(100% - var(--sheet-peek)));
     transition: transform var(--cioos-transition-normal, 0.25s ease);
     touch-action: none;

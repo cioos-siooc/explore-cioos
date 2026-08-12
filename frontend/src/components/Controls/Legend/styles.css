@@ -343,14 +343,18 @@
   .legend {
     top: auto;
     right: auto;
-    bottom: 12px;
+    /* Stacked directly above the tracks-mode time bar, which owns the bottom
+       edge of the screen here. --cioos-time-bar-space is 0 while the bar isn't
+       shown (TimeBar publishes its measured footprint), leaving the plain
+       bottom-corner offset. */
+    bottom: calc(12px + var(--cioos-time-bar-space, 0px));
     left: 8px;
-    max-height: calc(100vh - 148px);
+    max-height: calc(100vh - 148px - var(--cioos-time-bar-space, 0px));
   }
 }
 
 @media (max-height: 500px) {
   .legend {
-    max-height: calc(100vh - 80px);
+    max-height: calc(100vh - 80px - var(--cioos-time-bar-space, 0px));
   }
 }

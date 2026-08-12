@@ -80,6 +80,23 @@
      closed-state transforms all derive from this token so they stay in sync. */
   --cioos-panel-w: clamp(360px, 42vw, 580px);
 
+  /* --- Layout: top-bar footprint ---
+     How far down the centered top bar (brand card, Datasets/Filters pill, and
+     the active-filter chips flowing under them) reaches over the datasets
+     column on the left. TopControls publishes the real number, which grows as
+     chips wrap onto new rows, and 0 once the screen is wide enough for the bar
+     to sit clear of that column. */
+  --cioos-top-bar-space: 0px;
+
+  /* --- Layout: bottom time-bar footprint ---
+     How far the tracks-mode time bar reaches up from the bottom of the viewport
+     (its own offset + measured height). TimeBar publishes the real number on
+     :root while it is mounted and clears it on unmount, so anything sitting
+     over the lower half of the map — the datasets sidebar, the zoom-to-dataset
+     pill — can hold clearance from it without hard-coding its height. 0 when
+     the bar isn't shown. */
+  --cioos-time-bar-space: 0px;
+
   /* --- Header & Layout (Modern Sidebar) --- */
   --cioos-header-height: 70px;
   --cioos-header-height-mobile: 60px;

@@ -189,8 +189,6 @@
   "mapCoverageObisDatasets": "{{total}} jeu(x) de données OBIS",
   "mapPolygonToolTitle": "Outil polygone",
   "mapDeleteToolTitle": "Effacer",
-  "mapZoomInToolTitle": "Zoom avant",
-  "mapZoomOutToolTitle": "Zoom arrière",
   "mapCompassToolTitle": "Remettre l'orientation vers le nord",
   "currents": "Courants",
   "dissolvedOrganicCarbon": "Carbone organique dissous",

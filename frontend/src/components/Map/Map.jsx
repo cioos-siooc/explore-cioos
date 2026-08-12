@@ -1,7 +1,6 @@
 import * as React from 'react'
 import maplibreGl, {
   AttributionControl,
-  NavigationControl,
   Popup,
   ScaleControl
 } from 'maplibre-gl'
@@ -2715,13 +2714,27 @@ export default function CreateMap({
       compact: true
     })
     map.current.addControl(attribution, 'bottom-right')
+    // Start the attribution closed, as the bare ⓘ bubble, instead of with the
+    // credits line spread across the corner of the map.
+    //
+    // MapLibre expands compact attribution itself, and not at mount: on mount
+    // the control is still `maplibregl-attrib-empty` (the style's attributions
+    // haven't arrived), which makes its _updateCompact a no-op — so is clearing
+    // the expanded class here. The expansion lands later, when the attributions
+    // resolve and _updateCompact runs again on an element carrying neither
+    // class, at which point it adds `maplibregl-compact` *and*
+    // `maplibregl-compact-show`. Adding the compact class ourselves now is what
+    // holds: that branch is guarded on the class being absent, so it stops
+    // running while the ⓘ toggle, which only needs the same class, keeps
+    // working.
+    mapContainer.current
+      ?.querySelector('.maplibregl-ctrl-attrib')
+      ?.classList.add('maplibregl-compact')
     map.current.addControl(scale, 'bottom-right')
 
-    // Called order determines stacking order
-    map.current.addControl(
-      new NavigationControl({ showCompass: false }),
-      'bottom-right'
-    )
+    // Called order determines stacking order. No NavigationControl: the +/-
+    // zoom buttons only repeated what scroll, pinch and double-tap already do,
+    // and the corner is busy enough with the draw tools.
     map.current.addControl(drawPolygon.current, 'bottom-right')
 
     updateMapToolTitleLanguage(t)

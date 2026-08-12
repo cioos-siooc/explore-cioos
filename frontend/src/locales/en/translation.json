@@ -188,8 +188,6 @@
   "mapCoverageObisDatasets": "{{total}} OBIS dataset(s)",
   "mapPolygonToolTitle": "Polygon Tool (p)",
   "mapDeleteToolTitle": "Delete",
-  "mapZoomInToolTitle": "Zoom In",
-  "mapZoomOutToolTitle": "Zoom Out",
   "mapCompassToolTitle": "Reset bearing to North",
   "currents": "Currents",
   "dissolvedOrganicCarbon": "Dissolved Organic Carbon",
