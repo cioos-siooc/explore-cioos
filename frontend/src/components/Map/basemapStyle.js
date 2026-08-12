@@ -1,7 +1,7 @@
 /*
  * Ocean-first basemap for the CDE map.
  *
- * Two base rasters that hand over to each other across z10–z12: a bathymetry
+ * Two base rasters that hand over to each other at z10: a bathymetry
  * raster (EMODnet World Base Layer — global GEBCO-derived depth shading with
  * muted grey land) for the world view, satellite imagery (Esri World Imagery)
  * for the local view. Under them sits a slim OpenMapTiles-schema vector overlay
@@ -20,7 +20,13 @@
  */
 
 import { server } from '../../config'
-import { bathymetryFadeInZoom, bathymetryFullZoom } from '../config.js'
+import {
+  basemapHandoffEndZoom,
+  basemapHandoffStartZoom,
+  basemapPrewarmZoom,
+  bathymetryFadeInZoom,
+  bathymetryFullZoom
+} from '../config.js'
 
 const OFM_TILEJSON = 'https://tiles.openfreemap.org/planet'
 const OFM_GLYPHS = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf'
@@ -93,16 +99,22 @@ export function buildBasemapStyle (lang = 'en') {
       type: 'background',
       paint: { 'background-color': '#DCE8E5' }
     },
-    // The two base rasters cross-fade over z10–z12: EMODnet owns the world
-    // view, satellite owns the local view, and neither is blended into the
-    // other once the hand-off is done.
+    // The two base rasters swap at z10: EMODnet owns the world view, satellite
+    // owns the local view, and the change happens over the half zoom below z10
+    // rather than being blended across a wide range.
     //
-    // The hand-off sits there because that is where each source runs out or
-    // starts. EMODnet is pre-rendered only to z12 — past it the shading is
-    // overzoom, and its land was always a flat muted grey with no features in
-    // it, so a harbour view showed where the water ended and nothing about what
-    // it ended against. Esri's imagery is the opposite: nothing useful at world
-    // scale, everything from z12 in.
+    // The hand-off sits there because that is roughly where each source stops
+    // earning its place. EMODnet is pre-rendered only to z12, and its land was
+    // always a flat muted grey with no features in it, so a harbour view showed
+    // where the water ended and nothing about what it ended against. Esri's
+    // imagery is the opposite: nothing useful at world scale, everything from
+    // the regional view in.
+    //
+    // The window is deliberately short. A long cross-fade means a wide band of
+    // zooms where the map is two half-opaque rasters at once — neither the
+    // clean depth shading nor the imagery, and NONNA too faint to read on top
+    // of the pair. Half a zoom level is enough to avoid a hard cut on a smooth
+    // zoom and short enough that no resting zoom sits inside the blend.
     //
     // Every layer here that fades to nothing carries the maxzoom that matches
     // its fade. MapLibre skips *drawing* a layer once its opacity reaches 0,
@@ -118,22 +130,40 @@ export function buildBasemapStyle (lang = 'en') {
       source: 'bathymetry',
       // Also stops EMODnet tiles being fetched and cached past the hand-off: a
       // layer outside its zoom range marks its source unused.
-      maxzoom: 12,
+      maxzoom: basemapHandoffEndZoom,
       paint: {
-        'raster-opacity': ['interpolate', ['linear'], ['zoom'], 10, 1, 12, 0],
+        'raster-opacity': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          basemapHandoffStartZoom,
+          1,
+          basemapHandoffEndZoom,
+          0
+        ],
         'raster-saturation': -0.15
       }
     },
-    // minzoom is what stops imagery tiles being fetched at low zoom; the
-    // opacity ramp starting at 0 on that same zoom means they are already warm
-    // by the time they become visible.
+    // minzoom is what stops imagery tiles being fetched at world zooms. It sits
+    // below the fade rather than on it: the ramp is short enough now that a
+    // request started when the first pixel is drawn would land after the swap
+    // is over, so the layer is mounted (and its tiles requested) half a zoom
+    // early and held at zero opacity until the hand-off begins.
     {
       id: 'imagery',
       type: 'raster',
       source: 'imagery',
-      minzoom: 10,
+      minzoom: basemapPrewarmZoom,
       paint: {
-        'raster-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0, 12, 1],
+        'raster-opacity': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          basemapHandoffStartZoom,
+          0,
+          basemapHandoffEndZoom,
+          1
+        ],
         // Matches the bathymetry's muting so full-colour imagery doesn't shout
         // against the pastel palette everything else in the style shares.
         'raster-saturation': -0.15
@@ -167,7 +197,10 @@ export function buildBasemapStyle (lang = 'en') {
       id: 'bathymetry-nonna-100',
       type: 'raster',
       source: 'nonna100',
-      minzoom: bathymetryFadeInZoom,
+      // Mounted below the fade for the same reason as the imagery, and it
+      // matters more here: these tiles come through our own proxy and are the
+      // slowest thing on the map on a cold cache.
+      minzoom: basemapPrewarmZoom,
       paint: {
         'raster-opacity': [
           'interpolate',
@@ -190,7 +223,7 @@ export function buildBasemapStyle (lang = 'en') {
       id: 'bathymetry-nonna-10',
       type: 'raster',
       source: 'nonna10',
-      minzoom: bathymetryFadeInZoom,
+      minzoom: basemapPrewarmZoom,
       paint: {
         'raster-opacity': [
           'interpolate',
@@ -215,10 +248,18 @@ export function buildBasemapStyle (lang = 'en') {
       type: 'fill',
       source: 'ofm',
       'source-layer': 'water',
-      maxzoom: 13,
+      maxzoom: basemapHandoffEndZoom,
       paint: {
         'fill-color': '#52A79B',
-        'fill-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.1, 13, 0]
+        'fill-opacity': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          basemapHandoffStartZoom,
+          0.1,
+          basemapHandoffEndZoom,
+          0
+        ]
       }
     },
     // Coastline, for the zooms EMODnet owns. Its land/sea edge is a soft
@@ -229,9 +270,10 @@ export function buildBasemapStyle (lang = 'en') {
     // draw that edge on top of the raster: a pale casing for contrast against
     // dark water, and a dark line for contrast against land.
     //
-    // Both fade out by z12. They were the answer to a blurred raster shore, and
-    // past z12 there is no raster shore left to fix — the satellite has its own,
-    // and a drawn line beside it would only be a second, wrong one.
+    // Both fade out with the raster they were drawn for, so they are gone by
+    // z10. They were the answer to a blurred raster shore, and past the hand-off
+    // there is no raster shore left to fix — the satellite has its own, and a
+    // drawn line beside it would only be a second, wrong one.
     //
     // These two are why the maxzoom note above matters most: they turn the OSM
     // water polygons into *line* geometry, which is the most expensive thing
@@ -244,11 +286,11 @@ export function buildBasemapStyle (lang = 'en') {
       source: 'ofm',
       'source-layer': 'water',
       filter: SHORELINE_FILTER,
-      maxzoom: 12,
+      maxzoom: basemapHandoffEndZoom,
       layout: { 'line-join': 'round' },
       paint: {
         'line-color': '#F3F0EC',
-        // Off by z12, with the imagery fully in — see the coastline layer below.
+        // Off by z10, with the imagery fully in — see the coastline layer below.
         'line-opacity': [
           'interpolate',
           ['linear'],
@@ -257,24 +299,14 @@ export function buildBasemapStyle (lang = 'en') {
           0,
           7,
           0.35,
-          10,
+          basemapHandoffStartZoom,
           0.5,
-          12,
+          basemapHandoffEndZoom,
           0
         ],
-        'line-width': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          4,
-          1.2,
-          10,
-          2.4,
-          14,
-          3,
-          18,
-          3.6
-        ]
+        // Only ramps to the hand-off now; the stops past it keyed zooms the
+        // layer no longer reaches.
+        'line-width': ['interpolate', ['linear'], ['zoom'], 4, 1.2, 10, 2.4]
       }
     },
     {
@@ -283,7 +315,7 @@ export function buildBasemapStyle (lang = 'en') {
       source: 'ofm',
       'source-layer': 'water',
       filter: SHORELINE_FILTER,
-      maxzoom: 12,
+      maxzoom: basemapHandoffEndZoom,
       layout: { 'line-join': 'round' },
       paint: {
         // Slate-teal rather than near-black: dark enough to hold the edge
@@ -303,9 +335,9 @@ export function buildBasemapStyle (lang = 'en') {
           0.3,
           6,
           0.55,
-          10,
+          basemapHandoffStartZoom,
           0.72,
-          12,
+          basemapHandoffEndZoom,
           0
         ],
         // Width still ramps for the zooms where the line is visible at all.
@@ -318,11 +350,7 @@ export function buildBasemapStyle (lang = 'en') {
           6,
           0.8,
           10,
-          1.2,
-          14,
-          1.5,
-          18,
-          1.8
+          1.2
         ]
       }
     },

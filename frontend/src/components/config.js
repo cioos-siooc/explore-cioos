@@ -122,11 +122,29 @@ export const isMarkerTier = (zoom) => Number(zoom) >= MARKER_MIN_ZOOM
 // hex ramp keeps the metric switcher — colour has the range to carry it.
 export const MARKER_METRIC = 'days'
 
-// CHS NONNA bathymetry (see basemapStyle.js). The zooms the two NONNA raster
-// layers fade across; exported so the layers and the legend entry that
-// describes them cannot drift apart.
-export const bathymetryFadeInZoom = 10
-export const bathymetryFullZoom = 12
+// The basemap hand-off window (see basemapStyle.js): the zooms over which the
+// world view (EMODnet bathymetry raster, water tint, drawn coastline) gives way
+// to the local view (Esri imagery + CHS NONNA soundings). Every layer that
+// fades in or out during the hand-off reads these two numbers, so the swap
+// stays a single coordinated event rather than several loosely-aligned ones.
+//
+// It used to run z10 → z12: a two-zoom cross-fade that left the middle of the
+// range showing both rasters at partial opacity, with the satellite still
+// half-transparent and NONNA barely readable through most of it. It now
+// completes at z10 and takes half a zoom to do it, so a harbour view is fully
+// on imagery and full-strength soundings rather than in a long blend.
+export const basemapHandoffStartZoom = 9.5
+export const basemapHandoffEndZoom = 10
+// A short lead-in where the incoming rasters are requested but still drawn at
+// zero opacity. The fade is now too quick to double as a warm-up: without this
+// the first frame of a sharp swap would be whatever parent tiles happen to be
+// cached. Keeps tiles off the wire at world zooms, where they are useless.
+export const basemapPrewarmZoom = 9
+
+// CHS NONNA bathymetry rides the same window — exported under its own names so
+// the raster layers and the legend entry that describes them cannot drift apart.
+export const bathymetryFadeInZoom = basemapHandoffStartZoom
+export const bathymetryFullZoom = basemapHandoffEndZoom
 // Only claim the ramp once the raster is at least half opaque — at the fade-in
 // zoom itself it is drawn at zero opacity, and a legend for an invisible layer
 // is worse than none.

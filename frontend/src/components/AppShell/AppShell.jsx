@@ -31,6 +31,7 @@ export default function AppShell () {
   const { t } = useTranslation()
   const {
     loading,
+    basemapLoading,
     mapLoaded,
     zoom,
     currentRangeLevel,
@@ -134,7 +135,14 @@ export default function AppShell () {
           effect, which guards against their being undefined until then. */}
       <MapContainer />
       <ApiErrorBanner />
-      {loading && mapLoaded && <MapBusy />}
+      {/* One pill, two possible waits. The data redraw wins when both are in
+          flight: it's the one the user's own action started, and the basemap
+          catching up underneath it is the lesser news. */}
+      {mapLoaded && (loading || basemapLoading) && (
+        <MapBusy
+          messageKey={loading ? 'mapUpdatingText' : 'mapTilesLoadingText'}
+        />
+      )}
       <Sidebar />
       <TopControls />
       <FiltersModal />

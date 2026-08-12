@@ -432,6 +432,7 @@
   "dockDatasetsCountTitle": "{{filtered}} de {{total}} jeux de données affichés",
   "datasetsCountLoadingTitle": "Décompte des jeux de données…",
   "mapUpdatingText": "Mise à jour de la carte…",
+  "mapTilesLoadingText": "Chargement de l'imagerie…",
   "downloadSizeUnavailable": "—",
   "downloadSizeUnavailableTitle": "Estimation de taille indisponible",
   "dockDownloadCountTitle": "{{count}} jeux de données sélectionnés pour téléchargement",

@@ -61,6 +61,12 @@ export default function MapStateProvider ({ children }) {
     setLoadingState(value)
     if (!value) setMapLoaded(true)
   }, [])
+  // Separate from `loading` above, which is about the *data* the map draws.
+  // This one is the basemap rasters — imagery and CHS soundings still arriving
+  // after a pan or a zoom — and it is the slow one on a cold cache. Map.jsx
+  // only raises it for waits long enough to be worth a word (see the effect
+  // there); AppShell decides which of the two pills gets the spot.
+  const [basemapLoading, setBasemapLoading] = useState(false)
   // The camera, as the map reports it (numbers, plus bounds once it has
   // settled). Seeded from the share link — or the default view when the link
   // carries no camera — rather than left empty: MapLibre only pushes a view on
@@ -402,6 +408,8 @@ export default function MapStateProvider ({ children }) {
   const value = {
     loading,
     setLoading,
+    basemapLoading,
+    setBasemapLoading,
     mapLoaded,
     mapView,
     setMapView,

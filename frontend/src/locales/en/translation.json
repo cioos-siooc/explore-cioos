@@ -431,6 +431,7 @@
   "dockDatasetsCountTitle": "{{filtered}} of {{total}} datasets shown",
   "datasetsCountLoadingTitle": "Counting datasets…",
   "mapUpdatingText": "Updating map…",
+  "mapTilesLoadingText": "Loading map imagery…",
   "downloadSizeUnavailable": "—",
   "downloadSizeUnavailableTitle": "Size estimate unavailable",
   "dockDownloadCountTitle": "{{count}} datasets selected for download",
