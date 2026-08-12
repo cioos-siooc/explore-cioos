@@ -49,6 +49,7 @@
   "organizationFilterName": "Organizations",
   "organizationMulti": " organizations",
   "datasetsFilterName": "Datasets",
+  "topBarDatasetsLabel": "Datasets",
   "datasetsMulti": " datasets",
   "sourceFilterName": "Data Portal",
   "sourcesMulti": " data portals",

@@ -43,8 +43,12 @@
   justify-content: center;
   gap: 8px;
   min-width: 0;
-  height: 40px;
-  padding: 0 14px;
+  /* min-height, not height: the Datasets segment stacks a label over its
+     counts, and a long label can take a second line on a narrow viewport.
+     Both segments stretch together (the grid's align-items), so the strip
+     stays a single even band whatever the tallest one needs. */
+  min-height: 40px;
+  padding: 4px 10px;
   border: none;
   /* Dimmed primary: a translucent teal wash that highlights the two entry
      points without competing with the white brand row above them. */
@@ -53,9 +57,39 @@
   font-weight: 600;
   color: var(--cioos-primary-700);
   cursor: pointer;
-  white-space: nowrap;
   transition: background-color var(--cioos-transition-fast),
     color var(--cioos-transition-fast);
+}
+
+/* The icon and the filters badge hold their size; only text gives way. */
+.topBarButton > svg,
+.topBarCount {
+  flex: 0 0 auto;
+}
+
+/* Datasets segment: label on top, counts underneath. */
+.topBarButtonStack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+/* Labels wrap instead of running past the fixed-width brand card. The break
+   points come from the strings themselves — French joins "de données" with a
+   non-breaking space so it wraps as "Jeux / de données", never "Jeux de /
+   données". With the counts on their own line there is normally room for one
+   line; this only bites on the narrowest phones. */
+.topBarButtonLabel {
+  /* Floor the label at its longest word so flex shrinking can't squeeze it
+     narrower than "données" and split the word. */
+  min-width: min-content;
+  text-align: center;
+  line-height: 1.2;
+  /* break-word, not anywhere: a word only ever splits when it cannot fit on a
+     line of its own, so "données" drops to its own line instead of breaking
+     into "don / nées" on the narrowest phones. */
+  overflow-wrap: break-word;
 }
 
 /* Hairline weld between the two tabs. */
@@ -86,6 +120,29 @@
   box-shadow: var(--cioos-focus);
 }
 
+/* Shown / total, as a caption under the Datasets label: no badge chrome, just
+   a lighter second line, so both numbers stay readable at a glance without
+   turning the segment into two competing pills. */
+.topBarCounts {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 15px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  opacity: 0.8;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dimmer still while a refetch is in flight — see the sidebar counters. */
+.topBarCounts.updating {
+  opacity: 0.4;
+}
+
+/* Filters badge: the active-filter count, a single digit or two. */
 .topBarCount {
   display: inline-flex;
   align-items: center;
@@ -99,13 +156,8 @@
   white-space: nowrap;
 }
 
-/* On the active (teal) tab the count stays white too — a translucent white
+/* On the active (teal) tab the badge stays white too — a translucent white
    pill keeps the number legible without a dark-on-white patch. */
-/* Stale count during a refetch — see the sidebar counters. */
-.topBarCount.updating {
-  opacity: 0.55;
-}
-
 .topBarButton.active .topBarCount {
   background-color: rgba(255, 255, 255, 0.24);
   color: var(--cioos-white);
@@ -119,12 +171,21 @@
 
   .topBarButtonLabel {
     /* Keep labels — the merged pill is the only dataset/filter entry point on
-       phones now — but tighten the padding so both segments fit. */
+       phones now — but tighten type and padding so both segments fit. On a
+       320px-wide phone the card is only ~296px, leaving ~148px per segment,
+       where "Jeux de données" at 14px would wrap onto a second line. */
     display: inline;
+    font-size: 12px;
   }
 
   .topBarButton {
-    padding: 0 14px;
+    gap: 6px;
+    padding: 4px 8px;
+  }
+
+  .topBarCount {
+    padding: 1px 6px;
+    font-size: 11px;
   }
 }
 

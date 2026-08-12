@@ -49,6 +49,7 @@
   "organizationFilterName": "Organisations",
   "organizationMulti": " organisations",
   "datasetsFilterName": "Jeux de données",
+  "topBarDatasetsLabel": "Jeux de\u00a0données",
   "datasetsMulti": " jeux de données",
   "sourceFilterName": "Portail de données",
   "sourcesMulti": " portails de données",
