@@ -12,7 +12,12 @@ import {
   defaultStartDepth,
   defaultEndDepth
 } from '../../config.js'
+import {
+  DATA_LAYER_LABEL_KEYS,
+  selectedDataLayerKeys
+} from '../../../state/dataLayers.js'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
+import { useMapState } from '../../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
 
@@ -30,6 +35,7 @@ function filterNameForKey (key, t) {
   case 'time': return t('timeframeFilterName')
   case 'depth': return t('depthRangeFilterName')
   case 'scientificName': return 'scientificNameFilterName'
+  case 'dataLayers': return 'layerSelectorLabel'
   default: return undefined
   }
 }
@@ -59,6 +65,7 @@ export default function ActiveFilterChips () {
     setOnlyInView
   } = useSelection()
   const { setShowFiltersModal, setOpenFilter, setSidebarOpen } = useUI()
+  const { dataLayers, toggleDataLayer, resetDataLayers } = useMapState()
 
   // The chips can be collapsed behind a Show/Hide toggle. They start hidden on
   // phones — where they would eat most of the map — and shown on desktop. The
@@ -85,7 +92,24 @@ export default function ActiveFilterChips () {
     '(m)'
   )
 
+  // The geometry selection, announced the same way every other filter's is: one
+  // item per chosen value, and nothing at all while the filter is unfiltered
+  // (every geometry drawn). Dropping an item unticks that geometry; dropping
+  // the last one returns to all, via commitDataLayers.
+  const chosenDataLayers = selectedDataLayerKeys(dataLayers)
+  const dataLayersFilter = chosenDataLayers.length > 0 && {
+    key: 'dataLayers',
+    label: t('layerSelectorLabel'),
+    removeAll: resetDataLayers,
+    items: chosenDataLayers.map((key) => ({
+      id: key,
+      label: t(DATA_LAYER_LABEL_KEYS[key]),
+      remove: () => toggleDataLayer(key)
+    }))
+  }
+
   const activeFilters = [
+    dataLayersFilter,
     ...buildActiveFilters({ timeframesBadgeTitle, depthRangeBadgeTitle }),
     datasetTitleSearchText && {
       key: 'search',
@@ -200,6 +224,7 @@ export default function ActiveFilterChips () {
           className='filterMenuReset'
           onClick={() => {
             resetFilters()
+            resetDataLayers()
             setPolygon()
             setDatasetTitleSearchText('')
           }}

@@ -161,13 +161,30 @@
   text-transform: uppercase;
   color: var(--cioos-ink-40);
   margin-bottom: 2px;
-  white-space: nowrap;
+  /* Wraps rather than nowrap: the card is capped at 190px and the longer
+     captions (the French ones above all — "Trajectoires par hexagone") ran
+     past it, where the card's overflow simply cut them off mid-word. */
+  line-height: 1.25;
 }
 
 .legendItems {
   display: flex;
   flex-direction: column;
   gap: 0;
+}
+
+/* A pair of short entries that belong on one row (the point-size key). Wraps
+   rather than overflowing if a translation runs long. */
+.legendItems.inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+}
+
+/* Those labels are the whole point of the row, so let them size themselves
+   instead of inheriting the ellipsis the stacked entries want. */
+.legendItems.inline .legendItemLabel {
+  overflow: visible;
 }
 
 .legendItem {
@@ -262,55 +279,12 @@
   transform: translateX(-100%);
 }
 
-/* Basemap picker, above the layer switches. */
-.legendBasemapSelector {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: 8px;
-}
-
-.legendBasemapSelector .dropdown {
-  display: block;
-}
-
-.legendBasemapDropdown.btn,
-.legendBasemapDropdown .btn {
-  width: 100%;
-  justify-content: space-between;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Labels wrap instead of scrolling — the legend card clips horizontal
-   overflow (it scrolls vertically only), so a too-wide nowrap item would be
-   unreachable rather than just untidy. */
-.legendBasemapSelector .dropdown-item {
-  white-space: normal;
-}
-
 /* Map-layer switches, integrated into the legend card. Scoped-down switch
    chrome keeps the section compact alongside the color bar. */
 .legendLayerItems {
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-/* The data-layers group sits below the map-layer switches in the same card;
-   its caption doubles as the separator between the two switch groups. */
-.legendLayerItems + .legendSectionCaption {
-  display: block;
-  margin-top: 8px;
-  padding-top: 6px;
-  border-top: 1px solid var(--cioos-hairline);
-}
-
-/* A display option nested under its parent layer switch (e.g. "Show as track
-   lines" under Trajectories). */
-.legendLayerSub {
-  padding-left: 18px;
 }
 
 /* Scoped to the whole card, not just .legendLayerItems: the hex/point

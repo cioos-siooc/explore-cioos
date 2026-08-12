@@ -5,6 +5,7 @@ import {
   Building,
   CalendarWeek,
   FileEarmarkSpreadsheet,
+  Stack,
   Water,
   BroadcastPin,
   Server
@@ -13,6 +14,7 @@ import { useTranslation } from 'react-i18next'
 
 import Filter from '../../Controls/Filter/Filter.jsx'
 import FilterSection from '../../Controls/Filter/FilterMenu/FilterSection.jsx'
+import DataLayersFilter from '../../Controls/Filter/DataLayersFilter/DataLayersFilter.jsx'
 import MultiCheckboxFilter from '../../Controls/Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx'
 import SourceFilter from '../../Controls/Filter/SourceFilter/SourceFilter.jsx'
 import ScientificNameFilter from '../../Controls/Filter/ScientificNameFilter/ScientificNameFilter.jsx'
@@ -30,7 +32,13 @@ import {
   generateRangeSelectBadgeTitle,
   setAllOptionsIsSelectedTo
 } from '../../../utilities.jsx'
+import {
+  DATA_LAYER_KEYS,
+  DATA_LAYER_LABEL_KEYS,
+  selectedDataLayerKeys
+} from '../../../state/dataLayers.js'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
+import { useMapState } from '../../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
@@ -100,8 +108,20 @@ export default function FiltersPanel () {
     inViewCount
   } = useSelection()
   const { openFilter, setOpenFilter } = useUI()
+  const { dataLayers, resetDataLayers, showAllDataLayers } = useMapState()
 
   const inViewFilterName = t('datasetsCardOnlyInViewText')
+
+  // Same badge rule as the catalogue filters: the bare filter name while the
+  // filter is doing nothing, the chosen value(s) once it is.
+  const dataLayersFilterTranslationKey = 'layerSelectorLabel'
+  const dataLayersChosen = selectedDataLayerKeys(dataLayers)
+  const dataLayersBadgeTitle =
+    dataLayersChosen.length === 0
+      ? t(dataLayersFilterTranslationKey)
+      : dataLayersChosen.length === 1
+        ? t(DATA_LAYER_LABEL_KEYS[dataLayersChosen[0]])
+        : dataLayersChosen.length + t('dataLayersMulti')
 
   const eovsFilterTranslationKey = 'oceanVariablesFiltername'
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(
@@ -158,6 +178,24 @@ export default function FiltersPanel () {
     <div className='filtersPanel'>
       <div className='filtersPanelList'>
         <FilterSection title={t('filterGroupWhat')}>
+          {/* First in the section: this is the coarsest "what" there is — it
+              decides which families of data exist for the filters below to
+              narrow. */}
+          <Filter
+            active={dataLayersChosen.length > 0}
+            badgeTitle={dataLayersBadgeTitle}
+            tooltip={t('dataLayersFilterTooltip')}
+            icon={<Stack />}
+            controlled
+            filterName={dataLayersFilterTranslationKey}
+            openFilter={openFilter === dataLayersFilterTranslationKey}
+            setOpenFilter={setOpenFilter}
+            selectAllButton={showAllDataLayers}
+            resetButton={resetDataLayers}
+            numberOfOptions={DATA_LAYER_KEYS.length}
+          >
+            <DataLayersFilter />
+          </Filter>
           <Filter
             active={eovsSelected.filter((eov) => eov.isSelected).length !== 0}
             badgeTitle={eovsBadgeTitle}
@@ -457,6 +495,7 @@ export default function FiltersPanel () {
           className='filtersPanelReset filterMenuReset'
           onClick={() => {
             resetFilters()
+            resetDataLayers()
             setPolygon()
             setDatasetTitleSearchText('')
             setOnlyInView(false)

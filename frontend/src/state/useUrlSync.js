@@ -6,7 +6,10 @@ import {
   createDataFilterQueryString,
   createSelectionQueryString
 } from '../utilities.jsx'
-import { dataLayersAreDefault } from './dataLayers.js'
+import {
+  anyTrajectoryLayerOn,
+  dataLayersAreDefault
+} from './dataLayers.js'
 import { GROUP_NONE } from './datasetGroups.js'
 import { defaultTrailingDays } from '../components/config.js'
 import { useFilters } from './filters/FilterProvider.jsx'
@@ -89,12 +92,12 @@ export default function UrlSync () {
     // The trajectory view switches only mean anything while the layer is on,
     // and each param records its non-default state: track lines default on, so
     // 'tracks=false' is what needs saying; hexes default off, so 'trajHexes=true'.
-    if (dataLayers.trajectories) {
+    if (anyTrajectoryLayerOn(dataLayers)) {
       if (!tracksMode) obj.tracks = 'false'
       if (trajectoryHexes) obj.trajHexes = 'true'
     }
     // The scrub window only drives the track tiles, so it rides along with them.
-    if (tracksMode && dataLayers.trajectories) {
+    if (tracksMode && anyTrajectoryLayerOn(dataLayers)) {
       obj.scrubTime = scrubTime
       if (trailingDays !== defaultTrailingDays) obj.trail = trailingDays
     }

@@ -14,11 +14,19 @@ import {
   colorScale,
   DEFAULT_HEX_METRIC,
   isMarkerTier,
+  bathymetryColorScale,
+  bathymetryLegendMinZoom,
+  bathymetryScaleMin,
+  bathymetryScaleMax,
+  bathymetryTicks,
   TRAIL_ALL,
   effectiveTrailingDays
 } from '../../config.js'
 import platformColors from '../../platformColors'
-import { DEFAULT_DATA_LAYERS } from '../../../state/dataLayers.js'
+import {
+  DEFAULT_DATA_LAYERS,
+  anyTrajectoryLayerOn
+} from '../../../state/dataLayers.js'
 import Spinner from '../../ui/Spinner.jsx'
 import Switch from '../../ui/Switch.jsx'
 import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
@@ -54,6 +62,20 @@ function formatCount(value, singleDigit = false) {
   return `${value}`
 }
 
+// Abbreviate the depth ticks the same way, so "1000" doesn't run into the end
+// of the compact bar.
+function formatDepth(metres) {
+  return metres >= 1000 ? `${metres / 1000}k` : `${metres}`
+}
+
+// Position along the bathymetry bar, 0..1, for a depth in metres. The bar is
+// logarithmic (see bathymetryColorScale) so this is a log interpolation.
+const LOG_MIN = Math.log10(bathymetryScaleMin)
+const LOG_SPAN = Math.log10(bathymetryScaleMax) - LOG_MIN
+function depthPosition(metres) {
+  return (Math.log10(metres) - LOG_MIN) / LOG_SPAN
+}
+
 // Choose which stop indices get a tick label. Keeps every stop when there are
 // few, otherwise thins to an evenly spaced subset (always including the first
 // and last) so labels don't overlap on the compact bar.
@@ -81,10 +103,6 @@ export default function Legend({
   platformsAvailable = [],
   observationsControl,
   layerControls = [],
-  dataLayerControls = [],
-  basemapOptions = [],
-  basemap,
-  onBasemapChange,
   tracksMode,
   trajectoryHexes,
   trailingDays,
@@ -111,12 +129,12 @@ export default function Legend({
     layers.timeseries ||
     layers.timeseriesProfile ||
     layers.obis ||
-    (layers.trajectories && trajectoryHexes)
+    (anyTrajectoryLayerOn(layers) && trajectoryHexes)
   // Trajectory and OBIS coverage share one hex layer and one ramp.
   // currentCoverageRangeLevel is only set at the marker tier (MapStateProvider),
   // which is the only place that layer draws, so it doubles as the zoom gate.
   const showCoverageRamp =
-    (layers.obis || (layers.trajectories && trajectoryHexes)) &&
+    (layers.obis || (anyTrajectoryLayerOn(layers) && trajectoryHexes)) &&
     !isEmpty(currentCoverageRangeLevel)
 
   const metricOptions = [
@@ -313,7 +331,7 @@ export default function Legend({
   // that's left that's trajectory-specific, and it describes line styling
   // rather than a colour scale.
   function generateTrajectoryLegendElements() {
-    if (!layers.trajectories || !tracksMode) return null
+    if (!anyTrajectoryLayerOn(layers) || !tracksMode) return null
     return renderTrackLineKey()
   }
 
@@ -388,6 +406,59 @@ export default function Legend({
             'coverage'
           )}
       </>
+    )
+  }
+
+  // The CHS NONNA depth ramp. Not dimmed by the observations switch and not
+  // titled by the metric picker: it keys the bathymetry raster, which is part of
+  // the basemap rather than of the data this card otherwise describes.
+  function renderBathymetryBar() {
+    // zoom is undefined until the map first reports its view, and `undefined <
+    // n` is false — so test for the zoom being known as well, or the bar
+    // flashes on before the raster it describes exists.
+    if (!Number.isFinite(zoom) || zoom < bathymetryLegendMinZoom) return null
+    // Anchors sit at their own depths, so the gradient is uneven by design:
+    // the first stop's colour flats out to the left edge (everything shallower
+    // than it is that red) and the last stop's to the right edge.
+    const gradient = `linear-gradient(to right, ${bathymetryColorScale
+      .map(
+        ({ depth, color }) =>
+          `${color} ${(depthPosition(depth) * 100).toFixed(1)}%`
+      )
+      .join(', ')})`
+    return (
+      <div className='legendSection' key='bathymetry'>
+        <div
+          className='legendSectionCaption'
+          title={t('legendBathymetryTitle')}
+        >
+          {t('legendBathymetry')}
+        </div>
+        <div
+          className='legendColorBar'
+          style={{ background: gradient }}
+          aria-hidden='true'
+        />
+        <div className='legendColorBarTicks'>
+          {bathymetryTicks.map((metres, i) => {
+            const align =
+              i === 0
+                ? 'start'
+                : i === bathymetryTicks.length - 1
+                  ? 'end'
+                  : 'mid'
+            return (
+              <span
+                key={metres}
+                className={`legendTick ${align}`}
+                style={{ left: `${depthPosition(metres) * 100}%` }}
+              >
+                {formatDepth(metres)}
+              </span>
+            )
+          })}
+        </div>
+      </div>
     )
   }
 
@@ -490,45 +561,18 @@ export default function Legend({
             {renderMetricTitle()}
             {generateLegendElements()}
             {generateCoverageLegendElements()}
+            {renderBathymetryBar()}
           </div>
         )}
       </div>
 
-      {(layerControls.length > 0 ||
-        dataLayerControls.length > 0 ||
-        basemapOptions.length > 0) && (
+      {layerControls.length > 0 && (
         <div className={classNames('legendGroup', { closed: !layersOpen })}>
           {renderGroupHeader(t('layersMenuTitle'), layersOpen, () =>
             setLayersOpen(!layersOpen)
           )}
           {layersOpen && (
             <div className='legendGroupBody'>
-              {basemapOptions.length > 0 && (
-                <div className='legendBasemapSelector'>
-                  <span className='legendSectionCaption'>
-                    {t('basemapLabel')}
-                  </span>
-                  <DropdownButton
-                    className='legendBasemapDropdown'
-                    size='sm'
-                    variant='outline-secondary'
-                    title={
-                      basemapOptions.find((option) => option.key === basemap)
-                        ?.label
-                    }
-                  >
-                    {basemapOptions.map((option) => (
-                      <Dropdown.Item
-                        key={option.key}
-                        active={option.key === basemap}
-                        onClick={() => onBasemapChange(option.key)}
-                      >
-                        {option.label}
-                      </Dropdown.Item>
-                    ))}
-                  </DropdownButton>
-                </div>
-              )}
               <div className='legendLayerItems'>
                 {layerControls.map((control) => (
                   <Switch
@@ -540,28 +584,6 @@ export default function Legend({
                   />
                 ))}
               </div>
-              {dataLayerControls.length > 0 && (
-                <>
-                  <span className='legendSectionCaption'>
-                    {t('layerSelectorLabel')}
-                  </span>
-                  <div className='legendLayerItems'>
-                    {dataLayerControls.map((control) => (
-                      <div
-                        key={control.key}
-                        className={control.sub ? 'legendLayerSub' : undefined}
-                      >
-                        <Switch
-                          id={`dataLayer-${control.key}`}
-                          label={control.label}
-                          checked={control.checked}
-                          onChange={control.onChange}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
             </div>
           )}
         </div>

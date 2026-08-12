@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 // useState whose value survives a reload, keyed under a single namespace in
 // localStorage. Used for UI preferences the user sets once and expects to find
-// again (map layer toggles, projection, basemap) — never for shareable state,
+// again (map layer toggles, projection) — never for shareable state,
 // which belongs in the URL.
 //
 // Storage is best-effort: private-mode Safari and blocked third-party storage

@@ -21,7 +21,6 @@ export default function MapContainer () {
     dataLayersVisible,
     activeWmsOverlay,
     projection,
-    basemap,
     zoomTarget,
     mapRef,
     tracksMode,
@@ -68,7 +67,6 @@ export default function MapContainer () {
       dataLayersVisible={dataLayersVisible}
       activeWmsOverlay={activeWmsOverlay}
       projection={projection}
-      basemap={basemap}
       zoomTarget={zoomTarget}
       mapRef={mapRef}
     />

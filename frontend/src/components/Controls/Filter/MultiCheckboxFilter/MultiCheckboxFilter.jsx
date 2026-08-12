@@ -12,7 +12,6 @@ import './styles.css'
 export default function MultiCheckboxFilter({
   optionsSelected,
   setOptionsSelected,
-  searchable,
   translatable,
   colored,
   allOptions
@@ -23,36 +22,34 @@ export default function MultiCheckboxFilter({
     t(a.title).localeCompare(t(b.title), i18n.language)
   )
 
-  function setIsSelectedTo(isSelected, allOptions, listOfPKs) {
-    return allOptions.map((option) => {
-      if (listOfPKs.includes(option.pk)) {
-        return {
-          ...option,
-          isSelected
-        }
-      } else {
-        return option
-      }
-    })
+  // Nothing ticked constrains nothing, so an empty selection already means
+  // "all of them" — which is why unticking the last box is safe and lands back
+  // on the unfiltered result set rather than on an empty map. It is stored that
+  // way too (a short URL, and newly harvested options are picked up
+  // automatically instead of being absent from a frozen list of everything),
+  // and shown that way: no ticks in the default state, so the pane reports what
+  // the user has actually chosen rather than pre-answering for them.
+  const universe = allOptions || optionsSelected
+  const isChecked = (option) => option.isSelected
+
+  function toggleOption (option) {
+    setOptionsSelected(
+      universe.map((opt) =>
+        opt.pk === option.pk ? { ...opt, isSelected: !opt.isSelected } : opt
+      )
+    )
   }
 
   function selectAllSearchResultsToggle () {
-    // Get a list of all the pks in the optionsSelected subset of allOptions
-    const listOfPKs = optionsSelected.reduce(
-      (accumulatedPKs, currentOption) => {
-        accumulatedPKs.push(currentOption.pk)
-        return accumulatedPKs
-      },
-      []
+    const listOfPKs = optionsSelected.map((option) => option.pk)
+    const allShownChecked = optionsSelected.every(isChecked)
+    setOptionsSelected(
+      universe.map((option) =>
+        listOfPKs.includes(option.pk)
+          ? { ...option, isSelected: !allShownChecked }
+          : option
+      )
     )
-
-    // Set all isSelected to false if all isSelected === true
-    if (optionsSelected.every((option) => option.isSelected)) {
-      setOptionsSelected(setIsSelectedTo(false, allOptions, listOfPKs))
-    } else {
-      // Set all isSelected to true if some isSelected === false
-      setOptionsSelected(setIsSelectedTo(true, allOptions, listOfPKs))
-    }
   }
 
   return (
@@ -64,11 +61,7 @@ export default function MultiCheckboxFilter({
             className='searchResultsButton'
             onClick={() => selectAllSearchResultsToggle()}
           >
-            {optionsSelected.every((option) => option.isSelected) ? (
-              <CheckSquare />
-            ) : (
-              <Square />
-            )}
+            {optionsSelected.every(isChecked) ? <CheckSquare /> : <Square />}
             {t('multiCheckboxFilterSelectSearchResults')}{' '}
             {`(${optionsSelected.length})`}
             <hr />
@@ -118,36 +111,12 @@ export default function MultiCheckboxFilter({
               content={hoverText}
             >
               <div
-                className={`optionButton ${option.isSelected && 'selected'}`}
+                className={`optionButton ${isChecked(option) && 'selected'}`}
                 key={index}
                 title={hoverText ? '' : t(title)}
-                onClick={() => {
-                  if (searchable) {
-                    setOptionsSelected(
-                      allOptions.map((opt) => {
-                        if (opt.pk === option.pk) {
-                          return {
-                            ...opt,
-                            isSelected: !opt.isSelected
-                          }
-                        } else return opt
-                      })
-                    )
-                  } else {
-                    setOptionsSelected(
-                      optionsSelected.map((opt) => {
-                        if (opt.pk === option.pk) {
-                          return {
-                            ...opt,
-                            isSelected: !opt.isSelected
-                          }
-                        } else return opt
-                      })
-                    )
-                  }
-                }}
+                onClick={() => toggleOption(option)}
               >
-                {option.isSelected ? <CheckSquare /> : <Square />}
+                {isChecked(option) ? <CheckSquare /> : <Square />}
                 <span className='optionName'>
                   {capitalizeFirstLetter(title)}
                 </span>

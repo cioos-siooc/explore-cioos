@@ -12,8 +12,9 @@ import isEmpty from 'lodash/isEmpty'
 
 import { server } from '../../config.js'
 import {
-  basemap as defaultBasemap,
   DEFAULT_HEX_METRIC,
+  defaultMapCenter,
+  defaultMapZoom,
   defaultTrailingDays,
   isMarkerTier,
   MARKER_METRIC,
@@ -29,10 +30,16 @@ import fetchJson from '../fetchJson.js'
 import usePersistentState from '../usePersistentState.js'
 import { useFilters } from '../filters/FilterProvider.jsx'
 import {
+  ALL_DATA_LAYERS,
   DATA_LAYER_KEYS,
   DEFAULT_DATA_LAYERS,
   DEFAULT_TRACKS_MODE,
-  DEFAULT_TRAJECTORY_HEXES
+  DEFAULT_TRAJECTORY_HEXES,
+  TRAJECTORY_LAYER_KEYS,
+  allDataLayersOn,
+  anyTrajectoryLayerOn,
+  commitDataLayers,
+  onlyDataLayer
 } from '../dataLayers.js'
 
 const MapStateContext = createContext()
@@ -55,7 +62,27 @@ export default function MapStateProvider ({ children }) {
     setLoadingState(value)
     if (!value) setMapLoaded(true)
   }, [])
-  const [mapView, setMapView] = useState({})
+  // The camera, as the map reports it (numbers, plus bounds once it has
+  // settled). Seeded from the share link — or the default view when the link
+  // carries no camera — rather than left empty: MapLibre only pushes a view on
+  // 'idle'/'moveend', so an empty seed means every zoom-keyed consumer sees
+  // `undefined` for as long as the basemap takes to load. The legend read that
+  // as "no data matched" and said so. Number() rather than the raw params: they
+  // are strings, and Number.isFinite('12') is false.
+  const [mapView, setMapView] = useState(() => {
+    const params = new URL(window.location.href).searchParams
+    const asNumber = (name, fallback) => {
+      const value = Number(params.get(name))
+      return Number.isFinite(value) && params.get(name) !== null
+        ? value
+        : fallback
+    }
+    return {
+      lat: asNumber('lat', defaultMapCenter.lat),
+      lon: asNumber('lon', defaultMapCenter.lon),
+      zoom: asNumber('zoom', defaultMapZoom)
+    }
+  })
   // The datasets the map is allowed to draw, when the user has hidden some
   // groups in the datasets list (see SelectionProvider, which owns the
   // grouping and pushes the resulting pk list here — it lives downstream of
@@ -118,9 +145,6 @@ export default function MapStateProvider ({ children }) {
     'projection',
     'mercator'
   )
-  // Basemap raster: 'emodnet' (default) or 'arcgis-ocean'.
-  // See components/Map/basemapStyle.js.
-  const [basemap, setBasemap] = usePersistentState('basemap', defaultBasemap)
   // One-shot "frame this geometry" request for the Map. The nonce lets the
   // same extent be re-requested (clicking zoom again after panning away).
   const [zoomTarget, setZoomTarget] = useState()
@@ -171,7 +195,7 @@ export default function MapStateProvider ({ children }) {
   })
 
   // Data-type layers shown on the map. Absent `layers` param = the default
-  // selection (OBIS and trajectories off — see DEFAULT_DATA_LAYERS); a present
+  // selection (everything but trajectories — see DEFAULT_DATA_LAYERS); a present
   // param is the comma list of enabled layers, so a non-default selection
   // round-trips through the URL. An empty param means all off, which is why
   // this tests for null rather than falsiness.
@@ -182,32 +206,71 @@ export default function MapStateProvider ({ children }) {
     return Object.fromEntries(DATA_LAYER_KEYS.map((key) => [key, on.has(key)]))
   })
 
-  // The data-layer switches, and the two trajectory sub-switches. These live
-  // together because the trajectory ones are coupled to the parent switch in
-  // both directions: a trajectories layer showing nothing is a dead end, so
-  // clearing the last sub-switch turns the parent off, and turning the parent
+  // The geometry switches, and the two trajectory view sub-switches. These live
+  // together because the view switches are coupled to the trajectory ones in
+  // both directions: a trajectory layer showing nothing is a dead end, so
+  // clearing the last view turns the trajectory layers off, and switching one
   // back on restores the default pair rather than the empty state.
+  //
+  // The views belong to Trajectory and TrajectoryProfile jointly — they are one
+  // set of track/coverage layers fed by both — so the coupling is written
+  // against "is either on", not against a single key.
+  // Ticking a box while everything is on narrows to that one geometry — the
+  // same first pick the catalogue filters make — and unticking the last one
+  // folds back to everything (see commitDataLayers).
   function toggleDataLayer (key) {
-    const on = !dataLayers[key]
-    setDataLayers({ ...dataLayers, [key]: on })
-    if (key === 'trajectories' && on) {
+    const next = allDataLayersOn(dataLayers)
+      ? onlyDataLayer(key)
+      : commitDataLayers({ ...dataLayers, [key]: !dataLayers[key] })
+    setDataLayers(next)
+    // Restore the default views only when this change is what brings the
+    // trajectory layers back; with one already drawing, the user's current view
+    // choice is deliberate and stays.
+    if (anyTrajectoryLayerOn(next) && !anyTrajectoryLayerOn(dataLayers)) {
       setTracksMode(DEFAULT_TRACKS_MODE)
       setTrajectoryHexes(DEFAULT_TRAJECTORY_HEXES)
     }
   }
 
-  // Flip one sub-switch, dropping the parent when that would leave neither
-  // representation drawing anything.
+  // Flip one sub-switch, dropping both trajectory geometries when that would
+  // leave neither representation drawing anything.
   function setTrajectoryViews (tracks, hexes) {
     setTracksMode(tracks)
     setTrajectoryHexes(hexes)
-    if (!tracks && !hexes) setDataLayers({ ...dataLayers, trajectories: false })
+    if (!tracks && !hexes) {
+      setDataLayers(
+        commitDataLayers({
+          ...dataLayers,
+          ...Object.fromEntries(TRAJECTORY_LAYER_KEYS.map((k) => [k, false]))
+        })
+      )
+    }
   }
 
   const toggleTrackLines = () =>
     setTrajectoryViews(!tracksMode, trajectoryHexes)
   const toggleTrajectoryHexes = () =>
     setTrajectoryViews(tracksMode, !trajectoryHexes)
+
+  // Back to the default selection — every geometry, i.e. unfiltered — and to
+  // the default trajectory views with it: the sub-switches are part of what
+  // "reset" means here, and leaving them on whatever the user last chose would
+  // make the reset only half true. Backs the filter row's Reset and the chip's
+  // remove-all.
+  function resetDataLayers () {
+    setDataLayers({ ...DEFAULT_DATA_LAYERS })
+    setTracksMode(DEFAULT_TRACKS_MODE)
+    setTrajectoryHexes(DEFAULT_TRAJECTORY_HEXES)
+  }
+
+  // Every geometry on. Identical to the reset now that all-on IS the default,
+  // and kept separate only so the filter's Select All button reads the way the
+  // other filters' do.
+  function showAllDataLayers () {
+    setDataLayers({ ...ALL_DATA_LAYERS })
+    setTracksMode(DEFAULT_TRACKS_MODE)
+    setTrajectoryHexes(DEFAULT_TRAJECTORY_HEXES)
+  }
 
   const { zoom } = mapView
 
@@ -255,13 +318,9 @@ export default function MapStateProvider ({ children }) {
       .finally(() => setLegendLoading(false))
   }
 
-  // Initial map view from a share link, and the initial legend values.
+  // The initial legend values. (The camera from the share link is read where
+  // mapView is declared, so it is numeric from the first render.)
   useEffect(() => {
-    const { lat, lon, zoom } = Object.fromEntries(
-      new URL(window.location.href).searchParams
-    )
-    if (lat || lon || zoom) setMapView({ lat, lon, zoom })
-
     loadLegend(mapQueryString)
   }, [])
 
@@ -347,8 +406,6 @@ export default function MapStateProvider ({ children }) {
     setDataLayersVisible,
     projection,
     setProjection,
-    basemap,
-    setBasemap,
     // Read-only outside this provider: the layer switches and the two
     // trajectory sub-switches are coupled (clearing both sub-switches drops the
     // parent), so callers go through the toggles rather than the raw setters.
@@ -363,6 +420,8 @@ export default function MapStateProvider ({ children }) {
     setTrailingDays,
     dataLayers,
     toggleDataLayer,
+    resetDataLayers,
+    showAllDataLayers,
     griddapCoverage,
     activeWmsOverlay,
     setActiveWmsOverlay,

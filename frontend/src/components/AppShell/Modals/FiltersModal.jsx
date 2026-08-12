@@ -11,7 +11,12 @@ import './styles.css'
 // live, so closing is just dismissal — there is no confirm step.
 export default function FiltersModal () {
   const { t } = useTranslation()
-  const { showFiltersModal, setShowFiltersModal } = useUI()
+  const { showFiltersModal, setShowFiltersModal, openFilter } = useUI()
+
+  // openFilter is a translation key for most filters but an already-translated
+  // label for the two range ones (see FiltersPanel), and i18next returns an
+  // unknown key unchanged — so t() is the right call for both shapes.
+  const openFilterName = openFilter ? t(openFilter) : ''
 
   return (
     <Modal
@@ -24,6 +29,9 @@ export default function FiltersModal () {
       <Modal.Header closeButton>
         <Modal.Title id='filtersModalTitle'>
           {t('filtersMenuButton')}
+          {openFilterName && (
+            <span className='filtersModalTitleCurrent'>{openFilterName}</span>
+          )}
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
