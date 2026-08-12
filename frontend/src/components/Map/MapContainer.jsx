@@ -19,12 +19,12 @@ export default function MapContainer () {
     griddapCoverageVisible,
     griddapCoverage,
     dataLayersVisible,
+    bathymetryVisible,
     activeWmsOverlay,
     projection,
     zoomTarget,
     mapRef,
     tracksMode,
-    trajectoryHexes,
     debouncedScrubTime,
     trailingDays,
     dataLayers
@@ -57,7 +57,6 @@ export default function MapContainer () {
       inspectDataset={inspectDataset}
       setDatasetsSelected={setDatasetsSelected}
       tracksMode={tracksMode}
-      trajectoryHexes={trajectoryHexes}
       scrubTime={debouncedScrubTime}
       trailingDays={trailingDays}
       selectedTrajectory={selectedTrajectory}
@@ -65,6 +64,7 @@ export default function MapContainer () {
       dataLayers={dataLayers}
       griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
       dataLayersVisible={dataLayersVisible}
+      bathymetryVisible={bathymetryVisible}
       activeWmsOverlay={activeWmsOverlay}
       projection={projection}
       zoomTarget={zoomTarget}

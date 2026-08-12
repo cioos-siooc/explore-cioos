@@ -11,7 +11,10 @@ import {
   dataLayersAreDefault
 } from './dataLayers.js'
 import { GROUP_NONE } from './datasetGroups.js'
-import { defaultTrailingDays } from '../components/config.js'
+import {
+  DEFAULT_HEX_METRIC,
+  defaultTrailingDays
+} from '../components/config.js'
 import { useFilters } from './filters/FilterProvider.jsx'
 import { useMapState } from './map/MapStateProvider.jsx'
 import { useSelection } from './selection/SelectionProvider.jsx'
@@ -45,11 +48,15 @@ export default function UrlSync () {
   const {
     mapView,
     tracksMode,
-    trajectoryHexes,
     scrubTime,
     debouncedScrubTime,
     trailingDays,
-    dataLayers
+    dataLayers,
+    dataLayersVisible,
+    bathymetryVisible,
+    griddapCoverageVisible,
+    projection,
+    metricPreference
   } = useMapState()
   const {
     polygon,
@@ -89,12 +96,11 @@ export default function UrlSync () {
       ...(dataset ? { dataset } : {}),
       ...(dataset && server ? { server } : {})
     }
-    // The trajectory view switches only mean anything while the layer is on,
-    // and each param records its non-default state: track lines default on, so
-    // 'tracks=false' is what needs saying; hexes default off, so 'trajHexes=true'.
-    if (anyTrajectoryLayerOn(dataLayers)) {
-      if (!tracksMode) obj.tracks = 'false'
-      if (trajectoryHexes) obj.trajHexes = 'true'
+    // The track-lines switch only means anything while a trajectory geometry is
+    // on, and the param records its non-default state: it defaults on, so
+    // 'tracks=false' is what needs saying.
+    if (anyTrajectoryLayerOn(dataLayers) && !tracksMode) {
+      obj.tracks = 'false'
     }
     // The scrub window only drives the track tiles, so it rides along with them.
     if (tracksMode && anyTrajectoryLayerOn(dataLayers)) {
@@ -108,6 +114,18 @@ export default function UrlSync () {
         .map(([key]) => key)
         .join(',')
     }
+    // The legend's layer switches, each recording only its non-default state so
+    // an untouched map keeps the short link it had before they were shareable.
+    // They are preferences as well (localStorage), and a param in the link wins
+    // over the stored value — see useUrlSeededPersistentState.
+    if (!dataLayersVisible) obj.obs = 'false'
+    if (!bathymetryVisible) obj.bathy = 'false'
+    if (griddapCoverageVisible) obj.griddap = 'true'
+    if (projection === 'globe') obj.globe = 'true'
+    // What the hex ramp counts. The user's pick, not the value the current zoom
+    // pins it to (see metricPreference) — otherwise zooming into the marker tier
+    // would rewrite their choice out of the link.
+    if (metricPreference !== DEFAULT_HEX_METRIC) obj.metric = metricPreference
     const combined = new URLSearchParams(obj)
     // Replace, never push: this mirrors state the app never reads back out of
     // the URL, so an entry per map pan would only bury the history entries
@@ -122,10 +140,14 @@ export default function UrlSync () {
     groupBy,
     hiddenGroupsParam,
     tracksMode,
-    trajectoryHexes,
     debouncedScrubTime,
     trailingDays,
-    dataLayers
+    dataLayers,
+    dataLayersVisible,
+    bathymetryVisible,
+    griddapCoverageVisible,
+    projection,
+    metricPreference
   ])
 
   useEffect(() => {

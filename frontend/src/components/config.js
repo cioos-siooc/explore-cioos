@@ -69,17 +69,34 @@ export const colorScale = [
 // ramp — a mid-ramp teal disappeared into the fills it was meant to divide.
 export const hexOutlineColor = '#FFFFFF'
 
-// What the hex ramp counts. 'records' is the amount of data actually collected
-// (measurements / occurrence records / position fixes); 'days' is the span
-// covered; 'datasets' is how many distinct datasets a hexagon holds. See
+// What the hex ramp counts. 'days' is the span of time covered; 'records' is the
+// amount of data actually collected (measurements / occurrence records /
+// position fixes); 'datasets' is how many distinct datasets a hexagon holds. See
 // web-api/utils/hexMetric.js — the wire values must match.
+//
+// In the order the picker offers them, and the allowlist a ?metric= param is
+// checked against.
 //
 // 'datasets' is the one to reach for when the record counts bunch up: they run
 // over eight orders of magnitude and are dominated by a few high-rate
 // instruments, whereas dataset counts are small integers and spread evenly
 // across the ramp.
-export const HEX_METRICS = ['records', 'days', 'datasets']
-export const DEFAULT_HEX_METRIC = 'records'
+export const HEX_METRICS = ['days', 'records', 'datasets']
+
+// Days of data leads, and is what the map opens on. It means one thing across
+// all three sources, where 'records' sums three different units (and some of
+// those counts are extrapolated rather than measured — see the caveat in
+// web-api/utils/hexMetric.js), so it is the honest first reading. A share link
+// overrides it with ?metric=, and the user's own pick is remembered.
+export const DEFAULT_HEX_METRIC = 'days'
+
+// What the API counts when a query carries no `metric` param at all (see
+// DEFAULT_METRIC in web-api/utils/hexMetric.js). ONLY this value may be left out
+// of a tile or /legend URL: omitting any other would ramp the colours against a
+// count nobody asked for. It is deliberately not DEFAULT_HEX_METRIC — the two
+// were the same value until the map's default moved to days, and conflating them
+// again would silently paint record counts under a "days of data" title.
+export const API_DEFAULT_HEX_METRIC = 'records'
 
 // Where the hex aggregates give way to individual markers. Was a bare 7 in
 // Map.jsx (hexMaxZoom), MapStateProvider and the Legend; the marker tier's

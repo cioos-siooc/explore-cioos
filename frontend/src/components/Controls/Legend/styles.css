@@ -19,12 +19,7 @@
   box-shadow: var(--cioos-shadow-3d);
 }
 
-/* Each independently collapsible group (legend proper, map layers). */
-.legendGroup + .legendGroup {
-  border-top: 1px solid var(--cioos-hairline);
-}
-
-.legendGroupHeader {
+.legendHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -42,49 +37,92 @@
   cursor: pointer;
 }
 
-.legendGroupHeader:hover {
+.legendHeader:hover {
   background-color: var(--cioos-surface-2);
 }
 
-.legendGroupHeader:focus-visible {
+.legendHeader:focus-visible {
   outline: none;
   box-shadow: var(--cioos-focus);
 }
 
-.legendGroupBody {
+.legendBody {
   padding: 0 9px 6px;
 }
 
-/* The ramp's title line: the hex/point visibility switch, then the caption
-   (which is the metric picker when the metric is switchable). The switch keeps
-   its intrinsic width and the caption takes the rest, so a long caption
-   ellipsizes rather than squeezing the control. */
-.legendMetricRow {
+/* One group of related entries — the observations, the tracks, the seafloor, the
+   keyless layers. Set off from its neighbours by a rule and by more space than
+   anything inside it uses, so the grouping reads before the labels are. */
+.legendGroup + .legendGroup {
+  margin-top: 7px;
+  border-top: 1px solid var(--cioos-hairline);
+  padding-top: 6px;
+}
+
+/* A group's label line: the switch for everything in the group, then its name.
+   The switch keeps its intrinsic width and the label takes the rest, so a long
+   translation ellipsizes rather than squeezing the control. */
+.legendGroupLabelRow {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  /* the row owns the gap to the ramp below, since its children are zeroed */
+  /* the row owns the gap to its contents, since its children are zeroed */
   margin-bottom: 3px;
 }
 
-.legendMetricRow .form-check.form-switch {
+.legendGroupLabelRow .form-check.form-switch {
   flex: 0 0 auto;
   margin: 0;
 }
 
-.legendMetricRow > .legendSectionCaption,
-.legendMetricRow > .legendMetricDropdown {
+/* The group's name. Upper case and the darker ink; the sub-captions inside it
+   are sentence case and lighter, which is the whole of the hierarchy at 10px —
+   two uppercase levels would have looked like one. */
+.legendGroupLabel {
   flex: 1 1 auto;
   min-width: 0;
-  margin-bottom: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cioos-ink-60);
+  /* Wraps rather than nowrap: the card is capped at 190px and the longer French
+     labels ran past it, where the card's overflow simply cut them off. */
+  line-height: 1.25;
 }
 
-/* Styled as the caption it replaces, not as a button — it reads as the ramp's
-   title, and the caret is what says it can be changed. */
+/* One entry inside a group: its caption, then its swatches or bar. */
+.legendSubsection {
+  margin-top: 5px;
+}
+
+/* An entry's caption, one level under the group label: the shape it draws, then
+   its name. */
+.legendSubCaption {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--cioos-ink-40);
+  margin-bottom: 2px;
+  line-height: 1.25;
+}
+
+/* Inherits the caption's colour unless the icon sets its own (the hexagon
+   carries a ramp colour, the circles are drawn in the caption ink). */
+.legendSubIcon {
+  flex: 0 0 auto;
+}
+
+/* Styled as the group label it replaces, not as a button — it reads as the
+   group's title, and the caret is what says it can be changed. */
 .legendMetricDropdown {
+  flex: 1 1 auto;
+  min-width: 0;
   display: block;
-  margin-bottom: 3px;
 }
 
 .legendMetricDropdown .btn,
@@ -95,11 +133,11 @@
   border: none;
   background: transparent;
   font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   text-align: left;
-  color: var(--cioos-ink-40);
+  color: var(--cioos-ink-60);
 }
 
 .legendMetricDropdown .btn:hover {
@@ -139,32 +177,15 @@
   color: var(--cioos-primary);
 }
 
-.legendSection + .legendSection {
-  margin-top: 5px;
-  border-top: 1px solid var(--cioos-hairline);
-  padding-top: 5px;
-}
-
-/* A key whose layer is switched off (the Hexes & points toggle in the ramp
-   title row). Desaturated as well as faded: colour is the encoding that has
-   stopped applying, so draining it says more than fading alone. The title row
-   is never dimmed — it holds the switch that turns this back on. */
+/* A key whose layer is switched off. Desaturated as well as faded: colour is
+   the encoding that has stopped applying, so draining it says more than fading
+   alone. It goes on the swatches and labels only, never on a caption row: every
+   switch lives on a caption, and opacity on an ancestor cannot be undone by a
+   descendant, so a dimmed caption would drag the control that turns the layer
+   back on down with it. */
 .legendDimmed {
   opacity: 0.45;
   filter: grayscale(0.9);
-}
-
-.legendSectionCaption {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--cioos-ink-40);
-  margin-bottom: 2px;
-  /* Wraps rather than nowrap: the card is capped at 190px and the longer
-     captions (the French ones above all — "Trajectoires par hexagone") ran
-     past it, where the card's overflow simply cut them off mid-word. */
-  line-height: 1.25;
 }
 
 .legendItems {

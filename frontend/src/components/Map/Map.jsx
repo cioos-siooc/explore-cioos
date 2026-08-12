@@ -42,6 +42,7 @@ import {
 import {
   colorScale,
   hexOutlineColor,
+  API_DEFAULT_HEX_METRIC,
   DEFAULT_HEX_METRIC,
   MARKER_MIN_ZOOM,
   trackLineColor,
@@ -97,21 +98,18 @@ function buildHeadArrowImage(fillColor, strokeColor = '#ffffff') {
 // param is omitted when its layer(s) are fully on, so the URL stays clean.
 // Returns '' or '?...'.
 //
-// Trajectory coverage cells are requested only when a trajectory layer is on
-// AND the hex view is selected. The two trajectory views are independent — the
-// track lines come from a separate source (/tiles/tracks) and never depend on
-// this — so the hex switch is the only thing that decides whether the
-// trajectory counts appear in these tiles.
-function buildTileSuffix(
-  baseQuery,
-  dataLayers,
-  trajectoryHexes = false,
-  metric = DEFAULT_HEX_METRIC
-) {
+// Trajectory cells are requested whenever a trajectory geometry is selected,
+// full stop — their counts belong to the hexes the same way every other
+// geometry's do, and there is one switch for all of them (the hex/point
+// visibility one). There used to be a second, trajectory-only hex switch here,
+// which meant trajectory data could be missing from a hexagon for a reason the
+// hex ramp had no way of showing. The track lines are unaffected either way:
+// they come from a separate source (/tiles/tracks).
+function buildTileSuffix(baseQuery, dataLayers, metric = DEFAULT_HEX_METRIC) {
   const params = new URLSearchParams(baseQuery)
-  // Omitted at the default so the common case keeps the URL (and therefore the
-  // tile cache key) it had before the metric switcher existed.
-  if (metric !== DEFAULT_HEX_METRIC) params.set('metric', metric)
+  // Omitted only for the metric the API already assumes when the param is
+  // absent — see API_DEFAULT_HEX_METRIC.
+  if (metric !== API_DEFAULT_HEX_METRIC) params.set('metric', metric)
   if (dataLayers) {
     if (!dataLayers.obis || params.get('includeObis') === 'false') {
       params.set('includeObis', 'false')
@@ -128,7 +126,7 @@ function buildTileSuffix(
     if (enabledTrajectoryTypes.length < TRAJECTORY_TYPE_KEYS.length) {
       params.set('trajectoryTypes', enabledTrajectoryTypes.join(','))
     }
-    if (!enabledTrajectoryTypes.length || !trajectoryHexes) {
+    if (!enabledTrajectoryTypes.length) {
       params.set('includeTrajectory', 'false')
     }
   }
@@ -156,7 +154,6 @@ export default function CreateMap({
   inspectDataset,
   setDatasetsSelected,
   tracksMode,
-  trajectoryHexes = false,
   scrubTime,
   trailingDays,
   selectedTrajectory,
@@ -164,6 +161,7 @@ export default function CreateMap({
   dataLayers,
   griddapCoverage,
   dataLayersVisible = true,
+  bathymetryVisible = true,
   activeWmsOverlay,
   projection = 'mercator',
   zoomTarget,
@@ -318,7 +316,6 @@ export default function CreateMap({
   // Latest tracks-mode props for the one-shot map 'load' closure (layers are
   // created once; these refs let it apply the current mode/scrub window).
   const tracksModeRef = useRef(tracksMode)
-  const trajectoryHexesRef = useRef(trajectoryHexes)
   const scrubTimeRef = useRef(scrubTime)
   const trailingDaysRef = useRef(trailingDays)
   const dataLayersRef = useRef(dataLayers)
@@ -862,9 +859,17 @@ export default function CreateMap({
     'selected-track-fixes-nocog'
   ]
   const griddapLayerIds = ['griddap-coverage-fill', 'griddap-coverage-line']
+  // The CHS NONNA depth rasters the legend's depth ramp keys. They belong to
+  // the basemap, not to the data, so they are owned by their own switch and are
+  // left out of every group above — including the WMS overlay's blanket hide,
+  // which is about data layers competing with the gridded field.
+  const bathymetryLayerIds = ['bathymetry-nonna-100', 'bathymetry-nonna-10']
   // Mirrors the dataLayersVisible prop so removeWmsOverlay (called from map
   // event handlers) restores the user's toggle instead of forcing layers on.
   const dataLayersVisibleRef = useRef(true)
+  // Same, for the depth rasters: the style's layers are created visible, so the
+  // 'load' handler needs the current switch state to apply it.
+  const bathymetryVisibleRef = useRef(true)
 
   function setLayersVisibility(layerIds, visible) {
     layerIds.forEach((layerId) => {
@@ -1041,6 +1046,15 @@ export default function CreateMap({
     setLayersVisibility(observationLayerIds, dataLayersVisible)
   }, [dataLayersVisible])
 
+  // The depth-raster switch, on the legend's depth ramp. Unlike the observation
+  // layers this is left alone by the WMS overlay: the depth wash sits under
+  // everything and reads as basemap, so there is nothing for it to compete with.
+  useEffect(() => {
+    bathymetryVisibleRef.current = bathymetryVisible
+    if (!map.current) return
+    setLayersVisibility(bathymetryLayerIds, bathymetryVisible)
+  }, [bathymetryVisible])
+
   // Layer-picker globe/mercator projection switch. Globe renders high
   // latitudes without Mercator distortion; MapLibre auto-interpolates back
   // to mercator at high zoom, so close-up interactions are unaffected. No
@@ -1156,7 +1170,6 @@ export default function CreateMap({
     const filterSuffix = buildTileSuffix(
       queryString,
       dataLayersRef.current,
-      trajectoryHexesRef.current,
       metricRef.current
     )
     return {
@@ -1192,15 +1205,14 @@ export default function CreateMap({
     }
   }, [mapQueryString])
 
-  // Geometry toggle, and the trajectory hex switch alongside it: both change
-  // the tile-URL params (profileTypes/trajectoryTypes/includeObis/
-  // includeTrajectory), so both refetch the combined/coverage-cell sources and
-  // re-apply layer visibility. The track tiles carry trajectoryTypes too, so
-  // they refetch here as well — otherwise switching one trajectory geometry off
-  // would leave its lines on screen until the next scrub or filter change.
+  // Geometry toggle: it changes the tile-URL params (profileTypes/
+  // trajectoryTypes/includeObis/includeTrajectory), so it refetches the
+  // combined/coverage-cell sources and re-applies layer visibility. The track
+  // tiles carry trajectoryTypes too, so they refetch here as well — otherwise
+  // switching one trajectory geometry off would leave its lines on screen until
+  // the next scrub or filter change.
   useEffect(() => {
     dataLayersRef.current = dataLayers
-    trajectoryHexesRef.current = trajectoryHexes
     // Source existence, not map.loaded() — see the filter effect above.
     if (!map.current || !map.current.getSource('cde-tiles')) return
     refreshCombinedSources(mapQueryString)
@@ -1208,7 +1220,7 @@ export default function CreateMap({
       refreshTracksSource(mapQueryString, scrubTimeRef.current, trailingDaysRef.current)
     }
     applyLayerVisibility()
-  }, [dataLayers, trajectoryHexes])
+  }, [dataLayers])
 
   // Colour-by switch. The metric is computed server-side (it decides what the
   // tiles' `count` property sums), so flipping it has to refetch both sources
@@ -1882,6 +1894,11 @@ export default function CreateMap({
       // The track layers are not the picker's to hide, so they are left alone.
       if (!dataLayersVisibleRef.current) {
         setLayersVisibility(observationLayerIds, false)
+      }
+      // Same for the depth rasters, which come from the style itself and are
+      // therefore always created visible.
+      if (!bathymetryVisibleRef.current) {
+        setLayersVisibility(bathymetryLayerIds, false)
       }
 
       // A share link can carry the spatial selection (rectangle bounds or a

@@ -34,7 +34,7 @@ export default function AppShell () {
     mapLoaded,
     zoom,
     currentRangeLevel,
-    currentCoverageRangeLevel,
+    hexRangeLevel,
     metric,
     metricPinned,
     setMetric,
@@ -43,12 +43,14 @@ export default function AppShell () {
     setGriddapCoverageVisible,
     dataLayersVisible,
     setDataLayersVisible,
+    bathymetryVisible,
+    setBathymetryVisible,
     projection,
     setProjection,
     activeWmsOverlay,
     setActiveWmsOverlay,
     tracksMode,
-    trajectoryHexes,
+    toggleTrackLines,
     scrubTime,
     setScrubTime,
     trailingDays,
@@ -64,18 +66,38 @@ export default function AppShell () {
   const wmsLegendIsInline =
     sidebarOpen && activeWmsOverlay?.pk === inspectDataset?.pk
 
-  // The hex/point layer's own visibility, which rides on the legend's ramp
-  // title rather than sitting with the switches below: the ramp describes that
-  // layer and nothing else, so the control that hides it belongs on the thing
-  // it hides.
-  const observationsControl = {
-    key: 'observations',
-    label: t('layersObservations'),
-    checked: dataLayersVisible,
-    onChange: () => setDataLayersVisible(!dataLayersVisible)
+  // The switches that ride on the legend entries they key, rather than sitting
+  // in the layers list below: each of these turns off exactly what one legend
+  // entry describes, so the control belongs on the thing it hides.
+  //
+  // The track-lines switch is a display choice and nothing more — flipping it
+  // never touches the geometry filter, so the datasets list and its counts are
+  // unaffected (it used to live inside that filter, where turning it off could
+  // narrow the selection).
+  const legendControls = {
+    observations: {
+      key: 'observations',
+      label: t('layersObservations'),
+      checked: dataLayersVisible,
+      onChange: () => setDataLayersVisible(!dataLayersVisible)
+    },
+    bathymetry: {
+      key: 'bathymetry',
+      label: t('layersBathymetry'),
+      checked: bathymetryVisible,
+      onChange: () => setBathymetryVisible(!bathymetryVisible)
+    },
+    tracks: {
+      key: 'tracks',
+      label: t('layerTracksMode'),
+      checked: tracksMode,
+      onChange: toggleTrackLines
+    }
   }
 
-  // Map-layer switches, rendered inside the legend card.
+  // The switches with no legend entry of their own — nothing on the map is
+  // coloured or shaped to key them — rendered as the layers list at the foot of
+  // the card.
   const layerControls = [
     {
       key: 'griddap',
@@ -119,7 +141,7 @@ export default function AppShell () {
       <DownloadModal />
       <Legend
         currentRangeLevel={currentRangeLevel}
-        currentCoverageRangeLevel={currentCoverageRangeLevel}
+        hexRangeLevel={hexRangeLevel}
         metric={metric}
         // Withheld at the marker tier, where the metric is pinned to days of
         // data: no handler means the Legend titles the ramp with a plain
@@ -128,10 +150,8 @@ export default function AppShell () {
         loading={legendLoading}
         zoom={zoom}
         platformsAvailable={platformsAvailable}
-        observationsControl={observationsControl}
+        controls={legendControls}
         layerControls={layerControls}
-        tracksMode={tracksMode}
-        trajectoryHexes={trajectoryHexes}
         trailingDays={trailingDays}
         dataLayers={dataLayers}
       />

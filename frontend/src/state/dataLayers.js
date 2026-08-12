@@ -96,13 +96,11 @@ export const commitDataLayers = (next) =>
 export const onlyDataLayer = (key) =>
   Object.fromEntries(DATA_LAYER_KEYS.map((k) => [k, k === key]))
 
-// How the trajectory layers draw when either is switched on. Track lines are
-// the more legible first view of a voyage; the coverage hexes are the density
-// reading you opt into on top. Both are independent — see the two sub-switches
-// in DataLayersFilter — and these constants are also the state a trajectory
-// switch restores when it is re-enabled.
+// Whether the trajectory layers draw their track lines, which is the one
+// trajectory-specific display choice left (their cells are hexes like every
+// other geometry's, under the same hex/point switch). On by default: the lines
+// are the more legible first view of a voyage.
 export const DEFAULT_TRACKS_MODE = true
-export const DEFAULT_TRAJECTORY_HEXES = false
 
 // The cdm_data_types that share cde.profiles. The tile query names them
 // directly (profileTypes=<comma list>), so this doubles as the wire mapping.

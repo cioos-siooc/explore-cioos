@@ -1,7 +1,6 @@
 /* The two-line row layout (name + hint) and the wrapping are shared with every
    other filter body — see .filtersPanel .optionButton in Panels/styles.css.
-   What is specific to this filter is the hint itself and the nested trajectory
-   view options. */
+   What is specific to this filter is the hint itself. */
 
 .dataLayersFilter .optionHint {
   display: block;
@@ -13,20 +12,4 @@
 /* Keep the hint readable on the selected row's tinted background. */
 .dataLayersFilter .optionButton.selected .optionHint {
   color: var(--cioos-ink-60, var(--cioos-ink-40));
-}
-
-/* The trajectory display options, nested under the pair of trajectory
-   geometries they apply to. The indent matches the OBIS node group in
-   SourceFilter so the two nested lists in the filter menu read the same way. */
-.dataLayersFilter .dataLayerSubOptions {
-  margin-left: 25px;
-}
-
-.dataLayersFilter .dataLayerSubHeading {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--cioos-ink-40);
-  margin: 2px 0 4px;
 }

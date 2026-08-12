@@ -12,10 +12,12 @@ import isEmpty from 'lodash/isEmpty'
 
 import { server } from '../../config.js'
 import {
+  API_DEFAULT_HEX_METRIC,
   DEFAULT_HEX_METRIC,
   defaultMapCenter,
   defaultMapZoom,
   defaultTrailingDays,
+  HEX_METRICS,
   isMarkerTier,
   MARKER_METRIC,
   TRAIL_ALL
@@ -27,17 +29,14 @@ import {
   useDebounce
 } from '../../utilities.jsx'
 import fetchJson from '../fetchJson.js'
-import usePersistentState from '../usePersistentState.js'
+import { useUrlSeededPersistentState } from '../usePersistentState.js'
 import { useFilters } from '../filters/FilterProvider.jsx'
 import {
   ALL_DATA_LAYERS,
   DATA_LAYER_KEYS,
   DEFAULT_DATA_LAYERS,
   DEFAULT_TRACKS_MODE,
-  DEFAULT_TRAJECTORY_HEXES,
-  TRAJECTORY_LAYER_KEYS,
   allDataLayersOn,
-  anyTrajectoryLayerOn,
   commitDataLayers,
   onlyDataLayer
 } from '../dataLayers.js'
@@ -113,37 +112,70 @@ export default function MapStateProvider ({ children }) {
   // colour scale.
   const [coverageRangeLevels, setCoverageRangeLevels] = useState()
   const [currentCoverageRangeLevel, setCurrentCoverageRangeLevel] = useState()
-  // What the hex ramp counts: 'records' (how much data was collected) or
-  // 'days' (how long it spans). A display preference, so localStorage rather
-  // than the URL — same as the switches below. It is computed server-side, so
+  // What the hex ramp counts: 'days' (how long the data spans, the default),
+  // 'records' (how much was collected) or 'datasets'. Both a preference and
+  // shareable, like the switches below — ?metric= in the link wins, otherwise
+  // the user's last pick, otherwise the default. It is computed server-side, so
   // it also goes into the tile and /legend query strings.
-  const [metric, setMetric] = usePersistentState('hexMetric', DEFAULT_HEX_METRIC)
-  // The four map-appearance switches below are preferences rather than
-  // shareable state: they persist in localStorage so a reload comes back to
-  // the map the user left, while the camera and filters keep living in the URL.
+  //
+  // The storage key is versioned because the old one is poisoned: it was written
+  // on first render, so every visitor from before the default moved to days has
+  // 'records' stored whether or not they ever opened the picker, and reusing the
+  // key would hand them a default they never chose.
+  const [metric, setMetric] = useUrlSeededPersistentState(
+    'hexMetric.v2',
+    'metric',
+    DEFAULT_HEX_METRIC,
+    // An unknown metric in the link is not worth failing over, and it must not
+    // reach the API unchecked — parseMetric would ignore it there and the ramp
+    // would be titled with one metric over another's counts.
+    (raw) => (HEX_METRICS.includes(raw) ? raw : DEFAULT_HEX_METRIC)
+  )
+  // The map-appearance switches below are both preferences AND shareable: they
+  // persist in localStorage so a reload comes back to the map the user left,
+  // and UrlSync writes the non-default ones into the link so a shared view
+  // arrives drawn the way it was sent (see useUrlSeededPersistentState — a
+  // param in the link wins over the stored value).
   //
   // Griddap (gridded, metadata-only) datasets: the optional coverage layer
   // (off by default) and the on-demand per-dataset WMS overlay
   // ({pk, datasetId, wmsUrl, variable, time, elevation, bbox} | undefined).
   // The overlay itself is per-dataset and dies with the dataset page, so it
   // is deliberately not persisted.
-  const [griddapCoverageVisible, setGriddapCoverageVisible] = usePersistentState(
-    'griddapCoverageVisible',
-    false
-  )
+  const [griddapCoverageVisible, setGriddapCoverageVisible] =
+    useUrlSeededPersistentState(
+      'griddapCoverageVisible',
+      'griddap',
+      false,
+      (raw) => raw === 'true'
+    )
   const [griddapCoverage, setGriddapCoverage] = useState()
   const [activeWmsOverlay, setActiveWmsOverlay] = useState()
   // Layer visibility switch for the observation layers (hexes / points /
-  // trajectories). On by default.
-  const [dataLayersVisible, setDataLayersVisible] = usePersistentState(
+  // coverage cells). On by default.
+  const [dataLayersVisible, setDataLayersVisible] = useUrlSeededPersistentState(
     'dataLayersVisible',
-    true
+    'obs',
+    true,
+    (raw) => raw !== 'false'
+  )
+  // The CHS NONNA depth rasters, which the legend's depth ramp keys. On by
+  // default, and part of the basemap rather than of the data — so it is its own
+  // switch, independent of the observation layers above.
+  const [bathymetryVisible, setBathymetryVisible] = useUrlSeededPersistentState(
+    'bathymetryVisible',
+    'bathy',
+    true,
+    (raw) => raw !== 'false'
   )
   // Map projection: 'mercator' (default) or 'globe'. The globe view renders
-  // high latitudes (e.g. the Arctic) without Mercator distortion.
-  const [projection, setProjection] = usePersistentState(
+  // high latitudes (e.g. the Arctic) without Mercator distortion. The param is
+  // the switch the user sees ('globe=true'), not the internal value.
+  const [projection, setProjection] = useUrlSeededPersistentState(
     'projection',
-    'mercator'
+    'globe',
+    'mercator',
+    (raw) => (raw === 'true' ? 'globe' : 'mercator')
   )
   // One-shot "frame this geometry" request for the Map. The nonce lets the
   // same extent be re-requested (clicking zoom again after panning away).
@@ -173,13 +205,9 @@ export default function MapStateProvider ({ children }) {
   // On by default, so the param records the OFF case ('tracks=false'). Old
   // share links carrying 'tracks=true' still read as on.
   const [tracksMode, setTracksMode] = useState(
-    urlParams.get('tracks') !== 'false'
-  )
-  // Trajectory coverage hexes, independent of the track lines: both are views
-  // of the same data and combine freely. Off by default (see
-  // DEFAULT_TRAJECTORY_HEXES), so the param records the ON case.
-  const [trajectoryHexes, setTrajectoryHexes] = useState(
-    urlParams.get('trajHexes') === 'true'
+    urlParams.has('tracks')
+      ? urlParams.get('tracks') !== 'false'
+      : DEFAULT_TRACKS_MODE
   )
   const [scrubTime, setScrubTime] = useState(
     urlParams.get('scrubTime') || new Date().toISOString().split('T')[0]
@@ -206,61 +234,41 @@ export default function MapStateProvider ({ children }) {
     return Object.fromEntries(DATA_LAYER_KEYS.map((key) => [key, on.has(key)]))
   })
 
-  // The geometry switches, and the two trajectory view sub-switches. These live
-  // together because the view switches are coupled to the trajectory ones in
-  // both directions: a trajectory layer showing nothing is a dead end, so
-  // clearing the last view turns the trajectory layers off, and switching one
-  // back on restores the default pair rather than the empty state.
-  //
-  // The views belong to Trajectory and TrajectoryProfile jointly — they are one
-  // set of track/coverage layers fed by both — so the coupling is written
-  // against "is either on", not against a single key.
-  // Ticking a box while everything is on narrows to that one geometry — the
-  // same first pick the catalogue filters make — and unticking the last one
-  // folds back to everything (see commitDataLayers).
+  // The geometry filter. Ticking a box while everything is on narrows to that
+  // one geometry — the same first pick the catalogue filters make — and
+  // unticking the last one folds back to everything (see commitDataLayers).
   function toggleDataLayer (key) {
-    const next = allDataLayersOn(dataLayers)
-      ? onlyDataLayer(key)
-      : commitDataLayers({ ...dataLayers, [key]: !dataLayers[key] })
-    setDataLayers(next)
-    // Restore the default views only when this change is what brings the
-    // trajectory layers back; with one already drawing, the user's current view
-    // choice is deliberate and stays.
-    if (anyTrajectoryLayerOn(next) && !anyTrajectoryLayerOn(dataLayers)) {
-      setTracksMode(DEFAULT_TRACKS_MODE)
-      setTrajectoryHexes(DEFAULT_TRAJECTORY_HEXES)
-    }
+    setDataLayers(
+      allDataLayersOn(dataLayers)
+        ? onlyDataLayer(key)
+        : commitDataLayers({ ...dataLayers, [key]: !dataLayers[key] })
+    )
   }
 
-  // Flip one sub-switch, dropping both trajectory geometries when that would
-  // leave neither representation drawing anything.
-  function setTrajectoryViews (tracks, hexes) {
-    setTracksMode(tracks)
-    setTrajectoryHexes(hexes)
-    if (!tracks && !hexes) {
-      setDataLayers(
-        commitDataLayers({
-          ...dataLayers,
-          ...Object.fromEntries(TRAJECTORY_LAYER_KEYS.map((k) => [k, false]))
-        })
-      )
-    }
-  }
+  // Whether the trajectory data draws its track lines. It belongs to Trajectory
+  // and TrajectoryProfile jointly — one set of map layers fed by both — which is
+  // why it is a single switch rather than one per geometry, and it lives on the
+  // legend section it keys rather than inside the geometry filter.
+  //
+  // It is the only trajectory-specific display switch left. The companion
+  // "trajectory hexes" one is gone: those cells are hexes like every other
+  // geometry's, counted into the same ramp and hidden by the same hex/point
+  // switch, so a second control that could take trajectory data out of the
+  // hexagons on its own was drawing a distinction the ramp couldn't show.
+  //
+  // Flipping it is a map-appearance change and nothing more: it used to drop
+  // both trajectory geometries out of the filter selection when no view was
+  // left, which meant a display switch quietly narrowing the datasets list and
+  // its counts. Turning it off now just leaves the tracks undrawn — the same as
+  // hiding the hexes and points — and the legend keeps the switch on screen.
+  const toggleTrackLines = () => setTracksMode(!tracksMode)
 
-  const toggleTrackLines = () =>
-    setTrajectoryViews(!tracksMode, trajectoryHexes)
-  const toggleTrajectoryHexes = () =>
-    setTrajectoryViews(tracksMode, !trajectoryHexes)
-
-  // Back to the default selection — every geometry, i.e. unfiltered — and to
-  // the default trajectory views with it: the sub-switches are part of what
-  // "reset" means here, and leaving them on whatever the user last chose would
-  // make the reset only half true. Backs the filter row's Reset and the chip's
-  // remove-all.
+  // Back to the default selection: every geometry, i.e. unfiltered. Backs the
+  // filter row's Reset and the chip's remove-all. The trajectory view switches
+  // are deliberately untouched — they are map appearance, not part of this
+  // filter, so a filter reset has no business changing them.
   function resetDataLayers () {
     setDataLayers({ ...DEFAULT_DATA_LAYERS })
-    setTracksMode(DEFAULT_TRACKS_MODE)
-    setTrajectoryHexes(DEFAULT_TRAJECTORY_HEXES)
   }
 
   // Every geometry on. Identical to the reset now that all-on IS the default,
@@ -268,8 +276,6 @@ export default function MapStateProvider ({ children }) {
   // other filters' do.
   function showAllDataLayers () {
     setDataLayers({ ...ALL_DATA_LAYERS })
-    setTracksMode(DEFAULT_TRACKS_MODE)
-    setTrajectoryHexes(DEFAULT_TRAJECTORY_HEXES)
   }
 
   const { zoom } = mapView
@@ -292,12 +298,11 @@ export default function MapStateProvider ({ children }) {
   // first few seconds of every load.
   // The metric decides what /legend counts, so it has to travel with the
   // filters — a range taken over days can't scale a ramp painted over
-  // measurement counts. Omitted at the default so the common case keeps the
-  // URL (and cache key) it had before the switcher existed, matching
-  // buildTileSuffix in Map.jsx.
+  // measurement counts. Omitted only for the metric the API already assumes
+  // (API_DEFAULT_HEX_METRIC), matching buildTileSuffix in Map.jsx.
   function legendUrl (legendQuery, hexMetric) {
     const params = new URLSearchParams(legendQuery || '')
-    if (hexMetric !== DEFAULT_HEX_METRIC) params.set('metric', hexMetric)
+    if (hexMetric !== API_DEFAULT_HEX_METRIC) params.set('metric', hexMetric)
     const s = params.toString()
     return `${server}/legend${s ? '?' + s : ''}`
   }
@@ -375,13 +380,24 @@ export default function MapStateProvider ({ children }) {
   useEffect(() => {
     // Coverage hexes (trajectory and OBIS cells) only render at the marker
     // tier — below that, their counts are merged into the main hex ramp — so
-    // hide the legend entry otherwise.
+    // there is no separate domain to report otherwise.
     if (coverageRangeLevels && isMarkerTier(zoom)) {
       setCurrentCoverageRangeLevel(coverageRangeLevels.zoom1)
     } else {
       setCurrentCoverageRangeLevel()
     }
   }, [coverageRangeLevels, zoom])
+
+  // The one domain the hex colour gradient is drawn over, whatever the hexes
+  // hold. Below the marker tier every kind of cell — profile-family,
+  // trajectory, occurrence — is summed into the same hexes layer, so
+  // currentRangeLevel already covers all of them; at the marker tier the only
+  // hexes still on screen are the trajectory/OBIS coverage cells, which carry
+  // their own tier. One gradient either way, because the colour means the same
+  // thing either way: how much data this cell holds.
+  const hexRangeLevel = isMarkerTier(zoom)
+    ? currentCoverageRangeLevel
+    : currentRangeLevel
 
   const value = {
     loading,
@@ -394,25 +410,33 @@ export default function MapStateProvider ({ children }) {
     legendLoading,
     coverageRangeLevels,
     currentRangeLevel,
-    currentCoverageRangeLevel,
+    // What the legend's single hex gradient is keyed to — see above. The
+    // coverage tier is not exported on its own: it is one of the two things this
+    // can be, and nothing outside wants it separately now that the card draws
+    // one gradient for every hexagon.
+    hexRangeLevel,
     // The pinned value, not the raw preference — see effectiveMetric. Callers
     // that paint or label the map want what the map is counting.
     metric: effectiveMetric,
+    // The raw preference, for UrlSync: the link has to record what the user
+    // picked, not what the current zoom pins it to, or zooming in would rewrite
+    // their choice out of the URL.
+    metricPreference: metric,
     metricPinned,
     setMetric,
     griddapCoverageVisible,
     setGriddapCoverageVisible,
     dataLayersVisible,
     setDataLayersVisible,
+    bathymetryVisible,
+    setBathymetryVisible,
     projection,
     setProjection,
-    // Read-only outside this provider: the layer switches and the two
-    // trajectory sub-switches are coupled (clearing both sub-switches drops the
-    // parent), so callers go through the toggles rather than the raw setters.
+    // Read-only outside this provider: the track-lines switch is flipped through
+    // its toggle rather than the raw setter, so the reasoning about what a view
+    // change may and may not touch stays in one place (see toggleTrackLines).
     tracksMode,
-    trajectoryHexes,
     toggleTrackLines,
-    toggleTrajectoryHexes,
     scrubTime,
     setScrubTime,
     debouncedScrubTime,
