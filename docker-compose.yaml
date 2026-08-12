@@ -106,6 +106,9 @@ services:
       dockerfile: ./download_scheduler/Dockerfile
     profiles:
       - tools
+    # Without this, a crash leaves the queue with no consumer: the API keeps
+    # accepting downloads and they pile up as 'open' rows forever.
+    restart: unless-stopped
     depends_on:
       db_migrate:
         condition: service_completed_successfully

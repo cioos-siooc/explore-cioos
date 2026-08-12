@@ -279,6 +279,58 @@ def run_download(row):
     )
 
 
+def fail_job(pk, error):
+    """
+    Mark a job failed after an error escaped run_download, so it doesn't sit in
+    'downloading' forever with the user waiting on an email that never comes.
+    """
+    update_download_jobs(
+        pk,
+        {
+            "status": "failed",
+            # SQLAlchemy struggles with '%
+            "downloader_output": str(error).replace("%", "").replace("'", ""),
+            "time_complete": "NOW()",
+        },
+    )
+
+
+def process_next_job():
+    """
+    Claim and run the next queued job.
+
+    Returns True when the queue is being served (a job ran, or there was
+    nothing to do) and False when the job could not even be claimed, so the
+    caller can back off instead of spinning against a database that is down.
+
+    Errors are contained here deliberately. Nothing supervises this worker, so
+    an exception that escapes the polling loop kills it silently and leaves
+    every later download queued forever with no error surfaced to anyone.
+    """
+    try:
+        row = get_a_download_job()
+    except Exception:
+        logger.exception("Could not claim a download job")
+        return False
+
+    if row is None:
+        return True
+
+    try:
+        run_download(row)
+    except Exception:
+        # run_download handles downloader failures itself; reaching here means
+        # something outside that (a malformed job row, a template or mail
+        # error) broke, and the job is still marked 'downloading'.
+        logger.exception("Unhandled error running job {}", row["pk"])
+        try:
+            fail_job(row["pk"], traceback.format_exc())
+        except Exception:
+            logger.exception("Could not mark job {} as failed", row["pk"])
+
+    return True
+
+
 def update_download_jobs(pk, row, session=None):
     params = ",".join([f"{key}='{value}'" for key, value in row.items()])
     sql = f"UPDATE cde.download_jobs SET {params} WHERE PK={pk}"
