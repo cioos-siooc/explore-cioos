@@ -189,6 +189,10 @@
   align-items: center;
   gap: 4px;
   min-height: 15px;
+  /* Indented off the card's left edge. The row leads with a 6px circle inside a
+     12px swatch box, so its ink starts further right than the colour bar's does
+     and the row read as if it were hanging off the edge. */
+  padding-left: 4px;
   font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink);
   line-height: 1.15;
