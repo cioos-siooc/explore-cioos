@@ -22,39 +22,20 @@ export default function MultiCheckboxFilter({
     t(a.title).localeCompare(t(b.title), i18n.language)
   )
 
-  // These filters constrain nothing when nothing is ticked, so "none ticked"
-  // and "all ticked" ask for exactly the same data. Showing that state as a
-  // column of empty boxes said the opposite — it read as "no variables
-  // included" when every variable was — so an empty selection draws as fully
-  // ticked instead, and none-ticked stays the canonical way to store it (a
-  // short URL, and newly harvested options are picked up automatically rather
-  // than being absent from a frozen list of everything).
+  // Nothing ticked constrains nothing, so an empty selection already means
+  // "all of them" — which is why unticking the last box is safe and lands back
+  // on the unfiltered result set rather than on an empty map. It is stored that
+  // way too (a short URL, and newly harvested options are picked up
+  // automatically instead of being absent from a frozen list of everything),
+  // and shown that way: no ticks in the default state, so the pane reports what
+  // the user has actually chosen rather than pre-answering for them.
   const universe = allOptions || optionsSelected
-  const nothingSelected = !universe.some((option) => option.isSelected)
-  const isChecked = (option) => nothingSelected || option.isSelected
+  const isChecked = (option) => option.isSelected
 
-  // Collapse a fully-ticked list back to the empty representation, so ticking
-  // the last box lands on the same state Reset gives rather than a synonym of
-  // it that the badge would report as a filter.
-  const canonical = (options) =>
-    options.every((option) => option.isSelected)
-      ? options.map((option) => ({ ...option, isSelected: false }))
-      : options
-
-  // Ticking a box while everything is implicitly on means "just this one",
-  // not "this one on top of all the others" — untick the rest.
   function toggleOption (option) {
-    if (nothingSelected) {
-      setOptionsSelected(
-        universe.map((opt) => ({ ...opt, isSelected: opt.pk === option.pk }))
-      )
-      return
-    }
     setOptionsSelected(
-      canonical(
-        universe.map((opt) =>
-          opt.pk === option.pk ? { ...opt, isSelected: !opt.isSelected } : opt
-        )
+      universe.map((opt) =>
+        opt.pk === option.pk ? { ...opt, isSelected: !opt.isSelected } : opt
       )
     )
   }
@@ -62,18 +43,11 @@ export default function MultiCheckboxFilter({
   function selectAllSearchResultsToggle () {
     const listOfPKs = optionsSelected.map((option) => option.pk)
     const allShownChecked = optionsSelected.every(isChecked)
-    // Starting from "all implicitly on", the base has to be materialised
-    // before the search subset can be subtracted from it.
-    const base = nothingSelected
-      ? universe.map((option) => ({ ...option, isSelected: true }))
-      : universe
     setOptionsSelected(
-      canonical(
-        base.map((option) =>
-          listOfPKs.includes(option.pk)
-            ? { ...option, isSelected: !allShownChecked }
-            : option
-        )
+      universe.map((option) =>
+        listOfPKs.includes(option.pk)
+          ? { ...option, isSelected: !allShownChecked }
+          : option
       )
     )
   }

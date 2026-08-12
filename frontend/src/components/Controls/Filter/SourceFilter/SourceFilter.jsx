@@ -46,64 +46,25 @@ export default function SourceFilter({
   const showObisGroup =
     obisNodesSelected.length > 0 && (!search || nodesShown.length > 0)
 
-  // Nothing ticked anywhere constrains nothing, so it asks for the same data
-  // as everything ticked and draws that way — see MultiCheckboxFilter for the
-  // reasoning. The test spans both lists because they are one filter: a
-  // selection in either is a constraint on sources overall.
-  const nothingSelected =
-    !erddapServersSelected.some((server) => server.isSelected) &&
-    !obisNodesSelected.some((node) => node.isSelected)
-  const isChecked = (option) => nothingSelected || option.isSelected
-
-  // Ticking one while everything is implicitly on means "just this one", so
-  // the other list is cleared alongside the untouched entries in this one.
-  function selectOnly(servers, nodes) {
-    setErddapServersSelected(servers)
-    setObisNodesSelected(nodes)
-  }
-
-  const clearedServers = () =>
-    erddapServersSelected.map((s) => ({ ...s, isSelected: false }))
-  const clearedNodes = () =>
-    obisNodesSelected.map((n) => ({ ...n, isSelected: false }))
-
-  // Everything ticked collapses back to the empty representation, so the last
-  // tick lands on the same state Reset gives rather than a synonym of it.
-  function commit(servers, nodes) {
-    const all =
-      servers.every((s) => s.isSelected) && nodes.every((n) => n.isSelected)
-    if (all) return selectOnly(clearedServers(), clearedNodes())
-    return selectOnly(servers, nodes)
-  }
+  // Nothing ticked anywhere constrains nothing, so an empty selection already
+  // means every source — see MultiCheckboxFilter. Shown as it is stored: no
+  // ticks until the user picks something.
+  const isChecked = (option) => option.isSelected
 
   const allNodesSelected =
     obisNodesSelected.length > 0 && obisNodesSelected.every(isChecked)
   const someNodesSelected = obisNodesSelected.some(isChecked)
 
   function toggleServer(pk) {
-    if (nothingSelected) {
-      return selectOnly(
-        erddapServersSelected.map((s) => ({ ...s, isSelected: s.pk === pk })),
-        clearedNodes()
-      )
-    }
-    return commit(
+    setErddapServersSelected(
       erddapServersSelected.map((server) =>
         server.pk === pk ? { ...server, isSelected: !server.isSelected } : server
-      ),
-      obisNodesSelected
+      )
     )
   }
 
   function toggleNode(pk) {
-    if (nothingSelected) {
-      return selectOnly(
-        clearedServers(),
-        obisNodesSelected.map((n) => ({ ...n, isSelected: n.pk === pk }))
-      )
-    }
-    return commit(
-      erddapServersSelected,
+    setObisNodesSelected(
       obisNodesSelected.map((node) =>
         node.pk === pk ? { ...node, isSelected: !node.isSelected } : node
       )
@@ -111,14 +72,7 @@ export default function SourceFilter({
   }
 
   function toggleAllNodes() {
-    if (nothingSelected) {
-      return selectOnly(
-        clearedServers(),
-        obisNodesSelected.map((n) => ({ ...n, isSelected: true }))
-      )
-    }
-    return commit(
-      erddapServersSelected,
+    setObisNodesSelected(
       obisNodesSelected.map((node) => ({
         ...node,
         isSelected: !allNodesSelected

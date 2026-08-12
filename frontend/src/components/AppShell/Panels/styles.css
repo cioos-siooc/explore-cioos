@@ -137,22 +137,33 @@
   margin-right: 0;
 }
 
-/* Long names (dataset titles above all) wrap instead of widening the pane. */
-.filtersPanel .optionButton {
+/* Long names (dataset titles above all) wrap instead of widening the pane.
+   Qualified by .filterOptionsBody purely to outrank the single-line row rules
+   these bodies ship (.multiCheckboxFilter .optionButton and friends, same
+   specificity as a bare .filtersPanel prefix and loaded after it) — those set a
+   30px line box for one-line rows, which both breaks wrapped labels and leaves
+   the checkbox sitting ~6px above the text it belongs to. */
+.filtersPanel .filterOptionsBody .optionButton {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   line-height: 1.35;
   padding: 6px 8px;
+  margin: 0 0 4px;
   min-width: 0;
 }
 
-.filtersPanel .optionButton > svg {
-  flex-shrink: 0;
-  margin-top: 1px;
+/* The box sits on the first line of the label, centred on it. The icons are
+   1em tall and the line box is 1.35em, so half the difference is the offset —
+   in em, because a fixed pixel nudge stops being centred the moment the label
+   or the icon changes size. align-items alone can't do this: it would centre
+   the box against the whole (possibly three-line) label. */
+.filtersPanel .filterOptionsBody .optionButton > svg {
+  flex: 0 0 auto;
+  margin-top: 0.175em;
 }
 
-.filtersPanel .optionName {
+.filtersPanel .filterOptionsBody .optionName {
   margin-left: 0;
   min-width: 0;
   overflow-wrap: anywhere;
