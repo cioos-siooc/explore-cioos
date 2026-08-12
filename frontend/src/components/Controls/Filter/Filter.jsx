@@ -44,9 +44,16 @@ export default function Filter({
     controlled ? setFilterOpen(openFilter) : noop()
   }, [openFilter])
 
+  // `active` (this filter constrains something) and `open` (this is the filter
+  // whose options the pane is showing) are different facts and get different
+  // styling — in the master/detail panel especially, where several rows can be
+  // active at once and exactly one is being edited.
   const filterButton = (
     <button
-      className={`filterHeader ${active && 'active'}`}
+      className={`filterHeader ${active ? 'active' : ''} ${
+        filterOpen && (!controlled || openFilter) ? 'open' : ''
+      }`}
+      aria-current={filterOpen && (!controlled || openFilter) ? 'true' : undefined}
       onClick={() => {
         setFilterOpen(!filterOpen)
         if (controlled) setOpenFilter(filterName)

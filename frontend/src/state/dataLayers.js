@@ -56,19 +56,45 @@ export const ALL_DATA_LAYERS = Object.fromEntries(
   DATA_LAYER_KEYS.map((key) => [key, true])
 )
 
-// What a first visit shows. The three fixed-place geometries plus OBIS: the
-// biodiversity occurrences are a headline part of what the catalog holds, and
-// leaving them off meant a first visit under-reported the data by default.
-// Both path-sampling geometries stay opt-in — they pull the heaviest tile set
-// (track tiles on top of the coverage hexes) and bring the time scrub bar with
-// them, which is a different mode of reading the map rather than one more layer
-// on it. Off here means off everywhere — the map, the datasets panel and the
-// counts (see datasetInDataLayers).
-export const DEFAULT_DATA_LAYERS = {
-  ...ALL_DATA_LAYERS,
-  trajectories: false,
-  trajectoryProfile: false
-}
+// What a first visit shows: everything. This filter works like the catalogue
+// filters beside it — "nothing picked" means unfiltered, not empty — and the
+// unfiltered answer for a geometry selector is every geometry. Opting one or
+// two of them out of the default was the map quietly under-reporting what the
+// catalogue holds before the user had asked for anything.
+//
+// All-on is therefore also the neutral state the UI presents as no selection
+// (see isDataLayerChecked): a fully drawn map isn't a filter, so the pane shows
+// no ticks, the badge shows the plain filter name, and no chip appears.
+export const DEFAULT_DATA_LAYERS = ALL_DATA_LAYERS
+
+// Is the map drawing every geometry — i.e. is this filter doing nothing? The
+// same question as "is the selection empty" on the other filters.
+export const allDataLayersOn = (dataLayers) =>
+  !dataLayers || DATA_LAYER_KEYS.every((key) => dataLayers[key])
+
+// What the checkbox shows. Everything-on is the unfiltered state, so it draws
+// as no selection at all rather than as six ticks; once the user narrows, the
+// ticks are the geometries they kept.
+export const isDataLayerChecked = (dataLayers, key) =>
+  !allDataLayersOn(dataLayers) && Boolean(dataLayers?.[key])
+
+// The geometries a narrowed selection keeps, in render order. Empty when the
+// filter is doing nothing.
+export const selectedDataLayerKeys = (dataLayers) =>
+  allDataLayersOn(dataLayers)
+    ? []
+    : DATA_LAYER_KEYS.filter((key) => dataLayers[key])
+
+// Apply a selection, folding "nothing left" back to "everything" — unticking
+// the last box lands on the unfiltered map, the way clearing any other filter
+// does, instead of on a blank one that no control could recover from.
+export const commitDataLayers = (next) =>
+  DATA_LAYER_KEYS.some((key) => next[key]) ? next : { ...ALL_DATA_LAYERS }
+
+// Narrow to a single geometry — what ticking a box means while everything is
+// on, matching the other filters' first pick.
+export const onlyDataLayer = (key) =>
+  Object.fromEntries(DATA_LAYER_KEYS.map((k) => [k, k === key]))
 
 // How the trajectory layers draw when either is switched on. Track lines are
 // the more legible first view of a voyage; the coverage hexes are the density
@@ -118,15 +144,10 @@ export function datasetInDataLayers (row, dataLayers) {
   return key === undefined || dataLayers[key] !== false
 }
 
-// Is every layer on? SelectionProvider uses this to skip per-row filtering
-// entirely, so it stays a plain all-on test — it is NOT the default any more.
-export const allDataLayersOn = (dataLayers) =>
-  !dataLayers || Object.values(dataLayers).every(Boolean)
-
 // Is this the default selection? Only a non-default selection is worth writing
 // to the URL (see useUrlSync), and an absent ?layers= restores the default.
-export const dataLayersAreDefault = (dataLayers) =>
-  !dataLayers ||
-  DATA_LAYER_KEYS.every(
-    (key) => Boolean(dataLayers[key]) === DEFAULT_DATA_LAYERS[key]
-  )
+// Everything-on IS the default now, so this is the same question as
+// allDataLayersOn — kept as its own name because the callers mean different
+// things by it (one asks "is this shareable state", the other "is this filter
+// doing anything").
+export const dataLayersAreDefault = allDataLayersOn

@@ -9,16 +9,18 @@ import {
   DATA_LAYER_KEYS,
   DATA_LAYER_LABEL_KEYS,
   TRAJECTORY_LAYER_KEYS,
-  anyTrajectoryLayerOn
+  anyTrajectoryLayerOn,
+  isDataLayerChecked
 } from '../../../../state/dataLayers.js'
 import { useMapState } from '../../../../state/map/MapStateProvider.jsx'
 import './styles.css'
 
 // Which observation geometries the map draws, and — for the two path-sampling
-// ones — how they draw. This was a column of switches in the legend card;
-// inside the filter menu it takes the same checkbox idiom as every other
-// filter, because that is what it does: the selection gates the map tiles, the
-// datasets list and the counts alike (see datasetInDataLayers).
+// ones — how they draw. It behaves as every other filter does, down to the
+// semantics and not just the idiom: no ticks means unfiltered (all six drawn),
+// ticking narrows to what is ticked, and unticking the last one returns to all.
+// The selection gates the map tiles, the datasets list and the counts alike
+// (see datasetInDataLayers).
 //
 // Each row carries a hint line: what the geometry means in plain terms and the
 // platforms that typically produce it. "TimeSeriesProfile" tells a data manager
@@ -67,7 +69,7 @@ export default function DataLayersFilter () {
             key,
             t(DATA_LAYER_LABEL_KEYS[key]),
             t(DATA_LAYER_HINT_KEYS[key]),
-            Boolean(dataLayers[key]),
+            isDataLayerChecked(dataLayers, key),
             () => toggleDataLayer(key)
           )}
           {key === lastTrajectoryKey && anyTrajectoryLayerOn(dataLayers) && (

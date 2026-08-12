@@ -33,7 +33,10 @@ import {
   DEFAULT_TRACKS_MODE,
   DEFAULT_TRAJECTORY_HEXES,
   TRAJECTORY_LAYER_KEYS,
-  anyTrajectoryLayerOn
+  allDataLayersOn,
+  anyTrajectoryLayerOn,
+  commitDataLayers,
+  onlyDataLayer
 } from '../dataLayers.js'
 
 const MapStateContext = createContext()
@@ -201,32 +204,35 @@ export default function MapStateProvider ({ children }) {
   // The views belong to Trajectory and TrajectoryProfile jointly — they are one
   // set of track/coverage layers fed by both — so the coupling is written
   // against "is either on", not against a single key.
+  // Ticking a box while everything is on narrows to that one geometry — the
+  // same first pick the catalogue filters make — and unticking the last one
+  // folds back to everything (see commitDataLayers).
   function toggleDataLayer (key) {
-    const on = !dataLayers[key]
-    setDataLayers({ ...dataLayers, [key]: on })
-    // Restore the default views only when this switch is what brings the
-    // trajectory layers back; with the other one already on, the user's current
-    // view choice is deliberate and stays.
-    if (
-      on &&
-      TRAJECTORY_LAYER_KEYS.includes(key) &&
-      !anyTrajectoryLayerOn(dataLayers)
-    ) {
+    const next = allDataLayersOn(dataLayers)
+      ? onlyDataLayer(key)
+      : commitDataLayers({ ...dataLayers, [key]: !dataLayers[key] })
+    setDataLayers(next)
+    // Restore the default views only when this change is what brings the
+    // trajectory layers back; with one already drawing, the user's current view
+    // choice is deliberate and stays.
+    if (anyTrajectoryLayerOn(next) && !anyTrajectoryLayerOn(dataLayers)) {
       setTracksMode(DEFAULT_TRACKS_MODE)
       setTrajectoryHexes(DEFAULT_TRAJECTORY_HEXES)
     }
   }
 
-  // Flip one sub-switch, dropping both trajectory layers when that would leave
-  // neither representation drawing anything.
+  // Flip one sub-switch, dropping both trajectory geometries when that would
+  // leave neither representation drawing anything.
   function setTrajectoryViews (tracks, hexes) {
     setTracksMode(tracks)
     setTrajectoryHexes(hexes)
     if (!tracks && !hexes) {
-      setDataLayers({
-        ...dataLayers,
-        ...Object.fromEntries(TRAJECTORY_LAYER_KEYS.map((key) => [key, false]))
-      })
+      setDataLayers(
+        commitDataLayers({
+          ...dataLayers,
+          ...Object.fromEntries(TRAJECTORY_LAYER_KEYS.map((k) => [k, false]))
+        })
+      )
     }
   }
 
@@ -235,21 +241,22 @@ export default function MapStateProvider ({ children }) {
   const toggleTrajectoryHexes = () =>
     setTrajectoryViews(tracksMode, !trajectoryHexes)
 
-  // Back to the default selection, and to the default trajectory views with it
-  // — the sub-switches are part of what "reset" means here, and leaving them on
-  // whatever the user last chose would make the reset only half true. Backs the
-  // filter row's Reset and the data-layer chip's remove-all.
+  // Back to the default selection — every geometry, i.e. unfiltered — and to
+  // the default trajectory views with it: the sub-switches are part of what
+  // "reset" means here, and leaving them on whatever the user last chose would
+  // make the reset only half true. Backs the filter row's Reset and the chip's
+  // remove-all.
   function resetDataLayers () {
-    setDataLayers(DEFAULT_DATA_LAYERS)
+    setDataLayers({ ...DEFAULT_DATA_LAYERS })
     setTracksMode(DEFAULT_TRACKS_MODE)
     setTrajectoryHexes(DEFAULT_TRAJECTORY_HEXES)
   }
 
-  // Every layer on. The trajectory views come along for the same reason they do
-  // on the single toggle: a trajectories layer drawing neither representation
-  // would be on in name only.
+  // Every geometry on. Identical to the reset now that all-on IS the default,
+  // and kept separate only so the filter's Select All button reads the way the
+  // other filters' do.
   function showAllDataLayers () {
-    setDataLayers(ALL_DATA_LAYERS)
+    setDataLayers({ ...ALL_DATA_LAYERS })
     setTracksMode(DEFAULT_TRACKS_MODE)
     setTrajectoryHexes(DEFAULT_TRAJECTORY_HEXES)
   }

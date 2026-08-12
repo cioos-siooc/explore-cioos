@@ -13,9 +13,8 @@ import {
   defaultEndDepth
 } from '../../config.js'
 import {
-  DATA_LAYER_KEYS,
   DATA_LAYER_LABEL_KEYS,
-  dataLayersAreDefault
+  selectedDataLayerKeys
 } from '../../../state/dataLayers.js'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
 import { useMapState } from '../../../state/map/MapStateProvider.jsx'
@@ -93,38 +92,20 @@ export default function ActiveFilterChips () {
     '(m)'
   )
 
-  // The data-layer selection, announced only when it is not the default — the
-  // default is the map everyone gets, and a chip for it would be permanent
-  // furniture rather than a filter the user set.
-  //
-  // The items are the layers being HELD BACK, not the ones drawn. Most of the
-  // five are on in any normal selection, so listing what shows would put a
-  // five-item scroller in the chip row to report a one-switch change, and the
-  // deviation is both shorter and the thing actually worth saying. It also
-  // gives the x a sane meaning — dropping a "Trajectories" chip stops hiding
-  // trajectories, the same way dropping any other chip widens the query.
-  // Nothing hidden (everything on) is still non-default, and says so in one
-  // item rather than listing all five.
-  const hiddenDataLayers = DATA_LAYER_KEYS.filter((key) => !dataLayers[key])
-  const dataLayersFilter = !dataLayersAreDefault(dataLayers) && {
+  // The geometry selection, announced the same way every other filter's is: one
+  // item per chosen value, and nothing at all while the filter is unfiltered
+  // (every geometry drawn). Dropping an item unticks that geometry; dropping
+  // the last one returns to all, via commitDataLayers.
+  const chosenDataLayers = selectedDataLayerKeys(dataLayers)
+  const dataLayersFilter = chosenDataLayers.length > 0 && {
     key: 'dataLayers',
-    label: hiddenDataLayers.length
-      ? t('dataLayersHiddenChip')
-      : t('layerSelectorLabel'),
+    label: t('layerSelectorLabel'),
     removeAll: resetDataLayers,
-    items: hiddenDataLayers.length
-      ? hiddenDataLayers.map((key) => ({
-        id: key,
-        label: t(DATA_LAYER_LABEL_KEYS[key]),
-        remove: () => toggleDataLayer(key)
-      }))
-      : [
-        {
-          id: 'all',
-          label: t('dataLayersAllChip'),
-          remove: resetDataLayers
-        }
-      ]
+    items: chosenDataLayers.map((key) => ({
+      id: key,
+      label: t(DATA_LAYER_LABEL_KEYS[key]),
+      remove: () => toggleDataLayer(key)
+    }))
   }
 
   const activeFilters = [

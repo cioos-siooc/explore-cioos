@@ -68,9 +68,29 @@
   border-color: var(--cioos-hairline);
 }
 
+/* Has a selection: a teal ring, readable at a glance down the column. */
 .filtersPanelList .filterHeader.active {
   background-color: var(--cioos-teal-light);
   border-color: var(--cioos-primary);
+}
+
+/* Is the one being edited: a filled row with a bar on the leading edge, so the
+   pane on the right is unambiguously attached to a row on the left. Distinct
+   from .active because a row can be either, both, or neither — the bar is the
+   part that only ever means "you are here". */
+.filtersPanelList .filterHeader.open {
+  background-color: var(--cioos-surface-2);
+  border-color: var(--cioos-primary);
+  box-shadow: inset 3px 0 0 0 var(--cioos-primary);
+  font-weight: 700;
+}
+
+.filtersPanelList .filterHeader.open.active {
+  background-color: var(--cioos-teal-light);
+}
+
+.filtersPanelList .filterHeader.open:hover {
+  background-color: var(--cioos-teal-light);
 }
 
 /* The open filter's options fill the detail pane to the right of the list

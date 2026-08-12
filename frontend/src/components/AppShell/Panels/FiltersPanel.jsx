@@ -35,7 +35,7 @@ import {
 import {
   DATA_LAYER_KEYS,
   DATA_LAYER_LABEL_KEYS,
-  dataLayersAreDefault
+  selectedDataLayerKeys
 } from '../../../state/dataLayers.js'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
 import { useMapState } from '../../../state/map/MapStateProvider.jsx'
@@ -112,19 +112,16 @@ export default function FiltersPanel () {
 
   const inViewFilterName = t('datasetsCardOnlyInViewText')
 
-  // The data-layer badge reads the opposite way round from the catalog filters:
-  // their unfiltered state is "nothing picked", this one's is the default
-  // selection, so that — not an empty selection — is what shows the bare filter
-  // name. Everything else describes what is actually drawn.
+  // Same badge rule as the catalogue filters: the bare filter name while the
+  // filter is doing nothing, the chosen value(s) once it is.
   const dataLayersFilterTranslationKey = 'layerSelectorLabel'
-  const dataLayersOn = DATA_LAYER_KEYS.filter((key) => dataLayers[key])
-  const dataLayersBadgeTitle = dataLayersAreDefault(dataLayers)
-    ? t(dataLayersFilterTranslationKey)
-    : dataLayersOn.length === 0
-      ? t('dataLayersNone')
-      : dataLayersOn.length === 1
-        ? t(DATA_LAYER_LABEL_KEYS[dataLayersOn[0]])
-        : dataLayersOn.length + t('dataLayersMulti')
+  const dataLayersChosen = selectedDataLayerKeys(dataLayers)
+  const dataLayersBadgeTitle =
+    dataLayersChosen.length === 0
+      ? t(dataLayersFilterTranslationKey)
+      : dataLayersChosen.length === 1
+        ? t(DATA_LAYER_LABEL_KEYS[dataLayersChosen[0]])
+        : dataLayersChosen.length + t('dataLayersMulti')
 
   const eovsFilterTranslationKey = 'oceanVariablesFiltername'
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(
@@ -185,7 +182,7 @@ export default function FiltersPanel () {
               decides which families of data exist for the filters below to
               narrow. */}
           <Filter
-            active={!dataLayersAreDefault(dataLayers)}
+            active={dataLayersChosen.length > 0}
             badgeTitle={dataLayersBadgeTitle}
             tooltip={t('dataLayersFilterTooltip')}
             icon={<Stack />}
