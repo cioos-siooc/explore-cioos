@@ -1,3 +1,11 @@
+// Must be required before any router module: it patches the `handle` SETTER on
+// express's Layer.prototype, so only routes registered after this line get
+// their async rejections forwarded to the error handler. Routes registered
+// earlier assign `handle` as an own property and bypass the patch entirely —
+// a rejected promise there is an unhandled rejection, which Node turns into a
+// process exit, taking every other in-flight request down with it.
+require("express-async-errors");
+
 const createError = require("http-errors");
 const express = require("express");
 const path = require("path");

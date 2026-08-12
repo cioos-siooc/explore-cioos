@@ -374,7 +374,7 @@ router.get(
     if (includeObis) branches.push(obisBranch);
     // Guard: if nothing to show, return an empty CTE that still has the right
     // columns. Wrapped in a subquery so it holds even when trajectoryBranch
-    // carries its own WHERE (the tile prefilter).
+    // carries its own WHERE (the tile prefilter, present from z3 up).
     const combinedInner = branches.length
       ? branches.join("\n    UNION ALL\n    ")
       : `SELECT * FROM (${trajectoryBranch}) empty_combined WHERE FALSE`;

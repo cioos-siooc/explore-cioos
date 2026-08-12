@@ -174,18 +174,18 @@ router.get(
     const hexBranches = [];
     if (includeProfiles) hexBranches.push(profilesBranch, trajectoryBranch);
     if (includeObis) hexBranches.push(obisBranch);
-    // Wrapped in a subquery so the guard holds even though profilesBranch
-    // carries its own WHERE (show_as_point).
+    // Empty-branch guard: profilesBranch carries its own WHERE (show_as_point),
+    // so `${profilesBranch} WHERE FALSE` is a syntax error — wrap it in a
+    // subquery, as the tile route does.
+    const emptyBranch = `SELECT * FROM (${profilesBranch}) empty_branch WHERE FALSE`;
     const combinedHexInner = hexBranches.length
       ? hexBranches.join("\n        UNION ALL\n        ")
-      : `SELECT * FROM (${profilesBranch}) empty_hex WHERE FALSE`;
+      : emptyBranch;
 
     // Only profiles reach the point tier: both cell tables are drawn as hexes
     // at every zoom, so counting them here would ramp the point circles
     // against data they don't contain.
-    const combinedPointInner = includeProfiles
-      ? profilesBranch
-      : `SELECT * FROM (${profilesBranch}) empty_point WHERE FALSE`;
+    const combinedPointInner = includeProfiles ? profilesBranch : emptyBranch;
 
     const sql = `
         WITH combined_hex AS (

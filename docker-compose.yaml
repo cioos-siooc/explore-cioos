@@ -196,6 +196,25 @@ services:
       #   false = never; true/once = only when the DB is empty (new install);
       #   always = every deploy, regardless of DB contents.
       RUN_ON_DEPLOY: ${RUN_ON_DEPLOY:-false}
+      # Cap concurrent flow runs. The harvest-all flow fans out one child run
+      # per source (10+ of them); each is its own OS process under
+      # `--type process`. Unbounded, they exhausted a 15.7 GB host on
+      # 2026-08-04. See HARVEST_WORKER_LIMIT in worker-entrypoint.sh.
+      HARVEST_WORKER_LIMIT: ${HARVEST_WORKER_LIMIT:-6}
+    # Resource containment. Setting memswap_limit == mem_limit gives this
+    # container ZERO swap (cgroup v2: memory.swap.max = memswap_limit -
+    # mem_limit = 0), so a runaway harvest is OOM-killed inside its own cgroup
+    # in seconds instead of consuming host swap.
+    # On 2026-08-04 an unbounded harvest filled all 8.6 GB of host swap and
+    # livelocked the box for ~90 min: with swap to grind through, the kernel
+    # kept reclaiming, so the OOM killer never fired and nothing recovered
+    # until a hard reboot. A contained OOM kill is noisy but self-recovering
+    # (restart: unless-stopped above).
+    # NOTE: deliberately no mem_swappiness — that is cgroup v1 only, and these
+    # hosts are cgroup v2, where Compose silently drops it. memswap_limit is
+    # what actually disables swap here.
+    mem_limit: ${HARVESTER_MEM_LIMIT:-6g}
+    memswap_limit: ${HARVESTER_MEM_LIMIT:-10g}
 
   prefect:
     # Non-conda image: ships asyncpg, so Prefect can use Postgres as its
