@@ -28,6 +28,7 @@ import erddapServersJSONfile from '../../erddapServers.json'
 import { useFilters } from '../filters/FilterProvider.jsx'
 import { useMapState } from '../map/MapStateProvider.jsx'
 import { GROUP_NONE, hiddenDatasetPksFor } from '../datasetGroups.js'
+import { allDataLayersOn, datasetInDataLayers } from '../dataLayers.js'
 
 const SelectionContext = createContext()
 
@@ -60,7 +61,8 @@ export default function SelectionProvider ({ children }) {
     pendingDatasetZoom,
     setPendingDatasetZoom,
     mapView,
-    setMapDatasetPKs
+    setMapDatasetPKs,
+    dataLayers
   } = useMapState()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -188,11 +190,18 @@ export default function SelectionProvider ({ children }) {
   // DatasetsTable's search box used to match locally: title, dataset type,
   // and data-portal name. Derived here (rather than inside DatasetsTable) so
   // the datasets counters (Sidebar, TopControls) reflect it too.
+  //
+  // The data-layer switches narrow it as well: turning a data type off stops
+  // the map drawing it, so the list would otherwise keep offering datasets
+  // that have no presence on the map (see state/dataLayers.js for which
+  // switch owns which dataset — Grid datasets belong to none and always stay).
   const filteredDatasets = useMemo(() => {
     const query = datasetTitleSearchText.toLowerCase()
     const hasSearch = !isEmpty(datasetTitleSearchText)
-    if (!hasSearch && !onlyInView) return pointsData
+    const layersNarrowed = !allDataLayersOn(dataLayers)
+    if (!hasSearch && !onlyInView && !layersNarrowed) return pointsData
     return pointsData.filter((row) => {
+      if (layersNarrowed && !datasetInDataLayers(row, dataLayers)) return false
       if (onlyInView && !datasetsInViewPks.has(row.pk)) return false
       if (!hasSearch) return true
       return [
@@ -208,7 +217,14 @@ export default function SelectionProvider ({ children }) {
         .toLowerCase()
         .includes(query)
     })
-  }, [pointsData, datasetTitleSearchText, onlyInView, datasetsInViewPks, i18n.language])
+  }, [
+    pointsData,
+    datasetTitleSearchText,
+    onlyInView,
+    datasetsInViewPks,
+    dataLayers,
+    i18n.language
+  ])
 
   // Group keys are only meaningful within one dimension, so switching
   // dimensions drops whatever was hidden under the old one.
@@ -299,6 +315,47 @@ export default function SelectionProvider ({ children }) {
       )
     },
     [setSearchParams]
+  )
+
+  // A track clicked on the map does what clicking a platform row in the dataset
+  // inspector does (DatasetInspector's onRowClicked): open that dataset's page
+  // AND draw the platform's full history. Both writes happen in this one call so
+  // React batches them into a single render — which is what stops the
+  // [inspectDataset] effect below from clearing the selection it just made (it
+  // sees the new inspectDataset and the matching selectedTrajectory together).
+  const selectTrajectoryFromMap = useCallback(
+    (datasetPk, trajectoryId, datasetTitle) => {
+      // Re-clicking the selected track is a no-op, not a toggle: track-lines
+      // stays hit-testable (just dimmed) under the selected track drawn over it,
+      // so a toggle would clear the selection on any click along it — including
+      // a click meant to read a fix tooltip. Clearing stays the platform row.
+      if (
+        selectedTrajectory?.datasetPk === datasetPk &&
+        selectedTrajectory?.trajectoryId === trajectoryId
+      ) {
+        return
+      }
+
+      // The page can only open for a dataset the current results contain —
+      // inspectDataset resolves out of pointsData. The tracks tiles apply only
+      // the dataset-level filters, so they can carry a dataset that pointQuery's
+      // depth/bbox/polygon predicates dropped; draw its track anyway and leave
+      // the URL alone. Never setInspectDataset(undefined) here — that would
+      // close whatever page was open and take the new selection down with it.
+      const dataset = pointsData.find((row) => row.pk === datasetPk)
+      // Skipped when this dataset's page is already open, so repeat clicks don't
+      // each push a history entry Back has to walk through.
+      if (dataset && inspectDataset?.pk !== datasetPk && datasetUrlKey(dataset)) {
+        setInspectDataset(dataset)
+      }
+
+      setSelectedTrajectory({
+        datasetPk,
+        datasetTitle: dataset?.title || datasetTitle,
+        trajectoryId
+      })
+    },
+    [pointsData, inspectDataset, selectedTrajectory, setInspectDataset]
   )
 
   // Mark the polygon-draw control active for free-form polygons (rectangles
@@ -490,6 +547,7 @@ export default function SelectionProvider ({ children }) {
     setHoveredDataset,
     selectedTrajectory,
     setSelectedTrajectory,
+    selectTrajectoryFromMap,
     selectAll,
     pointsData,
     setPointsData,

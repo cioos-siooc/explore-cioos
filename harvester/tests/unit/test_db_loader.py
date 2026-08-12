@@ -156,9 +156,11 @@ class TestEnsureOrganizationPks:
 # ---------------------------------------------------------------------------
 
 class TestDbLoaderMainFullReload:
-    def test_drop_constraints_called(self, harvest_folder, mock_engine, mocker):
+    def test_no_constraint_ddl_toggling(self, harvest_folder, mock_engine, mocker):
+        # Full reload no longer drops/re-adds constraints via ALTER TABLE:
+        # columns are permanently NULL-able and the hex FKs are DEFERRABLE.
         sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=False)
-        assert any("drop_constraints" in s for s in sql_calls)
+        assert not any("drop_constraints" in s for s in sql_calls)
 
     def test_remove_all_data_called(self, harvest_folder, mock_engine, mocker):
         sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=False)
@@ -168,9 +170,9 @@ class TestDbLoaderMainFullReload:
         sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=False)
         assert any("profile_process" in s for s in sql_calls)
 
-    def test_set_constraints_called(self, harvest_folder, mock_engine, mocker):
+    def test_validate_loaded_data_called(self, harvest_folder, mock_engine, mocker):
         sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=False)
-        assert any("set_constraints" in s for s in sql_calls)
+        assert any("validate_loaded_data" in s for s in sql_calls)
 
 
 # ---------------------------------------------------------------------------

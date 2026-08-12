@@ -6,6 +6,44 @@ const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { validatorMiddleware } = require("../utils/validatorMiddlewares");
 const cache = require("../utils/cache");
+
+// Per-tile cap on how many trajectories a single /tiles/tracks tile assembles.
+// A low-zoom tile spans a huge area: with a long trail (e.g. "All time") its
+// candidate set is ~the whole catalogue (measured ~107k of 107k trajectories in
+// one z3 tile → a ~5 MB tile that OOMs the browser tab). The cap is applied at
+// the candidate stage (before any point is pulled), so it bounds BOTH the
+// payload and the server-side assembly cost. It is self-scaling: at high zoom a
+// tile covers a small area with far fewer than the cap, so it never bites there
+// (full detail when zoomed in); it only trims the low-zoom smear, keeping the
+// most recently-active trajectories. Coverage hexes convey overall density at
+// low zoom.
+const TRACKS_MAX_PER_TILE = 2500;
+
+// Spatial prefilter for the hex-aggregation tile queries (/tiles and
+// /tiles/cells). Without it each tile UNIONs and GROUP BYs the ENTIRE cell
+// tables (trajectory_cells ~860k rows / 3 GB, obis_cells, profiles) and only
+// clips to the tile at the very end — ~2.5 s of CPU per tile on every request
+// (measured, buffers warm), which shows up as half-painted tiles and slow
+// layer toggles (each toggle changes the tile URL and cold-refetches). This
+// prunes each branch's scan to the tile region up front via the tables' geom
+// GiST indexes. Hex membership stays the exact authority (the tile_hexes join
+// in /tiles/cells; the final `h.geom && tile_envelope` in /tiles), so the
+// prefilter only has to be a SUPERSET of the cells under the tile's hexes:
+// expand the envelope by >= one hex diameter (hex_0 ~200 km for z<5, hex_1
+// ~20 km for z>=5) so no cell of a hex straddling the tile edge is dropped.
+// Verified byte-identical to the unfiltered query across z3-z10. Below
+// PREFILTER_MIN_ZOOM the tile covers so much of the world that the GiST scan
+// loses to a plain seq scan (measured a ~3x regression at z2), so return null
+// there and leave the query unchanged.
+const PREFILTER_MIN_ZOOM = 3;
+function tileCellPrefilter(z) {
+  const zi = Number(z);
+  if (zi < PREFILTER_MIN_ZOOM) return null;
+  const hexDiameterM = zi < 5 ? 250000 : 25000; // > true diameter (hex_0 200km / hex_1 20km)
+  const tileWidthM = 40075016.686 / 2 ** zi;
+  const expandM = Math.ceil(Math.max(tileWidthM * 0.25, hexDiameterM));
+  return `geom && ST_Expand(ST_TileEnvelope(:z, :x, :y), ${expandM})`;
+}
 /**
  * /tiles/z/x/y/.mvt
  *
@@ -69,6 +107,8 @@ router.get(
     const isHexGrid = z < 7;
     const zoomPKColumn = z < 5 ? "hex_0_pk" : "hex_1_pk";
     const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
+    // Prune each branch's scan to the tile region (see tileCellPrefilter).
+    const cellPrefilter = tileCellPrefilter(z);
 
     const includeObis = req.query.includeObis !== 'false';
     // Data-type layer toggle (map layer selector). Trajectories: an explicit
@@ -114,7 +154,7 @@ router.get(
         : '';
     const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
            time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
-    FROM cde.profiles WHERE show_as_point${profilesTypeFilter}`;
+    FROM cde.profiles WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
     // Both cell tables (trajectory coverage cells and OBIS occurrence cells)
     // merge into the combined hex counts (z<7, the green ramp) but never
     // appear as individual points (z>=7). Their cell spacing is a grid
@@ -123,12 +163,12 @@ router.get(
     // /tiles/cells/:z/:x/:y.mvt.
     const trajectoryBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_cells`;
+    FROM cde.trajectory_cells${cellPrefilter ? ` WHERE ${cellPrefilter}` : ''}`;
     const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
            date_part('days', time_max - time_min) + 1 as record_count,
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
     FROM cde.obis_cells
-    WHERE :obisFilters`;
+    WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
 
     const branches = [];
     if (includeProfiles) branches.push(profilesBranch);
@@ -269,6 +309,8 @@ router.get(
     // reused uncapped past zoom 6 so coverage cells never become points.
     const zoomPKColumn = z < 5 ? "hex_0_pk" : "hex_1_pk";
     const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
+    // Prune each branch's scan to the tile region (see tileCellPrefilter).
+    const cellPrefilter = tileCellPrefilter(z);
 
     const includeObis = req.query.includeObis !== 'false';
     // Same gating as the main tile route: scientific-name filters are
@@ -289,20 +331,22 @@ router.get(
     const trajectoryBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'trajectory' as src,
            trajectory_id, 0::bigint as n_records,
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_cells`;
+    FROM cde.trajectory_cells${cellPrefilter ? ` WHERE ${cellPrefilter}` : ''}`;
     const obisBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'obis' as src,
            NULL as trajectory_id, n_records,
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
     FROM cde.obis_cells
-    WHERE :obisFilters`;
+    WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
 
     const branches = [];
     if (includeProfiles) branches.push(trajectoryBranch);
     if (includeObis) branches.push(obisBranch);
-    // Guard: if nothing to show, return an empty CTE that still has the right columns
+    // Guard: if nothing to show, return an empty CTE that still has the right
+    // columns. Wrapped in a subquery so it holds even when trajectoryBranch
+    // carries its own WHERE (the tile prefilter, present from z3 up).
     const combinedInner = branches.length
       ? branches.join("\n    UNION ALL\n    ")
-      : `${trajectoryBranch} WHERE FALSE`;
+      : `SELECT * FROM (${trajectoryBranch}) empty_combined WHERE FALSE`;
 
     // The tile-envelope test is applied BEFORE the aggregation (hexes are
     // disjoint, so filtering hexes before or after grouping yields identical
@@ -484,6 +528,10 @@ router.get(
         AND s.time_max >= :timeMin::timestamptz
         AND s.time_min <= :timeMax::timestamptz
         ${filters.hasShared ? "AND :filters" : ""}
+      -- Cap per tile (see TRACKS_MAX_PER_TILE): keep the most recently-active
+      -- trajectories; tie-break on the pk for deterministic, cache-stable tiles.
+      ORDER BY s.time_max DESC, s.dataset_pk, s.trajectory_id
+      LIMIT :maxTracksPerTile
     ),
     pts AS (
       SELECT p.dataset_pk, p.trajectory_id, p.time, p.longitude, p.latitude,
@@ -513,7 +561,9 @@ router.get(
         PARTITION BY dataset_pk, trajectory_id ORDER BY time
       ) AS seg
       FROM (
-        SELECT *, (
+        -- coalesce: each trajectory's first fix has no lag row, so the OR is
+        -- NULL — left as-is it would sum() into a NULL seg discarded below.
+        SELECT *, coalesce((
           abs(longitude - lag(longitude) OVER w) > 180
           OR extract(epoch FROM time - lag(time) OVER w) > gap_secs
           OR (
@@ -523,15 +573,19 @@ router.get(
             ) > 50000
             AND extract(epoch FROM time - lag(time) OVER w) < 345600
           )
-        )::int AS brk
+        )::int, 0) AS brk
         FROM pts
         WINDOW w AS (PARTITION BY dataset_pk, trajectory_id ORDER BY time)
       ) q
     ),
     lines AS (
-      SELECT trajectory_id, pk_url, ST_MakeLine(geom ORDER BY time) AS geom
+      -- dataset_title rides along so a track-line click can name its dataset
+      -- without a second lookup (MVT dedupes strings per layer, so the whole
+      -- tile carries one copy of each title).
+      SELECT trajectory_id, pk_url, dataset_title,
+             ST_MakeLine(geom ORDER BY time) AS geom
       FROM segs
-      GROUP BY dataset_pk, trajectory_id, pk_url, seg
+      GROUP BY dataset_pk, trajectory_id, pk_url, dataset_title, seg
       HAVING count(*) >= 2
     ),
     heads AS (
@@ -544,8 +598,8 @@ router.get(
              trajectory_id, pk_url, dataset_title,
              (extract(epoch FROM time) * 1000)::bigint AS head_time,
              round(degrees(ST_Azimuth(
-               ST_MakePoint(lag(longitude) OVER w, lag(latitude) OVER w)::geography,
-               ST_MakePoint(longitude, latitude)::geography
+               ST_SetSRID(ST_MakePoint(lag(longitude) OVER w, lag(latitude) OVER w), 4326)::geography,
+               ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography
              )))::int AS cog,
              geom
       FROM pts
@@ -553,8 +607,18 @@ router.get(
       ORDER BY dataset_pk, trajectory_id, time DESC
     ),
     line_mvt AS (
-      SELECT l.trajectory_id, l.pk_url,
-             ST_AsMVTGeom(l.geom, te.tile_envelope) AS geom
+      -- Zoom-aware simplify before MVT encoding: tolerance = one MVT grid unit
+      -- (tile width / 4096), the resolution ST_AsMVTGeom snaps to anyway, so it
+      -- drops vertices that would collapse on encode — visually lossless, fewer
+      -- vertices to encode/transfer at low zoom where tracks carry long history.
+      SELECT l.trajectory_id, l.pk_url, l.dataset_title,
+             ST_AsMVTGeom(
+               ST_Simplify(
+                 l.geom,
+                 (ST_XMax(te.tile_envelope) - ST_XMin(te.tile_envelope)) / 4096.0
+               ),
+               te.tile_envelope
+             ) AS geom
       FROM lines l, te
       WHERE l.geom && te.tile_envelope
     ),
@@ -575,6 +639,7 @@ router.get(
         filters: filters.shared,
         timeMin,
         timeMax,
+        maxTracksPerTile: TRACKS_MAX_PER_TILE,
         z,
         x,
         y,

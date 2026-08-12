@@ -251,7 +251,7 @@ def _iter_raw_chunks(dataset, traj_var, has_depth):
 
 def _extract_via_chunked_download(dataset, traj_var, has_depth):
     """Fallback for servers without orderBy interval grouping: download only
-    the id/position/time(/depth) columns in yearly chunks and bin locally."""
+    the id/position/time(/depth) columns in monthly chunks and bin locally."""
     frames = [
         _aggregate(df, traj_var, has_depth)
         for df in _iter_raw_chunks(dataset, traj_var, has_depth)
@@ -512,7 +512,7 @@ def extract_track_points(dataset, per_profile=False):
         if profile_var:
             # One row per (trajectory, profile): the row holding each group's
             # min time, lat/lon included. Bounded by profile count (same bound
-            # as _profiles_per_cell's distinct() query).
+            # as _profiles_per_cell's orderByMin query).
             request_vars = [v for v in (traj_var, profile_var) if v] + [
                 "time", "latitude", "longitude",
             ]

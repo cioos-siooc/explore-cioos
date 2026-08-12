@@ -49,7 +49,8 @@ background-color: var(--cioos-surface-2) !important;
   color: var(--cioos-ink-60);
 }
 
-.griddap-tooltip-hint {
+.griddap-tooltip-hint,
+.map-tooltip-hint {
   margin-top: 0.35rem;
   padding-top: 0.25rem;
   border-top: 1px solid var(--cioos-hairline);

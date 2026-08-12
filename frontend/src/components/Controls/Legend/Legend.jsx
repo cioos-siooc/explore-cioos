@@ -15,9 +15,11 @@ import {
   trajectoryColorScale,
   obisColorScale,
   mixedColorScale,
-  TRAIL_ALL
+  TRAIL_ALL,
+  effectiveTrailingDays
 } from '../../config.js'
 import platformColors from '../../platformColors'
+import { DEFAULT_DATA_LAYERS } from '../../../state/dataLayers.js'
 import Spinner from '../../ui/Spinner.jsx'
 import Switch from '../../ui/Switch.jsx'
 import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
@@ -62,6 +64,7 @@ export default function Legend({
   basemap,
   onBasemapChange,
   tracksMode,
+  trajectoryHexes,
   trailingDays,
   dataLayers
 }) {
@@ -73,22 +76,17 @@ export default function Legend({
     () => !window.matchMedia('(max-width: 900px)').matches
   )
 
-  // Default all-on when the prop is absent (older callers / initial render).
-  const layers = dataLayers || {
-    profile: true,
-    timeseries: true,
-    timeseriesProfile: true,
-    obis: true,
-    trajectories: true
-  }
+  // Fall back to the default selection when the prop is absent (older callers /
+  // initial render) — all-on would claim legend entries the map isn't drawing.
+  const layers = dataLayers || DEFAULT_DATA_LAYERS
   // The combined green ramp / platform points carry the profile-family types
-  // + OBIS, plus trajectory coverage when shown as hexes.
+  // + OBIS, plus trajectory coverage when its hex view is on.
   const showPointRamp =
     layers.profile ||
     layers.timeseries ||
     layers.timeseriesProfile ||
     layers.obis ||
-    (layers.trajectories && !tracksMode)
+    (layers.trajectories && trajectoryHexes)
 
   // Continuous color bar for a hex ramp. The hex counts follow a non-linear
   // (power/log) scale, so the colors are spaced evenly by their scale index
@@ -226,76 +224,89 @@ export default function Legend({
     }
   }
 
-  // The trajectory entry: in tracks mode a track-line/arrowhead key, otherwise
-  // the coverage-hex ramp (gated on the trajectories + hex-cells toggles).
+  // The trajectory entries: a track-line/arrowhead key and a coverage-hex ramp,
+  // one per view switch. Both switches are independent, so this emits both keys
+  // when both are on and nothing when neither is.
   function generateTrajectoryLegendElements() {
     // Trajectory layer hidden entirely — no trajectory legend.
     if (!layers.trajectories) return null
-    // Tracks mode replaces the coverage-hex ramp with the track-line layers.
-    if (tracksMode) {
-      return (
-        <div className='legendSection' key='tracks'>
-          <div className='legendSectionCaption'>{t('layerTrajectories')}</div>
-          <div className='legendItems'>
-            <div className='legendItem'>
-              <svg className='legendSwatch' width='12' height='12'>
-                <line
-                  x1='1'
-                  y1='10.5'
-                  x2='11'
-                  y2='1.5'
-                  stroke='#6749AC'
-                  strokeWidth='2.5'
-                  strokeLinecap='round'
-                />
-              </svg>
-              <span className='legendItemLabel'>
-                {`${t('legendTrackLine')} (${
-                  trailingDays === TRAIL_ALL
-                    ? t('timeBarTrailAll')
-                    : `${trailingDays}d`
-                })`}
-              </span>
-            </div>
-            <div className='legendItem'>
-              {/* same arrowhead the map draws, pointing along the course */}
-              <svg className='legendSwatch' width='12' height='12' viewBox='0 0 16 16'>
-                <path
-                  d='M8 1.5 L13.5 13.5 L8 10.5 L2.5 13.5 Z'
-                  fill='#6749AC'
-                  stroke='#ffffff'
-                  strokeWidth='1.5'
-                  strokeLinejoin='round'
-                  transform='rotate(45 8 8)'
-                />
-              </svg>
-              <span className='legendItemLabel'>{t('legendTrackHead')}</span>
-            </div>
-          </div>
-        </div>
-      )
-    }
-    if (isEmpty(currentTrajectoryRangeLevel)) return null
-    // Trajectory coverage always renders as hexes, at every zoom level.
-    return renderColorBar(
-      t('legendTrajectoriesPerHex'),
-      trajectoryColorScale,
-      currentTrajectoryRangeLevel,
-      'trajectories'
+    return (
+      <>
+        {tracksMode && renderTrackLineKey()}
+        {trajectoryHexes &&
+          !isEmpty(currentTrajectoryRangeLevel) &&
+          renderColorBar(
+            t('legendTrajectoriesPerHex'),
+            trajectoryColorScale,
+            currentTrajectoryRangeLevel,
+            'trajectories'
+          )}
+      </>
     )
   }
 
-  // Trajectory and OBIS coverage always render as hexes, and share one map
+  // The track-line + heading-arrow swatches, matching what the map draws. The
+  // window shown is the one actually loaded, not the one requested: zoomed out,
+  // the long trails are clamped (see effectiveTrailingDays), and a key that
+  // still claimed "All time" there would be wrong.
+  function renderTrackLineKey() {
+    const loadedTrail = effectiveTrailingDays(trailingDays, zoom)
+    const zoomClamped = loadedTrail !== trailingDays
+    const trailLabel =
+      loadedTrail === TRAIL_ALL ? t('timeBarTrailAll') : `${loadedTrail}d`
+    return (
+      <div className='legendSection' key='tracks'>
+        <div className='legendSectionCaption'>{t('layerTrajectories')}</div>
+        <div className='legendItems'>
+          <div
+            className='legendItem'
+            title={zoomClamped ? t('legendTrackTrailZoomGated') : undefined}
+          >
+            <svg className='legendSwatch' width='12' height='12'>
+              <line
+                x1='1'
+                y1='10.5'
+                x2='11'
+                y2='1.5'
+                stroke='#6749AC'
+                strokeWidth='2.5'
+                strokeLinecap='round'
+              />
+            </svg>
+            <span className='legendItemLabel'>
+              {`${t('legendTrackLine')} (${trailLabel}${zoomClamped ? '*' : ''})`}
+            </span>
+          </div>
+          <div className='legendItem'>
+            {/* same arrowhead the map draws, pointing along the course */}
+            <svg className='legendSwatch' width='12' height='12' viewBox='0 0 16 16'>
+              <path
+                d='M8 1.5 L13.5 13.5 L8 10.5 L2.5 13.5 Z'
+                fill='#6749AC'
+                stroke='#ffffff'
+                strokeWidth='1.5'
+                strokeLinejoin='round'
+                transform='rotate(45 8 8)'
+              />
+            </svg>
+            <span className='legendItemLabel'>{t('legendTrackHead')}</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Trajectory and OBIS coverage both render as hexes, and share one map
   // layer — a hex is coloured by which of the two it holds, or by a third
   // ramp when it holds both. The mixed ramp runs on the occurrence count (see
-  // coverageHexFillColor in Map.jsx), so it reuses the OBIS range. In tracks
-  // mode the trajectory counts leave the cells tiles (track lines replace
-  // them), so only the OBIS ramp can apply then.
+  // coverageHexFillColor in Map.jsx), so it reuses the OBIS range. With the
+  // trajectory hex view off the cells tiles carry no trajectory counts, so only
+  // the OBIS ramp can apply then.
   function generateCoverageLegendElements() {
     const showObisRamp = layers.obis && !isEmpty(currentObisRangeLevel)
     const showTrajectoryHexes =
       layers.trajectories &&
-      !tracksMode &&
+      trajectoryHexes &&
       !isEmpty(currentTrajectoryRangeLevel)
     return (
       <>

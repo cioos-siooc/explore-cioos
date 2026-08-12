@@ -3,6 +3,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useRef,
   useState,
   useEffect
@@ -12,7 +13,8 @@ import isEmpty from 'lodash/isEmpty'
 import { server } from '../../config.js'
 import {
   basemap as defaultBasemap,
-  defaultTrailingDays
+  defaultTrailingDays,
+  TRAIL_ALL
 } from '../../components/config.js'
 import {
   applyMapDatasetPKs,
@@ -23,14 +25,12 @@ import {
 import fetchJson from '../fetchJson.js'
 import usePersistentState from '../usePersistentState.js'
 import { useFilters } from '../filters/FilterProvider.jsx'
-
-const ALL_DATA_LAYERS = {
-  profile: true,
-  timeseries: true,
-  timeseriesProfile: true,
-  obis: true,
-  trajectories: true
-}
+import {
+  DATA_LAYER_KEYS,
+  DEFAULT_DATA_LAYERS,
+  DEFAULT_TRACKS_MODE,
+  DEFAULT_TRAJECTORY_HEXES
+} from '../dataLayers.js'
 
 const MapStateContext = createContext()
 
@@ -64,10 +64,13 @@ export default function MapStateProvider ({ children }) {
   // the hidden datasets.
   const [mapDatasetPKs, setMapDatasetPKs] = useState()
   // Every map query (tiles, legend, coverage) is the filter query narrowed to
-  // the shown groups.
-  const mapQueryString = applyMapDatasetPKs(
-    createDataFilterQueryString(query),
-    mapDatasetPKs
+  // the shown groups. Memoized: this provider re-renders on every moveend/zoom
+  // (mapView), and createDataFilterQueryString does full passes over every
+  // filter array — recomputing it per interaction was wasted work and produced
+  // a new string identity that could churn downstream effects.
+  const mapQueryString = useMemo(
+    () => applyMapDatasetPKs(createDataFilterQueryString(query), mapDatasetPKs),
+    [query, mapDatasetPKs]
   )
   const [rangeLevels, setRangeLevels] = useState()
   const [legendLoading, setLegendLoading] = useState(true)
@@ -132,28 +135,68 @@ export default function MapStateProvider ({ children }) {
   // layer selection, both restored from share-link params (UrlSync writes
   // them back).
   const urlParams = new URL(window.location.href).searchParams
+  // On by default, so the param records the OFF case ('tracks=false'). Old
+  // share links carrying 'tracks=true' still read as on.
   const [tracksMode, setTracksMode] = useState(
-    urlParams.get('tracks') === 'true'
+    urlParams.get('tracks') !== 'false'
+  )
+  // Trajectory coverage hexes, independent of the track lines: both are views
+  // of the same data and combine freely. Off by default (see
+  // DEFAULT_TRAJECTORY_HEXES), so the param records the ON case.
+  const [trajectoryHexes, setTrajectoryHexes] = useState(
+    urlParams.get('trajHexes') === 'true'
   )
   const [scrubTime, setScrubTime] = useState(
     urlParams.get('scrubTime') || new Date().toISOString().split('T')[0]
   )
   const debouncedScrubTime = useDebounce(scrubTime, 250)
-  const [trailingDays, setTrailingDays] = useState(
-    Number.parseInt(urlParams.get('trail')) || defaultTrailingDays
-  )
+  // The trail is either a day count or the TRAIL_ALL sentinel, which UrlSync
+  // writes verbatim — parseInt('all') is NaN, so it needs matching before the
+  // numeric parse or the 'all' trail silently reverts to the default on reload.
+  const [trailingDays, setTrailingDays] = useState(() => {
+    const trail = urlParams.get('trail')
+    if (trail === TRAIL_ALL) return TRAIL_ALL
+    return Number.parseInt(trail) || defaultTrailingDays
+  })
 
-  // Data-type layers shown on the map. Absent `layers` param = all on; a
-  // present param is the comma list of enabled layers (so a non-default
-  // selection round-trips through the URL).
+  // Data-type layers shown on the map. Absent `layers` param = the default
+  // selection (OBIS and trajectories off — see DEFAULT_DATA_LAYERS); a present
+  // param is the comma list of enabled layers, so a non-default selection
+  // round-trips through the URL. An empty param means all off, which is why
+  // this tests for null rather than falsiness.
   const [dataLayers, setDataLayers] = useState(() => {
     const layersParam = urlParams.get('layers')
-    if (layersParam == null) return ALL_DATA_LAYERS
+    if (layersParam == null) return DEFAULT_DATA_LAYERS
     const on = new Set(layersParam.split(',').filter(Boolean))
-    return Object.fromEntries(
-      Object.keys(ALL_DATA_LAYERS).map((key) => [key, on.has(key)])
-    )
+    return Object.fromEntries(DATA_LAYER_KEYS.map((key) => [key, on.has(key)]))
   })
+
+  // The data-layer switches, and the two trajectory sub-switches. These live
+  // together because the trajectory ones are coupled to the parent switch in
+  // both directions: a trajectories layer showing nothing is a dead end, so
+  // clearing the last sub-switch turns the parent off, and turning the parent
+  // back on restores the default pair rather than the empty state.
+  function toggleDataLayer (key) {
+    const on = !dataLayers[key]
+    setDataLayers({ ...dataLayers, [key]: on })
+    if (key === 'trajectories' && on) {
+      setTracksMode(DEFAULT_TRACKS_MODE)
+      setTrajectoryHexes(DEFAULT_TRAJECTORY_HEXES)
+    }
+  }
+
+  // Flip one sub-switch, dropping the parent when that would leave neither
+  // representation drawing anything.
+  function setTrajectoryViews (tracks, hexes) {
+    setTracksMode(tracks)
+    setTrajectoryHexes(hexes)
+    if (!tracks && !hexes) setDataLayers({ ...dataLayers, trajectories: false })
+  }
+
+  const toggleTrackLines = () =>
+    setTrajectoryViews(!tracksMode, trajectoryHexes)
+  const toggleTrajectoryHexes = () =>
+    setTrajectoryViews(tracksMode, !trajectoryHexes)
 
   const { zoom } = mapView
 
@@ -265,15 +308,20 @@ export default function MapStateProvider ({ children }) {
     setProjection,
     basemap,
     setBasemap,
+    // Read-only outside this provider: the layer switches and the two
+    // trajectory sub-switches are coupled (clearing both sub-switches drops the
+    // parent), so callers go through the toggles rather than the raw setters.
     tracksMode,
-    setTracksMode,
+    trajectoryHexes,
+    toggleTrackLines,
+    toggleTrajectoryHexes,
     scrubTime,
     setScrubTime,
     debouncedScrubTime,
     trailingDays,
     setTrailingDays,
     dataLayers,
-    setDataLayers,
+    toggleDataLayer,
     griddapCoverage,
     activeWmsOverlay,
     setActiveWmsOverlay,

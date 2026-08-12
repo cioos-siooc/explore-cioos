@@ -24,6 +24,7 @@ import './styles.css'
 import { server } from '../../config'
 import {
   boundsFromGeoJson,
+  escapeHtml,
   generateColorStops,
   getCurrentRangeLevel,
   selectionFromSearchParams,
@@ -46,9 +47,11 @@ import {
   trackLineColor,
   selectedTrackColor,
   tracksMinDate,
-  TRAIL_ALL
+  TRAIL_ALL,
+  effectiveTrailingDays
 } from '../config'
 import platformColors from '../../components/platformColors'
+import { PROFILE_TYPE_KEYS } from '../../state/dataLayers.js'
 import {
   applyBasemap,
   buildBasemapStyle,
@@ -82,24 +85,18 @@ function buildHeadArrowImage(fillColor, strokeColor = '#ffffff') {
   return ctx.getImageData(0, 0, size, size)
 }
 
-// Data-layer keys that map to profile cdm_data_types (all share cde.profiles).
-const PROFILE_TYPE_KEYS = [
-  ['profile', 'Profile'],
-  ['timeseries', 'TimeSeries'],
-  ['timeseriesProfile', 'TimeSeriesProfile']
-]
-
 // Combine the filter-derived query string with the data-layer selection into
 // a tile-URL suffix. OBIS off adds includeObis=false, OR-ed with any the
-// Source filter already emitted; trajectories off adds includeTrajectory=false;
-// a profile-type subset adds profileTypes=<comma list> (empty = none). A param
-// is omitted when its layer(s) are fully on, so the URL stays clean. Returns
-// '' or '?...'.
+// Source filter already emitted; a profile-type subset adds
+// profileTypes=<comma list> (empty = none). A param is omitted when its
+// layer(s) are fully on, so the URL stays clean. Returns '' or '?...'.
 //
-// excludeTrajectories forces includeTrajectory=false regardless of the layer
-// toggle — used for the coverage-cells URL in tracks mode, where track lines
-// replace the trajectory hexes but the OBIS cells stay.
-function buildTileSuffix(baseQuery, dataLayers, excludeTrajectories = false) {
+// Trajectory coverage cells are requested only when the trajectories layer is
+// on AND its hex view is selected. The two trajectory views are independent —
+// the track lines come from a separate source (/tiles/tracks) and never depend
+// on this — so the hex switch is the only thing that decides whether the
+// trajectory counts appear in these tiles.
+function buildTileSuffix(baseQuery, dataLayers, trajectoryHexes = false) {
   const params = new URLSearchParams(baseQuery)
   if (dataLayers) {
     if (!dataLayers.obis || params.get('includeObis') === 'false') {
@@ -111,9 +108,10 @@ function buildTileSuffix(baseQuery, dataLayers, excludeTrajectories = false) {
     if (enabledTypes.length < PROFILE_TYPE_KEYS.length) {
       params.set('profileTypes', enabledTypes.join(','))
     }
-    if (!dataLayers.trajectories) params.set('includeTrajectory', 'false')
+    if (!dataLayers.trajectories || !trajectoryHexes) {
+      params.set('includeTrajectory', 'false')
+    }
   }
-  if (excludeTrajectories) params.set('includeTrajectory', 'false')
   const s = params.toString()
   return s ? `?${s}` : ''
 }
@@ -138,9 +136,11 @@ export default function CreateMap({
   inspectDataset,
   setDatasetsSelected,
   tracksMode,
+  trajectoryHexes = false,
   scrubTime,
   trailingDays,
   selectedTrajectory,
+  selectTrajectoryFromMap,
   dataLayers,
   griddapCoverage,
   dataLayersVisible = true,
@@ -292,6 +292,7 @@ export default function CreateMap({
   // Latest tracks-mode props for the one-shot map 'load' closure (layers are
   // created once; these refs let it apply the current mode/scrub window).
   const tracksModeRef = useRef(tracksMode)
+  const trajectoryHexesRef = useRef(trajectoryHexes)
   const scrubTimeRef = useRef(scrubTime)
   const trailingDaysRef = useRef(trailingDays)
   const dataLayersRef = useRef(dataLayers)
@@ -300,48 +301,68 @@ export default function CreateMap({
 
   // UTC-day-snapped scrub window: [scrub date - N days, scrub date + 1 day),
   // or [tracksMinDate, scrub date + 1 day) for the 'all' trail (full tracks
-  // up to the scrub date — the default; see config.js). Day snapping keeps
-  // the tile URLs stable so the server's URL-keyed tile cache gets hits
-  // across scrubs and users.
-  function tracksTimeWindow(scrub, trailing) {
+  // up to the scrub date; see config.js). Day snapping keeps the tile URLs
+  // stable so the server's URL-keyed tile cache gets hits across scrubs and
+  // users. The requested trail is clamped by zoom first — a long window costs
+  // far more zoomed out, where one tile can carry the whole catalogue (see
+  // effectiveTrailingDays).
+  function tracksTimeWindow(scrub, trailing, zoom) {
     const MS_PER_DAY = 24 * 60 * 60 * 1000
+    const days = effectiveTrailingDays(trailing, zoom)
     const end = new Date(`${scrub}T00:00:00Z`).getTime()
     const timeMax = `${new Date(end + MS_PER_DAY).toISOString().split('T')[0]}T00:00:00Z`
     const timeMin =
-      trailing === TRAIL_ALL
+      days === TRAIL_ALL
         ? `${tracksMinDate}T00:00:00Z`
-        : `${new Date(end - trailing * MS_PER_DAY).toISOString().split('T')[0]}T00:00:00Z`
+        : `${new Date(end - days * MS_PER_DAY).toISOString().split('T')[0]}T00:00:00Z`
     return { timeMin, timeMax }
   }
 
   // Tracks tile URL: dataset-level filters from the regular map query string,
   // minus the TimeSelector's timeMin/timeMax (the scrub window must not
   // fight the date-range filter), plus the day-snapped scrub window.
-  function buildTracksTileUrl(queryString, scrub, trailing) {
+  function buildTracksTileUrl(queryString, scrub, trailing, zoom) {
     const params = new URLSearchParams(queryString)
     params.delete('timeMin')
     params.delete('timeMax')
-    const { timeMin, timeMax } = tracksTimeWindow(scrub, trailing)
+    const { timeMin, timeMax } = tracksTimeWindow(scrub, trailing, zoom)
     params.set('timeMin', timeMin)
     params.set('timeMax', timeMax)
     return `${server}/tiles/tracks/{z}/{x}/{y}.mvt?${params.toString()}`
   }
 
+  // The effective trail the tracks source was last built with, so the zoomend
+  // handler can tell a gate crossing (refetch) from any other zoom change (no-op).
+  const appliedTrailRef = useRef(null)
+
   function refreshTracksSource(queryString, scrub, trailing) {
     if (!map.current || !map.current.getSource('tracks')) return
+    const zoom = map.current.getZoom()
+    appliedTrailRef.current = effectiveTrailingDays(trailing, zoom)
     // Swap the tile URL and re-render via the public setTiles API — it
     // clears the source's tile cache and reloads the viewport tiles.
     map.current
       .getSource('tracks')
-      .setTiles([buildTracksTileUrl(queryString, scrub, trailing)])
+      .setTiles([buildTracksTileUrl(queryString, scrub, trailing, zoom)])
   }
 
   // Rebuild the shared point/hex and coverage-cell source URLs from the
-  // current filters AND the data-layer selection (plus tracks mode, which
-  // pulls trajectory coverage out of the cells tiles), then force a refetch.
-  // Shared by the filter-change, layer-toggle and tracks-mode effects.
+  // current filters AND the data-layer selection (including the trajectory hex
+  // switch), then force a refetch. Shared by the filter-change and
+  // layer-toggle effects.
   function refreshCombinedSources(queryString) {
-    if (!map.current || !map.current.loaded()) return
+    // Guard on source existence, NOT map.loaded(): loaded() is false whenever
+    // any tile is still in flight, and on this deployment the coverage/track
+    // tiles are heavy enough that the map is rarely idle — gating on it
+    // silently dropped filter changes that landed mid-load. The sources are
+    // created together in the 'load' handler, so their presence is the real
+    // precondition, and setTiles works fine while other tiles load.
+    if (
+      !map.current ||
+      !map.current.getSource('cde-tiles') ||
+      !map.current.getSource('cde-cells')
+    )
+      return
     const { tileQuery, cellTileQuery } = tileUrls(queryString)
     // Swap the tile URLs and re-render via the public setTiles API — it
     // clears each source's tile cache and reloads the viewport tiles.
@@ -349,12 +370,13 @@ export default function CreateMap({
     map.current.getSource('cde-cells').setTiles([cellTileQuery])
   }
 
-  // Apply the tracks-mode layer visibility: track lines/heads show only when
-  // trajectories are on AND tracks mode is active. Which data feeds the hex
-  // layers (trajectories in/out of the coverage cells, OBIS on/off, profile
-  // types) is decided server-side via the tile-URL params — see
-  // buildTileSuffix; the blanket "Hexes & points" picker switch owns whole-map
-  // observation-layer visibility (setLayersVisibility).
+  // Apply the track-line visibility: the track layers show only when
+  // trajectories are on AND the track-lines switch is on. This is the ONLY
+  // thing that hides them — the blanket "Hexes & points" picker owns the hex
+  // and point layers alone (observationLayerIds), so turning it off no longer
+  // takes the tracks with it. Which data feeds the hex layers (trajectory hexes
+  // on/off, OBIS on/off, profile types) is decided server-side via the tile-URL
+  // params — see buildTileSuffix.
   function applyLayerVisibility() {
     if (!map.current || !map.current.getLayer('track-lines')) return
     const trajOn = dataLayersRef.current
@@ -734,7 +756,15 @@ export default function CreateMap({
     'points-hovered',
     'points-highlighted',
     'coverage-hexes',
-    'coverage-hexes-hovered',
+    'coverage-hexes-hovered'
+  ]
+  // The track layers are deliberately NOT in observationLayerIds: the picker
+  // switch reads as "hexes and points", and it used to hide the tracks too, so
+  // unchecking it silently threw away the user's track lines. They are owned by
+  // the trajectories layer and its track-lines switch instead
+  // (applyLayerVisibility) — this list exists only for the WMS overlay, which
+  // hides everything regardless of who owns it.
+  const trackLayerIds = [
     'track-lines',
     'track-heads',
     'track-heads-fixed',
@@ -759,15 +789,19 @@ export default function CreateMap({
     })
   }
 
+  // WMS overlay show/hide. Hiding takes everything with it, including the
+  // tracks; restoring hands each group back to its own owner — the picker for
+  // the hex/point layers, applyLayerVisibility for the tracks.
   function setDataLayersVisibility(visible) {
     setLayersVisibility(griddapLayerIds, visible)
-    setLayersVisibility(
-      observationLayerIds,
-      visible && dataLayersVisibleRef.current
-    )
-    // The blanket show clobbers the tracks-vs-coverage-hexes split; re-apply
-    // the per-data-type toggles on top of it.
-    if (visible && dataLayersVisibleRef.current) applyLayerVisibility()
+    if (!visible) {
+      setLayersVisibility(observationLayerIds, false)
+      setLayersVisibility(trackLayerIds, false)
+      return
+    }
+    setLayersVisibility(observationLayerIds, dataLayersVisibleRef.current)
+    setLayersVisibility(trackLayerIds, true)
+    applyLayerVisibility()
   }
 
   function removeWmsOverlay() {
@@ -909,12 +943,13 @@ export default function CreateMap({
   // Layer-picker toggle for the observation layers. While a WMS overlay is
   // up all data layers are hidden anyway; the ref keeps the user's choice so
   // removeWmsOverlay restores it.
+  // The "Hexes & points" picker. It owns the hex and point layers only — the
+  // track layers belong to the trajectories switch (see trackLayerIds), so
+  // hiding the hexes leaves any track lines drawn.
   useEffect(() => {
     dataLayersVisibleRef.current = dataLayersVisible
     if (!map.current || activeWmsOverlay) return
     setLayersVisibility(observationLayerIds, dataLayersVisible)
-    // Blanket show clobbers the tracks-vs-coverage-hexes split; re-apply it.
-    if (dataLayersVisible) applyLayerVisibility()
   }, [dataLayersVisible])
 
   // Layer-picker globe/mercator projection switch. Globe renders high
@@ -1017,27 +1052,49 @@ export default function CreateMap({
   const mapQueryRef = useRef(mapQueryString)
   mapQueryRef.current = mapQueryString
 
-  // The filter query and the data-layer selection (plus tracks mode, which
-  // pulls trajectory coverage out of the cells tiles) combine into the two
-  // shared source URLs — see buildTileSuffix.
+  // Track clicks are served by a listener registered once, in the map-creation
+  // effect; the action it calls is rebuilt whenever the results change, so read
+  // it through a ref rather than freezing the first render's copy.
+  const selectTrajectoryFromMapRef = useRef(selectTrajectoryFromMap)
+  selectTrajectoryFromMapRef.current = selectTrajectoryFromMap
+
+  // Whether hovering this trajectory would offer anything on click, for the
+  // tooltip hint: its full track is already drawn once it is the selection.
+  const selectedTrajectoryRef = useRef(selectedTrajectory)
+  selectedTrajectoryRef.current = selectedTrajectory
+  const trackClickHint = (properties) =>
+    selectedTrajectoryRef.current?.trajectoryId === properties.trajectory_id &&
+    selectedTrajectoryRef.current?.datasetPk === Number(properties.pk_url)
+      ? ''
+      : `<div class='map-tooltip-hint'>${t('trackLineClickText')}</div>`
+
+  // The filter query and the data-layer selection combine into one suffix
+  // shared by both source URLs — see buildTileSuffix. The two routes split the
+  // zoom range for the same selection: /tiles folds the trajectory counts into
+  // the combined green hexes below z7, /tiles/cells carries the dedicated
+  // trajectory/OBIS coverage ramp at and above it. They take the same params so
+  // the hex switch can't leave trajectory counts showing in one and not the other.
   const tileUrls = (queryString) => {
-    const filterSuffix = buildTileSuffix(queryString, dataLayersRef.current)
-    const cellFilterSuffix = buildTileSuffix(
+    const filterSuffix = buildTileSuffix(
       queryString,
       dataLayersRef.current,
-      tracksModeRef.current
+      trajectoryHexesRef.current
     )
     return {
       tileQuery: `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`,
-      cellTileQuery: `${server}/tiles/cells/{z}/{x}/{y}.mvt${cellFilterSuffix}`
+      cellTileQuery: `${server}/tiles/cells/{z}/{x}/{y}.mvt${filterSuffix}`
     }
   }
 
   useEffect(() => {
-    // Before the map exists there is nothing to swap and nothing to reset —
-    // the 'load' handler below builds the layers from the current query, and
-    // resetting here would wipe a selection restored from a share link.
-    if (!map.current || !map.current.loaded()) return
+    // Guard on source existence, not map.loaded(): the sources and layers are
+    // all created together in the 'load' handler, so getSource('cde-tiles')
+    // being present means the layers this effect touches (points-highlighted)
+    // exist too. loaded() additionally requires no tiles in flight, which on a
+    // heavy trajectory deployment dropped filter changes that arrived while
+    // tiles were still loading (the reported "filters don't update the hexes"
+    // bug). Before the map/sources exist there is nothing to swap.
+    if (!map.current || !map.current.getSource('cde-tiles')) return
 
     setPointsToReview()
     map.current.setFilter('points-highlighted', ['in', 'pk', ''])
@@ -1056,26 +1113,27 @@ export default function CreateMap({
     }
   }, [mapQueryString])
 
-  // Data-layer toggle: refetch the combined/coverage-cell sources with the
-  // new profileTypes/includeObis/includeTrajectory params and re-apply
-  // layer visibility.
+  // Data-layer toggle, and the trajectory hex switch alongside it: both change
+  // the tile-URL params (profileTypes/includeObis/includeTrajectory), so both
+  // refetch the combined/coverage-cell sources and re-apply layer visibility.
   useEffect(() => {
     dataLayersRef.current = dataLayers
-    if (!map.current || !map.current.loaded()) return
+    trajectoryHexesRef.current = trajectoryHexes
+    // Source existence, not map.loaded() — see the filter effect above.
+    if (!map.current || !map.current.getSource('cde-tiles')) return
     refreshCombinedSources(mapQueryString)
     applyLayerVisibility()
-  }, [dataLayers])
+  }, [dataLayers, trajectoryHexes])
 
-  // Tracks mode: swap the trajectory coverage hexes for track lines/heads
-  // (respecting the trajectories layer toggle) and load the scrub window.
-  // The coverage-cells source refetches too: in tracks mode the trajectory
-  // counts leave the cells tiles (track lines replace them) while the OBIS
-  // cells stay — see tileUrls.
+  // Track-lines switch: show/hide the track layers and load the scrub window.
+  // No source refetch — the track lines come from their own /tiles/tracks
+  // source, and unlike the old tracks *mode* this switch no longer pulls the
+  // trajectory counts out of the hex tiles (that is the hex switch's job now),
+  // so the combined sources are untouched.
   useEffect(() => {
     tracksModeRef.current = tracksMode
     if (!map.current || !map.current.getLayer('track-lines')) return
     applyLayerVisibility()
-    refreshCombinedSources(mapQueryString)
     if (tracksMode) {
       refreshTracksSource(mapQueryString, scrubTime, trailingDays)
     }
@@ -1092,6 +1150,13 @@ export default function CreateMap({
   // Selected platform: fetch its full track once (cached in rawTrackRef), dim
   // the global track layers, and fit the view to the track.
   useEffect(() => {
+    // Clicking tracks on the map makes picking a second platform mid-fetch
+    // routine (the table's one-row-at-a-time rhythm did not), so the in-flight
+    // request is abandoned rather than left to land after the newer one and
+    // draw the wrong track under the newer selection's name.
+    const abortController = new AbortController()
+    let superseded = false
+
     async function renderSelectedTrack() {
       if (!map.current || !map.current.getSource('selected-track')) return
       const source = map.current.getSource('selected-track')
@@ -1110,11 +1175,21 @@ export default function CreateMap({
       const { datasetPk, trajectoryId } = selectedTrajectory
       const cacheKey = `${datasetPk}|${trajectoryId}`
       if (rawTrackRef.current?.key !== cacheKey) {
-        const response = await fetch(
-          `${server}/trajectories/track?datasetPKs=${datasetPk}&trajectoryId=${encodeURIComponent(trajectoryId)}`
-        )
-        if (!response.ok) return
-        const track = await response.json()
+        let track
+        try {
+          const response = await fetch(
+            `${server}/trajectories/track?datasetPKs=${datasetPk}&trajectoryId=${encodeURIComponent(trajectoryId)}`,
+            { signal: abortController.signal }
+          )
+          if (!response.ok) return
+          track = await response.json()
+        } catch (error) {
+          if (error.name !== 'AbortError') {
+            console.error('track fetch failed:', error)
+          }
+          return
+        }
+        if (superseded) return
         rawTrackRef.current = {
           key: cacheKey,
           coordinates: track.coordinates,
@@ -1185,15 +1260,22 @@ export default function CreateMap({
 
       const longitudes = rawCoordinates.map((c) => c[0])
       const latitudes = rawCoordinates.map((c) => c[1])
+      // Same framing the "zoom to dataset" button uses: the sidebar overlays the
+      // canvas, and a track picked on the map opens it at the same moment as this
+      // fit, so uniform padding would centre the track underneath it.
       map.current.fitBounds(
         [
           [Math.min(...longitudes), Math.min(...latitudes)],
           [Math.max(...longitudes), Math.max(...latitudes)]
         ],
-        { padding: 80, maxZoom: 9 }
+        zoomToDatasetCamera(map.current)
       )
     }
     renderSelectedTrack()
+    return () => {
+      superseded = true
+      abortController.abort()
+    }
   }, [selectedTrajectory])
 
   const mapZoom = searchParams.get('zoom')
@@ -1553,21 +1635,53 @@ export default function CreateMap({
         'points-highlighted'
       )
 
-      // --- Tracks mode layers -------------------------------------------
-      // Track lines + head positions from /tiles/tracks, shown only when
-      // tracks mode is on (visibility swaps with the trajectory hex layers).
-      // Created via refs so the current mode/scrub window applies even
-      // though this load handler runs once.
+      // --- Track-line layers ---------------------------------------------
+      // Track lines + head positions from /tiles/tracks, shown only when the
+      // track-lines switch is on. Independent of the trajectory hex layers —
+      // both can draw at once. Created via refs so the current switch state and
+      // scrub window apply even though this load handler runs once.
       const tracksVisibility = tracksModeRef.current ? 'visible' : 'none'
       map.current.addSource('tracks', {
         type: 'vector',
+        // No minzoom: track lines/heads render at every zoom level, including
+        // fully zoomed out. maxzoom caps the fetched tile zoom at 8 and lets
+        // maplibre overzoom past it rather than re-fetch expensive tiles at
+        // every zoom level in. NOTE: at low zoom a single tile can assemble
+        // every trajectory over the whole time window (100k+ features,
+        // multi-MB) — the bounded default trail (defaultTrailingDays) and the
+        // long-trail zoom gate (effectiveTrailingDays, both in config.js) keep
+        // that in check. If it regresses, add server-side low-zoom
+        // simplification in web-api/routes/tiles.js rather than a minzoom.
+        maxzoom: 8,
         tiles: [
           buildTracksTileUrl(
             mapQueryRef.current,
             scrubTimeRef.current,
-            trailingDaysRef.current
+            trailingDaysRef.current,
+            map.current.getZoom()
           )
         ]
+      })
+      appliedTrailRef.current = effectiveTrailingDays(
+        trailingDaysRef.current,
+        map.current.getZoom()
+      )
+
+      // Crossing the long-trail zoom gate changes the window the tracks tiles
+      // carry, so the source is rebuilt — but only on an actual crossing, not
+      // on every zoomend, since setTiles drops the whole tile cache.
+      map.current.on('zoomend', () => {
+        if (!tracksModeRef.current || !map.current.getSource('tracks')) return
+        const effective = effectiveTrailingDays(
+          trailingDaysRef.current,
+          map.current.getZoom()
+        )
+        if (effective === appliedTrailRef.current) return
+        refreshTracksSource(
+          mapQueryRef.current,
+          scrubTimeRef.current,
+          trailingDaysRef.current
+        )
       })
 
       map.current.addLayer({
@@ -1591,6 +1705,10 @@ export default function CreateMap({
         }
       })
 
+      // No per-fix markers on the global tracks layer: clicking a track draws
+      // that platform's full history with a marker at every fix ('selected-track'
+      // below), which is the detail view breadcrumb dots only hinted at.
+      //
       // Heads with a known course over ground render as arrowheads rotated
       // to the direction of travel; heads where cog is undefined (single-fix
       // trajectories, stationary platforms) fall back to circles.
@@ -1614,9 +1732,18 @@ export default function CreateMap({
           // rotate with the map, not the viewport, so the arrow keeps
           // pointing along the geographic course
           'icon-rotation-alignment': 'map',
-          // circles never collided; keep every head visible
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true
+          // Collision culling is zoom-gated at hexMaxZoom (7). Below it a tile
+          // can carry ~100k heads (whole catalogue at low zoom) — forcing every
+          // one to render overwhelms the tab, so let maplibre drop overlapping
+          // arrows there. At/above z7 a tile covers a small enough area that the
+          // head count is a few hundred, so overlap/ignore-placement are safe
+          // and every heading stays visible (the /tiles/tracks per-tile cap also
+          // bounds the count). z7 is the same breakpoint hexes→points use.
+          'icon-allow-overlap': ['step', ['zoom'], false, hexMaxZoom, true],
+          'icon-ignore-placement': ['step', ['zoom'], false, hexMaxZoom, true],
+          // When culling (below z7), keep the most recent heads deterministically
+          // rather than an arbitrary subset.
+          'symbol-sort-key': ['-', 0, ['coalesce', ['get', 'head_time'], 0]]
         }
       })
 
@@ -1694,13 +1821,13 @@ export default function CreateMap({
         }
       })
 
-      // Apply the initial trajectory layer visibility from the URL-restored
-      // tracks mode + data-layer selection (track lines vs coverage hexes vs
-      // trajectories-off).
+      // Apply the initial track-layer visibility from the URL-restored
+      // track-lines switch + data-layer selection.
       applyLayerVisibility()
 
-      // Layers are created visible; re-apply the picker state in case the
-      // observation layers were toggled off before the style finished loading.
+      // Layers are created visible; re-apply the picker state in case the hex
+      // and point layers were toggled off before the style finished loading.
+      // The track layers are not the picker's to hide, so they are left alone.
       if (!dataLayersVisibleRef.current) {
         setLayersVisibility(observationLayerIds, false)
       }
@@ -1735,6 +1862,13 @@ export default function CreateMap({
     }
 
     const handleMapPointsOnClick = (e) => {
+      // A track wins the ring between a point's visible circle and the invisible
+      // 10px hit halo around it (see isOnAPoint): the click was aimed at the
+      // track, and the rectangle selection below would refilter the results and
+      // close the dataset page the track selection just opened. Inside the
+      // visible circle the point still wins — the track handler stands aside
+      // there — so this is the same hand-off from the other side.
+      if (!isOnAPoint(e) && trackFeatureAt(e.point)) return
       e.originalEvent.preventDefault()
       if (!creatingPolygon.current) {
         drawPolygon.current?.deleteAll()
@@ -1773,7 +1907,11 @@ export default function CreateMap({
     }
 
     const handleMapHexesOnClick = (e) => {
-      if (griddapOutranksHexes(e)) return
+      // A track under the cursor wins: a hex sits under a track line whenever
+      // the hex layers are drawn (the trajectory hexes if that switch is on,
+      // otherwise a profile or OBIS hex), and this handler's zoom-to-7 flyTo
+      // would fight the fit the track selection is about to do.
+      if (griddapOutranksHexes(e) || trackFeatureAt(e.point)) return
       e.originalEvent.preventDefault()
       if (!creatingPolygon.current) {
         map.current.flyTo({
@@ -1795,10 +1933,13 @@ export default function CreateMap({
       e.originalEvent.preventDefault()
       // 'points' renders on top of 'coverage-hexes' at the same zoom
       // range — let its own click handler manage the click when the
-      // cursor is directly over a point.
+      // cursor is directly over a point. A track line under the cursor stands
+      // aside for the same reason: narrowing the selection to this hex's
+      // datasets would refilter the tracks tiles and erase the clicked track.
       if (
         map.current.queryRenderedFeatures(e.point, { layers: ['points'] })
-          .length > 0
+          .length > 0 ||
+        trackFeatureAt(e.point)
       ) {
         return
       }
@@ -1840,6 +1981,109 @@ export default function CreateMap({
       ) {
         creatingPolygon.current = false
       }
+    }
+
+    // Clickable track layers, most-deliberate target first: an arrowhead is
+    // aimed at (it is what the head tooltip describes), the line is the fallback.
+    const trackClickLayers = ['track-heads', 'track-heads-fixed', 'track-lines']
+
+    // The selected platform's own drawing, which sits over the tile layers.
+    const selectedTrackLayers = [
+      'selected-track-fixes',
+      'selected-track-fixes-nocog',
+      'selected-track-line'
+    ]
+
+    const renderedFeatures = (point, layerIds) => {
+      const layers = layerIds.filter((id) => map.current.getLayer(id))
+      return layers.length === 0
+        ? []
+        : map.current.queryRenderedFeatures(point, { layers })
+    }
+
+    // 'points' carries an invisible 10px hit stroke so small circles stay easy
+    // to hit (see its paint), but that halo is 2-4x the circle actually drawn —
+    // standing aside for all of it would leave track lines unclickable at z7+
+    // (where points appear) anywhere profiles are dense, which is most of the
+    // coast. A track yields only to the circle the user can see, plus a pixel
+    // or two of grace.
+    const POINT_HIT_GRACE_PX = 2
+    const isOnAPoint = (e) =>
+      renderedFeatures(e.point, ['points']).some((feature) => {
+        const centre = map.current.project(feature.geometry.coordinates)
+        const radius =
+          (feature.properties.count <= 2 ? smallCircleSize : largeCircleSize) +
+          POINT_HIT_GRACE_PX
+        return (
+          (centre.x - e.point.x) ** 2 + (centre.y - e.point.y) ** 2 <=
+          radius ** 2
+        )
+      })
+
+    // The track feature under a point, ranked by trackClickLayers rather than by
+    // render order, so a head from one trajectory and a line from another under
+    // the same cursor resolve the same way every time (the track-lines hover
+    // handler makes the same hand-off). Doubles as the "is a track under the
+    // cursor" test the hex and griddap handlers use to stand aside: hidden
+    // layers aren't hit-testable, so this is empty whenever the track-lines
+    // switch is off and no tracksMode check is needed.
+    const trackFeatureAt = (point) =>
+      renderedFeatures(point, trackClickLayers)
+        .sort(
+          (a, b) =>
+            trackClickLayers.indexOf(a.layer.id) -
+            trackClickLayers.indexOf(b.layer.id)
+        )[0]
+
+    // One listener per track layer means a click on a head arrow sitting on its
+    // own line delivers the same DOM event twice. Both deliveries land before
+    // React commits the first selection, so both would see a stale
+    // selectedTrajectory and push their own history entry — dedupe on the DOM
+    // event (MapLibre passes the same one to every delegated listener).
+    let lastHandledTrackEvent = null
+
+    // Clicking a track draws that platform's full history, exactly as clicking
+    // its row in the dataset inspector's platform table does.
+    const handleTrackOnClick = (e) => {
+      // Individual points stay the precise target at every zoom — the rule
+      // handleMapCoverageHexesOnClick and griddapFeatureIsCovered already follow.
+      if (isOnAPoint(e)) return
+
+      // The selected platform's track owns the pixels it covers: its fixes and
+      // line are drawn over the tile layers and its tooltip deliberately offers
+      // no click hint, so clicking it does nothing rather than pick whichever
+      // neighbouring track runs underneath. Datasets that split into many
+      // near-coincident short trajectories make that a real hazard — clicking
+      // the track you just selected would swap it for its neighbour.
+      const onSelectedTrack =
+        renderedFeatures(e.point, selectedTrackLayers).length > 0
+      const feature = onSelectedTrack ? undefined : trackFeatureAt(e.point)
+      if (!onSelectedTrack && !feature) return
+      // Keeps handleMapOnClick from reading this as a click on empty water and
+      // clearing the highlighted points, the review list and the drawn polygon.
+      e.originalEvent.preventDefault()
+      if (creatingPolygon.current) {
+        if (draw.getMode() === 'simple_select') creatingPolygon.current = false
+        return
+      }
+      if (onSelectedTrack) return
+      if (e.originalEvent === lastHandledTrackEvent) return
+      lastHandledTrackEvent = e.originalEvent
+      const {
+        pk_url: datasetPk,
+        trajectory_id: trajectoryId,
+        dataset_title: datasetTitle
+      } = feature.properties
+      // trajectory_id is '' for a dataset with a single unnamed trajectory
+      // (the schema default) and that is a valid selection end to end, so test
+      // for absence rather than falsiness.
+      if (datasetPk == null || trajectoryId == null) return
+      popup.remove()
+      selectTrajectoryFromMapRef.current?.(
+        Number(datasetPk),
+        trajectoryId,
+        datasetTitle
+      )
     }
 
     map.current.on('mousemove', (e) => {
@@ -1933,7 +2177,10 @@ export default function CreateMap({
 
     ;['track-heads', 'track-heads-fixed'].forEach((layerId) => {
       map.current.on('mousemove', layerId, (e) => {
-        if (!draw.getMode().includes('draw')) {
+        // These tooltips are registered after the 'points' one, so they would
+        // otherwise paint over it and offer a click hint where the click will
+        // go to the point instead (see isOnAPoint).
+        if (!draw.getMode().includes('draw') && !isOnAPoint(e)) {
           map.current.getCanvas().style.cursor = 'pointer'
           const properties = e.features[0].properties
           const headDate = properties.head_time
@@ -1942,7 +2189,7 @@ export default function CreateMap({
           popup
             .setLngLat([e.lngLat.lng, e.lngLat.lat])
             .setHTML(
-              `<div>${properties.dataset_title ? `<b>${properties.dataset_title}</b><br/>` : ''}${properties.trajectory_id}${headDate ? `<br/>${headDate}` : ''}</div>`
+              `<div>${properties.dataset_title ? `<b>${escapeHtml(properties.dataset_title)}</b><br/>` : ''}${escapeHtml(properties.trajectory_id)}${headDate ? `<br/>${headDate}` : ''}${trackClickHint(properties)}</div>`
             )
             .addTo(map.current)
         }
@@ -1967,7 +2214,7 @@ export default function CreateMap({
           popup
             .setLngLat([e.lngLat.lng, e.lngLat.lat])
             .setHTML(
-              `<div>${properties.dataset_title ? `<b>${properties.dataset_title}</b><br/>` : ''}${properties.trajectory_id}${fixDate ? `<br/>${fixDate}` : ''}</div>`
+              `<div>${properties.dataset_title ? `<b>${escapeHtml(properties.dataset_title)}</b><br/>` : ''}${escapeHtml(properties.trajectory_id)}${fixDate ? `<br/>${fixDate}` : ''}</div>`
             )
             .addTo(map.current)
         }
@@ -1982,17 +2229,25 @@ export default function CreateMap({
     })
 
     map.current.on('mousemove', 'track-lines', (e) => {
-      // heads sit above lines; let their own tooltip win
+      // Heads sit above lines, and the selected track's own fixes above both —
+      // let whichever is under the cursor keep its more specific tooltip (the
+      // head's date, the fix's timestamp).
       if (
         !draw.getMode().includes('draw') &&
-        map.current.queryRenderedFeatures(e.point, {
-          layers: ['track-heads', 'track-heads-fixed']
-        }).length === 0
+        !isOnAPoint(e) &&
+        renderedFeatures(e.point, [
+          'track-heads',
+          'track-heads-fixed',
+          ...selectedTrackLayers
+        ]).length === 0
       ) {
         map.current.getCanvas().style.cursor = 'pointer'
+        const properties = e.features[0].properties
         popup
           .setLngLat([e.lngLat.lng, e.lngLat.lat])
-          .setHTML(`<div><b>${e.features[0].properties.trajectory_id}</b></div>`)
+          .setHTML(
+            `<div>${properties.dataset_title ? `<b>${escapeHtml(properties.dataset_title)}</b><br/>` : ''}${escapeHtml(properties.trajectory_id)}${trackClickHint(properties)}</div>`
+          )
           .addTo(map.current)
       }
     })
@@ -2009,14 +2264,17 @@ export default function CreateMap({
     // (same pattern as coverage-hexes above). Past griddapPriorityZoom the
     // rectangles outrank the hex aggregates instead: the hexes are a coarse
     // backdrop by then, and someone zoomed in that far is working with a
-    // specific grid. Individual points stay precise targets at every zoom.
+    // specific grid. Individual points stay precise targets at every zoom, and
+    // so do track lines: a thin line someone aimed at outranks a backdrop
+    // rectangle, and letting the rectangle win would narrow the filters to its
+    // one dataset and erase the clicked track.
     const griddapFeatureIsCovered = (e) =>
       map.current.queryRenderedFeatures(e.point, {
         layers: (map.current.getZoom() >= griddapPriorityZoom
           ? ['points']
           : ['points', 'hexes']
         ).filter((layer) => map.current.getLayer(layer))
-      }).length > 0
+      }).length > 0 || Boolean(trackFeatureAt(e.point))
 
     // The other side of that hand-off: a hex hover/click stands aside once the
     // rectangles have priority, otherwise both handlers fire on the same event
@@ -2047,7 +2305,7 @@ export default function CreateMap({
       const titles = previewed
         .map(
           (feature) =>
-            `<div class="griddap-tooltip-item">${griddapTitle(feature)}</div>`
+            `<div class="griddap-tooltip-item">${escapeHtml(griddapTitle(feature))}</div>`
         )
         .join('')
       const remaining = features.length - previewed.length
@@ -2265,6 +2523,17 @@ export default function CreateMap({
 
     map.current.on('click', 'griddap-coverage-fill', handleGriddapCoverageOnClick)
     map.current.on('touchend', 'griddap-coverage-fill', handleGriddapCoverageOnClick)
+
+    // Registered before the map-wide handler below: MapLibre dispatches click
+    // listeners in registration order and mutates the one event object, which is
+    // what makes this handler's preventDefault() visible there. The handler
+    // itself dedupes the repeat deliveries this fan-out causes.
+    // The selected track's own layers are included so a click along it is
+    // absorbed there too, instead of falling through to the map-wide handler.
+    ;[...trackClickLayers, ...selectedTrackLayers].forEach((layerId) => {
+      map.current.on('click', layerId, handleTrackOnClick)
+      map.current.on('touchend', layerId, handleTrackOnClick)
+    })
 
     map.current.on('click', handleMapOnClick)
     // mobile seems better without handleMapOnClick enabled for touch

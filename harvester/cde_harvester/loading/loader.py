@@ -21,7 +21,7 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 # Transaction-scoped advisory lock key. Loads must run STRICTLY one-at-a-time over
 # the SHARED cde tables: a single-source incremental can never interleave with the
 # nightly full-reload (whose remove_all_data() TRUNCATEs every table), and two
-# incremental loads can't fight over drop/set_constraints + DELETE/INSERT.
+# incremental loads can't fight over each other's DELETE/INSERT churn.
 #
 # The lock is NOT taken at the top of the load. Incremental loads first populate
 # session-private temp tables WITHOUT the lock, then acquire it only around
@@ -67,7 +67,7 @@ def prepare_profiles_dataframe(profiles):
     # Both time bounds are NOT NULL in cde.profiles. Drop either-null rows here,
     # mirroring the harvester's filter (profiles.py): a time_max that passes the
     # harvester's null check but fails parse_erddap_dates' coerce becomes NaT and
-    # would otherwise slip through and fail set_constraints().
+    # would otherwise slip through and fail validate_loaded_data().
     profiles = profiles.drop(
         columns=["altitude_min", "altitude_max", "scientific_names"], errors="ignore"
     ).dropna(subset=["time_min", "time_max"])
@@ -277,7 +277,14 @@ def ensure_organization_pks(datasets):
         )
     return datasets
 
-@task(name="cde-db-loader")
+# timeout_seconds: hard ceiling well above any observed load (full reload incl.
+# hex build runs tens of minutes). A run that exceeds it is genuinely wedged —
+# Prefect marks it Failed instead of leaving it Running forever, complementing
+# the server-side idle_in_transaction/lock timeouts set inside the transaction.
+# No retries here on purpose: the transaction is atomic, but the next scheduled
+# harvest re-covers the data anyway, and auto-retrying a resource-starved DB
+# just piles on load.
+@task(name="cde-db-loader", timeout_seconds=7200)
 def main(folder, incremental=False):
     # setup database connection
     logger = get_run_logger()
@@ -420,11 +427,17 @@ def main(folder, incremental=False):
         # session-scoped and survive the commit.
         if transaction.in_transaction():
             transaction.commit()
+        # The advisory-lock wait is expected to exceed the session lock_timeout
+        # (set at transaction start), so lift the timeout for this one statement
+        # and restore it after. A zombie lock-holder can't wedge us: its
+        # idle_in_transaction_session_timeout kills it and releases the lock.
         logger.info("Acquiring db-loader advisory lock (serializes concurrent loads)")
+        transaction.execute(text("SET lock_timeout = 0"))
         transaction.execute(
             text("SELECT pg_advisory_xact_lock(:k)"),
             {"k": DB_LOADER_ADVISORY_LOCK_KEY},
         )
+        transaction.execute(text("SET lock_timeout = '2min'"))
 
     # "Commit as you go" connection, NOT engine.begin(): the load is two
     # transactions — a session-private staging phase (temp tables + uploads,
@@ -435,6 +448,31 @@ def main(folder, incremental=False):
     # staging leaves nothing behind (temp tables die with the session).
     with engine.connect() as transaction:
         logger.info("Writing to DB:")
+
+        # Session-level safety timeouts for the load transaction.
+        #
+        # idle_in_transaction_session_timeout: if this container dies mid-load
+        # (redeploy, OOM-kill) Postgres can keep the session alive as
+        # idle-in-transaction, holding the advisory lock — which would queue every
+        # future harvest forever at acquire_loader_lock(). 10 min never fires
+        # during real work (the gaps between Python-driven statements are
+        # milliseconds) but auto-kills such orphans, rolling their transaction back.
+        #
+        # lock_timeout: the load path is pure DML and normally never waits on
+        # DDL, but a manual psql ALTER, a live-applied migration, or pg_repack
+        # can still queue it indefinitely and silently. 2 min turns that into a
+        # clean, logged failure Prefect can surface. NOTE: lock_timeout also
+        # governs pg_advisory_xact_lock() waits, and a loader legitimately
+        # waiting behind another load may need far longer than 2 min —
+        # acquire_loader_lock() temporarily lifts the timeout for exactly that
+        # wait (the zombie-holder case is covered by the idle timeout above,
+        # so the wait still can't be infinite in practice).
+        transaction.execute(
+            text(
+                "SET idle_in_transaction_session_timeout = '10min'; "
+                "SET lock_timeout = '2min';"
+            )
+        )
 
         # Pre-fetch scientific_name → aphia_id mappings from existing
         # vernaculars so prepare_obis_cells_dataframe can populate
@@ -459,6 +497,13 @@ def main(folder, incremental=False):
             logger.info(
                 "Using INCREMENTAL mode - will load to temp tables, process, then UPSERT"
             )
+
+            # Deprioritize this load relative to live web-api traffic: without
+            # this, the merge phase's larger scans can fan out across every
+            # core and starve public queries. Single-threaded is fine here —
+            # the processing phase is delta-sized — and the full-reload path
+            # deliberately keeps parallelism (it runs with the site down).
+            transaction.execute(text("SET max_parallel_workers_per_gather = 0"))
 
             # Incremental approach using temporary tables:
             # 1. Load all data into temporary tables (no constraints)
@@ -533,10 +578,11 @@ def main(folder, incremental=False):
 
             # Temp-table uploads above are session-private and contend with nothing,
             # so they ran lock-free. Take the lock now: process_incremental_update()
-            # is the phase that touches the shared cde tables (drop/set constraints,
-            # DELETE/INSERT) and must not interleave with another load or the
-            # full-reload TRUNCATE. The lock auto-releases at COMMIT, covering the
-            # harvest-audit appends below and the commit itself.
+            # is the phase that touches the shared cde tables (DELETE/INSERT churn)
+            # and must not interleave with another load or the full-reload TRUNCATE.
+            # It runs as pure DML (no ACCESS EXCLUSIVE DDL), so it no longer
+            # deadlocks with live web-api readers. The lock auto-releases at COMMIT,
+            # covering the harvest-audit appends below and the commit itself.
             acquire_loader_lock()
 
             # Process and UPSERT all data using SQL functions
@@ -546,13 +592,15 @@ def main(folder, incremental=False):
                 logger.info("Incremental update complete")
 
             # Skipped-unchanged datasets: advance only verified_at.
+            # IF NOT EXISTS because prune_stale_datasets() below reads
+            # temp_verified as part of the run's coverage and creates it empty
+            # when this block didn't run first.
             if verified is not None and not verified.empty:
                 with _timed("verified_at bump", logger):
                     logger.info("Bumping verified_at for %d unchanged datasets", len(verified))
                     transaction.execute(text(
-                        "CREATE TEMP TABLE temp_verified "
-                        "(erddap_url text, dataset_id text, verified_at timestamptz) "
-                        "ON COMMIT DROP"
+                        "CREATE TEMP TABLE IF NOT EXISTS temp_verified "
+                        "(erddap_url text, dataset_id text, verified_at timestamptz)"
                     ))
                     verified[["erddap_url", "dataset_id", "verified_at"]].to_sql(
                         "temp_verified",
@@ -567,6 +615,23 @@ def main(folder, incremental=False):
                         "WHERE d.dataset_id = v.dataset_id "
                         "AND d.erddap_url = v.erddap_url"
                     ))
+
+            # Prune datasets that disappeared upstream. A harvest fully
+            # enumerates each source it covers (changed -> temp_datasets,
+            # unchanged -> temp_verified, errored/filtered -> temp_skipped),
+            # so anything of a covered source in none of the three is gone
+            # upstream. This gives incremental loads full-reload semantics
+            # without the TRUNCATE, so routine runs never need the full-reload
+            # path (and its site-blocking ACCESS EXCLUSIVE lock) at all. A
+            # per-source guard inside the function refuses mass-removals
+            # (> 50% of a source) as a harvester-bug precaution.
+            if os.environ.get("CDE_PRUNE_STALE", "1").lower() not in ("0", "false", "no"):
+                with _timed("prune_stale_datasets", logger):
+                    n_pruned = transaction.execute(
+                        text("SELECT prune_stale_datasets();")
+                    ).scalar()
+                    if n_pruned:
+                        logger.info("Pruned %d dataset(s) no longer present upstream", n_pruned)
 
         else:
             # Original full reload logic
@@ -620,10 +685,10 @@ def main(folder, incremental=False):
             """)
             )
 
-            with _timed("drop_constraints", logger):
-                logger.info("Dropping constraints")
-                transaction.execute(text("SELECT drop_constraints();"))
-
+            # No drop_constraints() step: the backfilled columns are permanently
+            # NULL-able and the hex FKs are DEFERRABLE INITIALLY DEFERRED (checked
+            # at COMMIT), so nothing needs toggling before the load. See
+            # 7_contraints.sql / validate_loaded_data().
             with _timed("remove_all_data", logger):
                 logger.info("Clearing tables")
                 transaction.execute(text("SELECT remove_all_data();"))
@@ -789,10 +854,12 @@ def main(folder, incremental=False):
                 logger.info("Creating hexes")
                 transaction.execute(text("SELECT create_hexes();"))
 
-            with _timed("set_constraints", logger):
-                # This ensures that all fields were set successfully
-                logger.info("Setting constraints")
-                transaction.execute(text("SELECT set_constraints();"))
+            with _timed("validate_loaded_data", logger):
+                # Ensures every required field was populated (replaces the old
+                # set_constraints() NOT NULL re-add). A plain SELECT — the hex FKs
+                # are validated by the DEFERRABLE constraint at COMMIT.
+                logger.info("Validating loaded data")
+                transaction.execute(text("SELECT validate_loaded_data();"))
 
         # Harvest audit: append-only. Same writes in both incremental and
         # full-reload paths since these tables are never truncated.
@@ -834,6 +901,28 @@ def main(folder, incremental=False):
         if harvest_attempts_df is not None:
             logger.info("Wrote to db: %s", f"{schema}.harvest_attempts")
 
+    # Post-commit maintenance, part 1: GC of orphaned points/hex cells.
+    # cde.points and hexes_zoom_* are append-only during loads (stable pks);
+    # rows orphaned by shrinking/removed datasets are collected here instead,
+    # OUTSIDE the load transaction so they never extend it. Runs under the
+    # loader advisory lock so it can't interleave with another load's linking
+    # phase — but with try-lock: if another load is already queued/running,
+    # skip and let a later run collect (orphans are invisible to the API
+    # meanwhile, so deferral is free).
+    with engine.begin() as tx:
+        got_lock = tx.execute(
+            text("SELECT pg_try_advisory_xact_lock(:k)"),
+            {"k": DB_LOADER_ADVISORY_LOCK_KEY},
+        ).scalar()
+        if got_lock:
+            with _timed("gc_orphan_points_and_hexes", logger):
+                n_gc = tx.execute(
+                    text("SELECT gc_orphan_points_and_hexes();")
+                ).scalar()
+                logger.info("GC removed %d orphaned point/hex row(s)", n_gc)
+        else:
+            logger.info("Skipping orphan GC: another load holds the loader lock")
+
     # Post-commit maintenance (VACUUM can't run inside the transaction).
     # Every load leaves one dead version per rewritten row (create_hexes()
     # relinks point_pk/hex FKs on all cells tables), and incremental loads add
@@ -841,6 +930,22 @@ def main(folder, incremental=False):
     # the tables plateau instead of growing run-over-run, and refreshes
     # planner stats for the tile queries.
     if trajectory_cells is not None or trajectory_points is not None:
+        # Announce before starting: VACUUM emits no output until it finishes, so
+        # without this line a multi-minute vacuum right after the final "Wrote to
+        # db" logs looks like a hung run.
+        vacuum_targets = ", ".join(
+            name
+            for name, present in (
+                ("cde.trajectory_cells", trajectory_cells is not None),
+                ("cde.trajectory_points", trajectory_points is not None),
+            )
+            if present
+        )
+        logger.info(
+            "Data committed. Running post-load VACUUM ANALYZE on %s "
+            "(may take several minutes, no output until done)",
+            vacuum_targets,
+        )
         with _timed("post-load VACUUM ANALYZE", logger):
             with engine.connect().execution_options(
                 isolation_level="AUTOCOMMIT"

@@ -25,6 +25,7 @@ export default function MapContainer () {
     zoomTarget,
     mapRef,
     tracksMode,
+    trajectoryHexes,
     debouncedScrubTime,
     trailingDays,
     dataLayers
@@ -36,7 +37,8 @@ export default function MapContainer () {
     hoveredDataset,
     setHoveredDataset,
     inspectDataset,
-    selectedTrajectory
+    selectedTrajectory,
+    selectTrajectoryFromMap
   } = useSelection()
 
   return (
@@ -56,9 +58,11 @@ export default function MapContainer () {
       inspectDataset={inspectDataset}
       setDatasetsSelected={setDatasetsSelected}
       tracksMode={tracksMode}
+      trajectoryHexes={trajectoryHexes}
       scrubTime={debouncedScrubTime}
       trailingDays={trailingDays}
       selectedTrajectory={selectedTrajectory}
+      selectTrajectoryFromMap={selectTrajectoryFromMap}
       dataLayers={dataLayers}
       griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
       dataLayersVisible={dataLayersVisible}

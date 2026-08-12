@@ -6,6 +6,7 @@ import {
   createDataFilterQueryString,
   createSelectionQueryString
 } from '../utilities.jsx'
+import { dataLayersAreDefault } from './dataLayers.js'
 import { GROUP_NONE } from './datasetGroups.js'
 import { defaultTrailingDays } from '../components/config.js'
 import { useFilters } from './filters/FilterProvider.jsx'
@@ -41,6 +42,7 @@ export default function UrlSync () {
   const {
     mapView,
     tracksMode,
+    trajectoryHexes,
     scrubTime,
     debouncedScrubTime,
     trailingDays,
@@ -84,14 +86,20 @@ export default function UrlSync () {
       ...(dataset ? { dataset } : {}),
       ...(dataset && server ? { server } : {})
     }
-    // Tracks-mode state persists in the URL only when active/non-default
-    if (tracksMode) {
-      obj.tracks = 'true'
+    // The trajectory view switches only mean anything while the layer is on,
+    // and each param records its non-default state: track lines default on, so
+    // 'tracks=false' is what needs saying; hexes default off, so 'trajHexes=true'.
+    if (dataLayers.trajectories) {
+      if (!tracksMode) obj.tracks = 'false'
+      if (trajectoryHexes) obj.trajHexes = 'true'
+    }
+    // The scrub window only drives the track tiles, so it rides along with them.
+    if (tracksMode && dataLayers.trajectories) {
       obj.scrubTime = scrubTime
       if (trailingDays !== defaultTrailingDays) obj.trail = trailingDays
     }
-    // Data-layer selection persists only when not the all-on default.
-    if (!Object.values(dataLayers).every(Boolean)) {
+    // Data-layer selection persists only when not the default selection.
+    if (!dataLayersAreDefault(dataLayers)) {
       obj.layers = Object.entries(dataLayers)
         .filter(([, on]) => on)
         .map(([key]) => key)
@@ -111,6 +119,7 @@ export default function UrlSync () {
     groupBy,
     hiddenGroupsParam,
     tracksMode,
+    trajectoryHexes,
     debouncedScrubTime,
     trailingDays,
     dataLayers

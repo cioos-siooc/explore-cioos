@@ -1,62 +1,101 @@
-/* 
- 
-   create_hexes()
-   
-   Create tables to store the hex polygons. Once they are joined with cde.points
-   the polygons are copied over to that table 
- 
+/*
+
+   hex_cell()     - covering hex-grid cell (i, j, geom) for a point, pure function
+   create_hexes() - assign hex cells to points and propagate the FKs
+
+   The hex grid is PostGIS's origin-anchored hexagon tiling
+   (ST_HexagonGrid / ST_Hexagon): cell (i, j) at a given size sits at a fixed
+   position in the plane regardless of any bounds argument. A point's cell is
+   therefore a pure function of its geometry, and cells never move between
+   runs. hexes_zoom_0 (100 km) / hexes_zoom_1 (10 km) are append-only, keyed
+   on (i, j): create_hexes() inserts newly-occupied cells and NEVER deletes or
+   renumbers, so hex pks are stable across loads. Cells that lose their last
+   point are harmless leftovers (tile/legend queries reach hexes only via the
+   FKs on profiles/obis_cells/trajectory_cells) and can be GC'd out of band.
+
+   This replaces the previous delete-and-retile-everything implementation,
+   which re-tiled the whole data extent (from a moving ST_EstimatedExtent) and
+   rewrote every row of points on every load.
+
  */
+
+
+-- Covering grid cell for a point. ST_HexagonGrid with a degenerate (point)
+-- bounds emits just the covering cell(s); a point exactly on a cell edge can
+-- match several, so ORDER BY makes the choice deterministic across runs.
+CREATE OR REPLACE FUNCTION hex_cell(pt geometry, size float8)
+RETURNS TABLE (i integer, j integer, geom geometry) AS $$
+  SELECT g.i::int, g.j::int, g.geom
+  FROM ST_HexagonGrid(size, pt) g
+  WHERE ST_Intersects(pt, g.geom)
+  ORDER BY g.i, g.j
+  LIMIT 1
+$$ LANGUAGE sql IMMUTABLE PARALLEL SAFE;
 
 
 CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
   BEGIN
 
-  DELETE FROM cde.hexes_zoom_0;
-  DELETE FROM cde.hexes_zoom_1;
+  -- Add newly-occupied cells; existing cells (and their pks) are untouched.
+  INSERT INTO cde.hexes_zoom_0 (i, j, geom)
+  SELECT DISTINCT ON (h.i, h.j) h.i, h.j, h.geom
+  FROM cde.points p
+  CROSS JOIN LATERAL hex_cell(p.geom, 100000) h
+  WHERE p.hex_0_pk IS NULL
+  ON CONFLICT (i, j) DO NOTHING;
 
-  UPDATE cde.points
-  SET hex_zoom_0 = hexes.geom
-  FROM ST_HexagonGrid(
-    100000,
-    ST_SetSRID(ST_EstimatedExtent('cde', 'points', 'geom'), 3857)
-  ) hexes
-  WHERE ST_Intersects(points.geom, hexes.geom);
+  INSERT INTO cde.hexes_zoom_1 (i, j, geom)
+  SELECT DISTINCT ON (h.i, h.j) h.i, h.j, h.geom
+  FROM cde.points p
+  CROSS JOIN LATERAL hex_cell(p.geom, 10000) h
+  WHERE p.hex_1_pk IS NULL
+  ON CONFLICT (i, j) DO NOTHING;
 
-  -- this takes a few mins
-  UPDATE cde.points
-  SET hex_zoom_1 = hexes.geom
-  FROM ST_HexagonGrid(
-    10000,
-    ST_SetSRID(ST_EstimatedExtent('cde', 'points', 'geom'), 3857)
-  ) hexes
-  WHERE ST_Intersects(points.geom, hexes.geom);
+  -- Assign cells to the points that don't have one yet — only points added
+  -- by this load (cde.points is append-only with stable pks, so existing
+  -- assignments never change).
+  WITH assign AS (
+    SELECT p.pk AS point_pk, hz.pk AS hex_pk
+    FROM cde.points p
+    CROSS JOIN LATERAL hex_cell(p.geom, 100000) h
+    JOIN cde.hexes_zoom_0 hz ON hz.i = h.i AND hz.j = h.j
+    WHERE p.hex_0_pk IS NULL
+  )
+  UPDATE cde.points p
+  SET hex_0_pk = a.hex_pk
+  FROM assign a
+  WHERE p.pk = a.point_pk;
 
-  INSERT INTO cde.hexes_zoom_0 (geom) SELECT DISTINCT hex_zoom_0 FROM cde.points;
-  INSERT INTO cde.hexes_zoom_1 (geom) SELECT DISTINCT hex_zoom_1 FROM cde.points;
+  WITH assign AS (
+    SELECT p.pk AS point_pk, hz.pk AS hex_pk
+    FROM cde.points p
+    CROSS JOIN LATERAL hex_cell(p.geom, 10000) h
+    JOIN cde.hexes_zoom_1 hz ON hz.i = h.i AND hz.j = h.j
+    WHERE p.hex_1_pk IS NULL
+  )
+  UPDATE cde.points p
+  SET hex_1_pk = a.hex_pk
+  FROM assign a
+  WHERE p.pk = a.point_pk;
 
-  UPDATE cde.points
-  SET hex_0_pk = hexes_zoom_0.pk
-  FROM cde.hexes_zoom_0
-  WHERE hexes_zoom_0.geom = points.hex_zoom_0;
-
-  UPDATE cde.points
-  SET hex_1_pk = hexes_zoom_1.pk
-  FROM cde.hexes_zoom_1
-  WHERE hexes_zoom_1.geom = points.hex_zoom_1;
-
-  -- Only the FK is propagated to profiles/obis_cells. Tile/legend queries
-  -- JOIN cde.hexes_zoom_0/1 to fetch the polygon when needed.
+  -- Only the FK is propagated to profiles/obis_cells, and only to rows that
+  -- don't have it yet (rows this load inserted/replaced — point and hex pks
+  -- are stable, so rows linked by a previous run are already correct).
+  -- Tile/legend queries JOIN cde.hexes_zoom_0/1 to fetch the polygon when
+  -- needed.
   UPDATE cde.profiles
   SET hex_0_pk = points.hex_0_pk,
       hex_1_pk = points.hex_1_pk
   FROM cde.points
-  WHERE points.pk = profiles.point_pk;
+  WHERE points.pk = profiles.point_pk
+    AND (profiles.hex_0_pk IS NULL OR profiles.hex_1_pk IS NULL);
 
   UPDATE cde.obis_cells
   SET hex_0_pk = points.hex_0_pk,
       hex_1_pk = points.hex_1_pk
   FROM cde.points
-  WHERE points.pk = obis_cells.point_pk;
+  WHERE points.pk = obis_cells.point_pk
+    AND (obis_cells.hex_0_pk IS NULL OR obis_cells.hex_1_pk IS NULL);
 
   -- trajectory_cells: link point_pk AND hex FKs in a single pass, joining by
   -- geom rather than a pre-set point_pk. profiles/obis link point_pk in their
@@ -68,7 +107,10 @@ CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
       hex_0_pk = points.hex_0_pk,
       hex_1_pk = points.hex_1_pk
   FROM cde.points
-  WHERE points.geom = trajectory_cells.geom;
+  WHERE points.geom = trajectory_cells.geom
+    AND (trajectory_cells.point_pk IS NULL
+         OR trajectory_cells.hex_0_pk IS NULL
+         OR trajectory_cells.hex_1_pk IS NULL);
 
   END;
 $$ LANGUAGE plpgsql;

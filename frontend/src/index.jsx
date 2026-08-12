@@ -39,6 +39,7 @@ i18n
   .use(LanguageDetector)
   .init({
     resources,
+    showSupportNotice: false,
     supportedLngs: ['en', 'fr'],
     // A ?lang= in the link always wins; without one the detector falls back to
     // the last language the user chose here (localStorage), so the choice

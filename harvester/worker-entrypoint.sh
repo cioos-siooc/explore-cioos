@@ -9,7 +9,10 @@
 # scaled replicas, and remote workers:
 #
 #   REGISTER_DEPLOYMENTS  (default true)  register work pool + deployments first
-#   RUN_ON_DEPLOY         (default false) fire one full harvest immediately
+#   RUN_ON_DEPLOY         (default false) fire a harvest on deploy:
+#                           false        never
+#                           true/once    only when the database is empty (new install)
+#                           always       every deploy, regardless of DB contents
 #   HARVESTER_CRON / VERNACULARS_CRON     (optional) recurring schedules
 #
 # Remote workers set REGISTER_DEPLOYMENTS=false so they ONLY poll the central
@@ -49,16 +52,45 @@ if [ "${REGISTER_DEPLOYMENTS:-true}" = "true" ]; then
   uv run python -m cde_harvester.prefect_pipeline -f "${CONFIG_FILE}" -d prod \
     || echo "[worker-entrypoint] registration failed (another replica may have won); continuing"
 
-  if [ "${RUN_ON_DEPLOY:-false}" = "true" ]; then
-    echo "[worker-entrypoint] RUN_ON_DEPLOY=true -> triggering per-server harvest fan-out"
-    # Only the registrar fires this, so it runs once per deploy regardless of
-    # replica count. Triggers the orchestrator, which launches one harvest job
-    # per server (same as the cron path). Non-fatal so a transient API hiccup
-    # can't block the worker.
+  # Decide whether to fire a harvest on this deploy. Only the registrar reaches
+  # here, so it runs once per deploy regardless of replica count.
+  RUN_ON_DEPLOY_MODE="${RUN_ON_DEPLOY:-false}"
+  SHOULD_HARVEST=false
+  case "${RUN_ON_DEPLOY_MODE}" in
+    always)
+      SHOULD_HARVEST=true
+      echo "[worker-entrypoint] RUN_ON_DEPLOY=always -> triggering harvest fan-out"
+      ;;
+    true|once)
+      # Run only on a fresh install: an empty (or not-yet-created) cde.datasets.
+      if uv run python -m cde_harvester.core.db; then
+        SHOULD_HARVEST=true
+        echo "[worker-entrypoint] RUN_ON_DEPLOY=${RUN_ON_DEPLOY_MODE} and database is empty -> triggering initial harvest fan-out"
+      else
+        echo "[worker-entrypoint] RUN_ON_DEPLOY=${RUN_ON_DEPLOY_MODE} but database already holds datasets -> skipping harvest"
+      fi
+      ;;
+    *)
+      echo "[worker-entrypoint] RUN_ON_DEPLOY=${RUN_ON_DEPLOY_MODE} -> not triggering a deploy harvest"
+      ;;
+  esac
+
+  if [ "${SHOULD_HARVEST}" = "true" ]; then
+    # Triggers the orchestrator, which launches one harvest job per server (same
+    # as the cron path). Non-fatal so a transient API hiccup can't block the
+    # worker.
     uv run prefect deployment run "Harvest All Sources/cde-harvest-all" \
       || echo "[worker-entrypoint] run-on-deploy trigger failed; worker will still start"
   fi
 fi
 
-echo "[worker-entrypoint] Starting process worker on pool ${POOL_NAME}"
-exec uv run prefect worker start --pool "${POOL_NAME}" --type process
+# Cap how many flow runs this worker executes at once. "Harvest All Sources"
+# fans out one child run per configured source (10+), and under `--type process`
+# each becomes a separate OS process. Unbounded, ten parallel harvests (the OBIS
+# parquet path being the heaviest) exhausted RAM + all swap on a 15.7 GB host on
+# 2026-08-04 and livelocked it. Raise deliberately, with headroom to match.
+WORKER_LIMIT="${HARVEST_WORKER_LIMIT:-2}"
+
+echo "[worker-entrypoint] Starting process worker on pool ${POOL_NAME} (concurrency limit ${WORKER_LIMIT})"
+exec uv run prefect worker start --pool "${POOL_NAME}" --type process \
+  --limit "${WORKER_LIMIT}"
