@@ -1,13 +1,24 @@
-.date {
-  margin-top: 10px;
+/* The Time filter's own layout. Everything inside the range pill and the rail
+   below it is styled by the shared TimeRail stylesheet — this is only how the
+   three parts stack in the panel. */
+.timeSelector {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.date span {
-  min-width: 100px;
+/* The date pair, centered above the rail it bounds. */
+.timeSelectorRange {
+  display: flex;
+  justify-content: center;
 }
 
-.date input {
-  width: 150px;
+.timeSelectorRange .timeRailDateInput {
+  font-size: var(--cioos-font-size-sm);
+}
+
+/* The rail runs the full width of the panel entry; its own padding already
+   holds half a year label clear of each end. */
+.timeSelector .timeRail {
+  padding-bottom: 2px;
 }

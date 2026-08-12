@@ -1,163 +1,86 @@
 import * as React from 'react'
-import { useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
 import { useTranslation } from 'react-i18next'
-import { X } from 'react-bootstrap-icons'
 
-import RangeSelector from '../RangeSelector/RangeSelector.jsx'
+import { defaultStartDate } from '../../../config.js'
+import { useFilters } from '../../../../state/filters/FilterProvider.jsx'
+import TimeRail, {
+  DateField,
+  useTimeAxis,
+  QUICK_PICKS,
+  lastDaysRange
+} from '../../TimeRail/TimeRail.jsx'
+import { clampIso, todayIso } from '../../TimeRail/timeAxis.js'
 import './styles.css'
 
-// Spacing elements out to the left and right using justify-content: space-between. https://medium.com/12-developer-labors/css-all-the-ways-to-align-elements-left-and-right-52ecce4a4af9
+// The Time filter inside the Filters panel.
+//
+// It is the same control as the bar along the bottom of the map — the same
+// warped axis, the same teal handles, the same typeable date fields, the same
+// ready-made windows — because it sets the same two values. The only
+// difference is the shape those windows take: a row of buttons here, where
+// there is room for one, and a dropdown in the bar, where there is not.
 export default function TimeSelector (props) {
   const { t } = useTranslation()
+  const { timeExtent, timeFilterActive } = useFilters()
+  const { startDate, endDate, setStartDate, setEndDate } = props
 
-  const [startDate, setStartDate] = useState(props.startDate)
-  const [endDate, setEndDate] = useState(props.endDate)
-  const [dateValid, setDateValid] = useState(true)
+  const maxIso = todayIso()
+  // Same axis the bar over the map draws, for the same reason: it spans the
+  // data the current selection covers, and only widens past that when the
+  // filter itself has been set outside it.
+  const { axis } = useTimeAxis({
+    timeExtent,
+    timeFilterActive,
+    startDate,
+    endDate
+  })
 
-  useEffect(() => {
-    setStartDate(props.startDate)
-    setDateValid(true)
-  }, [props.startDate])
-
-  useEffect(() => {
-    setEndDate(props.endDate)
-    setDateValid(true)
-  }, [props.endDate])
-
-  function handleSetStartDate (date) {
-    const tempDate = new Date(date)
-    setStartDate(date)
-    if (tempDate <= new Date(endDate)) {
-      // && tempDate >= new Date(defaultStartDate) && tempDate <= new Date(defaultEndDate)) {
-      setDateValid(true)
-      props.setStartDate(date)
-      props.setEndDate(endDate)
-    } else {
-      setDateValid(false)
-    }
+  function setHandleValue (handle, iso) {
+    if (handle === 'start') setStartDate(clampIso(iso, defaultStartDate, endDate))
+    else setEndDate(clampIso(iso, startDate, maxIso))
   }
 
-  function handleSetEndDate (date) {
-    const tempDate = new Date(date)
-    setEndDate(date)
-    if (tempDate >= new Date(startDate)) {
-      // } && tempDate >= new Date(defaultStartDate) && tempDate <= new Date(defaultEndDate)) {
-      setDateValid(true)
-      props.setEndDate(date)
-      props.setStartDate(startDate)
-    } else {
-      setDateValid(false)
-    }
+  function selectLastDays (days) {
+    const { start, end } = lastDaysRange(days)
+    setStartDate(start)
+    setEndDate(end)
   }
-
-  function onChange(value) {
-    const tempStartDate = new Date(value[0]).toISOString().split('T')[0]
-    const tempEndDate = new Date(value[1]).toISOString().split('T')[0]
-    if (startDate !== tempStartDate) {
-      handleSetStartDate(tempStartDate)
-    } else if (endDate !== tempEndDate) {
-      handleSetEndDate(tempEndDate)
-    }
-  }
-
-  const dateToday = new Date().getTime()
 
   return (
     <div className='timeSelector'>
       <div className='depthQuickSelectGrid'>
-        <button
-          onClick={() => {
-            const date = new Date()
-            props.setEndDate(date.toISOString().split('T')[0])
-            props.setStartDate(new Date(date.getTime() - 10 * 86400000).toISOString().split('T')[0])
-          }}
-        >
-          {t('timeSelectorQuickSelect10Days')}
-        </button>
-        <button
-          onClick={() => {
-            const date = new Date()
-            props.setEndDate(date.toISOString().split('T')[0])
-            props.setStartDate(new Date(date.getTime() - 30 * 86400000).toISOString().split('T')[0])
-          }}
-        >
-          {t('timeSelectorQuickSelect30Days')}
-        </button>
-        <button
-          onClick={() => {
-            const date = new Date()
-            props.setEndDate(date.toISOString().split('T')[0])
-            props.setStartDate(new Date(date.getTime() - 365 * 86400000).toISOString().split('T')[0])
-          }}
-        >
-          {t('timeSelectorQuickSelect1Year')}
-        </button>
-        <button
-          onClick={() => {
-            const date = new Date()
-            props.setEndDate(date.toISOString().split('T')[0])
-            props.setStartDate(new Date(date.getTime() - 3652 * 86400000).toISOString().split('T')[0])
-          }}
-        >
-          {t('timeSelectorQuickSelect10Years')}
-        </button>
+        {QUICK_PICKS.map(({ days, labelKey }) => (
+          <button key={days} onClick={() => selectLastDays(days)}>
+            {t(labelKey)}
+          </button>
+        ))}
       </div>
-      <div className='date'>
-        <span>
-          {t('timeSelectorStartDate')}
-          {/* Start Date: */}
-        </span>
-        <input
-          type='date'
-          value={startDate}
-          max={new Date().toISOString().split('T')[0]}
-          min='1900-01-01'
-          onChange={(e) => handleSetStartDate(e.target.value)}
-        />
-      </div>
-      <div className='date'>
-        <span>
-          {t('timeSelectorEndDate')}
-          {/* End Date: */}
-        </span>
-        <input
-          type='date'
-          value={endDate}
-          max={new Date().toISOString().split('T')[0]}
-          min='1900-01-01'
-          onChange={(e) => handleSetEndDate(e.target.value)}
-        />
-      </div>
-      <RangeSelector
-        start={new Date(props.startDate).getTime()}
-        end={new Date(props.endDate).getTime()}
-        marks={{
-          '-2208960000000': '1900',
-          // '-1893427200000': '1910',
-          '-1577894400000': '1920',
-          // '-1262275200000': '1930',
-          '-946742400000': '1940',
-          // '-631123200000': '1950',
-          '-315590400000': '1960',
-          // '28800000': '1970',
-          '315561600000': '1980',
-          // '631180800000': '1990',
-          '946713600000': '2000',
-          // '1262332800000': '2010',
-          '1577865600000': '2020',
-          [dateToday]: '',
-        }}
-        min={-2208960000000}
-        max={dateToday}
-        onChange={onChange}
-      />
-      {!dateValid && (
-        <div>
-          {' '}
-          <X color='red' size={30} /> {t('dateFilterInvalidWarning')}
+      <div className='timeSelectorRange'>
+        <div className='timeRailField timeRailFieldRange'>
+          <DateField
+            label={t('timeSelectorStartDate')}
+            value={startDate}
+            min={defaultStartDate}
+            max={endDate}
+            onCommit={(value) => setHandleValue('start', value)}
+          />
+          <span className='timeRailFieldSep'>–</span>
+          <DateField
+            label={t('timeSelectorEndDate')}
+            value={endDate}
+            min={startDate}
+            max={maxIso}
+            onCommit={(value) => setHandleValue('end', value)}
+          />
         </div>
-      )}
+      </div>
+      <TimeRail
+        axis={axis}
+        startDate={startDate}
+        endDate={endDate}
+        onCommit={setHandleValue}
+      />
     </div>
   )
 }

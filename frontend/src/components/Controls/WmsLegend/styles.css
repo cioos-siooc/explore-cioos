@@ -5,7 +5,10 @@
 .wmsLegend.floating {
   position: fixed;
   left: 12px;
-  bottom: 12px;
+  /* Above the time bar: it holds the bottom edge, and once the viewport is
+     narrower than its bubble it reaches into this corner. TimeBar publishes
+     its measured footprint. */
+  bottom: calc(12px + var(--cioos-time-bar-space, 0px));
   z-index: var(--cioos-z-shell, 30);
   background-color: var(--cioos-white);
   border-radius: var(--cioos-radius-sm);
@@ -98,11 +101,11 @@
 }
 
 @media (max-width: 600px) {
-  /* Clear the collapsed datasets bottom sheet. */
+  /* Clear the collapsed datasets bottom sheet and the time bar above it. */
   .wmsLegend.floating {
     left: 10px;
     right: 10px;
-    bottom: 48px;
+    bottom: calc(12px + var(--cioos-time-bar-space, 0px));
     max-width: 280px;
     font-size: 0.85em;
   }

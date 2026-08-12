@@ -34,6 +34,16 @@
   --cioos-warn:        #B07A00;
   --cioos-info:        #0F6D8E;
 
+  /* --- Map data keys --- */
+  /* Colours that identify one layer or tool wherever it shows up: the paint on
+     the map, its legend swatch, and the control that drives it. The track
+     purple is `trackLineColor` in components/config.js — the map paints from
+     there, the chrome from here, and the two have to stay in step. */
+  --cioos-track:       #6749AC; /* trajectory track lines + the scrub control */
+  --cioos-track-700:   #543A90; /* hover/pressed */
+  --cioos-track-bg:    rgba(103, 73, 172, 0.14); /* trailing-window wash */
+  --cioos-track-surface: #EFEAF8; /* opaque sibling of -bg, for cards over the map */
+
   /* --- Elevation --- */
   --cioos-shadow-card:    0 2px 8px rgba(21, 47, 55, 0.08);
   --cioos-shadow-float:   0 4px 16px rgba(21, 47, 55, 0.16);

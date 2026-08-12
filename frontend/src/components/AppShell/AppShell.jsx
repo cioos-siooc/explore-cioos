@@ -16,7 +16,7 @@ import Legend from '../Controls/Legend/Legend.jsx'
 import TimeBar from '../Controls/TimeBar/TimeBar.jsx'
 import WmsLegend from '../Controls/WmsLegend/WmsLegend.jsx'
 import IntroModal from '../Controls/IntroModal/IntroModal.jsx'
-import { anyTrajectoryLayerOn } from '../../state/dataLayers.js'
+import { useFilters } from '../../state/filters/FilterProvider.jsx'
 import { useMapState } from '../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../state/ui/UIProvider.jsx'
@@ -52,12 +52,11 @@ export default function AppShell () {
     setActiveWmsOverlay,
     tracksMode,
     toggleTrackLines,
-    scrubTime,
-    setScrubTime,
     trailingDays,
-    setTrailingDays,
+    scrubTime,
     dataLayers
   } = useMapState()
+  const { startDate, endDate, timeFilterActive } = useFilters()
   const { showIntroModal, setShowIntroModal, sidebarOpen } = useUI()
   const { inspectDataset, platformsAvailable } = useSelection()
 
@@ -162,19 +161,19 @@ export default function AppShell () {
         layerControls={layerControls}
         trailingDays={trailingDays}
         dataLayers={dataLayers}
+        startDate={startDate}
+        endDate={endDate}
+        timeFilterActive={timeFilterActive}
+        scrubTime={scrubTime}
       />
       <MapCornerControls />
-      {/* TimeBar renders before the zoom pill: they share the bottom-center
-          spot, and a CSS sibling rule lifts the pill while the bar is shown. */}
-      {tracksMode && anyTrajectoryLayerOn(dataLayers) && (
-        <TimeBar
-          scrubTime={scrubTime}
-          setScrubTime={setScrubTime}
-          trailingDays={trailingDays}
-          setTrailingDays={setTrailingDays}
-          zoom={zoom}
-        />
-      )}
+      {/* The bottom time bar carries both time controls — the range filter and
+          the trajectory scrub date — so it is always mounted; the scrub row
+          inside it is what comes and goes with the track layers. It renders
+          before the zoom pill because they share the bottom-center spot, and a
+          CSS sibling rule lifts the pill clear of it. It reads its own state
+          from the filter and map providers. */}
+      <TimeBar />
       <ZoomToDataset variant='floating' />
       {activeWmsOverlay && !wmsLegendIsInline && (
         <WmsLegend

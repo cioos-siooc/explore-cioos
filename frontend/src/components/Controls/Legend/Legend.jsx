@@ -128,7 +128,10 @@ export default function Legend({
   controls = {},
   layerControls = [],
   trailingDays,
-  dataLayers
+  dataLayers,
+  // The date the time bar's scrub handle is on, named in the trajectory keys —
+  // the track lines and the heading arrows are drawn relative to it.
+  scrubTime
 }) {
   const { t } = useTranslation()
   // The card's collapse, and the only thing that hides any of this: open, it
@@ -597,7 +600,11 @@ export default function Legend({
               transform='rotate(45 8 8)'
             />
           </svg>
-          <span className='legendItemLabel'>{t('legendTrackHead')}</span>
+          <span className='legendItemLabel'>
+            {scrubTime
+              ? t('legendTrackHeadAt', { date: scrubTime })
+              : t('legendTrackHead')}
+          </span>
         </div>
       </div>
     )

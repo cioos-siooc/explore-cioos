@@ -1,0 +1,297 @@
+/* ------------------------------------------------------------------
+ * The time slider, wherever it appears — the bar along the bottom of
+ * the map and the Time filter in the Filters panel. Only the chrome
+ * around it differs between the two; the rail, its handles and its year
+ * labels are the same control and are styled once, here.
+ *
+ * The rail and the tick row are both full-width children of a box inset
+ * far enough that a handle parked at either end, and the year label
+ * centered under it, still sit inside. Every label is centered on its
+ * tick — pinning the end ones inside instead would make them reach
+ * twice as far towards their neighbour as the spacing pass that placed
+ * them assumed, which is how they collide.
+ * ------------------------------------------------------------------ */
+.timeRail {
+  padding: 0 16px;
+  /* Nothing here is text to copy — it is labels on a control, and dragging a
+     handle used to sweep a selection across them. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.timeRailTrack {
+  position: relative;
+  height: 18px;
+  /* Dragging a handle must not pan the map or scroll the panel under it. */
+  touch-action: none;
+  cursor: pointer;
+}
+
+.timeRailLine {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-hairline);
+}
+
+/* The filtered span. */
+.timeRailRangeFill {
+  position: absolute;
+  top: 50%;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-primary);
+}
+
+/* How far back the drawn tracks reach behind the scrub date — the window the
+   tiles are actually built from, so the zoom clamp shows here too. A soft
+   block behind the rail line rather than on it, keeping the two readings
+   (what is filtered, what is drawn) from being mistaken for one another. */
+.timeRailTrailBand {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-track-bg);
+  pointer-events: none;
+}
+
+/* The handles carry every box property explicitly and are written one level
+   deeper than they need to be. They are <button>s, and the surfaces this rail
+   drops into style their own buttons — the Filters panel gives every button in
+   it a 30px pill with padding and margins, which turned these into pale
+   lozenges parked below the rail. `.timeRail x` outranks that.
+ *
+ * No white ring on them either: at this size it ate most of the handle and
+ * left a pale dot that was hard to pick out against the rail. The colour goes
+ * edge to edge and a soft shadow does the separating. */
+.timeRail .timeRailHandle {
+  position: absolute;
+  top: 50%;
+  box-sizing: border-box;
+  padding: 0;
+  border: none;
+  background-image: none;
+  font: inherit;
+  cursor: grab;
+  touch-action: none;
+  transition: none;
+}
+
+.timeRail .timeRailHandle:active {
+  cursor: grabbing;
+}
+
+.timeRail .timeRailHandle:focus-visible {
+  outline: none;
+}
+
+/* Range ends: round, teal, sitting on the rail. */
+.timeRail .timeRailHandleRange {
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background-color: var(--cioos-primary-700);
+  box-shadow: var(--cioos-shadow-sm);
+  z-index: 1;
+}
+
+.timeRail .timeRailHandleRange:hover {
+  background-color: var(--cioos-navy);
+}
+
+.timeRail .timeRailHandleRange:focus-visible {
+  box-shadow: var(--cioos-focus);
+}
+
+/* The scrub date: a narrow upright marker rather than a third circle. It can
+   sit anywhere among the range handles — including exactly on one — so it has
+   to read as a different kind of thing and stay grabbable on top of them. */
+.timeRail .timeRailHandleScrub {
+  width: 6px;
+  height: 18px;
+  margin: -9px 0 0 -3px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-track);
+  box-shadow: var(--cioos-shadow-sm);
+  z-index: 2;
+}
+
+.timeRail .timeRailHandleScrub:hover {
+  background-color: var(--cioos-track-700);
+}
+
+.timeRail .timeRailHandleScrub:focus-visible {
+  box-shadow: 0 0 0 3px rgb(103 73 172 / 45%);
+}
+
+.timeRailTicks {
+  position: relative;
+  height: 11px;
+  font-size: 11px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  /* Read at a glance against the map showing through — the 40% ink these
+     started at was too faint to scan. */
+  color: var(--cioos-ink-60);
+}
+
+.timeRailTick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------
+ * The date fields that go with the rail. Plain text until pointed at,
+ * so a row of them doesn't read as a form.
+ * ------------------------------------------------------------------ */
+.timeRailDateInput {
+  user-select: text;
+  -webkit-user-select: text;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--cioos-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--cioos-ink);
+}
+
+.timeRailDateInput:hover {
+  background-color: var(--cioos-white);
+}
+
+.timeRailDateInput:focus-visible {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
+}
+
+/* Chrome draws the picker button at full contrast; dim it to match the rest. */
+.timeRailDateInput::-webkit-calendar-picker-indicator {
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.timeRailDateInput:hover::-webkit-calendar-picker-indicator {
+  opacity: 0.8;
+}
+
+/* ------------------------------------------------------------------
+ * The named, tinted pill a pair of date fields sits in, in the colour
+ * of the handle it drives. Shared so the Filters panel's Time entry and
+ * the bar over the map are recognisably the same control.
+ * ------------------------------------------------------------------ */
+.timeRailField {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 2px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius-pill);
+}
+
+/* The colour key. An even hairline all the way round — a one-sided rule on a
+   pill radius reads as two heavy arcs at the ends rather than as an
+   underline. */
+.timeRailFieldRange {
+  background-color: var(--cioos-surface-2);
+  border-color: var(--cioos-primary);
+}
+
+.timeRailFieldScrub {
+  /* The opaque sibling of --cioos-track-bg: that one is a wash meant to let
+     what is behind it show through, which over the map would let the map
+     through too. */
+  background-color: var(--cioos-track-surface);
+  border-color: var(--cioos-track);
+}
+
+.timeRailFieldScrub .timeRailDateInput {
+  color: var(--cioos-track-700);
+}
+
+.timeRailFieldScrub .timeRailDateInput:focus-visible {
+  border-color: var(--cioos-track);
+  box-shadow: 0 0 0 3px rgb(103 73 172 / 45%);
+}
+
+/* Plain body type, just weighted — the tint and the colour do the work that a
+   caps/tracking treatment would, and at this size they do it better. */
+.timeRailFieldLabel {
+  flex-shrink: 0;
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.timeRailFieldRange .timeRailFieldLabel {
+  color: var(--cioos-primary-700);
+}
+
+.timeRailFieldScrub .timeRailFieldLabel {
+  color: var(--cioos-track-700);
+}
+
+.timeRailFieldSep {
+  color: var(--cioos-ink-60);
+}
+
+.timeRailPresetSelect,
+.timeRailTrailSelect {
+  max-width: 110px;
+  padding: 2px 2px 2px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink);
+  cursor: pointer;
+}
+
+.timeRailPresetSelect:hover,
+.timeRailTrailSelect:hover {
+  background-color: var(--cioos-white);
+}
+
+/* Marks a trail that the zoom gate is currently clamping; carries the
+   explanation as a tooltip. */
+.timeRailTrailClamped {
+  margin-left: -2px;
+  color: var(--cioos-track-700);
+  font-weight: 700;
+  cursor: help;
+}
+
+.timeRailReset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: var(--cioos-radius-pill);
+  background: transparent;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+}
+
+.timeRailReset:hover {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
+}

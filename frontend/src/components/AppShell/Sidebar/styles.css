@@ -262,12 +262,14 @@
     );
     border-radius: var(--cioos-radius-lg) var(--cioos-radius-lg) 0 0;
     box-shadow: var(--cioos-shadow-lift, var(--cioos-shadow-float));
-    /* Collapsed rest position: only the drag strip peeks above the bottom edge,
-       with the rest of the list parked below the screen. The strip keeps the
-       edge — the time bar crosses it but sits a layer above (see the TimeBar
-       stylesheet), so the bar stays usable and nothing else on the bottom of
-       the map has to dodge an invisible strip. */
-    transform: translateY(calc(100% - var(--sheet-peek)));
+    /* Collapsed rest position: only the drag strip peeks out, with the rest of
+       the list parked below the screen. The strip rests on top of the time
+       bar rather than on the bottom edge — the bar is flush to that edge here,
+       so a strip left underneath it would be covered and the swipe-up that
+       opens the list would be unreachable. */
+    transform: translateY(
+      calc(100% - var(--sheet-peek) - var(--cioos-time-bar-space, 0px))
+    );
     transition: transform var(--cioos-transition-normal, 0.25s ease);
     touch-action: none;
   }
