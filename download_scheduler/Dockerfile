@@ -2,16 +2,12 @@ FROM ghcr.io/astral-sh/uv:python3.10-bookworm
 
 RUN apt-get -y -qq update
 
-# Split into two layers on purpose. Bundled as one RUN this pulled 210 packages
-# and took >18 minutes on a loaded build host — long enough to be killed before
-# it finished, so it cached nothing and every retry paid the full cost again.
-# Build deps are the cheap half (11 packages): as their own layer they cache
-# immediately, leaving only the wkhtmltopdf half to retry.
-# --no-install-recommends takes the total from 210 packages to 94.
-
-# for shapely
-RUN apt-get -y -qq install --no-install-recommends \
-    gcc libc-dev libgeos-dev python3-dev
+# No gcc/libc-dev/libgeos-dev/python3-dev here on purpose. Nothing compiles:
+# uv installs every dependency from a binary wheel (shapely bundles its own
+# GEOS, psycopg2-binary its own libpq). Installing them cost far more than the
+# 11 packages suggested, because libc-dev and python3-dev drag in upgrades of
+# libc6 and python3.11 in the base image — ~18 minutes of unpacking on a loaded
+# build host, long enough that the layer never finished or cached.
 
 # for pdf creation (CREATE_PDF=True). libqt5gui5 is needed by wkhtmltopdf, and
 # fonts-dejavu-core is named explicitly because it would otherwise only arrive
