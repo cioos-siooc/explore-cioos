@@ -37,13 +37,6 @@
   pointer-events: auto;
 }
 
-/* The zoom-to-dataset pill shares the bottom-center spot; lift it above the
-   bar by the bar's measured footprint, so the gap holds at any bar height
-   (the trajectory pill appearing can rewrap the whole row). */
-.timeBar ~ .zoomToDatasetButton.floating {
-  bottom: calc(var(--cioos-time-bar-space, 0px) + 12px);
-}
-
 /* MapLibre's bottom-right stack — now the draw tools alone, the scale bar and
    the attribution ⓘ having moved into the legend card — stands in a corner the
    centered bar reaches into on narrower screens: below ~1400px the bar's right

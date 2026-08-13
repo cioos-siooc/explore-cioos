@@ -360,6 +360,17 @@ export default function CreateMap({
   // Signature of the focus state last written to the map, so re-applying an
   // unchanged focus costs nothing (see hoverHighlightPoints).
   const appliedFocus = useRef('')
+  // The same guard for the track layers' focus paint, which is written whole
+  // rather than per feature (see applyTrackFocus). Reset when those layers are
+  // (re)created, since a fresh layer carries none of it.
+  const trackFocusApplied = useRef(undefined)
+  // The dataset the hex ramp is scaled to — the one whose page is open, and
+  // only that one. A hover is a passing thing and leaves the ramp alone; an
+  // open page is a state, and while it lasts the ramp describes that dataset's
+  // cells rather than every dataset's (see refreshViewportHexRange).
+  const rampFocusPk = useRef(undefined)
+  // Which focus the held measurement was taken for, so it is taken once.
+  const rampMeasuredForPk = useRef(undefined)
   // Latest tracks-mode props for the one-shot map 'load' closure (layers are
   // created once; these refs let it apply the current mode/scrub window).
   const tracksModeRef = useRef(tracksMode)
@@ -545,6 +556,27 @@ export default function CreateMap({
       sourceLayer: 'coverage-hexes-layer'
     }
   }
+
+  // Hex and marker features carry the datasets they aggregate as a JSON array
+  // of pks (MapLibre hands nested properties back as strings). Both the dimming
+  // and the ramp's domain ask the same question of them.
+  const featureHasDataset = (feature, pk) => {
+    try {
+      return JSON.parse(feature.properties.datasets).includes(pk)
+    } catch {
+      return false
+    }
+  }
+
+  // Tracks are the third way a dataset draws itself (hexes, markers, tracks),
+  // and they need no feature-state: every track feature carries its dataset on
+  // it (pk_url, as a string in the tile), so the paint expression can read the
+  // focus straight off the property. See applyTrackFocus.
+  const trackIsFocused = (pk) => [
+    '==',
+    ['to-number', ['get', 'pk_url']],
+    pk
+  ]
 
   useEffect(() => {
     setColorStops()
@@ -771,7 +803,7 @@ export default function CreateMap({
   // rendered rather than fetched: the counts are already on the features the
   // map is drawing, so a viewport-scaled ramp costs no request — one pass over
   // the visible hexes, which is at most a few thousand small objects.
-  function measureVisibleHexRange() {
+  function measureVisibleHexRange(focusPk) {
     const layers = HEX_LAYER_IDS.filter((id) => map.current.getLayer(id))
     if (!layers.length) return undefined
     // No geometry argument = the whole viewport. Hidden layers and layers
@@ -786,6 +818,11 @@ export default function CreateMap({
     // expensive. Features straddling a tile boundary appear more than once —
     // harmless for a min/max.
     for (const feature of features) {
+      // With a dataset page open, every other dataset's cells are greyed (see
+      // hoverHighlightPoints) — they carry none of the ramp's colours, so they
+      // have no business setting its domain. Measuring them was what made the
+      // few coloured cells change shade on a pan across unrelated data.
+      if (focusPk !== undefined && !featureHasDataset(feature, focusPk)) continue
       const count = Number(feature.properties?.count)
       if (!Number.isFinite(count) || count <= 0) continue
       if (count < lo) lo = count
@@ -809,8 +846,21 @@ export default function CreateMap({
     // arrives after the re-renders a hover causes, and a viewport full of
     // hexes is not free to walk.
     if (!hexRangeDirty.current) return
+    const focusPk = rampFocusPk.current
+    // An open dataset page measures once and then holds. The ramp is scaled to
+    // that dataset's cells, and those cells are being read against each other —
+    // re-scaling under every drag would paint the same cell a different shade
+    // each time the camera settled, which is exactly what the ramp is for
+    // avoiding. Panning has nothing to re-measure until the page closes or a
+    // filter changes what the counts mean (resetViewportHexRange).
+    if (focusPk !== undefined && rampMeasuredForPk.current === focusPk) return
     hexRangeDirty.current = false
-    const range = measureVisibleHexRange()
+    const range = measureVisibleHexRange(focusPk)
+    // Only a real measurement locks it: opening a page while its dataset is off
+    // screen finds nothing, and should keep looking until the camera reaches it.
+    if (focusPk !== undefined && range !== undefined) {
+      rampMeasuredForPk.current = focusPk
+    }
     if (rangesEqual(viewportHexRange.current, range)) return
     viewportHexRange.current = range
     setColorStopsRef.current()
@@ -823,14 +873,49 @@ export default function CreateMap({
   // measured. The next idle re-measures, once the new tiles are up.
   function resetViewportHexRange() {
     hexRangeDirty.current = true
+    rampMeasuredForPk.current = undefined
     if (viewportHexRange.current === undefined) return
     viewportHexRange.current = undefined
     setColorStopsRef.current?.()
     onViewportHexRangeRef.current(undefined)
   }
 
+  // The track layers' half of the focus. Unlike the hex/marker layers this is
+  // paint on the whole layer rather than per-feature state, so it survives new
+  // tiles on its own and only has to be re-applied when the focus itself
+  // changes — the signature guard below keeps the calls from the map's own
+  // 'idle' free.
+  //
+  // A selected platform outranks a focused dataset: its own track is drawn on
+  // top by the 'selected-track' layers, and everything under it goes flat grey
+  // so it reads alone. Without a selection, the focused dataset's tracks keep
+  // their colour and every other dataset's go grey.
+  function applyTrackFocus() {
+    if (!map.current || !map.current.getLayer('track-lines')) return
+    const pk = selectedTrajectoryRef.current
+      ? 'selection'
+      : focusedDatasetPk.current
+    if (trackFocusApplied.current === pk) return
+    trackFocusApplied.current = pk
+
+    const [lineColor, headIcon] =
+      pk === 'selection'
+        ? ['lightgrey', 'track-head-arrow-dim']
+        : pk
+          ? [
+            ['case', trackIsFocused(pk), trackLineColor, 'lightgrey'],
+            ['case', trackIsFocused(pk), 'track-head-arrow', 'track-head-arrow-dim']
+          ]
+          : [trackLineColor, 'track-head-arrow']
+
+    map.current.setPaintProperty('track-lines', 'line-color', lineColor)
+    map.current.setLayoutProperty('track-heads', 'icon-image', headIcon)
+    map.current.setPaintProperty('track-heads-fixed', 'circle-color', lineColor)
+  }
+
   function hoverHighlightPoints(pk) {
     if (!map.current || !layersLoaded.current) return
+    applyTrackFocus()
 
     // Which rendered features do NOT belong to the focused dataset — those are
     // the ones that go grey. queryRenderedFeatures only sees what is on screen
@@ -848,9 +933,7 @@ export default function CreateMap({
       }
       dimmed[layerId] = map.current
         .queryRenderedFeatures({ layers: [layerId] })
-        .filter(
-          (feature) => !JSON.parse(feature.properties.datasets).includes(pk)
-        )
+        .filter((feature) => !featureHasDataset(feature, pk))
         // promoteId puts pk on the feature id, which is what setFeatureState
         // addresses.
         .map((feature) => feature.id)
@@ -1134,10 +1217,25 @@ export default function CreateMap({
 
   // The single dataset the map singles out: whatever the cursor is over in the
   // list, else the dataset whose page is open. Inspecting a dataset therefore
-  // pins the same highlight hovering gives, until it's closed.
+  // pins the same highlight hovering gives, until it's closed. Every other
+  // dataset stays on the map, drawn grey — they are still the context this one
+  // is being read against.
   useEffect(() => {
     if (map.current) {
       const focusedDataset = hoveredDataset || inspectDataset
+      // The ramp follows the open page only, never the hover: rescaling it per
+      // row would set the whole map moving as the cursor swept the list. A new
+      // page (or none) means the held measurement no longer describes what is
+      // coloured, so the next idle takes a fresh one.
+      const rampPk =
+        inspectDataset && inspectDataset.cdm_data_type !== 'Grid'
+          ? inspectDataset.pk
+          : undefined
+      if (rampPk !== rampFocusPk.current) {
+        rampFocusPk.current = rampPk
+        rampMeasuredForPk.current = undefined
+        hexRangeDirty.current = true
+      }
       if (focusedDataset?.cdm_data_type === 'Grid') {
         // A griddap dataset has no map features: highlighting its pk would
         // grey the whole map with nothing selected. Draw its bbox instead.
@@ -1149,6 +1247,9 @@ export default function CreateMap({
         setGriddapHighlight(activeWmsOverlay ? activeWmsOverlay.bbox : null)
         hoverHighlightPoints(focusedDataset?.pk)
       }
+      // Also from here: hoverHighlightPoints skips everything until the layers
+      // have settled, and clearing a focus has no later event to ride in on.
+      applyTrackFocus()
     }
   }, [hoveredDataset, inspectDataset, activeWmsOverlay])
 
@@ -1406,11 +1507,9 @@ export default function CreateMap({
       if (!selectedTrajectory) {
         rawTrackRef.current = null
         source.setData({ type: 'FeatureCollection', features: [] })
-        if (map.current.getLayer('track-lines')) {
-          map.current.setPaintProperty('track-lines', 'line-color', trackLineColor)
-          map.current.setLayoutProperty('track-heads', 'icon-image', 'track-head-arrow')
-          map.current.setPaintProperty('track-heads-fixed', 'circle-color', trackLineColor)
-        }
+        // Back to whatever the dataset focus asks for — full colour when no
+        // dataset page is open, the focused dataset's tracks alone when one is.
+        applyTrackFocus()
         return
       }
 
@@ -1494,11 +1593,8 @@ export default function CreateMap({
         features: [...lineFeatures, ...fixFeatures]
       })
 
-      if (map.current.getLayer('track-lines')) {
-        map.current.setPaintProperty('track-lines', 'line-color', 'lightgrey')
-        map.current.setLayoutProperty('track-heads', 'icon-image', 'track-head-arrow-dim')
-        map.current.setPaintProperty('track-heads-fixed', 'circle-color', 'lightgrey')
-      }
+      // Everything under the selected track goes flat grey so it reads alone.
+      applyTrackFocus()
 
       const longitudes = rawCoordinates.map((c) => c[0])
       const latitudes = rawCoordinates.map((c) => c[1])
@@ -1709,7 +1805,14 @@ export default function CreateMap({
           'source-layer': 'internal-layer-name',
           paint: {
             'circle-color': '#ffffff',
-            'circle-opacity': 0.9,
+            // A white casing is what makes a marker pop, which is the last
+            // thing a greyed-out one should do — it shares this source layer
+            // with 'points', so the same dimmed state reaches it and fades it
+            // back rather than leaving grey dots ringed in white. Only halfway
+            // back: the other datasets stay on the map to be seen, just
+            // quietly, and the casing is what keeps a grey dot legible over a
+            // dark sea.
+            'circle-opacity': ['case', IS_DIMMED, 0.5, 0.9],
             'circle-radius': radiusExpression(pointRadiusRange.current, 1.25)
           }
         },
@@ -1959,6 +2062,11 @@ export default function CreateMap({
           'circle-stroke-width': 1.5
         }
       })
+
+      // These three layers were just created in full colour, so whatever focus
+      // paint was on the old ones is gone with them.
+      trackFocusApplied.current = undefined
+      applyTrackFocus()
 
       // One selected platform's full track (GeoJSON from /trajectories/track).
       // Line features render the path; point features are the raw fixes.
