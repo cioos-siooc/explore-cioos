@@ -65,9 +65,34 @@
   box-shadow: var(--cioos-shadow-3d);
 }
 
-/* Expanded: fill the remaining height so the list can scroll. */
+/* Expanded: fill the remaining height so the list can scroll, and slide in from
+   the left edge of the screen — the column is asked for from the top bar, so it
+   should read as arriving rather than blinking into place. The perspective is
+   carried through both keyframes so the card keeps its 3D lift while it
+   travels, and the duration is spelled out rather than taken from
+   --cioos-transition-*: those tokens carry a timing function of their own, and
+   a second one after them makes the shorthand invalid — the animation is then
+   dropped without a word. */
 .sidebarDatasets.expanded {
   flex: 1 1 auto;
+  animation: sidebarSlideIn 0.32s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+
+@keyframes sidebarSlideIn {
+  from {
+    /* Its own width plus the column's left inset: clear of the screen edge, so
+       the card travels in rather than growing out of it. */
+    transform: translateX(calc(-100% - 16px)) var(--cioos-perspective);
+  }
+  to {
+    transform: translateX(0) var(--cioos-perspective);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebarDatasets.expanded {
+    animation: none;
+  }
 }
 
 /* The datasets card is opened from the top-bar Datasets button, so when
@@ -355,9 +380,9 @@
 
 @keyframes sheetRise {
   from {
-    transform: translateY(100%);
+    transform: translateY(100%) var(--cioos-perspective);
   }
   to {
-    transform: translateY(0);
+    transform: translateY(0) var(--cioos-perspective);
   }
 }
