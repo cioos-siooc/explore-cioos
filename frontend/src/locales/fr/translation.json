@@ -370,6 +370,8 @@
   "harvest.card.lastAttempt": "Dernière tentative : {{date}}",
   "tracksToggleLabel": "Afficher les trajectoires",
   "layerSelectorLabel": "Géométrie des jeux de données",
+  "layerPoint": "Point",
+  "layerPointHint": "Échantillons isolés et indépendants, chacun en son lieu et son instant — échantillons d'eau, mesures ponctuelles",
   "layerProfile": "Profil",
   "layerProfileHint": "Un lieu, mesuré en profondeur dans la colonne d'eau — profils CTD, échantillons par bouteille",
   "layerTimeseries": "Série temporelle",

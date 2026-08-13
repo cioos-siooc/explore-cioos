@@ -369,6 +369,8 @@
   "harvest.card.lastAttempt": "Last attempt: {{date}}",
   "tracksToggleLabel": "Show trajectory tracks",
   "layerSelectorLabel": "Dataset geometry",
+  "layerPoint": "Point",
+  "layerPointHint": "Single independent samples, each its own place and moment — water samples, spot readings",
   "layerProfile": "Profile",
   "layerProfileHint": "One place, measured down through the water column — CTD casts, bottle samples",
   "layerTimeseries": "Time series",

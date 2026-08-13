@@ -12,14 +12,17 @@
 // These are the CF discrete-sampling geometries a dataset declares
 // (cdm_data_type), which is why the filter calls itself "Dataset geometry" —
 // the choice is about the SHAPE of the observations, not the subject matter.
-// The order follows the taxonomy: the three that sample a fixed place, then
-// the two that sample along a path, then the occurrence records. The two
-// trajectory rows are kept adjacent because the track/hex display options
-// render once, under the pair.
+// The order follows the taxonomy: the single sample, then the three that
+// sample a fixed place, then the two that sample along a path, then the
+// occurrence records. The two trajectory rows are kept adjacent because the
+// track/hex display options render once, under the pair.
 //
 // 'trajectories' (plural) is the plain-Trajectory key. It keeps its old name
-// so the ?layers= links already in the wild still resolve.
+// so the ?layers= links already in the wild still resolve. Adding 'point' is
+// safe for the same links: ?layers= is a comma list of these NAMES, so a new
+// key changes render order only, never the meaning of an existing link.
 export const DATA_LAYER_LABEL_KEYS = {
+  point: 'layerPoint',
   profile: 'layerProfile',
   timeseries: 'layerTimeseries',
   timeseriesProfile: 'layerTimeseriesProfile',
@@ -31,6 +34,7 @@ export const DATA_LAYER_LABEL_KEYS = {
 // The one-line hint under each label: what the geometry means in plain terms,
 // and the platforms that typically produce it. Same keys as above.
 export const DATA_LAYER_HINT_KEYS = {
+  point: 'layerPointHint',
   profile: 'layerProfileHint',
   timeseries: 'layerTimeseriesHint',
   timeseriesProfile: 'layerTimeseriesProfileHint',
@@ -73,7 +77,7 @@ export const allDataLayersOn = (dataLayers) =>
   !dataLayers || DATA_LAYER_KEYS.every((key) => dataLayers[key])
 
 // What the checkbox shows. Everything-on is the unfiltered state, so it draws
-// as no selection at all rather than as six ticks; once the user narrows, the
+// as no selection at all rather than as a full set of ticks; once the user narrows, the
 // ticks are the geometries they kept.
 export const isDataLayerChecked = (dataLayers, key) =>
   !allDataLayersOn(dataLayers) && Boolean(dataLayers?.[key])
@@ -104,7 +108,15 @@ export const DEFAULT_TRACKS_MODE = true
 
 // The cdm_data_types that share cde.profiles. The tile query names them
 // directly (profileTypes=<comma list>), so this doubles as the wire mapping.
+//
+// Point is here because a small Point dataset is stored as exact rows in
+// cde.profiles — but it is the one type that is not tied to a single table:
+// above a size cutoff the harvester stores it as coverage cells instead, so
+// it appears in POINT_TYPE_KEYS below as well. A given dataset's rows only
+// ever live in one table, so naming Point on both wire params returns the
+// right union without the client tracking which table it landed in.
 export const PROFILE_TYPE_KEYS = [
+  ['point', 'Point'],
   ['profile', 'Profile'],
   ['timeseries', 'TimeSeries'],
   ['timeseriesProfile', 'TimeSeriesProfile']
@@ -117,6 +129,11 @@ export const TRAJECTORY_TYPE_KEYS = [
   ['trajectoryProfile', 'TrajectoryProfile']
 ]
 
+// Point again, for the cell side of the same switch. Kept as its own list so
+// the trajectory pair keeps meaning exactly the trajectory pair — it also
+// drives the track-lines layer, which Point has nothing to contribute to.
+export const POINT_TYPE_KEYS = [['point', 'Point']]
+
 const TYPE_TO_KEY = new Map(
   [...PROFILE_TYPE_KEYS, ...TRAJECTORY_TYPE_KEYS].map(([key, type]) => [
     type,
@@ -125,11 +142,12 @@ const TYPE_TO_KEY = new Map(
 )
 
 // Which switch governs a dataset, or undefined when none does. OBIS datasets
-// carry cdm_data_type 'Point' — which an ERDDAP dataset can legitimately be
-// too — so they're matched on source first, the same way SelectionProvider
-// tells them apart. Grid datasets belong to no geometry layer: they have
-// their own gridded-coverage switch, and the geometry selection never hides
-// them.
+// carry cdm_data_type 'Point', and so now do the ERDDAP datasets on the Point
+// layer — the collision this source-first check was written against is a live
+// case rather than a hypothetical one, so the order here is load-bearing.
+// SelectionProvider tells them apart the same way. Grid datasets belong to no
+// geometry layer: they have their own gridded-coverage switch, and the
+// geometry selection never hides them.
 export function dataLayerKeyForDataset (row) {
   if (row.source_type === 'obis') return 'obis'
   return TYPE_TO_KEY.get(row.cdm_data_type)
