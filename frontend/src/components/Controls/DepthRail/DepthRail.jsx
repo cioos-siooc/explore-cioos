@@ -2,14 +2,23 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import Rail from '../Rail/Rail.jsx'
-import { createDepthAxis, snapToMetre, tickDepthsFor } from './depthAxis.js'
+import { snapToGridNode } from '../../../wmsUtilities'
+import {
+  createDepthAxis,
+  snapToMetre,
+  tickDepthsFor,
+  MIN_TICK_GAP_PX,
+  MIN_TICK_GAP_PX_VERTICAL
+} from './depthAxis.js'
+import './styles.css'
 
 // The depth slider, built the same way the time one is: the shared Rail, given
-// a warped axis and a pair of teal handles. The Filters panel is the only place
-// it appears — depth has no equivalent of the trajectory scrub, so there is
-// nothing here to put over the map — but it is the same control as the Time
-// entry above it, on purpose. Presentational: every value comes in as a prop
-// and every change goes out through onCommit.
+// a warped axis, a pair of teal handles and — while a gridded dataset with a
+// vertical axis is drawn — the amber marker saying which of its levels the map
+// is painting. It appears in the Filters panel as the range alone, and along
+// the bottom of the map, above the time bar, as range plus marker.
+// Presentational: every value comes in as a prop and every change goes out
+// through onCommit.
 
 // Keyboard step per key, in metres. Arrows walk 1 m for the exact figure; the
 // coarser steps are what make a 12 km domain navigable without a mouse.
@@ -44,7 +53,7 @@ export function DepthField ({ value, min, max, onCommit, label, className }) {
     <input
       type='number'
       inputMode='numeric'
-      className={className}
+      className={className || 'railValueInput depthRailNumberInput'}
       aria-label={label}
       value={draft}
       min={min}
@@ -132,9 +141,10 @@ export function DepthPresetSelect ({
   )
 }
 
-// The axis the rail draws. Fixed, unlike the time one: the filterable water
-// column is the same 0–12000 m whatever the current selection holds, and there
-// is no /depthExtent to narrow it to.
+// The axis the Filters panel's rail draws: the whole filterable water column,
+// the same 0–12000 m whatever the selection holds, since there is no
+// /depthExtent to narrow it to. The bar over the map builds its own instead —
+// it has a gridded dataset's levels to fit as well.
 export function useDepthAxis (min, max) {
   return useMemo(() => createDepthAxis(min, max), [min, max])
 }
@@ -143,7 +153,13 @@ export default function DepthRail ({
   axis,
   startDepth,
   endDepth,
+  // { value, nodes } while a gridded dataset with a vertical axis is drawn on
+  // the map: which of its levels is showing, and the levels it has to choose
+  // from. The depth twin of the time rail's grid marker, and amber for the same
+  // reason — it says where the drawn data *is*, not what is filtered.
+  grid,
   onCommit,
+  orientation,
   className
 }) {
   const { t } = useTranslation()
@@ -162,7 +178,18 @@ export default function DepthRail ({
       valueText: `${endDepth} m`,
       label: t('depthFilterEndDepth'),
       className: 'railHandleRange'
-    }
+    },
+    ...(grid
+      ? [
+        {
+          key: 'grid',
+          value: grid.value,
+          valueText: `${grid.value} m`,
+          label: t('depthBarGridLabel'),
+          className: 'railHandleMarker railHandleGrid'
+        }
+      ]
+      : [])
   ]
 
   const bands = [
@@ -170,24 +197,39 @@ export default function DepthRail ({
   ]
 
   const ticksFor = useCallback(
-    (railWidth) =>
-      tickDepthsFor(railWidth, axis.anchorDepths, axis.toPos).map((depth) => ({
+    (railLength) =>
+      tickDepthsFor(
+        railLength,
+        axis.anchorDepths,
+        axis.toPos,
+        orientation === 'vertical' ? MIN_TICK_GAP_PX_VERTICAL : MIN_TICK_GAP_PX
+      ).map((depth) => ({
         key: depth,
         value: depth,
         label: depth
       })),
-    [axis]
+    [axis, orientation]
   )
 
   return (
     <Rail
       className={className}
+      orientation={orientation}
       axis={axis}
       handles={handles}
       bands={bands}
       ticksFor={ticksFor}
-      snap={snapToMetre}
-      stepFor={keyboardStepMetres}
+      // The range ends land on whole metres; the grid marker lands on the
+      // nearest level the dataset holds, so dragging it steps through that
+      // dataset rather than past it.
+      snap={(depth, handle) =>
+        handle === 'grid'
+          ? snapToGridNode(grid.nodes, depth)
+          : snapToMetre(depth)}
+      stepFor={(event, handle) =>
+        handle === 'grid'
+          ? grid.nodes.step * (event.shiftKey ? 10 : 1)
+          : keyboardStepMetres(event)}
       onCommit={onCommit}
     />
   )

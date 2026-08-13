@@ -13,6 +13,7 @@ import MapCornerControls from './MapCorner/MapCornerControls.jsx'
 import ZoomToDataset from './ZoomToDataset/ZoomToDataset.jsx'
 import Loading from '../Controls/Loading/Loading.jsx'
 import Legend from '../Controls/Legend/Legend.jsx'
+import DepthBar from '../Controls/DepthBar/DepthBar.jsx'
 import TimeBar from '../Controls/TimeBar/TimeBar.jsx'
 import WmsLegend from '../Controls/WmsLegend/WmsLegend.jsx'
 import IntroModal from '../Controls/IntroModal/IntroModal.jsx'
@@ -167,13 +168,15 @@ export default function AppShell () {
         scrubTime={scrubTime}
       />
       <MapCornerControls />
-      {/* The bottom time bar carries both time controls — the range filter and
-          the trajectory scrub date — so it is always mounted; the scrub row
-          inside it is what comes and goes with the track layers. It renders
-          before the zoom pill because they share the bottom-center spot, and a
-          CSS sibling rule lifts the pill clear of it. It reads its own state
-          from the filter and map providers. */}
+      {/* The two range bars over the map, each carrying the filter for its
+          axis and the marks that say where the drawn data sits on it: time
+          along the bottom edge, depth down the right one, perpendicular the
+          way the axes are. Each comes and goes with whether it has anything to
+          say. The time bar renders before the zoom pill because they share the
+          bottom-center spot, and a CSS sibling rule lifts the pill clear of it.
+          Both read their own state from the filter and map providers. */}
       <TimeBar />
+      <DepthBar />
       <ZoomToDataset variant='floating' />
       {activeWmsOverlay && !wmsLegendIsInline && (
         <WmsLegend

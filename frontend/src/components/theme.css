@@ -43,6 +43,13 @@
   --cioos-track-700:   #543A90; /* hover/pressed */
   --cioos-track-bg:    rgba(103, 73, 172, 0.14); /* trailing-window wash */
   --cioos-track-surface: #EFEAF8; /* opaque sibling of -bg, for cards over the map */
+  /* The gridded-data amber, paired the same way: the map paints the active
+     grid's footprint in it (griddap-highlight in Map.jsx), and the controls
+     that say which slice of that grid is drawn — its marker on the time bar and
+     on the depth strip — carry it too. */
+  --cioos-grid:        #FBB03B; /* griddap coverage highlight + its markers */
+  --cioos-grid-700:    #C77F14; /* hover/pressed, and label text on white */
+  --cioos-grid-surface: #FDF1DC; /* opaque tint, for pills over the map */
 
   /* --- Elevation --- */
   --cioos-shadow-card:    0 2px 8px rgba(21, 47, 55, 0.08);
@@ -99,12 +106,13 @@
   --cioos-top-bar-space: 0px;
 
   /* --- Layout: bottom time-bar footprint ---
-     How far the tracks-mode time bar reaches up from the bottom of the viewport
-     (its own offset + measured height). TimeBar publishes the real number on
-     :root while it is mounted and clears it on unmount, so anything sitting
-     over the lower half of the map — the datasets sidebar, the zoom-to-dataset
-     pill — can hold clearance from it without hard-coding its height. 0 when
-     the bar isn't shown. */
+     How far the time bar reaches up from the bottom of the viewport (its own
+     offset + measured height). TimeBar publishes the real number on :root while
+     it is mounted and clears it on unmount, so anything sitting over the lower
+     half of the map — the datasets sidebar, the zoom-to-dataset pill — can hold
+     clearance from it without hard-coding its height. 0 when the bar isn't
+     shown. (The depth bar runs down the right edge instead and is measured by
+     nothing: it sits clear of the other floating surfaces.) */
   --cioos-time-bar-space: 0px;
 
   /* --- Header & Layout (Modern Sidebar) --- */

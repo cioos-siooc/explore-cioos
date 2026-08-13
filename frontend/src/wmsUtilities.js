@@ -180,6 +180,24 @@ export function getTimeDimension(dimensions) {
   return (dimensions || []).find((dim) => dim.name === 'time')
 }
 
+// The slices a grid axis actually holds, as plain numbers: its two endpoints
+// and how many nodes lie between them. ERDDAP's axes are evenly spaced, so the
+// nodes can be reconstructed from the harvested metadata alone — which is what
+// lets the markers on the time and depth bars land on slices the dataset has
+// rather than on interpolated values between them. Null when the axis is
+// missing, degenerate, or a single slice (nothing to move along).
+export function gridAxisNodes(min, max, count) {
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null
+  if (!count || count < 2) return null
+  return { min, max, count, step: (max - min) / (count - 1) }
+}
+
+export function snapToGridNode(nodes, value) {
+  if (!nodes) return value
+  const snapped = nodes.min + Math.round((value - nodes.min) / nodes.step) * nodes.step
+  return Math.min(Math.max(snapped, nodes.min), nodes.max)
+}
+
 export function getVerticalDimension(dimensions) {
   return (dimensions || []).find(
     (dim) => dim.name === 'depth' || dim.name === 'altitude'

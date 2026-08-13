@@ -29,9 +29,12 @@ const TICK_FILLERS = [
   25, 50, 200, 250, 750, 1500, 2000, 3000, 5000, 6000, 8000, 10000
 ]
 
-// Label pitch: a five-digit metre count at the tick row's 11px size (~34px)
-// plus breathing room on both sides.
-const MIN_TICK_GAP_PX = 46
+// Label pitch across: a five-digit metre count at the tick row's 11px size
+// (~34px) plus breathing room on both sides. Down the rail the labels stack
+// instead, so what has to clear is their line height, not their width — which
+// is why the vertical rail can afford several times as many.
+export const MIN_TICK_GAP_PX = 46
+export const MIN_TICK_GAP_PX_VERTICAL = 16
 
 // Whole metres only: the depth filter is a query parameter, and a drag that
 // generated fractional metres would key a new request every animation frame.
@@ -104,9 +107,14 @@ export function createDepthAxis (min, max) {
 // Two passes. The layer boundaries the warp is built around go first, each kept
 // only if it clears the last one kept; the spans between the survivors are then
 // filled with whatever round depths still have room on both sides.
-export function tickDepthsFor (railWidth, anchorDepths, toPos) {
-  if (!railWidth) return []
-  const minGap = MIN_TICK_GAP_PX / railWidth
+export function tickDepthsFor (
+  railLength,
+  anchorDepths,
+  toPos,
+  minGapPx = MIN_TICK_GAP_PX
+) {
+  if (!railLength) return []
+  const minGap = minGapPx / railLength
 
   const kept = []
   anchorDepths.forEach((depth) => {

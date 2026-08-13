@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import { defaultStartDate } from '../../config.js'
 import Rail from '../Rail/Rail.jsx'
+import { snapToGridNode } from '../../../wmsUtilities'
 import {
   MS_PER_DAY,
   createTimeAxis,
@@ -21,10 +22,12 @@ import './styles.css'
 // as moving the other.
 //
 // It draws a range (two teal handles bounding the time filter) and, optionally,
-// a scrub marker (one purple handle, the trajectory date) with the trailing
-// window shaded behind it. The track, the handles and the tick row are the
-// shared Rail, which knows nothing about dates; this file is what makes that
-// rail a calendar.
+// the two marks that say where something *is* rather than what is filtered: the
+// scrub marker (purple, the trajectory date) with its trailing window shaded
+// behind it, and the grid marker (amber, the time slice of the gridded dataset
+// being drawn). The track, the handles and the tick row are the shared Rail,
+// which knows nothing about dates; this file is what makes that rail a
+// calendar.
 
 // Keyboard step per key, in days. Arrows walk a day at a time for the exact
 // date; the coarser steps are what make a decades-wide domain navigable
@@ -64,7 +67,7 @@ export function DateField ({ value, min, max, onCommit, label, className }) {
   return (
     <input
       type='date'
-      className={className || 'timeRailDateInput'}
+      className={className || 'railValueInput timeRailDateInput'}
       aria-label={label}
       value={draft}
       min={min}
@@ -198,7 +201,12 @@ export function useTimeAxis ({
   endDate,
   // Whether the axis has to reach "today" whatever the data says — it does
   // while the trajectory scrub is on it, since the scrub runs to now.
-  includeToday = false
+  includeToday = false,
+  // Dates the axis must cover whatever the catalogue says, because something
+  // else on the rail lives at them: the span of the gridded dataset being
+  // drawn, which may start before the selection and (on a forecast) end after
+  // today. A marker the axis can't represent is a marker that can't be dragged.
+  include = []
 }) {
   const maxIso = todayIso()
   const dataStart = clampIso(
@@ -211,12 +219,17 @@ export function useTimeAxis ({
     dataStart,
     maxIso
   )
-  const domainStart =
-    timeFilterActive && startDate < dataStart ? startDate : dataStart
+  const domainStart = [
+    timeFilterActive && startDate < dataStart ? startDate : dataStart,
+    ...include
+  ]
+    .filter(Boolean)
+    .reduce((earliest, date) => (date < earliest ? date : earliest))
   const domainEnd = [
     dataEnd,
     timeFilterActive ? endDate : '',
-    includeToday ? maxIso : ''
+    includeToday ? maxIso : '',
+    ...include
   ]
     .filter(Boolean)
     .reduce((latest, date) => (date > latest ? date : latest))
@@ -235,6 +248,12 @@ export default function TimeRail ({
   // { value, trailStartMs } while the trajectory scrub shares this rail;
   // absent everywhere else.
   scrub,
+  // { value, nodes } while a gridded dataset is drawn on the map: which of its
+  // time slices is showing, and the slices it has to choose from. Unlike every
+  // other mark on this rail it does not walk days — it walks the dataset's own
+  // nodes, and commits a full timestamp rather than a date, because a grid can
+  // hold several slices in a day.
+  grid,
   onCommit,
   className
 }) {
@@ -276,7 +295,18 @@ export default function TimeRail ({
           value: isoToMs(scrub.value),
           valueText: scrub.value,
           label: t('timeBarScrubLabel'),
-          className: 'timeRailHandleScrub'
+          className: 'railHandleMarker timeRailHandleScrub'
+        }
+      ]
+      : []),
+    ...(grid
+      ? [
+        {
+          key: 'grid',
+          value: Date.parse(grid.value),
+          valueText: grid.value,
+          label: t('timeBarGridLabel'),
+          className: 'railHandleMarker railHandleGrid'
         }
       ]
       : [])
@@ -319,9 +349,21 @@ export default function TimeRail ({
       handles={handles}
       bands={bands}
       ticksFor={ticksFor}
-      snap={snapToDay}
-      stepFor={(event) => keyboardStepDays(event) * MS_PER_DAY}
-      onCommit={(handle, ms) => onCommit(handle, msToIso(ms))}
+      // The range and the scrub are dates and land on whole days; the grid
+      // marker lands on the nearest slice the dataset holds, which is what
+      // makes dragging it feel like stepping through the dataset rather than
+      // scrubbing past it.
+      snap={(ms, handle) =>
+        handle === 'grid' ? snapToGridNode(grid.nodes, ms) : snapToDay(ms)}
+      stepFor={(event, handle) =>
+        handle === 'grid'
+          ? grid.nodes.step * (event.shiftKey ? 10 : 1)
+          : keyboardStepDays(event) * MS_PER_DAY}
+      onCommit={(handle, ms) =>
+        onCommit(
+          handle,
+          handle === 'grid' ? new Date(ms).toISOString() : msToIso(ms)
+        )}
     />
   )
 }

@@ -116,3 +116,260 @@
   transform: translateX(-50%);
   white-space: nowrap;
 }
+
+/* ------------------------------------------------------------------
+ * Running down instead of across. Only the geometry changes: the track
+ * becomes a column with the axis minimum at the top, and the labels move
+ * to its left. Depth is the reason it exists — a water column drawn
+ * sideways asks the reader to rotate it in their head every time — so
+ * the same rail serves the strip down the edge of the map.
+ * ------------------------------------------------------------------ */
+.railVertical {
+  /* Track first in the markup, labels second; reversed here so the labels
+     sit on the leading edge where they are read from. */
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: stretch;
+  gap: 4px;
+  height: 100%;
+  /* The inset that keeps a handle parked at either end, and its label, inside
+     the box — the horizontal rail's left/right padding, turned. */
+  padding: 8px 0;
+}
+
+.railVertical .railTrack {
+  flex: 0 0 18px;
+  width: 18px;
+  height: auto;
+}
+
+.railVertical .railLine {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  right: auto;
+  width: 3px;
+  height: auto;
+  margin: 0 0 0 -1.5px;
+}
+
+.railVertical .railFill {
+  top: auto;
+  left: 50%;
+  width: 3px;
+  margin: 0 0 0 -1.5px;
+}
+
+/* Down the middle of the track, at the height its value sits at (the height
+   itself comes in as an inline style, the way `left` does across). */
+.railVertical .railHandle {
+  left: 50%;
+}
+
+.railVertical .railTicks {
+  flex: 1 1 auto;
+  /* Wide enough for a five-digit metre count, and said here rather than left to
+     the labels themselves — they are absolutely positioned, so they contribute
+     no width of their own and would otherwise be squeezed out of the box by
+     whatever else the surface holds. */
+  min-width: 30px;
+  height: auto;
+  text-align: right;
+}
+
+.railVertical .railTicks {
+  /* Smaller than across: down here they are a column of short numbers running
+     beside the track, read as a scale, not labels standing on their own. */
+  font-size: 10px;
+}
+
+.railVertical .railTick {
+  top: auto;
+  right: 0;
+  transform: translateY(-50%);
+}
+
+/* ------------------------------------------------------------------
+ * Markers: a mark that says where something *is* rather than what is
+ * filtered — the trajectory scrub date, and the slice of a gridded
+ * dataset currently drawn. A narrow upright bar rather than another
+ * circle, because it can sit anywhere among the range handles —
+ * including exactly on one — so it has to read as a different kind of
+ * thing and stay grabbable on top of them. The colour is the mark's
+ * own; the shape is shared.
+ * ------------------------------------------------------------------ */
+.rail .railHandleMarker {
+  width: 6px;
+  height: 18px;
+  margin: -9px 0 0 -3px;
+  border-radius: var(--cioos-radius-pill);
+  box-shadow: var(--cioos-shadow-sm);
+  z-index: 2;
+}
+
+/* Turned with the rail: a bar across the track, not along it. */
+.railVertical .railHandleMarker {
+  width: 18px;
+  height: 6px;
+  margin: -3px 0 0 -9px;
+}
+
+.rail .railHandleGrid {
+  background-color: var(--cioos-grid);
+}
+
+.rail .railHandleGrid:hover {
+  background-color: var(--cioos-grid-700);
+}
+
+.rail .railHandleGrid:focus-visible {
+  box-shadow: 0 0 0 3px rgb(251 176 59 / 55%);
+}
+
+/* ------------------------------------------------------------------
+ * The quiet fields that go with a rail, and the named, tinted pills
+ * they sit in — one pill per mark, in that mark's colour, so the label
+ * says which control it is and the colour says which mark on the rail
+ * it moves. Plain text until pointed at, so a row of them over the map
+ * doesn't read as a form.
+ *
+ * Shared by the time bar and the depth bar; the Filters panel boxes the
+ * same fields back up into a proper form instead (see the Filter
+ * stylesheet).
+ * ------------------------------------------------------------------ */
+.railValueInput {
+  user-select: text;
+  -webkit-user-select: text;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--cioos-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--cioos-ink);
+}
+
+.railValueInput:hover {
+  background-color: var(--cioos-white);
+}
+
+.railValueInput:focus-visible {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
+}
+
+.railField {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 2px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius-pill);
+}
+
+/* The colour key. An even hairline all the way round — a one-sided rule on a
+   pill radius reads as two heavy arcs at the ends rather than as an
+   underline. */
+.railFieldRange {
+  background-color: var(--cioos-surface-2);
+  border-color: var(--cioos-primary);
+}
+
+.railFieldScrub {
+  /* The opaque sibling of --cioos-track-bg: that one is a wash meant to let
+     what is behind it show through, which over the map would let the map
+     through too. */
+  background-color: var(--cioos-track-surface);
+  border-color: var(--cioos-track);
+}
+
+.railFieldScrub .railValueInput {
+  color: var(--cioos-track-700);
+}
+
+.railFieldScrub .railValueInput:focus-visible {
+  border-color: var(--cioos-track);
+  box-shadow: 0 0 0 3px rgb(103 73 172 / 45%);
+}
+
+.railFieldGrid {
+  background-color: var(--cioos-grid-surface);
+  border-color: var(--cioos-grid);
+}
+
+.railFieldGrid .railValueInput {
+  color: var(--cioos-grid-700);
+}
+
+.railFieldGrid .railValueInput:focus-visible {
+  border-color: var(--cioos-grid);
+  box-shadow: 0 0 0 3px rgb(251 176 59 / 55%);
+}
+
+/* Plain body type, just weighted — the tint and the colour do the work that a
+   caps/tracking treatment would, and at this size they do it better. */
+.railFieldLabel {
+  flex-shrink: 0;
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.railFieldRange .railFieldLabel {
+  color: var(--cioos-primary-700);
+}
+
+.railFieldScrub .railFieldLabel {
+  color: var(--cioos-track-700);
+}
+
+.railFieldGrid .railFieldLabel {
+  color: var(--cioos-grid-700);
+}
+
+.railFieldSep,
+.railFieldUnits {
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-xs);
+}
+
+.railPresetSelect {
+  max-width: 110px;
+  padding: 2px 2px 2px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink);
+  cursor: pointer;
+}
+
+.railPresetSelect:hover {
+  background-color: var(--cioos-white);
+}
+
+.railReset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: var(--cioos-radius-pill);
+  background: transparent;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+}
+
+.railReset:hover {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
+}

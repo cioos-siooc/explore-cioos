@@ -12,7 +12,11 @@ import {
 import { anyTrajectoryLayerOn } from '../../../state/dataLayers.js'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
 import { useMapState } from '../../../state/map/MapStateProvider.jsx'
-import usePublishedFootprint from '../../../state/ui/usePublishedFootprint.js'
+import {
+  getTimeDimension,
+  gridAxisNodes,
+  snapToGridNode
+} from '../../../wmsUtilities'
 import TimeRail, {
   DateField,
   IntervalSelect,
@@ -20,55 +24,72 @@ import TimeRail, {
   matchQuickPick,
   slideRange
 } from '../TimeRail/TimeRail.jsx'
-import { MS_PER_DAY, isoToMs, clampIso } from '../TimeRail/timeAxis.js'
+import { MS_PER_DAY, isoToMs, msToIso, clampIso } from '../TimeRail/timeAxis.js'
+import usePublishedFootprint from '../../../state/ui/usePublishedFootprint.js'
 import './styles.css'
 
 // How far up the bar reaches from the bottom of the viewport: its own offset
 // plus its height, which changes with the locale's label lengths, with the
-// tighter phone layout, and with whether the trajectory pill is shown.
-// Everything else sitting over the lower map — the datasets sidebar, the legend
-// on narrow screens, the zoom-to-dataset pill, MapLibre's own bottom-right
-// stack — holds clearance from this rather than from a hardcoded height.
+// tighter phone layout, and with which pills are shown. Everything else sitting
+// over the lower map — the datasets sidebar, the legend on narrow screens, the
+// zoom-to-dataset pill, MapLibre's own bottom-right stack — holds clearance
+// from this rather than from a hardcoded height.
 function measureBarSpace ({ top, height }) {
   return Math.max(window.innerHeight - top, height)
 }
 
-// The bottom time bar: one axis carrying both time controls the app has.
+// The time slices of the gridded dataset currently drawn on the map, if it has
+// a time axis at all. Its endpoints come from the harvest as ISO strings.
+export function gridTimeNodes (overlay) {
+  const dimension = getTimeDimension(overlay?.dimensions)
+  if (!dimension) return null
+  return gridAxisNodes(
+    Date.parse(dimension.min),
+    Date.parse(dimension.max),
+    dimension.n_values
+  )
+}
+
+// The bottom time bar: one axis carrying every time control the app has.
 //
 //   * the time-range filter (teal) — two handles bounding what the map, the
 //     datasets list and the counts are filtered to;
 //   * the trajectory scrub date (purple, only while the track layers are
 //     drawing) — the instant each platform's position is drawn at, with its
-//     trailing window shaded behind it.
+//     trailing window shaded behind it;
+//   * the gridded dataset's time slice (amber, only while a WMS overlay with a
+//     time axis is drawn) — which slice of that grid the map is painting.
 //
 // They share an axis but not a value: the scrub deliberately ignores the
 // filter range (Map.jsx keeps timeMin/timeMax off the tracks request), so a
-// narrow filter never strands the scrub outside its own domain.
+// narrow filter never strands the scrub outside its own domain, and the grid
+// marker answers to the dataset's own axis rather than to either of them.
 //
 // Two floating pieces with map showing between them: the input pills on top,
 // the slider card beneath. Full bleed along the bottom edge on phones, a
 // centered bubble once there is room for one.
 //
 // It costs a strip of map, so it is only there when it has something to say:
-// either a time filter is narrowing what is drawn — and then it shows what
-// that range is and lets it be moved or cleared — or trajectories are drawing
-// and the scrub is what dates them. With neither, the range is set from the
-// Time entry in the Filters panel and the map keeps the room.
+// a time filter narrowing what is drawn, trajectories being dated by the
+// scrub, or a grid whose slice can be stepped through. With none of them, the
+// range is set from the Time entry in the Filters panel and the map keeps the
+// room.
 export default function TimeBar () {
   const { timeFilterActive } = useFilters()
-  const { tracksMode, dataLayers } = useMapState()
+  const { tracksMode, dataLayers, activeWmsOverlay } = useMapState()
 
   const scrubActive = tracksMode && anyTrajectoryLayerOn(dataLayers)
-  if (!timeFilterActive && !scrubActive) return null
+  const gridNodes = gridTimeNodes(activeWmsOverlay)
+  if (!timeFilterActive && !scrubActive && !gridNodes) return null
 
-  return <TimeBarSurface scrubActive={scrubActive} />
+  return <TimeBarSurface scrubActive={scrubActive} gridNodes={gridNodes} />
 }
 
 // Split out so the bar's footprint is published by a component that only
 // exists while the bar does: the property is cleared on unmount, which is what
 // lets the sidebar, the legend and MapLibre's corners reclaim the bottom edge
 // the moment it goes away.
-function TimeBarSurface ({ scrubActive }) {
+function TimeBarSurface ({ scrubActive, gridNodes }) {
   const { t } = useTranslation()
   const {
     startDate,
@@ -78,18 +99,39 @@ function TimeBarSurface ({ scrubActive }) {
     timeFilterActive,
     timeExtent
   } = useFilters()
-  const { zoom, scrubTime, setScrubTime, trailingDays, setTrailingDays } =
-    useMapState()
+  const {
+    zoom,
+    scrubTime,
+    setScrubTime,
+    trailingDays,
+    setTrailingDays,
+    activeWmsOverlay,
+    setActiveWmsOverlay
+  } = useMapState()
 
   const barRef = useRef(null)
   usePublishedFootprint(barRef, '--cioos-time-bar-space', measureBarSpace)
+
+  // Where the grid marker sits, and the pill's reading of it. The overlay's
+  // own time is what the map is painting; it is snapped here because a share
+  // link or the harvest could hand over something between two slices.
+  const gridTimeMs = gridNodes
+    ? snapToGridNode(gridNodes, Date.parse(activeWmsOverlay.time))
+    : null
+  const gridIso = gridNodes ? new Date(gridTimeMs).toISOString() : undefined
+  // A grid with slices closer together than a day has a time of day worth
+  // showing; a daily or monthly one does not, and the date says it all.
+  const gridSubDaily = gridNodes && gridNodes.step < MS_PER_DAY
 
   const { axis, maxIso, domainStart, domainEnd } = useTimeAxis({
     timeExtent,
     timeFilterActive,
     startDate,
     endDate,
-    includeToday: scrubActive
+    includeToday: scrubActive,
+    include: gridNodes
+      ? [msToIso(gridNodes.min), msToIso(gridNodes.max)]
+      : []
   })
 
   // The scrub has its own floor (the tracks only go back so far) but can never
@@ -127,7 +169,9 @@ function TimeBarSurface ({ scrubActive }) {
   // scrub — which only ever lives on the rail — has its own bounds.
   const setHandleValue = useCallback(
     (handle, iso) => {
-      if (handle === 'scrub') {
+      if (handle === 'grid') {
+        setActiveWmsOverlay({ ...activeWmsOverlay, time: iso })
+      } else if (handle === 'scrub') {
         setScrubTime(clampIso(iso, scrubMinIso, domainEnd))
       } else if (windowLocked) {
         const { start, end } = slideRange(handle, iso, {
@@ -152,7 +196,9 @@ function TimeBarSurface ({ scrubActive }) {
       endDate,
       maxIso,
       scrubMinIso,
-      domainEnd
+      domainEnd,
+      activeWmsOverlay,
+      setActiveWmsOverlay
     ]
   )
 
@@ -162,8 +208,8 @@ function TimeBarSurface ({ scrubActive }) {
           named, and tinted in the colour of its handle — the label says which
           control it is, the colour says which mark on the rail it moves. */}
       <div className='timeBarFields'>
-        <div className='timeRailField timeRailFieldRange' role='group'>
-          <span className='timeRailFieldLabel'>{t('timeBarRangeLabel')}</span>
+        <div className='railField railFieldRange' role='group'>
+          <span className='railFieldLabel'>{t('timeBarRangeLabel')}</span>
           <DateField
             label={t('timeSelectorStartDate')}
             value={startDate}
@@ -171,7 +217,7 @@ function TimeBarSurface ({ scrubActive }) {
             max={endDate}
             onCommit={(value) => setFieldValue('start', value)}
           />
-          <span className='timeRailFieldSep'>–</span>
+          <span className='railFieldSep'>–</span>
           <DateField
             label={t('timeSelectorEndDate')}
             value={endDate}
@@ -183,7 +229,7 @@ function TimeBarSurface ({ scrubActive }) {
               row. There is no room for a label here, so the picker names itself
               until a window is chosen. */}
           <IntervalSelect
-            className='timeRailPresetSelect'
+            className='railPresetSelect'
             ariaLabel={t('timeBarPresetLabel')}
             startDate={startDate}
             endDate={endDate}
@@ -197,7 +243,7 @@ function TimeBarSurface ({ scrubActive }) {
           {timeFilterActive && (
             <button
               type='button'
-              className='timeRailReset'
+              className='railReset'
               title={t('timeBarResetRangeTitle')}
               aria-label={t('timeBarResetRangeTitle')}
               onClick={() => {
@@ -211,8 +257,8 @@ function TimeBarSurface ({ scrubActive }) {
         </div>
 
         {scrubActive && (
-          <div className='timeRailField timeRailFieldScrub' role='group'>
-            <span className='timeRailFieldLabel'>{t('timeBarScrubLabel')}</span>
+          <div className='railField railFieldScrub' role='group'>
+            <span className='railFieldLabel'>{t('timeBarScrubLabel')}</span>
             <DateField
               label={t('timeBarScrubLabel')}
               value={scrubIso}
@@ -260,6 +306,30 @@ function TimeBarSurface ({ scrubActive }) {
             )}
           </div>
         )}
+
+        {/* The gridded dataset's own slice. It used to be a bare range input in
+            the legend card, numbered by node index; here it is dated, and it
+            moves on the same axis as everything else time-shaped, so how the
+            drawn slice sits against the filtered range is visible rather than
+            being something to work out. */}
+        {gridNodes && (
+          <div className='railField railFieldGrid' role='group'>
+            <span className='railFieldLabel'>{t('timeBarGridLabel')}</span>
+            <DateField
+              label={t('timeBarGridLabel')}
+              value={gridIso.slice(0, 10)}
+              min={msToIso(gridNodes.min)}
+              max={msToIso(gridNodes.max)}
+              // A typed date names a day; which of that day's slices it lands
+              // on is the rail's business, and the clock beside it reports the
+              // answer.
+              onCommit={(value) => setHandleValue('grid', `${value}T00:00:00Z`)}
+            />
+            {gridSubDaily && (
+              <span className='timeRailClock'>{gridIso.slice(11, 16)}</span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className='timeBarSlider'>
@@ -281,6 +351,7 @@ function TimeBarSurface ({ scrubActive }) {
               }
               : undefined
           }
+          grid={gridNodes ? { value: gridIso, nodes: gridNodes } : undefined}
           onCommit={setHandleValue}
         />
       </div>

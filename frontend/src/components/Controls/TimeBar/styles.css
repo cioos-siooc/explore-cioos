@@ -74,9 +74,9 @@
 }
 
 /* Each pill is its own floating surface (its fill and border come from the
-   shared .timeRailField rules), opaque so the map behind cannot muddle the
+   shared .railField rules), opaque so the map behind cannot muddle the
    dates. */
-.timeBarFields .timeRailField {
+.timeBarFields .railField {
   box-shadow: var(--cioos-shadow-3d-sm, var(--cioos-shadow-float));
   pointer-events: auto;
 }
