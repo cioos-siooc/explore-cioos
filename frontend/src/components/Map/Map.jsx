@@ -1075,7 +1075,7 @@ export default function CreateMap({
     const bounds = boundsFromGeoJson(zoomTarget.geometry)
     if (!bounds) return
     map.current.fitBounds(bounds, {
-      ...zoomToDatasetCamera(map.current),
+      ...zoomToDatasetCamera(),
       duration: 1000
     })
   }, [zoomTarget])
@@ -1368,15 +1368,14 @@ export default function CreateMap({
 
       const longitudes = rawCoordinates.map((c) => c[0])
       const latitudes = rawCoordinates.map((c) => c[1])
-      // Same framing the "zoom to dataset" button uses: the sidebar overlays the
-      // canvas, and a track picked on the map opens it at the same moment as this
-      // fit, so uniform padding would centre the track underneath it.
+      // Same framing the "zoom to dataset" button uses: the track centred in the
+      // canvas, with the sidebar left out of the reckoning.
       map.current.fitBounds(
         [
           [Math.min(...longitudes), Math.min(...latitudes)],
           [Math.max(...longitudes), Math.max(...latitudes)]
         ],
-        zoomToDatasetCamera(map.current)
+        zoomToDatasetCamera()
       )
     }
     renderSelectedTrack()

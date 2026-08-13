@@ -441,6 +441,8 @@
   "griddapLegendAltText": "legend",
   "griddapNoWmsText": "Map preview is not available for this dataset — access it on ERDDAP",
   "wmsLegendCloseTitle": "Hide overlay",
+  "wmsLegendShowTitle": "Show legend",
+  "wmsLegendCollapseTitle": "Collapse legend",
   "dockFiltersCountTitle": "{{count}} active filters",
   "dockDatasetsCountTitle": "{{filtered}} of {{total}} datasets shown",
   "datasetsCountLoadingTitle": "Counting datasets…",

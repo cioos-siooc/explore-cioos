@@ -4,6 +4,10 @@
  * footer). The brand + Datasets/Filters entry points live in the
  * centered top bar. On phones the datasets card becomes a bottom sheet
  * draggable up from the base of the screen.
+ *
+ * The griddap legend pins itself over this column's top-left corner
+ * rather than stacking inside it (see the WmsLegend stylesheet), so the
+ * column is a single card again.
  * ------------------------------------------------------------------ */
 :root {
   --cioos-sidebar-width: 420px;

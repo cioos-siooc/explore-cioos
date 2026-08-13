@@ -442,6 +442,8 @@
   "griddapLegendAltText": "légende",
   "griddapNoWmsText": "Aperçu cartographique non disponible pour ce jeu de données — y accéder via ERDDAP",
   "wmsLegendCloseTitle": "Masquer la superposition",
+  "wmsLegendShowTitle": "Afficher la légende",
+  "wmsLegendCollapseTitle": "Réduire la légende",
   "dockFiltersCountTitle": "{{count}} filtres actifs",
   "dockDatasetsCountTitle": "{{filtered}} de {{total}} jeux de données affichés",
   "datasetsCountLoadingTitle": "Décompte des jeux de données…",

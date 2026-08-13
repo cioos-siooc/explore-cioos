@@ -396,36 +396,20 @@ export function boundsIntersect(a, b) {
   return aw <= be && ae >= bw && as <= bn && an >= bs
 }
 
-// Camera the "zoom to dataset" action asks for. The map canvas is full-bleed
-// and the datasets sidebar floats on top of its left edge, so a plain centred
-// fit would push half the extent underneath the sidebar: pad the fit by the
-// space the sidebar actually occupies, measured from the live DOM (it varies
-// with the viewport, and shrinks away entirely on a narrow screen). maxZoom
-// keeps a pin-sized extent from slamming the camera to street level.
+// Camera the "zoom to dataset" action asks for: the extent centred in the map
+// canvas with an even margin on every side. The datasets sidebar floats over
+// the canvas's left edge, but the fit deliberately ignores it — the sidebar is
+// a transparent column the user can collapse, and steering the camera around
+// it threw the extent off to the right of the screen. maxZoom keeps a
+// pin-sized extent from slamming the camera to street level.
 //
 // Shared with ZoomToDataset, which asks the map what camera these bounds would
 // produce and compares it to the live one — that comparison is how the button
 // knows the view is already right, and it only agrees if the padding matches.
-const ZOOM_TO_DATASET_MARGIN = 24
 const ZOOM_TO_DATASET_BASE_PADDING = 60
 
-export function zoomToDatasetCamera(map) {
-  const padding = {
-    top: ZOOM_TO_DATASET_BASE_PADDING,
-    bottom: ZOOM_TO_DATASET_BASE_PADDING,
-    left: ZOOM_TO_DATASET_BASE_PADDING,
-    right: ZOOM_TO_DATASET_BASE_PADDING
-  }
-  const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect()
-  const canvasWidth = map?.getCanvas()?.clientWidth
-  if (sidebar?.width && canvasWidth) {
-    const left = sidebar.right + ZOOM_TO_DATASET_MARGIN
-    // On a narrow viewport the sidebar covers nearly the whole map. Padding
-    // wider than the canvas leaves MapLibre no room to fit anything into, so
-    // only clear the sidebar while a usable strip of map remains beside it.
-    if (left < canvasWidth * 0.6) padding.left = left
-  }
-  return { padding, maxZoom: 9 }
+export function zoomToDatasetCamera() {
+  return { padding: ZOOM_TO_DATASET_BASE_PADDING, maxZoom: 9 }
 }
 
 // True when the map is already showing `bounds` the way zoomToGeometry would
@@ -433,7 +417,7 @@ export function zoomToDatasetCamera(map) {
 // (within a few dozen screen pixels, so the tolerance scales with the view).
 export function boundsAreFramed(map, bounds) {
   if (!map || !bounds) return false
-  const camera = map.cameraForBounds(bounds, zoomToDatasetCamera(map))
+  const camera = map.cameraForBounds(bounds, zoomToDatasetCamera())
   if (!camera) return false
   if (Math.abs(map.getZoom() - camera.zoom) > 0.2) return false
   const offset = map.project(camera.center).dist(map.project(map.getCenter()))

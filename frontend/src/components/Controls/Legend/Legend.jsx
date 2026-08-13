@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ChevronCompactDown,
@@ -32,6 +32,7 @@ import {
 import Spinner from '../../ui/Spinner.jsx'
 import Switch from '../../ui/Switch.jsx'
 import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
+import usePublishedFootprint from '../../../state/ui/usePublishedFootprint.js'
 
 import './styles.css'
 import classNames from 'classnames'
@@ -82,6 +83,24 @@ function depthPosition(metres) {
 // an average hexagon looks like on the map. Picking an end of the ramp would have
 // made the icon claim a count.
 const HEX_ICON_COLOR = colorScale[Math.floor(colorScale.length / 2)]
+
+// Where a surface stacking with this card starts, published as a pair because
+// this card changes corners: top-right on a wide screen, bottom-left under
+// 900px (see the stylesheet). Whichever corner it holds, the surface stacking
+// with it goes on the far side — under the card's foot when it is anchored to
+// the top, over its head when it is anchored to the bottom — so the two
+// measurements are `top:` and `bottom:` values respectively.
+//
+// It collapses to its header row and grows with what is on the map, so its
+// height has to be told rather than assumed. The griddap legend's button is the
+// one thing reading these today (see the WmsLegend stylesheet).
+const LEGEND_STACK_GAP = 8
+function measureLegendBelowSpace (rect) {
+  return rect.bottom + LEGEND_STACK_GAP
+}
+function measureLegendAboveSpace (rect) {
+  return window.innerHeight - rect.top + LEGEND_STACK_GAP
+}
 
 // Choose which stop indices get a tick label. Keeps every stop when there are
 // few, otherwise thins to an evenly spaced subset (always including the first
@@ -138,6 +157,17 @@ export default function Legend({
   // shows the whole list — the ramps, their ticks, the marker keys, the track
   // lines, the remaining layer switches; closed, it is the header row alone.
   const [legendOpen, setLegendOpen] = useState(true)
+  const cardRef = useRef(null)
+  usePublishedFootprint(
+    cardRef,
+    '--cioos-legend-below-space',
+    measureLegendBelowSpace
+  )
+  usePublishedFootprint(
+    cardRef,
+    '--cioos-legend-above-space',
+    measureLegendAboveSpace
+  )
 
   // Fall back to the default selection when the prop is absent (older callers /
   // initial render) — all-on would claim legend entries the map isn't drawing.
@@ -679,7 +709,7 @@ export default function Legend({
   ].filter(Boolean)
 
   return (
-    <div className='legend'>
+    <div className='legend' ref={cardRef}>
       <button
         className='legendHeader'
         onClick={() => setLegendOpen(!legendOpen)}

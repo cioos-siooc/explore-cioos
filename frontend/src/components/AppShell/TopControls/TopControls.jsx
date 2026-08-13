@@ -13,8 +13,12 @@ import { useFilters } from '../../../state/filters/FilterProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
 
-// Gap held between the bottom of the top bar and whatever it pushes down.
-const TOP_BAR_GAP = 12
+// Gap held between the bottom of the top bar and whatever it pushes down. Half
+// the 12px inset the shell uses elsewhere: this one is spent on every viewport
+// narrow enough for the bar to reach over the left column, and it comes
+// straight off the top of that column — where the datasets card and the
+// griddap legend are stacked and the height is already spoken for.
+const TOP_BAR_GAP = 6
 
 // How far down the top bar reaches over the datasets column on the left. The bar
 // is centered and grows downward as active-filter chips wrap onto new rows, so

@@ -61,9 +61,10 @@ export default function AppShell () {
   const { showIntroModal, setShowIntroModal, sidebarOpen } = useUI()
   const { inspectDataset, platformsAvailable } = useSelection()
 
-  // The WMS legend lives inside the dataset page while that page is open (see
-  // GriddapDetails); it only floats over the map — bottom-left — once the
-  // datasets sidebar is collapsed, so it's never shown twice.
+  // The griddap legend lives inside the dataset page while that page is open
+  // (see GriddapDetails); otherwise it pins itself to the top-left corner of
+  // the map, over the datasets column rather than inside it — see its
+  // stylesheet for why it overlaps instead of stacking.
   const wmsLegendIsInline =
     sidebarOpen && activeWmsOverlay?.pk === inspectDataset?.pk
 
