@@ -27,10 +27,10 @@ export default function DatasetsPanel () {
     filteredDatasets,
     inspectDataset,
     setInspectDataset,
+    returnToDatasetList,
     selectionLoading,
     initialPointsQueryComplete,
     setInspectRecordID,
-    setBackClicked,
     selectAll,
     handleSelectDataset,
     handleSelectAllDatasets,
@@ -67,33 +67,40 @@ export default function DatasetsPanel () {
           results readable underneath rather than blanking the panel — the
           scrim just marks them as about to be replaced. */}
       {selectionLoading && <Loading variant='inline' />}
+      {/* The two views are deliberately not interchangeable: the list is the
+          browsing surface, a dataset page is a drill-in. Each announces itself
+          on entry (the detail slides in from the right, the list back in from
+          the left — see styles.css), and the sidebar header changes with it. */}
       {inspectDataset ? (
-        <DatasetInspector
-          dataset={inspectDataset}
-          setHoveredDataset={setHoveredDataset}
-          setBackClicked={setBackClicked}
-          setInspectDataset={setInspectDataset}
-          setInspectRecordID={setInspectRecordID}
-          filterSet={filterSet}
-          query={combinedQueries}
-          selectedTrajectory={selectedTrajectory}
-          setSelectedTrajectory={setSelectedTrajectory}
-          activeWmsOverlay={activeWmsOverlay}
-          setActiveWmsOverlay={setActiveWmsOverlay}
-        />
+        <div className='datasetsPanelView datasetsPanelDetail' key='detail'>
+          <DatasetInspector
+            dataset={inspectDataset}
+            setHoveredDataset={setHoveredDataset}
+            returnToList={returnToDatasetList}
+            setInspectRecordID={setInspectRecordID}
+            filterSet={filterSet}
+            query={combinedQueries}
+            selectedTrajectory={selectedTrajectory}
+            setSelectedTrajectory={setSelectedTrajectory}
+            activeWmsOverlay={activeWmsOverlay}
+            setActiveWmsOverlay={setActiveWmsOverlay}
+          />
+        </div>
       ) : (
-        <DatasetsTable
-          handleSelectAllDatasets={handleSelectAllDatasets}
-          handleSelectDataset={handleSelectDataset}
-          setInspectDataset={setInspectDataset}
-          setInspectRecordID={setInspectRecordID}
-          filterSet={filterSet}
-          selectAll={selectAll}
-          setDatasets={setPointsData}
-          datasets={filteredDatasets}
-          setHoveredDataset={setHoveredDataset}
-          datasetsInViewPks={datasetsInViewPks}
-        />
+        <div className='datasetsPanelView datasetsPanelList' key='list'>
+          <DatasetsTable
+            handleSelectAllDatasets={handleSelectAllDatasets}
+            handleSelectDataset={handleSelectDataset}
+            setInspectDataset={setInspectDataset}
+            setInspectRecordID={setInspectRecordID}
+            filterSet={filterSet}
+            selectAll={selectAll}
+            setDatasets={setPointsData}
+            datasets={filteredDatasets}
+            setHoveredDataset={setHoveredDataset}
+            datasetsInViewPks={datasetsInViewPks}
+          />
+        </div>
       )}
     </div>
   )

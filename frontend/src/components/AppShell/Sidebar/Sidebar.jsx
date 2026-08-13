@@ -1,5 +1,11 @@
 import * as React from 'react'
-import { ChevronDown, Download, ListUl } from 'react-bootstrap-icons'
+import {
+  ChevronDown,
+  ChevronLeft,
+  Download,
+  FileEarmarkText,
+  ListUl
+} from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
 import isEmpty from 'lodash/isEmpty'
@@ -16,9 +22,11 @@ import './styles.css'
 // Datasets/Filters entry points now live in the centered top bar.) On phones
 // the same card rises as a bottom sheet, but only once the top bar's Datasets
 // button asks for it — nothing of it is left at the bottom edge otherwise.
+// Drilling into a single dataset swaps that header for a back banner: the card
+// hosts two different surfaces, and the header is what names the one in view.
 export default function Sidebar () {
   const { t } = useTranslation()
-  const { pointsToReview } = useSelection()
+  const { pointsToReview, inspectDataset, returnToDatasetList } = useSelection()
   const { sidebarOpen, setSidebarOpen, setShowDownloadModal } = useUI()
   // Until `ready`, there is no dataset count to show — not even a zero. See
   // useDatasetCounts.
@@ -32,6 +40,11 @@ export default function Sidebar () {
   } = useDatasetCounts()
 
   const expanded = sidebarOpen
+  // The panel is on a single dataset rather than the list. The banner swaps
+  // with it, so the card never leaves the user guessing which of the two
+  // surfaces they are on — and the way back is in the banner, not buried in
+  // the page's own title block.
+  const inspecting = Boolean(inspectDataset)
   const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length
   const countsTitle = countsReady
     ? t('dockDatasetsCountTitle', {
@@ -48,33 +61,60 @@ export default function Sidebar () {
       aria-label={t('datasetsFilterName')}
     >
       <section className={classNames('sidebarDatasets', { expanded })}>
-        <button
-          type='button'
-          className='datasetsToggle'
-          onClick={() => setSidebarOpen(!expanded)}
-          aria-expanded={expanded}
-          title={expanded ? t('sidebarCollapseTitle') : t('sidebarShowTitle')}
-        >
-          <ListUl size={18} aria-hidden='true' />
-          <span className='datasetsToggleLabel'>{t('datasetsFilterName')}</span>
-          <span
-            className={classNames('datasetsToggleCount', {
-              updating: countsUpdating
-            })}
-            title={countsTitle}
+        {inspecting ? (
+          <div className='datasetsBanner'>
+            <button
+              type='button'
+              className='datasetsBackButton'
+              onClick={returnToDatasetList}
+              title={t('datasetInspectorBackButtonTitle')}
+            >
+              <ChevronLeft size={14} aria-hidden='true' />
+              <span>{t('datasetsFilterName')}</span>
+            </button>
+            <span className='datasetsBannerMode'>
+              <FileEarmarkText size={13} aria-hidden='true' />
+              {t('sidebarDatasetPageLabel')}
+            </span>
+            <button
+              type='button'
+              className='datasetsBannerCollapse'
+              onClick={() => setSidebarOpen(false)}
+              title={t('sidebarCollapseTitle')}
+              aria-label={t('sidebarCollapseTitle')}
+            >
+              <ChevronDown size={16} aria-hidden='true' />
+            </button>
+          </div>
+        ) : (
+          <button
+            type='button'
+            className='datasetsToggle'
+            onClick={() => setSidebarOpen(!expanded)}
+            aria-expanded={expanded}
+            title={expanded ? t('sidebarCollapseTitle') : t('sidebarShowTitle')}
           >
-            {countsReady ? (
-              countLabel
-            ) : (
-              <Spinner size='sm' className='countSpinner' />
-            )}
-          </span>
-          <ChevronDown
-            className='datasetsToggleChevron'
-            size={16}
-            aria-hidden='true'
-          />
-        </button>
+            <ListUl size={18} aria-hidden='true' />
+            <span className='datasetsToggleLabel'>{t('datasetsFilterName')}</span>
+            <span
+              className={classNames('datasetsToggleCount', {
+                updating: countsUpdating
+              })}
+              title={countsTitle}
+            >
+              {countsReady ? (
+                countLabel
+              ) : (
+                <Spinner size='sm' className='countSpinner' />
+              )}
+            </span>
+            <ChevronDown
+              className='datasetsToggleChevron'
+              size={16}
+              aria-hidden='true'
+            />
+          </button>
+        )}
         <div className='sidebarBody'>
           <DatasetsPanel />
         </div>

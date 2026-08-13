@@ -134,12 +134,91 @@
   transform: rotate(180deg);
 }
 
+/* ------------------------------------------------------------------
+ * Dataset-page banner: replaces the datasets toggle while a single
+ * dataset is open. Reads differently on purpose — tinted — so the card
+ * is never mistaken for the list it drilled in from. Back on the left,
+ * what-you-are-looking-at on the right, and the collapse chevron kept
+ * where the toggle's was.
+ * ------------------------------------------------------------------ */
+.datasetsBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 8px 10px;
+  background-color: var(--cioos-teal-light);
+}
+
+.datasetsBackButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 5px 12px 5px 8px;
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.datasetsBackButton:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.datasetsBackButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* Names the surface, not the dataset — the dataset's own title is the
+   heading directly below, and repeating it here would just crowd the row. */
+.datasetsBannerMode {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  margin-left: auto;
+  font-family: var(--cioos-font-display);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  color: var(--cioos-primary-700);
+}
+
+.datasetsBannerCollapse {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+}
+
+.datasetsBannerCollapse:hover {
+  color: var(--cioos-ink);
+}
+
 /* The list body sits below the toggle, visually separated by a hairline. */
 .sidebarBody {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  /* The list and the dataset page slide in horizontally (Panels/styles.css);
+     clipped rather than scrolled, so those few frames can't flash a horizontal
+     scrollbar (a scroll box with overflow-y: auto resolves overflow-x to auto
+     unless it is set). Nothing in this column is meant to reach past its edge. */
+  overflow-x: hidden;
   border-top: 1px solid var(--cioos-hairline);
 }
 

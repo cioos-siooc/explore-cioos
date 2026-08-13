@@ -7,11 +7,14 @@
   min-height: 0;
 }
 
+/* The panel hosting this page washes its background (see .datasetsPanelDetail),
+   which is what separates a dataset page from the list it drilled in from. The
+   sections below sit on that wash as white cards. */
 .datasetInspectorBody {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 14px 24px 14px;
+  padding: 12px 12px 24px 12px;
 }
 
 /* The eyebrow label and the back control share one row: label leads on the
@@ -141,7 +144,11 @@
    grid of bordered cards. */
 /* No top rule of its own: the pinned title block above already draws one. */
 .datasetMetaSheet {
-  margin: 0 0 18px 0;
+  margin: 0 0 12px 0;
+  padding: 4px 12px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
 }
 
 .datasetMetaSheet .metaRow {
@@ -150,6 +157,11 @@
   align-items: flex-start;
   padding: 7px 2px;
   border-bottom: 1px solid var(--cioos-hairline);
+}
+
+/* The sheet's own edge closes the last row. */
+.datasetMetaSheet .metaRow:last-child {
+  border-bottom: none;
 }
 
 /* Fixed label column keeps every value left-aligned on a common axis. */
@@ -263,8 +275,11 @@
 
 /* --- Record table section --- */
 .recordSection {
-  border-top: 1px solid var(--cioos-hairline);
-  padding-top: 14px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
 }
 
 .recordSectionHeader {

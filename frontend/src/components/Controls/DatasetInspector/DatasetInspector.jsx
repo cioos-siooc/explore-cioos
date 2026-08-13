@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { XLg } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import DataTable from 'react-data-table-component'
 import TableFilter, { filterRows } from '../../ui/TableFilter.jsx'
@@ -44,8 +43,9 @@ function GridNodeCount({ dimensions }) {
 
 export default function DatasetInspector({
   dataset,
-  setInspectDataset,
-  setBackClicked,
+  // Shared with the sidebar header's back control (SelectionProvider), so both
+  // ways out of this page do the same thing.
+  returnToList,
   setHoveredDataset,
   setInspectRecordID,
   filterSet,
@@ -72,21 +72,6 @@ export default function DatasetInspector({
   // the spinner appears.
   const [loading, setLoading] = useState(hasRecordList)
 
-  // Opening this page usually narrows the datasets filter to a single dataset
-  // (clicking a hex or a griddap footprint does exactly that), so closing it
-  // drops that filter as well — otherwise the user lands back on a list that
-  // is still silently restricted to the dataset they just left.
-  const returnToList = () => {
-    const { datasetsSelected, setDatasetsSelected } = filterSet.datasetFilter
-    if (datasetsSelected.some((d) => d.isSelected)) {
-      setDatasetsSelected(
-        datasetsSelected.map((d) => ({ ...d, isSelected: false }))
-      )
-    }
-    setBackClicked(true)
-    setInspectDataset()
-    if (setSelectedTrajectory) setSelectedTrajectory()
-  }
   // const platformColor = platformColors.filter(
   //   (pc) => pc.platform === dataset.platform
   // )
@@ -161,7 +146,7 @@ export default function DatasetInspector({
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+  }, [returnToList])
 
   // Swipe left (touch, trackpad two-finger, or mouse horizontal wheel) to
   // return to the dataset list. Swipes work everywhere, including over the
@@ -231,7 +216,7 @@ export default function DatasetInspector({
       el.removeEventListener('wheel', onWheel)
       if (wheelTimer) clearTimeout(wheelTimer)
     }
-  }, [])
+  }, [returnToList])
 
   const dataColumnWith = '105px'
 
@@ -334,21 +319,16 @@ export default function DatasetInspector({
       onMouseLeave={() => setHoveredDataset()}
     >
       {/* The title block is pinned: it names the page, so it stays put while
-          the metadata sheet and record table scroll under it. */}
+          the metadata sheet and record table scroll under it. The way back is
+          the sidebar header's own back control (Sidebar.jsx), which replaces
+          the datasets banner while this page is open — one control, in the one
+          place that marks the panel as being on a dataset rather than the
+          list. */}
       <div className='datasetTitleBlock'>
         <div className='datasetTitleTop'>
           <span className='metadataLabel'>
             {t('datasetInspectorTitleText')}
           </span>
-          <button
-            type='button'
-            className='closeButton'
-            onClick={returnToList}
-            title={t('datasetInspectorBackButtonTitle')} // 'Return to dataset list'
-            aria-label={t('datasetInspectorBackButtonTitle')}
-          >
-            <XLg />
-          </button>
         </div>
         <FilterButton
           setOptionsSelected={datasetFilter.setDatasetsSelected}

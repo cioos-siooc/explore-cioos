@@ -463,6 +463,7 @@
   "dockIntroButtonTitle": "About this tool",
   "dockDownloadEmptyMessage": "Select datasets from the dataset list or on the map to build a download.",
   "filtersPanelHint": "Pick a filter on the left to see its options here. Filters apply to the map as you change them.",
+  "sidebarDatasetPageLabel": "Dataset page",
   "sidebarCollapseTitle": "Hide the dataset list",
   "sidebarShowTitle": "Show the dataset list",
   "sidebarCountsDatasets": "{{filtered}} / {{total}} datasets",

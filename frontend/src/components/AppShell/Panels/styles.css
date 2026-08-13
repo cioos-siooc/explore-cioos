@@ -237,6 +237,56 @@
   min-height: 300px;
 }
 
+/* The panel's two surfaces — the list, and a single dataset's page. They are
+   different places, so each enters from the direction it came: the page from
+   the right (a drill-in), the list back in from the left. */
+.datasetsPanelView {
+  height: 100%;
+  min-height: 0;
+}
+
+.datasetsPanelDetail {
+  /* Tinted, so a dataset page never reads as another view of the list: the
+     page's own title block and sections sit as white cards on this wash. */
+  background-color: var(--cioos-sand, var(--cioos-surface-2));
+  /* Duration spelled out: --cioos-transition-* carries its own timing function,
+     and a second one after it invalidates the shorthand. */
+  animation: datasetsDetailIn 0.22s ease-out;
+}
+
+.datasetsPanelList {
+  animation: datasetsListIn 0.22s ease-out;
+}
+
+@keyframes datasetsDetailIn {
+  from {
+    transform: translateX(14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes datasetsListIn {
+  from {
+    transform: translateX(-14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .datasetsPanelDetail,
+  .datasetsPanelList {
+    animation: none;
+  }
+}
+
 .downloadPanel {
   height: 100%;
 }
