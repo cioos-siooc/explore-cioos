@@ -354,6 +354,38 @@
   background-color: var(--cioos-white);
 }
 
+/* One mark, one step, for a field whose value walks a grid rather than a
+   calendar: the slices of a gridded dataset are routinely thinner than a pixel
+   of any rail, and these are the only way to land on the one next door.
+   Written with every box property it needs — the pill also renders inside the
+   datasets sidebar, which styles its own buttons. */
+.railField .railStep {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--cioos-radius-pill);
+  background: transparent;
+  background-image: none;
+  color: var(--cioos-grid-700);
+  cursor: pointer;
+}
+
+.railField .railStep:hover:not(:disabled) {
+  background-color: var(--cioos-grid);
+  color: var(--cioos-white);
+}
+
+.railField .railStep:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .railReset {
   display: inline-flex;
   align-items: center;

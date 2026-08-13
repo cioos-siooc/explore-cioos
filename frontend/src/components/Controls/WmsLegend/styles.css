@@ -13,12 +13,102 @@
   background-color: var(--cioos-white);
   border-radius: var(--cioos-radius-sm);
   box-shadow: var(--cioos-shadow-float);
-  padding: 8px 10px;
-  max-width: 320px;
+  padding: 4px 8px 8px;
+  /* Wide enough to show the legend at the size ERDDAP drew it. The text in it
+     is rendered at a fixed size whatever image width is asked for, so a card
+     narrower than the image doesn't get a smaller legend — it gets the same
+     legend with unreadable type. See GRIDDAP_LEGEND_WIDTH in wmsUtilities. */
+  max-width: 376px;
+}
+
+/* Inline variant: inside the dataset page in the sidebar, under the
+   show-on-map switch. It needs no surface of its own — the page is the
+   surface — only the room to show the image at the size it was drawn. */
+.wmsLegend.inline {
+  margin-top: 6px;
+}
+
+.wmsLegendHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* With no picker the close button still keeps the right edge. */
+  justify-content: flex-end;
+}
+
+/* Written with every box property it needs and one level deeper than it looks
+   like it should be: this card also renders inside the datasets sidebar's
+   dataset page, which gives every button in it a padded pill. */
+.wmsLegend .wmsLegendCloseButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--cioos-radius-pill);
+  background: transparent;
+  background-image: none;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+}
+
+.wmsLegend .wmsLegendCloseButton:hover {
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink);
+}
+
+.wmsLegend .wmsLegendCloseButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* The image is the card's title, so it is also its link to ERDDAP. */
+.wmsLegendFigure {
+  display: block;
+  line-height: 0;
 }
 
 .wmsLegendImage {
   max-width: 100%;
+}
+
+/* Takes the rest of the row, and stays one line high inside it: a long
+   long_name would otherwise wrap the header to three lines above an image
+   that already spells the name out in full. */
+.wmsLegendVariableSelector {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.wmsLegendVariableSelector .dropdown-toggle {
+  width: 100%;
+  text-align: left;
+}
+
+/* The name truncates; the caret the toggle draws after it keeps its place. */
+.wmsLegendVariableName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wmsLegendFallback {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wmsLegendTitle {
+  font-weight: 600;
+}
+
+.wmsLegendVariable {
+  font-size: 0.9em;
 }
 
 .wmsLegendUnavailable {
@@ -28,7 +118,9 @@
 }
 
 @media (max-width: 600px) {
-  /* Clear the collapsed datasets bottom sheet and the time bar above it. */
+  /* Clear the collapsed datasets bottom sheet and the time bar above it. On a
+     phone the legend can't have the width its type wants; the image scales
+     down rather than pushing the card off the screen. */
   .wmsLegend.floating {
     left: 10px;
     right: 10px;

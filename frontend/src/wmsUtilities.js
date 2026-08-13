@@ -57,24 +57,54 @@ export function buildWmsGetMapUrl({
   return `${wmsUrl}?${params.toString()}`
 }
 
+// The width the legend is asked for, and the width the card is built to show
+// it at. ERDDAP draws the legend's text at a fixed size whatever image size is
+// requested — a wider one gets a wider colorbar and the same 11px type — so
+// there is no "larger" version to fetch, only a version that isn't scaled down
+// afterwards. The card therefore sizes itself to the image (see the WmsLegend
+// stylesheet), rather than the image to the card.
+export const GRIDDAP_LEGEND_WIDTH = 360
+
 // ERDDAP's WMS has no GetLegendGraphic; the griddap .png endpoint's
 // &.legend=Only mode is the colorbar source. The query must constrain every
-// dimension in dataset order: latest time slice, first level of any other
-// non-spatial dimension, and strided lat/lon to keep the server-side read
-// cheap (the legend only depends on the variable's palette + range).
-export function buildGriddapLegendUrl({ erddapUrl, variable, dimensions }) {
+// dimension in dataset order: the slice being drawn on the map for time and
+// for the vertical axis, the first level of any other non-spatial dimension,
+// and strided lat/lon to keep the server-side read cheap (the legend only
+// depends on the variable's palette + range).
+//
+// The slice is named rather than left at `last` because ERDDAP writes the
+// constraints it was given into the image, underneath the dataset title — so
+// the caption the card leans on says what is actually on the map.
+export function buildGriddapLegendUrl({
+  erddapUrl,
+  variable,
+  dimensions,
+  time,
+  elevation
+}) {
   if (!erddapUrl || !variable) return null
+  const verticalDimension = getVerticalDimension(dimensions)
   const dimQuery = (dimensions || [])
     .map((dim) => {
       if (dim.name === 'latitude' || dim.name === 'longitude') {
         return '[0:10:last]'
       }
-      if (dim.name === 'time') return '[(last)]'
+      if (dim.name === 'time') {
+        return time ? `[(${normalizeIsoTime(time)})]` : '[(last)]'
+      }
+      // Back from the WMS request's altitude into whatever the dataset's own
+      // axis counts in — the same negation either way round.
+      if (dim === verticalDimension && elevation !== undefined && elevation !== null) {
+        return `[(${toElevation(dim, elevation)})]`
+      }
       return '[0]'
     })
     .join('')
   const pngUrl = erddapUrl.replace(/\.html$/, '.png')
-  return `${pngUrl}?${encodeURIComponent(variable + dimQuery)}&.legend=Only`
+  return (
+    `${pngUrl}?${encodeURIComponent(variable + dimQuery)}` +
+    `&.legend=Only&.size=${GRIDDAP_LEGEND_WIDTH}|150`
+  )
 }
 
 // The WMS default: the first variable representing a currently-selected EOV,

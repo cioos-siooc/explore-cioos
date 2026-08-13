@@ -33,6 +33,32 @@
   pointer-events: none;
 }
 
+/* The stretch of time the gridded dataset on the map covers. A slim bar sat
+   directly under the rail line, touching it, rather than a block behind the
+   track: down at the foot of the track it crossed the handles and the scrub
+   marker, and read as a second rail rather than as an annotation of this one.
+   It is the one mark here that isn't a live reading. Which slice of it is
+   drawn is set on the dataset's own rail — see GridTimeRail — so nothing
+   about this one is grabbable. */
+.timeRailGridBand {
+  position: absolute;
+  /* The line is 3px centred on the track's midline: its underside is at
+     50% + 1.5px, and this starts there. */
+  top: 50%;
+  margin-top: 1.5px;
+  height: 3px;
+  /* A week of hourly slices is a thousandth of the catalogue's span and would
+     otherwise round away to nothing. Off by a pixel or two at that size, and
+     visible, beats exact and invisible. */
+  min-width: 3px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-grid);
+  /* Takes the pointer only so it can carry its own tooltip — a press still
+     reaches the track handler underneath, which is on the parent and gets the
+     event by bubbling. */
+  cursor: inherit;
+}
+
 /* ------------------------------------------------------------------
  * The date fields that go with the rail. Plain text until pointed at,
  * so a row of them over the map doesn't read as a form; the shared
