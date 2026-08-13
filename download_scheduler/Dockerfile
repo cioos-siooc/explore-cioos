@@ -9,11 +9,19 @@ RUN apt-get -y -qq update
 # libc6 and python3.11 in the base image — ~18 minutes of unpacking on a loaded
 # build host, long enough that the layer never finished or cached.
 
-# for pdf creation (CREATE_PDF=True). libqt5gui5 is needed by wkhtmltopdf, and
-# fonts-dejavu-core is named explicitly because it would otherwise only arrive
-# as a recommend — without it wkhtmltopdf renders PDFs with missing glyphs.
-RUN apt-get -y -qq install --no-install-recommends \
-    wkhtmltopdf libqt5gui5 fonts-dejavu-core \
+# PDF generation (CREATE_PDF=True) needs wkhtmltopdf, which is opt-in at build
+# time because it is enormous: even with --no-install-recommends it pulls the
+# whole Qt/Mesa stack (libllvm15, libdrm-*, libgstreamer, wayland, xcb — ~83
+# packages) for a feature that is off by default on every deployment. Enable it
+# with:  docker compose build --build-arg INSTALL_PDF=true scheduler
+# libqt5gui5 is needed by wkhtmltopdf, and fonts-dejavu-core is named
+# explicitly because it would otherwise only arrive as a recommend — without it
+# wkhtmltopdf renders PDFs with missing glyphs.
+ARG INSTALL_PDF=false
+RUN if [ "$INSTALL_PDF" = "true" ]; then \
+        apt-get -y -qq install --no-install-recommends \
+            wkhtmltopdf libqt5gui5 fonts-dejavu-core; \
+    fi \
     && rm -rf /var/lib/apt/lists/*
 
 # See https://github.com/wkhtmltopdf/wkhtmltopdf/issues/4497. exit 0 so it doesnt fail on ARM
