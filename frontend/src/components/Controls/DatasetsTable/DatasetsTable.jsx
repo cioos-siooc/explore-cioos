@@ -3,6 +3,8 @@ import {
   CaretDownFill,
   CaretRightFill,
   CaretUpFill,
+  ChevronLeft,
+  ChevronRight,
   Eye,
   EyeSlash,
   Search
@@ -23,14 +25,38 @@ import {
 import DatasetCard from './DatasetCard.jsx'
 import './styles.css'
 
-// How many cards to render before the incremental "grow on scroll" kicks in.
-// Keeps large result sets cheap to paint on mobile without a pager.
-const PAGE_SIZE = 60
-// Distance (px) from the bottom of the scroll area at which we reveal more.
-const SCROLL_THRESHOLD = 400
+// The list is paged rather than grown on scroll: a page is a place the user
+// can leave and come back to, and the scroll bar means the same thing on every
+// result set. These are the sizes the pager offers, the first being the default.
+const PAGE_SIZES = [25, 50, 100]
+// How many numbered buttons the pager shows around the current page before it
+// falls back to ellipses (kept small — this column is ~420px wide).
+const PAGE_WINDOW = 1
 // Stable default so an absent datasetsInViewPks prop (e.g. the download modal)
 // doesn't create a new Set every render and thrash memo deps.
 const EMPTY_SET = new Set()
+
+// The page numbers to offer: always the first and last, the current page and
+// its neighbours, with '…' standing in for the runs left out. Returns e.g.
+// [1, '…', 7, 8, 9, '…', 24].
+function pageButtons (current, pageCount) {
+  const wanted = new Set([1, pageCount])
+  for (let page = current - PAGE_WINDOW; page <= current + PAGE_WINDOW; page++) {
+    if (page >= 1 && page <= pageCount) wanted.add(page)
+  }
+  const pages = [...wanted].sort((a, b) => a - b)
+  const out = []
+  let previous = 0
+  for (const page of pages) {
+    // A single skipped page is worth showing outright — an ellipsis standing in
+    // for one number is both wider and less useful than the number.
+    if (page - previous === 2) out.push(previous + 1)
+    else if (page - previous > 2) out.push(`gap-${page}`)
+    out.push(page)
+    previous = page
+  }
+  return out
+}
 
 // The datasets list, rendered as cards (replaces the old data table). Used in
 // two contexts: the sidebar results list and the download-review modal
@@ -64,7 +90,8 @@ export default function DatasetsTable({
   // The download modal is a flat review list — it never groups, whatever the
   // sidebar is grouped by.
   const groupBy = isDownloadModal ? GROUP_NONE : selectedGroupBy
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0])
+  const [page, setPage] = useState(1)
   const listRef = useRef(null)
 
   // Sort fields differ by context: the download modal exposes the size and
@@ -177,39 +204,56 @@ export default function DatasetsTable({
     return items
   }, [visibleRows, groupBy, collapsedGroups, datasetsInViewPks, i18n.language])
 
-  // Total data rows currently expanded (excludes headers and collapsed groups),
-  // used to drive the grow-on-scroll window.
+  // Total data rows currently expanded (excludes headers and collapsed groups).
+  // This — not the dataset count — is what the pages divide up, because an
+  // array-valued grouping dimension lists a dataset under each of its values.
   const totalRowCount = useMemo(
     () => renderItems.reduce((n, item) => (item.header ? n : n + 1), 0),
     [renderItems]
   )
 
-  // Take render entries up to visibleCount *rows* (headers don't consume the
-  // window), then drop any trailing header left with no rows beneath it.
-  const shownItems = useMemo(() => {
+  const pageCount = Math.max(1, Math.ceil(totalRowCount / pageSize))
+  // Clamped rather than stored: a page can vanish under the list (the filters
+  // narrowed the results, a group was collapsed) between renders.
+  const currentPage = Math.min(page, pageCount)
+  const firstRow = (currentPage - 1) * pageSize
+
+  // This page's slice of the render list. Headers don't consume the page's
+  // budget: a group header is re-shown at the top of every page its rows run
+  // onto, so a page opened mid-group still says which group it is in. A
+  // collapsed group has no rows of its own, so its header shows on the page
+  // its position falls into — once, never twice.
+  const pageItems = useMemo(() => {
+    // The last page runs to the end so that collapsed groups trailing the final
+    // row still land somewhere — with an exact multiple of pageSize there is no
+    // further page for them to fall onto.
+    const lastRow =
+      currentPage === pageCount ? Number.POSITIVE_INFINITY : firstRow + pageSize
     const out = []
-    let rows = 0
+    let rowIndex = 0
+    let pendingHeader = null
     for (const item of renderItems) {
       if (item.header) {
-        out.push(item)
-      } else {
-        if (rows >= visibleCount) break
-        out.push(item)
-        rows++
+        if (collapsedGroups.has(item.group)) {
+          pendingHeader = null
+          if (rowIndex >= firstRow && rowIndex < lastRow) out.push(item)
+        } else {
+          pendingHeader = item
+        }
+        continue
       }
-    }
-    // Drop a trailing header only when it's orphaned by the row window — a
-    // collapsed group legitimately shows a header with no rows, and must keep
-    // it so the group can be reopened.
-    while (
-      out.length &&
-      out[out.length - 1].header &&
-      !collapsedGroups.has(out[out.length - 1].group)
-    ) {
-      out.pop()
+      if (rowIndex >= lastRow) break
+      if (rowIndex >= firstRow) {
+        if (pendingHeader) {
+          out.push(pendingHeader)
+          pendingHeader = null
+        }
+        out.push(item)
+      }
+      rowIndex++
     }
     return out
-  }, [renderItems, visibleCount, collapsedGroups])
+  }, [renderItems, firstRow, pageSize, currentPage, pageCount, collapsedGroups])
 
   const toggleGroupCollapsed = (group) => {
     setCollapsedGroups((prev) => {
@@ -220,21 +264,18 @@ export default function DatasetsTable({
     })
   }
 
-  // Reset the render window whenever the result set or ordering changes so we
-  // don't leave a stale partial list scrolled off the top.
+  // Back to page one whenever the result set or its ordering changes: page 7 of
+  // the previous results is not page 7 of these.
   useEffect(() => {
-    setVisibleCount(PAGE_SIZE)
+    setPage(1)
     if (listRef.current) listRef.current.scrollTop = 0
-  }, [datasets, sort, isDownloadModal, groupBy])
+  }, [datasets, sort, isDownloadModal, groupBy, pageSize])
 
-  const handleScroll = (e) => {
-    const el = e.currentTarget
-    if (
-      el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_THRESHOLD &&
-      visibleCount < totalRowCount
-    ) {
-      setVisibleCount((c) => Math.min(c + PAGE_SIZE, totalRowCount))
-    }
+  // Every page starts at its top — the reader is at a new place in the list,
+  // not where they left the scroll bar on the page before.
+  const goToPage = (next) => {
+    setPage(Math.min(Math.max(next, 1), pageCount))
+    if (listRef.current) listRef.current.scrollTop = 0
   }
 
   const controls = (
@@ -329,11 +370,11 @@ export default function DatasetsTable({
   return (
     <div className={classNames('datasetsTable', { downloadModal: isDownloadModal })}>
       {controls}
-      <div className='datasetsCardList' ref={listRef} onScroll={handleScroll}>
+      <div className='datasetsCardList' ref={listRef}>
         {visibleRows.length === 0 ? (
           <div className='datasetsCardEmpty'>{t('datasetsCardNoResultsText')}</div>
         ) : (
-          shownItems.map((item) => {
+          pageItems.map((item) => {
             if (!item.header) {
               return (
                 <DatasetCard
@@ -402,6 +443,79 @@ export default function DatasetsTable({
           })
         )}
       </div>
+      {totalRowCount > 0 && (
+        <nav className='datasetsPager' aria-label={t('datasetsPagerLabel')}>
+          <span className='datasetsPagerRange'>
+            {t('datasetsPagerRangeText', {
+              first: firstRow + 1,
+              last: Math.min(firstRow + pageSize, totalRowCount),
+              total: totalRowCount
+            })}
+          </span>
+          {pageCount > 1 && (
+            <div className='datasetsPagerControls'>
+              <button
+                type='button'
+                className='datasetsPagerStep'
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                title={t('datasetsPagerPreviousTitle')}
+                aria-label={t('datasetsPagerPreviousTitle')}
+              >
+                <ChevronLeft size={12} aria-hidden='true' />
+              </button>
+              {pageButtons(currentPage, pageCount).map((entry) =>
+                typeof entry === 'number' ? (
+                  <button
+                    key={entry}
+                    type='button'
+                    className={classNames('datasetsPagerPage', {
+                      active: entry === currentPage
+                    })}
+                    onClick={() => goToPage(entry)}
+                    aria-current={entry === currentPage ? 'page' : undefined}
+                    title={t('datasetsPagerPageTitle', { page: entry })}
+                  >
+                    {entry}
+                  </button>
+                ) : (
+                  <span key={entry} className='datasetsPagerGap' aria-hidden='true'>
+                    …
+                  </span>
+                )
+              )}
+              <button
+                type='button'
+                className='datasetsPagerStep'
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === pageCount}
+                title={t('datasetsPagerNextTitle')}
+                aria-label={t('datasetsPagerNextTitle')}
+              >
+                <ChevronRight size={12} aria-hidden='true' />
+              </button>
+            </div>
+          )}
+          <label className='datasetsPagerSize'>
+            <span className='sr-only'>{t('datasetsPagerPerPageLabel')}</span>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              title={t('datasetsPagerPerPageLabel')}
+            >
+              {/* The number is put in place here rather than interpolated: a
+                  numeric `count` option is i18next's pluralization trigger (see
+                  the note in Map.jsx), and the unit is the only translated
+                  part of "25 per page" anyway. */}
+              {PAGE_SIZES.map((size) => (
+                <option key={size} value={size}>
+                  {`${size} ${t('datasetsPagerPerPageUnitText')}`}
+                </option>
+              ))}
+            </select>
+          </label>
+        </nav>
+      )}
     </div>
   )
 }
