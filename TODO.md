@@ -4,7 +4,9 @@
 
 ### Bugs
 - [ ] Fix hexes at high latitude for trajectories.
-
+- [ ] Fix click on map grid box / hex / marker interaction
+- [ ] Update hexes colormap base on visible hexes 
+- [ ] 
 ### Downloader — test and fix
 - [ ] Trajectory
 - [ ] Griddap
@@ -15,7 +17,7 @@
 - [ ] Add Optional Banner to present to user the very first time for form or question with markdown and date limit option.
 
 ### Dataset types & integrations
-- [ ] Integrate full trajectory dataset view from Richard.
+- [x] Integrate full trajectory dataset view from Richard.
 - [ ] Add Point type datasets, add flag for large Point datasets. Some datasets are wrongly defined as Point datasets while they are more likely something else.
 
 ### Onboarding
@@ -30,9 +32,9 @@
 - [x] Drop log message "i18next is made possible by our own product, Locize".
 
 ### Database & harvesting (see docs for reference)
-- [ ] Improve dataset incremental upload to db.
-- [ ] Improve database indexing for speeding up calls.
-- [ ] Harvester incremental update freezes the database and frontend on load — avoid doing that.
+- [x] Improve dataset incremental upload to db.
+- [x] Improve database indexing for speeding up calls.
+- [x] Harvester incremental update freezes the database and frontend on load — avoid doing that.
 
 ## Testing
 - [ ] Add frontend testing for the different items:
@@ -50,8 +52,8 @@
 - [ ] Review Mapbox terms and services to see if we're still within the low-cost range.
 
 ## Open questions for reviewers
-- [ ] Should we add more map backgrounds?
-- [ ] Should we use only a single map background?
+- [x] Should we add more map backgrounds?
+- [x] Should we use only a single map background?
 - [ ] Should we default to globe view?
 - [ ] Group by source should separate by the different ERDDAP servers.
 - [ ] Review UI logic of dataset selected / filter activated / defaults / WMS servers.
