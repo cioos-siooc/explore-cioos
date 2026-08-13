@@ -292,23 +292,6 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: var(--cioos-focus);
 }
 
-/* rc-slider (time / depth range filters) — replace the library's default
-   sky-blue with CIOOS teal so the range controls match the rest of the UI. */
-.rc-slider-rail { background-color: var(--cioos-hairline); }
-.rc-slider-track { background-color: var(--cioos-primary); }
-.rc-slider-dot-active { border-color: var(--cioos-primary); }
-.rc-slider-handle {
-  border-color: var(--cioos-primary);
-  background-color: var(--cioos-white);
-  opacity: 1;
-}
-.rc-slider-handle:hover,
-.rc-slider-handle:focus,
-.rc-slider-handle-dragging.rc-slider-handle-dragging.rc-slider-handle-dragging {
-  border-color: var(--cioos-primary-700);
-  box-shadow: var(--cioos-focus);
-}
-
 /* Screen reader only: hide content visually but keep it accessible */
 .sr-only {
   position: absolute;

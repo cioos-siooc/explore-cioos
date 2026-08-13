@@ -1,10 +1,11 @@
 /* ------------------------------------------------------------------
  * Time bar — the bottom-edge control carrying both of the app's time
- * inputs on one warped axis: the time-range filter (teal, always there)
- * and the trajectory scrub date with its trailing window (purple, only
- * while the track layers draw). The slider itself is TimeRail, shared
- * with the Time entry in the Filters panel; this stylesheet is only the
- * chrome that floats it over the map.
+ * inputs on one warped axis: the time-range filter (teal) and the
+ * trajectory scrub date with its trailing window (purple, only while the
+ * track layers draw). The bar itself is only mounted while one of the two
+ * is live — an active time filter, or trajectories on the map. The slider
+ * inside it is TimeRail, shared with the Time entry in the Filters panel;
+ * this stylesheet is only the chrome that floats it over the map.
  *
  * It is the one piece of chrome that spans the map, so it is built to
  * cost as little of it as it can. Rather than one tall card, it is two

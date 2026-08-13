@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useState } from 'react'
 import {
   ArrowsExpand,
   BoundingBox,
@@ -6,6 +7,7 @@ import {
   CalendarWeek,
   FileEarmarkSpreadsheet,
   Stack,
+  Tag,
   Water,
   BroadcastPin,
   Server
@@ -110,6 +112,11 @@ export default function FiltersPanel () {
   const { openFilter, setOpenFilter } = useUI()
   const { dataLayers, resetDataLayers, showAllDataLayers } = useMapState()
 
+  // The one search box whose terms aren't a filter over options already in
+  // state — it is a query against WoRMS — so it is kept here rather than in the
+  // filter state the URL is built from.
+  const [scientificNameSearchTerms, setScientificNameSearchTerms] = useState('')
+
   const inViewFilterName = t('datasetsCardOnlyInViewText')
 
   // Same badge rule as the catalogue filters: the bare filter name while the
@@ -166,6 +173,16 @@ export default function FiltersPanel () {
     [startDate, endDate],
     [defaultStartDate, defaultEndDate]
   )
+  // Not one of the catalogue's own facets, so it has no options list to count:
+  // the badge names the picked species instead, on the same one/many rule.
+  const scientificNamesFilterTranslationKey = 'scientificNameFilterName'
+  const scientificNamesBadgeTitle =
+    scientificNamesSelected.length === 0
+      ? t(scientificNamesFilterTranslationKey)
+      : scientificNamesSelected.length === 1
+        ? scientificNamesSelected[0]
+        : scientificNamesSelected.length + t('scientificNamesMulti')
+
   const depthRangeFilterName = t('depthRangeFilterName')
   const depthRangeBadgeTitle = generateRangeSelectBadgeTitle(
     depthRangeFilterName,
@@ -475,19 +492,33 @@ export default function FiltersPanel () {
         </FilterSection>
         {obisDataAvailable && (
           <FilterSection title={t('filterGroupBiodiversity')}>
-            <ScientificNameFilter
-              scientificNamesSelected={scientificNamesSelected}
-              setScientificNamesSelected={setScientificNamesSelected}
+            <Filter
+              active={scientificNamesSelected.length > 0}
+              badgeTitle={scientificNamesBadgeTitle}
+              tooltip={t('scientificNameFilterTooltip')}
               disabled={!showObis}
               disabledTooltip={t('scientificNameFilterDisabledTooltip')}
-              tooltip={t('scientificNameFilterTooltip')}
+              icon={<Tag />}
               controlled
-              openFilter={openFilter === 'scientificNameFilterName'}
-              setOpenFilter={setOpenFilter}
-              filterName='scientificNameFilterName'
-              badgeTitle={t('scientificNameFilterName')}
+              searchable
+              searchTerms={scientificNameSearchTerms}
+              setSearchTerms={setScientificNameSearchTerms}
               searchPlaceholder={t('scientificNameFilterSearchPlaceholder')}
-            />
+              filterName={scientificNamesFilterTranslationKey}
+              openFilter={openFilter === scientificNamesFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              resetButton={
+                scientificNamesSelected.length > 0
+                  ? () => setScientificNamesSelected([])
+                  : undefined
+              }
+            >
+              <ScientificNameFilter
+                scientificNamesSelected={scientificNamesSelected}
+                setScientificNamesSelected={setScientificNamesSelected}
+                searchTerms={scientificNameSearchTerms}
+              />
+            </Filter>
           </FilterSection>
         )}
         <button

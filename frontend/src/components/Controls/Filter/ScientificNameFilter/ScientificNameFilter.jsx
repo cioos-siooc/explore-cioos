@@ -1,19 +1,15 @@
 /* eslint-disable react/prop-types */
 import * as React from 'react'
-import { useRef, useState, useEffect } from 'react'
-import {
-  ChevronCompactDown,
-  ChevronCompactUp,
-  X
-} from 'react-bootstrap-icons'
+import { useState, useEffect } from 'react'
+import { CheckSquare, Square } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 
-import QuestionIconTooltip from '../../QuestionIconTooltip/QuestionIconTooltip.jsx'
 import Spinner from '../../../ui/Spinner.jsx'
-import { abbreviateString, useOutsideAlerter, useDebounce } from '../../../../utilities'
+import { useDebounce } from '../../../../utilities'
 import { server } from '../../../../config.js'
 
 import '../styles.css'
+import '../MultiCheckboxFilter/styles.css'
 import './styles.css'
 
 // Show only Family and below in the typeahead — every higher rank is
@@ -36,43 +32,42 @@ const TOO_BROAD_RANKS = new Set([
   'Superfamily', 'Epifamily',
 ])
 
+// The body of the Scientific Name filter: the same ticked list of options every
+// other filter in the panel shows.
+//
+// What is different about it is where the options come from — the other lists
+// are the catalogue's own facets, held in state and searched in the browser,
+// while this one is a typeahead against WoRMS by way of /scientificNames, so
+// what is offered changes with what is typed into the panel's search box. That
+// is why the picked names are pinned to the top of the list rather than left to
+// the search: an option that vanished from the list the moment the search moved
+// on would be one the user could no longer untick.
 export default function ScientificNameFilter({
   scientificNamesSelected,
   setScientificNamesSelected,
-  disabled,
-  disabledTooltip,
-  tooltip,
-  icon,
-  controlled,
-  openFilter,
-  setOpenFilter,
-  filterName,
-  searchPlaceholder,
-  badgeTitle
+  searchTerms
 }) {
   const { t, i18n } = useTranslation()
   const lang = i18n.language && i18n.language.startsWith('fr') ? 'fr' : 'en'
-  const [filterOpen, setFilterOpen] = useState(false)
-  const [input, setInput] = useState('')
-  const debouncedInput = useDebounce(input, 250)
+  const debouncedSearchTerms = useDebounce(searchTerms || '', 250)
   const [suggestions, setSuggestions] = useState([])
-  const [vernacularByName, setVernacularByName] = useState({})
+  // Rank and common name for every name we have seen, kept so a picked name
+  // reads the same pinned at the top of the list as it did in the suggestions
+  // it was picked from — the search that offered it has usually moved on by
+  // then, and a row that loses its second line on being ticked looks like a
+  // different row.
+  const [detailsByName, setDetailsByName] = useState({})
   const [loading, setLoading] = useState(false)
-  const wrapperRef = useRef(null)
-  useOutsideAlerter(wrapperRef, setFilterOpen, false)
 
-  const open = controlled ? filterOpen && openFilter : filterOpen
-
-  useEffect(() => {
-    if (controlled) setFilterOpen(openFilter)
-  }, [openFilter])
-
-  const mergeVernaculars = (items) => {
-    setVernacularByName((prev) => {
+  const mergeDetails = (items) => {
+    setDetailsByName((prev) => {
       const next = { ...prev }
       for (const item of items) {
-        if (item && item.scientificName && item.vernacular) {
-          next[item.scientificName] = item.vernacular
+        if (item && item.scientificName && (item.vernacular || item.rank)) {
+          next[item.scientificName] = {
+            vernacular: item.vernacular,
+            rank: item.rank
+          }
         }
       }
       return next
@@ -80,36 +75,35 @@ export default function ScientificNameFilter({
   }
 
   useEffect(() => {
-    if (!open) return
     const controller = new AbortController()
     setLoading(true)
-    const q = encodeURIComponent(debouncedInput || '')
+    const q = encodeURIComponent(debouncedSearchTerms)
     fetch(`${server}/scientificNames?q=${q}&lang=${lang}&limit=200`, { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : []))
       .then((items) => {
         const normalized = Array.isArray(items) ? items.filter((i) => i && i.scientificName) : []
         setSuggestions(normalized)
-        mergeVernaculars(normalized)
+        mergeDetails(normalized)
       })
       .catch((err) => {
         if (err.name !== 'AbortError') console.error(err)
       })
       .finally(() => setLoading(false))
     return () => controller.abort()
-  }, [debouncedInput, open, lang])
+  }, [debouncedSearchTerms, lang])
 
-  // Hydrate vernaculars for selections we don't yet know about (e.g. on page load
-  // when chips were restored from the URL). Re-runs when the locale changes so a
-  // user toggling the site language gets locale-appropriate subtitles.
+  // Hydrate details for selections we don't yet know about (e.g. on page load
+  // when the names were restored from the URL). Re-runs when the locale changes so
+  // a user toggling the site language gets locale-appropriate subtitles.
   useEffect(() => {
-    const unknown = scientificNamesSelected.filter((n) => !vernacularByName[n])
+    const unknown = scientificNamesSelected.filter((n) => !detailsByName[n])
     if (unknown.length === 0) return
     const controller = new AbortController()
     const names = encodeURIComponent(unknown.join(','))
     fetch(`${server}/scientificNames?names=${names}&lang=${lang}`, { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : []))
       .then((items) => {
-        if (Array.isArray(items)) mergeVernaculars(items)
+        if (Array.isArray(items)) mergeDetails(items)
       })
       .catch((err) => {
         if (err.name !== 'AbortError') console.error(err)
@@ -117,131 +111,64 @@ export default function ScientificNameFilter({
     return () => controller.abort()
   }, [scientificNamesSelected, lang])
 
-  // A disabled filter (OBIS not shown) must not read as active even if it
-  // still holds selections — those selections aren't applied to the query.
-  const active = !disabled && scientificNamesSelected && scientificNamesSelected.length > 0
-  const displayName = badgeTitle || filterName
-  const label = active
-    ? `${displayName}: ${abbreviateString(scientificNamesSelected.join(', '), 30)}`
-    : displayName
-
-  const filteredSuggestions = suggestions.filter(
-    (s) => !scientificNamesSelected.includes(s.scientificName)
-        && !TOO_BROAD_RANKS.has(s.rank)
-  )
-
-  const handleAdd = (name, vernacular) => {
-    if (!scientificNamesSelected.includes(name)) {
+  const toggleName = (name) => {
+    if (scientificNamesSelected.includes(name)) {
+      setScientificNamesSelected(
+        scientificNamesSelected.filter((n) => n !== name)
+      )
+    } else {
       setScientificNamesSelected([...scientificNamesSelected, name])
     }
-    if (vernacular) {
-      setVernacularByName((prev) => ({ ...prev, [name]: vernacular }))
-    }
-    setInput('')
   }
 
-  const handleRemove = (name) => {
-    setScientificNamesSelected(
-      scientificNamesSelected.filter((n) => n !== name)
-    )
-  }
-
-  const handleClick = () => {
-    if (disabled) return
-    setFilterOpen(!filterOpen)
-    if (controlled) setOpenFilter(filterName)
-  }
+  // The picked names first, then whatever the search is offering that isn't
+  // already picked.
+  const options = [
+    ...scientificNamesSelected.map((scientificName) => ({
+      scientificName,
+      ...detailsByName[scientificName],
+      isSelected: true
+    })),
+    ...suggestions
+      .filter(
+        (s) =>
+          !scientificNamesSelected.includes(s.scientificName) &&
+          !TOO_BROAD_RANKS.has(s.rank)
+      )
+      .map((s) => ({ ...s, isSelected: false }))
+  ]
 
   return (
-    <div className='filter scientificNameFilter' ref={wrapperRef}>
-      <button
-        className={`filterHeader ${active ? 'active' : ''} ${disabled ? 'disabled' : ''}`}
-        onClick={handleClick}
-        disabled={disabled}
-        title={disabled ? disabledTooltip : undefined}
-      >
-        {tooltip && !disabled && (
-          <QuestionIconTooltip
-            tooltipText={tooltip}
-            tooltipPlacement='bottom'
-            size={20}
-          />
-        )}
-        {icon}
-        <div className='badgeTitle' title={badgeTitle || label}>
-          {abbreviateString(badgeTitle || label, 35)}
+    <div className='multiCheckboxFilter scientificNameFilter'>
+      {options.map(({ scientificName, vernacular, rank, isSelected }) => (
+        <div
+          key={scientificName}
+          className={`optionButton ${isSelected ? 'selected' : ''}`}
+          title={vernacular || scientificName}
+          onClick={() => toggleName(scientificName)}
+        >
+          {isSelected ? <CheckSquare /> : <Square />}
+          <span className='optionName'>
+            <span className='scientificNameOptionName'>{scientificName}</span>
+            {(rank || vernacular) && (
+              <span className='scientificNameOptionDetail'>
+                {rank && <span className='scientificNameOptionRank'>{rank}</span>}
+                {rank && vernacular && ' · '}
+                {vernacular}
+              </span>
+            )}
+          </span>
         </div>
-        {filterOpen ? <ChevronCompactUp /> : <ChevronCompactDown />}
-      </button>
-      {open && !disabled && (
-        <div className='filterOptions'>
-          {scientificNamesSelected.length > 0 && (
-            <div className='scientificNameChips'>
-              {scientificNamesSelected.map((name) => {
-                const vern = vernacularByName[name]
-                return (
-                  <span
-                    key={name}
-                    className='badge scientificNameChip'
-                    onClick={() => handleRemove(name)}
-                    title={t('scientificNameFilterRemoveTitle')}
-                  >
-                    <span className='scientificNameChipName'>{name}</span>
-                    {vern && (
-                      <span className='scientificNameChipVernacular'> ({vern})</span>
-                    )}
-                    <X size={16} />
-                  </span>
-                )
-              })}
-            </div>
-          )}
-          <input
-            autoFocus
-            className='filterSearch'
-            type='text'
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={searchPlaceholder}
-          />
-          <div className='scientificNameSuggestions'>
-            {loading && (
-              <div className='scientificNameLoading'>
-                <Spinner size='sm' />
-                {t('scientificNameFilterLoading')}
-              </div>
-            )}
-            {!loading && filteredSuggestions.length === 0 && (
-              <div className='scientificNameEmpty'>
-                {t('scientificNameFilterNoResults')}
-              </div>
-            )}
-            {filteredSuggestions.map(({ scientificName, vernacular, rank }) => (
-              <div
-                key={scientificName}
-                className='scientificNameSuggestion'
-                onClick={() => handleAdd(scientificName, vernacular)}
-              >
-                <div className='scientificNameSuggestionPrimary'>{scientificName}</div>
-                {(rank || vernacular) && (
-                  <div className='scientificNameSuggestionVernacular'>
-                    {rank && (
-                      <span className='scientificNameSuggestionRank'>{rank}</span>
-                    )}
-                    {rank && vernacular && ' · '}
-                    {vernacular}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-          {scientificNamesSelected.length > 0 && (
-            <div className='filterOptionsActions'>
-              <button onClick={() => setScientificNamesSelected([])}>
-                {t('resetButtonText')}
-              </button>
-            </div>
-          )}
+      ))}
+      {loading && (
+        <div className='scientificNameLoading'>
+          <Spinner size='sm' />
+          {t('scientificNameFilterLoading')}
+        </div>
+      )}
+      {!loading && options.length === 0 && (
+        <div className='scientificNameEmpty'>
+          {t('scientificNameFilterNoResults')}
         </div>
       )}
     </div>

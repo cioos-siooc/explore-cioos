@@ -1,0 +1,118 @@
+/* ------------------------------------------------------------------
+ * The range slider, wherever it appears — the time bar along the bottom
+ * of the map, the Time entry in the Filters panel, and the Depth entry
+ * under it. Only the chrome around it differs between the three; the
+ * track, its handles and its tick labels are the same control and are
+ * styled once, here. What is peculiar to one rail (the time bar's purple
+ * scrub marker and its trail band) is styled beside that rail instead.
+ *
+ * The track and the tick row are both full-width children of a box inset
+ * far enough that a handle parked at either end, and the label centered
+ * under it, still sit inside. Every label is centered on its tick —
+ * pinning the end ones inside instead would make them reach twice as far
+ * towards their neighbour as the spacing pass that placed them assumed,
+ * which is how they collide.
+ * ------------------------------------------------------------------ */
+.rail {
+  padding: 0 16px;
+  /* Nothing here is text to copy — it is labels on a control, and dragging a
+     handle used to sweep a selection across them. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.railTrack {
+  position: relative;
+  height: 18px;
+  /* Dragging a handle must not pan the map or scroll the panel under it. */
+  touch-action: none;
+  cursor: pointer;
+}
+
+.railLine {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-hairline);
+}
+
+/* The filtered span. */
+.railFill {
+  position: absolute;
+  top: 50%;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-primary);
+}
+
+/* The handles carry every box property explicitly and are written one level
+   deeper than they need to be. They are <button>s, and the surfaces this rail
+   drops into style their own buttons — the Filters panel gives every button in
+   it a 30px pill with padding and margins, which turned these into pale
+   lozenges parked below the rail. `.rail x` outranks that.
+ *
+ * No white ring on them either: at this size it ate most of the handle and
+ * left a pale dot that was hard to pick out against the rail. The colour goes
+ * edge to edge and a soft shadow does the separating. */
+.rail .railHandle {
+  position: absolute;
+  top: 50%;
+  box-sizing: border-box;
+  padding: 0;
+  border: none;
+  background-image: none;
+  font: inherit;
+  cursor: grab;
+  touch-action: none;
+  transition: none;
+}
+
+.rail .railHandle:active {
+  cursor: grabbing;
+}
+
+.rail .railHandle:focus-visible {
+  outline: none;
+}
+
+/* Range ends: round, teal, sitting on the rail. */
+.rail .railHandleRange {
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background-color: var(--cioos-primary-700);
+  box-shadow: var(--cioos-shadow-sm);
+  z-index: 1;
+}
+
+.rail .railHandleRange:hover {
+  background-color: var(--cioos-navy);
+}
+
+.rail .railHandleRange:focus-visible {
+  box-shadow: var(--cioos-focus);
+}
+
+.railTicks {
+  position: relative;
+  height: 11px;
+  font-size: 11px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  /* Read at a glance against the map showing through — the 40% ink these
+     started at was too faint to scan. */
+  color: var(--cioos-ink-60);
+}
+
+.railTick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}

@@ -18,6 +18,11 @@ export default function Filter({
   active,
   badgeTitle,
   tooltip,
+  // A filter that has nothing to narrow right now (Scientific Name with OBIS
+  // switched off): shown greyed rather than hidden, so it doesn't come and go
+  // from the list, with `disabledTooltip` saying what would bring it back.
+  disabled,
+  disabledTooltip,
   icon,
   controlled,
   openFilter,
@@ -50,11 +55,16 @@ export default function Filter({
   // active at once and exactly one is being edited.
   const filterButton = (
     <button
-      className={`filterHeader ${active ? 'active' : ''} ${
+      className={`filterHeader ${active && !disabled ? 'active' : ''} ${
         filterOpen && (!controlled || openFilter) ? 'open' : ''
-      }`}
+      } ${disabled ? 'disabled' : ''}`}
       aria-current={filterOpen && (!controlled || openFilter) ? 'true' : undefined}
+      // aria-disabled rather than the `disabled` attribute: a disabled button
+      // takes no pointer events, and the tooltip explaining why it is off is
+      // the whole point of leaving the row there.
+      aria-disabled={disabled ? 'true' : undefined}
       onClick={() => {
+        if (disabled) return
         setFilterOpen(!filterOpen)
         if (controlled) setOpenFilter(filterName)
       }}
@@ -73,14 +83,17 @@ export default function Filter({
       {/* Tooltip text shown on hover (desktop) and on focus/tap (mobile),
           replacing the old "?" help icon. Suppressed while the dropdown is
           open so it doesn't overlap the options. */}
-      {tooltip && !filterOpen ? (
-        <Tooltip placement='bottom' content={tooltip}>
+      {(disabled ? disabledTooltip || tooltip : tooltip) && !filterOpen ? (
+        <Tooltip
+          placement='bottom'
+          content={disabled ? disabledTooltip || tooltip : tooltip}
+        >
           {filterButton}
         </Tooltip>
       ) : (
         filterButton
       )}
-      {(controlled ? filterOpen && openFilter : filterOpen) && (
+      {!disabled && (controlled ? filterOpen && openFilter : filterOpen) && (
         <div className='filterOptions'>
           {searchable && (
             <>

@@ -68,6 +68,14 @@
   border-color: var(--cioos-hairline);
 }
 
+/* A row that can't open stays exactly as it rests (see .filterHeader.disabled
+   in the Filter stylesheet — its hover restates the white of the pills over
+   the map, which is not this column's resting colour). */
+.filtersPanelList .filterHeader.disabled:hover {
+  background-color: transparent;
+  border-color: transparent;
+}
+
 /* Has a selection: a teal ring, readable at a glance down the column. */
 .filtersPanelList .filterHeader.active {
   background-color: var(--cioos-teal-light);
@@ -146,10 +154,7 @@
    negative margin below — a horizontal scrollbar on every filter. The pane now
    owns the scrolling and the width; the bodies just fill it. */
 .filtersPanel .filterOptionsBody > *,
-.filtersPanel .multiCheckboxFilter,
-.filtersPanel .scientificNameSuggestions,
-.filtersPanel .scientificNameChips,
-.filtersPanel .depthSelector {
+.filtersPanel .multiCheckboxFilter {
   max-height: none;
   min-width: 0;
   max-width: none;
