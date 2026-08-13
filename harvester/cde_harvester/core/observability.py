@@ -4,6 +4,7 @@ import logging
 import os
 import time
 from datetime import datetime
+from urllib.parse import urlparse
 
 import sentry_sdk
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -28,6 +29,36 @@ def init_sentry():
         ],
         environment=os.environ.get("ENVIRONMENT", "development"),
     )
+
+
+def report_dataset_issue(logger, erddap_url, dataset_id, reason_code, message):
+    """Surface a dataset-level problem to the people who can fix it.
+
+    The harvest dashboard is the primary channel — the caller writes the same
+    message to cde.harvest_attempts.error_message, next to the query_urls that
+    prove it. This adds the Sentry side.
+
+    init_sentry sets event_level=WARNING, so the log call below is already an
+    event; what it lacks is grouping. Sentry groups on message text by
+    default, and these messages embed per-dataset numbers, so every rejection
+    would become its own issue. The tags below group them by server and by
+    problem instead, which is the view an operator actually wants.
+    """
+    try:
+        with sentry_sdk.new_scope() as scope:
+            scope.set_tag("erddap_domain", urlparse(erddap_url).hostname or erddap_url)
+            scope.set_tag("dataset_id", dataset_id)
+            scope.set_tag("reason_code", reason_code)
+            scope.fingerprint = ["dataset-quality", reason_code]
+            scope.set_context(
+                "dataset", {"erddap_url": erddap_url, "dataset_id": dataset_id}
+            )
+            logger.warning("Skipping dataset (%s): %s", reason_code, message)
+    except Exception:
+        # Reporting a skip must never turn that skip into a failed harvest.
+        # The dashboard row is written by the caller either way, and it is the
+        # channel that matters; Sentry is the convenience copy.
+        logger.warning("Skipping dataset (%s): %s", reason_code, message)
 
 
 def run_logger(fallback=None):
