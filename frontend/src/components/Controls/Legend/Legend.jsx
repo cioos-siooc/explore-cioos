@@ -31,6 +31,7 @@ import {
 } from '../../../state/dataLayers.js'
 import Spinner from '../../ui/Spinner.jsx'
 import Switch from '../../ui/Switch.jsx'
+import LegendFooter from './LegendFooter.jsx'
 import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
 import usePublishedFootprint from '../../../state/ui/usePublishedFootprint.js'
 
@@ -130,6 +131,10 @@ function pickTickIndices(n, maxTicks = 5) {
 //
 // There is exactly one switch for the hexagons, on the observations group, and
 // it covers every hexagon whatever kind of data it holds.
+//
+// Under all of it, outside the collapse, the card's foot carries what the map
+// itself is measured and made from: the scale bar and the basemap credits (see
+// LegendFooter).
 export default function Legend({
   // The point-tier range, which the marker size key reads.
   currentRangeLevel,
@@ -724,6 +729,10 @@ export default function Legend({
         )}
       </button>
       {legendOpen && <div className='legendBody'>{groups}</div>}
+      {/* Outside the collapse: the scale bar reads the map rather than the
+          keys, so it is as useful with the card shut as open — closed, the card
+          is its header row and the scale row, and nothing more. */}
+      <LegendFooter />
     </div>
   )
 }

@@ -1,9 +1,5 @@
 import * as React from 'react'
-import maplibreGl, {
-  AttributionControl,
-  Popup,
-  ScaleControl
-} from 'maplibre-gl'
+import maplibreGl, { Popup } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import MapboxDraw from '@mapbox/mapbox-gl-draw'
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
@@ -1410,8 +1406,9 @@ export default function CreateMap({
       // the discrete GPU on dual-GPU laptops. The map is circles and fills —
       // the integrated GPU renders it fine, so hint 'low-power'.
       canvasContextAttributes: { powerPreference: 'low-power' },
-      // Per-source attributions replace the default control (see the compact
-      // AttributionControl added below).
+      // No attribution in the map's own corner: the per-source attributions are
+      // gathered by an AttributionControl the legend card builds and parents
+      // itself (see LegendFooter.jsx).
       attributionControl: false,
       // Starting camera. The same share-link params and the same fallbacks
       // MapStateProvider seeds its mapView from — the two have to agree, or
@@ -2702,38 +2699,12 @@ export default function CreateMap({
     map.current.on('click', handleMapOnClick)
     // mobile seems better without handleMapOnClick enabled for touch
 
-    const scale = new ScaleControl({
-      maxWidth: 150,
-      unit: 'metric'
-    })
-
-    // Aggregates the per-source attributions from the basemap style
-    // (EMODnet bathymetry, Esri imagery, OpenFreeMap vector).
-    const attribution = new AttributionControl({
-      compact: true
-    })
-    map.current.addControl(attribution, 'bottom-right')
-    // Start the attribution closed, as the bare ⓘ bubble, instead of with the
-    // credits line spread across the corner of the map.
-    //
-    // MapLibre expands compact attribution itself, and not at mount: on mount
-    // the control is still `maplibregl-attrib-empty` (the style's attributions
-    // haven't arrived), which makes its _updateCompact a no-op — so is clearing
-    // the expanded class here. The expansion lands later, when the attributions
-    // resolve and _updateCompact runs again on an element carrying neither
-    // class, at which point it adds `maplibregl-compact` *and*
-    // `maplibregl-compact-show`. Adding the compact class ourselves now is what
-    // holds: that branch is guarded on the class being absent, so it stops
-    // running while the ⓘ toggle, which only needs the same class, keeps
-    // working.
-    mapContainer.current
-      ?.querySelector('.maplibregl-ctrl-attrib')
-      ?.classList.add('maplibregl-compact')
-    map.current.addControl(scale, 'bottom-right')
-
-    // Called order determines stacking order. No NavigationControl: the +/-
-    // zoom buttons only repeated what scroll, pinch and double-tap already do,
-    // and the corner is busy enough with the draw tools.
+    // The only control this corner keeps. The scale bar and the attribution ⓘ
+    // stood here too until they moved into the foot of the legend card, which
+    // is where the rest of "what you are looking at" already lived (see
+    // LegendFooter.jsx); they are constructed there and never handed to
+    // addControl. No NavigationControl either: the +/- zoom buttons only
+    // repeated what scroll, pinch and double-tap already do.
     map.current.addControl(drawPolygon.current, 'bottom-right')
 
     updateMapToolTitleLanguage(t)

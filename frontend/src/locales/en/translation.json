@@ -241,6 +241,7 @@
   "legendPointSizeLess": "Fewer",
   "legendPointSizeMore": "More",
   "legendBathymetry": "Depth (m)",
+  "legendCreditsTooltip": "Basemap sources and credits",
   "legendBathymetryTitle": "Seafloor depth from CHS NONNA bathymetry. The Canadian Hydrographic Service publishes these tiles as pre-rendered colour rather than depth values, so the scale is calibrated from the imagery — read it as approximate bands, not exact contours.",
   "layersGriddedCoverage": "Gridded data coverage",
   "layersObservations": "Hexes & points",

@@ -44,12 +44,11 @@
   bottom: calc(var(--cioos-time-bar-space, 0px) + 12px);
 }
 
-/* MapLibre's bottom-right stack — the scale bar and the attribution/info
-   button, with the draw tools above them — stands in a corner the centered bar
-   reaches into on narrower screens: the bar's right edge passes the left edge
-   of the ~160px scale bar below ~1400px, and narrower still the bar spans the
-   full width. Lift the whole corner by the bar's measured footprint so nothing
-   hides under it. */
+/* MapLibre's bottom-right stack — now the draw tools alone, the scale bar and
+   the attribution ⓘ having moved into the legend card — stands in a corner the
+   centered bar reaches into on narrower screens: below ~1400px the bar's right
+   edge passes the corner, and narrower still it spans the full width. Lift the
+   whole corner by the bar's measured footprint so nothing hides under it. */
 @media (max-width: 1400px) {
   .maplibregl-ctrl-bottom-right {
     margin-bottom: var(--cioos-time-bar-space, 0px);

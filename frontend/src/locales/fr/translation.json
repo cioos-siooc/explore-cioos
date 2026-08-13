@@ -242,6 +242,7 @@
   "legendPointSizeLess": "Moins",
   "legendPointSizeMore": "Plus",
   "legendBathymetry": "Profondeur (m)",
+  "legendCreditsTooltip": "Sources et crédits du fond de carte",
   "legendBathymetryTitle": "Profondeur du fond marin d'après la bathymétrie NONNA du SHC. Le Service hydrographique du Canada publie ces tuiles sous forme de couleurs pré-calculées plutôt que de valeurs de profondeur : l'échelle est donc calibrée à partir de l'imagerie et doit être lue comme des plages approximatives, non comme des isobathes exactes.",
   "layersGriddedCoverage": "Couverture des données maillées",
   "layersObservations": "Hexagones et points",
