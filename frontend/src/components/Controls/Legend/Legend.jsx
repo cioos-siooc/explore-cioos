@@ -141,6 +141,11 @@ export default function Legend({
   // The one domain every hexagon on the map is coloured over, whatever kind of
   // data it holds — see MapStateProvider.
   hexRangeLevel,
+  // True when that domain is the extent of the hexes on screen rather than the
+  // whole catalogue's, which is what makes the bar's numbers move with the
+  // camera. It earns a tooltip, not a line: it is the answer to a question the
+  // bar raises only for the people who notice it.
+  hexRangeScaledToView = false,
   metric = DEFAULT_HEX_METRIC,
   onMetricChange,
   loading,
@@ -304,7 +309,12 @@ export default function Legend({
     // real maximum — say "264k+", not "264k".
     const clamped = rangeLevel?.[2] > rangeLevel?.[1]
     return (
-      <div className={classNames({ legendDimmed: dimmed })}>
+      <div
+        className={classNames({ legendDimmed: dimmed })}
+        // Why the numbers under the bar move when the map does. Only when they
+        // do: a bar drawn over the catalogue's domain has nothing to explain.
+        title={hexRangeScaledToView ? t('legendScaledToView') : undefined}
+      >
         <div
           className='legendColorBar'
           style={{ background: gradient }}

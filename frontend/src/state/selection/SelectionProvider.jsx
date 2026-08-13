@@ -54,7 +54,7 @@ export function useSelection () {
 // Note: datasets and points are exchangable terminology
 export default function SelectionProvider ({ children }) {
   const { i18n } = useTranslation()
-  const { query, catalogLoaded } = useFilters()
+  const { query, catalogLoaded, setDatasetsSelected } = useFilters()
   const {
     setActiveWmsOverlay,
     zoomToGeometry,
@@ -317,6 +317,24 @@ export default function SelectionProvider ({ children }) {
     [setSearchParams]
   )
 
+  // Leaving the dataset page, from wherever it is asked for — the page's own
+  // close/swipe/Backspace, or the sidebar header's back control. Opening the
+  // page usually narrows the datasets filter to that one dataset (clicking a
+  // hex or a griddap footprint does exactly that), so leaving drops that filter
+  // too — otherwise the user lands back on a list still silently restricted to
+  // the dataset they just left. Written as a functional update so this stays
+  // stable: the inspector's key/gesture handlers bind it once.
+  const returnToDatasetList = useCallback(() => {
+    setDatasetsSelected((previous) =>
+      previous.some((dataset) => dataset.isSelected)
+        ? previous.map((dataset) => ({ ...dataset, isSelected: false }))
+        : previous
+    )
+    setBackClicked(true)
+    setInspectDataset()
+    setSelectedTrajectory()
+  }, [setDatasetsSelected, setInspectDataset])
+
   // A track clicked on the map does what clicking a platform row in the dataset
   // inspector does (DatasetInspector's onRowClicked): open that dataset's page
   // AND draw the platform's full history. Both writes happen in this one call so
@@ -553,6 +571,7 @@ export default function SelectionProvider ({ children }) {
     setPointsData,
     inspectDataset,
     setInspectDataset,
+    returnToDatasetList,
     selectionLoading,
     initialPointsQueryComplete,
     inspectRecordID,

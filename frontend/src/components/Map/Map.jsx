@@ -22,6 +22,8 @@ import {
   escapeHtml,
   generateColorStops,
   getCurrentRangeLevel,
+  quantizeCountRange,
+  rangesEqual,
   selectionFromSearchParams,
   updateMapToolTitleLanguage,
   zoomToDatasetCamera,
@@ -60,6 +62,32 @@ import {
   FIRST_LABEL_LAYER_ID,
   LABEL_LAYER_IDS
 } from './basemapStyle.js'
+
+// --- Viewport-adaptive hex ramp knobs ------------------------------------
+// How long the camera has to hold still before the visible hexes are measured.
+// It is a debounce, not a throttle: a drag or a pinch produces one measurement
+// at the end of the gesture, not one per frame. Long enough that a hesitant
+// pan across a coastline doesn't renumber the legend halfway through, short
+// enough to feel like it belongs to the movement that caused it.
+const VIEWPORT_RAMP_DEBOUNCE_MS = 400
+// Any hex on screen is worth measuring, including a single one. The threshold
+// used to be four, on the theory that fewer than that is not a distribution —
+// but zoomed in there often are only one or two cells in view, and the domain
+// they fell back to was the whole catalogue's, which paints them at the pale
+// bottom of the ramp: the "hexes have no colour when zoomed in" complaint. A
+// lone hex is not a problem the ramp has to dodge either, because
+// generateColorStops already answers it — a one-value range takes the middle of
+// the ramp, since with nothing to compare against the honest shade is a mid
+// one.
+const MIN_VIEWPORT_HEXES = 1
+// The layers the measurement reads. Only one of them is ever on screen (the
+// combined hexes below the marker tier, the trajectory/OBIS coverage cells at
+// and above it), and queryRenderedFeatures returns nothing for a layer outside
+// its zoom range, so asking for both costs nothing and needs no zoom test.
+const HEX_LAYER_IDS = ['hexes', 'coverage-hexes']
+// The sources those layers draw from — tiles landing in either one can change
+// what a measurement would find.
+const HEX_SOURCE_IDS = ['cde-tiles', 'cde-cells']
 
 // North-pointing arrowhead icon for track heads and selected-track fixes;
 // the symbol layers rotate it to each point's course over ground. Drawn at
@@ -144,6 +172,11 @@ export default function CreateMap({
   offsetFlyTo,
   rangeLevels,
   coverageRangeLevels,
+  // Reports the count range the hexes on screen actually span, so the legend
+  // can be numbered for the same domain the ramp is painted over. Called with
+  // undefined whenever there is nothing to measure and the global tier takes
+  // over. Debounced and deduped here — see refreshViewportHexRange.
+  onViewportHexRange = () => {},
   metric = DEFAULT_HEX_METRIC,
   hoveredDataset,
   setHoveredDataset,
@@ -277,19 +310,24 @@ export default function CreateMap({
   // Zoom at which griddap coverage rectangles take hover/click priority over
   // the hex aggregates (which stop being drawn at hexMaxZoom anyway).
   const griddapPriorityZoom = 5
-  // 0.55 at the z7 hand-off (where trajectory and OBIS counts stop being
-  // merged into the green hexes layer), fading to a light coverage wash by z10
-  // so the point circles stay readable over dense coverage areas.
+  // 0.6 at the z7 hand-off (where trajectory and OBIS counts stop being merged
+  // into the green hexes layer), easing back as the markers thin out but
+  // holding at 0.4 — enough that the fill still reads as a colour on the ramp.
+  // It used to bottom out at 0.15, which is where a coverage hex stops being a
+  // shade of anything: zoomed in, the cells were a faint grey wash and the ramp
+  // they belong to was unreadable off the map. The point circles stay legible
+  // over them because they sit above the fill and carry their own white halo,
+  // which is a stronger separation than transparency was buying.
   const coverageHexOpacity = [
     'interpolate',
     ['linear'],
     ['zoom'],
     hexMaxZoom,
-    0.55,
+    0.6,
     hexMaxZoom + 1.5,
-    0.3,
+    0.5,
     hexMaxZoom + 3,
-    0.15
+    0.4
   ]
 
   const draw = new MapboxDraw(drawControlOptions)
@@ -298,6 +336,19 @@ export default function CreateMap({
   const layersLoaded = useRef(false)
   const colorStops = useRef([])
   const coverageColorStops = useRef([])
+  // The quantized count range of the hexes currently on screen, or undefined
+  // when there is nothing worth measuring and the global tier keeps the ramp.
+  // A ref, not state: it is read by setColorStops and by map event handlers,
+  // and a re-render of this component is not what it should cause — the legend
+  // hears about it through onViewportHexRange instead.
+  const viewportHexRange = useRef(undefined)
+  // Latest setColorStops closure (it reads the rangeLevels props), for the map
+  // handlers registered once on mount.
+  const setColorStopsRef = useRef(undefined)
+  // Whether anything has happened that could have changed the hexes on screen
+  // since the last measurement. Starts true — the first tiles to arrive have
+  // never been measured.
+  const hexRangeDirty = useRef(true)
   // Point-tier count range, kept so the circle-radius ramp can be rebuilt on
   // the layers whenever the metric or the filters change (see setColorStops).
   const pointRadiusRange = useRef(null)
@@ -309,6 +360,17 @@ export default function CreateMap({
   // Signature of the focus state last written to the map, so re-applying an
   // unchanged focus costs nothing (see hoverHighlightPoints).
   const appliedFocus = useRef('')
+  // The same guard for the track layers' focus paint, which is written whole
+  // rather than per feature (see applyTrackFocus). Reset when those layers are
+  // (re)created, since a fresh layer carries none of it.
+  const trackFocusApplied = useRef(undefined)
+  // The dataset the hex ramp is scaled to — the one whose page is open, and
+  // only that one. A hover is a passing thing and leaves the ramp alone; an
+  // open page is a state, and while it lasts the ramp describes that dataset's
+  // cells rather than every dataset's (see refreshViewportHexRange).
+  const rampFocusPk = useRef(undefined)
+  // Which focus the held measurement was taken for, so it is taken once.
+  const rampMeasuredForPk = useRef(undefined)
   // Latest tracks-mode props for the one-shot map 'load' closure (layers are
   // created once; these refs let it apply the current mode/scrub window).
   const tracksModeRef = useRef(tracksMode)
@@ -316,6 +378,10 @@ export default function CreateMap({
   const trailingDaysRef = useRef(trailingDays)
   const dataLayersRef = useRef(dataLayers)
   const metricRef = useRef(metric)
+  // Latest onViewportHexRange, for the same reason: the debounced handler that
+  // reports the measurement is registered once.
+  const onViewportHexRangeRef = useRef(onViewportHexRange)
+  onViewportHexRangeRef.current = onViewportHexRange
   // Raw selected-track response, cached so re-renders don't re-fetch.
   const rawTrackRef = useRef(null)
 
@@ -491,6 +557,27 @@ export default function CreateMap({
     }
   }
 
+  // Hex and marker features carry the datasets they aggregate as a JSON array
+  // of pks (MapLibre hands nested properties back as strings). Both the dimming
+  // and the ramp's domain ask the same question of them.
+  const featureHasDataset = (feature, pk) => {
+    try {
+      return JSON.parse(feature.properties.datasets).includes(pk)
+    } catch {
+      return false
+    }
+  }
+
+  // Tracks are the third way a dataset draws itself (hexes, markers, tracks),
+  // and they need no feature-state: every track feature carries its dataset on
+  // it (pk_url, as a string in the tile), so the paint expression can read the
+  // focus straight off the property. See applyTrackFocus.
+  const trackIsFocused = (pk) => [
+    '==',
+    ['to-number', ['get', 'pk_url']],
+    pk
+  ]
+
   useEffect(() => {
     setColorStops()
   }, [rangeLevels, coverageRangeLevels])
@@ -623,12 +710,21 @@ export default function CreateMap({
     // (see defaultRangeLevels). The real ranges replace these once /legend
     // returns and this re-runs via the [rangeLevels] effect.
     const effectiveRangeLevels = rangeLevels || defaultRangeLevels
-    colorStops.current = generateColorStops(
-      colorScale,
+    // The measured extent of the hexes on screen wins over the tier's global
+    // domain when there is one — see refreshViewportHexRange. Zoomed into a
+    // quiet corner, the global maximum is set by a hex somewhere else entirely,
+    // and every cell in view lands in the bottom decade of the ramp: one flat
+    // pale shade over the whole viewport. The same measurement serves both
+    // layers below, because only one of them is ever on screen (the combined
+    // hexes below the marker tier, the coverage cells at and above it).
+    const hexDomain =
+      viewportHexRange.current ||
       getCurrentRangeLevel(effectiveRangeLevels, map.current.getZoom())
-    ).map((colorStop) => {
-      return [colorStop.stop, colorStop.color]
-    })
+    colorStops.current = generateColorStops(colorScale, hexDomain).map(
+      (colorStop) => {
+        return [colorStop.stop, colorStop.color]
+      }
+    )
 
     // Coverage hexes only ever render at zoom >= hexMaxZoom, where the hex_1
     // grid is always used, so there's a single range to apply.
@@ -636,7 +732,7 @@ export default function CreateMap({
       coverageRangeLevels || defaultCoverageRangeLevels
     coverageColorStops.current = generateColorStops(
       colorScale,
-      effectiveCoverageRangeLevels.zoom1
+      viewportHexRange.current || effectiveCoverageRangeLevels.zoom1
     ).map((colorStop) => {
       return [colorStop.stop, colorStop.color]
     })
@@ -700,9 +796,126 @@ export default function CreateMap({
       )
     }
   }
+  setColorStopsRef.current = setColorStops
+
+  // The count range the hexes on screen span, snapped out to the nearest nice
+  // rungs, or undefined when there is nothing to measure. Read from what is
+  // rendered rather than fetched: the counts are already on the features the
+  // map is drawing, so a viewport-scaled ramp costs no request — one pass over
+  // the visible hexes, which is at most a few thousand small objects.
+  function measureVisibleHexRange(focusPk) {
+    const layers = HEX_LAYER_IDS.filter((id) => map.current.getLayer(id))
+    if (!layers.length) return undefined
+    // No geometry argument = the whole viewport. Hidden layers and layers
+    // outside their zoom range return nothing, so this needs no zoom or
+    // visibility test of its own.
+    const features = map.current.queryRenderedFeatures({ layers })
+    if (features.length < MIN_VIEWPORT_HEXES) return undefined
+    let lo = Infinity
+    let hi = -Infinity
+    // A plain loop, not a map/filter chain: this runs over every rendered hex,
+    // and the intermediate arrays are the only part of it that would be
+    // expensive. Features straddling a tile boundary appear more than once —
+    // harmless for a min/max.
+    for (const feature of features) {
+      // With a dataset page open, every other dataset's cells are greyed (see
+      // hoverHighlightPoints) — they carry none of the ramp's colours, so they
+      // have no business setting its domain. Measuring them was what made the
+      // few coloured cells change shade on a pan across unrelated data.
+      if (focusPk !== undefined && !featureHasDataset(feature, focusPk)) continue
+      const count = Number(feature.properties?.count)
+      if (!Number.isFinite(count) || count <= 0) continue
+      if (count < lo) lo = count
+      if (count > hi) hi = count
+    }
+    if (!Number.isFinite(hi)) return undefined
+    return quantizeCountRange([lo, hi])
+  }
+
+  // Re-scale the ramp to what is on screen. Called on a debounce from the
+  // camera and tile events, and cheap to call spuriously: quantizing the
+  // measurement to coarse rungs (see quantizeCountRange) means an ordinary pan
+  // measures the same domain it started from, and an unchanged domain returns
+  // here without touching the map or the legend. That dedupe is also what stops
+  // the loop — repainting a data-driven paint property makes the map re-render,
+  // which is one of the things that calls this.
+  function refreshViewportHexRange() {
+    if (!map.current || !map.current.isStyleLoaded()) return
+    // Nothing has moved and no tile has landed since the last measurement, so
+    // the answer is the one already on hand. Worth the flag: 'idle' also
+    // arrives after the re-renders a hover causes, and a viewport full of
+    // hexes is not free to walk.
+    if (!hexRangeDirty.current) return
+    const focusPk = rampFocusPk.current
+    // An open dataset page measures once and then holds. The ramp is scaled to
+    // that dataset's cells, and those cells are being read against each other —
+    // re-scaling under every drag would paint the same cell a different shade
+    // each time the camera settled, which is exactly what the ramp is for
+    // avoiding. Panning has nothing to re-measure until the page closes or a
+    // filter changes what the counts mean (resetViewportHexRange).
+    if (focusPk !== undefined && rampMeasuredForPk.current === focusPk) return
+    hexRangeDirty.current = false
+    const range = measureVisibleHexRange(focusPk)
+    // Only a real measurement locks it: opening a page while its dataset is off
+    // screen finds nothing, and should keep looking until the camera reaches it.
+    if (focusPk !== undefined && range !== undefined) {
+      rampMeasuredForPk.current = focusPk
+    }
+    if (rangesEqual(viewportHexRange.current, range)) return
+    viewportHexRange.current = range
+    setColorStopsRef.current()
+    onViewportHexRangeRef.current(range)
+  }
+
+  // Drop the measurement and fall back to the global tier. For the changes that
+  // make the counts on screen mean something else — a new metric, new filters —
+  // where the hexes about to be drawn have nothing to do with the ones just
+  // measured. The next idle re-measures, once the new tiles are up.
+  function resetViewportHexRange() {
+    hexRangeDirty.current = true
+    rampMeasuredForPk.current = undefined
+    if (viewportHexRange.current === undefined) return
+    viewportHexRange.current = undefined
+    setColorStopsRef.current?.()
+    onViewportHexRangeRef.current(undefined)
+  }
+
+  // The track layers' half of the focus. Unlike the hex/marker layers this is
+  // paint on the whole layer rather than per-feature state, so it survives new
+  // tiles on its own and only has to be re-applied when the focus itself
+  // changes — the signature guard below keeps the calls from the map's own
+  // 'idle' free.
+  //
+  // A selected platform outranks a focused dataset: its own track is drawn on
+  // top by the 'selected-track' layers, and everything under it goes flat grey
+  // so it reads alone. Without a selection, the focused dataset's tracks keep
+  // their colour and every other dataset's go grey.
+  function applyTrackFocus() {
+    if (!map.current || !map.current.getLayer('track-lines')) return
+    const pk = selectedTrajectoryRef.current
+      ? 'selection'
+      : focusedDatasetPk.current
+    if (trackFocusApplied.current === pk) return
+    trackFocusApplied.current = pk
+
+    const [lineColor, headIcon] =
+      pk === 'selection'
+        ? ['lightgrey', 'track-head-arrow-dim']
+        : pk
+          ? [
+            ['case', trackIsFocused(pk), trackLineColor, 'lightgrey'],
+            ['case', trackIsFocused(pk), 'track-head-arrow', 'track-head-arrow-dim']
+          ]
+          : [trackLineColor, 'track-head-arrow']
+
+    map.current.setPaintProperty('track-lines', 'line-color', lineColor)
+    map.current.setLayoutProperty('track-heads', 'icon-image', headIcon)
+    map.current.setPaintProperty('track-heads-fixed', 'circle-color', lineColor)
+  }
 
   function hoverHighlightPoints(pk) {
     if (!map.current || !layersLoaded.current) return
+    applyTrackFocus()
 
     // Which rendered features do NOT belong to the focused dataset — those are
     // the ones that go grey. queryRenderedFeatures only sees what is on screen
@@ -720,9 +933,7 @@ export default function CreateMap({
       }
       dimmed[layerId] = map.current
         .queryRenderedFeatures({ layers: [layerId] })
-        .filter(
-          (feature) => !JSON.parse(feature.properties.datasets).includes(pk)
-        )
+        .filter((feature) => !featureHasDataset(feature, pk))
         // promoteId puts pk on the feature id, which is what setFeatureState
         // addresses.
         .map((feature) => feature.id)
@@ -1006,10 +1217,25 @@ export default function CreateMap({
 
   // The single dataset the map singles out: whatever the cursor is over in the
   // list, else the dataset whose page is open. Inspecting a dataset therefore
-  // pins the same highlight hovering gives, until it's closed.
+  // pins the same highlight hovering gives, until it's closed. Every other
+  // dataset stays on the map, drawn grey — they are still the context this one
+  // is being read against.
   useEffect(() => {
     if (map.current) {
       const focusedDataset = hoveredDataset || inspectDataset
+      // The ramp follows the open page only, never the hover: rescaling it per
+      // row would set the whole map moving as the cursor swept the list. A new
+      // page (or none) means the held measurement no longer describes what is
+      // coloured, so the next idle takes a fresh one.
+      const rampPk =
+        inspectDataset && inspectDataset.cdm_data_type !== 'Grid'
+          ? inspectDataset.pk
+          : undefined
+      if (rampPk !== rampFocusPk.current) {
+        rampFocusPk.current = rampPk
+        rampMeasuredForPk.current = undefined
+        hexRangeDirty.current = true
+      }
       if (focusedDataset?.cdm_data_type === 'Grid') {
         // A griddap dataset has no map features: highlighting its pk would
         // grey the whole map with nothing selected. Draw its bbox instead.
@@ -1021,6 +1247,9 @@ export default function CreateMap({
         setGriddapHighlight(activeWmsOverlay ? activeWmsOverlay.bbox : null)
         hoverHighlightPoints(focusedDataset?.pk)
       }
+      // Also from here: hoverHighlightPoints skips everything until the layers
+      // have settled, and clearing a focus has no later event to ride in on.
+      applyTrackFocus()
     }
   }, [hoveredDataset, inspectDataset, activeWmsOverlay])
 
@@ -1187,6 +1416,10 @@ export default function CreateMap({
     setPointsToReview()
     map.current.setFilter('points-highlighted', ['in', 'pk', ''])
 
+    // The hexes about to be drawn are a different population from the ones the
+    // ramp was last measured over, so the measurement goes and the global tier
+    // holds the ramp until the new tiles land (see resetViewportHexRange).
+    resetViewportHexRange()
     refreshCombinedSources(mapQueryString)
     setLoading(true)
     doFinalCheck.current = true
@@ -1211,6 +1444,9 @@ export default function CreateMap({
     dataLayersRef.current = dataLayers
     // Source existence, not map.loaded() — see the filter effect above.
     if (!map.current || !map.current.getSource('cde-tiles')) return
+    // Adding or removing a geometry changes what the hexes sum, so the ramp's
+    // measured domain goes with it.
+    resetViewportHexRange()
     refreshCombinedSources(mapQueryString)
     if (tracksModeRef.current && anyTrajectoryLayerOn(dataLayers)) {
       refreshTracksSource(mapQueryString, scrubTimeRef.current, trailingDaysRef.current)
@@ -1226,6 +1462,9 @@ export default function CreateMap({
   useEffect(() => {
     metricRef.current = metric
     if (!map.current || !map.current.getSource('cde-tiles')) return
+    // A measurement taken over day counts cannot scale a ramp painted over
+    // measurement counts — drop it and re-measure once the new tiles are up.
+    resetViewportHexRange()
     refreshCombinedSources(mapQueryString)
   }, [metric])
 
@@ -1268,11 +1507,9 @@ export default function CreateMap({
       if (!selectedTrajectory) {
         rawTrackRef.current = null
         source.setData({ type: 'FeatureCollection', features: [] })
-        if (map.current.getLayer('track-lines')) {
-          map.current.setPaintProperty('track-lines', 'line-color', trackLineColor)
-          map.current.setLayoutProperty('track-heads', 'icon-image', 'track-head-arrow')
-          map.current.setPaintProperty('track-heads-fixed', 'circle-color', trackLineColor)
-        }
+        // Back to whatever the dataset focus asks for — full colour when no
+        // dataset page is open, the focused dataset's tracks alone when one is.
+        applyTrackFocus()
         return
       }
 
@@ -1356,11 +1593,8 @@ export default function CreateMap({
         features: [...lineFeatures, ...fixFeatures]
       })
 
-      if (map.current.getLayer('track-lines')) {
-        map.current.setPaintProperty('track-lines', 'line-color', 'lightgrey')
-        map.current.setLayoutProperty('track-heads', 'icon-image', 'track-head-arrow-dim')
-        map.current.setPaintProperty('track-heads-fixed', 'circle-color', 'lightgrey')
-      }
+      // Everything under the selected track goes flat grey so it reads alone.
+      applyTrackFocus()
 
       const longitudes = rawCoordinates.map((c) => c[0])
       const latitudes = rawCoordinates.map((c) => c[1])
@@ -1571,7 +1805,14 @@ export default function CreateMap({
           'source-layer': 'internal-layer-name',
           paint: {
             'circle-color': '#ffffff',
-            'circle-opacity': 0.9,
+            // A white casing is what makes a marker pop, which is the last
+            // thing a greyed-out one should do — it shares this source layer
+            // with 'points', so the same dimmed state reaches it and fades it
+            // back rather than leaving grey dots ringed in white. Only halfway
+            // back: the other datasets stay on the map to be seen, just
+            // quietly, and the casing is what keeps a grey dot legible over a
+            // dark sea.
+            'circle-opacity': ['case', IS_DIMMED, 0.5, 0.9],
             'circle-radius': radiusExpression(pointRadiusRange.current, 1.25)
           }
         },
@@ -1821,6 +2062,11 @@ export default function CreateMap({
           'circle-stroke-width': 1.5
         }
       })
+
+      // These three layers were just created in full colour, so whatever focus
+      // paint was on the old ones is gone with them.
+      trackFocusApplied.current = undefined
+      applyTrackFocus()
 
       // One selected platform's full track (GeoJSON from /trajectories/track).
       // Line features render the path; point features are the raw fixes.
@@ -2813,6 +3059,45 @@ export default function CreateMap({
     map.current.on('zoomend', reapplyColorStops)
     return () => map.current.off('zoomend', reapplyColorStops)
   }, [rangeLevels, coverageRangeLevels])
+
+  // Keep the ramp scaled to the hexes actually on screen. Registered once —
+  // the handler reads the current setColorStops through a ref — so the
+  // debounce survives every re-render and a slow drag really does produce one
+  // measurement rather than one per settled frame.
+  //
+  // Two things can change the hexes on screen: the camera moving over data
+  // already loaded, and new tiles arriving (a pan into unloaded ground, a
+  // filter change, a metric switch). Both raise the dirty flag; the
+  // measurement itself waits for 'idle', which is the one event that means the
+  // new features are rendered — 'sourcedata' fires while they are still on
+  // their way to the screen, and queryRenderedFeatures only sees what is
+  // actually drawn. All three share one debounce, so a pan that pulls in new
+  // tiles measures once at the end rather than once per event.
+  useEffect(() => {
+    if (!map.current) return
+    const measure = debounce(
+      () => refreshViewportHexRange(),
+      VIEWPORT_RAMP_DEBOUNCE_MS
+    )
+    const onMoveEnd = () => {
+      hexRangeDirty.current = true
+      measure()
+    }
+    const onDataSourceLoaded = (e) => {
+      if (!e.isSourceLoaded || !HEX_SOURCE_IDS.includes(e.sourceId)) return
+      hexRangeDirty.current = true
+      measure()
+    }
+    map.current.on('moveend', onMoveEnd)
+    map.current.on('sourcedata', onDataSourceLoaded)
+    map.current.on('idle', measure)
+    return () => {
+      measure.cancel()
+      map.current.off('moveend', onMoveEnd)
+      map.current.off('sourcedata', onDataSourceLoaded)
+      map.current.off('idle', measure)
+    }
+  }, [])
 
   // Live-swap basemap label languages on EN⇄FR toggle. The initial language
   // is baked into buildBasemapStyle at construction, so this only fires on

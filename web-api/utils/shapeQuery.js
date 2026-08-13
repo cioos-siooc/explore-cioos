@@ -122,6 +122,13 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                   d.platform,
                   d.num_columns,
                   d.first_eov_column,
+                  -- The variables carrying each CF discrete-sampling role
+                  -- (cf_role=timeseries_id / profile_id / trajectory_id), so
+                  -- the record list can name its ID column after the role the
+                  -- dataset actually uses, and after the variable behind it.
+                  d.timeseries_id_variable,
+                  d.profile_id_variable,
+                  d.trajectory_id_variable,
                   json_build_object('en',title,'fr',title_fr)     title_translated,
                   d.eovs                                          eovs,
                   organizations,

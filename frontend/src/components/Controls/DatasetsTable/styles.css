@@ -176,6 +176,108 @@
   padding: 10px;
 }
 
+/* --- Pager: pinned under the list, so the way to the next page is always in
+   the same place rather than at the end of however long this page runs. --- */
+.datasetsPager {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-white);
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink-60);
+}
+
+.datasetsPagerRange {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Page numbers push to the trailing edge; the per-page select follows them. */
+.datasetsPagerControls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.datasetsPagerStep,
+.datasetsPagerPage {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 5px;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius-sm, 4px);
+  background: transparent;
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast), border-color var(--cioos-transition-fast);
+}
+
+.datasetsPagerStep:hover:not(:disabled),
+.datasetsPagerPage:hover:not(.active) {
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink);
+}
+
+.datasetsPagerStep:focus-visible,
+.datasetsPagerPage:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.datasetsPagerStep:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* The page you are on, marked the same way the active sort chip is. */
+.datasetsPagerPage.active {
+  background-color: var(--cioos-teal-light);
+  border-color: var(--cioos-primary);
+  color: var(--cioos-primary-700);
+  cursor: default;
+}
+
+.datasetsPagerGap {
+  padding: 0 1px;
+  color: var(--cioos-ink-40);
+}
+
+/* Single page: no controls between them, so the select takes the trailing edge
+   the controls would otherwise have held. */
+.datasetsPagerRange + .datasetsPagerSize {
+  margin-left: auto;
+}
+
+.datasetsPagerSize select {
+  padding: 3px 6px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font: inherit;
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+}
+
+.datasetsPagerSize select:focus-visible {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
+}
+
 .datasetsCardEmpty {
   padding: 24px 12px;
   text-align: center;

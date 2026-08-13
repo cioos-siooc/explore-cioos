@@ -10,7 +10,6 @@ import FiltersModal from './Modals/FiltersModal.jsx'
 import DownloadModal from './Modals/DownloadModal.jsx'
 import PreviewHost from './Panels/PreviewHost.jsx'
 import MapCornerControls from './MapCorner/MapCornerControls.jsx'
-import ZoomToDataset from './ZoomToDataset/ZoomToDataset.jsx'
 import Loading from '../Controls/Loading/Loading.jsx'
 import Legend from '../Controls/Legend/Legend.jsx'
 import DepthBar from '../Controls/DepthBar/DepthBar.jsx'
@@ -37,6 +36,7 @@ export default function AppShell () {
     zoom,
     currentRangeLevel,
     hexRangeLevel,
+    hexRangeScaledToView,
     metric,
     metricPinned,
     setMetric,
@@ -151,6 +151,7 @@ export default function AppShell () {
       <Legend
         currentRangeLevel={currentRangeLevel}
         hexRangeLevel={hexRangeLevel}
+        hexRangeScaledToView={hexRangeScaledToView}
         metric={metric}
         // Withheld at the marker tier, where the metric is pinned to days of
         // data: no handler means the Legend titles the ramp with a plain
@@ -173,12 +174,9 @@ export default function AppShell () {
           axis and the marks that say where the drawn data sits on it: time
           along the bottom edge, depth down the right one, perpendicular the
           way the axes are. Each comes and goes with whether it has anything to
-          say. The time bar renders before the zoom pill because they share the
-          bottom-center spot, and a CSS sibling rule lifts the pill clear of it.
-          Both read their own state from the filter and map providers. */}
+          say. Both read their own state from the filter and map providers. */}
       <TimeBar />
       <DepthBar />
-      <ZoomToDataset variant='floating' />
       {activeWmsOverlay && !wmsLegendIsInline && (
         <WmsLegend
           overlay={activeWmsOverlay}

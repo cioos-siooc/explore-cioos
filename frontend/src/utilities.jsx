@@ -333,6 +333,50 @@ export function getCurrentRangeLevel (rangeLevels, zoom) {
   return rangeLevels.zoom2
 }
 
+// The rungs a quantized count domain is allowed to land on, within each decade.
+// Coarse enough that an ordinary pan lands on the same rung it started from —
+// which is the whole point: an unquantized viewport domain would shift by a few
+// counts on every drag, repainting the ramp and renumbering the legend for a
+// change nobody can see.
+const NICE_MANTISSAS = [1, 1.5, 2, 3, 5, 7, 10]
+
+// Snap a positive count out to the nearest rung, away from the middle of the
+// domain: 'up' for a maximum, 'down' for a minimum, so quantizing only ever
+// widens a range and never clips a hex out of its own ramp.
+function snapCount (value, direction) {
+  if (!Number.isFinite(value) || value <= 0) return undefined
+  const base = 10 ** Math.floor(Math.log10(value))
+  const mantissa = value / base
+  // The float slack absorbs the log10/pow round trip, which lands a clean 100
+  // on 99.99999999999999 often enough to matter — without it, a maximum of 100
+  // would snap up to 150.
+  const rung =
+    direction === 'up'
+      ? NICE_MANTISSAS.find((m) => m >= mantissa - 1e-9)
+      : [...NICE_MANTISSAS].reverse().find((m) => m <= mantissa + 1e-9)
+  return Math.max(1, Math.round(rung * base))
+}
+
+// Widen a measured [min, max] onto the rungs above. Counts, so the result is
+// integral and never below 1; anything that isn't a usable range (no data on
+// screen, a null max from a query that matched nothing) comes back undefined,
+// which every caller reads as "use the global domain instead".
+export function quantizeCountRange (range) {
+  if (!Array.isArray(range)) return undefined
+  const hi = snapCount(range[1], 'up')
+  if (!hi) return undefined
+  const lo = snapCount(Math.max(Number(range[0]) || 1, 1), 'down') || 1
+  return [Math.min(lo, hi), hi]
+}
+
+// Are two [min, max] ranges the same domain? Used to drop no-op ramp repaints
+// and the state updates that would re-render the legend behind them.
+export function rangesEqual (a, b) {
+  if (a === b) return true
+  if (!Array.isArray(a) || !Array.isArray(b)) return false
+  return a[0] === b[0] && a[1] === b[1]
+}
+
 // Does a [min, max] range describe any data? The API answers a query that
 // matched nothing with [null, null] (min/max over no rows), so "empty" isn't
 // enough of a test — and a null max would otherwise render as an empty ramp

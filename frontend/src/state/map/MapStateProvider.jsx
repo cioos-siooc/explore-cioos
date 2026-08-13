@@ -8,7 +8,6 @@ import {
   useState,
   useEffect
 } from 'react'
-import isEmpty from 'lodash/isEmpty'
 
 import { server } from '../../config.js'
 import {
@@ -26,6 +25,7 @@ import {
   applyMapDatasetPKs,
   createDataFilterQueryString,
   getCurrentRangeLevel,
+  rangesEqual,
   useDebounce
 } from '../../utilities.jsx'
 import fetchJson from '../fetchJson.js'
@@ -108,9 +108,13 @@ export default function MapStateProvider ({ children }) {
     [query, mapDatasetPKs]
   )
   const [rangeLevels, setRangeLevels] = useState()
-  // Which metric the ranges in flight / on hand were requested for, so a metric
-  // change can be told apart from a filter change (see the refetch effect).
-  const loadedMetric = useRef()
+  // What the ranges on hand / in flight were requested for: the query and the
+  // metric together, since either one changes what /legend counts. This is the
+  // whole dedupe test for the refetch effect below.
+  const legendKey = (legendQuery, hexMetric) => `${hexMetric}|${legendQuery}`
+  const requestedLegendKey = useRef(undefined)
+  // The in-flight /legend request, so a newer one can cancel it (see loadLegend).
+  const legendRequest = useRef(undefined)
   const [legendLoading, setLegendLoading] = useState(true)
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
   // The always-hex coverage layer (trajectory + OBIS cells) at zoom >= 7. One
@@ -313,10 +317,19 @@ export default function MapStateProvider ({ children }) {
     return `${server}/legend${s ? '?' + s : ''}`
   }
 
+  // Only the newest request may write the ranges. Flipping the metric twice in
+  // a row puts two /legend calls in flight over the same filters, and they can
+  // land in either order — the slower first response would otherwise overwrite
+  // the newer one and leave the bar numbered for a metric the tiles no longer
+  // carry. The previous request is aborted as well, so a fast switcher isn't
+  // holding several copies of the app's heaviest query open at once.
   function loadLegend (legendQuery, hexMetric = effectiveMetric) {
-    loadedMetric.current = hexMetric
+    legendRequest.current?.abort()
+    const controller = new AbortController()
+    legendRequest.current = controller
+    requestedLegendKey.current = legendKey(legendQuery, hexMetric)
     setLegendLoading(true)
-    fetchJson(legendUrl(legendQuery, hexMetric))
+    fetchJson(legendUrl(legendQuery, hexMetric), { signal: controller.signal })
       .then((legend) => {
         if (legend) {
           setRangeLevels(legend.recordsCount)
@@ -324,37 +337,41 @@ export default function MapStateProvider ({ children }) {
         }
       })
       .catch((error) => {
+        if (error.name === 'AbortError') return
         console.error('legend fetch failed:', error)
+        // Let the effect below retry this key: a failed fetch leaves no ranges
+        // behind, so nothing should count as loaded for it.
+        requestedLegendKey.current = undefined
       })
-      .finally(() => setLegendLoading(false))
+      .finally(() => {
+        if (legendRequest.current !== controller) return
+        legendRequest.current = undefined
+        setLegendLoading(false)
+      })
   }
 
-  // The initial legend values. (The camera from the share link is read where
-  // mapView is declared, so it is numeric from the first render.)
-  useEffect(() => {
-    loadLegend(mapQueryString)
-  }, [])
-
-  // Refetch the legend whenever the (debounced) query changes, or a group is
-  // hidden from / restored to the map — the ramp counts what the map draws.
-  // The metric is in here too: it changes what /legend counts, and a stale
-  // range would scale the new numbers against the old domain.
+  // Fetch the legend for whatever the map is drawing: on mount, whenever the
+  // (debounced) query changes, whenever a group is hidden from / restored to
+  // the map, and whenever the metric changes — the ramp counts what the map
+  // draws, and a stale range would scale the new numbers against the old
+  // domain.
   //
   // It's the *effective* metric, so crossing MARKER_MIN_ZOOM refetches — one
   // /legend response covers every zoom tier of a single metric, and the marker
   // tier is pinned to a different one than the hexes. Both URLs cache, so it's
   // one extra fetch per (filters x metric), not one per zoom.
   //
-  // A metric change refetches even mid-load, unlike a query change. Changing
-  // the metric *causes* a load (the tiles reload to carry the new count), so
-  // the old `!loading` guard skipped the one refetch that mattered and never
-  // retried — the bar kept the previous metric's numbers under the new
-  // metric's tiles. A query change can wait: whatever is in flight already
-  // carries the new filters, whereas an in-flight request cannot retroactively
-  // have asked for a metric that was chosen after it was issued.
+  // The guard is the (query, metric) pair the last request was issued for, and
+  // nothing else. It used to also bail while `loading` was true, on the theory
+  // that a request already in flight carried the new filters — but `loading` is
+  // the *tiles*, not this fetch, so any change arriving during a redraw (which
+  // is exactly when a metric or filter change arrives, since it causes one) was
+  // dropped and never retried, leaving the previous metric's numbers under the
+  // new metric's tiles. It also bailed on empty rangeLevels, which meant a
+  // first response that failed or matched nothing froze the ramp for the rest
+  // of the session.
   useEffect(() => {
-    if (isEmpty(rangeLevels)) return
-    if (loading && loadedMetric.current === effectiveMetric) return
+    if (requestedLegendKey.current === legendKey(mapQueryString, effectiveMetric)) return
     loadLegend(mapQueryString)
   }, [mapQueryString, effectiveMetric])
 
@@ -394,16 +411,36 @@ export default function MapStateProvider ({ children }) {
     }
   }, [coverageRangeLevels, zoom])
 
-  // The one domain the hex colour gradient is drawn over, whatever the hexes
-  // hold. Below the marker tier every kind of cell — profile-family,
-  // trajectory, occurrence — is summed into the same hexes layer, so
-  // currentRangeLevel already covers all of them; at the marker tier the only
-  // hexes still on screen are the trajectory/OBIS coverage cells, which carry
-  // their own tier. One gradient either way, because the colour means the same
-  // thing either way: how much data this cell holds.
-  const hexRangeLevel = isMarkerTier(zoom)
+  // The domain the hexes on screen actually span, measured from the rendered
+  // tiles and reported by Map.jsx (see refreshViewportHexRange there). It is
+  // quantized and debounced at the source, so this only changes when the ramp
+  // it drives changes; the setter drops equal values so a re-report can't
+  // re-render the legend for nothing.
+  const [viewportHexRange, setViewportHexRangeState] = useState()
+  const setViewportHexRange = useCallback((range) => {
+    setViewportHexRangeState((previous) =>
+      rangesEqual(previous, range) ? previous : range
+    )
+  }, [])
+
+  // The global domain for the hexes, whatever they hold. Below the marker tier
+  // every kind of cell — profile-family, trajectory, occurrence — is summed
+  // into the same hexes layer, so currentRangeLevel already covers all of them;
+  // at the marker tier the only hexes still on screen are the trajectory/OBIS
+  // coverage cells, which carry their own tier. One gradient either way,
+  // because the colour means the same thing either way: how much data this cell
+  // holds.
+  const globalHexRangeLevel = isMarkerTier(zoom)
     ? currentCoverageRangeLevel
     : currentRangeLevel
+
+  // What the gradient is actually drawn over. The visible extent wins when
+  // there is one: a domain taken from the whole catalogue leaves a zoomed-in
+  // view painted in one flat shade, since every hex in it sits in the bottom
+  // decade of a global maximum set somewhere else entirely. The global tier is
+  // the fallback — before the first measurement, and wherever too few hexes are
+  // on screen to call it a distribution.
+  const hexRangeLevel = viewportHexRange || globalHexRangeLevel
 
   const value = {
     loading,
@@ -423,6 +460,13 @@ export default function MapStateProvider ({ children }) {
     // can be, and nothing outside wants it separately now that the card draws
     // one gradient for every hexagon.
     hexRangeLevel,
+    // Whether that domain came from the view rather than the whole catalogue,
+    // so the legend can say as much — the numbers on the bar move with the
+    // camera, and a bar that renumbers itself on a pan without explaining why
+    // reads as a glitch.
+    hexRangeScaledToView: Boolean(viewportHexRange),
+    // Map.jsx reports the visible hex extent here; nothing else writes it.
+    setViewportHexRange,
     // The pinned value, not the raw preference — see effectiveMetric. Callers
     // that paint or label the map want what the map is counting.
     metric: effectiveMetric,

@@ -16,8 +16,8 @@ const UIContext = createContext()
 
 // Above this width the datasets list is shown by default — there is enough map
 // left over for it to sit beside rather than on top of. Below it the map leads
-// and the list is opened from the top bar (or dragged up, on phones, where the
-// card is a bottom sheet).
+// and the list is opened from the top bar — on phones that raises it as a
+// bottom sheet.
 const WIDE_SCREEN_QUERY = '(min-width: 1400px)'
 
 export function useUI () {

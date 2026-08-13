@@ -2,8 +2,9 @@
  * Sidebar — the left column holding the datasets card (a toggle header
  * that shows/hides the dataset list body and the counts + Download
  * footer). The brand + Datasets/Filters entry points live in the
- * centered top bar. On phones the datasets card becomes a bottom sheet
- * draggable up from the base of the screen.
+ * centered top bar. On phones the datasets card becomes a bottom sheet,
+ * shown only while the top bar's Datasets button is on — closed, it
+ * leaves nothing at the bottom edge and the map reads full-screen.
  *
  * The griddap legend pins itself over this column's top-left corner
  * rather than stacking inside it (see the WmsLegend stylesheet), so the
@@ -11,9 +12,6 @@
  * ------------------------------------------------------------------ */
 :root {
   --cioos-sidebar-width: 420px;
-  /* Sliver of the collapsed datasets sheet left visible on mobile — just a
-     slim grab handle. Kept in sync with SHEET_PEEK in Sidebar.jsx. */
-  --sheet-peek: 28px;
   /* Floor for the clearance held below the top bar on mobile, so the sheet's
      top edge rests under it (logo row + Datasets/Filters pill) instead of
      sliding behind it. The measured --cioos-top-bar-space takes over whenever
@@ -67,25 +65,42 @@
   box-shadow: var(--cioos-shadow-3d);
 }
 
-/* Expanded: fill the remaining height so the list can scroll. */
+/* Expanded: fill the remaining height so the list can scroll, and slide in from
+   the left edge of the screen — the column is asked for from the top bar, so it
+   should read as arriving rather than blinking into place. The perspective is
+   carried through both keyframes so the card keeps its 3D lift while it
+   travels, and the duration is spelled out rather than taken from
+   --cioos-transition-*: those tokens carry a timing function of their own, and
+   a second one after them makes the shorthand invalid — the animation is then
+   dropped without a word. */
 .sidebarDatasets.expanded {
   flex: 1 1 auto;
+  animation: sidebarSlideIn 0.32s cubic-bezier(0.22, 0.8, 0.3, 1);
 }
 
-/* Collapsed: only the toggle header shows; hide the list + footer. */
-.sidebarDatasets:not(.expanded) .sidebarBody,
-.sidebarDatasets:not(.expanded) .sidebarFooter {
-  display: none;
-}
-
-/* On desktop the datasets card is opened from the top-bar Datasets button, so
-   when collapsed the whole card (banner included) disappears from the left —
-   the map is unobstructed. When expanded its banner stays clickable to hide
-   it again. (Phones keep the draggable bottom-sheet peek; see below.) */
-@media (min-width: 701px) {
-  .sidebarDatasets:not(.expanded) {
-    display: none;
+@keyframes sidebarSlideIn {
+  from {
+    /* Its own width plus the column's left inset: clear of the screen edge, so
+       the card travels in rather than growing out of it. */
+    transform: translateX(calc(-100% - 16px)) var(--cioos-perspective);
   }
+  to {
+    transform: translateX(0) var(--cioos-perspective);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebarDatasets.expanded {
+    animation: none;
+  }
+}
+
+/* The datasets card is opened from the top-bar Datasets button, so when
+   collapsed the whole card (banner included) disappears — the map is
+   unobstructed at every width. When expanded its banner stays clickable to
+   hide it again. */
+.sidebarDatasets:not(.expanded) {
+  display: none;
 }
 
 .datasetsToggle {
@@ -144,12 +159,91 @@
   transform: rotate(180deg);
 }
 
+/* ------------------------------------------------------------------
+ * Dataset-page banner: replaces the datasets toggle while a single
+ * dataset is open. Reads differently on purpose — tinted — so the card
+ * is never mistaken for the list it drilled in from. Back on the left,
+ * what-you-are-looking-at on the right, and the collapse chevron kept
+ * where the toggle's was.
+ * ------------------------------------------------------------------ */
+.datasetsBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 8px 10px;
+  background-color: var(--cioos-teal-light);
+}
+
+.datasetsBackButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 5px 12px 5px 8px;
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.datasetsBackButton:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.datasetsBackButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* Names the surface, not the dataset — the dataset's own title is the
+   heading directly below, and repeating it here would just crowd the row. */
+.datasetsBannerMode {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  margin-left: auto;
+  font-family: var(--cioos-font-display);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  color: var(--cioos-primary-700);
+}
+
+.datasetsBannerCollapse {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+}
+
+.datasetsBannerCollapse:hover {
+  color: var(--cioos-ink);
+}
+
 /* The list body sits below the toggle, visually separated by a hairline. */
 .sidebarBody {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  /* The list and the dataset page slide in horizontally (Panels/styles.css);
+     clipped rather than scrolled, so those few frames can't flash a horizontal
+     scrollbar (a scroll box with overflow-y: auto resolves overflow-x to auto
+     unless it is set). Nothing in this column is meant to reach past its edge. */
+  overflow-x: hidden;
   border-top: 1px solid var(--cioos-hairline);
 }
 
@@ -233,7 +327,9 @@
 
 /* ------------------------------------------------------------------
  * Mobile: brand card floats top-left; the datasets card becomes a
- * bottom sheet, dragged up from the base of the screen by its handle.
+ * bottom sheet that the top bar's Datasets button raises. Closed, the
+ * card is not rendered at all (see the collapsed rule above), so the
+ * bottom edge belongs to the map.
  * ------------------------------------------------------------------ */
 @media (max-width: 700px) {
   .sidebar {
@@ -241,8 +337,8 @@
     width: auto;
   }
 
-  /* Expanded, the sheet owns the screen — including the time bar, which sits a
-     layer above the resting sheet so the collapsed list doesn't cover it. */
+  /* Open, the sheet owns the screen — including the time bar, which the shell
+     otherwise keeps above this column. */
   .sidebar.sheetExpanded {
     z-index: var(--cioos-z-sheet, 34);
   }
@@ -251,12 +347,12 @@
     position: fixed;
     left: 0;
     right: 0;
-    /* The sheet owns the screen here: expanded it rises over the time bar
-       instead of holding clearance from it the way the desktop column does. */
+    /* The sheet owns the screen here: it rises over the time bar instead of
+       holding clearance from it the way the desktop column does. */
     bottom: 0;
-    /* Full height minus the top-bar clearance, so the expanded sheet reaches
-       nearly the top of the screen while stopping below the bar (and below the
-       filter chips wrapped under it, which is what pushes the measured
+    /* Full height minus the top-bar clearance, so the sheet reaches nearly the
+       top of the screen while stopping below the bar (and below the filter
+       chips wrapped under it, which is what pushes the measured
        --cioos-top-bar-space past the floor). */
     height: calc(
       100dvh - max(var(--sheet-top-gap), var(--cioos-top-bar-space, 0px))
@@ -266,78 +362,27 @@
     );
     border-radius: var(--cioos-radius-lg) var(--cioos-radius-lg) 0 0;
     box-shadow: var(--cioos-shadow-lift, var(--cioos-shadow-float));
-    /* Collapsed rest position: only the drag strip peeks out, with the rest of
-       the list parked below the screen. The strip rests on top of the time
-       bar rather than on the bottom edge — the bar is flush to that edge here,
-       so a strip left underneath it would be covered and the swipe-up that
-       opens the list would be unreachable. */
-    transform: translateY(
-      calc(100% - var(--sheet-peek) - var(--cioos-time-bar-space, 0px))
-    );
-    transition: transform var(--cioos-transition-normal, 0.25s ease);
-    touch-action: none;
   }
 
   .sidebarDatasets.expanded {
     flex: none;
-    transform: translateY(0);
+    /* Rises from the bottom edge on open — the sheet is mounted by the toggle,
+       so this plays once rather than tracking a gesture. */
+    animation: sheetRise var(--cioos-transition-normal, 0.25s ease);
   }
 
-  /* On mobile the list is part of the sheet, always mounted — reveal it
-     by dragging rather than by remounting. */
-  .sidebarDatasets:not(.expanded) .sidebarBody,
-  .sidebarDatasets:not(.expanded) .sidebarFooter {
-    display: flex;
+  @media (prefers-reduced-motion: reduce) {
+    .sidebarDatasets.expanded {
+      animation: none;
+    }
   }
+}
 
-  /* Grab handle: a short centered pill above the toggle label. */
-  .datasetsToggle {
-    position: relative;
-    justify-content: center;
-    padding-top: 20px;
-    min-height: var(--sheet-peek);
+@keyframes sheetRise {
+  from {
+    transform: translateY(100%) var(--cioos-perspective);
   }
-
-  .datasetsToggle::before {
-    content: '';
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 40px;
-    height: 4px;
-    border-radius: var(--cioos-radius-pill);
-    background-color: var(--cioos-ink-40, var(--cioos-hairline));
-  }
-
-  /* The chevron is redundant next to the grab handle on the sheet. */
-  .datasetsToggleChevron {
-    display: none;
-  }
-
-  /* Collapsed at the base: the sheet is fully hidden. Only an invisible
-     strip stays at the bottom edge as a drag zone — no handle, no label, no
-     chrome — so the map reads edge-to-edge. Swipe/drag up from the edge to
-     reveal the list; all the sheet chrome returns once it's expanded. */
-  .sidebarDatasets:not(.expanded) {
-    background: transparent;
-    border-color: transparent;
-    box-shadow: none;
-  }
-
-  .sidebarDatasets:not(.expanded) .datasetsToggle {
-    padding: 0;
-    min-height: var(--sheet-peek);
-  }
-
-  .sidebarDatasets:not(.expanded) .datasetsToggle:hover {
-    background: transparent;
-  }
-
-  .sidebarDatasets:not(.expanded) .datasetsToggle::before,
-  .sidebarDatasets:not(.expanded) .datasetsToggle > svg:first-child,
-  .sidebarDatasets:not(.expanded) .datasetsToggleLabel,
-  .sidebarDatasets:not(.expanded) .datasetsToggleCount {
-    display: none;
+  to {
+    transform: translateY(0) var(--cioos-perspective);
   }
 }

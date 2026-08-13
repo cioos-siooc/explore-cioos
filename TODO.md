@@ -5,8 +5,9 @@
 ### Bugs
 - [ ] Fix hexes at high latitude for trajectories.
 - [ ] Fix click on map grid box / hex / marker interaction
-- [ ] Update hexes colormap base on visible hexes 
-- [ ] 
+- [ ] Update hexes colormap base on visible hexes
+- [ ] Make icons in dataset page vertically stacked
+
 ### Downloader — test and fix
 - [ ] Trajectory
 - [ ] Griddap

@@ -201,6 +201,10 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
+  /* The same width as the brand card above (see TopLeft/styles.css, which
+     defines the token and the viewport cap): the chips read as that card's
+     own footer rather than a row of loose pills spilling wider than it. */
+  width: min(var(--cioos-brand-width), calc(100vw - 24px));
   margin: 0;
   padding: 0;
   list-style: none;
@@ -216,9 +220,9 @@
   align-items: stretch;
   flex-wrap: nowrap;
   gap: 4px;
-  /* Don't let a group sprawl across the map; past this width the value chips
-     wrap in the middle lane (below). */
-  max-width: min(360px, calc(100vw - 32px));
+  /* A group never reaches past the row it sits in — which is the brand card's
+     width; past that the value chips wrap in the middle lane (below). */
+  max-width: 100%;
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
