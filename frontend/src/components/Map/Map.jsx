@@ -22,6 +22,8 @@ import {
   escapeHtml,
   generateColorStops,
   getCurrentRangeLevel,
+  quantizeCountRange,
+  rangesEqual,
   selectionFromSearchParams,
   updateMapToolTitleLanguage,
   zoomToDatasetCamera,
@@ -60,6 +62,32 @@ import {
   FIRST_LABEL_LAYER_ID,
   LABEL_LAYER_IDS
 } from './basemapStyle.js'
+
+// --- Viewport-adaptive hex ramp knobs ------------------------------------
+// How long the camera has to hold still before the visible hexes are measured.
+// It is a debounce, not a throttle: a drag or a pinch produces one measurement
+// at the end of the gesture, not one per frame. Long enough that a hesitant
+// pan across a coastline doesn't renumber the legend halfway through, short
+// enough to feel like it belongs to the movement that caused it.
+const VIEWPORT_RAMP_DEBOUNCE_MS = 400
+// Any hex on screen is worth measuring, including a single one. The threshold
+// used to be four, on the theory that fewer than that is not a distribution —
+// but zoomed in there often are only one or two cells in view, and the domain
+// they fell back to was the whole catalogue's, which paints them at the pale
+// bottom of the ramp: the "hexes have no colour when zoomed in" complaint. A
+// lone hex is not a problem the ramp has to dodge either, because
+// generateColorStops already answers it — a one-value range takes the middle of
+// the ramp, since with nothing to compare against the honest shade is a mid
+// one.
+const MIN_VIEWPORT_HEXES = 1
+// The layers the measurement reads. Only one of them is ever on screen (the
+// combined hexes below the marker tier, the trajectory/OBIS coverage cells at
+// and above it), and queryRenderedFeatures returns nothing for a layer outside
+// its zoom range, so asking for both costs nothing and needs no zoom test.
+const HEX_LAYER_IDS = ['hexes', 'coverage-hexes']
+// The sources those layers draw from — tiles landing in either one can change
+// what a measurement would find.
+const HEX_SOURCE_IDS = ['cde-tiles', 'cde-cells']
 
 // North-pointing arrowhead icon for track heads and selected-track fixes;
 // the symbol layers rotate it to each point's course over ground. Drawn at
@@ -144,6 +172,11 @@ export default function CreateMap({
   offsetFlyTo,
   rangeLevels,
   coverageRangeLevels,
+  // Reports the count range the hexes on screen actually span, so the legend
+  // can be numbered for the same domain the ramp is painted over. Called with
+  // undefined whenever there is nothing to measure and the global tier takes
+  // over. Debounced and deduped here — see refreshViewportHexRange.
+  onViewportHexRange = () => {},
   metric = DEFAULT_HEX_METRIC,
   hoveredDataset,
   setHoveredDataset,
@@ -277,19 +310,24 @@ export default function CreateMap({
   // Zoom at which griddap coverage rectangles take hover/click priority over
   // the hex aggregates (which stop being drawn at hexMaxZoom anyway).
   const griddapPriorityZoom = 5
-  // 0.55 at the z7 hand-off (where trajectory and OBIS counts stop being
-  // merged into the green hexes layer), fading to a light coverage wash by z10
-  // so the point circles stay readable over dense coverage areas.
+  // 0.6 at the z7 hand-off (where trajectory and OBIS counts stop being merged
+  // into the green hexes layer), easing back as the markers thin out but
+  // holding at 0.4 — enough that the fill still reads as a colour on the ramp.
+  // It used to bottom out at 0.15, which is where a coverage hex stops being a
+  // shade of anything: zoomed in, the cells were a faint grey wash and the ramp
+  // they belong to was unreadable off the map. The point circles stay legible
+  // over them because they sit above the fill and carry their own white halo,
+  // which is a stronger separation than transparency was buying.
   const coverageHexOpacity = [
     'interpolate',
     ['linear'],
     ['zoom'],
     hexMaxZoom,
-    0.55,
+    0.6,
     hexMaxZoom + 1.5,
-    0.3,
+    0.5,
     hexMaxZoom + 3,
-    0.15
+    0.4
   ]
 
   const draw = new MapboxDraw(drawControlOptions)
@@ -298,6 +336,19 @@ export default function CreateMap({
   const layersLoaded = useRef(false)
   const colorStops = useRef([])
   const coverageColorStops = useRef([])
+  // The quantized count range of the hexes currently on screen, or undefined
+  // when there is nothing worth measuring and the global tier keeps the ramp.
+  // A ref, not state: it is read by setColorStops and by map event handlers,
+  // and a re-render of this component is not what it should cause — the legend
+  // hears about it through onViewportHexRange instead.
+  const viewportHexRange = useRef(undefined)
+  // Latest setColorStops closure (it reads the rangeLevels props), for the map
+  // handlers registered once on mount.
+  const setColorStopsRef = useRef(undefined)
+  // Whether anything has happened that could have changed the hexes on screen
+  // since the last measurement. Starts true — the first tiles to arrive have
+  // never been measured.
+  const hexRangeDirty = useRef(true)
   // Point-tier count range, kept so the circle-radius ramp can be rebuilt on
   // the layers whenever the metric or the filters change (see setColorStops).
   const pointRadiusRange = useRef(null)
@@ -316,6 +367,10 @@ export default function CreateMap({
   const trailingDaysRef = useRef(trailingDays)
   const dataLayersRef = useRef(dataLayers)
   const metricRef = useRef(metric)
+  // Latest onViewportHexRange, for the same reason: the debounced handler that
+  // reports the measurement is registered once.
+  const onViewportHexRangeRef = useRef(onViewportHexRange)
+  onViewportHexRangeRef.current = onViewportHexRange
   // Raw selected-track response, cached so re-renders don't re-fetch.
   const rawTrackRef = useRef(null)
 
@@ -623,12 +678,21 @@ export default function CreateMap({
     // (see defaultRangeLevels). The real ranges replace these once /legend
     // returns and this re-runs via the [rangeLevels] effect.
     const effectiveRangeLevels = rangeLevels || defaultRangeLevels
-    colorStops.current = generateColorStops(
-      colorScale,
+    // The measured extent of the hexes on screen wins over the tier's global
+    // domain when there is one — see refreshViewportHexRange. Zoomed into a
+    // quiet corner, the global maximum is set by a hex somewhere else entirely,
+    // and every cell in view lands in the bottom decade of the ramp: one flat
+    // pale shade over the whole viewport. The same measurement serves both
+    // layers below, because only one of them is ever on screen (the combined
+    // hexes below the marker tier, the coverage cells at and above it).
+    const hexDomain =
+      viewportHexRange.current ||
       getCurrentRangeLevel(effectiveRangeLevels, map.current.getZoom())
-    ).map((colorStop) => {
-      return [colorStop.stop, colorStop.color]
-    })
+    colorStops.current = generateColorStops(colorScale, hexDomain).map(
+      (colorStop) => {
+        return [colorStop.stop, colorStop.color]
+      }
+    )
 
     // Coverage hexes only ever render at zoom >= hexMaxZoom, where the hex_1
     // grid is always used, so there's a single range to apply.
@@ -636,7 +700,7 @@ export default function CreateMap({
       coverageRangeLevels || defaultCoverageRangeLevels
     coverageColorStops.current = generateColorStops(
       colorScale,
-      effectiveCoverageRangeLevels.zoom1
+      viewportHexRange.current || effectiveCoverageRangeLevels.zoom1
     ).map((colorStop) => {
       return [colorStop.stop, colorStop.color]
     })
@@ -699,6 +763,70 @@ export default function CreateMap({
         coverageHexOutlineColor()
       )
     }
+  }
+  setColorStopsRef.current = setColorStops
+
+  // The count range the hexes on screen span, snapped out to the nearest nice
+  // rungs, or undefined when there is nothing to measure. Read from what is
+  // rendered rather than fetched: the counts are already on the features the
+  // map is drawing, so a viewport-scaled ramp costs no request — one pass over
+  // the visible hexes, which is at most a few thousand small objects.
+  function measureVisibleHexRange() {
+    const layers = HEX_LAYER_IDS.filter((id) => map.current.getLayer(id))
+    if (!layers.length) return undefined
+    // No geometry argument = the whole viewport. Hidden layers and layers
+    // outside their zoom range return nothing, so this needs no zoom or
+    // visibility test of its own.
+    const features = map.current.queryRenderedFeatures({ layers })
+    if (features.length < MIN_VIEWPORT_HEXES) return undefined
+    let lo = Infinity
+    let hi = -Infinity
+    // A plain loop, not a map/filter chain: this runs over every rendered hex,
+    // and the intermediate arrays are the only part of it that would be
+    // expensive. Features straddling a tile boundary appear more than once —
+    // harmless for a min/max.
+    for (const feature of features) {
+      const count = Number(feature.properties?.count)
+      if (!Number.isFinite(count) || count <= 0) continue
+      if (count < lo) lo = count
+      if (count > hi) hi = count
+    }
+    if (!Number.isFinite(hi)) return undefined
+    return quantizeCountRange([lo, hi])
+  }
+
+  // Re-scale the ramp to what is on screen. Called on a debounce from the
+  // camera and tile events, and cheap to call spuriously: quantizing the
+  // measurement to coarse rungs (see quantizeCountRange) means an ordinary pan
+  // measures the same domain it started from, and an unchanged domain returns
+  // here without touching the map or the legend. That dedupe is also what stops
+  // the loop — repainting a data-driven paint property makes the map re-render,
+  // which is one of the things that calls this.
+  function refreshViewportHexRange() {
+    if (!map.current || !map.current.isStyleLoaded()) return
+    // Nothing has moved and no tile has landed since the last measurement, so
+    // the answer is the one already on hand. Worth the flag: 'idle' also
+    // arrives after the re-renders a hover causes, and a viewport full of
+    // hexes is not free to walk.
+    if (!hexRangeDirty.current) return
+    hexRangeDirty.current = false
+    const range = measureVisibleHexRange()
+    if (rangesEqual(viewportHexRange.current, range)) return
+    viewportHexRange.current = range
+    setColorStopsRef.current()
+    onViewportHexRangeRef.current(range)
+  }
+
+  // Drop the measurement and fall back to the global tier. For the changes that
+  // make the counts on screen mean something else — a new metric, new filters —
+  // where the hexes about to be drawn have nothing to do with the ones just
+  // measured. The next idle re-measures, once the new tiles are up.
+  function resetViewportHexRange() {
+    hexRangeDirty.current = true
+    if (viewportHexRange.current === undefined) return
+    viewportHexRange.current = undefined
+    setColorStopsRef.current?.()
+    onViewportHexRangeRef.current(undefined)
   }
 
   function hoverHighlightPoints(pk) {
@@ -1187,6 +1315,10 @@ export default function CreateMap({
     setPointsToReview()
     map.current.setFilter('points-highlighted', ['in', 'pk', ''])
 
+    // The hexes about to be drawn are a different population from the ones the
+    // ramp was last measured over, so the measurement goes and the global tier
+    // holds the ramp until the new tiles land (see resetViewportHexRange).
+    resetViewportHexRange()
     refreshCombinedSources(mapQueryString)
     setLoading(true)
     doFinalCheck.current = true
@@ -1211,6 +1343,9 @@ export default function CreateMap({
     dataLayersRef.current = dataLayers
     // Source existence, not map.loaded() — see the filter effect above.
     if (!map.current || !map.current.getSource('cde-tiles')) return
+    // Adding or removing a geometry changes what the hexes sum, so the ramp's
+    // measured domain goes with it.
+    resetViewportHexRange()
     refreshCombinedSources(mapQueryString)
     if (tracksModeRef.current && anyTrajectoryLayerOn(dataLayers)) {
       refreshTracksSource(mapQueryString, scrubTimeRef.current, trailingDaysRef.current)
@@ -1226,6 +1361,9 @@ export default function CreateMap({
   useEffect(() => {
     metricRef.current = metric
     if (!map.current || !map.current.getSource('cde-tiles')) return
+    // A measurement taken over day counts cannot scale a ramp painted over
+    // measurement counts — drop it and re-measure once the new tiles are up.
+    resetViewportHexRange()
     refreshCombinedSources(mapQueryString)
   }, [metric])
 
@@ -2813,6 +2951,45 @@ export default function CreateMap({
     map.current.on('zoomend', reapplyColorStops)
     return () => map.current.off('zoomend', reapplyColorStops)
   }, [rangeLevels, coverageRangeLevels])
+
+  // Keep the ramp scaled to the hexes actually on screen. Registered once —
+  // the handler reads the current setColorStops through a ref — so the
+  // debounce survives every re-render and a slow drag really does produce one
+  // measurement rather than one per settled frame.
+  //
+  // Two things can change the hexes on screen: the camera moving over data
+  // already loaded, and new tiles arriving (a pan into unloaded ground, a
+  // filter change, a metric switch). Both raise the dirty flag; the
+  // measurement itself waits for 'idle', which is the one event that means the
+  // new features are rendered — 'sourcedata' fires while they are still on
+  // their way to the screen, and queryRenderedFeatures only sees what is
+  // actually drawn. All three share one debounce, so a pan that pulls in new
+  // tiles measures once at the end rather than once per event.
+  useEffect(() => {
+    if (!map.current) return
+    const measure = debounce(
+      () => refreshViewportHexRange(),
+      VIEWPORT_RAMP_DEBOUNCE_MS
+    )
+    const onMoveEnd = () => {
+      hexRangeDirty.current = true
+      measure()
+    }
+    const onDataSourceLoaded = (e) => {
+      if (!e.isSourceLoaded || !HEX_SOURCE_IDS.includes(e.sourceId)) return
+      hexRangeDirty.current = true
+      measure()
+    }
+    map.current.on('moveend', onMoveEnd)
+    map.current.on('sourcedata', onDataSourceLoaded)
+    map.current.on('idle', measure)
+    return () => {
+      measure.cancel()
+      map.current.off('moveend', onMoveEnd)
+      map.current.off('sourcedata', onDataSourceLoaded)
+      map.current.off('idle', measure)
+    }
+  }, [])
 
   // Live-swap basemap label languages on EN⇄FR toggle. The initial language
   // is baked into buildBasemapStyle at construction, so this only fires on

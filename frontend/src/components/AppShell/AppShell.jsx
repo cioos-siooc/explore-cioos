@@ -37,6 +37,7 @@ export default function AppShell () {
     zoom,
     currentRangeLevel,
     hexRangeLevel,
+    hexRangeScaledToView,
     metric,
     metricPinned,
     setMetric,
@@ -151,6 +152,7 @@ export default function AppShell () {
       <Legend
         currentRangeLevel={currentRangeLevel}
         hexRangeLevel={hexRangeLevel}
+        hexRangeScaledToView={hexRangeScaledToView}
         metric={metric}
         // Withheld at the marker tier, where the metric is pinned to days of
         // data: no handler means the Legend titles the ramp with a plain

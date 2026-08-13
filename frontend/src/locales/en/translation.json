@@ -233,6 +233,7 @@
   "legendMetricDatasetsTitle": "Colour hexagons by how many distinct datasets they hold",
   "legendCountsApproximate": "Counts combine measurements, occurrence records and position fixes. Some are estimated from each dataset's sampling rate.",
   "legendTopTickClamped": "The darkest colour covers everything above this, up to {{max}}",
+  "legendScaledToView": "The colours are scaled to the hexagons currently in view, so the same colour means different amounts in different places",
   "legendMarkerDaysPinned": "Marker size always shows days of data: measurement counts span too many orders of magnitude to tell apart by size. The colour options above apply to the hexagons.",
   "legendGroupTrajectories": "Trajectories",
   "legendHexes": "Hexes",

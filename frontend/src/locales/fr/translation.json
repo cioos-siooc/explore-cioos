@@ -234,6 +234,7 @@
   "legendMetricDatasetsTitle": "Colorer les hexagones selon le nombre de jeux de données distincts qu'ils contiennent",
   "legendCountsApproximate": "Les décomptes regroupent mesures, enregistrements d'occurrence et positions. Certains sont estimés à partir de la fréquence d'échantillonnage du jeu de données.",
   "legendTopTickClamped": "La couleur la plus foncée couvre tout ce qui dépasse cette valeur, jusqu'à {{max}}",
+  "legendScaledToView": "Les couleurs sont ajustées aux hexagones actuellement visibles : une même couleur représente donc des quantités différentes d'un endroit à l'autre",
   "legendMarkerDaysPinned": "La taille des marqueurs indique toujours les jours de données : les décomptes de mesures couvrent trop d'ordres de grandeur pour être distingués par la taille. Les options de couleur ci-dessus s'appliquent aux hexagones.",
   "legendGroupTrajectories": "Trajectoires",
   "legendHexes": "Hexagones",
