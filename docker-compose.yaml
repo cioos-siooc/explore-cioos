@@ -130,6 +130,11 @@ services:
       # Under Coolify, SERVICE_URL_NGINX is injected with nginx's public URL;
       # elsewhere it is unset and APP_DOMAIN from .env is used.
       - "DOWNLOAD_WAF_URL=${SERVICE_URL_NGINX:-${APP_DOMAIN}}/downloads"
+      # Same reason as web-api: Coolify supplies DB_NAME/USER/PASSWORD/PORT but
+      # not the host. download_scheduler.py reads envs["DB_HOST"] unconditionally
+      # at import, so without this the module raises KeyError before it can poll
+      # and the container crash-loops on restart: unless-stopped.
+      - "DB_HOST=db"
     volumes:
       - downloads:/usr/src/app/download_scheduler/downloads
   frontend:
