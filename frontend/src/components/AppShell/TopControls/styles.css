@@ -67,19 +67,11 @@
   flex: 0 0 auto;
 }
 
-/* Datasets segment: label on top, counts underneath. */
-.topBarButtonStack {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 0;
-}
-
 /* Labels wrap instead of running past the fixed-width brand card. The break
    points come from the strings themselves — French joins "de données" with a
    non-breaking space so it wraps as "Jeux / de données", never "Jeux de /
-   données". With the counts on their own line there is normally room for one
-   line; this only bites on the narrowest phones. */
+   données". There is normally room for one line; this only bites on the
+   narrowest phones. */
 .topBarButtonLabel {
   /* Floor the label at its longest word so flex shrinking can't squeeze it
      narrower than "données" and split the word. */
@@ -120,26 +112,78 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* Shown / total, as a caption under the Datasets label: no badge chrome, just
-   a lighter second line, so both numbers stay readable at a glance without
-   turning the segment into two competing pills. */
-.topBarCounts {
-  display: inline-flex;
+/* ------------------------------------------------------------------
+ * Dataset tally — one compact line of type between the brand lockup and the
+ * tab strip: "123/150 datasets ( 23 in view )". Banded rather than floated on
+ * the card face: a full-bleed strip ruled off top and bottom, so it is plainly
+ * its own section and not a caption belonging to either neighbour. Kept to a
+ * single line — it is a readout, and every pixel it takes comes off the map.
+ * ------------------------------------------------------------------ */
+.topBarCountsRow {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  min-height: 15px;
-  font-size: 11px;
+  gap: 0 5px;
+  min-height: 22px;
+  padding: 4px 12px;
+  border-top: 1px solid var(--cioos-hairline);
+  border-bottom: 1px solid var(--cioos-hairline);
+  font-size: 12px;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.3;
   letter-spacing: 0.01em;
-  opacity: 0.8;
-  white-space: nowrap;
+  color: var(--cioos-ink-60);
   font-variant-numeric: tabular-nums;
+  transition: opacity var(--cioos-transition-fast);
 }
 
-/* Dimmer still while a refetch is in flight — see the sidebar counters. */
-.topBarCounts.updating {
-  opacity: 0.4;
+/* Dimmed while a refetch is in flight: the previous numbers stay on screen
+   rather than collapsing back to a spinner — see the sidebar counters. */
+.topBarCountsRow.updating {
+  opacity: 0.45;
+}
+
+/* The parenthetical travels as one unit, so the brackets never wrap away from
+   the number they hold. */
+.topBarCountsInViewWrap {
+  white-space: nowrap;
+}
+
+/* The in-view tally doubles as the switch that applies the narrowing, so it is
+   the one part of the line that looks pressable — a text link, no chrome, so
+   the strip stays a line of type. */
+.topBarCountsInView {
+  padding: 0;
+  /* Breathing room inside the brackets. A margin rather than padding so the
+     underline stays under the words and doesn't run out to the brackets. */
+  margin: 0 4px;
+  background: transparent;
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  font: inherit;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color var(--cioos-transition-fast);
+}
+
+.topBarCountsInView:hover {
+  color: var(--cioos-primary);
+}
+
+.topBarCountsInView:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* Applied: bolder and no longer underlined — it now reads as the state the
+   list is in, with a second click to leave it. */
+.topBarCountsInView.active {
+  font-weight: 700;
+  color: var(--cioos-primary-700);
+  text-decoration: none;
 }
 
 /* Filters badge: the active-filter count, a single digit or two. */
@@ -186,6 +230,12 @@
   .topBarCount {
     padding: 1px 6px;
     font-size: 11px;
+  }
+
+  .topBarCountsRow {
+    margin: 5px 0;
+    padding: 3px 8px;
+    font-size: 10px;
   }
 }
 
