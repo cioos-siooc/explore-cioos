@@ -39,8 +39,7 @@ import {
 import {
   colorScale,
   hexOutlineColor,
-  API_DEFAULT_HEX_METRIC,
-  DEFAULT_HEX_METRIC,
+  HEX_METRIC,
   MARKER_MIN_ZOOM,
   trackLineColor,
   selectedTrackColor,
@@ -128,11 +127,11 @@ function buildHeadArrowImage(fillColor, strokeColor = '#ffffff') {
 // which meant trajectory data could be missing from a hexagon for a reason the
 // hex ramp had no way of showing. The track lines are unaffected either way:
 // they come from a separate source (/tiles/tracks).
-function buildTileSuffix(baseQuery, dataLayers, metric = DEFAULT_HEX_METRIC) {
+function buildTileSuffix(baseQuery, dataLayers) {
   const params = new URLSearchParams(baseQuery)
-  // Omitted only for the metric the API already assumes when the param is
-  // absent — see API_DEFAULT_HEX_METRIC.
-  if (metric !== API_DEFAULT_HEX_METRIC) params.set('metric', metric)
+  // Always written out: the API counts something else when the param is absent
+  // — see HEX_METRIC.
+  params.set('metric', HEX_METRIC)
   if (dataLayers) {
     if (!dataLayers.obis || params.get('includeObis') === 'false') {
       params.set('includeObis', 'false')
@@ -177,7 +176,6 @@ export default function CreateMap({
   // undefined whenever there is nothing to measure and the global tier takes
   // over. Debounced and deduped here — see refreshViewportHexRange.
   onViewportHexRange = () => {},
-  metric = DEFAULT_HEX_METRIC,
   hoveredDataset,
   setHoveredDataset,
   inspectDataset,
@@ -303,9 +301,9 @@ export default function CreateMap({
   // at every count. Count is carried by colour alone.
   const hexOpacity = 0.8
   const hexMinZoom = 0
-  // Shared with MapStateProvider (which pins the metric above this zoom) and
-  // the Legend (which switches its key here): the hex band ending and the
-  // marker tier starting are the same boundary, and they must not drift.
+  // Shared with the Legend (which switches its key here): the hex band ending
+  // and the marker tier starting are the same boundary, and they must not
+  // drift.
   const hexMaxZoom = MARKER_MIN_ZOOM
   // Zoom at which griddap coverage rectangles take hover/click priority over
   // the hex aggregates (which stop being drawn at hexMaxZoom anyway).
@@ -349,8 +347,16 @@ export default function CreateMap({
   // since the last measurement. Starts true — the first tiles to arrive have
   // never been measured.
   const hexRangeDirty = useRef(true)
+  // Whether the hex layers have been let through their opening fade — see
+  // revealHexes. False until the ramp on them is the one they will keep.
+  const hexesRevealed = useRef(false)
+  // Latest rangeLevels, for the once-registered measurement handler: it runs on
+  // the first render's closure (like setColorStops, which it reaches through a
+  // ref of its own), so the prop it captured is forever the mount-time one.
+  const rangeLevelsRef = useRef(rangeLevels)
+  rangeLevelsRef.current = rangeLevels
   // Point-tier count range, kept so the circle-radius ramp can be rebuilt on
-  // the layers whenever the metric or the filters change (see setColorStops).
+  // the layers whenever the filters change (see setColorStops).
   const pointRadiusRange = useRef(null)
   // pk of the dataset the map is currently singling out (hovered in the list,
   // or the one whose page is open). Held in a ref because the map's own event
@@ -377,7 +383,6 @@ export default function CreateMap({
   const scrubTimeRef = useRef(scrubTime)
   const trailingDaysRef = useRef(trailingDays)
   const dataLayersRef = useRef(dataLayers)
-  const metricRef = useRef(metric)
   // Latest onViewportHexRange, for the same reason: the debounced handler that
   // reports the measurement is registered once.
   const onViewportHexRangeRef = useRef(onViewportHexRange)
@@ -494,8 +499,77 @@ export default function CreateMap({
   // function has zero stops, which is why creating them from empty stops left
   // them missing entirely. The real ramp replaces these as soon as the legend
   // lands (setColorStops re-runs via the [rangeLevels] effect).
+  //
+  // Nobody ever sees them: the hex layers are drawn at zero opacity until the
+  // ramp is the real one (see revealHexes), which is what these stops exist to
+  // hold the layers open for.
   const defaultRangeLevels = { zoom0: [1, 100], zoom1: [1, 100], zoom2: [1, 100] }
   const defaultCoverageRangeLevels = { zoom1: [1, 100] }
+
+  // The hex layers' opening fade. They are created at zero opacity and stay
+  // there until the colours on them are the colours they will keep, because a
+  // first load otherwise painted every hexagon twice: once from the placeholder
+  // ranges above (or the catalogue-wide tier), and again a moment later from the
+  // real domain — a full-map colour change a second into the load, which reads
+  // as a glitch rather than as data arriving.
+  //
+  // Zero opacity rather than 'visibility: none': queryRenderedFeatures skips a
+  // hidden layer entirely, and measuring the hexes on screen is exactly what
+  // decides when to reveal them (see refreshViewportHexRange). A transparent
+  // fill is still a rendered one.
+  //
+  // One-way, and deliberately so. Later changes that re-ramp the hexes — a
+  // filter change, a pan into new tiles — repaint a map the user is already
+  // reading, where a fade to nothing and back would be the more jarring of the
+  // two. This is about the first sight of the map only.
+  //
+  // The paint change rides MapLibre's default transition, so the hexes fade up
+  // over ~300ms rather than snapping on.
+  function revealHexes () {
+    if (hexesRevealed.current || !map.current) return
+    hexesRevealed.current = true
+    if (map.current.getLayer('hexes')) {
+      map.current.setPaintProperty('hexes', 'fill-opacity', hexOpacity)
+    }
+    if (map.current.getLayer('coverage-hexes')) {
+      map.current.setPaintProperty(
+        'coverage-hexes',
+        'fill-opacity',
+        coverageHexOpacity
+      )
+    }
+  }
+
+  // Reveal once a measurement pass has settled what the ramp is going to be.
+  //
+  // A measured range IS the ramp — it wins over the global tier in
+  // setColorStops, so nothing arriving later can change the colours just
+  // painted. Without one, the hexes are painted over the catalogue-wide tier
+  // instead, which is only the final answer once /legend has actually returned
+  // it; before that the layers are still holding the placeholder ranges and
+  // must stay invisible.
+  //
+  // The no-measurement-but-legend-in-hand case is not hypothetical: an empty
+  // result set has no hexes to measure, and opening a dataset page from a share
+  // link scales the ramp to that one dataset, whose cells may be off screen. It
+  // does mean "no hexes here", though, which is only true once the tiles have
+  // actually arrived — otherwise a legend that lands first would reveal an empty
+  // map and let the tiles behind it paint over the catalogue-wide tier, which is
+  // the double colouring this exists to avoid.
+  function revealHexesIfRamped (measuredRange) {
+    if (measuredRange !== undefined) return revealHexes()
+    if (!rangeLevelsRef.current || !hexSourcesLoaded()) return
+    revealHexes()
+  }
+
+  // Both hex sources have everything the current view asks for. Deliberately
+  // false while a source is missing: at that point the tiles are still on their
+  // way in, and nothing measured over them means anything yet.
+  function hexSourcesLoaded () {
+    return HEX_SOURCE_IDS.every(
+      (id) => map.current.getSource(id) && map.current.isSourceLoaded(id)
+    )
+  }
 
   const [boxSelectStartCoords, setBoxSelectStartCoords] = useState()
   const [boxSelectEndCoords, setBoxSelectEndCoords] = useState()
@@ -639,23 +713,17 @@ export default function CreateMap({
 
   const hexFillColor = () => rampExpression(colorStops.current, 'count')
 
-  // Hover wording has to follow the metric: the same `count` property is a
-  // measurement count in one mode and a day span in the other, and a tooltip
-  // that says "measurements" over a day count is worse than no tooltip.
-  // Numbers are locale-formatted — a bare 1738204 is unreadable at a glance.
-  // Note the interpolation variable is `total`, not `count`: i18next treats a
-  // numeric `count` option as a pluralization trigger and would go looking for
-  // _one/_other variants that don't exist.
+  // The `count` property, worded: it is a span of days everywhere on the map
+  // (see HEX_METRIC). Numbers are locale-formatted — a bare 1738204 is
+  // unreadable at a glance. Note the interpolation variable is `total`, not
+  // `count`: i18next treats a numeric `count` option as a pluralization trigger
+  // and would go looking for _one/_other variants that don't exist.
   const metricCountLabel = (value) =>
-    t(
-      {
-        days: 'mapHexCountDays',
-        datasets: 'mapHexCountDatasets'
-      }[metricRef.current] || 'mapHexCountRecords',
-      { total: Number(value || 0).toLocaleString(i18n.language) }
-    )
+    t('mapHexCountDays', {
+      total: Number(value || 0).toLocaleString(i18n.language)
+    })
 
-  // Point markers size by the same metric the hexes colour by, log-spaced over
+  // Point markers size by the same count the hexes colour by, log-spaced over
   // the point-tier range so the marker for a long mooring record reads bigger
   // than one for a single cast. Log because the range spans orders of
   // magnitude — linear would leave every marker at the minimum but one.
@@ -861,16 +929,24 @@ export default function CreateMap({
     if (focusPk !== undefined && range !== undefined) {
       rampMeasuredForPk.current = focusPk
     }
-    if (rangesEqual(viewportHexRange.current, range)) return
+    if (rangesEqual(viewportHexRange.current, range)) {
+      // Nothing to repaint — but the pass still says the ramp already on the
+      // layers is the one this view gets, which is what the first reveal waits
+      // for. (The common way in on a first load: the measurement runs before
+      // any hexes have arrived, finds none, and the legend's tier stands.)
+      revealHexesIfRamped(range)
+      return
+    }
     viewportHexRange.current = range
     setColorStopsRef.current()
     onViewportHexRangeRef.current(range)
+    revealHexesIfRamped(range)
   }
 
   // Drop the measurement and fall back to the global tier. For the changes that
-  // make the counts on screen mean something else — a new metric, new filters —
-  // where the hexes about to be drawn have nothing to do with the ones just
-  // measured. The next idle re-measures, once the new tiles are up.
+  // make the counts on screen mean something else — new filters, a new geometry
+  // selection — where the hexes about to be drawn have nothing to do with the
+  // ones just measured. The next idle re-measures, once the new tiles are up.
   function resetViewportHexRange() {
     hexRangeDirty.current = true
     rampMeasuredForPk.current = undefined
@@ -1088,6 +1164,13 @@ export default function CreateMap({
         )
       }
     })
+    // Showing a layer changes what a measurement would find — a hidden layer
+    // returns nothing from queryRenderedFeatures — so the ramp has to be
+    // re-measured, and until it is, the hexes are still waiting to be revealed
+    // (see revealHexes). Nothing else raises this flag for a visibility change:
+    // no tile lands and the camera does not move, so only the 'idle' that
+    // follows the repaint is left to act on it.
+    if (visible) hexRangeDirty.current = true
   }
 
   // WMS overlay show/hide. Hiding takes everything with it, including the
@@ -1392,11 +1475,7 @@ export default function CreateMap({
   // trajectory/OBIS coverage ramp at and above it. They take the same params so
   // the hex switch can't leave trajectory counts showing in one and not the other.
   const tileUrls = (queryString) => {
-    const filterSuffix = buildTileSuffix(
-      queryString,
-      dataLayersRef.current,
-      metricRef.current
-    )
+    const filterSuffix = buildTileSuffix(queryString, dataLayersRef.current)
     return {
       tileQuery: `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`,
       cellTileQuery: `${server}/tiles/cells/{z}/{x}/{y}.mvt${filterSuffix}`
@@ -1453,20 +1532,6 @@ export default function CreateMap({
     }
     applyLayerVisibility()
   }, [dataLayers])
-
-  // Colour-by switch. The metric is computed server-side (it decides what the
-  // tiles' `count` property sums), so flipping it has to refetch both sources
-  // — repainting alone would ramp the old numbers against the new domain. The
-  // matching /legend refetch happens in MapStateProvider; setColorStops picks
-  // up the new ranges from the [rangeLevels] effect.
-  useEffect(() => {
-    metricRef.current = metric
-    if (!map.current || !map.current.getSource('cde-tiles')) return
-    // A measurement taken over day counts cannot scale a ramp painted over
-    // measurement counts — drop it and re-measure once the new tiles are up.
-    resetViewportHexRange()
-    refreshCombinedSources(mapQueryString)
-  }, [metric])
 
   // Track-lines switch: show/hide the track layers and load the scrub window.
   // No source refetch — the track lines come from their own /tiles/tracks
@@ -1785,7 +1850,8 @@ export default function CreateMap({
           source: 'cde-cells',
           'source-layer': 'coverage-hexes-layer',
           paint: {
-            'fill-opacity': coverageHexOpacity,
+            // Zero until the ramp is final — see revealHexes.
+            'fill-opacity': hexesRevealed.current ? coverageHexOpacity : 0,
             'fill-color': dimmable(coverageHexFillColor()),
             'fill-outline-color': coverageHexOutlineColor()
           }
@@ -1828,7 +1894,8 @@ export default function CreateMap({
         'source-layer': 'internal-layer-name',
 
         paint: {
-          'fill-opacity': hexOpacity,
+          // Zero until the ramp is final — see revealHexes.
+          'fill-opacity': hexesRevealed.current ? hexOpacity : 0,
           // A real interpolate expression rather than the legacy
           // { property, stops } paint function, because that form cannot be
           // nested inside the 'case' dimmable wraps it in — the same reason
@@ -2587,8 +2654,6 @@ export default function CreateMap({
             // the circle's own centre, not the cursor, so the tooltip sits on
             // the point it describes
             .setLngLat(features[0].geometry.coordinates.slice())
-            // metricCountLabel, not a fixed noun: `count` is measurements,
-            // days or datasets depending on the metric.
             .setHTML(
               `<div>${metricCountLabel(
                 features[0].properties.count
@@ -2615,8 +2680,8 @@ export default function CreateMap({
           // aren't the same unit, and this is where that stays visible.
           const breakdown = []
           if (trajectories > 0) {
-            // Distinct missions/deployments — the one figure here that doesn't
-            // change with the metric.
+            // Distinct missions/deployments — a count of things, not a span of
+            // days like the two figures around it.
             breakdown.push(
               t('mapCoverageTrajectories', {
                 trajectories: Number(trajectories).toLocaleString(i18n.language)
@@ -2624,16 +2689,12 @@ export default function CreateMap({
             )
           }
           if (occurrences > 0) {
-            // obis_count carries the same metric as `count`, so its noun has to
-            // follow suit — "occurrence records" over a day span would be wrong.
+            // obis_count carries the same metric as `count` — a span of days,
+            // not a count of occurrence records.
             breakdown.push(
-              t(
-                {
-                  days: 'mapCoverageObisDays',
-                  datasets: 'mapCoverageObisDatasets'
-                }[metricRef.current] || 'mapCoverageObisRecords',
-                { total: Number(occurrences).toLocaleString(i18n.language) }
-              )
+              t('mapCoverageObisDays', {
+                total: Number(occurrences).toLocaleString(i18n.language)
+              })
             )
           }
 
@@ -3067,10 +3128,10 @@ export default function CreateMap({
   //
   // Two things can change the hexes on screen: the camera moving over data
   // already loaded, and new tiles arriving (a pan into unloaded ground, a
-  // filter change, a metric switch). Both raise the dirty flag; the
-  // measurement itself waits for 'idle', which is the one event that means the
-  // new features are rendered — 'sourcedata' fires while they are still on
-  // their way to the screen, and queryRenderedFeatures only sees what is
+  // filter change). Both raise the dirty flag; the measurement itself waits for
+  // 'idle', which is the one event that means the new features are rendered —
+  // 'sourcedata' fires while they are still on their way to the screen, and
+  // queryRenderedFeatures only sees what is
   // actually drawn. All three share one debounce, so a pan that pulls in new
   // tiles measures once at the end rather than once per event.
   useEffect(() => {

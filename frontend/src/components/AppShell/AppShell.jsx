@@ -37,9 +37,6 @@ export default function AppShell () {
     currentRangeLevel,
     hexRangeLevel,
     hexRangeScaledToView,
-    metric,
-    metricPinned,
-    setMetric,
     legendLoading,
     griddapCoverageVisible,
     setGriddapCoverageVisible,
@@ -152,11 +149,6 @@ export default function AppShell () {
         currentRangeLevel={currentRangeLevel}
         hexRangeLevel={hexRangeLevel}
         hexRangeScaledToView={hexRangeScaledToView}
-        metric={metric}
-        // Withheld at the marker tier, where the metric is pinned to days of
-        // data: no handler means the Legend titles the ramp with a plain
-        // caption instead of a picker that couldn't change anything.
-        onMetricChange={metricPinned ? undefined : setMetric}
         loading={legendLoading}
         zoom={zoom}
         platformsAvailable={platformsAvailable}

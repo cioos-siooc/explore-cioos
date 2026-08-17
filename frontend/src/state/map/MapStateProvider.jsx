@@ -11,14 +11,11 @@ import {
 
 import { server } from '../../config.js'
 import {
-  API_DEFAULT_HEX_METRIC,
-  DEFAULT_HEX_METRIC,
   defaultMapCenter,
   defaultMapZoom,
   defaultTrailingDays,
-  HEX_METRICS,
+  HEX_METRIC,
   isMarkerTier,
-  MARKER_METRIC,
   TRAIL_ALL
 } from '../../components/config.js'
 import {
@@ -108,11 +105,10 @@ export default function MapStateProvider ({ children }) {
     [query, mapDatasetPKs]
   )
   const [rangeLevels, setRangeLevels] = useState()
-  // What the ranges on hand / in flight were requested for: the query and the
-  // metric together, since either one changes what /legend counts. This is the
-  // whole dedupe test for the refetch effect below.
-  const legendKey = (legendQuery, hexMetric) => `${hexMetric}|${legendQuery}`
-  const requestedLegendKey = useRef(undefined)
+  // What the ranges on hand / in flight were requested for — the query, which is
+  // the only thing that changes what /legend counts. This is the whole dedupe
+  // test for the refetch effect below.
+  const requestedLegendQuery = useRef(undefined)
   // The in-flight /legend request, so a newer one can cancel it (see loadLegend).
   const legendRequest = useRef(undefined)
   const [legendLoading, setLegendLoading] = useState(true)
@@ -122,25 +118,6 @@ export default function MapStateProvider ({ children }) {
   // colour scale.
   const [coverageRangeLevels, setCoverageRangeLevels] = useState()
   const [currentCoverageRangeLevel, setCurrentCoverageRangeLevel] = useState()
-  // What the hex ramp counts: 'days' (how long the data spans, the default),
-  // 'records' (how much was collected) or 'datasets'. Both a preference and
-  // shareable, like the switches below — ?metric= in the link wins, otherwise
-  // the user's last pick, otherwise the default. It is computed server-side, so
-  // it also goes into the tile and /legend query strings.
-  //
-  // The storage key is versioned because the old one is poisoned: it was written
-  // on first render, so every visitor from before the default moved to days has
-  // 'records' stored whether or not they ever opened the picker, and reusing the
-  // key would hand them a default they never chose.
-  const [metric, setMetric] = useUrlSeededPersistentState(
-    'hexMetric.v2',
-    'metric',
-    DEFAULT_HEX_METRIC,
-    // An unknown metric in the link is not worth failing over, and it must not
-    // reach the API unchecked — parseMetric would ignore it there and the ramp
-    // would be titled with one metric over another's counts.
-    (raw) => (HEX_METRICS.includes(raw) ? raw : DEFAULT_HEX_METRIC)
-  )
   // The map-appearance switches below are both preferences AND shareable: they
   // persist in localStorage so a reload comes back to the map the user left,
   // and UrlSync writes the non-default ones into the link so a shared view
@@ -290,14 +267,6 @@ export default function MapStateProvider ({ children }) {
 
   const { zoom } = mapView
 
-  // The marker tier always counts days of data, whatever the switcher says —
-  // see MARKER_METRIC for why. This is the value everything downstream uses
-  // (tile URLs, /legend, the hover tooltips, the legend card), so the pin can't
-  // drift out of sync with what the map is actually painting; `metric` stays
-  // the user's choice, remembered for when they zoom back out to the hexes.
-  const metricPinned = isMarkerTier(zoom)
-  const effectiveMetric = metricPinned ? MARKER_METRIC : metric
-
   // A failed legend fetch (e.g. gateway timeout) just leaves the current
   // color ramp in place — the map itself keeps working — so failures log
   // instead of crashing, and loadLegend() is exposed for the retry banner.
@@ -306,30 +275,29 @@ export default function MapStateProvider ({ children }) {
   // filters" are indistinguishable from the values alone, and /legend is the
   // app's slowest query: without it the legend card claimed "No Data" for the
   // first few seconds of every load.
-  // The metric decides what /legend counts, so it has to travel with the
-  // filters — a range taken over days can't scale a ramp painted over
-  // measurement counts. Omitted only for the metric the API already assumes
-  // (API_DEFAULT_HEX_METRIC), matching buildTileSuffix in Map.jsx.
-  function legendUrl (legendQuery, hexMetric) {
+  // The metric travels with the filters: a range taken over one count can't
+  // scale a ramp painted over another. It is always written out, never omitted
+  // — the API counts something else when the param is absent (see HEX_METRIC) —
+  // and the tile URLs spell it out the same way (buildTileSuffix in Map.jsx).
+  function legendUrl (legendQuery) {
     const params = new URLSearchParams(legendQuery || '')
-    if (hexMetric !== API_DEFAULT_HEX_METRIC) params.set('metric', hexMetric)
-    const s = params.toString()
-    return `${server}/legend${s ? '?' + s : ''}`
+    params.set('metric', HEX_METRIC)
+    return `${server}/legend?${params.toString()}`
   }
 
-  // Only the newest request may write the ranges. Flipping the metric twice in
-  // a row puts two /legend calls in flight over the same filters, and they can
-  // land in either order — the slower first response would otherwise overwrite
-  // the newer one and leave the bar numbered for a metric the tiles no longer
-  // carry. The previous request is aborted as well, so a fast switcher isn't
-  // holding several copies of the app's heaviest query open at once.
-  function loadLegend (legendQuery, hexMetric = effectiveMetric) {
+  // Only the newest request may write the ranges. Two filter changes in a row
+  // put two /legend calls in flight and they can land in either order — the
+  // slower first response would otherwise overwrite the newer one and leave the
+  // bar numbered for filters the tiles no longer carry. The previous request is
+  // aborted as well, so a fast succession of changes isn't holding several
+  // copies of the app's heaviest query open at once.
+  function loadLegend (legendQuery) {
     legendRequest.current?.abort()
     const controller = new AbortController()
     legendRequest.current = controller
-    requestedLegendKey.current = legendKey(legendQuery, hexMetric)
+    requestedLegendQuery.current = legendQuery
     setLegendLoading(true)
-    fetchJson(legendUrl(legendQuery, hexMetric), { signal: controller.signal })
+    fetchJson(legendUrl(legendQuery), { signal: controller.signal })
       .then((legend) => {
         if (legend) {
           setRangeLevels(legend.recordsCount)
@@ -339,9 +307,9 @@ export default function MapStateProvider ({ children }) {
       .catch((error) => {
         if (error.name === 'AbortError') return
         console.error('legend fetch failed:', error)
-        // Let the effect below retry this key: a failed fetch leaves no ranges
+        // Let the effect below retry this query: a failed fetch leaves no ranges
         // behind, so nothing should count as loaded for it.
-        requestedLegendKey.current = undefined
+        requestedLegendQuery.current = undefined
       })
       .finally(() => {
         if (legendRequest.current !== controller) return
@@ -351,29 +319,22 @@ export default function MapStateProvider ({ children }) {
   }
 
   // Fetch the legend for whatever the map is drawing: on mount, whenever the
-  // (debounced) query changes, whenever a group is hidden from / restored to
-  // the map, and whenever the metric changes — the ramp counts what the map
-  // draws, and a stale range would scale the new numbers against the old
-  // domain.
+  // (debounced) query changes, and whenever a group is hidden from / restored to
+  // the map — the ramp counts what the map draws, and a stale range would scale
+  // the new numbers against the old domain. One response covers every zoom tier.
   //
-  // It's the *effective* metric, so crossing MARKER_MIN_ZOOM refetches — one
-  // /legend response covers every zoom tier of a single metric, and the marker
-  // tier is pinned to a different one than the hexes. Both URLs cache, so it's
-  // one extra fetch per (filters x metric), not one per zoom.
-  //
-  // The guard is the (query, metric) pair the last request was issued for, and
-  // nothing else. It used to also bail while `loading` was true, on the theory
-  // that a request already in flight carried the new filters — but `loading` is
-  // the *tiles*, not this fetch, so any change arriving during a redraw (which
-  // is exactly when a metric or filter change arrives, since it causes one) was
-  // dropped and never retried, leaving the previous metric's numbers under the
-  // new metric's tiles. It also bailed on empty rangeLevels, which meant a
-  // first response that failed or matched nothing froze the ramp for the rest
-  // of the session.
+  // The guard is the query the last request was issued for, and nothing else. It
+  // used to also bail while `loading` was true, on the theory that a request
+  // already in flight carried the new filters — but `loading` is the *tiles*, not
+  // this fetch, so any change arriving during a redraw (which is exactly when a
+  // filter change arrives, since it causes one) was dropped and never retried,
+  // leaving the previous filters' numbers under the new tiles. It also bailed on
+  // empty rangeLevels, which meant a first response that failed or matched
+  // nothing froze the ramp for the rest of the session.
   useEffect(() => {
-    if (requestedLegendKey.current === legendKey(mapQueryString, effectiveMetric)) return
+    if (requestedLegendQuery.current === mapQueryString) return
     loadLegend(mapQueryString)
-  }, [mapQueryString, effectiveMetric])
+  }, [mapQueryString])
 
   // Fetch griddap coverage bboxes when the layer is visible, in lockstep
   // with the same debounced query the tiles and /pointQuery use. Data is
@@ -467,15 +428,6 @@ export default function MapStateProvider ({ children }) {
     hexRangeScaledToView: Boolean(viewportHexRange),
     // Map.jsx reports the visible hex extent here; nothing else writes it.
     setViewportHexRange,
-    // The pinned value, not the raw preference — see effectiveMetric. Callers
-    // that paint or label the map want what the map is counting.
-    metric: effectiveMetric,
-    // The raw preference, for UrlSync: the link has to record what the user
-    // picked, not what the current zoom pins it to, or zooming in would rewrite
-    // their choice out of the URL.
-    metricPreference: metric,
-    metricPinned,
-    setMetric,
     griddapCoverageVisible,
     setGriddapCoverageVisible,
     dataLayersVisible,

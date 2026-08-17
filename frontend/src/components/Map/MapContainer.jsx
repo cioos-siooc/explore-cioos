@@ -17,7 +17,6 @@ export default function MapContainer () {
     rangeLevels,
     coverageRangeLevels,
     setViewportHexRange,
-    metric,
     griddapCoverageVisible,
     griddapCoverage,
     dataLayersVisible,
@@ -54,7 +53,6 @@ export default function MapContainer () {
       rangeLevels={rangeLevels}
       coverageRangeLevels={coverageRangeLevels}
       onViewportHexRange={setViewportHexRange}
-      metric={metric}
       offsetFlyTo={false}
       setHoveredDataset={setHoveredDataset}
       hoveredDataset={hoveredDataset}
