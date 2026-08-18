@@ -281,6 +281,15 @@ export default function CreateMap({
     state.feature.updateCoordinate(path, newCoord[0], newCoord[1])
   }
 
+  // Dragging the body of a drawn shape (as opposed to one of its corner/
+  // midpoint handles) defaults to translating the whole thing — disable
+  // that so a spatial filter can only be resized from its handles, never
+  // moved wholesale. Still track dragMoveLocation so a later handle-drag in
+  // the same gesture doesn't jump using a stale reference point.
+  modes.direct_select.dragFeature = function (state, e) {
+    state.dragMoveLocation = e.lngLat
+  }
+
   // A midpoint handle lets a user add a 5th vertex, which would permanently
   // break a rectangle's "always 4 corners" invariant — so suppress midpoint
   // handles specifically while editing a rectangle. Free-form polygons keep
