@@ -10,7 +10,6 @@ import TopControls from './TopControls/TopControls.jsx'
 import FiltersModal from './Modals/FiltersModal.jsx'
 import DownloadModal from './Modals/DownloadModal.jsx'
 import PreviewHost from './Panels/PreviewHost.jsx'
-import MapCornerControls from './MapCorner/MapCornerControls.jsx'
 import Loading from '../Controls/Loading/Loading.jsx'
 import Legend from '../Controls/Legend/Legend.jsx'
 import DepthBar from '../Controls/DepthBar/DepthBar.jsx'
@@ -24,10 +23,9 @@ import { useUI } from '../../state/ui/UIProvider.jsx'
 import './styles.css'
 
 // The map-first shell: full-bleed map with a centered top bar (brand on the
-// first layer, the merged Datasets/Filters segmented control on the second,
-// active-filter chips beneath), the datasets sidebar on the left (list +
-// counts + Download), and the map interaction controls lower-right. Filters
-// and Download open as modals.
+// first layer, the merged Datasets/spatial-filter/Filters segmented control
+// on the second, active-filter chips beneath) and the datasets sidebar on the
+// left (list + counts + Download). Filters and Download open as modals.
 export default function AppShell () {
   const { t } = useTranslation()
   const {
@@ -167,7 +165,6 @@ export default function AppShell () {
         timeFilterActive={timeFilterActive}
         scrubTime={scrubTime}
       />
-      <MapCornerControls />
       {/* The two range bars over the map, each carrying the filter for its
           axis and the marks that say where the drawn data sits on it: time
           along the bottom edge, depth down the right one, perpendicular the

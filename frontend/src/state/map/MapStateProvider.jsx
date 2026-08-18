@@ -167,6 +167,11 @@ export default function MapStateProvider ({ children }) {
   // One-shot "frame this geometry" request for the Map. The nonce lets the
   // same extent be re-requested (clicking zoom again after panning away).
   const [zoomTarget, setZoomTarget] = useState()
+  // One-shot "start/stop drawing" request for the Map, from the spatial
+  // filter button in the top bar. mode is 'box', 'polygon' or 'clear'; the
+  // nonce lets the same mode be re-requested (picking "Bounding box" again
+  // after cancelling out of it).
+  const [drawRequest, setDrawRequest] = useState()
   // A share link can carry ?dataset=… with no lat/lon/zoom (the user only
   // meant to point at the dataset, not a specific camera). SelectionProvider
   // consumes this once the dataset resolves, framing its footprint instead of
@@ -193,6 +198,10 @@ export default function MapStateProvider ({ children }) {
 
   function zoomToGeometry (geometry) {
     if (geometry) setZoomTarget({ geometry, nonce: Date.now() })
+  }
+
+  function requestDraw (mode) {
+    setDrawRequest({ mode, nonce: Date.now() })
   }
 
   // Tracks mode (trajectory track lines + time scrub bar) and the data-type
@@ -465,6 +474,8 @@ export default function MapStateProvider ({ children }) {
     setActiveWmsOverlay,
     zoomTarget,
     zoomToGeometry,
+    drawRequest,
+    requestDraw,
     pendingDatasetZoom,
     setPendingDatasetZoom,
     mapRef,

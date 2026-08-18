@@ -25,7 +25,6 @@ import {
   quantizeCountRange,
   rangesEqual,
   selectionFromSearchParams,
-  updateMapToolTitleLanguage,
   zoomToDatasetCamera,
   splitTrackRuns,
   initialBearing
@@ -200,6 +199,7 @@ export default function CreateMap({
   activeWmsOverlay,
   projection = 'mercator',
   zoomTarget,
+  drawRequest,
   mapRef
 }) {
   const { t, i18n } = useTranslation()
@@ -224,11 +224,14 @@ export default function CreateMap({
 
   const drawControlOptions = {
     displayControlsDefault: false,
+    // No buttons of its own: draw_rectangle/draw_polygon/simple_select are
+    // driven imperatively from the top bar's spatial filter button (see the
+    // drawRequest effect), not by clicking a control here.
     controls: {
       point: false,
       line_string: false,
-      polygon: true,
-      trash: true,
+      polygon: false,
+      trash: false,
       combine_features: false,
       uncombine_features: false,
       modes,
@@ -688,6 +691,16 @@ export default function CreateMap({
     drawPolygon.current?.deleteAll()
     map.current.setFilter('points-highlighted', ['in', 'pk', ''])
     setPolygon()
+  }
+
+  // Cancel whatever draw mode is active and clear the drawn shape — the
+  // spatial filter button's "Clear" option, and previously the trash button
+  // in the map's lower-right corner.
+  function endDrawing() {
+    if (!map.current) return
+    map.current.getCanvas().style.cursor = 'unset'
+    drawPolygon.current.changeMode('simple_select')
+    deleteAllShapes()
   }
 
   // The one hex ramp, shared by the combined 'hexes' layer below z7 and the
@@ -1411,6 +1424,24 @@ export default function CreateMap({
     })
   }, [zoomTarget])
 
+  // Spatial filter button (top bar): 'box'/'polygon' replace whatever was
+  // drawn before and start that draw mode; 'clear' cancels out of drawing and
+  // removes the shape. Mirrors the onclick handlers the map's own draw/trash
+  // controls used to carry before they moved into the top bar.
+  useEffect(() => {
+    if (!drawRequest || !map.current) return
+    if (drawRequest.mode === 'clear') {
+      endDrawing()
+      return
+    }
+    map.current.getCanvas().style.cursor = 'crosshair'
+    deleteAllShapes()
+    creatingPolygon.current = true
+    drawPolygon.current.changeMode(
+      drawRequest.mode === 'box' ? 'draw_rectangle' : 'draw_polygon'
+    )
+  }, [drawRequest])
+
   // Re-runs when the spatial filter changes too, so the overlay is re-requested
   // clipped to the new selection.
   useEffect(() => {
@@ -1751,53 +1782,7 @@ export default function CreateMap({
     // disable map rotation using touch rotation gesture
     map.current.touchZoomRotate.disableRotation()
 
-    // clone an element to remove it's events
-    function cloneElement(oldElement) {
-      const newElement = oldElement.cloneNode(true)
-      oldElement.parentNode.replaceChild(newElement, oldElement)
-      return newElement
-    }
-
     map.current.on('load', () => {
-      const boxQueryElement = document.getElementById('boxQueryButton')
-      const trashQueryElement = cloneElement(
-        document.getElementsByClassName('mapbox-gl-draw_trash').item(0)
-      )
-      const polyQueryElement = cloneElement(
-        document.getElementsByClassName('mapbox-gl-draw_polygon').item(0)
-      )
-
-      // Portaled in by MapCornerControls; guard so a mount-order surprise
-      // can't break the rest of map init.
-      if (boxQueryElement) {
-        boxQueryElement.onclick = (e) => {
-          map.current.getCanvas().style.cursor = 'crosshair'
-          deleteAllShapes()
-          creatingPolygon.current = true
-          drawPolygon.current.changeMode('draw_rectangle')
-          return false
-        }
-      }
-      
-      polyQueryElement.onclick = (e) => {
-        map.current.getCanvas().style.cursor = 'crosshair'
-        deleteAllShapes()
-        creatingPolygon.current = true
-        drawPolygon.current.changeMode('draw_polygon')
-        return false
-      }
-
-      trashQueryElement.onclick = () => {
-        endDrawing()
-        return false
-      }
-
-      function endDrawing() {
-        map.current.getCanvas().style.cursor = 'unset'
-        drawPolygon.current.changeMode('simple_select')
-        deleteAllShapes()
-      }
-
       setColorStops()
 
       const { tileQuery, cellTileQuery } = tileUrls(mapQueryRef.current)
@@ -2975,15 +2960,14 @@ export default function CreateMap({
       handleMapClick(e)
     })
 
-    // The only control this corner keeps. The scale bar and the attribution ⓘ
-    // stood here too until they moved into the foot of the legend card, which
-    // is where the rest of "what you are looking at" already lived (see
-    // LegendFooter.jsx); they are constructed there and never handed to
-    // addControl. No NavigationControl either: the +/- zoom buttons only
-    // repeated what scroll, pinch and double-tap already do.
+    // No visible buttons (drawControlOptions.controls) — the draw/box/trash
+    // triggers moved into the top bar's spatial filter button, which drives
+    // this control via changeMode/deleteAll instead (see the drawRequest
+    // effect). Still added to the map so those modes exist to be driven: the
+    // scale bar and the attribution ⓘ that used to share this corner moved
+    // into the foot of the legend card (see LegendFooter.jsx), and there is no
+    // NavigationControl either, since scroll/pinch/double-tap already zoom.
     map.current.addControl(drawPolygon.current, 'bottom-right')
-
-    updateMapToolTitleLanguage(t)
   }, [])
 
   // Tell the user when the basemap imagery is still on the wire.

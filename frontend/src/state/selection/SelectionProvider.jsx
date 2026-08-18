@@ -20,7 +20,6 @@ import {
   datasetMatchesUrlKey,
   datasetUrlKey,
   formatErddapServerName,
-  polygonIsRectangle,
   selectionFromSearchParams,
   useDebounce
 } from '../../utilities.jsx'
@@ -401,24 +400,6 @@ export default function SelectionProvider ({ children }) {
       )
     )
   }, [])
-
-  // Mark the polygon-draw control active for free-form polygons (rectangles
-  // have their own #boxQueryButton active state).
-  useEffect(() => {
-    const elem = document.querySelector(
-      '.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon'
-    )
-    if (polygon && !polygonIsRectangle(polygon)) {
-      if (elem) {
-        elem.style.backgroundColor = 'var(--cioos-teal-light)'
-      }
-    } else {
-      // remove colour from button
-      if (elem) {
-        elem.style.backgroundColor = 'var(--cioos-white)'
-      }
-    }
-  }, [polygon])
 
   useEffect(() => {
     if (isEmpty(pointsToReview)) {

@@ -22,13 +22,19 @@
   pointer-events: auto;
 }
 
-/* Merged tabs, pulled out full-bleed from below the brand row: two
-   equal-width segments (1fr 1fr — the columns grow to fit the widest label,
-   so both stay the same width) that bleed 1px past the card on the left,
-   right and bottom to cover its border, leaving no line around them. */
+/* Merged tabs, pulled out full-bleed from below the brand row: Datasets and
+   Filters share the row equally (1fr each — the columns grow to fit the
+   widest label, so both stay the same width); the spatial filter button
+   between them is icon-only and takes only what its icon needs (auto). All
+   three bleed 1px past the card on the left, right and bottom to cover its
+   border, leaving no line around them. The middle segment
+   (SpatialFilterButton) is a DropdownButton, whose own wrapper div would
+   otherwise be the grid item instead of the button inside it —
+   display:contents lifts the button itself into the grid so it sizes to its
+   own content instead of an empty wrapper's. */
 .topBarActions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr auto 1fr;
   align-items: stretch;
   margin: 0 -1px -1px;
   border-top: 1px solid var(--cioos-hairline);
@@ -37,7 +43,17 @@
   overflow: hidden;
 }
 
-.topBarButton {
+.topBarActions > .dropdown {
+  display: contents;
+}
+
+/* .topBar .topBarActions .topBarButton, not the bare class: the middle
+   segment's button is also a DropdownButton .dropdown-toggle, which carries
+   its own generic chrome (dropdownStyles.css, imported by a different
+   component) at equal class-selector specificity. The three-class prefix
+   here — cheaper than !important — outranks that generic chrome regardless
+   of which stylesheet the bundler happens to place first. */
+.topBar .topBarActions .topBarButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -45,12 +61,16 @@
   min-width: 0;
   /* min-height, not height: the Datasets segment stacks a label over its
      counts, and a long label can take a second line on a narrow viewport.
-     Both segments stretch together (the grid's align-items), so the strip
-     stays a single even band whatever the tallest one needs. */
+     All three segments stretch together (the grid's align-items), so the
+     strip stays a single even band whatever the tallest one needs. */
   min-height: 40px;
   padding: 4px 10px;
   border: none;
-  /* Dimmed primary: a translucent teal wash that highlights the two entry
+  /* Square, not the generic dropdown chrome's rounded corners — the row's
+     only curve is the outer one .topBarActions cuts at its own bottom
+     corners. */
+  border-radius: 0;
+  /* Dimmed primary: a translucent teal wash that highlights the three entry
      points without competing with the white brand row above them. */
   background-color: rgba(82, 167, 155, 0.14);
   font: inherit;
@@ -59,6 +79,18 @@
   cursor: pointer;
   transition: background-color var(--cioos-transition-fast),
     color var(--cioos-transition-fast);
+}
+
+/* Spatial filter toggle: icon-only, so it takes only the width its icon
+   needs (grid-template-columns above) rather than sharing the row equally
+   with Datasets/Filters. No dropdown caret either — the icon alone is the
+   affordance. */
+.topBar .topBarActions .topBarSpatialFilterToggle {
+  padding: 4px 8px;
+}
+
+.topBar .topBarActions .topBarSpatialFilterToggle::after {
+  display: none;
 }
 
 /* The icon and the filters badge hold their size; only text gives way. */
@@ -84,30 +116,70 @@
   overflow-wrap: break-word;
 }
 
-/* Hairline weld between the two tabs. */
-.topBarButton + .topBarButton {
+/* Hairline weld between the three tabs. Not a sibling selector: the middle
+   segment (SpatialFilterButton) is a real button nested inside its
+   DropdownButton's wrapper div, so it and the Filters button that follows it
+   are not DOM siblings of the Datasets button even though display:contents
+   (above) puts all three in the same visual row. Every segment gets the
+   weld; only the leading one — always the Datasets toggle, the first DOM
+   child of .topBarActions — has nothing to its left to weld against. */
+.topBar .topBarActions .topBarButton {
   border-left: 1px solid rgba(82, 167, 155, 0.32);
+}
+
+.topBarActions > .topBarButton:first-child {
+  border-left: none;
 }
 
 .topBarButton svg {
   color: var(--cioos-primary);
 }
 
-.topBarButton:hover {
+.topBar .topBarActions .topBarButton:hover {
   background-color: rgba(82, 167, 155, 0.24);
 }
 
-/* Pressed/open state (Datasets sidebar showing): fill with solid primary. */
-.topBarButton.active {
+/* Applied-but-closed state: a shape stays drawn, or filters stay set, after
+   the menu/modal that set them has closed. Lighter than .active on purpose —
+   it says "this segment has a value" without competing with whichever
+   segment's UI is actually open right now. Same light-teal wash the rest of
+   the app already uses for "selected" (dropdown-item.active, filter chips). */
+.topBar .topBarActions .topBarButton.applied {
+  background-color: var(--cioos-teal-light);
+  color: var(--cioos-primary-700);
+}
+
+.topBarButton.applied svg {
+  color: var(--cioos-primary-700);
+}
+
+/* Pressed/open state (Datasets toggle open, the draw menu open, or the
+   Filters modal up): fill with solid primary. Two neighbours can be active
+   together (e.g. the datasets sidebar open while the draw menu is also open)
+   — same solid fill, sitting flush with no gap between them, so without help
+   they'd read as one wide block instead of two buttons. A lightened
+   full-perimeter ring stacked on the app's shared 3D shadow (see theme.css —
+   the same raised-chip treatment as the brand bar, sidebar and legend) gives
+   every active segment its own edge on all four sides and lifts it physically
+   off the row, so it still reads as its own button whichever neighbours are
+   also lit up; raising it above the row (position+z-index) keeps that shadow
+   from being cut off by a neighbour or clipped by the row's own
+   overflow:hidden. */
+.topBar .topBarActions .topBarButton.active {
+  position: relative;
+  z-index: 1;
   background-color: var(--cioos-primary);
   color: var(--cioos-white);
+  transform: var(--cioos-perspective);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    var(--cioos-shadow-3d-sm);
 }
 
 .topBarButton.active svg {
   color: var(--cioos-white);
 }
 
-.topBarButton:focus-visible {
+.topBar .topBarActions .topBarButton:focus-visible {
   outline: none;
   box-shadow: var(--cioos-focus);
 }
@@ -127,7 +199,6 @@
   gap: 0 5px;
   min-height: 22px;
   padding: 4px 12px;
-  border-top: 1px solid var(--cioos-hairline);
   border-bottom: 1px solid var(--cioos-hairline);
   font-size: 12px;
   font-weight: 600;
@@ -222,7 +293,7 @@
     font-size: 12px;
   }
 
-  .topBarButton {
+  .topBar .topBarActions .topBarButton {
     gap: 6px;
     padding: 4px 8px;
   }
@@ -276,7 +347,7 @@
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
-  padding: 3px 6px 3px 4px;
+  padding: 3px;
   /* 3D depth (shared tokens; see theme.css) — the chip-scale ladder.
      preserve-3d floats the inner value chips above the pill face. */
   transform: var(--cioos-perspective);
@@ -364,7 +435,7 @@
   gap: 2px;
   max-width: 170px;
   background-color: var(--cioos-teal-light);
-  border-radius: var(--cioos-radius-pill);
+  border-radius: var(--cioos-radius-sm);
   padding: 2px 2px 2px 9px;
   font-size: 12px;
   font-weight: 600;

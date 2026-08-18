@@ -4,20 +4,6 @@
   height: 100%;
 }
 
-.mapbox-gl-draw_polygon {
-  background-image: url(../Images/polygonIcon.png) !important;
-  background-size: 30px 30px;
-  border-radius: 0px;
-}
-
-.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon:hover {
-background-color: var(--cioos-surface-2) !important;
-}
-
-.mapbox-gl-draw_polygon.active {
-  background-color: var(--cioos-surface-2);
-}
-
 .maplibregl-canvas {
   width: 100%;
 }

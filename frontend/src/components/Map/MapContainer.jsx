@@ -24,6 +24,7 @@ export default function MapContainer () {
     activeWmsOverlay,
     projection,
     zoomTarget,
+    drawRequest,
     mapRef,
     featureQuery,
     setFeatureQuery,
@@ -69,6 +70,7 @@ export default function MapContainer () {
       activeWmsOverlay={activeWmsOverlay}
       projection={projection}
       zoomTarget={zoomTarget}
+      drawRequest={drawRequest}
       mapRef={mapRef}
     />
   )
