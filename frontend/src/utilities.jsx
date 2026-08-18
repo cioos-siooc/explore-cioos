@@ -494,6 +494,14 @@ function polygonToMaxMins(polygon) {
   }
 }
 
+// The `polygon` ring is already closed everywhere it's produced (turf's
+// bboxPolygon, mapbox-gl-draw's own rings, selectionFromSearchParams below),
+// so it needs no extra closing point here.
+export function polygonToWkt (polygon) {
+  const ring = polygon.map(([lon, lat]) => `${lon} ${lat}`).join(', ')
+  return `POLYGON((${ring}))`
+}
+
 export function createSelectionQueryString (polygon) {
   if (polygonIsRectangle(polygon)) {
     // res = { latMin, lonMin, latMax, lonMax }

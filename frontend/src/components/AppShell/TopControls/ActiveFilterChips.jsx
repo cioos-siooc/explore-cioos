@@ -3,9 +3,7 @@ import { useEffect, useState } from 'react'
 import { X } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 
-import {
-  generateRangeSelectBadgeTitle
-} from '../../../utilities.jsx'
+import { generateRangeSelectBadgeTitle } from '../../../utilities.jsx'
 import {
   defaultStartDate,
   defaultEndDate,

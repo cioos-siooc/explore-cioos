@@ -22,6 +22,7 @@ import {
   escapeHtml,
   generateColorStops,
   getCurrentRangeLevel,
+  polygonIsRectangle,
   quantizeCountRange,
   rangesEqual,
   selectionFromSearchParams,
@@ -61,6 +62,25 @@ import {
   LABEL_LAYER_IDS
 } from './basemapStyle.js'
 
+// direct_select's own dragVertex/toDisplayFeatures, captured once here at
+// module load — before the component below patches these modes on every
+// render (see the simple_select.toDisplayFeatures override further down).
+// Capturing the ORIGINAL library functions at module scope, rather than
+// inside the component, means each render's override always falls back to
+// true library behavior, not to the previous render's override — so
+// re-renders don't stack wrapper upon wrapper.
+const defaultDragVertex = MapboxDraw.modes.direct_select.dragVertex
+const defaultDirectSelectToDisplayFeatures = MapboxDraw.modes.direct_select.toDisplayFeatures
+
+// A rectangle drawn with draw_rectangle is a 4-point ring — mapbox-gl-draw
+// strips the closing duplicate point internally (see Polygon's constructor
+// in the library). polygonIsRectangle expects a closed 5-point ring, so
+// re-close it here before delegating to that check.
+function isRectangleFeature (feature) {
+  const ring = feature?.type === 'Polygon' && feature.coordinates?.[0]
+  return Boolean(ring) && ring.length === 4 && polygonIsRectangle([...ring, ring[0]])
+}
+
 // --- Viewport-adaptive hex ramp knobs ------------------------------------
 // How long the camera has to hold still before the visible hexes are measured.
 // It is a debounce, not a throttle: a drag or a pinch produces one measurement
@@ -68,6 +88,12 @@ import {
 // pan across a coastline doesn't renumber the legend halfway through, short
 // enough to feel like it belongs to the movement that caused it.
 const VIEWPORT_RAMP_DEBOUNCE_MS = 400
+// direct_select fires draw.update on every mousemove/touchmove tick of a drag
+// (a dragged vertex or a dragged whole-shape), not just once at drag-end.
+// setPolygon feeds SelectionProvider's /pointQuery fetch, so committing it on
+// every tick would fire a request per frame of the drag — settle on this
+// debounce instead, same idea as VIEWPORT_RAMP_DEBOUNCE_MS above.
+const DRAW_UPDATE_DEBOUNCE_MS = 300
 // Any hex on screen is worth measuring, including a single one. The threshold
 // used to be four, on the theory that fewer than that is not a distribution —
 // but zoomed in there often are only one or two cells in view, and the domain
@@ -211,14 +237,73 @@ export default function CreateMap({
   const creatingPolygon = useRef(false)
   const shiftBoxCreate = useRef(false)
 
-  // disables edting of polygon/box vertices
+  // Suppresses vertex/midpoint handles for a merely-*selected* shape (one
+  // click, still simple_select) — direct_select keeps its library-default
+  // toDisplayFeatures, which is what draws those handles for dragging. A
+  // second click on the selected shape (mapbox-gl-draw's own
+  // clickOnFeature/clickOnVertex transitions) enters direct_select and
+  // reveals them. The vertex/midpoint layer styles below are already scoped
+  // to `!= mode simple_select` for exactly this split.
   const disabledEvent = function (state, geojson, display) {
     display(geojson)
   }
 
   const modes = MapboxDraw.modes
-  MapboxDraw.modes.direct_select.toDisplayFeatures = disabledEvent
   MapboxDraw.modes.simple_select.toDisplayFeatures = disabledEvent
+
+  // A drawn bounding box must stay an axis-aligned rectangle while it's being
+  // edited: dragging the whole shape already preserves that (translation),
+  // but the library's default dragVertex moves only the one dragged corner,
+  // which would let it warp into an arbitrary quadrilateral. For a
+  // rectangle's single-corner drags, also slide its two ring-adjacent
+  // corners along the axis they already share with it (the one on the same
+  // old X gets the new X, the one on the same old Y gets the new Y), leaving
+  // the opposite corner as the resize anchor. Anything else — a polygon, or
+  // more than one selected vertex — keeps the library's own behavior.
+  modes.direct_select.dragVertex = function (state, e, delta) {
+    const path = state.selectedCoordPaths[0]
+    if (state.selectedCoordPaths.length !== 1 || !isRectangleFeature(state.feature)) {
+      defaultDragVertex.call(this, state, e, delta)
+      return
+    }
+    const [ringIndex, index] = path.split('.').map((x) => parseInt(x, 10))
+    const oldCoord = state.feature.getCoordinate(path)
+    const newCoord = [oldCoord[0] + delta.lng, oldCoord[1] + delta.lat]
+    ;[(index + 3) % 4, (index + 1) % 4].forEach((neighborIndex) => {
+      const neighborPath = `${ringIndex}.${neighborIndex}`
+      const neighborOld = state.feature.getCoordinate(neighborPath)
+      if (neighborOld[0] === oldCoord[0]) {
+        state.feature.updateCoordinate(neighborPath, newCoord[0], neighborOld[1])
+      } else {
+        state.feature.updateCoordinate(neighborPath, neighborOld[0], newCoord[1])
+      }
+    })
+    state.feature.updateCoordinate(path, newCoord[0], newCoord[1])
+  }
+
+  // A midpoint handle lets a user add a 5th vertex, which would permanently
+  // break a rectangle's "always 4 corners" invariant — so suppress midpoint
+  // handles specifically while editing a rectangle. Free-form polygons keep
+  // their midpoints, so vertices can still be added to those as before.
+  modes.direct_select.toDisplayFeatures = function (state, geojson, push) {
+    if (state.featureId === geojson.properties.id && isRectangleFeature(state.feature)) {
+      defaultDirectSelectToDisplayFeatures.call(this, state, geojson, (feature) => {
+        if (feature.properties?.meta === 'midpoint') return
+        push(feature)
+      })
+      return
+    }
+    defaultDirectSelectToDisplayFeatures.call(this, state, geojson, push)
+  }
+
+  // A drawn shape should always render "active" (yellow, with drag handles)
+  // rather than dropping back to simple_select's plain/blue look. The
+  // library's own clickNoTarget/clickInactive (clicking empty water, or a
+  // second inactive feature, while editing) exit to simple_select — reuse
+  // its clickActiveFeature instead, which just clears any selected vertex
+  // and stays in direct_select.
+  modes.direct_select.clickNoTarget = modes.direct_select.clickActiveFeature
+  modes.direct_select.clickInactive = modes.direct_select.clickActiveFeature
 
   modes.draw_rectangle = DrawRectangle
 
@@ -2273,10 +2358,11 @@ export default function CreateMap({
         new URL(window.location.href).searchParams
       )
       if (sharedSelection) {
-        drawPolygon.current.add({
+        const [featureId] = drawPolygon.current.add({
           type: 'Feature',
           geometry: { type: 'Polygon', coordinates: [sharedSelection] }
         })
+        drawPolygon.current.changeMode('direct_select', { featureId })
         highlightPoints(sharedSelection)
       }
     })
@@ -2793,8 +2879,11 @@ export default function CreateMap({
       lastClickHandledAt = now
 
       // Drawing owns the canvas: a click that closes a polygon is not a query.
+      // A finished shape lands in direct_select now (see draw.create below),
+      // not simple_select — so "done drawing" is just "no longer in a
+      // draw_* mode", regardless of which select mode it landed in.
       if (creatingPolygon.current) {
-        if (draw.getMode() === 'simple_select') creatingPolygon.current = false
+        if (!draw.getMode().includes('draw')) creatingPolygon.current = false
         return
       }
       if (draw.getMode().includes('draw')) return
@@ -2837,18 +2926,32 @@ export default function CreateMap({
       if (drawPolygon.current.getAll().features.length > 1) {
         drawPolygon.current.delete(drawPolygon.current.getAll().features[0].id)
       }
-      const polygon =
-        drawPolygon.current.getAll().features[0].geometry.coordinates[0]
+      const feature = drawPolygon.current.getAll().features[0]
+      const polygon = feature.geometry.coordinates[0]
       highlightPoints(polygon)
       setPolygon(polygon)
       map.current.getCanvas().style.cursor = 'unset'
-      // creatingPolygon.current = false
-      // if(!polygonIsRectangle(polygon)){
-      //   // set className of polygon button to active
-      //   const polygonCreateButton = document.getElementsByClassName('mapbox-gl-draw_ctrl-draw-btn mapbox-gl-draw_polygon')
-      //   polygonCreateButton.setProperty('background-colour', '#c6e3df')
-      // }
+      // Straight into direct_select so the shape is immediately draggable
+      // (yellow, with handles) rather than sitting in simple_select first.
+      // draw.create fires from inside the draw mode's own onStop, which is
+      // itself running inside the changeMode() call that's finishing the
+      // drawing — calling changeMode again in here would be a reentrant call
+      // into that same in-progress transition, so it's deferred a tick.
+      setTimeout(() => {
+        drawPolygon.current?.changeMode('direct_select', { featureId: feature.id })
+      }, 0)
     })
+
+    // Dragging an existing shape (a vertex, or the whole body) in
+    // direct_select — see DRAW_UPDATE_DEBOUNCE_MS for why this is debounced.
+    const commitDrawUpdate = debounce(() => {
+      const feature = drawPolygon.current.getAll().features[0]
+      if (!feature) return
+      const polygon = feature.geometry.coordinates[0]
+      highlightPoints(polygon)
+      setPolygon(polygon)
+    }, DRAW_UPDATE_DEBOUNCE_MS)
+    map.current.on('draw.update', commitDrawUpdate)
 
     // New tiles — a filter change, or the camera moving into fresh data —
     // arrive as features the focus filters were never computed against (they

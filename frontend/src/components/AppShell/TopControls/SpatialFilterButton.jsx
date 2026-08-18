@@ -1,11 +1,11 @@
 import * as React from 'react'
-import { useState } from 'react'
-import { BoundingBox, Pentagon, X } from 'react-bootstrap-icons'
+import { useEffect, useState } from 'react'
+import { BoundingBox, Check2, Clipboard, Pentagon, X } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
 
 import { DropdownButton, Dropdown } from '../../ui/Dropdown.jsx'
-import { polygonIsRectangle } from '../../../utilities.jsx'
+import { polygonIsRectangle, polygonToWkt } from '../../../utilities.jsx'
 import { useMapState } from '../../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 
@@ -26,6 +26,16 @@ export default function SpatialFilterButton () {
   const { requestDraw } = useMapState()
   const { polygon } = useSelection()
   const [menuOpen, setMenuOpen] = useState(false)
+
+  // Briefly swaps the copy button's icon to a checkmark after a successful
+  // copy, then reverts — a timeout in an effect (not the click handler) so
+  // it's cleared if the panel closes (or the selection changes) mid-countdown.
+  const [wktCopied, setWktCopied] = useState(false)
+  useEffect(() => {
+    if (!wktCopied) return
+    const timer = setTimeout(() => setWktCopied(false), 1500)
+    return () => clearTimeout(timer)
+  }, [wktCopied])
 
   const hasSelection = Boolean(polygon)
   const isBox = hasSelection && polygonIsRectangle(polygon)
@@ -65,6 +75,23 @@ export default function SpatialFilterButton () {
           <X size={16} aria-hidden='true' />
           {t('drawClearOption')}
         </Dropdown.Item>
+      )}
+      {hasSelection && (
+        <div className='spatialFilterWktSection'>
+          <button
+            type='button'
+            className='dropdown-item'
+            onClick={() => {
+              navigator.clipboard.writeText(polygonToWkt(polygon))
+              setWktCopied(true)
+            }}
+          >
+            {wktCopied
+              ? <Check2 size={16} aria-hidden='true' />
+              : <Clipboard size={16} aria-hidden='true' />}
+            {t(wktCopied ? 'copiedSelectionWktTitle' : 'copySelectionWktTitle')}
+          </button>
+        </div>
       )}
     </DropdownButton>
   )

@@ -481,6 +481,8 @@
   "sidebarCountsSelected": "{{count}} in selection",
   "activeFiltersLabel": "Active filters",
   "chipMapSelectionLabel": "Map selection",
+  "copySelectionWktTitle": "Copy as WKT",
+  "copiedSelectionWktTitle": "Copied!",
   "activeFiltersShow": "Show filters",
   "activeFiltersHide": "Hide filters",
   "apiErrorBannerText": "The data service is not responding — filters and datasets could not be loaded.",

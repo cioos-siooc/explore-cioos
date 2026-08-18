@@ -502,3 +502,12 @@
 .filterMenuReset:hover:not(:disabled) {
   color: var(--cioos-error);
 }
+
+/* Copy-as-WKT, appended to the spatial filter dropdown once a shape is
+   drawn. Icon-only — no WKT text is shown, just the button. Its .dropdown-item
+   class matches the Box/Polygon/Clear items above it (dropdownStyles.css);
+   this wrapper only adds the divider separating it from those. */
+.spatialFilterWktSection {
+  padding-top: 4px;
+  border-top: 1px solid var(--cioos-hairline);
+}
