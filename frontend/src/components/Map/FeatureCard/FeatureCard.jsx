@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowRight,
   CheckCircleFill,
@@ -15,6 +15,7 @@ import classNames from 'classnames'
 import platformColors from '../../platformColors'
 import { useMapState } from '../../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
+import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
 
 // The "what's here" card: the single answer to a click anywhere on the map.
@@ -30,85 +31,35 @@ import './styles.css'
 // appears here too, so a device with no hover loses nothing, and on a phone the
 // card is a half-height sheet rather than a popup — the map stays visible above
 // it, which is the only way to see what a selection did.
+//
+// It never competes with the datasets sidebar for the same corner: the sidebar
+// already sorts and outlines the datasets a click found (see DatasetsTable's
+// pinnedPks), so once it is open the card would be a second, redundant answer
+// to the same click sitting on top of the first.
 
 // How far a stack has to grow before the list scrolls rather than the card.
 const VISIBLE_ROWS = 5
-
-// Clearance between the card and the point it describes, and between the card
-// and the edge of the window. Kept in step with the width in styles.css.
-const CARD_GAP_PX = 14
-const CARD_MARGIN_PX = 8
-const CARD_WIDTH_PX = 320
-
-// Below this the card is a bottom sheet and anchors to nothing, so the inline
-// positioning below is skipped entirely — an inline `left`/`top` would beat the
-// stylesheet's sheet rules and no media query could undo it. Same rung as the
-// datasets sheet (see theme.css).
-const SHEET_QUERY = '(max-width: 700px)'
 
 const KIND_ORDER = ['track', 'observation', 'grid']
 
 export default function FeatureCard () {
   const { t, i18n } = useTranslation()
-  const { featureQuery, setFeatureQuery, mapRef, zoomToGeometry } = useMapState()
+  const { featureQuery, setFeatureQuery, zoomToGeometry } = useMapState()
   const {
     pointsData,
     setInspectDataset,
     selectTrajectoryFromMap,
     addDatasetsToSelection
   } = useSelection()
+  const { sidebarOpen } = useUI()
 
-  const cardRef = useRef(null)
-  const [anchor, setAnchor] = useState(null)
   const [expanded, setExpanded] = useState(false)
-  // Which side of the anchor the card hangs off. Above by default — the card
-  // then sits over water the user is not pointing at — but a click near the top
-  // of the canvas has no room there and the card would be clipped by the
-  // viewport, so it flips under the point instead.
-  const [below, setBelow] = useState(false)
-  const [isSheet, setIsSheet] = useState(
-    () => window.matchMedia(SHEET_QUERY).matches
-  )
-
-  useEffect(() => {
-    const mql = window.matchMedia(SHEET_QUERY)
-    const onChange = (e) => setIsSheet(e.matches)
-    mql.addEventListener('change', onChange)
-    return () => mql.removeEventListener('change', onChange)
-  }, [])
 
   const close = useCallback(() => setFeatureQuery(null), [setFeatureQuery])
 
   // A fresh query is a fresh card: collapse any "show all" the last one was
   // left in.
   useEffect(() => setExpanded(false), [featureQuery?.nonce])
-
-  // The card is pinned to the water it describes, not to the screen, so it
-  // travels with a pan and stays put through the "Zoom here" flight. Projecting
-  // on every 'move' is cheap — one matrix multiply against a single point.
-  useLayoutEffect(() => {
-    const map = mapRef.current
-    if (!map || !featureQuery) {
-      setAnchor(null)
-      return undefined
-    }
-    const project = () => {
-      const point = map.project(featureQuery.lngLat)
-      setAnchor({ x: point.x, y: point.y })
-    }
-    project()
-    map.on('move', project)
-    return () => map.off('move', project)
-  }, [mapRef, featureQuery])
-
-  // Flip below the anchor when there isn't room above it. Measured rather than
-  // guessed: the card's height depends on how many datasets the click found and
-  // on whether "show more" has been pressed.
-  useLayoutEffect(() => {
-    const el = cardRef.current
-    if (!el || !anchor || isSheet) return
-    setBelow(anchor.y - el.offsetHeight - CARD_GAP_PX < CARD_MARGIN_PX)
-  }, [anchor, expanded, isSheet, featureQuery?.nonce])
 
   // Escape closes, like every other dismissable surface in the app.
   useEffect(() => {
@@ -120,7 +71,10 @@ export default function FeatureCard () {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [featureQuery, close])
 
-  if (!featureQuery) return null
+  // The datasets sidebar already answers "what did that click find?" once it's
+  // open — see the comment up top. The query itself is left alone so the card
+  // picks back up where it left off if the sidebar closes again.
+  if (!featureQuery || sidebarOpen) return null
 
   // The hex and point tiles carry dataset pks but no titles, so an observation
   // row has to resolve against the current results to have anything to say —
@@ -249,32 +203,12 @@ export default function FeatureCard () {
       total: Number(value || 0).toLocaleString(i18n.language)
     })
 
-  // Positioned by the anchor on desktop and pinned to the bottom edge on phones
-  // (see styles.css, where the media query overrides `left`, `top` and
-  // `transform` wholesale).
-  //
-  // The horizontal clamp keeps a card anchored near either edge of the canvas
-  // fully on screen; the card is centred on its point everywhere there is room
-  // for it to be, which is most of the map.
-  const half = CARD_WIDTH_PX / 2
-  const style = anchor && !isSheet
-    ? {
-      left: Math.min(
-        Math.max(anchor.x, half + CARD_MARGIN_PX),
-        Math.max(window.innerWidth - half - CARD_MARGIN_PX, half + CARD_MARGIN_PX)
-      ),
-      top: anchor.y,
-      transform: below
-        ? `translate(-50%, ${CARD_GAP_PX}px)`
-        : `translate(-50%, calc(-100% - ${CARD_GAP_PX}px))`
-    }
-    : undefined
-
+  // Pinned to the top-left corner of the map on desktop and to the bottom
+  // edge on phones — see styles.css, where the media query overrides `left`,
+  // `top` and friends wholesale.
   return (
     <div
       className={classNames('featureCard', { featureCardEmpty: empty })}
-      style={style}
-      ref={cardRef}
       role='dialog'
       aria-label={t('featureCardTitle')}
     >
@@ -388,10 +322,10 @@ export default function FeatureCard () {
                 type='button'
                 className='featureCardAction primary'
                 onClick={() => addAll(addablePks)}
-                title={t('featureCardAddAllTitle')}
+                title={t('featureCardAddAllTitle', { n: addablePks.length })}
               >
                 <Plus size={15} aria-hidden='true' />
-                {t('featureCardAddAll', { n: addablePks.length })}
+                {t('featureCardAddAll')}
               </button>
             )}
             {featureQuery.bounds && (

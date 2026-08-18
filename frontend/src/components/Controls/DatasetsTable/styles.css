@@ -285,6 +285,25 @@
   font-style: italic;
 }
 
+/* Names the accent .datasetCard.fromMapClick puts on rows below — see there. */
+.datasetsCardMapClickHint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+}
+
+.datasetsCardMapClickSwatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 2px solid var(--cioos-primary);
+  box-shadow: 0 0 0 2px rgba(82, 167, 155, 0.35);
+}
+
 /* --- Card --- */
 .datasetCard {
   position: relative;

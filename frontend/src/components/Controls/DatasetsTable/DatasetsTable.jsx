@@ -399,6 +399,17 @@ export default function DatasetsTable({
   return (
     <div className={classNames('datasetsTable', { downloadModal: isDownloadModal })}>
       {controls}
+      {/* Explains the accent DatasetCard puts on rows the last map click found
+          (see .datasetCard.fromMapClick in styles.css) — otherwise the only
+          place that colour is named is a hover tooltip on the row itself,
+          which a touch user never sees and a mouse user has no reason to go
+          looking for. Only worth saying while there is a click to explain. */}
+      {!isDownloadModal && pinnedPks.size > 0 && (
+        <div className='datasetsCardMapClickHint'>
+          <span className='datasetsCardMapClickSwatch' aria-hidden='true' />
+          {t('datasetsCardMapClickHint')}
+        </div>
+      )}
       <div className='datasetsCardList' ref={listRef}>
         {visibleRows.length === 0 ? (
           <div className='datasetsCardEmpty'>{t('datasetsCardNoResultsText')}</div>
