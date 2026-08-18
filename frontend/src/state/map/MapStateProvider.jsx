@@ -181,6 +181,16 @@ export default function MapStateProvider ({ children }) {
   // depends on the canvas size, which only the map knows).
   const mapRef = useRef(null)
 
+  // What the last click on the map found under it — the payload behind the
+  // "what's here" card. Map.jsx builds it from one hit-test over every data
+  // layer and hands it over; FeatureCard resolves the dataset pks in it
+  // against the current results and renders the answer. null = nothing open.
+  //
+  // It lives here rather than in SelectionProvider because it is a question,
+  // not a selection: opening the card changes nothing about the filters, the
+  // camera, or the dataset page. Only the buttons inside it do.
+  const [featureQuery, setFeatureQuery] = useState(null)
+
   function zoomToGeometry (geometry) {
     if (geometry) setZoomTarget({ geometry, nonce: Date.now() })
   }
@@ -458,6 +468,8 @@ export default function MapStateProvider ({ children }) {
     pendingDatasetZoom,
     setPendingDatasetZoom,
     mapRef,
+    featureQuery,
+    setFeatureQuery,
     mapDatasetPKs,
     setMapDatasetPKs,
     mapQueryString,

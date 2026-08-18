@@ -14,6 +14,8 @@ export const OTHER_KEY = '__other__'
 export const UNCATEGORIZED_KEY = '__uncategorized__'
 export const IN_VIEW_KEY = 'in'
 export const OUT_OF_VIEW_KEY = 'out'
+export const SELECTED_KEY = 'selected'
+export const UNSELECTED_KEY = 'unselected'
 
 // Groups that sort last regardless of their label.
 const LAST_KEYS = new Set([OTHER_KEY, UNCATEGORIZED_KEY])
@@ -21,7 +23,9 @@ const LAST_KEYS = new Set([OTHER_KEY, UNCATEGORIZED_KEY])
 // 'inView' groups by the current map viewport rather than by a property of the
 // dataset, so its membership changes on every pan — hiding it from the map is
 // not offered (see DatasetsTable), which would otherwise reload the tiles on
-// each pan for no visible gain.
+// each pan for no visible gain. 'selected' is the same shape of thing: it
+// groups by what the user has put aside, which they change constantly, so it
+// isn't hideable either.
 export const HIDEABLE_DIMENSIONS = new Set([
   'type',
   'platform',
@@ -38,7 +42,8 @@ export function groupOptions (t) {
     { id: 'organization', label: t('datasetsCardGroupOrganizationText') },
     { id: 'eov', label: t('datasetsCardGroupEovText') },
     { id: 'source', label: t('datasetsCardGroupSourceText') },
-    { id: 'inView', label: t('datasetsCardOnlyInViewText') }
+    { id: 'inView', label: t('datasetsCardOnlyInViewText') },
+    { id: 'selected', label: t('datasetsCardGroupSelectedText') }
   ]
 }
 
@@ -66,6 +71,8 @@ export function groupKeysFor (row, groupBy, datasetsInViewPks) {
     return [
       datasetsInViewPks?.has(row.pk) ? IN_VIEW_KEY : OUT_OF_VIEW_KEY
     ]
+  case 'selected':
+    return [row.selected ? SELECTED_KEY : UNSELECTED_KEY]
   default:
     return []
   }
@@ -86,14 +93,31 @@ export function groupLabel (key, groupBy, t) {
     return key === IN_VIEW_KEY
       ? t('datasetsCardOnlyInViewText')
       : t('datasetsCardGroupOutOfViewText')
+  case 'selected':
+    return key === SELECTED_KEY
+      ? t('datasetsCardGroupInSelectionText')
+      : t('datasetsCardGroupNotInSelectionText')
   default:
     return key
   }
 }
 
+// The two-group dimensions have a natural order that alphabetising would
+// scramble — and would scramble differently per language. The group the user
+// asked about goes first.
+const FIRST_KEY_BY_DIMENSION = {
+  inView: IN_VIEW_KEY,
+  selected: SELECTED_KEY
+}
+
 // Alphabetical by label, with Other/Uncategorized pinned to the bottom.
 export function sortGroupKeys (keys, groupBy, t, language) {
+  const firstKey = FIRST_KEY_BY_DIMENSION[groupBy]
   return [...keys].sort((a, b) => {
+    if (firstKey) {
+      if (a === firstKey) return -1
+      if (b === firstKey) return 1
+    }
     const aLast = LAST_KEYS.has(a)
     const bLast = LAST_KEYS.has(b)
     if (aLast !== bLast) return aLast ? 1 : -1

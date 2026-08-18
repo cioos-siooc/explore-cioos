@@ -25,6 +25,8 @@ export default function MapContainer () {
     projection,
     zoomTarget,
     mapRef,
+    featureQuery,
+    setFeatureQuery,
     tracksMode,
     debouncedScrubTime,
     trailingDays,
@@ -33,19 +35,16 @@ export default function MapContainer () {
   const {
     polygon,
     setPolygon,
-    setPointsToReview,
     hoveredDataset,
     setHoveredDataset,
     inspectDataset,
-    selectedTrajectory,
-    selectTrajectoryFromMap
+    selectedTrajectory
   } = useSelection()
 
   return (
     <Map
       polygon={polygon}
       setPolygon={setPolygon}
-      setPointsToReview={setPointsToReview}
       setLoading={setLoading}
       setBasemapLoading={setBasemapLoading}
       mapQueryString={mapQueryString}
@@ -53,7 +52,8 @@ export default function MapContainer () {
       rangeLevels={rangeLevels}
       coverageRangeLevels={coverageRangeLevels}
       onViewportHexRange={setViewportHexRange}
-      offsetFlyTo={false}
+      onFeatureQuery={setFeatureQuery}
+      featureQuery={featureQuery}
       setHoveredDataset={setHoveredDataset}
       hoveredDataset={hoveredDataset}
       inspectDataset={inspectDataset}
@@ -62,7 +62,6 @@ export default function MapContainer () {
       scrubTime={debouncedScrubTime}
       trailingDays={trailingDays}
       selectedTrajectory={selectedTrajectory}
-      selectTrajectoryFromMap={selectTrajectoryFromMap}
       dataLayers={dataLayers}
       griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
       dataLayersVisible={dataLayersVisible}

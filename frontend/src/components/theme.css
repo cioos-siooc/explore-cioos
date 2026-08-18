@@ -171,6 +171,27 @@
   --cioos-button-hover-scale: 1.02;
 }
 
+/* --- Breakpoints ---
+   A custom property cannot be read inside a @media query, so these can only be
+   a convention rather than a token. Written down anyway, because the scale had
+   drifted to seven rungs (600 / 700 / 900 / 991.98 / 992 / 1200 / 1400) with
+   nothing saying which belonged to what:
+
+     600px   phone      the panel tokens above; modals go full-viewport
+     700px   phone/lap  the datasets column becomes a bottom sheet, the map's
+                        "what's here" card with it, and the filter chips
+                        collapse. This is THE mobile rung — anything about the
+                        map's own chrome belongs here.
+     900px   tablet     the legend moves out of the top-right corner
+     992px   tablet     legacy Bootstrap rung, modal + intro layout only
+     1200px  laptop     the WMS legend goes compact
+     1400px  desktop    wide enough for the datasets column to sit beside the
+                        map rather than over it, so it opens by default
+                        (WIDE_SCREEN_QUERY in UIProvider) and the time bar
+                        stops lifting MapLibre's corner controls
+
+   Prefer an existing rung over a new one. */
+
 /* Phones: the panel takes over the full viewport so the dataset details and
    record table stay usable instead of overflowing a fixed column. */
 @media (max-width: 600px) {

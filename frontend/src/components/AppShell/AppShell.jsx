@@ -2,6 +2,7 @@ import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
 import MapContainer from '../Map/MapContainer.jsx'
+import FeatureCard from '../Map/FeatureCard/FeatureCard.jsx'
 import ApiErrorBanner from './ApiErrorBanner.jsx'
 import MapBusy from './MapBusy.jsx'
 import Sidebar from './Sidebar/Sidebar.jsx'
@@ -132,6 +133,11 @@ export default function AppShell () {
           rangeLevels/coverageRangeLevels arrive via Map's setColorStops
           effect, which guards against their being undefined until then. */}
       <MapContainer />
+      {/* The answer to the last click on the map. Sits directly after the map
+          because it belongs to it — it is anchored to a point on the canvas and
+          dismissed by the next click — and before the rest of the chrome, which
+          all outranks it. */}
+      <FeatureCard />
       <ApiErrorBanner />
       {/* One pill, two possible waits. The data redraw wins when both are in
           flight: it's the one the user's own action started, and the basemap

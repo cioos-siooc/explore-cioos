@@ -100,7 +100,6 @@ export default function SelectionProvider ({ children }) {
   const [inspectRecordID, setInspectRecordID] = useState()
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [recordLoading, setRecordLoading] = useState(false)
-  const [backClicked, setBackClicked] = useState(false)
   const [datasetPreview, setDatasetPreview] = useState()
   // Free-text title search for the datasets list (DatasetsTable's search
   // box). Lifted out of that component so it can also surface as a
@@ -318,22 +317,20 @@ export default function SelectionProvider ({ children }) {
   )
 
   // Leaving the dataset page, from wherever it is asked for — the page's own
-  // close/swipe/Backspace, or the sidebar header's back control. Opening the
-  // page usually narrows the datasets filter to that one dataset (clicking a
-  // hex or a griddap footprint does exactly that), so leaving drops that filter
-  // too — otherwise the user lands back on a list still silently restricted to
-  // the dataset they just left. Written as a functional update so this stays
-  // stable: the inspector's key/gesture handlers bind it once.
+  // close/swipe/Backspace, or the sidebar header's back control.
+  //
+  // This used to clear the datasets filter on the way out, because opening the
+  // page was itself what had set that filter: clicking a hex or a griddap
+  // footprint overwrote it with the cell's datasets, and a single survivor then
+  // auto-opened its page, so leaving had to undo a narrowing the user never
+  // asked for. Nothing does that any more — a map click reports what it found
+  // and the filter only changes when the user presses a button — so leaving the
+  // page is now just leaving the page. Clearing here would instead discard a
+  // selection they deliberately built up.
   const returnToDatasetList = useCallback(() => {
-    setDatasetsSelected((previous) =>
-      previous.some((dataset) => dataset.isSelected)
-        ? previous.map((dataset) => ({ ...dataset, isSelected: false }))
-        : previous
-    )
-    setBackClicked(true)
     setInspectDataset()
     setSelectedTrajectory()
-  }, [setDatasetsSelected, setInspectDataset])
+  }, [setInspectDataset])
 
   // A track clicked on the map does what clicking a platform row in the dataset
   // inspector does (DatasetInspector's onRowClicked): open that dataset's page
@@ -376,6 +373,35 @@ export default function SelectionProvider ({ children }) {
     [pointsData, inspectDataset, selectedTrajectory, setInspectDataset]
   )
 
+  // Put datasets aside into the selection, from the "what's here" card — the
+  // same thing the "+" on a dataset card does, for a set at a time. The
+  // selection is a shortlist the user is building; downloading it is one thing
+  // they can do with it afterwards, not what it is for.
+  //
+  // This deliberately does NOT touch the datasets *filter*. The card's "+" used
+  // to add to that filter, which narrowed the results to whatever had been
+  // added — and a narrowed list is a list you cannot pick anything else out of,
+  // so the second click on the map had less to offer than the first and the
+  // basket could never grow. Adding to the download selection composes instead:
+  // click around the map, keep adding, the list stays whole.
+  //
+  // Griddap datasets are metadata-only and never enter pointsToReview (see
+  // handleSelectDataset), so they are skipped here too rather than silently
+  // added and dropped later.
+  const addDatasetsToSelection = useCallback((pks) => {
+    const wanted = new Set(pks.map(Number))
+    if (wanted.size === 0) return
+    setPointsData((previous) =>
+      previous.map((point) =>
+        wanted.has(Number(point.pk)) &&
+        !point.selected &&
+        point.cdm_data_type !== 'Grid'
+          ? { ...point, selected: true }
+          : point
+      )
+    )
+  }, [])
+
   // Mark the polygon-draw control active for free-form polygons (rectangles
   // have their own #boxQueryButton active state).
   useEffect(() => {
@@ -410,10 +436,14 @@ export default function SelectionProvider ({ children }) {
       setPointsToReview(pointsData.filter((point) => point.selected))
     }
     setSelectionLoading(false)
-    if (pointsData.length === 1 && !backClicked) {
-      // Auto load single selected dataset
-      setInspectDataset(pointsData[0], { replace: true })
-    } else if (
+    // A single remaining result used to open its own dataset page. That made
+    // the outcome of a map click depend on how dense the data happened to be —
+    // clicking a griddap footprint or a hex narrowed the filter, and you landed
+    // on a dataset page or on a one-row list depending on whether the narrowing
+    // bottomed out at exactly one. Opening a dataset page is now always an
+    // explicit act: a row in the "what's here" card, a card in the list, or a
+    // ?dataset= link.
+    if (
       !isEmpty(pointsData) &&
       searchParams.get('dataset') &&
       !pointsData.some((point) => datasetMatchesUrlKey(point, searchParams))
@@ -477,7 +507,6 @@ export default function SelectionProvider ({ children }) {
           setInitialPointsQueryComplete(true)
         })
     }
-    setBackClicked(false)
   }, [query, polygon, catalogLoaded])
 
   useEffect(() => {
@@ -572,6 +601,7 @@ export default function SelectionProvider ({ children }) {
     inspectDataset,
     setInspectDataset,
     returnToDatasetList,
+    addDatasetsToSelection,
     selectionLoading,
     initialPointsQueryComplete,
     inspectRecordID,
@@ -580,7 +610,6 @@ export default function SelectionProvider ({ children }) {
     setShowPreviewModal,
     recordLoading,
     setRecordLoading,
-    setBackClicked,
     datasetPreview,
     setDatasetPreview,
     datasetTitleSearchText,

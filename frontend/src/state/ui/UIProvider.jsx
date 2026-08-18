@@ -25,7 +25,8 @@ export function useUI () {
 }
 
 export default function UIProvider ({ children }) {
-  const { polygon, selectedTrajectory } = useSelection()
+  const { polygon, selectedTrajectory, inspectDataset, pointsToReview } =
+    useSelection()
 
   // The datasets sidebar: open by default on wide screens, closed on anything
   // narrower, where it would take too much of the map.
@@ -74,11 +75,34 @@ export default function UIProvider ({ children }) {
     if (!isEmpty(polygon)) setSidebarOpenState(true)
   }, [polygon])
 
-  // Clicking a track on the map opens that dataset's page — surface the panel
-  // holding it, which a phone (or a collapsed sidebar) would otherwise hide.
+  // A dataset page has to be somewhere the user can see it. Opening one used to
+  // imply a track click or a filter narrowed to a single dataset, both of which
+  // are covered elsewhere here; the map's "what's here" card opens pages
+  // directly, with no filter change to notice, so the panel is raised for the
+  // page itself rather than for whatever happened to precede it. Covers a share
+  // link carrying ?dataset= too, which lands with the page already open.
+  useEffect(() => {
+    if (inspectDataset) setSidebarOpenState(true)
+  }, [inspectDataset])
+
+  // Clicking a track on the map draws its platform history — surface the panel
+  // holding the page that shows it.
   useEffect(() => {
     if (selectedTrajectory) setSidebarOpenState(true)
   }, [selectedTrajectory])
+
+  // Adding datasets to the download from the map's "what's here" card puts
+  // something in the list's footer — show the list so the user sees the basket
+  // grow and can reach Download. Without it the card's whole effect on a phone
+  // was invisible: the sheet was closed and nothing else announced the change.
+  // Only a growing selection counts — unticking a dataset should not reopen a
+  // list the user had put away.
+  const previousDownloadCount = useRef(0)
+  useEffect(() => {
+    const count = isEmpty(pointsToReview) ? 0 : pointsToReview.length
+    if (count > previousDownloadCount.current) setSidebarOpenState(true)
+    previousDownloadCount.current = count
+  }, [pointsToReview])
 
   const value = {
     sidebarOpen,

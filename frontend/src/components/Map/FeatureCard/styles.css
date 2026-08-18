@@ -1,0 +1,360 @@
+/* The "what's here" card — the single answer to a click on the map.
+   See FeatureCard.jsx for why there is only one of these.
+
+   Desktop: a popover anchored to the clicked water. It outranks the rest of the
+   map chrome — including the top bar — because it is the direct answer to
+   something the user just did and it can be dismissed in a click, whereas the
+   bar and the datasets column are permanent furniture. Ranking it below them
+   meant a click in the top third of the map opened a card the brand bar then
+   covered. Phones: a half-height bottom sheet instead, so the map stays visible
+   above it. */
+.featureCard {
+  position: absolute;
+  z-index: calc(var(--cioos-z-dock, 35) + 1);
+  /* The same navy that outlines the clicked region on the map and edges the
+     rows this card pulled to the top of the datasets list. Three surfaces, one
+     colour, so "the map region", "this card" and "those rows" read as one
+     thing rather than three coincidences. */
+  border-top: 3px solid var(--cioos-navy);
+  /* `left`, `top` and `transform` are all set inline: the card flips to the
+     underside of its point when there is no room above, and clamps horizontally
+     at the window edges. See FeatureCard.jsx. */
+  width: 320px;
+  max-width: calc(100vw - 24px);
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  box-shadow: var(--cioos-shadow-float);
+  font-family: var(--cioos-font-body);
+  color: var(--cioos-ink);
+  overflow: hidden;
+}
+
+.featureCardHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--cioos-space-sm);
+  padding: var(--cioos-space-sm) var(--cioos-space-sm) var(--cioos-space-xs)
+    var(--cioos-space-md);
+  border-bottom: 1px solid var(--cioos-hairline);
+}
+
+.featureCardHeading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.featureCardHeadingTitle {
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cioos-ink-60);
+}
+
+.featureCardHeadingMeta {
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink);
+}
+
+.featureCardClose {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  color: var(--cioos-ink-40);
+  cursor: pointer;
+}
+
+.featureCardClose:focus-visible {
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink);
+  outline: none;
+}
+
+@media (hover: hover) {
+  .featureCardClose:hover {
+    background-color: var(--cioos-surface-2);
+    color: var(--cioos-ink);
+    outline: none;
+  }
+}
+
+/* Five rows before the list — not the card — starts scrolling, so a stack of
+   forty gridded datasets is still a card rather than a column down the map. */
+.featureCardList {
+  max-height: 232px;
+  overflow-y: auto;
+  padding: var(--cioos-space-xs);
+}
+
+.featureCardRow {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  border-radius: var(--cioos-radius-sm);
+}
+
+/* Guarded, because a touch device leaves :hover latched on the last thing
+   tapped — and on this card that would mark a row the user has already acted
+   on. Every hover state here is decoration; nothing is only reachable by
+   hovering. */
+@media (hover: hover) {
+  .featureCardRow:hover {
+    background-color: var(--cioos-surface-2);
+  }
+}
+
+.featureCardRowOpen {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--cioos-space-sm);
+  flex: 1;
+  min-width: 0;
+  padding: var(--cioos-space-sm);
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.featureCardRowOpen:focus-visible {
+  box-shadow: var(--cioos-focus);
+  outline: none;
+}
+
+/* No page to open (see FeatureCard.jsx). The row still reads normally — it is
+   describing something genuinely under the click — it just doesn't offer the
+   pointer that says "this leads somewhere". */
+.featureCardRowOpen:disabled {
+  cursor: default;
+}
+
+.featureCardRowIcon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  /* Lines the marker dot up with the first line of the title rather than the
+     middle of a two-line block. */
+  height: 1.15em;
+  color: var(--cioos-ink-40);
+}
+
+.featureCardRowText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.featureCardRowTitle {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.35;
+}
+
+.featureCardRowMeta {
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+}
+
+.featureCardRowAdd {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  color: var(--cioos-ink-40);
+  cursor: pointer;
+}
+
+.featureCardRowAdd:focus-visible:not(:disabled) {
+  background-color: var(--cioos-teal-light);
+  color: var(--cioos-primary-700);
+  outline: none;
+}
+
+@media (hover: hover) {
+  .featureCardRowAdd:hover:not(:disabled) {
+    background-color: var(--cioos-teal-light);
+    color: var(--cioos-primary-700);
+    outline: none;
+  }
+}
+
+.featureCardRowAdd.isSelected {
+  color: var(--cioos-primary);
+  cursor: default;
+}
+
+.featureCardMore {
+  display: block;
+  width: 100%;
+  padding: var(--cioos-space-xs) var(--cioos-space-md);
+  border: none;
+  border-top: 1px solid var(--cioos-hairline);
+  background: transparent;
+  color: var(--cioos-primary-700);
+  font-size: var(--cioos-font-size-xs);
+  text-align: left;
+  cursor: pointer;
+}
+
+.featureCardMore:focus-visible {
+  background-color: var(--cioos-surface-2);
+  outline: none;
+}
+
+@media (hover: hover) {
+  .featureCardMore:hover {
+    background-color: var(--cioos-surface-2);
+    outline: none;
+  }
+}
+
+.featureCardActions {
+  display: flex;
+  gap: var(--cioos-space-xs);
+  padding: var(--cioos-space-sm);
+  border-top: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-sand);
+}
+
+.featureCardAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 1;
+  min-height: 34px;
+  padding: 0 var(--cioos-space-sm);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
+  color: var(--cioos-ink);
+  font-family: inherit;
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.featureCardAction:focus-visible {
+  background-color: var(--cioos-surface-2);
+  border-color: var(--cioos-primary);
+  outline: none;
+}
+
+@media (hover: hover) {
+  .featureCardAction:hover {
+    background-color: var(--cioos-surface-2);
+    border-color: var(--cioos-primary);
+    outline: none;
+  }
+}
+
+.featureCardAction.primary {
+  background-color: var(--cioos-teal-light);
+  border-color: var(--cioos-primary);
+  color: var(--cioos-primary-700);
+}
+
+.featureCardAction.primary:focus-visible {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
+}
+
+@media (hover: hover) {
+  .featureCardAction.primary:hover {
+    background-color: var(--cioos-primary);
+    color: var(--cioos-white);
+  }
+}
+
+.featureCardEmptyText {
+  margin: 0;
+  padding: var(--cioos-space-md);
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink-60);
+}
+
+/* ---------------------------------------------------------------------------
+   Phones. The card stops being a popover and becomes a sheet on the bottom
+   edge, capped at 45vh so the map — and whatever the tap just did to it — stays
+   visible above. A popover anchored to the tap would cover the feature it
+   describes on a screen this size, and there is no hover tooltip here to fall
+   back on: this card is the only way a touch user sees any of it.
+   Matches the datasets sheet's own breakpoint (Sidebar/styles.css).
+   ------------------------------------------------------------------------ */
+@media (max-width: 700px) {
+  .featureCard {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: auto;
+    max-width: none;
+    transform: none;
+    max-height: 45vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--cioos-radius-lg) var(--cioos-radius-lg) 0 0;
+    border-bottom: none;
+    animation: featureCardRise var(--cioos-transition-normal);
+  }
+
+  .featureCardList {
+    max-height: none;
+    flex: 1;
+  }
+
+  /* Comfortable touch targets: the desktop rows are sized for a cursor. */
+  .featureCardRowOpen {
+    min-height: 44px;
+    padding: var(--cioos-space-sm) var(--cioos-space-md);
+  }
+
+  .featureCardRowAdd {
+    width: 44px;
+  }
+
+  .featureCardAction {
+    min-height: 44px;
+    font-size: var(--cioos-font-size-sm);
+  }
+
+  .featureCardClose {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@keyframes featureCardRise {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .featureCard {
+    animation: none;
+  }
+}
