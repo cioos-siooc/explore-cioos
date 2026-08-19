@@ -26,19 +26,20 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
   // against: the per-feature bbox for profiles (extent search), and the cell
   // point for the already-fine-grained obis/trajectory cells.
   const profilesBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,
-               profile_id, timeseries_id,
+               profile_id, timeseries_id, eovs AS feature_eovs,
                latitude, longitude, point_pk, geom, bbox AS search_geom
-        FROM cde.profiles`;
+        FROM cde.profiles
+        WHERE :profileFilters`;
   // Trajectory coverage cells: ERDDAP data, gated with profiles. The
   // trajectory_id doubles as the profile_id surrogate so the records list
   // labels rows by mission/deployment; records_per_day was computed at
   // harvest so the estimate math below applies unchanged.
   const trajectoryBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,
-               trajectory_id as profile_id, NULL as timeseries_id,
+               trajectory_id as profile_id, NULL as timeseries_id, NULL::text[] as feature_eovs,
                latitude, longitude, point_pk, geom, geom AS search_geom
         FROM cde.trajectory_cells`;
   const obisBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, 0 as records_per_day,
-               NULL as profile_id, NULL as timeseries_id,
+               NULL as profile_id, NULL as timeseries_id, NULL::text[] as feature_eovs,
                latitude, longitude, point_pk, geom, geom AS search_geom
         FROM cde.obis_cells
         WHERE :obisFilters`;
@@ -55,6 +56,7 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                coalesce(coverage_depth_max, 0) AS depth_max,
                0 AS records_per_day,
                NULL::text AS profile_id, NULL::text AS timeseries_id,
+               NULL::text[] AS feature_eovs,
                NULL::double precision AS latitude, NULL::double precision AS longitude,
                NULL::integer AS point_pk, NULL::geometry AS geom,
                coverage_bbox AS search_geom
@@ -86,15 +88,27 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                    'time_min',   time_min,
                    'time_max',   time_max,
                    'depth_min',  depth_min,
-                   'depth_max',  depth_max
+                   'depth_max',  depth_max,
+                   'eovs',       eovs
                  ) ORDER BY time_min DESC) AS profiles
         FROM     (SELECT   dataset_pk,
                            coalesce(profile_id, timeseries_id) AS profile_id,
                            min(time_min)::DATE  AS time_min,
                            max(time_max)::DATE  AS time_max,
                            min(depth_min)       AS depth_min,
-                           max(depth_max)       AS depth_max
+                           max(depth_max)       AS depth_max,
+                           -- The EOVs this record carries, unioned across the
+                           -- cells it was collapsed from. NULL for the sources
+                           -- with no per-feature EOVs (trajectory, OBIS, grid);
+                           -- the inspector falls back to the dataset's there.
+                           -- The lateral duplicates rows, which the min/max
+                           -- aggregates above are indifferent to, and LEFT
+                           -- keeps records whose feature_eovs is NULL.
+                           array_agg(DISTINCT eov.name)
+                             FILTER (WHERE eov.name IS NOT NULL) AS eovs
                   FROM     filtered
+                  LEFT JOIN LATERAL unnest(filtered.feature_eovs) AS eov(name)
+                         ON TRUE
                   GROUP BY dataset_pk, coalesce(profile_id, timeseries_id)) r
         GROUP BY dataset_pk
   ),`;
@@ -190,10 +204,16 @@ FROM   sub
       depthMax,
       filters: filters.shared,
       obisFilters: filters.obisOnly,
+      profileFilters: filters.profileOnly,
       adder: 0,
       multiplier: 10,
     };
-  } else queryParams = { filters: filters.shared, obisFilters: filters.obisOnly };
+  } else
+    queryParams = {
+      filters: filters.shared,
+      obisFilters: filters.obisOnly,
+      profileFilters: filters.profileOnly,
+    };
 
   const q = db.raw(sql, queryParams);
 
