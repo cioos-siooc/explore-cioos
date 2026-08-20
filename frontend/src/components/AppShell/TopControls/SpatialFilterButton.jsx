@@ -39,7 +39,19 @@ export default function SpatialFilterButton () {
 
   const hasSelection = Boolean(polygon)
   const isBox = hasSelection && polygonIsRectangle(polygon)
-  const Icon = isBox ? BoundingBox : hasSelection ? Pentagon : BoundingBox
+
+  // Which tool the menu highlights/leads with once there's no active shape to
+  // read a type off of — the box/polygon choice a user actually made most
+  // recently, defaulting to box. Kept in sync with a live selection too, so a
+  // shape restored from a share link (never chosen through this menu) still
+  // counts as "last used" once it exists.
+  const [lastMode, setLastMode] = useState('box')
+  useEffect(() => {
+    if (hasSelection) setLastMode(isBox ? 'box' : 'polygon')
+  }, [hasSelection, isBox])
+
+  const activeMode = hasSelection ? (isBox ? 'box' : 'polygon') : lastMode
+  const Icon = activeMode === 'polygon' ? Pentagon : BoundingBox
 
   return (
     <DropdownButton
@@ -59,13 +71,22 @@ export default function SpatialFilterButton () {
       title={<Icon size={18} aria-hidden='true' />}
       align='center'
     >
-      <Dropdown.Item onClick={() => requestDraw('box')} active={isBox}>
+      <Dropdown.Item
+        onClick={() => {
+          setLastMode('box')
+          requestDraw('box')
+        }}
+        active={activeMode === 'box'}
+      >
         <BoundingBox size={16} aria-hidden='true' />
         {t('drawBoundingBoxOption')}
       </Dropdown.Item>
       <Dropdown.Item
-        onClick={() => requestDraw('polygon')}
-        active={hasSelection && !isBox}
+        onClick={() => {
+          setLastMode('polygon')
+          requestDraw('polygon')
+        }}
+        active={activeMode === 'polygon'}
       >
         <Pentagon size={16} aria-hidden='true' />
         {t('drawPolygonOption')}
