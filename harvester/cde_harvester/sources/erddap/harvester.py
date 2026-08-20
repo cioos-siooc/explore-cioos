@@ -17,7 +17,7 @@ from cde_harvester.core.schemas import (
     HarvestAttemptSchema,
     ProfileSchema,
     SkippedDatasetSchema,
-    TrajectoryCellSchema,
+    TrajectoryDaySchema,
     TrajectoryPointSchema,
     VariableSchema,
     VerifiedDatasetSchema,
@@ -96,7 +96,7 @@ class DatasetHarvestResult:
     attempt: dict                    # one harvest_attempts.csv row
     features: pd.DataFrame = None    # populated only on success
     # Which HarvestResult attribute `features` belongs in: "profiles" for
-    # point-like types, "trajectory_cells" for trajectory coverage cells.
+    # point-like types, "trajectory_days" for trajectory per-day aggregates.
     feature_kind: str = "profiles"
     # Secondary output (trajectory types only): ordered, downsampled track
     # fixes for HarvestResult.trajectory_points / cde.trajectory_points.
@@ -151,8 +151,8 @@ class ERDDAPHarvester(BaseHarvester):
         df_profiles_all = pd.DataFrame(
             columns=ProfileSchema.to_schema().columns.keys()
         )
-        df_trajectory_cells_all = pd.DataFrame(
-            columns=TrajectoryCellSchema.to_schema().columns.keys()
+        df_trajectory_days_all = pd.DataFrame(
+            columns=TrajectoryDaySchema.to_schema().columns.keys()
         )
         df_trajectory_points_all = pd.DataFrame(
             columns=TrajectoryPointSchema.to_schema().columns.keys()
@@ -265,9 +265,9 @@ class ERDDAPHarvester(BaseHarvester):
                 )
                 attempt_records.append(result.attempt)
                 if result.status == "success":
-                    if result.feature_kind == "trajectory_cells":
-                        df_trajectory_cells_all = pd.concat(
-                            [df_trajectory_cells_all, result.features]
+                    if result.feature_kind == "trajectory_days":
+                        df_trajectory_days_all = pd.concat(
+                            [df_trajectory_days_all, result.features]
                         )
                     elif result.feature_kind == "dataset_extent":
                         # Metadata-only (griddap): the extent lives on the
@@ -356,7 +356,7 @@ class ERDDAPHarvester(BaseHarvester):
             datasets=df_datasets_all,
             variables=df_variables_all,
             skipped=df_skipped_datasets,
-            trajectory_cells=df_trajectory_cells_all,
+            trajectory_days=df_trajectory_days_all,
             trajectory_points=df_trajectory_points_all,
             attempts=df_attempts,
             verified=df_verified,

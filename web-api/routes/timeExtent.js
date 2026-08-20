@@ -95,9 +95,13 @@ router.get(
     const profilesBranch = `SELECT dataset_pk, point_pk, time_min, time_max,
                depth_min, depth_max, bbox AS search_geom
         FROM cde.profiles WHERE show_as_point`;
-    const trajectoryBranch = `SELECT dataset_pk, point_pk, time_min, time_max,
-               depth_min, depth_max, geom AS search_geom
-        FROM cde.trajectory_cells`;
+    // 10 km tier only (the 100 km rows are the same data, coarser), and the
+    // hex polygon as search_geom — see shapeQuery.js.
+    const trajectoryBranch = `SELECT t.dataset_pk, NULL::integer AS point_pk, t.time_min, t.time_max,
+               t.depth_min, t.depth_max, h.geom AS search_geom
+        FROM cde.trajectory_hexes t
+        JOIN cde.hexes_zoom_1 h ON h.pk = t.hex_pk
+        WHERE t.hex_tier = 1`;
     const obisBranch = `SELECT dataset_pk, point_pk, time_min, time_max,
                depth_min, depth_max, geom AS search_geom
         FROM cde.obis_cells
