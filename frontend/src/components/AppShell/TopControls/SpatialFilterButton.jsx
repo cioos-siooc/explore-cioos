@@ -21,7 +21,7 @@ import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 // mirrors it into menuOpen so the toggle can go solid while the menu itself
 // is up, distinct from the lighter "applied" wash it gets from a drawn shape
 // once the menu is closed again.
-export default function SpatialFilterButton () {
+export default function SpatialFilterButton() {
   const { t } = useTranslation()
   const { requestDraw } = useMapState()
   const { polygon } = useSelection()
@@ -53,9 +53,19 @@ export default function SpatialFilterButton () {
   const activeMode = hasSelection ? (isBox ? 'box' : 'polygon') : lastMode
   const Icon = activeMode === 'polygon' ? Pentagon : BoundingBox
 
+  // Opening the menu with nothing drawn yet arms the last-used tool
+  // immediately (crosshair cursor, ready to draw) instead of making the user
+  // pick it again from the list. Skipped once there's already a shape, since
+  // requestDraw deletes whatever's currently drawn — that case opens the menu
+  // to Clear/Copy WKT, not to restart drawing.
+  function handleOpenChange(open) {
+    setMenuOpen(open)
+    if (open && !hasSelection) requestDraw(lastMode)
+  }
+
   return (
     <DropdownButton
-      onOpenChange={setMenuOpen}
+      onOpenChange={handleOpenChange}
       toggleClassName={classNames(
         'topBarButton topBarSpatialFilterToggle',
         {
