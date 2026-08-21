@@ -16,15 +16,7 @@ import re
 import pandas as pd
 from cde_harvester.dataset_types.base import DatasetTypeHandler
 from cde_harvester.dataset_types.tabledap_features import _axis_bounds_from_metadata
-from cde_harvester.utils import eov_to_standard_name
-
-# Reverse of eov_to_standard_name: CF standard name -> list of EOV keys, so a
-# grid variable can be tagged with the ocean variables it represents (the same
-# EOV mapping get_eovs() uses at the dataset level).
-_standard_name_to_eovs = {}
-for _eov, _standard_names in eov_to_standard_name.items():
-    for _standard_name in _standard_names:
-        _standard_name_to_eovs.setdefault(_standard_name, []).append(_eov)
+from cde_harvester.utils import standard_name_to_eovs
 
 _N_VALUES_RE = re.compile(r"nValues=(\d+)")
 _EVENLY_SPACED_RE = re.compile(r"evenlySpaced=(true|false)")
@@ -163,7 +155,7 @@ def _extract_variables(dataset):
                 "standard_name": standard_name,
                 "long_name": var_meta.get("long_name") or None,
                 "units": var_meta.get("units") or None,
-                "eovs": _standard_name_to_eovs.get(standard_name, []),
+                "eovs": standard_name_to_eovs.get(standard_name, []),
             }
         )
     return variables

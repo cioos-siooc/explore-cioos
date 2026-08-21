@@ -14,7 +14,11 @@ from prefect import get_run_logger, task
 
 from cde_harvester.core.db import create_db_engine, db_host
 from cde_harvester.core.observability import init_sentry
-from cde_harvester.core.schemas import DATASET_ARRAY_DTYPES, OBIS_ARRAY_DTYPES
+from cde_harvester.core.schemas import (
+    DATASET_ARRAY_DTYPES,
+    OBIS_ARRAY_DTYPES,
+    PROFILE_ARRAY_DTYPES,
+)
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -350,6 +354,11 @@ def main(folder, incremental=False):
             harvest_attempts_file, parse_dates=["attempted_at"]
         )
 
+    if "eovs" in profiles.columns:
+        profiles["eovs"] = profiles["eovs"].apply(
+            lambda x: ast.literal_eval(x) if isinstance(x, str) else []
+        )
+
     datasets["eovs"] = datasets["eovs"].apply(ast.literal_eval)
     datasets["organizations"] = datasets["organizations"].apply(ast.literal_eval)
     datasets["profile_variables"] = datasets["profile_variables"].apply(
@@ -536,6 +545,7 @@ def main(folder, incremental=False):
                         con=transaction,
                         if_exists="append",
                         index=False,
+                        dtype=PROFILE_ARRAY_DTYPES,
                         method="multi",
                     )
 
@@ -717,6 +727,7 @@ def main(folder, incremental=False):
                         if_exists="append",
                         schema=schema,
                         index=False,
+                        dtype=PROFILE_ARRAY_DTYPES,
                         method="multi",
                     )
 

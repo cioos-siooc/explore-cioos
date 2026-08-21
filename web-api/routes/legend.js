@@ -157,7 +157,7 @@ router.get(
     // which keep large-region features off the map entirely.
     const profilesBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, ${recordCountExpr('profiles', metric)},
                time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
-        FROM cde.profiles WHERE show_as_point`;
+        FROM cde.profiles WHERE show_as_point AND :profileFilters`;
     // Trajectory and OBIS coverage cells merge into the hex-tier ranges
     // (zoom0/zoom1, the green ramp) but not the point-tier range (zoom2) — at
     // that zoom they only render via the dedicated always-hex coverage layer,
@@ -273,7 +273,11 @@ router.get(
     // failing the one request. Contained the same way the tile routes do it.
     try {
       const [rows, coverageRows] = await Promise.all([
-        db.raw(sql, { filters: filters.shared, obisFilters: filters.obisOnly }),
+        db.raw(sql, {
+          filters: filters.shared,
+          obisFilters: filters.obisOnly,
+          profileFilters: filters.profileOnly,
+        }),
         db.raw(coverageSql, { filters: filters.shared, obisFilters: filters.obisOnly }),
       ]);
 

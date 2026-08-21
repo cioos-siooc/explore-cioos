@@ -266,6 +266,14 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     datasets.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
         datasets_file, index=False
     )
+    # Serialize the per-feature EOV list to its Python repr up front: the CSV
+    # round-trip would do it anyway (the loader reads it back with
+    # ast.literal_eval, as it does for the dataset arrays), and lists are
+    # unhashable, so drop_duplicates() below cannot see the column otherwise.
+    if "eovs" in erddap_profiles.columns:
+        erddap_profiles["eovs"] = erddap_profiles["eovs"].apply(
+            lambda x: repr(list(x)) if isinstance(x, (list, tuple)) else x
+        )
     erddap_profiles.drop_duplicates().to_csv(profiles_file, index=False)
     if not df_ckan.empty:
         df_ckan.to_csv(ckan_file, index=False)
