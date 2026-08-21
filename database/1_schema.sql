@@ -348,6 +348,11 @@ CREATE TABLE trajectory_hexes (
     depth_max double precision,
     -- distinct UTC days the trajectory was inside this hex
     days integer,
+    -- the same day set as `days`, as maximal runs of consecutive UTC days
+    -- ('[)' bounds). The map's `days` metric unions these across the features
+    -- in a hex (day_union_days) instead of adding day counts up, so overlapping
+    -- deployments don't multiply a year of coverage into a decade.
+    day_ranges daterange[],
     -- apportioned from cde.trajectory_days by time spent in the hex each day;
     -- per-dataset totals are preserved, per-hex values are estimates
     n_records bigint,
