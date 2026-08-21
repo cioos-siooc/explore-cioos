@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react'
-import { Modal } from 'react-bootstrap'
+import React, { useState, useEffect, Suspense, lazy } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import Modal from '../../ui/Modal.jsx'
+
 import Loading from '../Loading/Loading.jsx'
-import DatasetPreviewPlot from '../DatasetPreviewPlot/DatasetPreviewPlot.jsx'
 import DatasetPreviewTable from '../DatasetPreviewTable/DatasetPreviewTable.jsx'
 import './styles.css'
+
+// Lazy so the ~1 MB Plotly chunk only downloads when the Plot tab is opened.
+const DatasetPreviewPlot = lazy(() =>
+  import('../DatasetPreviewPlot/DatasetPreviewPlot.jsx')
+)
 
 export default function DatasetPreview({
   datasetPreview,
@@ -57,10 +62,8 @@ export default function DatasetPreview({
     <Modal
       className='dataPreviewModal'
       show={showModal}
-      // fullscreen
       size='xl'
       onHide={onModalClose}
-      onExit={onModalClose}
       centered
       scrollable
     >
@@ -71,7 +74,7 @@ export default function DatasetPreview({
               <>
                 <button
                   className={`toggleButton ${selectedVis === 'table' && 'selected'
-                    }`}
+                  }`}
                   onClick={() => {
                     setSelectedVis('table')
                     // setRecordLoading(true)
@@ -81,7 +84,7 @@ export default function DatasetPreview({
                 </button>
                 <button
                   className={`toggleButton ${selectedVis === 'plot' && 'selected'
-                    }`}
+                  }`}
                   onClick={() => {
                     setSelectedVis('plot')
                     // setRecordLoading(true)
@@ -101,7 +104,7 @@ export default function DatasetPreview({
           <Modal.Body>
             <div className='tableAndPlotGridItem tableAndPlot'>
               {recordLoading ? (
-                <Loading />
+                <Loading variant='inline' />
               ) : (
                 <>
                   {datasetPreview?.table?.rows ? (
@@ -112,14 +115,16 @@ export default function DatasetPreview({
                           data={data}
                         />
                       ) : (
-                        <DatasetPreviewPlot
-                          inspectDataset={inspectDataset}
-                          plotAxes={plotAxes}
-                          datasetPreview={datasetPreview}
-                          setPlotAxes={setPlotAxes}
-                          inspectRecordID={inspectRecordID}
-                          data={data}
-                        />
+                        <Suspense fallback={<Loading variant='inline' />}>
+                          <DatasetPreviewPlot
+                            inspectDataset={inspectDataset}
+                            plotAxes={plotAxes}
+                            datasetPreview={datasetPreview}
+                            setPlotAxes={setPlotAxes}
+                            inspectRecordID={inspectRecordID}
+                            data={data}
+                          />
+                        </Suspense>
                       )}
                     </>
                   ) : (

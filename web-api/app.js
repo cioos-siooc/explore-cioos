@@ -1,3 +1,11 @@
+// Must be required before any router module: it patches the `handle` SETTER on
+// express's Layer.prototype, so only routes registered after this line get
+// their async rejections forwarded to the error handler. Routes registered
+// earlier assign `handle` as an own property and bypass the patch entirely —
+// a rejected promise there is an unhandled rejection, which Node turns into a
+// process exit, taking every other in-flight request down with it.
+require("express-async-errors");
+
 const createError = require("http-errors");
 const express = require("express");
 const path = require("path");
@@ -10,6 +18,7 @@ const Tracing = require("@sentry/tracing");
 const downloadRouter = require("./routes/download");
 const indexRouter = require("./routes/index");
 const legendRouter = require("./routes/legend");
+const timeExtentRouter = require("./routes/timeExtent");
 const organizationsRouter = require("./routes/organizations");
 const datasetsRouter = require("./routes/datasets");
 const pointQueryRouter = require("./routes/pointQuery");
@@ -18,7 +27,14 @@ const oceanVariablesRouter = require("./routes/oceanVariables");
 const previewRouter = require("./routes/preview");
 const platformsRouter = require("./routes/platforms");
 const datasetRecordsListRouter = require("./routes/datasetRecordsList");
+const griddapCoverageRouter = require("./routes/griddapCoverage");
 const downloadEstimateRouter = require("./routes/downloadEstimate");
+const scientificNamesRouter = require("./routes/scientificNames");
+const obisNodesRouter = require("./routes/obisNodes");
+const erddapServersRouter = require("./routes/erddapServers");
+const harvestRouter = require("./routes/harvest");
+const trajectoriesRouter = require("./routes/trajectories");
+const nonnaRouter = require("./routes/nonna");
 const swaggerSpec = require('./swagger');
 const swaggerUi = require('swagger-ui-express');
 
@@ -28,12 +44,17 @@ const app = express();
 
 if (process.env.ENVIRONMENT === "production") {
   console.log("Using sentry");
+  // Tracing every request (1.0) adds per-request overhead across the
+  // initial-load burst, so sample only a fraction in production. Defaults to
+  // 1.0 in development and 0.1 in production; override with
+  // SENTRY_TRACES_SAMPLE_RATE (e.g. set it to 1.0 to trace everything).
+  const defaultTracesSampleRate = process.env.ENVIRONMENT === "production" ? 0.1 : 1.0;
+  const tracesSampleRate = process.env.SENTRY_TRACES_SAMPLE_RATE
+    ? Number(process.env.SENTRY_TRACES_SAMPLE_RATE)
+    : defaultTracesSampleRate;
   Sentry.init({
     dsn: "https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595",
-
-    // We recommend adjusting this value in production, or using tracesSampler
-    // for finer control
-    tracesSampleRate: 1.0,
+    tracesSampleRate,
   });
   app.use(Sentry.Handlers.requestHandler());
 }
@@ -91,6 +112,7 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use("/", indexRouter);
 app.use("/download", downloadRouter);
 app.use("/legend", legendRouter);
+app.use("/timeExtent", timeExtentRouter);
 app.use("/organizations", organizationsRouter);
 app.use("/datasets", datasetsRouter);
 app.use("/pointQuery", pointQueryRouter);
@@ -99,7 +121,14 @@ app.use("/oceanVariables", oceanVariablesRouter);
 app.use("/preview", previewRouter);
 app.use("/platforms", platformsRouter);
 app.use("/datasetRecordsList", datasetRecordsListRouter);
+app.use("/griddapCoverage", griddapCoverageRouter);
 app.use("/downloadEstimate", downloadEstimateRouter);
+app.use("/scientificNames", scientificNamesRouter);
+app.use("/obisNodes", obisNodesRouter);
+app.use("/erddapServers", erddapServersRouter);
+app.use("/harvest", harvestRouter);
+app.use("/trajectories", trajectoriesRouter);
+app.use("/nonna", nonnaRouter);
 
 // Swagger docs - conditionally enabled via ENABLE_API_DOCS environment variable
 if (process.env.ENABLE_API_DOCS !== 'false') {

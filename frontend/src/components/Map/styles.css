@@ -2,24 +2,61 @@
   position: absolute;
   width: 100%;
   height: 100%;
-  min-height: 500px;
-  min-width: 900px;
 }
 
-.mapbox-gl-draw_polygon {
-  background-image: url(../Images/polygonIcon.png) !important;
-  background-size: 30px 30px;
-  border-radius: 0px;
-}
-
-.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon:hover {
-background-color: #f3f3f3 !important;
-}
-
-.mapbox-gl-draw_polygon.active {
-  background-color: lightgray;
-}
-
-.mapboxgl-canvas {
+.maplibregl-canvas {
   width: 100%;
+}
+
+/* The hover chip. One line, one label, nothing else — see the showChip comment
+   in Map.jsx for what this replaced and why.
+   The popup's own frame is stripped back to nothing: MapLibre's default content
+   box carries padding, a radius, a white ground and a shadow, which around a
+   two-word label reads as a panel rather than a label. The chip draws its own,
+   much tighter. */
+.mapChipPopup .maplibregl-popup-content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+/* No tail: at this size the arrow is a third of the chip's height, and the
+   offset already ties it to the feature. */
+.mapChipPopup .maplibregl-popup-tip {
+  display: none;
+}
+
+/* The chip is a label, not a target — never let it eat a click meant for the
+   feature underneath it. */
+.mapChipPopup {
+  pointer-events: none;
+}
+
+.mapChip {
+  display: inline-block;
+  max-width: 240px;
+  padding: 3px 7px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-navy);
+  color: var(--cioos-white);
+  font-family: var(--cioos-font-body);
+  font-size: var(--cioos-font-size-xs);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Reads over both a pale hex and dark bathymetry without a border. */
+  box-shadow: var(--cioos-shadow-sm);
+}
+
+/* The picker that used to list overlapping gridded datasets lived here. Every
+   layer's click now lands in the same place — see FeatureCard — so the one
+   pattern that was right for one layer is the pattern for all of them, built as
+   a React component rather than DOM assembled inside a popup. */
+
+@media (max-width: 900px) {
+  .map {
+    min-width: auto;
+  }
 }

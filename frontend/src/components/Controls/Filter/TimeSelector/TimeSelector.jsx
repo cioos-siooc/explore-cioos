@@ -1,163 +1,122 @@
 import * as React from 'react'
-import { useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
 import { useTranslation } from 'react-i18next'
-import { X } from 'react-bootstrap-icons'
 
-import RangeSelector from '../RangeSelector/RangeSelector.jsx'
-import './styles.css'
+import { defaultStartDate } from '../../../config.js'
+import { useFilters } from '../../../../state/filters/FilterProvider.jsx'
+import TimeRail, {
+  DateField,
+  IntervalSelect,
+  useTimeAxis,
+  matchQuickPick,
+  slideRange
+} from '../../TimeRail/TimeRail.jsx'
+import { clampIso, todayIso } from '../../TimeRail/timeAxis.js'
+import '../styles.css'
 
-// Spacing elements out to the left and right using justify-content: space-between. https://medium.com/12-developer-labors/css-all-the-ways-to-align-elements-left-and-right-52ecce4a4af9
+// The Time filter inside the Filters panel.
+//
+// It is the same control as the bar along the bottom of the map — the same
+// warped axis, the same teal handles, the same typeable dates, the same
+// ready-made windows — because it sets the same two values. What differs is the
+// shape they take. Over the map they are a pill that reads as a label until
+// pointed at, because they are sitting on the map; in here there is room to
+// spell them out, so they are a plain three-row form: a label, a field, one row
+// per thing being set, like every other field in the panel.
 export default function TimeSelector (props) {
   const { t } = useTranslation()
+  const { timeExtent, timeFilterActive } = useFilters()
+  const { startDate, endDate, setStartDate, setEndDate } = props
 
-  const [startDate, setStartDate] = useState(props.startDate)
-  const [endDate, setEndDate] = useState(props.endDate)
-  const [dateValid, setDateValid] = useState(true)
+  const maxIso = todayIso()
+  // Same axis the bar over the map draws, for the same reason: it spans the
+  // data the current selection covers, and only widens past that when the
+  // filter itself has been set outside it.
+  const { axis } = useTimeAxis({
+    timeExtent,
+    timeFilterActive,
+    startDate,
+    endDate
+  })
 
-  useEffect(() => {
-    setStartDate(props.startDate)
-    setDateValid(true)
-  }, [props.startDate])
-
-  useEffect(() => {
-    setEndDate(props.endDate)
-    setDateValid(true)
-  }, [props.endDate])
-
-  function handleSetStartDate (date) {
-    const tempDate = new Date(date)
-    setStartDate(date)
-    if (tempDate <= new Date(endDate)) {
-      // && tempDate >= new Date(defaultStartDate) && tempDate <= new Date(defaultEndDate)) {
-      setDateValid(true)
-      props.setStartDate(date)
-      props.setEndDate(endDate)
-    } else {
-      setDateValid(false)
-    }
+  // Typing in a field moves that end alone, bounded by the other.
+  function setFieldValue (handle, iso) {
+    if (handle === 'start') setStartDate(clampIso(iso, defaultStartDate, endDate))
+    else setEndDate(clampIso(iso, startDate, maxIso))
   }
 
-  function handleSetEndDate (date) {
-    const tempDate = new Date(date)
-    setEndDate(date)
-    if (tempDate >= new Date(startDate)) {
-      // } && tempDate >= new Date(defaultStartDate) && tempDate <= new Date(defaultEndDate)) {
-      setDateValid(true)
-      props.setEndDate(date)
-      props.setStartDate(startDate)
-    } else {
-      setDateValid(false)
-    }
-  }
+  // A chosen window moves whole: on the rail, dragging either end takes the
+  // other with it and the window keeps its length. Typing a date is still free
+  // to change that length, and doing so is what releases the hold — the same
+  // rule as the bar over the map.
+  const windowLocked = !['', 'all'].includes(
+    matchQuickPick(startDate, endDate, defaultStartDate)
+  )
 
-  function onChange(value) {
-    const tempStartDate = new Date(value[0]).toISOString().split('T')[0]
-    const tempEndDate = new Date(value[1]).toISOString().split('T')[0]
-    if (startDate !== tempStartDate) {
-      handleSetStartDate(tempStartDate)
-    } else if (endDate !== tempEndDate) {
-      handleSetEndDate(tempEndDate)
+  function setHandleValue (handle, iso) {
+    if (!windowLocked) {
+      setFieldValue(handle, iso)
+      return
     }
+    const { start, end } = slideRange(handle, iso, {
+      startDate,
+      endDate,
+      minIso: defaultStartDate,
+      maxIso
+    })
+    setStartDate(start)
+    setEndDate(end)
   }
-
-  const dateToday = new Date().getTime()
 
   return (
-    <div className='timeSelector'>
-      <div className='depthQuickSelectGrid'>
-        <button
-          onClick={() => {
-            const date = new Date()
-            props.setEndDate(date.toISOString().split('T')[0])
-            props.setStartDate(new Date(date.getTime() - 10 * 86400000).toISOString().split('T')[0])
-          }}
-        >
-          {t('timeSelectorQuickSelect10Days')}
-        </button>
-        <button
-          onClick={() => {
-            const date = new Date()
-            props.setEndDate(date.toISOString().split('T')[0])
-            props.setStartDate(new Date(date.getTime() - 30 * 86400000).toISOString().split('T')[0])
-          }}
-        >
-          {t('timeSelectorQuickSelect30Days')}
-        </button>
-        <button
-          onClick={() => {
-            const date = new Date()
-            props.setEndDate(date.toISOString().split('T')[0])
-            props.setStartDate(new Date(date.getTime() - 365 * 86400000).toISOString().split('T')[0])
-          }}
-        >
-          {t('timeSelectorQuickSelect1Year')}
-        </button>
-        <button
-          onClick={() => {
-            const date = new Date()
-            props.setEndDate(date.toISOString().split('T')[0])
-            props.setStartDate(new Date(date.getTime() - 3652 * 86400000).toISOString().split('T')[0])
-          }}
-        >
-          {t('timeSelectorQuickSelect10Years')}
-        </button>
+    <div className='filterRangeSelector timeSelector'>
+      {/* Each field is wrapped in its own <label>, so the text beside it is the
+          field's name to a screen reader and a click target to everyone else —
+          no aria-label standing in for a label that is right there. */}
+      <div className='filterRangeForm'>
+        <label className='filterRangeRow'>
+          <span className='filterRangeLabel'>{t('timeBarPresetLabel')}</span>
+          <IntervalSelect
+            className='filterRangeInput filterRangeSelect'
+            startDate={startDate}
+            endDate={endDate}
+            defaultStart={defaultStartDate}
+            maxIso={maxIso}
+            onSelect={(start, end) => {
+              setStartDate(start)
+              setEndDate(end)
+            }}
+          />
+        </label>
+        <label className='filterRangeRow'>
+          <span className='filterRangeLabel'>
+            {t('timeSelectorStartDate')}
+          </span>
+          <DateField
+            className='timeRailDateInput filterRangeInput'
+            value={startDate}
+            min={defaultStartDate}
+            max={endDate}
+            onCommit={(value) => setFieldValue('start', value)}
+          />
+        </label>
+        <label className='filterRangeRow'>
+          <span className='filterRangeLabel'>{t('timeSelectorEndDate')}</span>
+          <DateField
+            className='timeRailDateInput filterRangeInput'
+            value={endDate}
+            min={startDate}
+            max={maxIso}
+            onCommit={(value) => setFieldValue('end', value)}
+          />
+        </label>
       </div>
-      <div className='date'>
-        <span>
-          {t('timeSelectorStartDate')}
-          {/* Start Date: */}
-        </span>
-        <input
-          type='date'
-          value={startDate}
-          max={new Date().toISOString().split('T')[0]}
-          min='1900-01-01'
-          onChange={(e) => handleSetStartDate(e.target.value)}
-        />
-      </div>
-      <div className='date'>
-        <span>
-          {t('timeSelectorEndDate')}
-          {/* End Date: */}
-        </span>
-        <input
-          type='date'
-          value={endDate}
-          max={new Date().toISOString().split('T')[0]}
-          min='1900-01-01'
-          onChange={(e) => handleSetEndDate(e.target.value)}
-        />
-      </div>
-      <RangeSelector
-        start={new Date(props.startDate).getTime()}
-        end={new Date(props.endDate).getTime()}
-        marks={{
-          '-2208960000000': '1900',
-          // '-1893427200000': '1910',
-          '-1577894400000': '1920',
-          // '-1262275200000': '1930',
-          '-946742400000': '1940',
-          // '-631123200000': '1950',
-          '-315590400000': '1960',
-          // '28800000': '1970',
-          '315561600000': '1980',
-          // '631180800000': '1990',
-          '946713600000': '2000',
-          // '1262332800000': '2010',
-          '1577865600000': '2020',
-          [dateToday]: '',
-        }}
-        min={-2208960000000}
-        max={dateToday}
-        onChange={onChange}
+      <TimeRail
+        axis={axis}
+        startDate={startDate}
+        endDate={endDate}
+        onCommit={setHandleValue}
       />
-      {!dateValid && (
-        <div>
-          {' '}
-          <X color='red' size={30} /> {t('dateFilterInvalidWarning')}
-        </div>
-      )}
     </div>
   )
 }

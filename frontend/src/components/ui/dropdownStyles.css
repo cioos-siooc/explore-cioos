@@ -1,0 +1,72 @@
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-family: var(--cioos-font-body, sans-serif);
+  font-size: var(--cioos-font-size-sm, 13px);
+  color: var(--cioos-ink, #152f37);
+  background-color: var(--cioos-white, #fff);
+  border: 1px solid var(--cioos-hairline, #dce8e5);
+  border-radius: var(--cioos-radius-sm, 6px);
+  cursor: pointer;
+}
+
+.dropdown .btn:hover {
+  background-color: var(--cioos-surface-2, #eef6f4);
+}
+
+.dropdown .btn-sm {
+  padding: 4px 10px;
+  font-size: var(--cioos-font-size-xs, 11px);
+}
+
+.dropdown .dropdown-toggle::after {
+  content: '';
+  border-top: 5px solid currentColor;
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+  margin-left: 2px;
+}
+
+.dropdown-menu {
+  /* position/top/left/min-width are set inline (DropdownButton computes them
+     from the toggle's bounding rect — the menu portals into document.body). */
+  z-index: 1000;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px 0;
+  background-color: var(--cioos-white, #fff);
+  border: 1px solid var(--cioos-hairline, #dce8e5);
+  border-radius: var(--cioos-radius-sm, 6px);
+  box-shadow: var(--cioos-shadow-md, 0 2px 8px rgba(21, 47, 55, 0.2));
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  border: 0;
+  background: none;
+  font-family: var(--cioos-font-body, sans-serif);
+  font-size: var(--cioos-font-size-sm, 13px);
+  color: var(--cioos-ink, #152f37);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dropdown-item:hover {
+  background-color: var(--cioos-surface-2, #eef6f4);
+}
+
+.dropdown-item.active {
+  background-color: var(--cioos-teal-light, #c6e3df);
+}

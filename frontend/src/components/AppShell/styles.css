@@ -1,0 +1,80 @@
+/* API failure banner: bottom center, above everything but modals — the top
+   center is the brand/Datasets/Filters bar. */
+.apiErrorBanner {
+  position: fixed;
+  /* Stacked above the time bar, which holds the bottom center now that it is
+     always mounted. TimeBar publishes its measured footprint. */
+  bottom: calc(12px + var(--cioos-time-bar-space, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--cioos-z-dock, 35);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+  padding: 10px 16px;
+  background-color: var(--cioos-error-bg);
+  border: 1px solid var(--cioos-error);
+  border-radius: var(--cioos-radius);
+  box-shadow: var(--cioos-shadow-float);
+  color: var(--cioos-ink);
+  font-size: var(--cioos-font-size-sm);
+}
+
+.apiErrorBanner svg {
+  color: var(--cioos-error);
+  flex-shrink: 0;
+}
+
+.apiErrorBanner button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--cioos-error);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font: inherit;
+  font-weight: 600;
+  color: var(--cioos-ink);
+  white-space: nowrap;
+}
+
+.apiErrorBanner button:hover {
+  background-color: var(--cioos-error);
+  color: var(--cioos-white);
+}
+
+.apiErrorBanner button svg {
+  color: currentColor;
+}
+
+/* "Updating map…" pill: the map is redrawing but is still usable, so this sits
+   quietly at the bottom center rather than dimming the app. It shares that spot
+   with the API error banner and steps above it when both are up. */
+.mapBusy {
+  position: fixed;
+  bottom: calc(12px + var(--cioos-time-bar-space, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--cioos-z-dock, 35);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  box-shadow: var(--cioos-shadow-float);
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-sm);
+  pointer-events: none;
+}
+
+.mapBusy .spinner-border {
+  color: var(--cioos-primary);
+}
+
+.apiErrorBanner ~ .mapBusy {
+  bottom: calc(68px + var(--cioos-time-bar-space, 0px));
+}

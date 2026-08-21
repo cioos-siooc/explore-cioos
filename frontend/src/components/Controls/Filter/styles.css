@@ -5,79 +5,137 @@
 
 .filterHeader {
   pointer-events: all;
-  background-color: white;
+  background-color: var(--cioos-white);
   display: inline-flex;
+  align-items: center;
   text-align: center;
-  border-radius: 30px;
-  padding: 5px;
+  border-radius: var(--cioos-radius-pill);
+  padding: 5px 6px;
   cursor: pointer;
-  border: 1px solid white;
+  border: 1px solid var(--cioos-hairline);
+  box-shadow: var(--cioos-shadow-card);
+  color: var(--cioos-ink);
+  font: inherit;
+  font-weight: 500;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
+/* Active filter: teal-light fill + a thin primary ring so an applied
+   filter is unmistakable against the map. */
 .filterHeader.active {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
+  border-color: var(--cioos-primary);
 }
 
 .filterHeader:hover {
-  background-color: #c6e3df;
-  border: 1px solid darkgrey;
+  background-color: var(--cioos-surface-2);
+  border-color: var(--cioos-primary);
 }
 
-.filterHeader>* {
+.filterHeader.active:hover {
+  background-color: var(--cioos-teal-light);
+}
+
+/* Nothing to narrow right now: the row stays in place, greyed and inert, with
+   its tooltip explaining what would switch it back on. */
+.filterHeader.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Nothing happens on hover either — the row is not going to open, so it must
+   not light up as though it might. Each surface restates its own resting look
+   here, because "resting" is transparent in the panel list and white in the
+   pills over the map. */
+.filterHeader.disabled:hover {
+  background-color: var(--cioos-white);
+  border-color: var(--cioos-hairline);
+}
+
+.filterHeader > * {
   margin: 0px 5px;
   height: 28px;
 }
 
+/* Centre the label text within its fixed-height box so it lines up with the
+   icon and chevron rather than sitting at the top. */
+.filterHeader > .badgeTitle {
+  display: flex;
+  align-items: center;
+}
+
+/* The variable / org / dataset icon picks up the brand teal. */
+.filterHeader > svg {
+  color: var(--cioos-primary);
+}
+
 .filterHeader button {
-  border-radius: 10px;
+  border-radius: var(--cioos-radius-sm);
 }
 
 .filterOptions {
   pointer-events: all;
   position: absolute;
-  top: 45px;
+  top: 48px;
   left: 0px;
   z-index: 10;
-  background-color: white;
-  border-radius: 10px;
-  padding: 10px;
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  box-shadow: var(--cioos-shadow-float);
+  padding: 12px;
   max-width: fit-content;
   min-width: 350px;
 }
 
+/* Utility actions inside the dropdown (Select all / Reset / Close). */
 .filterOptions button {
-  background-color: #c6e3df;
-  border: solid 2px darkgrey;
-  border-radius: 10px;
+  background-color: var(--cioos-teal-light);
+  color: var(--cioos-ink);
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  padding: 0 14px;
   margin: 5px 5px;
   height: 30px;
+  font-weight: 600;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .filterOptions button:hover {
-  background-color: #52a79b;
-  color: white;
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
 }
 
 .filterSearch {
   width: 100%;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  padding: 6px 10px;
+  font: inherit;
+}
+
+.filterSearch:focus {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
 }
 
 .clearFilter {
   position: absolute;
-  right: 12px;
-  top: 12px;
-  border-radius: 30px;
+  right: 14px;
+  top: 14px;
+  border-radius: var(--cioos-radius-pill);
 }
 
 .clearFilter:hover {
-  background-color: lightgray;
+  background-color: var(--cioos-surface-2);
   cursor: pointer;
 }
 
 .filterInfoButton {
   position: absolute;
-  border-radius: 5px;
+  border-radius: var(--cioos-radius-sm);
   height: 30px;
   width: 60;
   bottom: 16px;
@@ -85,9 +143,131 @@
 }
 
 .filterInfoButton:hover {
-  background-color: lightgrey;
+  background-color: var(--cioos-surface-2);
 }
 
 .filterInfoButton svg {
   margin: 6px 7px 7px 7px;
+}
+
+.obisIcon {
+  width: 20px;
+  height: 20px;
+  align-self: center;
+}
+
+/* ------------------------------------------------------------------
+ * The two range filters — Time and Depth — share a shape: a small form
+ * of labelled fields over the rail that draws what the form says. The
+ * rails themselves are styled by the shared Rail stylesheet; the fields
+ * borrow the time bar's date input and are boxed back up here, because a
+ * field that hides its edges until pointed at belongs over the map, not
+ * in a panel where it sits among labelled fields that show theirs.
+ * ------------------------------------------------------------------ */
+.filterRangeSelector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* No minimum width: the Filters pane owns the width and zeroes the one the
+     filter bodies used to bring with them (see .filterOptionsBody > * in the
+     panel stylesheet), so asking for one here only reads as a promise it
+     can't keep. */
+}
+
+.filterRangeForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Name then field, the whole row being the <label>. The names share a column
+   wide enough for any of them, so the fields line up under each other and each
+   form reads as one form — not spread to the far edges of a pane that is much
+   wider than the fields need. */
+.filterRangeRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+
+.filterRangeLabel {
+  flex: 0 0 auto;
+  /* Holds the longest of the names in either locale ("Profondeur min. (m)")
+     without wrapping, so every field starts at the same x — in the Depth
+     filter and in the Time filter above it alike. */
+  width: 130px;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  color: var(--cioos-ink);
+}
+
+/* Same quiet box and teal focus ring as the search field above it and the
+   text inputs elsewhere in the app. */
+.filterRangeSelector .filterRangeInput {
+  /* 160px given the room, narrower rather than overflowing when the pane is
+     the phone-width one. */
+  flex: 0 1 160px;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
+  font-size: var(--cioos-font-size-sm);
+  cursor: text;
+}
+
+.filterRangeSelector .filterRangeInput:hover {
+  border-color: var(--cioos-primary);
+}
+
+/* The band pickers wear the same box as the fields under them — they are one
+   more field in the same form — but they are a choice, not something typed. */
+.filterRangeSelector .filterRangeSelect {
+  cursor: pointer;
+}
+
+.filterRangeSelector .filterRangeInput:focus-visible {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
+}
+
+/* The rail runs the full width of the panel entry, inset far enough that the
+   label centered under a handle parked at either end still sits inside: half
+   of "12000" is wider than the 16px the rail brings with it, and the pane's
+   own padding is not enough to make up the difference. */
+.filterRangeSelector .rail {
+  padding: 0 20px 2px;
+}
+
+/* --- "In view" filter flyout: a single labelled checkbox plus a live count
+   of datasets in the current map view. --- */
+.inViewFilterToggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 2px;
+  cursor: pointer;
+  color: var(--cioos-ink);
+  font-weight: 600;
+}
+
+.inViewFilterToggle input {
+  margin-top: 2px;
+  flex: 0 0 auto;
+  accent-color: var(--cioos-primary);
+  cursor: pointer;
+}
+
+.inViewFilterCount {
+  padding: 4px 2px 2px;
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-sm);
+}
+
+@media (max-width: 600px) {
+  .filterButtonContainer {
+    font-size: 0.9em;
+  }
 }

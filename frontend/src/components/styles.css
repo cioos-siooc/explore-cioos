@@ -1,53 +1,7 @@
 body {
-  font-family: "Montserrat", Sans-serif;
-  line-height: 21pt;
-}
-
-.mapboxgl-ctrl-group>button {
-  width: 42px;
-  height: 42px;
-}
-
-.row>.selectionPanelColumn {
-  padding-left: 0px;
-  padding-right: 0px;
-}
-
-.logo.english {
-  width: 130px;
-  height: 40px;
-  border: 2px solid transparent;
-  pointer-events: all;
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background-image: url(./Images/NationalLogoEnglish.png);
-  background-color: #fff;
-  background-repeat: no-repeat;
-  background-size: contain;
-  border-radius: 10px;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
-}
-
-.logo.french {
-  width: 130px;
-  height: 40px;
-  border: 2px solid transparent;
-  pointer-events: all;
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background-image: url(./Images/NationalLogoFrench.png);
-  background-color: #fff;
-  background-repeat: no-repeat;
-  background-size: contain;
-  border-radius: 10px;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
-}
-
-.logo:hover {
-  background-color: #f3f3f3;
-  /* border: 2px solid lightgray; */
+  font-family: var(--cioos-font-body);
+  line-height: 1.5;
+  color: var(--cioos-ink);
 }
 
 .emailAddress {
@@ -56,42 +10,14 @@ body {
   margin-bottom: 10px;
 }
 
-.boxQueryButton {
-  position: absolute;
-  right: 10px;
-  bottom: 240px;
-  width: 42px;
-  height: 42px;
-  border-radius: 4px 4px 0px 0px;
-  border: 0px;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
-  background-color: #fff;
-  padding: 5px;
-  z-index: 2;
+/* Feedback icon colors */
+.submissionFeedback svg.success {
+  color: var(--cioos-primary);
 }
 
-.boxQueryButton.active {
-  background-color: #c6e3df;
+.submissionFeedback svg.error {
+  color: var(--cioos-error);
 }
-
-.rectangleIcon {
-  width: 42px;
-  height: 42px;
-  background-image: url(./Images/rectangleIcon.png);
-  background-color: transparent;
-  background-repeat: space;
-  background-size: 30px 30px;
-}
-
-.boxQueryButton:hover {
-  background-color: #f3f3f3;
-}
-
-.mapboxgl-ctrl-group {
-  border-radius: 0px 0px 4px 4px;
-}
-
-
 
 .submissionFeedback span {
   vertical-align: middle;
@@ -103,32 +29,8 @@ body {
   margin-left: 5px;
 }
 
-@media all and (max-width: 915px) {
-  /* .logo {
-    left: calc(900px - 140px);
-  } */
-/* 
-  .feedbackButton {
-    left: 848px;
-  } */
-
-  .boxQueryButton {
-    left: 848px;
-  }
-
-  /* .introButton {
-    left: 848px;
-  } */
-}
-
-@media all and (max-height: 500px) {
-  .boxQueryButton {
-    top: 176px;
-  }
-}
-
 .resetFiltersButton:hover {
-  background-color: #c6e3df;
+  background-color: var(--cioos-teal-light);
 }
 
 .resetFiltersButton {

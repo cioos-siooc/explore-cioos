@@ -1,8 +1,9 @@
 import * as React from 'react'
 import { useState } from 'react'
-import { Container, Modal, Row } from 'react-bootstrap'
-import { ChatDots } from 'react-bootstrap-icons'
+import Modal from '../../ui/Modal.jsx'
 import { useTranslation } from 'react-i18next'
+
+import FeedbackButton from '../FeedbackButton/FeedbackButton.jsx'
 
 import polygonImage from '../../Images/polygonIcon.png'
 import rectangleImage from '../../Images/rectangleIcon.png'
@@ -141,21 +142,9 @@ export default function IntroModal({ showModal, setShowModal }) {
         <div className='tipInfo'>
           <p>{t('introModalWelcomeMessage')}</p>
           <p>
-            <a
-              className='feedbackButton'
-              title={t('feedbackButtonTitle')}
-              href={
-                i18n.language === 'en'
-                  ? 'https://docs.google.com/forms/d/e/1FAIpQLScrpW_V0whLXAIy7Vk4Wzd2UAZf-hUxPl455jhUlUoUzQGqvg/viewform?usp=dialog'
-                  : 'https://docs.google.com/forms/d/e/1FAIpQLScOHpRSyXeGIwkOCLR9_VLhxs6siSiEuTqEGHG1PVNN0BumsQ/viewform?usp=dialog'
-              }
-              target='_blank'
-              rel='noreferrer'
-            >
-              <ChatDots size='30px' />
-            </a>
+            <FeedbackButton className='feedbackButton' size={30} />
             {t('tipInfoFeedback')}
-            {/* Please fill out our user feedback survey! It helps improve this interface and find bugs. */}
+            {/* Click the chat button to send us feedback — it helps improve this interface and find bugs. */}
           </p>
           <p>
             <img className='infoButtonImage' />
@@ -212,11 +201,11 @@ export default function IntroModal({ showModal, setShowModal }) {
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Container fluid>
-            <Row style={{ marginBottom: '5px' }}>
+          <div className='container-fluid'>
+            <div className='row' style={{ marginBottom: '5px' }}>
               {t('tipInfoHoverHelpHeading')}
-            </Row>
-            <Row>
+            </div>
+            <div className='row'>
               <div className='steps' onMouseOut={() => setHoveredStep()}>
                 <div
                   className={`stepImage filterStep ${i18n.language}`}
@@ -243,9 +232,9 @@ export default function IntroModal({ showModal, setShowModal }) {
                   {t('stepInfoDownload')}
                 </div>
               </div>
-            </Row>
-            <Row className='infoBox'>{generateInfo()}</Row>
-          </Container>
+            </div>
+            <div className='row infoBox'>{generateInfo()}</div>
+          </div>
         </Modal.Body>
       </Modal>
     </div>
