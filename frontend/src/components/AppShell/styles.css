@@ -2,7 +2,9 @@
    center is the brand/Datasets/Filters bar. */
 .apiErrorBanner {
   position: fixed;
-  bottom: 12px;
+  /* Stacked above the time bar, which holds the bottom center now that it is
+     always mounted. TimeBar publishes its measured footprint. */
+  bottom: calc(12px + var(--cioos-time-bar-space, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: var(--cioos-z-dock, 35);
@@ -52,7 +54,7 @@
    with the API error banner and steps above it when both are up. */
 .mapBusy {
   position: fixed;
-  bottom: 12px;
+  bottom: calc(12px + var(--cioos-time-bar-space, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: var(--cioos-z-dock, 35);
@@ -74,5 +76,5 @@
 }
 
 .apiErrorBanner ~ .mapBusy {
-  bottom: 68px;
+  bottom: calc(68px + var(--cioos-time-bar-space, 0px));
 }

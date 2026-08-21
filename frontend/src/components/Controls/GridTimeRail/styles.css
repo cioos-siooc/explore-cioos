@@ -1,0 +1,16 @@
+/* ------------------------------------------------------------------
+ * The gridded dataset's own time rail. The track, the marker and the
+ * tick row are the shared Rail's; all that is peculiar to it is the
+ * stretch of the dataset already behind the drawn slice, drawn in the
+ * grid's amber so the whole control reads as one colour with the pill
+ * above it and the marker on it.
+ * ------------------------------------------------------------------ */
+.gridTimeRailFill {
+  position: absolute;
+  top: 50%;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-grid);
+  pointer-events: none;
+}

@@ -10,6 +10,20 @@
   height: min(72vh, 760px);
 }
 
+/* The open filter's name, trailing "Filters" as a breadcrumb — the detail pane
+   fills most of the dialog, so the title is where you look to know what you are
+   editing. Lighter than the title itself: it is the subject, not the heading. */
+.filtersModal .filtersModalTitleCurrent {
+  color: var(--cioos-ink-60);
+  font-weight: 500;
+}
+
+.filtersModal .filtersModalTitleCurrent::before {
+  content: '›';
+  margin: 0 8px;
+  color: var(--cioos-ink-40);
+}
+
 .downloadModal .downloadModalDialog {
   max-width: min(1040px, calc(100vw - 24px));
 }
