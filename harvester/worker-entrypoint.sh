@@ -29,17 +29,21 @@ POOL_NAME="cde-process-pool"
 CONFIG_FILE="${HARVEST_CONFIG_FILE:-harvest_config.yaml}"
 if [ -n "${HARVEST_CONFIG_B64:-}" ]; then
   echo "[worker-entrypoint] Harvest config: HARVEST_CONFIG_B64 env var"
+elif [ -n "${HARVEST_CONFIG_YAML:-}" ]; then
+  echo "[worker-entrypoint] Harvest config: HARVEST_CONFIG_YAML env var (deprecated, use HARVEST_CONFIG_B64)"
 elif [ -f "${CONFIG_FILE}" ]; then
   echo "[worker-entrypoint] Harvest config: ${CONFIG_FILE}"
 else
-  echo "[worker-entrypoint] ERROR: no harvest config found at '${CONFIG_FILE}' and HARVEST_CONFIG_B64 is not set." >&2
+  echo "[worker-entrypoint] ERROR: no harvest config found at '${CONFIG_FILE}' and neither HARVEST_CONFIG_B64 nor HARVEST_CONFIG_YAML is set." >&2
   echo "[worker-entrypoint] Provide one via:" >&2
   echo "[worker-entrypoint]   1. HARVEST_CONFIG_B64 env var holding the whole YAML file" >&2
   echo "[worker-entrypoint]      base64-encoded on one line (Coolify UI). Generate it with:" >&2
   echo "[worker-entrypoint]        base64 < harvest_config.yaml | tr -d '\\n'" >&2
   echo "[worker-entrypoint]   2. a file mounted at /app/harvester/harvest_config.yaml" >&2
-  echo "[worker-entrypoint]      (compose volume, or a Coolify Persistent Storage file mount), or" >&2
-  echo "[worker-entrypoint]   3. HARVEST_CONFIG_FILE env var pointing at a mounted file." >&2
+  echo "[worker-entrypoint]      (compose volume, or a Coolify Persistent Storage file mount)," >&2
+  echo "[worker-entrypoint]   3. HARVEST_CONFIG_FILE env var pointing at a mounted file, or" >&2
+  echo "[worker-entrypoint]   4. HARVEST_CONFIG_YAML env var holding the raw YAML text" >&2
+  echo "[worker-entrypoint]      (deprecated - multi-line values corrupt easily in transit)." >&2
   exit 1
 fi
 
