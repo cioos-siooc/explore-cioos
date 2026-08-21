@@ -92,7 +92,7 @@ services:
       # default to localhost when unset. Mirrors the prefect_worker service.
       DB_HOST: db
       REDIS_HOST: redis
-    expose:f
+    expose:
       - "5000"
     depends_on:
       db_migrate:
