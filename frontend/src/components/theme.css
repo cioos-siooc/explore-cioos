@@ -120,7 +120,10 @@
 
   /* --- Z-Index Stack ---
      map (0) < map corner controls < in-panel chrome < shell (brand/search)
-     < sheet < dock < modal < tooltip. */
+     < sheet < dock < modal < dropdown < tooltip.
+     Dropdown sits above modal because ui/Dropdown portals its menu to
+     document.body, making it a root-level sibling of .modal rather than a
+     descendant — Bootstrap's 1000 would put it behind the dialog. */
   --cioos-z-content: 1;
   --cioos-z-map-controls: 2;
   --cioos-z-sticky-search: 9;
@@ -129,6 +132,7 @@
   --cioos-z-sheet: 34;
   --cioos-z-dock: 35;
   --cioos-z-modal: 1055;
+  --cioos-z-dropdown: 1060;
   --cioos-z-tooltip: 1080;
 
   /* --- Button States --- */
