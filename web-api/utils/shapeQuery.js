@@ -208,12 +208,13 @@ FROM   sub
       adder: 0,
       multiplier: 10,
     };
-  } else
+  } else {
     queryParams = {
       filters: filters.shared,
       obisFilters: filters.obisOnly,
       profileFilters: filters.profileOnly,
     };
+  }
 
   const q = db.raw(sql, queryParams);
 
