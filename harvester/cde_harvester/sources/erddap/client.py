@@ -314,3 +314,41 @@ class ERDDAP(object):
     def get_logger(self):
         logger = logging.getLogger(self.domain)
         return logger
+
+
+# Columns allDatasets reports for every dataset. Their combined value is the
+# cheapest available "did this dataset change?" signal: one request per server
+# covers every dataset, and unlike the Croissant file-list hash it also works
+# for database-backed (typically realtime) datasets.
+LISTING_EXTENT_COLUMNS = (
+    "minTime", "maxTime",
+    "minLatitude", "maxLatitude",
+    "minLongitude", "maxLongitude",
+    "minAltitude", "maxAltitude",
+)
+
+
+def listing_extent_signature(listing_row):
+    """Return (extent_hash, max_time) for one allDatasets row.
+
+    extent_hash is a SHA-256 over LISTING_EXTENT_COLUMNS, so adding a column
+    later changes the hash for every dataset once and then stays stable.
+    max_time is the parsed maxTime, or None when the server omits/blanks it.
+    Returns (None, None) when the row carries no extent at all — the caller
+    then falls back to the Croissant hash rather than skipping blind.
+    """
+    values = []
+    present = False
+    for column in LISTING_EXTENT_COLUMNS:
+        value = getattr(listing_row, column, None)
+        if value is None or (isinstance(value, float) and pd.isna(value)):
+            values.append("")
+        else:
+            values.append(str(value))
+            present = True
+    if not present:
+        return None, None
+    digest = hashlib.sha256("\x1f".join(values).encode("utf-8")).hexdigest()
+    max_time = pd.to_datetime(getattr(listing_row, "maxTime", None),
+                              utc=True, errors="coerce")
+    return digest, (None if pd.isna(max_time) else max_time.to_pydatetime())

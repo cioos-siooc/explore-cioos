@@ -15,6 +15,14 @@ import FilterButton from '../Filter/FilterButton/FilterButton.jsx'
 import ZoomToDataset, {
   useZoomToDataset
 } from '../../AppShell/ZoomToDataset/ZoomToDataset.jsx'
+import {
+  useFreshness,
+  useLatest,
+  isLive,
+  liveTimeMax,
+  newestRow
+} from '../../../state/live/useLive'
+import { fmtDt } from '../../Harvest/format.js'
 import './styles.css'
 
 // The grid's node count spelled out as the product of its axes —
@@ -130,6 +138,18 @@ export default function DatasetInspector({
   const isTrajectoryDataset =
     dataset.source_type !== 'obis' &&
     (dataset.cdm_data_type || '').includes('Trajectory')
+
+  // A dataset still being appended to has moved on since the harvest this
+  // panel's counts come from, so it gets the live pair of fields: what the
+  // source holds now, and which harvest the map's coverage still reflects.
+  const freshness = useFreshness()
+  const datasetIsLive = isLive(dataset, freshness)
+  const liveMaxTime = liveTimeMax(dataset, freshness)
+  // Griddap has no tabledap endpoint to read an observation from; its listing
+  // time is all there is.
+  const { latest, valueColumn } = useLatest(dataset, datasetIsLive && !isGrid)
+  const latestRow = newestRow(latest)
+  const latestValue = valueColumn ? latestRow?.[valueColumn] : null
 
   useEffect(() => {
     if (!hasRecordList) {
@@ -425,6 +445,18 @@ export default function DatasetInspector({
             used to be a click on the title itself, which no reader expects of
             a page's title — it is the button beside the zoom one now. */}
         <h2 className='datasetTitle'>{dataset.title}</h2>
+        {/* Says the dataset is still growing, which is what makes the
+            coverage-through line below worth reading. */}
+        {datasetIsLive && (
+          <span
+            className='liveBadge'
+            title={t('datasetLiveBadgeTooltip', {
+              time: fmtDt(liveMaxTime)
+            })}
+          >
+            {t('datasetLiveBadgeText')}
+          </span>
+        )}
         <div className='datasetTitleActions'>
           <button
             type='button'
@@ -525,6 +557,37 @@ export default function DatasetInspector({
               )}
             </dd>
           </div>
+          {/* Directly under the count, because these two lines are what keep
+              the count honest: the source has data through one time, the map
+              and the count stop at the other. */}
+          {datasetIsLive && (
+            <>
+              <div className='metaCell'>
+                <dt className='metadataLabel'>
+                  {t('datasetLiveLatestLabel')}
+                </dt>
+                <dd className='metadataValue'>
+                  {fmtDt(liveMaxTime)}
+                  {latestValue !== null && latestValue !== undefined && (
+                    <span className='liveLatestValue'>
+                      {valueColumn}: {latestValue}
+                    </span>
+                  )}
+                </dd>
+              </div>
+              <div className='metaCell'>
+                <dt className='metadataLabel'>
+                  {t('datasetLiveCoverageLabel')}
+                </dt>
+                <dd
+                  className='metadataValue liveCoverageValue'
+                  title={t('datasetLiveCoverageTooltip')}
+                >
+                  {fmtDt(dataset.last_updated_at)}
+                </dd>
+              </div>
+            </>
+          )}
           {/* The outbound links used to be a labelled row each; they say what
               they are in their own text, so one "Sources" line holds them
               all. */}

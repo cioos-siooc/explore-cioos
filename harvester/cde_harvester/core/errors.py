@@ -9,6 +9,7 @@ NO_PROFILES_FOUND = "NO_PROFILES_FOUND"
 ON_SKIP_LIST = "ON_SKIP_LIST"
 RESPONSE_TOO_LARGE = "RESPONSE_TOO_LARGE"
 UNCHANGED = "UNCHANGED"
+UNCHANGED_EXTENT = "UNCHANGED_EXTENT"  # allDatasets listing extent identical to last harvest
 
 # Why a dataset has no content_hash (stored on cde.datasets.content_hash_reason).
 # Distinct from the harvest-status reason codes above: these explain hash *absence*,

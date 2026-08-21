@@ -87,6 +87,17 @@ CREATE TABLE datasets (
     grid_variables jsonb,
     grid_dimensions jsonb,
     wms_url text,
+    -- Freshness signals read from the server listing (allDatasets.csv), which
+    -- costs one request per server. Appended at table end so ALTER TABLE on an
+    -- existing deployment lands them in the same position as a fresh volume.
+    -- SHA-256 of the listing's extent tuple (min/max time, lat, lon, altitude)
+    -- as of the last successful harvest: the primary "did anything change?"
+    -- signal, and the only one that works for database-backed datasets (they
+    -- produce no Croissant content_hash).
+    source_extent_hash TEXT,
+    -- The listing's maxTime at last harvest. Queryable, so "is this dataset
+    -- live?" needs no network call.
+    source_time_max timestamptz,
     -- lat clamped to +-85.06 (3857 pole blowup); lon_min > lon_max means
     -- antimeridian-crossing -> split into a two-envelope MultiPolygon.
     coverage_bbox geometry(Geometry,3857) GENERATED ALWAYS AS (

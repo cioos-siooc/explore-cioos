@@ -18,6 +18,17 @@ Functions:
 */
 
 
+-- Schema top-up (the one exception to this file being pure CREATE OR REPLACE).
+-- 1_schema.sql only runs on a fresh volume, so a live DB would not have the
+-- freshness columns that upsert_datasets_from_temp() below writes, and the
+-- upsert would fail at the next load. These two ADDs are idempotent and
+-- metadata-only (nullable, no default, no table rewrite); they run at deploy
+-- via db_migrate, never inside a load, so the "no DDL in the incremental load
+-- path" rule is unaffected. Keep in sync with 1_schema.sql.
+ALTER TABLE cde.datasets ADD COLUMN IF NOT EXISTS source_extent_hash TEXT;
+ALTER TABLE cde.datasets ADD COLUMN IF NOT EXISTS source_time_max timestamptz;
+
+
 -- Create temporary tables for incremental mode
 -- These mirror the structure of main tables but without constraints
 CREATE OR REPLACE FUNCTION create_temp_tables() RETURNS VOID AS $$
@@ -87,7 +98,8 @@ BEGIN
     content_hash, content_hash_reason, last_updated_at, verified_at,
     coverage_lat_min, coverage_lat_max, coverage_lon_min, coverage_lon_max,
     coverage_time_min, coverage_time_max, coverage_depth_min, coverage_depth_max,
-    grid_variables, grid_dimensions, wms_url
+    grid_variables, grid_dimensions, wms_url,
+    source_extent_hash, source_time_max
   )
   SELECT
     pk_url, dataset_id, erddap_url, platform, title, title_fr,
@@ -98,7 +110,8 @@ BEGIN
     content_hash, content_hash_reason, last_updated_at, verified_at,
     coverage_lat_min, coverage_lat_max, coverage_lon_min, coverage_lon_max,
     coverage_time_min, coverage_time_max, coverage_depth_min, coverage_depth_max,
-    grid_variables, grid_dimensions, wms_url
+    grid_variables, grid_dimensions, wms_url,
+    source_extent_hash, source_time_max
   FROM temp_datasets
   ON CONFLICT (dataset_id, erddap_url)
   DO UPDATE SET
@@ -135,7 +148,9 @@ BEGIN
     coverage_depth_max = EXCLUDED.coverage_depth_max,
     grid_variables = EXCLUDED.grid_variables,
     grid_dimensions = EXCLUDED.grid_dimensions,
-    wms_url = EXCLUDED.wms_url;
+    wms_url = EXCLUDED.wms_url,
+    source_extent_hash = EXCLUDED.source_extent_hash,
+    source_time_max = EXCLUDED.source_time_max;
 END;
 $$ LANGUAGE plpgsql;
 

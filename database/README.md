@@ -26,6 +26,15 @@ If the change touches stored procedures, update the matching numbered file
 re-applies these on every deploy, so live DBs pick them up without a volume
 reset.
 
+Adding a **nullable** column is the one case that need not cost a volume reset:
+put the canonical definition in `1_schema.sql` *and* an idempotent
+`ALTER TABLE cde.datasets ADD COLUMN IF NOT EXISTS ...` at the top of
+`9_incremental_upsert.sql` (see the "Schema top-up" block there), so `db_migrate`
+adds it to live DBs at deploy. That is metadata-only and takes only a brief
+lock at deploy time — never do DDL inside a load. Anything that rewrites the
+table (`NOT NULL`, defaults, type changes, dropped columns) still means
+dropping the volume and re-harvesting.
+
 `harvester/tests/unit/test_schema_drift.py` cross-checks the Pandera schemas
 against `1_schema.sql` and fails when a schema column is missing from the DDL.
 

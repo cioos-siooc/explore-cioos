@@ -34,6 +34,7 @@ const obisNodesRouter = require("./routes/obisNodes");
 const erddapServersRouter = require("./routes/erddapServers");
 const harvestRouter = require("./routes/harvest");
 const trajectoriesRouter = require("./routes/trajectories");
+const liveRouter = require("./routes/live");
 const nonnaRouter = require("./routes/nonna");
 const swaggerSpec = require('./swagger');
 const swaggerUi = require('swagger-ui-express');
@@ -128,6 +129,7 @@ app.use("/obisNodes", obisNodesRouter);
 app.use("/erddapServers", erddapServersRouter);
 app.use("/harvest", harvestRouter);
 app.use("/trajectories", trajectoriesRouter);
+app.use("/live", liveRouter);
 app.use("/nonna", nonnaRouter);
 
 // Swagger docs - conditionally enabled via ENABLE_API_DOCS environment variable

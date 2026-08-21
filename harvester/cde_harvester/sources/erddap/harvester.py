@@ -5,13 +5,13 @@ import logging
 import os
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
 import pandas as pd
 from cde_harvester.sources.base import BaseHarvester, HarvestResult
 from cde_harvester.sources.erddap.compliance import CDEComplianceChecker
-from cde_harvester.sources.erddap.client import ERDDAP
+from cde_harvester.sources.erddap.client import ERDDAP, listing_extent_signature
 from cde_harvester.core.schemas import (
     DatasetSchema,
     HarvestAttemptSchema,
@@ -30,6 +30,7 @@ from cde_harvester.core.errors import (
     RESPONSE_TOO_LARGE,
     ResponseTooLargeError,
     UNCHANGED,
+    UNCHANGED_EXTENT,
     UNKNOWN_ERROR,
 )
 from cde_harvester.dataset_types import (
@@ -40,11 +41,32 @@ from cde_harvester.dataset_types import (
     supported_data_structures,
 )
 from cde_harvester.dataset_types.geo import POINT_THRESHOLD_M
-from cde_harvester.sources.erddap.state import load_previous_hashes
+from cde_harvester.sources.erddap.state import load_previous_state
 from requests.exceptions import HTTPError
 from prefect import task
 
 logger = logging.getLogger(__name__)
+
+# An unchanged listing extent means nothing was appended, but it cannot see a
+# dataset reprocessed in place (values corrected at existing times). Re-harvest
+# anyway once a dataset has been skipped this long, so a silent in-place edit is
+# picked up within a bounded window instead of never.
+MAX_SKIP_AGE_DAYS = int(os.environ.get("MAX_SKIP_AGE_DAYS", 30))
+
+
+def _within_skip_window(last_updated_at):
+    """True while a dataset may still be skipped on an unchanged extent.
+
+    A missing or unparseable last_updated_at reads as "too old" so the dataset
+    is harvested — the safe direction, since the alternative is skipping a
+    dataset we know nothing about.
+    """
+    if last_updated_at is None:
+        return False
+    if last_updated_at.tzinfo is None:
+        last_updated_at = last_updated_at.replace(tzinfo=timezone.utc)
+    age = datetime.now(timezone.utc) - last_updated_at
+    return age < timedelta(days=MAX_SKIP_AGE_DAYS)
 
 
 def _attempt_urls(erddap_url, dataset, dataset_id):
@@ -171,8 +193,8 @@ class ERDDAPHarvester(BaseHarvester):
         )
         df_all_datasets = erddap.df_all_datasets
 
-        previous_hashes = (
-            load_previous_hashes(self.erddap_url) if self.skip_unchanged else {}
+        previous_state = (
+            load_previous_state(self.erddap_url) if self.skip_unchanged else {}
         )
 
         empty_attempts = pd.DataFrame(
@@ -255,10 +277,15 @@ class ERDDAPHarvester(BaseHarvester):
             wms_url = getattr(df_dataset_row, "wms", None)
             if not isinstance(wms_url, str) or not wms_url:
                 wms_url = None
+            # The listing's extent is the primary change signal and costs no
+            # extra request — it is already in the row we are iterating.
+            extent_hash, source_time_max = listing_extent_signature(df_dataset_row)
             try:
                 result = harvest_dataset(
                     erddap, dataset_id,
-                    previous_hashes=previous_hashes,
+                    previous_state=previous_state,
+                    extent_hash=extent_hash,
+                    source_time_max=source_time_max,
                     skip_unchanged=self.skip_unchanged,
                     run_id=self.run_id, idx=i + 1, total=total,
                     data_structure=data_structure, wms_url=wms_url,
@@ -363,17 +390,20 @@ class ERDDAPHarvester(BaseHarvester):
         )
 
 
-def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=False,
+def harvest_dataset(erddap, dataset_id, previous_state=None, skip_unchanged=False,
                     run_id=None, idx=None, total=None,
-                    data_structure="table", wms_url=None):
+                    data_structure="table", wms_url=None,
+                    extent_hash=None, source_time_max=None):
     """Harvest one ERDDAP dataset (plain function; reuses `erddap`, never rebuilds it).
 
     Returns DatasetHarvestResult on success/skip; raises DatasetHarvestError on
     error (carrying the audit row the caller persists).
 
-    When ``skip_unchanged`` and the dataset's Croissant lists files whose hash
-    matches ``previous_hashes``, returns early as "skipped_unchanged" — one HTTP
-    request, no metadata or profile queries.
+    ``skip_unchanged`` enables two early exits, checked cheapest-first against
+    ``previous_state``: an unchanged listing extent (zero requests, works for
+    every dataset), then an unchanged Croissant file-list hash (one request,
+    file-backed datasets only). Either returns "skipped_unchanged" without any
+    metadata or profile queries.
     """
     log = erddap.get_logger()
     erddap_url = erddap.url
@@ -382,12 +412,40 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
     # get_dataset() succeeded before failing.
     dataset = None
     progress = f" {idx}/{total}" if idx and total else ""
+    prev = (previous_state or {}).get(dataset_id) or {}
+
+    # Cheapest check first: the listing extent came free with the dataset list,
+    # so an unchanged one skips the dataset without any request at all.
+    if skip_unchanged and extent_hash and prev.get("source_extent_hash") == extent_hash:
+        last_updated_at = prev.get("last_updated_at")
+        if _within_skip_window(last_updated_at):
+            log.info(
+                f"Dataset not updated since last harvest, skipping: "
+                f"{dataset_id}{progress} (listing extent unchanged)"
+            )
+            return DatasetHarvestResult(
+                status="skipped_unchanged",
+                verified_at=datetime.now(timezone.utc),
+                attempt=_build_attempt(
+                    run_id, erddap_url, dataset_id,
+                    status="skipped",
+                    reason_code=UNCHANGED_EXTENT,
+                    error_message="allDatasets listing extent unchanged since last harvest",
+                    duration_ms=int((time.monotonic() - t0) * 1000),
+                    query_urls=[f"{erddap_url.rstrip('/')}/info/{dataset_id}/index.html"],
+                ),
+            )
+        log.info(
+            "Listing extent unchanged for %s but last harvested %s — re-harvesting "
+            "to pick up any in-place edits", dataset_id, last_updated_at,
+        )
+
     try:
         new_hash, has_files, hash_reason = erddap.get_croissant_fingerprint(
             erddap_url, dataset_id,
             dap="griddap" if data_structure == "grid" else "tabledap",
         )
-        prev_hash = (previous_hashes or {}).get(dataset_id)
+        prev_hash = prev.get("content_hash")
         if skip_unchanged and has_files and new_hash and prev_hash == new_hash:
             duration_ms = int((time.monotonic() - t0) * 1000)
             log.info(
@@ -414,6 +472,8 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
         # Record why there's no hash (database-backed, fetch failure, …) so the
         # harvest dashboard can distinguish "correctly unhashed" from "failed".
         dataset.content_hash_reason = hash_reason
+        dataset.source_extent_hash = extent_hash
+        dataset.source_time_max = source_time_max
         compliance_checker = CDEComplianceChecker(dataset)
 
         if compliance_checker.passes_all_checks():

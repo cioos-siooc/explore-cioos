@@ -43,6 +43,24 @@
   color: var(--cioos-ink);
 }
 
+/* "Live": a small teal pill on the title line for a dataset still being
+   appended to. Deliberately quiet — it qualifies the record's numbers rather
+   than advertising the dataset. */
+.liveBadge {
+  flex: 0 0 auto;
+  margin-top: 3px;
+  padding: 2px 7px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-success-bg);
+  color: var(--cioos-primary-700);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: default;
+}
+
 /* Stacked, not side by side: the title takes the width it needs and the two
    actions sit in a narrow column against the right edge. */
 .datasetTitleActions {
@@ -201,6 +219,22 @@
   font-weight: 700;
   line-height: 1.2;
   color: var(--cioos-ink);
+}
+
+/* The observed value under its timestamp: a second line, quieter than the
+   time, since the time is what the field is about. */
+.liveLatestValue {
+  flex: 0 0 100%;
+  font-size: 0.72rem;
+  color: var(--cioos-ink-60);
+  overflow-wrap: anywhere;
+}
+
+/* The harvest date behind the counts and the map's coverage. Amber because it
+   is a caveat on the figures above it, not a fact about the dataset. */
+.datasetMetaSheet .metadataValue.liveCoverageValue {
+  color: var(--cioos-warn);
+  cursor: help;
 }
 
 /* Source links sit on one line, separated by their own gap. */

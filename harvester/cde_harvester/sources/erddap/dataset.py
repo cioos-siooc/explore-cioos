@@ -47,6 +47,11 @@ class Dataset(object):
         self.content_hash = None
         # Why content_hash is None (a HASH_* code); None when a hash was produced.
         self.content_hash_reason = None
+        # Freshness, lifted from the server listing row by the caller: a hash of
+        # its extent tuple and its maxTime. Set on every harvested dataset,
+        # including database-backed ones that produce no content_hash.
+        self.source_extent_hash = None
+        self.source_time_max = None
 
         # Griddap metadata (set by the Grid handler; None for tabledap types).
         self.df_info = None
@@ -100,6 +105,8 @@ class Dataset(object):
                 "grid_variables": [self.grid_variables],
                 "grid_dimensions": [self.grid_dimensions],
                 "wms_url": [self.wms_url],
+                "source_extent_hash": [self.source_extent_hash],
+                "source_time_max": [self.source_time_max],
             }
         )
 

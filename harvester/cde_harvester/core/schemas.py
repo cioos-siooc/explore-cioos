@@ -176,6 +176,11 @@ class DatasetSchema(pa.DataFrameModel):
     grid_variables: Series[object] = pa.Field(nullable=True)  # list of dicts -> jsonb
     grid_dimensions: Series[object] = pa.Field(nullable=True)  # list of dicts -> jsonb
     wms_url: Series[str] = pa.Field(nullable=True)
+    # Freshness signals lifted from the server listing (allDatasets.csv):
+    # hash of its extent tuple, and its maxTime. Drive skip-if-unchanged
+    # and the "is this dataset live?" test.
+    source_extent_hash: Series[str] = pa.Field(nullable=True)
+    source_time_max: Series[pa.DateTime] = pa.Field(nullable=True)
 
     class Config:
         coerce = True

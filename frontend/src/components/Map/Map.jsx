@@ -50,6 +50,8 @@ import {
   effectiveTrailingDays
 } from '../config'
 import platformColors from '../../components/platformColors'
+import { useFreshness, useLatest, isLive } from '../../state/live/useLive'
+import { fmtDt } from '../Harvest/format.js'
 import {
   PROFILE_TYPE_KEYS,
   TRAJECTORY_TYPE_KEYS,
@@ -152,6 +154,57 @@ function buildHeadArrowImage(fillColor, strokeColor = '#ffffff') {
 // which meant trajectory data could be missing from a hexagon for a reason the
 // hex ramp had no way of showing. The track lines are unaffected either way:
 // they come from a separate source (/tiles/tracks).
+// One platform's fixes as drawable GeoJSON: the path as lines, every fix as an
+// oriented point. Split at the antimeridian and at large time gaps so a line
+// never spans the seam or a data gap (same segmentation rule as the
+// /tiles/tracks layer). `properties` is stamped on every feature, which is how
+// the harvested track and its un-harvested live tail are told apart in the
+// layer filters.
+function trackFeatures(coordinates, times, properties = {}) {
+  const runs = splitTrackRuns(coordinates, times)
+  const lineFeatures = runs
+    .filter((run) => run.length >= 2)
+    .map((run) => ({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: run },
+      properties
+    }))
+  // Every raw fix, oriented by course over ground within its run: the bearing
+  // from the previous fix (a run's first fix points toward its next fix
+  // instead; coincident fixes inherit the last known course). Bearings never
+  // span run breaks — direction across a data gap or the antimeridian seam
+  // would be meaningless. cog stays unset when a run has a single fix, which
+  // the -nocog circle layer picks up.
+  // runs partitions coordinates in place (every input point appears exactly
+  // once, in order) so a running cursor recovers each point's original fix
+  // time for the tooltip.
+  let rawIndex = 0
+  const fixFeatures = runs.flatMap((run) => {
+    let lastCog = null
+    return run.map((coordinate, i) => {
+      const time = times[rawIndex]
+      rawIndex++
+      const cog =
+        i > 0
+          ? initialBearing(run[i - 1], coordinate)
+          : run.length > 1
+            ? initialBearing(coordinate, run[1])
+            : null
+      if (cog !== null) lastCog = cog
+      return {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: coordinate },
+        properties: {
+          ...(lastCog === null ? {} : { cog: lastCog }),
+          time,
+          ...properties
+        }
+      }
+    })
+  })
+  return [...lineFeatures, ...fixFeatures]
+}
+
 function buildTileSuffix(baseQuery, dataLayers) {
   const params = new URLSearchParams(baseQuery)
   // Always written out: the API counts something else when the param is absent
@@ -494,6 +547,38 @@ export default function CreateMap({
   onViewportHexRangeRef.current = onViewportHexRange
   // Raw selected-track response, cached so re-renders don't re-fetch.
   const rawTrackRef = useRef(null)
+
+  // Where an open dataset's platforms are *now*. The harvested drawing under
+  // them ends at the last harvest; for a dataset still being appended to that
+  // can be days back, so the current position is read straight from the source.
+  const freshness = useFreshness()
+  const liveInspected =
+    inspectDataset && isLive(inspectDataset, freshness) ? inspectDataset : null
+  const { latest: liveLatest, valueColumn: liveValueColumn } =
+    useLatest(liveInspected)
+
+  useEffect(() => {
+    if (!map.current || !map.current.getSource('live-latest')) return
+    map.current.getSource('live-latest').setData({
+      type: 'FeatureCollection',
+      features: liveLatest
+        // Griddap and stations that report no position have nothing to mark.
+        .filter((row) => row.longitude != null && row.latitude != null)
+        .map((row) => ({
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [row.longitude, row.latitude]
+          },
+          properties: {
+            label:
+              liveValueColumn && row[liveValueColumn] != null
+                ? `${fmtDt(row.time)} · ${liveValueColumn} ${row[liveValueColumn]}`
+                : fmtDt(row.time)
+          }
+        }))
+    })
+  }, [liveLatest, liveValueColumn])
 
   // UTC-day-snapped scrub window: [scrub date - N days, scrub date + 1 day),
   // or [tracksMinDate, scrub date + 1 day) for the 'all' trail (full tracks
@@ -1269,8 +1354,11 @@ export default function CreateMap({
     'track-heads',
     'track-heads-fixed',
     'selected-track-line',
+    'selected-track-line-live',
     'selected-track-fixes',
-    'selected-track-fixes-nocog'
+    'selected-track-fixes-nocog',
+    'selected-track-fixes-live',
+    'live-latest-markers'
   ]
   const griddapLayerIds = ['griddap-coverage-fill', 'griddap-coverage-line']
   // The CHS NONNA depth rasters the legend's depth ramp keys. They belong to
@@ -1726,13 +1814,24 @@ export default function CreateMap({
       const cacheKey = `${datasetPk}|${trajectoryId}`
       if (rawTrackRef.current?.key !== cacheKey) {
         let track
+        let tail
         try {
-          const response = await fetch(
-            `${server}/trajectories/track?datasetPKs=${datasetPk}&trajectoryId=${encodeURIComponent(trajectoryId)}`,
-            { signal: abortController.signal }
-          )
-          if (!response.ok) return
-          track = await response.json()
+          const query = `datasetPKs=${datasetPk}&trajectoryId=${encodeURIComponent(trajectoryId)}`
+          const [trackResponse, tailResponse] = await Promise.all([
+            fetch(`${server}/trajectories/track?${query}`, {
+              signal: abortController.signal
+            }),
+            // What the source holds beyond the last harvest, straight from
+            // ERDDAP. Empty for a dataset that stopped or is not live, and
+            // best-effort: the harvested track draws with or without it.
+            fetch(
+              `${server}/live/track?dataset=${datasetPk}&trajectoryId=${encodeURIComponent(trajectoryId)}`,
+              { signal: abortController.signal }
+            )
+          ])
+          if (!trackResponse.ok) return
+          track = await trackResponse.json()
+          tail = tailResponse.ok ? await tailResponse.json() : null
         } catch (error) {
           if (error.name !== 'AbortError') {
             console.error('track fetch failed:', error)
@@ -1743,70 +1842,50 @@ export default function CreateMap({
         rawTrackRef.current = {
           key: cacheKey,
           coordinates: track.coordinates,
-          times: track.times
+          times: track.times,
+          tailCoordinates: tail?.coordinates ?? [],
+          tailTimes: tail?.times ?? []
         }
       }
-      const { coordinates: rawCoordinates, times: rawTimes } = rawTrackRef.current
+      const {
+        coordinates: rawCoordinates,
+        times: rawTimes,
+        tailCoordinates,
+        tailTimes
+      } = rawTrackRef.current
       if (!rawCoordinates || rawCoordinates.length === 0) return
 
-      // Split at the antimeridian and at large time gaps so a line never
-      // spans the seam or a data gap (same segmentation rule as the
-      // /tiles/tracks layer).
-      const runs = splitTrackRuns(rawCoordinates, rawTimes)
-      const lineFeatures = runs
-        .filter((run) => run.length >= 2)
-        .map((run) => ({
-          type: 'Feature',
-          geometry: {
-            type: 'LineString',
-            coordinates: run
-          },
-          properties: {}
-        }))
-      // Every raw fix, oriented by course over ground within its run: the
-      // bearing from the previous fix (a run's first fix points toward its
-      // next fix instead; coincident fixes inherit the last known course).
-      // Bearings never span run breaks — direction across a data gap or the
-      // antimeridian seam would be meaningless. cog stays unset when a run
-      // has a single fix, which the -nocog circle layer picks up.
-      // runs partitions rawCoordinates in place (every input point appears
-      // exactly once, in order) so a running cursor recovers each point's
-      // original fix time for the tooltip below.
-      let rawIndex = 0
-      const fixFeatures = runs.flatMap((run) => {
-        let lastCog = null
-        return run.map((coordinate, i) => {
-          const time = rawTimes[rawIndex]
-          rawIndex++
-          const cog =
-            i > 0
-              ? initialBearing(run[i - 1], coordinate)
-              : run.length > 1
-                ? initialBearing(coordinate, run[1])
-                : null
-          if (cog !== null) lastCog = cog
-          return {
-            type: 'Feature',
-            geometry: { type: 'Point', coordinates: coordinate },
-            properties: {
-              ...(lastCog === null ? {} : { cog: lastCog }),
-              time,
-              trajectory_id: trajectoryId,
-              dataset_title: selectedTrajectory.datasetTitle
-            }
-          }
-        })
-      })
+      const identity = {
+        trajectory_id: trajectoryId,
+        dataset_title: selectedTrajectory.datasetTitle
+      }
+      // The tail starts from the last harvested fix, so the two lines meet
+      // instead of leaving a gap where the harvest stopped. It is drawn dashed
+      // (see the -live layers) because nothing in it is in the map's coverage
+      // or the dataset's counts yet.
+      const tail = tailCoordinates.length
+        ? trackFeatures(
+          [rawCoordinates[rawCoordinates.length - 1], ...tailCoordinates],
+          [rawTimes[rawTimes.length - 1], ...tailTimes],
+          { ...identity, live: true }
+        )
+        : []
       source.setData({
         type: 'FeatureCollection',
-        features: [...lineFeatures, ...fixFeatures]
+        features: [
+          ...trackFeatures(rawCoordinates, rawTimes, identity),
+          ...tail
+        ]
       })
 
       // Everything under the selected track goes flat grey so it reads alone.
       applyTrackFocus()
 
-      const longitudes = rawCoordinates.map((c) => c[0])
-      const latitudes = rawCoordinates.map((c) => c[1])
+      // The tail counts toward the framing: where the platform is now is the
+      // part of the drawing a viewer most wants in the canvas.
+      const framed = [...rawCoordinates, ...tailCoordinates]
+      const longitudes = framed.map((c) => c[0])
+      const latitudes = framed.map((c) => c[1])
       // Same framing the "zoom to dataset" button uses: the track centred in the
       // canvas, with the sidebar left out of the reckoning.
       map.current.fitBounds(
@@ -2323,11 +2402,35 @@ export default function CreateMap({
         id: 'selected-track-line',
         type: 'line',
         source: 'selected-track',
-        filter: ['==', ['geometry-type'], 'LineString'],
+        filter: [
+          'all',
+          ['==', ['geometry-type'], 'LineString'],
+          ['!', ['has', 'live']]
+        ],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': selectedTrackColor,
           'line-width': 3
+        }
+      })
+
+      // The stretch the source has published since the last harvest: the same
+      // colour, because it is the same platform, but dashed — none of it is in
+      // the hexes, the counts, or the time slider yet.
+      map.current.addLayer({
+        id: 'selected-track-line-live',
+        type: 'line',
+        source: 'selected-track',
+        filter: [
+          'all',
+          ['==', ['geometry-type'], 'LineString'],
+          ['has', 'live']
+        ],
+        layout: { 'line-cap': 'butt', 'line-join': 'round' },
+        paint: {
+          'line-color': selectedTrackColor,
+          'line-width': 3,
+          'line-dasharray': [1.6, 1.2]
         }
       })
 
@@ -2347,7 +2450,12 @@ export default function CreateMap({
         source: 'selected-track',
         // full expression syntax ('geometry-type', not the legacy '$type'):
         // MapLibre 5 rejects filters that mix legacy and expression operators
-        filter: ['all', ['==', ['geometry-type'], 'Point'], ['has', 'cog']],
+        filter: [
+          'all',
+          ['==', ['geometry-type'], 'Point'],
+          ['has', 'cog'],
+          ['!', ['has', 'live']]
+        ],
         layout: {
           'icon-image': 'selected-fix-arrow',
           'icon-size': 0.75,
@@ -2362,12 +2470,52 @@ export default function CreateMap({
         id: 'selected-track-fixes-nocog',
         type: 'circle',
         source: 'selected-track',
-        filter: ['all', ['==', ['geometry-type'], 'Point'], ['!', ['has', 'cog']]],
+        filter: [
+          'all',
+          ['==', ['geometry-type'], 'Point'],
+          ['!', ['has', 'cog']],
+          ['!', ['has', 'live']]
+        ],
         paint: {
           'circle-color': '#ffffff',
           'circle-radius': 3,
           'circle-stroke-color': selectedTrackColor,
           'circle-stroke-width': 1.5
+        }
+      })
+
+      // Live fixes stay small and hollow whatever their heading: arrowheads
+      // would read as harvested track, and the dashes already carry the
+      // direction the tail runs in.
+      map.current.addLayer({
+        id: 'selected-track-fixes-live',
+        type: 'circle',
+        source: 'selected-track',
+        filter: ['all', ['==', ['geometry-type'], 'Point'], ['has', 'live']],
+        paint: {
+          'circle-color': '#ffffff',
+          'circle-radius': 2.5,
+          'circle-stroke-color': selectedTrackColor,
+          'circle-stroke-width': 1
+        }
+      })
+
+      // Where the datasets on this page are right now, one marker per station
+      // or platform, read live from the source (see the liveLatest effect).
+      map.current.addSource('live-latest', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      })
+
+      map.current.addLayer({
+        id: 'live-latest-markers',
+        type: 'circle',
+        source: 'live-latest',
+        paint: {
+          'circle-color': selectedTrackColor,
+          'circle-radius': 5,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 2
         }
       })
 
@@ -2413,7 +2561,9 @@ export default function CreateMap({
     const selectedTrackLayers = [
       'selected-track-fixes',
       'selected-track-fixes-nocog',
-      'selected-track-line'
+      'selected-track-fixes-live',
+      'selected-track-line',
+      'selected-track-line-live'
     ]
 
     // 'points' carries an invisible 10px hit stroke so small circles stay easy
@@ -2558,8 +2708,23 @@ export default function CreateMap({
         show: (e, features) => showGriddapTooltip(e, dedupeGriddapByPk(features))
       },
       {
+        // Sits above everything: it is a handful of markers, deliberately
+        // placed, and the one thing on the map that is current.
+        id: 'live-latest',
+        layers: ['live-latest-markers'],
+        show: (e, features) =>
+          showChip(
+            features[0].geometry.coordinates.slice(),
+            features[0].properties.label
+          )
+      },
+      {
         id: 'selected-fixes',
-        layers: ['selected-track-fixes', 'selected-track-fixes-nocog'],
+        layers: [
+          'selected-track-fixes',
+          'selected-track-fixes-nocog',
+          'selected-track-fixes-live'
+        ],
         // The date is the whole point of hovering a fix on the drawn track —
         // the platform is already named in the page that drew it.
         show: (e, features) =>
@@ -2627,7 +2792,8 @@ export default function CreateMap({
     const hoverLayerIds = [
       ...new Set([
         ...hoverRules.flatMap((rule) => rule.layers),
-        'selected-track-line'
+        'selected-track-line',
+        'selected-track-line-live'
       ])
     ]
 

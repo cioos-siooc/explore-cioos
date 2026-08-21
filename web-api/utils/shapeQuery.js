@@ -151,6 +151,13 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                   'https://catalogue.cioos.ca/dataset/'
                            || ckan_id AS ckan_url,
                   d.wms_url,
+                  -- Freshness. source_time_max is the server listing's maxTime
+                  -- at the last harvest, so "is this dataset live?" needs no
+                  -- network call; last_updated_at is the harvest the map's
+                  -- hexes and counts reflect, which the UI has to label
+                  -- because those aggregates are never refreshed live.
+                  d.source_time_max,
+                  d.last_updated_at,
                   d.grid_variables,
                   d.grid_dimensions,
                   -- griddap footprint for the frontend bbox highlight; NULL

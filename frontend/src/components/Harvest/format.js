@@ -1,4 +1,5 @@
-// Shared display formatters for the Harvest dashboard pages.
+// Shared display formatters (dates, durations, source links), first written
+// for the Harvest dashboard pages and used wherever those forms are needed.
 
 export function hostname(url) {
   try { return new URL(url).hostname || url } catch { return url }
