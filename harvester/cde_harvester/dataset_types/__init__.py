@@ -41,10 +41,32 @@ def extract_features(dataset):
     return handler.extract_features(dataset)
 
 
-def feature_kind_for(cdm_data_type):
-    """Which HarvestResult attribute this type's features land in."""
+def feature_kind_for(dataset_or_type):
+    """Which HarvestResult attribute this dataset's features land in.
+
+    Accepts a Dataset or a bare cdm_data_type string. A Dataset may carry a
+    per-dataset ``feature_kind`` set during extraction, which wins over the
+    handler's class-level default — Point uses this to store small datasets as
+    exact profiles and large ones as coverage cells.
+    """
+    cdm_data_type = getattr(dataset_or_type, "cdm_data_type", dataset_or_type)
+    override = getattr(dataset_or_type, "feature_kind", None)
+    if override:
+        return override
     handler = get_handler(cdm_data_type)
     return handler.feature_kind if handler else "profiles"
+
+
+def validate(dataset):
+    """Dispatch the handler's structural QC hook.
+
+    Returns a DatasetQualityReport to skip the dataset, or None to accept.
+    Call after CDEComplianceChecker passes and before extract_features().
+    """
+    handler = get_handler(dataset.cdm_data_type)
+    if handler is None:
+        return None
+    return handler.validate(dataset)
 
 
 def extract_track_points(dataset):
@@ -72,6 +94,7 @@ from cde_harvester.dataset_types.trajectory import (  # noqa: E402
     TrajectoryProfileHandler,
 )
 from cde_harvester.dataset_types.grid import GridHandler  # noqa: E402
+from cde_harvester.dataset_types.point import PointHandler  # noqa: E402
 
 register(TimeSeriesHandler())
 register(ProfileHandler())
@@ -79,3 +102,4 @@ register(TimeSeriesProfileHandler())
 register(TrajectoryHandler())
 register(TrajectoryProfileHandler())
 register(GridHandler())
+register(PointHandler())

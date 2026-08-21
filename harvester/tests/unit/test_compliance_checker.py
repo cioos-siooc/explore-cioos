@@ -41,6 +41,33 @@ class TestPassesAllChecks:
         checker.passes_all_checks()
         assert checker.failure_reason_code == ""
 
+    def test_no_failure_details_on_pass(self):
+        checker = _checker()
+        checker.passes_all_checks()
+        assert checker.failure_details is None
+
+
+class TestFailureDetails:
+    """harvest_dataset writes failure_details into
+    cde.harvest_attempts.error_message, which the harvest dashboard shows to
+    the ERDDAP admin. It read the attribute long before anything set it, so
+    every compliance skip reached the dashboard with a null message."""
+
+    def test_details_explain_the_failure(self):
+        checker = _checker()
+        checker.dataset.variables_list = [
+            v for v in checker.dataset.variables_list if v != "time"
+        ]
+        checker.passes_all_checks()
+        assert checker.failure_details
+        assert "time" in checker.failure_details
+
+    def test_details_accompany_every_reason_code(self):
+        checker = _checker(globals={"cde_ingest": "False", "title": "t"})
+        assert checker.passes_all_checks() is False
+        assert checker.failure_reason_code
+        assert checker.failure_details
+
 
 class TestRequiredVariables:
     def test_missing_time_fails(self):

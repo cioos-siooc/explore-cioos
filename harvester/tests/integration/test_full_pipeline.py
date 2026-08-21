@@ -114,8 +114,9 @@ class TestHarvestOutput:
 
     def test_unsupported_dataset_is_skipped(self, harvest_result):
         """
-        allDatasets CSV includes 'test_unsupported_001' (Point type).
-        It should NOT appear in datasets (filtered before get_dataset is called).
+        allDatasets CSV includes 'test_unsupported_001' (cdm_data_type=Other,
+        which has no handler). It should NOT appear in datasets (filtered
+        before get_dataset is called).
         """
         _, datasets, _, skipped = harvest_result
         assert "test_unsupported_001" not in datasets["dataset_id"].values

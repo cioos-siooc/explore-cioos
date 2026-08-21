@@ -48,6 +48,14 @@ class Dataset(object):
         # Why content_hash is None (a HASH_* code); None when a hash was produced.
         self.content_hash_reason = None
 
+        # Per-dataset overrides set during extraction, for types whose
+        # representation is not fixed by cdm_data_type alone. Point sets both:
+        # feature_kind picks the destination table (exact profiles vs coverage
+        # cells) and point_total_records is the whole-dataset count its QC
+        # already measured, which is what that choice is made on.
+        self.feature_kind = None
+        self.point_total_records = None
+
         # Griddap metadata (set by the Grid handler; None for tabledap types).
         self.df_info = None
         self.wms_url = None
@@ -373,6 +381,14 @@ class Dataset(object):
 
         if not "standard_name" in df_variables:
             df_variables["standard_name"] = None
+        # Same backfill for cf_role: the pivot above only creates a column for
+        # attributes at least one variable declares, so a dataset where NOTHING
+        # declares a cf_role has no such column, and every reader of it —
+        # get_profile_ids, trajectory_features.extract_cells — raises KeyError
+        # rather than seeing "no feature identity". Point datasets are the
+        # common case: they are not supposed to have a cf_role at all.
+        if not "cf_role" in df_variables:
+            df_variables["cf_role"] = ""
         df_variables.set_index("name", drop=False, inplace=True)
         self.df_variables = df_variables
         self.eovs = self.get_eovs()
