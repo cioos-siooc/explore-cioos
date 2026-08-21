@@ -35,7 +35,7 @@ against `1_schema.sql` and fails when a schema column is missing from the DDL.
 |---|---|
 | `1_schema.sql` | All tables, indexes, materialized views |
 | `3_ckan_process.sql` | `ckan_process()` — organization denormalization |
-| `4_create_hexes.sql` | `hex_cell()` + `create_hexes()` — origin-anchored hex binning (100 km + 10 km), append-only cells keyed on (i, j) |
+| `4_create_hexes.sql` | `hex_cell()` + `create_hexes()` — origin-anchored hex binning (100 km + 10 km), append-only cells keyed on (i, j); `trajectory_gap_secs()` / `trajectory_segments()` / `trajectory_build_hexes()` — trajectory coverage swept from the track through that grid |
 | `5_profile_process.sql` | `profile_process()`, `obis_*()`, `trajectory_*()` post-load processing; `gc_orphan_points_and_hexes()` |
 | `6_remove_all_data.sql` | `remove_all_data()` — full-reload TRUNCATE |
 | `7_contraints.sql` | `drop_constraints()` / `set_constraints()` |

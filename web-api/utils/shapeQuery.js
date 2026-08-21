@@ -23,20 +23,27 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
   const showObis = includeObis !== 'false';
 
   // search_geom is the geometry the shared spatial filter (dbFilter) matches
-  // against: the per-feature bbox for profiles (extent search), and the cell
-  // point for the already-fine-grained obis/trajectory cells.
+  // against: the per-feature bbox for profiles (extent search), the cell point
+  // for the already-fine-grained OBIS cells, and the hex polygon for
+  // trajectory coverage.
   const profilesBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,
                profile_id, timeseries_id,
                latitude, longitude, point_pk, geom, bbox AS search_geom
         FROM cde.profiles`;
-  // Trajectory coverage cells: ERDDAP data, gated with profiles. The
+  // Trajectory coverage hexes: ERDDAP data, gated with profiles. The
   // trajectory_id doubles as the profile_id surrogate so the records list
-  // labels rows by mission/deployment; records_per_day was computed at
-  // harvest so the estimate math below applies unchanged.
-  const trajectoryBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,
-               trajectory_id as profile_id, NULL as timeseries_id,
-               latitude, longitude, point_pk, geom, geom AS search_geom
-        FROM cde.trajectory_cells`;
+  // labels rows by mission/deployment; records_per_day is derived from the
+  // hex's own record count and day count, so the estimate math below applies
+  // unchanged. Only the 10 km tier: the 100 km rows describe the same data at
+  // a coarser grain and would double-count every estimate.
+  // search_geom is the HEX POLYGON, not its centroid — a drawn polygon smaller
+  // than a hex still selects the data the track left inside it.
+  const trajectoryBranch = `SELECT t.dataset_pk, t.time_min, t.time_max, t.depth_min, t.depth_max, t.records_per_day,
+               t.trajectory_id as profile_id, NULL as timeseries_id,
+               t.latitude, t.longitude, NULL::integer AS point_pk, t.geom, h.geom AS search_geom
+        FROM cde.trajectory_hexes t
+        JOIN cde.hexes_zoom_1 h ON h.pk = t.hex_pk
+        WHERE t.hex_tier = 1`;
   const obisBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, 0 as records_per_day,
                NULL as profile_id, NULL as timeseries_id,
                latitude, longitude, point_pk, geom, geom AS search_geom
@@ -73,7 +80,7 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
 
   // The record list is one row per *record* (profile / trajectory / OBIS
   // dataset), not one per matched feature. Trajectory and OBIS coverage is
-  // stored as grid cells, so a mission crossing 40 cells is 40 rows in
+  // stored per cell/hex, so a mission crossing 40 hexes is 40 rows in
   // `filtered` all carrying the same trajectory_id (or '' / NULL when the
   // record is unnamed) — collapsing them here is what keeps the inspector's
   // table from repeating the same ID down the page. The time/depth extents are

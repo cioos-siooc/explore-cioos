@@ -41,7 +41,7 @@ function parseMetric(value) {
   return METRICS.includes(value) ? value : DEFAULT_METRIC;
 }
 
-// n_records and days are nullable on both cell tables (only profiles.n_records
+// n_records and days are nullable on the cell/hex tables (only profiles.n_records
 // is guaranteed by validate_loaded_data), and a NULL would poison the sum for
 // the whole hex — hence coalesce, not optimism.
 // `datasets` is 0 here because it aggregates dataset_pk (already carried by
@@ -52,8 +52,12 @@ const EXPRESSIONS = {
     days: "coalesce(days, 0)",
     datasets: "0",
   },
-  trajectory_cells: {
+  trajectory_hexes: {
     records: "coalesce(n_records, 0)",
+    // Already a distinct-day count for this (trajectory, hex) — the database
+    // counts the UTC days the track was actually inside the hex, so summing
+    // the rows in a hex is summing days across trajectories and datasets, the
+    // same thing the other two branches do.
     days: "coalesce(days, 0)",
     datasets: "0",
   },
