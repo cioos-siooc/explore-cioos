@@ -30,6 +30,10 @@
 - [x] Drop log message "i18next is made possible by our own product, Locize".
 
 ### Database & harvesting (see docs for reference)
+- [ ] Add a post-deploy check that `populate_vernaculars` actually finished — a partial run fails silently.
+    - Symptom: Family-and-above scientific-name filters quietly under-match while Species-level looks perfect (only the higher ranks need the AphiaID rolldown; species also match on the literal name).
+    - Not visible in the typeahead: the rows exist with rank and vernacular, it's `ancestor_aphia_ids` that's incomplete — so it reads as missing OBIS data rather than an unfinished backfill.
+    - Suggested check: assert a known family (e.g. Laridae) expands to the expected order of magnitude of AphiaIDs. Hit on dev 2026-08-07 when a redeploy landed mid-run.
 - [ ] Improve dataset incremental upload to db.
 - [ ] Improve database indexing for speeding up calls.
 - [ ] Harvester incremental update freezes the database and frontend on load — avoid doing that.

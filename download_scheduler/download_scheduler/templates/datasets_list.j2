@@ -1,5 +1,5 @@
 {% for dataset in dataset_urls %}
-ERDDAP: {{ dataset['erddap_metadata_url'] }}
+{{ dataset['source_label'] }}: {{ dataset['source_url'] }}
 {% if "ckan_url" in dataset %}
 CKAN: {{ dataset['ckan_url'] }}
 {% endif %}

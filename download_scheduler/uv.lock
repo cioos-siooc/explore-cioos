@@ -597,6 +597,7 @@ name = "downloader"
 version = "0.1.0"
 source = { editable = "../downloader" }
 dependencies = [
+    { name = "duckdb" },
     { name = "erddapy" },
     { name = "loguru" },
     { name = "numpy" },
@@ -608,6 +609,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "duckdb", specifier = ">=1.1.0" },
     { name = "erddapy", specifier = ">=2.2.4" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "numpy", specifier = "<2.0.0" },

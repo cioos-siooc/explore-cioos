@@ -104,20 +104,43 @@ router.get(
 
     const wktPolygon = polygon ? polygonJSONToWKT(polygon) : null;
 
-    // Trajectory coverage cells are downloadable ERDDAP datasets too — union
-    // them with profiles so a selection over a glider/ship track queues its
-    // dataset. (Pre-M2 this also interpolated the filter OBJECT into the SQL
-    // string instead of binding filters.shared — fixed to match the other
-    // routes.)
+    // Which feature sources feed the queue. Mirror shapeQuery.js so the queued
+    // set matches the size estimate the user was shown: profiles + trajectory
+    // cells for ERDDAP data, obis_cells for OBIS. Scientific-name / OBIS-node
+    // selections hide the profile branches (OBIS-only mode) unless ERDDAP
+    // servers are also selected.
+    const { includeObis = "true", scientificNames, obisNodes, erddapServers } = req.query;
+    const includeProfiles = !scientificNames && (!obisNodes || Boolean(erddapServers));
+    const showObis = includeObis !== "false";
+
+    // search_geom is the geometry filters.shared matches against: the per-feature
+    // bbox for profiles (extent search), the cell point for obis/trajectory.
+    const profilesBranch = `SELECT dataset_pk, point_pk, geom, latitude, longitude,
+               time_min, time_max, depth_min, depth_max, bbox AS search_geom
+        FROM cde.profiles`;
+    // Trajectory coverage cells are downloadable ERDDAP datasets too, so a
+    // selection over a glider/ship track queues its dataset.
+    const trajectoryBranch = `SELECT dataset_pk, point_pk, geom, latitude, longitude,
+               time_min, time_max, depth_min, depth_max, geom AS search_geom
+        FROM cde.trajectory_cells`;
+    // OBIS occurrence cells. The scientific-name/aphia predicate lives in
+    // filters.obisOnly (obis_cells columns) and is applied inside the branch;
+    // the shared spatial/time/source filter still applies in the outer WHERE.
+    const obisBranch = `SELECT dataset_pk, point_pk, geom, latitude, longitude,
+               time_min, time_max, depth_min, depth_max, geom AS search_geom
+        FROM cde.obis_cells
+        WHERE :obisFilters`;
+
+    const branches = [];
+    if (includeProfiles) branches.push(profilesBranch, trajectoryBranch);
+    if (showObis) branches.push(obisBranch);
+
+    // Nothing to download (e.g. a scientific-name selection with OBIS disabled).
+    if (!branches.length) return res.send({ count: 0 });
+
     const SQL = `
         WITH combined AS (
-        SELECT dataset_pk, point_pk, geom, latitude, longitude,
-               time_min, time_max, depth_min, depth_max, bbox AS search_geom
-        FROM cde.profiles
-        UNION ALL
-        SELECT dataset_pk, point_pk, geom, latitude, longitude,
-               time_min, time_max, depth_min, depth_max, geom AS search_geom
-        FROM cde.trajectory_cells
+        ${branches.join("\n        UNION ALL\n        ")}
         ),
         profiles_subset AS (
         SELECT d.erddap_url,
@@ -125,6 +148,7 @@ router.get(
                d.title,
                d.profile_variables,
                d.cdm_data_type,
+               d.source_type,
                d.ckan_id ckan_id,
                'https://catalogue.cioos.ca/dataset/' ckan_url
         FROM combined p
@@ -135,7 +159,11 @@ router.get(
       `;
 
     try {
-      const tileRaw = await db.raw(SQL, { filters: filters.shared });
+      let count = 0;
+      const tileRaw = await db.raw(SQL, {
+        filters: filters.shared,
+        obisFilters: filters.obisOnly,
+      });
       const tile = tileRaw.rows[0];
       if (tile.json_agg && tile.json_agg.length) {
         const jobID = uuidv4().substr(0, 6);
