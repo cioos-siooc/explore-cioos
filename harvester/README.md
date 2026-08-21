@@ -81,7 +81,9 @@ The harvest config is **not baked into the image** — it must be provided at
 runtime. It is resolved in priority order (see
 `cde_harvester/core/config.py:resolve_harvest_config_file`):
 
-1. `HARVEST_CONFIG_YAML` env var — full YAML content inline (used on Coolify).
+1. `HARVEST_CONFIG_B64` env var — the whole YAML file base64-encoded on one
+   line (used on Coolify, where raw multi-line env values get mangled).
+   Generate it with `base64 < harvest_config.yaml | tr -d '\n'`.
 2. `HARVEST_CONFIG_FILE` env var — path to a mounted config file. The
    docker-compose files set this to `/app/harvester/harvest_config.yaml`, so
    the mounted config is used without needing the `-f` flag.

@@ -12,8 +12,9 @@
 #   3. DB_HOST_EXTERNAL must reach the central Postgres over the network.
 #   4. A harvest config: the image does not bake one, and flows read it at run
 #      time on WHICHEVER worker executes them — so it must match the primary
-#      stack's config. Set HARVEST_CONFIG_YAML in .env (full YAML content), or
-#      copy the file here and mount it (see the volumes section below).
+#      stack's config. Set HARVEST_CONFIG_B64 in .env (the whole YAML file
+#      base64-encoded on one line: `base64 < harvest_config.yaml | tr -d '\n'`),
+#      or copy the file here and mount it (see the volumes section below).
 #
 # Usage:
 #   PREFECT_API_URL=https://prefect.example/api \
@@ -43,7 +44,7 @@ services:
       REGISTER_DEPLOYMENTS: "false"
       RUN_ON_DEPLOY: "false"
     volumes:
-      # Alternative to HARVEST_CONFIG_YAML: copy the primary stack's config to
+      # Alternative to HARVEST_CONFIG_B64: copy the primary stack's config to
       # this host and uncomment (must stay in sync with the primary).
       # - ./harvest_config.yaml:/app/harvester/harvest_config.yaml:ro
       - harvest_data:/app/harvester/harvest

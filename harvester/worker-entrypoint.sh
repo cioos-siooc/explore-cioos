@@ -27,14 +27,16 @@ POOL_NAME="cde-process-pool"
 # worker, the first flow run) crash with an obscure traceback. Priority here
 # mirrors cde_harvester/core/config.py:resolve_harvest_config_file.
 CONFIG_FILE="${HARVEST_CONFIG_FILE:-harvest_config.yaml}"
-if [ -n "${HARVEST_CONFIG_YAML:-}" ]; then
-  echo "[worker-entrypoint] Harvest config: HARVEST_CONFIG_YAML env var"
+if [ -n "${HARVEST_CONFIG_B64:-}" ]; then
+  echo "[worker-entrypoint] Harvest config: HARVEST_CONFIG_B64 env var"
 elif [ -f "${CONFIG_FILE}" ]; then
   echo "[worker-entrypoint] Harvest config: ${CONFIG_FILE}"
 else
-  echo "[worker-entrypoint] ERROR: no harvest config found at '${CONFIG_FILE}' and HARVEST_CONFIG_YAML is not set." >&2
+  echo "[worker-entrypoint] ERROR: no harvest config found at '${CONFIG_FILE}' and HARVEST_CONFIG_B64 is not set." >&2
   echo "[worker-entrypoint] Provide one via:" >&2
-  echo "[worker-entrypoint]   1. HARVEST_CONFIG_YAML env var containing the full YAML (Coolify UI), or" >&2
+  echo "[worker-entrypoint]   1. HARVEST_CONFIG_B64 env var holding the whole YAML file" >&2
+  echo "[worker-entrypoint]      base64-encoded on one line (Coolify UI). Generate it with:" >&2
+  echo "[worker-entrypoint]        base64 < harvest_config.yaml | tr -d '\\n'" >&2
   echo "[worker-entrypoint]   2. a file mounted at /app/harvester/harvest_config.yaml" >&2
   echo "[worker-entrypoint]      (compose volume, or a Coolify Persistent Storage file mount), or" >&2
   echo "[worker-entrypoint]   3. HARVEST_CONFIG_FILE env var pointing at a mounted file." >&2
