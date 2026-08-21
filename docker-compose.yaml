@@ -92,7 +92,7 @@ services:
       # default to localhost when unset. Mirrors the prefect_worker service.
       DB_HOST: db
       REDIS_HOST: redis
-    expose:
+    expose:f
       - "5000"
     depends_on:
       db_migrate:
@@ -150,7 +150,6 @@ services:
     build:
       context: .
       dockerfile: ./harvester/Dockerfile
-    image: cde-harvester:latest
     depends_on:
       prefect:
         condition: service_healthy
