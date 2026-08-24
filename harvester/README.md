@@ -25,16 +25,20 @@ The harvester is typically run periodically (via the Docker harvester profile) t
 
 ### Using Docker (Recommended)
 
-The harvester runs as a Docker profile in the main compose file. See the main [README.md](../README.md) for setup instructions.
+The harvester runs as a Prefect **process worker** (`prefect_worker`) in the main
+compose file — there is no standalone `harvester` service. The worker registers
+the work pool and deployments on startup, then polls; harvests are triggered by
+schedule, by the Prefect UI, or by the dashboard. See the main
+[README.md](../README.md) for setup instructions.
 
-To run the harvester with Docker:
+To run the worker with Docker:
 
 ```bash
 # Development environment
-docker compose up -d harvester
+docker compose up -d prefect_worker
 
-# Production environment
-docker compose -f docker-compose.production.yaml up -d harvester
+# Production (docker-compose.production.yaml is an overlay on the base file)
+docker compose -f docker-compose.yaml -f docker-compose.production.yaml up -d prefect_worker
 ```
 ### Using uv (recommended for local development)
 
