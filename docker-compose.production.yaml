@@ -15,6 +15,15 @@ services:
     ports:
       - "${NGINX_PORT:-8098}:4000"
 
+  frontend:
+    build:
+      args:
+        ENVIRONMENT: $ENVIRONMENT
+        SENTRY_RELEASE: $SENTRY_RELEASE
+        SENTRY_AUTH_TOKEN: $SENTRY_AUTH_TOKEN
+        SENTRY_ORG: $SENTRY_ORG
+        SENTRY_PROJECT: $SENTRY_PROJECT
+
   prefect:
     ports:
       - "${PREFECT_PORT:-4200}:4200"

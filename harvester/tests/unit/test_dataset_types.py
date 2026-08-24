@@ -48,7 +48,7 @@ class TestRegistry:
         for cdm_type in ("TimeSeries", "Profile", "TimeSeriesProfile"):
             assert get_handler(cdm_type).feature_kind == "profiles"
         for cdm_type in ("Trajectory", "TrajectoryProfile"):
-            assert get_handler(cdm_type).feature_kind == "trajectory_cells"
+            assert get_handler(cdm_type).feature_kind == "trajectory_days"
         assert get_handler("Grid").feature_kind == "dataset_extent"
         assert get_handler("Grid").data_structure == "grid"
 

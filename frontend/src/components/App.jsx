@@ -16,6 +16,8 @@ import './styles.css'
 Sentry.init({
   dsn: 'https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595',
   enabled: process.env.NODE_ENV === 'production',
+  environment: process.env.ENVIRONMENT || 'development',
+  release: process.env.SENTRY_RELEASE,
   integrations: [
     Sentry.browserTracingIntegration(),
     // The feedback form replaces the old Google Form survey. autoInject is off:

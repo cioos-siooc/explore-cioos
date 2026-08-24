@@ -17,6 +17,7 @@ import { useSearchParams } from 'react-router-dom'
 import './styles.css'
 
 import { server } from '../../config'
+import reportError from '../../state/reportError.js'
 import {
   boundsFromGeoJson,
   escapeHtml,
@@ -76,7 +77,7 @@ const defaultDirectSelectToDisplayFeatures = MapboxDraw.modes.direct_select.toDi
 // strips the closing duplicate point internally (see Polygon's constructor
 // in the library). polygonIsRectangle expects a closed 5-point ring, so
 // re-close it here before delegating to that check.
-function isRectangleFeature (feature) {
+function isRectangleFeature(feature) {
   const ring = feature?.type === 'Polygon' && feature.coordinates?.[0]
   return Boolean(ring) && ring.length === 4 && polygonIsRectangle([...ring, ring[0]])
 }
@@ -195,11 +196,11 @@ export default function CreateMap({
   polygon,
   setPolygon,
   setLoading,
-  setBasemapLoading = () => {},
+  setBasemapLoading = () => { },
   setMapView,
   // Hands the "what's here" card its payload: everything one click found under
   // it, or null for a click on empty water. See handleMapClick.
-  onFeatureQuery = () => {},
+  onFeatureQuery = () => { },
   // The same payload handed back, so the map can outline the region the open
   // card is describing.
   featureQuery,
@@ -209,7 +210,7 @@ export default function CreateMap({
   // can be numbered for the same domain the ramp is painted over. Called with
   // undefined whenever there is nothing to measure and the global tier takes
   // over. Debounced and deduped here — see refreshViewportHexRange.
-  onViewportHexRange = () => {},
+  onViewportHexRange = () => { },
   hoveredDataset,
   setHoveredDataset,
   inspectDataset,
@@ -269,15 +270,15 @@ export default function CreateMap({
     const [ringIndex, index] = path.split('.').map((x) => parseInt(x, 10))
     const oldCoord = state.feature.getCoordinate(path)
     const newCoord = [oldCoord[0] + delta.lng, oldCoord[1] + delta.lat]
-    ;[(index + 3) % 4, (index + 1) % 4].forEach((neighborIndex) => {
-      const neighborPath = `${ringIndex}.${neighborIndex}`
-      const neighborOld = state.feature.getCoordinate(neighborPath)
-      if (neighborOld[0] === oldCoord[0]) {
-        state.feature.updateCoordinate(neighborPath, newCoord[0], neighborOld[1])
-      } else {
-        state.feature.updateCoordinate(neighborPath, neighborOld[0], newCoord[1])
-      }
-    })
+      ;[(index + 3) % 4, (index + 1) % 4].forEach((neighborIndex) => {
+        const neighborPath = `${ringIndex}.${neighborIndex}`
+        const neighborOld = state.feature.getCoordinate(neighborPath)
+        if (neighborOld[0] === oldCoord[0]) {
+          state.feature.updateCoordinate(neighborPath, newCoord[0], neighborOld[1])
+        } else {
+          state.feature.updateCoordinate(neighborPath, neighborOld[0], newCoord[1])
+        }
+      })
     state.feature.updateCoordinate(path, newCoord[0], newCoord[1])
   }
 
@@ -592,9 +593,9 @@ export default function CreateMap({
     if (!map.current || !map.current.getLayer('track-lines')) return
     const trajOn = anyTrajectoryLayerOn(dataLayersRef.current)
     const showTracks = trajOn && tracksModeRef.current
-    ;['track-lines', 'track-heads', 'track-heads-fixed'].forEach((id) =>
-      map.current.setLayoutProperty(id, 'visibility', showTracks ? 'visible' : 'none')
-    )
+      ;['track-lines', 'track-heads', 'track-heads-fixed'].forEach((id) =>
+        map.current.setLayoutProperty(id, 'visibility', showTracks ? 'visible' : 'none')
+      )
   }
 
   // Placeholder count ranges used only until the /legend request resolves.
@@ -630,7 +631,7 @@ export default function CreateMap({
   //
   // The paint change rides MapLibre's default transition, so the hexes fade up
   // over ~300ms rather than snapping on.
-  function revealHexes () {
+  function revealHexes() {
     if (hexesRevealed.current || !map.current) return
     hexesRevealed.current = true
     if (map.current.getLayer('hexes')) {
@@ -661,7 +662,7 @@ export default function CreateMap({
   // actually arrived — otherwise a legend that lands first would reveal an empty
   // map and let the tiles behind it paint over the catalogue-wide tier, which is
   // the double colouring this exists to avoid.
-  function revealHexesIfRamped (measuredRange) {
+  function revealHexesIfRamped(measuredRange) {
     if (measuredRange !== undefined) return revealHexes()
     if (!rangeLevelsRef.current || !hexSourcesLoaded()) return
     revealHexes()
@@ -670,7 +671,7 @@ export default function CreateMap({
   // Both hex sources have everything the current view asks for. Deliberately
   // false while a source is missing: at that point the tiles are still on their
   // way in, and nothing measured over them means anything yet.
-  function hexSourcesLoaded () {
+  function hexSourcesLoaded() {
     return HEX_SOURCE_IDS.every(
       (id) => map.current.getSource(id) && map.current.isSourceLoaded(id)
     )
@@ -878,7 +879,8 @@ export default function CreateMap({
     ['points-halo', 1.25],
     ['points-highlighted', 0],
     ['points-hovered', 0],
-    ['click-highlight-point', 0]
+    ['click-highlight-point', 0],
+    ['click-highlight-point-glow', 6]
   ]
   // Coverage hexes ramp on their own domain (coverageColorStops) rather than
   // the main one: they cover a different population of hexes, and sharing the
@@ -1174,7 +1176,7 @@ export default function CreateMap({
   // colours: the ramp already owns the greens, the tracks own the purple and
   // the grid coverage owns the amber, so an accent here would read as another
   // data layer instead of as "this is what you just asked about".
-  const clickHighlightColor = '#152F37'
+  const clickHighlightColor = 'goldenrod'
   // Latest coverage prop, readable from the map 'load' closure (which would
   // otherwise capture the initial render's value).
   const griddapCoverageRef = useRef(null)
@@ -1733,9 +1735,7 @@ export default function CreateMap({
           if (!response.ok) return
           track = await response.json()
         } catch (error) {
-          if (error.name !== 'AbortError') {
-            console.error('track fetch failed:', error)
-          }
+          reportError('track fetch failed', error)
           return
         }
         if (superseded) return
@@ -2108,6 +2108,34 @@ export default function CreateMap({
       map.current.addSource('click-highlight', {
         type: 'geojson',
         data: emptyFeatureCollection
+      })
+      // A soft blurred halo under the crisp outline/point below, so the
+      // selected item reads as picked out at a glance instead of just
+      // outlined. Point and polygon geometries blur through different paint
+      // properties (circle-blur vs. line-blur), so each gets its own layer.
+      map.current.addLayer({
+        id: 'click-highlight-glow',
+        type: 'line',
+        source: 'click-highlight',
+        filter: ['!=', ['geometry-type'], 'Point'],
+        paint: {
+          'line-color': clickHighlightColor,
+          'line-width': 10,
+          'line-blur': 8,
+          'line-opacity': 0.85
+        }
+      })
+      map.current.addLayer({
+        id: 'click-highlight-point-glow',
+        type: 'circle',
+        source: 'click-highlight',
+        filter: ['==', ['geometry-type'], 'Point'],
+        paint: {
+          'circle-radius': radiusExpression(pointRadiusRange.current, 6),
+          'circle-color': clickHighlightColor,
+          'circle-blur': 0.8,
+          'circle-opacity': 0.85
+        }
       })
       map.current.addLayer({
         id: 'click-highlight-fill',

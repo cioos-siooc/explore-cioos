@@ -26,6 +26,7 @@ import {
   useDebounce
 } from '../../utilities.jsx'
 import fetchJson from '../fetchJson.js'
+import reportError from '../reportError.js'
 import { useUrlSeededPersistentState } from '../usePersistentState.js'
 import { useFilters } from '../filters/FilterProvider.jsx'
 import {
@@ -325,7 +326,7 @@ export default function MapStateProvider ({ children }) {
       })
       .catch((error) => {
         if (error.name === 'AbortError') return
-        console.error('legend fetch failed:', error)
+        reportError('legend fetch failed', error)
         // Let the effect below retry this query: a failed fetch leaves no ranges
         // behind, so nothing should count as loaded for it.
         requestedLegendQuery.current = undefined
@@ -369,7 +370,7 @@ export default function MapStateProvider ({ children }) {
         if (coverage) setGriddapCoverage(coverage)
       })
       .catch((error) => {
-        if (error.name !== 'AbortError') throw error
+        reportError('griddap coverage fetch failed', error)
       })
     return () => controller.abort()
   }, [mapQueryString, griddapCoverageVisible])

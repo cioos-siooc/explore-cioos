@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next'
 import isEmpty from 'lodash/isEmpty'
 
 import { server } from '../../config.js'
+import reportError from '../reportError.js'
 import {
   boundsFromGeoJson,
   boundsIntersect,
@@ -483,7 +484,7 @@ export default function SelectionProvider ({ children }) {
         .catch((error) => {
           // network failure / gateway timeout: land on an empty list rather
           // than an endless spinner
-          console.error('pointQuery failed:', error)
+          reportError('pointQuery failed', error)
           setPointsData([])
           setInitialPointsQueryComplete(true)
         })
@@ -555,7 +556,7 @@ export default function SelectionProvider ({ children }) {
             setRecordLoading(false)
           })
           .catch((error) => {
-            console.error('preview fetch failed:', error)
+            reportError('preview fetch failed', error)
             setRecordLoading(false)
           })
       }

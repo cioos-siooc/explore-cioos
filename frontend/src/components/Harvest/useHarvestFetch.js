@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { server } from '../../config.js'
+import reportError from '../../state/reportError.js'
 
 export default function useHarvestFetch(path, deps = []) {
   const [data, setData] = useState(null)
@@ -17,7 +18,10 @@ export default function useHarvestFetch(path, deps = []) {
         return r.json()
       })
       .then(d => { if (!cancelled) { setData(d); setLoading(false) } })
-      .catch(e => { if (!cancelled) { setError(e.message); setLoading(false) } })
+      .catch(e => {
+        reportError('harvest fetch failed', e)
+        if (!cancelled) { setError(e.message); setLoading(false) }
+      })
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)

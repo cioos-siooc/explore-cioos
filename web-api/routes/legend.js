@@ -157,14 +157,22 @@ router.get(
     // which keep large-region features off the map entirely.
     const profilesBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, ${recordCountExpr('profiles', metric)},
                time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
-        FROM cde.profiles WHERE show_as_point`;
+        FROM cde.profiles WHERE show_as_point AND :profileFilters`;
     // Trajectory and OBIS coverage cells merge into the hex-tier ranges
     // (zoom0/zoom1, the green ramp) but not the point-tier range (zoom2) — at
     // that zoom they only render via the dedicated always-hex coverage layer,
     // whose own range comes from the second query below.
-    const trajectoryBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, ${recordCountExpr('trajectory_cells', metric)},
+    // cde.trajectory_hexes carries ONE hex per row plus its tier (each tier's
+    // day count is aggregated independently), so the two hex FK columns the
+    // other branches select are split out of hex_pk here. The NULL that leaves
+    // in the other tier's column is why sub1/sub2 below exclude NULL keys —
+    // otherwise every tier-1 row would pile into one bogus hex_0 bucket and
+    // stretch the ramp domain.
+    const trajectoryBranch = `SELECT CASE WHEN hex_tier = 0 THEN hex_pk END AS hex_0_pk,
+               CASE WHEN hex_tier = 1 THEN hex_pk END AS hex_1_pk,
+               NULL::integer AS point_pk, dataset_pk, ${recordCountExpr('trajectory_hexes', metric)},
                time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-        FROM cde.trajectory_cells`;
+        FROM cde.trajectory_hexes`;
     const obisBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk,
                ${recordCountExpr('obis_cells', metric)},
                time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
@@ -212,8 +220,8 @@ router.get(
         -- sum, not count(distinct point_pk): the ramp ranks hexes by how much
         -- data they hold, so its domain has to be over the same quantity the
         -- tiles emit as \`count\`.
-        sub1 AS (SELECT ${rampRange()} zoom0 FROM (SELECT ${countAggregate(metric, 'hex_records')} count FROM hex_records GROUP BY hex_0_pk) s),
-        sub2 AS (SELECT ${rampRange()} zoom1 FROM (SELECT ${countAggregate(metric, 'hex_records')} count FROM hex_records GROUP BY hex_1_pk) s),
+        sub1 AS (SELECT ${rampRange()} zoom0 FROM (SELECT ${countAggregate(metric, 'hex_records')} count FROM hex_records WHERE hex_0_pk IS NOT NULL GROUP BY hex_0_pk) s),
+        sub2 AS (SELECT ${rampRange()} zoom1 FROM (SELECT ${countAggregate(metric, 'hex_records')} count FROM hex_records WHERE hex_1_pk IS NOT NULL GROUP BY hex_1_pk) s),
         sub3 AS (SELECT ${rampRange()} zoom2 FROM (SELECT ${countAggregate(metric, 'point_records')} count FROM point_records GROUP BY point_pk) s)
 
         SELECT * from sub1,sub2,sub3
@@ -236,8 +244,8 @@ router.get(
       && includeProfiles;
     const coverageBranches = [];
     if (includeTrajectoryCells) {
-      coverageBranches.push(`SELECT hex_1_pk, dataset_pk, ${recordCountExpr('trajectory_cells', metric)}
-        FROM cde.trajectory_cells`);
+      coverageBranches.push(`SELECT hex_pk AS hex_1_pk, dataset_pk, ${recordCountExpr('trajectory_hexes', metric)}
+        FROM cde.trajectory_hexes WHERE hex_tier = 1`);
     }
     if (includeObis) {
       coverageBranches.push(`SELECT hex_1_pk, dataset_pk, ${recordCountExpr('obis_cells', metric)}
@@ -273,7 +281,11 @@ router.get(
     // failing the one request. Contained the same way the tile routes do it.
     try {
       const [rows, coverageRows] = await Promise.all([
-        db.raw(sql, { filters: filters.shared, obisFilters: filters.obisOnly }),
+        db.raw(sql, {
+          filters: filters.shared,
+          obisFilters: filters.obisOnly,
+          profileFilters: filters.profileOnly,
+        }),
         db.raw(coverageSql, { filters: filters.shared, obisFilters: filters.obisOnly }),
       ]);
 
