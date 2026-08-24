@@ -2801,7 +2801,20 @@ export default function CreateMap({
         const layerId = feature.layer.id
         const count = Number(feature.properties.count) || 0
         observationCount += count
-        if (layerId !== 'points') cellFeatures.push(feature)
+        // A hex is one row server-side, but MVT clips it to whichever tiles
+        // it crosses — at low zoom it fits inside a single tile, at high
+        // zoom (e.g. z10) the same hex spans several, and `feature` above is
+        // only the fragment the click point happened to land in. Pull every
+        // currently-rendered fragment sharing this pk so the highlight/bounds
+        // below cover the whole hex instead of the one sliver under the
+        // cursor.
+        if (layerId !== 'points') {
+          const fragments = map.current.queryRenderedFeatures({
+            layers: [layerId],
+            filter: ['==', ['get', 'pk'], feature.properties.pk]
+          })
+          cellFeatures.push(...(fragments.length ? fragments : [feature]))
+        }
         datasetPksOf(feature).forEach((pk) => {
           const existing = observations.get(pk)
           if (existing) {
