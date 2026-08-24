@@ -9,7 +9,9 @@ Tables are truncated during data ingestion
 CREATE OR REPLACE FUNCTION remove_all_data() RETURNS VOID AS $$
 BEGIN
 
-  TRUNCATE cde.profiles, cde.obis_cells, cde.trajectory_cells, cde.datasets,
+  TRUNCATE cde.profiles, cde.obis_cells, cde.trajectory_days,
+           cde.trajectory_hexes,
+           cde.trajectory_points, cde.trajectory_track_stats, cde.datasets,
            cde.organizations, cde.points, cde.skipped_datasets,
            cde.hexes_zoom_0, cde.hexes_zoom_1;
 

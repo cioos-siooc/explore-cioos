@@ -23,9 +23,8 @@ SET search_path TO cde, public;
 -- size (100 km for zoom_0, 10 km for zoom_1). This natural key is what keeps
 -- hex pks stable across loads — create_hexes() upserts on (i, j) and never
 -- deletes, so a cell that already exists keeps its pk forever. Nullable (not
--- NOT NULL) so a load straddling a deploy can't fail mid-migration; rows that
--- somehow miss (i, j) are backfilled by migrations/stable-hex-grid.sql on the
--- next deploy.
+-- NOT NULL) so create_hexes() can insert a cell and set (i, j) within the same
+-- load without a mid-transaction constraint failure.
 DROP TABLE IF EXISTS hexes_zoom_0;
 CREATE TABLE hexes_zoom_0 (
     pk serial PRIMARY KEY,
@@ -83,9 +82,8 @@ CREATE TABLE datasets (
     content_hash_reason TEXT,
     last_updated_at timestamptz,
     verified_at timestamptz,
-    -- Griddap (metadata-only) coverage; see migrations/add-griddap-dataset-columns.sql
-    -- for semantics. Kept at table end so temp_datasets (LIKE ...) stays aligned
-    -- with migrated live databases.
+    -- Griddap (metadata-only) coverage. Kept at table end so temp_datasets
+    -- (LIKE ...) column order stays stable.
     coverage_lat_min double precision,
     coverage_lat_max double precision,
     coverage_lon_min double precision,
@@ -145,8 +143,7 @@ CREATE TABLE points (
     -- hex pks and backfilled by create_hexes() within the load transaction, so
     -- the reference is only valid again at COMMIT (checked there, not
     -- per-statement). Deferring also keeps loads off ALTER TABLE / ACCESS
-    -- EXCLUSIVE, which used to deadlock with live web-api reads (see
-    -- migrations/relax-shared-table-constraints.sql).
+    -- EXCLUSIVE, which used to deadlock with live web-api reads.
     hex_0_pk integer CONSTRAINT hexes_zoom_0_points_foreign REFERENCES hexes_zoom_0(pk) DEFERRABLE INITIALLY DEFERRED,
     hex_1_pk integer CONSTRAINT hexes_zoom_1_points_foreign REFERENCES hexes_zoom_1(pk) DEFERRABLE INITIALLY DEFERRED
 );
@@ -200,6 +197,12 @@ CREATE TABLE profiles (
     n_records bigint,
     records_per_day float,
     n_profiles bigint,
+    -- The EOVs this feature actually carries, detected at harvest from the
+    -- per-variable record counts. Always a subset of the parent dataset's
+    -- eovs, and never empty (it falls back to the dataset's full list when
+    -- detection isn't possible) — the web-api filters with the && overlap
+    -- operator, so an empty list would hide the feature from every selection.
+    eovs text[],
     -- Hex FKs are DEFERRABLE INITIALLY DEFERRED for the same reason as on
     -- cde.points above: create_hexes() rebuilds+relinks within the transaction
     -- and the reference is validated at COMMIT, keeping loads off ACCESS
@@ -219,6 +222,14 @@ CREATE INDEX ON profiles(longitude);
 CREATE INDEX ON profiles(erddap_url, dataset_id);
 -- Index for faster lookups when joining with specific profile/timeseries IDs
 CREATE INDEX ON profiles(erddap_url, dataset_id, timeseries_id, profile_id);
+-- Every tile/legend/shape query joins profiles.dataset_pk = datasets.pk; the
+-- (erddap_url, dataset_id) index above does not serve a dataset_pk lookup, so
+-- without this a single-dataset / Source-filter drilldown seq-scans profiles.
+CREATE INDEX ON profiles(dataset_pk);
+-- The EOV filter is an && array overlap pushed into the profiles branch of
+-- every tile/legend/shape query; without GIN it seq-scans the largest table in
+-- the app on every pan.
+CREATE INDEX ON profiles USING GIN (eovs);
 
 
 
@@ -260,6 +271,14 @@ CREATE TABLE obis_cells (
 CREATE INDEX ON obis_cells USING GIST (geom);
 CREATE INDEX ON obis_cells (dataset_id);
 CREATE INDEX ON obis_cells (latitude, longitude);
+-- Tile/legend/shape queries join obis_cells.dataset_pk = datasets.pk; (dataset_id)
+-- above serves the incremental DELETE, not this integer-pk join.
+CREATE INDEX ON obis_cells (dataset_pk);
+-- /tiles/cells joins the visible hexes (tile_hexes) to cells on zoom_pk. Without
+-- these, only the trajectory half could index-prune and the OBIS half
+-- full-scanned the whole table per coverage tile.
+CREATE INDEX ON obis_cells (hex_0_pk);
+CREATE INDEX ON obis_cells (hex_1_pk);
 -- Partial GIN: only cells whose aphia_ids are still empty (i.e. WoRMS hasn't
 -- resolved any of their scientific_names yet). The literal-name predicate in
 -- web-api/utils/dbFilter.js fires only for those rows; once aphia_ids is
@@ -276,14 +295,15 @@ ALTER TABLE cde.obis_cells SET (fillfactor = 80);
 ALTER TABLE cde.points SET (fillfactor = 80);
 
 
--- Trajectory / TrajectoryProfile coverage cells: one row per (trajectory,
--- 1/12-degree grid cell) the track passes through, produced by the harvester's
--- trajectory dataset-type handler via server-side binned ERDDAP queries (no
--- full-resolution track is ever stored here). Modeled on obis_cells — same
--- generated geom, same points/hex FK propagation (see trajectory_* functions
--- in 5_profile_process.sql).
-DROP TABLE IF EXISTS trajectory_cells;
-CREATE TABLE trajectory_cells (
+-- Trajectory / TrajectoryProfile per-day ERDDAP aggregates: one row per
+-- (trajectory, UTC day), produced by the trajectory dataset-type handler via
+-- server-side day-bucket grouping (orderByCount / orderByMinMax on
+-- "<traj>,time/86400"). Deliberately carries NO geometry: where a platform was
+-- on a given day comes from cde.trajectory_points, not from this table. The
+-- two are joined by day in trajectory_build_hexes() (4_create_hexes.sql).
+-- Small: a few rows per trajectory-day for the whole catalogue.
+DROP TABLE IF EXISTS trajectory_days;
+CREATE TABLE trajectory_days (
     pk serial PRIMARY KEY,
     dataset_pk integer,
     erddap_url text,
@@ -291,55 +311,153 @@ CREATE TABLE trajectory_cells (
     -- cf_role=trajectory_id value (mission/deployment); '' when the dataset
     -- has a single unnamed trajectory.
     trajectory_id text DEFAULT '',
-    -- bin-center coordinates, rounded to 8 dp (same convention as obis_cells)
+    day date NOT NULL,
+    n_records bigint,
+    -- TrajectoryProfile: distinct profiles started on this day. 0 for plain
+    -- Trajectory datasets.
+    n_profiles bigint DEFAULT 0,
+    depth_min double precision,
+    depth_max double precision,
+    UNIQUE (erddap_url, dataset_id, trajectory_id, day),
+    FOREIGN KEY (dataset_pk) REFERENCES datasets(pk)
+);
+
+-- The incremental DELETE and the dataset_pk backfill both key on
+-- (erddap_url, dataset_id) — served by the UNIQUE index's leading columns.
+-- This one serves the day-join in trajectory_build_hexes().
+CREATE INDEX trajectory_days_dataset_pk_idx ON trajectory_days (dataset_pk, trajectory_id, day);
+
+
+-- Trajectory coverage, one row per (dataset, trajectory, hex tier, hex).
+-- DERIVED, not harvested: trajectory_build_hexes() (4_create_hexes.sql) sweeps
+-- each track's segments through the hex grid, so a hex lights up when the
+-- track PASSED THROUGH it. The previous design binned positions to a
+-- 1/12-degree lat/lon grid on the ERDDAP server and lit the single hex holding
+-- each bin centre; because 1/12 degree of latitude is 9.28 km / cos(lat) in
+-- EPSG:3857 metres while a hex row is a fixed 17.3 km, whole hex rows along a
+-- track went unlit north of ~57N (horizontal striping).
+--
+-- `days` is a COUNT OF DISTINCT UTC DAYS in the hex, not a time span: a ship
+-- crossing the same place each January contributes one day per visit, where
+-- the old per-cell span contributed the whole eleven months between them.
+DROP TABLE IF EXISTS trajectory_hexes;
+CREATE TABLE trajectory_hexes (
+    pk serial PRIMARY KEY,
+    dataset_pk integer,
+    trajectory_id text DEFAULT '',
+    -- 0 = cde.hexes_zoom_0 (100 km, z<5), 1 = cde.hexes_zoom_1 (10 km, z>=5).
+    -- Each tier is aggregated independently so `days` is exact at both: summing
+    -- the 10 km rows into a 100 km hex would count a day once per 10 km hex the
+    -- platform crossed that day.
+    hex_tier smallint NOT NULL,
+    hex_pk integer NOT NULL,
+    -- hex centroid, so the shared time/depth/space filters (dbFilter's
+    -- search_geom, shapeQuery, timeExtent, download) work on this table the
+    -- same way they work on the point-shaped cell tables.
     latitude double precision,
     longitude double precision,
     geom geometry(Point, 3857) GENERATED ALWAYS AS
       (ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)) STORED,
+    -- first entry into / last exit from this hex, interpolated along the
+    -- segments that crossed it
     time_min timestamptz,
     time_max timestamptz,
     depth_min double precision,
     depth_max double precision,
+    -- distinct UTC days the trajectory was inside this hex
+    days integer,
+    -- apportioned from cde.trajectory_days by time spent in the hex each day;
+    -- per-dataset totals are preserved, per-hex values are estimates
     n_records bigint,
-    -- TrajectoryProfile: distinct profiles observed in this cell. 0 for plain
-    -- Trajectory datasets.
     n_profiles bigint DEFAULT 0,
-    -- computed at harvest time so the download-estimate math in
-    -- web-api/utils/shapeQuery.js works unchanged on this table
+    -- download-size estimator input (web-api/utils/shapeQuery.js)
     records_per_day float,
-    days bigint,
-    -- hex polygon geometries live on cde.hexes_zoom_0/1; only the FK is
-    -- carried here (filled by create_hexes() via cde.points).
-    hex_0_pk integer,
-    hex_1_pk integer,
-    point_pk integer,
-    UNIQUE(erddap_url, dataset_id, trajectory_id, latitude, longitude),
+    UNIQUE (dataset_pk, trajectory_id, hex_tier, hex_pk),
     FOREIGN KEY (dataset_pk) REFERENCES datasets(pk)
 );
 
-CREATE INDEX trajectory_cells_geom_gist ON trajectory_cells USING GIST (geom);
--- No (erddap_url, dataset_id) index: the UNIQUE constraint's index above has
--- them as its leading columns and serves those lookups (incremental DELETE,
--- dataset_pk backfill join).
-CREATE INDEX trajectory_cells_latlon_idx ON trajectory_cells (latitude, longitude);
--- Drive the per-tile lookup in /tiles/trajectories: hexes intersecting the
--- tile envelope come from the hexes_zoom_* GIST, then these indexes fetch
--- just the cells under those hexes.
-CREATE INDEX trajectory_cells_hex_0_idx ON trajectory_cells (hex_0_pk);
-CREATE INDEX trajectory_cells_hex_1_idx ON trajectory_cells (hex_1_pk);
-ALTER TABLE cde.trajectory_cells SET (fillfactor = 80);
+-- Tile and legend queries fetch every row under the hexes intersecting a tile,
+-- at one tier: this is their access path.
+CREATE INDEX trajectory_hexes_tier_hex_idx ON trajectory_hexes (hex_tier, hex_pk);
+-- Delta-scoped rebuilds and the datasets join.
+CREATE INDEX trajectory_hexes_dataset_pk_idx ON trajectory_hexes (dataset_pk);
+-- dbFilter lat/lon bounds + drawn-polygon ST_Intersects on search_geom.
+CREATE INDEX trajectory_hexes_geom_gist ON trajectory_hexes USING GIST (geom);
+CREATE INDEX trajectory_hexes_latlon_idx ON trajectory_hexes (latitude, longitude);
+
+
+-- Ordered, downsampled track fixes for Trajectory / TrajectoryProfile
+-- datasets: one row per (trajectory, retained fix), produced by the
+-- harvester's extract_track_points (per-profile fixes for TrajectoryProfile,
+-- first-fix-per-day for plain Trajectory, capped per trajectory). Unlike
+-- trajectory_hexes these are RAW coordinates in time order — the source for
+-- the /tiles/tracks line assembly, the /trajectories/track endpoint AND (via
+-- trajectory_build_hexes) the hex coverage itself.
+-- NOT hex-aggregated: no point_pk/hex FKs by design.
+DROP TABLE IF EXISTS trajectory_points;
+CREATE TABLE trajectory_points (
+    pk serial PRIMARY KEY,
+    dataset_pk integer,
+    erddap_url text,
+    dataset_id text,
+    -- cf_role=trajectory_id value; '' when the dataset has a single unnamed
+    -- trajectory (same convention as trajectory_days).
+    trajectory_id text DEFAULT '',
+    -- cf_role=profile_id value for TrajectoryProfile fixes; NULL for plain
+    -- Trajectory (per-day) fixes.
+    profile_id text,
+    time timestamptz NOT NULL,
+    -- raw (unsnapped) fix coordinates
+    latitude double precision,
+    longitude double precision,
+    geom geometry(Point, 3857) GENERATED ALWAYS AS
+      (ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)) STORED,
+    UNIQUE (erddap_url, dataset_id, trajectory_id, time),
+    FOREIGN KEY (dataset_pk) REFERENCES datasets(pk)
+);
+
+-- (a) scrub-window queries: prune by time before per-trajectory assembly
+CREATE INDEX trajectory_points_time_idx ON trajectory_points (time);
+-- (b) ordered per-trajectory reads (ST_MakeLine ORDER BY time, full-track endpoint)
+CREATE INDEX trajectory_points_traj_time_idx ON trajectory_points (dataset_pk, trajectory_id, time);
+CREATE INDEX trajectory_points_geom_gist ON trajectory_points USING GIST (geom);
+ALTER TABLE cde.trajectory_points SET (fillfactor = 90);
+
+-- Per-trajectory summary, rebuilt on each load by trajectory_refresh_track_stats()
+-- (5_profile_process.sql). Serves the /trajectories/platforms list and lets the
+-- /tiles/tracks route prune candidate trajectories by bbox before assembling
+-- lines (a per-point spatial filter would break segments at tile borders).
+DROP TABLE IF EXISTS trajectory_track_stats;
+CREATE TABLE trajectory_track_stats (
+    dataset_pk integer,
+    trajectory_id text DEFAULT '',
+    time_min timestamptz,
+    time_max timestamptz,
+    n_points bigint,
+    -- ST_Extent envelope of the track; Geometry (not Polygon) because a
+    -- single-fix track's envelope degenerates to a Point.
+    bbox geometry(Geometry, 3857),
+    -- Median gap between consecutive retained fixes: the platform's TYPICAL
+    -- reporting cadence, robust to long idle periods (a mean would conflate
+    -- sailing and idle time). Drives the /tiles/tracks gap-split threshold.
+    median_gap_secs double precision,
+    PRIMARY KEY (dataset_pk, trajectory_id)
+);
+CREATE INDEX trajectory_track_stats_bbox_gist ON trajectory_track_stats USING GIST (bbox);
 
 -- Aggressive autovacuum on the load-churned tables. Incremental loads
 -- DELETE+INSERT each changed dataset's rows; at the default scale factor
 -- (0.2) a 780k-row table accrues ~156k dead tuples before autovacuum reacts,
 -- which then bursts IO against live web-api traffic. 0.02 makes cleanup
 -- small and frequent instead (autovacuum's cost-based throttling paces the
--- IO). Same values as migrations/autovacuum-churned-tables.sql.
+-- IO).
 ALTER TABLE cde.profiles SET (
   autovacuum_vacuum_scale_factor = 0.02, autovacuum_analyze_scale_factor = 0.02);
 ALTER TABLE cde.obis_cells SET (
   autovacuum_vacuum_scale_factor = 0.02, autovacuum_analyze_scale_factor = 0.02);
-ALTER TABLE cde.trajectory_cells SET (
+ALTER TABLE cde.trajectory_hexes SET (
+  autovacuum_vacuum_scale_factor = 0.02, autovacuum_analyze_scale_factor = 0.02);
+ALTER TABLE cde.trajectory_points SET (
   autovacuum_vacuum_scale_factor = 0.02, autovacuum_analyze_scale_factor = 0.02);
 ALTER TABLE cde.points SET (
   autovacuum_vacuum_scale_factor = 0.02, autovacuum_analyze_scale_factor = 0.02);

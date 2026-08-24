@@ -23,6 +23,7 @@ from cde_harvester.core.observability import (
     init_sentry,
     setup_logging,
 )
+from cde_harvester.core.issues import report_issues
 from cde_harvester.core.schemas import HarvestAttemptSchema
 from cde_harvester.sources.erddap.harvester import harvest_erddap
 from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
@@ -147,6 +148,12 @@ def _write_run_audit_csvs(folder, run_id, started_at, finished_at, git_sha,
     # Surface the same per-dataset statuses in the Prefect UI as a table artifact.
     _publish_status_artifact(df_attempts, run_id, status, logger)
 
+    # Collapse the run's errors into one report per (server, distinct error) and
+    # hand them to Sentry, which de-dupes on the fingerprint so only a problem we
+    # haven't seen before raises an alert. Runs here because this is the one seam
+    # every exit path goes through, with all attempts already concatenated.
+    report_issues("harvester", df_attempts, logger)
+
 
 def _run_logger():
     """Prefect run logger when inside a run, else the module logger.
@@ -164,7 +171,8 @@ def _run_logger():
 @task(task_run_name="merge-and-write-csvs")
 def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skipped,
                          obis_datasets, obis_cells, obis_skipped, df_ckan,
-                         erddap_verified=None, erddap_trajectory_cells=None):
+                         erddap_verified=None, erddap_trajectory_days=None,
+                         erddap_trajectory_points=None):
     """Join CKAN metadata, merge all sources, and write the output CSVs (@task)."""
     logger = _run_logger()
     datasets_file = f"{folder}/datasets.csv"
@@ -172,11 +180,14 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     skipped_datasets_file = f"{folder}/skipped.csv"
     ckan_file = f"{folder}/ckan.csv"
     obis_cells_file = f"{folder}/obis_cells.csv"
-    trajectory_cells_file = f"{folder}/trajectory_cells.csv"
+    trajectory_days_file = f"{folder}/trajectory_days.csv"
+    trajectory_points_file = f"{folder}/trajectory_points.csv"
     verified_file = f"{folder}/verified.csv"
 
-    if erddap_trajectory_cells is None:
-        erddap_trajectory_cells = pd.DataFrame()
+    if erddap_trajectory_days is None:
+        erddap_trajectory_days = pd.DataFrame()
+    if erddap_trajectory_points is None:
+        erddap_trajectory_points = pd.DataFrame()
 
     # --- ERDDAP-specific post-processing ---
     if not erddap_datasets.empty:
@@ -252,15 +263,24 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
         )
 
     logger.info(
-        "Adding %s datasets, %s profiles, %s obis_cells, %s trajectory_cells",
+        "Adding %s datasets, %s profiles, %s obis_cells, %s trajectory_days, "
+        "%s trajectory_points",
         len(datasets), len(erddap_profiles), len(obis_cells),
-        len(erddap_trajectory_cells),
+        len(erddap_trajectory_days), len(erddap_trajectory_points),
     )
 
     # Write output CSVs
     datasets.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
         datasets_file, index=False
     )
+    # Serialize the per-feature EOV list to its Python repr up front: the CSV
+    # round-trip would do it anyway (the loader reads it back with
+    # ast.literal_eval, as it does for the dataset arrays), and lists are
+    # unhashable, so drop_duplicates() below cannot see the column otherwise.
+    if "eovs" in erddap_profiles.columns:
+        erddap_profiles["eovs"] = erddap_profiles["eovs"].apply(
+            lambda x: repr(list(x)) if isinstance(x, (list, tuple)) else x
+        )
     erddap_profiles.drop_duplicates().to_csv(profiles_file, index=False)
     if not df_ckan.empty:
         df_ckan.to_csv(ckan_file, index=False)
@@ -269,8 +289,11 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     if not obis_cells.empty:
         obis_cells.to_csv(obis_cells_file, index=False)
 
-    if not erddap_trajectory_cells.empty:
-        erddap_trajectory_cells.to_csv(trajectory_cells_file, index=False)
+    if not erddap_trajectory_days.empty:
+        erddap_trajectory_days.to_csv(trajectory_days_file, index=False)
+
+    if not erddap_trajectory_points.empty:
+        erddap_trajectory_points.to_csv(trajectory_points_file, index=False)
 
     # Datasets skipped as unchanged — only their verified_at is bumped by the loader.
     if erddap_verified is not None and not erddap_verified.empty:
@@ -285,9 +308,14 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     logger.info("Wrote %s", " ".join(str(f) for f in written_files))
     if not obis_cells.empty:
         logger.info("Wrote %s (%d cells)", obis_cells_file, len(obis_cells))
-    if not erddap_trajectory_cells.empty:
+    if not erddap_trajectory_days.empty:
         logger.info(
-            "Wrote %s (%d cells)", trajectory_cells_file, len(erddap_trajectory_cells)
+            "Wrote %s (%d days)", trajectory_days_file, len(erddap_trajectory_days)
+        )
+    if not erddap_trajectory_points.empty:
+        logger.info(
+            "Wrote %s (%d track points)",
+            trajectory_points_file, len(erddap_trajectory_points),
         )
 
     if not skipped_datasets.empty:
@@ -379,15 +407,19 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
 
         # Collect ERDDAP results
         erddap_profiles = pd.DataFrame()
-        erddap_trajectory_cells = pd.DataFrame()
+        erddap_trajectory_days = pd.DataFrame()
+        erddap_trajectory_points = pd.DataFrame()
         erddap_datasets = pd.DataFrame()
         variables = pd.DataFrame()
         erddap_skipped = pd.DataFrame()
 
         for result in erddap_results:
             erddap_profiles = pd.concat([erddap_profiles, result.profiles])
-            erddap_trajectory_cells = pd.concat(
-                [erddap_trajectory_cells, result.trajectory_cells]
+            erddap_trajectory_days = pd.concat(
+                [erddap_trajectory_days, result.trajectory_days]
+            )
+            erddap_trajectory_points = pd.concat(
+                [erddap_trajectory_points, result.trajectory_points]
             )
             erddap_datasets = pd.concat([erddap_datasets, result.datasets])
             variables = pd.concat([variables, result.variables])
@@ -451,7 +483,11 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             triggered_source=triggered_source,
             triggered_by=triggered_by,
         )
-        sys.exit(1)
+        # Raise, don't sys.exit: main() also runs INSIDE a Prefect flow, where
+        # SystemExit reports as "Crashed" (no message, no failure handling)
+        # instead of a clean Failed. The CLI path still exits non-zero on an
+        # uncaught exception.
+        raise RuntimeError("No datasets harvested from any source")
 
     if erddap_datasets.empty and obis_datasets.empty:
         logging.info(
@@ -498,7 +534,8 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         folder=folder,
         erddap_datasets=erddap_datasets,
         erddap_profiles=erddap_profiles,
-        erddap_trajectory_cells=erddap_trajectory_cells,
+        erddap_trajectory_days=erddap_trajectory_days,
+        erddap_trajectory_points=erddap_trajectory_points,
         erddap_skipped=erddap_skipped,
         obis_datasets=obis_datasets,
         obis_cells=obis_cells,

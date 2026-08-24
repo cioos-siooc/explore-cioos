@@ -114,7 +114,11 @@ body.cioos-modal-open {
   border-radius: 0;
 }
 
-@media (max-width: 991.98px) {
+/* 992px, the tablet rung of the shared scale (theme.css). The .98 this carried
+   was Bootstrap's, which built its max-widths off `min-width - 0.02` to avoid
+   overlapping its own min-width queries; nothing here has a matching
+   min-width: 992px rule for it to avoid. */
+@media (max-width: 992px) {
   .modal-fullscreen-lg-down {
     width: 100vw;
     max-width: none;

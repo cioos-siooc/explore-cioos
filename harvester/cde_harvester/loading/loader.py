@@ -3,7 +3,6 @@ import csv
 import io
 import logging
 import os
-import sys
 import time
 from contextlib import contextmanager
 
@@ -15,7 +14,11 @@ from prefect import get_run_logger, task
 
 from cde_harvester.core.db import create_db_engine, db_host
 from cde_harvester.core.observability import init_sentry
-from cde_harvester.core.schemas import DATASET_ARRAY_DTYPES, OBIS_ARRAY_DTYPES
+from cde_harvester.core.schemas import (
+    DATASET_ARRAY_DTYPES,
+    OBIS_ARRAY_DTYPES,
+    PROFILE_ARRAY_DTYPES,
+)
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -24,16 +27,32 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 # nightly full-reload (whose remove_all_data() TRUNCATEs every table), and two
 # incremental loads can't fight over each other's DELETE/INSERT churn.
 #
-# The lock is NOT taken at the top of the transaction. Incremental loads first
-# populate session-private temp tables (no shared-table contention) WITHOUT the
-# lock, then acquire it only around process_incremental_update() — the phase that
-# actually touches the shared tables. This keeps the lock held for minutes, not the
-# whole bulk upload (~tens of minutes), so concurrent loaders upload in parallel and
-# only serialize on the short processing phase. Full reloads still take the lock for
-# their entire transaction (they TRUNCATE shared tables from the start). A late-
-# acquiring incremental is still correct: the full-reload holds the same lock, so the
-# worst case is the incremental simply waits behind it. pg_advisory_xact_lock auto-
-# releases at COMMIT/ROLLBACK. Arbitrary stable constant ("CDE-LOADER").
+# The lock is NOT taken at the top of the load. Incremental loads first populate
+# session-private temp tables WITHOUT the lock, then acquire it only around
+# process_incremental_update() — the phase that actually touches the shared
+# tables. This keeps the lock held for minutes, not the whole bulk upload
+# (~tens of minutes), so concurrent loaders upload in parallel and only
+# serialize on the short processing phase.
+#
+# CRITICAL ORDERING INVARIANT: the staging phase runs in its OWN transaction,
+# COMMITTED before the advisory lock is requested (see acquire_loader_lock).
+# The staging phase is not lock-free — create_temp_tables()'s
+# CREATE TEMP TABLE (LIKE cde.X) takes AccessShareLock on every shared source
+# table, held to transaction end — while the locked phase takes
+# AccessExclusiveLock on the same tables (drop_constraints ALTERs). If a
+# loader could WAIT on the advisory lock while still HOLDING staging locks,
+# the advisory-lock holder's AccessExclusive requests would queue behind
+# those AccessShare locks: a circular wait. A live three-loader deadlock
+# (two DeadlockDetected + one aborted load) was traced to exactly that.
+# Committing the staging transaction first releases every lock the session
+# holds, so a loader waiting on the advisory lock holds nothing. Temp tables
+# and their rows survive the commit (session-scoped, ON COMMIT PRESERVE ROWS).
+#
+# Full reloads take the lock before any shared-table access in their phase.
+# A late-acquiring incremental is still correct: the full-reload holds the same
+# lock, so the worst case is the incremental simply waits behind it.
+# pg_advisory_xact_lock auto-releases at COMMIT/ROLLBACK. Arbitrary stable
+# constant ("CDE-LOADER").
 DB_LOADER_ADVISORY_LOCK_KEY = 738825001
 
 logging.basicConfig(
@@ -109,7 +128,7 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
     else:
         agg["aphia_ids"] = [[] for _ in range(len(agg))]
 
-    # Same bigint/COPY constraint as prepare_trajectory_cells_dataframe.
+    # Same bigint/COPY constraint as prepare_trajectory_days_dataframe.
     agg["n_records"] = agg["n_records"].round().astype("Int64")
     return agg
 
@@ -141,7 +160,7 @@ def _pg_int_array(values):
 
 
 def load_cells_copy(df, table_name, transaction, schema=None):
-    """Bulk-load a cells DataFrame (obis_cells / trajectory_cells) via COPY
+    """Bulk-load a cells DataFrame (obis_cells / trajectory_days) via COPY
     FROM STDIN.
 
     Replaces the previous to_sql-based loader: COPY runs ~10-50x faster than
@@ -185,39 +204,65 @@ def load_cells_copy(df, table_name, transaction, schema=None):
 load_obis_cells_copy = load_cells_copy
 
 
-def prepare_trajectory_cells_dataframe(trajectory_cells):
-    """Clean and prepare trajectory_cells DataFrame for insertion.
+def prepare_trajectory_days_dataframe(trajectory_days):
+    """Clean and prepare the trajectory_days DataFrame for insertion.
 
-    Mirrors prepare_obis_cells_dataframe: round coordinates to 8 dp to avoid
-    float-precision duplicates, then deduplicate on the table's unique key,
-    aggregating extents/counts defensively.
+    Deduplicates on the table's unique key, aggregating counts and depth
+    extents defensively (a dataset harvested in two passes can produce the
+    same trajectory-day twice).
     """
-    cells = trajectory_cells.copy()
-    cells["trajectory_id"] = cells["trajectory_id"].fillna("").astype(str)
-    cells["latitude"] = cells["latitude"].round(8)
-    cells["longitude"] = cells["longitude"].round(8)
+    days = trajectory_days.copy()
+    days["trajectory_id"] = days["trajectory_id"].fillna("").astype(str)
+    # date, not timestamp: the day column is a DATE in the DB, and a stray
+    # time-of-day would split one day into two rows.
+    days["day"] = pd.to_datetime(days["day"], errors="coerce", utc=True).dt.date
 
-    key_cols = ["erddap_url", "dataset_id", "trajectory_id", "latitude", "longitude"]
+    key_cols = ["erddap_url", "dataset_id", "trajectory_id", "day"]
     agg = (
-        cells.groupby(key_cols, dropna=False)
+        days.groupby(key_cols, dropna=False)
         .agg(
-            time_min=("time_min", "min"),
-            time_max=("time_max", "max"),
-            depth_min=("depth_min", "min"),
-            depth_max=("depth_max", "max"),
             n_records=("n_records", "sum"),
             n_profiles=("n_profiles", "sum"),
-            records_per_day=("records_per_day", "sum"),
-            days=("days", "max"),
+            depth_min=("depth_min", "min"),
+            depth_max=("depth_max", "max"),
         )
         .reset_index()
     )
     # COPY does no casting: these land in bigint columns, and pandas upcasts
     # counts to float64 ("2.0") as soon as a NaN is involved anywhere upstream.
     # Nullable Int64 renders as "2" / \N in the COPY buffer.
-    for col in ("n_records", "n_profiles", "days"):
+    for col in ("n_records", "n_profiles"):
         agg[col] = agg[col].round().astype("Int64")
     return agg
+
+
+def prepare_trajectory_points_dataframe(trajectory_points):
+    """Clean and prepare trajectory_points DataFrame for insertion.
+
+    Unlike the cells tables nothing is aggregated or rounded — these are raw
+    ordered fixes. Parse times, drop unusable rows, and deduplicate on the
+    table's unique key (erddap_url, dataset_id, trajectory_id, time).
+    """
+    points = trajectory_points.copy()
+    points["trajectory_id"] = points["trajectory_id"].fillna("").astype(str)
+    points["time"] = pd.to_datetime(points["time"], errors="coerce", utc=True)
+    points = points.dropna(subset=["time", "latitude", "longitude"])
+    if "profile_id" in points.columns:
+        points["profile_id"] = points["profile_id"].astype("string")
+        points.loc[points["profile_id"].str.strip() == "", "profile_id"] = pd.NA
+    else:
+        points["profile_id"] = pd.NA
+
+    key_cols = ["erddap_url", "dataset_id", "trajectory_id", "time"]
+    points = (
+        points.sort_values(key_cols)
+        .drop_duplicates(subset=key_cols, keep="first")
+        .reset_index(drop=True)
+    )
+    return points[
+        ["erddap_url", "dataset_id", "trajectory_id", "profile_id",
+         "time", "latitude", "longitude"]
+    ]
 
 
 def ensure_organization_pks(datasets):
@@ -254,7 +299,8 @@ def main(folder, incremental=False):
     profiles_file = f"{folder}/profiles.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
     obis_cells_file = f"{folder}/obis_cells.csv"
-    trajectory_cells_file = f"{folder}/trajectory_cells.csv"
+    trajectory_days_file = f"{folder}/trajectory_days.csv"
+    trajectory_points_file = f"{folder}/trajectory_points.csv"
     verified_file = f"{folder}/verified.csv"
     harvest_runs_file = f"{folder}/harvest_runs.csv"
     harvest_attempts_file = f"{folder}/harvest_attempts.csv"
@@ -274,10 +320,15 @@ def main(folder, incremental=False):
         logger.info("Reading %s", obis_cells_file)
         obis_cells = pd.read_csv(obis_cells_file)
 
-    trajectory_cells = None
-    if os.path.isfile(trajectory_cells_file):
-        logger.info("Reading %s", trajectory_cells_file)
-        trajectory_cells = pd.read_csv(trajectory_cells_file)
+    trajectory_days = None
+    if os.path.isfile(trajectory_days_file):
+        logger.info("Reading %s", trajectory_days_file)
+        trajectory_days = pd.read_csv(trajectory_days_file)
+
+    trajectory_points = None
+    if os.path.isfile(trajectory_points_file):
+        logger.info("Reading %s", trajectory_points_file)
+        trajectory_points = pd.read_csv(trajectory_points_file)
 
     verified = None
     if os.path.isfile(verified_file) and os.path.getsize(verified_file) > 1:
@@ -298,6 +349,11 @@ def main(folder, incremental=False):
         logger.info("Reading %s", harvest_attempts_file)
         harvest_attempts_df = pd.read_csv(
             harvest_attempts_file, parse_dates=["attempted_at"]
+        )
+
+    if "eovs" in profiles.columns:
+        profiles["eovs"] = profiles["eovs"].apply(
+            lambda x: ast.literal_eval(x) if isinstance(x, str) else []
         )
 
     datasets["eovs"] = datasets["eovs"].apply(ast.literal_eval)
@@ -345,9 +401,13 @@ def main(folder, incremental=False):
     if datasets.empty:
         if not incremental:
             # A full reload with zero datasets would TRUNCATE everything and
-            # leave the DB empty — genuinely wrong, so bail out hard.
-            logger.info("No datasets found")
-            sys.exit(1)
+            # leave the DB empty — genuinely wrong, so bail out hard. Raise,
+            # don't sys.exit: this also runs inside a Prefect flow, where
+            # SystemExit reports as "Crashed" instead of a clean Failed (the
+            # CLI wrapper in loading/__main__.py handles the exit code).
+            raise RuntimeError(
+                "Full reload found no datasets; refusing to wipe the database"
+            )
         # Incremental runs legitimately produce an empty datasets.csv when every
         # dataset was unchanged and skipped by the harvester (skip_unchanged).
         # That is a successful no-op, not a crash: fall through so we still bump
@@ -363,10 +423,20 @@ def main(folder, incremental=False):
         # Transaction-scoped lock that serializes loads over the shared cde tables.
         # See DB_LOADER_ADVISORY_LOCK_KEY for why this is acquired late (incremental)
         # vs up-front (full reload). Concurrent loaders simply wait here until the one
-        # ahead commits/rolls back — that wait is expected to exceed the session
-        # lock_timeout (set at transaction start), so lift the timeout for this one
-        # statement and restore it after. A zombie lock-holder can't wedge us:
-        # its idle_in_transaction_session_timeout kills it and releases the lock.
+        # ahead commits/rolls back.
+        #
+        # Commit the staging transaction FIRST: it releases every lock this
+        # session holds (notably create_temp_tables' AccessShareLock on the
+        # shared tables it LIKEs), so no loader ever waits on the advisory
+        # lock while holding a shared-table lock — the lock-order inversion
+        # behind a live three-loader deadlock. Temp tables and their rows are
+        # session-scoped and survive the commit.
+        if transaction.in_transaction():
+            transaction.commit()
+        # The advisory-lock wait is expected to exceed the session lock_timeout
+        # (set at transaction start), so lift the timeout for this one statement
+        # and restore it after. A zombie lock-holder can't wedge us: its
+        # idle_in_transaction_session_timeout kills it and releases the lock.
         logger.info("Acquiring db-loader advisory lock (serializes concurrent loads)")
         transaction.execute(text("SET lock_timeout = 0"))
         transaction.execute(
@@ -375,7 +445,14 @@ def main(folder, incremental=False):
         )
         transaction.execute(text("SET lock_timeout = '2min'"))
 
-    with engine.begin() as transaction:
+    # "Commit as you go" connection, NOT engine.begin(): the load is two
+    # transactions — a session-private staging phase (temp tables + uploads,
+    # plus the vernaculars prefetch), committed inside acquire_loader_lock(),
+    # then the advisory-locked shared-table phase, committed at the end. A
+    # staging failure aborts before any shared-table change; a locked-phase
+    # failure rolls back the shared-table work while the already-committed
+    # staging leaves nothing behind (temp tables die with the session).
+    with engine.connect() as transaction:
         logger.info("Writing to DB:")
 
         # Session-level safety timeouts for the load transaction.
@@ -465,6 +542,7 @@ def main(folder, incremental=False):
                         con=transaction,
                         if_exists="append",
                         index=False,
+                        dtype=PROFILE_ARRAY_DTYPES,
                         method="multi",
                     )
 
@@ -476,14 +554,23 @@ def main(folder, incremental=False):
                     )
                     load_cells_copy(prepared, "temp_obis_cells", transaction)
 
-            if trajectory_cells is not None:
-                prepared = prepare_trajectory_cells_dataframe(trajectory_cells)
-                with _timed("temp_trajectory_cells COPY", logger):
+            if trajectory_days is not None:
+                prepared = prepare_trajectory_days_dataframe(trajectory_days)
+                with _timed("temp_trajectory_days COPY", logger):
                     logger.info(
-                        "Loading trajectory_cells into temp table (%d rows)",
+                        "Loading trajectory_days into temp table (%d rows)",
                         len(prepared),
                     )
-                    load_cells_copy(prepared, "temp_trajectory_cells", transaction)
+                    load_cells_copy(prepared, "temp_trajectory_days", transaction)
+
+            if trajectory_points is not None:
+                prepared = prepare_trajectory_points_dataframe(trajectory_points)
+                with _timed("temp_trajectory_points COPY", logger):
+                    logger.info(
+                        "Loading trajectory_points into temp table (%d rows)",
+                        len(prepared),
+                    )
+                    load_cells_copy(prepared, "temp_trajectory_points", transaction)
 
             if not skipped_datasets.empty:
                 with _timed("temp_skipped_datasets to_sql", logger):
@@ -637,6 +724,7 @@ def main(folder, incremental=False):
                         if_exists="append",
                         schema=schema,
                         index=False,
+                        dtype=PROFILE_ARRAY_DTYPES,
                         method="multi",
                     )
 
@@ -648,16 +736,18 @@ def main(folder, incremental=False):
                         prepared, "obis_cells", transaction, schema=schema
                     )
 
-            if trajectory_cells is not None:
-                prepared = prepare_trajectory_cells_dataframe(trajectory_cells)
+            if trajectory_days is not None or trajectory_points is not None:
                 # Resolve dataset_pk at COPY time (datasets were just written
-                # above) so trajectory_link_dataset_pk() doesn't rewrite every
+                # above) so the *_link_dataset_pk() passes don't rewrite every
                 # row post-load. Unmatched rows COPY a NULL and are caught by
-                # that backfill pass.
+                # those backfill passes.
                 pk_rows = transaction.execute(
                     text("SELECT pk, erddap_url, dataset_id FROM cde.datasets")
                 ).all()
                 pk_map = {(r.erddap_url, r.dataset_id): r.pk for r in pk_rows}
+
+            if trajectory_days is not None:
+                prepared = prepare_trajectory_days_dataframe(trajectory_days)
                 prepared["dataset_pk"] = pd.array(
                     [
                         pk_map.get(key)
@@ -667,10 +757,27 @@ def main(folder, incremental=False):
                     ],
                     dtype="Int64",
                 )
-                with _timed("trajectory_cells COPY", logger):
-                    logger.info("Writing trajectory_cells (%d rows)", len(prepared))
+                with _timed("trajectory_days COPY", logger):
+                    logger.info("Writing trajectory_days (%d rows)", len(prepared))
                     load_cells_copy(
-                        prepared, "trajectory_cells", transaction, schema=schema
+                        prepared, "trajectory_days", transaction, schema=schema
+                    )
+
+            if trajectory_points is not None:
+                prepared = prepare_trajectory_points_dataframe(trajectory_points)
+                prepared["dataset_pk"] = pd.array(
+                    [
+                        pk_map.get(key)
+                        for key in zip(
+                            prepared["erddap_url"], prepared["dataset_id"]
+                        )
+                    ],
+                    dtype="Int64",
+                )
+                with _timed("trajectory_points COPY", logger):
+                    logger.info("Writing trajectory_points (%d rows)", len(prepared))
+                    load_cells_copy(
+                        prepared, "trajectory_points", transaction, schema=schema
                     )
 
             with _timed("skipped_datasets to_sql", logger):
@@ -714,21 +821,36 @@ def main(folder, incremental=False):
                             "  %s: %s rows affected", fn, n if n is not None else 0
                         )
 
-            if trajectory_cells is not None:
-                # Per-step invocation for timing/row-count logs (sub-functions
-                # in 5_profile_process.sql); incremental calls the
-                # trajectory_process() wrapper instead. Must run after
-                # profile_process() (points rebuild) and before create_hexes()
-                # (which links point_pk + hex FKs in one pass). The two steps
-                # here are backfills that should touch ~0 rows: dataset_pk is
-                # set at COPY time above, days at harvest time.
-                trajectory_steps = [
-                    "trajectory_link_dataset_pk",
-                    "trajectory_insert_points",
-                    "trajectory_update_days",
+            if trajectory_days is not None:
+                # dataset_pk backfill only (~0 rows: it is set at COPY time
+                # above). Per-step invocation for timing/row-count logs;
+                # incremental calls the trajectory_process() wrapper instead.
+                logger.info("Processing trajectory_days")
+                with _timed("trajectory_link_dataset_pk", logger):
+                    n = transaction.execute(
+                        text("SELECT trajectory_link_dataset_pk();")
+                    ).scalar()
+                    logger.info(
+                        "  trajectory_link_dataset_pk: %s rows affected",
+                        n if n is not None else 0,
+                    )
+
+            if trajectory_points is not None:
+                # dataset_pk backfill (~0 rows, set at COPY time), the
+                # per-trajectory summary rebuild for /tiles/tracks pruning and
+                # the platform list, then the hex sweep that turns these tracks
+                # into the map's coverage layer. Order matters: the sweep takes
+                # each trajectory's gap threshold from track_stats, and joins
+                # cde.trajectory_days (COPYed above) for the attributes.
+                # NULL = whole corpus; the incremental path scopes it to the
+                # datasets it touched.
+                trajectory_point_steps = [
+                    "trajectory_points_link_dataset_pk",
+                    "trajectory_refresh_track_stats",
+                    "trajectory_build_hexes",
                 ]
-                logger.info("Processing trajectory_cells")
-                for fn in trajectory_steps:
+                logger.info("Processing trajectory_points")
+                for fn in trajectory_point_steps:
                     with _timed(fn, logger):
                         n = transaction.execute(text(f"SELECT {fn}();")).scalar()
                         logger.info(
@@ -773,6 +895,11 @@ def main(folder, incremental=False):
                     method="multi",
                 )
 
+        # Commit the locked phase (engine.connect() does not auto-commit the
+        # way engine.begin() did); this also releases the advisory lock.
+        if transaction.in_transaction():
+            transaction.commit()
+
         logger.info("Wrote to db: %s", f"{schema}.datasets")
         logger.info("Wrote to db: %s", f"{schema}.profiles")
         logger.info("Wrote to db: %s", f"{schema}.skipped_datasets")
@@ -809,16 +936,31 @@ def main(folder, incremental=False):
     # DELETE+INSERT churn. Vacuuming right away keeps that space reusable so
     # the tables plateau instead of growing run-over-run, and refreshes
     # planner stats for the tile queries.
-    if trajectory_cells is not None:
+    if trajectory_days is not None or trajectory_points is not None:
         # Announce before starting: VACUUM emits no output until it finishes, so
         # without this line a multi-minute vacuum right after the final "Wrote to
         # db" logs looks like a hung run.
+        vacuum_targets = ", ".join(
+            name
+            for name, present in (
+                ("cde.trajectory_hexes", trajectory_points is not None),
+                ("cde.trajectory_days", trajectory_days is not None),
+                ("cde.trajectory_points", trajectory_points is not None),
+            )
+            if present
+        )
         logger.info(
-            "Data committed. Running post-load VACUUM ANALYZE on "
-            "cde.trajectory_cells (may take several minutes, no output until done)"
+            "Data committed. Running post-load VACUUM ANALYZE on %s "
+            "(may take several minutes, no output until done)",
+            vacuum_targets,
         )
         with _timed("post-load VACUUM ANALYZE", logger):
             with engine.connect().execution_options(
                 isolation_level="AUTOCOMMIT"
             ) as conn:
-                conn.execute(text("VACUUM ANALYZE cde.trajectory_cells"))
+                if trajectory_points is not None:
+                    conn.execute(text("VACUUM ANALYZE cde.trajectory_hexes"))
+                if trajectory_days is not None:
+                    conn.execute(text("VACUUM ANALYZE cde.trajectory_days"))
+                if trajectory_points is not None:
+                    conn.execute(text("VACUUM ANALYZE cde.trajectory_points"))

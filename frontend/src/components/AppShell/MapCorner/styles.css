@@ -1,4 +1,0 @@
-/* Lower-right map interaction cluster. The box-query (rectangle) button
-   portals into MapLibre's draw group so it flows with the native draw / zoom /
-   scale stack instead of tracking it with hardcoded offsets. Button chrome
-   lives in components/styles.css. */

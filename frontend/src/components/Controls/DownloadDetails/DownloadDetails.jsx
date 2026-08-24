@@ -20,6 +20,7 @@ import {
   defaultStartDepth
 } from '../../config.js'
 import { server } from '../../../config.js'
+import reportError from '../../../state/reportError.js'
 import './styles.css'
 import {
   ArrowsExpand,
@@ -124,7 +125,7 @@ export default function DownloadDetails({
         )
       })
       .catch((error) => {
-        console.error('download size estimate failed:', error)
+        reportError('download size estimate failed', error)
       })
       .finally(() => {
         if (!cancelled) setEstimatesLoading(false)

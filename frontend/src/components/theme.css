@@ -34,6 +34,23 @@
   --cioos-warn:        #B07A00;
   --cioos-info:        #0F6D8E;
 
+  /* --- Map data keys --- */
+  /* Colours that identify one layer or tool wherever it shows up: the paint on
+     the map, its legend swatch, and the control that drives it. The track
+     purple is `trackLineColor` in components/config.js — the map paints from
+     there, the chrome from here, and the two have to stay in step. */
+  --cioos-track:       #6749AC; /* trajectory track lines + the scrub control */
+  --cioos-track-700:   #543A90; /* hover/pressed */
+  --cioos-track-bg:    rgba(103, 73, 172, 0.14); /* trailing-window wash */
+  --cioos-track-surface: #EFEAF8; /* opaque sibling of -bg, for cards over the map */
+  /* The gridded-data amber, paired the same way: the map paints the active
+     grid's footprint in it (griddap-highlight in Map.jsx), and the controls
+     that say which slice of that grid is drawn — its marker on the time bar and
+     on the depth strip — carry it too. */
+  --cioos-grid:        #FBB03B; /* griddap coverage highlight + its markers */
+  --cioos-grid-700:    #C77F14; /* hover/pressed, and label text on white */
+  --cioos-grid-surface: #FDF1DC; /* opaque tint, for pills over the map */
+
   /* --- Elevation --- */
   --cioos-shadow-card:    0 2px 8px rgba(21, 47, 55, 0.08);
   --cioos-shadow-float:   0 4px 16px rgba(21, 47, 55, 0.16);
@@ -79,6 +96,24 @@
      phones (see media query below). The legend offset and the panel's own
      closed-state transforms all derive from this token so they stay in sync. */
   --cioos-panel-w: clamp(360px, 42vw, 580px);
+
+  /* --- Layout: top-bar footprint ---
+     How far down the centered top bar (brand card, Datasets/Filters pill, and
+     the active-filter chips flowing under them) reaches over the datasets
+     column on the left. TopControls publishes the real number, which grows as
+     chips wrap onto new rows, and 0 once the screen is wide enough for the bar
+     to sit clear of that column. */
+  --cioos-top-bar-space: 0px;
+
+  /* --- Layout: bottom time-bar footprint ---
+     How far the time bar reaches up from the bottom of the viewport (its own
+     offset + measured height). TimeBar publishes the real number on :root while
+     it is mounted and clears it on unmount, so anything sitting over the lower
+     half of the map — the datasets sidebar, the zoom-to-dataset pill — can hold
+     clearance from it without hard-coding its height. 0 when the bar isn't
+     shown. (The depth bar runs down the right edge instead and is measured by
+     nothing: it sits clear of the other floating surfaces.) */
+  --cioos-time-bar-space: 0px;
 
   /* --- Header & Layout (Modern Sidebar) --- */
   --cioos-header-height: 70px;
@@ -139,6 +174,27 @@
   --cioos-button-height-lg: 44px;
   --cioos-button-hover-scale: 1.02;
 }
+
+/* --- Breakpoints ---
+   A custom property cannot be read inside a @media query, so these can only be
+   a convention rather than a token. Written down anyway, because the scale had
+   drifted to seven rungs (600 / 700 / 900 / 991.98 / 992 / 1200 / 1400) with
+   nothing saying which belonged to what:
+
+     600px   phone      the panel tokens above; modals go full-viewport
+     700px   phone/lap  the datasets column becomes a bottom sheet, the map's
+                        "what's here" card with it, and the filter chips
+                        collapse. This is THE mobile rung — anything about the
+                        map's own chrome belongs here.
+     900px   tablet     the legend moves out of the top-right corner
+     992px   tablet     legacy Bootstrap rung, modal + intro layout only
+     1200px  laptop     the WMS legend goes compact
+     1400px  desktop    wide enough for the datasets column to sit beside the
+                        map rather than over it, so it opens by default
+                        (WIDE_SCREEN_QUERY in UIProvider) and the time bar
+                        stops lifting MapLibre's corner controls
+
+   Prefer an existing rung over a new one. */
 
 /* Phones: the panel takes over the full viewport so the dataset details and
    record table stay usable instead of overflowing a fixed column. */
@@ -238,7 +294,6 @@ h1, h2, h3, h4, h5, h6 {
 .filterButton:focus-visible,
 .panelHandle:focus-visible,
 .resetFiltersButton:focus-visible,
-.boxQueryButton:focus-visible,
 .introButton:focus-visible,
 .downloadButton:focus-visible,
 .submitRequestButton:focus-visible,
@@ -266,23 +321,6 @@ h1, h2, h3, h4, h5, h6 {
 .pointDetailsSearchBar input:focus {
   outline: none;
   border-color: var(--cioos-primary);
-  box-shadow: var(--cioos-focus);
-}
-
-/* rc-slider (time / depth range filters) — replace the library's default
-   sky-blue with CIOOS teal so the range controls match the rest of the UI. */
-.rc-slider-rail { background-color: var(--cioos-hairline); }
-.rc-slider-track { background-color: var(--cioos-primary); }
-.rc-slider-dot-active { border-color: var(--cioos-primary); }
-.rc-slider-handle {
-  border-color: var(--cioos-primary);
-  background-color: var(--cioos-white);
-  opacity: 1;
-}
-.rc-slider-handle:hover,
-.rc-slider-handle:focus,
-.rc-slider-handle-dragging.rc-slider-handle-dragging.rc-slider-handle-dragging {
-  border-color: var(--cioos-primary-700);
   box-shadow: var(--cioos-focus);
 }
 

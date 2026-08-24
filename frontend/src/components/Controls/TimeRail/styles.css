@@ -1,0 +1,114 @@
+/* ------------------------------------------------------------------
+ * What is peculiar to the time rail: the purple scrub marker and its
+ * trail band, and the date input's own quirks. The track, the teal range
+ * handles, the tick row, the marker shape and the pills the fields sit
+ * in are all the shared Rail's (see Controls/Rail/styles.css) — the
+ * depth rail and the depth bar draw the same ones.
+ * ------------------------------------------------------------------ */
+
+/* The scrub date's own colour; the shape it wears is the shared
+   .railHandleMarker. */
+.rail .timeRailHandleScrub {
+  background-color: var(--cioos-track);
+}
+
+.rail .timeRailHandleScrub:hover {
+  background-color: var(--cioos-track-700);
+}
+
+.rail .timeRailHandleScrub:focus-visible {
+  box-shadow: 0 0 0 3px rgb(103 73 172 / 45%);
+}
+
+/* How far back the drawn tracks reach behind the scrub date — the window the
+   tiles are actually built from, so the zoom clamp shows here too. A soft
+   block behind the rail line rather than on it, keeping the two readings
+   (what is filtered, what is drawn) from being mistaken for one another. */
+.timeRailTrailBand {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-track-bg);
+  pointer-events: none;
+}
+
+/* The stretch of time the gridded dataset on the map covers. A slim bar sat
+   directly under the rail line, touching it, rather than a block behind the
+   track: down at the foot of the track it crossed the handles and the scrub
+   marker, and read as a second rail rather than as an annotation of this one.
+   It is the one mark here that isn't a live reading. Which slice of it is
+   drawn is set on the dataset's own rail — see GridTimeRail — so nothing
+   about this one is grabbable. */
+.timeRailGridBand {
+  position: absolute;
+  /* The line is 3px centred on the track's midline: its underside is at
+     50% + 1.5px, and this starts there. */
+  top: 50%;
+  margin-top: 1.5px;
+  height: 3px;
+  /* A week of hourly slices is a thousandth of the catalogue's span and would
+     otherwise round away to nothing. Off by a pixel or two at that size, and
+     visible, beats exact and invisible. */
+  min-width: 3px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-grid);
+  /* Takes the pointer only so it can carry its own tooltip — a press still
+     reaches the track handler underneath, which is on the parent and gets the
+     event by bubbling. */
+  cursor: inherit;
+}
+
+/* ------------------------------------------------------------------
+ * The date fields that go with the rail. Plain text until pointed at,
+ * so a row of them over the map doesn't read as a form; the shared
+ * .railValueInput does that part, and this adds what only a date input
+ * has. The Filters panel's Time entry, where they *are* a form, boxes
+ * them back up along with the depth fields beside them (see the Filter
+ * stylesheet's range form rules).
+ * ------------------------------------------------------------------ */
+
+/* Chrome draws the picker button at full contrast; dim it to match the rest. */
+.timeRailDateInput::-webkit-calendar-picker-indicator {
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.timeRailDateInput:hover::-webkit-calendar-picker-indicator {
+  opacity: 0.8;
+}
+
+/* The time of day the scrub or grid date resolves to, shown beside the date
+   field on grids whose slices are finer than a day. Read-only: the date field
+   and the rail set it, this only says where it landed. */
+.timeRailClock {
+  flex-shrink: 0;
+  font-size: var(--cioos-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--cioos-grid-700);
+}
+
+.timeRailTrailSelect {
+  max-width: 110px;
+  padding: 2px 2px 2px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink);
+  cursor: pointer;
+}
+
+.timeRailTrailSelect:hover {
+  background-color: var(--cioos-white);
+}
+
+/* Marks a trail that the zoom gate is currently clamping; carries the
+   explanation as a tooltip. */
+.timeRailTrailClamped {
+  margin-left: -2px;
+  color: var(--cioos-track-700);
+  font-weight: 700;
+  cursor: help;
+}

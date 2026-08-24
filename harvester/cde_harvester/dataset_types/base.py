@@ -19,7 +19,7 @@ class DatasetTypeHandler(ABC):
     # ERDDAP dataStructure this type is listed under: "table" | "grid".
     data_structure: str = "table"
     # HarvestResult attribute the extracted features land in
-    # ("profiles" today; e.g. "trajectory_cells" for future cell-based types).
+    # ("profiles" for point-like types, "trajectory_days" for trajectories).
     feature_kind: str = "profiles"
 
     @abstractmethod
@@ -27,8 +27,8 @@ class DatasetTypeHandler(ABC):
         """Per-feature spatial/temporal min-max frame for this dataset.
 
         Point-like types return ProfileSchema-shaped rows (one lat/lon per
-        feature); cell-like types (future trajectory hex bins) return their
-        own cell schema.
+        feature); trajectory types return TrajectoryDaySchema-shaped rows
+        (per-day aggregates, no position — see trajectory_features).
         """
 
     def adjust_feature_identity(
@@ -39,3 +39,11 @@ class DatasetTypeHandler(ABC):
         extraction. Default = no-op. TimeSeriesProfile overrides this with
         its collapse-to-timeseries logic."""
         return profiles_with_lat_lon, profile_variables, profile_variable_list
+
+    def extract_track_points(self, dataset):
+        """Hook: secondary output — ordered, downsampled track fixes
+        (TrajectoryPointSchema-shaped) for track-line rendering AND for the
+        hex coverage the database sweeps from them. Default = None (no track
+        output). Only the trajectory handlers override this; it runs AFTER
+        extract_features for the same dataset."""
+        return None

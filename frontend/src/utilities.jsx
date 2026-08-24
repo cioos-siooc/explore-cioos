@@ -1,5 +1,5 @@
 import isEmpty from 'lodash/isEmpty'
-import { scaleLinear, scalePow } from 'd3-scale'
+import { scaleLinear, scaleLog } from 'd3-scale'
 import React, { useState, useEffect } from 'react'
 import { defaultQuery } from './components/config.js'
 import { useTranslation } from 'react-i18next'
@@ -64,6 +64,18 @@ export function abbreviateString (text, maxLength) {
       return text
     }
   }
+}
+
+// For strings interpolated into popup.setHTML() markup: dataset titles and
+// trajectory ids come from harvested (third-party) metadata, so anything
+// markup-significant must be neutralized before it reaches the DOM.
+export function escapeHtml (text) {
+  return String(text ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
 }
 
 export function validateEmail(email) {
@@ -196,27 +208,74 @@ export function createDataFilterQueryString(query) {
   return objectToURL(apiMappedQuery)
 }
 
+// How many times bigger the max has to be than the min before the ramp goes
+// log instead of linear.
+const LOG_SCALE_MIN_RATIO = 100
+
 // returns an array of {stop: num, color: string} objects
+//
+// Two shapes, picked by how wide the range is rather than how big its maximum
+// is. There used to be a third — a power curve with exponent 5 — from when the
+// ramp counted distinct locations per hex; every current metric is better
+// served by one of these two, and the power curve actively hurt them (over a
+// [1, 15] dataset-count range it collapsed to stops 1|2|6|15, putting almost
+// every hexagon in the lightest shade).
 export function generateColorStops(colorScale, range) {
-  // check if fewer points than colors
-  const exponent = 5
+  // Ranges arrive from /legend and can be absent (still in flight), or [null,
+  // null] when the filters match nothing. Neither is a scale.
+  if (!range || !Number.isFinite(range[1]) || range[1] <= 0) return []
   let colors
   let scale
-  if (range[1] <= colorScale.length * 2) {
-    colors = colorScale.slice(0, range[1])
+  // scaleLog cannot have 0 in its domain, so the low end is clamped to 1 —
+  // safe because these are counts, and a hex that survives the aggregation
+  // holds at least one thing.
+  const lo = Math.max(Number.isFinite(range[0]) ? range[0] : 1, 1)
+  const hi = range[1]
+  if (hi / lo >= LOG_SCALE_MIN_RATIO) {
+    // Measurement and day counts span five to eight orders of magnitude. Any
+    // linear spacing over that puts all but a handful of hexes in the lightest
+    // color, which reads as "there's nothing here" across most of the map. Log
+    // spacing is what makes the middle of the distribution visible.
+    //
+    // The scale is built value -> index and inverted, since the caller wants
+    // index -> value and a log domain of [0, n-1] would be the illegal
+    // direction.
+    colors = colorScale
+    const logScale = scaleLog()
+      .domain([lo, hi])
+      .range([0, colors.length - 1])
+    scale = (index) => logScale.invert(index)
+  } else {
+    // Narrow ranges — dataset counts run about 1..19 — spread evenly. When
+    // there are fewer distinct values than colors, thin the ramp so each value
+    // gets its own shade instead of two shades sharing a value. Thin by
+    // sampling across the whole ramp rather than taking a prefix: a prefix of a
+    // 12-stop ramp that starts in pale teal would paint a 1..3 range entirely
+    // in the lightest end, and "3 datasets" would look like nothing.
+    const span = Math.floor(hi) - Math.floor(lo) + 1
+    // A one-value range takes the middle of the ramp, not its first stop: with
+    // nothing to compare against, the honest shade is a mid one.
+    colors =
+      span < colorScale.length
+        ? Array.from({ length: span }, (_, i) =>
+          colorScale[
+            Math.round(
+              (span === 1 ? 0.5 : i / (span - 1)) * (colorScale.length - 1)
+            )
+          ]
+        )
+        : colorScale
     scale = scaleLinear()
       .domain([0, colors.length - 1])
-      .range(range)
-  } else {
-    colors = colorScale
-    scale = scalePow()
-      .exponent(exponent)
-      .domain([0, colors.length - 1])
-      .range(range)
+      .range([lo, hi])
   }
   const colorStops = colors.map((color, index) => {
     return {
-      stop: Math.floor(scale(index)),
+      // The top stop is pinned to the range max rather than floored: on the
+      // log scale invert() lands a hair under it (499.999... for a max of
+      // 500), and a legend whose last tick reads one less than the real
+      // maximum looks like a bug.
+      stop: index === colors.length - 1 ? hi : Math.floor(scale(index)),
       color
     }
   })
@@ -261,15 +320,69 @@ export function useDebounce (value, delay) {
   return debouncedValue
 }
 
+// Which of the three tiers the ramp is drawn from, for a zoom. Every zoom maps
+// onto one: an unknown zoom (the map hasn't reported its camera yet) takes the
+// widest tier rather than falling out of the switch — a caller that got
+// `undefined` back could only read it as "no data", which is a different thing
+// entirely.
 export function getCurrentRangeLevel (rangeLevels, zoom) {
-  switch (true) {
-  case zoom < 5:
-    return rangeLevels.zoom0
-  case zoom >= 5 && zoom < 7:
-    return rangeLevels.zoom1
-  case zoom >= 7:
-    return rangeLevels.zoom2
-  }
+  if (!rangeLevels) return undefined
+  const level = Number(zoom)
+  if (!Number.isFinite(level) || level < 5) return rangeLevels.zoom0
+  if (level < 7) return rangeLevels.zoom1
+  return rangeLevels.zoom2
+}
+
+// The rungs a quantized count domain is allowed to land on, within each decade.
+// Coarse enough that an ordinary pan lands on the same rung it started from —
+// which is the whole point: an unquantized viewport domain would shift by a few
+// counts on every drag, repainting the ramp and renumbering the legend for a
+// change nobody can see.
+const NICE_MANTISSAS = [1, 1.5, 2, 3, 5, 7, 10]
+
+// Snap a positive count out to the nearest rung, away from the middle of the
+// domain: 'up' for a maximum, 'down' for a minimum, so quantizing only ever
+// widens a range and never clips a hex out of its own ramp.
+function snapCount (value, direction) {
+  if (!Number.isFinite(value) || value <= 0) return undefined
+  const base = 10 ** Math.floor(Math.log10(value))
+  const mantissa = value / base
+  // The float slack absorbs the log10/pow round trip, which lands a clean 100
+  // on 99.99999999999999 often enough to matter — without it, a maximum of 100
+  // would snap up to 150.
+  const rung =
+    direction === 'up'
+      ? NICE_MANTISSAS.find((m) => m >= mantissa - 1e-9)
+      : [...NICE_MANTISSAS].reverse().find((m) => m <= mantissa + 1e-9)
+  return Math.max(1, Math.round(rung * base))
+}
+
+// Widen a measured [min, max] onto the rungs above. Counts, so the result is
+// integral and never below 1; anything that isn't a usable range (no data on
+// screen, a null max from a query that matched nothing) comes back undefined,
+// which every caller reads as "use the global domain instead".
+export function quantizeCountRange (range) {
+  if (!Array.isArray(range)) return undefined
+  const hi = snapCount(range[1], 'up')
+  if (!hi) return undefined
+  const lo = snapCount(Math.max(Number(range[0]) || 1, 1), 'down') || 1
+  return [Math.min(lo, hi), hi]
+}
+
+// Are two [min, max] ranges the same domain? Used to drop no-op ramp repaints
+// and the state updates that would re-render the legend behind them.
+export function rangesEqual (a, b) {
+  if (a === b) return true
+  if (!Array.isArray(a) || !Array.isArray(b)) return false
+  return a[0] === b[0] && a[1] === b[1]
+}
+
+// Does a [min, max] range describe any data? The API answers a query that
+// matched nothing with [null, null] (min/max over no rows), so "empty" isn't
+// enough of a test — and a null max would otherwise render as an empty ramp
+// with no explanation.
+export function rangeLevelHasData (rangeLevel) {
+  return Array.isArray(rangeLevel) && Number.isFinite(rangeLevel[1])
 }
 
 export function getPointsDataSize (pointsData) {
@@ -327,36 +440,20 @@ export function boundsIntersect(a, b) {
   return aw <= be && ae >= bw && as <= bn && an >= bs
 }
 
-// Camera the "zoom to dataset" action asks for. The map canvas is full-bleed
-// and the datasets sidebar floats on top of its left edge, so a plain centred
-// fit would push half the extent underneath the sidebar: pad the fit by the
-// space the sidebar actually occupies, measured from the live DOM (it varies
-// with the viewport, and shrinks away entirely on a narrow screen). maxZoom
-// keeps a pin-sized extent from slamming the camera to street level.
+// Camera the "zoom to dataset" action asks for: the extent centred in the map
+// canvas with an even margin on every side. The datasets sidebar floats over
+// the canvas's left edge, but the fit deliberately ignores it — the sidebar is
+// a transparent column the user can collapse, and steering the camera around
+// it threw the extent off to the right of the screen. maxZoom keeps a
+// pin-sized extent from slamming the camera to street level.
 //
 // Shared with ZoomToDataset, which asks the map what camera these bounds would
 // produce and compares it to the live one — that comparison is how the button
 // knows the view is already right, and it only agrees if the padding matches.
-const ZOOM_TO_DATASET_MARGIN = 24
 const ZOOM_TO_DATASET_BASE_PADDING = 60
 
-export function zoomToDatasetCamera(map) {
-  const padding = {
-    top: ZOOM_TO_DATASET_BASE_PADDING,
-    bottom: ZOOM_TO_DATASET_BASE_PADDING,
-    left: ZOOM_TO_DATASET_BASE_PADDING,
-    right: ZOOM_TO_DATASET_BASE_PADDING
-  }
-  const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect()
-  const canvasWidth = map?.getCanvas()?.clientWidth
-  if (sidebar?.width && canvasWidth) {
-    const left = sidebar.right + ZOOM_TO_DATASET_MARGIN
-    // On a narrow viewport the sidebar covers nearly the whole map. Padding
-    // wider than the canvas leaves MapLibre no room to fit anything into, so
-    // only clear the sidebar while a usable strip of map remains beside it.
-    if (left < canvasWidth * 0.6) padding.left = left
-  }
-  return { padding, maxZoom: 9 }
+export function zoomToDatasetCamera() {
+  return { padding: ZOOM_TO_DATASET_BASE_PADDING, maxZoom: 9 }
 }
 
 // True when the map is already showing `bounds` the way zoomToGeometry would
@@ -364,7 +461,7 @@ export function zoomToDatasetCamera(map) {
 // (within a few dozen screen pixels, so the tolerance scales with the view).
 export function boundsAreFramed(map, bounds) {
   if (!map || !bounds) return false
-  const camera = map.cameraForBounds(bounds, zoomToDatasetCamera(map))
+  const camera = map.cameraForBounds(bounds, zoomToDatasetCamera())
   if (!camera) return false
   if (Math.abs(map.getZoom() - camera.zoom) > 0.2) return false
   const offset = map.project(camera.center).dist(map.project(map.getCenter()))
@@ -395,6 +492,14 @@ function polygonToMaxMins(polygon) {
     latMax: Math.max(...lats).toFixed(4),
     lonMax: Math.max(...lons).toFixed(4)
   }
+}
+
+// The `polygon` ring is already closed everywhere it's produced (turf's
+// bboxPolygon, mapbox-gl-draw's own rings, selectionFromSearchParams below),
+// so it needs no extra closing point here.
+export function polygonToWkt (polygon) {
+  const ring = polygon.map(([lon, lat]) => `${lon} ${lat}`).join(', ')
+  return `POLYGON((${ring}))`
 }
 
 export function createSelectionQueryString (polygon) {
@@ -564,27 +669,6 @@ export function datasetMatchesUrlKey (row, searchParams) {
   return datasetUrlKey(row)?.server === server
 }
 
-export function updateMapToolTitleLanguage(t) {
-  // const { t } = useTranslation()
-  const polygonToolDiv = document.getElementsByClassName(
-    'mapbox-gl-draw_polygon'
-  )
-  polygonToolDiv[0].title = t('mapPolygonToolTitle')
-
-  const deleteToolDiv = document.getElementsByClassName('mapbox-gl-draw_trash')
-  deleteToolDiv[0].title = t('mapDeleteToolTitle')
-
-  const zoomInToolDiv = document.getElementsByClassName(
-    'maplibregl-ctrl-zoom-in'
-  )
-  zoomInToolDiv[0].title = t('mapZoomInToolTitle')
-
-  const zoomOutToolDiv = document.getElementsByClassName(
-    'maplibregl-ctrl-zoom-out'
-  )
-  zoomOutToolDiv[0].title = t('mapZoomOutToolTitle')
-}
-
 // make table column headers more readable
 export function splitLines(s) {
   const split = s.split(' ')
@@ -595,4 +679,92 @@ export function splitLines(s) {
       {split.slice(1).join(' ')}
     </span>
   )
+}
+
+// Split an ordered [lon, lat] coordinate run where consecutive fixes jump
+// more than 180 degrees of longitude (antimeridian crossing) so a track
+// never draws a line looping around the globe. Returns an array of runs.
+export function splitAtAntimeridian(coords) {
+  if (!coords || coords.length === 0) return []
+  const runs = [[coords[0]]]
+  for (let i = 1; i < coords.length; i++) {
+    if (Math.abs(coords[i][0] - coords[i - 1][0]) > 180) {
+      runs.push([coords[i]])
+    } else {
+      runs[runs.length - 1].push(coords[i])
+    }
+  }
+  return runs
+}
+
+// Split an ordered [lon, lat] track into runs, three break conditions
+// (mirrors the segs CTE in web-api /tiles/tracks so the selected-platform
+// view and the tile layer segment identically):
+//   1. antimeridian crossing (consecutive fixes jump >180 deg of longitude);
+//   2. large time gap — over 4x the track's MEDIAN inter-fix gap (its
+//      typical reporting cadence, robust to idle periods — a mean would let
+//      a vessel idle between short cruises draw between-cruise connector
+//      chords), floored at 48h: an Argo float's ~10-day cycles never split,
+//      a ship dark for months between expeditions always does;
+//   3. outage chord — >50km between fixes closer than 96h in time. The
+//      harvester densifies data-backed chords to <=25km, so a long chord on
+//      a sub-96h gap is a reporting outage on a fast platform: the true
+//      path is unknown, draw nothing rather than a chord through
+//      possibly-land. The 96h guard protects slow reporters (Argo drifts
+//      30-100km per cycle) from being shredded by this condition.
+// `times` is the parallel timestamp array from /trajectories/track; without
+// it (or under 2 fixes) this degrades to the antimeridian-only split.
+export function splitTrackRuns(coords, times) {
+  if (!coords || coords.length === 0) return []
+  if (!times || times.length !== coords.length || coords.length < 2) {
+    return splitAtAntimeridian(coords)
+  }
+  const ms = times.map((t) => new Date(t).getTime())
+  const sortedGaps = ms
+    .slice(1)
+    .map((t, i) => t - ms[i])
+    .sort((a, b) => a - b)
+  const medianGapMs = sortedGaps[Math.floor(sortedGaps.length / 2)]
+  const gapMs = Math.max(medianGapMs * 4, 48 * 3600 * 1000)
+
+  const chordKm = (a, b) => {
+    const rad = Math.PI / 180
+    const p1 = a[1] * rad
+    const p2 = b[1] * rad
+    const h =
+      Math.sin(((b[1] - a[1]) * rad) / 2) ** 2 +
+      Math.cos(p1) * Math.cos(p2) * Math.sin(((b[0] - a[0]) * rad) / 2) ** 2
+    return 2 * 6371 * Math.asin(Math.sqrt(h))
+  }
+
+  const runs = [[coords[0]]]
+  for (let i = 1; i < coords.length; i++) {
+    const dtMs = ms[i] - ms[i - 1]
+    if (
+      Math.abs(coords[i][0] - coords[i - 1][0]) > 180 ||
+      dtMs > gapMs ||
+      (chordKm(coords[i - 1], coords[i]) > 50 && dtMs < 96 * 3600 * 1000)
+    ) {
+      runs.push([coords[i]])
+    } else {
+      runs[runs.length - 1].push(coords[i])
+    }
+  }
+  return runs
+}
+
+// Initial great-circle bearing from [lon, lat] point a to point b, in
+// degrees clockwise from north, [0, 360). Returns null for coincident
+// points (direction undefined). The frontend twin of the ST_Azimuth-based
+// cog the /tiles/tracks heads layer carries.
+export function initialBearing(a, b) {
+  if (a[0] === b[0] && a[1] === b[1]) return null
+  const rad = Math.PI / 180
+  const p1 = a[1] * rad
+  const p2 = b[1] * rad
+  const dl = (b[0] - a[0]) * rad
+  const y = Math.sin(dl) * Math.cos(p2)
+  const x =
+    Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl)
+  return (Math.atan2(y, x) / rad + 360) % 360
 }

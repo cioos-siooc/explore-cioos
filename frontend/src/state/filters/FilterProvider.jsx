@@ -1,9 +1,10 @@
 import * as React from 'react'
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import isEmpty from 'lodash/isEmpty'
 
 import fetchJson from '../fetchJson.js'
+import reportError from '../reportError.js'
 
 import platformsJSONfile from '../../platforms.json'
 import eovsJSONfile from '../../eovs.json'
@@ -25,7 +26,8 @@ import {
 import {
   capitalizeFirstLetter,
   useDebounce,
-  setAllOptionsIsSelectedTo
+  setAllOptionsIsSelectedTo,
+  createDataFilterQueryString
 } from '../../utilities.jsx'
 
 const FilterContext = createContext()
@@ -153,6 +155,44 @@ export default function FilterProvider ({ children }) {
     debouncedErddapServersSelected,
     showObis
   ])
+
+  // How much observation time the current selection actually covers, which is
+  // what the time slider draws its axis over — there is no point handing a
+  // hundred years of rail to a selection that starts in 2012.
+  //
+  // The time filter is left out of the request on purpose: the extent is what
+  // a time selection is made against, so letting the selection narrow it would
+  // walk the axis inwards on every drag. Leaving it out also makes the URL
+  // stable while the user scrubs, so changing dates costs no fetch at all.
+  const [timeExtent, setTimeExtent] = useState()
+  const extentQueryString = useMemo(() => {
+    if (isEmpty(query)) return undefined
+    const params = new URLSearchParams(createDataFilterQueryString(query))
+    params.delete('timeMin')
+    params.delete('timeMax')
+    return params.toString()
+  }, [query])
+
+  useEffect(() => {
+    if (extentQueryString === undefined) return undefined
+    let cancelled = false
+    fetchJson(
+      `${server}/timeExtent${extentQueryString ? '?' + extentQueryString : ''}`
+    )
+      .then((extent) => {
+        // A selection matching nothing comes back as nulls; keep the axis as
+        // it is rather than collapsing it to an empty domain.
+        if (!cancelled && extent?.min && extent?.max) setTimeExtent(extent)
+      })
+      .catch((error) => {
+        // The axis falls back to the full filterable domain, so this is a
+        // cosmetic loss — never a reason to break the bar.
+        reportError('time extent fetch failed', error)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [extentQueryString])
 
   useEffect(() => {
     setTimeFilterActive(
@@ -640,6 +680,7 @@ export default function FilterProvider ({ children }) {
     scientificNamesSelected,
     setScientificNamesSelected,
     timeFilterActive,
+    timeExtent,
     depthFilterActive,
     anyServersSelected,
     anyObisNodesSelected,

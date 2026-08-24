@@ -1,3 +1,11 @@
+// Must be required before any router module: it patches the `handle` SETTER on
+// express's Layer.prototype, so only routes registered after this line get
+// their async rejections forwarded to the error handler. Routes registered
+// earlier assign `handle` as an own property and bypass the patch entirely —
+// a rejected promise there is an unhandled rejection, which Node turns into a
+// process exit, taking every other in-flight request down with it.
+require("express-async-errors");
+
 const createError = require("http-errors");
 const express = require("express");
 const path = require("path");
@@ -10,6 +18,7 @@ const Tracing = require("@sentry/tracing");
 const downloadRouter = require("./routes/download");
 const indexRouter = require("./routes/index");
 const legendRouter = require("./routes/legend");
+const timeExtentRouter = require("./routes/timeExtent");
 const organizationsRouter = require("./routes/organizations");
 const datasetsRouter = require("./routes/datasets");
 const pointQueryRouter = require("./routes/pointQuery");
@@ -24,6 +33,8 @@ const scientificNamesRouter = require("./routes/scientificNames");
 const obisNodesRouter = require("./routes/obisNodes");
 const erddapServersRouter = require("./routes/erddapServers");
 const harvestRouter = require("./routes/harvest");
+const trajectoriesRouter = require("./routes/trajectories");
+const nonnaRouter = require("./routes/nonna");
 const swaggerSpec = require('./swagger');
 const swaggerUi = require('swagger-ui-express');
 
@@ -97,6 +108,7 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use("/", indexRouter);
 app.use("/download", downloadRouter);
 app.use("/legend", legendRouter);
+app.use("/timeExtent", timeExtentRouter);
 app.use("/organizations", organizationsRouter);
 app.use("/datasets", datasetsRouter);
 app.use("/pointQuery", pointQueryRouter);
@@ -111,6 +123,8 @@ app.use("/scientificNames", scientificNamesRouter);
 app.use("/obisNodes", obisNodesRouter);
 app.use("/erddapServers", erddapServersRouter);
 app.use("/harvest", harvestRouter);
+app.use("/trajectories", trajectoriesRouter);
+app.use("/nonna", nonnaRouter);
 
 // Swagger docs - conditionally enabled via ENABLE_API_DOCS environment variable
 if (process.env.ENABLE_API_DOCS !== 'false') {

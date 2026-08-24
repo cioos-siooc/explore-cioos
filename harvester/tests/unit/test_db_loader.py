@@ -117,7 +117,7 @@ class TestLoadCellsCopy:
             captured["body"] = buf.read()
 
         cur.copy_expert.side_effect = grab
-        load_cells_copy(df, "temp_trajectory_cells", transaction)
+        load_cells_copy(df, "temp_trajectory_days", transaction)
         return captured["body"]
 
     def test_int64_renders_without_decimal_point_and_na_as_null(self):

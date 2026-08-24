@@ -11,7 +11,8 @@ from cde_harvester.core.schemas import (
     ObisCellSchema,
     ProfileSchema,
     SkippedDatasetSchema,
-    TrajectoryCellSchema,
+    TrajectoryDaySchema,
+    TrajectoryPointSchema,
     VariableSchema,
     VerifiedDatasetSchema,
 )
@@ -28,16 +29,21 @@ class HarvestResult:
     variables: DataFrame[VariableSchema]
     skipped: DataFrame[SkippedDatasetSchema]
     obis_cells: DataFrame[ObisCellSchema] = None
-    trajectory_cells: DataFrame[TrajectoryCellSchema] = None
+    trajectory_days: DataFrame[TrajectoryDaySchema] = None
+    trajectory_points: DataFrame[TrajectoryPointSchema] = None
     attempts: DataFrame[HarvestAttemptSchema] = None
     verified: DataFrame[VerifiedDatasetSchema] = None
 
     def __post_init__(self):
         if self.obis_cells is None:
             self.obis_cells = pd.DataFrame(columns=ObisCellSchema.to_schema().columns.keys())
-        if self.trajectory_cells is None:
-            self.trajectory_cells = pd.DataFrame(
-                columns=TrajectoryCellSchema.to_schema().columns.keys()
+        if self.trajectory_days is None:
+            self.trajectory_days = pd.DataFrame(
+                columns=TrajectoryDaySchema.to_schema().columns.keys()
+            )
+        if self.trajectory_points is None:
+            self.trajectory_points = pd.DataFrame(
+                columns=TrajectoryPointSchema.to_schema().columns.keys()
             )
         if self.attempts is None:
             self.attempts = pd.DataFrame(columns=HarvestAttemptSchema.to_schema().columns.keys())
@@ -52,7 +58,8 @@ class HarvestResult:
             ("variables", VariableSchema),
             ("skipped", SkippedDatasetSchema),
             ("obis_cells", ObisCellSchema),
-            ("trajectory_cells", TrajectoryCellSchema),
+            ("trajectory_days", TrajectoryDaySchema),
+            ("trajectory_points", TrajectoryPointSchema),
             ("attempts", HarvestAttemptSchema),
         ]:
             df = getattr(self, name)
