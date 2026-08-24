@@ -10,7 +10,7 @@ Functions:
 - upsert_datasets_from_temp() - UPSERT datasets from temp_datasets
 - replace_profiles_from_temp() - Replace profiles for updated datasets
 - replace_obis_cells_from_temp() - Replace obis_cells for updated datasets
-- replace_trajectory_cells_from_temp() - Replace trajectory_cells for updated datasets
+- replace_trajectory_days_from_temp() - Replace trajectory_days for updated datasets
 - replace_trajectory_points_from_temp() - Replace trajectory_points for updated datasets
 - upsert_skipped_datasets_from_temp() - UPSERT skipped datasets
 - process_incremental_update() - Main orchestrator for entire incremental workflow
@@ -33,10 +33,9 @@ BEGIN
   CREATE TEMP TABLE IF NOT EXISTS temp_profiles (LIKE cde.profiles INCLUDING DEFAULTS EXCLUDING CONSTRAINTS EXCLUDING GENERATED);
   CREATE TEMP TABLE IF NOT EXISTS temp_skipped_datasets (LIKE cde.skipped_datasets INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
   CREATE TEMP TABLE IF NOT EXISTS temp_obis_cells (LIKE cde.obis_cells INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
-  -- LIKE copies the GENERATED expression for geom, which would reject plain
-  -- INSERTs of lat/lon-only rows on some paths; drop the expression so the
-  -- temp table takes NULL geom (the main-table INSERT recomputes it anyway).
-  CREATE TEMP TABLE IF NOT EXISTS temp_trajectory_cells (LIKE cde.trajectory_cells INCLUDING DEFAULTS EXCLUDING CONSTRAINTS EXCLUDING GENERATED);
+  CREATE TEMP TABLE IF NOT EXISTS temp_trajectory_days (LIKE cde.trajectory_days INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
+  ALTER TABLE temp_trajectory_days
+    ALTER COLUMN day DROP NOT NULL;
   CREATE TEMP TABLE IF NOT EXISTS temp_trajectory_points (LIKE cde.trajectory_points INCLUDING DEFAULTS EXCLUDING CONSTRAINTS EXCLUDING GENERATED);
   ALTER TABLE temp_trajectory_points
     ALTER COLUMN time DROP NOT NULL;
@@ -219,11 +218,11 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- Replace trajectory_cells for datasets that are in temp_datasets
--- Deletes old cells for those datasets, then inserts new ones from temp
-CREATE OR REPLACE FUNCTION replace_trajectory_cells_from_temp() RETURNS VOID AS $$
+-- Replace trajectory_days for datasets that are in temp_datasets
+-- Deletes old rows for those datasets, then inserts new ones from temp
+CREATE OR REPLACE FUNCTION replace_trajectory_days_from_temp() RETURNS VOID AS $$
 BEGIN
-  DELETE FROM cde.trajectory_cells c
+  DELETE FROM cde.trajectory_days c
   USING temp_datasets td
   WHERE c.dataset_id = td.dataset_id
     AND c.erddap_url = td.erddap_url;
@@ -232,37 +231,32 @@ BEGIN
   -- already run) so trajectory_link_dataset_pk() doesn't have to rewrite every
   -- freshly-inserted row afterwards. LEFT JOIN keeps rows whose dataset is
   -- somehow missing; the backfill pass in trajectory_process() catches those.
-  INSERT INTO cde.trajectory_cells
-    (dataset_pk, erddap_url, dataset_id, trajectory_id, latitude, longitude,
-     time_min, time_max, depth_min, depth_max,
-     n_records, n_profiles, records_per_day, days)
-  SELECT d.pk, t.erddap_url, t.dataset_id, t.trajectory_id, t.latitude, t.longitude,
-         t.time_min, t.time_max, t.depth_min, t.depth_max,
-         t.n_records, t.n_profiles, t.records_per_day, t.days
-  FROM temp_trajectory_cells t
+  INSERT INTO cde.trajectory_days
+    (dataset_pk, erddap_url, dataset_id, trajectory_id, day,
+     n_records, n_profiles, depth_min, depth_max)
+  SELECT d.pk, t.erddap_url, t.dataset_id, t.trajectory_id, t.day,
+         t.n_records, t.n_profiles, t.depth_min, t.depth_max
+  FROM temp_trajectory_days t
   LEFT JOIN cde.datasets d
     ON d.dataset_id = t.dataset_id AND d.erddap_url = t.erddap_url
-  ON CONFLICT (erddap_url, dataset_id, trajectory_id, latitude, longitude) DO UPDATE SET
+  WHERE t.day IS NOT NULL
+  ON CONFLICT (erddap_url, dataset_id, trajectory_id, day) DO UPDATE SET
     dataset_pk = EXCLUDED.dataset_pk,
-    time_min = EXCLUDED.time_min,
-    time_max = EXCLUDED.time_max,
-    depth_min = EXCLUDED.depth_min,
-    depth_max = EXCLUDED.depth_max,
     n_records = EXCLUDED.n_records,
     n_profiles = EXCLUDED.n_profiles,
-    records_per_day = EXCLUDED.records_per_day,
-    days = EXCLUDED.days;
+    depth_min = EXCLUDED.depth_min,
+    depth_max = EXCLUDED.depth_max;
 END;
 $$ LANGUAGE plpgsql;
 
 
 -- Replace trajectory_points for updated datasets.
--- Unlike the cells tables, the DELETE is scoped to datasets that actually
+-- Unlike the other tables, the DELETE is scoped to datasets that actually
 -- shipped NEW track points this run (not all of temp_datasets): track
 -- extraction is best-effort in the harvester — a transient track-query
--- failure yields cells but no points, and must not wipe the dataset's
--- existing (still valid) track. Stale tracks self-heal on the next
--- successful harvest of that dataset.
+-- failure yields per-day aggregates but no points, and must not wipe the
+-- dataset's existing (still valid) track, which is also what its map coverage
+-- is swept from. Stale tracks self-heal on the next successful harvest.
 CREATE OR REPLACE FUNCTION replace_trajectory_points_from_temp() RETURNS VOID AS $$
 BEGIN
   DELETE FROM cde.trajectory_points p
@@ -271,7 +265,7 @@ BEGIN
     AND p.erddap_url = tp.erddap_url;
 
   -- dataset_pk resolved at INSERT time, same rationale as
-  -- replace_trajectory_cells_from_temp() above.
+  -- replace_trajectory_days_from_temp() above.
   INSERT INTO cde.trajectory_points
     (dataset_pk, erddap_url, dataset_id, trajectory_id, profile_id,
      time, latitude, longitude)
@@ -295,6 +289,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION process_incremental_update() RETURNS VOID AS $$
 DECLARE
   has_obis_delta boolean;
+  traj_delta_pks integer[];
 BEGIN
   -- 1. Process temp tables to populate computed fields
   PERFORM process_temp_profiles();
@@ -312,8 +307,8 @@ BEGIN
   -- 5. Replace obis_cells (delete old, insert new)
   PERFORM replace_obis_cells_from_temp();
 
-  -- 6. Replace trajectory_cells (delete old, insert new)
-  PERFORM replace_trajectory_cells_from_temp();
+  -- 6. Replace trajectory_days (delete old, insert new)
+  PERFORM replace_trajectory_days_from_temp();
 
   -- 6b. Replace trajectory_points (delete old, insert new); track stats are
   -- rebuilt afterwards inside trajectory_process().
@@ -356,9 +351,25 @@ BEGIN
     PERFORM obis_backfill_aphia_ids(FALSE);
   END IF;
 
-  PERFORM trajectory_process();
+  -- Trajectories: the same steps trajectory_process() runs for a full reload,
+  -- but the hex sweep is scoped to the datasets this load actually touched —
+  -- re-sweeping every track would make an incremental load pay a whole-corpus
+  -- cost. Skipped entirely when no trajectory data changed.
+  PERFORM trajectory_link_dataset_pk();
+  PERFORM trajectory_points_link_dataset_pk();
+  PERFORM trajectory_refresh_track_stats();
 
-  -- 9. Create hexes for all data
+  SELECT array_agg(DISTINCT d.pk) INTO traj_delta_pks
+    FROM cde.datasets d
+   WHERE EXISTS (SELECT 1 FROM temp_trajectory_points t
+                  WHERE t.dataset_id = d.dataset_id AND t.erddap_url = d.erddap_url)
+      OR EXISTS (SELECT 1 FROM temp_trajectory_days t
+                  WHERE t.dataset_id = d.dataset_id AND t.erddap_url = d.erddap_url);
+  IF traj_delta_pks IS NOT NULL THEN
+    PERFORM trajectory_build_hexes(traj_delta_pks);
+  END IF;
+
+  -- 9. Create hexes for profiles / obis cells
   PERFORM create_hexes();
 
   -- 10. Validate that every required column got populated (replaces the old
@@ -439,8 +450,13 @@ BEGIN
   DELETE FROM cde.obis_cells o USING _prune_candidates c
   WHERE o.dataset_id = c.dataset_id AND c.source_type = 'obis';
 
-  DELETE FROM cde.trajectory_cells t USING _prune_candidates c
+  DELETE FROM cde.trajectory_days t USING _prune_candidates c
   WHERE t.dataset_id = c.dataset_id AND t.erddap_url = c.erddap_url;
+
+  -- trajectory_hexes is keyed on dataset_pk and has an FK to datasets(pk), so
+  -- it must be cleared before the datasets DELETE below.
+  DELETE FROM cde.trajectory_hexes h USING _prune_candidates c
+  WHERE h.dataset_pk = c.pk;
 
   -- trajectory_points has an FK to datasets(pk); it must be cleared before the
   -- datasets DELETE below or pruning a trajectory dataset raises a

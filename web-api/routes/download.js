@@ -104,9 +104,9 @@ router.get(
 
     const wktPolygon = polygon ? polygonJSONToWKT(polygon) : null;
 
-    // Trajectory coverage cells are downloadable ERDDAP datasets too — union
+    // Trajectory coverage hexes are downloadable ERDDAP datasets too — union
     // them with profiles so a selection over a glider/ship track queues its
-    // dataset. (Pre-M2 this also interpolated the filter OBJECT into the SQL
+    // dataset. 10 km tier only, hex polygon as search_geom (see shapeQuery.js). (Pre-M2 this also interpolated the filter OBJECT into the SQL
     // string instead of binding filters.shared — fixed to match the other
     // routes.)
     const SQL = `
@@ -116,9 +116,11 @@ router.get(
         FROM cde.profiles
         WHERE :profileFilters
         UNION ALL
-        SELECT dataset_pk, point_pk, geom, latitude, longitude,
-               time_min, time_max, depth_min, depth_max, geom AS search_geom
-        FROM cde.trajectory_cells
+        SELECT t.dataset_pk, NULL::integer AS point_pk, t.geom, t.latitude, t.longitude,
+               t.time_min, t.time_max, t.depth_min, t.depth_max, h.geom AS search_geom
+        FROM cde.trajectory_hexes t
+        JOIN cde.hexes_zoom_1 h ON h.pk = t.hex_pk
+        WHERE t.hex_tier = 1
         ),
         profiles_subset AS (
         SELECT d.erddap_url,
