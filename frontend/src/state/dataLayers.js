@@ -9,13 +9,15 @@
 // Switch labels, in the order the switches render. The key order is also the
 // order of the ?layers= comma list.
 //
-// These are the CF discrete-sampling geometries a dataset declares
+// Most of these are the CF discrete-sampling geometries a dataset declares
 // (cdm_data_type), which is why the filter calls itself "Dataset geometry" —
 // the choice is about the SHAPE of the observations, not the subject matter.
 // The order follows the taxonomy: the three that sample a fixed place, then
-// the two that sample along a path, then the occurrence records. The two
-// trajectory rows are kept adjacent because the track/hex display options
-// render once, under the pair.
+// the two that sample along a path, then the occurrence records, then the
+// gridded (griddap) datasets — not a discrete-sampling geometry at all, but
+// the shape question still applies and datasets need somewhere to be found.
+// The two trajectory rows are kept adjacent because the track/hex display
+// options render once, under the pair.
 //
 // 'trajectories' (plural) is the plain-Trajectory key. It keeps its old name
 // so the ?layers= links already in the wild still resolve.
@@ -25,7 +27,8 @@ export const DATA_LAYER_LABEL_KEYS = {
   timeseriesProfile: 'layerTimeseriesProfile',
   trajectories: 'layerTrajectories',
   trajectoryProfile: 'layerTrajectoryProfile',
-  obis: 'layerObis'
+  obis: 'layerObis',
+  grid: 'layerGrid'
 }
 
 // The one-line hint under each label: what the geometry means in plain terms,
@@ -36,7 +39,8 @@ export const DATA_LAYER_HINT_KEYS = {
   timeseriesProfile: 'layerTimeseriesProfileHint',
   trajectories: 'layerTrajectoriesHint',
   trajectoryProfile: 'layerTrajectoryProfileHint',
-  obis: 'layerObisHint'
+  obis: 'layerObisHint',
+  grid: 'layerGridHint'
 }
 
 // The two path-sampling geometries. They share every table and every map layer
@@ -127,11 +131,14 @@ const TYPE_TO_KEY = new Map(
 // Which switch governs a dataset, or undefined when none does. OBIS datasets
 // carry cdm_data_type 'Point' — which an ERDDAP dataset can legitimately be
 // too — so they're matched on source first, the same way SelectionProvider
-// tells them apart. Grid datasets belong to no geometry layer: they have
-// their own gridded-coverage switch, and the geometry selection never hides
-// them.
+// tells them apart. Griddap datasets carry cdm_data_type 'Grid' and are
+// matched on that, same as every other geometry — the gridded-coverage map
+// switch (griddapCoverageVisible) stays independent of this filter, the same
+// way the trajectory track-lines switch is independent of the trajectory
+// rows: both are map appearance, not dataset admission.
 export function dataLayerKeyForDataset (row) {
   if (row.source_type === 'obis') return 'obis'
+  if (row.cdm_data_type === 'Grid') return 'grid'
   return TYPE_TO_KEY.get(row.cdm_data_type)
 }
 

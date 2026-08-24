@@ -391,6 +391,8 @@
   "layerTrajectoryProfileHint": "Un trajet mobile, mesuré en profondeur au fil du parcours — planeurs, flotteurs Argo, CTD remorqués",
   "layerObis": "Relevés d'occurrence",
   "layerObisHint": "Où une espèce a été observée — relevés OBIS, traits de filet, comptages visuels",
+  "layerGrid": "Données maillées",
+  "layerGridHint": "Un champ continu sur une zone, non des stations individuelles — sorties de modèles, grilles satellite et de réanalyse (griddap)",
   "dataLayersFilterTooltip": "Choisir les géométries d'observation affichées sur la carte. Les géométries masquées sont aussi exclues de la liste des jeux de données et de ses décomptes.",
   "dataLayersMulti": " géométries",
   "layerTracksMode": "Afficher les lignes de trajet",

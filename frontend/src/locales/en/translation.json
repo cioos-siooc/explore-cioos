@@ -390,6 +390,8 @@
   "layerTrajectoryProfileHint": "A moving path, measured through depth as it goes — gliders, Argo floats, towed CTDs",
   "layerObis": "Occurrence records",
   "layerObisHint": "Where a species was recorded — OBIS surveys, net tows, visual counts",
+  "layerGrid": "Gridded data",
+  "layerGridHint": "A continuous field over an area, not individual stations — model output, satellite and reanalysis grids (griddap)",
   "dataLayersFilterTooltip": "Choose which observation geometries the map draws. Hidden ones are also left out of the datasets list and its counts.",
   "dataLayersMulti": " geometries",
   "layerTracksMode": "Show track lines",
