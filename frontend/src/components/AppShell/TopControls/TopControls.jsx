@@ -10,6 +10,7 @@ import DatasetCounts from './DatasetCounts.jsx'
 import SpatialFilterButton from './SpatialFilterButton.jsx'
 import usePublishedFootprint from '../../../state/ui/usePublishedFootprint.js'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
+import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
 
@@ -57,6 +58,7 @@ export default function TopControls () {
   } = useFilters()
   const { showFiltersModal, setShowFiltersModal, sidebarOpen, setSidebarOpen } =
     useUI()
+  const { inspectDataset, returnToDatasetList } = useSelection()
 
   const barRef = useRef(null)
   usePublishedFootprint(barRef, '--cioos-top-bar-space', measureTopBarSpace)
@@ -81,7 +83,10 @@ export default function TopControls () {
           <button
             type='button'
             className={classNames('topBarButton', { active: sidebarOpen })}
-            onClick={() => setSidebarOpen(!sidebarOpen)}
+            onClick={() => {
+              if (inspectDataset) returnToDatasetList()
+              setSidebarOpen(!sidebarOpen)
+            }}
             aria-pressed={sidebarOpen}
             title={
               sidebarOpen ? t('sidebarCollapseTitle') : t('sidebarShowTitle')
