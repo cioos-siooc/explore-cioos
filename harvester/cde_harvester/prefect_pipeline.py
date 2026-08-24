@@ -645,7 +645,7 @@ def main():
     if not args.file:
         logger.error("No config file provided. Use -f to specify harvest_config.yaml")
         sys.exit(1)
-    # Honor HARVEST_CONFIG_YAML (e.g. from Coolify) at registration time too, not
+    # Honor HARVEST_CONFIG_B64 (e.g. from Coolify) at registration time too, not
     # just at flow runtime. Registration derives the per-source deployment list
     # from this config, so if it ignored the env var the per-source deployments
     # would reflect the baked config while the orchestrator resolves the env var

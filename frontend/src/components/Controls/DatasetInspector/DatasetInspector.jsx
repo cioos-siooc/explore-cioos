@@ -318,6 +318,18 @@ export default function DatasetInspector({
       sortable: true,
       wrap: true,
       width: dataColumnWith
+    },
+    {
+      // Which ocean variables this individual record carries — a dataset's
+      // records don't all measure everything it lists. Null for the sources
+      // with no per-record detection (trajectory, OBIS, grid), where the
+      // dataset's own list is the best answer available.
+      name: splitLines(t('datasetInspectorOceanVariablesText')),
+      selector: (row) =>
+        (row.eovs ?? dataset.eovs).map((eov) => t(eov)).join(', '),
+      sortable: true,
+      wrap: true,
+      grow: 2
     }
   ]
   const data = filterRows(datasetRecords?.profiles, recordFilterText)

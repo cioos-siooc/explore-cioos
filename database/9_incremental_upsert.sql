@@ -157,14 +157,14 @@ BEGIN
     geom, dataset_pk, erddap_url, dataset_id, timeseries_id, profile_id,
     time_min, time_max, latitude, longitude,
     latitude_min, latitude_max, longitude_min, longitude_max, show_as_point,
-    depth_min, depth_max, n_records, records_per_day, n_profiles,
+    depth_min, depth_max, n_records, records_per_day, n_profiles, eovs,
     hex_0_pk, hex_1_pk, point_pk, days
   )
   SELECT
     geom, dataset_pk, erddap_url, dataset_id, timeseries_id, profile_id,
     time_min, time_max, latitude, longitude,
     latitude_min, latitude_max, longitude_min, longitude_max, show_as_point,
-    depth_min, depth_max, n_records, records_per_day, n_profiles,
+    depth_min, depth_max, n_records, records_per_day, n_profiles, eovs,
     hex_0_pk, hex_1_pk, point_pk, days
   FROM temp_profiles;
 END;

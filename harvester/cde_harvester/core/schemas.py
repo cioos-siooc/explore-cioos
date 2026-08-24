@@ -28,6 +28,10 @@ DATASET_ARRAY_DTYPES = {
     "grid_dimensions": JSONB,
 }
 
+PROFILE_ARRAY_DTYPES = {
+    "eovs": ARRAY(TEXT),
+}
+
 OBIS_ARRAY_DTYPES = {
     "scientific_names": ARRAY(TEXT),
     "aphia_ids": ARRAY(INTEGER),
@@ -64,6 +68,12 @@ class ProfileSchema(pa.DataFrameModel):
     n_records: Series[float] = pa.Field(nullable=True)
     records_per_day: Series[float] = pa.Field(nullable=True)
     n_profiles: Series[float] = pa.Field(nullable=True)
+    # The EOVs this feature actually carries — a subset of its dataset's eovs,
+    # detected from the per-variable record counts at harvest. Falls back to
+    # the dataset's full list when detection isn't possible, never empty: the
+    # web-api filters with an array overlap, so an empty list would hide the
+    # feature from every EOV selection.
+    eovs: Series[object] = pa.Field(nullable=True)
 
     class Config:
         coerce = True

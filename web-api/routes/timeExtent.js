@@ -90,11 +90,13 @@ router.get(
       && (!req.query.obisNodes || Boolean(req.query.erddapServers));
 
     // The column list is what the shared filter can reference (time, depth,
-    // point_pk and search_geom); eovs/platform/organization_pks live on
-    // cde.datasets and resolve through the join.
+    // point_pk and search_geom); platform/organization_pks live on
+    // cde.datasets and resolve through the join. EOVs are the exception:
+    // cde.profiles carries its own per-feature list, so that predicate is
+    // applied in the branch below rather than after the join.
     const profilesBranch = `SELECT dataset_pk, point_pk, time_min, time_max,
                depth_min, depth_max, bbox AS search_geom
-        FROM cde.profiles WHERE show_as_point`;
+        FROM cde.profiles WHERE show_as_point AND :profileFilters`;
     // 10 km tier only (the 100 km rows are the same data, coarser), and the
     // hex polygon as search_geom — see shapeQuery.js.
     const trajectoryBranch = `SELECT t.dataset_pk, NULL::integer AS point_pk, t.time_min, t.time_max,
@@ -134,6 +136,7 @@ router.get(
       const { rows } = await db.raw(sql, {
         filters: filters.shared,
         obisFilters: filters.obisOnly,
+        profileFilters: filters.profileOnly,
       });
       return res.send(rows[0] || { min: null, max: null });
     } catch (e) {

@@ -42,6 +42,34 @@ def _axis_bounds_from_metadata(dataset, axis):
     return None
 
 
+def _eovs_per_feature(profile_count, eov_variables, dataset_eovs):
+    """Per-feature EOV lists as a Series aligned to ``profile_count``'s index.
+
+    A feature carries an EOV when at least one variable mapped to that EOV has
+    a non-zero record count for it. Per-variable EOVs are by construction a
+    subset of the dataset's, so a feature's list never exceeds the dataset's.
+
+    A feature with no non-zero counts falls back to the dataset's EOVs rather
+    than getting an empty list: the web-api filters with a PostgreSQL array
+    overlap, so an empty list would silently hide the feature from every EOV
+    selection.
+    """
+    if not eov_variables:
+        return pd.Series(
+            [list(dataset_eovs)] * len(profile_count), index=profile_count.index
+        )
+
+    per_feature = []
+    for _, counts in profile_count.iterrows():
+        eovs = []
+        for variable, variable_eovs in eov_variables.items():
+            count = counts.get(variable)
+            if pd.notna(count) and count > 0:
+                eovs.extend(eov for eov in variable_eovs if eov not in eovs)
+        per_feature.append(sorted(eovs) if eovs else list(dataset_eovs))
+    return pd.Series(per_feature, index=profile_count.index)
+
+
 def _lat_lon_box(dataset, profiles, profile_variable_list, logger):
     """Per-feature lat/lon bounding box, indexed by ``profile_variable_list``
     with columns latitude_min/max, longitude_min/max.
@@ -230,15 +258,50 @@ def extract_features(dataset, handler):
 
     count_variables = sorted(list(set(count_variables)))
 
+    # Variables carrying an EOV are counted per feature as well: ERDDAP's
+    # orderByCount answers with one non-null count column per requested
+    # variable, so the request already being made also tells us which of the
+    # dataset's EOVs each feature actually holds.
+    #
+    # A single-feature dataset is skipped: its one feature is the dataset, so
+    # its EOVs are the dataset's. That also sidesteps get_count's two shortcuts
+    # (time_coverage_resolution, 30-day extrapolation), which only fire for
+    # single-feature datasets and return a time-only or window-limited frame
+    # that cannot answer EOV presence.
+    is_single_feature = len(dataset.profile_ids) <= 1 or len(profiles) <= 1
+    eov_variables = {} if is_single_feature else dataset.get_eov_variables()
+
     profile_count = dataset.get_count(
-        count_variables, profile_variable_list, time_min, time_max
+        sorted(set(count_variables) | set(eov_variables)),
+        profile_variable_list,
+        time_min,
+        time_max,
     )
+    if profile_count.empty and eov_variables:
+        # The widened request can fail where the narrow one succeeds (longer
+        # URL, larger response). Never lose a dataset over EOV detection: redo
+        # the original request and fall back to the dataset's EOVs.
+        logger.warning("Count including EOV variables failed, retrying without them")
+        eov_variables = {}
+        profile_count = dataset.get_count(
+            count_variables, profile_variable_list, time_min, time_max
+        )
+
     if not profile_count.empty:
-        profiles["n_records"] = profile_count.set_index(profile_variable_list).max(
-            axis="columns"
+        profile_count = profile_count.set_index(profile_variable_list)
+        # n_records counts records, not variables: it has to keep ranging over
+        # the same columns it did before the EOV columns joined the request.
+        n_records_columns = [
+            column for column in count_variables if column in profile_count.columns
+        ]
+        profiles["n_records"] = profile_count[n_records_columns].max(axis="columns")
+        profiles["eovs"] = _eovs_per_feature(
+            profile_count, eov_variables, dataset.eovs
         )
     if not "n_records" in profiles:
         profiles["n_records"] = None
+    if not "eovs" in profiles:
+        profiles["eovs"] = [list(dataset.eovs)] * len(profiles)
 
     # something went wrong with counting records
     profiles = profiles.query("not n_records.isnull()")

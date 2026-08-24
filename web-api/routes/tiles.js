@@ -206,7 +206,7 @@ router.get(
     const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${metricValueExpr('profiles', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
     FROM cde.profiles ${metricJoin('profiles', metric)}
-    WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
+    WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ''} AND :profileFilters`;
     // Both cell tables (trajectory coverage cells and OBIS occurrence cells)
     // merge into the combined hex counts (z<7, the green ramp) but never
     // appear as individual points (z>=7). Their cell spacing is a grid
@@ -297,6 +297,7 @@ router.get(
       const q = db.raw(SQL, {
         filters: filters.shared,
         obisFilters: filters.obisOnly,
+        profileFilters: filters.profileOnly,
         zoomPKColumn,
         z,
         x,

@@ -114,6 +114,7 @@ router.get(
         SELECT dataset_pk, point_pk, geom, latitude, longitude,
                time_min, time_max, depth_min, depth_max, bbox AS search_geom
         FROM cde.profiles
+        WHERE :profileFilters
         UNION ALL
         SELECT t.dataset_pk, NULL::integer AS point_pk, t.geom, t.latitude, t.longitude,
                t.time_min, t.time_max, t.depth_min, t.depth_max, h.geom AS search_geom
@@ -137,7 +138,10 @@ router.get(
       `;
 
     try {
-      const tileRaw = await db.raw(SQL, { filters: filters.shared });
+      const tileRaw = await db.raw(SQL, {
+        filters: filters.shared,
+        profileFilters: filters.profileOnly,
+      });
       const tile = tileRaw.rows[0];
       if (tile.json_agg && tile.json_agg.length) {
         const jobID = uuidv4().substr(0, 6);

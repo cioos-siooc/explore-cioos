@@ -20,9 +20,11 @@ COPY ./harvester/worker-entrypoint.sh ./worker-entrypoint.sh
 # The harvest config is deliberately NOT baked into the image — it is provided
 # at runtime so config changes never require a rebuild. Resolution order (see
 # cde_harvester/core/config.py:resolve_harvest_config_file):
-#   1. HARVEST_CONFIG_YAML env var (full YAML content; Coolify UI friendly)
-#   2. HARVEST_CONFIG_FILE env var (path to a mounted file)
-#   3. a file mounted at /app/harvester/harvest_config.yaml
+#   1. HARVEST_CONFIG_B64 env var (whole YAML file, base64 on one line; the
+#      Coolify-safe channel — raw multi-line YAML gets mangled in transit)
+#   2. HARVEST_CONFIG_YAML env var (raw YAML text; deprecated, corrupts easily)
+#   3. HARVEST_CONFIG_FILE env var (path to a mounted file)
+#   4. a file mounted at /app/harvester/harvest_config.yaml
 # Startup fails with an actionable error when none is provided.
 COPY ./Obis_Datasets.json ./Obis_Datasets.json
 

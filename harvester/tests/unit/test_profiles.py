@@ -150,3 +150,160 @@ class TestGetProfilesEmptyAndEdgeCases:
         result = get_profiles(single_station_dataset)
         assert "profile_id" in result.columns
         assert (result["profile_id"] == "").all()
+
+
+# ---------------------------------------------------------------------------
+# Per-feature EOV detection
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def two_station_dataset(single_station_dataset):
+    """Two stations, where only STATION_001 carries oxygen.
+
+    get_count answers the way ERDDAP's orderByCount does: one non-null count
+    column per requested variable, grouped by the feature identity.
+    """
+    dataset = single_station_dataset
+    stations = ["STATION_001", "STATION_002"]
+
+    profile_ids = pd.DataFrame(
+        {
+            "station_id": stations,
+            "latitude": [48.5, 49.5],
+            "longitude": [-125.0, -126.0],
+        }
+    )
+    dataset.profile_ids = profile_ids
+    dataset.get_profile_ids.return_value = profile_ids.copy()
+
+    def _get_max_min(vars_list):
+        last_var = vars_list[-1]
+        index_vars = vars_list[:-1]
+        if last_var == "time":
+            data = {
+                "station_id": stations,
+                "time_min": ["2020-01-01T00:00:00Z"] * 2,
+                "time_max": ["2023-12-31T00:00:00Z"] * 2,
+            }
+        elif last_var == "latitude":
+            data = {
+                "station_id": stations,
+                "latitude_min": [48.5, 49.5],
+                "latitude_max": [48.5, 49.5],
+            }
+        elif last_var == "longitude":
+            data = {
+                "station_id": stations,
+                "longitude_min": [-125.0, -126.0],
+                "longitude_max": [-125.0, -126.0],
+            }
+        else:
+            data = {
+                "station_id": stations,
+                f"{last_var}_min": [0.5, 0.5],
+                f"{last_var}_max": [200.5, 200.5],
+            }
+        return pd.DataFrame(data).set_index(index_vars)
+
+    dataset.get_max_min.side_effect = _get_max_min
+
+    # temperature is measured at both stations, oxygen only at the first.
+    dataset.get_eov_variables.return_value = {
+        "temperature": ["subSurfaceTemperature"],
+        "oxygen": ["oxygen"],
+    }
+
+    def _get_count(variables, groupby, time_min, time_max):
+        counts = {"station_id": stations, "time": [1000, 800], "depth": [1000, 800]}
+        if "temperature" in variables:
+            counts["temperature"] = [1000, 800]
+        if "oxygen" in variables:
+            counts["oxygen"] = [1000, 0]
+        return pd.DataFrame(counts)
+
+    dataset.get_count.side_effect = _get_count
+    dataset.eovs = ["oxygen", "subSurfaceTemperature"]
+    return dataset
+
+
+class TestPerFeatureEovs:
+    def test_eovs_column_present(self, two_station_dataset):
+        result = get_profiles(two_station_dataset)
+        assert "eovs" in result.columns
+
+    def test_station_without_oxygen_excludes_it(self, two_station_dataset):
+        result = get_profiles(two_station_dataset).set_index("timeseries_id")
+        assert result.loc["STATION_001", "eovs"] == [
+            "oxygen",
+            "subSurfaceTemperature",
+        ]
+        assert result.loc["STATION_002", "eovs"] == ["subSurfaceTemperature"]
+
+    def test_feature_eovs_never_exceed_dataset_eovs(self, two_station_dataset):
+        result = get_profiles(two_station_dataset)
+        for eovs in result["eovs"]:
+            assert set(eovs) <= set(two_station_dataset.eovs)
+
+    def test_n_records_ignores_eov_count_columns(self, two_station_dataset):
+        """Regression: n_records is a record count, so it must keep ranging
+        over time/depth/cf-role only — the EOV columns joining the same
+        request must not change it."""
+        with_eovs = get_profiles(two_station_dataset).set_index("timeseries_id")
+
+        two_station_dataset.get_eov_variables.return_value = {}
+        without_eovs = get_profiles(two_station_dataset).set_index("timeseries_id")
+
+        assert list(with_eovs["n_records"]) == list(without_eovs["n_records"])
+        assert with_eovs.loc["STATION_001", "n_records"] == 1000
+        assert with_eovs.loc["STATION_002", "n_records"] == 800
+
+    def test_widened_count_failure_falls_back_to_dataset_eovs(
+        self, two_station_dataset
+    ):
+        """The widened request can fail where the narrow one succeeds. The
+        dataset must survive, and every feature must inherit the dataset's
+        EOVs rather than ending up with an empty list."""
+        stations = ["STATION_001", "STATION_002"]
+
+        def _get_count(variables, groupby, time_min, time_max):
+            if "oxygen" in variables:
+                return pd.DataFrame()
+            return pd.DataFrame(
+                {"station_id": stations, "time": [1000, 800], "depth": [1000, 800]}
+            )
+
+        two_station_dataset.get_count.side_effect = _get_count
+        result = get_profiles(two_station_dataset)
+
+        assert len(result) == 2
+        for eovs in result["eovs"]:
+            assert eovs == two_station_dataset.eovs
+
+    def test_feature_with_no_counts_falls_back_to_dataset_eovs(
+        self, two_station_dataset
+    ):
+        """A feature whose EOV variables are all zero keeps the dataset's list:
+        an empty array would hide it from the web-api's overlap filter."""
+        stations = ["STATION_001", "STATION_002"]
+
+        def _get_count(variables, groupby, time_min, time_max):
+            counts = {"station_id": stations, "time": [1000, 800], "depth": [1000, 800]}
+            if "temperature" in variables:
+                counts["temperature"] = [1000, 0]
+            if "oxygen" in variables:
+                counts["oxygen"] = [1000, 0]
+            return pd.DataFrame(counts)
+
+        two_station_dataset.get_count.side_effect = _get_count
+        result = get_profiles(two_station_dataset).set_index("timeseries_id")
+        assert result.loc["STATION_002", "eovs"] == two_station_dataset.eovs
+
+    def test_single_feature_dataset_inherits_dataset_eovs(
+        self, single_station_dataset
+    ):
+        """One feature is the dataset, so detection is skipped entirely — that
+        also sidesteps get_count's single-feature shortcuts, which return a
+        time-only or window-limited frame."""
+        result = get_profiles(single_station_dataset)
+        assert list(result["eovs"].iloc[0]) == list(single_station_dataset.eovs)
+        single_station_dataset.get_eov_variables.assert_not_called()
