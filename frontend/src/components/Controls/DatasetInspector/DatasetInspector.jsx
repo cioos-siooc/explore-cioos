@@ -9,6 +9,7 @@ import TableFilter, { filterRows } from '../../ui/TableFilter.jsx'
 import Loading from '../Loading/Loading.jsx'
 import GriddapDetails from '../GriddapDetails/GriddapDetails.jsx'
 import { server } from '../../../config'
+import reportError from '../../../state/reportError.js'
 import { splitLines } from '../../../utilities'
 import { gridNodeFactors, totalGridNodes } from '../../../wmsUtilities'
 import FilterButton from '../Filter/FilterButton/FilterButton.jsx'
@@ -154,7 +155,7 @@ export default function DatasetInspector({
       .catch((error) => {
         // An error response used to leave the spinner running forever. Land on
         // an empty record table instead — the rest of the page still reads.
-        console.error('datasetRecordsList failed:', error)
+        reportError('datasetRecordsList fetch failed', error)
         if (!cancelled) setDatasetRecords([])
       })
       .finally(() => {
@@ -175,7 +176,10 @@ export default function DatasetInspector({
     fetch(`${server}/trajectories/platforms?datasetPKs=${dataset.pk}`)
       .then((response) => (response.ok ? response.json() : []))
       .then((platforms) => setTrajectoryPlatforms(platforms))
-      .catch(() => setTrajectoryPlatforms([]))
+      .catch((error) => {
+        reportError('trajectory platforms fetch failed', error)
+        setTrajectoryPlatforms([])
+      })
   }, [dataset])
 
   // Browser Back needs no handling here: the open dataset lives in the URL

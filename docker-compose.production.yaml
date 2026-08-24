@@ -109,6 +109,11 @@ services:
       args:
         API_URL: $API_URL
         BASE_URL: $BASE_URL
+        ENVIRONMENT: $ENVIRONMENT
+        SENTRY_RELEASE: $SENTRY_RELEASE
+        SENTRY_AUTH_TOKEN: $SENTRY_AUTH_TOKEN
+        SENTRY_ORG: $SENTRY_ORG
+        SENTRY_PROJECT: $SENTRY_PROJECT
     expose:
       - "80"
     networks:

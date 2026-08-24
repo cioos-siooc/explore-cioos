@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import isEmpty from 'lodash/isEmpty'
 
 import { server } from '../../config.js'
+import reportError from '../reportError.js'
 import {
   defaultStartDate,
   defaultEndDate,
@@ -141,7 +142,7 @@ export default function DownloadProvider ({ children }) {
       })
       .catch((error) => {
         setSubmissionState('failed')
-        throw error
+        reportError('download submission failed', error)
       })
   }
 

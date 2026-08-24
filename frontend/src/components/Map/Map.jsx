@@ -17,6 +17,7 @@ import { useSearchParams } from 'react-router-dom'
 import './styles.css'
 
 import { server } from '../../config'
+import reportError from '../../state/reportError.js'
 import {
   boundsFromGeoJson,
   escapeHtml,
@@ -1733,9 +1734,7 @@ export default function CreateMap({
           if (!response.ok) return
           track = await response.json()
         } catch (error) {
-          if (error.name !== 'AbortError') {
-            console.error('track fetch failed:', error)
-          }
+          reportError('track fetch failed', error)
           return
         }
         if (superseded) return
