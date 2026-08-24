@@ -250,9 +250,62 @@ log_dir: ../harvester_logs
 # Logging level (DEBUG, INFO, WARNING, ERROR)
 log_level: INFO
 
-# Maximum concurrent threads for harvesting
-max_workers: 1
+# --- OBIS ---
+# Discover which OBIS datasets to harvest from the OBIS API: everything from
+# the OBIS Canada node, everything from OTN-OBIS, and anything with occurrences
+# inside the Canadian EEZ. Resolved fresh at the start of each OBIS harvest.
+obis_discovery:
+  enabled: true
+  nodes:
+    - 7dfb2d90-9317-434d-8d4e-64adf324579a   # OBIS Canada
+    - 68f83ea7-69a7-44fd-be77-3c3afd6f3cf8   # OTN-OBIS
+  geometry: eez        # 'eez' | 'none' | inline WKT
+  areas: []            # optional OBIS areaids
+  include: []          # dataset UUIDs always added
+  exclude: []          # dataset UUIDs always removed
+  min_datasets: 700    # abort rather than harvest an implausibly short list
+
+# Harvest a fixed set instead (test mode) — bypasses obis_discovery entirely.
+# obis_dataset_ids:
+#   - 4b5e4ccb-cf66-44e4-8890-fa68f8404c3f
+
+# Clip OBIS occurrences to Canadian waters. Datasets from the exempt nodes are
+# harvested in full. mode: none disables clipping (test use only).
+obis_geo_filter:
+  mode: canada
+  exempt_node_ids:
+    - 7dfb2d90-9317-434d-8d4e-64adf324579a
+    - 68f83ea7-69a7-44fd-be77-3c3afd6f3cf8
+
+# Shared cache for OBIS occurrence/metadata downloads. Must live outside
+# `folder` (per-run directories get pruned).
+# obis_folder: ./obis_cache
 ```
+
+`harvest_config.sample.yaml` in the project root documents every key, including
+the precedence rules between `obis_dataset_ids`, `obis_discovery`, and the
+legacy `obis_datasets_file`.
+
+### Which OBIS datasets get harvested
+
+Discovery replaces the old hand-maintained `Obis_Datasets.json`, so adding a
+Canadian OBIS dataset no longer needs a code change — it is picked up on the
+next harvest. To see what the current config would resolve to, without running
+a harvest:
+
+```bash
+uv run python scripts/discover_obis_datasets.py -f ../harvest_config.yaml \
+    --compare ../Obis_Datasets.json --cells ../harvest/obis_cells.csv
+```
+
+That prints the per-query counts, the reduced query geometry, and a diff
+against a previous list — including how many datasets that actually produced
+map cells would be dropped. Re-run it whenever the boundary polygon or the node
+list changes.
+
+Discovery is all-or-nothing: if any of its queries fails, the OBIS harvest
+fails, so the db-loader never runs and nothing is pruned. `min_datasets` is the
+backstop against a short-but-successful list.
 
 A list of CIOOS ERDDAP servers is maintained in [cioos_erddap_servers.csv](cioos_erddap_servers.csv).
 

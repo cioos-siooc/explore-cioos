@@ -20,11 +20,13 @@ from prefect.exceptions import ObjectNotFound
 from cde_harvester.__main__ import main as harvester_main
 from cde_harvester.core.config import (
     load_config,
-    load_obis_dataset_ids,
     resolve_harvest_config_file,
+    resolve_obis_config,
 )
 from cde_harvester.core.observability import cleanup_old_logs, run_logger
 from cde_harvester.sources import OBIS_ALIASES
+from cde_harvester.sources.obis.discovery import ObisDiscoveryConfig
+from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
 from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
 from cde_harvester.loading.loader import main as db_loader_main
 from cde_harvester.loading.populate_vernaculars import main as vernaculars_main
@@ -173,6 +175,22 @@ def _cron_env(var_name):
     return (os.getenv(var_name) or "").strip() or None
 
 
+def _configured_sources(erddap_urls, obis_dataset_ids, obis_discovery):
+    """The list of harvestable sources: each ERDDAP url, plus "obis" when OBIS is on.
+
+    Shared by create_deployment() and cde_harvest_all_run() — the registered
+    per-source deployments and the fan-out list must never disagree, or OBIS
+    ends up registered but never triggered (or vice versa), which is silent
+    data loss. Note that under discovery `obis_dataset_ids` is empty at config
+    time, so it can't be used alone to decide whether OBIS is configured.
+    """
+    sources = [u.strip() for u in (erddap_urls or "").split(",") if u.strip()] \
+        if isinstance(erddap_urls, str) else [u.strip() for u in (erddap_urls or []) if u and u.strip()]
+    if obis_dataset_ids or (obis_discovery or {}).get("enabled", bool(obis_discovery)):
+        sources.append("obis")
+    return sources
+
+
 class PrefectCDEPipeline:
     erddap_urls: str
     cache_requests: bool
@@ -184,6 +202,8 @@ class PrefectCDEPipeline:
     incremental: bool
     flush_redis: bool
     obis_dataset_ids: list
+    obis_discovery: dict
+    obis_geo_filter: dict
     obis_folder: str
     source: str
     triggered_by: str
@@ -209,11 +229,22 @@ class PrefectCDEPipeline:
         # Defaults; cde_pipeline_run() overrides these for a single-source run.
         self.source = None
         self.triggered_by = None
-        self.obis_dataset_ids = load_obis_dataset_ids(
-            dataset_ids=config.get("obis_dataset_ids"),
-            datasets_file=config.get("obis_datasets_file"),
-        )
+        # Declarative only — discovery itself runs inside the OBIS harvest task.
+        # init_config() is also called at deployment-registration time, so a
+        # network call here would make container startup depend on api.obis.org
+        # and would fire on every ERDDAP-only per-source run.
+        obis = resolve_obis_config(config)
+        logger.info("OBIS selection mode: %s", obis.mode)
+        self.obis_dataset_ids = obis.dataset_ids
+        self.obis_discovery = obis.discovery
+        self.obis_geo_filter = obis.geo_filter
         self.obis_folder = config.get("obis_folder")
+
+        # Parse-and-discard so a malformed OBIS block fails here — at container
+        # startup / deployment registration — instead of at the first harvest.
+        # Neither call touches the network.
+        ObisDiscoveryConfig.from_config(self.obis_discovery)
+        ObisGeoFilter.from_config(self.obis_geo_filter)
 
         logger.info("CDE Pipeline initialized with configuration:")
         logger.info(f"{vars(self)}")
@@ -262,6 +293,11 @@ class PrefectCDEPipeline:
                         dataset_ids=self.dataset_ids,
                         obis_dataset_ids=self.obis_dataset_ids,
                         obis_folder=str(obis_folder),
+                        # Both of these were previously never passed, so the
+                        # documented obis_geo_filter config block was silently
+                        # ignored on the Prefect (production) path.
+                        obis_geo_filter=self.obis_geo_filter,
+                        obis_discovery=self.obis_discovery,
                         source=self.source,
                         triggered_by=self.triggered_by,
                         skip_unchanged=effective_incremental,
@@ -397,9 +433,9 @@ class PrefectCDEPipeline:
         # One on-demand deployment per source (re-deploy updates rather than
         # duplicates). The dashboard "Trigger harvest" button and the orchestrator
         # both run these by name; each forces incremental db-load (see cde_pipeline).
-        per_source = [u.strip() for u in (self.erddap_urls or "").split(",") if u.strip()]
-        if self.obis_dataset_ids:
-            per_source.append("obis")
+        per_source = _configured_sources(
+            self.erddap_urls, self.obis_dataset_ids, self.obis_discovery
+        )
         source_deployment_names = []
         for src in per_source:
             dep_name = f"cde-harvester-{deployment_slug(src)}"
@@ -554,20 +590,22 @@ def cde_harvest_all_run(
 ):
     """Scheduled fan-out: trigger one independent per-source harvest job per configured source,
     wait for all, and fail red if any did not complete (a failure doesn't cancel the others)."""
-    logger = get_run_logger()
+    # _run_logger() rather than get_run_logger() so the source-resolution logic
+    # below is callable (and testable) outside a flow context.
+    logger = _run_logger()
 
     config_file = resolve_harvest_config_file(config_file)
     config = load_config(config_file)
 
-    sources = [u.strip() for u in (config.get("erddap_urls") or []) if u and u.strip()]
-    obis_ids = load_obis_dataset_ids(
-        dataset_ids=config.get("obis_dataset_ids"),
-        datasets_file=config.get("obis_datasets_file"),
+    obis = resolve_obis_config(config)
+    sources = _configured_sources(
+        config.get("erddap_urls") or [], obis.dataset_ids, obis.discovery
     )
-    if obis_ids:
-        sources.append("obis")
     if not sources:
-        raise ValueError("No sources configured to harvest (erddap_urls / obis_dataset_ids)")
+        raise ValueError(
+            "No sources configured to harvest (erddap_urls / obis_discovery / "
+            "obis_dataset_ids / obis_datasets_file)"
+        )
 
     logger.info("Fanning out %d per-source harvest job(s): %s", len(sources), sources)
     futures = [_trigger_source_harvest.submit(src, triggered_by) for src in sources]

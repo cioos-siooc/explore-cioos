@@ -8,10 +8,12 @@ from datetime import datetime, timezone
 import pandas as pd
 import requests
 from prefect import task
-from prefect.logging import get_run_logger
+
+from cde_harvester.core.observability import run_logger
 
 from cde_harvester.sources.base import BaseHarvester, HarvestResult
 from cde_harvester.sources.ckan.create_ckan_obis_link import get_ckan_obis_records
+from cde_harvester.sources.obis.discovery import ObisDatasetDiscovery
 from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
 from cde_harvester.core.schemas import (
     DatasetSchema,
@@ -46,6 +48,14 @@ class OBISHarvester(BaseHarvester):
         self.run_id = run_id
 
     def harvest(self) -> HarvestResult:
+        if not self.limit_dataset_ids:
+            # Returning empty frames here would look like "OBIS has no data" and
+            # let the db-loader prune every OBIS dataset out of the database.
+            raise ValueError(
+                "OBISHarvester was given no dataset ids. Configure obis_discovery, "
+                "obis_dataset_ids, or obis_datasets_file."
+            )
+
         all_cells = []
         all_datasets = []
         all_skipped = []
@@ -469,12 +479,54 @@ class OBISHarvester(BaseHarvester):
 
 
 @task(task_run_name="harvest-obis")
-def harvest_obis(limit_dataset_ids=None, folder="./obis/", geo_filter=None, run_id=None):
-    """Run the OBIS harvester."""
+def harvest_obis(limit_dataset_ids=None, folder="./obis/", geo_filter=None, run_id=None,
+                 discovery=None):
+    """Run the OBIS harvester.
+
+    When no explicit ``limit_dataset_ids`` are given and ``discovery`` is
+    enabled, the dataset list is resolved from the OBIS API first. Discovery
+    failures propagate: the task fails, so ``cde_pipeline`` never reaches the
+    db-loader and nothing is pruned.
+    """
+    # run_logger() rather than get_run_logger() so the task body is callable
+    # (and testable) outside a flow context.
+    prefect_logger = run_logger(logger)
+    geo_filter = geo_filter or ObisGeoFilter(mode="canada")
+
+    if not limit_dataset_ids and discovery is not None and discovery.enabled:
+        result = ObisDatasetDiscovery(
+            discovery, geo_filter=geo_filter, logger=prefect_logger,
+        ).discover()
+        limit_dataset_ids = result.dataset_ids
+        _publish_discovery_artifact(result, prefect_logger)
+    elif limit_dataset_ids:
+        prefect_logger.info(
+            "Harvesting %d explicitly configured OBIS dataset(s); discovery bypassed",
+            len(limit_dataset_ids),
+        )
+
     harvester = OBISHarvester(
         limit_dataset_ids, folder,
-        prefect_logger=get_run_logger(),
+        prefect_logger=prefect_logger,
         geo_filter=geo_filter,
         run_id=run_id,
     )
     return harvester.harvest()
+
+
+def _publish_discovery_artifact(result, prefect_logger):
+    """Best-effort Prefect artifact showing what discovery returned. Never fails the run."""
+    try:
+        from prefect.artifacts import create_table_artifact
+
+        rows = [{"query": label, "datasets": count} for label, count in result.per_query.items()]
+        rows.append({"query": "TOTAL (deduped)", "datasets": len(result.dataset_ids)})
+        if result.geometry_bytes:
+            rows.append({"query": "geometry WKT bytes", "datasets": result.geometry_bytes})
+        create_table_artifact(
+            key="obis-discovery",
+            table=rows,
+            description="OBIS datasets discovered for this harvest run.",
+        )
+    except Exception as e:
+        prefect_logger.warning("Could not publish OBIS discovery artifact: %s", e)
