@@ -9,6 +9,7 @@ import * as helpers from '@turf/helpers'
 import turfBboxPolygon from '@turf/bbox-polygon'
 import turfPointsWithinPolygon from '@turf/points-within-polygon'
 import turfBbox from '@turf/bbox'
+import turfUnion from '@turf/union'
 
 import DrawRectangle from 'mapbox-gl-draw-rectangle-mode'
 import debounce from 'lodash/debounce'
@@ -2808,12 +2809,28 @@ export default function CreateMap({
         // currently-rendered fragment sharing this pk so the highlight/bounds
         // below cover the whole hex instead of the one sliver under the
         // cursor.
+        //
+        // The fragments still meet at the tile edge they were clipped along,
+        // so unioning them back into one polygon isn't just cosmetic tidying
+        // — without it, click-highlight-line/glow draw that internal edge as
+        // a line cutting across the hex, on top of drawing its true outline.
         if (layerId !== 'points') {
           const fragments = map.current.queryRenderedFeatures({
             layers: [layerId],
             filter: ['==', ['get', 'pk'], feature.properties.pk]
           })
-          cellFeatures.push(...(fragments.length ? fragments : [feature]))
+          const parts = fragments.length ? fragments : [feature]
+          let merged = parts[0]
+          for (let i = 1; i < parts.length; i++) {
+            try {
+              merged = turfUnion(merged, parts[i]) || merged
+            } catch (error) {
+              // A degenerate fragment (e.g. a sliver from the MVT buffer
+              // overlap) fails to union — keep what merged so far rather
+              // than losing the highlight entirely.
+            }
+          }
+          cellFeatures.push(merged)
         }
         datasetPksOf(feature).forEach((pk) => {
           const existing = observations.get(pk)
