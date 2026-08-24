@@ -23,6 +23,7 @@ from cde_harvester.core.observability import (
     init_sentry,
     setup_logging,
 )
+from cde_harvester.core.issues import report_issues
 from cde_harvester.core.schemas import HarvestAttemptSchema
 from cde_harvester.sources.erddap.harvester import harvest_erddap
 from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
@@ -146,6 +147,12 @@ def _write_run_audit_csvs(folder, run_id, started_at, finished_at, git_sha,
 
     # Surface the same per-dataset statuses in the Prefect UI as a table artifact.
     _publish_status_artifact(df_attempts, run_id, status, logger)
+
+    # Collapse the run's errors into one report per (server, distinct error) and
+    # hand them to Sentry, which de-dupes on the fingerprint so only a problem we
+    # haven't seen before raises an alert. Runs here because this is the one seam
+    # every exit path goes through, with all attempts already concatenated.
+    report_issues("harvester", df_attempts, logger)
 
 
 def _run_logger():
