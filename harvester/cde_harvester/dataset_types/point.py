@@ -95,6 +95,10 @@ def extract_exact_samples(dataset):
             "dataset_id": dataset.id,
             "timeseries_id": "",
             "profile_id": samples.apply(_sample_key, axis="columns", has_depth=has_depth),
+            # No per-variable EOV breakdown here (unlike the shared tabledap
+            # pipeline's _eovs_per_feature): every sample gets the dataset's
+            # full EOV list, same as that pipeline's own fallback.
+            "eovs": [list(dataset.eovs)] * len(samples),
             "latitude": samples["latitude"],
             "longitude": samples["longitude"],
             # A single sample has no extent: the box collapses onto the point,

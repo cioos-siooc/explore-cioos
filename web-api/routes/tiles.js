@@ -67,7 +67,9 @@ function requestedTrajectoryTypes(query) {
 
 // Point is the one cdm_data_type that is not tied to a single table: the
 // harvester stores a small Point dataset as exact rows in cde.profiles and a
-// large one as coverage cells in cde.trajectory_cells (see the Point handler).
+// large one as day/hex coverage in cde.trajectory_hexes, sharing the
+// trajectory pipeline as a single unnamed pseudo-trajectory (see the Point
+// handler).
 // A dataset's rows only ever live in ONE of them, so naming Point in both
 // allowlists yields the right union without the client needing to know which
 // table any given dataset landed in.
