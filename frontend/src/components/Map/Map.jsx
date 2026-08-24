@@ -817,8 +817,8 @@ export default function CreateMap({
 
   const hexFillColor = () => rampExpression(colorStops.current, 'count')
 
-  // The `count` property, worded: it is a span of days everywhere on the map
-  // (see HEX_METRIC). Numbers are locale-formatted — a bare 1738204 is
+  // The `count` property, worded: it is a number of distinct days everywhere on
+  // the map (see HEX_METRIC). Numbers are locale-formatted — a bare 1738204 is
   // unreadable at a glance. Note the interpolation variable is `total`, not
   // `count`: i18next treats a numeric `count` option as a pluralization trigger
   // and would go looking for _one/_other variants that don't exist.

@@ -83,7 +83,12 @@ One row per (dataset, trajectory, `hex_tier`, `hex_pk`), built by
    dropped segment are not lost.
 3. **Days**: each occupancy interval is split at UTC midnight, so
    `days = count(distinct day)` per hex — a real count, whatever the gaps
-   between visits.
+   between visits. The same day set is also kept as `day_ranges`, the maximal
+   runs of consecutive UTC days, because the map's "days of data" ramp unions
+   day sets across the features in a hex rather than adding their counts up
+   (`day_union_days()`, `database/8_range_functions.sql`) — a count alone can't
+   be unioned, and the `[time_min, time_max]` envelope would hand a ship that
+   crosses the hex every January the decades in between.
 4. **Attributes**: joined from `cde.trajectory_days` by day and apportioned
    across the hexes visited that day by time spent in each. Per-dataset record
    totals are preserved to within integer rounding (~0.001% on a 24M-record

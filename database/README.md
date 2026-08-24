@@ -39,5 +39,5 @@ against `1_schema.sql` and fails when a schema column is missing from the DDL.
 | `5_profile_process.sql` | `profile_process()`, `obis_*()`, `trajectory_*()` post-load processing; `gc_orphan_points_and_hexes()` |
 | `6_remove_all_data.sql` | `remove_all_data()` — full-reload TRUNCATE |
 | `7_contraints.sql` | `drop_constraints()` / `set_constraints()` |
-| `7_/8_range_functions.sql` | `range_intersection_length()` (download estimates) |
+| `7_/8_range_functions.sql` | `range_intersection_length()` (download estimates); `day_union_days()` (the map's distinct-day ramp) |
 | `9_incremental_upsert.sql` | temp tables + `process_incremental_update()` |
