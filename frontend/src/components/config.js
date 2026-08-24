@@ -16,8 +16,8 @@ export const defaultObisNodesSelected = []
 // from them: the map only reports its camera once it has finished loading, and
 // everything keyed off the zoom (the legend ramps above all) would otherwise
 // have to treat "not loaded yet" as "no zoom".
-export const defaultMapCenter = { lat: 60, lon: -150 }
-export const defaultMapZoom = 2
+export const defaultMapCenter = { lat: 63.3, lon: -95.9 }
+export const defaultMapZoom = 2.75
 
 export const defaultQuery = {
   startDate: defaultStartDate,

@@ -56,14 +56,13 @@ export default function ActiveFilterChips () {
   } = useFilters()
   const {
     polygon,
-    setPolygon,
     datasetTitleSearchText,
     setDatasetTitleSearchText,
     onlyInView,
     setOnlyInView
   } = useSelection()
   const { setShowFiltersModal, setOpenFilter, setSidebarOpen } = useUI()
-  const { dataLayers, toggleDataLayer, resetDataLayers } = useMapState()
+  const { dataLayers, toggleDataLayer, resetDataLayers, requestDraw } = useMapState()
 
   // The chips can be collapsed behind a Show/Hide toggle. They start hidden on
   // phones — where they would eat most of the map — and shown on desktop. The
@@ -200,7 +199,7 @@ export default function ActiveFilterChips () {
             <button
               type='button'
               className='activeFilterItemRemove'
-              onClick={() => setPolygon()}
+              onClick={() => requestDraw('clear')}
               title={t('activeFilterRemoveItemTitle')}
             >
               <X size={14} aria-hidden='true' />
@@ -223,7 +222,7 @@ export default function ActiveFilterChips () {
           onClick={() => {
             resetFilters()
             resetDataLayers()
-            setPolygon()
+            requestDraw('clear')
             setDatasetTitleSearchText('')
           }}
           title={t('resetFiltersButtonTooltipText')}

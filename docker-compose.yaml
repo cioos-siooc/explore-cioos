@@ -150,7 +150,6 @@ services:
     build:
       context: .
       dockerfile: ./harvester/Dockerfile
-    image: cde-harvester:latest
     depends_on:
       prefect:
         condition: service_healthy
@@ -164,9 +163,13 @@ services:
       # instructions otherwise). A relative bind-mount of a repo file doesn't
       # work under Coolify (it resolves the source to an empty
       # persistent-storage dir and fails "mount dir onto file"), so:
-      #   - under Coolify: set the HARVEST_CONFIG_YAML env var to the full YAML
-      #     (editable in the UI; applied on redeploy/recreate), or add a
-      #     Persistent Storage FILE mount onto /app/harvester/harvest_config.yaml;
+      #   - under Coolify: set the HARVEST_CONFIG_B64 env var to the whole YAML
+      #     file base64-encoded on ONE line (applied on redeploy/recreate) —
+      #     generate it with `base64 < harvest_config.yaml | tr -d '\n'`. Raw
+      #     multi-line YAML in an env var does NOT survive Coolify's env editor
+      #     (it reindents continuations and mangles `#` comments), which is why
+      #     the value is base64. Or add a Persistent Storage FILE mount onto
+      #     /app/harvester/harvest_config.yaml to keep it UI-editable;
       #   - locally: mount ./harvest_config.yaml via docker-compose.override.yaml
       #     (see docker-compose.override.yaml.sample).
       # Config is re-read on every container start (deployments re-register) and
