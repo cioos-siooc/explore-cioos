@@ -129,6 +129,18 @@
 
 .topBarActions > .topBarButton:first-child {
   border-left: none;
+  /* Matches .topBarActions' own bottom-left radius. The row's overflow:hidden
+     clips a plain button to that curve, but .active (below) promotes the
+     button to its own compositing layer via transform + box-shadow, and that
+     layer's paint doesn't reliably clip to the ancestor's rounded corner —
+     it can leave a square sliver of the button showing past the curve.
+     Rounding the corner on the button itself removes the dependency on
+     cross-layer clipping. */
+  border-bottom-left-radius: var(--cioos-radius-lg);
+}
+
+.topBarActions > .topBarButton:last-child {
+  border-bottom-right-radius: var(--cioos-radius-lg);
 }
 
 .topBarButton svg {

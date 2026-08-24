@@ -189,6 +189,12 @@ CREATE TABLE profiles (
     n_records bigint,
     records_per_day float,
     n_profiles bigint,
+    -- The EOVs this feature actually carries, detected at harvest from the
+    -- per-variable record counts. Always a subset of the parent dataset's
+    -- eovs, and never empty (it falls back to the dataset's full list when
+    -- detection isn't possible) — the web-api filters with the && overlap
+    -- operator, so an empty list would hide the feature from every selection.
+    eovs text[],
     -- Hex FKs are DEFERRABLE INITIALLY DEFERRED for the same reason as on
     -- cde.points above: create_hexes() rebuilds+relinks within the transaction
     -- and the reference is validated at COMMIT, keeping loads off ACCESS
@@ -212,6 +218,10 @@ CREATE INDEX ON profiles(erddap_url, dataset_id, timeseries_id, profile_id);
 -- (erddap_url, dataset_id) index above does not serve a dataset_pk lookup, so
 -- without this a single-dataset / Source-filter drilldown seq-scans profiles.
 CREATE INDEX ON profiles(dataset_pk);
+-- The EOV filter is an && array overlap pushed into the profiles branch of
+-- every tile/legend/shape query; without GIN it seq-scans the largest table in
+-- the app on every pan.
+CREATE INDEX ON profiles USING GIN (eovs);
 
 
 

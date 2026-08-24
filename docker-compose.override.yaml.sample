@@ -24,7 +24,7 @@ services:
       - "${PREFECT_PORT:-4200}:4200"  # Prefect UI + API
   prefect_worker:
     # Mount your local harvest config — the image does not bake one, so without
-    # this mount (or a HARVEST_CONFIG_YAML env var) the worker refuses to start.
+    # this mount (or a HARVEST_CONFIG_B64 env var) the worker refuses to start.
     # Create it first: `cp harvest_config.sample.yaml harvest_config.yaml`
     # (harvest_config.yaml is gitignored). Edits are picked up on the next flow
     # run; a changed server list needs `docker compose restart prefect_worker`
