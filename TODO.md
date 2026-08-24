@@ -3,10 +3,20 @@
 ## Release blockers
 
 ### Bugs
-- [ ] Fix hexes at high latitude for trajectories.
-- [ ] Fix click on map grid box / hex / marker interaction
+- [x] Fix hexes at high latitude for trajectories — coverage is swept from the
+      track itself (`trajectory_build_hexes`) instead of a 1/12-degree lat/lon
+      grid whose latitude spacing outgrew the hex rows north of ~57N.
+- [x] Fix click on map grid box / hex / marker interaction — one click handler
+      for every layer, answered by the "what's here" card, instead of six
+      handlers doing five unrelated things behind a stand-aside ladder.
 - [ ] Update hexes colormap base on visible hexes
 - [ ] Make icons in dataset page vertically stacked
+
+### Map interaction follow-ups
+- [ ] Give the datasets sheet a mid snap point on phones, so the list and the
+      map are visible together. Deliberately left alone for now: the sheet drag
+      was removed on purpose in "on phones the sheet waits to be asked for".
+- [ ] Long-press on the map as "add everything here" without opening the card.
 
 ### Downloader — test and fix
 - [ ] Trajectory

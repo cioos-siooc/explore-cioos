@@ -1,17 +1,30 @@
-"""Trajectory coverage-cell extraction.
+"""Trajectory coverage extraction.
 
 Trajectory / TrajectoryProfile datasets (gliders, drifters, ships underway)
 have a moving position per record, so the one-lat/lon-per-feature profile
-pipeline doesn't apply. Instead the track is reduced to coverage cells: one
-row per (trajectory, 1/12-degree grid cell) with time/depth extents and a
-record count — the same representation obis_cells uses for occurrences.
+pipeline doesn't apply. The track is reduced to two outputs, and the database
+combines them:
 
-The reduction happens ON THE ERDDAP SERVER via orderBy* grouping with the
-``variable/interval`` syntax (orderByMinMax("traj,latitude/0.08333333,...")),
-so the response size is the number of occupied cells (KB), never the
+* ``extract_track_points`` — the ordered, downsampled fixes themselves
+  (cde.trajectory_points). The database sweeps the segments between them
+  through the hex grid (``trajectory_build_hexes``, database/4_create_hexes.sql),
+  so the map lights every hex the platform CROSSED. This is the geometry.
+* ``extract_day_stats`` — per (trajectory, UTC day) record counts and depth
+  range (cde.trajectory_days). These are the attributes; the database
+  apportions them across the hexes each day's track passed through.
+
+Both reductions happen ON THE ERDDAP SERVER via orderBy* grouping with the
+``variable/interval`` syntax (``orderByCount("traj,time/86400")``), so the
+response size is the number of trajectory-days (KB), never the
 full-resolution track. Servers whose ERDDAP predates interval grouping fall
 back to downloading only the id/lat/lon/time/depth columns in monthly chunks
-and binning in pandas (bounded by MAX_RESPONSE_SIZE).
+and reducing in pandas (bounded by MAX_RESPONSE_SIZE).
+
+An earlier design asked the server to bin positions onto a 1/12-degree lat/lon
+grid and lit the single hex containing each bin centre. In EPSG:3857 — where
+the hex grid lives — 1/12 degree of latitude is 9.28 km / cos(lat) while a hex
+row is a fixed 17.3 km, so north of ~57N whole hex rows along a track went
+unlit. Sweeping the track itself has no such latitude dependence.
 """
 
 import logging
@@ -26,12 +39,6 @@ from cde_harvester.core.errors import ResponseTooLargeError
 from cde_harvester.sources.erddap.client import ERDDAP
 
 logger = logging.getLogger(__name__)
-
-# Bin size for coverage cells: 1/12 degree (~5 NM), matching the OBIS cell
-# grid (obis harvester GRID_DEG) so both cell tables aggregate comparably.
-GRID_DEG = 1 / 12
-# Interval literal sent to ERDDAP (8 dp keeps the URL stable for caching).
-GRID_INTERVAL = f"{GRID_DEG:.8f}"
 
 # Track-point downsampling for plain Trajectory datasets (ships/drifters can
 # report every few seconds, others every few days): start from a cheap
@@ -65,9 +72,16 @@ TRACK_FALLBACK_INTERVAL_SECONDS = 1800
 # 708-day one shouldn't share one flat cap. Enforced by _decimate_tracks via
 # shape-preserving (Douglas-Peucker) simplification first, falling back to an
 # even stride only if DP alone doesn't fit under the cap.
+# The cap also sets the RESOLUTION OF THE MAP COVERAGE, not just the smoothness
+# of the drawn line: the database sweeps the segments between retained fixes
+# through the hex grid, so a stride-decimated track under-reports the hexes it
+# actually crossed. Sized for the worst case in the catalogue — a single
+# 20-year ship trajectory — and cheap: the fixes are already downloaded (only
+# local Douglas-Peucker retention changes) and the whole table is an order of
+# magnitude smaller than the per-cell table this replaced.
 TRACK_POINTS_PER_ACTIVE_DAY = 50
 MIN_TRACK_POINTS_CAP = 1000
-MAX_TRACK_POINTS_CAP = 20000
+MAX_TRACK_POINTS_CAP = 60000
 # Perpendicular-distance tolerance for the Douglas-Peucker simplification,
 # applied in an equirectangular approximation (longitude scaled by
 # cos(mean latitude)) so a single degree-space tolerance is roughly isotropic.
@@ -86,120 +100,86 @@ KM_PER_DEGREE_LATITUDE = 111.32
 TRACK_MAX_CHORD_KM = 25
 
 
-def _snap(series):
-    """Snap coordinates to the canonical cell grid (round-to-nearest, 8 dp).
+def _day_group(traj_var):
+    """orderBy* grouping clause: one group per (trajectory, UTC day).
 
-    Applied to every server response as well: if the server returned binned
-    values they are already multiples of the grid and snap to themselves; if
-    it returned raw row values they land on the nearest cell.
+    ERDDAP's ``time/86400`` interval buckets are epoch-aligned, which is UTC
+    midnight — the same day boundary the database uses when it counts distinct
+    days per hex.
     """
-    return ((series.astype(float) / GRID_DEG).round() * GRID_DEG).round(8)
-
-
-def _group_clause(traj_var):
-    parts = ([traj_var] if traj_var else []) + [
-        f"latitude/{GRID_INTERVAL}",
-        f"longitude/{GRID_INTERVAL}",
-    ]
+    parts = ([traj_var] if traj_var else []) + [f"time/{TRACK_DAY_SECONDS}"]
     return ",".join(parts)
 
 
-def _binned_min_max(dataset, traj_var, target_var):
-    """Per-cell min/max of target_var via server-side interval grouping.
+def _bucket_index_to_day(series):
+    """Turn an orderByCount interval-group column into the bucket's UTC day.
 
-    Returns a DataFrame with [traj_var?, latitude, longitude, target_var]
-    (two rows per cell), or empty on no data.
+    For an interval group (`time/86400`) orderByCount returns the BUCKET INDEX
+    in the grouped column, not the bucket's value — verified live against
+    ERDDAP 2.x: `time/86400` came back as 13017, formatted as
+    "1970-01-01T03:36:57Z" (13017 SECONDS), and `time/3600` as the matching
+    hour index. Taken at face value every row collapses onto 1970-01-01, which
+    is exactly how the previous per-cell design lost its counts: it read the
+    same response's `latitude/0.08333333` group as a latitude, got a bin index
+    like 531.0, merged on it, matched nothing, and silently kept the 2-row
+    min/max count — production trajectory n_records are all 1..7 because of it.
+
+    orderByMin/orderByMax are unaffected (they return the actual extreme row,
+    so a real timestamp), so both shapes have to be handled here: an index for
+    day buckets is ~2e4, a real timestamp is ~1.5e9, and no plausible ocean
+    dataset sits in between.
     """
-    request_vars = ([traj_var] if traj_var else []) + [
-        "latitude", "longitude", target_var,
-    ]
+    epoch = ERDDAP.parse_erddap_dates(series).astype("int64") // 10**9
+    if len(epoch) and epoch.abs().max() < 10**6:
+        epoch = epoch * TRACK_DAY_SECONDS
+    return pd.to_datetime(epoch, unit="s", utc=True).dt.floor("D")
+
+
+def _day_counts(dataset, traj_var):
+    """Records per (trajectory, day) via server-side orderByCount.
+
+    `latitude` is the counted column (`time` can't be: it is the group-by
+    column). Counting positions rather than every row is also the honest number
+    for a coverage layer whose geometry is positions.
+    """
+    request_vars = ([traj_var] if traj_var else []) + ["time", "latitude"]
     url = ",".join(request_vars) + requests.utils.quote(
-        f'&orderByMinMax("{_group_clause(traj_var)},{target_var}")'
+        f'&orderByCount("{_day_group(traj_var)}")'
     )
-    return dataset.dataset_tabledap_query(url)
-
-
-def _binned_count(dataset, traj_var):
-    """Per-cell record count (of time values) via orderByCount."""
-    request_vars = ([traj_var] if traj_var else []) + [
-        "latitude", "longitude", "time",
-    ]
-    url = ",".join(request_vars) + requests.utils.quote(
-        f'&orderByCount("{_group_clause(traj_var)}")'
-    )
-    return dataset.dataset_tabledap_query(url)
-
-
-def _aggregate(df, traj_var, has_depth):
-    """Bin a [traj?, latitude, longitude, time(, depth)] frame into cells."""
-    df = df.dropna(subset=["latitude", "longitude"]).copy()
+    df = dataset.dataset_tabledap_query(url)
     if df.empty:
         return df
-    df["latitude"] = _snap(df["latitude"])
-    df["longitude"] = _snap(df["longitude"])
+    df = df.rename(columns={"latitude": "n_records"})
+    df["day"] = _bucket_index_to_day(df["time"])
     if traj_var:
         df[traj_var] = df[traj_var].astype(str)
-    group_cols = ([traj_var] if traj_var else []) + ["latitude", "longitude"]
-
-    df["time"] = ERDDAP.parse_erddap_dates(df["time"])
-    agg = {
-        "time_min": ("time", "min"),
-        "time_max": ("time", "max"),
-        "n_records": ("time", "count"),
-    }
-    if has_depth:
-        df["depth"] = pd.to_numeric(df["depth"], errors="coerce")
-        agg["depth_min"] = ("depth", "min")
-        agg["depth_max"] = ("depth", "max")
-    return df.groupby(group_cols, dropna=False).agg(**agg).reset_index()
+    return df.dropna(subset=["day"])
 
 
-def _extract_via_server_binning(dataset, traj_var, has_depth):
-    """Primary path: three small grouped queries, all reduced server-side."""
-    df_time = _binned_min_max(dataset, traj_var, "time")
-    if df_time.empty:
-        return pd.DataFrame()
+def _day_depths(dataset, traj_var):
+    """Depth range per (trajectory, day) via server-side orderByMinMax.
 
-    cells = _aggregate(df_time, traj_var, has_depth=False)
+    Two rows per group (the min row and the max row); collapsed by the caller.
+    """
+    request_vars = ([traj_var] if traj_var else []) + ["time", "depth"]
+    url = ",".join(request_vars) + requests.utils.quote(
+        f'&orderByMinMax("{_day_group(traj_var)},depth")'
+    )
+    return dataset.dataset_tabledap_query(url)
 
-    if has_depth:
-        df_depth = _binned_min_max(dataset, traj_var, "depth")
-        if not df_depth.empty:
-            df_depth = df_depth.dropna(subset=["latitude", "longitude"]).copy()
-            df_depth["latitude"] = _snap(df_depth["latitude"])
-            df_depth["longitude"] = _snap(df_depth["longitude"])
-            if traj_var:
-                df_depth[traj_var] = df_depth[traj_var].astype(str)
-            df_depth["depth"] = pd.to_numeric(df_depth["depth"], errors="coerce")
-            group_cols = ([traj_var] if traj_var else []) + ["latitude", "longitude"]
-            depth_cells = (
-                df_depth.groupby(group_cols, dropna=False)
-                .agg(depth_min=("depth", "min"), depth_max=("depth", "max"))
-                .reset_index()
-            )
-            cells = cells.merge(depth_cells, on=group_cols, how="left")
 
-    df_count = _binned_count(dataset, traj_var)
-    if not df_count.empty:
-        df_count = df_count.dropna(subset=["latitude", "longitude"]).copy()
-        df_count["latitude"] = _snap(df_count["latitude"])
-        df_count["longitude"] = _snap(df_count["longitude"])
-        if traj_var:
-            df_count[traj_var] = df_count[traj_var].astype(str)
-        group_cols = ([traj_var] if traj_var else []) + ["latitude", "longitude"]
-        df_count["time"] = pd.to_numeric(df_count["time"], errors="coerce")
-        counts = (
-            df_count.groupby(group_cols, dropna=False)
-            .agg(count_records=("time", "sum"))
-            .reset_index()
-        )
-        cells = cells.merge(counts, on=group_cols, how="left")
-        # orderByCount is the authoritative count; the min/max response only
-        # contributed 2 rows per cell.
-        cells["n_records"] = cells["count_records"].fillna(cells["n_records"])
-        cells = cells.drop(columns=["count_records"])
-
-    return cells
+def _to_days(df, traj_var):
+    """Add a UTC `day` column from a parsed/parseable `time` column."""
+    df = df.dropna(subset=["time"]).copy()
+    if df.empty:
+        return df
+    if not pd.api.types.is_datetime64_any_dtype(df["time"]):
+        df["time"] = ERDDAP.parse_erddap_dates(df["time"])
+    df = df.dropna(subset=["time"])
+    df["day"] = df["time"].dt.floor("D")
+    if traj_var:
+        df[traj_var] = df[traj_var].astype(str)
+    return df
 
 
 def _iter_raw_chunks(dataset, traj_var, has_depth):
@@ -249,40 +229,51 @@ def _iter_raw_chunks(dataset, traj_var, has_depth):
         yield df
 
 
-def _extract_via_chunked_download(dataset, traj_var, has_depth):
+def _day_stats_via_chunked_download(dataset, traj_var, has_depth):
     """Fallback for servers without orderBy interval grouping: download only
-    the id/position/time(/depth) columns in monthly chunks and bin locally."""
-    frames = [
-        _aggregate(df, traj_var, has_depth)
-        for df in _iter_raw_chunks(dataset, traj_var, has_depth)
-    ]
+    the id/position/time(/depth) columns in monthly chunks and reduce each
+    chunk to per-day rows locally."""
+    frames = []
+    for df in _iter_raw_chunks(dataset, traj_var, has_depth):
+        df = _to_days(df, traj_var)
+        if df.empty:
+            continue
+        group_cols = ([traj_var] if traj_var else []) + ["day"]
+        agg = {"n_records": ("latitude", "count")}
+        if has_depth:
+            df["depth"] = pd.to_numeric(df["depth"], errors="coerce")
+            agg["depth_min"] = ("depth", "min")
+            agg["depth_max"] = ("depth", "max")
+        frames.append(df.groupby(group_cols, dropna=False).agg(**agg).reset_index())
 
     if not frames:
         return pd.DataFrame()
 
     merged = pd.concat(frames, ignore_index=True)
-    group_cols = ([traj_var] if traj_var else []) + ["latitude", "longitude"]
-    agg = {
-        "time_min": ("time_min", "min"),
-        "time_max": ("time_max", "max"),
-        "n_records": ("n_records", "sum"),
-    }
+    group_cols = ([traj_var] if traj_var else []) + ["day"]
+    agg = {"n_records": ("n_records", "sum")}
     if has_depth:
         agg["depth_min"] = ("depth_min", "min")
         agg["depth_max"] = ("depth_max", "max")
     return merged.groupby(group_cols, dropna=False).agg(**agg).reset_index()
 
 
-def _profiles_per_cell(dataset, traj_var, profile_var):
-    """TrajectoryProfile: distinct profiles per cell.
+def _profile_fixes(dataset, traj_var, profile_var):
+    """TrajectoryProfile: one row per (trajectory, profile) — the fix at the
+    profile's first sample, via orderByMin.
 
-    One row per (trajectory, profile) via orderByMin — each profile counted
-    in the cell holding its first fix. NOT distinct() over
-    (traj, profile, lat, lon): position varies within a profile whenever the
-    platform interpolates lat/lon per sample (all glider datasets checked),
-    so distinct() returns ~one row per SAMPLE — seen live at 255MB against
-    the 200MB response cap, failing the whole dataset.
+    NOT distinct() over (traj, profile, lat, lon): position varies within a
+    profile whenever the platform interpolates lat/lon per sample (all glider
+    datasets checked), so distinct() returns ~one row per SAMPLE — seen live at
+    255MB against the 200MB response cap, failing the whole dataset.
+
+    Cached on the dataset: extract_day_stats counts profiles per day from it
+    and extract_track_points draws the track from it, and one request has to
+    serve both.
     """
+    cached = getattr(dataset, "_trajectory_profile_fixes", None)
+    if cached is not None:
+        return cached
     request_vars = [v for v in (traj_var, profile_var) if v] + [
         "time", "latitude", "longitude",
     ]
@@ -291,19 +282,8 @@ def _profiles_per_cell(dataset, traj_var, profile_var):
         ",".join(request_vars)
         + requests.utils.quote(f'&orderByMin("{group},time")')
     )
-    if df.empty:
-        return None
-    df = df.dropna(subset=["latitude", "longitude"]).copy()
-    df["latitude"] = _snap(df["latitude"])
-    df["longitude"] = _snap(df["longitude"])
-    if traj_var:
-        df[traj_var] = df[traj_var].astype(str)
-    group_cols = ([traj_var] if traj_var else []) + ["latitude", "longitude"]
-    return (
-        df.groupby(group_cols, dropna=False)
-        .agg(n_profiles=(profile_var, "nunique"))
-        .reset_index()
-    )
+    dataset._trajectory_profile_fixes = df
+    return df
 
 
 def _first_fix_per_interval(df, traj_var, interval_seconds):
@@ -497,10 +477,12 @@ def extract_track_points(dataset, per_profile=False):
     (``per_profile=True``, full fidelity at Argo cadence); for plain
     Trajectory an adaptive time-bucket candidate set reduced by
     Douglas-Peucker simplification (see _choose_track_interval_seconds /
-    _decimate_tracks). Unlike extract_cells nothing is grid-snapped; these
-    rows feed cde.trajectory_points for track-line rendering.
+    _decimate_tracks). Nothing is snapped or aggregated: these rows feed
+    cde.trajectory_points, which the database both draws as track lines and
+    sweeps through the hex grid to build the coverage layer — so how much of
+    the track survives _decimate_tracks is how much of the map lights up.
 
-    Assumes extract_cells() already ran on this dataset (it populates
+    Assumes extract_day_stats() already ran on this dataset (it populates
     dataset.trajectory_id_variable / profile_id_variable).
     """
     log = dataset.logger
@@ -511,16 +493,10 @@ def extract_track_points(dataset, per_profile=False):
     try:
         if profile_var:
             # One row per (trajectory, profile): the row holding each group's
-            # min time, lat/lon included. Bounded by profile count (same bound
-            # as _profiles_per_cell's orderByMin query).
-            request_vars = [v for v in (traj_var, profile_var) if v] + [
-                "time", "latitude", "longitude",
-            ]
-            group = ",".join(v for v in (traj_var, profile_var) if v)
-            url = ",".join(request_vars) + requests.utils.quote(
-                f'&orderByMin("{group},time")'
-            )
-            points = dataset.dataset_tabledap_query(url)
+            # min time, lat/lon included. Bounded by profile count, and already
+            # fetched by extract_day_stats (which counts profiles per day from
+            # the same frame) — _profile_fixes serves both from one request.
+            points = _profile_fixes(dataset, traj_var, profile_var)
         else:
             # Two-step adaptive downsample, both fully server-side (never a
             # local full-resolution download): first probe at one-fix-per-
@@ -567,7 +543,7 @@ def extract_track_points(dataset, per_profile=False):
         points = pd.DataFrame()
 
     if points.empty:
-        # Fallback: same monthly-chunked raw download the cell fallback uses,
+        # Fallback: same monthly-chunked raw download the day-stats fallback uses,
         # reduced locally to first-fix-per-half-hour (also for
         # TrajectoryProfile — a fixed-bucket track is an acceptable
         # degradation when the server lacks orderBy grouping). The two-step
@@ -595,7 +571,7 @@ def extract_track_points(dataset, per_profile=False):
     points["latitude"] = pd.to_numeric(points["latitude"], errors="coerce")
     points["longitude"] = pd.to_numeric(points["longitude"], errors="coerce")
     points = points.dropna(subset=["time", "latitude", "longitude"])
-    # Same validity filter as extract_cells — also drops Argo's 99.999 /
+    # Same validity filter as extract_day_stats — also drops Argo's 99.999 /
     # 999.999 bad-position sentinels.
     points = points.query(
         "latitude > -90 and latitude < 90 and longitude >= -180 and longitude <= 180"
@@ -637,10 +613,14 @@ def extract_track_points(dataset, per_profile=False):
     return points
 
 
-def extract_cells(dataset, count_profiles=False):
-    """Build the trajectory_cells DataFrame for one dataset.
+def extract_day_stats(dataset, count_profiles=False):
+    """Build the trajectory_days DataFrame for one dataset.
 
-    Returns a TrajectoryCellSchema-shaped frame (may be empty = no data).
+    One row per (trajectory, UTC day): records observed and depth range.
+    Deliberately position-free — where the platform was that day comes from
+    extract_track_points, and the database joins the two by day.
+
+    Returns a TrajectoryDaySchema-shaped frame (may be empty = no data).
     """
     log = dataset.logger
 
@@ -672,75 +652,92 @@ def extract_cells(dataset, count_profiles=False):
         trajectories = pd.DataFrame({"trajectory_id": [""]})
         dataset.profile_ids = trajectories
 
+    group_cols = ([traj_var] if traj_var else []) + ["day"]
+
     try:
-        cells = _extract_via_server_binning(dataset, traj_var, has_depth)
+        days = _day_counts(dataset, traj_var)
+        if not days.empty:
+            days["n_records"] = pd.to_numeric(days["n_records"], errors="coerce")
+            days = (
+                days.groupby(group_cols, dropna=False)
+                .agg(n_records=("n_records", "sum"))
+                .reset_index()
+            )
     except HTTPError:
         log.warning(
-            "Server-side interval grouping failed for %s; falling back to "
-            "chunked download + local binning", dataset.id,
+            "Server-side day grouping failed for %s; falling back to "
+            "chunked download + local reduction", dataset.id,
         )
-        cells = pd.DataFrame()
+        days = pd.DataFrame()
 
-    if cells.empty:
-        cells = _extract_via_chunked_download(dataset, traj_var, has_depth)
-
-    if cells.empty:
-        log.warning("No trajectory cells found for %s", dataset.id)
-        return cells
-
-    # Distinct profile count per cell (TrajectoryProfile only). Best-effort:
-    # the count is a display enhancement, and a failed enhancement query must
-    # not fail a dataset whose cells succeeded (a too-large response here
-    # took out a whole glider dataset in production).
-    if count_profiles and profile_var:
-        group_cols = ([traj_var] if traj_var else []) + ["latitude", "longitude"]
+    if days.empty:
+        days = _day_stats_via_chunked_download(dataset, traj_var, has_depth)
+    elif has_depth:
+        # Best-effort, like the profile count below: a dataset whose counts
+        # succeeded must not fail because its depth query was too large.
         try:
-            profile_counts = _profiles_per_cell(dataset, traj_var, profile_var)
+            depths = _to_days(_day_depths(dataset, traj_var), traj_var)
+        except (HTTPError, ResponseTooLargeError):
+            log.warning("Per-day depth range failed for %s", dataset.id, exc_info=True)
+            depths = pd.DataFrame()
+        if not depths.empty:
+            depths["depth"] = pd.to_numeric(depths["depth"], errors="coerce")
+            depths = (
+                depths.groupby(group_cols, dropna=False)
+                .agg(depth_min=("depth", "min"), depth_max=("depth", "max"))
+                .reset_index()
+            )
+            days = days.merge(depths, on=group_cols, how="left")
+
+    if days.empty:
+        log.warning("No trajectory days found for %s", dataset.id)
+        return days
+
+    # Distinct profiles per day (TrajectoryProfile only), counted from the
+    # per-profile fixes extract_track_points draws the track from — no request
+    # of its own. Best-effort: a failed enhancement must not fail a dataset
+    # whose days succeeded (a too-large response here took out a whole glider
+    # dataset in production).
+    if count_profiles and profile_var:
+        try:
+            fixes = _to_days(_profile_fixes(dataset, traj_var, profile_var), traj_var)
         except (HTTPError, ResponseTooLargeError):
             log.warning(
-                "Per-cell profile count failed for %s; keeping cells without "
+                "Per-day profile count failed for %s; keeping days without "
                 "n_profiles", dataset.id, exc_info=True,
             )
-            profile_counts = None
-        if profile_counts is not None:
-            cells = cells.merge(profile_counts, on=group_cols, how="left")
-    if "n_profiles" not in cells:
-        cells["n_profiles"] = 0
-    cells["n_profiles"] = cells["n_profiles"].fillna(0)
+            fixes = pd.DataFrame()
+        if not fixes.empty:
+            profile_counts = (
+                fixes.groupby(group_cols, dropna=False)
+                .agg(n_profiles=(profile_var, "nunique"))
+                .reset_index()
+            )
+            days = days.merge(profile_counts, on=group_cols, how="left")
+    if "n_profiles" not in days:
+        days["n_profiles"] = 0
+    days["n_profiles"] = days["n_profiles"].fillna(0)
 
-    # Normalize to the TrajectoryCellSchema contract
-    cells = cells.rename(columns={traj_var: "trajectory_id"} if traj_var else {})
-    if "trajectory_id" not in cells:
-        cells["trajectory_id"] = ""
-    if not has_depth or "depth_min" not in cells:
-        cells["depth_min"] = 0
-        cells["depth_max"] = 0
-    cells["depth_min"] = cells["depth_min"].fillna(0)
-    cells["depth_max"] = cells["depth_max"].fillna(0)
+    if not has_depth or "depth_min" not in days:
+        days["depth_min"] = 0
+        days["depth_max"] = 0
+    days["depth_min"] = days["depth_min"].fillna(0)
+    days["depth_max"] = days["depth_max"].fillna(0)
 
-    cells["dataset_id"] = dataset.id
-    cells["erddap_url"] = dataset.erddap_url
-
-    # Drop cells with unusable extents or coordinates (mirrors the profile
-    # pipeline's bad-geom filter).
-    cells = cells.dropna(subset=["time_min", "time_max"])
-    cells = cells.query(
-        "latitude > -90 and latitude < 90 and longitude >= -180 and longitude <= 180"
-    ).copy()
-    if cells.empty:
-        return cells
-
-    # days + records_per_day feed tiles and the download-size estimator.
-    # Match the profiles conventions exactly: the `days` column is
-    # date_part('days', span) + 1 (see process_profile_geometry_and_links),
-    # while records_per_day divides by the raw span floored to one day
-    # (see the profile pipeline in tabledap_features).
-    span_days = (cells["time_max"] - cells["time_min"]).dt.days
-    cells["days"] = span_days + 1
-    cells["records_per_day"] = cells["n_records"] / span_days.replace(0, 1)
+    # Normalize to the TrajectoryDaySchema contract
+    days = days.rename(columns={traj_var: "trajectory_id"} if traj_var else {})
+    if "trajectory_id" not in days:
+        days["trajectory_id"] = ""
+    days["trajectory_id"] = days["trajectory_id"].astype(str)
+    days["dataset_id"] = dataset.id
+    days["erddap_url"] = dataset.erddap_url
+    days = days.dropna(subset=["day"])
 
     log.info(
-        "Extracted %d trajectory cells across %d trajectories for %s",
-        len(cells), cells["trajectory_id"].nunique(), dataset.id,
+        "Extracted %d trajectory days across %d trajectories for %s",
+        len(days), days["trajectory_id"].nunique(), dataset.id,
     )
-    return cells
+    return days[
+        ["erddap_url", "dataset_id", "trajectory_id", "day",
+         "n_records", "n_profiles", "depth_min", "depth_max"]
+    ]

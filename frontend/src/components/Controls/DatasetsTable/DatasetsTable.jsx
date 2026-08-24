@@ -12,6 +12,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
 
+import { useMapState } from '../../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import {
   GROUP_NONE,
@@ -87,6 +88,17 @@ export default function DatasetsTable({
     toggleGroupHidden,
     showAllGroups
   } = useSelection()
+  // The datasets the open "what's here" card is about. They sort to the top of
+  // the list, which is what ties the card to this list at all — without it the
+  // card named datasets that could be on page 6 of 8, and there was no way to
+  // tell which rows it meant. The download modal is reviewing an order, not
+  // exploring the map, so it ignores this.
+  const { featureQuery } = useMapState()
+  const pinnedPks = useMemo(() => {
+    if (isDownloadModal || !featureQuery?.datasetPks?.length) return EMPTY_SET
+    return new Set(featureQuery.datasetPks.map(Number))
+  }, [featureQuery, isDownloadModal])
+
   // The download modal is a flat review list — it never groups, whatever the
   // sidebar is grouped by.
   const groupBy = isDownloadModal ? GROUP_NONE : selectedGroupBy
@@ -163,13 +175,20 @@ export default function DatasetsTable({
     const field = sortFields.find((f) => f.id === sort.field)
     const factor = sort.dir === 'asc' ? 1 : -1
     const sorted = [...(datasets || [])].sort((a, b) => {
+      // Datasets under the last map click come first, in the chosen sort order
+      // among themselves. This rides on top of the sort rather than replacing
+      // it, so the sort chips still do what they say — they just order the two
+      // blocks separately.
+      const pa = pinnedPks.has(Number(a.pk)) ? 0 : 1
+      const pb = pinnedPks.has(Number(b.pk)) ? 0 : 1
+      if (pa !== pb) return pa - pb
       const va = sortValue(a, sort.field)
       const vb = sortValue(b, sort.field)
       if (field?.type === 'number') return (va - vb) * factor
       return String(va).localeCompare(String(vb), i18n.language) * factor
     })
     return sorted
-  }, [datasets, sort, downloadSizeEstimates, i18n.language])
+  }, [datasets, sort, downloadSizeEstimates, i18n.language, pinnedPks])
 
   // Flat render list: without grouping it's just the sorted rows; with grouping
   // it's the rows bucketed under headers. Each entry is either
@@ -264,12 +283,22 @@ export default function DatasetsTable({
     })
   }
 
+  // Which datasets are in the results, as a value rather than an array
+  // identity. Adding one to the selection rewrites every row object (the
+  // provider maps over pointsData), so keying the reset below on `datasets`
+  // itself sent the reader back to page 1 on every "+" — which is exactly the
+  // action they are most likely to repeat.
+  const datasetsKey = useMemo(
+    () => (datasets || []).map((row) => row.pk).join(','),
+    [datasets]
+  )
+
   // Back to page one whenever the result set or its ordering changes: page 7 of
   // the previous results is not page 7 of these.
   useEffect(() => {
     setPage(1)
     if (listRef.current) listRef.current.scrollTop = 0
-  }, [datasets, sort, isDownloadModal, groupBy, pageSize])
+  }, [datasetsKey, sort, isDownloadModal, groupBy, pageSize, pinnedPks])
 
   // Every page starts at its top — the reader is at a new place in the list,
   // not where they left the scroll bar on the page before.
@@ -370,6 +399,17 @@ export default function DatasetsTable({
   return (
     <div className={classNames('datasetsTable', { downloadModal: isDownloadModal })}>
       {controls}
+      {/* Explains the accent DatasetCard puts on rows the last map click found
+          (see .datasetCard.fromMapClick in styles.css) — otherwise the only
+          place that colour is named is a hover tooltip on the row itself,
+          which a touch user never sees and a mouse user has no reason to go
+          looking for. Only worth saying while there is a click to explain. */}
+      {!isDownloadModal && pinnedPks.size > 0 && (
+        <div className='datasetsCardMapClickHint'>
+          <span className='datasetsCardMapClickSwatch' aria-hidden='true' />
+          {t('datasetsCardMapClickHint')}
+        </div>
+      )}
       <div className='datasetsCardList' ref={listRef}>
         {visibleRows.length === 0 ? (
           <div className='datasetsCardEmpty'>{t('datasetsCardNoResultsText')}</div>
@@ -390,6 +430,7 @@ export default function DatasetsTable({
                   hiddenFromMap={
                     item.group !== undefined && hiddenGroups.has(item.group)
                   }
+                  fromMapClick={pinnedPks.has(Number(item.row.pk))}
                   t={t}
                   i18n={i18n}
                 />

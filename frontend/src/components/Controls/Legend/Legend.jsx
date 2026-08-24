@@ -14,7 +14,6 @@ import {
 } from '../../../utilities.jsx'
 import {
   colorScale,
-  DEFAULT_HEX_METRIC,
   isMarkerTier,
   bathymetryColorScale,
   bathymetryLegendMinZoom,
@@ -32,7 +31,6 @@ import {
 import Spinner from '../../ui/Spinner.jsx'
 import Switch from '../../ui/Switch.jsx'
 import LegendFooter from './LegendFooter.jsx'
-import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
 import usePublishedFootprint from '../../../state/ui/usePublishedFootprint.js'
 
 import './styles.css'
@@ -146,8 +144,6 @@ export default function Legend({
   // camera. It earns a tooltip, not a line: it is the answer to a question the
   // bar raises only for the people who notice it.
   hexRangeScaledToView = false,
-  metric = DEFAULT_HEX_METRIC,
-  onMetricChange,
   loading,
   zoom,
   platformsAvailable = [],
@@ -210,41 +206,12 @@ export default function Legend({
   // The marker keys (size, platform colours) describe the point tier only.
   const pointsOnMap = markerTier && profileFamilyOn
 
-  // Days of data leads, as it does in HEX_METRICS and as the map's default:
-  // it is the one metric that means the same thing across all three sources.
-  const metricOptions = [
-    {
-      key: 'days',
-      label: t('legendMetricDays'),
-      title: t('legendMetricDaysTitle')
-    },
-    {
-      key: 'records',
-      label: t('legendMetricRecords'),
-      title: t('legendMetricRecordsTitle')
-    },
-    {
-      key: 'datasets',
-      label: t('legendMetricDatasets'),
-      title: t('legendMetricDatasetsTitle')
-    }
-  ]
-  const activeMetric = metricOptions.find((option) => option.key === metric)
-  // The caption is the metric and nothing else — no "per hexagon" / "per
-  // location" qualifier. Which shape is carrying the count is obvious from the
-  // map and from the swatches right below it, and spelling it out made the one
-  // line in this card that changes with the zoom read as if the *metric* had
-  // changed when only the geometry had.
-  const metricCaption = activeMetric?.label || t('legendMetricDays')
-
   // One group: its label row — the switch for everything in the group, then the
   // group's title — and its contents. The label row is never dimmed; it holds
   // the control that turns the group back on.
   //
-  // `label` may be a node rather than a string: the observations group is titled
-  // by the metric picker, since what its colours count is the one thing about it
-  // that changes. It may also be absent, for a group whose rows are already
-  // self-describing switches — a label there would only name the leftovers.
+  // `label` may be absent, for a group whose rows are already self-describing
+  // switches — a label there would only name the leftovers.
   function renderGroup(key, label, { control, tooltip } = {}, children) {
     return (
       <div className='legendGroup' key={key}>
@@ -353,47 +320,16 @@ export default function Legend({
     platformsAvailable.includes(pc.platform)
   )
 
-  // The observations group's title: what the hex colours count. The bar looks the
-  // same whatever it counts, so the line naming the metric is the only thing
-  // about the group that changes — which is why that line is both its title and
-  // the control that changes it. The entries under it say which shape is
+  // The observations group's title: what the hex colours and the marker sizes
+  // count, which is days of data everywhere on the map (see HEX_METRIC). It was
+  // a dropdown while the ramp could count records or datasets instead; now it
+  // is the plain label it titles. The entries under it say which shape is
   // carrying the count (see renderSubCaption), so the title doesn't have to.
   function renderMetricTitle() {
     // Nothing on the map is keyed to a count (tracks only, say): a title for a
     // ramp that isn't there names nothing.
     if (!hexesOnMap && !pointsOnMap) return null
-    // The counts mix units and some are extrapolated from sampling rate rather
-    // than measured. That caveat used to be a footnote under the ramp, which
-    // spent three lines of a card this small on a sentence most people read
-    // once — it hangs off the label it qualifies instead.
-    const tooltip =
-      metric === 'records'
-        ? t('legendCountsApproximate')
-        : metricOptions.find((option) => option.key === metric)?.title
-    // No handler = the metric is pinned (the marker tier always counts days of
-    // data), so the title is a plain label. Say why, rather than describing a
-    // metric the user didn't pick.
-    if (!onMetricChange) return metricCaption
-    return (
-      <DropdownButton
-        className='legendMetricDropdown'
-        size='sm'
-        variant='outline-secondary'
-        title={metricCaption}
-        tooltip={tooltip}
-      >
-        {metricOptions.map((option) => (
-          <Dropdown.Item
-            key={option.key}
-            active={option.key === metric}
-            title={option.title}
-            onClick={() => onMetricChange(option.key)}
-          >
-            {option.label}
-          </Dropdown.Item>
-        ))}
-      </DropdownButton>
-    )
+    return t('legendMetricDays')
   }
 
   // Stands in for the ramp when this tier has no counts to show yet. /legend is
@@ -520,8 +456,8 @@ export default function Legend({
     // A missing range is reported by renderHexRamp, which owns the status line
     // for this tier — the keys just stay away.
     if (!pointsOnMap || isEmpty(currentRangeLevel)) return null
-    // Points are always keyed to days of data (MARKER_METRIC). One line rather
-    // than a stacked pair, and one number rather than both ends of the ramp:
+    // Points are keyed to days of data, like the hexes (HEX_METRIC). One line
+    // rather than a stacked pair, and one number rather than both ends of the ramp:
     // "○ ≤ 1 < ●" — at or below the ramp's floor a marker is drawn at the
     // small radius, and it grows from there. radiusExpression (Map.jsx)
     // clamps below `lo`, so the floor is the value worth naming; the top of
@@ -699,7 +635,10 @@ export default function Legend({
       renderGroup(
         'observations',
         renderMetricTitle(),
-        { control: controls.observations },
+        {
+          control: controls.observations,
+          tooltip: t('legendMetricDaysTitle')
+        },
         <>
           {countStatus}
           {hexEntry}

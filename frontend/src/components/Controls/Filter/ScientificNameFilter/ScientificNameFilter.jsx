@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import Spinner from '../../../ui/Spinner.jsx'
 import { useDebounce } from '../../../../utilities'
 import { server } from '../../../../config.js'
+import reportError from '../../../../state/reportError.js'
 
 import '../styles.css'
 import '../MultiCheckboxFilter/styles.css'
@@ -86,7 +87,7 @@ export default function ScientificNameFilter({
         mergeDetails(normalized)
       })
       .catch((err) => {
-        if (err.name !== 'AbortError') console.error(err)
+        reportError('scientificNames search failed', err)
       })
       .finally(() => setLoading(false))
     return () => controller.abort()
@@ -106,7 +107,7 @@ export default function ScientificNameFilter({
         if (Array.isArray(items)) mergeDetails(items)
       })
       .catch((err) => {
-        if (err.name !== 'AbortError') console.error(err)
+        reportError('scientificNames search failed', err)
       })
     return () => controller.abort()
   }, [scientificNamesSelected, lang])

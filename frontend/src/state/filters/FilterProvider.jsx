@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import isEmpty from 'lodash/isEmpty'
 
 import fetchJson from '../fetchJson.js'
+import reportError from '../reportError.js'
 
 import platformsJSONfile from '../../platforms.json'
 import eovsJSONfile from '../../eovs.json'
@@ -186,7 +187,7 @@ export default function FilterProvider ({ children }) {
       .catch((error) => {
         // The axis falls back to the full filterable domain, so this is a
         // cosmetic loss — never a reason to break the bar.
-        console.error('time extent fetch failed:', error)
+        reportError('time extent fetch failed', error)
       })
     return () => {
       cancelled = true

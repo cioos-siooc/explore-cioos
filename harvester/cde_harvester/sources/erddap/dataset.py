@@ -6,8 +6,13 @@ import pandas as pd
 import requests
 from cde_harvester.core.observability import run_logger
 from cde_harvester.sources.erddap.platform_vocab import platforms_nerc_ioos
-from cde_harvester.utils import eov_to_standard_name, intersection
+from cde_harvester.utils import (
+    eov_to_standard_name,
+    intersection,
+    standard_name_to_eovs,
+)
 from requests.exceptions import HTTPError
+
 
 def is_valid_duration(duration):
     try:
@@ -282,6 +287,21 @@ class Dataset(object):
                 )
                 eovs.append(eov)
         return eovs
+
+    def get_eov_variables(self):
+        """{variable name: [eov, ...]} for every variable whose standard_name
+        maps to at least one EOV.
+
+        The dataset-level get_eovs() above is the union of these. Per-feature
+        EOV detection counts these variables per feature to find out which of
+        the dataset's EOVs each feature actually carries.
+        """
+        eov_variables = {}
+        for name, row in self.df_variables.iterrows():
+            eovs = standard_name_to_eovs.get(row.get("standard_name"))
+            if eovs:
+                eov_variables[name] = eovs
+        return eov_variables
 
     def get_platform_code(self):
         platform = self.globals.get("platform")

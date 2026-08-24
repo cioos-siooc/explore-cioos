@@ -126,44 +126,6 @@
   flex: 0 0 auto;
 }
 
-/* Styled as the group label it replaces, not as a button — it reads as the
-   group's title, and the caret is what says it can be changed. */
-.legendMetricDropdown {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: block;
-}
-
-.legendMetricDropdown .btn,
-.legendMetricDropdown .btn-sm {
-  width: 100%;
-  justify-content: space-between;
-  padding: 0;
-  border: none;
-  background: transparent;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  text-align: left;
-  color: var(--cioos-ink-60);
-}
-
-.legendMetricDropdown .btn:hover {
-  background: transparent;
-  color: var(--cioos-ink);
-}
-
-.legendMetricDropdown .btn:focus-visible {
-  outline: none;
-  box-shadow: var(--cioos-focus);
-}
-
-/* Same reason as the basemap menu: the card clips horizontal overflow. */
-.legendMetricDropdown .dropdown-item {
-  white-space: normal;
-}
-
 .legendNoData {
   font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink-60);

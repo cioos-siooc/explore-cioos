@@ -6,8 +6,8 @@ import classNames from 'classnames'
 
 import BrandSearch from '../TopLeft/BrandSearch.jsx'
 import ActiveFilterChips from './ActiveFilterChips.jsx'
-import Spinner from '../../ui/Spinner.jsx'
-import useDatasetCounts from '../../../state/useDatasetCounts.js'
+import DatasetCounts from './DatasetCounts.jsx'
+import SpatialFilterButton from './SpatialFilterButton.jsx'
 import usePublishedFootprint from '../../../state/ui/usePublishedFootprint.js'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
@@ -34,11 +34,14 @@ function measureTopBarSpace (rect) {
   return rect.bottom + TOP_BAR_GAP
 }
 
-// Centered top header. First layer: the brand bar. Second layer, merged into a
-// single segmented pill directly below it: the Datasets toggle (opens/closes
-// the left datasets sidebar) and the Filters button (opens the filters modal).
-// Both segments carry a dimmed-primary wash so they read as the map's primary
-// entry points. The active-filter chips flow beneath, staying centered.
+// Centered top header. First layer: the brand bar. Second layer: the dataset
+// tally (shown / in view / total), which is what the three layers below act
+// on. Third layer, merged into a single segmented pill: the Datasets toggle
+// (opens/closes the left datasets sidebar), the spatial filter button (starts
+// a bounding-box or polygon draw on the map — see SpatialFilterButton) and
+// the Filters button (opens the filters modal). All three segments carry a
+// dimmed-primary wash so they read as the map's primary entry points. The
+// active-filter chips flow beneath, staying centered.
 export default function TopControls () {
   const { t } = useTranslation()
   const {
@@ -52,17 +55,8 @@ export default function TopControls () {
     timeFilterActive,
     depthFilterActive
   } = useFilters()
-  const { setShowFiltersModal, sidebarOpen, setSidebarOpen } = useUI()
-  // No count is shown until there is a real one — see useDatasetCounts.
-  const {
-    ready: countsReady,
-    updating: countsUpdating,
-    filteredCount,
-    total,
-    // "1832 / 1834", collapsing to a single number when nothing is filtered
-    // out — the same string the sidebar footer shows.
-    label: countLabel
-  } = useDatasetCounts()
+  const { showFiltersModal, setShowFiltersModal, sidebarOpen, setSidebarOpen } =
+    useUI()
 
   const barRef = useRef(null)
   usePublishedFootprint(barRef, '--cioos-top-bar-space', measureTopBarSpace)
@@ -82,6 +76,7 @@ export default function TopControls () {
   return (
     <div className='topBar' ref={barRef}>
       <BrandSearch>
+        <DatasetCounts />
         <div className='topBarActions'>
           <button
             type='button'
@@ -89,40 +84,26 @@ export default function TopControls () {
             onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-pressed={sidebarOpen}
             title={
-              countsReady
-                ? t('dockDatasetsCountTitle', {
-                  filtered: filteredCount,
-                  total: total ?? filteredCount
-                })
-                : t('datasetsCountLoadingTitle')
+              sidebarOpen ? t('sidebarCollapseTitle') : t('sidebarShowTitle')
             }
           >
             <ListUl size={18} aria-hidden='true' />
-            {/* Label over counts, not label beside counts: on its own line the
-                "shown / total" pair has the segment's full width, so it stays
-                legible as one horizontal reading in both languages instead of
-                being folded to fit next to "Jeux de données". */}
-            <span className='topBarButtonStack'>
-              <span className='topBarButtonLabel'>
-                {t('topBarDatasetsLabel')}
-              </span>
-              <span
-                className={classNames('topBarCounts', {
-                  updating: countsUpdating
-                })}
-              >
-                {countsReady ? (
-                  countLabel
-                ) : (
-                  <Spinner size='sm' className='countSpinner' />
-                )}
-              </span>
+            <span className='topBarButtonLabel'>
+              {t('topBarDatasetsLabel')}
             </span>
           </button>
+          <SpatialFilterButton />
           <button
             type='button'
-            className='topBarButton'
+            className={classNames('topBarButton', {
+              // Solid while the modal itself is open; once it's closed, any
+              // applied filters keep the button in the lighter "applied"
+              // wash instead of dropping all the way back to baseline.
+              active: showFiltersModal,
+              applied: !showFiltersModal && activeFilterCount > 0
+            })}
             onClick={() => setShowFiltersModal(true)}
+            aria-pressed={showFiltersModal}
             title={t('dockFiltersCountTitle', { count: activeFilterCount })}
           >
             <Filter size={18} aria-hidden='true' />

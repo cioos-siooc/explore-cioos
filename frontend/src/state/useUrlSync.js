@@ -11,10 +11,7 @@ import {
   dataLayersAreDefault
 } from './dataLayers.js'
 import { GROUP_NONE } from './datasetGroups.js'
-import {
-  DEFAULT_HEX_METRIC,
-  defaultTrailingDays
-} from '../components/config.js'
+import { defaultTrailingDays } from '../components/config.js'
 import { useFilters } from './filters/FilterProvider.jsx'
 import { useMapState } from './map/MapStateProvider.jsx'
 import { useSelection } from './selection/SelectionProvider.jsx'
@@ -55,8 +52,7 @@ export default function UrlSync () {
     dataLayersVisible,
     bathymetryVisible,
     griddapCoverageVisible,
-    projection,
-    metricPreference
+    projection
   } = useMapState()
   const {
     polygon,
@@ -122,10 +118,6 @@ export default function UrlSync () {
     if (!bathymetryVisible) obj.bathy = 'false'
     if (griddapCoverageVisible) obj.griddap = 'true'
     if (projection === 'globe') obj.globe = 'true'
-    // What the hex ramp counts. The user's pick, not the value the current zoom
-    // pins it to (see metricPreference) — otherwise zooming into the marker tier
-    // would rewrite their choice out of the link.
-    if (metricPreference !== DEFAULT_HEX_METRIC) obj.metric = metricPreference
     const combined = new URLSearchParams(obj)
     // Replace, never push: this mirrors state the app never reads back out of
     // the URL, so an entry per map pan would only bury the history entries
@@ -146,8 +138,7 @@ export default function UrlSync () {
     dataLayersVisible,
     bathymetryVisible,
     griddapCoverageVisible,
-    projection,
-    metricPreference
+    projection
   ])
 
   useEffect(() => {

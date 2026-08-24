@@ -30,11 +30,13 @@
      the column goes back to starting at the top of the map. */
   top: max(12px, var(--cioos-top-bar-space, 0px));
   left: 12px;
-  /* Stop above the tracks-mode time bar rather than running under it: the bar
-     is centered on the viewport and wide, so on anything narrower than ~1580px
-     it reaches into this column. --cioos-time-bar-space is 0 unless the bar is
-     mounted (TimeBar publishes its measured footprint), so with the bar absent
-     this is the plain 12px inset. */
+  /* Stop above the tracks-mode time bar rather than running under it. --cioos-
+     time-bar-space is 0 unless the bar is mounted (TimeBar publishes its
+     measured footprint), so with the bar absent this is the plain 12px inset.
+     Past 1944px wide this undoes itself again — see the media query below —
+     because the bar is centered and only 1080px wide, and at that width its
+     left edge (half of viewport-minus-1080) has cleared this column's right
+     edge (12px inset + 420px width), leaving nothing here left to clear. */
   bottom: calc(12px + var(--cioos-time-bar-space, 0px));
   z-index: var(--cioos-z-shell, 30);
   display: flex;
@@ -42,6 +44,16 @@
   gap: 12px;
   width: min(var(--cioos-sidebar-width), calc(100vw - 24px));
   pointer-events: none;
+}
+
+/* 1080px (the bar's own cap) + 2 * 432px (this column's 12px inset + 420px
+   width) — the narrowest viewport whose centered bar no longer reaches the
+   column's right edge. Update this if --cioos-sidebar-width or the bar's
+   1080px cap (TimeBar/styles.css) changes. */
+@media (min-width: 1944px) {
+  .sidebar {
+    bottom: 12px;
+  }
 }
 
 .sidebar > * {

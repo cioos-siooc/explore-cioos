@@ -35,10 +35,9 @@ function persist (key, value) {
 //
 // `parse` turns the raw param into the state's own type, and is the only thing
 // standing between the query string and the app's state: the boolean switches
-// read 'false'/'true', the projection maps `globe=true` onto its two named
-// values, and the metric checks the param against its allowlist. So the link
-// says what the user sees rather than naming internal state, and a junk param
-// lands on the default instead of somewhere unexpected.
+// read 'false'/'true', and the projection maps `globe=true` onto its two named
+// values. So the link says what the user sees rather than naming internal
+// state, and a junk param lands on the default instead of somewhere unexpected.
 //
 // There was a plain localStorage-only variant of this alongside it. Every
 // preference the map has is shareable now, so it had no callers left.

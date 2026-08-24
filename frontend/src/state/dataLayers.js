@@ -122,7 +122,7 @@ export const PROFILE_TYPE_KEYS = [
   ['timeseriesProfile', 'TimeSeriesProfile']
 ]
 
-// The cdm_data_types that share cde.trajectory_cells / cde.trajectory_points,
+// The cdm_data_types that share cde.trajectory_hexes / cde.trajectory_points,
 // same idea: the tile query names them as trajectoryTypes=<comma list>.
 export const TRAJECTORY_TYPE_KEYS = [
   ['trajectories', 'Trajectory'],

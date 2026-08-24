@@ -494,6 +494,14 @@ function polygonToMaxMins(polygon) {
   }
 }
 
+// The `polygon` ring is already closed everywhere it's produced (turf's
+// bboxPolygon, mapbox-gl-draw's own rings, selectionFromSearchParams below),
+// so it needs no extra closing point here.
+export function polygonToWkt (polygon) {
+  const ring = polygon.map(([lon, lat]) => `${lon} ${lat}`).join(', ')
+  return `POLYGON((${ring}))`
+}
+
 export function createSelectionQueryString (polygon) {
   if (polygonIsRectangle(polygon)) {
     // res = { latMin, lonMin, latMax, lonMax }
@@ -659,19 +667,6 @@ export function datasetMatchesUrlKey (row, searchParams) {
   const server = searchParams.get('server')
   if (!server) return true
   return datasetUrlKey(row)?.server === server
-}
-
-export function updateMapToolTitleLanguage(t) {
-  // const { t } = useTranslation()
-  const polygonToolDiv = document.getElementsByClassName(
-    'mapbox-gl-draw_polygon'
-  )
-  polygonToolDiv[0].title = t('mapPolygonToolTitle')
-
-  const deleteToolDiv = document.getElementsByClassName('mapbox-gl-draw_trash')
-  deleteToolDiv[0].title = t('mapDeleteToolTitle')
-  // The zoom in/out buttons are gone (scroll, pinch and double-tap all zoom),
-  // so there are no titles to translate for them.
 }
 
 // make table column headers more readable

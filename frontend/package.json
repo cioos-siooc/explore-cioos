@@ -33,6 +33,7 @@
     "react-router-dom": "^6.30.4"
   },
   "devDependencies": {
+    "@sentry/vite-plugin": "^5.4.0",
     "@vitejs/plugin-react": "^5.0.0",
     "eslint": "^8.16.0",
     "eslint-config-airbnb-base": "^15.0.0",

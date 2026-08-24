@@ -16,8 +16,8 @@ export const defaultObisNodesSelected = []
 // from them: the map only reports its camera once it has finished loading, and
 // everything keyed off the zoom (the legend ramps above all) would otherwise
 // have to treat "not loaded yet" as "no zoom".
-export const defaultMapCenter = { lat: 60, lon: -150 }
-export const defaultMapZoom = 2
+export const defaultMapCenter = { lat: 63.3, lon: -95.9 }
+export const defaultMapZoom = 2.75
 
 export const defaultQuery = {
   startDate: defaultStartDate,
@@ -69,39 +69,27 @@ export const colorScale = [
 // ramp — a mid-ramp teal disappeared into the fills it was meant to divide.
 export const hexOutlineColor = '#FFFFFF'
 
-// What the hex ramp counts. 'days' is the span of time covered; 'records' is the
-// amount of data actually collected (measurements / occurrence records /
-// position fixes); 'datasets' is how many distinct datasets a hexagon holds. See
-// web-api/utils/hexMetric.js — the wire values must match.
+// What every count on the map means: the span of time a hexagon or a point
+// covers, in days. See web-api/utils/hexMetric.js — the wire value must match.
 //
-// In the order the picker offers them, and the allowlist a ?metric= param is
-// checked against.
+// It used to be a choice of three — days, 'records' (measurements / occurrence
+// records / position fixes) and 'datasets' — offered by a picker on the legend's
+// observations group. Days is the only one of the three that means one thing
+// across all three sources: 'records' sums three different units and some of
+// those counts are extrapolated from sampling rate rather than measured (see the
+// caveat in web-api/utils/hexMetric.js), and 'datasets' answers a different
+// question than the ramp's "how much data is here". So the picker was a control
+// whose other two settings were harder to read than its default, on the one line
+// of the legend that had to be read to understand the colours at all.
 //
-// 'datasets' is the one to reach for when the record counts bunch up: they run
-// over eight orders of magnitude and are dominated by a few high-rate
-// instruments, whereas dataset counts are small integers and spread evenly
-// across the ramp.
-export const HEX_METRICS = ['days', 'records', 'datasets']
-
-// Days of data leads, and is what the map opens on. It means one thing across
-// all three sources, where 'records' sums three different units (and some of
-// those counts are extrapolated rather than measured — see the caveat in
-// web-api/utils/hexMetric.js), so it is the honest first reading. A share link
-// overrides it with ?metric=, and the user's own pick is remembered.
-export const DEFAULT_HEX_METRIC = 'days'
-
-// What the API counts when a query carries no `metric` param at all (see
-// DEFAULT_METRIC in web-api/utils/hexMetric.js). ONLY this value may be left out
-// of a tile or /legend URL: omitting any other would ramp the colours against a
-// count nobody asked for. It is deliberately not DEFAULT_HEX_METRIC — the two
-// were the same value until the map's default moved to days, and conflating them
-// again would silently paint record counts under a "days of data" title.
-export const API_DEFAULT_HEX_METRIC = 'records'
+// The API still takes ?metric= and still defaults to 'records' when the param is
+// absent (DEFAULT_METRIC in web-api/utils/hexMetric.js), so this value is written
+// into every tile and /legend URL explicitly — never omitted.
+export const HEX_METRIC = 'days'
 
 // Where the hex aggregates give way to individual markers. Was a bare 7 in
-// Map.jsx (hexMaxZoom), MapStateProvider and the Legend; the marker tier's
-// pinned metric below makes those three agree by necessity rather than by
-// coincidence, so the number lives in one place.
+// Map.jsx (hexMaxZoom), MapStateProvider and the Legend, which had to agree by
+// coincidence; the number lives in one place instead.
 export const MARKER_MIN_ZOOM = 7
 
 // Is the camera in the marker tier? Not inlined as a comparison because the two
@@ -113,14 +101,6 @@ export const MARKER_MIN_ZOOM = 7
 // two call sites, two answers, for the same camera. Coerce, and treat an
 // unknown zoom as the hex tier: the default camera is the whole world.
 export const isMarkerTier = (zoom) => Number(zoom) >= MARKER_MIN_ZOOM
-
-// The marker tier ignores the metric above and always counts days of data.
-// Marker *size* is the only "how much" channel a point has, and area is a weak
-// one: measurement counts run over eight orders of magnitude, so a log radius
-// ramp over them leaves nearly every marker at the same size. Days of data
-// spans three or four orders instead, which a radius can actually show. The
-// hex ramp keeps the metric switcher — colour has the range to carry it.
-export const MARKER_METRIC = 'days'
 
 // The basemap hand-off window (see basemapStyle.js): the zooms over which the
 // world view (EMODnet bathymetry raster, water tint, drawn coastline) gives way

@@ -1,10 +1,11 @@
 """Unit tests for the Point handler's two representations.
 
 A validated Point dataset is stored either as one exact row per sample in
-cde.profiles, or — above POINT_EXACT_MAX_SAMPLES — as the coverage cells the
-trajectory pipeline already produces. These tests cover the choice between
-them and the shape of the exact path, whose synthetic identity is the part
-with no precedent elsewhere in the harvester.
+cde.profiles, or — above POINT_EXACT_MAX_SAMPLES — as the day/hex coverage
+the trajectory pipeline already produces (treating the dataset as one
+unnamed pseudo-trajectory). These tests cover the choice between them and
+the shape of the exact path, whose synthetic identity is the part with no
+precedent elsewhere in the harvester.
 """
 
 import logging
@@ -128,17 +129,17 @@ class TestRepresentationChoice:
         assert dataset.feature_kind == "profiles"
         assert "show_as_point" in features.columns
 
-    def test_large_dataset_falls_back_to_coverage_cells(self, monkeypatch):
-        cells = pd.DataFrame({"latitude": [44.0], "longitude": [-63.0]})
+    def test_large_dataset_falls_back_to_day_hex_coverage(self, monkeypatch):
+        days = pd.DataFrame({"trajectory_id": [""], "day": ["2008-01-04"]})
         monkeypatch.setattr(
-            "cde_harvester.dataset_types.trajectory_features.extract_cells",
-            lambda dataset, count_profiles=False: cells,
+            "cde_harvester.dataset_types.trajectory_features.extract_day_stats",
+            lambda dataset, count_profiles=False: days,
         )
         dataset = build_point_dataset()
         dataset.point_total_records = POINT_EXACT_MAX_SAMPLES + 1
         features = PointHandler().extract_features(dataset)
-        assert dataset.feature_kind == "trajectory_cells"
-        assert features is cells
+        assert dataset.feature_kind == "trajectory_days"
+        assert features is days
 
     def test_unmeasured_count_takes_the_exact_path(self):
         """Falling back to exact rows is the safe default: it is bounded by
@@ -157,6 +158,21 @@ class TestHandlerRegistration:
         assert handler.data_structure == "table"
         assert handler.feature_kind == "profiles"
 
-    def test_points_have_no_track(self):
-        """Points are unordered — there is no path to draw between them."""
-        assert PointHandler().extract_track_points(build_point_dataset()) is None
+    def test_exact_path_points_have_no_track(self):
+        """The exact-samples path already has real positions in
+        cde.profiles, so there is no separate track to draw."""
+        dataset = build_point_dataset()
+        dataset.feature_kind = "profiles"
+        assert PointHandler().extract_track_points(dataset) is None
+
+    def test_coverage_path_delegates_to_trajectory_track_points(self, monkeypatch):
+        """The day/hex coverage path needs the same track points the
+        trajectory pipeline sweeps into hexes."""
+        points = pd.DataFrame({"trajectory_id": [""], "latitude": [44.0]})
+        monkeypatch.setattr(
+            "cde_harvester.dataset_types.trajectory_features.extract_track_points",
+            lambda dataset, per_profile=False: points,
+        )
+        dataset = build_point_dataset()
+        dataset.feature_kind = "trajectory_days"
+        assert PointHandler().extract_track_points(dataset) is points

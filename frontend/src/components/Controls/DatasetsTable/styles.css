@@ -285,6 +285,25 @@
   font-style: italic;
 }
 
+/* Names the accent .datasetCard.fromMapClick puts on rows below — see there. */
+.datasetsCardMapClickHint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+}
+
+.datasetsCardMapClickSwatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 2px solid var(--cioos-primary);
+  box-shadow: 0 0 0 2px rgba(82, 167, 155, 0.35);
+}
+
 /* --- Card --- */
 .datasetCard {
   position: relative;
@@ -298,6 +317,22 @@
   transition: box-shadow var(--cioos-transition-fast),
     border-color var(--cioos-transition-fast),
     background-color var(--cioos-transition-fast);
+}
+
+/* Sorted to the top because the last map click found it here. A solid primary
+   border plus a soft glow, so the tie to the map is unmistakable at a glance
+   rather than a property you have to go looking for — the plain teal-light
+   border tried first read as barely different from the resting hairline.
+   `box-shadow`, not a wider `border`, does the "thicker" part: a real 2px
+   border would grow the card by 2px and jostle its neighbours in the list
+   every time a row's state changed; a shadow ring reads the same but costs no
+   layout. Left to `:not(.selected)` on purpose: a row already in the
+   selection gets its own full-strength border and background wash below, and
+   that is the more important of the two things to know about it. */
+.datasetCard.fromMapClick:not(.selected) {
+  border-color: var(--cioos-primary);
+  box-shadow: 0 0 0 2px rgba(82, 167, 155, 0.35),
+    0 0 10px 1px rgba(82, 167, 155, 0.35), var(--cioos-shadow-card);
 }
 
 .datasetCard.clickable {
@@ -428,68 +463,59 @@
   text-align: center;
 }
 
-/* --- Selection badge: floats on the card's top-left corner, external to the
-   body, so the text content uses the full width. Always visible on touch
-   devices (below); on hover-capable devices it stays hidden until the card is
-   hovered — or is already selected — to keep the resting list uncluttered. --- */
-.datasetCardSelect {
+/* --- Add to download: a plus in the card's bottom-right corner that becomes a
+   tick once the dataset is in the download selection.
+
+   Always visible, at rest, on every device. The control it replaces was a
+   circle-and-label badge on the top-left that faded in only on hover, so on a
+   mouse the resting list showed nothing about what was in the download —
+   answering "which of these have I picked?" meant sweeping the cursor down the
+   column. A tick that is simply there costs one small glyph per row and answers
+   it at a glance.
+
+   Bottom-right because the meta row is the card's shortest line, so the button
+   sits in space the content was not using; top-left would have collided with
+   the platform dot and the title. --- */
+.datasetCardAdd {
   position: absolute;
-  top: -7px;
-  left: -7px;
+  right: 4px;
+  bottom: 4px;
   z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px;
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
-  box-shadow: var(--cioos-shadow-sm);
-}
-
-/* "Select for download" label: revealed alongside the checkbox while hovering
-   the card (hover-capable devices only — see below). */
-.datasetCardSelectLabel {
-  display: none;
-  padding-right: 5px;
-  font-size: var(--cioos-font-size-xs);
-  font-weight: 600;
-  white-space: nowrap;
-  color: var(--cioos-ink-60);
-}
-
-@media (hover: hover) {
-  .datasetCardSelect {
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--cioos-transition-fast);
-  }
-
-  .datasetCard:hover .datasetCardSelect,
-  .datasetCard.selected .datasetCardSelect {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  .datasetCard:hover .datasetCardSelectLabel {
-    display: inline;
-  }
-}
-
-.datasetCheckbox {
-  color: var(--cioos-ink-60);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  /* No pill around it. The border and its inner padding took most of a small
+     box and left the glyph cramped; the icon is a complete shape on its own (a
+     plus, then a filled tick), so it carries the control unaided. */
+  border: none;
+  background: transparent;
+  color: var(--cioos-ink-40);
   cursor: pointer;
   transition: color var(--cioos-transition-fast);
 }
 
-.datasetCardSelect:hover .datasetCheckbox:not(.disabled) {
-  color: var(--cioos-primary-700);
+@media (hover: hover) {
+  .datasetCardAdd:not(:disabled):hover {
+    color: var(--cioos-primary-700);
+  }
 }
 
-.datasetCheckbox.checked {
+.datasetCardAdd:focus-visible {
+  border-radius: var(--cioos-radius-sm);
+  box-shadow: var(--cioos-focus);
+  outline: none;
+}
+
+/* In the selection. The filled tick in the brand teal reads from across the
+   list, which is the whole point of keeping this control visible at rest. */
+.datasetCardAdd.checked {
   color: var(--cioos-primary);
 }
 
-.datasetCheckbox.disabled {
+/* Griddap: metadata-only, never downloadable through the CDE. */
+.datasetCardAdd:disabled {
   color: var(--cioos-hairline);
   cursor: not-allowed;
 }
@@ -531,6 +557,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
+  /* Clears the add-to-selection button in the bottom-right corner, which floats
+     over this row. */
+  padding-right: 26px;
   font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink-60);
 }

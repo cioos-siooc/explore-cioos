@@ -26,7 +26,7 @@ const TRACKS_MAX_PER_TILE = 2500;
 
 // Spatial prefilter for the hex-aggregation tile queries (/tiles and
 // /tiles/cells). Without it each tile UNIONs and GROUP BYs the ENTIRE cell
-// tables (trajectory_cells ~860k rows / 3 GB, obis_cells, profiles) and only
+// tables (trajectory_hexes, obis_cells, profiles) and only
 // clips to the tile at the very end — ~2.5 s of CPU per tile on every request
 // (measured, buffers warm), which shows up as half-painted tiles and slow
 // layer toggles (each toggle changes the tile URL and cold-refetches). This
@@ -50,7 +50,7 @@ function tileCellPrefilter(z) {
   return `geom && ST_Expand(ST_TileEnvelope(:z, :x, :y), ${expandM})`;
 }
 
-// The cdm_data_types that share cde.trajectory_cells / cde.trajectory_points.
+// The cdm_data_types that share cde.trajectory_hexes / cde.trajectory_points.
 // They are separate layers in the map's geometry selector, so the routes below
 // take a trajectoryTypes param that works exactly like profileTypes: absent =
 // both (pre-split behaviour, and what any older client sends), a comma list =
@@ -164,6 +164,10 @@ router.get(
     const isHexGrid = z < 7;
     const zoomPKColumn = z < 5 ? "hex_0_pk" : "hex_1_pk";
     const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
+    // cde.trajectory_hexes stores one row per tier instead of two hex FK
+    // columns (each tier's day count is aggregated independently, so they
+    // can't share a row). Numeric literal, never user input.
+    const hexTier = z < 5 ? 0 : 1;
     // Prune each branch's scan to the tile region (see tileCellPrefilter).
     const cellPrefilter = tileCellPrefilter(z);
 
@@ -223,12 +227,13 @@ router.get(
         : '';
     const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${recordCountExpr('profiles', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
-    FROM cde.profiles WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
-    // Both cell tables (coverage cells and OBIS occurrence cells) merge into
-    // the combined hex counts (z<7, the green ramp) but never appear as
-    // individual points (z>=7). Their cell spacing is a grid artifact, not a
-    // measurement location, so at point zoom they're shown only via the
-    // dedicated always-hex coverage layer from /tiles/cells/:z/:x/:y.mvt.
+    FROM cde.profiles WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ''} AND :profileFilters`;
+    // Both cell tables (trajectory + Point coverage hexes and OBIS occurrence
+    // cells) merge into the combined hex counts (z<7, the green ramp) but
+    // never appear as individual points (z>=7). Their cell spacing is a grid
+    // artifact, not a measurement location, so at point zoom they're shown
+    // only via the dedicated always-hex coverage layer from
+    // /tiles/cells/:z/:x/:y.mvt.
     // Same shape as profilesTypeFilter above: restrict to the requested
     // geometries when only some are on, and combine with the tile prefilter
     // into one WHERE (either, both, or neither can be present).
@@ -236,9 +241,15 @@ router.get(
       cellPrefilter,
       cellTypePredicate(visibleCellTypes),
     ].filter(Boolean);
-    const cellBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${recordCountExpr('trajectory_cells', metric)},
+    // cde.trajectory_hexes is already keyed on the hex, one row per
+    // (dataset, trajectory, tier, hex) — hence `hex_pk as zoom_pk` and a tier
+    // predicate where the other branches carry two hex FK columns. point_pk is
+    // NULL because trajectory/Point coverage never renders at the point tier
+    // (a large Point dataset lands here too — see the Point handler — sharing
+    // this table via cellTypePredicate rather than a dedicated one).
+    const cellBranch = `SELECT NULL::integer as point_pk, dataset_pk, hex_pk as zoom_pk, geom as point_geom, ${recordCountExpr('trajectory_hexes', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_cells${cellConds.length ? ` WHERE ${cellConds.join(' AND ')}` : ''}`;
+    FROM cde.trajectory_hexes WHERE hex_tier = ${hexTier}${cellConds.length ? ` AND ${cellConds.join(' AND ')}` : ''}`;
     const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
            ${recordCountExpr('obis_cells', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
@@ -307,6 +318,7 @@ router.get(
       const q = db.raw(SQL, {
         filters: filters.shared,
         obisFilters: filters.obisOnly,
+        profileFilters: filters.profileOnly,
         zoomPKColumn,
         z,
         x,
@@ -399,6 +411,7 @@ router.get(
     // reused uncapped past zoom 6 so coverage cells never become points.
     const zoomPKColumn = z < 5 ? "hex_0_pk" : "hex_1_pk";
     const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
+    const hexTier = z < 5 ? 0 : 1; // see the main tile route
     // Prune each branch's scan to the tile region (see tileCellPrefilter).
     const cellPrefilter = tileCellPrefilter(z);
 
@@ -432,10 +445,10 @@ router.get(
       cellPrefilter,
       cellTypePredicate(visibleCellTypes),
     ].filter(Boolean);
-    const trajectoryBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'trajectory' as src,
-           trajectory_id, ${recordCountExpr('trajectory_cells', metric)},
+    const trajectoryBranch = `SELECT dataset_pk, hex_pk as zoom_pk, 'trajectory' as src,
+           trajectory_id, ${recordCountExpr('trajectory_hexes', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_cells${trajectoryConds.length ? ` WHERE ${trajectoryConds.join(' AND ')}` : ''}`;
+    FROM cde.trajectory_hexes WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(' AND ')}` : ''}`;
     const obisBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'obis' as src,
            NULL as trajectory_id, ${recordCountExpr('obis_cells', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
@@ -634,14 +647,12 @@ router.get(
       -- split; a multi-expedition ship track (months dark between summers)
       -- or a monitoring vessel idle between short cruises always does,
       -- instead of drawing a connector chord across the map.
+      -- The threshold lives in SQL (trajectory_gap_secs, 4_create_hexes.sql)
+      -- because the hex coverage sweep applies the same one: a chord this
+      -- route refuses to draw must not light hexes either.
       SELECT s.dataset_pk, s.trajectory_id,
-             GREATEST(
-               COALESCE(
-                 s.median_gap_secs,
-                 extract(epoch FROM s.time_max - s.time_min)
-                   / GREATEST(s.n_points - 1, 1)
-               ) * 4,
-               172800
+             trajectory_gap_secs(
+               s.median_gap_secs, s.time_min, s.time_max, s.n_points
              ) AS gap_secs
       FROM cde.trajectory_track_stats s
       JOIN cde.datasets d ON d.pk = s.dataset_pk, te

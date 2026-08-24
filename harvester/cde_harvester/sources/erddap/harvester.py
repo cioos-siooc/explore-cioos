@@ -17,7 +17,7 @@ from cde_harvester.core.schemas import (
     HarvestAttemptSchema,
     ProfileSchema,
     SkippedDatasetSchema,
-    TrajectoryCellSchema,
+    TrajectoryDaySchema,
     TrajectoryPointSchema,
     VariableSchema,
     VerifiedDatasetSchema,
@@ -32,6 +32,7 @@ from cde_harvester.core.errors import (
     UNCHANGED,
     UNKNOWN_ERROR,
 )
+from cde_harvester.core.issues import erddap_error_text
 from cde_harvester.dataset_types import (
     extract_features,
     extract_track_points,
@@ -98,7 +99,7 @@ class DatasetHarvestResult:
     attempt: dict                    # one harvest_attempts.csv row
     features: pd.DataFrame = None    # populated only on success
     # Which HarvestResult attribute `features` belongs in: "profiles" for
-    # point-like types, "trajectory_cells" for trajectory coverage cells.
+    # point-like types, "trajectory_days" for trajectory per-day aggregates.
     feature_kind: str = "profiles"
     # Secondary output (trajectory types only): ordered, downsampled track
     # fixes for HarvestResult.trajectory_points / cde.trajectory_points.
@@ -153,8 +154,8 @@ class ERDDAPHarvester(BaseHarvester):
         df_profiles_all = pd.DataFrame(
             columns=ProfileSchema.to_schema().columns.keys()
         )
-        df_trajectory_cells_all = pd.DataFrame(
-            columns=TrajectoryCellSchema.to_schema().columns.keys()
+        df_trajectory_days_all = pd.DataFrame(
+            columns=TrajectoryDaySchema.to_schema().columns.keys()
         )
         df_trajectory_points_all = pd.DataFrame(
             columns=TrajectoryPointSchema.to_schema().columns.keys()
@@ -267,9 +268,9 @@ class ERDDAPHarvester(BaseHarvester):
                 )
                 attempt_records.append(result.attempt)
                 if result.status == "success":
-                    if result.feature_kind == "trajectory_cells":
-                        df_trajectory_cells_all = pd.concat(
-                            [df_trajectory_cells_all, result.features]
+                    if result.feature_kind == "trajectory_days":
+                        df_trajectory_days_all = pd.concat(
+                            [df_trajectory_days_all, result.features]
                         )
                     elif result.feature_kind == "dataset_extent":
                         # Metadata-only (griddap): the extent lives on the
@@ -358,7 +359,7 @@ class ERDDAPHarvester(BaseHarvester):
             datasets=df_datasets_all,
             variables=df_variables_all,
             skipped=df_skipped_datasets,
-            trajectory_cells=df_trajectory_cells_all,
+            trajectory_days=df_trajectory_days_all,
             trajectory_points=df_trajectory_points_all,
             attempts=df_attempts,
             verified=df_verified,
@@ -526,18 +527,25 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
     except HTTPError as e:
         duration_ms = int((time.monotonic() - t0) * 1000)
         response = e.response
-        log.error("HTTP ERROR: %s %s", response.status_code, response.reason)
+        # The status line alone is not diagnostic — every ERDDAP failure is a
+        # 500. requests attaches the response, so ERDDAP's own error message is
+        # right here; record it so issues group by what actually went wrong.
+        server_error = erddap_error_text(response)
+        detail = f"HTTP {response.status_code} {response.reason}"
+        if server_error:
+            detail = f"{detail}: {server_error}"
+        log.error("HTTP ERROR: %s", detail)
         raise DatasetHarvestError(
             attempt=_build_attempt(
                 run_id, erddap_url, dataset_id,
                 status="error",
                 reason_code=HTTP_ERROR,
-                error_message=f"HTTP {response.status_code} {response.reason}",
+                error_message=detail,
                 duration_ms=duration_ms,
                 query_urls=_attempt_urls(erddap_url, dataset, dataset_id),
             ),
             skipped_reason_code=HTTP_ERROR,
-            message=f"HTTP {response.status_code} {response.reason} harvesting {dataset_id}",
+            message=f"{detail} harvesting {dataset_id}",
         ) from e
     except ResponseTooLargeError as e:
         duration_ms = int((time.monotonic() - t0) * 1000)

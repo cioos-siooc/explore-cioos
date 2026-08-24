@@ -14,7 +14,11 @@ from prefect import get_run_logger, task
 
 from cde_harvester.core.db import create_db_engine, db_host
 from cde_harvester.core.observability import init_sentry
-from cde_harvester.core.schemas import DATASET_ARRAY_DTYPES, OBIS_ARRAY_DTYPES
+from cde_harvester.core.schemas import (
+    DATASET_ARRAY_DTYPES,
+    OBIS_ARRAY_DTYPES,
+    PROFILE_ARRAY_DTYPES,
+)
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -124,7 +128,7 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
     else:
         agg["aphia_ids"] = [[] for _ in range(len(agg))]
 
-    # Same bigint/COPY constraint as prepare_trajectory_cells_dataframe.
+    # Same bigint/COPY constraint as prepare_trajectory_days_dataframe.
     agg["n_records"] = agg["n_records"].round().astype("Int64")
     return agg
 
@@ -156,7 +160,7 @@ def _pg_int_array(values):
 
 
 def load_cells_copy(df, table_name, transaction, schema=None):
-    """Bulk-load a cells DataFrame (obis_cells / trajectory_cells) via COPY
+    """Bulk-load a cells DataFrame (obis_cells / trajectory_days) via COPY
     FROM STDIN.
 
     Replaces the previous to_sql-based loader: COPY runs ~10-50x faster than
@@ -200,37 +204,34 @@ def load_cells_copy(df, table_name, transaction, schema=None):
 load_obis_cells_copy = load_cells_copy
 
 
-def prepare_trajectory_cells_dataframe(trajectory_cells):
-    """Clean and prepare trajectory_cells DataFrame for insertion.
+def prepare_trajectory_days_dataframe(trajectory_days):
+    """Clean and prepare the trajectory_days DataFrame for insertion.
 
-    Mirrors prepare_obis_cells_dataframe: round coordinates to 8 dp to avoid
-    float-precision duplicates, then deduplicate on the table's unique key,
-    aggregating extents/counts defensively.
+    Deduplicates on the table's unique key, aggregating counts and depth
+    extents defensively (a dataset harvested in two passes can produce the
+    same trajectory-day twice).
     """
-    cells = trajectory_cells.copy()
-    cells["trajectory_id"] = cells["trajectory_id"].fillna("").astype(str)
-    cells["latitude"] = cells["latitude"].round(8)
-    cells["longitude"] = cells["longitude"].round(8)
+    days = trajectory_days.copy()
+    days["trajectory_id"] = days["trajectory_id"].fillna("").astype(str)
+    # date, not timestamp: the day column is a DATE in the DB, and a stray
+    # time-of-day would split one day into two rows.
+    days["day"] = pd.to_datetime(days["day"], errors="coerce", utc=True).dt.date
 
-    key_cols = ["erddap_url", "dataset_id", "trajectory_id", "latitude", "longitude"]
+    key_cols = ["erddap_url", "dataset_id", "trajectory_id", "day"]
     agg = (
-        cells.groupby(key_cols, dropna=False)
+        days.groupby(key_cols, dropna=False)
         .agg(
-            time_min=("time_min", "min"),
-            time_max=("time_max", "max"),
-            depth_min=("depth_min", "min"),
-            depth_max=("depth_max", "max"),
             n_records=("n_records", "sum"),
             n_profiles=("n_profiles", "sum"),
-            records_per_day=("records_per_day", "sum"),
-            days=("days", "max"),
+            depth_min=("depth_min", "min"),
+            depth_max=("depth_max", "max"),
         )
         .reset_index()
     )
     # COPY does no casting: these land in bigint columns, and pandas upcasts
     # counts to float64 ("2.0") as soon as a NaN is involved anywhere upstream.
     # Nullable Int64 renders as "2" / \N in the COPY buffer.
-    for col in ("n_records", "n_profiles", "days"):
+    for col in ("n_records", "n_profiles"):
         agg[col] = agg[col].round().astype("Int64")
     return agg
 
@@ -298,7 +299,7 @@ def main(folder, incremental=False):
     profiles_file = f"{folder}/profiles.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
     obis_cells_file = f"{folder}/obis_cells.csv"
-    trajectory_cells_file = f"{folder}/trajectory_cells.csv"
+    trajectory_days_file = f"{folder}/trajectory_days.csv"
     trajectory_points_file = f"{folder}/trajectory_points.csv"
     verified_file = f"{folder}/verified.csv"
     harvest_runs_file = f"{folder}/harvest_runs.csv"
@@ -319,10 +320,10 @@ def main(folder, incremental=False):
         logger.info("Reading %s", obis_cells_file)
         obis_cells = pd.read_csv(obis_cells_file)
 
-    trajectory_cells = None
-    if os.path.isfile(trajectory_cells_file):
-        logger.info("Reading %s", trajectory_cells_file)
-        trajectory_cells = pd.read_csv(trajectory_cells_file)
+    trajectory_days = None
+    if os.path.isfile(trajectory_days_file):
+        logger.info("Reading %s", trajectory_days_file)
+        trajectory_days = pd.read_csv(trajectory_days_file)
 
     trajectory_points = None
     if os.path.isfile(trajectory_points_file):
@@ -348,6 +349,11 @@ def main(folder, incremental=False):
         logger.info("Reading %s", harvest_attempts_file)
         harvest_attempts_df = pd.read_csv(
             harvest_attempts_file, parse_dates=["attempted_at"]
+        )
+
+    if "eovs" in profiles.columns:
+        profiles["eovs"] = profiles["eovs"].apply(
+            lambda x: ast.literal_eval(x) if isinstance(x, str) else []
         )
 
     datasets["eovs"] = datasets["eovs"].apply(ast.literal_eval)
@@ -536,6 +542,7 @@ def main(folder, incremental=False):
                         con=transaction,
                         if_exists="append",
                         index=False,
+                        dtype=PROFILE_ARRAY_DTYPES,
                         method="multi",
                     )
 
@@ -547,14 +554,14 @@ def main(folder, incremental=False):
                     )
                     load_cells_copy(prepared, "temp_obis_cells", transaction)
 
-            if trajectory_cells is not None:
-                prepared = prepare_trajectory_cells_dataframe(trajectory_cells)
-                with _timed("temp_trajectory_cells COPY", logger):
+            if trajectory_days is not None:
+                prepared = prepare_trajectory_days_dataframe(trajectory_days)
+                with _timed("temp_trajectory_days COPY", logger):
                     logger.info(
-                        "Loading trajectory_cells into temp table (%d rows)",
+                        "Loading trajectory_days into temp table (%d rows)",
                         len(prepared),
                     )
-                    load_cells_copy(prepared, "temp_trajectory_cells", transaction)
+                    load_cells_copy(prepared, "temp_trajectory_days", transaction)
 
             if trajectory_points is not None:
                 prepared = prepare_trajectory_points_dataframe(trajectory_points)
@@ -717,6 +724,7 @@ def main(folder, incremental=False):
                         if_exists="append",
                         schema=schema,
                         index=False,
+                        dtype=PROFILE_ARRAY_DTYPES,
                         method="multi",
                     )
 
@@ -728,7 +736,7 @@ def main(folder, incremental=False):
                         prepared, "obis_cells", transaction, schema=schema
                     )
 
-            if trajectory_cells is not None or trajectory_points is not None:
+            if trajectory_days is not None or trajectory_points is not None:
                 # Resolve dataset_pk at COPY time (datasets were just written
                 # above) so the *_link_dataset_pk() passes don't rewrite every
                 # row post-load. Unmatched rows COPY a NULL and are caught by
@@ -738,8 +746,8 @@ def main(folder, incremental=False):
                 ).all()
                 pk_map = {(r.erddap_url, r.dataset_id): r.pk for r in pk_rows}
 
-            if trajectory_cells is not None:
-                prepared = prepare_trajectory_cells_dataframe(trajectory_cells)
+            if trajectory_days is not None:
+                prepared = prepare_trajectory_days_dataframe(trajectory_days)
                 prepared["dataset_pk"] = pd.array(
                     [
                         pk_map.get(key)
@@ -749,10 +757,10 @@ def main(folder, incremental=False):
                     ],
                     dtype="Int64",
                 )
-                with _timed("trajectory_cells COPY", logger):
-                    logger.info("Writing trajectory_cells (%d rows)", len(prepared))
+                with _timed("trajectory_days COPY", logger):
+                    logger.info("Writing trajectory_days (%d rows)", len(prepared))
                     load_cells_copy(
-                        prepared, "trajectory_cells", transaction, schema=schema
+                        prepared, "trajectory_days", transaction, schema=schema
                     )
 
             if trajectory_points is not None:
@@ -813,34 +821,33 @@ def main(folder, incremental=False):
                             "  %s: %s rows affected", fn, n if n is not None else 0
                         )
 
-            if trajectory_cells is not None:
-                # Per-step invocation for timing/row-count logs (sub-functions
-                # in 5_profile_process.sql); incremental calls the
-                # trajectory_process() wrapper instead. Must run after
-                # profile_process() (points rebuild) and before create_hexes()
-                # (which links point_pk + hex FKs in one pass). The two steps
-                # here are backfills that should touch ~0 rows: dataset_pk is
-                # set at COPY time above, days at harvest time.
-                trajectory_steps = [
-                    "trajectory_link_dataset_pk",
-                    "trajectory_insert_points",
-                    "trajectory_update_days",
-                ]
-                logger.info("Processing trajectory_cells")
-                for fn in trajectory_steps:
-                    with _timed(fn, logger):
-                        n = transaction.execute(text(f"SELECT {fn}();")).scalar()
-                        logger.info(
-                            "  %s: %s rows affected", fn, n if n is not None else 0
-                        )
+            if trajectory_days is not None:
+                # dataset_pk backfill only (~0 rows: it is set at COPY time
+                # above). Per-step invocation for timing/row-count logs;
+                # incremental calls the trajectory_process() wrapper instead.
+                logger.info("Processing trajectory_days")
+                with _timed("trajectory_link_dataset_pk", logger):
+                    n = transaction.execute(
+                        text("SELECT trajectory_link_dataset_pk();")
+                    ).scalar()
+                    logger.info(
+                        "  trajectory_link_dataset_pk: %s rows affected",
+                        n if n is not None else 0,
+                    )
 
             if trajectory_points is not None:
-                # dataset_pk backfill (~0 rows, set at COPY time) + the
+                # dataset_pk backfill (~0 rows, set at COPY time), the
                 # per-trajectory summary rebuild for /tiles/tracks pruning and
-                # the platform list. No hex/point linkage by design.
+                # the platform list, then the hex sweep that turns these tracks
+                # into the map's coverage layer. Order matters: the sweep takes
+                # each trajectory's gap threshold from track_stats, and joins
+                # cde.trajectory_days (COPYed above) for the attributes.
+                # NULL = whole corpus; the incremental path scopes it to the
+                # datasets it touched.
                 trajectory_point_steps = [
                     "trajectory_points_link_dataset_pk",
                     "trajectory_refresh_track_stats",
+                    "trajectory_build_hexes",
                 ]
                 logger.info("Processing trajectory_points")
                 for fn in trajectory_point_steps:
@@ -929,14 +936,15 @@ def main(folder, incremental=False):
     # DELETE+INSERT churn. Vacuuming right away keeps that space reusable so
     # the tables plateau instead of growing run-over-run, and refreshes
     # planner stats for the tile queries.
-    if trajectory_cells is not None or trajectory_points is not None:
+    if trajectory_days is not None or trajectory_points is not None:
         # Announce before starting: VACUUM emits no output until it finishes, so
         # without this line a multi-minute vacuum right after the final "Wrote to
         # db" logs looks like a hung run.
         vacuum_targets = ", ".join(
             name
             for name, present in (
-                ("cde.trajectory_cells", trajectory_cells is not None),
+                ("cde.trajectory_hexes", trajectory_points is not None),
+                ("cde.trajectory_days", trajectory_days is not None),
                 ("cde.trajectory_points", trajectory_points is not None),
             )
             if present
@@ -950,7 +958,9 @@ def main(folder, incremental=False):
             with engine.connect().execution_options(
                 isolation_level="AUTOCOMMIT"
             ) as conn:
-                if trajectory_cells is not None:
-                    conn.execute(text("VACUUM ANALYZE cde.trajectory_cells"))
+                if trajectory_points is not None:
+                    conn.execute(text("VACUUM ANALYZE cde.trajectory_hexes"))
+                if trajectory_days is not None:
+                    conn.execute(text("VACUUM ANALYZE cde.trajectory_days"))
                 if trajectory_points is not None:
                     conn.execute(text("VACUUM ANALYZE cde.trajectory_points"))

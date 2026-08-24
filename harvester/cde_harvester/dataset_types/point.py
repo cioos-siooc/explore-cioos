@@ -10,8 +10,11 @@ readings:
 
 * small enough -> one exact row per sample in cde.profiles, so each sample
   keeps its true position and can be clicked individually.
-* larger -> the same 1/12-degree coverage cells the trajectory and OBIS
-  pipelines already use, which bounds both the response and the table.
+* larger -> the same day/hex coverage model the trajectory pipeline uses
+  (cde.trajectory_days + cde.trajectory_points, swept into cde.trajectory_hexes
+  by the database), which bounds both the response and the table. The whole
+  dataset is treated as one unnamed pseudo-trajectory (trajectory_id=''),
+  since a Point dataset has no cf_role=trajectory_id to split it by.
 
 The cutoff is applied to the whole-dataset record count QC already measured,
 so choosing costs no extra query.
@@ -138,18 +141,24 @@ class PointHandler(DatasetTypeHandler):
 
         if total_records is not None and total_records > POINT_EXACT_MAX_SAMPLES:
             dataset.logger.info(
-                "Point dataset has %s records (> %s): storing coverage cells "
+                "Point dataset has %s records (> %s): storing day/hex coverage "
                 "instead of exact samples",
                 f"{total_records:,}", f"{POINT_EXACT_MAX_SAMPLES:,}",
             )
-            dataset.feature_kind = "trajectory_cells"
-            # No cf_role=trajectory_id, so extract_cells treats the dataset as
-            # one unnamed trajectory (trajectory_id=''), which is exactly the
-            # shape a Point dataset needs.
-            return trajectory_features.extract_cells(dataset, count_profiles=False)
+            dataset.feature_kind = "trajectory_days"
+            # No cf_role=trajectory_id, so extract_day_stats treats the
+            # dataset as one unnamed trajectory (trajectory_id=''), which is
+            # exactly the shape a Point dataset needs.
+            return trajectory_features.extract_day_stats(dataset, count_profiles=False)
 
         dataset.feature_kind = "profiles"
         return extract_exact_samples(dataset)
 
-    # extract_track_points stays the inherited None: points are unordered, so
-    # there is no track to draw between them.
+    def extract_track_points(self, dataset):
+        # Only the coverage path (feature_kind flipped to trajectory_days
+        # above) has anything to sweep into hexes; the exact-samples path
+        # already wrote real positions to cde.profiles and gets its own hex
+        # cell there, so there is no track to draw between them.
+        if dataset.feature_kind != "trajectory_days":
+            return None
+        return trajectory_features.extract_track_points(dataset, per_profile=False)

@@ -33,6 +33,24 @@ def get_df_eov_to_standard_name(eov_to_standard_name):
 df_eov_to_standard_name = get_df_eov_to_standard_name(eov_to_standard_name)
 
 
+def get_standard_name_to_eovs(eov_to_standard_name):
+    """Reverse of eov_to_standard_name: CF standard name -> list of EOV keys.
+
+    Lets a single variable be tagged with the ocean variables it represents,
+    which is how both the grid variable list and the per-feature EOV detection
+    decide what a variable contributes.
+    """
+    res = {}
+    for eov, standard_names in eov_to_standard_name.items():
+        for standard_name in standard_names:
+            res.setdefault(standard_name, []).append(eov)
+    return res
+
+
+# dictionary mapping from standard names to ocean variables
+standard_name_to_eovs = get_standard_name_to_eovs(eov_to_standard_name)
+
+
 def intersection(lst1, lst2):
     """
     intersection doesnt include nulls

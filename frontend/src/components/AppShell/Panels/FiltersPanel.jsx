@@ -103,14 +103,13 @@ export default function FiltersPanel () {
     resetFilters
   } = useFilters()
   const {
-    setPolygon,
     setDatasetTitleSearchText,
     onlyInView,
     setOnlyInView,
     inViewCount
   } = useSelection()
   const { openFilter, setOpenFilter } = useUI()
-  const { dataLayers, resetDataLayers, showAllDataLayers } = useMapState()
+  const { dataLayers, resetDataLayers, showAllDataLayers, requestDraw } = useMapState()
 
   // The one search box whose terms aren't a filter over options already in
   // state — it is a query against WoRMS — so it is kept here rather than in the
@@ -527,7 +526,7 @@ export default function FiltersPanel () {
           onClick={() => {
             resetFilters()
             resetDataLayers()
-            setPolygon()
+            requestDraw('clear')
             setDatasetTitleSearchText('')
             setOnlyInView(false)
           }}

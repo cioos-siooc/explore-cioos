@@ -4,108 +4,10 @@ body {
   color: var(--cioos-ink);
 }
 
-/* mapbox-gl-draw still emits mapboxgl-* classes for its control group while
-   MapLibre v5's own controls (and base CSS) use maplibregl-* only — style
-   both prefixes. */
-.maplibregl-ctrl-group>button,
-.mapboxgl-ctrl-group>button {
-  width: 42px;
-  height: 42px;
-}
-
 .emailAddress {
   height: 40px;
   width: 100%;
   margin-bottom: 10px;
-}
-
-/* Portaled into the draw plugin's control group (see AppShell/MapCorner) so
-   rectangle / polygon / trash present as one card. The portal appends it
-   last in the DOM; `order` displays it first. */
-.boxQueryButton {
-  width: 42px;
-  height: 42px;
-  border: 0px;
-  background-color: var(--cioos-white);
-  padding: 5px;
-  order: -1;
-}
-
-.boxQueryButton.active {
-  background-color: var(--cioos-teal-light);
-}
-
-/* Fills the button's content box (42px minus padding); the fixed 42px it
-   had before overflowed the padded button and pushed the icon off-center. */
-.rectangleIcon {
-  width: 100%;
-  height: 100%;
-  background-image: url(./Images/rectangleIcon.png);
-  background-color: transparent;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 30px 30px;
-}
-
-.boxQueryButton:hover {
-  background-color: var(--cioos-surface-2);
-}
-
-/* Each control group is its own rounded card; overflow keeps the squared
-   child buttons from poking out of the rounded corners. */
-.maplibregl-ctrl-group,
-.mapboxgl-ctrl-group {
-  border-radius: var(--cioos-radius);
-  overflow: hidden;
-}
-
-/* MapLibre v5's base CSS only styles maplibregl-ctrl-group; recreate the
-   control chrome for the draw plugin's mapboxgl-prefixed group so it doesn't
-   render unstyled. Flex so the portaled rectangle button can reorder above
-   the polygon and trash buttons. */
-.mapboxgl-ctrl-group {
-  display: flex;
-  flex-direction: column;
-  background: var(--cioos-white);
-}
-
-/* Hairline separators between the visually 2nd and 3rd buttons (polygon,
-   trash) — the rectangle button displays first via `order`. */
-.mapboxgl-ctrl-group .mapbox-gl-draw_polygon,
-.mapboxgl-ctrl-group .mapbox-gl-draw_trash {
-  border-top: 1px solid var(--cioos-hairline);
-}
-
-.mapboxgl-ctrl-group:not(:empty) {
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
-}
-
-.mapboxgl-ctrl-group button {
-  background-color: transparent;
-  border: 0;
-  box-sizing: border-box;
-  cursor: pointer;
-  display: block;
-  outline: none;
-  overflow: hidden;
-  padding: 0;
-}
-
-.maplibregl-ctrl-bottom-right .mapboxgl-ctrl {
-  float: right;
-  margin: 0 10px 10px 0;
-  clear: both;
-  pointer-events: auto;
-}
-
-/* Polygon-draw button state colors */
-.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon {
-  background-color: var(--cioos-white);
-}
-
-.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon.active,
-.mapbox-gl-draw_ctrl-draw-btn.mapbox-gl-draw_polygon.drawing {
-  background-color: var(--cioos-teal-light);
 }
 
 /* Feedback icon colors */

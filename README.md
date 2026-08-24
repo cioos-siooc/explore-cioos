@@ -21,7 +21,7 @@ If you just want to see how a dataset is harvested by CDE:
 4. Copy `docker-compose.override.yaml.sample` to `docker-compose.override.yaml`. The base `docker-compose.yaml` publishes **no** host ports (so it can be deployed as-is behind a proxy such as Coolify); the override publishes nginx and Prefect locally. Ports are configurable via `NGINX_PORT` (default 8098) and `PREFECT_PORT` (default 4200) in `.env`.
 5. Run locally with docker compose:
     1. Development environment: `docker compose up -d`
-    2. Production environment: `docker compose -f docker-compose.production.yaml up -d`
+    2. Production configuration: `docker compose -f docker-compose.yaml -f docker-compose.production.yaml up -d` — `docker-compose.production.yaml` is an **overlay**, not a standalone stack (see [Production deployment](#production-deployment)).
 6. See website at <http://localhost:8098>
 7. See Prefect Dashboard at <http://localhost:4200> (Manage flows and deployments)
 
@@ -46,11 +46,18 @@ is provided at runtime, so config changes never require an image rebuild. The
 worker resolves it in priority order (both when registering deployments at
 startup and again at the start of every flow run):
 
-1. **`HARVEST_CONFIG_YAML`** env var — the *full YAML content* inline
-   (Coolify-friendly: editable in the UI, applied on redeploy/recreate).
-2. **`HARVEST_CONFIG_FILE`** env var — path to a config file mounted into the
+1. **`HARVEST_CONFIG_B64`** env var — the *whole YAML file, base64-encoded on
+   one line*. This is the channel to use under Coolify; generate it with
+   `base64 < harvest_config.yaml | tr -d '\n'`. A value that fails to decode
+   (or decodes to something that isn't a YAML mapping) aborts startup — it
+   never silently falls back to a stale mounted config.
+2. **`HARVEST_CONFIG_YAML`** env var — the *raw YAML text*. **Deprecated**,
+   kept for deployments already using it: multi-line values do not survive
+   Coolify's env editor intact, which is the corruption `HARVEST_CONFIG_B64`
+   exists to avoid. Use it and you get a warning in the worker log.
+3. **`HARVEST_CONFIG_FILE`** env var — path to a config file mounted into the
    container (set to `/app/harvester/harvest_config.yaml` in the compose files).
-3. A file mounted at `/app/harvester/harvest_config.yaml` — locally via
+4. A file mounted at `/app/harvester/harvest_config.yaml` — locally via
    `docker-compose.override.yaml`, in production via the bind mount in
    `docker-compose.production.yaml`.
 
@@ -64,10 +71,10 @@ instead of silently harvesting the sample servers.
 |---|---|
 | Values in the mounted file (`cache`, `incremental`, `dataset_ids`, …) | Nothing — the next flow run re-reads the file |
 | `erddap_urls` / OBIS list in the mounted file | `docker compose restart prefect_worker` — startup re-registers the per-source deployments |
-| Anything set via env (`HARVEST_CONFIG_YAML`, `HARVESTER_CRON`, `.env` values) | `docker compose up -d --force-recreate prefect_worker` — a plain `restart` reuses the old container **and its old environment** (on Coolify: redeploy the resource) |
+| Anything set via env (`HARVEST_CONFIG_B64`/`HARVEST_CONFIG_YAML`, `HARVESTER_CRON`, `.env` values) | `docker compose up -d --force-recreate prefect_worker` — a plain `restart` reuses the old container **and its old environment** (on Coolify: redeploy the resource) |
 
 Remote workers (`docker-compose.worker.yaml`) execute flows too, so they need
-the *same* config as the primary stack — via `HARVEST_CONFIG_YAML` in their
+the *same* config as the primary stack — via `HARVEST_CONFIG_B64` in their
 `.env` or a local file mount (see the comments in that compose file).
 
 This will register the flow with the Prefect server. You can then trigger runs from the UI or let the schedule take over.
@@ -207,11 +214,29 @@ under Coolify (the source resolves to an empty persistent-storage dir), and the
 image no longer bakes a config (the old `BAKED_HARVEST_CONFIG` build variable
 is gone). Provide the config one of two ways:
 
-- Set the **`HARVEST_CONFIG_YAML`** env var on the resource to the full YAML
-  content (multi-line values are supported — the indentation Coolify adds is
-  stripped automatically). Edit it in the UI and redeploy to apply.
-- Or add a **Persistent Storage file mount** onto
-  `/app/harvester/harvest_config.yaml`.
+- Set the **`HARVEST_CONFIG_B64`** env var on the resource to the whole YAML
+  file, base64-encoded onto a single line:
+
+  ```sh
+  base64 < harvest_config.production.yaml | tr -d '\n'
+  ```
+
+  Paste that one line as the value, then **redeploy** the resource (a restart
+  reuses the old environment). To check what a deployed value holds, run
+  `echo "$HARVEST_CONFIG_B64" | base64 -d`.
+
+  Do *not* paste raw multi-line YAML into an env var. Coolify's env editor
+  reindents continuation lines and mangles `#` comments on the way to the
+  generated `.env`, so the config arrives corrupted — which is exactly why this
+  value is base64. To edit the config, change the YAML file in the repo and
+  re-encode it. (`HARVEST_CONFIG_YAML` still accepts raw YAML for existing
+  deployments, but it is deprecated for precisely this reason.)
+
+- Or, if you want the config to stay human-editable in the Coolify UI, add a
+  **Persistent Storage file mount** onto `/app/harvester/harvest_config.yaml`
+  and paste the YAML there instead. `HARVEST_CONFIG_FILE` already points at that
+  path in `docker-compose.yaml`. (Note this is a Coolify-managed *file* mount —
+  a relative bind mount of a repo file in the compose file does not work.)
 
 Without one of these the `prefect_worker` container exits at startup with a
 message explaining the options.
@@ -223,7 +248,45 @@ file (no Coolify). Published host ports are configurable via `.env`:
 `NGINX_PORT` (default 8098), `PREFECT_PORT` (default 4200) and `DB_PORT`
 (default 5432 — also sets Postgres' internal `PGPORT`).
 
+### Compose file layout
+
+`docker-compose.production.yaml` is an **overlay**: it contains only what
+self-hosted production *adds* to `docker-compose.yaml`, so the whole
+production-vs-everything-else diff is that one short file. Deploy both:
+
+```sh
+docker compose -f docker-compose.yaml -f docker-compose.production.yaml up -d --build
+```
+
+Two settings in `.env` make that the default for every command run on the box
+(docker compose reads `COMPOSE_*` from `.env`), so ad-hoc `docker compose logs` /
+`ps` / `restart` on the server pick up the same pair — both are already in
+`.env.production`:
+
+```sh
+COMPOSE_FILE=docker-compose.yaml:docker-compose.production.yaml
+COMPOSE_PROFILES=tools
+```
+
+`COMPOSE_PROFILES=tools` is **required**: `scheduler` sits behind the `tools`
+profile in the base file (Coolify does not run it), and an overlay can *add* a
+profile but never remove one — so production opts in through the environment.
+Without it the download scheduler silently never starts.
+
+What the overlay adds, and nothing else: host ports (nginx, Prefect, Postgres),
+the externally-managed `explore-cioos_default` network, the host-editable
+`harvest_config.yaml` bind mount, the capped redis config, and the two env vars
+whose base values assume Coolify (`DOWNLOAD_WAF_URL`, `DB_HOST_EXTERNAL`).
+Everything else — images, healthchecks, named volumes, harvester memory limits —
+is inherited from `docker-compose.yaml`, so it only has to be maintained once.
+
 ### Initial Setup
+
+0. Create the shared network once, if it does not already exist on the host:
+
+   ```sh
+   docker network create explore-cioos_default
+   ```
 
 1. Rename `.env.sample` to `.env` and configure with production settings (docker compose only auto-loads `.env`). The deploy workflow renders these from `.env.production` via 1Password.
 
@@ -235,11 +298,14 @@ file (no Coolify). Published host ports are configurable via `.env`:
    sudo docker volume rm cde_postgres-data cde_redis-data
    ```
 
-4. Start all services using the production Docker Compose file:
+4. Start all services using the base file plus the production overlay:
 
    ```sh
-   sudo docker compose -f docker-compose.production.yaml up -d --build
+   sudo docker compose -f docker-compose.yaml -f docker-compose.production.yaml up -d --build
    ```
+
+   With `COMPOSE_FILE` and `COMPOSE_PROFILES` set in `.env` (above), plain
+   `sudo docker compose up -d --build` is equivalent.
 
 ### Data Harvesting (Production)
 

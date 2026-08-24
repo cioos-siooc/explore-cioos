@@ -45,11 +45,27 @@ from cde_harvester.core.errors import (
     ResponseTooLargeError,
 )
 from cde_harvester.dataset_types.base import DatasetQualityReport
-from cde_harvester.dataset_types.trajectory_features import (
-    KM_PER_DEGREE_LATITUDE,
-    _binned_count,
-)
+from cde_harvester.dataset_types.trajectory_features import KM_PER_DEGREE_LATITUDE
 from cde_harvester.sources.erddap.client import ERDDAP
+
+# --- Probe A sizing ----------------------------------------------------------
+# Bin size for the occupied-cell probe below: 1/12 degree (~5 NM), matching
+# the OBIS cell grid. QC-local: the trajectory pipeline dropped position
+# binning when it moved to the swept-segment coverage model
+# (cde.trajectory_hexes), but Point QC still needs a coarse "how many
+# distinct places did this dataset touch" count to catch a single-location
+# mooring wrongly declaring Point (see _check_single_location).
+_GRID_DEG = 1 / 12
+_GRID_INTERVAL = f"{_GRID_DEG:.8f}"
+
+
+def _binned_count(dataset):
+    """Per-cell record count (of time values) via orderByCount, one row per
+    occupied 1/12-degree grid cell."""
+    url = "latitude,longitude,time" + requests.utils.quote(
+        f'&orderByCount("latitude/{_GRID_INTERVAL},longitude/{_GRID_INTERVAL}")'
+    )
+    return dataset.dataset_tabledap_query(url)
 
 # --- Probe B sizing ---------------------------------------------------------
 # Sample from days ERDDAP tells us have data, rather than from windows carved
@@ -291,7 +307,7 @@ def probe_cells(dataset):
     One server-side grouped request via the trajectory pipeline's binning.
     """
     try:
-        df_count = _binned_count(dataset, None)
+        df_count = _binned_count(dataset)
     except (HTTPError, ResponseTooLargeError):
         dataset.logger.warning("Cell-count probe failed; Point QC will use the sample only")
         return None, None
