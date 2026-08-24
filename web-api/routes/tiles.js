@@ -6,6 +6,11 @@ const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { validatorMiddleware } = require("../utils/validatorMiddlewares");
 const cache = require("../utils/cache");
+const {
+  parseMetric,
+  recordCountExpr,
+  countAggregate,
+} = require("../utils/hexMetric");
 
 // Per-tile cap on how many trajectories a single /tiles/tracks tile assembles.
 // A low-zoom tile spans a huge area: with a long trail (e.g. "All time") its
@@ -21,7 +26,7 @@ const TRACKS_MAX_PER_TILE = 2500;
 
 // Spatial prefilter for the hex-aggregation tile queries (/tiles and
 // /tiles/cells). Without it each tile UNIONs and GROUP BYs the ENTIRE cell
-// tables (trajectory_cells ~860k rows / 3 GB, obis_cells, profiles) and only
+// tables (trajectory_hexes, obis_cells, profiles) and only
 // clips to the tile at the very end — ~2.5 s of CPU per tile on every request
 // (measured, buffers warm), which shows up as half-painted tiles and slow
 // layer toggles (each toggle changes the tile URL and cold-refetches). This
@@ -44,6 +49,33 @@ function tileCellPrefilter(z) {
   const expandM = Math.ceil(Math.max(tileWidthM * 0.25, hexDiameterM));
   return `geom && ST_Expand(ST_TileEnvelope(:z, :x, :y), ${expandM})`;
 }
+
+// The cdm_data_types that share cde.trajectory_hexes / cde.trajectory_points.
+// They are separate layers in the map's geometry selector, so the routes below
+// take a trajectoryTypes param that works exactly like profileTypes: absent =
+// both (pre-split behaviour, and what any older client sends), a comma list =
+// only those, empty = neither. Values are matched against this fixed set, which
+// is what makes them safe to inline into the branch SQL.
+const ALL_TRAJECTORY_TYPES = ["Trajectory", "TrajectoryProfile"];
+
+function requestedTrajectoryTypes(query) {
+  if (query.trajectoryTypes === undefined) return ALL_TRAJECTORY_TYPES;
+  return String(query.trajectoryTypes)
+    .split(",")
+    .filter((t) => ALL_TRAJECTORY_TYPES.includes(t));
+}
+
+// A predicate restricting a trajectory table to the requested types, or '' when
+// the restriction would be a no-op. Both types requested needs no filter; none
+// requested never reaches a branch (callers drop it instead), so the emptiness
+// check here is belt-and-braces rather than a live case.
+function trajectoryTypePredicate(types) {
+  if (!types.length || types.length === ALL_TRAJECTORY_TYPES.length) return "";
+  return `dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${types
+    .map((t) => `'${t}'`)
+    .join(",")}))`;
+}
+
 /**
  * /tiles/z/x/y/.mvt
  *
@@ -77,6 +109,14 @@ function tileCellPrefilter(z) {
  *       - in: query
  *         name: timeMax
  *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: metric
+ *         description: >
+ *           What the `count` property counts, and therefore what the colour
+ *           ramp represents. `records` sums measurement/occurrence/fix counts;
+ *           `days` sums each feature's day span; `datasets` counts distinct
+ *           datasets. Anything else falls back to `records`. Must match the metric passed to /legend.
+ *         schema: { type: string, enum: [records, days, datasets], default: records }
  *     responses:
  *       200:
  *         description: MVT binary tile.
@@ -107,10 +147,17 @@ router.get(
     const isHexGrid = z < 7;
     const zoomPKColumn = z < 5 ? "hex_0_pk" : "hex_1_pk";
     const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
+    // cde.trajectory_hexes stores one row per tier instead of two hex FK
+    // columns (each tier's day count is aggregated independently, so they
+    // can't share a row). Numeric literal, never user input.
+    const hexTier = z < 5 ? 0 : 1;
     // Prune each branch's scan to the tile region (see tileCellPrefilter).
     const cellPrefilter = tileCellPrefilter(z);
 
     const includeObis = req.query.includeObis !== 'false';
+    // What the hex/point `count` property means — see utils/hexMetric.js. The
+    // same metric must reach /legend, or the ramp domain won't match the tiles.
+    const metric = parseMetric(req.query.metric);
     // Data-type layer toggle (map layer selector). Trajectories: an explicit
     // includeTrajectory=false hides them. Profiles: the profileTypes param is
     // the comma list of cdm_data_types to show (Profile / TimeSeries /
@@ -124,6 +171,7 @@ router.get(
           .split(',')
           .filter((t) => ALL_PROFILE_TYPES.includes(t));
     const trajectoryToggledOn = req.query.includeTrajectory !== 'false';
+    const trajectoryTypes = requestedTrajectoryTypes(req.query);
     // ERDDAP-sourced data (profiles + trajectory coverage) is hidden wholesale
     // when an OBIS-only filter is active: scientific-name filters are
     // OBIS-only, and an OBIS-node selection also hides it, unless ERDDAP
@@ -132,7 +180,8 @@ router.get(
     const erddapVisible = !req.query.scientificNames
       && (!req.query.obisNodes || Boolean(req.query.erddapServers));
     const includeProfiles = erddapVisible && profileTypes.length > 0;
-    const includeTrajectory = trajectoryToggledOn && erddapVisible;
+    const includeTrajectory = trajectoryToggledOn
+      && erddapVisible && trajectoryTypes.length > 0;
 
     // At hex zoom we only need the hex FK and point_pk (for distinct counts);
     // the polygon is fetched once per hex via JOIN to hexes_zoom_*. At point
@@ -152,20 +201,31 @@ router.get(
             .map((t) => `'${t}'`)
             .join(',')}))`
         : '';
-    const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
+    const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${recordCountExpr('profiles', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
-    FROM cde.profiles WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
+    FROM cde.profiles WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ''} AND :profileFilters`;
     // Both cell tables (trajectory coverage cells and OBIS occurrence cells)
     // merge into the combined hex counts (z<7, the green ramp) but never
     // appear as individual points (z>=7). Their cell spacing is a grid
     // artifact, not a measurement location, so at point zoom they're shown
     // only via the dedicated always-hex coverage layer from
     // /tiles/cells/:z/:x/:y.mvt.
-    const trajectoryBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, days as record_count,
+    // Same shape as profilesTypeFilter above: restrict to the requested
+    // geometries when only some are on, and combine with the tile prefilter
+    // into one WHERE (either, both, or neither can be present).
+    const trajectoryConds = [
+      cellPrefilter,
+      trajectoryTypePredicate(trajectoryTypes),
+    ].filter(Boolean);
+    // cde.trajectory_hexes is already keyed on the hex, one row per
+    // (dataset, trajectory, tier, hex) — hence `hex_pk as zoom_pk` and a tier
+    // predicate where the other branches carry two hex FK columns. point_pk is
+    // NULL because trajectory coverage never renders at the point tier.
+    const trajectoryBranch = `SELECT NULL::integer as point_pk, dataset_pk, hex_pk as zoom_pk, geom as point_geom, ${recordCountExpr('trajectory_hexes', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_cells${cellPrefilter ? ` WHERE ${cellPrefilter}` : ''}`;
+    FROM cde.trajectory_hexes WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(' AND ')}` : ''}`;
     const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
-           date_part('days', time_max - time_min) + 1 as record_count,
+           ${recordCountExpr('obis_cells', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
     FROM cde.obis_cells
     WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
@@ -183,8 +243,13 @@ router.get(
       ? branches.join("\n    UNION ALL\n    ")
       : `SELECT * FROM (${profilesBranch}) empty_combined WHERE FALSE`;
 
+    // `count` is the same quantity at both tiers — the summed metric. It used
+    // to be count(distinct point_pk) at hex zoom and sum(record_count) at point
+    // zoom, so the property changed meaning mid-zoom and the hex ramp ranked a
+    // 20-year mooring level with a single CTD cast. Summing at both tiers fixes
+    // the ramp and drops a distinct-aggregate at the same time.
     const relevantPointsSQL = isHexGrid
-      ? `SELECT p.zoom_pk pk, count(distinct p.point_pk) count,
+      ? `SELECT p.zoom_pk pk, ${countAggregate(metric, 'p')} count,
                 array_to_json(array_agg(distinct d.pk_url)) datasets,
                 h.geom AS geom
          FROM combined p
@@ -192,7 +257,7 @@ router.get(
          JOIN ${hexesTable} h ON h.pk = p.zoom_pk
          ${filters.hasShared ? "WHERE :filters" : ""}
          GROUP BY p.zoom_pk, h.geom`
-      : `SELECT p.point_pk pk, d.platform as platform, sum(p.record_count)::bigint count,
+      : `SELECT p.point_pk pk, d.platform as platform, ${countAggregate(metric, 'p')} count,
                 array_to_json(array_agg(distinct d.pk_url)) datasets,
                 p.point_geom AS geom
          FROM combined p
@@ -227,6 +292,7 @@ router.get(
       const q = db.raw(SQL, {
         filters: filters.shared,
         obisFilters: filters.obisOnly,
+        profileFilters: filters.profileOnly,
         zoomPKColumn,
         z,
         x,
@@ -257,9 +323,11 @@ router.get(
  *       Returns a Mapbox Vector Tile of trajectory and OBIS dataset coverage,
  *       always aggregated as hexagons — unlike /tiles/{z}/{x}/{y}.mvt this
  *       never falls back to individual points at high zoom. Each hex carries
- *       both a trajectory_count (distinct trajectories) and an obis_count
- *       (occurrence records), so a hex holding both can be drawn and labelled
- *       differently from one holding only one kind.
+ *       `count` — the summed metric over both kinds of cell, which is what the
+ *       colour ramp reads — plus trajectory_count (distinct trajectories) and
+ *       obis_count (the metric over OBIS cells alone) for the hover tooltip,
+ *       which is where the per-source breakdown stays reachable now that the
+ *       ramp folds the two together.
  *     parameters:
  *       - in: path
  *         name: z
@@ -279,6 +347,14 @@ router.get(
  *       - in: query
  *         name: timeMax
  *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: metric
+ *         description: >
+ *           What the `count` property counts, and therefore what the colour
+ *           ramp represents. `records` sums measurement/occurrence/fix counts;
+ *           `days` sums each feature's day span. Anything else falls back to
+ *           `records`. Must match the metric passed to /legend.
+ *         schema: { type: string, enum: [records, days, datasets], default: records }
  *     responses:
  *       200:
  *         description: MVT binary tile.
@@ -309,31 +385,40 @@ router.get(
     // reused uncapped past zoom 6 so coverage cells never become points.
     const zoomPKColumn = z < 5 ? "hex_0_pk" : "hex_1_pk";
     const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
+    const hexTier = z < 5 ? 0 : 1; // see the main tile route
     // Prune each branch's scan to the tile region (see tileCellPrefilter).
     const cellPrefilter = tileCellPrefilter(z);
 
     const includeObis = req.query.includeObis !== 'false';
+    const metric = parseMetric(req.query.metric);
     // Same gating as the main tile route: scientific-name filters are
     // OBIS-only, so they hide the (ERDDAP) trajectory cells; an OBIS-node
     // selection does too, unless ERDDAP servers are selected alongside it.
     // On top of that, an explicit includeTrajectory=false hides them — the
     // trajectories layer toggle, and tracks mode (where track lines replace
     // the coverage hexes but OBIS cells stay).
+    // ...and, since the two trajectory geometries are separate layers, the
+    // requested subset of them; with neither on there is nothing to draw.
+    const trajectoryTypes = requestedTrajectoryTypes(req.query);
     const includeProfiles = req.query.includeTrajectory !== 'false'
+      && trajectoryTypes.length > 0
       && !req.query.scientificNames
       && (!req.query.obisNodes || Boolean(req.query.erddapServers));
 
-    // A `src` discriminator lets one pass over the union produce a separate
-    // count per kind, so a hex can report (and be coloured by) exactly what
-    // it holds. n_records is meaningless for trajectory cells and
-    // trajectory_id for OBIS cells; each is only ever read behind its own
-    // FILTER below.
-    const trajectoryBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'trajectory' as src,
-           trajectory_id, 0::bigint as n_records,
+    // A `src` discriminator lets one pass over the union produce both the
+    // unified count that colours the hex AND the per-kind figures the hover
+    // tooltip names. trajectory_id is meaningless for OBIS cells and is only
+    // ever read behind its own FILTER below.
+    const trajectoryConds = [
+      cellPrefilter,
+      trajectoryTypePredicate(trajectoryTypes),
+    ].filter(Boolean);
+    const trajectoryBranch = `SELECT dataset_pk, hex_pk as zoom_pk, 'trajectory' as src,
+           trajectory_id, ${recordCountExpr('trajectory_hexes', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_cells${cellPrefilter ? ` WHERE ${cellPrefilter}` : ''}`;
+    FROM cde.trajectory_hexes WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(' AND ')}` : ''}`;
     const obisBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'obis' as src,
-           NULL as trajectory_id, n_records,
+           NULL as trajectory_id, ${recordCountExpr('obis_cells', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
     FROM cde.obis_cells
     WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
@@ -367,9 +452,16 @@ router.get(
     ),
     agg as (
       SELECT c.zoom_pk pk,
+             -- What colours the hex: one ramp over both kinds of coverage
+             -- cell, the same quantity the main /tiles layer emits.
+             ${countAggregate(metric, 'c')} count,
+             -- Kept for the hover tooltip only. The ramp folds the two kinds
+             -- together; the tooltip is where the breakdown stays reachable,
+             -- since a trajectory fix and an occurrence record aren't the
+             -- same unit.
              count(distinct (c.dataset_pk, c.trajectory_id))
                FILTER (WHERE c.src = 'trajectory') trajectory_count,
-             coalesce(sum(c.n_records) FILTER (WHERE c.src = 'obis'), 0)::bigint obis_count,
+             coalesce(sum(c.record_count) FILTER (WHERE c.src = 'obis'), 0)::bigint obis_count,
              array_to_json(array_agg(distinct d.pk_url)) datasets
       FROM combined c
       JOIN cde.datasets d ON c.dataset_pk = d.pk
@@ -378,7 +470,7 @@ router.get(
       GROUP BY c.zoom_pk
     ),
     mvtgeom AS (
-      SELECT a.pk, a.trajectory_count, a.obis_count, a.datasets,
+      SELECT a.pk, a.count, a.trajectory_count, a.obis_count, a.datasets,
         ST_AsMVTGeom (
           th.geom,
           te.tile_envelope
@@ -486,6 +578,19 @@ router.get(
     ["eovs", "platforms", "datasetPKs", "organizations", "obisNodes", "erddapServers"]
       .forEach((k) => { if (req.query[k]) datasetLevelQuery[k] = req.query[k]; });
 
+    // Track lines are drawn for whichever trajectory geometries are switched
+    // on. With neither on the client stops asking for this layer at all, but
+    // answer honestly rather than serving every track if a request arrives.
+    const trajectoryTypes = requestedTrajectoryTypes(req.query);
+    if (!trajectoryTypes.length) {
+      return res.status(204).send();
+    }
+    // The cand CTE already joins cde.datasets, so the type test rides along
+    // there — filtering candidate trajectories before any fix is pulled.
+    const trackTypeFilter = trajectoryTypes.length < ALL_TRAJECTORY_TYPES.length
+      ? ` AND d.cdm_data_type IN (${trajectoryTypes.map((t) => `'${t}'`).join(",")})`
+      : "";
+
     let filters;
     try {
       filters = await createDBFilter(datasetLevelQuery);
@@ -510,14 +615,12 @@ router.get(
       -- split; a multi-expedition ship track (months dark between summers)
       -- or a monitoring vessel idle between short cruises always does,
       -- instead of drawing a connector chord across the map.
+      -- The threshold lives in SQL (trajectory_gap_secs, 4_create_hexes.sql)
+      -- because the hex coverage sweep applies the same one: a chord this
+      -- route refuses to draw must not light hexes either.
       SELECT s.dataset_pk, s.trajectory_id,
-             GREATEST(
-               COALESCE(
-                 s.median_gap_secs,
-                 extract(epoch FROM s.time_max - s.time_min)
-                   / GREATEST(s.n_points - 1, 1)
-               ) * 4,
-               172800
+             trajectory_gap_secs(
+               s.median_gap_secs, s.time_min, s.time_max, s.n_points
              ) AS gap_secs
       FROM cde.trajectory_track_stats s
       JOIN cde.datasets d ON d.pk = s.dataset_pk, te
@@ -527,6 +630,7 @@ router.get(
             )
         AND s.time_max >= :timeMin::timestamptz
         AND s.time_min <= :timeMax::timestamptz
+        ${trackTypeFilter}
         ${filters.hasShared ? "AND :filters" : ""}
       -- Cap per tile (see TRACKS_MAX_PER_TILE): keep the most recently-active
       -- trajectories; tie-break on the pk for deterministic, cache-stable tiles.

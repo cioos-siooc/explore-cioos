@@ -17,13 +17,21 @@ _root_logger = logging.getLogger()
 
 
 def init_sentry():
-    """Identical Sentry setup previously inlined in both package __main__ modules."""
+    """Identical Sentry setup previously inlined in both package __main__ modules.
+
+    Log records become breadcrumbs only (``event_level=None``). Sending every
+    WARNING as its own event meant an alert per dataset per run, grouped by log
+    message so all servers collapsed together. Dataset failures now arrive via
+    ``core.issues.report_issues``, grouped by the error the server actually
+    returned and de-duped by Sentry; unhandled exceptions are still captured by
+    Sentry's default integrations.
+    """
     sentry_sdk.init(
         dsn=os.environ.get("SENTRY_DSN"),
         integrations=[
             LoggingIntegration(
                 level=logging.INFO,  # Capture info and above as breadcrumbs
-                event_level=logging.WARNING,  # Send records as events
+                event_level=None,  # Don't turn log records into events
             ),
         ],
         environment=os.environ.get("ENVIRONMENT", "development"),

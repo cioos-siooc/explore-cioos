@@ -10,9 +10,10 @@ import './styles.css'
 
 // Griddap-specific section of the dataset inspector: grid structure, variable
 // list, and (when the ERDDAP serves WMS) the show-on-map switch. While the
-// dataset page is open the WmsLegend (variable picker, time/depth sliders,
-// colorbar) renders inline here; when the sidebar is collapsed it moves to the
-// floating card over the map (rendered by AppShell).
+// dataset page is open the WmsLegend (variable picker, colorbar) renders inline
+// here; when the sidebar is collapsed it moves to the floating card over the
+// map (rendered by AppShell). Which slice of the grid is drawn is set on the
+// bars along the bottom of the map, beside the filters for the same axes.
 export default function GriddapDetails({
   dataset,
   activeWmsOverlay,
@@ -56,6 +57,32 @@ export default function GriddapDetails({
 
   return (
     <div className='griddapDetails'>
+      {dataset.wms_url ? (
+        <div className='metadataGridItem griddapWmsControls'>
+          <strong>{t('griddapMapPreviewTitle')}</strong>
+          <Switch
+            id='griddapShowOnMapSwitch'
+            label={t('griddapShowOnMapToggle')}
+            checked={overlayActive}
+            disabled={!variables.length}
+            onChange={(event) =>
+              event.target.checked ? showOverlay() : setActiveWmsOverlay()
+            }
+          />
+          {overlayActive && sidebarOpen && (
+            <WmsLegend
+              overlay={activeWmsOverlay}
+              variant='inline'
+              onClose={() => setActiveWmsOverlay()}
+              setActiveWmsOverlay={setActiveWmsOverlay}
+            />
+          )}
+        </div>
+      ) : (
+        <div className='metadataGridItem griddapNoWms'>
+          {t('griddapNoWmsText')}
+        </div>
+      )}
       <div className='metadataGridItem'>
         <strong>{t('griddapDimensionsTitle')}</strong>
         {/* One card per axis rather than a 5-column table: at the sidebar's
@@ -111,32 +138,6 @@ export default function GriddapDetails({
           ))}
         </ul>
       </div>
-      {dataset.wms_url ? (
-        <div className='metadataGridItem griddapWmsControls'>
-          <strong>{t('griddapMapPreviewTitle')}</strong>
-          <Switch
-            id='griddapShowOnMapSwitch'
-            label={t('griddapShowOnMapToggle')}
-            checked={overlayActive}
-            disabled={!variables.length}
-            onChange={(event) =>
-              event.target.checked ? showOverlay() : setActiveWmsOverlay()
-            }
-          />
-          {overlayActive && sidebarOpen && (
-            <WmsLegend
-              overlay={activeWmsOverlay}
-              variant='inline'
-              onClose={() => setActiveWmsOverlay()}
-              setActiveWmsOverlay={setActiveWmsOverlay}
-            />
-          )}
-        </div>
-      ) : (
-        <div className='metadataGridItem griddapNoWms'>
-          {t('griddapNoWmsText')}
-        </div>
-      )}
     </div>
   )
 }

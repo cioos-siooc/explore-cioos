@@ -339,63 +339,29 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- Trajectory-cell post-load processing. Mirrors the obis_* functions above:
--- trajectory_cells carries a generated geom, so processing is only the
--- dataset_pk backfill, the points insert and the days backfill. Must run
--- AFTER profile_process() (which rebuilds cde.points) and BEFORE
--- create_hexes() (which links point_pk + hex FKs by joining points on geom).
+-- Superseded by the day/hex model below: cde.trajectory_cells and its
+-- cde.points linkage are gone. Dropped explicitly so a live database that ran
+-- an older deploy doesn't keep dead functions around (db_migrate re-applies
+-- this file on every deploy).
+DROP FUNCTION IF EXISTS trajectory_insert_points();
+DROP FUNCTION IF EXISTS trajectory_update_days();
+
+
+-- Trajectory per-day aggregate post-load processing. cde.trajectory_days is
+-- attribute-only (records / depth / profiles per UTC day); the geometry side
+-- lives in cde.trajectory_points and is swept into hexes by
+-- trajectory_build_hexes() (4_create_hexes.sql). So the only pass needed here
+-- is the dataset_pk backfill.
 
 CREATE OR REPLACE FUNCTION trajectory_link_dataset_pk() RETURNS bigint AS $$
 DECLARE n bigint;
 BEGIN
-  UPDATE cde.trajectory_cells c
+  UPDATE cde.trajectory_days c
   SET dataset_pk = d.pk
   FROM cde.datasets d
   WHERE c.dataset_id = d.dataset_id
     AND c.erddap_url = d.erddap_url
     AND c.dataset_pk IS NULL;
-  GET DIAGNOSTICS n = ROW_COUNT;
-  RETURN n;
-END;
-$$ LANGUAGE plpgsql;
-
-
--- Same delta-scoping as obis_insert_points(): only unlinked rows can carry
--- geometries not yet in cde.points, and trajectory_cells is the largest cells
--- table, so the WHERE keeps this from re-scanning ~800k rows per load.
-CREATE OR REPLACE FUNCTION trajectory_insert_points() RETURNS bigint AS $$
-DECLARE n bigint;
-BEGIN
-  INSERT INTO cde.points (geom)
-  SELECT src.new_geom
-    FROM (
-      SELECT DISTINCT
-             ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857) AS new_geom
-        FROM cde.trajectory_cells
-       WHERE point_pk IS NULL
-    ) src
-    LEFT JOIN cde.points p ON p.geom = src.new_geom
-   WHERE p.pk IS NULL
-  ON CONFLICT (geom) DO NOTHING;
-  GET DIAGNOSTICS n = ROW_COUNT;
-  RETURN n;
-END;
-$$ LANGUAGE plpgsql;
-
-
--- NOTE: there is deliberately no trajectory_link_point_pk(). point_pk is
--- linked together with the hex FKs in create_hexes() (single UPDATE joining
--- cde.points by geom) to avoid rewriting every row of the largest cells
--- table twice per load. Points are append-only with stable pks, so that
--- relink only touches rows still missing a link — freshly replaced cells.
-
-CREATE OR REPLACE FUNCTION trajectory_update_days() RETURNS bigint AS $$
-DECLARE n bigint;
-BEGIN
-  UPDATE cde.trajectory_cells
-  SET days = date_part('days', time_max - time_min) + 1
-  WHERE days IS NULL
-    AND time_min IS NOT NULL AND time_max IS NOT NULL;
   GET DIAGNOSTICS n = ROW_COUNT;
   RETURN n;
 END;
@@ -466,14 +432,15 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION trajectory_process() RETURNS VOID AS $$
 BEGIN
   -- dataset_pk is normally set at INSERT time (loader COPY / incremental
-  -- upsert both fill it); this pass only backfills rows that missed it.
+  -- upsert both fill it); these passes only backfill rows that missed it.
   PERFORM trajectory_link_dataset_pk();
-  PERFORM trajectory_insert_points();
-  -- days is computed at harvest time; this pass only backfills NULLs.
-  PERFORM trajectory_update_days();
-  -- point_pk + hex FKs are linked in create_hexes(), which runs after.
   PERFORM trajectory_points_link_dataset_pk();
+  -- track_stats must be current before the hex sweep: trajectory_segments()
+  -- takes each trajectory's gap threshold from it.
   PERFORM trajectory_refresh_track_stats();
+  -- Whole-corpus sweep. The incremental path calls
+  -- trajectory_build_hexes(<changed dataset pks>) directly instead.
+  PERFORM trajectory_build_hexes(NULL);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -485,7 +452,7 @@ $$ LANGUAGE plpgsql;
 -- when another load is queued), so it never extends a load transaction and
 -- never races another loader's linking phase. Leftover rows are invisible to
 -- tile/legend queries meanwhile — those only reach points/hexes via the FKs
--- on profiles/obis_cells/trajectory_cells.
+-- on profiles/obis_cells, and via trajectory_hexes.hex_pk.
 CREATE OR REPLACE FUNCTION gc_orphan_points_and_hexes() RETURNS bigint AS $$
 DECLARE
   n bigint;
@@ -494,7 +461,7 @@ BEGIN
   DELETE FROM cde.points p
   WHERE NOT EXISTS (SELECT 1 FROM cde.profiles f WHERE f.point_pk = p.pk)
     AND NOT EXISTS (SELECT 1 FROM cde.obis_cells o WHERE o.point_pk = p.pk)
-    AND NOT EXISTS (SELECT 1 FROM cde.trajectory_cells t WHERE t.point_pk = p.pk);
+;
   GET DIAGNOSTICS n = ROW_COUNT;
   total := total + n;
 
@@ -502,7 +469,8 @@ BEGIN
   WHERE NOT EXISTS (SELECT 1 FROM cde.points x WHERE x.hex_0_pk = h.pk)
     AND NOT EXISTS (SELECT 1 FROM cde.profiles x WHERE x.hex_0_pk = h.pk)
     AND NOT EXISTS (SELECT 1 FROM cde.obis_cells x WHERE x.hex_0_pk = h.pk)
-    AND NOT EXISTS (SELECT 1 FROM cde.trajectory_cells x WHERE x.hex_0_pk = h.pk);
+    AND NOT EXISTS (SELECT 1 FROM cde.trajectory_hexes x
+                     WHERE x.hex_tier = 0 AND x.hex_pk = h.pk);
   GET DIAGNOSTICS n = ROW_COUNT;
   total := total + n;
 
@@ -510,7 +478,8 @@ BEGIN
   WHERE NOT EXISTS (SELECT 1 FROM cde.points x WHERE x.hex_1_pk = h.pk)
     AND NOT EXISTS (SELECT 1 FROM cde.profiles x WHERE x.hex_1_pk = h.pk)
     AND NOT EXISTS (SELECT 1 FROM cde.obis_cells x WHERE x.hex_1_pk = h.pk)
-    AND NOT EXISTS (SELECT 1 FROM cde.trajectory_cells x WHERE x.hex_1_pk = h.pk);
+    AND NOT EXISTS (SELECT 1 FROM cde.trajectory_hexes x
+                     WHERE x.hex_tier = 1 AND x.hex_pk = h.pk);
   GET DIAGNOSTICS n = ROW_COUNT;
   total := total + n;
 

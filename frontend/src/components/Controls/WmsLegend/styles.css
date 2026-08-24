@@ -1,94 +1,187 @@
-/* Floating variant: shown over the map only while the datasets sidebar is
-   collapsed (otherwise the legend renders inline in the dataset page). The
-   bottom-left corner is the free one — the collapsed sidebar card sits at the
-   top-left and the data legend at the top-right. */
+/* Floating variant: pinned to the top-left corner of the map, shown only while
+   the dataset page it belongs to isn't open (that page renders this same card
+   inline instead).
+
+   It is positioned against the viewport rather than laid out inside the
+   datasets column, and it deliberately OVERLAPS that column: as a card in the
+   column's flex flow it was pushed down the moment the dataset list grew, and
+   a legend that moves whenever the list beside it changes length is worse than
+   one that covers a few rows. Above the column in the stack so it stays
+   readable — it comes and goes with the overlay, and closing the overlay (or
+   the list) uncovers what is under it.
+
+   A flat 12px top, deliberately NOT the --cioos-top-bar-space clearance the
+   datasets column holds. That clearance is measured against the column's right
+   edge, so it turns on as soon as the centered top bar reaches x=432 — around
+   a 1285px viewport — and dropped this card long before the bar was anywhere
+   near it. Moving the threshold to this card's own narrower right edge only
+   moves the problem to a slightly narrower viewport; the card stays put
+   instead, and the bar (a layer above, at --cioos-z-dock) draws over it on the
+   viewports where the two really do meet. */
 .wmsLegend.floating {
   position: fixed;
+  top: 12px;
   left: 12px;
-  bottom: 12px;
-  z-index: var(--cioos-z-shell, 30);
+  z-index: calc(var(--cioos-z-shell, 30) + 1);
   background-color: var(--cioos-white);
   border-radius: var(--cioos-radius-sm);
   box-shadow: var(--cioos-shadow-float);
-  padding: 8px 10px;
-  max-width: 320px;
+  padding: 4px 8px 8px;
+  /* Wide enough to show the legend at the size ERDDAP drew it. The text in it
+     is rendered at a fixed size whatever image width is asked for, so a card
+     narrower than the image doesn't get a smaller legend — it gets the same
+     legend with unreadable type. See GRIDDAP_LEGEND_WIDTH in wmsUtilities. */
+  max-width: 376px;
 }
 
-/* Inline variant: renders inside the griddap section of the dataset page, so
-   it drops the floating card chrome and flows with the surrounding content.
-   Full width because its parent (.griddapWmsControls) is align-items:
-   flex-start, which would otherwise shrink it to its content. */
+/* Opened from the button on a viewport where the top bar reaches this corner:
+   it rises over the bar for as long as it is open. The bar is the app's
+   primary nav and normally wins, but this card is here because the user just
+   asked for it and it folds away with one click. */
+.wmsLegend.floating.compactOpen {
+  z-index: calc(var(--cioos-z-dock, 35) + 1);
+}
+
+/* The card stood down to a button (see COMPACT_QUERY in WmsLegend).
+
+   It stacks with the map legend rather than holding the top-left corner the
+   card opens into: the corner is where the centered top bar reaches on exactly
+   the viewports this button exists for, and the map legend's edge is clear
+   there. It goes on the far side of that legend from the legend's own corner —
+   below it while the legend is anchored top-right, above it were the legend
+   ever anchored bottom-left — so it reads as hanging off the legend rather
+   than crowding the corner the legend is holding.
+
+   --cioos-legend-below-space is the foot of that card plus a gap, republished
+   as it collapses and grows (see Legend). The 12px fallback is the plain top
+   inset, for the moment before the legend has measured itself. */
+.wmsLegendPeek {
+  position: fixed;
+  top: var(--cioos-legend-below-space, 12px);
+  right: 12px;
+  z-index: calc(var(--cioos-z-shell, 30) + 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(240px, calc(100vw - 24px));
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  background-image: none;
+  box-shadow: var(--cioos-shadow-float);
+  font: inherit;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink);
+  cursor: pointer;
+}
+
+.wmsLegendPeek:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.wmsLegendPeek:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* The variable name is as long as the dataset made it; the pill keeps one line
+   and truncates, with the icon holding its place beside it. */
+.wmsLegendPeekLabel {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Inline variant: inside the dataset page in the sidebar, under the
+   show-on-map switch. It needs no surface of its own — the page is the
+   surface — only the room to show the image at the size it was drawn. */
 .wmsLegend.inline {
-  align-self: stretch;
-  width: 100%;
-  min-width: 0;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .wmsLegendHeader {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
+  /* With no picker the close button still keeps the right edge. */
+  justify-content: flex-end;
 }
 
-.wmsLegendTitle {
-  font-weight: 600;
-  font-size: 0.85em;
-  color: var(--cioos-primary);
-  text-decoration: none;
-}
-
-.wmsLegendTitle:hover {
-  text-decoration: underline;
-}
-
-.wmsLegendVariableSelector {
-  margin: 4px 0;
-}
-
-.wmsLegendVariableSelector .dropdown-menu {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.wmsLegendCloseButton {
-  border: 0;
-  background: none;
+/* Written with every box property it needs and one level deeper than it looks
+   like it should be: this card also renders inside the datasets sidebar's
+   dataset page, which gives every button in it a padded pill. */
+.wmsLegend .wmsLegendCloseButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: 0;
   padding: 0;
+  border: none;
+  border-radius: var(--cioos-radius-pill);
+  background: transparent;
+  background-image: none;
   color: var(--cioos-ink-60);
-  flex-shrink: 0;
+  cursor: pointer;
 }
 
-.wmsLegendCloseButton:hover {
+.wmsLegend .wmsLegendCloseButton:hover {
+  background-color: var(--cioos-surface-2);
   color: var(--cioos-ink);
 }
 
-.wmsLegendVariable {
-  font-size: 0.8em;
-  color: var(--cioos-ink-60);
-  margin: 2px 0 4px 0;
+.wmsLegend .wmsLegendCloseButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }
 
-.wmsLegendSlider {
-  display: flex;
-  flex-direction: column;
-  margin: 4px 0;
-}
-
-.wmsLegendSlider label {
-  font-size: 0.8em;
-  color: var(--cioos-ink-60);
-  margin-bottom: 0;
-}
-
-.wmsLegendSlider input[type='range'] {
-  width: 100%;
-  accent-color: var(--cioos-primary);
+/* The image is the card's title, so it is also its link to ERDDAP. */
+.wmsLegendFigure {
+  display: block;
+  line-height: 0;
 }
 
 .wmsLegendImage {
   max-width: 100%;
+}
+
+/* Takes the rest of the row, and stays one line high inside it: a long
+   long_name would otherwise wrap the header to three lines above an image
+   that already spells the name out in full. */
+.wmsLegendVariableSelector {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.wmsLegendVariableSelector .dropdown-toggle {
+  width: 100%;
+  text-align: left;
+}
+
+/* The name truncates; the caret the toggle draws after it keeps its place. */
+.wmsLegendVariableName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wmsLegendFallback {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wmsLegendTitle {
+  font-weight: 600;
+}
+
+.wmsLegendVariable {
+  font-size: 0.9em;
 }
 
 .wmsLegendUnavailable {
@@ -97,12 +190,27 @@
   font-style: italic;
 }
 
+/* Under 900px the map legend gives up the top-right corner for the bottom-left
+   one (see the Legend stylesheet). The button follows it and swaps ends: still
+   on the far side of that card from the card's own corner, which is now above
+   it rather than below. --cioos-legend-above-space is measured up from the
+   bottom of the viewport, so it pairs with `bottom` the way the below-space
+   pairs with `top`; the 8px left inset is the legend's own. */
+@media (max-width: 900px) {
+  .wmsLegendPeek {
+    top: auto;
+    right: auto;
+    bottom: var(--cioos-legend-above-space, 12px);
+    left: 8px;
+  }
+}
+
 @media (max-width: 600px) {
-  /* Clear the collapsed datasets bottom sheet. */
+  /* On a phone the legend can't have the width its type wants; the image
+     scales down rather than pushing the card off the screen. Nothing to
+     overlap here — the datasets card is a bottom sheet, so this corner is the
+     legend's alone. */
   .wmsLegend.floating {
-    left: 10px;
-    right: 10px;
-    bottom: 48px;
     max-width: 280px;
     font-size: 0.85em;
   }

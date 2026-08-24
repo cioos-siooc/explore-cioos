@@ -1,4 +1,4 @@
-"""Unit tests for trajectory coverage-cell extraction (dataset_types.trajectory_features)."""
+"""Unit tests for trajectory extraction (dataset_types.trajectory_features)."""
 
 import logging
 from unittest.mock import MagicMock
@@ -10,7 +10,6 @@ from requests.exceptions import HTTPError
 
 from cde_harvester.dataset_types import extract_features, get_handler
 from cde_harvester.dataset_types.trajectory_features import (
-    GRID_DEG,
     MAX_TRACK_POINTS_CAP,
     MIN_TRACK_POINTS_CAP,
     TRACK_DAY_SECONDS,
@@ -20,62 +19,51 @@ from cde_harvester.dataset_types.trajectory_features import (
     _choose_track_interval_seconds,
     _decimate_tracks,
     _iter_raw_chunks,
-    extract_cells,
+    extract_day_stats,
     extract_track_points,
 )
 from cde_harvester.loading.loader import (
-    prepare_trajectory_cells_dataframe,
+    prepare_trajectory_days_dataframe,
     prepare_trajectory_points_dataframe,
 )
 
 ERDDAP_URL = "https://test.erddap.com/erddap"
 DATASET_ID = "test_trajectory_001"
 
-# Two occupied cells on the canonical 1/12-degree grid
-CELL_A = (round(576 * GRID_DEG, 8), round(-1500 * GRID_DEG, 8))   # 48.0, -125.0
-CELL_B = (round(577 * GRID_DEG, 8), round(-1500 * GRID_DEG, 8))
 
-
-def _minmax_time_df():
-    """orderByMinMax response: 2 rows (min,max) per (trajectory, cell)."""
+def _day_count_df():
+    """orderByCount("traj,time/86400") response as ERDDAP really sends it: the
+    group column carries the BUCKET INDEX (day number since the epoch),
+    formatted as if it were epoch seconds, and `latitude` carries the count.
+    Jan 1 2021 is day 18628, Jan 2 is 18629."""
     return pd.DataFrame({
-        "traj_id": ["m1"] * 4,
-        "latitude": [CELL_A[0], CELL_A[0], CELL_B[0], CELL_B[0]],
-        "longitude": [CELL_A[1], CELL_A[1], CELL_B[1], CELL_B[1]],
-        "time": [
-            "2021-01-01T00:00:00Z", "2021-01-10T00:00:00Z",
-            "2021-01-10T00:00:00Z", "2021-01-20T00:00:00Z",
-        ],
+        "traj_id": ["m1", "m1"],
+        "time": ["1970-01-01T05:10:28Z", "1970-01-01T05:10:29Z"],  # 18628, 18629
+        "latitude": [500, 300],
     })
 
 
-def _minmax_depth_df():
+def _day_depth_df():
+    """orderByMinMax("traj,time/86400,depth"): 2 rows (min,max) per day."""
     return pd.DataFrame({
         "traj_id": ["m1"] * 4,
-        "latitude": [CELL_A[0], CELL_A[0], CELL_B[0], CELL_B[0]],
-        "longitude": [CELL_A[1], CELL_A[1], CELL_B[1], CELL_B[1]],
+        "time": [
+            "2021-01-01T00:00:00Z", "2021-01-01T00:00:00Z",
+            "2021-01-02T00:00:00Z", "2021-01-02T00:00:00Z",
+        ],
         "depth": [0.0, 100.0, 5.0, 80.0],
     })
 
 
-def _count_df():
-    return pd.DataFrame({
-        "traj_id": ["m1", "m1"],
-        "latitude": [CELL_A[0], CELL_B[0]],
-        "longitude": [CELL_A[1], CELL_B[1]],
-        "time": [500, 300],
-    })
-
-
 def _per_profile_track_df():
-    """orderByMin("traj,prof,time"): one raw (unsnapped) fix per profile.
-    Shared by track extraction AND _profiles_per_cell (same query): p1/p2
-    snap into CELL_A, p3 into CELL_B."""
+    """orderByMin("traj,prof,time"): one raw fix per profile. Serves both the
+    track geometry and the per-day profile count (p1/p2 on Jan 1, p3 on Jan 2).
+    """
     return pd.DataFrame({
         "traj_id": ["m1", "m1", "m1"],
         "prof_id": ["p1", "p2", "p3"],
         "time": [
-            "2021-01-01T06:00:00Z", "2021-01-11T06:00:00Z", "2021-01-19T06:00:00Z",
+            "2021-01-01T06:00:00Z", "2021-01-01T18:00:00Z", "2021-01-02T06:00:00Z",
         ],
         "latitude": [48.0132, 48.0300, 48.0972],
         "longitude": [-125.0021, -125.0388, -125.0300],
@@ -83,7 +71,7 @@ def _per_profile_track_df():
 
 
 def _per_day_track_df():
-    """orderByMin("traj,time/1day"): first fix of each day (raw coords)."""
+    """orderByMin("traj,time/1day,time"): first fix of each day (raw coords)."""
     return pd.DataFrame({
         "traj_id": ["m1", "m1", "m1"],
         "time": [
@@ -114,15 +102,16 @@ def build_trajectory_dataset(cdm_data_type="Trajectory", with_depth=True,
     if cdm_data_type == "TrajectoryProfile":
         rows.append({"name": "prof_id", "cf_role": "profile_id"})
     dataset.df_variables = pd.DataFrame(rows)
+    # extract_day_stats caches the per-profile fix frame on the dataset so
+    # extract_track_points reuses it; a MagicMock would hand back a Mock.
+    dataset._trajectory_profile_fixes = None
 
     def fake_query(url):
         plain = unquote(url)
         if "orderByMinMax" in plain:
             if fail_server_binning:
                 raise HTTPError("500: No operator found in constraint")
-            if ",time" in plain.split("orderByMinMax")[1]:
-                return _minmax_time_df()
-            return _minmax_depth_df()
+            return _day_depth_df()
         if "orderByMin(" in plain:
             if fail_server_binning:
                 raise HTTPError("500: No operator found in constraint")
@@ -130,18 +119,20 @@ def build_trajectory_dataset(cdm_data_type="Trajectory", with_depth=True,
                 return _per_profile_track_df()
             return _per_day_track_df()
         if "orderByCount" in plain:
-            return _count_df()
+            if fail_server_binning:
+                raise HTTPError("500: No operator found in constraint")
+            return _day_count_df()
         if plain.startswith("traj_id&distinct"):
             return pd.DataFrame({"traj_id": ["m1"]})
-        # fallback full-column download (chunked). Longitudes zigzag ~1.5km
-        # (beyond the DP tolerance) so the shape pass keeps every fix, while
-        # still snapping into the same two cells.
+        # fallback full-column download (chunked): 6 fixes on 6 distinct days.
+        # Longitudes zigzag ~1.5km (beyond the DP tolerance) so the shape pass
+        # keeps every fix.
         if plain.startswith("traj_id,latitude,longitude,time"):
             n = 6
             return pd.DataFrame({
                 "traj_id": ["m1"] * n,
-                "latitude": [CELL_A[0] + 0.001] * 3 + [CELL_B[0] - 0.001] * 3,
-                "longitude": [CELL_A[1] + 0.02 * (i % 2) for i in range(n)],
+                "latitude": [48.001] * 3 + [48.0823] * 3,
+                "longitude": [-125.0 + 0.02 * (i % 2) for i in range(n)],
                 "time": ["2021-01-0%dT00:00:00Z" % (i + 1) for i in range(n)],
                 "depth": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
             })
@@ -151,65 +142,126 @@ def build_trajectory_dataset(cdm_data_type="Trajectory", with_depth=True,
     return dataset
 
 
-class TestServerBinnedExtraction:
-    def test_two_cells_extracted(self):
-        cells = extract_cells(build_trajectory_dataset())
-        assert len(cells) == 2
-        assert set(cells["trajectory_id"]) == {"m1"}
-        assert set(cells["dataset_id"]) == {DATASET_ID}
-        assert set(cells["erddap_url"]) == {ERDDAP_URL}
+class TestDayStatsExtraction:
+    def test_one_row_per_day(self):
+        days = extract_day_stats(build_trajectory_dataset())
+        assert len(days) == 2
+        assert set(days["trajectory_id"]) == {"m1"}
+        assert set(days["dataset_id"]) == {DATASET_ID}
+        assert set(days["erddap_url"]) == {ERDDAP_URL}
+        assert list(days.columns) == [
+            "erddap_url", "dataset_id", "trajectory_id", "day",
+            "n_records", "n_profiles", "depth_min", "depth_max",
+        ]
 
-    def test_counts_and_extents(self):
-        cells = extract_cells(build_trajectory_dataset()).sort_values("n_records", ascending=False)
-        assert cells["n_records"].tolist() == [500, 300]
-        a = cells.iloc[0]
+    def test_counts_and_depths(self):
+        days = extract_day_stats(build_trajectory_dataset()).sort_values(
+            "n_records", ascending=False
+        )
+        assert days["n_records"].tolist() == [500, 300]
+        a = days.iloc[0]
         assert a["depth_min"] == 0.0 and a["depth_max"] == 100.0
-        assert a["days"] == 10  # Jan 1 -> Jan 10 (9 days) + same-day floor applies to 0 only
-        assert a["records_per_day"] == pytest.approx(500 / 9)
+
+    def test_day_buckets_are_utc_midnight(self):
+        # The database counts distinct UTC days per hex and joins these rows on
+        # that day, so the harvester's buckets must land on the same boundary.
+        days = extract_day_stats(build_trajectory_dataset())
+        assert (days["day"] == days["day"].dt.floor("D")).all()
+
+    def test_count_group_column_is_decoded_as_a_bucket_index(self):
+        # Regression: orderByCount returns the interval's BUCKET INDEX in the
+        # grouped column, not its value. Read literally, every row lands on
+        # 1970-01-01 and the whole dataset collapses to one day — and reading
+        # the equivalent latitude/longitude bin index as a coordinate is what
+        # silently zeroed the old per-cell record counts.
+        days = extract_day_stats(build_trajectory_dataset()).sort_values("day")
+        assert [str(d.date()) for d in days["day"]] == ["2021-01-01", "2021-01-02"]
+
+    def test_real_timestamps_in_the_group_column_still_work(self):
+        # Some servers/versions may return the bucket's value instead; the
+        # magnitude test has to accept both.
+        dataset = build_trajectory_dataset()
+        inner = dataset.dataset_tabledap_query.side_effect
+
+        def real_timestamps(url):
+            df = inner(url)
+            if "orderByCount" in unquote(url):
+                df = df.copy()
+                df["time"] = ["2021-01-01T00:00:00Z", "2021-01-02T12:00:00Z"]
+            return df
+
+        dataset.dataset_tabledap_query = MagicMock(side_effect=real_timestamps)
+        days = extract_day_stats(dataset).sort_values("day")
+        assert [str(d.date()) for d in days["day"]] == ["2021-01-01", "2021-01-02"]
+
+    def test_no_position_columns(self):
+        # Where the platform was comes from trajectory_points; a lat/lon here
+        # would be the coarse grid whose hex gaps this design removed.
+        days = extract_day_stats(build_trajectory_dataset())
+        assert "latitude" not in days and "longitude" not in days
 
     def test_dataset_attributes_populated(self):
         dataset = build_trajectory_dataset()
-        extract_cells(dataset)
+        extract_day_stats(dataset)
         assert dataset.trajectory_id_variable == "traj_id"
         assert len(dataset.profile_ids) == 1  # one mission -> datasets.n_profiles
 
     def test_dispatch_via_registry(self):
         dataset = build_trajectory_dataset()
-        cells = extract_features(dataset)
-        assert len(cells) == 2
-        assert get_handler("Trajectory").feature_kind == "trajectory_cells"
+        days = extract_features(dataset)
+        assert len(days) == 2
+        assert get_handler("Trajectory").feature_kind == "trajectory_days"
 
     def test_no_depth_variable_fills_zero(self):
-        cells = extract_cells(build_trajectory_dataset(with_depth=False))
-        assert (cells["depth_min"] == 0).all()
-        assert (cells["depth_max"] == 0).all()
+        days = extract_day_stats(build_trajectory_dataset(with_depth=False))
+        assert (days["depth_min"] == 0).all()
+        assert (days["depth_max"] == 0).all()
+
+    def test_no_position_grouping_requested(self):
+        # Regression: the previous design asked ERDDAP to bin latitude and
+        # longitude onto a 1/12-degree grid, which is what left hex rows unlit
+        # north of ~57N. Nothing may group by position any more.
+        dataset = build_trajectory_dataset()
+        extract_day_stats(dataset)
+        urls = [unquote(c.args[0]) for c in dataset.dataset_tabledap_query.call_args_list]
+        assert not any("latitude/" in u or "longitude/" in u for u in urls)
 
 
 class TestTrajectoryProfile:
-    def test_profiles_per_cell(self):
+    def test_profiles_per_day(self):
         dataset = build_trajectory_dataset(cdm_data_type="TrajectoryProfile")
-        cells = extract_cells(dataset, count_profiles=True).sort_values(
+        days = extract_day_stats(dataset, count_profiles=True).sort_values(
             "n_records", ascending=False
         )
-        assert cells["n_profiles"].tolist() == [2, 1]
+        assert days["n_profiles"].tolist() == [2, 1]
 
     def test_plain_trajectory_has_zero_profiles(self):
-        cells = extract_cells(build_trajectory_dataset())
-        assert (cells["n_profiles"] == 0).all()
+        days = extract_day_stats(build_trajectory_dataset())
+        assert (days["n_profiles"] == 0).all()
 
     def test_profile_count_uses_per_profile_query_not_distinct(self):
         # distinct() over (traj, profile, lat, lon) returns ~one row per
         # SAMPLE when position varies within a profile (seen live at 255MB);
         # the count must come from the bounded orderByMin per-profile query.
         dataset = build_trajectory_dataset(cdm_data_type="TrajectoryProfile")
-        extract_cells(dataset, count_profiles=True)
+        extract_day_stats(dataset, count_profiles=True)
         urls = [unquote(c.args[0]) for c in dataset.dataset_tabledap_query.call_args_list]
         assert any('orderByMin("traj_id,prof_id,time")' in u for u in urls)
         assert not any("prof_id" in u and "distinct()" in u for u in urls)
 
-    def test_failed_profile_count_keeps_cells(self):
-        # The per-cell profile count is a display enhancement; a too-large
-        # response there must not fail a dataset whose cells succeeded (this
+    def test_profile_query_issued_once_for_counts_and_track(self):
+        # The per-profile fixes are both the profile count and the track
+        # geometry; asking ERDDAP twice for the same (potentially large)
+        # response is what this cache exists to avoid.
+        dataset = build_trajectory_dataset(cdm_data_type="TrajectoryProfile")
+        extract_day_stats(dataset, count_profiles=True)
+        extract_track_points(dataset, per_profile=True)
+        urls = [unquote(c.args[0]) for c in dataset.dataset_tabledap_query.call_args_list]
+        assert sum('orderByMin("traj_id,prof_id,time")' in u for u in urls) == 1
+
+    def test_failed_profile_count_keeps_days(self):
+        # The per-day profile count is a display enhancement; a too-large
+        # response there must not fail a dataset whose days succeeded (this
         # exact failure took out a whole glider dataset in production).
         from cde_harvester.core.errors import ResponseTooLargeError
 
@@ -223,18 +275,18 @@ class TestTrajectoryProfile:
             return inner(url)
 
         dataset.dataset_tabledap_query = MagicMock(side_effect=failing_profile_count)
-        cells = extract_cells(dataset, count_profiles=True)
-        assert len(cells) == 2
-        assert (cells["n_profiles"] == 0).all()
+        days = extract_day_stats(dataset, count_profiles=True)
+        assert len(days) == 2
+        assert (days["n_profiles"] == 0).all()
 
 
 class TestFallback:
     def test_falls_back_to_chunked_download(self):
         dataset = build_trajectory_dataset(fail_server_binning=True)
-        cells = extract_cells(dataset)
-        # 6 raw fixes binned into the two cells
-        assert len(cells) == 2
-        assert cells["n_records"].sum() == 6
+        days = extract_day_stats(dataset)
+        # 6 raw fixes on 6 distinct days
+        assert len(days) == 6
+        assert days["n_records"].sum() == 6
 
     def test_chunks_by_month_not_year(self):
         # A high-frequency trajectory's full download can itself exceed
@@ -258,52 +310,57 @@ class TestFallback:
         assert len(queries) == 3
 
 
-class TestPrepareTrajectoryCellsDataframe:
+class TestPrepareTrajectoryDaysDataframe:
     def test_dedup_on_unique_key(self):
         df = pd.DataFrame({
             "erddap_url": [ERDDAP_URL] * 2,
             "dataset_id": [DATASET_ID] * 2,
             "trajectory_id": ["m1", "m1"],
-            # float artifacts that must collapse to one cell after rounding
-            "latitude": [48.000000004, 48.000000001],
-            "longitude": [-125.0, -125.0],
-            "time_min": ["2021-01-01", "2021-01-02"],
-            "time_max": ["2021-01-05", "2021-01-09"],
-            "depth_min": [0.0, 5.0],
-            "depth_max": [50.0, 100.0],
+            # same day, reported twice (a dataset harvested in two passes)
+            "day": ["2021-01-01", "2021-01-01T00:00:00Z"],
             "n_records": [10, 20],
             "n_profiles": [1, 2],
-            "records_per_day": [2.0, 4.0],
-            "days": [5, 8],
+            "depth_min": [5.0, 0.0],
+            "depth_max": [50.0, 100.0],
         })
-        out = prepare_trajectory_cells_dataframe(df)
+        out = prepare_trajectory_days_dataframe(df)
         assert len(out) == 1
         row = out.iloc[0]
         assert row["n_records"] == 30
         assert row["n_profiles"] == 3
+        assert row["depth_min"] == 0.0
         assert row["depth_max"] == 100.0
-        assert row["time_max"] == "2021-01-09"
+
+    def test_time_of_day_does_not_split_a_day(self):
+        # The DB column is a DATE and the hex sweep joins on it; a stray
+        # time-of-day would make one day look like two.
+        df = pd.DataFrame({
+            "erddap_url": [ERDDAP_URL] * 2,
+            "dataset_id": [DATASET_ID] * 2,
+            "trajectory_id": ["m1", "m1"],
+            "day": ["2021-01-01T00:00:00Z", "2021-01-01T13:45:00Z"],
+            "n_records": [1, 1],
+            "n_profiles": [0, 0],
+            "depth_min": [0.0, 0.0],
+            "depth_max": [1.0, 1.0],
+        })
+        assert len(prepare_trajectory_days_dataframe(df)) == 1
 
     def test_bigint_columns_come_out_int64(self):
-        # regression: the orderByCount merge/fillna upcasts n_records to
-        # float64, and Postgres COPY rejects "2.0" for a bigint column
+        # regression: a merge/fillna upcasts n_records to float64, and
+        # Postgres COPY rejects "2.0" for a bigint column
         df = pd.DataFrame({
             "erddap_url": [ERDDAP_URL] * 2,
             "dataset_id": [DATASET_ID] * 2,
             "trajectory_id": ["m1", "m2"],
-            "latitude": [48.0, 49.0],
-            "longitude": [-125.0, -126.0],
-            "time_min": ["2021-01-01", "2021-02-01"],
-            "time_max": ["2021-01-05", "2021-02-05"],
-            "depth_min": [0.0, 0.0],
-            "depth_max": [50.0, 60.0],
+            "day": ["2021-01-01", "2021-02-01"],
             "n_records": [2.0, float("nan")],
             "n_profiles": [1.0, float("nan")],
-            "records_per_day": [2.0, 4.0],
-            "days": [5.0, float("nan")],
+            "depth_min": [0.0, 0.0],
+            "depth_max": [50.0, 60.0],
         })
-        out = prepare_trajectory_cells_dataframe(df)
-        for col in ("n_records", "n_profiles", "days"):
+        out = prepare_trajectory_days_dataframe(df)
+        for col in ("n_records", "n_profiles"):
             assert out[col].dtype == "Int64", col
         assert out.loc[out["trajectory_id"] == "m1", "n_records"].iloc[0] == 2
 
@@ -312,23 +369,18 @@ class TestPrepareTrajectoryCellsDataframe:
             "erddap_url": [ERDDAP_URL],
             "dataset_id": [DATASET_ID],
             "trajectory_id": [None],
-            "latitude": [48.0],
-            "longitude": [-125.0],
-            "time_min": ["2021-01-01"],
-            "time_max": ["2021-01-05"],
-            "depth_min": [0.0],
-            "depth_max": [50.0],
+            "day": ["2021-01-01"],
             "n_records": [10],
             "n_profiles": [0],
-            "records_per_day": [2.0],
-            "days": [5],
+            "depth_min": [0.0],
+            "depth_max": [50.0],
         })
-        out = prepare_trajectory_cells_dataframe(df)
+        out = prepare_trajectory_days_dataframe(df)
         assert out.iloc[0]["trajectory_id"] == ""
 
 
 def _dataset_for_tracks(cdm_data_type="Trajectory", fail_server_binning=False):
-    """Trajectory dataset with the CF-role attrs extract_cells would have set."""
+    """Trajectory dataset with the CF-role attrs extract_day_stats would set."""
     dataset = build_trajectory_dataset(
         cdm_data_type=cdm_data_type, fail_server_binning=fail_server_binning
     )
@@ -546,7 +598,7 @@ class TestCapForActiveDays:
         assert _cap_for_active_days(44) == 2200
 
     def test_ceilings_at_maximum_for_long_deployments(self):
-        assert _cap_for_active_days(1000) == MAX_TRACK_POINTS_CAP
+        assert _cap_for_active_days(5000) == MAX_TRACK_POINTS_CAP
 
 
 class TestPrepareTrajectoryPointsDataframe:

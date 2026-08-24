@@ -18,6 +18,7 @@ const Tracing = require("@sentry/tracing");
 const downloadRouter = require("./routes/download");
 const indexRouter = require("./routes/index");
 const legendRouter = require("./routes/legend");
+const timeExtentRouter = require("./routes/timeExtent");
 const organizationsRouter = require("./routes/organizations");
 const datasetsRouter = require("./routes/datasets");
 const pointQueryRouter = require("./routes/pointQuery");
@@ -34,6 +35,7 @@ const erddapServersRouter = require("./routes/erddapServers");
 const harvestRouter = require("./routes/harvest");
 const harvestDownloadsRouter = require("./routes/harvestDownloads");
 const trajectoriesRouter = require("./routes/trajectories");
+const nonnaRouter = require("./routes/nonna");
 const swaggerSpec = require('./swagger');
 const swaggerUi = require('swagger-ui-express');
 
@@ -111,6 +113,7 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use("/", indexRouter);
 app.use("/download", downloadRouter);
 app.use("/legend", legendRouter);
+app.use("/timeExtent", timeExtentRouter);
 app.use("/organizations", organizationsRouter);
 app.use("/datasets", datasetsRouter);
 app.use("/pointQuery", pointQueryRouter);
@@ -129,6 +132,7 @@ app.use("/erddapServers", erddapServersRouter);
 app.use("/harvest/downloads", harvestDownloadsRouter);
 app.use("/harvest", harvestRouter);
 app.use("/trajectories", trajectoriesRouter);
+app.use("/nonna", nonnaRouter);
 
 // Swagger docs - conditionally enabled via ENABLE_API_DOCS environment variable
 if (process.env.ENABLE_API_DOCS !== 'false') {

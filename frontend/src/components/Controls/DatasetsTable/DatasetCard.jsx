@@ -1,10 +1,10 @@
 import React from 'react'
 import {
   CheckCircleFill,
-  Circle,
   CircleFill,
   Grid3x3Gap,
   Check2Circle,
+  Plus,
   XCircle,
   Server,
   PinMapFill,
@@ -36,6 +36,11 @@ export default function DatasetCard({
   // The card's group is hidden from the map: the dataset stays in the list
   // (and downloadable), so it's dimmed rather than dropped.
   hiddenFromMap,
+  // This dataset is one the last map click found. It has already been sorted to
+  // the top of the list; the accent is what says why it is up there, so the
+  // reordering reads as an answer rather than as the list having shuffled
+  // itself.
+  fromMapClick,
   t,
   i18n
 }) {
@@ -94,8 +99,10 @@ export default function DatasetCard({
         selected: row.selected,
         clickable,
         downloadModal: isDownloadModal,
-        hiddenFromMap
+        hiddenFromMap,
+        fromMapClick
       })}
+      title={fromMapClick ? t('datasetCardFromMapTitle') : undefined}
       onClick={handleCardClick}
       onMouseEnter={() => onHover(row)}
       onMouseLeave={() => onHoverEnd()}
@@ -103,21 +110,28 @@ export default function DatasetCard({
       tabIndex={clickable ? 0 : undefined}
       onKeyDown={handleKeyDown}
     >
-      <div className='datasetCardSelect' title={selectTitle} onClick={handleSelect}>
+      {/* Add-to-download. A plus that becomes a tick, in the card's bottom-right
+          corner — the same control, in the same two states, as the "+" in the
+          map's "what's here" card, so adding a dataset looks the same wherever
+          you do it. It replaces a hover-revealed circle-and-label badge on the
+          top-left: that one was invisible at rest on a mouse, so which rows
+          were in the download could not be read off the list at a glance, which
+          is the one thing this control has to answer. */}
+      <button
+        type='button'
+        className={classNames('datasetCardAdd', { checked: row.selected })}
+        title={selectTitle}
+        onClick={handleSelect}
+        disabled={selectDisabled}
+        aria-pressed={Boolean(row.selected)}
+        aria-label={t('datasetsCardSelectForDownloadText')}
+      >
         {row.selected ? (
-          <CheckCircleFill className='datasetCheckbox checked' size={18} />
+          <CheckCircleFill size={17} aria-hidden='true' />
         ) : (
-          <Circle
-            className={classNames('datasetCheckbox', { disabled: selectDisabled })}
-            size={18}
-          />
+          <Plus size={18} aria-hidden='true' />
         )}
-        {!selectDisabled && (
-          <span className='datasetCardSelectLabel'>
-            {t('datasetsCardSelectForDownloadText')}
-          </span>
-        )}
-      </div>
+      </button>
 
       <div className='datasetCardBody'>
         <div className='datasetCardHeadline'>

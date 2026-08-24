@@ -8,28 +8,35 @@ import {
   useState,
   useEffect
 } from 'react'
-import isEmpty from 'lodash/isEmpty'
 
 import { server } from '../../config.js'
 import {
-  basemap as defaultBasemap,
+  defaultMapCenter,
+  defaultMapZoom,
   defaultTrailingDays,
+  HEX_METRIC,
+  isMarkerTier,
   TRAIL_ALL
 } from '../../components/config.js'
 import {
   applyMapDatasetPKs,
   createDataFilterQueryString,
   getCurrentRangeLevel,
+  rangesEqual,
   useDebounce
 } from '../../utilities.jsx'
 import fetchJson from '../fetchJson.js'
-import usePersistentState from '../usePersistentState.js'
+import reportError from '../reportError.js'
+import { useUrlSeededPersistentState } from '../usePersistentState.js'
 import { useFilters } from '../filters/FilterProvider.jsx'
 import {
+  ALL_DATA_LAYERS,
   DATA_LAYER_KEYS,
   DEFAULT_DATA_LAYERS,
   DEFAULT_TRACKS_MODE,
-  DEFAULT_TRAJECTORY_HEXES
+  allDataLayersOn,
+  commitDataLayers,
+  onlyDataLayer
 } from '../dataLayers.js'
 
 const MapStateContext = createContext()
@@ -52,7 +59,33 @@ export default function MapStateProvider ({ children }) {
     setLoadingState(value)
     if (!value) setMapLoaded(true)
   }, [])
-  const [mapView, setMapView] = useState({})
+  // Separate from `loading` above, which is about the *data* the map draws.
+  // This one is the basemap rasters — imagery and CHS soundings still arriving
+  // after a pan or a zoom — and it is the slow one on a cold cache. Map.jsx
+  // only raises it for waits long enough to be worth a word (see the effect
+  // there); AppShell decides which of the two pills gets the spot.
+  const [basemapLoading, setBasemapLoading] = useState(false)
+  // The camera, as the map reports it (numbers, plus bounds once it has
+  // settled). Seeded from the share link — or the default view when the link
+  // carries no camera — rather than left empty: MapLibre only pushes a view on
+  // 'idle'/'moveend', so an empty seed means every zoom-keyed consumer sees
+  // `undefined` for as long as the basemap takes to load. The legend read that
+  // as "no data matched" and said so. Number() rather than the raw params: they
+  // are strings, and Number.isFinite('12') is false.
+  const [mapView, setMapView] = useState(() => {
+    const params = new URL(window.location.href).searchParams
+    const asNumber = (name, fallback) => {
+      const value = Number(params.get(name))
+      return Number.isFinite(value) && params.get(name) !== null
+        ? value
+        : fallback
+    }
+    return {
+      lat: asNumber('lat', defaultMapCenter.lat),
+      lon: asNumber('lon', defaultMapCenter.lon),
+      zoom: asNumber('zoom', defaultMapZoom)
+    }
+  })
   // The datasets the map is allowed to draw, when the user has hidden some
   // groups in the datasets list (see SelectionProvider, which owns the
   // grouping and pushes the resulting pk list here — it lives downstream of
@@ -73,46 +106,73 @@ export default function MapStateProvider ({ children }) {
     [query, mapDatasetPKs]
   )
   const [rangeLevels, setRangeLevels] = useState()
+  // What the ranges on hand / in flight were requested for — the query, which is
+  // the only thing that changes what /legend counts. This is the whole dedupe
+  // test for the refetch effect below.
+  const requestedLegendQuery = useRef(undefined)
+  // The in-flight /legend request, so a newer one can cancel it (see loadLegend).
+  const legendRequest = useRef(undefined)
   const [legendLoading, setLegendLoading] = useState(true)
   const [currentRangeLevel, setCurrentRangeLevel] = useState()
-  const [trajectoryRangeLevels, setTrajectoryRangeLevels] = useState()
-  const [currentTrajectoryRangeLevel, setCurrentTrajectoryRangeLevel] =
-    useState()
-  const [obisRangeLevels, setObisRangeLevels] = useState()
-  const [currentObisRangeLevel, setCurrentObisRangeLevel] = useState()
-  // The four map-appearance switches below are preferences rather than
-  // shareable state: they persist in localStorage so a reload comes back to
-  // the map the user left, while the camera and filters keep living in the URL.
+  // The always-hex coverage layer (trajectory + OBIS cells) at zoom >= 7. One
+  // range, because both kinds now share one ramp — it was three, one per
+  // colour scale.
+  const [coverageRangeLevels, setCoverageRangeLevels] = useState()
+  const [currentCoverageRangeLevel, setCurrentCoverageRangeLevel] = useState()
+  // The map-appearance switches below are both preferences AND shareable: they
+  // persist in localStorage so a reload comes back to the map the user left,
+  // and UrlSync writes the non-default ones into the link so a shared view
+  // arrives drawn the way it was sent (see useUrlSeededPersistentState — a
+  // param in the link wins over the stored value).
   //
   // Griddap (gridded, metadata-only) datasets: the optional coverage layer
   // (off by default) and the on-demand per-dataset WMS overlay
   // ({pk, datasetId, wmsUrl, variable, time, elevation, bbox} | undefined).
   // The overlay itself is per-dataset and dies with the dataset page, so it
   // is deliberately not persisted.
-  const [griddapCoverageVisible, setGriddapCoverageVisible] = usePersistentState(
-    'griddapCoverageVisible',
-    false
-  )
+  const [griddapCoverageVisible, setGriddapCoverageVisible] =
+    useUrlSeededPersistentState(
+      'griddapCoverageVisible',
+      'griddap',
+      false,
+      (raw) => raw === 'true'
+    )
   const [griddapCoverage, setGriddapCoverage] = useState()
   const [activeWmsOverlay, setActiveWmsOverlay] = useState()
   // Layer visibility switch for the observation layers (hexes / points /
-  // trajectories). On by default.
-  const [dataLayersVisible, setDataLayersVisible] = usePersistentState(
+  // coverage cells). On by default.
+  const [dataLayersVisible, setDataLayersVisible] = useUrlSeededPersistentState(
     'dataLayersVisible',
-    true
+    'obs',
+    true,
+    (raw) => raw !== 'false'
+  )
+  // The CHS NONNA depth rasters, which the legend's depth ramp keys. On by
+  // default, and part of the basemap rather than of the data — so it is its own
+  // switch, independent of the observation layers above.
+  const [bathymetryVisible, setBathymetryVisible] = useUrlSeededPersistentState(
+    'bathymetryVisible',
+    'bathy',
+    true,
+    (raw) => raw !== 'false'
   )
   // Map projection: 'mercator' (default) or 'globe'. The globe view renders
-  // high latitudes (e.g. the Arctic) without Mercator distortion.
-  const [projection, setProjection] = usePersistentState(
+  // high latitudes (e.g. the Arctic) without Mercator distortion. The param is
+  // the switch the user sees ('globe=true'), not the internal value.
+  const [projection, setProjection] = useUrlSeededPersistentState(
     'projection',
-    'mercator'
+    'globe',
+    'mercator',
+    (raw) => (raw === 'true' ? 'globe' : 'mercator')
   )
-  // Basemap raster: 'emodnet' (default) or 'arcgis-ocean'.
-  // See components/Map/basemapStyle.js.
-  const [basemap, setBasemap] = usePersistentState('basemap', defaultBasemap)
   // One-shot "frame this geometry" request for the Map. The nonce lets the
   // same extent be re-requested (clicking zoom again after panning away).
   const [zoomTarget, setZoomTarget] = useState()
+  // One-shot "start/stop drawing" request for the Map, from the spatial
+  // filter button in the top bar. mode is 'box', 'polygon' or 'clear'; the
+  // nonce lets the same mode be re-requested (picking "Bounding box" again
+  // after cancelling out of it).
+  const [drawRequest, setDrawRequest] = useState()
   // A share link can carry ?dataset=… with no lat/lon/zoom (the user only
   // meant to point at the dataset, not a specific camera). SelectionProvider
   // consumes this once the dataset resolves, framing its footprint instead of
@@ -127,8 +187,22 @@ export default function MapStateProvider ({ children }) {
   // depends on the canvas size, which only the map knows).
   const mapRef = useRef(null)
 
+  // What the last click on the map found under it — the payload behind the
+  // "what's here" card. Map.jsx builds it from one hit-test over every data
+  // layer and hands it over; FeatureCard resolves the dataset pks in it
+  // against the current results and renders the answer. null = nothing open.
+  //
+  // It lives here rather than in SelectionProvider because it is a question,
+  // not a selection: opening the card changes nothing about the filters, the
+  // camera, or the dataset page. Only the buttons inside it do.
+  const [featureQuery, setFeatureQuery] = useState(null)
+
   function zoomToGeometry (geometry) {
     if (geometry) setZoomTarget({ geometry, nonce: Date.now() })
+  }
+
+  function requestDraw (mode) {
+    setDrawRequest({ mode, nonce: Date.now() })
   }
 
   // Tracks mode (trajectory track lines + time scrub bar) and the data-type
@@ -138,13 +212,9 @@ export default function MapStateProvider ({ children }) {
   // On by default, so the param records the OFF case ('tracks=false'). Old
   // share links carrying 'tracks=true' still read as on.
   const [tracksMode, setTracksMode] = useState(
-    urlParams.get('tracks') !== 'false'
-  )
-  // Trajectory coverage hexes, independent of the track lines: both are views
-  // of the same data and combine freely. Off by default (see
-  // DEFAULT_TRAJECTORY_HEXES), so the param records the ON case.
-  const [trajectoryHexes, setTrajectoryHexes] = useState(
-    urlParams.get('trajHexes') === 'true'
+    urlParams.has('tracks')
+      ? urlParams.get('tracks') !== 'false'
+      : DEFAULT_TRACKS_MODE
   )
   const [scrubTime, setScrubTime] = useState(
     urlParams.get('scrubTime') || new Date().toISOString().split('T')[0]
@@ -160,7 +230,7 @@ export default function MapStateProvider ({ children }) {
   })
 
   // Data-type layers shown on the map. Absent `layers` param = the default
-  // selection (OBIS and trajectories off — see DEFAULT_DATA_LAYERS); a present
+  // selection (everything but trajectories — see DEFAULT_DATA_LAYERS); a present
   // param is the comma list of enabled layers, so a non-default selection
   // round-trips through the URL. An empty param means all off, which is why
   // this tests for null rather than falsiness.
@@ -171,32 +241,49 @@ export default function MapStateProvider ({ children }) {
     return Object.fromEntries(DATA_LAYER_KEYS.map((key) => [key, on.has(key)]))
   })
 
-  // The data-layer switches, and the two trajectory sub-switches. These live
-  // together because the trajectory ones are coupled to the parent switch in
-  // both directions: a trajectories layer showing nothing is a dead end, so
-  // clearing the last sub-switch turns the parent off, and turning the parent
-  // back on restores the default pair rather than the empty state.
+  // The geometry filter. Ticking a box while everything is on narrows to that
+  // one geometry — the same first pick the catalogue filters make — and
+  // unticking the last one folds back to everything (see commitDataLayers).
   function toggleDataLayer (key) {
-    const on = !dataLayers[key]
-    setDataLayers({ ...dataLayers, [key]: on })
-    if (key === 'trajectories' && on) {
-      setTracksMode(DEFAULT_TRACKS_MODE)
-      setTrajectoryHexes(DEFAULT_TRAJECTORY_HEXES)
-    }
+    setDataLayers(
+      allDataLayersOn(dataLayers)
+        ? onlyDataLayer(key)
+        : commitDataLayers({ ...dataLayers, [key]: !dataLayers[key] })
+    )
   }
 
-  // Flip one sub-switch, dropping the parent when that would leave neither
-  // representation drawing anything.
-  function setTrajectoryViews (tracks, hexes) {
-    setTracksMode(tracks)
-    setTrajectoryHexes(hexes)
-    if (!tracks && !hexes) setDataLayers({ ...dataLayers, trajectories: false })
+  // Whether the trajectory data draws its track lines. It belongs to Trajectory
+  // and TrajectoryProfile jointly — one set of map layers fed by both — which is
+  // why it is a single switch rather than one per geometry, and it lives on the
+  // legend section it keys rather than inside the geometry filter.
+  //
+  // It is the only trajectory-specific display switch left. The companion
+  // "trajectory hexes" one is gone: those cells are hexes like every other
+  // geometry's, counted into the same ramp and hidden by the same hex/point
+  // switch, so a second control that could take trajectory data out of the
+  // hexagons on its own was drawing a distinction the ramp couldn't show.
+  //
+  // Flipping it is a map-appearance change and nothing more: it used to drop
+  // both trajectory geometries out of the filter selection when no view was
+  // left, which meant a display switch quietly narrowing the datasets list and
+  // its counts. Turning it off now just leaves the tracks undrawn — the same as
+  // hiding the hexes and points — and the legend keeps the switch on screen.
+  const toggleTrackLines = () => setTracksMode(!tracksMode)
+
+  // Back to the default selection: every geometry, i.e. unfiltered. Backs the
+  // filter row's Reset and the chip's remove-all. The trajectory view switches
+  // are deliberately untouched — they are map appearance, not part of this
+  // filter, so a filter reset has no business changing them.
+  function resetDataLayers () {
+    setDataLayers({ ...DEFAULT_DATA_LAYERS })
   }
 
-  const toggleTrackLines = () =>
-    setTrajectoryViews(!tracksMode, trajectoryHexes)
-  const toggleTrajectoryHexes = () =>
-    setTrajectoryViews(tracksMode, !trajectoryHexes)
+  // Every geometry on. Identical to the reset now that all-on IS the default,
+  // and kept separate only so the filter's Select All button reads the way the
+  // other filters' do.
+  function showAllDataLayers () {
+    setDataLayers({ ...ALL_DATA_LAYERS })
+  }
 
   const { zoom } = mapView
 
@@ -208,38 +295,65 @@ export default function MapStateProvider ({ children }) {
   // filters" are indistinguishable from the values alone, and /legend is the
   // app's slowest query: without it the legend card claimed "No Data" for the
   // first few seconds of every load.
+  // The metric travels with the filters: a range taken over one count can't
+  // scale a ramp painted over another. It is always written out, never omitted
+  // — the API counts something else when the param is absent (see HEX_METRIC) —
+  // and the tile URLs spell it out the same way (buildTileSuffix in Map.jsx).
+  function legendUrl (legendQuery) {
+    const params = new URLSearchParams(legendQuery || '')
+    params.set('metric', HEX_METRIC)
+    return `${server}/legend?${params.toString()}`
+  }
+
+  // Only the newest request may write the ranges. Two filter changes in a row
+  // put two /legend calls in flight and they can land in either order — the
+  // slower first response would otherwise overwrite the newer one and leave the
+  // bar numbered for filters the tiles no longer carry. The previous request is
+  // aborted as well, so a fast succession of changes isn't holding several
+  // copies of the app's heaviest query open at once.
   function loadLegend (legendQuery) {
+    legendRequest.current?.abort()
+    const controller = new AbortController()
+    legendRequest.current = controller
+    requestedLegendQuery.current = legendQuery
     setLegendLoading(true)
-    fetchJson(`${server}/legend${legendQuery ? '?' + legendQuery : ''}`)
+    fetchJson(legendUrl(legendQuery), { signal: controller.signal })
       .then((legend) => {
         if (legend) {
           setRangeLevels(legend.recordsCount)
-          setTrajectoryRangeLevels(legend.trajectoryRecordsCount)
-          setObisRangeLevels(legend.obisRecordsCount)
+          setCoverageRangeLevels(legend.coverageCount)
         }
       })
       .catch((error) => {
-        console.error('legend fetch failed:', error)
+        if (error.name === 'AbortError') return
+        reportError('legend fetch failed', error)
+        // Let the effect below retry this query: a failed fetch leaves no ranges
+        // behind, so nothing should count as loaded for it.
+        requestedLegendQuery.current = undefined
       })
-      .finally(() => setLegendLoading(false))
+      .finally(() => {
+        if (legendRequest.current !== controller) return
+        legendRequest.current = undefined
+        setLegendLoading(false)
+      })
   }
 
-  // Initial map view from a share link, and the initial legend values.
+  // Fetch the legend for whatever the map is drawing: on mount, whenever the
+  // (debounced) query changes, and whenever a group is hidden from / restored to
+  // the map — the ramp counts what the map draws, and a stale range would scale
+  // the new numbers against the old domain. One response covers every zoom tier.
+  //
+  // The guard is the query the last request was issued for, and nothing else. It
+  // used to also bail while `loading` was true, on the theory that a request
+  // already in flight carried the new filters — but `loading` is the *tiles*, not
+  // this fetch, so any change arriving during a redraw (which is exactly when a
+  // filter change arrives, since it causes one) was dropped and never retried,
+  // leaving the previous filters' numbers under the new tiles. It also bailed on
+  // empty rangeLevels, which meant a first response that failed or matched
+  // nothing froze the ramp for the rest of the session.
   useEffect(() => {
-    const { lat, lon, zoom } = Object.fromEntries(
-      new URL(window.location.href).searchParams
-    )
-    if (lat || lon || zoom) setMapView({ lat, lon, zoom })
-
+    if (requestedLegendQuery.current === mapQueryString) return
     loadLegend(mapQueryString)
-  }, [])
-
-  // Refetch the legend whenever the (debounced) query changes, or a group is
-  // hidden from / restored to the map — the ramp counts what the map draws.
-  useEffect(() => {
-    if (!loading && !isEmpty(rangeLevels)) {
-      loadLegend(mapQueryString)
-    }
   }, [mapQueryString])
 
   // Fetch griddap coverage bboxes when the layer is visible, in lockstep
@@ -256,7 +370,7 @@ export default function MapStateProvider ({ children }) {
         if (coverage) setGriddapCoverage(coverage)
       })
       .catch((error) => {
-        if (error.name !== 'AbortError') throw error
+        reportError('griddap coverage fetch failed', error)
       })
     return () => controller.abort()
   }, [mapQueryString, griddapCoverageVisible])
@@ -268,53 +382,85 @@ export default function MapStateProvider ({ children }) {
   }, [rangeLevels, zoom])
 
   useEffect(() => {
-    // Coverage hexes (trajectory and OBIS cells) only render at zoom >= 7 —
-    // below that, their counts are merged into the green hex ramp — so hide
-    // both legend entries otherwise.
-    if (trajectoryRangeLevels && zoom >= 7) {
-      setCurrentTrajectoryRangeLevel(trajectoryRangeLevels.zoom1)
+    // Coverage hexes (trajectory and OBIS cells) only render at the marker
+    // tier — below that, their counts are merged into the main hex ramp — so
+    // there is no separate domain to report otherwise.
+    if (coverageRangeLevels && isMarkerTier(zoom)) {
+      setCurrentCoverageRangeLevel(coverageRangeLevels.zoom1)
     } else {
-      setCurrentTrajectoryRangeLevel()
+      setCurrentCoverageRangeLevel()
     }
-  }, [trajectoryRangeLevels, zoom])
+  }, [coverageRangeLevels, zoom])
 
-  useEffect(() => {
-    if (obisRangeLevels && zoom >= 7) {
-      setCurrentObisRangeLevel(obisRangeLevels.zoom1)
-    } else {
-      setCurrentObisRangeLevel()
-    }
-  }, [obisRangeLevels, zoom])
+  // The domain the hexes on screen actually span, measured from the rendered
+  // tiles and reported by Map.jsx (see refreshViewportHexRange there). It is
+  // quantized and debounced at the source, so this only changes when the ramp
+  // it drives changes; the setter drops equal values so a re-report can't
+  // re-render the legend for nothing.
+  const [viewportHexRange, setViewportHexRangeState] = useState()
+  const setViewportHexRange = useCallback((range) => {
+    setViewportHexRangeState((previous) =>
+      rangesEqual(previous, range) ? previous : range
+    )
+  }, [])
+
+  // The global domain for the hexes, whatever they hold. Below the marker tier
+  // every kind of cell — profile-family, trajectory, occurrence — is summed
+  // into the same hexes layer, so currentRangeLevel already covers all of them;
+  // at the marker tier the only hexes still on screen are the trajectory/OBIS
+  // coverage cells, which carry their own tier. One gradient either way,
+  // because the colour means the same thing either way: how much data this cell
+  // holds.
+  const globalHexRangeLevel = isMarkerTier(zoom)
+    ? currentCoverageRangeLevel
+    : currentRangeLevel
+
+  // What the gradient is actually drawn over. The visible extent wins when
+  // there is one: a domain taken from the whole catalogue leaves a zoomed-in
+  // view painted in one flat shade, since every hex in it sits in the bottom
+  // decade of a global maximum set somewhere else entirely. The global tier is
+  // the fallback — before the first measurement, and wherever too few hexes are
+  // on screen to call it a distribution.
+  const hexRangeLevel = viewportHexRange || globalHexRangeLevel
 
   const value = {
     loading,
     setLoading,
+    basemapLoading,
+    setBasemapLoading,
     mapLoaded,
     mapView,
     setMapView,
     zoom,
     rangeLevels,
     legendLoading,
-    trajectoryRangeLevels,
-    obisRangeLevels,
+    coverageRangeLevels,
     currentRangeLevel,
-    currentTrajectoryRangeLevel,
-    currentObisRangeLevel,
+    // What the legend's single hex gradient is keyed to — see above. The
+    // coverage tier is not exported on its own: it is one of the two things this
+    // can be, and nothing outside wants it separately now that the card draws
+    // one gradient for every hexagon.
+    hexRangeLevel,
+    // Whether that domain came from the view rather than the whole catalogue,
+    // so the legend can say as much — the numbers on the bar move with the
+    // camera, and a bar that renumbers itself on a pan without explaining why
+    // reads as a glitch.
+    hexRangeScaledToView: Boolean(viewportHexRange),
+    // Map.jsx reports the visible hex extent here; nothing else writes it.
+    setViewportHexRange,
     griddapCoverageVisible,
     setGriddapCoverageVisible,
     dataLayersVisible,
     setDataLayersVisible,
+    bathymetryVisible,
+    setBathymetryVisible,
     projection,
     setProjection,
-    basemap,
-    setBasemap,
-    // Read-only outside this provider: the layer switches and the two
-    // trajectory sub-switches are coupled (clearing both sub-switches drops the
-    // parent), so callers go through the toggles rather than the raw setters.
+    // Read-only outside this provider: the track-lines switch is flipped through
+    // its toggle rather than the raw setter, so the reasoning about what a view
+    // change may and may not touch stays in one place (see toggleTrackLines).
     tracksMode,
-    trajectoryHexes,
     toggleTrackLines,
-    toggleTrajectoryHexes,
     scrubTime,
     setScrubTime,
     debouncedScrubTime,
@@ -322,14 +468,20 @@ export default function MapStateProvider ({ children }) {
     setTrailingDays,
     dataLayers,
     toggleDataLayer,
+    resetDataLayers,
+    showAllDataLayers,
     griddapCoverage,
     activeWmsOverlay,
     setActiveWmsOverlay,
     zoomTarget,
     zoomToGeometry,
+    drawRequest,
+    requestDraw,
     pendingDatasetZoom,
     setPendingDatasetZoom,
     mapRef,
+    featureQuery,
+    setFeatureQuery,
     mapDatasetPKs,
     setMapDatasetPKs,
     mapQueryString,

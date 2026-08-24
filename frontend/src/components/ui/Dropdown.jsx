@@ -20,14 +20,34 @@ const DropdownContext = createContext({ close: () => {} })
 // transformed ancestor, which clips an in-place absolutely-positioned menu
 // no matter its own position value. Positioning is computed from the
 // toggle's bounding rect instead of relying on CSS containment.
+// `title` is the toggle's *content*; `tooltip` is the HTML title attribute.
 export function DropdownButton ({
   title,
+  tooltip,
   className = '',
+  toggleClassName = '',
   size,
   variant,
+  // 'start' (default) lines the menu's left edge up with the toggle's, which
+  // reads fine once the menu is about as wide as its toggle (the two
+  // existing callers, both text buttons). 'center' anchors the menu under
+  // the toggle's midpoint instead via transform: translateX(-50%) — needed
+  // once the toggle is much narrower than its menu (an icon-only button, say),
+  // where left-alignment leaves the menu looking like it belongs to whatever
+  // sits to the toggle's right instead.
+  align = 'start',
+  // Fires whenever the menu opens/closes. The toggle's own open/closed state
+  // otherwise stays private to this component — callers that need to style
+  // the toggle differently while its menu is up (see topBarSpatialFilterToggle)
+  // use this to mirror it into their own state.
+  onOpenChange,
   children
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpenState] = useState(false)
+  const setOpen = (value) => {
+    setOpenState(value)
+    onOpenChange?.(value)
+  }
   const [menuStyle, setMenuStyle] = useState(null)
   const buttonRef = useRef(null)
   const menuRef = useRef(null)
@@ -35,13 +55,23 @@ export function DropdownButton ({
   useLayoutEffect(() => {
     if (!open || !buttonRef.current) return
     const rect = buttonRef.current.getBoundingClientRect()
-    setMenuStyle({
-      position: 'fixed',
-      top: rect.bottom + 2,
-      left: rect.left,
-      minWidth: rect.width
-    })
-  }, [open])
+    setMenuStyle(
+      align === 'center'
+        ? {
+          position: 'fixed',
+          top: rect.bottom + 2,
+          left: rect.left + rect.width / 2,
+          minWidth: rect.width,
+          transform: 'translateX(-50%)'
+        }
+        : {
+          position: 'fixed',
+          top: rect.bottom + 2,
+          left: rect.left,
+          minWidth: rect.width
+        }
+    )
+  }, [open, align])
 
   useLayoutEffect(() => {
     if (!open) return
@@ -61,7 +91,8 @@ export function DropdownButton ({
     'btn',
     'dropdown-toggle',
     size && `btn-${size}`,
-    variant && `btn-${variant}`
+    variant && `btn-${variant}`,
+    toggleClassName
   ]
     .filter(Boolean)
     .join(' ')
@@ -72,6 +103,7 @@ export function DropdownButton ({
         type='button'
         ref={buttonRef}
         className={buttonClasses}
+        title={tooltip}
         aria-expanded={open}
         aria-haspopup='listbox'
         onClick={() => setOpen(!open)}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { XLg } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
+import classNames from 'classnames'
+import { Funnel, FunnelFill } from 'react-bootstrap-icons'
 import DataTable from 'react-data-table-component'
 import TableFilter, { filterRows } from '../../ui/TableFilter.jsx'
 
@@ -8,10 +9,13 @@ import TableFilter, { filterRows } from '../../ui/TableFilter.jsx'
 import Loading from '../Loading/Loading.jsx'
 import GriddapDetails from '../GriddapDetails/GriddapDetails.jsx'
 import { server } from '../../../config'
+import reportError from '../../../state/reportError.js'
 import { splitLines } from '../../../utilities'
 import { gridNodeFactors, totalGridNodes } from '../../../wmsUtilities'
 import FilterButton from '../Filter/FilterButton/FilterButton.jsx'
-import ZoomToDataset from '../../AppShell/ZoomToDataset/ZoomToDataset.jsx'
+import ZoomToDataset, {
+  useZoomToDataset
+} from '../../AppShell/ZoomToDataset/ZoomToDataset.jsx'
 import './styles.css'
 
 // The grid's node count spelled out as the product of its axes —
@@ -42,10 +46,53 @@ function GridNodeCount({ dimensions }) {
   )
 }
 
+// Which CF discrete-sampling role identifies one record of this dataset, and
+// which of its variables carries that role. The record list hands every kind
+// back under the one `profile_id` key (shapeQuery.js coalesces profile_id /
+// timeseries_id, and aliases a trajectory's trajectory_id into the same slot),
+// so the column can only be named from the dataset's own cf_role variables.
+// The order below follows that coalesce, with a trajectory's own role first
+// when the dataset is one. Datasets that declare no role at all (OBIS, a
+// tabledap table with no cf_role attribute anywhere) fall back to the generic
+// "Record ID".
+const CF_ROLE_LABELS = {
+  timeseries_id: 'cfRoleTimeseriesIdText',
+  profile_id: 'cfRoleProfileIdText',
+  trajectory_id: 'cfRoleTrajectoryIdText'
+}
+
+function cfRoleColumn(dataset, roleOrder, t) {
+  const variableFor = {
+    timeseries_id: dataset.timeseries_id_variable,
+    profile_id: dataset.profile_id_variable,
+    trajectory_id: dataset.trajectory_id_variable
+  }
+  // '' is the harvester's sentinel for "this dataset has no such role"
+  // (cf_role attributes are parsed as strings), and NULL means the same thing
+  // once it has been through the database.
+  const role = roleOrder.find((r) => variableFor[r])
+  return {
+    label: role ? t(CF_ROLE_LABELS[role]) : t('datasetInspectorRecordIDText'),
+    variable: role ? variableFor[role] : undefined
+  }
+}
+
+// A table heading that names the role on top and the variable behind it
+// underneath, so the column says both what the ID means and where it came from.
+function ColumnHeading({ label, variable }) {
+  return (
+    <span className='columnHeading'>
+      <span className='columnHeadingLabel'>{label}</span>
+      {variable && <span className='columnHeadingVariable'>{variable}</span>}
+    </span>
+  )
+}
+
 export default function DatasetInspector({
   dataset,
-  setInspectDataset,
-  setBackClicked,
+  // Shared with the sidebar header's back control (SelectionProvider), so both
+  // ways out of this page do the same thing.
+  returnToList,
   setHoveredDataset,
   setInspectRecordID,
   filterSet,
@@ -56,6 +103,7 @@ export default function DatasetInspector({
   setActiveWmsOverlay
 }) {
   const { t } = useTranslation()
+  const { zoomToDataset } = useZoomToDataset()
   const [datasetRecords, setDatasetRecords] = useState()
   const [recordFilterText, setRecordFilterText] = useState('')
   const [trajectoryPlatforms, setTrajectoryPlatforms] = useState()
@@ -67,26 +115,16 @@ export default function DatasetInspector({
   const isGrid = dataset.cdm_data_type === 'Grid'
   // no per-record list for OBIS (external) or griddap (metadata-only)
   const hasRecordList = dataset.source_type !== 'obis' && !isGrid
+  // OBIS datasets always link out to OBIS; the rest have whichever of their
+  // ERDDAP / CKAN URLs the harvest found.
+  const hasSources =
+    dataset.source_type === 'obis' ||
+    Boolean(dataset.erddap_url || dataset.ckan_url)
   // Start loading rather than false: the fetch below is fired from an effect,
   // so an initial false would paint one frame of an empty record table before
   // the spinner appears.
   const [loading, setLoading] = useState(hasRecordList)
 
-  // Opening this page usually narrows the datasets filter to a single dataset
-  // (clicking a hex or a griddap footprint does exactly that), so closing it
-  // drops that filter as well — otherwise the user lands back on a list that
-  // is still silently restricted to the dataset they just left.
-  const returnToList = () => {
-    const { datasetsSelected, setDatasetsSelected } = filterSet.datasetFilter
-    if (datasetsSelected.some((d) => d.isSelected)) {
-      setDatasetsSelected(
-        datasetsSelected.map((d) => ({ ...d, isSelected: false }))
-      )
-    }
-    setBackClicked(true)
-    setInspectDataset()
-    if (setSelectedTrajectory) setSelectedTrajectory()
-  }
   // const platformColor = platformColors.filter(
   //   (pc) => pc.platform === dataset.platform
   // )
@@ -117,7 +155,7 @@ export default function DatasetInspector({
       .catch((error) => {
         // An error response used to leave the spinner running forever. Land on
         // an empty record table instead — the rest of the page still reads.
-        console.error('datasetRecordsList failed:', error)
+        reportError('datasetRecordsList fetch failed', error)
         if (!cancelled) setDatasetRecords([])
       })
       .finally(() => {
@@ -138,7 +176,10 @@ export default function DatasetInspector({
     fetch(`${server}/trajectories/platforms?datasetPKs=${dataset.pk}`)
       .then((response) => (response.ok ? response.json() : []))
       .then((platforms) => setTrajectoryPlatforms(platforms))
-      .catch(() => setTrajectoryPlatforms([]))
+      .catch((error) => {
+        reportError('trajectory platforms fetch failed', error)
+        setTrajectoryPlatforms([])
+      })
   }, [dataset])
 
   // Browser Back needs no handling here: the open dataset lives in the URL
@@ -161,7 +202,7 @@ export default function DatasetInspector({
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+  }, [returnToList])
 
   // Swipe left (touch, trackpad two-finger, or mouse horizontal wheel) to
   // return to the dataset list. Swipes work everywhere, including over the
@@ -231,13 +272,24 @@ export default function DatasetInspector({
       el.removeEventListener('wheel', onWheel)
       if (wheelTimer) clearTimeout(wheelTimer)
     }
-  }, [])
+  }, [returnToList])
 
   const dataColumnWith = '105px'
 
+  // Trajectory datasets list one row per mission, so their record column is the
+  // trajectory role; every other type resolves to whichever of profile_id /
+  // timeseries_id the dataset declares.
+  const recordIdColumn = cfRoleColumn(
+    dataset,
+    isTrajectoryDataset
+      ? ['trajectory_id', 'profile_id', 'timeseries_id']
+      : ['profile_id', 'timeseries_id', 'trajectory_id'],
+    t
+  )
+
   const columns = [
     {
-      name: splitLines(t('datasetInspectorRecordIDText')),
+      name: <ColumnHeading {...recordIdColumn} />,
       selector: (row) => row.profile_id,
       sortable: true,
       wrap: true,
@@ -270,13 +322,37 @@ export default function DatasetInspector({
       sortable: true,
       wrap: true,
       width: dataColumnWith
+    },
+    {
+      // Which ocean variables this individual record carries — a dataset's
+      // records don't all measure everything it lists. Null for the sources
+      // with no per-record detection (trajectory, OBIS, grid), where the
+      // dataset's own list is the best answer available.
+      name: splitLines(t('datasetInspectorOceanVariablesText')),
+      selector: (row) =>
+        (row.eovs ?? dataset.eovs).map((eov) => t(eov)).join(', '),
+      sortable: true,
+      wrap: true,
+      grow: 2
     }
   ]
   const data = filterRows(datasetRecords?.profiles, recordFilterText)
 
   const platformColumns = [
     {
-      name: splitLines(t('trajectoryPlatformIdText')),
+      // Same value the record column carries, named the same way: the
+      // cf_role=trajectory_id variable, or the plain "Platform ID" when the
+      // dataset is a single unnamed trajectory with no such variable.
+      name: (
+        <ColumnHeading
+          label={
+            dataset.trajectory_id_variable
+              ? t('cfRoleTrajectoryIdText')
+              : t('trajectoryPlatformIdText')
+          }
+          variable={dataset.trajectory_id_variable || undefined}
+        />
+      ),
       selector: (row) => row.trajectory_id,
       sortable: true,
       wrap: true,
@@ -326,6 +402,21 @@ export default function DatasetInspector({
 
   const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet
 
+  // The title bar's filter button: narrow the map to this dataset alone, or
+  // release it again. Same toggle the dataset's chip in the Filters panel does
+  // (FilterButton), on the one dataset this page is about.
+  const datasetIsFiltered = datasetFilter.datasetsSelected.some(
+    (option) => option.pk === dataset.pk && option.isSelected
+  )
+  const toggleDatasetFilter = () =>
+    datasetFilter.setDatasetsSelected(
+      datasetFilter.datasetsSelected.map((option) =>
+        option.pk === dataset.pk
+          ? { ...option, isSelected: !option.isSelected }
+          : option
+      )
+    )
+
   return (
     <div
       className='datasetInspector'
@@ -333,35 +424,54 @@ export default function DatasetInspector({
       onMouseEnter={() => setHoveredDataset(dataset)}
       onMouseLeave={() => setHoveredDataset()}
     >
-      {/* The title block is pinned: it names the page, so it stays put while
-          the metadata sheet and record table scroll under it. */}
-      <div className='datasetTitleBlock'>
-        <div className='datasetTitleTop'>
-          <span className='metadataLabel'>
-            {t('datasetInspectorTitleText')}
-          </span>
+      {/* The title bar is pinned: it names the page, so it stays put while the
+          metadata sheet and record table scroll under it. Title on the left,
+          the two actions that belong to the dataset on the right — a heading at
+          the top of a page needs no "Title" label over it. Double-clicking the
+          bar frames the map on this dataset, the same thing the zoom button
+          does, for anyone who goes for the title first; the map is otherwise
+          left where the user put it, since opening a page highlights the
+          dataset among the others rather than travelling to it.
+          The way back is the sidebar header's own back control (Sidebar.jsx),
+          which replaces the datasets banner while this page is open — one
+          control, in the one place that marks the panel as being on a dataset
+          rather than the list. */}
+      <div className='datasetTitleBlock' onDoubleClick={zoomToDataset}>
+        {/* A heading, and only a heading. Filtering the map to this dataset
+            used to be a click on the title itself, which no reader expects of
+            a page's title — it is the button beside the zoom one now. */}
+        <h2 className='datasetTitle'>{dataset.title}</h2>
+        <div className='datasetTitleActions'>
           <button
             type='button'
-            className='closeButton'
-            onClick={returnToList}
-            title={t('datasetInspectorBackButtonTitle')} // 'Return to dataset list'
-            aria-label={t('datasetInspectorBackButtonTitle')}
+            className={classNames('datasetTitleAction', {
+              active: datasetIsFiltered
+            })}
+            onClick={toggleDatasetFilter}
+            aria-pressed={datasetIsFiltered}
+            title={t(
+              datasetIsFiltered
+                ? 'datasetFilterButtonRemove'
+                : 'datasetFilterButtonApply'
+            )}
           >
-            <XLg />
+            {datasetIsFiltered ? (
+              <FunnelFill size={15} aria-hidden='true' />
+            ) : (
+              <Funnel size={15} aria-hidden='true' />
+            )}
           </button>
+          {/* Frames the map on this dataset; vanishes once it already is. */}
+          <ZoomToDataset />
         </div>
-        <FilterButton
-          setOptionsSelected={datasetFilter.setDatasetsSelected}
-          optionsSelected={datasetFilter.datasetsSelected}
-          option={dataset}
-        />
-        {/* Same action as the pill floating over the map, and it vanishes the
-            same way once the map is already framed on this dataset. */}
-        <ZoomToDataset variant='inline' />
       </div>
       <div className='datasetInspectorBody'>
+        {/* The front matter, as compact as it can be read: each field is a
+            small eyebrow label with its value stacked under it, and the fields
+            flow two-up across the sheet, the chip-carrying ones taking a full
+            row of their own. No row rules — the whitespace separates them. */}
         <dl className='datasetMetaSheet'>
-          <div className='metaRow'>
+          <div className='metaCell metaCellWide'>
             <dt className='metadataLabel'>
               {t('datasetInspectorOrganizationText')}
             </dt>
@@ -380,7 +490,7 @@ export default function DatasetInspector({
               })}
             </dd>
           </div>
-          <div className='metaRow'>
+          <div className='metaCell metaCellWide'>
             <dt className='metadataLabel'>
               {t('datasetInspectorOceanVariablesText')}
             </dt>
@@ -399,7 +509,7 @@ export default function DatasetInspector({
               })}
             </dd>
           </div>
-          <div className='metaRow'>
+          <div className='metaCell'>
             <dt className='metadataLabel'>
               {t('datasetInspectorPlatformText')}
             </dt>
@@ -415,7 +525,9 @@ export default function DatasetInspector({
               />
             </dd>
           </div>
-          <div className='metaRow'>
+          {/* A grid spells its node count out as a product of its axes, which
+              needs the full width; a plain record count shares its row. */}
+          <div className={isGrid ? 'metaCell metaCellWide' : 'metaCell'}>
             <dt className='metadataLabel'>
               {isGrid ? t('griddapNodesText') : t('datasetInspectorRecordsText')}
             </dt>
@@ -429,59 +541,52 @@ export default function DatasetInspector({
               )}
             </dd>
           </div>
-          {dataset.source_type === 'obis' ? (
-            <div className='metaRow'>
-              <dt className='metadataLabel'>OBIS</dt>
-              <dd className='metadataValue'>
-                <a
-                  className='metadataLink'
-                  href={`https://obis.org/dataset/${dataset.dataset_id}`}
-                  target='_blank'
-                  rel='noreferrer'
-                >
-                  {t('datasetInspectorOBISURL')}
-                </a>
+          {/* The outbound links used to be a labelled row each; they say what
+              they are in their own text, so one "Sources" line holds them
+              all. */}
+          {hasSources && (
+            <div className='metaCell metaCellWide'>
+              <dt className='metadataLabel'>
+                {t('datasetInspectorSourcesText')}
+              </dt>
+              <dd className='metadataValue metadataLinks'>
+                {dataset.source_type === 'obis' ? (
+                  <a
+                    className='metadataLink'
+                    href={`https://obis.org/dataset/${dataset.dataset_id}`}
+                    target='_blank'
+                    rel='noreferrer'
+                  >
+                    {t('datasetInspectorOBISURL')}
+                  </a>
+                ) : (
+                  <>
+                    {dataset.erddap_url && (
+                      <a
+                        className='metadataLink'
+                        href={dataset.erddap_url}
+                        target='_blank'
+                        title={t('datasetInspectorERDDAPText')}
+                        rel='noreferrer'
+                      >
+                        {t('datasetInspectorERDDAPURL')} (ERDDAP™)
+                      </a>
+                    )}
+                    {dataset.ckan_url && (
+                      <a
+                        className='metadataLink'
+                        href={dataset.ckan_url}
+                        target='_blank'
+                        title={t('datasetInspectorCKANText')}
+                        rel='noreferrer'
+                      >
+                        {t('datasetInspectorCKANURL')} (CKAN)
+                      </a>
+                    )}
+                  </>
+                )}
               </dd>
             </div>
-          ) : (
-            <>
-              {dataset.erddap_url && (
-                <div className='metaRow'>
-                  <dt className='metadataLabel'>
-                    {t('datasetInspectorERDDAPText')}
-                  </dt>
-                  <dd className='metadataValue'>
-                    <a
-                      className='metadataLink'
-                      href={dataset.erddap_url}
-                      target='_blank'
-                      title={dataset.erddap_url}
-                      rel='noreferrer'
-                    >
-                      {t('datasetInspectorERDDAPURL')} (ERDDAP™)
-                    </a>
-                  </dd>
-                </div>
-              )}
-              {dataset.ckan_url && (
-                <div className='metaRow'>
-                  <dt className='metadataLabel'>
-                    {t('datasetInspectorCKANText')}
-                  </dt>
-                  <dd className='metadataValue'>
-                    <a
-                      className='metadataLink'
-                      href={dataset.ckan_url}
-                      target='_blank'
-                      title={dataset.ckan_url}
-                      rel='noreferrer'
-                    >
-                      {t('datasetInspectorCKANURL')} (CKAN)
-                    </a>
-                  </dd>
-                </div>
-              )}
-            </>
           )}
         </dl>
         {isGrid && (
