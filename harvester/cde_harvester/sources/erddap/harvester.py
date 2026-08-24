@@ -32,6 +32,7 @@ from cde_harvester.core.errors import (
     UNCHANGED,
     UNKNOWN_ERROR,
 )
+from cde_harvester.core.issues import erddap_error_text
 from cde_harvester.dataset_types import (
     extract_features,
     extract_track_points,
@@ -498,18 +499,25 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
     except HTTPError as e:
         duration_ms = int((time.monotonic() - t0) * 1000)
         response = e.response
-        log.error("HTTP ERROR: %s %s", response.status_code, response.reason)
+        # The status line alone is not diagnostic — every ERDDAP failure is a
+        # 500. requests attaches the response, so ERDDAP's own error message is
+        # right here; record it so issues group by what actually went wrong.
+        server_error = erddap_error_text(response)
+        detail = f"HTTP {response.status_code} {response.reason}"
+        if server_error:
+            detail = f"{detail}: {server_error}"
+        log.error("HTTP ERROR: %s", detail)
         raise DatasetHarvestError(
             attempt=_build_attempt(
                 run_id, erddap_url, dataset_id,
                 status="error",
                 reason_code=HTTP_ERROR,
-                error_message=f"HTTP {response.status_code} {response.reason}",
+                error_message=detail,
                 duration_ms=duration_ms,
                 query_urls=_attempt_urls(erddap_url, dataset, dataset_id),
             ),
             skipped_reason_code=HTTP_ERROR,
-            message=f"HTTP {response.status_code} {response.reason} harvesting {dataset_id}",
+            message=f"{detail} harvesting {dataset_id}",
         ) from e
     except ResponseTooLargeError as e:
         duration_ms = int((time.monotonic() - t0) * 1000)
