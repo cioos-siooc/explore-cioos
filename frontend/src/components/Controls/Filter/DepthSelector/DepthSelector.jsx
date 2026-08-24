@@ -1,153 +1,103 @@
 import * as React from 'react'
-import { useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
 import { useTranslation } from 'react-i18next'
-import { X } from 'react-bootstrap-icons'
 
-import RangeSelector from '../RangeSelector/RangeSelector.jsx'
-import './styles.css'
+import { defaultStartDepth, defaultEndDepth } from '../../../config.js'
+import DepthRail, {
+  DepthField,
+  DepthPresetSelect,
+  useDepthAxis
+} from '../../DepthRail/DepthRail.jsx'
+import { clampDepth } from '../../DepthRail/depthAxis.js'
+import '../styles.css'
 
+// The Depth filter inside the Filters panel.
+//
+// It is the Time filter's twin, and deliberately so: both set a range, so both
+// are the same three-row form — a ready-made band, a start, an end — over the
+// same rail with the same teal handles. Only the axis differs, time running
+// left to right and depth running shallow to deep.
+//
+// The four bands used to be a grid of buttons and the two figures a pair of
+// number boxes that could be left in a state the filter refused to apply, with
+// a red warning under them. Nothing can be left invalid now: a typed figure
+// commits only once it is complete and inside the range the other end allows,
+// exactly as a typed date does.
 export default function DepthSelector (props) {
   const { t } = useTranslation()
+  const { startDepth, endDepth, setStartDepth, setEndDepth } = props
 
-  const [startDepth, setStartDepth] = useState(props.startDepth)
-  const [endDepth, setEndDepth] = useState(props.endDepth)
-  const [depthValid, setDepthValid] = useState(true)
+  const axis = useDepthAxis(defaultStartDepth, defaultEndDepth)
 
-  useEffect(() => {
-    setStartDepth(props.startDepth)
-    setDepthValid(true)
-  }, [props.startDepth])
-
-  useEffect(() => {
-    setEndDepth(props.endDepth)
-    setDepthValid(true)
-  }, [props.endDepth])
-
-  function handleSetStartDepth (value) {
-    setStartDepth(value * 1.0)
-    if (value * 1.0 <= endDepth && value * 1.0 >= 0 && value * 1.0 <= 12000) {
-      setDepthValid(true)
-      props.setStartDepth(value * 1.0)
-      props.setEndDepth(endDepth)
+  // Either end moves alone, bounded by the other — from the rail and from the
+  // fields alike. Unlike a time window, a chosen depth band is a place in the
+  // water column rather than a thickness, so dragging one end resizes it
+  // instead of sliding the whole band deeper.
+  function setHandleValue (handle, value) {
+    if (handle === 'start') {
+      setStartDepth(clampDepth(value, defaultStartDepth, endDepth))
     } else {
-      setDepthValid(false)
+      setEndDepth(clampDepth(value, startDepth, defaultEndDepth))
     }
-  }
-
-  function handleSetEndDepth (value) {
-    setEndDepth(value * 1.0)
-    if (value * 1.0 >= startDepth && value * 1.0 >= 0 && value * 1.0 <= 12000) {
-      setDepthValid(true)
-      props.setEndDepth(value * 1.0)
-      props.setStartDepth(startDepth)
-    } else {
-      setDepthValid(false)
-    }
-  }
-
-  function onChange(value) {
-    props.setStartDepth(value[0])
-    props.setEndDepth(value[1])
   }
 
   return (
-    <div className='depthSelector'>
-      <div className='inputs'>
-        <div className='depthQuickSelectGrid'>
-          <button
-            onClick={() => {
-              props.setStartDepth(0)
-              props.setEndDepth(100)
+    <div className='filterRangeSelector depthSelector'>
+      {/* Each field is wrapped in its own <label>, so the text beside it is the
+          field's name to a screen reader and a click target to everyone else. */}
+      <div className='filterRangeForm'>
+        <label className='filterRangeRow'>
+          <span className='filterRangeLabel'>
+            {t('depthSelectorPresetLabel')}
+          </span>
+          <DepthPresetSelect
+            className='filterRangeInput filterRangeSelect'
+            startDepth={startDepth}
+            endDepth={endDepth}
+            min={defaultStartDepth}
+            max={defaultEndDepth}
+            onSelect={(start, end) => {
+              setStartDepth(start)
+              setEndDepth(end)
             }}
-          >
-            100 m
-          </button>
-          <button
-            onClick={() => {
-              props.setStartDepth(0)
-              props.setEndDepth(500)
-            }}
-          >
-            500 m
-          </button>
-          <button
-            onClick={() => {
-              props.setStartDepth(0)
-              props.setEndDepth(1000)
-            }}
-          >
-            1000 m
-          </button>
-          <button
-            onClick={() => {
-              props.setStartDepth(1000)
-              props.setEndDepth(12000)
-            }}
-          >
-            1000+ m
-          </button>
-        </div>
-        <div
-          className='depth'
-          title={!depthValid ? t('depthFilterStartInvalidTitle') : undefined}
-        >
-          <span>{t('depthFilterStartDepth')}</span>
-          <input
-            className='startDepth'
+          />
+        </label>
+        <label className='filterRangeRow'>
+          <span className='filterRangeLabel'>
+            {t('depthFilterStartDepth')}
+          </span>
+          <DepthField
+            className='filterRangeInput'
             value={startDepth}
-            type='number'
-            max={12000}
-            min={0}
-            onChange={(e) => handleSetStartDepth(e.target.value)}
-            size={'6'}
+            min={defaultStartDepth}
+            max={endDepth}
+            onCommit={(value) => setHandleValue('start', value)}
           />
-        </div>
-        <div
-          className='depth'
-          title={!depthValid ? t('depthFilterEndInvalidTitle') : undefined}
-        >
-          <span>{t('depthFilterEndDepth')}</span>
-          <input
-            className='endDepth'
+        </label>
+        <label className='filterRangeRow'>
+          <span className='filterRangeLabel'>{t('depthFilterEndDepth')}</span>
+          <DepthField
+            className='filterRangeInput'
             value={endDepth}
-            type='number'
-            max={12000}
-            min={0}
-            onChange={(e) => handleSetEndDepth(e.target.value)}
-            size={'6'}
+            min={startDepth}
+            max={defaultEndDepth}
+            onCommit={(value) => setHandleValue('end', value)}
           />
-        </div>
+        </label>
       </div>
-      <RangeSelector
-        start={props.startDepth}
-        end={props.endDepth}
-        marks={{
-          0: '0m',
-          2000: '2000m',
-          4000: '4000m',
-          6000: '6000m',
-          8000: '8000m',
-          10000: '10000m',
-          12000: '12000m'
-        }}
-        min={0}
-        max={12000}
-        onChange={onChange}
+      <DepthRail
+        axis={axis}
+        startDepth={startDepth}
+        endDepth={endDepth}
+        onCommit={setHandleValue}
       />
-      {!depthValid && (
-        <div>
-          {' '}
-          <X color='red' size={30} /> {t('depthFilterInvalidWarning')}
-        </div>
-      )}
     </div>
   )
 }
 
 DepthSelector.propTypes = {
   startDepth: PropTypes.number.isRequired,
-  setStartDepth: PropTypes.func.isRequired,
   endDepth: PropTypes.number.isRequired,
+  setStartDepth: PropTypes.func.isRequired,
   setEndDepth: PropTypes.func.isRequired
 }

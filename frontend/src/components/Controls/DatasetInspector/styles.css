@@ -7,30 +7,58 @@
   min-height: 0;
 }
 
+/* The panel hosting this page washes its background (see .datasetsPanelDetail),
+   which is what separates a dataset page from the list it drilled in from. The
+   sections below sit on that wash as white cards. */
 .datasetInspectorBody {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 14px 24px 14px;
+  padding: 12px 12px 24px 12px;
 }
 
-/* The eyebrow label and the back control share one row: label leads on the
-   left, "Back" sits opposite on the right. */
-.datasetTitleTop {
+/* --- Dataset title: set like the title of a research record. The two actions
+   that belong to the dataset — filter the map to it, frame the map on it —
+   share the line at the right edge. --- */
+.datasetTitleBlock {
+  flex: 0 0 auto;
   display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-white);
+}
+
+.datasetTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 2px 0;
+  font-family: var(--cioos-font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--cioos-ink);
+}
+
+/* Stacked, not side by side: the title takes the width it needs and the two
+   actions sit in a narrow column against the right edge. */
+.datasetTitleActions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 6px;
 }
 
-.datasetTitleTop .metadataLabel {
-  margin-bottom: 0;
-}
-
-/* --- Close: an icon button that borrows the same bordered, white-fill,
-   teal-on-hover treatment as the filter chips and other controls on this
-   page, so it reads as part of the set rather than a one-off. --- */
-.datasetInspector .closeButton {
+/* Both title-bar actions, including the zoom button ZoomToDataset renders into
+   this row: a small bordered icon button, the same treatment the page's other
+   controls wear. Defined here because this row is the only place either one
+   appears. */
+.datasetTitleAction,
+.datasetTitleActions .zoomToDatasetButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -41,39 +69,44 @@
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-white);
-  color: var(--cioos-ink-60);
+  color: var(--cioos-primary-700, var(--cioos-primary));
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease,
     color 0.15s ease;
 }
 
-.datasetInspector .closeButton svg {
-  font-size: 0.8rem;
-}
-
-.datasetInspector .closeButton:hover,
-.datasetInspector .closeButton:focus-visible {
-  background-color: var(--cioos-surface-2);
+.datasetTitleAction:hover,
+.datasetTitleAction:focus-visible,
+.datasetTitleActions .zoomToDatasetButton:hover,
+.datasetTitleActions .zoomToDatasetButton:focus-visible {
+  background-color: var(--cioos-sand);
   border-color: var(--cioos-primary);
-  color: var(--cioos-ink);
   outline: none;
 }
 
-.datasetInspector .closeButton:focus-visible {
+.datasetTitleAction:focus-visible,
+.datasetTitleActions .zoomToDatasetButton:focus-visible {
   box-shadow: var(--cioos-focus);
 }
 
-/* --- Dataset title: set like the title of a research record, not a chip.
-   It stays an interactive filter toggle, but reads as the page heading. --- */
-.datasetTitleBlock {
-  flex: 0 0 auto;
-  padding: 12px 14px 10px 14px;
-  border-bottom: 1px solid var(--cioos-hairline);
-  background-color: var(--cioos-white);
+.datasetTitleAction:active,
+.datasetTitleActions .zoomToDatasetButton:active {
+  transform: translateY(1px);
 }
 
-.datasetTitleBlock .metadataLabel {
-  margin-bottom: 4px;
+/* Filtering is a state, not a one-shot action: while the map is narrowed to
+   this dataset the button stays filled, and its icon is the solid funnel. */
+.datasetTitleAction.active {
+  background-color: var(--cioos-primary);
+  border-color: var(--cioos-primary);
+  color: var(--cioos-white);
+}
+
+.datasetTitleAction.active:hover,
+.datasetTitleAction.active:focus-visible {
+  background-color: var(--cioos-primary-700);
+  border-color: var(--cioos-primary-700);
+  color: var(--cioos-white);
 }
 
 /* Metadata chips read as informational values that can wrap to two lines
@@ -81,7 +114,7 @@
    and use a tighter corner so a taller, multi-line chip reads as a neat
    rounded rectangle rather than an oversized lozenge. */
 .datasetInspector .filterButton {
-  padding: 3px 10px;
+  padding: 2px 8px;
   border-radius: var(--cioos-radius-sm);
   white-space: normal;
   text-align: left;
@@ -96,35 +129,7 @@
   display: none;
 }
 
-.datasetTitleBlock .filterButton {
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  margin: 0;
-  white-space: normal;
-  text-align: left;
-  font-family: var(--cioos-font-display);
-  font-size: 1.2rem;
-  font-weight: 600;
-  line-height: 1.3;
-  letter-spacing: -0.01em;
-  padding: 2px 0;
-  border: none;
-  border-radius: 0;
-  background: none;
-  transition: color 0.15s ease;
-}
-
-/* The title is a heading first, a toggle second: hover/selection shift only
-   the text colour, never a box or fill. */
-.datasetTitleBlock .filterButton:hover,
-.datasetTitleBlock .filterButton.selected {
-  background: none;
-  border: none;
-  color: var(--cioos-primary-700);
-}
-
-/* Shared eyebrow label for the title block and every metadata row. */
+/* Shared eyebrow label for every metadata field. */
 .metadataLabel {
   display: block;
   margin-bottom: 6px;
@@ -136,28 +141,36 @@
 }
 
 /* --- Metadata record sheet ---
-   A dense definition list (label / value rows divided by hairline rules),
-   in the spirit of a journal article's front-matter, replacing the looser
-   grid of bordered cards. */
+   The front matter of a journal article, compressed: each field is a tiny
+   eyebrow label with its value directly beneath, and the fields flow two to a
+   row. The narrow ones (platform, record count) pair up; the ones carrying
+   chips or links take a full row. Whitespace does the dividing, so there are
+   no rules and no 86px label gutter eating the width. */
 /* No top rule of its own: the pinned title block above already draws one. */
 .datasetMetaSheet {
-  margin: 0 0 18px 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+  margin: 0 0 10px 0;
+  padding: 9px 11px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
 }
 
-.datasetMetaSheet .metaRow {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  padding: 7px 2px;
-  border-bottom: 1px solid var(--cioos-hairline);
+.datasetMetaSheet .metaCell {
+  min-width: 0;
 }
 
-/* Fixed label column keeps every value left-aligned on a common axis. */
+/* Chips, link lists and a grid's node product need the whole width. */
+.datasetMetaSheet .metaCellWide {
+  grid-column: 1 / -1;
+}
+
 .datasetMetaSheet .metadataLabel {
-  flex: 0 0 86px;
-  margin: 0;
-  padding-top: 4px;
-  line-height: 1.3;
+  margin-bottom: 3px;
+  font-size: 0.65rem;
+  line-height: 1.2;
 }
 
 .metadataValue {
@@ -168,28 +181,31 @@
 }
 
 .datasetMetaSheet .metadataValue {
-  flex: 1 1 auto;
-  min-width: 0;
   margin: 0;
-  /* Chips flow beside the label and wrap onto new lines when there are many;
-     top-align them so the label stays alone at the row's top-left and each
-     wrapped row of chips lines up cleanly. */
+  /* Chips wrap onto new lines when there are many; top-align them so each
+     wrapped row lines up cleanly under the label. */
   align-items: flex-start;
   align-content: flex-start;
-  gap: 5px;
+  gap: 4px;
 }
 
-/* Chips sit flush inside their row; the row's gap handles spacing. */
+/* Chips sit flush inside their field; the field's gap handles spacing. */
 .datasetMetaSheet .filterButton {
   margin: 0;
+  font-size: 0.78rem;
 }
 
 /* Record count reads as the sheet's key figure. */
 .datasetMetaSheet .metadataValue.recordCount {
-  padding-top: 2px;
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 700;
+  line-height: 1.2;
   color: var(--cioos-ink);
+}
+
+/* Source links sit on one line, separated by their own gap. */
+.datasetMetaSheet .metadataLinks {
+  gap: 4px 14px;
 }
 
 /* Grid node count: the axis factors read as small stacked value/name pairs,
@@ -244,7 +260,6 @@
 /* Source links (ERDDAP / CKAN / OBIS) as quiet, citation-style inline links
    rather than boxed buttons — keeps the sheet flat and dense. */
 .metadataLink {
-  padding-top: 3px;
   color: var(--cioos-primary-700);
   font-weight: 600;
   text-decoration: none;
@@ -263,8 +278,11 @@
 
 /* --- Record table section --- */
 .recordSection {
-  border-top: 1px solid var(--cioos-hairline);
-  padding-top: 14px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
 }
 
 .recordSectionHeader {
@@ -282,6 +300,31 @@
   margin-top: 2px;
   font-size: 0.85rem;
   color: var(--cioos-ink-60);
+}
+
+/* An ID column heading names the CF role the dataset uses for its records
+   (cf_role=profile_id / timeseries_id / trajectory_id) and, under it, the
+   variable carrying that role — set in mono so it reads as the source column's
+   own name rather than more prose. */
+.columnHeading {
+  display: block;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.columnHeadingLabel {
+  display: block;
+  white-space: normal;
+}
+
+.columnHeadingVariable {
+  display: block;
+  margin-top: 1px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: var(--cioos-ink-60);
+  overflow-wrap: anywhere;
 }
 
 /* The data table has fixed-width columns (~550px). On a phone we let it
@@ -314,14 +357,10 @@
   }
 
   .datasetTitleBlock {
-    padding: 10px 10px 8px 10px;
+    padding: 8px 10px;
   }
 
-  .datasetMetaSheet .metadataLabel {
-    flex: 0 0 70px;
-  }
-
-  .datasetTitleBlock .filterButton {
+  .datasetTitle {
     font-size: 1rem;
   }
 }

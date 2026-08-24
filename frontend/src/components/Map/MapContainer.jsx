@@ -12,20 +12,23 @@ export default function MapContainer () {
   const {
     mapQueryString,
     setLoading,
+    setBasemapLoading,
     setMapView,
     rangeLevels,
-    trajectoryRangeLevels,
-    obisRangeLevels,
+    coverageRangeLevels,
+    setViewportHexRange,
     griddapCoverageVisible,
     griddapCoverage,
     dataLayersVisible,
+    bathymetryVisible,
     activeWmsOverlay,
     projection,
-    basemap,
     zoomTarget,
+    drawRequest,
     mapRef,
+    featureQuery,
+    setFeatureQuery,
     tracksMode,
-    trajectoryHexes,
     debouncedScrubTime,
     trailingDays,
     dataLayers
@@ -33,43 +36,41 @@ export default function MapContainer () {
   const {
     polygon,
     setPolygon,
-    setPointsToReview,
     hoveredDataset,
     setHoveredDataset,
     inspectDataset,
-    selectedTrajectory,
-    selectTrajectoryFromMap
+    selectedTrajectory
   } = useSelection()
 
   return (
     <Map
       polygon={polygon}
       setPolygon={setPolygon}
-      setPointsToReview={setPointsToReview}
       setLoading={setLoading}
+      setBasemapLoading={setBasemapLoading}
       mapQueryString={mapQueryString}
       setMapView={setMapView}
       rangeLevels={rangeLevels}
-      trajectoryRangeLevels={trajectoryRangeLevels}
-      obisRangeLevels={obisRangeLevels}
-      offsetFlyTo={false}
+      coverageRangeLevels={coverageRangeLevels}
+      onViewportHexRange={setViewportHexRange}
+      onFeatureQuery={setFeatureQuery}
+      featureQuery={featureQuery}
       setHoveredDataset={setHoveredDataset}
       hoveredDataset={hoveredDataset}
       inspectDataset={inspectDataset}
       setDatasetsSelected={setDatasetsSelected}
       tracksMode={tracksMode}
-      trajectoryHexes={trajectoryHexes}
       scrubTime={debouncedScrubTime}
       trailingDays={trailingDays}
       selectedTrajectory={selectedTrajectory}
-      selectTrajectoryFromMap={selectTrajectoryFromMap}
       dataLayers={dataLayers}
       griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
       dataLayersVisible={dataLayersVisible}
+      bathymetryVisible={bathymetryVisible}
       activeWmsOverlay={activeWmsOverlay}
       projection={projection}
-      basemap={basemap}
       zoomTarget={zoomTarget}
+      drawRequest={drawRequest}
       mapRef={mapRef}
     />
   )

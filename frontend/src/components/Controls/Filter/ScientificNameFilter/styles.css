@@ -1,87 +1,31 @@
-.scientificNameFilter .filterHeader.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.scientificNameFilter .filterHeader.disabled:hover {
-  background-color: white;
-  border: 1px solid white;
-}
-
-.scientificNameChips {
+/* The Scientific Name options are the shared checkbox rows (see the
+   MultiCheckboxFilter stylesheet, which owns their hover and ticked states);
+   all that is left here is what a taxon row has that an organization row does
+   not — a name that is set in italics by convention, and a second line naming
+   the rank and the common name it was found under. */
+.scientificNameFilter .optionName {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 6px;
-  max-width: 420px;
+  flex-direction: column;
 }
 
-.scientificNameChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 6px;
-  border: 1px solid var(--cioos-hairline);
-  cursor: pointer;
-  font-weight: normal;
-  font-size: 13px;
-}
-
-.scientificNameChipName {
+.scientificNameOptionName {
   font-style: italic;
 }
 
-.scientificNameChipVernacular {
-  font-style: normal;
-  color: var(--cioos-ink);
-  font-size: 12px;
-}
-
-.scientificNameChip:hover {
-  background-color: var(--cioos-surface-2) !important;
-}
-
-.scientificNameSuggestions {
-  max-height: 260px;
-  min-width: 350px;
-  max-width: 500px;
-  overflow-y: auto;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: 6px;
-  margin-bottom: 6px;
-}
-
-.scientificNameSuggestion {
-  padding: 5px 8px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.scientificNameSuggestionPrimary {
-  font-style: italic;
-}
-
-.scientificNameSuggestionVernacular {
-  font-size: 12px;
-  color: var(--cioos-ink-60);
-  font-style: normal;
-  margin-top: 1px;
-}
-
-.scientificNameSuggestionRank {
-  font-style: italic;
+.scientificNameOptionDetail {
+  font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink-60);
 }
 
-.scientificNameSuggestion:hover {
-  background-color: var(--cioos-teal-light);
+.scientificNameOptionRank {
+  font-style: italic;
 }
 
 .scientificNameEmpty,
 .scientificNameLoading {
   padding: 8px;
   color: var(--cioos-ink-60);
-  font-size: 13px;
+  font-size: var(--cioos-font-size-sm);
 }
 
 .scientificNameLoading {

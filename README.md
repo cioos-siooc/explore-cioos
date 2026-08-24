@@ -46,11 +46,18 @@ is provided at runtime, so config changes never require an image rebuild. The
 worker resolves it in priority order (both when registering deployments at
 startup and again at the start of every flow run):
 
-1. **`HARVEST_CONFIG_YAML`** env var — the *full YAML content* inline
-   (Coolify-friendly: editable in the UI, applied on redeploy/recreate).
-2. **`HARVEST_CONFIG_FILE`** env var — path to a config file mounted into the
+1. **`HARVEST_CONFIG_B64`** env var — the *whole YAML file, base64-encoded on
+   one line*. This is the channel to use under Coolify; generate it with
+   `base64 < harvest_config.yaml | tr -d '\n'`. A value that fails to decode
+   (or decodes to something that isn't a YAML mapping) aborts startup — it
+   never silently falls back to a stale mounted config.
+2. **`HARVEST_CONFIG_YAML`** env var — the *raw YAML text*. **Deprecated**,
+   kept for deployments already using it: multi-line values do not survive
+   Coolify's env editor intact, which is the corruption `HARVEST_CONFIG_B64`
+   exists to avoid. Use it and you get a warning in the worker log.
+3. **`HARVEST_CONFIG_FILE`** env var — path to a config file mounted into the
    container (set to `/app/harvester/harvest_config.yaml` in the compose files).
-3. A file mounted at `/app/harvester/harvest_config.yaml` — locally via
+4. A file mounted at `/app/harvester/harvest_config.yaml` — locally via
    `docker-compose.override.yaml`, in production via the bind mount in
    `docker-compose.production.yaml`.
 
@@ -65,10 +72,10 @@ instead of silently harvesting the sample servers.
 | Values in the mounted file (`cache`, `incremental`, `dataset_ids`, …) | Nothing — the next flow run re-reads the file |
 | `erddap_urls`, or turning OBIS on/off (`obis_discovery.enabled`) | `docker compose restart prefect_worker` — startup re-registers the per-source deployments |
 | Which OBIS datasets are harvested | Nothing — `obis_discovery` re-queries the OBIS API on every OBIS harvest, so new Canadian datasets are picked up automatically |
-| Anything set via env (`HARVEST_CONFIG_YAML`, `HARVESTER_CRON`, `.env` values) | `docker compose up -d --force-recreate prefect_worker` — a plain `restart` reuses the old container **and its old environment** (on Coolify: redeploy the resource) |
+| Anything set via env (`HARVEST_CONFIG_B64`/`HARVEST_CONFIG_YAML`, `HARVESTER_CRON`, `.env` values) | `docker compose up -d --force-recreate prefect_worker` — a plain `restart` reuses the old container **and its old environment** (on Coolify: redeploy the resource) |
 
 Remote workers (`docker-compose.worker.yaml`) execute flows too, so they need
-the *same* config as the primary stack — via `HARVEST_CONFIG_YAML` in their
+the *same* config as the primary stack — via `HARVEST_CONFIG_B64` in their
 `.env` or a local file mount (see the comments in that compose file).
 
 This will register the flow with the Prefect server. You can then trigger runs from the UI or let the schedule take over.
@@ -208,11 +215,29 @@ under Coolify (the source resolves to an empty persistent-storage dir), and the
 image no longer bakes a config (the old `BAKED_HARVEST_CONFIG` build variable
 is gone). Provide the config one of two ways:
 
-- Set the **`HARVEST_CONFIG_YAML`** env var on the resource to the full YAML
-  content (multi-line values are supported — the indentation Coolify adds is
-  stripped automatically). Edit it in the UI and redeploy to apply.
-- Or add a **Persistent Storage file mount** onto
-  `/app/harvester/harvest_config.yaml`.
+- Set the **`HARVEST_CONFIG_B64`** env var on the resource to the whole YAML
+  file, base64-encoded onto a single line:
+
+  ```sh
+  base64 < harvest_config.production.yaml | tr -d '\n'
+  ```
+
+  Paste that one line as the value, then **redeploy** the resource (a restart
+  reuses the old environment). To check what a deployed value holds, run
+  `echo "$HARVEST_CONFIG_B64" | base64 -d`.
+
+  Do *not* paste raw multi-line YAML into an env var. Coolify's env editor
+  reindents continuation lines and mangles `#` comments on the way to the
+  generated `.env`, so the config arrives corrupted — which is exactly why this
+  value is base64. To edit the config, change the YAML file in the repo and
+  re-encode it. (`HARVEST_CONFIG_YAML` still accepts raw YAML for existing
+  deployments, but it is deprecated for precisely this reason.)
+
+- Or, if you want the config to stay human-editable in the Coolify UI, add a
+  **Persistent Storage file mount** onto `/app/harvester/harvest_config.yaml`
+  and paste the YAML there instead. `HARVEST_CONFIG_FILE` already points at that
+  path in `docker-compose.yaml`. (Note this is a Coolify-managed *file* mount —
+  a relative bind mount of a repo file in the compose file does not work.)
 
 Without one of these the `prefect_worker` container exits at startup with a
 message explaining the options.

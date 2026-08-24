@@ -1,34 +1,30 @@
 import * as React from 'react'
-import { useMemo } from 'react'
-import classNames from 'classnames'
+import { useCallback, useMemo } from 'react'
 import { ZoomIn } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 
 import { useMapState } from '../../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { boundsAreFramed, boundsFromGeoJson } from '../../../utilities.jsx'
-import './styles.css'
 
-// Frames the map on the open dataset's footprint. Rendered twice, from the same
-// state: floating over the lower-centre of the map (from AppShell), and inline
-// in the dataset page's title block (from DatasetInspector) — whichever the
-// user's eye is on, the action is there. Both read the dataset from context, so
-// neither needs it passed in.
+// Framing the map on the open dataset's footprint. The map never does this on
+// its own — opening a dataset page only highlights that dataset among the rest
+// (see hoverHighlightPoints in Map.jsx), it doesn't move the camera — so this
+// is the one place the camera is asked to travel, from the button below or
+// from a double-click on the dataset's title (DatasetInspector).
 //
-// The other datasets don't need filtering out of the way — an open dataset page
-// already greys them on the map (see hoverHighlightPoints in Map.jsx), so the
-// framed view shows this dataset in colour against them.
+// The button renders into the dataset page's title bar and is styled there,
+// alongside the filter action it sits with (see DatasetInspector/styles.css).
 //
 // filtered_bbox_geojson is the extent of the features the current filters
 // actually matched, so the framing follows the filters — narrowing the time
 // range or drawing a polygon reframes to what's left. Grids have no features,
 // so theirs is the coverage bbox (see shapeQuery.js).
 //
-// Both copies disappear once the map is already framed on that extent: there is
-// nothing left to do, and they would otherwise sit there inviting a no-op click.
-// Panning or zooming away brings them back.
-export default function ZoomToDataset ({ variant = 'floating' }) {
-  const { t } = useTranslation()
+// `framed` is true once the map already shows that extent: there is nothing
+// left to do, and the button hides itself rather than sit there inviting a
+// no-op click. Panning or zooming away brings it back.
+export function useZoomToDataset () {
   const { inspectDataset } = useSelection()
   const { zoomToGeometry, mapRef, mapView } = useMapState()
 
@@ -43,17 +39,28 @@ export default function ZoomToDataset ({ variant = 'floating' }) {
     [bounds, mapView]
   )
 
-  if (!bounds || framed) return null
+  const zoomToDataset = useCallback(() => {
+    if (footprint) zoomToGeometry(footprint)
+  }, [footprint, zoomToGeometry])
+
+  return { zoomToDataset, canZoom: Boolean(bounds), framed }
+}
+
+export default function ZoomToDataset () {
+  const { t } = useTranslation()
+  const { zoomToDataset, canZoom, framed } = useZoomToDataset()
+
+  if (!canZoom || framed) return null
 
   return (
     <button
       type='button'
-      className={classNames('zoomToDatasetButton', variant)}
-      onClick={() => zoomToGeometry(footprint)}
+      className='zoomToDatasetButton'
+      onClick={zoomToDataset}
       title={t('zoomToDatasetTitle')}
+      aria-label={t('zoomToDatasetText')}
     >
-      <ZoomIn size={16} aria-hidden='true' />
-      {t('zoomToDatasetText')}
+      <ZoomIn size={15} aria-hidden='true' />
     </button>
   )
 }

@@ -46,10 +46,14 @@ export default function SourceFilter({
   const showObisGroup =
     obisNodesSelected.length > 0 && (!search || nodesShown.length > 0)
 
+  // Nothing ticked anywhere constrains nothing, so an empty selection already
+  // means every source — see MultiCheckboxFilter. Shown as it is stored: no
+  // ticks until the user picks something.
+  const isChecked = (option) => option.isSelected
+
   const allNodesSelected =
-    obisNodesSelected.length > 0 &&
-    obisNodesSelected.every((node) => node.isSelected)
-  const someNodesSelected = obisNodesSelected.some((node) => node.isSelected)
+    obisNodesSelected.length > 0 && obisNodesSelected.every(isChecked)
+  const someNodesSelected = obisNodesSelected.some(isChecked)
 
   function toggleServer(pk) {
     setErddapServersSelected(
@@ -91,11 +95,11 @@ export default function SourceFilter({
       {serversShown.map((server) => (
         <div
           key={server.pk}
-          className={`optionButton ${server.isSelected && 'selected'}`}
+          className={`optionButton ${isChecked(server) && 'selected'}`}
           title={server.title}
           onClick={() => toggleServer(server.pk)}
         >
-          {server.isSelected ? <CheckSquare /> : <Square />}
+          {isChecked(server) ? <CheckSquare /> : <Square />}
           <span className='optionName'>
             {capitalizeFirstLetter(server.title)}
           </span>
@@ -131,11 +135,11 @@ export default function SourceFilter({
               {nodesShown.map((node) => (
                 <div
                   key={node.pk}
-                  className={`optionButton ${node.isSelected && 'selected'}`}
+                  className={`optionButton ${isChecked(node) && 'selected'}`}
                   title={node.title}
                   onClick={() => toggleNode(node.pk)}
                 >
-                  {node.isSelected ? <CheckSquare /> : <Square />}
+                  {isChecked(node) ? <CheckSquare /> : <Square />}
                   <span className='optionName'>{node.title}</span>
                 </div>
               ))}

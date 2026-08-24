@@ -4,6 +4,17 @@
 
 ### Bugs
 - [ ] Fix hexes at high latitude for trajectories.
+- [x] Fix click on map grid box / hex / marker interaction — one click handler
+      for every layer, answered by the "what's here" card, instead of six
+      handlers doing five unrelated things behind a stand-aside ladder.
+- [ ] Update hexes colormap base on visible hexes
+- [ ] Make icons in dataset page vertically stacked
+
+### Map interaction follow-ups
+- [ ] Give the datasets sheet a mid snap point on phones, so the list and the
+      map are visible together. Deliberately left alone for now: the sheet drag
+      was removed on purpose in "on phones the sheet waits to be asked for".
+- [ ] Long-press on the map as "add everything here" without opening the card.
 
 ### Downloader — test and fix
 - [ ] Trajectory
@@ -15,7 +26,7 @@
 - [ ] Add Optional Banner to present to user the very first time for form or question with markdown and date limit option.
 
 ### Dataset types & integrations
-- [ ] Integrate full trajectory dataset view from Richard.
+- [x] Integrate full trajectory dataset view from Richard.
 - [ ] Add Point type datasets, add flag for large Point datasets. Some datasets are wrongly defined as Point datasets while they are more likely something else.
 
 ### Onboarding
@@ -34,9 +45,9 @@
     - Symptom: Family-and-above scientific-name filters quietly under-match while Species-level looks perfect (only the higher ranks need the AphiaID rolldown; species also match on the literal name).
     - Not visible in the typeahead: the rows exist with rank and vernacular, it's `ancestor_aphia_ids` that's incomplete — so it reads as missing OBIS data rather than an unfinished backfill.
     - Suggested check: assert a known family (e.g. Laridae) expands to the expected order of magnitude of AphiaIDs. Hit on dev 2026-08-07 when a redeploy landed mid-run.
-- [ ] Improve dataset incremental upload to db.
-- [ ] Improve database indexing for speeding up calls.
-- [ ] Harvester incremental update freezes the database and frontend on load — avoid doing that.
+- [x] Improve dataset incremental upload to db.
+- [x] Improve database indexing for speeding up calls.
+- [x] Harvester incremental update freezes the database and frontend on load — avoid doing that.
 
 ## Testing
 - [ ] Add frontend testing for the different items:
@@ -54,8 +65,8 @@
 - [ ] Review Mapbox terms and services to see if we're still within the low-cost range.
 
 ## Open questions for reviewers
-- [ ] Should we add more map backgrounds?
-- [ ] Should we use only a single map background?
+- [x] Should we add more map backgrounds?
+- [x] Should we use only a single map background?
 - [ ] Should we default to globe view?
 - [ ] Group by source should separate by the different ERDDAP servers.
 - [ ] Review UI logic of dataset selected / filter activated / defaults / WMS servers.
