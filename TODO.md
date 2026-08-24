@@ -30,7 +30,7 @@
 ### Dataset types & integrations
 - [x] Integrate full trajectory dataset view from Richard.
 - [x] Add Point type datasets, add flag for large Point datasets. Some datasets are wrongly defined as Point datasets while they are more likely something else.
-  - Harvested behind structural QC (`dataset_types/point_quality.py`): mislabelled moorings, casts, gliders and drifters are skipped with an admin-facing diagnosis on the harvest dashboard. Large Point datasets are stored as coverage cells rather than exact samples.
+  - Harvested behind structural QC (`dataset_types/point_quality.py`): mislabelled moorings, casts, gliders and drifters are skipped with an admin-facing diagnosis on the harvest dashboard. Large Point datasets are stored as day/hex coverage (the trajectory pipeline's `trajectory_days`/`trajectory_hexes` model, as a single unnamed pseudo-trajectory) rather than exact samples.
   - Thresholds were calibrated against live datasets; revisit them as more Point datasets appear (see the module constants, each carries its reasoning).
 
 ### Onboarding
