@@ -47,7 +47,7 @@ datasetID,cdm_data_type,accessible,dataStructure
 ,,,
 test_timeseries_001,TimeSeries,public,table
 test_profile_001,Profile,public,table
-test_unsupported_001,Point,public,table
+test_unsupported_001,Other,public,table
 """
 
 # /info/{id}/index.csv — skiprows=[] so the header is row 0, data starts row 1.

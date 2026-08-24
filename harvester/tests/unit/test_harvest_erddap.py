@@ -21,6 +21,7 @@ from cde_harvester.core.errors import (
     CDM_DATA_TYPE_UNSUPPORTED,
     HTTP_ERROR,
 )
+from cde_harvester.dataset_types.base import DatasetQualityReport
 
 
 # ---------------------------------------------------------------------------
@@ -111,10 +112,43 @@ class TestHarvestErddapHappyPath:
 
 class TestHarvestErddapSkipping:
     def test_unsupported_cdm_type_skipped(self):
-        erddap_mock = _make_erddap_mock([("bad_ds", "Point")])
+        # "Other" is a real ERDDAP cdm_data_type with no handler. Point used to
+        # play this role and no longer can — it is harvested now, behind QC.
+        erddap_mock = _make_erddap_mock([("bad_ds", "Other")])
         result = _run_harvest(erddap_mock)
         assert "bad_ds" in result.skipped["dataset_id"].values
         assert CDM_DATA_TYPE_UNSUPPORTED in result.skipped["reason_code"].values
+
+    def test_failed_structural_qc_skips_with_its_reason_and_message(self):
+        """A handler's validate() hook rejecting a dataset is a skip, not an
+        error, and the admin-facing explanation reaches harvest_attempts."""
+        report = DatasetQualityReport(
+            "POINT_TRAJECTORY_SHAPED", "This is a glider; declare Trajectory."
+        )
+        erddap_mock = _make_erddap_mock([(DATASET_ID, "Point")])
+        with patch(
+            "cde_harvester.sources.erddap.harvester.validate_dataset",
+            return_value=report,
+        ):
+            result = _run_harvest(erddap_mock)
+
+        assert DATASET_ID not in result.datasets["dataset_id"].values
+        assert DATASET_ID in result.skipped["dataset_id"].values
+        assert "POINT_TRAJECTORY_SHAPED" in result.skipped["reason_code"].values
+
+        attempt = result.attempts[result.attempts["dataset_id"] == DATASET_ID].iloc[0]
+        assert attempt["status"] == "skipped"
+        assert attempt["reason_code"] == "POINT_TRAJECTORY_SHAPED"
+        assert attempt["error_message"] == "This is a glider; declare Trajectory."
+
+    def test_passing_structural_qc_harvests_normally(self):
+        erddap_mock = _make_erddap_mock([(DATASET_ID, "Point")])
+        with patch(
+            "cde_harvester.sources.erddap.harvester.validate_dataset",
+            return_value=None,
+        ):
+            result = _run_harvest(erddap_mock)
+        assert DATASET_ID in result.datasets["dataset_id"].values
 
     def test_non_compliant_dataset_added_to_skipped(self):
         """A dataset with no EOVs should fail compliance and appear in skipped."""

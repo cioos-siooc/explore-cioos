@@ -15,16 +15,16 @@ import './styles.css'
 
 // Which observation geometries the map draws. It behaves as every other filter
 // does, down to the semantics and not just the idiom: no ticks means unfiltered
-// (all six drawn), ticking narrows to what is ticked, and unticking the last one
-// returns to all. The selection gates the map tiles, the datasets list and the
-// counts alike (see datasetInDataLayers).
+// (every geometry drawn), ticking narrows to what is ticked, and unticking the
+// last one returns to all. The selection gates the map tiles, the datasets list
+// and the counts alike (see datasetInDataLayers).
 //
 // Each row carries a hint line: what the geometry means in plain terms and the
 // platforms that typically produce it. "TimeSeriesProfile" tells a data manager
 // exactly what it is and a visitor nothing at all, and the hint is what closes
 // that gap without renaming the CF types.
 //
-// Six rows and nothing else. The track-lines / hex-cells switches used to hang
+// One row per geometry and nothing else. The track-lines / hex-cells switches used to hang
 // off the trajectory pair here, which put the same two controls in two places
 // once the legend grew switches of its own — and they never belonged in a
 // filter: they change how the trajectories are drawn, not which datasets are

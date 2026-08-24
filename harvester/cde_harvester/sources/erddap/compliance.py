@@ -16,10 +16,16 @@ class CDEComplianceChecker(object):
         self.dataset = dataset
         self.logger = dataset.logger
         self.failure_reason_code = ""
+        # Human-readable version of the failure, read by harvest_dataset into
+        # cde.harvest_attempts.error_message. Until this was set, every
+        # compliance skip reached the harvest dashboard with a bare reason code
+        # and a null message.
+        self.failure_details = None
 
     def failed_error(self, msg, failure_reason_code):
         self.logger.error("Skipping dataset:" + msg)
         self.failure_reason_code = failure_reason_code
+        self.failure_details = msg
 
     def check_required_variables(self):
         # make sure LLAT variables exist. Depth/Altitude is assumed to be 0 if it doesnt exist

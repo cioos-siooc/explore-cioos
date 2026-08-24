@@ -39,7 +39,9 @@ from cde_harvester.dataset_types import (
     feature_kind_for,
     supported_cdm_data_types,
     supported_data_structures,
+    validate as validate_dataset,
 )
+from cde_harvester.core.observability import report_dataset_issue
 from cde_harvester.dataset_types.geo import POINT_THRESHOLD_M
 from cde_harvester.sources.erddap.state import load_previous_hashes
 from requests.exceptions import HTTPError
@@ -418,8 +420,34 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
         compliance_checker = CDEComplianceChecker(dataset)
 
         if compliance_checker.passes_all_checks():
+            # Structural QC: does the DATA match the geometry the dataset
+            # declares? Only Point implements this — it is ERDDAP's default
+            # cdm_data_type, so it cannot be taken at its word.
+            quality_report = validate_dataset(dataset)
+            if quality_report is not None:
+                duration_ms = int((time.monotonic() - t0) * 1000)
+                report_dataset_issue(
+                    dataset.logger,
+                    erddap_url=erddap_url,
+                    dataset_id=dataset_id,
+                    reason_code=quality_report.reason_code,
+                    message=quality_report.details,
+                )
+                return DatasetHarvestResult(
+                    status="skipped",
+                    skipped_reason_code=quality_report.reason_code,
+                    attempt=_build_attempt(
+                        run_id, erddap_url, dataset_id,
+                        status="skipped",
+                        reason_code=quality_report.reason_code,
+                        error_message=quality_report.details,
+                        duration_ms=duration_ms,
+                        query_urls=dataset.queried_urls,
+                    ),
+                )
+
             df_features = extract_features(dataset)
-            feature_kind = feature_kind_for(dataset.cdm_data_type)
+            feature_kind = feature_kind_for(dataset)
             if df_features.empty:
                 duration_ms = int((time.monotonic() - t0) * 1000)
                 log.warning("No %s found", feature_kind)

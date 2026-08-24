@@ -10,6 +10,18 @@ ON_SKIP_LIST = "ON_SKIP_LIST"
 RESPONSE_TOO_LARGE = "RESPONSE_TOO_LARGE"
 UNCHANGED = "UNCHANGED"
 
+# Structural QC failures for cdm_data_type=Point (see dataset_types/point_quality.py).
+# Point is what ERDDAP generates when a dataset admin sets nothing, so the type is
+# full of moorings, casts, gliders and drifters whose admin never corrected the
+# default. Each code names the geometry the data ACTUALLY has, so the message on
+# the harvest dashboard can tell the admin which cdm_data_type to declare instead.
+POINT_DUPLICATE_RECORDS = "POINT_DUPLICATE_RECORDS"        # repeated identical time+position+depth
+POINT_MULTI_DEPTH_PER_SITE = "POINT_MULTI_DEPTH_PER_SITE"  # casts: many depths at one time+position
+POINT_REPEATED_LOCATIONS = "POINT_REPEATED_LOCATIONS"      # stations: few positions, many records each
+POINT_TRAJECTORY_SHAPED = "POINT_TRAJECTORY_SHAPED"        # a moving platform (glider, drifter, ship)
+POINT_SINGLE_LOCATION = "POINT_SINGLE_LOCATION"            # one fixed position: a mooring
+POINT_QC_INCONCLUSIVE = "POINT_QC_INCONCLUSIVE"            # every probe failed; nothing was verified
+
 # Why a dataset has no content_hash (stored on cde.datasets.content_hash_reason).
 # Distinct from the harvest-status reason codes above: these explain hash *absence*,
 # not why a harvest attempt was skipped/errored. A NULL reason means a hash was produced.

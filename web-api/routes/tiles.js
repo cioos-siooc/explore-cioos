@@ -65,12 +65,31 @@ function requestedTrajectoryTypes(query) {
     .filter((t) => ALL_TRAJECTORY_TYPES.includes(t));
 }
 
-// A predicate restricting a trajectory table to the requested types, or '' when
-// the restriction would be a no-op. Both types requested needs no filter; none
+// Point is the one cdm_data_type that is not tied to a single table: the
+// harvester stores a small Point dataset as exact rows in cde.profiles and a
+// large one as day/hex coverage in cde.trajectory_hexes, sharing the
+// trajectory pipeline as a single unnamed pseudo-trajectory (see the Point
+// handler).
+// A dataset's rows only ever live in ONE of them, so naming Point in both
+// allowlists yields the right union without the client needing to know which
+// table any given dataset landed in.
+//
+// Which means the Point layer is carried on the profileTypes param alone —
+// one switch, both branches — and ALL_TRAJECTORY_TYPES stays as it was, since
+// it also drives /tiles/tracks where Point has nothing to contribute.
+const ALL_CELL_TYPES = [...ALL_TRAJECTORY_TYPES, "Point"];
+
+function requestedCellTypes(query, profileTypes) {
+  const types = requestedTrajectoryTypes(query);
+  return profileTypes.includes("Point") ? [...types, "Point"] : types;
+}
+
+// A predicate restricting a cell table to the requested types, or '' when the
+// restriction would be a no-op. Every type requested needs no filter; none
 // requested never reaches a branch (callers drop it instead), so the emptiness
 // check here is belt-and-braces rather than a live case.
-function trajectoryTypePredicate(types) {
-  if (!types.length || types.length === ALL_TRAJECTORY_TYPES.length) return "";
+function cellTypePredicate(types) {
+  if (!types.length || types.length === ALL_CELL_TYPES.length) return "";
   return `dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${types
     .map((t) => `'${t}'`)
     .join(",")}))`;
@@ -161,18 +180,18 @@ router.get(
     // Data-type layer toggle (map layer selector). Trajectories: an explicit
     // includeTrajectory=false hides them. Profiles: the profileTypes param is
     // the comma list of cdm_data_types to show (Profile / TimeSeries /
-    // TimeSeriesProfile — all three share cde.profiles); absent = all three
-    // (pre-toggle behaviour), empty = none. Values are validated against the
-    // fixed set below so they can be inlined into the branch SQL safely.
-    const ALL_PROFILE_TYPES = ['Profile', 'TimeSeries', 'TimeSeriesProfile'];
+    // TimeSeriesProfile / Point — all four can appear in cde.profiles);
+    // absent = all of them (pre-toggle behaviour), empty = none. Values are
+    // validated against the fixed set below so they can be inlined into the
+    // branch SQL safely.
+    const ALL_PROFILE_TYPES = ['Profile', 'TimeSeries', 'TimeSeriesProfile', 'Point'];
     const profileTypes = req.query.profileTypes === undefined
       ? ALL_PROFILE_TYPES
       : String(req.query.profileTypes)
           .split(',')
           .filter((t) => ALL_PROFILE_TYPES.includes(t));
     const trajectoryToggledOn = req.query.includeTrajectory !== 'false';
-    const trajectoryTypes = requestedTrajectoryTypes(req.query);
-    // ERDDAP-sourced data (profiles + trajectory coverage) is hidden wholesale
+    // ERDDAP-sourced data (profiles + coverage cells) is hidden wholesale
     // when an OBIS-only filter is active: scientific-name filters are
     // OBIS-only, and an OBIS-node selection also hides it, unless ERDDAP
     // servers are selected alongside it (combined Source filter — show both,
@@ -180,8 +199,15 @@ router.get(
     const erddapVisible = !req.query.scientificNames
       && (!req.query.obisNodes || Boolean(req.query.erddapServers));
     const includeProfiles = erddapVisible && profileTypes.length > 0;
-    const includeTrajectory = trajectoryToggledOn
-      && erddapVisible && trajectoryTypes.length > 0;
+    // includeTrajectory=false is the trajectory layer's own switch (tracks
+    // mode, where lines replace the coverage hexes). It must not take Point
+    // cells down with it — those belong to a different layer that happens to
+    // share the table.
+    const cellTypes = requestedCellTypes(req.query, profileTypes);
+    const visibleCellTypes = trajectoryToggledOn
+      ? cellTypes
+      : cellTypes.filter((t) => t === 'Point');
+    const includeCells = erddapVisible && visibleCellTypes.length > 0;
 
     // At hex zoom we only need the hex FK and point_pk (for distinct counts);
     // the polygon is fetched once per hex via JOIN to hexes_zoom_*. At point
@@ -193,8 +219,8 @@ router.get(
     // for profiles, the cell point otherwise) backs the shared spatial filter.
     // When only some profile types are requested, additionally restrict the
     // branch to datasets of those cdm_data_types (values allowlisted above →
-    // safe to inline). All-three or none → no type filter (none never reaches
-    // the branch).
+    // safe to inline). All of them, or none → no type filter (none never
+    // reaches the branch).
     const profilesTypeFilter =
       profileTypes.length && profileTypes.length < ALL_PROFILE_TYPES.length
         ? ` AND dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${profileTypes
@@ -204,26 +230,28 @@ router.get(
     const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${recordCountExpr('profiles', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
     FROM cde.profiles WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ''} AND :profileFilters`;
-    // Both cell tables (trajectory coverage cells and OBIS occurrence cells)
-    // merge into the combined hex counts (z<7, the green ramp) but never
-    // appear as individual points (z>=7). Their cell spacing is a grid
+    // Both cell tables (trajectory + Point coverage hexes and OBIS occurrence
+    // cells) merge into the combined hex counts (z<7, the green ramp) but
+    // never appear as individual points (z>=7). Their cell spacing is a grid
     // artifact, not a measurement location, so at point zoom they're shown
     // only via the dedicated always-hex coverage layer from
     // /tiles/cells/:z/:x/:y.mvt.
     // Same shape as profilesTypeFilter above: restrict to the requested
     // geometries when only some are on, and combine with the tile prefilter
     // into one WHERE (either, both, or neither can be present).
-    const trajectoryConds = [
+    const cellConds = [
       cellPrefilter,
-      trajectoryTypePredicate(trajectoryTypes),
+      cellTypePredicate(visibleCellTypes),
     ].filter(Boolean);
     // cde.trajectory_hexes is already keyed on the hex, one row per
     // (dataset, trajectory, tier, hex) — hence `hex_pk as zoom_pk` and a tier
     // predicate where the other branches carry two hex FK columns. point_pk is
-    // NULL because trajectory coverage never renders at the point tier.
-    const trajectoryBranch = `SELECT NULL::integer as point_pk, dataset_pk, hex_pk as zoom_pk, geom as point_geom, ${recordCountExpr('trajectory_hexes', metric)},
+    // NULL because trajectory/Point coverage never renders at the point tier
+    // (a large Point dataset lands here too — see the Point handler — sharing
+    // this table via cellTypePredicate rather than a dedicated one).
+    const cellBranch = `SELECT NULL::integer as point_pk, dataset_pk, hex_pk as zoom_pk, geom as point_geom, ${recordCountExpr('trajectory_hexes', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_hexes WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(' AND ')}` : ''}`;
+    FROM cde.trajectory_hexes WHERE hex_tier = ${hexTier}${cellConds.length ? ` AND ${cellConds.join(' AND ')}` : ''}`;
     const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
            ${recordCountExpr('obis_cells', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
@@ -232,9 +260,9 @@ router.get(
 
     const branches = [];
     if (includeProfiles) branches.push(profilesBranch);
-    // Trajectory coverage cells only join the combined hex counts at hex zoom;
-    // at point zoom they're shown via the dedicated /tiles/cells layer.
-    if (includeTrajectory && isHexGrid) branches.push(trajectoryBranch);
+    // Coverage cells only join the combined hex counts at hex zoom; at point
+    // zoom they're shown via the dedicated /tiles/cells layer.
+    if (includeCells && isHexGrid) branches.push(cellBranch);
     if (includeObis && isHexGrid) branches.push(obisBranch);
     // Guard: if nothing to show, return an empty CTE that still has the right
     // columns. Wrapped in a subquery so it holds even when profilesBranch
@@ -392,16 +420,22 @@ router.get(
     const includeObis = req.query.includeObis !== 'false';
     const metric = parseMetric(req.query.metric);
     // Same gating as the main tile route: scientific-name filters are
-    // OBIS-only, so they hide the (ERDDAP) trajectory cells; an OBIS-node
+    // OBIS-only, so they hide the (ERDDAP) coverage cells; an OBIS-node
     // selection does too, unless ERDDAP servers are selected alongside it.
-    // On top of that, an explicit includeTrajectory=false hides them — the
-    // trajectories layer toggle, and tracks mode (where track lines replace
-    // the coverage hexes but OBIS cells stay).
-    // ...and, since the two trajectory geometries are separate layers, the
-    // requested subset of them; with neither on there is nothing to draw.
-    const trajectoryTypes = requestedTrajectoryTypes(req.query);
-    const includeProfiles = req.query.includeTrajectory !== 'false'
-      && trajectoryTypes.length > 0
+    // On top of that, an explicit includeTrajectory=false hides the
+    // trajectory ones — the trajectories layer toggle, and tracks mode (where
+    // track lines replace the coverage hexes but OBIS cells stay). Large
+    // Point datasets share this table but not that switch, so they survive it.
+    // ...and, since the geometries are separate layers, the requested subset
+    // of them; with none on there is nothing to draw.
+    const cellProfileTypes = req.query.profileTypes === undefined
+      ? ['Point']
+      : String(req.query.profileTypes).split(',');
+    const cellTypes = requestedCellTypes(req.query, cellProfileTypes);
+    const visibleCellTypes = req.query.includeTrajectory !== 'false'
+      ? cellTypes
+      : cellTypes.filter((t) => t === 'Point');
+    const includeCells = visibleCellTypes.length > 0
       && !req.query.scientificNames
       && (!req.query.obisNodes || Boolean(req.query.erddapServers));
 
@@ -411,7 +445,7 @@ router.get(
     // ever read behind its own FILTER below.
     const trajectoryConds = [
       cellPrefilter,
-      trajectoryTypePredicate(trajectoryTypes),
+      cellTypePredicate(visibleCellTypes),
     ].filter(Boolean);
     const trajectoryBranch = `SELECT dataset_pk, hex_pk as zoom_pk, 'trajectory' as src,
            trajectory_id, ${recordCountExpr('trajectory_hexes', metric)},
@@ -424,7 +458,7 @@ router.get(
     WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
 
     const branches = [];
-    if (includeProfiles) branches.push(trajectoryBranch);
+    if (includeCells) branches.push(trajectoryBranch);
     if (includeObis) branches.push(obisBranch);
     // Guard: if nothing to show, return an empty CTE that still has the right
     // columns. Wrapped in a subquery so it holds even when trajectoryBranch
