@@ -57,6 +57,32 @@ export default function GriddapDetails({
 
   return (
     <div className='griddapDetails'>
+      {dataset.wms_url ? (
+        <div className='metadataGridItem griddapWmsControls'>
+          <strong>{t('griddapMapPreviewTitle')}</strong>
+          <Switch
+            id='griddapShowOnMapSwitch'
+            label={t('griddapShowOnMapToggle')}
+            checked={overlayActive}
+            disabled={!variables.length}
+            onChange={(event) =>
+              event.target.checked ? showOverlay() : setActiveWmsOverlay()
+            }
+          />
+          {overlayActive && sidebarOpen && (
+            <WmsLegend
+              overlay={activeWmsOverlay}
+              variant='inline'
+              onClose={() => setActiveWmsOverlay()}
+              setActiveWmsOverlay={setActiveWmsOverlay}
+            />
+          )}
+        </div>
+      ) : (
+        <div className='metadataGridItem griddapNoWms'>
+          {t('griddapNoWmsText')}
+        </div>
+      )}
       <div className='metadataGridItem'>
         <strong>{t('griddapDimensionsTitle')}</strong>
         {/* One card per axis rather than a 5-column table: at the sidebar's
@@ -112,32 +138,6 @@ export default function GriddapDetails({
           ))}
         </ul>
       </div>
-      {dataset.wms_url ? (
-        <div className='metadataGridItem griddapWmsControls'>
-          <strong>{t('griddapMapPreviewTitle')}</strong>
-          <Switch
-            id='griddapShowOnMapSwitch'
-            label={t('griddapShowOnMapToggle')}
-            checked={overlayActive}
-            disabled={!variables.length}
-            onChange={(event) =>
-              event.target.checked ? showOverlay() : setActiveWmsOverlay()
-            }
-          />
-          {overlayActive && sidebarOpen && (
-            <WmsLegend
-              overlay={activeWmsOverlay}
-              variant='inline'
-              onClose={() => setActiveWmsOverlay()}
-              setActiveWmsOverlay={setActiveWmsOverlay}
-            />
-          )}
-        </div>
-      ) : (
-        <div className='metadataGridItem griddapNoWms'>
-          {t('griddapNoWmsText')}
-        </div>
-      )}
     </div>
   )
 }
