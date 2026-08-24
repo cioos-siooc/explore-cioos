@@ -35,7 +35,7 @@ jobs:
         run: |
           SSH_CMD="ssh -i ~/.ssh/deploy_key github-runner@${{ secrets.SERVER_IP }}"
           STACK="explore-cioos-${{ github.ref_name == 'master' && 'production' || 'development' }}"
-          ${SSH_CMD} "cd /srv/services/explore-cioos && docker compose -p ${STACK} -f docker-compose.production.yaml --profile tools run -d --rm harvester"
+          ${SSH_CMD} "cd /srv/services/explore-cioos && docker compose -p ${STACK} -f docker-compose.yaml -f docker-compose.production.yaml --profile tools run -d --rm harvester"
 
       - name: Tear down WireGuard
         if: always()
