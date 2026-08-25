@@ -663,7 +663,10 @@ def cde_rebuild_database_run(
     run_harvest: trigger "Harvest All Sources" afterwards to repopulate (the rebuilt
     schema is empty, so the app has no data until a harvest completes).
     """
-    logger = get_run_logger()
+    # _run_logger (not get_run_logger) so the flow body also works when called
+    # directly via .fn outside a run context — which is how it is tested, and how it
+    # can be driven by hand if the Prefect API is unreachable.
+    logger = _run_logger()
 
     expected = check_confirmation(
         confirm, db_name=core_db.db_name(), host=core_db.db_host()
@@ -700,12 +703,28 @@ def cde_rebuild_database_run(
         )
         return report
 
+    # The schema rebuild above is already committed and irreversible. A failure to
+    # SUBMIT the follow-up harvest (deployment not registered yet on a brand-new
+    # install, API hiccup) must not fail this flow: a red run after a successful drop
+    # invites someone to re-run a destructive operation that already did its job. Report
+    # it in the result and let the harvest be triggered by hand.
     logger.info("Triggering 'Harvest All Sources' to repopulate the empty schema")
-    run_deployment(
-        name="Harvest All Sources/cde-harvest-all",
-        parameters={"triggered_by": triggered_by or "rebuild-database"},
-        timeout=0,
-    )
+    try:
+        run_deployment(
+            name="Harvest All Sources/cde-harvest-all",
+            parameters={"triggered_by": triggered_by or "rebuild-database"},
+            timeout=0,
+        )
+        report["harvest_triggered"] = True
+    except Exception as e:
+        report["harvest_triggered"] = False
+        report["harvest_trigger_error"] = str(e)
+        logger.error(
+            "Schema was rebuilt, but triggering 'Harvest All Sources' failed (%s). The "
+            "database is EMPTY until a harvest runs — trigger it manually. Do NOT re-run "
+            "the rebuild; it already completed.",
+            e,
+        )
     return report
 
 

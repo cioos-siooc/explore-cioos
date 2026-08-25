@@ -292,3 +292,88 @@ class TestRequiredDbSettings:
         monkeypatch.setenv("DB_HOST_EXTERNAL", "db")
         monkeypatch.chdir(tmp_path)
         assert core_db.database_url() == "postgresql://postgres:p@db:5432/cde"
+
+
+class TestRebuildFlowBody:
+    """The flow body, called via .fn (no Prefect API needed).
+
+    The ordering property under test: everything after rebuild_schema() runs AFTER an
+    irreversible DROP SCHEMA, so none of it may turn a completed rebuild into a failed
+    flow run — a red run invites re-running a destructive operation that already worked.
+    """
+
+    @staticmethod
+    def _flow():
+        from cde_harvester.prefect_pipeline import cde_rebuild_database_run
+
+        return cde_rebuild_database_run.fn
+
+    @staticmethod
+    def _patch(monkeypatch, *, rebuild=None, trigger=None, flush=None):
+        from cde_harvester import prefect_pipeline as pp
+
+        default_report = {
+            "schema": "cde",
+            "init_file": "1_schema.sql",
+            "function_files": ["4_create_hexes.sql"],
+            "tables_created": 18,
+        }
+        monkeypatch.setattr(
+            pp, "rebuild_schema", rebuild or (lambda engine: dict(default_report))
+        )
+        monkeypatch.setattr(pp, "run_deployment", trigger or (lambda **kw: None))
+        monkeypatch.setattr(pp, "clearRedisCache", flush or (lambda: None))
+        monkeypatch.setattr(pp.core_db, "create_db_engine", lambda **kw: _FakeEngine())
+        monkeypatch.setattr(pp.core_db, "db_name", lambda: "cde")
+        monkeypatch.setattr(pp.core_db, "db_host", lambda: "db")
+
+    def test_happy_path_reports_trigger(self, monkeypatch):
+        self._patch(monkeypatch)
+        report = self._flow()(confirm="cde")
+        assert report["tables_created"] == 18
+        assert report["harvest_triggered"] is True
+
+    def test_harvest_trigger_failure_does_not_fail_the_flow(self, monkeypatch):
+        def boom(**kw):
+            raise RuntimeError("deployment not found")
+
+        self._patch(monkeypatch, trigger=boom)
+        report = self._flow()(confirm="cde")
+        assert report["harvest_triggered"] is False
+        assert "deployment not found" in report["harvest_trigger_error"]
+
+    def test_redis_flush_failure_does_not_fail_the_flow(self, monkeypatch):
+        def boom():
+            raise RuntimeError("no redis here")
+
+        self._patch(monkeypatch, flush=boom)
+        report = self._flow()(confirm="cde")
+        assert report["harvest_triggered"] is True
+
+    def test_wrong_confirm_aborts_before_touching_the_schema(self, monkeypatch):
+        called = []
+        self._patch(monkeypatch, rebuild=lambda engine: called.append(1) or {})
+        with pytest.raises(ValueError, match="DESTROYS ALL DATA"):
+            self._flow()(confirm="nope")
+        assert called == [], "rebuild_schema must not run when confirmation fails"
+
+    def test_run_harvest_false_skips_the_trigger(self, monkeypatch):
+        called = []
+        self._patch(monkeypatch, trigger=lambda **kw: called.append(1))
+        report = self._flow()(confirm="cde", run_harvest=False)
+        assert called == []
+        assert "harvest_triggered" not in report
+
+    def test_rebuild_failure_does_propagate(self, monkeypatch):
+        """A failure of the rebuild itself must fail the run — nothing was committed."""
+        def boom(engine):
+            raise RuntimeError("lock timeout")
+
+        self._patch(monkeypatch, rebuild=boom)
+        with pytest.raises(RuntimeError, match="lock timeout"):
+            self._flow()(confirm="cde")
+
+
+class _FakeEngine:
+    def dispose(self):
+        pass
