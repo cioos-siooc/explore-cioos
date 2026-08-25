@@ -230,3 +230,65 @@ class TestDotenvSearchesAncestors:
         monkeypatch.chdir(tmp_path)
         with pytest.raises(ValueError, match="cwd="):
             schema.check_confirmation("cde", db_name=None)
+
+
+class TestRequiredDbSettings:
+    """A fresh Coolify deployment supplies none of the DB_* settings (see
+    .env.coolify.sample). Without them the worker used to start, register deployments,
+    and then fail inside every flow run — so they are reported up front instead."""
+
+    def test_missing_settings_are_all_reported(self, tmp_path, monkeypatch):
+        from cde_harvester.core import db as core_db
+
+        for v in core_db.REQUIRED_DB_SETTINGS:
+            monkeypatch.delenv(v, raising=False)
+        monkeypatch.chdir(tmp_path)
+        assert set(core_db.missing_db_settings()) == set(core_db.REQUIRED_DB_SETTINGS)
+
+    def test_nothing_missing_when_complete(self, tmp_path, monkeypatch):
+        from cde_harvester.core import db as core_db
+
+        monkeypatch.setenv("DB_NAME", "cde")
+        monkeypatch.setenv("DB_USER", "postgres")
+        monkeypatch.setenv("DB_PASSWORD", "p")
+        monkeypatch.chdir(tmp_path)
+        assert core_db.missing_db_settings() == []
+
+    def test_partial_config_reports_only_the_gaps(self, tmp_path, monkeypatch):
+        from cde_harvester.core import db as core_db
+
+        monkeypatch.setenv("DB_NAME", "cde")
+        monkeypatch.delenv("DB_USER", raising=False)
+        monkeypatch.delenv("DB_PASSWORD", raising=False)
+        monkeypatch.chdir(tmp_path)
+        assert core_db.missing_db_settings() == ["DB_USER", "DB_PASSWORD"]
+
+    def test_empty_string_counts_as_missing(self, tmp_path, monkeypatch):
+        """Coolify writes empty values for variables left blank in the UI."""
+        from cde_harvester.core import db as core_db
+
+        monkeypatch.setenv("DB_NAME", "")
+        monkeypatch.setenv("DB_USER", "postgres")
+        monkeypatch.setenv("DB_PASSWORD", "p")
+        monkeypatch.chdir(tmp_path)
+        assert core_db.missing_db_settings() == ["DB_NAME"]
+
+    def test_database_url_names_every_missing_setting(self, tmp_path, monkeypatch):
+        """Was a bare KeyError naming only the first gap, with no hint it was config."""
+        from cde_harvester.core import db as core_db
+
+        for v in core_db.REQUIRED_DB_SETTINGS:
+            monkeypatch.delenv(v, raising=False)
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(ValueError, match="DB_NAME, DB_USER, DB_PASSWORD"):
+            core_db.database_url()
+
+    def test_database_url_still_builds_when_complete(self, tmp_path, monkeypatch):
+        from cde_harvester.core import db as core_db
+
+        monkeypatch.setenv("DB_NAME", "cde")
+        monkeypatch.setenv("DB_USER", "postgres")
+        monkeypatch.setenv("DB_PASSWORD", "p")
+        monkeypatch.setenv("DB_HOST_EXTERNAL", "db")
+        monkeypatch.chdir(tmp_path)
+        assert core_db.database_url() == "postgresql://postgres:p@db:5432/cde"

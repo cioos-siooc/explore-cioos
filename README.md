@@ -354,6 +354,10 @@ socket). Since we use Prefect for orchestration, you don't need a system cron jo
    transaction (a mid-way failure rolls back rather than half-migrating), flushes the
    redis tile cache, and triggers `Harvest All Sources` to repopulate.
 
+   Requires `DB_NAME`/`DB_USER`/`DB_PASSWORD` on the deployment — Coolify supplies none
+   of them (see `.env.coolify.sample`). The worker now refuses to start without them
+   rather than registering deployments that fail at connection time inside every run.
+
    **This destroys all harvested data**, exactly as deleting the Postgres volume would.
    `confirm` must equal `DB_NAME` or the flow aborts before touching anything, so the
    Run button in the Prefect UI can't wipe a database by accident. Pass
