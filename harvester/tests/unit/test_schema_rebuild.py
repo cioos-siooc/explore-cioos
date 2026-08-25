@@ -126,8 +126,107 @@ class TestConfirmationGate:
         with pytest.raises(ValueError, match="DB_NAME is not set"):
             schema.check_confirmation("")
 
+    def test_empty_db_name_argument_refuses(self):
+        """core_db.db_name() returns "" (not None) when unset, so the explicit-argument
+        path has to reject it too — otherwise passing it through would skip the guard."""
+        with pytest.raises(ValueError, match="DB_NAME is not set"):
+            schema.check_confirmation("", db_name="")
+
+    def test_unset_db_name_message_is_diagnostic(self, monkeypatch):
+        monkeypatch.delenv("DB_NAME", raising=False)
+        with pytest.raises(ValueError, match="printenv"):
+            schema.check_confirmation("cde")
+
     def test_db_name_read_from_env_when_not_passed(self, monkeypatch):
         monkeypatch.setenv("DB_NAME", "cde_dev")
         assert schema.check_confirmation("cde_dev") == "cde_dev"
         with pytest.raises(ValueError):
             schema.check_confirmation("cde")
+
+
+class TestDbNameResolution:
+    """The guard must resolve DB_NAME the way the connection does. Reading os.environ
+    directly made the flow fail with "DB_NAME is not set" on a worker whose engine
+    resolves it via load_dotenv from the run's working directory."""
+
+    def test_db_name_reads_dotenv_from_cwd(self, tmp_path, monkeypatch):
+        from cde_harvester.core import db as core_db
+
+        monkeypatch.delenv("DB_NAME", raising=False)
+        (tmp_path / ".env").write_text("DB_NAME=cde_from_dotenv\n")
+        monkeypatch.chdir(tmp_path)
+        assert core_db.db_name() == "cde_from_dotenv"
+
+    def test_db_name_empty_when_nothing_sets_it(self, tmp_path, monkeypatch):
+        from cde_harvester.core import db as core_db
+
+        monkeypatch.delenv("DB_NAME", raising=False)
+        monkeypatch.chdir(tmp_path)
+        assert core_db.db_name() == ""
+
+    def test_db_host_also_reads_dotenv(self, tmp_path, monkeypatch):
+        """Same asymmetry: db_host() is used in the guard's error message, so it has to
+        report the host the engine would actually use."""
+        from cde_harvester.core import db as core_db
+
+        monkeypatch.delenv("DB_HOST_EXTERNAL", raising=False)
+        (tmp_path / ".env").write_text("DB_HOST_EXTERNAL=db.internal\n")
+        monkeypatch.chdir(tmp_path)
+        assert core_db.db_host() == "db.internal"
+
+
+class TestDotenvSearchesAncestors:
+    """The .env is as likely to sit at the app root as in the harvester dir, and the flow
+    run's cwd is the harvester dir. Only checking $CWD/.env is what let DB_NAME look unset
+    to the guard while harvests connected fine."""
+
+    def test_db_name_found_in_parent_directory(self, tmp_path, monkeypatch):
+        from cde_harvester.core import db as core_db
+
+        monkeypatch.delenv("DB_NAME", raising=False)
+        (tmp_path / ".env").write_text("DB_NAME=cde_from_parent\n")
+        child = tmp_path / "harvester"
+        child.mkdir()
+        monkeypatch.chdir(child)
+        assert core_db.db_name() == "cde_from_parent"
+
+    def test_nearest_dotenv_wins(self, tmp_path, monkeypatch):
+        from cde_harvester.core import db as core_db
+
+        monkeypatch.delenv("DB_NAME", raising=False)
+        (tmp_path / ".env").write_text("DB_NAME=from_parent\n")
+        child = tmp_path / "harvester"
+        child.mkdir()
+        (child / ".env").write_text("DB_NAME=from_child\n")
+        monkeypatch.chdir(child)
+        assert core_db.db_name() == "from_child"
+
+    def test_real_environment_is_not_overridden(self, tmp_path, monkeypatch):
+        """load_dotenv must not clobber what the container already set."""
+        from cde_harvester.core import db as core_db
+
+        monkeypatch.setenv("DB_NAME", "from_container_env")
+        (tmp_path / ".env").write_text("DB_NAME=from_dotenv\n")
+        monkeypatch.chdir(tmp_path)
+        assert core_db.db_name() == "from_container_env"
+
+    def test_guard_and_connection_agree_on_the_same_dotenv(self, tmp_path, monkeypatch):
+        """The invariant that matters: whatever database_url() would connect to is what
+        the guard demands confirmation for."""
+        from cde_harvester.core import db as core_db
+
+        for v in ("DB_NAME", "DB_USER", "DB_PASSWORD", "DB_HOST_EXTERNAL"):
+            monkeypatch.delenv(v, raising=False)
+        (tmp_path / ".env").write_text(
+            "DB_NAME=cde_agree\nDB_USER=u\nDB_PASSWORD=p\nDB_HOST_EXTERNAL=h\n"
+        )
+        monkeypatch.chdir(tmp_path)
+        assert core_db.db_name() == "cde_agree"
+        assert core_db.database_url().endswith("/cde_agree")
+        assert schema.check_confirmation("cde_agree", db_name=core_db.db_name()) == "cde_agree"
+
+    def test_missing_db_name_error_names_what_it_searched(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("DB_NAME", raising=False)
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(ValueError, match="cwd="):
+            schema.check_confirmation("cde", db_name=None)

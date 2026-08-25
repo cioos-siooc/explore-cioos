@@ -665,7 +665,9 @@ def cde_rebuild_database_run(
     """
     logger = get_run_logger()
 
-    expected = check_confirmation(confirm, host=core_db.db_host())
+    expected = check_confirmation(
+        confirm, db_name=core_db.db_name(), host=core_db.db_host()
+    )
 
     logger.warning(
         "Rebuilding schema '%s' on %s — dropping all harvested data%s",

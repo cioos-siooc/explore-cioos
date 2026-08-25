@@ -10,12 +10,33 @@ DB_USER, DB_PASSWORD.
 import os
 import sys
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from sqlalchemy import create_engine, text
 
 
+def _load_env():
+    """Load the nearest ``.env`` (cwd, then ancestors) into os.environ.
+
+    Kept in one place because reading ``os.environ`` *without* it sees a different — and
+    usually smaller — set of variables than the engine will connect with. A Prefect flow
+    run is the case that bites: the deployment's ``set_working_directory`` pull step puts
+    the run in the harvester dir, and on some deployments the DB settings arrive from a
+    ``.env`` rather than from the container environment. Any code deciding something about
+    the database (not just connecting to it) has to resolve names the same way, or it will
+    disagree with the connection it is about to open — which is how a rebuild guard came
+    to report DB_NAME unset on a worker whose harvests were connecting fine.
+
+    Searches ancestors (``find_dotenv``) rather than only ``$CWD/.env``, because the file
+    is as likely to sit at the repo/app root as in the harvester dir. Nearest wins, and
+    it never overrides variables already in the environment.
+    """
+    path = find_dotenv(usecwd=True)
+    if path:
+        load_dotenv(path)
+
+
 def database_url():
-    load_dotenv(os.path.join(os.getcwd(), ".env"))
+    _load_env()
     envs = os.environ
     db_host = envs.get("DB_HOST_EXTERNAL", "localhost")
     return (
@@ -26,7 +47,18 @@ def database_url():
 
 def db_host():
     """The host part of the connection, for log messages."""
+    _load_env()
     return os.environ.get("DB_HOST_EXTERNAL", "localhost")
+
+
+def db_name():
+    """The database name, resolved exactly as database_url() resolves it.
+
+    Empty string when unset, so callers can report the misconfiguration themselves
+    instead of dying on a KeyError deep inside connection setup.
+    """
+    _load_env()
+    return os.environ.get("DB_NAME", "")
 
 
 def create_db_engine(**kwargs):

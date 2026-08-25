@@ -81,7 +81,18 @@ def check_confirmation(confirm, db_name=None, host=None):
     """
     expected = db_name if db_name is not None else os.environ.get("DB_NAME", "")
     if not expected:
-        raise ValueError("DB_NAME is not set; refusing to rebuild an unidentified database.")
+        from dotenv import find_dotenv
+
+        dotenv_path = find_dotenv(usecwd=True) or "none found"
+        raise ValueError(
+            "DB_NAME is not set, so there is no database name to confirm against and no "
+            "safe way to identify what would be dropped. This resolves DB_NAME exactly as "
+            "the connection does: the process environment, plus the nearest .env. "
+            f"Searched from cwd={os.getcwd()!r}, .env={dotenv_path!r}. "
+            "If harvests connect fine but this is empty, they are getting DB_NAME from "
+            "somewhere this does not look. Check the worker with: "
+            "printenv | grep '^DB_'"
+        )
     if confirm != expected:
         where = f" on {host}" if host else ""
         raise ValueError(
