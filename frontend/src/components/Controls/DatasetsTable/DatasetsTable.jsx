@@ -2,9 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CaretDownFill,
   CaretRightFill,
-  CaretUpFill,
-  ChevronLeft,
-  ChevronRight,
   Eye,
   EyeSlash,
   Search
@@ -24,40 +21,13 @@ import {
   sortGroupKeys
 } from '../../../state/datasetGroups.js'
 import DatasetCard from './DatasetCard.jsx'
+import Pager, { PAGE_SIZES } from '../../ui/Pager.jsx'
+import SortChips from '../../ui/SortChips.jsx'
 import './styles.css'
 
-// The list is paged rather than grown on scroll: a page is a place the user
-// can leave and come back to, and the scroll bar means the same thing on every
-// result set. These are the sizes the pager offers, the first being the default.
-const PAGE_SIZES = [25, 50, 100]
-// How many numbered buttons the pager shows around the current page before it
-// falls back to ellipses (kept small — this column is ~420px wide).
-const PAGE_WINDOW = 1
 // Stable default so an absent datasetsInViewPks prop (e.g. the download modal)
 // doesn't create a new Set every render and thrash memo deps.
 const EMPTY_SET = new Set()
-
-// The page numbers to offer: always the first and last, the current page and
-// its neighbours, with '…' standing in for the runs left out. Returns e.g.
-// [1, '…', 7, 8, 9, '…', 24].
-function pageButtons (current, pageCount) {
-  const wanted = new Set([1, pageCount])
-  for (let page = current - PAGE_WINDOW; page <= current + PAGE_WINDOW; page++) {
-    if (page >= 1 && page <= pageCount) wanted.add(page)
-  }
-  const pages = [...wanted].sort((a, b) => a - b)
-  const out = []
-  let previous = 0
-  for (const page of pages) {
-    // A single skipped page is worth showing outright — an ellipsis standing in
-    // for one number is both wider and less useful than the number.
-    if (page - previous === 2) out.push(previous + 1)
-    else if (page - previous > 2) out.push(`gap-${page}`)
-    out.push(page)
-    previous = page
-  }
-  return out
-}
 
 // The datasets list, rendered as cards (replaces the old data table). Used in
 // two contexts: the sidebar results list and the download-review modal
@@ -138,15 +108,6 @@ export default function DatasetsTable({
   // Hiding a group takes its datasets off the map. Not offered for the
   // viewport-based dimension ('inView'), whose membership changes on every pan.
   const canHideGroups = HIDEABLE_DIMENSIONS.has(groupBy)
-
-  // Tap a chip to sort by it; tap the active chip again to flip direction.
-  const handleSortClick = (fieldId) => {
-    setSort((prev) =>
-      prev.field === fieldId
-        ? { field: fieldId, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
-        : { field: fieldId, dir: 'asc' }
-    )
-  }
 
   function sortValue(row, field) {
     const isGrid = row.cdm_data_type === 'Grid'
@@ -333,36 +294,7 @@ export default function DatasetsTable({
         )}
       </div>
 
-      <div className='datasetsCardSortRow'>
-        <span className='datasetsCardSortLabel'>{t('datasetsCardSortByLabel')}</span>
-        {sortFields.map((field) => {
-          const active = sort.field === field.id
-          return (
-            <button
-              key={field.id}
-              type='button'
-              className={classNames('datasetsCardSortChip', { active })}
-              onClick={() => handleSortClick(field.id)}
-              aria-pressed={active}
-              title={
-                active
-                  ? sort.dir === 'asc'
-                    ? t('datasetsCardSortAscendingTitle')
-                    : t('datasetsCardSortDescendingTitle')
-                  : undefined
-              }
-            >
-              {field.label}
-              {active &&
-                (sort.dir === 'asc' ? (
-                  <CaretUpFill size={10} aria-hidden='true' />
-                ) : (
-                  <CaretDownFill size={10} aria-hidden='true' />
-                ))}
-            </button>
-          )
-        })}
-      </div>
+      <SortChips fields={sortFields} sort={sort} onChange={setSort} />
 
       {!isDownloadModal && (
         <div className='datasetsCardGroupRow'>
@@ -484,79 +416,16 @@ export default function DatasetsTable({
           })
         )}
       </div>
-      {totalRowCount > 0 && (
-        <nav className='datasetsPager' aria-label={t('datasetsPagerLabel')}>
-          <span className='datasetsPagerRange'>
-            {t('datasetsPagerRangeText', {
-              first: firstRow + 1,
-              last: Math.min(firstRow + pageSize, totalRowCount),
-              total: totalRowCount
-            })}
-          </span>
-          {pageCount > 1 && (
-            <div className='datasetsPagerControls'>
-              <button
-                type='button'
-                className='datasetsPagerStep'
-                onClick={() => goToPage(currentPage - 1)}
-                disabled={currentPage === 1}
-                title={t('datasetsPagerPreviousTitle')}
-                aria-label={t('datasetsPagerPreviousTitle')}
-              >
-                <ChevronLeft size={12} aria-hidden='true' />
-              </button>
-              {pageButtons(currentPage, pageCount).map((entry) =>
-                typeof entry === 'number' ? (
-                  <button
-                    key={entry}
-                    type='button'
-                    className={classNames('datasetsPagerPage', {
-                      active: entry === currentPage
-                    })}
-                    onClick={() => goToPage(entry)}
-                    aria-current={entry === currentPage ? 'page' : undefined}
-                    title={t('datasetsPagerPageTitle', { page: entry })}
-                  >
-                    {entry}
-                  </button>
-                ) : (
-                  <span key={entry} className='datasetsPagerGap' aria-hidden='true'>
-                    …
-                  </span>
-                )
-              )}
-              <button
-                type='button'
-                className='datasetsPagerStep'
-                onClick={() => goToPage(currentPage + 1)}
-                disabled={currentPage === pageCount}
-                title={t('datasetsPagerNextTitle')}
-                aria-label={t('datasetsPagerNextTitle')}
-              >
-                <ChevronRight size={12} aria-hidden='true' />
-              </button>
-            </div>
-          )}
-          <label className='datasetsPagerSize'>
-            <span className='sr-only'>{t('datasetsPagerPerPageLabel')}</span>
-            <select
-              value={pageSize}
-              onChange={(e) => setPageSize(Number(e.target.value))}
-              title={t('datasetsPagerPerPageLabel')}
-            >
-              {/* The number is put in place here rather than interpolated: a
-                  numeric `count` option is i18next's pluralization trigger (see
-                  the note in Map.jsx), and the unit is the only translated
-                  part of "25 per page" anyway. */}
-              {PAGE_SIZES.map((size) => (
-                <option key={size} value={size}>
-                  {`${size} ${t('datasetsPagerPerPageUnitText')}`}
-                </option>
-              ))}
-            </select>
-          </label>
-        </nav>
-      )}
+      <Pager
+        page={currentPage}
+        pageCount={pageCount}
+        pageSize={pageSize}
+        total={totalRowCount}
+        onPageChange={goToPage}
+        onPageSizeChange={setPageSize}
+        label={t('datasetsPagerLabel')}
+        perPageLabel={t('datasetsPagerPerPageLabel')}
+      />
     </div>
   )
 }
