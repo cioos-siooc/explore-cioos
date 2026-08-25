@@ -300,8 +300,9 @@
   width: 10px;
   height: 10px;
   border-radius: 3px;
-  border: 2px solid var(--cioos-primary);
-  box-shadow: 0 0 0 2px rgba(82, 167, 155, 0.35);
+  border: 2px solid var(--cioos-map-click);
+  background-color: var(--cioos-map-click-surface);
+  box-shadow: 0 0 0 2px var(--cioos-map-click-glow);
 }
 
 /* --- Card --- */
@@ -319,20 +320,27 @@
     background-color var(--cioos-transition-fast);
 }
 
-/* Sorted to the top because the last map click found it here. A solid primary
-   border plus a soft glow, so the tie to the map is unmistakable at a glance
-   rather than a property you have to go looking for — the plain teal-light
-   border tried first read as barely different from the resting hairline.
+/* Sorted to the top because the last map click found it here — wearing the same
+   goldenrod ring, glow and fill the map itself puts on the hex or marker that
+   was clicked (--cioos-map-click, see theme.css), so the two ends of that click
+   are recognisably one thing rather than a colour each. It is a colour no data
+   layer uses, which is what lets it sit next to the teal of the selection
+   without either being mistaken for the other.
    `box-shadow`, not a wider `border`, does the "thicker" part: a real 2px
-   border would grow the card by 2px and jostle its neighbours in the list
-   every time a row's state changed; a shadow ring reads the same but costs no
-   layout. Left to `:not(.selected)` on purpose: a row already in the
-   selection gets its own full-strength border and background wash below, and
-   that is the more important of the two things to know about it. */
+   border would grow the card by 2px and jostle its neighbours in the list every
+   time a row's state changed; a shadow ring reads the same but costs no layout.
+   The glow applies to selected rows too — it says where the row came from,
+   which is orthogonal to whether it is in the download — while the wash and the
+   border are left to `:not(.selected)`, the selection's own teal border and
+   background wash being the more important of the two facts about such a row. */
+.datasetCard.fromMapClick {
+  box-shadow: 0 0 0 2px var(--cioos-map-click-glow),
+    0 0 10px 1px var(--cioos-map-click-glow), var(--cioos-shadow-card);
+}
+
 .datasetCard.fromMapClick:not(.selected) {
-  border-color: var(--cioos-primary);
-  box-shadow: 0 0 0 2px rgba(82, 167, 155, 0.35),
-    0 0 10px 1px rgba(82, 167, 155, 0.35), var(--cioos-shadow-card);
+  border-color: var(--cioos-map-click);
+  background-color: var(--cioos-map-click-surface);
 }
 
 .datasetCard.clickable {

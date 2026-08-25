@@ -322,8 +322,9 @@
   width: 10px;
   height: 10px;
   border-radius: 3px;
-  border: 2px solid var(--cioos-primary);
-  box-shadow: 0 0 0 2px rgba(82, 167, 155, 0.35);
+  border: 2px solid var(--cioos-map-click);
+  background-color: var(--cioos-map-click-surface);
+  box-shadow: 0 0 0 2px var(--cioos-map-click-glow);
 }
 
 .recordShowAll {

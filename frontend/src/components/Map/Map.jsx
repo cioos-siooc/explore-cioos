@@ -39,6 +39,7 @@ import {
   warpEquirectToMercator
 } from '../../wmsUtilities'
 import {
+  clickHighlightColor,
   colorScale,
   hexOutlineColor,
   HEX_METRIC,
@@ -1179,11 +1180,6 @@ export default function CreateMap({
 
   const emptyFeatureCollection = { type: 'FeatureCollection', features: [] }
 
-  // The clicked region's outline. CIOOS navy rather than one of the accent
-  // colours: the ramp already owns the greens, the tracks own the purple and
-  // the grid coverage owns the amber, so an accent here would read as another
-  // data layer instead of as "this is what you just asked about".
-  const clickHighlightColor = 'goldenrod'
   // Latest coverage prop, readable from the map 'load' closure (which would
   // otherwise capture the initial render's value).
   const griddapCoverageRef = useRef(null)

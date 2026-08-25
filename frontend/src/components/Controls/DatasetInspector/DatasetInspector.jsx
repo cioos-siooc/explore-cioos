@@ -712,12 +712,20 @@ export default function DatasetInspector({
                   onRowClicked={(row) => setInspectRecordID(row.profile_id)}
                   striped
                   pointerOnHover
+                  // The pinned record wears what the map put on the marker
+                  // that named it: the same goldenrod ring over the same wash
+                  // (--cioos-map-click, see theme.css). The ring is inset so
+                  // it costs the row no height and the table's rhythm is
+                  // unchanged — the row is marked, not resized.
                   conditionalRowStyles={[
                     {
                       when: (row) =>
                         markerRecordPinned &&
                         row.profile_id === highlightedRecord.profileId,
-                      style: { backgroundColor: '#d5c9ee' }
+                      style: {
+                        backgroundColor: 'var(--cioos-map-click-surface)',
+                        boxShadow: 'inset 0 0 0 2px var(--cioos-map-click)'
+                      }
                     }
                   ]}
                   columns={columns}
