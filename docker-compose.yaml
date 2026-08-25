@@ -87,11 +87,20 @@ services:
       - .env
     environment:
       # Docker-network service names so the API reaches Postgres/Redis without a
-      # repo .env (Coolify supplies DB_NAME/USER/PASSWORD/PORT but not the hosts).
-      # web-api/db.js reads DB_HOST and utils/redis.js reads REDIS_HOST; both
-      # default to localhost when unset. Mirrors the prefect_worker service.
+      # repo .env. web-api/db.js reads DB_HOST and utils/redis.js reads REDIS_HOST;
+      # both default to localhost when unset. Mirrors the prefect_worker service.
       DB_HOST: db
       REDIS_HOST: redis
+      # The credentials too, by interpolation rather than only `env_file` above.
+      # Same reasoning as prefect_worker: Coolify reliably populates variables for
+      # interpolation (that is why `db` and `prefect` come up), but the .env that
+      # `env_file` reads can be absent or empty on a deployment — which left the
+      # harvester with no DB settings at all while db/prefect ran on the same
+      # values. Delivering them both ways keeps this service off that cliff.
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: ${DB_PORT:-5432}
     expose:
       - "5000"
     depends_on:
@@ -135,6 +144,12 @@ services:
       # at import, so without this the module raises KeyError before it can poll
       # and the container crash-loops on restart: unless-stopped.
       - "DB_HOST=db"
+      # As above: interpolation as well as `env_file`, so an empty .env cannot
+      # leave the scheduler unable to reach the queue.
+      - "DB_NAME=${DB_NAME}"
+      - "DB_USER=${DB_USER}"
+      - "DB_PASSWORD=${DB_PASSWORD}"
+      - "DB_PORT=${DB_PORT:-5432}"
     volumes:
       - downloads:/usr/src/app/download_scheduler/downloads
   frontend:
