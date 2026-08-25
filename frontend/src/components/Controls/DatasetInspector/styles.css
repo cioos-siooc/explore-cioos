@@ -512,6 +512,13 @@
   cursor: pointer;
 }
 
+/* The card's own hover wash is the same surface-2 the tags sit on, which
+   swallows their bubble outline whole. Lift the tags onto white so they stay
+   visible against the hovered card. */
+.listCard:hover .listCardTag {
+  background-color: var(--cioos-white);
+}
+
 .listCardTagsMore:hover {
   border-color: var(--cioos-primary);
   background-color: var(--cioos-white);

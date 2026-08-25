@@ -165,6 +165,7 @@
   "datasetInspectorCKANURL": "Métadonnées",
   "datasetInspectorOrganizationText": "Organisations",
   "datasetInspectorOceanVariablesText": "Variables océaniques",
+  "datasetInspectorGeometryText": "Géométrie",
   "datasetInspectorPlatformText": "Plateformes",
   "datasetInspectorRecordsText": "Emplacements",
   "datasetInspectorRecordsOverflowText": " enregistrements sélectionnés, 1000 affichés",

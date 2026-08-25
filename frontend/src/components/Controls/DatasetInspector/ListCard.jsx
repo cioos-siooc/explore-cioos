@@ -64,6 +64,27 @@ export function CardField ({ label, children }) {
   )
 }
 
+// Limits a list to its first few items behind a "+n" toggle that expands to
+// the rest. Shared by a record card's variable tags below and the metadata
+// sheet's own EOV row (DatasetInspector) — the same "show a few, expand for
+// the rest" affordance wherever a list-valued field could otherwise run
+// several lines longer than everything around it.
+export function useExpandableList (items, limit) {
+  const [expanded, setExpanded] = useState(false)
+  const shown = expanded ? items : items.slice(0, limit)
+  const hidden = items.length - shown.length
+
+  // Toggles usually sit inside something else clickable (a record card opens
+  // its preview on click) — stop the event there so expanding the list isn't
+  // read as that click too.
+  const toggle = (e) => {
+    e.stopPropagation()
+    setExpanded(!expanded)
+  }
+
+  return { shown, hidden, expanded, toggle }
+}
+
 // The values of a list-valued field (a record's ocean variables), condensed to
 // the first few with the rest behind a "+n". A record can carry a dozen
 // variables, which on its own would make the card several lines taller than
@@ -72,18 +93,11 @@ export function CardField ({ label, children }) {
 // search box above the cards answers outright.
 export function CardTags ({ values, limit = 3 }) {
   const { t } = useTranslation()
-  const [expanded, setExpanded] = useState(false)
+  const { shown, hidden, expanded, toggle } = useExpandableList(
+    values ?? [],
+    limit
+  )
   if (!values?.length) return null
-
-  const shown = expanded ? values : values.slice(0, limit)
-  const hidden = values.length - shown.length
-
-  // The card underneath opens a record preview on click (and on Enter/Space);
-  // expanding its variable list is not that, so the event stops here.
-  const toggle = (e) => {
-    e.stopPropagation()
-    setExpanded(!expanded)
-  }
 
   return (
     <>

@@ -7,6 +7,10 @@ import Loading from '../Loading/Loading.jsx'
 import GriddapDetails from '../GriddapDetails/GriddapDetails.jsx'
 import { server } from '../../../config'
 import reportError from '../../../state/reportError.js'
+import {
+  dataLayerKeyForDataset,
+  DATA_LAYER_LABEL_KEYS
+} from '../../../state/dataLayers.js'
 import { gridNodeFactors, totalGridNodes } from '../../../wmsUtilities'
 import FilterButton from '../Filter/FilterButton/FilterButton.jsx'
 import CardList from './CardList.jsx'
@@ -14,7 +18,8 @@ import ListCard, {
   CardField,
   CardTags,
   formatInstantRange,
-  formatRange
+  formatRange,
+  useExpandableList
 } from './ListCard.jsx'
 import ZoomToDataset, {
   useZoomToDataset
@@ -93,6 +98,12 @@ function IdCaption({ label, variable }) {
   )
 }
 
+// The metadata sheet's EOV row, expandable past this like the record list's
+// own variable tags (CardTags) — a dataset can carry a dozen ocean variables,
+// which would otherwise push the platform/record-count row that follows well
+// down the sheet.
+const EOV_VISIBLE_LIMIT = 3
+
 export default function DatasetInspector({
   dataset,
   // Shared with the sidebar header's back control (SelectionProvider), so both
@@ -118,6 +129,13 @@ export default function DatasetInspector({
   const [trajectoryPlatforms, setTrajectoryPlatforms] = useState()
   const inspectorRef = useRef(null)
   const isGrid = dataset.cdm_data_type === 'Grid'
+  // Same CF discrete-sampling geometry the map's "Dataset geometry" layer
+  // filter switches on (dataLayers.js) — reused here so the label matches
+  // what that filter calls the same shape.
+  const geometryKey = dataLayerKeyForDataset(dataset)
+  const geometryLabel = geometryKey
+    ? t(DATA_LAYER_LABEL_KEYS[geometryKey])
+    : dataset.cdm_data_type
   // no per-record list for OBIS (external) or griddap (metadata-only)
   const hasRecordList = dataset.source_type !== 'obis' && !isGrid
   // OBIS datasets always link out to OBIS; the rest have whichever of their
@@ -351,6 +369,13 @@ export default function DatasetInspector({
 
   const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet
 
+  const {
+    shown: shownEovs,
+    hidden: hiddenEovCount,
+    expanded: eovsExpanded,
+    toggle: toggleEovsExpanded
+  } = useExpandableList(dataset.eovs, EOV_VISIBLE_LIMIT)
+
   // The title bar's filter button: narrow the map to this dataset alone, or
   // release it again. Same toggle the dataset's chip in the Filters panel does
   // (FilterButton), on the one dataset this page is about.
@@ -444,7 +469,7 @@ export default function DatasetInspector({
               {t('datasetInspectorOceanVariablesText')}
             </dt>
             <dd className='metadataValue'>
-              {dataset.eovs.map((eov, index) => {
+              {shownEovs.map((eov, index) => {
                 return (
                   <FilterButton
                     key={index}
@@ -456,7 +481,32 @@ export default function DatasetInspector({
                   />
                 )
               })}
+              {(hiddenEovCount > 0 || eovsExpanded) && (
+                <button
+                  type='button'
+                  className='listCardTagsMore'
+                  onClick={toggleEovsExpanded}
+                  aria-expanded={eovsExpanded}
+                  title={
+                    eovsExpanded
+                      ? t('listCardTagsFewerText')
+                      : t('listCardTagsMoreTitle', {
+                        total: dataset.eovs.length
+                      })
+                  }
+                >
+                  {eovsExpanded
+                    ? t('listCardTagsFewerText')
+                    : `+${hiddenEovCount}`}
+                </button>
+              )}
             </dd>
+          </div>
+          <div className='metaCell'>
+            <dt className='metadataLabel'>
+              {t('datasetInspectorGeometryText')}
+            </dt>
+            <dd className='metadataValue'>{geometryLabel}</dd>
           </div>
           <div className='metaCell'>
             <dt className='metadataLabel'>

@@ -165,6 +165,7 @@
   "datasetInspectorCKANURL": "Metadata",
   "datasetInspectorOrganizationText": "Organizations",
   "datasetInspectorOceanVariablesText": "Ocean Variables",
+  "datasetInspectorGeometryText": "Geometry",
   "datasetInspectorPlatformText": "Platform",
   "datasetInspectorRecordsText": "Locations",
   "datasetInspectorRecordsSelectAllButtonText": "Select all records from dataset",
