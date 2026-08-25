@@ -142,10 +142,11 @@
 
 /* --- Metadata record sheet ---
    The front matter of a journal article, compressed: each field is a tiny
-   eyebrow label with its value directly beneath, and the fields flow two to a
-   row. The narrow ones (platform, record count) pair up; the ones carrying
-   chips or links take a full row. Whitespace does the dividing, so there are
-   no rules and no 86px label gutter eating the width. */
+   eyebrow label with its value beside it on the same line — the same
+   label/value baseline pairing the record cards use (.listCardField) — and
+   the fields flow two to a row. The narrow ones (platform, record count) pair
+   up; the ones carrying chips or links take a full row. Whitespace does the
+   dividing, so there are no rules and no 86px label gutter eating the width. */
 /* No top rule of its own: the pinned title block above already draws one. */
 .datasetMetaSheet {
   display: grid;
@@ -158,7 +159,14 @@
   background-color: var(--cioos-white);
 }
 
+/* Label and value share a line while there is room for both, and the value
+   drops under its label when there isn't — the same wrapping rule
+   .listCardField uses on the record cards. */
 .datasetMetaSheet .metaCell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
   min-width: 0;
 }
 
@@ -168,7 +176,8 @@
 }
 
 .datasetMetaSheet .metadataLabel {
-  margin-bottom: 3px;
+  flex: 0 0 auto;
+  margin-bottom: 0;
   font-size: 0.65rem;
   line-height: 1.2;
 }
@@ -181,6 +190,7 @@
 }
 
 .datasetMetaSheet .metadataValue {
+  flex: 1 1 140px;
   margin: 0;
   /* Chips wrap onto new lines when there are many; top-align them so each
      wrapped row lines up cleanly under the label. */
@@ -193,19 +203,6 @@
 .datasetMetaSheet .filterButton {
   margin: 0;
   font-size: 0.78rem;
-}
-
-/* Record count reads as the sheet's key figure. */
-.datasetMetaSheet .metadataValue.recordCount {
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--cioos-ink);
-}
-
-/* Source links sit on one line, separated by their own gap. */
-.datasetMetaSheet .metadataLinks {
-  gap: 4px 14px;
 }
 
 /* Grid node count: the axis factors read as small stacked value/name pairs,
@@ -257,22 +254,44 @@
   white-space: nowrap;
 }
 
-/* Source links (ERDDAP / CKAN / OBIS) as quiet, citation-style inline links
-   rather than boxed buttons — keeps the sheet flat and dense. */
-.metadataLink {
-  color: var(--cioos-primary-700);
+/* A badge for a value that isn't itself a filter (geometry, the record
+   count) or that is a link rather than a button (the source links) — the
+   exact box .filterButton uses (same pill radius, hairline border, white
+   fill, padding and font-size), so every field's value reads as one
+   consistent badge family regardless of what renders it. */
+.datasetMetaSheet .metadataChip,
+.datasetMetaSheet .metadataLink {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 12px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.datasetMetaSheet .metadataChip {
+  font-weight: 500;
+  color: var(--cioos-ink);
+}
+
+/* Source links (ERDDAP / CKAN / OBIS): the same badge, coloured and weighted
+   like a link so it still reads as clickable. */
+.datasetMetaSheet .metadataLink {
   font-weight: 600;
+  color: var(--cioos-primary-700);
   text-decoration: none;
 }
 
-.metadataLink:hover,
-.metadataLink:focus-visible {
-  text-decoration: underline;
+.datasetMetaSheet .metadataLink:hover,
+.datasetMetaSheet .metadataLink:focus-visible {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-surface-2);
   outline: none;
 }
 
-.metadataLink:focus-visible {
-  border-radius: var(--cioos-radius-sm);
+.datasetMetaSheet .metadataLink:focus-visible {
   box-shadow: var(--cioos-focus);
 }
 

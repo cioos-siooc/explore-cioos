@@ -143,6 +143,12 @@ export default function DatasetInspector({
   const hasSources =
     dataset.source_type === 'obis' ||
     Boolean(dataset.erddap_url || dataset.ckan_url)
+  // OBIS is always the one link; ERDDAP + CKAN can both be present, at which
+  // point the row needs the full width to hold two chips.
+  const hasMultipleSources =
+    dataset.source_type !== 'obis' &&
+    Boolean(dataset.erddap_url) &&
+    Boolean(dataset.ckan_url)
   // Start loading rather than false: the fetch below is fired from an effect,
   // so an initial false would paint one frame of an empty record table before
   // the spinner appears.
@@ -376,6 +382,10 @@ export default function DatasetInspector({
     toggle: toggleEovsExpanded
   } = useExpandableList(dataset.eovs, EOV_VISIBLE_LIMIT)
 
+  const platformOption = platformFilter.platformsSelected.filter(
+    (p) => dataset.platform === p.title
+  )[0]
+
   // The title bar's filter button: narrow the map to this dataset alone, or
   // release it again. Same toggle the dataset's chip in the Filters panel does
   // (FilterButton), on the one dataset this page is about.
@@ -441,9 +451,11 @@ export default function DatasetInspector({
       </div>
       <div className='datasetInspectorBody'>
         {/* The front matter, as compact as it can be read: each field is a
-            small eyebrow label with its value stacked under it, and the fields
-            flow two-up across the sheet, the chip-carrying ones taking a full
-            row of their own. No row rules — the whitespace separates them. */}
+            small eyebrow label with its value beside it on the same line
+            (wrapping under only when the row is too narrow for both), and the
+            fields flow two-up across the sheet, the chip-carrying ones taking
+            a full row of their own. No row rules — the whitespace separates
+            them. */}
         <dl className='datasetMetaSheet'>
           <div className='metaCell metaCellWide'>
             <dt className='metadataLabel'>
@@ -502,11 +514,18 @@ export default function DatasetInspector({
               )}
             </dd>
           </div>
+          {/* Geometry, platform, locations and sources: a label with its
+              value(s) as badges beside it, the same badge organizations and
+              EOVs already use (same pill radius, border and padding as
+              .filterButton) — one consistent chip style across every field
+              instead of four different treatments. */}
           <div className='metaCell'>
             <dt className='metadataLabel'>
               {t('datasetInspectorGeometryText')}
             </dt>
-            <dd className='metadataValue'>{geometryLabel}</dd>
+            <dd className='metadataValue'>
+              <span className='metadataChip'>{geometryLabel}</span>
+            </dd>
           </div>
           <div className='metaCell'>
             <dt className='metadataLabel'>
@@ -516,11 +535,7 @@ export default function DatasetInspector({
               <FilterButton
                 setOptionsSelected={platformFilter.setPlatformsSelected}
                 optionsSelected={platformFilter.platformsSelected}
-                option={
-                  platformFilter.platformsSelected.filter(
-                    (p) => dataset.platform === p.title
-                  )[0]
-                }
+                option={platformOption}
               />
             </dd>
           </div>
@@ -530,28 +545,32 @@ export default function DatasetInspector({
             <dt className='metadataLabel'>
               {isGrid ? t('griddapNodesText') : t('datasetInspectorRecordsText')}
             </dt>
-            <dd className='metadataValue recordCount'>
+            <dd className='metadataValue'>
               {isGrid ? (
                 <GridNodeCount dimensions={dataset.grid_dimensions} />
-              ) : dataset.profiles_count !== dataset.n_profiles ? (
-                `${dataset.profiles_count} / ${dataset.n_profiles}`
               ) : (
-                dataset.profiles_count
+                <span className='metadataChip'>
+                  {dataset.profiles_count !== dataset.n_profiles
+                    ? `${dataset.profiles_count} / ${dataset.n_profiles}`
+                    : dataset.profiles_count}
+                </span>
               )}
             </dd>
           </div>
           {/* The outbound links used to be a labelled row each; they say what
               they are in their own text, so one "Sources" line holds them
-              all. */}
+              all — narrow like Locations before it so the two pair up on one
+              row, unless there's more than one link (ERDDAP + CKAN both), in
+              which case the row needs the full width to hold both badges. */}
           {hasSources && (
-            <div className='metaCell metaCellWide'>
+            <div className={classNames('metaCell', { metaCellWide: hasMultipleSources })}>
               <dt className='metadataLabel'>
                 {t('datasetInspectorSourcesText')}
               </dt>
-              <dd className='metadataValue metadataLinks'>
+              <dd className='metadataValue'>
                 {dataset.source_type === 'obis' ? (
                   <a
-                    className='metadataLink'
+                    className='metadataChip metadataLink'
                     href={`https://obis.org/dataset/${dataset.dataset_id}`}
                     target='_blank'
                     rel='noreferrer'
@@ -562,7 +581,7 @@ export default function DatasetInspector({
                   <>
                     {dataset.erddap_url && (
                       <a
-                        className='metadataLink'
+                        className='metadataChip metadataLink'
                         href={dataset.erddap_url}
                         target='_blank'
                         title={t('datasetInspectorERDDAPText')}
@@ -573,7 +592,7 @@ export default function DatasetInspector({
                     )}
                     {dataset.ckan_url && (
                       <a
-                        className='metadataLink'
+                        className='metadataChip metadataLink'
                         href={dataset.ckan_url}
                         target='_blank'
                         title={t('datasetInspectorCKANText')}
