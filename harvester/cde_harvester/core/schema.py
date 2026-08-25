@@ -95,8 +95,22 @@ def check_confirmation(confirm, db_name=None, host=None):
         )
     if confirm != expected:
         where = f" on {host}" if host else ""
+        if not confirm:
+            # The common case, and it is NOT a misconfiguration: `confirm` defaults to
+            # empty so a one-click Run in the Prefect UI cannot wipe a database. Say so,
+            # because an operator who just fixed a real env problem reads any red run as
+            # "still broken" and goes looking for another bug.
+            raise ValueError(
+                f"No confirmation given, so nothing was touched. This flow DESTROYS ALL "
+                f"DATA in the '{expected}' database{where}, so it requires the database "
+                f"name as the 'confirm' parameter. This is expected, not a bug: 'confirm' "
+                f"defaults to empty so a one-click run cannot wipe a database. "
+                f"In the Prefect UI use 'Custom run' (NOT 'Quick run') and set "
+                f"confirm={expected} ; from the CLI add -p confirm={expected}"
+            )
         raise ValueError(
-            f"Refusing to rebuild: this DESTROYS ALL DATA in the '{expected}' database"
+            f"Refusing to rebuild: confirm={confirm!r} does not match the database name. "
+            f"This DESTROYS ALL DATA in the '{expected}' database"
             f"{where}. Re-run with confirm='{expected}' if that is what you want."
         )
     return expected

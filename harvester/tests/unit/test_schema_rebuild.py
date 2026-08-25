@@ -377,3 +377,31 @@ class TestRebuildFlowBody:
 class _FakeEngine:
     def dispose(self):
         pass
+
+
+class TestConfirmationMessagesAreDistinct:
+    """An empty confirm (the default, i.e. a Quick run) and a wrong confirm are different
+    operator mistakes and must not read the same — four consecutive red runs were spent
+    partly because 'Refusing to rebuild' looked like the previous env bug."""
+
+    def test_empty_confirm_says_it_is_expected_and_how_to_pass_it(self):
+        with pytest.raises(ValueError) as exc:
+            schema.check_confirmation("", db_name="cde")
+        msg = str(exc.value)
+        assert "not a bug" in msg
+        assert "Custom run" in msg
+        assert "confirm=cde" in msg
+        assert "nothing was touched" in msg
+
+    def test_wrong_confirm_quotes_what_was_given(self):
+        with pytest.raises(ValueError) as exc:
+            schema.check_confirmation("prod", db_name="cde")
+        msg = str(exc.value)
+        assert "'prod'" in msg
+        assert "does not match" in msg
+        assert "Custom run" not in msg, "wrong-name is a different mistake from no-input"
+
+    def test_both_still_name_the_target_database(self):
+        for given in ("", "wrong"):
+            with pytest.raises(ValueError, match="cde"):
+                schema.check_confirmation(given, db_name="cde")
