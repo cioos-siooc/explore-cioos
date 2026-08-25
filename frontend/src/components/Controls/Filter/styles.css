@@ -64,6 +64,16 @@
   align-items: center;
 }
 
+/* Sits between the button and its options section, explaining what the
+   filter does (or, disabled, why it's off) as plain text — always readable,
+   no hover or tap needed. */
+.filterCaption {
+  padding: 2px 12px 6px;
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-xs);
+  line-height: 1.35;
+}
+
 /* The variable / org / dataset icon picks up the brand teal. */
 .filterHeader > svg {
   color: var(--cioos-primary);

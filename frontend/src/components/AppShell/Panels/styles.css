@@ -127,6 +127,16 @@
   padding: 4px 8px 12px;
 }
 
+/* What the filter does, at the top of its section above the search box and
+   options — the pane's own intro line. */
+.filtersPanel .filterOptionsCaption {
+  flex: 0 0 auto;
+  margin: 0 0 8px;
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.35;
+}
+
 .filtersPanel .filterOptionsBody {
   flex: 1 1 auto;
   /* min-*: 0 lets a flex item shrink below its content size — without it the
