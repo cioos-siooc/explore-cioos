@@ -10,7 +10,6 @@ import {
 import isEmpty from 'lodash/isEmpty'
 
 import { getCookieValue } from '../../utilities.jsx'
-import { useMapState } from '../map/MapStateProvider.jsx'
 import { useSelection } from '../selection/SelectionProvider.jsx'
 
 const UIContext = createContext()
@@ -28,7 +27,6 @@ export function useUI () {
 export default function UIProvider ({ children }) {
   const { polygon, selectedTrajectory, inspectDataset, pointsToReview } =
     useSelection()
-  const { featureQuery } = useMapState()
 
   // The datasets sidebar: open by default on wide screens, closed on anything
   // narrower, where it would take too much of the map.
@@ -92,16 +90,6 @@ export default function UIProvider ({ children }) {
   useEffect(() => {
     if (selectedTrajectory) setSidebarOpenState(true)
   }, [selectedTrajectory])
-
-  // Clicking a marker/hex surfaces the datasets under it as the list's pinned,
-  // top-sorted rows (see DatasetsTable's pinnedPks) — but only once the list is
-  // actually open to show them. Without this, a click on a narrow screen (where
-  // the list starts closed) only ever reached the map's own "what's here" card,
-  // and the pinned highlight in the list went unseen until the user happened to
-  // open it themselves.
-  useEffect(() => {
-    if (featureQuery) setSidebarOpenState(true)
-  }, [featureQuery])
 
   // Adding datasets to the download from the map's "what's here" card puts
   // something in the list's footer — show the list so the user sees the basket
