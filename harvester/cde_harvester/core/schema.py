@@ -141,6 +141,34 @@ def schema_files(directory=None):
     return init, functions
 
 
+def ensure_database(maint_engine, name):
+    """``CREATE DATABASE name`` if it is absent. Returns True when it had to be created.
+
+    A deployment whose Postgres volume initialised BEFORE DB_NAME was set has no `cde`
+    database at all: the db service passes ``POSTGRES_DB=$DB_NAME``, so an empty value
+    leaves the image creating only the default ``postgres`` database. Everything then
+    fails with ``FATAL: database "cde" does not exist`` — and the rebuild cannot dig
+    itself out, because ``1_schema.sql`` assumes it is already connected to the target
+    and ``CREATE DATABASE`` cannot run inside a transaction.
+
+    Runs against the maintenance database (``postgres``), which always exists. Mirrors
+    the ``prefect`` service's own ensure_db bootstrap, except that one connects to
+    DB_NAME and so cannot help when DB_NAME is what is missing.
+    """
+    if '"' in name:
+        # Identifier interpolation below cannot be parameterised; refuse anything that
+        # could break out of the quoting rather than escaping it cleverly.
+        raise ValueError(f"Refusing to create a database with a quote in its name: {name!r}")
+    with maint_engine.connect() as conn:
+        exists = conn.execute(
+            text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": name}
+        ).scalar()
+        if exists:
+            return False
+        conn.execute(text(f'CREATE DATABASE "{name}"'))
+    return True
+
+
 def _apply_sql_file(conn, path):
     """Execute one whole .sql file in the current transaction.
 

@@ -25,7 +25,11 @@ from cde_harvester.core.config import (
 )
 from cde_harvester.core import db as core_db
 from cde_harvester.core.observability import cleanup_old_logs, run_logger
-from cde_harvester.core.schema import check_confirmation, rebuild_schema
+from cde_harvester.core.schema import (
+    check_confirmation,
+    ensure_database,
+    rebuild_schema,
+)
 from cde_harvester.sources import OBIS_ALIASES
 from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
 from cde_harvester.loading.loader import main as db_loader_main
@@ -676,6 +680,20 @@ def cde_rebuild_database_run(
         "Rebuilding schema '%s' on %s — dropping all harvested data%s",
         expected, core_db.db_host(), f" (triggered by {triggered_by})" if triggered_by else "",
     )
+
+    # The database itself may not exist: a volume that initialised before DB_NAME was
+    # set has only the default `postgres` database (POSTGRES_DB=$DB_NAME was empty), and
+    # every connection then fails with 'database "cde" does not exist'. Create it first —
+    # the rebuild cannot, since CREATE DATABASE will not run inside a transaction.
+    maint = core_db.maintenance_engine()
+    try:
+        if ensure_database(maint, expected):
+            logger.warning(
+                "Database %r did not exist on %s — created it. This deployment's Postgres "
+                "volume was initialised before DB_NAME was set.", expected, core_db.db_host(),
+            )
+    finally:
+        maint.dispose()
 
     engine = core_db.create_db_engine()
     try:

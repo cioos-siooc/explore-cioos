@@ -324,6 +324,8 @@ class TestRebuildFlowBody:
         monkeypatch.setattr(pp, "run_deployment", trigger or (lambda **kw: None))
         monkeypatch.setattr(pp, "clearRedisCache", flush or (lambda: None))
         monkeypatch.setattr(pp.core_db, "create_db_engine", lambda **kw: _FakeEngine())
+        monkeypatch.setattr(pp.core_db, "maintenance_engine", lambda **kw: _FakeEngine())
+        monkeypatch.setattr(pp, "ensure_database", lambda engine, name: False)
         monkeypatch.setattr(pp.core_db, "db_name", lambda: "cde")
         monkeypatch.setattr(pp.core_db, "db_host", lambda: "db")
 
@@ -405,3 +407,127 @@ class TestConfirmationMessagesAreDistinct:
         for given in ("", "wrong"):
             with pytest.raises(ValueError, match="cde"):
                 schema.check_confirmation(given, db_name="cde")
+
+
+class TestEnsureDatabase:
+    """A volume that initialised before DB_NAME was set has only the default `postgres`
+    database (POSTGRES_DB=$DB_NAME was empty), so every connection dies with
+    'database "cde" does not exist' and the rebuild cannot dig itself out."""
+
+    def test_creates_when_absent(self):
+        engine = _FakeMaintEngine(existing=[])
+        assert schema.ensure_database(engine, "cde") is True
+        assert engine.executed == ['CREATE DATABASE "cde"']
+
+    def test_no_op_when_present(self):
+        engine = _FakeMaintEngine(existing=["cde"])
+        assert schema.ensure_database(engine, "cde") is False
+        assert engine.executed == [], "must not attempt CREATE DATABASE when it exists"
+
+    def test_rejects_a_quoted_name(self):
+        """The identifier cannot be parameterised, so refuse rather than escape."""
+        engine = _FakeMaintEngine(existing=[])
+        with pytest.raises(ValueError, match="quote in its name"):
+            schema.ensure_database(engine, 'cde"; DROP DATABASE postgres; --')
+        assert engine.executed == []
+
+    def test_maintenance_engine_targets_the_postgres_database(self, tmp_path, monkeypatch):
+        """CREATE DATABASE has to run from a database that always exists, and in
+        AUTOCOMMIT — it cannot run inside a transaction block."""
+        from cde_harvester.core import db as core_db
+
+        monkeypatch.setenv("DB_NAME", "cde")
+        monkeypatch.setenv("DB_USER", "postgres")
+        monkeypatch.setenv("DB_PASSWORD", "p")
+        monkeypatch.setenv("DB_HOST_EXTERNAL", "db")
+        monkeypatch.chdir(tmp_path)
+        engine = core_db.maintenance_engine()
+        try:
+            assert engine.url.database == "postgres"
+            assert engine.dialect.name == "postgresql"
+        finally:
+            engine.dispose()
+
+
+class _FakeMaintConn:
+    def __init__(self, parent):
+        self._parent = parent
+
+    def execute(self, statement, params=None):
+        sql = str(statement)
+        if "pg_database" in sql:
+            return _FakeResult(1 if params["name"] in self._parent.existing else None)
+        self._parent.executed.append(sql)
+        return _FakeResult(None)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class _FakeResult:
+    def __init__(self, value):
+        self._value = value
+
+    def scalar(self):
+        return self._value
+
+
+class _FakeMaintEngine:
+    def __init__(self, existing):
+        self.existing = existing
+        self.executed = []
+
+    def connect(self):
+        return _FakeMaintConn(self)
+
+    def dispose(self):
+        pass
+
+
+class TestFlowCreatesMissingDatabase:
+    """The flow must create the database before rebuilding its schema, and must not
+    proceed to the rebuild if that creation fails."""
+
+    @staticmethod
+    def _patch(monkeypatch, ensure, rebuild_calls):
+        from cde_harvester import prefect_pipeline as pp
+
+        monkeypatch.setattr(pp, "ensure_database", ensure)
+        monkeypatch.setattr(
+            pp,
+            "rebuild_schema",
+            lambda engine: rebuild_calls.append(1)
+            or {"schema": "cde", "init_file": "1_schema.sql",
+                "function_files": [], "tables_created": 18},
+        )
+        monkeypatch.setattr(pp, "run_deployment", lambda **kw: None)
+        monkeypatch.setattr(pp, "clearRedisCache", lambda: None)
+        monkeypatch.setattr(pp.core_db, "create_db_engine", lambda **kw: _FakeEngine())
+        monkeypatch.setattr(pp.core_db, "maintenance_engine", lambda **kw: _FakeEngine())
+        monkeypatch.setattr(pp.core_db, "db_name", lambda: "cde")
+        monkeypatch.setattr(pp.core_db, "db_host", lambda: "db")
+        from cde_harvester.prefect_pipeline import cde_rebuild_database_run
+
+        return cde_rebuild_database_run.fn
+
+    def test_ensure_runs_before_rebuild_and_flow_completes(self, monkeypatch):
+        seen, rebuilds = [], []
+        flow = self._patch(monkeypatch, lambda engine, name: seen.append(name) or True, rebuilds)
+        report = flow(confirm="cde")
+        assert seen == ["cde"]
+        assert rebuilds == [1]
+        assert report["tables_created"] == 18
+
+    def test_creation_failure_aborts_before_rebuild(self, monkeypatch):
+        rebuilds = []
+
+        def boom(engine, name):
+            raise RuntimeError("permission denied to create database")
+
+        flow = self._patch(monkeypatch, boom, rebuilds)
+        with pytest.raises(RuntimeError, match="permission denied"):
+            flow(confirm="cde")
+        assert rebuilds == [], "must not rebuild when the database could not be created"

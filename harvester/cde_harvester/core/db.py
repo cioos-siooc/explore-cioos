@@ -12,6 +12,7 @@ import sys
 
 from dotenv import find_dotenv, load_dotenv
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 
 
 def _load_env():
@@ -90,6 +91,21 @@ def db_name():
 def create_db_engine(**kwargs):
     """SQLAlchemy engine for the CDE database. kwargs pass through to create_engine."""
     return create_engine(database_url(), **kwargs)
+
+
+# Always present on a Postgres cluster, so it is where you connect to ask questions
+# about — or create — other databases.
+MAINTENANCE_DATABASE = "postgres"
+
+
+def maintenance_engine(**kwargs):
+    """Engine bound to the ``postgres`` database, for CREATE DATABASE and the like.
+
+    AUTOCOMMIT because CREATE DATABASE cannot run inside a transaction block.
+    """
+    url = make_url(database_url()).set(database=MAINTENANCE_DATABASE)
+    kwargs.setdefault("isolation_level", "AUTOCOMMIT")
+    return create_engine(url, **kwargs)
 
 
 def database_is_empty():
