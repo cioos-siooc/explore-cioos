@@ -176,6 +176,8 @@
   "datasetInspectorFilterText": "Search table",
   "datasetInspectorClickPreviewText": "Click on a record to preview the first 1000 records in a table or plot",
   "datasetInspectorRecordTable": "Record list",
+  "datasetInspectorMapClickHint": "The highlighted record was found under your last click on the map",
+  "datasetInspectorClearMapRecordText": "Clear",
   "datasetInspectorERDDAPText": "Dataset source URL",
   "datasetInspectorCKANText": "Catalogue URL",
   "datasetInspectorSourcesText": "Sources",

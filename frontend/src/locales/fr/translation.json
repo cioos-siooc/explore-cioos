@@ -177,6 +177,8 @@
   "datasetInspectorFilterText": "Rechercher le tableau",
   "datasetInspectorClickPreviewText": "Cliquez sur un enregistrement pour prévisualiser les 1000 premiers enregistrements d'un tableau ou d'un graphique.",
   "datasetInspectorRecordTable": "Liste d'enregistrements",
+  "datasetInspectorMapClickHint": "L'enregistrement en surbrillance a été trouvé sous votre dernier clic sur la carte",
+  "datasetInspectorClearMapRecordText": "Effacer",
   "datasetInspectorERDDAPText": "Lien d’origine du jeu de données",
   "datasetInspectorCKANText": "URL du catalogue",
   "datasetInspectorSourcesText": "Sources",

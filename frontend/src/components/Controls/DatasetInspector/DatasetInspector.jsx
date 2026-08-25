@@ -99,6 +99,11 @@ export default function DatasetInspector({
   query,
   selectedTrajectory,
   setSelectedTrajectory,
+  // The one record ({datasetPk, profileId}) an unambiguous map marker click
+  // resolved to — pins that record to the top of the table below rather than
+  // opening its preview outright, until cleared (see markerRecordPinned).
+  highlightedRecord,
+  setHighlightedRecord,
   activeWmsOverlay,
   setActiveWmsOverlay
 }) {
@@ -336,7 +341,25 @@ export default function DatasetInspector({
       grow: 2
     }
   ]
-  const data = filterRows(datasetRecords?.profiles, recordFilterText)
+  // A record picked on the map (rather than from this table) is pinned to the
+  // front of the row list rather than filtering the rest away — the same
+  // "found here, sorted to the top" treatment the datasets list itself gives
+  // a map click (see DatasetsTable's pinnedPks). defaultSortField is left off
+  // the DataTable below while this is active, or the library's own initial
+  // sort would immediately undo the pin (an explicit column-sort click still
+  // can, same tradeoff pinnedPks accepts — see its own comment).
+  const markerRecordPinned = highlightedRecord?.datasetPk === dataset.pk
+  const filteredRecords = filterRows(datasetRecords?.profiles, recordFilterText) || []
+  const data = markerRecordPinned
+    ? [
+      ...filteredRecords.filter(
+        (row) => row.profile_id === highlightedRecord.profileId
+      ),
+      ...filteredRecords.filter(
+        (row) => row.profile_id !== highlightedRecord.profileId
+      )
+    ]
+    : filteredRecords
 
   const platformColumns = [
     {
@@ -659,6 +682,21 @@ export default function DatasetInspector({
                 {t('datasetInspectorClickPreviewText')}
               </span>
             </div>
+            {/* Names the accent conditionalRowStyles puts on the pinned row
+                below, and offers the way to unpin it again. */}
+            {markerRecordPinned && (
+              <div className='recordMapClickHint'>
+                <span className='recordMapClickSwatch' aria-hidden='true' />
+                {t('datasetInspectorMapClickHint')}
+                <button
+                  type='button'
+                  className='recordShowAll'
+                  onClick={() => setHighlightedRecord(undefined)}
+                >
+                  {t('datasetInspectorClearMapRecordText')}
+                </button>
+              </div>
+            )}
             {loading ? (
               <div className='datasetInspectorLoadingContainer'>
                 <Loading variant='inline' />
@@ -674,10 +712,20 @@ export default function DatasetInspector({
                   onRowClicked={(row) => setInspectRecordID(row.profile_id)}
                   striped
                   pointerOnHover
+                  conditionalRowStyles={[
+                    {
+                      when: (row) =>
+                        markerRecordPinned &&
+                        row.profile_id === highlightedRecord.profileId,
+                      style: { backgroundColor: '#d5c9ee' }
+                    }
+                  ]}
                   columns={columns}
                   data={data}
-                  defaultSortField='profile_id'
-                  defaultSortAsc={false}
+                  {...(!markerRecordPinned && {
+                    defaultSortField: 'profile_id',
+                    defaultSortAsc: false
+                  })}
                   pagination
                   paginationPerPage={100}
                   paginationRowsPerPageOptions={[100, 150, 200, 250]}

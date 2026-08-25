@@ -205,6 +205,12 @@ export default function CreateMap({
   // The same payload handed back, so the map can outline the region the open
   // card is describing.
   featureQuery,
+  // A click that landed on exactly one individual marker naming exactly one
+  // dataset — nothing else under the cursor, no ambiguity about which station
+  // the user meant. Called with (datasetPk, pointPk) instead of building a
+  // featureQuery, so the caller can jump straight to that station's record
+  // rather than making the user open a card and pick a row. See handleMapClick.
+  onMarkerClick = () => { },
   rangeLevels,
   coverageRangeLevels,
   // Reports the count range the hexes on screen actually span, so the legend
@@ -1607,6 +1613,8 @@ export default function CreateMap({
   // click handler; the card does that itself now, straight from the provider.)
   const onFeatureQueryRef = useRef(onFeatureQuery)
   onFeatureQueryRef.current = onFeatureQuery
+  const onMarkerClickRef = useRef(onMarkerClick)
+  onMarkerClickRef.current = onMarkerClick
 
   // Read by the track-focus paint (see applyTrackFocus). It also fed a
   // "click to show this platform's full track" line on the track tooltips,
@@ -2956,13 +2964,105 @@ export default function CreateMap({
       if (draw.getMode().includes('draw')) return
 
       const layers = clickLayerIds.filter((id) => map.current.getLayer(id))
-      const hits = layers.length
+      let hits = layers.length
         ? map.current.queryRenderedFeatures(e.point, { layers })
         : []
+
+      // A marker is a specific station; 'coverage-hexes' shares the marker
+      // tier's zoom band (both render at z >= hexMaxZoom) and can sit right
+      // under it as a neighbourhood aggregate covering the same pixel. The
+      // marker is what the user pointed at, so once one is under the click the
+      // hex hits are dropped rather than merged into it — a click here always
+      // means "this station", never "this station, plus whatever hex happens
+      // to be under it".
+      const markerHits = hits.filter((feature) => feature.layer.id === 'points')
+      if (markerHits.length > 0) {
+        hits = hits.filter(
+          (feature) => !['hexes', 'coverage-hexes'].includes(feature.layer.id)
+        )
+      }
+
+      // 'points' carries a wide invisible hit stroke (circle-stroke-width: 10,
+      // circle-stroke-opacity: 0.001 — see the layer below) so a marker stays
+      // a comfortable target at any zoom. That means one click very commonly
+      // registers hits on more than one nearby station, not just the one the
+      // cursor is actually over — requiring exactly one hit made almost every
+      // click in a cluster fall back to the ambiguous card. Pick whichever
+      // station's true position (not its inflated hit area) is closest to the
+      // cursor instead; that is unambiguously the one the user pointed at,
+      // however many others' hit areas also happened to cover the pixel.
+      // Deduped by pk first — the same station can be hit twice where it
+      // straddles a tile boundary.
+      let nearestMarker = null
+      if (markerHits.length > 0) {
+        const seenPks = new Set()
+        let nearestDistSq = Infinity
+        markerHits.forEach((feature) => {
+          const pk = feature.properties.pk
+          if (seenPks.has(pk)) return
+          seenPks.add(pk)
+          const projected = map.current.project(feature.geometry.coordinates)
+          const dx = projected.x - e.point.x
+          const dy = projected.y - e.point.y
+          const distSq = dx * dx + dy * dy
+          if (distSq < nearestDistSq) {
+            nearestDistSq = distSq
+            nearestMarker = feature
+          }
+        })
+      }
+
+      // Nothing under the click but (possibly several) markers, and the
+      // nearest one names exactly one dataset: unambiguous enough to jump
+      // straight to that station's record instead of making the user open a
+      // card and click through. A marker's cell naming more than one dataset,
+      // or a track/grid sharing the pixel, still falls through to the regular
+      // card below, same as before.
+      const nonMarkerHits = hits.filter((feature) => feature.layer.id !== 'points')
+      if (nearestMarker && nonMarkerHits.length === 0) {
+        const markerDatasetPks = datasetPksOf(nearestMarker)
+        if (markerDatasetPks.length === 1) {
+          popup.remove()
+          // This path skips onFeatureQueryRef (see below) — it opens the
+          // dataset page directly rather than building a card query — so the
+          // usual featureQuery-driven click-highlight effect never runs for
+          // it. Ring the clicked marker here instead, the same way
+          // buildFeatureQuery would have: same source, same Point-with-count
+          // shape, so click-highlight-point sizes the ring to match the
+          // marker exactly.
+          map.current.getSource('click-highlight')?.setData({
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                geometry: nearestMarker.geometry,
+                properties: { count: Number(nearestMarker.properties.count) || 0 }
+              }
+            ]
+          })
+          onMarkerClickRef.current(
+            markerDatasetPks[0],
+            Number(nearestMarker.properties.pk)
+          )
+          return
+        }
+      }
+
       const query = buildFeatureQuery(e, hits)
 
       popup.remove()
       onFeatureQueryRef.current(query)
+
+      // Usually redundant with the featureQuery effect below (a real query is
+      // always a fresh object, so setFeatureQuery(query) reliably re-triggers
+      // it) — needed for the one case that isn't: clicking empty water right
+      // after the marker path above, which sets the ring without ever
+      // touching featureQuery. If it was already null, React bails out of the
+      // no-op setFeatureQuery(null) and that effect never runs, leaving the
+      // marker's ring stuck on screen with nothing left for it to point at.
+      if (!query) {
+        map.current.getSource('click-highlight')?.setData(emptyFeatureCollection)
+      }
 
       // A click on empty water is the way out of everything: it closes the card
       // and drops the spatial selection, which is the only undo a touch user

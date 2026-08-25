@@ -302,6 +302,47 @@
   color: var(--cioos-ink-60);
 }
 
+/* Explains the accent conditionalRowStyles puts on the record pinned to the
+   top of the table below — see markerRecordPinned in DatasetInspector.jsx.
+   Same shape as DatasetsTable's .datasetsCardMapClickHint. */
+.recordMapClickHint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-surface-2);
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+}
+
+.recordMapClickSwatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 2px solid var(--cioos-primary);
+  box-shadow: 0 0 0 2px rgba(82, 167, 155, 0.35);
+}
+
+.recordShowAll {
+  margin-left: auto;
+  padding: 4px 8px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-700);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.recordShowAll:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-surface-2);
+}
+
 /* An ID column heading names the CF role the dataset uses for its records
    (cf_role=profile_id / timeseries_id / trajectory_id) and, under it, the
    variable carrying that role — set in mono so it reads as the source column's

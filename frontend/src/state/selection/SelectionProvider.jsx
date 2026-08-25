@@ -92,6 +92,15 @@ export default function SelectionProvider ({ children }) {
   // full track on the map: {datasetPk, datasetTitle, trajectoryId} | undefined.
   const [selectedTrajectory, setSelectedTrajectory] = useState()
 
+  // The one record (timeseries_id/profile_id) an unambiguous map marker click
+  // resolved to: {datasetPk, profileId} | undefined. Distinct from
+  // inspectRecordID — that one means "show this record's preview", and is set
+  // by an explicit click on a row (here, or in the inspector's own table).
+  // This one only marks a row for the inspector to highlight and scroll to, so
+  // a marker click opens the dataset page and points at the record rather than
+  // jumping straight into the preview the user hasn't asked to see yet.
+  const [highlightedRecord, setHighlightedRecord] = useState()
+
   const [selectAll, setSelectAll] = useState(false)
   const [pointsData, setPointsData] = useState([])
   const [selectionLoading, setSelectionLoading] = useState(true)
@@ -540,6 +549,11 @@ export default function SelectionProvider ({ children }) {
     setSelectedTrajectory((current) =>
       current && current.datasetPk !== inspectDataset?.pk ? undefined : current
     )
+    // Same for a marker's highlighted record: it only means anything on the
+    // dataset page the marker opened.
+    setHighlightedRecord((current) =>
+      current && current.datasetPk !== inspectDataset?.pk ? undefined : current
+    )
   }, [inspectDataset])
 
   useEffect(() => {
@@ -577,6 +591,8 @@ export default function SelectionProvider ({ children }) {
     selectedTrajectory,
     setSelectedTrajectory,
     selectTrajectoryFromMap,
+    highlightedRecord,
+    setHighlightedRecord,
     selectAll,
     pointsData,
     setPointsData,
