@@ -198,6 +198,23 @@ services:
       # In-process flows inherit this container's env for DB / redis access.
       DB_HOST_EXTERNAL: db
       REDIS_HOST: redis
+      # The connection settings themselves, delivered by compose interpolation —
+      # the same way `db` (POSTGRES_DB=$DB_NAME) and `prefect`
+      # (PREFECT_API_DATABASE_CONNECTION_URL) already get them, rather than
+      # relying on `env_file: .env` above.
+      #
+      # These are the SAME values, not different ones. The two delivery paths are
+      # not equally reliable: Coolify always provides variables for interpolation
+      # (which is why db and prefect come up), but the `.env` that `env_file`
+      # reads can be absent or empty on a deployment. When that happened, this
+      # container started with no DB settings at all and every flow run died at
+      # connection time ("DB_NAME is not set") while db and prefect ran happily
+      # on the very same credentials — see harvester/core/db.py:REQUIRED_DB_SETTINGS
+      # and the startup pre-flight in worker-entrypoint.sh.
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: ${DB_PORT:-5432}
       HARVESTER_LOG_DIR: /app/harvester/logs
       # Surface stdlib-logging from harvester/db-loader in Prefect UI logs.
       PREFECT_LOGGING_EXTRA_LOGGERS: populate_vernaculars,cde_db_loader,cde_harvester
