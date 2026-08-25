@@ -28,6 +28,12 @@ COPY ./harvester/worker-entrypoint.sh ./worker-entrypoint.sh
 # Startup fails with an actionable error when none is provided.
 COPY ./Obis_Datasets.json ./Obis_Datasets.json
 
+# The numbered schema files, so the "Rebuild Database" flow can recreate the schema
+# after a deploy changes the table layout (Postgres applies 1_schema.sql only on a
+# fresh volume, and db_migrate re-applies only the [3-9] function files). Read-only
+# input to cde_harvester/core/schema.py; overridable via CDE_DATABASE_DIR.
+COPY ./database /app/database
+
 # 4. Install project itself
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked || (echo "Lock mismatch final stage, aborting" && exit 1)

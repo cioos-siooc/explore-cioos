@@ -334,6 +334,31 @@ socket). Since we use Prefect for orchestration, you don't need a system cron jo
    *Note: single-source runs always force **Incremental Mode** so they can't
    TRUNCATE the other sources. Full runs honor `INCREMENTAL_MODE`.*
 
+2b. **Rebuilding the schema after a table-layout change.** Postgres applies
+   `database/1_schema.sql` only when it initialises a *fresh* data volume, and
+   `db_migrate` re-applies only the `[3-9]_*.sql` function files — whose table
+   references all sit inside PL/pgSQL bodies and so are not checked at load time.
+   A deploy that adds or renames a table therefore reports a clean migration while
+   leaving the database on the old layout; the mismatch first shows up as
+   `relation "cde.<table>" does not exist` at query time.
+
+   The `Rebuild Database` deployment (`cde-rebuild-database`) fixes that in place —
+   no volume deletion and no host shell:
+
+   ```sh
+   docker exec <prefect_worker> sh -c "cd /app/harvester && uv run prefect deployment run \
+     'Rebuild Database/cde-rebuild-database' -p confirm=$DB_NAME"
+   ```
+
+   It drops the `cde` schema, re-applies `1_schema.sql` and the `[3-9]` files in one
+   transaction (a mid-way failure rolls back rather than half-migrating), flushes the
+   redis tile cache, and triggers `Harvest All Sources` to repopulate.
+
+   **This destroys all harvested data**, exactly as deleting the Postgres volume would.
+   `confirm` must equal `DB_NAME` or the flow aborts before touching anything, so the
+   Run button in the Prefect UI can't wipe a database by accident. Pass
+   `-p run_harvest=false` to leave it empty.
+
 3. Scale workers (more concurrent runs) on the same host:
    ```sh
    docker compose up -d --scale prefect_worker=N

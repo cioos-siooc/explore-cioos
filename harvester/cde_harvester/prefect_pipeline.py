@@ -23,7 +23,9 @@ from cde_harvester.core.config import (
     load_obis_dataset_ids,
     resolve_harvest_config_file,
 )
+from cde_harvester.core import db as core_db
 from cde_harvester.core.observability import cleanup_old_logs, run_logger
+from cde_harvester.core.schema import check_confirmation, rebuild_schema
 from cde_harvester.sources import OBIS_ALIASES
 from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
 from cde_harvester.loading.loader import main as db_loader_main
@@ -419,6 +421,18 @@ class PrefectCDEPipeline:
             source_deployment_names.append(dep_name)
             logger.info("Per-source deployment registered: %s (source=%s)", dep_name, src)
 
+        # Destructive schema rebuild, on-demand only — never scheduled, and gated on a
+        # confirm parameter matching DB_NAME (see cde_rebuild_database_run).
+        rebuild_id = flow.from_source(
+            source=source_dir,
+            entrypoint="cde_harvester/prefect_pipeline.py:cde_rebuild_database_run",
+        ).deploy(
+            name="cde-rebuild-database",
+            work_pool_name=POOL_NAME,
+            cron=None,
+            job_variables=job_vars,
+        )
+
         # Scheduled fan-out orchestrator: on each HARVESTER_CRON tick it triggers
         # the per-source deployments above (registered first so they resolve at run time).
         orchestrator_id = flow.from_source(
@@ -436,8 +450,8 @@ class PrefectCDEPipeline:
         print(f"  uv run prefect worker start --pool {POOL_NAME} --type process")
         logger.info(
             "Deployments created: cde-harvester=%s cde-harvest-all=%s "
-            "populate-vernaculars=%s per-source=%s",
-            harvest_id, orchestrator_id, vernaculars_id, source_deployment_names,
+            "populate-vernaculars=%s rebuild-database=%s per-source=%s",
+            harvest_id, orchestrator_id, vernaculars_id, rebuild_id, source_deployment_names,
         )
         return harvest_id
 
@@ -625,6 +639,72 @@ def populate_vernaculars_run(
     finally:
         sys.argv = saved_argv
     print("vernaculars_main() returned")
+
+
+@flow(name="Rebuild Database", log_prints=True)
+def cde_rebuild_database_run(
+    confirm: str = "",
+    run_harvest: bool = True,
+    flush_redis: bool = True,
+    triggered_by: str | None = None,
+):
+    """DESTRUCTIVE: drop the cde schema, recreate it from database/*.sql, re-harvest.
+
+    For when a deploy changes the table layout. Postgres applies 1_schema.sql only on a
+    fresh volume and db_migrate re-applies only the [3-9] function files, so the tables
+    silently stay on the old layout and every query against a new table fails with
+    `relation "cde.x" does not exist`. This rebuilds them without volume surgery or host
+    shell access.
+
+    ALL HARVESTED DATA IS LOST — same as deleting the Postgres volume. To proceed,
+    `confirm` must be the database name (DB_NAME); anything else aborts before touching
+    the schema, so a stray Run in the Prefect UI cannot wipe a database by accident.
+
+    run_harvest: trigger "Harvest All Sources" afterwards to repopulate (the rebuilt
+    schema is empty, so the app has no data until a harvest completes).
+    """
+    logger = get_run_logger()
+
+    expected = check_confirmation(confirm, host=core_db.db_host())
+
+    logger.warning(
+        "Rebuilding schema '%s' on %s — dropping all harvested data%s",
+        expected, core_db.db_host(), f" (triggered by {triggered_by})" if triggered_by else "",
+    )
+
+    engine = core_db.create_db_engine()
+    try:
+        report = rebuild_schema(engine)
+    finally:
+        engine.dispose()
+
+    logger.info(
+        "Schema rebuilt: %s + %s -> %d tables",
+        report["init_file"], ", ".join(report["function_files"]), report["tables_created"],
+    )
+
+    # Tiles and legend ranges are cached per-geometry; after a wipe they describe data
+    # that no longer exists, so serve-stale would outlive the rebuild.
+    if flush_redis:
+        try:
+            clearRedisCache()
+        except Exception as e:  # cache is best-effort — never fail the rebuild on it
+            logger.warning("Could not flush the redis cache (%s); tiles may serve stale data", e)
+
+    if not run_harvest:
+        logger.warning(
+            "run_harvest=False — the schema is empty. Trigger a harvest before expecting "
+            "the app to show data."
+        )
+        return report
+
+    logger.info("Triggering 'Harvest All Sources' to repopulate the empty schema")
+    run_deployment(
+        name="Harvest All Sources/cde-harvest-all",
+        parameters={"triggered_by": triggered_by or "rebuild-database"},
+        timeout=0,
+    )
+    return report
 
 
 def deploy(pipeline):
