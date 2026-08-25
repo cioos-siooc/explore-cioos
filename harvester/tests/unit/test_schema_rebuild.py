@@ -531,3 +531,44 @@ class TestFlowCreatesMissingDatabase:
         with pytest.raises(RuntimeError, match="permission denied"):
             flow(confirm="cde")
         assert rebuilds == [], "must not rebuild when the database could not be created"
+
+
+class TestSearchPathIsolation:
+    """1_schema.sql ends with `SET search_path TO cde, public`. The db image's entrypoint
+    runs each file in its own psql process, so that SET never reaches 3_*..9_* and their
+    functions land in `public` — where the app looks for them. Applying every file on one
+    connection let the SET leak, creating them in `cde` instead, and the db-loader failed
+    with `function create_temp_tables() does not exist` AFTER a successful harvest."""
+
+    def test_search_path_is_reset_before_each_file(self, tmp_path):
+        f = tmp_path / "9_x.sql"
+        f.write_text("CREATE OR REPLACE FUNCTION noop() RETURNS void AS $$ BEGIN END $$ LANGUAGE plpgsql;")
+        conn = _RecordingConn()
+        schema._apply_sql_file(conn, f)
+        assert len(conn.executed) == 2
+        assert conn.executed[0] == 'SET search_path TO "$user", public'
+        assert "CREATE OR REPLACE FUNCTION noop" in conn.executed[1]
+
+    def test_reset_uses_the_postgres_default(self):
+        assert schema.DEFAULT_SEARCH_PATH == '"$user", public'
+        assert "cde" not in schema.DEFAULT_SEARCH_PATH
+
+
+class _RecordingCursor:
+    def __init__(self, parent):
+        self._parent = parent
+
+    def execute(self, sql):
+        self._parent.executed.append(sql)
+
+    def close(self):
+        pass
+
+
+class _RecordingConn:
+    def __init__(self):
+        self.executed = []
+        self.connection = self
+
+    def cursor(self):
+        return _RecordingCursor(self)

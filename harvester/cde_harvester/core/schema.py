@@ -169,8 +169,23 @@ def ensure_database(maint_engine, name):
     return True
 
 
+# The search_path Postgres gives a fresh session. The db image's entrypoint runs each
+# .sql file in its OWN psql invocation, so a `SET search_path` inside one file never
+# reaches the next; restoring this before every file reproduces that isolation.
+DEFAULT_SEARCH_PATH = '"$user", public'
+
+
 def _apply_sql_file(conn, path):
-    """Execute one whole .sql file in the current transaction.
+    """Execute one whole .sql file in the current transaction, at the default search_path.
+
+    The search_path reset is essential, not cosmetic. ``1_schema.sql`` ends with
+    ``SET search_path TO cde, public``. On a fresh volume that is harmless because the
+    entrypoint runs every file as a separate psql process, so ``3_*``..``9_*`` create their
+    functions at the DEFAULT search_path and they land in ``public`` — which is where the
+    app looks for them (``SELECT create_temp_tables()`` etc.). Applying all the files in one
+    connection, as this module does, would otherwise let that SET persist and create every
+    function in ``cde``, where the db-loader cannot see it:
+    ``function create_temp_tables() does not exist``.
 
     Goes down to the raw DBAPI cursor rather than ``text()`` or ``exec_driver_sql``.
     These files are full of dollar-quoted PL/pgSQL bodies, ``::`` casts and ``%`` in
@@ -182,6 +197,7 @@ def _apply_sql_file(conn, path):
     """
     cursor = conn.connection.cursor()
     try:
+        cursor.execute(f"SET search_path TO {DEFAULT_SEARCH_PATH}")
         cursor.execute(path.read_text())
     finally:
         cursor.close()
