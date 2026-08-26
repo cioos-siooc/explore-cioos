@@ -115,6 +115,11 @@ const HEX_LAYER_IDS = ['hexes', 'coverage-hexes']
 // The sources those layers draw from — tiles landing in either one can change
 // what a measurement would find.
 const HEX_SOURCE_IDS = ['cde-tiles', 'cde-cells']
+// How far a screen corner may move across an unproject/project round trip and
+// still count as a point on the map surface. One pixel: the round trip is exact
+// to floating-point noise for a point that is really on the surface, and off by
+// tens or hundreds of pixels for one that isn't (see viewportQueryIsReliable).
+const SURFACE_ROUND_TRIP_TOLERANCE_PX = 1
 
 // North-pointing arrowhead icon for track heads and selected-track fixes;
 // the symbol layers rotate it to each point's course over ground. Drawn at
@@ -999,6 +1004,38 @@ export default function CreateMap({
   }
   setColorStopsRef.current = setColorStops
 
+  // Whether queryRenderedFeatures can still answer "what is on screen". It
+  // builds the region it searches by unprojecting the viewport corners, and in
+  // globe projection a corner whose ray misses the sphere is snapped to the
+  // nearest point on the horizon instead (unprojectScreenPoint in maplibre-gl,
+  // whose own query code calls globe support a hack pending a real
+  // implementation). The region searched is then not the region on screen, so
+  // the measurement it feeds is fiction — and the crossover is abrupt: the
+  // corners leave the sphere the moment the globe stops covering them, at about
+  // z3 on a wide window and lower on a tall one, which is exactly where the
+  // ramp domain was seen to jump and re-shade the whole map on a zoom-out.
+  //
+  // An unproject/project round trip is the test, and a cheap one — two matrix
+  // multiplies per corner. It only fails for a screen point that is not on the
+  // map surface, so mercator never trips it (nor does globe once the globe
+  // fills the view).
+  function viewportQueryIsReliable() {
+    const canvas = map.current.getCanvas()
+    const corners = [
+      [0, 0],
+      [canvas.clientWidth, 0],
+      [0, canvas.clientHeight],
+      [canvas.clientWidth, canvas.clientHeight]
+    ]
+    return corners.every(([x, y]) => {
+      const roundTrip = map.current.project(map.current.unproject([x, y]))
+      return (
+        Math.hypot(roundTrip.x - x, roundTrip.y - y) <=
+        SURFACE_ROUND_TRIP_TOLERANCE_PX
+      )
+    })
+  }
+
   // The count range the hexes on screen span, snapped out to the nearest nice
   // rungs, or undefined when there is nothing to measure. Read from what is
   // rendered rather than fetched: the counts are already on the features the
@@ -1007,6 +1044,13 @@ export default function CreateMap({
   function measureVisibleHexRange(focusPk) {
     const layers = HEX_LAYER_IDS.filter((id) => map.current.getLayer(id))
     if (!layers.length) return undefined
+    // No trustworthy answer to be had — see viewportQueryIsReliable. Nothing is
+    // lost by not measuring here: this only happens with the whole globe in
+    // view, where the catalogue-wide tier range the ramp falls back to is the
+    // honest domain anyway, and it holds still under pan, rotate and zoom
+    // instead of shifting with a query region that has nothing to do with the
+    // view.
+    if (!viewportQueryIsReliable()) return undefined
     // No geometry argument = the whole viewport. Hidden layers and layers
     // outside their zoom range return nothing, so this needs no zoom or
     // visibility test of its own.
