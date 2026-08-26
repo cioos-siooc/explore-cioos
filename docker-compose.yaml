@@ -125,8 +125,11 @@ services:
     build:
       context: .
       dockerfile: ./download_scheduler/Dockerfile
-    profiles:
-      - tools
+    # NOT behind a compose profile. It used to sit in the `tools` profile to
+    # dodge a start-up crash (fc2eae11, since fixed), but a profile is opt-in:
+    # `docker compose up` skips the service unless COMPOSE_PROFILES names it,
+    # and Coolify never sets that — so every Coolify deploy silently ran with no
+    # consumer on the queue and downloads stayed 'open' forever.
     # Without this, a crash leaves the queue with no consumer: the API keeps
     # accepting downloads and they pile up as 'open' rows forever.
     restart: unless-stopped

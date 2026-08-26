@@ -258,20 +258,20 @@ production-vs-everything-else diff is that one short file. Deploy both:
 docker compose -f docker-compose.yaml -f docker-compose.production.yaml up -d --build
 ```
 
-Two settings in `.env` make that the default for every command run on the box
+One setting in `.env` makes that the default for every command run on the box
 (docker compose reads `COMPOSE_*` from `.env`), so ad-hoc `docker compose logs` /
-`ps` / `restart` on the server pick up the same pair — both are already in
+`ps` / `restart` on the server pick up the same pair — it is already in
 `.env.production`:
 
 ```sh
 COMPOSE_FILE=docker-compose.yaml:docker-compose.production.yaml
-COMPOSE_PROFILES=tools
 ```
 
-`COMPOSE_PROFILES=tools` is **required**: `scheduler` sits behind the `tools`
-profile in the base file (Coolify does not run it), and an overlay can *add* a
-profile but never remove one — so production opts in through the environment.
-Without it the download scheduler silently never starts.
+No `COMPOSE_PROFILES` is needed, and no service is profile-gated. `scheduler`
+used to sit behind a `tools` profile, which made starting the download-queue
+consumer opt-in: any deployment that forgot the env var — Coolify never sets it —
+came up with no consumer and left every download `open` forever. It is now an
+ordinary service.
 
 What the overlay adds, and nothing else: host ports (nginx, Prefect, Postgres),
 the externally-managed `explore-cioos_default` network, the host-editable
@@ -304,7 +304,7 @@ is inherited from `docker-compose.yaml`, so it only has to be maintained once.
    sudo docker compose -f docker-compose.yaml -f docker-compose.production.yaml up -d --build
    ```
 
-   With `COMPOSE_FILE` and `COMPOSE_PROFILES` set in `.env` (above), plain
+   With `COMPOSE_FILE` set in `.env` (above), plain
    `sudo docker compose up -d --build` is equivalent.
 
 ### Data Harvesting (Production)
