@@ -2114,15 +2114,47 @@ export default function CreateMap({
         type: 'geojson',
         data: emptyFeatureCollection
       })
+      // The flat merged fill goes down first. A stack of grid boxes draws its
+      // glow (below) per individual box, not once for the merged shape — put
+      // the fill on top of that glow instead and every box nested inside the
+      // stack has its glow smothered from both sides by the fill covering it,
+      // leaving only the outermost box's glow poking out past the fill's own
+      // edge. That read as "just the biggest box got selected" even though
+      // every box was outlined and listed correctly.
+      map.current.addLayer({
+        id: 'click-highlight-fill',
+        type: 'fill',
+        source: 'click-highlight',
+        // Excludes the individual grid rectangles, which the merged stand-in
+        // shape fills on their behalf — see the `role` comment in
+        // buildFeatureQuery. Painting both would compound a stack's opacity;
+        // painting only the individual boxes is exactly what this avoids.
+        filter: [
+          'all',
+          ['!=', ['geometry-type'], 'Point'],
+          ['!=', ['get', 'role'], 'outline']
+        ],
+        paint: {
+          'fill-color': clickHighlightColor,
+          'fill-opacity': 0.18
+        }
+      })
       // A soft blurred halo under the crisp outline/point below, so the
       // selected item reads as picked out at a glance instead of just
       // outlined. Point and polygon geometries blur through different paint
       // properties (circle-blur vs. line-blur), so each gets its own layer.
+      // Painted after the fill above so every box's glow shows through it,
+      // not just the outermost one's.
       map.current.addLayer({
         id: 'click-highlight-glow',
         type: 'line',
         source: 'click-highlight',
-        filter: ['!=', ['geometry-type'], 'Point'],
+        // Excludes the fill-only merged grid shape — see click-highlight-fill.
+        filter: [
+          'all',
+          ['!=', ['geometry-type'], 'Point'],
+          ['!=', ['get', 'role'], 'fill']
+        ],
         paint: {
           'line-color': clickHighlightColor,
           'line-width': 10,
@@ -2143,20 +2175,17 @@ export default function CreateMap({
         }
       })
       map.current.addLayer({
-        id: 'click-highlight-fill',
-        type: 'fill',
-        source: 'click-highlight',
-        filter: ['!=', ['geometry-type'], 'Point'],
-        paint: {
-          'fill-color': clickHighlightColor,
-          'fill-opacity': 0.18
-        }
-      })
-      map.current.addLayer({
         id: 'click-highlight-line',
         type: 'line',
         source: 'click-highlight',
-        filter: ['!=', ['geometry-type'], 'Point'],
+        // Excludes the fill-only merged grid shape: it exists purely to give
+        // the fill layer a flat-opacity stand-in, and its outline would just
+        // duplicate the outer envelope of the individual boxes drawn here.
+        filter: [
+          'all',
+          ['!=', ['geometry-type'], 'Point'],
+          ['!=', ['get', 'role'], 'fill']
+        ],
         paint: {
           'line-color': clickHighlightColor,
           'line-width': 2.5
@@ -2858,9 +2887,10 @@ export default function CreateMap({
 
       // Gridded footprints, deduped by dataset — a stack of grids covering the
       // same water is the norm, not the exception.
-      const grids = dedupeGriddapByPk(
+      const gridFeatures = dedupeGriddapByPk(
         hits.filter((feature) => feature.layer.id === 'griddap-coverage-fill')
-      ).map((feature) => ({
+      )
+      const grids = gridFeatures.map((feature) => ({
         kind: 'grid',
         pk: Number(feature.properties.pk),
         title: griddapTitle(feature)
@@ -2877,24 +2907,63 @@ export default function CreateMap({
       // Areas (hexes, coverage hexes, grid rectangles) are outlined; individual
       // markers are ringed. They stay in one collection — the highlight layers
       // filter on geometry type — but only the areas can be framed.
-      const areaFeatures = [
-        ...cellFeatures,
-        ...hits.filter(
-          (feature) => feature.layer.id === 'griddap-coverage-fill'
-        )
-      ]
+      //
+      // Grid rectangles routinely stack — a dozen gridded datasets can share
+      // the same patch of ocean — and click-highlight-fill paints every area
+      // feature as its own translucent polygon, so pushing one per dataset
+      // would compound into a darker patch the more of them overlap here.
+      // A single unioned shape fixes the opacity, but painting *only* that
+      // shape (dropping the individual rectangles) collapses nested/uneven
+      // boxes down to just their outer envelope — the small ones disappear
+      // and it reads as "just the biggest box got selected". So both are
+      // kept, tagged with the `role` the highlight layers filter on: the
+      // merged shape feeds the fill and only the fill ('fill'), the
+      // individual rectangles feed the outline and glow and only those
+      // ('outline'), so every box in the stack still draws its own border.
+      // Everything else is drawn by all of them ('both').
+      let mergedGrid = gridFeatures[0] || null
+      for (let i = 1; i < gridFeatures.length; i++) {
+        try {
+          mergedGrid = turfUnion(mergedGrid, gridFeatures[i]) || mergedGrid
+        } catch (error) {
+          // A degenerate polygon fails to union — keep what merged so far
+          // rather than losing the highlight entirely.
+        }
+      }
+
+      // A feature from queryRenderedFeatures is a MapLibre GeoJSONFeature,
+      // whose `geometry` is a getter on the prototype: it has to be read off
+      // the live object here, and a feature can never be tagged by spreading
+      // it (`{ ...feature, role }` copies own properties only, silently
+      // dropping the geometry and leaving the highlight with nothing to
+      // draw). Hence the (feature, role) pairs rather than tagged copies.
+      const highlightFeature = ({ feature, role }) => ({
+        type: 'Feature',
+        geometry: feature.geometry,
+        properties: {
+          // `count` rides along because click-highlight-point sizes itself
+          // with the same ramp 'points' does, and that expression reads it.
+          // A unioned shape carries turf's empty properties, but only the
+          // point layers read `count`, and those are never unioned.
+          count: Number(feature.properties?.count) || 0,
+          role
+        }
+      })
+
+      const areaHighlights = [
+        ...cellFeatures.map((feature) => ({ feature, role: 'both' })),
+        ...gridFeatures.map((feature) => ({ feature, role: 'outline' })),
+        ...(mergedGrid ? [{ feature: mergedGrid, role: 'fill' }] : [])
+      ].map(highlightFeature)
+
       const highlight = {
         type: 'FeatureCollection',
         features: [
-          ...areaFeatures,
-          ...observationHits.filter((feature) => feature.layer.id === 'points')
-        ].map((feature) => ({
-          type: 'Feature',
-          geometry: feature.geometry,
-          // `count` rides along because click-highlight-point sizes itself with
-          // the same ramp 'points' does, and that expression reads it.
-          properties: { count: Number(feature.properties.count) || 0 }
-        }))
+          ...areaHighlights,
+          ...observationHits
+            .filter((feature) => feature.layer.id === 'points')
+            .map((feature) => highlightFeature({ feature, role: 'both' }))
+        ]
       }
 
       // "Zoom here" frames the cell that was clicked where there is one, so the
@@ -2903,15 +2972,11 @@ export default function CreateMap({
       // area to frame, so it gets no button rather than one that jumps the
       // camera to nothing.
       let bounds = null
-      if (areaFeatures.length > 0) {
+      if (areaHighlights.length > 0) {
         try {
           const box = turfBbox({
             type: 'FeatureCollection',
-            features: areaFeatures.map((feature) => ({
-              type: 'Feature',
-              geometry: feature.geometry,
-              properties: {}
-            }))
+            features: areaHighlights
           })
           bounds = [
             [box[0], box[1]],
