@@ -29,6 +29,7 @@ import { useFilters } from '../filters/FilterProvider.jsx'
 import { useMapState } from '../map/MapStateProvider.jsx'
 import { GROUP_NONE, hiddenDatasetPksFor } from '../datasetGroups.js'
 import { allDataLayersOn, datasetInDataLayers } from '../dataLayers.js'
+import { RECORD_PARAM, withoutPreviewParams } from './previewParams.js'
 
 const SelectionContext = createContext()
 
@@ -97,9 +98,12 @@ export default function SelectionProvider ({ children }) {
   const [selectionLoading, setSelectionLoading] = useState(true)
   const [initialPointsQueryComplete, setInitialPointsQueryComplete] =
     useState(false)
-  const [inspectRecordID, setInspectRecordID] = useState()
-  const [showPreviewModal, setShowPreviewModal] = useState(false)
-  const [recordLoading, setRecordLoading] = useState(false)
+  // True from the moment a record is asked for until its payload lands, so the
+  // modal opens on a spinner instead of flashing "no data". Seeded from the URL
+  // because a shared link arrives with the record already open.
+  const [recordLoading, setRecordLoading] = useState(
+    () => Boolean(initialParams.get(RECORD_PARAM))
+  )
   const [datasetPreview, setDatasetPreview] = useState()
   // Free-text title search for the datasets list (DatasetsTable's search
   // box). Lifted out of that component so it can also surface as a
@@ -298,7 +302,11 @@ export default function SelectionProvider ({ children }) {
     (dataset, { replace = false } = {}) => {
       setSearchParams(
         (previous) => {
-          const next = new URLSearchParams(previous)
+          // The open record and its plot settings belong to the dataset page:
+          // every caller here is either closing it or moving to a DIFFERENT
+          // dataset, so carrying them over would leave params describing columns
+          // the new dataset may not even have.
+          const next = withoutPreviewParams(previous)
           const key = datasetUrlKey(dataset)
           if (key) {
             next.set('dataset', key.dataset)
@@ -308,6 +316,34 @@ export default function SelectionProvider ({ children }) {
             next.delete('dataset')
             next.delete('server')
           }
+          return next
+        },
+        { replace }
+      )
+    },
+    [setSearchParams]
+  )
+
+  // The open record lives in the URL as well (?record=…), for the same payoffs
+  // as the dataset above: Back closes the preview natively, and the link
+  // reproduces it.
+  const inspectRecordID = searchParams.get(RECORD_PARAM) || undefined
+
+  // Opening a record is a navigation the user made, so it pushes an entry Back
+  // reverses. Closing it drops the plot params in the SAME write, because
+  // react-router hands a functional updater the params from the last RENDER —
+  // not the ones a previous call in this same tick just wrote — so two calls
+  // would silently lose one of them.
+  const setInspectRecordID = useCallback(
+    (recordId, { replace = false } = {}) => {
+      // Set before the navigation, so the modal never renders "no data" in the
+      // frame between the record opening and the fetch starting.
+      if (recordId) setRecordLoading(true)
+      setSearchParams(
+        (previous) => {
+          if (!recordId) return withoutPreviewParams(previous)
+          const next = new URLSearchParams(previous)
+          next.set(RECORD_PARAM, recordId)
           return next
         },
         { replace }
@@ -542,28 +578,50 @@ export default function SelectionProvider ({ children }) {
     )
   }, [inspectDataset])
 
+  // Fetch the open record's rows.
+  //
+  // Keyed on the dataset_id rather than on the inspectDataset object: pointsData
+  // is re-mapped through datasetsInLanguage on every language change, and the
+  // fresh object identities that produces would otherwise refetch a payload
+  // measured at up to 59 MB.
+  //
+  // Both halves have to be present, and on a link opened cold they arrive at
+  // different times — ?record= is readable on the first render while pointsData
+  // is still empty, so inspectDataset resolves only once /pointQuery returns.
+  // Waiting is all this can do; a record left with no dataset is cleaned up
+  // where the dataset param is (setInspectDataset drops the whole preview), not
+  // here, because doing it here is what would wipe a shared link's own record
+  // before its dataset had a chance to load.
   useEffect(() => {
-    if (inspectDataset) {
-      if (inspectRecordID) {
-        setShowPreviewModal(true)
-        setRecordLoading(true)
-        fetch(
-          `${server}/preview?dataset=${inspectDataset.dataset_id}&profile=${inspectRecordID}`
-        )
-          .then((response) => (response.ok ? response.json() : undefined))
-          .then((preview) => {
-            setDatasetPreview(preview)
-            setRecordLoading(false)
-          })
-          .catch((error) => {
-            reportError('preview fetch failed', error)
-            setRecordLoading(false)
-          })
-      }
-    } else {
-      setInspectRecordID()
-    }
-  }, [inspectRecordID])
+    if (!inspectDataset || !inspectRecordID) return
+    setRecordLoading(true)
+    const previewUrl = `${server}/preview?dataset=${encodeURIComponent(
+      inspectDataset.dataset_id
+    )}&profile=${encodeURIComponent(inspectRecordID)}`
+    fetch(previewUrl)
+      .then((response) => {
+        if (response.ok) return response.json()
+        // /preview distinguishes its failures now: 404 RECORD_NOT_FOUND or
+        // NO_DATA is an empty record (expected, the modal says so), while a
+        // 502 ERDDAP_UNAVAILABLE is an outage worth reporting. Before, every
+        // upstream failure came back as `200 []` and looked like empty data.
+        if (response.status >= 500) {
+          reportError(
+            `preview upstream failure (${response.status})`,
+            new Error(previewUrl)
+          )
+        }
+        return undefined
+      })
+      .then((preview) => {
+        setDatasetPreview(preview)
+        setRecordLoading(false)
+      })
+      .catch((error) => {
+        reportError('preview fetch failed', error)
+        setRecordLoading(false)
+      })
+  }, [inspectRecordID, inspectDataset?.dataset_id])
 
   const value = {
     polygon,
@@ -588,8 +646,16 @@ export default function SelectionProvider ({ children }) {
     initialPointsQueryComplete,
     inspectRecordID,
     setInspectRecordID,
-    showPreviewModal,
-    setShowPreviewModal,
+    // Derived, not stored: the record param IS the open state, the same way
+    // ?dataset= is the dataset page's.
+    //
+    // Both halves, deliberately. recordLoading must NOT open it on its own: it
+    // is seeded true by a shared link, and if that link's dataset never resolves
+    // (a filter in the same link excludes it) an OR here would leave a modal
+    // open forever with nothing inside — the body needs both too. Gated like
+    // this, a cold link simply opens once its dataset lands, on the spinner
+    // recordLoading is still holding up.
+    showPreviewModal: Boolean(inspectDataset && inspectRecordID),
     recordLoading,
     setRecordLoading,
     datasetPreview,

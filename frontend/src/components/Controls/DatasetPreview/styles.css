@@ -153,3 +153,22 @@
 .tableAndPlot .dropdown {
   display: inline;
 } */
+/* Copy-link button. Shares the toggle buttons' shape but not their fixed width:
+   it holds an icon plus a couple of words, and it is not a toggle. */
+.tableAndPlotGridContainer .copyLinkButton {
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  background-color: white;
+  border-radius: 5px;
+  border: 2px solid var(--cioos-hairline);
+  color: var(--cioos-ink);
+  line-height: 15px;
+  white-space: nowrap;
+}
+
+.tableAndPlotGridContainer .copyLinkButton:hover {
+  background-color: var(--cioos-teal-light);
+}

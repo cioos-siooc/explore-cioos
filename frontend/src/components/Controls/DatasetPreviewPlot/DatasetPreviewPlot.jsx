@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
 import Tooltip from '../../ui/Tooltip.jsx'
@@ -11,66 +11,40 @@ import frLocale from 'plotly.js-locales/fr'
 Plotly.register(frLocale)
 const Plot = createPlotlyComponent(Plotly)
 
+// Everything describing the plot is owned by DatasetPreview: the axes and the
+// display prefs live in the query string (usePreviewPlotParams) so a link
+// reproduces them, and the per-role renames are plain state up there. None of it
+// can live here, because this component is unmounted every time the user flips to
+// the Table and back — which is how the axes, the plot type and the colorscales
+// all used to get silently discarded.
 export default function DatasetPreviewPlot({
   inspectDataset,
   plotAxes,
   datasetPreview,
   setPlotAxes,
   inspectRecordID,
-  data
+  data,
+  plotType,
+  setPlotType,
+  colorscales,
+  setColorscales,
+  dualColorscale,
+  setDualColorscale,
+  customLabels,
+  setCustomLabels
 }) {
   const { t, i18n } = useTranslation()
-  const [plotType, setPlotType] = useState('markers')
-  // User-provided display names per role (blank = use the raw column name).
-  const [customLabels, setCustomLabels] = useState({ x: '', y: '', secondary: '', color: '' })
+  // Purely local: a disclosure triangle is not worth a param, and nobody wants
+  // to share which panel they had folded open.
   const [showLabels, setShowLabels] = useState(false)
-  // Colorscale display prefs (not reset on record switch, like plotType). When a
-  // second variable is present the user can opt into a different scale per trace.
-  const [dualColorscale, setDualColorscale] = useState(false)
-  const [colorscales, setColorscales] = useState({ primary: 'Viridis', secondary: 'Reds' })
 
-  const isProfile = inspectDataset.cdm_data_type
+  // `|| ''` because cdm_data_type is only guaranteed non-null in the DATABASE
+  // (validate_loaded_data() aborts a load that would leave it NULL). A dataset
+  // object assembled anywhere else — a test, a hand-built fixture — can still
+  // reach here without it, and an unguarded .toLowerCase() throws during render.
+  const isProfile = (inspectDataset.cdm_data_type || '')
     .toLowerCase()
     .includes('profile')
-
-  useEffect(() => {
-    // Reset any custom names when switching to a different record.
-    setCustomLabels({ x: '', y: '', secondary: '', color: '' })
-    switch (inspectDataset.cdm_data_type) {
-    case 'Profile':
-    case 'TimeSeriesProfile':
-      setPlotAxes({
-        x: {
-          columnName: inspectDataset.first_eov_column,
-          unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
-        },
-        y: {
-          columnName: 'depth',
-          unit: 'm'
-        },
-        secondary: null,
-        color: null
-      })
-      break
-    case 'TimeSeries':
-      setPlotAxes({
-        x: {
-          columnName: 'time',
-          unit: 'UTC'
-        },
-        y: {
-          columnName: inspectDataset.first_eov_column,
-          unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
-        },
-        secondary: null,
-        color: null
-      })
-      break
-
-    default:
-      break
-    }
-  }, [inspectRecordID])
 
   const columnNames = datasetPreview?.table?.columnNames || []
   const columnUnits = datasetPreview?.table?.columnUnits || []

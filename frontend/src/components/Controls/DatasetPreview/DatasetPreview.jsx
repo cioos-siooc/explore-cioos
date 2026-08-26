@@ -1,16 +1,23 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Check2, Clipboard } from 'react-bootstrap-icons'
 
 import Modal from '../../ui/Modal.jsx'
 
 import Loading from '../Loading/Loading.jsx'
 import DatasetPreviewTable from '../DatasetPreviewTable/DatasetPreviewTable.jsx'
+import usePreviewPlotParams from './usePreviewPlotParams.js'
 import './styles.css'
 
-// Lazy so the ~1 MB Plotly chunk only downloads when the Plot tab is opened.
+// Lazy so the ~1 MB Plotly chunk only downloads when a plot is actually shown.
+// It now downloads on the first record opened rather than on the first Plot
+// click, since the plot is the default view — but it stays a separate chunk
+// behind the Loading fallback below, and the /preview fetch runs alongside it.
 const DatasetPreviewPlot = lazy(() =>
   import('../DatasetPreviewPlot/DatasetPreviewPlot.jsx')
 )
+
+const NO_CUSTOM_LABELS = { x: '', y: '', secondary: '', color: '' }
 
 export default function DatasetPreview({
   datasetPreview,
@@ -18,19 +25,34 @@ export default function DatasetPreview({
   inspectRecordID,
   setInspectRecordID,
   showModal,
-  setShowModal,
   recordLoading,
   setRecordLoading
 }) {
   const { t } = useTranslation()
-  const clearAxes = {
-    x: { columnName: null, unit: null },
-    y: { columnName: null, unit: null },
-    secondary: null, // { columnName, unit } — optional 2nd variable
-    color: null // { columnName, unit } — optional color-by variable
-  }
-  const [plotAxes, setPlotAxes] = useState(clearAxes)
-  const [selectedVis, setSelectedVis] = useState('table')
+
+  // What is being looked at and how it is drawn — all of it in the query string,
+  // so a link reproduces the plot and Back closes it. Each param is written only
+  // when it differs from what this dataset type opens on, so an untouched plot
+  // adds nothing to the URL. See usePreviewPlotParams.
+  const {
+    selectedVis,
+    setSelectedVis,
+    plotAxes,
+    setPlotAxes,
+    plotType,
+    setPlotType,
+    colorscales,
+    setColorscales,
+    dualColorscale,
+    setDualColorscale
+  } = usePreviewPlotParams(inspectDataset, datasetPreview?.table)
+
+  // Per-role display names. Lifted out of the plot so they survive the
+  // Table/Plot flip (which unmounts it) like everything else now does, but
+  // deliberately NOT in the URL: free text is what makes a query string
+  // unreadable, and a rename is a private annotation rather than a view.
+  const [customLabels, setCustomLabels] = useState(NO_CUSTOM_LABELS)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   const [data, setData] = useState()
 
@@ -52,12 +74,19 @@ export default function DatasetPreview({
     setData(data)
   }, [datasetPreview])
 
+  // A different record is a different plot: drop the previous one's names, and
+  // let the copy button offer itself again.
+  useEffect(() => {
+    setCustomLabels(NO_CUSTOM_LABELS)
+    setLinkCopied(false)
+  }, [inspectRecordID])
+
   const onModalClose = () => {
+    // One call, one history entry: setInspectRecordID clears ?record= and every
+    // plot param together, because react-router would drop one of two writes
+    // made in the same tick (see previewParams.js).
     setInspectRecordID()
-    setShowModal(false)
-    setPlotAxes(clearAxes)
-    setSelectedVis('table')
-    setInspectRecordID()
+    setCustomLabels(NO_CUSTOM_LABELS)
     setData()
     setRecordLoading(false)
   }
@@ -80,20 +109,14 @@ export default function DatasetPreview({
                 <button
                   className={`toggleButton ${selectedVis === 'table' && 'selected'
                   }`}
-                  onClick={() => {
-                    setSelectedVis('table')
-                    // setRecordLoading(true)
-                  }}
+                  onClick={() => setSelectedVis('table')}
                 >
                   {t('datasetPreviewTableText')}
                 </button>
                 <button
                   className={`toggleButton ${selectedVis === 'plot' && 'selected'
                   }`}
-                  onClick={() => {
-                    setSelectedVis('plot')
-                    // setRecordLoading(true)
-                  }}
+                  onClick={() => setSelectedVis('plot')}
                 >
                   {t('datasetPreviewPlotText')}
                 </button>
@@ -102,9 +125,26 @@ export default function DatasetPreview({
 
             <h4 className='datasetTitle'>
               {inspectDataset.title}: <i>{inspectRecordID}</i>
-              {/* {t('datasetInspectorModalTitle')} */}
-              {/* Dataset Preview */}
             </h4>
+
+            {dataIsReady && (
+              // The address bar is already the live mirror of the whole app
+              // state — record, plot settings, map and filters — so sharing what
+              // is on screen is the current URL and nothing more.
+              <button
+                type='button'
+                className='copyLinkButton'
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href)
+                  setLinkCopied(true)
+                }}
+              >
+                {linkCopied
+                  ? <Check2 size={16} aria-hidden='true' />
+                  : <Clipboard size={16} aria-hidden='true' />}
+                {t(linkCopied ? 'copiedPreviewLinkTitle' : 'copyPreviewLinkTitle')}
+              </button>
+            )}
           </Modal.Header>
           <Modal.Body>
             <div className='tableAndPlotGridItem tableAndPlot'>
@@ -128,6 +168,14 @@ export default function DatasetPreview({
                             setPlotAxes={setPlotAxes}
                             inspectRecordID={inspectRecordID}
                             data={data}
+                            plotType={plotType}
+                            setPlotType={setPlotType}
+                            colorscales={colorscales}
+                            setColorscales={setColorscales}
+                            dualColorscale={dualColorscale}
+                            setDualColorscale={setDualColorscale}
+                            customLabels={customLabels}
+                            setCustomLabels={setCustomLabels}
                           />
                         </Suspense>
                       )}

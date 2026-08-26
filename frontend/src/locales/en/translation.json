@@ -496,6 +496,8 @@
   "sidebarCountsSelected": "{{count}} in selection",
   "activeFiltersLabel": "Active filters",
   "chipMapSelectionLabel": "Map selection",
+  "copyPreviewLinkTitle": "Copy link",
+  "copiedPreviewLinkTitle": "Link copied!",
   "copySelectionWktTitle": "Copy as WKT",
   "copiedSelectionWktTitle": "Copied!",
   "activeFiltersShow": "Show filters",

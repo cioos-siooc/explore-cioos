@@ -11,6 +11,7 @@ import {
   dataLayersAreDefault
 } from './dataLayers.js'
 import { GROUP_NONE } from './datasetGroups.js'
+import { PLOT_PARAMS, RECORD_PARAM } from './selection/previewParams.js'
 import { defaultTrailingDays } from '../components/config.js'
 import { useFilters } from './filters/FilterProvider.jsx'
 import { useMapState } from './map/MapStateProvider.jsx'
@@ -26,10 +27,13 @@ import { useSelection } from './selection/SelectionProvider.jsx'
 // seeds the filters, MapStateProvider the camera, SelectionProvider the
 // selection / search / grouping), each from the address the app was opened at.
 //
-// The open dataset page is the exception: SelectionProvider owns the
-// dataset/server params and derives its state from them, so this sync must
-// carry them through rather than drop them (it rebuilds the whole search
-// string from scratch on every map pan).
+// The open dataset page and the record preview are the exception:
+// SelectionProvider and usePreviewPlotParams own those params and derive their
+// state from them, so this sync must carry them through rather than drop them
+// (it rebuilds the whole search string from scratch on every map pan). Anything
+// not named in PRESERVED_PARAMS below is gone the moment the map moves.
+const PRESERVED_PARAMS = ['server', RECORD_PARAM, ...PLOT_PARAMS]
+
 export default function UrlSync () {
   const [searchParams] = useSearchParams()
   const { i18n } = useTranslation()
@@ -38,7 +42,6 @@ export default function UrlSync () {
   // would undo the stored preference on the first sync.
   const lang = searchParams.get('lang') || i18n.resolvedLanguage
   const dataset = searchParams.get('dataset')
-  const server = searchParams.get('server')
   const navigate = useNavigate()
 
   const { query } = useFilters()
@@ -90,7 +93,17 @@ export default function UrlSync () {
       ...(groupBy && groupBy !== GROUP_NONE ? { groupBy } : {}),
       ...(hiddenGroupsParam ? { hiddenGroups: hiddenGroupsParam } : {}),
       ...(dataset ? { dataset } : {}),
-      ...(dataset && server ? { server } : {})
+      // All of these hang off the dataset page: the server that disambiguates
+      // it, the open record, and how that record is plotted. With no dataset
+      // there is nothing for them to describe, so they go rather than linger as
+      // stale keys pointing at a page that is closed.
+      ...(dataset
+        ? Object.fromEntries(
+          PRESERVED_PARAMS.map((param) => [param, searchParams.get(param)]).filter(
+            ([, value]) => value !== null
+          )
+        )
+        : {})
     }
     // The track-lines switch only means anything while a trajectory geometry is
     // on, and the param records its non-default state: it defaults on, so

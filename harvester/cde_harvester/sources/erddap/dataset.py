@@ -22,6 +22,42 @@ def is_valid_duration(duration):
         return False
 
 
+# Per-variable attributes pulled out of /info/{id}/index.csv and kept on
+# df_variables. ERDDAP publishes far more than this; anything not listed here is
+# dropped when get_metadata() pivots the info frame.
+#
+#   identity/units    cf_role, standard_name, units, long_name, axis,
+#                     actual_range   - the original set, used for EOV mapping,
+#                     CF-role detection and the griddap variable/dimension jsonb.
+#   colour            colorBar*      - the publisher's intended colour ramp and
+#                     range for a variable. Only ~18% of variables declare a
+#                     palette, so consumers must have a default.
+#   grouping          ioos_category  - variable families (Temperature, Salinity,
+#                     Optical Properties, Identifier...), ~48% coverage.
+#   quality flags     flag_values, flag_meanings, ancillary_variables - how a QC
+#                     flag column announces itself, so plots can exclude them.
+#
+# tests/conftest.py imports this list rather than restating it: the fixtures
+# built by build_variables_df() must pivot exactly what production pivots.
+CONSIDERED_VARIABLE_ATTRIBUTES = [
+    "cf_role",
+    "standard_name",
+    "actual_range",
+    "units",
+    "long_name",
+    "axis",
+    "colorBarPalette",
+    "colorBarMinimum",
+    "colorBarMaximum",
+    "colorBarScale",
+    "colorBarContinuous",
+    "ioos_category",
+    "flag_values",
+    "flag_meanings",
+    "ancillary_variables",
+]
+
+
 class Dataset(object):
     def __init__(self, erddap_server, id, data_structure="table"):
         self.id = id
@@ -351,10 +387,7 @@ class Dataset(object):
         # "dimension"/"variable" rows (tabledap types never need it).
         self.df_info = df
 
-        considered_attributes = [
-            "cf_role", "standard_name", "actual_range", "units", "long_name",
-            "axis",
-        ]
+        considered_attributes = CONSIDERED_VARIABLE_ATTRIBUTES
 
         data_types = df.query(
             '(`Variable Name`!="NC_GLOBAL" and `Attribute Name`=="")'

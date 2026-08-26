@@ -58,15 +58,67 @@ attribute,NC_GLOBAL,cdm_data_type,,TimeSeries
 attribute,NC_GLOBAL,title,,Test Temperature Dataset
 attribute,NC_GLOBAL,institution,,Test Institution
 variable,time,,double,
+attribute,time,axis,,T
+attribute,time,ioos_category,,Time
 attribute,time,actual_range,,"2020-01-01T00:00:00Z,2025-01-01T00:00:00Z"
 variable,latitude,,double,
+attribute,latitude,axis,,Y
+attribute,latitude,ioos_category,,Location
 variable,longitude,,double,
+attribute,longitude,axis,,X
+attribute,longitude,ioos_category,,Location
 variable,depth,,double,
+attribute,depth,axis,,Z
+attribute,depth,ioos_category,,Location
+attribute,depth,colorBarPalette,,TopographyDepth
+attribute,depth,colorBarMinimum,double,0.0
+attribute,depth,colorBarMaximum,double,8000.0
 attribute,depth,actual_range,,"0.5,200.5"
 variable,temperature,,double,
 attribute,temperature,standard_name,,sea_water_temperature
+attribute,temperature,long_name,,Sea Water Temperature
+attribute,temperature,units,,degree_C
+attribute,temperature,ioos_category,,Temperature
+attribute,temperature,colorBarPalette,,KT_thermal
+attribute,temperature,colorBarMinimum,double,-10.0
+attribute,temperature,colorBarMaximum,double,40.0
 variable,station_id,,String,
 attribute,station_id,cf_role,,timeseries_id
+"""
+
+# Info CSV exercising the QC-flag machinery and a log colour bar. Kept separate
+# from ERDDAP_INFO_CSV (which many tests share) because it adds *variables*, not
+# just attributes: chlorophyll_qc would change variables_list / num_columns for
+# every test that uses the shared fixture.
+ERDDAP_INFO_QC_AND_LOG_CSV = """\
+Row Type,Variable Name,Attribute Name,Data Type,Value
+attribute,NC_GLOBAL,cdm_data_type,,TimeSeries
+attribute,NC_GLOBAL,title,,Test Chlorophyll Dataset
+attribute,NC_GLOBAL,institution,,Test Institution
+variable,time,,double,
+attribute,time,axis,,T
+variable,latitude,,double,
+attribute,latitude,axis,,Y
+variable,longitude,,double,
+attribute,longitude,axis,,X
+variable,chlorophyll,,float,
+attribute,chlorophyll,standard_name,,mass_concentration_of_chlorophyll_in_sea_water
+attribute,chlorophyll,long_name,,Chlorophyll-a Concentration
+attribute,chlorophyll,units,,mg m-3
+attribute,chlorophyll,ioos_category,,Ocean Color
+attribute,chlorophyll,colorBarPalette,,KT_algae
+attribute,chlorophyll,colorBarMinimum,double,0.03
+attribute,chlorophyll,colorBarMaximum,double,30.0
+attribute,chlorophyll,colorBarScale,,Log
+attribute,chlorophyll,colorBarContinuous,,false
+attribute,chlorophyll,ancillary_variables,,chlorophyll_qc
+variable,chlorophyll_qc,,byte,
+attribute,chlorophyll_qc,long_name,,Chlorophyll-a Quality Flag
+attribute,chlorophyll_qc,flag_values,byte,"1, 2, 3, 4, 9"
+attribute,chlorophyll_qc,flag_meanings,,good not_evaluated questionable bad missing
+variable,station_id,,String,
+attribute,station_id,cf_role,,timeseries_id
+attribute,station_id,ioos_category,,Identifier
 """
 
 # Info CSV for a dataset that has no supported EOVs
@@ -291,11 +343,12 @@ def build_variables_df(csv_text: str = ERDDAP_INFO_CSV) -> pd.DataFrame:
     Build the df_variables DataFrame exactly as Dataset.get_metadata() does,
     so unit tests for ComplianceChecker / profiles can use a realistic object.
     """
+    # Imported, not restated: a fixture that pivots a different attribute set
+    # than production is a fixture that tests nothing.
+    from cde_harvester.sources.erddap.dataset import CONSIDERED_VARIABLE_ATTRIBUTES
+
     df = build_info_df(csv_text)
-    considered_attributes = [
-        "cf_role", "standard_name", "actual_range", "units", "long_name",
-        "axis",
-    ]
+    considered_attributes = CONSIDERED_VARIABLE_ATTRIBUTES
 
     data_types = df.query(
         '(`Variable Name`!="NC_GLOBAL" and `Attribute Name`=="")'
