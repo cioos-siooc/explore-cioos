@@ -39,6 +39,33 @@ docker compose up -d prefect_worker
 ```
 *Note: Set `INCREMENTAL_MODE=true` in your `.env` to make the deployment default to incremental harvesting (faster, only updates changed datasets).*
 
+#### Downloads in Prefect
+
+Downloads are queued in `cde.download_jobs` by the web API and consumed by the
+`scheduler` service, which is a plain polling worker — **not** a Prefect
+deployment, and it does not run on the `cde-process-pool`. Keeping it in its own
+container is deliberate: the pool's workers share a memory budget sized for
+harvests, and a download (OBIS parquet through DuckDB, multi-hundred-MB CSVs) is
+heavy enough that co-scheduling the two risks starving both. It also means a
+harvester crash or restart cannot take the download queue's only consumer with
+it.
+
+Each job is still *reported* to Prefect, so the queue is observable in the same
+UI as the harvests. `run_download_observed` wraps every job in a flow run under
+the flow **`Download Job`**, named `download-<job_id>`, and mirrors the
+scheduler's loguru output into that run's logs. Run state reflects the outcome:
+a job finishing `failed` is a failed run; `completed`, `no-data` and
+`over-limit` are all successes, since those are results the user is emailed
+about rather than faults.
+
+This is controlled by `PREFECT_API_URL`, which compose sets on the `scheduler`
+service (hardcoded to `http://prefect:4200/api`, not interpolated from `.env` —
+that var holds `localhost:4200` for host-side CLI use, which inside the
+container points at the container itself). Remove the line and the queue still
+drains exactly as before — jobs simply stop appearing in Prefect. That is also
+why it is off by default outside compose: with no server to talk to, Prefect
+would record runs into its own ephemeral store where nobody would look.
+
 #### Harvest configuration
 
 The harvest config (`harvest_config.yaml`) is **not baked into the image** — it
@@ -172,6 +199,10 @@ For complete local development with all services running outside Docker (advance
    ```sh
    python -m download_scheduler
    ```
+
+   Export `PREFECT_API_URL=http://localhost:4200/api` first if you want each
+   download to show up as a flow run in the Prefect dashboard — see
+   [Downloads in Prefect](#downloads-in-prefect).
 
 6. Start the frontend:
 

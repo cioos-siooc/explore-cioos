@@ -102,3 +102,67 @@ def test_fail_job_strips_characters_sqlalchemy_chokes_on(updates):
     _, fields = updates[0]
     assert "%" not in fields["downloader_output"]
     assert "'" not in fields["downloader_output"]
+
+
+class TestPrefectObservability:
+    """run_download_observed — the Prefect wrapper around a single job.
+
+    Each download becomes a flow run so the queue is visible in the same UI as
+    the harvests. The wrapper must stay invisible when Prefect is not
+    configured, and must never let a job's own outcome escape as an exception:
+    run_download has already written the status row and emailed the user, so a
+    raise reaching process_next_job would mark the job failed a second time and
+    replace that status with a traceback.
+    """
+
+    def test_runs_the_job_directly_when_prefect_is_not_configured(
+        self, monkeypatch, job
+    ):
+        monkeypatch.delenv("PREFECT_API_URL", raising=False)
+        ran = []
+        monkeypatch.setattr(ds, "run_download", ran.append)
+
+        ds.run_download_observed(job)
+
+        assert ran == [job]
+
+    def test_prefect_is_off_by_default_and_on_with_an_api_url(self, monkeypatch):
+        monkeypatch.delenv("PREFECT_API_URL", raising=False)
+        assert ds._prefect_enabled() is False
+
+        monkeypatch.setenv("PREFECT_API_URL", "http://prefect:4200/api")
+        assert ds._prefect_enabled() is True
+
+    def test_a_failed_job_does_not_raise_past_the_wrapper(self, monkeypatch, job):
+        """A 'failed' status becomes a red flow run, not a second failure.
+
+        Regression guard for the double-marking path: process_next_job's except
+        branch calls fail_job, which would overwrite the real downloader error
+        with this wrapper's traceback.
+        """
+        monkeypatch.delenv("PREFECT_API_URL", raising=False)
+        monkeypatch.setattr(ds, "run_download", lambda row: "failed")
+
+        ds.run_download_observed(job)  # must not raise
+
+    def test_a_crash_inside_the_job_still_propagates(self, monkeypatch, job):
+        """Only the job's own outcome is swallowed; real crashes must reach
+        process_next_job so the row gets marked failed rather than sitting in
+        'downloading' forever."""
+        monkeypatch.delenv("PREFECT_API_URL", raising=False)
+
+        def boom(row):
+            raise TypeError("malformed job row")
+
+        monkeypatch.setattr(ds, "run_download", boom)
+
+        with pytest.raises(TypeError):
+            ds.run_download_observed(job)
+
+    def test_failed_status_set_is_only_real_faults(self):
+        """no-data and over-limit are outcomes the user is emailed about, not
+        faults, so they must not turn the flow run red."""
+        assert "failed" in ds.FAILED_STATUSES
+        assert "no-data" not in ds.FAILED_STATUSES
+        assert "over-limit" not in ds.FAILED_STATUSES
+        assert "completed" not in ds.FAILED_STATUSES

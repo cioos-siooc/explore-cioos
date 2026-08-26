@@ -307,6 +307,11 @@ def run_download(row):
         downloader_input["user_query"]["language"],
     )
 
+    # Returned so run_download_observed can decide the Prefect run's state. The
+    # row and the user's email are already written by this point; this is only
+    # the outcome label.
+    return status
+
 
 def fail_job(pk, error):
     """
@@ -322,6 +327,94 @@ def fail_job(pk, error):
             "time_complete": "NOW()",
         },
     )
+
+
+# --- Prefect observability ---------------------------------------------------
+# Each download runs as its own Prefect flow run, so the queue is visible in the
+# same UI as the harvests — per-job state, duration and log lines — instead of
+# only a status column in cde.download_jobs that someone has to query by hand.
+#
+# Opt-in via PREFECT_API_URL, which compose sets for the scheduler service. With
+# it unset (a bare local run, or a deployment with no Prefect server) Prefect
+# would quietly stand up its own ephemeral backing store and record runs where
+# nobody is looking, so skip the wrapper and behave exactly as before.
+DOWNLOAD_FLOW_NAME = "Download Job"
+
+# Outcomes of run_download that should show as a FAILED flow run. no-data and
+# over-limit are ordinary results the user is emailed about, not faults.
+FAILED_STATUSES = frozenset({"failed"})
+
+
+class DownloadJobFailed(Exception):
+    """Carries a failed download into Prefect as a failed flow run.
+
+    Raised inside the flow body only, and swallowed by run_download_observed:
+    run_download has already written the status and emailed the user, so this
+    must not reach process_next_job, which would mark the job failed a second
+    time and overwrite that status with this traceback.
+    """
+
+
+def _prefect_enabled():
+    return bool(os.environ.get("PREFECT_API_URL"))
+
+
+def _mirror_logs_to_prefect():
+    """Forward loguru output to the active Prefect run logger; returns the sink id.
+
+    Without this a download's flow run has no logs at all: the scheduler and the
+    downloader both log through loguru, which Prefect knows nothing about
+    (PREFECT_LOGGING_EXTRA_LOGGERS only reaches stdlib loggers). Returns None
+    outside a run context, so the caller knows there is no sink to remove.
+    """
+    from prefect import get_run_logger
+
+    try:
+        run_logger = get_run_logger()
+    except Exception:
+        return None
+
+    def sink(message):
+        record = message.record
+        # loguru's level numbers match the stdlib ones (DEBUG 10 ... CRITICAL 50).
+        run_logger.log(record["level"].no, record["message"])
+
+    return logger.add(sink, level="INFO")
+
+
+def run_download_observed(row):
+    """Run one claimed job, as a Prefect flow run when Prefect is configured."""
+    if not _prefect_enabled():
+        run_download(row)
+        return
+
+    from prefect import flow
+
+    # Declared per job so the run can be named after it, while the flow NAME
+    # stays constant so Prefect still groups every download under one flow.
+    # Deliberately parameterless: `row` is a SQLAlchemy RowMapping, which is not
+    # a serializable Prefect parameter, and its identity is already in the name.
+    @flow(name=DOWNLOAD_FLOW_NAME, flow_run_name=f"download-{row['job_id']}")
+    def download_job():
+        sink_id = _mirror_logs_to_prefect()
+        try:
+            status = run_download(row)
+        finally:
+            # Per-job sink: leaving it attached would stack one dead run logger
+            # per download and mirror every later job into all of them.
+            if sink_id is not None:
+                logger.remove(sink_id)
+        if status in FAILED_STATUSES:
+            raise DownloadJobFailed(
+                f"download job {row['job_id']} finished as '{status}'"
+            )
+        return status
+
+    try:
+        download_job()
+    except DownloadJobFailed as e:
+        # The red flow run is the point; the job row and email are already done.
+        logger.info("{}", e)
 
 
 def process_next_job():
@@ -346,7 +439,7 @@ def process_next_job():
         return True
 
     try:
-        run_download(row)
+        run_download_observed(row)
     except Exception:
         # run_download handles downloader failures itself; reaching here means
         # something outside that (a malformed job row, a template or mail

@@ -14,3 +14,9 @@ os.environ.setdefault("DB_NAME", "test")
 # never pick up (or send with) real ones.
 os.environ.setdefault("GMAIL_USER", "test-sender@example.invalid")
 os.environ.setdefault("GMAIL_PASSWORD", "test-password")
+
+# run_download_observed wraps each job in a Prefect flow run when PREFECT_API_URL
+# is set. A developer who happens to have it exported would otherwise have the
+# whole suite trying to reach a real Prefect server; the flow path is covered by
+# its own tests, which set it explicitly.
+os.environ.pop("PREFECT_API_URL", None)

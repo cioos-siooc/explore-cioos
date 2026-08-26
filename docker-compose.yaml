@@ -153,6 +153,13 @@ services:
       - "DB_USER=${DB_USER}"
       - "DB_PASSWORD=${DB_PASSWORD}"
       - "DB_PORT=${DB_PORT:-5432}"
+      # Makes each download a Prefect flow run in the same UI as the harvests
+      # (download_scheduler.run_download_observed). Delete this line to turn
+      # that off: the queue still drains, it just stops being visible.
+      # Hardcoded, NOT ${PREFECT_API_URL}, for the same reason prefect_worker
+      # hardcodes it: .env sets that var to localhost:4200 for host-side CLI
+      # use, and interpolating it here points the container at itself.
+      - "PREFECT_API_URL=http://prefect:4200/api"
     volumes:
       - downloads:/usr/src/app/download_scheduler/downloads
   frontend:
