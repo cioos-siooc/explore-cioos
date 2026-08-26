@@ -142,3 +142,31 @@ class TestHarvestErddapSkipping:
             result = harvest_erddap.fn(ERDDAP_URL)
 
         assert HTTP_ERROR in result.skipped["reason_code"].values
+
+    def test_http_error_records_the_servers_own_message(self):
+        """The status line alone isn't diagnostic — every ERDDAP failure is a 500.
+        The attempt row must carry ERDDAP's own complaint so issues group by what
+        actually went wrong rather than by 'HTTP 500'."""
+        import requests
+        erddap_mock = _make_erddap_mock([(DATASET_ID, "TimeSeries")])
+
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.reason = "Internal Server Error"
+        mock_response.text = (
+            'Error {\n  code=500;\n  message="Query error: '
+            'Unrecognized constraint variable=&quot;salinity&quot;";\n}'
+        )
+        erddap_mock.get_dataset.side_effect = requests.exceptions.HTTPError(
+            response=mock_response
+        )
+
+        with (
+            patch("cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock),
+            patch("cde_harvester.sources.erddap.harvester.extract_features"),
+        ):
+            result = harvest_erddap.fn(ERDDAP_URL)
+
+        error_message = result.attempts.query("status == 'error'")["error_message"].iloc[0]
+        assert error_message.startswith("HTTP 500 Internal Server Error: ")
+        assert "Unrecognized constraint" in error_message

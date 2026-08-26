@@ -9,6 +9,7 @@ import * as helpers from '@turf/helpers'
 import turfBboxPolygon from '@turf/bbox-polygon'
 import turfPointsWithinPolygon from '@turf/points-within-polygon'
 import turfBbox from '@turf/bbox'
+import turfUnion from '@turf/union'
 
 import DrawRectangle from 'mapbox-gl-draw-rectangle-mode'
 import debounce from 'lodash/debounce'
@@ -17,6 +18,7 @@ import { useSearchParams } from 'react-router-dom'
 import './styles.css'
 
 import { server } from '../../config'
+import reportError from '../../state/reportError.js'
 import {
   boundsFromGeoJson,
   escapeHtml,
@@ -37,6 +39,7 @@ import {
   warpEquirectToMercator
 } from '../../wmsUtilities'
 import {
+  clickHighlightColor,
   colorScale,
   hexOutlineColor,
   HEX_METRIC,
@@ -76,7 +79,7 @@ const defaultDirectSelectToDisplayFeatures = MapboxDraw.modes.direct_select.toDi
 // strips the closing duplicate point internally (see Polygon's constructor
 // in the library). polygonIsRectangle expects a closed 5-point ring, so
 // re-close it here before delegating to that check.
-function isRectangleFeature (feature) {
+function isRectangleFeature(feature) {
   const ring = feature?.type === 'Polygon' && feature.coordinates?.[0]
   return Boolean(ring) && ring.length === 4 && polygonIsRectangle([...ring, ring[0]])
 }
@@ -112,6 +115,11 @@ const HEX_LAYER_IDS = ['hexes', 'coverage-hexes']
 // The sources those layers draw from — tiles landing in either one can change
 // what a measurement would find.
 const HEX_SOURCE_IDS = ['cde-tiles', 'cde-cells']
+// How far a screen corner may move across an unproject/project round trip and
+// still count as a point on the map surface. One pixel: the round trip is exact
+// to floating-point noise for a point that is really on the surface, and off by
+// tens or hundreds of pixels for one that isn't (see viewportQueryIsReliable).
+const SURFACE_ROUND_TRIP_TOLERANCE_PX = 1
 
 // North-pointing arrowhead icon for track heads and selected-track fixes;
 // the symbol layers rotate it to each point's course over ground. Drawn at
@@ -195,21 +203,27 @@ export default function CreateMap({
   polygon,
   setPolygon,
   setLoading,
-  setBasemapLoading = () => {},
+  setBasemapLoading = () => { },
   setMapView,
   // Hands the "what's here" card its payload: everything one click found under
   // it, or null for a click on empty water. See handleMapClick.
-  onFeatureQuery = () => {},
+  onFeatureQuery = () => { },
   // The same payload handed back, so the map can outline the region the open
   // card is describing.
   featureQuery,
+  // A click that landed on exactly one individual marker naming exactly one
+  // dataset — nothing else under the cursor, no ambiguity about which station
+  // the user meant. Called with (datasetPk, pointPk) instead of building a
+  // featureQuery, so the caller can jump straight to that station's record
+  // rather than making the user open a card and pick a row. See handleMapClick.
+  onMarkerClick = () => { },
   rangeLevels,
   coverageRangeLevels,
   // Reports the count range the hexes on screen actually span, so the legend
   // can be numbered for the same domain the ramp is painted over. Called with
   // undefined whenever there is nothing to measure and the global tier takes
   // over. Debounced and deduped here — see refreshViewportHexRange.
-  onViewportHexRange = () => {},
+  onViewportHexRange = () => { },
   hoveredDataset,
   setHoveredDataset,
   inspectDataset,
@@ -269,15 +283,15 @@ export default function CreateMap({
     const [ringIndex, index] = path.split('.').map((x) => parseInt(x, 10))
     const oldCoord = state.feature.getCoordinate(path)
     const newCoord = [oldCoord[0] + delta.lng, oldCoord[1] + delta.lat]
-    ;[(index + 3) % 4, (index + 1) % 4].forEach((neighborIndex) => {
-      const neighborPath = `${ringIndex}.${neighborIndex}`
-      const neighborOld = state.feature.getCoordinate(neighborPath)
-      if (neighborOld[0] === oldCoord[0]) {
-        state.feature.updateCoordinate(neighborPath, newCoord[0], neighborOld[1])
-      } else {
-        state.feature.updateCoordinate(neighborPath, neighborOld[0], newCoord[1])
-      }
-    })
+      ;[(index + 3) % 4, (index + 1) % 4].forEach((neighborIndex) => {
+        const neighborPath = `${ringIndex}.${neighborIndex}`
+        const neighborOld = state.feature.getCoordinate(neighborPath)
+        if (neighborOld[0] === oldCoord[0]) {
+          state.feature.updateCoordinate(neighborPath, newCoord[0], neighborOld[1])
+        } else {
+          state.feature.updateCoordinate(neighborPath, neighborOld[0], newCoord[1])
+        }
+      })
     state.feature.updateCoordinate(path, newCoord[0], newCoord[1])
   }
 
@@ -592,9 +606,9 @@ export default function CreateMap({
     if (!map.current || !map.current.getLayer('track-lines')) return
     const trajOn = anyTrajectoryLayerOn(dataLayersRef.current)
     const showTracks = trajOn && tracksModeRef.current
-    ;['track-lines', 'track-heads', 'track-heads-fixed'].forEach((id) =>
-      map.current.setLayoutProperty(id, 'visibility', showTracks ? 'visible' : 'none')
-    )
+      ;['track-lines', 'track-heads', 'track-heads-fixed'].forEach((id) =>
+        map.current.setLayoutProperty(id, 'visibility', showTracks ? 'visible' : 'none')
+      )
   }
 
   // Placeholder count ranges used only until the /legend request resolves.
@@ -630,7 +644,7 @@ export default function CreateMap({
   //
   // The paint change rides MapLibre's default transition, so the hexes fade up
   // over ~300ms rather than snapping on.
-  function revealHexes () {
+  function revealHexes() {
     if (hexesRevealed.current || !map.current) return
     hexesRevealed.current = true
     if (map.current.getLayer('hexes')) {
@@ -661,7 +675,7 @@ export default function CreateMap({
   // actually arrived — otherwise a legend that lands first would reveal an empty
   // map and let the tiles behind it paint over the catalogue-wide tier, which is
   // the double colouring this exists to avoid.
-  function revealHexesIfRamped (measuredRange) {
+  function revealHexesIfRamped(measuredRange) {
     if (measuredRange !== undefined) return revealHexes()
     if (!rangeLevelsRef.current || !hexSourcesLoaded()) return
     revealHexes()
@@ -670,7 +684,7 @@ export default function CreateMap({
   // Both hex sources have everything the current view asks for. Deliberately
   // false while a source is missing: at that point the tiles are still on their
   // way in, and nothing measured over them means anything yet.
-  function hexSourcesLoaded () {
+  function hexSourcesLoaded() {
     return HEX_SOURCE_IDS.every(
       (id) => map.current.getSource(id) && map.current.isSourceLoaded(id)
     )
@@ -878,7 +892,8 @@ export default function CreateMap({
     ['points-halo', 1.25],
     ['points-highlighted', 0],
     ['points-hovered', 0],
-    ['click-highlight-point', 0]
+    ['click-highlight-point', 0],
+    ['click-highlight-point-glow', 6]
   ]
   // Coverage hexes ramp on their own domain (coverageColorStops) rather than
   // the main one: they cover a different population of hexes, and sharing the
@@ -989,6 +1004,38 @@ export default function CreateMap({
   }
   setColorStopsRef.current = setColorStops
 
+  // Whether queryRenderedFeatures can still answer "what is on screen". It
+  // builds the region it searches by unprojecting the viewport corners, and in
+  // globe projection a corner whose ray misses the sphere is snapped to the
+  // nearest point on the horizon instead (unprojectScreenPoint in maplibre-gl,
+  // whose own query code calls globe support a hack pending a real
+  // implementation). The region searched is then not the region on screen, so
+  // the measurement it feeds is fiction — and the crossover is abrupt: the
+  // corners leave the sphere the moment the globe stops covering them, at about
+  // z3 on a wide window and lower on a tall one, which is exactly where the
+  // ramp domain was seen to jump and re-shade the whole map on a zoom-out.
+  //
+  // An unproject/project round trip is the test, and a cheap one — two matrix
+  // multiplies per corner. It only fails for a screen point that is not on the
+  // map surface, so mercator never trips it (nor does globe once the globe
+  // fills the view).
+  function viewportQueryIsReliable() {
+    const canvas = map.current.getCanvas()
+    const corners = [
+      [0, 0],
+      [canvas.clientWidth, 0],
+      [0, canvas.clientHeight],
+      [canvas.clientWidth, canvas.clientHeight]
+    ]
+    return corners.every(([x, y]) => {
+      const roundTrip = map.current.project(map.current.unproject([x, y]))
+      return (
+        Math.hypot(roundTrip.x - x, roundTrip.y - y) <=
+        SURFACE_ROUND_TRIP_TOLERANCE_PX
+      )
+    })
+  }
+
   // The count range the hexes on screen span, snapped out to the nearest nice
   // rungs, or undefined when there is nothing to measure. Read from what is
   // rendered rather than fetched: the counts are already on the features the
@@ -997,6 +1044,13 @@ export default function CreateMap({
   function measureVisibleHexRange(focusPk) {
     const layers = HEX_LAYER_IDS.filter((id) => map.current.getLayer(id))
     if (!layers.length) return undefined
+    // No trustworthy answer to be had — see viewportQueryIsReliable. Nothing is
+    // lost by not measuring here: this only happens with the whole globe in
+    // view, where the catalogue-wide tier range the ramp falls back to is the
+    // honest domain anyway, and it holds still under pan, rotate and zoom
+    // instead of shifting with a query region that has nothing to do with the
+    // view.
+    if (!viewportQueryIsReliable()) return undefined
     // No geometry argument = the whole viewport. Hidden layers and layers
     // outside their zoom range return nothing, so this needs no zoom or
     // visibility test of its own.
@@ -1170,11 +1224,6 @@ export default function CreateMap({
 
   const emptyFeatureCollection = { type: 'FeatureCollection', features: [] }
 
-  // The clicked region's outline. CIOOS navy rather than one of the accent
-  // colours: the ramp already owns the greens, the tracks own the purple and
-  // the grid coverage owns the amber, so an accent here would read as another
-  // data layer instead of as "this is what you just asked about".
-  const clickHighlightColor = '#152F37'
   // Latest coverage prop, readable from the map 'load' closure (which would
   // otherwise capture the initial render's value).
   const griddapCoverageRef = useRef(null)
@@ -1604,6 +1653,8 @@ export default function CreateMap({
   // click handler; the card does that itself now, straight from the provider.)
   const onFeatureQueryRef = useRef(onFeatureQuery)
   onFeatureQueryRef.current = onFeatureQuery
+  const onMarkerClickRef = useRef(onMarkerClick)
+  onMarkerClickRef.current = onMarkerClick
 
   // Read by the track-focus paint (see applyTrackFocus). It also fed a
   // "click to show this platform's full track" line on the track tooltips,
@@ -1733,9 +1784,7 @@ export default function CreateMap({
           if (!response.ok) return
           track = await response.json()
         } catch (error) {
-          if (error.name !== 'AbortError') {
-            console.error('track fetch failed:', error)
-          }
+          reportError('track fetch failed', error)
           return
         }
         if (superseded) return
@@ -2109,21 +2158,78 @@ export default function CreateMap({
         type: 'geojson',
         data: emptyFeatureCollection
       })
+      // The flat merged fill goes down first. A stack of grid boxes draws its
+      // glow (below) per individual box, not once for the merged shape — put
+      // the fill on top of that glow instead and every box nested inside the
+      // stack has its glow smothered from both sides by the fill covering it,
+      // leaving only the outermost box's glow poking out past the fill's own
+      // edge. That read as "just the biggest box got selected" even though
+      // every box was outlined and listed correctly.
       map.current.addLayer({
         id: 'click-highlight-fill',
         type: 'fill',
         source: 'click-highlight',
-        filter: ['!=', ['geometry-type'], 'Point'],
+        // Excludes the individual grid rectangles, which the merged stand-in
+        // shape fills on their behalf — see the `role` comment in
+        // buildFeatureQuery. Painting both would compound a stack's opacity;
+        // painting only the individual boxes is exactly what this avoids.
+        filter: [
+          'all',
+          ['!=', ['geometry-type'], 'Point'],
+          ['!=', ['get', 'role'], 'outline']
+        ],
         paint: {
           'fill-color': clickHighlightColor,
           'fill-opacity': 0.18
+        }
+      })
+      // A soft blurred halo under the crisp outline/point below, so the
+      // selected item reads as picked out at a glance instead of just
+      // outlined. Point and polygon geometries blur through different paint
+      // properties (circle-blur vs. line-blur), so each gets its own layer.
+      // Painted after the fill above so every box's glow shows through it,
+      // not just the outermost one's.
+      map.current.addLayer({
+        id: 'click-highlight-glow',
+        type: 'line',
+        source: 'click-highlight',
+        // Excludes the fill-only merged grid shape — see click-highlight-fill.
+        filter: [
+          'all',
+          ['!=', ['geometry-type'], 'Point'],
+          ['!=', ['get', 'role'], 'fill']
+        ],
+        paint: {
+          'line-color': clickHighlightColor,
+          'line-width': 10,
+          'line-blur': 8,
+          'line-opacity': 0.85
+        }
+      })
+      map.current.addLayer({
+        id: 'click-highlight-point-glow',
+        type: 'circle',
+        source: 'click-highlight',
+        filter: ['==', ['geometry-type'], 'Point'],
+        paint: {
+          'circle-radius': radiusExpression(pointRadiusRange.current, 6),
+          'circle-color': clickHighlightColor,
+          'circle-blur': 0.8,
+          'circle-opacity': 0.85
         }
       })
       map.current.addLayer({
         id: 'click-highlight-line',
         type: 'line',
         source: 'click-highlight',
-        filter: ['!=', ['geometry-type'], 'Point'],
+        // Excludes the fill-only merged grid shape: it exists purely to give
+        // the fill layer a flat-opacity stand-in, and its outline would just
+        // duplicate the outer envelope of the individual boxes drawn here.
+        filter: [
+          'all',
+          ['!=', ['geometry-type'], 'Point'],
+          ['!=', ['get', 'role'], 'fill']
+        ],
         paint: {
           'line-color': clickHighlightColor,
           'line-width': 2.5
@@ -2773,7 +2879,36 @@ export default function CreateMap({
         const layerId = feature.layer.id
         const count = Number(feature.properties.count) || 0
         observationCount += count
-        if (layerId !== 'points') cellFeatures.push(feature)
+        // A hex is one row server-side, but MVT clips it to whichever tiles
+        // it crosses — at low zoom it fits inside a single tile, at high
+        // zoom (e.g. z10) the same hex spans several, and `feature` above is
+        // only the fragment the click point happened to land in. Pull every
+        // currently-rendered fragment sharing this pk so the highlight/bounds
+        // below cover the whole hex instead of the one sliver under the
+        // cursor.
+        //
+        // The fragments still meet at the tile edge they were clipped along,
+        // so unioning them back into one polygon isn't just cosmetic tidying
+        // — without it, click-highlight-line/glow draw that internal edge as
+        // a line cutting across the hex, on top of drawing its true outline.
+        if (layerId !== 'points') {
+          const fragments = map.current.queryRenderedFeatures({
+            layers: [layerId],
+            filter: ['==', ['get', 'pk'], feature.properties.pk]
+          })
+          const parts = fragments.length ? fragments : [feature]
+          let merged = parts[0]
+          for (let i = 1; i < parts.length; i++) {
+            try {
+              merged = turfUnion(merged, parts[i]) || merged
+            } catch (error) {
+              // A degenerate fragment (e.g. a sliver from the MVT buffer
+              // overlap) fails to union — keep what merged so far rather
+              // than losing the highlight entirely.
+            }
+          }
+          cellFeatures.push(merged)
+        }
         datasetPksOf(feature).forEach((pk) => {
           const existing = observations.get(pk)
           if (existing) {
@@ -2796,9 +2931,10 @@ export default function CreateMap({
 
       // Gridded footprints, deduped by dataset — a stack of grids covering the
       // same water is the norm, not the exception.
-      const grids = dedupeGriddapByPk(
+      const gridFeatures = dedupeGriddapByPk(
         hits.filter((feature) => feature.layer.id === 'griddap-coverage-fill')
-      ).map((feature) => ({
+      )
+      const grids = gridFeatures.map((feature) => ({
         kind: 'grid',
         pk: Number(feature.properties.pk),
         title: griddapTitle(feature)
@@ -2815,24 +2951,63 @@ export default function CreateMap({
       // Areas (hexes, coverage hexes, grid rectangles) are outlined; individual
       // markers are ringed. They stay in one collection — the highlight layers
       // filter on geometry type — but only the areas can be framed.
-      const areaFeatures = [
-        ...cellFeatures,
-        ...hits.filter(
-          (feature) => feature.layer.id === 'griddap-coverage-fill'
-        )
-      ]
+      //
+      // Grid rectangles routinely stack — a dozen gridded datasets can share
+      // the same patch of ocean — and click-highlight-fill paints every area
+      // feature as its own translucent polygon, so pushing one per dataset
+      // would compound into a darker patch the more of them overlap here.
+      // A single unioned shape fixes the opacity, but painting *only* that
+      // shape (dropping the individual rectangles) collapses nested/uneven
+      // boxes down to just their outer envelope — the small ones disappear
+      // and it reads as "just the biggest box got selected". So both are
+      // kept, tagged with the `role` the highlight layers filter on: the
+      // merged shape feeds the fill and only the fill ('fill'), the
+      // individual rectangles feed the outline and glow and only those
+      // ('outline'), so every box in the stack still draws its own border.
+      // Everything else is drawn by all of them ('both').
+      let mergedGrid = gridFeatures[0] || null
+      for (let i = 1; i < gridFeatures.length; i++) {
+        try {
+          mergedGrid = turfUnion(mergedGrid, gridFeatures[i]) || mergedGrid
+        } catch (error) {
+          // A degenerate polygon fails to union — keep what merged so far
+          // rather than losing the highlight entirely.
+        }
+      }
+
+      // A feature from queryRenderedFeatures is a MapLibre GeoJSONFeature,
+      // whose `geometry` is a getter on the prototype: it has to be read off
+      // the live object here, and a feature can never be tagged by spreading
+      // it (`{ ...feature, role }` copies own properties only, silently
+      // dropping the geometry and leaving the highlight with nothing to
+      // draw). Hence the (feature, role) pairs rather than tagged copies.
+      const highlightFeature = ({ feature, role }) => ({
+        type: 'Feature',
+        geometry: feature.geometry,
+        properties: {
+          // `count` rides along because click-highlight-point sizes itself
+          // with the same ramp 'points' does, and that expression reads it.
+          // A unioned shape carries turf's empty properties, but only the
+          // point layers read `count`, and those are never unioned.
+          count: Number(feature.properties?.count) || 0,
+          role
+        }
+      })
+
+      const areaHighlights = [
+        ...cellFeatures.map((feature) => ({ feature, role: 'both' })),
+        ...gridFeatures.map((feature) => ({ feature, role: 'outline' })),
+        ...(mergedGrid ? [{ feature: mergedGrid, role: 'fill' }] : [])
+      ].map(highlightFeature)
+
       const highlight = {
         type: 'FeatureCollection',
         features: [
-          ...areaFeatures,
-          ...observationHits.filter((feature) => feature.layer.id === 'points')
-        ].map((feature) => ({
-          type: 'Feature',
-          geometry: feature.geometry,
-          // `count` rides along because click-highlight-point sizes itself with
-          // the same ramp 'points' does, and that expression reads it.
-          properties: { count: Number(feature.properties.count) || 0 }
-        }))
+          ...areaHighlights,
+          ...observationHits
+            .filter((feature) => feature.layer.id === 'points')
+            .map((feature) => highlightFeature({ feature, role: 'both' }))
+        ]
       }
 
       // "Zoom here" frames the cell that was clicked where there is one, so the
@@ -2841,15 +3016,11 @@ export default function CreateMap({
       // area to frame, so it gets no button rather than one that jumps the
       // camera to nothing.
       let bounds = null
-      if (areaFeatures.length > 0) {
+      if (areaHighlights.length > 0) {
         try {
           const box = turfBbox({
             type: 'FeatureCollection',
-            features: areaFeatures.map((feature) => ({
-              type: 'Feature',
-              geometry: feature.geometry,
-              properties: {}
-            }))
+            features: areaHighlights
           })
           bounds = [
             [box[0], box[1]],
@@ -2898,13 +3069,105 @@ export default function CreateMap({
       if (draw.getMode().includes('draw')) return
 
       const layers = clickLayerIds.filter((id) => map.current.getLayer(id))
-      const hits = layers.length
+      let hits = layers.length
         ? map.current.queryRenderedFeatures(e.point, { layers })
         : []
+
+      // A marker is a specific station; 'coverage-hexes' shares the marker
+      // tier's zoom band (both render at z >= hexMaxZoom) and can sit right
+      // under it as a neighbourhood aggregate covering the same pixel. The
+      // marker is what the user pointed at, so once one is under the click the
+      // hex hits are dropped rather than merged into it — a click here always
+      // means "this station", never "this station, plus whatever hex happens
+      // to be under it".
+      const markerHits = hits.filter((feature) => feature.layer.id === 'points')
+      if (markerHits.length > 0) {
+        hits = hits.filter(
+          (feature) => !['hexes', 'coverage-hexes'].includes(feature.layer.id)
+        )
+      }
+
+      // 'points' carries a wide invisible hit stroke (circle-stroke-width: 10,
+      // circle-stroke-opacity: 0.001 — see the layer below) so a marker stays
+      // a comfortable target at any zoom. That means one click very commonly
+      // registers hits on more than one nearby station, not just the one the
+      // cursor is actually over — requiring exactly one hit made almost every
+      // click in a cluster fall back to the ambiguous card. Pick whichever
+      // station's true position (not its inflated hit area) is closest to the
+      // cursor instead; that is unambiguously the one the user pointed at,
+      // however many others' hit areas also happened to cover the pixel.
+      // Deduped by pk first — the same station can be hit twice where it
+      // straddles a tile boundary.
+      let nearestMarker = null
+      if (markerHits.length > 0) {
+        const seenPks = new Set()
+        let nearestDistSq = Infinity
+        markerHits.forEach((feature) => {
+          const pk = feature.properties.pk
+          if (seenPks.has(pk)) return
+          seenPks.add(pk)
+          const projected = map.current.project(feature.geometry.coordinates)
+          const dx = projected.x - e.point.x
+          const dy = projected.y - e.point.y
+          const distSq = dx * dx + dy * dy
+          if (distSq < nearestDistSq) {
+            nearestDistSq = distSq
+            nearestMarker = feature
+          }
+        })
+      }
+
+      // Nothing under the click but (possibly several) markers, and the
+      // nearest one names exactly one dataset: unambiguous enough to jump
+      // straight to that station's record instead of making the user open a
+      // card and click through. A marker's cell naming more than one dataset,
+      // or a track/grid sharing the pixel, still falls through to the regular
+      // card below, same as before.
+      const nonMarkerHits = hits.filter((feature) => feature.layer.id !== 'points')
+      if (nearestMarker && nonMarkerHits.length === 0) {
+        const markerDatasetPks = datasetPksOf(nearestMarker)
+        if (markerDatasetPks.length === 1) {
+          popup.remove()
+          // This path skips onFeatureQueryRef (see below) — it opens the
+          // dataset page directly rather than building a card query — so the
+          // usual featureQuery-driven click-highlight effect never runs for
+          // it. Ring the clicked marker here instead, the same way
+          // buildFeatureQuery would have: same source, same Point-with-count
+          // shape, so click-highlight-point sizes the ring to match the
+          // marker exactly.
+          map.current.getSource('click-highlight')?.setData({
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                geometry: nearestMarker.geometry,
+                properties: { count: Number(nearestMarker.properties.count) || 0 }
+              }
+            ]
+          })
+          onMarkerClickRef.current(
+            markerDatasetPks[0],
+            Number(nearestMarker.properties.pk)
+          )
+          return
+        }
+      }
+
       const query = buildFeatureQuery(e, hits)
 
       popup.remove()
       onFeatureQueryRef.current(query)
+
+      // Usually redundant with the featureQuery effect below (a real query is
+      // always a fresh object, so setFeatureQuery(query) reliably re-triggers
+      // it) — needed for the one case that isn't: clicking empty water right
+      // after the marker path above, which sets the ring without ever
+      // touching featureQuery. If it was already null, React bails out of the
+      // no-op setFeatureQuery(null) and that effect never runs, leaving the
+      // marker's ring stuck on screen with nothing left for it to point at.
+      if (!query) {
+        map.current.getSource('click-highlight')?.setData(emptyFeatureCollection)
+      }
 
       // A click on empty water is the way out of everything: it closes the card
       // and drops the spatial selection, which is the only undo a touch user

@@ -28,6 +28,10 @@ DATASET_ARRAY_DTYPES = {
     "grid_dimensions": JSONB,
 }
 
+PROFILE_ARRAY_DTYPES = {
+    "eovs": ARRAY(TEXT),
+}
+
 OBIS_ARRAY_DTYPES = {
     "scientific_names": ARRAY(TEXT),
     "aphia_ids": ARRAY(INTEGER),
@@ -64,6 +68,12 @@ class ProfileSchema(pa.DataFrameModel):
     n_records: Series[float] = pa.Field(nullable=True)
     records_per_day: Series[float] = pa.Field(nullable=True)
     n_profiles: Series[float] = pa.Field(nullable=True)
+    # The EOVs this feature actually carries — a subset of its dataset's eovs,
+    # detected from the per-variable record counts at harvest. Falls back to
+    # the dataset's full list when detection isn't possible, never empty: the
+    # web-api filters with an array overlap, so an empty list would hide the
+    # feature from every EOV selection.
+    eovs: Series[object] = pa.Field(nullable=True)
 
     class Config:
         coerce = True
@@ -91,27 +101,24 @@ class ObisCellSchema(pa.DataFrameModel):
         strict = False
 
 
-class TrajectoryCellSchema(pa.DataFrameModel):
-    """Schema for the trajectory_cells DataFrame.
+class TrajectoryDaySchema(pa.DataFrameModel):
+    """Schema for the trajectory_days DataFrame.
 
-    Mirrors cde.trajectory_cells in the database: one row per
-    (trajectory, 1/12-degree grid cell) a Trajectory/TrajectoryProfile
-    dataset's track passes through.
+    Mirrors cde.trajectory_days in the database: one row per
+    (trajectory, UTC day) a Trajectory/TrajectoryProfile dataset reported on.
+    Attribute-only — WHERE the platform was that day comes from
+    TrajectoryPointSchema, which the database sweeps through the hex grid
+    (trajectory_build_hexes in database/4_create_hexes.sql).
     """
 
     erddap_url: Series[str]
     dataset_id: Series[str]
     trajectory_id: Series[str] = pa.Field(nullable=True, default="")
-    latitude: Series[float] = pa.Field(ge=-90, le=90)
-    longitude: Series[float] = pa.Field(ge=-180, le=180)
-    time_min: Series[pa.DateTime] = pa.Field(nullable=True)
-    time_max: Series[pa.DateTime] = pa.Field(nullable=True)
-    depth_min: Series[float] = pa.Field(nullable=True)
-    depth_max: Series[float] = pa.Field(nullable=True)
+    day: Series[pa.DateTime]
     n_records: Series[float] = pa.Field(nullable=True)
     n_profiles: Series[float] = pa.Field(nullable=True)
-    records_per_day: Series[float] = pa.Field(nullable=True)
-    days: Series[float] = pa.Field(nullable=True)
+    depth_min: Series[float] = pa.Field(nullable=True)
+    depth_max: Series[float] = pa.Field(nullable=True)
 
     class Config:
         coerce = True
@@ -124,8 +131,9 @@ class TrajectoryPointSchema(pa.DataFrameModel):
     Mirrors cde.trajectory_points in the database: one row per
     (trajectory, retained fix) — ordered, downsampled RAW track positions
     (per-profile fixes for TrajectoryProfile, first-fix-per-day for plain
-    Trajectory). The source for track-line rendering; unlike
-    TrajectoryCellSchema nothing here is grid-snapped or aggregated.
+    Trajectory). The source both for track-line rendering and for the map's
+    hex coverage: the database sweeps the segments between these fixes through
+    the hex grid, so their spacing sets the resolution of the coverage layer.
     """
 
     erddap_url: Series[str]

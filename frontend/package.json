@@ -13,6 +13,7 @@
     "@turf/bbox": "^6.5.0",
     "@turf/bbox-polygon": "^6.5.0",
     "@turf/points-within-polygon": "^6.5.0",
+    "@turf/union": "^6.5.0",
     "bytes": "^3.1.2",
     "classnames": "^2.5.1",
     "d3-scale": "^4.0.2",
@@ -33,6 +34,7 @@
     "react-router-dom": "^6.30.4"
   },
   "devDependencies": {
+    "@sentry/vite-plugin": "^5.4.0",
     "@vitejs/plugin-react": "^5.0.0",
     "eslint": "^8.16.0",
     "eslint-config-airbnb-base": "^15.0.0",

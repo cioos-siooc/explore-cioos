@@ -49,11 +49,31 @@ async function createDBFilter(request) {
 
   const filters = [];
   const obisFilters = [];
+  const profileFilters = [];
   const parameters = {};
 
   if (eovs) {
     parameters.eovsCommaSeparatedString = unique(eovs.split(","));
+    // Dataset level: bare `eovs` here resolves to cde.datasets.eovs, because
+    // every route applies this blob after joining cde.datasets.
     filters.push("eovs && :eovsCommaSeparatedString");
+    // Feature level: cde.profiles carries the EOVs each feature actually holds
+    // (a subset of its dataset's), so a multi-EOV dataset contributes only the
+    // stations/casts that measured the selected variable instead of all of
+    // them. Applied INSIDE the profiles branch, where cde.profiles is the only
+    // table in scope and bare `eovs` is unambiguously profiles.eovs — it
+    // cannot go in `filters` above, where it would be ambiguous against
+    // datasets.eovs.
+    //
+    // Every branch reading FROM cde.profiles must apply this, or it silently
+    // keeps the old dataset-level behaviour — there is no error to catch it.
+    // The five today: shapeQuery's profilesBranch, tiles.js (the hex/point
+    // route), legend.js, timeExtent.js and download.js. Branches that cannot
+    // answer it stay dataset-level via `filters`, which is why that clause is
+    // kept there: obis_cells, trajectory cells and track stats, the griddap
+    // pseudo-branch, and the two coverage-cell queries (/tiles/cells and the
+    // legend's coverage ramp) which read only trajectory + OBIS cells.
+    profileFilters.push("eovs && :eovsCommaSeparatedString");
   }
 
   if (platforms) {
@@ -112,7 +132,10 @@ async function createDBFilter(request) {
   }
 
   if (pointPKs) {
-    parameters.pointPKs = pointPKs;
+    // Comma-separated, like datasetPKs/organizations above — this was binding
+    // the raw query string instead of an array, so `= ANY(:pointPKs)` never
+    // worked (Postgres can't cast "12342,34534" to an integer array).
+    parameters.pointPKs = pointPKs.split(",");
     filters.push("point_pk = ANY (:pointPKs)");
   }
 
@@ -204,12 +227,15 @@ async function createDBFilter(request) {
 
   const sharedSql = filters.join(" AND \n") || "TRUE";
   const obisSql = obisFilters.join(" AND \n") || "TRUE";
+  const profileSql = profileFilters.join(" AND \n") || "TRUE";
 
   return {
     shared: db.raw(sharedSql, parameters),
     obisOnly: db.raw(obisSql, parameters),
+    profileOnly: db.raw(profileSql, parameters),
     hasShared: filters.length > 0,
     hasObisOnly: obisFilters.length > 0,
+    hasProfileOnly: profileFilters.length > 0,
   };
 }
 

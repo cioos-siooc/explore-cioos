@@ -4,6 +4,13 @@
 > the load path, advisory-lock serialization, session timeouts, COPY loading,
 > post-load VACUUM). Items A and B — the global points/hex rebuild — remain and
 > are covered, with the follow-on plan, in `incremental-update-v2-plan.md`.
+>
+> **Status (2026-08):** the numbers and SQL quoted below are a snapshot of the
+> pre-fix state and are kept for the diagnosis, not as a description of the
+> current schema. `cde.trajectory_cells` no longer exists: trajectory coverage
+> is derived from `cde.trajectory_points` into `cde.trajectory_hexes` and no
+> longer passes through `cde.points` at all, so the 778k-row relink pass listed
+> under root cause 1 is gone with it. See `trajectory-coverage.md`.
 
 ## Summary
 
@@ -26,7 +33,7 @@ Observed during a routine `cioosatlantic-ca` harvest on a dev stack:
 ```
      relname      | n_live_tup | n_dead_tup |   sz
 ------------------+------------+------------+---------
- trajectory_cells |     777858 |          0 | 1081 MB
+ trajectory_cells |     777858 |          0 | 1081 MB   <-- table since replaced
  profiles         |     244432 |          0 | 2280 MB
  points           |     197210 |    3881458 | 3232 MB   <-- 3.2 GB for 197k rows
  hexes_zoom_1     |      48719 |          0 |   63 MB
@@ -58,6 +65,9 @@ UPDATE cde.profiles SET hex_0_pk, hex_1_pk ...          -- all 244k
 UPDATE cde.obis_cells SET hex_0_pk, hex_1_pk ...        -- all
 UPDATE cde.trajectory_cells SET point_pk ...            -- all 778k
 ```
+
+(The last line is historical: as of 2026-08 trajectory coverage does not go
+through `cde.points`, so this pass no longer exists.)
 
 That is roughly six full-table rewrites of `points`, plus full rewrites of `profiles`, `obis_cells`, and `trajectory_cells` — **on every single-server harvest**. This is the dominant cost and the source of the dead-tuple bloat.
 
@@ -106,7 +116,7 @@ Even with no other change, this alone converts a full site outage into a merely-
 ### D. Reduce load on the DB host
 
 - The whole-table `UPDATE` passes are the source of the 3.88M dead tuples on `points`; (B) removes most of them at the root.
-- Tune autovacuum on `points` / `trajectory_cells` — vacuum currently fights the loader for IO mid-run.
+- Tune autovacuum on `points` / the cells tables — vacuum currently fights the loader for IO mid-run.
 - Consider `maintenance_work_mem` / batching for the remaining bulk operations.
 
 ### E. Operational guardrails (cheap, independent of the above)

@@ -127,6 +127,16 @@
   padding: 4px 8px 12px;
 }
 
+/* What the filter does, at the top of its section above the search box and
+   options — the pane's own intro line. */
+.filtersPanel .filterOptionsCaption {
+  flex: 0 0 auto;
+  margin: 0 0 8px;
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.35;
+}
+
 .filtersPanel .filterOptionsBody {
   flex: 1 1 auto;
   /* min-*: 0 lets a flex item shrink below its content size — without it the
@@ -235,6 +245,12 @@
   position: relative; /* anchors the refetch scrim (Loading) */
   height: 100%;
   min-height: 300px;
+  /* Each of the two views below manages its own scrolling — the list scrolls
+     its cards under a fixed toolbar and pager, a dataset page scrolls its body
+     under a pinned title. So the panel itself must never scroll: without this,
+     the enter animation's overflow leaks up to .sidebarBody and the column
+     shows a second scrollbar beside the one that actually moves the content. */
+  overflow: hidden;
 }
 
 /* The panel's two surfaces — the list, and a single dataset's page. They are

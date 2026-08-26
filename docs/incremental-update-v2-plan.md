@@ -1,5 +1,14 @@
 # Incremental update v2 — delta-proportional loads, live site during rebuilds
 
+> **Update (2026-08):** trajectory coverage has since moved off `cde.points`
+> entirely — `cde.trajectory_cells` was replaced by `cde.trajectory_days`
+> (harvester output) plus `cde.trajectory_hexes` (derived by
+> `trajectory_build_hexes()`, keyed directly on the hex). Wherever this doc
+> lists a `trajectory_*` point/hex relink as part of the cascade, that work no
+> longer exists; the trajectory equivalent is a delta-scoped sweep of the
+> changed datasets' tracks. See `trajectory-coverage.md`. Everything below
+> about `profiles`/`obis_cells` still holds.
+
 Follow-up to `incremental-update-performance.md`. That doc's items **C** (no DDL
 in the load path), **D** (partial) and **E** (timeouts, advisory lock) are now
 implemented. This doc covers what is still broken and the plan to finish the
@@ -23,7 +32,8 @@ COPY, delta upserts). The **processing** side is not:
 - Because `points` pks are renumbered each run, every dependent table must be
   fully relinked every run: `obis_link_point_pk()` rewrites **all** obis_cells,
   and `create_hexes()` (`database/4_create_hexes.sql:66`) rewrites **all**
-  ~778k trajectory_cells by geometry join.
+  ~778k trajectory_cells by geometry join. (That second half is gone as of
+  2026-08 — trajectories no longer use `cde.points`.)
 - `create_hexes()` still deletes both hex tables and re-tiles the entire data
   extent at 100 km and 10 km via `ST_HexagonGrid(... ST_EstimatedExtent ...)`,
   then runs four more full-table `UPDATE` passes over `points`, `profiles`,
@@ -81,7 +91,9 @@ identical to the old spatial-join output.
 
 - Add `UNIQUE (geom)` on `cde.points`; replace the `DELETE FROM cde.points` +
   rebuild with the insert-missing anti-join pattern that
-  `obis_insert_points()` / `trajectory_insert_points()` already use.
+  `obis_insert_points()` / `trajectory_insert_points()` already use
+  (`trajectory_insert_points()` has since been deleted along with the cells
+  table it fed).
 - Since pks are now stable, all "relink point_pk for every row" passes shrink
   to `WHERE point_pk IS NULL` (their original intent — see the comment on
   `obis_link_point_pk()` explaining it only relinks all rows *because* points
@@ -97,7 +109,8 @@ unlinked rows, `gc_orphan_points_and_hexes()` run by the db-loader
 post-commit under a try-advisory-lock. Measured on the dev DB: a zero-delta
 incremental (`process_incremental_update()` with empty temp tables) runs in
 **4.4 s** with zero rows written; a same-data re-harvest of the two biggest
-datasets (59k profiles + 624k trajectory cells) relinks every replaced row to
+datasets (59k profiles + 624k trajectory cells, as the tables stood then)
+relinks every replaced row to
 bit-identical point/hex pks with **zero writes outside the delta**; GC removes
 exactly the predicted orphans and nothing else.
 
@@ -112,7 +125,10 @@ datasets present in `temp_datasets`:
   `hex_*_pk` for **new** points only, propagate FKs only to rows of changed
   datasets.
 - `obis_*` / `trajectory_*` backfills already use `IS NULL` guards — they
-  become genuine ~0-row no-ops once nothing is renumbered.
+  become genuine ~0-row no-ops once nothing is renumbered. (The trajectory
+  half is now a different shape: `trajectory_build_hexes(<changed dataset
+  pks>)` rebuilds only the touched datasets' hex rows, ~9 s for one dataset
+  against ~110 s for the whole corpus.)
 
 With 1–3, the advisory-locked critical section drops from minutes to seconds.
 Concurrent harvesters still serialize (keep the single global lock — it's
@@ -121,7 +137,8 @@ churn that caused 504s is gone at the root.
 
 Implemented as: `WHERE point_pk IS NULL` scoping on
 `obis_insert_points()`/`trajectory_insert_points()` (the DISTINCT+transform
-scans over the full cells tables were 850 ms + 420 ms per load);
+scans over the full cells tables were 850 ms + 420 ms per load; the trajectory
+one is since gone entirely);
 `IS DISTINCT FROM` no-op guards on every `datasets`/`organizations` UPDATE
 (`n_profiles`, `pk_url`, `organization_pks` — the latter's `array_agg` now
 ordered so the guard can't flap); and an OBIS gate in
@@ -187,7 +204,8 @@ cache after the swap. Drop `cde_old` after verification.
   `DB_POOL_MIN`/`DB_POOL_MAX`, `acquireTimeoutMillis: 30000`) so a slow DB
   degrades instead of hard-failing — the one item E leftover.
 - ✅ Autovacuum tuning on the load-churned tables (`profiles`, `obis_cells`,
-  `trajectory_cells`, `points`): `autovacuum_vacuum/analyze_scale_factor =
+  `trajectory_hexes`, `trajectory_points`, `points`):
+  `autovacuum_vacuum/analyze_scale_factor =
   0.02` so cleanup runs small-and-frequent instead of bursting IO against
   live traffic (`migrations/autovacuum-churned-tables.sql`).
 - ✅ Loader deprioritization: the incremental session sets

@@ -106,7 +106,7 @@ router.get(
 
     // Which feature sources feed the queue. Mirror shapeQuery.js so the queued
     // set matches the size estimate the user was shown: profiles + trajectory
-    // cells for ERDDAP data, obis_cells for OBIS. Scientific-name / OBIS-node
+    // hexes for ERDDAP data, obis_cells for OBIS. Scientific-name / OBIS-node
     // selections hide the profile branches (OBIS-only mode) unless ERDDAP
     // servers are also selected.
     const { includeObis = "true", scientificNames, obisNodes, erddapServers } = req.query;
@@ -114,15 +114,20 @@ router.get(
     const showObis = includeObis !== "false";
 
     // search_geom is the geometry filters.shared matches against: the per-feature
-    // bbox for profiles (extent search), the cell point for obis/trajectory.
+    // bbox for profiles (extent search), the cell point for obis, the hex polygon
+    // for trajectory coverage.
     const profilesBranch = `SELECT dataset_pk, point_pk, geom, latitude, longitude,
                time_min, time_max, depth_min, depth_max, bbox AS search_geom
-        FROM cde.profiles`;
-    // Trajectory coverage cells are downloadable ERDDAP datasets too, so a
-    // selection over a glider/ship track queues its dataset.
-    const trajectoryBranch = `SELECT dataset_pk, point_pk, geom, latitude, longitude,
-               time_min, time_max, depth_min, depth_max, geom AS search_geom
-        FROM cde.trajectory_cells`;
+        FROM cde.profiles
+        WHERE :profileFilters`;
+    // Trajectory coverage hexes are downloadable ERDDAP datasets too, so a
+    // selection over a glider/ship track queues its dataset. 10 km tier only,
+    // hex polygon as search_geom (see shapeQuery.js).
+    const trajectoryBranch = `SELECT t.dataset_pk, NULL::integer AS point_pk, t.geom, t.latitude, t.longitude,
+               t.time_min, t.time_max, t.depth_min, t.depth_max, h.geom AS search_geom
+        FROM cde.trajectory_hexes t
+        JOIN cde.hexes_zoom_1 h ON h.pk = t.hex_pk
+        WHERE t.hex_tier = 1`;
     // OBIS occurrence cells. The scientific-name/aphia predicate lives in
     // filters.obisOnly (obis_cells columns) and is applied inside the branch;
     // the shared spatial/time/source filter still applies in the outer WHERE.
@@ -138,6 +143,8 @@ router.get(
     // Nothing to download (e.g. a scientific-name selection with OBIS disabled).
     if (!branches.length) return res.send({ count: 0 });
 
+    // (Pre-M2 this interpolated the filter OBJECT into the SQL string instead
+    // of binding filters.shared — fixed to match the other routes.)
     const SQL = `
         WITH combined AS (
         ${branches.join("\n        UNION ALL\n        ")}
@@ -162,6 +169,7 @@ router.get(
       let count = 0;
       const tileRaw = await db.raw(SQL, {
         filters: filters.shared,
+        profileFilters: filters.profileOnly,
         obisFilters: filters.obisOnly,
       });
       const tile = tileRaw.rows[0];
