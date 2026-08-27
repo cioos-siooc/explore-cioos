@@ -919,8 +919,17 @@ export default function CreateMap({
   // temporary tuning panel below can move them live — see TEMP_FADE_TUNER.
   // Once the values are settled these go back to plain consts and the panel
   // and everything referencing it comes out.
-  const fadeFactorRef = useRef(0.45)
-  const fadePercentileRef = useRef(0.25)
+  // Chosen by eye on 2026-08-27 against the freshly harvested catalogue and
+  // kept as the defaults so a reload restores them: faded hexes keep 0.70 of
+  // their normal opacity (0.56 against the 0.80 base), and the sparse band is
+  // the bottom 15% of the counts on screen.
+  //
+  // 0.15 rather than 0.25 makes no difference on the UNFILTERED map — 37.3% of
+  // hexes hold exactly 1 day, so both percentiles land on a threshold of 1 and
+  // fade the same 21,016 of 56,413. It only bites on a filtered view, where the
+  // bottom of the distribution is sparser and the two pull apart.
+  const fadeFactorRef = useRef(0.7)
+  const fadePercentileRef = useRef(0.15)
   // TEMP_FADE_TUNER, ramp half. 'default' = whatever generateColorStops does
   // (log once max/min >= 100, which every real days domain is), so the tuner
   // starts on today's behaviour and any change is a deliberate comparison.
@@ -1315,13 +1324,13 @@ export default function CreateMap({
     host.innerHTML = `
       <div style="font-weight:600;margin-bottom:8px">Hex fade (temporary)</div>
       <label style="display:block">Faded opacity &times;
-        <b id="tft-f-val">0.45</b>
-        <input id="tft-f" type="range" min="0.05" max="1" step="0.05" value="0.45"
+        <b id="tft-f-val">0.7</b>
+        <input id="tft-f" type="range" min="0.05" max="1" step="0.05" value="0.7"
                style="width:100%">
       </label>
       <label style="display:block;margin-top:6px">Sparse cutoff pctile
-        <b id="tft-p-val">0.25</b>
-        <input id="tft-p" type="range" min="0" max="0.9" step="0.05" value="0.25"
+        <b id="tft-p-val">0.15</b>
+        <input id="tft-p" type="range" min="0" max="0.9" step="0.05" value="0.15"
                style="width:100%">
       </label>
       <div id="tft-out" style="margin-top:8px;font-size:11px;color:#456"></div>
@@ -1440,18 +1449,18 @@ export default function CreateMap({
       apply()
     })
     $('#tft-reset').addEventListener('click', () => {
-      fadeFactorRef.current = 0.45
-      fadePercentileRef.current = 0.25
+      fadeFactorRef.current = 0.7
+      fadePercentileRef.current = 0.15
       rampModeRef.current = 'default'
       rampGammaRef.current = 1
       rampTopPctRef.current = 1
-      $('#tft-f').value = '0.45'
-      $('#tft-p').value = '0.25'
+      $('#tft-f').value = '0.7'
+      $('#tft-p').value = '0.15'
       $('#tft-mode').value = 'default'
       $('#tft-top').value = '1'
       $('#tft-g').value = '1'
-      $('#tft-f-val').textContent = '0.45'
-      $('#tft-p-val').textContent = '0.25'
+      $('#tft-f-val').textContent = '0.7'
+      $('#tft-p-val').textContent = '0.15'
       $('#tft-top-val').textContent = '1.00'
       $('#tft-g-val').textContent = '1.00'
       apply()
