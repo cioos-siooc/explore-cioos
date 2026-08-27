@@ -9,7 +9,13 @@ import {
   plotHeightFor,
   plotWidthFor,
   panelColorFor,
-  MIN_PANEL_PX
+  marginFor,
+  maxCharsFor,
+  LABEL_GUTTER_PX,
+  panelPitch,
+  wrapLabel,
+  MIN_PANEL_PX,
+  LABEL_FONT_PX
 } from './previewFacetFigure.js'
 import { VIKING, VIKING_DATASET } from './previewVariables.test.mjs'
 
@@ -116,10 +122,22 @@ test('a profile gets one shared y axis and one x axis per panel', () => {
   assert.equal(Object.keys(layout).filter((k) => /^xaxis/.test(k)).length, 6)
 })
 
-test('the shared depth axis is reversed and titled once', () => {
+test('the shared depth axis is reversed, and labelled horizontally beside itself', () => {
   const { layout } = figure('TimeSeriesProfile', ALL_SIX)
   assert.equal(layout.yaxis.autorange, 'reversed')
-  assert.equal(layout.yaxis.title.text, 'depth of observation ( m )')
+  // NOT an axis title: this Plotly has no angle on one, so it would be drawn
+  // sideways. An annotation in the same place instead — beside the axis, centred
+  // on the span it labels.
+  assert.ok(!layout.yaxis.title)
+  assert.equal(layout.annotations.length, 1)
+  const label = layout.annotations[0]
+  assert.equal(label.text.replace(/<br>/g, ' '), 'depth of observation ( m )')
+  assert.equal(label.y, 0.5)
+  assert.equal(label.yanchor, 'middle')
+  // Left of the axis line and clear of its tick labels.
+  assert.equal(label.xanchor, 'right')
+  assert.ok(label.xshift < 0)
+  assert.equal(label.showarrow, false)
 })
 
 test('profile panel titles sit on top, one per variable', () => {
@@ -162,7 +180,12 @@ test('the first selected variable is drawn at the bottom', () => {
   // to the panel order.
   const { layout } = figure('TimeSeries', ['TE90_01', 'PSAL_01', 'DOXY_01'])
   assert.ok(layout.yaxis.domain[0] < layout.yaxis3.domain[0])
-  assert.equal(layout.yaxis.title.text, 'Temperature (1990 scale) ( degree_C )')
+  assert.equal(
+    layout.annotations[0].text.replace(/<br>/g, ' '),
+    'Temperature (1990 scale) ( degree_C )'
+  )
+  const [low, high] = layout.yaxis.domain
+  assert.equal(layout.annotations[0].y, (low + high) / 2)
 })
 
 test('a timeseries puts time across and the variable up', () => {
@@ -258,4 +281,207 @@ test('no rows yet still produces the full axis skeleton', () => {
   assert.equal(data.length, 2)
   assert.deepEqual(data[0].x, [])
   assert.equal(layout.xaxis2.title.text, 'Practical Salinity ( PSU )')
+})
+
+// --- labels read horizontally, whatever the orientation ----------------------
+
+test('every stacked panel is labelled along its own axis, never rotated', () => {
+  const { layout } = figure('TimeSeries', ALL_SIX)
+  assert.equal(layout.annotations.length, ALL_SIX.length)
+  for (let index = 0; index < ALL_SIX.length; index += 1) {
+    const key = index === 0 ? 'yaxis' : `yaxis${index + 1}`
+    // A y axis title is the one label Plotly insists on rotating, so no panel
+    // axis carries one.
+    assert.ok(!layout[key].title, `${key} has no title`)
+    const [low, high] = layout[key].domain
+    const annotation = layout.annotations[index]
+    // Where the axis title would have been: centred on the axis it labels, and
+    // to the left of it.
+    assert.equal(annotation.y, (low + high) / 2, `${key} label is centred on it`)
+    assert.equal(annotation.yanchor, 'middle')
+    assert.equal(annotation.xanchor, 'right')
+    assert.equal(annotation.x, 0)
+    assert.ok(annotation.xshift < 0)
+    assert.equal(annotation.font.size, LABEL_FONT_PX)
+  }
+})
+
+test('a vertical axis label wraps into the gutter the margin reserves', () => {
+  // The gutter is a constant, so unlike a panel title this wraps even on the
+  // first render, before anything has been measured.
+  const { layout } = figure('TimeSeries', ALL_SIX)
+  const fits = maxCharsFor(LABEL_GUTTER_PX)
+  layout.annotations.forEach((annotation) => {
+    annotation.text.split('<br>').forEach((line) => {
+      assert.ok(line.length <= fits, `"${line}" (${line.length} > ${fits})`)
+    })
+  })
+  // Long enough to need it: this one does not fit on one line.
+  assert.ok(layout.annotations[1].text.includes('<br>'), layout.annotations[1].text)
+  const margin = marginFor(ROWS)
+  assert.ok(
+    margin.l >= LABEL_GUTTER_PX,
+    `left margin ${margin.l} holds a ${LABEL_GUTTER_PX}px gutter`
+  )
+})
+
+test('a stack keeps its shared axis title — that one is already horizontal', () => {
+  const { layout } = figure('TimeSeries', ['TE90_01'])
+  assert.equal(layout.xaxis.title.text, 'Time ( UTC )')
+  assert.equal(layout.xaxis.title.font.size, LABEL_FONT_PX)
+})
+
+test('a profile labels only the shared axis by annotation', () => {
+  // Panel titles there are x titles on top, which Plotly already draws
+  // horizontally — so they stay axis titles and keep automargin.
+  const { layout } = figure('TimeSeriesProfile', ALL_SIX)
+  assert.equal(layout.annotations.length, 1)
+  assert.equal(layout.xaxis.side, 'top')
+  assert.ok(layout.xaxis.title.text)
+})
+
+test('every label is drawn at the size the wrap estimate assumes', () => {
+  const { layout } = figure('TimeSeriesProfile', ALL_SIX)
+  assert.equal(layout.font.size, LABEL_FONT_PX)
+  assert.equal(layout.xaxis.title.font.size, LABEL_FONT_PX)
+  assert.equal(layout.annotations[0].font.size, LABEL_FONT_PX)
+})
+
+// --- wrapping ----------------------------------------------------------------
+
+test('a label that fits is left alone', () => {
+  assert.equal(wrapLabel('Depth ( m )', 40), 'Depth ( m )')
+})
+
+test('the unit goes on its own line first', () => {
+  assert.equal(
+    wrapLabel('Practical Salinity ( PSU )', 20),
+    'Practical Salinity<br>( PSU )'
+  )
+})
+
+test('a long name wraps at word boundaries, never mid-word', () => {
+  const wrapped = wrapLabel('Mass concentration of chlorophyll ( mg m-3 )', 22)
+  wrapped.split('<br>').forEach((line) => {
+    assert.ok(line.length <= 22 || !line.includes(' '), line)
+  })
+  assert.ok(!wrapped.includes('chloro<br>'))
+})
+
+test('past the line cap the name is truncated and the unit survives', () => {
+  const wrapped = wrapLabel(
+    'Mass concentration of chlorophyll a in sea water estimated from fluorescence ( mg m-3 )',
+    21
+  )
+  const lines = wrapped.split('<br>')
+  assert.equal(lines.length, 3)
+  assert.ok(lines[1].endsWith('…'))
+  assert.equal(lines[2], '( mg m-3 )')
+})
+
+test('a label with no unit still wraps, using every allowed line', () => {
+  const lines = wrapLabel('some very long variable name with no unit', 14).split('<br>')
+  assert.equal(lines.length, 3)
+  assert.ok(lines.every((line) => !line.startsWith('(')))
+})
+
+test('an unknown width means do not wrap', () => {
+  // buildFigure runs once before the plot area has been measured; wrapping
+  // against a guessed width would be worse than not wrapping.
+  assert.equal(maxCharsFor(0), 0)
+  assert.equal(maxCharsFor(undefined), 0)
+  assert.equal(wrapLabel('Practical Salinity ( PSU )', 0), 'Practical Salinity ( PSU )')
+})
+
+test('narrower panels allow fewer characters', () => {
+  assert.ok(maxCharsFor(150) < maxCharsFor(170))
+  assert.ok(maxCharsFor(170) < maxCharsFor(1140))
+  assert.ok(maxCharsFor(10) >= 8) // a floor, so a label is never one char a line
+})
+
+test('panel titles wrap to their own panel once the width is known', () => {
+  const wide = figure('TimeSeriesProfile', ALL_SIX, { size: { width: 1140, height: 620 } })
+  const titles = ALL_SIX.map((_, index) =>
+    wide.layout[index === 0 ? 'xaxis' : `xaxis${index + 1}`].title.text
+  )
+  // Six panels in 1140px is 150px each, and no line may be wider than that.
+  const columns = marginFor(COLUMNS)
+  const [start, end] = wide.layout.xaxis.domain
+  const fits = maxCharsFor((1140 - columns.l - columns.r) * (end - start))
+  titles.forEach((text) => {
+    text.split('<br>').forEach((line) => {
+      assert.ok(line.length <= fits, `"${line}" (${line.length} > ${fits})`)
+    })
+  })
+  // And the labels that do not fit were the reason: they wrapped.
+  assert.ok(titles.filter((text) => text.includes('<br>')).length >= 5, titles.join(' | '))
+  // The same figure with no measured width leaves them on one line.
+  const unsized = figure('TimeSeriesProfile', ALL_SIX)
+  assert.ok(!unsized.layout.xaxis.title.text.includes('<br>'))
+})
+
+test('one panel is wide enough not to wrap', () => {
+  const { layout } = figure('TimeSeriesProfile', ['TE90_01'],
+    { size: { width: 1140, height: 620 } })
+  assert.ok(!layout.xaxis.title.text.includes('<br>'))
+})
+
+test('hover text keeps the unwrapped label', () => {
+  // A <br> in a hover box breaks the line where the panel needed it.
+  const { data } = figure('TimeSeriesProfile', ALL_SIX,
+    { size: { width: 1140, height: 620 } })
+  assert.ok(data[0].layout === undefined)
+  assert.ok(data[0].name.includes('Temperature (1990 scale)'))
+  assert.ok(!data[0].name.includes('<br>'))
+  assert.ok(data[0].hovertemplate.startsWith('Temperature (1990 scale) ( degree_C ):'))
+})
+
+// --- margins -----------------------------------------------------------------
+
+test('each orientation reserves the edge its labels actually use', () => {
+  const columns = marginFor(COLUMNS)
+  const rows = marginFor(ROWS)
+  // A profile's panel titles are on top and its one horizontal label is at the
+  // bottom; a stack is the other way round.
+  assert.ok(columns.t > columns.b)
+  assert.ok(rows.b > rows.t)
+  // Neither reserves width for a rotated title any more.
+  assert.equal(columns.l, rows.l)
+})
+
+test('the sizing floors pay for the gaps, so a panel really gets its minimum', () => {
+  // The floors used to be n * MIN_PANEL_PX, which ignored the gaps between the
+  // panels — so six panels were promised 150px each and drawn at 109px.
+  for (const n of [2, 6, 14, 19]) {
+    const width = plotWidthFor(COLUMNS, n, 100, false)
+    const columns = marginFor(COLUMNS)
+    const plotting = width - columns.l - columns.r
+    const [start, end] = domainsFor(n, 0.22)[0]
+    assert.ok(
+      plotting * (end - start) >= MIN_PANEL_PX - 1,
+      `n=${n}: ${(plotting * (end - start)).toFixed(0)}px panel`
+    )
+
+    const height = plotHeightFor(ROWS, n, 100)
+    const rows = marginFor(ROWS)
+    const stacked = height - rows.t - rows.b
+    const [low, high] = domainsFor(n, 0.12)[0]
+    assert.ok(
+      stacked * (high - low) >= MIN_PANEL_PX - 1,
+      `n=${n}: ${(stacked * (high - low)).toFixed(0)}px panel`
+    )
+  }
+})
+
+test('the gap is a share of a panel, not of the whole plot', () => {
+  // At a fixed 5.5% of the plotting area, nineteen panels spent 99% of the
+  // width on the eighteen gaps and each panel came out about a pixel wide.
+  const domains = domainsFor(19, 0.22)
+  const span = domains[0][1] - domains[0][0]
+  assert.ok(span > 0.03, `${span} of the width per panel`)
+  const gap = domains[1][0] - domains[0][1]
+  assert.ok(Math.abs(gap / span - 0.22) < 0.01, `gap is ${(gap / span).toFixed(3)} of a panel`)
+  assert.equal(panelPitch(19, 0.22), 19 + 18 * 0.22)
+  assert.equal(panelPitch(1, 0.22), 1)
+  assert.equal(panelPitch(0, 0.22), 0)
 })

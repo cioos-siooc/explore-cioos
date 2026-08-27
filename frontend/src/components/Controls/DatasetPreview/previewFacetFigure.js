@@ -15,35 +15,160 @@
 //                       all anchored to y. Traces: {xaxis:'x<i>', yaxis:'y'}.
 //   ROWS (timeseries)   one shared `xaxis`, N y axes each with its own domain,
 //                       all anchored to x. Traces: {xaxis:'x', yaxis:'y<i>'}.
+//
+// WHY SOME LABELS ARE ANNOTATIONS AND NOT AXIS TITLES
+// A cartesian axis title in this Plotly is exactly {text, font, standoff} —
+// there is no angle anywhere on it, so Plotly always writes a y axis title
+// sideways. Every label here has to read horizontally, so the two labels that
+// would sit beside a vertical axis are drawn as layout.annotations instead:
+// the shared depth label in a profile, and each panel's label in a stack. The
+// labels that Plotly already draws horizontally (a profile's panel titles on
+// top, a stack's shared axis at the bottom) stay axis titles, because axis
+// titles get `automargin` and annotations do not.
 
 import { COLUMNS } from './previewFacetPlan.js'
 import { labelFor } from './previewVariables.js'
 import { colorscaleFor } from './erddapPalettes.js'
 
-// Room for the shared axis and its title, the panel titles, and the modebar.
-const MARGIN = { l: 78, r: 26, t: 54, b: 62 }
-// Gap between panels, as a fraction of the plotting area. Panel titles sit above
-// each column, and a y axis label sits left of each row, so the two orientations
-// need different gaps.
-const COLUMN_GAP = 0.055
-const ROW_GAP = 0.09
+// Left of every vertical axis: room for its tick labels, then room for the
+// axis's own label, which is written horizontally and so needs width where a
+// rotated one needed almost none. Both are reserved on the left in both
+// orientations, because both put a labelled vertical axis there — the shared
+// depth axis of a profile, and every panel's axis in a stack.
+const TICK_ROOM_PX = 52
+export const LABEL_GUTTER_PX = 104
+
+// Room for the shared axis, its labels, and the modebar. Orientation-dependent
+// because the two layouts spend their other edges differently: a profile puts
+// its panel titles on TOP and nothing at the bottom, a stack puts its shared
+// axis at the BOTTOM.
+const COLUMNS_MARGIN = { l: TICK_ROOM_PX + LABEL_GUTTER_PX, r: 26, t: 54, b: 22 }
+const ROWS_MARGIN = { l: TICK_ROOM_PX + LABEL_GUTTER_PX, r: 26, t: 30, b: 62 }
+
+export function marginFor (orientation) {
+  return orientation === COLUMNS ? COLUMNS_MARGIN : ROWS_MARGIN
+}
+
+// Gap between panels, as a fraction of ONE PANEL rather than of the whole
+// plotting area — which is what it used to be, and it does not survive many
+// panels: at 5.5 % each, nineteen panels spend 99 % of the width on the
+// eighteen gaps between them and every panel comes out about a pixel wide. A
+// panel-relative gap keeps the same proportions at any n.
+//
+// 0.22 is also what makes six 150 px profile panels fit a ~1140 px modal
+// exactly, with 33 px between them. Stacked panels need much less: every panel
+// is labelled beside its own axis, and only the bottom one carries x tick
+// labels, so the gap is separation and nothing else — and vertical space is the
+// scarce one, since that is the direction the modal scrolls.
+const COLUMN_GAP = 0.22
+const ROW_GAP = 0.12
 // Below this a panel is not worth drawing; the container scrolls instead.
 export const MIN_PANEL_PX = 150
 export const MIN_PLOT_PX = 320
 // Extra width reserved for the colourbar and its title when colouring is on.
 const COLORBAR_GUTTER = 108
 
-// n evenly spaced [start, end] pairs over 0..1 with `gap` between them.
-export function domainsFor (n, gap) {
+// Every label is drawn at this size explicitly, rather than at Plotly's default
+// for an axis title — which is bigFont(layout.font.size) = round(1.2 * 12) = 14.
+// Being explicit is what lets maxCharsFor() below predict how wide a label will
+// actually render, and 12 matches the tick labels.
+export const LABEL_FONT_PX = 12
+// Average advance per character for Plotly's default stack ("Open Sans, verdana,
+// arial, sans-serif"), as a fraction of the font size. Deliberately generous:
+// overestimating the width wraps a label one word early, underestimating it puts
+// two panel titles on top of each other, which is the bug this is fixing.
+const CHAR_PX_PER_FONT_PX = 0.58
+const MAX_LABEL_LINES = 3
+
+// How many characters fit in `widthPx`. 0 means "unknown" — buildFigure is
+// called before the plot area has been measured, and every caller treats 0 as
+// "do not wrap" rather than wrapping against a guessed width.
+export function maxCharsFor (widthPx, fontPx = LABEL_FONT_PX) {
+  if (!widthPx || widthPx <= 0) return 0
+  return Math.max(8, Math.floor(widthPx / (fontPx * CHAR_PX_PER_FONT_PX)))
+}
+
+// labelFor() writes "long_name ( unit )", and the unit group is both the tail of
+// every label and the part that collides first, so it gets its own line.
+const UNIT_SUFFIX = /\s\(\s[^()]*\s\)$/
+
+function greedyLines (text, maxChars) {
+  const lines = []
+  let current = ''
+  text.split(/\s+/).filter(Boolean).forEach((word) => {
+    if (!current) {
+      current = word
+    } else if (`${current} ${word}`.length <= maxChars) {
+      current = `${current} ${word}`
+    } else {
+      lines.push(current)
+      current = word
+    }
+  })
+  if (current) lines.push(current)
+  return lines
+}
+
+function ellipsize (text, maxChars) {
+  if (text.length <= maxChars) return text
+  return `${text.slice(0, Math.max(1, maxChars - 1)).trimEnd()}…`
+}
+
+/**
+ * Break a label onto as many lines as it needs, with <br> — which is what Plotly
+ * reads inside a title or an annotation, and what it counts when it grows a
+ * margin to fit one.
+ *
+ * A word is never split: a single long token overflows its panel slightly rather
+ * than being mangled. Past `maxLines` the NAME is truncated and the unit line is
+ * always kept — a label whose unit went missing reads as a different quantity.
+ */
+export function wrapLabel (text, maxChars, maxLines = MAX_LABEL_LINES) {
+  const label = (text || '').trim()
+  if (!maxChars || label.length <= maxChars) return label
+
+  const match = label.match(UNIT_SUFFIX)
+  const unit = match ? match[0].trim() : ''
+  const name = match ? label.slice(0, match.index).trim() : label
+
+  const allowed = Math.max(1, maxLines - (unit ? 1 : 0))
+  let lines = greedyLines(name, maxChars)
+  if (!lines.length) lines = ['']
+  if (lines.length > allowed) {
+    const kept = lines.slice(0, allowed - 1)
+    kept.push(ellipsize(lines.slice(allowed - 1).join(' '), maxChars))
+    lines = kept
+  }
+  return [...lines, ...(unit ? [unit] : [])].join('<br>')
+}
+
+// The plotting area a panel count needs, in panels: n panels plus the gaps
+// between them, each gap being `gapRatio` of a panel. Both the domains below and
+// the minimum-size floors are derived from it, so they cannot drift apart —
+// which is how the floors used to promise a 150 px panel and hand over a 109 px
+// one.
+export function panelPitch (n, gapRatio) {
+  return n <= 0 ? 0 : n + (n - 1) * gapRatio
+}
+
+// n evenly spaced [start, end] pairs over 0..1, separated by `gapRatio` of a
+// panel.
+export function domainsFor (n, gapRatio) {
   if (n <= 0) return []
   if (n === 1) return [[0, 1]]
-  const span = (1 - gap * (n - 1)) / n
-  return Array.from({ length: n }, (_, index) => {
-    const start = index * (span + gap)
+  const span = 1 / panelPitch(n, gapRatio)
+  const pitch = span * (1 + gapRatio)
+  const domains = Array.from({ length: n }, (_, index) => {
+    const start = index * pitch
     // Round to kill float drift, which Plotly reports as an invalid domain when
     // the last end lands at 1.0000000000000002.
     return [Number(start.toFixed(6)), Number((start + span).toFixed(6))]
   })
+  // The ends are exact by construction and inexact in floating point; Plotly
+  // wants the full 0..1 covered, so say so rather than hope the rounding agreed.
+  domains[0][0] = 0
+  domains[n - 1][1] = 1
+  return domains
 }
 
 // How tall the plot has to be. Constant in n for profiles, because the panels
@@ -53,8 +178,11 @@ export function domainsFor (n, gap) {
 export function plotHeightFor (orientation, panelCount, availableHeight) {
   const available = Math.max(availableHeight || 0, MIN_PLOT_PX)
   if (orientation === COLUMNS) return available
-  const needed = panelCount * MIN_PANEL_PX + MARGIN.t + MARGIN.b
-  return Math.max(available, needed)
+  const margin = marginFor(orientation)
+  const needed =
+    MIN_PANEL_PX * panelPitch(panelCount, ROW_GAP) + margin.t + margin.b
+  // Whole pixels: a fractional height is a fractional scroll position.
+  return Math.ceil(Math.max(available, needed))
 }
 
 // Profiles get narrow fast: six panels in a 1140 px modal is ~170 px each, which
@@ -62,10 +190,13 @@ export function plotHeightFor (orientation, panelCount, availableHeight) {
 // cost of a horizontal scroll.
 export function plotWidthFor (orientation, panelCount, availableWidth, hasColorbar) {
   const gutter = hasColorbar ? COLORBAR_GUTTER : 0
-  const available = Math.max(availableWidth || 0, 320)
+  const available = Math.max(availableWidth || 0, MIN_PLOT_PX)
   if (orientation !== COLUMNS) return available
-  const needed = panelCount * MIN_PANEL_PX + MARGIN.l + MARGIN.r + gutter
-  return Math.max(available, needed)
+  const margin = marginFor(orientation)
+  const needed =
+    MIN_PANEL_PX * panelPitch(panelCount, COLUMN_GAP) +
+    margin.l + margin.r + gutter
+  return Math.ceil(Math.max(available, needed))
 }
 
 const axisKey = (letter, index) =>
@@ -80,6 +211,33 @@ const finiteValues = (data, columnName) => {
   })
   return values
 }
+
+// A vertical axis's own label, in the place Plotly would have put its title —
+// beside the axis, centred on the span it labels — but written horizontally
+// instead of rotated. `y` is the centre of that span in paper coordinates.
+//
+// Right-anchored and shifted clear of the tick labels, so the text sits flush
+// against the axis and multi-line labels line up with each other.
+const axisLabel = (text, y) => ({
+  text,
+  xref: 'paper',
+  x: 0,
+  xanchor: 'right',
+  xshift: -TICK_ROOM_PX,
+  yref: 'paper',
+  y,
+  yanchor: 'middle',
+  showarrow: false,
+  align: 'right',
+  font: { size: LABEL_FONT_PX }
+})
+
+// Vertical-axis labels wrap into the fixed gutter the margin reserves, not into
+// a measured panel — the gutter is a constant, so these wrap on the very first
+// render too. Four lines because the panel is at least MIN_PANEL_PX tall and
+// four lines of 12px are 68 of those 150 pixels.
+const wrapAxisLabel = (text) =>
+  wrapLabel(text, maxCharsFor(LABEL_GUTTER_PX), 4)
 
 // Panel trace colours. The image draws each variable in its own solid colour;
 // these are that palette, extended so a 14-column selection stays distinguishable.
@@ -152,9 +310,21 @@ export function buildFigure ({
   const effectiveMode =
     colorActive && !mode.includes('markers') ? 'markers+lines' : mode
 
+  const margin = marginFor(plan.orientation)
+  const gutter = colorActive ? COLORBAR_GUTTER : 0
+  // The width labels actually have to fit in. 0 until the plot area has been
+  // measured, and maxCharsFor turns that into "leave the label alone".
+  const plottingWidth = size.width
+    ? Math.max(size.width - margin.l - margin.r - gutter, 0)
+    : 0
+  const wrapAt = (text, widthPx) => wrapLabel(text, maxCharsFor(widthPx))
+
+  const annotations = []
   const layout = {
     uirevision,
-    margin: { ...MARGIN, r: MARGIN.r + (colorActive ? COLORBAR_GUTTER : 0) },
+    margin: { ...margin, r: margin.r + gutter },
+    // Stated rather than inherited, because maxCharsFor's estimate assumes it.
+    font: { size: LABEL_FONT_PX },
     showlegend: false, // each panel is titled; a legend would repeat it
     hovermode: 'closest',
     dragmode: 'zoom',
@@ -164,17 +334,30 @@ export function buildFigure ({
   }
 
   const sharedTitle = titleFor(sharedAxis)
-  const sharedAxisSettings = {
-    automargin: true,
-    title: { text: sharedTitle },
-    ...(plan.sharedReversed ? { autorange: 'reversed' } : {})
-  }
 
   if (isColumns) {
-    // One depth axis on the left, spanning the full height.
-    layout.yaxis = { ...sharedAxisSettings, domain: [0, 1], anchor: 'x' }
+    // One depth axis on the left, spanning the full height. Its label cannot be
+    // an axis title without being rotated, so it is an annotation beside the
+    // axis instead — same place, centred on the same span, just horizontal.
+    layout.yaxis = {
+      automargin: true,
+      domain: [0, 1],
+      anchor: 'x',
+      ...(plan.sharedReversed ? { autorange: 'reversed' } : {})
+    }
+    annotations.push(axisLabel(wrapAxisLabel(sharedTitle), 0.5))
   } else {
-    layout.xaxis = { ...sharedAxisSettings, domain: [0, 1], anchor: 'y' }
+    // Already horizontal: keep it an axis title and let automargin size for it.
+    layout.xaxis = {
+      automargin: true,
+      domain: [0, 1],
+      anchor: 'y',
+      title: {
+        text: wrapAt(sharedTitle, plottingWidth),
+        font: { size: LABEL_FONT_PX },
+        standoff: 6
+      }
+    }
   }
 
   const traces = panels.map((columnName, index) => {
@@ -187,7 +370,13 @@ export function buildFigure ({
         anchor: 'y',
         automargin: true,
         side: 'top', // the image titles each profile panel above it
-        title: { text: panelTitle },
+        title: {
+          // Wrapped to its OWN panel's width: six panels in a 1140 px modal are
+          // ~170 px each, and one unwrapped long_name covers three of them.
+          text: wrapAt(panelTitle, plottingWidth * (domain[1] - domain[0])),
+          font: { size: LABEL_FONT_PX },
+          standoff: 6
+        },
         zeroline: false
       }
     } else {
@@ -195,12 +384,17 @@ export function buildFigure ({
       // panel order already puts the first selected variable lowest — which is
       // how the image stacks them.
       layout[axisKey('y', index)] = {
-        domain: domains[index],
+        domain,
         anchor: 'x',
         automargin: true,
-        title: { text: panelTitle },
         zeroline: false
       }
+      // No title on the axis: it would be rotated. An annotation beside the
+      // axis instead, centred on this panel — where the axis title would have
+      // been, only horizontal.
+      annotations.push(
+        axisLabel(wrapAxisLabel(panelTitle), (domain[0] + domain[1]) / 2)
+      )
     }
 
     const sharedValues = (data || []).map((row) => row[sharedAxis])
@@ -209,6 +403,8 @@ export function buildFigure ({
     return {
       type: 'scatter',
       mode: effectiveMode,
+      // Plain, never the wrapped text: a <br> in a hover box breaks the line
+      // where the panel needed it, not where the sentence does.
       name: panelTitle,
       x: isColumns ? panelValues : sharedValues,
       y: isColumns ? sharedValues : panelValues,
@@ -250,5 +446,6 @@ export function buildFigure ({
     }
   })
 
+  layout.annotations = annotations
   return { data: traces, layout }
 }

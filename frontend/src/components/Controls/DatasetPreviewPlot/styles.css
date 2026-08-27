@@ -67,20 +67,14 @@
   display: inline-block;
 }
 
-/* Right side: plot-type button on top, plot fills the rest. */
+/* Right side: nothing but the plot. The plot-type button used to sit in a
+   header row here; it is a control like the other three, so it lives in the left
+   column now and the figure gets the whole height of the scroller. */
 .datasetPreviewPlotArea {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-}
-
-.datasetPreviewPlotHeader {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
 }
 
 /* No height rules here at all, and that is the fix.
@@ -119,14 +113,6 @@
 .dropdownButtonLeft .dropdown-toggle {
   min-width: 120px !important;
   max-width: 120px !important;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dropdownButtonRight .dropdown-toggle {
-  min-width: 255px !important;
-  max-width: 255px !important;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

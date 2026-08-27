@@ -68,22 +68,13 @@ export default function DatasetPreviewPlot ({
   // Width comes from the element that owns it: the plot area is flex-sized by
   // the row, independent of how tall the figure ends up.
   const [plotAreaRef, plotAreaSize] = useElementSize()
-  // The plot-type row above the figure. Measured rather than assumed because its
-  // height has to come OFF the budget — a figure as tall as the whole scroller
-  // plus this row is taller than the scroller, which would put a scrollbar back
-  // even on a single panel. Its own height is content-driven and so independent
-  // of the figure: no feedback loop.
-  const [headerRef, headerSize] = useElementSize()
-
   const measurements = measurementsOf(variables)
   const sharedCandidates = sharedCandidatesFor(variables)
   const colorActive = Boolean(colorBy)
 
-  const height = plotHeightFor(
-    plan.orientation,
-    panels.length,
-    Math.max((availableHeight || 0) - headerSize.height, 0)
-  )
+  // The whole scroller: with the plot-type control moved into the left column
+  // there is nothing above the figure to subtract.
+  const height = plotHeightFor(plan.orientation, panels.length, availableHeight || 0)
   const width = plotWidthFor(
     plan.orientation,
     panels.length,
@@ -189,6 +180,37 @@ export default function DatasetPreviewPlot ({
     </div>
   )
 
+  // Plot type. First in the column deliberately: it is the one control that
+  // changes every panel at once, and it used to sit alone in a row above the
+  // figure, which cost the figure that row's height for one dropdown.
+  const plotTypeRow = (
+    <div className='controlRow'>
+      <span className='controlCaption'>{t('plotType')}</span>
+      <span className='controlButtonWrap'>
+        <DropdownButton className='dropdownButtonLeft' title={t(plotType)}>
+          <Dropdown.Item
+            active={plotType === 'markers'}
+            onClick={() => setPlotType('markers')}
+          >
+            {t('markers')}
+          </Dropdown.Item>
+          <Dropdown.Item
+            active={plotType === 'lines'}
+            onClick={() => setPlotType('lines')}
+          >
+            {t('line')}
+          </Dropdown.Item>
+          <Dropdown.Item
+            active={plotType === 'markers+lines'}
+            onClick={() => setPlotType('markers+lines')}
+          >
+            {t('markersAndLine')}
+          </Dropdown.Item>
+        </DropdownButton>
+      </span>
+    </div>
+  )
+
   // Single-select rows: the shared axis, and the optional colour dimension.
   const singleSelectRow = (captionKey, value, options, onPick, includeNone) => (
     <div className='controlRow'>
@@ -269,6 +291,7 @@ export default function DatasetPreviewPlot ({
   return (
     <div className='datasetPreviewControls'>
       <div className='datasetPreviewControlsColumn'>
+        {plotTypeRow}
         {panelPicker}
         {singleSelectRow(
           'datasetPreviewPlotSharedAxis',
@@ -303,22 +326,6 @@ export default function DatasetPreviewPlot ({
       </div>
 
       <div className='datasetPreviewPlotArea' ref={plotAreaRef}>
-        <div className='datasetPreviewPlotHeader' ref={headerRef}>
-          <DropdownButton
-            className='dropdownButtonRight dropdownButton'
-            title={t('plotType') + ': ' + t(plotType)}
-          >
-            <Dropdown.Item onClick={() => setPlotType('markers')}>
-              {t('markers')}
-            </Dropdown.Item>
-            <Dropdown.Item onClick={() => setPlotType('lines')}>
-              {t('line')}
-            </Dropdown.Item>
-            <Dropdown.Item onClick={() => setPlotType('markers+lines')}>
-              {t('markersAndLine')}
-            </Dropdown.Item>
-          </DropdownButton>
-        </div>
         <div className='datasetPreviewPlot'>
           {figure
             ? (
