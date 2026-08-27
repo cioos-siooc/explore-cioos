@@ -48,7 +48,14 @@ obis_discovery:
   geometry: eez
   areas: []
   include: []
-  exclude: []
+  exclude:
+    # iNaturalist Research-grade Observations Marine Subset (OBIS UK).
+    # 11.5M global occurrences: get_occurrences bounds the parquet read only by
+    # world lat/lon and materialises every row before the EEZ filter runs, so it
+    # peaks at ~18GB RSS and OOM-kills the 6GB prefect_worker. Newly reachable
+    # via geometry: eez. Drop this entry once the geo filter is pushed into the
+    # DuckDB query.
+    - eaea291a-1e1d-4382-b86f-ac3cc15b8d5a
   min_datasets: 700
 
 # Rollback lever: comment out obis_discovery and uncomment this to go back to

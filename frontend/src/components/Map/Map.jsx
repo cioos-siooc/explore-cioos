@@ -648,13 +648,13 @@ export default function CreateMap({
     if (hexesRevealed.current || !map.current) return
     hexesRevealed.current = true
     if (map.current.getLayer('hexes')) {
-      map.current.setPaintProperty('hexes', 'fill-opacity', hexOpacity)
+      map.current.setPaintProperty('hexes', 'fill-opacity', hexOpacityExpression())
     }
     if (map.current.getLayer('coverage-hexes')) {
       map.current.setPaintProperty(
         'coverage-hexes',
         'fill-opacity',
-        coverageHexOpacity
+        coverageHexOpacityExpression()
       )
     }
   }
@@ -905,6 +905,32 @@ export default function CreateMap({
   // fill is nearly transparent (the layer fades out with zoom).
   const coverageHexOutlineColor = () => hexOutlineColor
 
+  // Opacity expression that reduces transparency for hexes in the bottom
+  // quartile (least data). Uses the domain to estimate p25, then applies
+  // reduced opacity below that threshold so sparse hexes don't saturate the map.
+  const hexOpacityExpression = () => {
+    if (!colorStops.current || colorStops.current.length === 0) {
+      return hexOpacity
+    }
+    // Estimate p25 from the color domain's min/max. The minimum is at
+    // colorStops[0][0], maximum at colorStops[last][0].
+    const minStop = colorStops.current[0][0]
+    const maxStop = colorStops.current[colorStops.current.length - 1][0]
+    const p25 = minStop + (maxStop - minStop) * 0.25
+    // Case: if count < p25, use reduced opacity (0.3); otherwise normal (hexOpacity)
+    return ['case', ['<', ['get', 'count'], p25], 0.3, hexOpacity]
+  }
+
+  const coverageHexOpacityExpression = () => {
+    if (!coverageColorStops.current || coverageColorStops.current.length === 0) {
+      return coverageHexOpacity
+    }
+    const minStop = coverageColorStops.current[0][0]
+    const maxStop = coverageColorStops.current[coverageColorStops.current.length - 1][0]
+    const p25 = minStop + (maxStop - minStop) * 0.25
+    return ['case', ['<', ['get', 'count'], p25], 0.3, coverageHexOpacity]
+  }
+
   function setColorStops() {
     // The map now mounts before the legend request resolves (first paint is
     // no longer gated on it), so rangeLevels can be undefined on early calls.
@@ -973,6 +999,12 @@ export default function CreateMap({
           'fill-color',
           dimmable(hexFillColor())
         )
+        // Update opacity based on the new color domain (p25 threshold)
+        map.current.setPaintProperty(
+          'hexes',
+          'fill-opacity',
+          hexOpacityExpression()
+        )
       }
     }
 
@@ -999,6 +1031,12 @@ export default function CreateMap({
         'coverage-hexes',
         'fill-outline-color',
         coverageHexOutlineColor()
+      )
+      // Update opacity based on the new color domain (p25 threshold)
+      map.current.setPaintProperty(
+        'coverage-hexes',
+        'fill-opacity',
+        coverageHexOpacityExpression()
       )
     }
   }
@@ -1996,8 +2034,9 @@ export default function CreateMap({
           source: 'cde-cells',
           'source-layer': 'coverage-hexes-layer',
           paint: {
-            // Zero until the ramp is final — see revealHexes.
-            'fill-opacity': hexesRevealed.current ? coverageHexOpacity : 0,
+            // Zero until the ramp is final — see revealHexes. Then data-driven:
+            // hexes in the bottom quartile get 0.3 opacity, others get normal.
+            'fill-opacity': hexesRevealed.current ? coverageHexOpacityExpression() : 0,
             'fill-color': dimmable(coverageHexFillColor()),
             'fill-outline-color': coverageHexOutlineColor()
           }
@@ -2040,8 +2079,9 @@ export default function CreateMap({
         'source-layer': 'internal-layer-name',
 
         paint: {
-          // Zero until the ramp is final — see revealHexes.
-          'fill-opacity': hexesRevealed.current ? hexOpacity : 0,
+          // Zero until the ramp is final — see revealHexes. Then data-driven:
+          // hexes in the bottom quartile get 0.3 opacity, others get normal.
+          'fill-opacity': hexesRevealed.current ? hexOpacityExpression() : 0,
           // A real interpolate expression rather than the legacy
           // { property, stops } paint function, because that form cannot be
           // nested inside the 'case' dimmable wraps it in — the same reason
