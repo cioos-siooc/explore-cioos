@@ -310,6 +310,21 @@ class OBISHarvester(BaseHarvester):
             if col not in df.columns:
                 df[col] = None
 
+        # Distinct UTC days with data, the same unit cde.trajectory_hexes.days
+        # carries. date_start, not the date_start..date_end range: OBIS bounds
+        # a coarse eventDate ("1997") as a whole year, and expanding that would
+        # rebuild the span defect this replaces (docs/trajectory-coverage.md).
+        #
+        # Reuses the conversion above when it already ran -- re-parsing an
+        # already-datetime column costs an extra 8 bytes/row at peak (measured),
+        # which is real on the multi-million-occurrence datasets discovery now
+        # turns up. Only the never-had-the-column case pays for a parse, and
+        # there the values are all None anyway.
+        day_source = df["date_start"]
+        if not pd.api.types.is_datetime64_any_dtype(day_source):
+            day_source = pd.to_datetime(day_source, errors="coerce", utc=True)
+        df["day"] = day_source.dt.floor("D")
+
         # Snap coordinates to a ~5 nautical mile grid (1/12 degree)
         # Round to 8 decimal places to avoid floating-point artifacts from the
         # multiply-back step (e.g. 550 * (1/12) can differ in the last bit
@@ -333,6 +348,8 @@ class OBISHarvester(BaseHarvester):
             time_min=("date_start", "min"),
             time_max=("date_end", "max"),
             n_records=("decimalLatitude", "count"),
+            # nunique skips NaT, so undated occurrences contribute no days.
+            days=("day", "nunique"),
             scientific_names=("scientificName", lambda x: sorted(x.dropna().unique().tolist())),
         ).reset_index(drop=True)
 

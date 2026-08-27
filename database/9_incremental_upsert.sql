@@ -203,13 +203,14 @@ BEGIN
   -- Insert new obis_cells from temp table. aphia_ids is pre-resolved by the
   -- db-loader from cde.scientific_name_vernaculars at COPY time; carried
   -- through here so the post-load backfill UPDATE sees fewer empty rows.
-  INSERT INTO cde.obis_cells (dataset_id, latitude, longitude, scientific_names, aphia_ids, n_records, time_min, time_max, depth_min, depth_max)
-  SELECT dataset_id, latitude, longitude, scientific_names, aphia_ids, n_records, time_min, time_max, depth_min, depth_max
+  INSERT INTO cde.obis_cells (dataset_id, latitude, longitude, scientific_names, aphia_ids, n_records, days, time_min, time_max, depth_min, depth_max)
+  SELECT dataset_id, latitude, longitude, scientific_names, aphia_ids, n_records, days, time_min, time_max, depth_min, depth_max
   FROM temp_obis_cells
   ON CONFLICT (dataset_id, latitude, longitude) DO UPDATE SET
     scientific_names = EXCLUDED.scientific_names,
     aphia_ids = EXCLUDED.aphia_ids,
     n_records = EXCLUDED.n_records,
+    days = EXCLUDED.days,
     time_min = EXCLUDED.time_min,
     time_max = EXCLUDED.time_max,
     depth_min = EXCLUDED.depth_min,

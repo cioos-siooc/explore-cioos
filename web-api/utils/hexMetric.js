@@ -20,8 +20,19 @@
  * choice: one comparable "amount of data" ramp beats three incomparable ones.
  * The coverage-hex tooltip keeps the per-source breakdown.
  *
- * `days` is the unit-safe alternative — one meaning across all three sources —
- * at the cost of ranking a daily-sampled and an hourly-sampled mooring equally.
+ * `days` is the unit-safe alternative — at the cost of ranking a daily-sampled
+ * and an hourly-sampled mooring equally. It is what the map actually draws
+ * (frontend config.js HEX_METRIC), and it means "days that have data, summed
+ * across the stations in the hex": two stations reporting on the same day is
+ * two days.
+ *
+ * Two of the three sources honour that. `profiles.days` does NOT — it is an
+ * elapsed span, `time_max - time_min + 1` set in database/5_profile_process.sql,
+ * so it counts every empty day between a dataset's first and last observation.
+ * glisa_general_seasonal_erie reports 39,357 days (1917→2025) for a seasonal
+ * dataset holding roughly 430 days of real data. TimeSeries rows are ~80% of
+ * all profile-days, so the inflation is not a fringe case. Fixing it needs a
+ * per-station day count in the harvester — see TODO.md.
  *
  * `datasets` counts distinct datasets instead of summing anything. It answers
  * "how many different things were measured here" rather than "how much", and
@@ -63,8 +74,12 @@ const EXPRESSIONS = {
   },
   obis_cells: {
     records: "coalesce(n_records, 0)",
-    // obis_cells has no days column; the cell's time span is the equivalent.
-    days: "date_part('days', time_max - time_min) + 1",
+    // Distinct UTC days with data in this cell, counted by the harvester from
+    // each occurrence's date — the same unit trajectory_hexes.days carries.
+    // Was the cell's time span, which counted every empty day between the
+    // first and last occurrence: spans averaged 2171 days and reached 65454,
+    // so OBIS outweighed profiles in 87% of the hexes holding both.
+    days: "coalesce(days, 0)",
     datasets: "0",
   },
 };

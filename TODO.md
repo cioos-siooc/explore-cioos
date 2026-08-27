@@ -43,6 +43,20 @@
 - [x] Drop log message "i18next is made possible by our own product, Locize".
 
 ### Database & harvesting (see docs for reference)
+- [ ] `profiles.days` is an elapsed span, not a count of days with data
+      (`database/5_profile_process.sql`), so it inflates intermittent datasets on
+      the map's `days` ramp — the same defect the trajectory work removed in
+      2026-08 (`docs/trajectory-coverage.md`) and that OBIS no longer has.
+    - `glisa_general_seasonal_erie` reports 39,357 days (1917-12-01 → 2025-09-01)
+      for a seasonal dataset with `records_per_day` 0.03 — roughly 430 days of
+      real data, a ~90x overstatement.
+    - Not a fringe case: TimeSeries rows are ~80% of all profile-days
+      (sum 5,745,051, max 39,357) vs Profile at 150,779.
+    - Fix needs a per-station day count harvested from ERDDAP — the same
+      `orderByCount("time/86400")` that
+      `trajectory_features.extract_day_stats` already issues — because a span is
+      all the profile rows currently carry. Then `profiles.days` becomes a
+      stored count and `5_profile_process.sql` stops synthesising it.
 - [ ] Add a post-deploy check that `populate_vernaculars` actually finished — a partial run fails silently.
     - Symptom: Family-and-above scientific-name filters quietly under-match while Species-level looks perfect (only the higher ranks need the AphiaID rolldown; species also match on the literal name).
     - Not visible in the typeahead: the rows exist with rank and vernacular, it's `ancestor_aphia_ids` that's incomplete — so it reads as missing OBIS data rather than an unfinished backfill.
