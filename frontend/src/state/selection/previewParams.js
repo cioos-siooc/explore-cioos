@@ -20,23 +20,32 @@ export const RECORD_PARAM = 'record'
 //                                  (default: the dataset's first EOV column)
 //   paxis    the axis every panel shares
 //                                  (default: depth / time / track, per type)
-//   pcolor   optional colour-by     (default: none)
 //   pmode    markers | lines | markers+lines
-//   pscale   colorscale name
+//   pcolors  per-variable colours, `column~rrggbb` comma-separated
+//                                  (default: the variable's own ERDDAP palette)
 export const PLOT_PARAMS = [
   'vis',
   'pvars',
   'paxis',
-  'pcolor',
   'pmode',
-  'pscale'
+  'pcolors'
 ]
 
-// Written by the pre-faceting plot and never again. They stay in the cleanup
-// list so a link made before faceting does not leave orphans in the address bar
-// after the modal closes, but nothing reads them back: two axis roles plus one
-// overlaid "second variable" has no meaning once every variable gets a panel.
-const RETIRED_PLOT_PARAMS = ['px', 'py', 'p2', 'pscale2']
+// Written by an earlier version of the plot and never again. They stay in the
+// cleanup list so a link made before them does not leave orphans in the address
+// bar after the modal closes, but nothing reads them back.
+//
+//   px, py, p2, pscale2   two axis roles plus one overlaid "second variable",
+//                         which has no meaning once every variable gets a panel
+//   pcolor, pscale        the colour DIMENSION: one variable whose values shaded
+//                         every panel through one colourscale. Replaced by
+//                         `pcolors`, which gives each variable its own colour —
+//                         note the singular/plural, they are different things,
+//                         and `pcolor` is retired rather than reused so a link
+//                         made yesterday cannot be misread as the new one.
+const RETIRED_PLOT_PARAMS = [
+  'px', 'py', 'p2', 'pscale2', 'pcolor', 'pscale'
+]
 
 export const PREVIEW_PARAMS = [
   RECORD_PARAM,

@@ -25,10 +25,17 @@
 // labels that Plotly already draws horizontally (a profile's panel titles on
 // top, a stack's shared axis at the bottom) stay axis titles, because axis
 // titles get `automargin` and annotations do not.
+//
+// WHY THERE IS A FIGURE TITLE AGAIN
+// The modal header reads "<dataset title>: <record id>", so the figure went
+// without one. But the header is not part of the figure — a downloaded PNG
+// carries the title and nothing else — and for a TimeSeriesProfile the record id
+// is the STATION while the thing drawn is one PROFILE, which nothing on screen
+// named. The title says what the cf_role columns say: see recordTitleFor.
 
 import { COLUMNS } from './previewFacetPlan.js'
-import { labelFor } from './previewVariables.js'
-import { colorscaleFor } from './erddapPalettes.js'
+import { labelFor, shortLabelFor } from './previewVariables.js'
+import { defaultColorFor } from './previewColors.js'
 
 // Left of every vertical axis: room for its tick labels, then room for the
 // axis's own label, which is written horizontally and so needs width where a
@@ -38,15 +45,37 @@ import { colorscaleFor } from './erddapPalettes.js'
 const TICK_ROOM_PX = 52
 export const LABEL_GUTTER_PX = 104
 
-// Room for the shared axis, its labels, and the modebar. Orientation-dependent
-// because the two layouts spend their other edges differently: a profile puts
-// its panel titles on TOP and nothing at the bottom, a stack puts its shared
-// axis at the BOTTOM.
+// Room for the shared axis, its labels, and the modebar — before the figure
+// title, which marginFor() adds on top. Orientation-dependent because the two
+// layouts spend their other edges differently: a profile puts its panel titles
+// on TOP and nothing at the bottom, a stack puts its shared axis at the BOTTOM.
 const COLUMNS_MARGIN = { l: TICK_ROOM_PX + LABEL_GUTTER_PX, r: 26, t: 54, b: 22 }
 const ROWS_MARGIN = { l: TICK_ROOM_PX + LABEL_GUTTER_PX, r: 26, t: 30, b: 62 }
 
-export function marginFor (orientation) {
-  return orientation === COLUMNS ? COLUMNS_MARGIN : ROWS_MARGIN
+// The title is bigger than a label (12) because it is a title, and its room is
+// reserved by hand for the same reason the annotations' is: see marginFor.
+export const TITLE_FONT_PX = 14
+// 14px at Plotly's LINE_SPACING of 1.3 is 18.2; 19 buys a pixel of clearance
+// rather than spending one.
+const TITLE_LINE_PX = 19
+const TITLE_PAD_PX = 10
+export const MAX_TITLE_LINES = 2
+
+// Top margin a title of `lineCount` lines needs, or nothing at all when there
+// is no title — a record whose columns carry no cf_role value must not pay for
+// one.
+export function titleRoomFor (lineCount) {
+  return lineCount > 0 ? TITLE_PAD_PX + lineCount * TITLE_LINE_PX : 0
+}
+
+/**
+ * The margins the layout uses. `titleLines` defaults to the worst case, so the
+ * sizing floors below reserve room for a title they cannot measure; buildFigure
+ * passes the count it actually wrapped to.
+ */
+export function marginFor (orientation, titleLines = MAX_TITLE_LINES) {
+  const base = orientation === COLUMNS ? COLUMNS_MARGIN : ROWS_MARGIN
+  return { ...base, t: base.t + titleRoomFor(titleLines) }
 }
 
 // Gap between panels, as a fraction of ONE PANEL rather than of the whole
@@ -65,8 +94,6 @@ const ROW_GAP = 0.12
 // Below this a panel is not worth drawing; the container scrolls instead.
 export const MIN_PANEL_PX = 150
 export const MIN_PLOT_PX = 320
-// Extra width reserved for the colourbar and its title when colouring is on.
-const COLORBAR_GUTTER = 108
 
 // Every label is drawn at this size explicitly, rather than at Plotly's default
 // for an axis title — which is bigFont(layout.font.size) = round(1.2 * 12) = 14.
@@ -142,6 +169,19 @@ export function wrapLabel (text, maxChars, maxLines = MAX_LABEL_LINES) {
   return [...lines, ...(unit ? [unit] : [])].join('<br>')
 }
 
+// The title wraps against the whole figure width, not a panel: it is centred on
+// the figure, not on anything inside it.
+export function wrapTitleFor (title, widthPx) {
+  return wrapLabel(title, maxCharsFor(widthPx, TITLE_FONT_PX), MAX_TITLE_LINES)
+}
+
+// How many lines that wrap produced — what titleRoomFor() needs, and what the
+// component needs before it can pick a height.
+export function titleLinesFor (title, widthPx) {
+  const wrapped = wrapTitleFor(title, widthPx)
+  return wrapped ? wrapped.split('<br>').length : 0
+}
+
 // The plotting area a panel count needs, in panels: n panels plus the gaps
 // between them, each gap being `gapRatio` of a panel. Both the domains below and
 // the minimum-size floors are derived from it, so they cannot drift apart —
@@ -175,10 +215,15 @@ export function domainsFor (n, gapRatio) {
 // sit side by side and share one depth axis; growing for stacked panels, which
 // is the case where "as many variables as the dataset has" and "no overflow"
 // genuinely conflict.
-export function plotHeightFor (orientation, panelCount, availableHeight) {
+export function plotHeightFor (
+  orientation,
+  panelCount,
+  availableHeight,
+  titleLines = MAX_TITLE_LINES
+) {
   const available = Math.max(availableHeight || 0, MIN_PLOT_PX)
   if (orientation === COLUMNS) return available
-  const margin = marginFor(orientation)
+  const margin = marginFor(orientation, titleLines)
   const needed =
     MIN_PANEL_PX * panelPitch(panelCount, ROW_GAP) + margin.t + margin.b
   // Whole pixels: a fractional height is a fractional scroll position.
@@ -188,29 +233,18 @@ export function plotHeightFor (orientation, panelCount, availableHeight) {
 // Profiles get narrow fast: six panels in a 1140 px modal is ~170 px each, which
 // still reads, but the floor is what keeps a 14-column selection legible at the
 // cost of a horizontal scroll.
-export function plotWidthFor (orientation, panelCount, availableWidth, hasColorbar) {
-  const gutter = hasColorbar ? COLORBAR_GUTTER : 0
+export function plotWidthFor (orientation, panelCount, availableWidth) {
   const available = Math.max(availableWidth || 0, MIN_PLOT_PX)
   if (orientation !== COLUMNS) return available
   const margin = marginFor(orientation)
   const needed =
-    MIN_PANEL_PX * panelPitch(panelCount, COLUMN_GAP) +
-    margin.l + margin.r + gutter
+    MIN_PANEL_PX * panelPitch(panelCount, COLUMN_GAP) + margin.l + margin.r
   return Math.ceil(Math.max(available, needed))
 }
 
 const axisKey = (letter, index) =>
   index === 0 ? `${letter}axis` : `${letter}axis${index + 1}`
 const axisRef = (letter, index) => (index === 0 ? letter : `${letter}${index + 1}`)
-
-const finiteValues = (data, columnName) => {
-  const values = []
-  ;(data || []).forEach((row) => {
-    const value = Number(row[columnName])
-    if (Number.isFinite(value)) values.push(value)
-  })
-  return values
-}
 
 // A vertical axis's own label, in the place Plotly would have put its title —
 // beside the axis, centred on the span it labels — but written horizontally
@@ -239,15 +273,55 @@ const axisLabel = (text, y) => ({
 const wrapAxisLabel = (text) =>
   wrapLabel(text, maxCharsFor(LABEL_GUTTER_PX), 4)
 
-// Panel trace colours. The image draws each variable in its own solid colour;
-// these are that palette, extended so a 14-column selection stays distinguishable.
-const PANEL_COLORS = [
-  '#2ca02c', '#1f77b4', '#d62728', '#ff7f0e', '#9467bd', '#8c564b',
-  '#17becf', '#e377c2', '#bcbd22', '#7f7f7f', '#393b79', '#637939'
-]
+// Between two id entries in the title, and between several values of one id.
+const TITLE_JOIN = ' — '
+const VALUE_JOIN = ', '
+// A record window can legitimately span more than one profile; naming all of
+// them would be a paragraph, so three and a count.
+const MAX_TITLE_VALUES = 3
 
-export function panelColorFor (index) {
-  return PANEL_COLORS[index % PANEL_COLORS.length]
+// Every value the column actually takes over these rows, first seen first,
+// blanks and ERDDAP's own empty spellings dropped.
+function distinctValues (data, columnName) {
+  const seen = []
+  const known = new Set()
+  ;(data || []).forEach((row) => {
+    const value = row && row[columnName]
+    if (value === null || value === undefined) return
+    const text = String(value).trim()
+    if (!text || text === 'NaN' || known.has(text)) return
+    known.add(text)
+    seen.push(text)
+  })
+  return seen
+}
+
+/**
+ * What names the record on screen: one entry per cf_role column, in ERDDAP's
+ * order, as "<its label>: <its value>".
+ *
+ * On the Viking record that reads "Station Id: PMZA-RIKI — Profile:
+ * PMZA-RIKI-25/09/16-17:35:26" — and the second half is the point, because the
+ * station is what the user clicked and the profile is what is drawn. A column
+ * present but empty is skipped rather than printed as a bare "Profile: ".
+ *
+ * shortLabelFor, not the figure's own titleFor: an id takes no unit and has no
+ * rename field, so there is nothing for either to add.
+ */
+export function recordTitleFor ({ plan, variablesByName, data }) {
+  const columns = (plan && plan.titleColumns) || []
+  return columns
+    .map((columnName) => {
+      const values = distinctValues(data, columnName)
+      if (!values.length) return null
+      const shown = values.slice(0, MAX_TITLE_VALUES).join(VALUE_JOIN)
+      const rest = values.length - MAX_TITLE_VALUES
+      const variable = variablesByName && variablesByName.get(columnName)
+      const label = shortLabelFor(variable) || columnName
+      return `${label}: ${shown}${rest > 0 ? ` +${rest}` : ''}`
+    })
+    .filter(Boolean)
+    .join(TITLE_JOIN)
 }
 
 /**
@@ -256,9 +330,9 @@ export function panelColorFor (index) {
  * @param panels        resolved column names, one panel each
  * @param sharedAxis    column name shared by every panel
  * @param data          array of row objects
- * @param colorBy       column name or null
- * @param colorscale    named Plotly colorscale for the colour dimension
+ * @param colors        { [columnName]: '#rrggbb' } — the user's overrides only
  * @param labels        { [columnName]: customLabel }
+ * @param title         plain text, from recordTitleFor(); wrapped here
  * @param mode          'markers' | 'lines' | 'markers+lines'
  * @param size          { width, height }
  * @param uirevision    changes whenever the axis set changes
@@ -269,9 +343,9 @@ export function buildFigure ({
   panels,
   sharedAxis,
   data,
-  colorBy,
-  colorscale,
+  colors = {},
   labels = {},
+  title = '',
   mode = 'markers',
   size = {},
   uirevision
@@ -287,42 +361,22 @@ export function buildFigure ({
   const gap = isColumns ? COLUMN_GAP : ROW_GAP
   const domains = domainsFor(panels.length, gap)
 
-  // The colour dimension spans every panel, so one colourbar and one shared
-  // range. colorBarMinimum/Maximum from the harvest beat the data range; never
-  // actual_range, which carries fill sentinels (TE90_01 declares a max of
-  // 191277.0 degrees C on mpoPmzaVikingCtdInsitu).
-  const colorVariable = colorBy ? variablesByName.get(colorBy) : null
-  let colorValues
-  let cmin
-  let cmax
-  if (colorVariable && data) {
-    colorValues = data.map((row) => Number(row[colorVariable.columnName]))
-    const finite = finiteValues(data, colorVariable.columnName)
-    cmin = Number.isFinite(colorVariable.cmin)
-      ? colorVariable.cmin
-      : (finite.length ? Math.min(...finite) : undefined)
-    cmax = Number.isFinite(colorVariable.cmax)
-      ? colorVariable.cmax
-      : (finite.length ? Math.max(...finite) : undefined)
-  }
-  const colorActive = Boolean(colorVariable && data)
-  // A colour value only shows on markers, so force them on.
-  const effectiveMode =
-    colorActive && !mode.includes('markers') ? 'markers+lines' : mode
-
-  const margin = marginFor(plan.orientation)
-  const gutter = colorActive ? COLORBAR_GUTTER : 0
+  // Only the lines the title actually needs are paid for, which is why the wrap
+  // happens before the margin is chosen.
+  const wrappedTitle = wrapTitleFor(title, size.width)
+  const titleLines = wrappedTitle ? wrappedTitle.split('<br>').length : 0
+  const margin = marginFor(plan.orientation, titleLines)
   // The width labels actually have to fit in. 0 until the plot area has been
   // measured, and maxCharsFor turns that into "leave the label alone".
   const plottingWidth = size.width
-    ? Math.max(size.width - margin.l - margin.r - gutter, 0)
+    ? Math.max(size.width - margin.l - margin.r, 0)
     : 0
   const wrapAt = (text, widthPx) => wrapLabel(text, maxCharsFor(widthPx))
 
   const annotations = []
   const layout = {
     uirevision,
-    margin: { ...margin, r: margin.r + gutter },
+    margin,
     // Stated rather than inherited, because maxCharsFor's estimate assumes it.
     font: { size: LABEL_FONT_PX },
     showlegend: false, // each panel is titled; a legend would repeat it
@@ -331,6 +385,29 @@ export function buildFigure ({
     modebar: { orientation: 'v' },
     ...(size.width ? { width: size.width } : {}),
     ...(size.height ? { height: size.height } : {})
+  }
+
+  if (titleLines) {
+    // Pinned inside the top margin: yref 'container' with y 1 and yanchor 'top'
+    // puts the first line's cap top exactly pad.t below the top of the image, so
+    // a profile's panel titles still have the rest of the margin to themselves.
+    //
+    // title.automargin is deliberately NOT set. It exists in this bundle and it
+    // only ever grows a margin — but it grows it inside a height that is fixed
+    // here, so a push nobody predicted would silently shrink every panel below
+    // the MIN_PANEL_PX the floor promised. Reserved by hand instead, the same
+    // way the annotations are.
+    layout.title = {
+      text: wrappedTitle,
+      font: { size: TITLE_FONT_PX },
+      xref: 'container',
+      x: 0.5,
+      xanchor: 'center',
+      yref: 'container',
+      y: 1,
+      yanchor: 'top',
+      pad: { t: TITLE_PAD_PX }
+    }
   }
 
   const sharedTitle = titleFor(sharedAxis)
@@ -399,10 +476,16 @@ export function buildFigure ({
 
     const sharedValues = (data || []).map((row) => row[sharedAxis])
     const panelValues = (data || []).map((row) => row[columnName])
+    // The user's pick, else what the dataset's own colorBarPalette implies, else
+    // the next colour along. Colour says WHICH variable this panel draws; it
+    // used to say what one shared variable's values were, which is why there was
+    // a colourbar here and is not one now.
+    const color =
+      colors[columnName] || defaultColorFor(variablesByName.get(columnName), index)
 
     return {
       type: 'scatter',
-      mode: effectiveMode,
+      mode,
       // Plain, never the wrapped text: a <br> in a hover box breaks the line
       // where the panel needed it, not where the sentence does.
       name: panelTitle,
@@ -413,36 +496,9 @@ export function buildFigure ({
       hovertemplate:
         (isColumns
           ? `${panelTitle}: %{x}<br>${sharedTitle}: %{y}`
-          : `${sharedTitle}: %{x}<br>${panelTitle}: %{y}`) +
-        (colorActive ? `<br>${titleFor(colorBy)}: %{customdata}` : '') +
-        '<extra></extra>',
-      ...(colorActive
-        ? {
-          marker: {
-            color: colorValues,
-            colorscale: colorscaleFor(colorVariable, colorscale),
-            cmin,
-            cmax,
-            // One bar for the whole figure: the range is shared, so N bars
-            // would be N copies of the same scale.
-            showscale: index === 0,
-            ...(index === 0
-              ? {
-                colorbar: {
-                  title: { text: titleFor(colorBy), side: 'right' },
-                  thickness: 14,
-                  len: 0.9,
-                  x: 1.02,
-                  xanchor: 'left',
-                  y: 0.5,
-                  yanchor: 'middle'
-                }
-              }
-              : {})
-          },
-          customdata: colorValues
-        }
-        : { marker: { color: panelColorFor(index) }, line: { color: panelColorFor(index) } })
+          : `${sharedTitle}: %{x}<br>${panelTitle}: %{y}`) + '<extra></extra>',
+      marker: { color },
+      line: { color }
     }
   })
 

@@ -48,12 +48,10 @@ export default function DatasetPreview ({
     panels,
     setPanels,
     togglePanel,
-    colorBy,
-    setColorBy,
+    variableColors,
+    setVariableColor,
     plotType,
     setPlotType,
-    colorscale,
-    setColorscale,
     uirevision,
     linkKey
   } = usePreviewPlotParams(inspectDataset, datasetPreview?.table, data)
@@ -201,12 +199,10 @@ export default function DatasetPreview ({
                             panels={panels}
                             togglePanel={togglePanel}
                             setPanels={setPanels}
-                            colorBy={colorBy}
-                            setColorBy={setColorBy}
+                            variableColors={variableColors}
+                            setVariableColor={setVariableColor}
                             plotType={plotType}
                             setPlotType={setPlotType}
-                            colorscale={colorscale}
-                            setColorscale={setColorscale}
                             customLabels={customLabels}
                             setCustomLabels={setCustomLabels}
                             uirevision={uirevision}

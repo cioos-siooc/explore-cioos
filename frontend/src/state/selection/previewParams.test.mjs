@@ -10,19 +10,26 @@ import {
 
 test('the preview owns the record param and the plot params', () => {
   assert.equal(RECORD_PARAM, 'record')
-  assert.deepEqual(PLOT_PARAMS, ['vis', 'pvars', 'paxis', 'pcolor', 'pmode', 'pscale'])
+  assert.deepEqual(PLOT_PARAMS, ['vis', 'pvars', 'paxis', 'pmode', 'pcolors'])
   for (const param of [RECORD_PARAM, ...PLOT_PARAMS]) {
     assert.ok(PREVIEW_PARAMS.includes(param), param)
   }
 })
 
-test('params retired with the two-axis plot are still cleaned up', () => {
-  // Written by the pre-faceting plot and never read again, but a link made then
-  // must not leave orphans in the address bar once the modal closes.
-  for (const param of ['px', 'py', 'p2', 'pscale2']) {
+test('retired params are still cleaned up, and never written again', () => {
+  // Written by earlier versions of the plot and never read again, but a link
+  // made then must not leave orphans in the address bar once the modal closes.
+  //
+  //   px/py/p2/pscale2  two axis roles plus an overlaid second variable
+  //   pcolor/pscale     the colour dimension, replaced by per-variable colours
+  for (const param of ['px', 'py', 'p2', 'pscale2', 'pcolor', 'pscale']) {
     assert.ok(PREVIEW_PARAMS.includes(param), param)
     assert.ok(!PLOT_PARAMS.includes(param), `${param} must not be written`)
   }
+  // pcolors is the live one, and one letter from a retired one: they are
+  // different things and must not be confused for each other.
+  assert.ok(PLOT_PARAMS.includes('pcolors'))
+  assert.ok(!PLOT_PARAMS.includes('pcolor'))
 })
 
 test('no preview param collides with one the map or the filters already use', () => {
@@ -46,7 +53,9 @@ test('no preview param collides with one the map or the filters already use', ()
 test('closing the preview strips all of its params and touches nothing else', () => {
   const params = new URLSearchParams(
     'lat=45&zoom=5&dataset=X&server=ogsl&record=R1&vis=table&paxis=depth' +
-    '&pvars=TE90_01,PSAL_01&pcolor=depth&pmode=lines&pscale=Jet' +
+    '&pvars=TE90_01,PSAL_01&pmode=lines&pcolors=TE90_01~a52c60' +
+    // The colour dimension's two params, from a link made before it was replaced.
+    '&pcolor=depth&pscale=Jet' +
     // A stale link from before faceting, carried into the same close.
     '&px=time&py=depth&p2=PSAL&pscale2=Reds&eovs=salinity'
   )

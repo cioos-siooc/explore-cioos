@@ -138,3 +138,15 @@ test('vis default comes from the type alone, never the payload', () => {
   assert.equal(defaultVisFor({ cdm_data_type: 'Other' }), 'table')
   assert.equal(defaultVisFor(undefined), 'table')
 })
+
+test('the plan names the cf_role columns, which is what titles the figure', () => {
+  assert.deepEqual(planFor('TimeSeriesProfile').titleColumns, ['station_id', 'profile'])
+  // Independent of the layout: a stack is titled the same way.
+  assert.deepEqual(planFor('TimeSeries').titleColumns, ['station_id', 'profile'])
+  // And independent of the harvest: without columnMeta the roles come from the
+  // dataset's own timeseries/profile/trajectory id fields.
+  assert.deepEqual(
+    planFor('TimeSeriesProfile', VIKING_NO_META).titleColumns,
+    ['station_id', 'profile']
+  )
+})

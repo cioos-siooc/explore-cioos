@@ -60,16 +60,22 @@ const numberOr = (value, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
-// Which of the dataset's columns are the CF-role id columns. shapeQuery.js has
-// been sending these three fields all along and nothing read them until now.
-function recordIdColumns (dataset) {
-  return new Set(
-    [
-      dataset && dataset.timeseries_id_variable,
-      dataset && dataset.profile_id_variable,
-      dataset && dataset.trajectory_id_variable
-    ].filter(Boolean)
-  )
+// The dataset's own answer for which columns carry a CF role, as
+// columnName -> role. shapeQuery.js has been sending these three fields all
+// along, and they are the ONLY source of cf_role for a catalogue harvested
+// before datasets.table_variables existed: without columnMeta there are no
+// per-variable attributes at all. Both the id classification below and the
+// plot's title read the roles from here.
+function recordIdRoles (dataset) {
+  const roles = new Map()
+  ;[
+    ['timeseries_id', dataset && dataset.timeseries_id_variable],
+    ['profile_id', dataset && dataset.profile_id_variable],
+    ['trajectory_id', dataset && dataset.trajectory_id_variable]
+  ].forEach(([role, columnName]) => {
+    if (columnName) roles.set(columnName, role)
+  })
+  return roles
 }
 
 // Every column named by some other variable's ancillary_variables. ERDDAP
@@ -84,9 +90,10 @@ function flaggedColumns (columnMeta) {
   return flags
 }
 
-function classify (variable, { idColumns, flagColumns }) {
+function classify (variable, { flagColumns }) {
   if (
-    idColumns.has(variable.columnName) ||
+    // Set from the harvest when it knows, from the dataset's own three id fields
+    // when it does not.
     variable.cfRole ||
     ID_CATEGORIES.has(variable.ioosCategory) ||
     ID_NAME.test(variable.columnName)
@@ -116,7 +123,7 @@ function classify (variable, { idColumns, flagColumns }) {
 export function variablesFrom (table, dataset) {
   if (!table || !table.columnNames) return []
   const { columnNames, columnTypes = [], columnUnits = [], columnMeta } = table
-  const idColumns = recordIdColumns(dataset)
+  const idRoles = recordIdRoles(dataset)
   const flagColumns = flaggedColumns(columnMeta)
 
   const variables = columnNames.map((columnName, index) => {
@@ -131,7 +138,11 @@ export function variablesFrom (table, dataset) {
       isNumeric: NUMERIC_TYPES.has(String(type)),
       longName: meta && trimmed(meta.long_name),
       standardName: meta && trimmed(meta.standard_name),
-      cfRole: meta && trimmed(meta.cf_role),
+      // The harvest first, the dataset's id fields second: columnMeta is what
+      // ERDDAP itself publishes for this variable, where the dataset fields are
+      // one level of inference away.
+      cfRole:
+        (meta && trimmed(meta.cf_role)) || idRoles.get(columnName) || null,
       axis: meta && trimmed(meta.axis),
       positive: meta && trimmed(meta.positive),
       ioosCategory: meta && trimmed(meta.ioos_category),
@@ -145,7 +156,7 @@ export function variablesFrom (table, dataset) {
 
   return variables.map((variable) => ({
     ...variable,
-    kind: classify(variable, { idColumns, flagColumns })
+    kind: classify(variable, { flagColumns })
   }))
 }
 
@@ -173,6 +184,14 @@ export function byColumnName (variables) {
 // What can go in a panel: numeric, and not an axis, an id or a QC flag.
 export function measurementsOf (variables) {
   return (variables || []).filter((variable) => variable.kind === 'measurement')
+}
+
+// The cf_role columns, in ERDDAP's order — what names the record being drawn.
+// A TimeSeriesProfile declares two (the station and the profile), and both are
+// worth saying: the station is what the user clicked, the profile is what is
+// actually on screen.
+export function idVariablesFor (variables) {
+  return (variables || []).filter((variable) => variable.cfRole)
 }
 
 // A depth axis has to be drawn downwards. `positive` is the only attribute that

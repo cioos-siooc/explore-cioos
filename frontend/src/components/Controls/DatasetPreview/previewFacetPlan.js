@@ -22,6 +22,7 @@
 // all before mounting the lazy chunk, and this is what answers.
 
 import {
+  idVariablesFor,
   isDownwardVertical,
   measurementsOf
 } from './previewVariables.js'
@@ -149,6 +150,13 @@ export function facetPlanFor (dataset, variables, data) {
     // A depth axis runs downwards; nothing else is reversed.
     sharedReversed: orientation === COLUMNS && isDownwardVertical(shared),
     sharedCandidates: sharedCandidatesFor(variables).map(
+      (variable) => variable.columnName
+    ),
+    // What names the record: the cf_role columns, which the figure turns into
+    // its title. Here rather than in the figure because this is the module that
+    // answers "what is drawn", and because it keeps the figure's inputs to a
+    // plan plus a payload.
+    titleColumns: idVariablesFor(variables).map(
       (variable) => variable.columnName
     ),
     panelDefaults

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import {
   variablesFrom,
+  idVariablesFor,
   labelFor,
   shortLabelFor,
   measurementsOf,
@@ -267,6 +268,50 @@ test('depth is downward by declaration, and by CF convention without it', () => 
   assert.equal(isDownwardVertical({ columnName: 'altitude', positive: 'up' }), false)
   assert.equal(isDownwardVertical({ columnName: 'time' }), false)
   assert.equal(isDownwardVertical(null), false)
+})
+
+test('a cf_role is read from the harvest, or inferred from the dataset', () => {
+  const index = byColumnName(variablesFrom(VIKING, VIKING_DATASET))
+  assert.equal(index.get('station_id').cfRole, 'timeseries_id')
+  assert.equal(index.get('profile').cfRole, 'profile_id')
+  assert.equal(index.get('TE90_01').cfRole, null)
+
+  // No columnMeta at all — the state of every dataset until a harvest with
+  // incremental: false runs — so the roles come from the three fields
+  // shapeQuery.js has been sending all along.
+  const noMeta = byColumnName(variablesFrom(VIKING_NO_META, VIKING_DATASET))
+  assert.equal(noMeta.get('station_id').cfRole, 'timeseries_id')
+  assert.equal(noMeta.get('profile').cfRole, 'profile_id')
+
+  // And with neither, nothing is invented.
+  const neither = byColumnName(variablesFrom(VIKING_NO_META, {}))
+  assert.equal(neither.get('station_id').cfRole, null)
+})
+
+test('the harvest wins where the two disagree', () => {
+  // The dataset fields are one inference away from what ERDDAP publishes per
+  // variable, so they only fill a gap.
+  const index = byColumnName(
+    variablesFrom(VIKING, { ...VIKING_DATASET, trajectory_id_variable: 'station_id' })
+  )
+  assert.equal(index.get('station_id').cfRole, 'timeseries_id')
+})
+
+test('the id columns come back in ERDDAP order — that is title order', () => {
+  const variables = variablesFrom(VIKING, VIKING_DATASET)
+  assert.deepEqual(
+    idVariablesFor(variables).map((variable) => variable.columnName),
+    ['station_id', 'profile']
+  )
+  // An id by name or by ioos_category is not a cf_role and does not name the
+  // record: mpoEaeTemperature's minilogID is an instrument serial.
+  const table = {
+    columnNames: ['minilogID', 'TE90'],
+    columnTypes: ['String', 'float'],
+    columnUnits: [null, 'degree_C']
+  }
+  assert.deepEqual(idVariablesFor(variablesFrom(table, {})), [])
+  assert.deepEqual(idVariablesFor(undefined), [])
 })
 
 export { VIKING, VIKING_NO_META, VIKING_DATASET }

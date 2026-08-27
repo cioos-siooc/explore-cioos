@@ -8,42 +8,75 @@ import {
   domainsFor,
   plotHeightFor,
   plotWidthFor,
-  panelColorFor,
   marginFor,
   maxCharsFor,
   LABEL_GUTTER_PX,
   panelPitch,
+  recordTitleFor,
+  titleLinesFor,
+  titleRoomFor,
+  wrapTitleFor,
+  MAX_TITLE_LINES,
+  TITLE_FONT_PX,
   wrapLabel,
   MIN_PANEL_PX,
   LABEL_FONT_PX
 } from './previewFacetFigure.js'
-import { VIKING, VIKING_DATASET } from './previewVariables.test.mjs'
+import { defaultColorFor } from './previewColors.js'
+import { paletteColorFor } from './erddapPalettes.js'
+import {
+  VIKING,
+  VIKING_NO_META,
+  VIKING_DATASET
+} from './previewVariables.test.mjs'
 
 const ALL_SIX = ['TE90_01', 'CNDC_01', 'PRES_01', 'PSAL_01', 'FLOR_01', 'DOXY_01']
 
+// The two cf_role columns carry values, because they are what the figure is
+// titled after — the station the user clicked, and the profile actually drawn.
 const DATA = Array.from({ length: 20 }, (_, i) => {
-  const row = { depth: i + 1, time: `2025-09-16T00:${String(i).padStart(2, '0')}:00Z` }
+  const row = {
+    station_id: 'PMZA-RIKI',
+    profile: 'PMZA-RIKI-25/09/16-17:35:26',
+    depth: i + 1,
+    time: `2025-09-16T00:${String(i).padStart(2, '0')}:00Z`
+  }
   ALL_SIX.forEach((name, n) => { row[name] = i * (n + 1) })
   return row
 })
 
-function figure (type, panels, extra = {}) {
+const TITLE = 'Station Id: PMZA-RIKI — Profile: PMZA-RIKI-25/09/16-17:35:26'
+
+// Same dataset with the publisher's palettes declared on two measurements, to
+// exercise the colour default that comes from ERDDAP rather than from an index.
+const VIKING_PALETTES = {
+  ...VIKING,
+  columnMeta: VIKING.columnMeta.map((meta) => {
+    if (meta.name === 'TE90_01') return { ...meta, colorBarPalette: 'KT_thermal' }
+    if (meta.name === 'PSAL_01') return { ...meta, colorBarPalette: 'KT_haline' }
+    return meta
+  })
+}
+
+function figureFrom (table, type, panels, extra = {}) {
   const dataset = { ...VIKING_DATASET, cdm_data_type: type }
-  const variables = variablesFrom(VIKING, dataset)
+  const variables = variablesFrom(table, dataset)
+  const variablesByName = byColumnName(variables)
   const plan = facetPlanFor(dataset, variables, DATA)
   return buildFigure({
     plan,
-    variablesByName: byColumnName(variables),
+    variablesByName,
     panels,
     sharedAxis: plan.sharedAxis,
     data: DATA,
-    colorBy: null,
-    colorscale: 'Viridis',
+    title: recordTitleFor({ plan, variablesByName, data: DATA }),
     mode: 'markers',
     uirevision: 'test',
     ...extra
   })
 }
+
+const figure = (type, panels, extra) => figureFrom(VIKING, type, panels, extra)
 
 // --- domain arithmetic -------------------------------------------------------
 
@@ -101,16 +134,10 @@ test('a collapsed container still gets a usable height', () => {
 })
 
 test('profile width grows past the container once panels hit their floor', () => {
-  assert.equal(plotWidthFor(COLUMNS, 2, 1000, false), 1000)
-  assert.ok(plotWidthFor(COLUMNS, 14, 1000, false) > 1000)
+  assert.equal(plotWidthFor(COLUMNS, 2, 1000), 1000)
+  assert.ok(plotWidthFor(COLUMNS, 14, 1000) > 1000)
   // Stacked panels never widen — they share one x axis.
-  assert.equal(plotWidthFor(ROWS, 14, 1000, false), 1000)
-})
-
-test('colouring reserves gutter width', () => {
-  assert.ok(
-    plotWidthFor(COLUMNS, 8, 400, true) > plotWidthFor(COLUMNS, 8, 400, false)
-  )
+  assert.equal(plotWidthFor(ROWS, 14, 1000), 1000)
 })
 
 // --- profile layout (COLUMNS) ------------------------------------------------
@@ -203,13 +230,6 @@ test('one variable is a single panel filling the area, not a special case', () =
   assert.equal(layout.yaxis.domain[0], 0)
 })
 
-test('panels get distinct colours', () => {
-  const { data } = figure('TimeSeriesProfile', ALL_SIX)
-  const colors = data.map((t) => t.marker.color)
-  assert.equal(new Set(colors).size, 6)
-  assert.equal(colors[0], panelColorFor(0))
-})
-
 test('the legend is off — each panel is already titled', () => {
   assert.equal(figure('TimeSeriesProfile', ALL_SIX).layout.showlegend, false)
 })
@@ -225,38 +245,6 @@ test('explicit width and height are passed through, replacing autosize', () => {
 test('uirevision is carried so a changed axis set does not restore a stale zoom', () => {
   assert.equal(figure('TimeSeriesProfile', ALL_SIX,
     { uirevision: 'rec|depth|a,b' }).layout.uirevision, 'rec|depth|a,b')
-})
-
-// --- colour dimension -------------------------------------------------------
-
-test('colouring draws exactly one colourbar across all panels', () => {
-  const { data } = figure('TimeSeriesProfile', ALL_SIX, { colorBy: 'PSAL_01' })
-  assert.deepEqual(data.map((t) => t.marker.showscale),
-    [true, false, false, false, false, false])
-  assert.equal(data.filter((t) => t.marker.colorbar).length, 1)
-})
-
-test('colour range prefers the declared colorBar bounds over the data', () => {
-  // TE90_01 declares -10..40 and an actual_range topping 191277 — the data
-  // range would be right here, but the declared bounds are what publishers mean.
-  const { data } = figure('TimeSeriesProfile', ['PSAL_01'], { colorBy: 'TE90_01' })
-  assert.equal(data[0].marker.cmin, -10)
-  assert.equal(data[0].marker.cmax, 40)
-})
-
-test('colour range falls back to the data when nothing is declared', () => {
-  const { data } = figure('TimeSeriesProfile', ['TE90_01'], { colorBy: 'CNDC_01' })
-  assert.equal(data[0].marker.cmin, 0)
-  assert.equal(data[0].marker.cmax, 19 * 2)
-})
-
-test('lines-only mode gains markers when colouring is on', () => {
-  // A colour value has nothing to render on without a marker.
-  const { data } = figure('TimeSeriesProfile', ['TE90_01'],
-    { colorBy: 'PSAL_01', mode: 'lines' })
-  assert.equal(data[0].mode, 'markers+lines')
-  const plain = figure('TimeSeriesProfile', ['TE90_01'], { mode: 'lines' })
-  assert.equal(plain.data[0].mode, 'lines')
 })
 
 test('a custom label replaces the name but keeps the unit', () => {
@@ -275,7 +263,6 @@ test('no rows yet still produces the full axis skeleton', () => {
     panels: ['TE90_01', 'PSAL_01'],
     sharedAxis: 'depth',
     data: undefined,
-    colorscale: 'Viridis',
     uirevision: 'x'
   })
   assert.equal(data.length, 2)
@@ -434,26 +421,32 @@ test('hover text keeps the unwrapped label', () => {
   assert.ok(data[0].name.includes('Temperature (1990 scale)'))
   assert.ok(!data[0].name.includes('<br>'))
   assert.ok(data[0].hovertemplate.startsWith('Temperature (1990 scale) ( degree_C ):'))
+  // The colour dimension used to add a third line here, off customdata.
+  assert.ok(!data[0].hovertemplate.includes('customdata'))
 })
 
 // --- margins -----------------------------------------------------------------
 
 test('each orientation reserves the edge its labels actually use', () => {
-  const columns = marginFor(COLUMNS)
-  const rows = marginFor(ROWS)
-  // A profile's panel titles are on top and its one horizontal label is at the
-  // bottom; a stack is the other way round.
+  // Without the title, which sits at the top of both.
+  const columns = marginFor(COLUMNS, 0)
+  const rows = marginFor(ROWS, 0)
+  // A profile's panel titles are on top and nothing is drawn at its bottom; a
+  // stack is the other way round.
   assert.ok(columns.t > columns.b)
   assert.ok(rows.b > rows.t)
   // Neither reserves width for a rotated title any more.
   assert.equal(columns.l, rows.l)
+  // And the title is added to the top of each, never taken out of it.
+  assert.equal(marginFor(COLUMNS, 2).t - columns.t, titleRoomFor(2))
+  assert.equal(marginFor(ROWS, 2).t - rows.t, titleRoomFor(2))
 })
 
 test('the sizing floors pay for the gaps, so a panel really gets its minimum', () => {
   // The floors used to be n * MIN_PANEL_PX, which ignored the gaps between the
   // panels — so six panels were promised 150px each and drawn at 109px.
   for (const n of [2, 6, 14, 19]) {
-    const width = plotWidthFor(COLUMNS, n, 100, false)
+    const width = plotWidthFor(COLUMNS, n, 100)
     const columns = marginFor(COLUMNS)
     const plotting = width - columns.l - columns.r
     const [start, end] = domainsFor(n, 0.22)[0]
@@ -484,4 +477,143 @@ test('the gap is a share of a panel, not of the whole plot', () => {
   assert.equal(panelPitch(19, 0.22), 19 + 18 * 0.22)
   assert.equal(panelPitch(1, 0.22), 1)
   assert.equal(panelPitch(0, 0.22), 0)
+})
+
+// --- one colour per variable -------------------------------------------------
+
+test('a variable with no declared palette takes the next colour along', () => {
+  const { data } = figure('TimeSeriesProfile', ALL_SIX)
+  const colors = data.map((t) => t.marker.color)
+  assert.equal(new Set(colors).size, 6)
+  colors.forEach((color, index) => {
+    assert.equal(color, defaultColorFor(undefined, index))
+    // Markers and line agree: a mode of markers+lines must not draw two colours.
+    assert.equal(data[index].line.color, color)
+  })
+})
+
+test("a declared colorBarPalette decides the variable's colour", () => {
+  // The publisher's own intent, harvested into table_variables: the plot opens
+  // reading roughly the way an ERDDAP graph of the same dataset does.
+  const { data } = figureFrom(VIKING_PALETTES, 'TimeSeriesProfile',
+    ['TE90_01', 'PSAL_01', 'DOXY_01'])
+  assert.equal(data[0].marker.color, paletteColorFor('KT_thermal'))
+  assert.equal(data[1].marker.color, paletteColorFor('KT_haline'))
+  // DOXY_01 declares nothing, so it keeps its place in the fallback list.
+  assert.equal(data[2].marker.color, defaultColorFor(undefined, 2))
+})
+
+test("the user's colour beats both, on the line as well as the markers", () => {
+  const { data } = figure('TimeSeriesProfile', ['TE90_01', 'PSAL_01'],
+    { colors: { PSAL_01: '#123456' } })
+  assert.equal(data[1].marker.color, '#123456')
+  assert.equal(data[1].line.color, '#123456')
+  // And only that one: an override is not a theme.
+  assert.equal(data[0].marker.color, defaultColorFor(undefined, 0))
+})
+
+test('nothing draws a colourbar any anymore, and no width is kept for one', () => {
+  const { data } = figure('TimeSeriesProfile', ALL_SIX)
+  data.forEach((trace) => {
+    assert.ok(!trace.marker.colorbar)
+    assert.ok(!('showscale' in trace.marker))
+    assert.ok(!trace.customdata)
+  })
+  assert.equal(plotWidthFor(COLUMNS, 8, 2000), 2000)
+})
+
+test('lines-only stays lines — nothing forces markers on any more', () => {
+  // Markers used to be forced whenever colouring was on, because a per-point
+  // colour has nothing to render on without one.
+  const { data } = figure('TimeSeriesProfile', ['TE90_01'], { mode: 'lines' })
+  assert.equal(data[0].mode, 'lines')
+})
+
+// --- the title names the record ----------------------------------------------
+
+test('the title names every cf_role column, in ERDDAP order', () => {
+  const variables = variablesFrom(VIKING, VIKING_DATASET)
+  const plan = facetPlanFor(VIKING_DATASET, variables, DATA)
+  assert.deepEqual(plan.titleColumns, ['station_id', 'profile'])
+  assert.equal(
+    recordTitleFor({ plan, variablesByName: byColumnName(variables), data: DATA }),
+    TITLE
+  )
+})
+
+test('a catalogue with no columnMeta still names the record', () => {
+  // cf_role is only in columnMeta, which is absent entirely before a reharvest —
+  // so the roles fall back to the dataset's own three *_id_variable fields, and
+  // the labels fall back to the column names.
+  const variables = variablesFrom(VIKING_NO_META, VIKING_DATASET)
+  const plan = facetPlanFor(VIKING_DATASET, variables, DATA)
+  assert.deepEqual(plan.titleColumns, ['station_id', 'profile'])
+  assert.equal(
+    recordTitleFor({ plan, variablesByName: byColumnName(variables), data: DATA }),
+    'station_id: PMZA-RIKI — profile: PMZA-RIKI-25/09/16-17:35:26'
+  )
+})
+
+test('a cf_role column with nothing in it is skipped, not printed empty', () => {
+  const plan = { titleColumns: ['station_id', 'profile'] }
+  const data = [{ station_id: 'PMZA-RIKI', profile: '   ' }]
+  assert.equal(
+    recordTitleFor({ plan, variablesByName: new Map(), data }),
+    'station_id: PMZA-RIKI'
+  )
+  assert.equal(recordTitleFor({ plan, variablesByName: new Map(), data: [] }), '')
+  assert.equal(recordTitleFor({ plan: null, variablesByName: new Map(), data }), '')
+})
+
+test('a window spanning several profiles names three and counts the rest', () => {
+  const data = ['a', 'b', 'c', 'd', 'e'].map((profile) => ({ profile }))
+  assert.equal(
+    recordTitleFor({ plan: { titleColumns: ['profile'] }, variablesByName: new Map(), data }),
+    'profile: a, b, c +2'
+  )
+})
+
+test('the title is drawn where Plotly draws a title, and not by automargin', () => {
+  const { layout } = figure('TimeSeriesProfile', ALL_SIX,
+    { size: { width: 1140, height: 620 } })
+  assert.equal(layout.title.text, TITLE)
+  assert.equal(layout.title.font.size, TITLE_FONT_PX)
+  assert.equal(layout.title.yref, 'container')
+  assert.equal(layout.title.y, 1)
+  assert.equal(layout.title.yanchor, 'top')
+  assert.equal(layout.title.xanchor, 'center')
+  // automargin would grow the top margin inside a height that is fixed here,
+  // shrinking every panel below the minimum the floor promised.
+  assert.ok(!('automargin' in layout.title))
+})
+
+test('the title costs the top margin only the lines it actually used', () => {
+  assert.equal(titleLinesFor(TITLE, 1140), 1)
+  assert.equal(titleLinesFor(TITLE, 340), 2)
+  const wide = figure('TimeSeriesProfile', ['TE90_01'],
+    { size: { width: 1140, height: 620 } })
+  const narrow = figure('TimeSeriesProfile', ['TE90_01'],
+    { size: { width: 340, height: 620 } })
+  assert.equal(wide.layout.margin.t, marginFor(COLUMNS, 1).t)
+  assert.equal(narrow.layout.margin.t, marginFor(COLUMNS, 2).t)
+  assert.ok(narrow.layout.margin.t > wide.layout.margin.t)
+  // And a stack sized for one line is shorter than one sized for the worst case.
+  assert.ok(plotHeightFor(ROWS, 6, 100, 1) < plotHeightFor(ROWS, 6, 100, 2))
+})
+
+test('no title means no title and no room reserved for one', () => {
+  const { layout } = figure('TimeSeriesProfile', ['TE90_01'], { title: '' })
+  assert.ok(!layout.title)
+  assert.equal(layout.margin.t, marginFor(COLUMNS, 0).t)
+  assert.equal(titleRoomFor(0), 0)
+  assert.equal(titleLinesFor('', 1140), 0)
+})
+
+test('the title wraps at the line cap rather than overflowing the figure', () => {
+  const long = Array.from({ length: 40 }, (_, i) => `word${i}`).join(' ')
+  const lines = wrapTitleFor(long, 320).split('<br>')
+  assert.equal(lines.length, MAX_TITLE_LINES)
+  assert.ok(lines[lines.length - 1].endsWith('…'))
+  // Wrapped at the FIGURE's width, not a panel's: it is centred on the figure.
+  assert.ok(titleLinesFor(TITLE, 1140) < titleLinesFor(TITLE, 400))
 })

@@ -55,14 +55,6 @@
   font-size: 0.9em;
 }
 
-/* "Different scale per variable" toggle: checkbox first, then the (longer)
-   label flowing across the row instead of squeezed into the caption column. */
-.controlCheckboxRow {
-  font-size: 0.9em;
-  cursor: pointer;
-  margin: 0;
-}
-
 .controlButtonWrap {
   display: inline-block;
 }
@@ -118,7 +110,8 @@
   white-space: nowrap;
 }
 
-/* Collapsible "Customize plot" panel: colorscale controls + rename fields. */
+/* Collapsible "Customize plot" panel: one block per drawn variable, holding its
+   colour and its display name. */
 .labelEditorToggle {
   margin-top: 8px;
   padding: 4px 0;
@@ -152,10 +145,76 @@
   color: #555;
 }
 
-.labelEditorRow input {
-  width: 100%;
+/* The colour chip and the rename field share a line; the chip is intrinsically
+   sized and the field takes the rest. min-width: 0 so the field can shrink
+   inside the flex row rather than pushing the column wider. */
+.labelEditorControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.labelEditorRow input[type='text'] {
+  flex: 1 1 auto;
+  min-width: 0;
   box-sizing: border-box;
   padding: 3px 6px;
   border: 1px solid darkgrey;
   border-radius: 4px;
+}
+
+/* The colour in use, on the toggle and again on every swatch in the menu. The
+   hairline border is what keeps a pale colour visible against white. */
+.colorSwatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--cioos-hairline, #dce8e5);
+  border-radius: 3px;
+}
+
+/* A toggle holding one 16px chip has nothing to gain from the 120px the variable
+   pickers are pinned to. */
+.dropdownButtonSwatch .dropdown-toggle {
+  padding: 3px 6px;
+}
+
+/* The swatch grid, and the menu rows below it. Not nested under
+   .dropdownButtonSwatch, because ui/Dropdown portals the menu into
+   document.body — the same reason .dropdownButtonLeft's own menu cap lives in
+   ui/dropdownStyles.css. */
+/* Six 26px items a row (16px chip + 4px padding + 1px border, doubled), so the
+   twelve land as two even rows rather than five-five-two. */
+.colorSwatchGrid {
+  display: flex;
+  flex-wrap: wrap;
+  width: 172px;
+  padding: 4px 8px;
+}
+
+.colorSwatchGrid .dropdown-item {
+  width: auto;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.colorSwatchCustom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 12px;
+  font-size: var(--cioos-font-size-sm, 13px);
+  cursor: pointer;
+}
+
+.colorSwatchCustom input {
+  width: 32px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--cioos-hairline, #dce8e5);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
 }

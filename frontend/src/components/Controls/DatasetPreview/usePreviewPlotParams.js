@@ -7,7 +7,7 @@ import {
   resolvePanels,
   defaultVisFor
 } from './previewFacetPlan.js'
-import { DEFAULT_COLORSCALE } from './erddapPalettes.js'
+import { parseColorsParam, formatColorsParam } from './previewColors.js'
 
 // Everything that describes the plot on screen, kept in the query string so a
 // link reproduces it — the same arrangement SelectionProvider already uses for
@@ -153,24 +153,36 @@ export default function usePreviewPlotParams (inspectDataset, table, data) {
     [setPanels, panels]
   )
 
-  const colorParam = searchParams.get('pcolor')
-  const colorBy =
-    colorParam && variablesByName.has(colorParam) ? colorParam : null
-  const setColorBy = useCallback(
-    (columnName) => setParams({ pcolor: columnName || null }),
-    [setParams]
+  // One colour per variable, keyed by COLUMN NAME and not by panel index: a
+  // colour then survives unticking a variable and ticking it again, and a link's
+  // colours cannot slide onto the wrong panels when the selection differs.
+  //
+  // This replaces `pcolor`, which named the ONE variable whose values shaded
+  // every panel. See previewColors.js for the codec and previewParams.js for why
+  // the old param is retired rather than reused.
+  const variableColors = useMemo(
+    () =>
+      parseColorsParam(searchParams.get('pcolors'), (columnName) =>
+        variablesByName.has(columnName)
+      ),
+    [searchParams, variablesByName]
+  )
+  const setVariableColor = useCallback(
+    (columnName, color) => {
+      const next = { ...variableColors }
+      if (color) next[columnName] = color
+      // No colour is the default colour: dropping the entry is what deletes it
+      // from the link, so "back to what the dataset says" leaves no trace.
+      else delete next[columnName]
+      setParams({ pcolors: formatColorsParam(next) })
+    },
+    [setParams, variableColors]
   )
 
   const modeParam = searchParams.get('pmode')
   const plotType = PLOT_MODES.includes(modeParam) ? modeParam : DEFAULT_MODE
   const setPlotType = useCallback(
     (mode) => setParams({ pmode: mode === DEFAULT_MODE ? null : mode }),
-    [setParams]
-  )
-
-  const colorscale = searchParams.get('pscale') || DEFAULT_COLORSCALE
-  const setColorscale = useCallback(
-    (scale) => setParams({ pscale: scale === DEFAULT_COLORSCALE ? null : scale }),
     [setParams]
   )
 
@@ -194,12 +206,10 @@ export default function usePreviewPlotParams (inspectDataset, table, data) {
     panels,
     setPanels,
     togglePanel,
-    colorBy,
-    setColorBy,
+    variableColors,
+    setVariableColor,
     plotType,
     setPlotType,
-    colorscale,
-    setColorscale,
     uirevision,
     linkKey
   }
