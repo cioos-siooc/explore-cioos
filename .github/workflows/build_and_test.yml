@@ -79,7 +79,9 @@ jobs:
         working-directory: test
         run: npm ci --quiet
 
-      - name: Test harvested API
+      - name: Run JavaScript API and frontend tests
+        env:
+          CI: "true"
         run: |
           read -r latitude longitude < <(
             docker compose $COMPOSE_FILES exec -T db \
@@ -87,16 +89,11 @@ jobs:
               -c "SELECT latitude, longitude FROM cde.profiles WHERE latitude IS NOT NULL AND longitude IS NOT NULL LIMIT 1"
           )
           test -n "${latitude:-}" && test -n "${longitude:-}"
-          CI_LATITUDE="$latitude" CI_LONGITUDE="$longitude" node test/test_api_endpoints.js
+          CI_LATITUDE="$latitude" CI_LONGITUDE="$longitude" npm --prefix test test
 
       - name: Submit and complete a download request
         run: .github/scripts/test-download-request.sh
 
-      - name: Test frontend loads without errors
-        working-directory: test
-        env:
-          CI: "true"
-        run: node frontend_loads_without_errors.js
 
       - name: Print Compose diagnostics
         if: failure()

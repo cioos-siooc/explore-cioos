@@ -15,7 +15,7 @@ test -n "${time_min:-}" && test -n "${time_max:-}"
 
 CI_LATITUDE="$latitude" CI_LONGITUDE="$longitude" \
   CI_TIME_MIN="$time_min" CI_TIME_MAX="$time_max" \
-  node test/test_download_request.js
+  npm --prefix test run test:download
 
 job_id="$(docker compose $COMPOSE_FILES exec -T db \
   psql -U postgres -d cde -At \
