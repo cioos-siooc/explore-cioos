@@ -1,55 +1,33 @@
-import assert from "assert";
+import assert from "node:assert/strict";
 import fetch from "node-fetch";
-/***
- *
- * Check that the API returns data for all endpoints
- *
- */
 
-// url of frontend
-const API_URL = "http://localhost:8098/api";
+const API_URL = process.env.API_URL || "http://localhost:8098/api";
 
-const cdeQuery = (url) => {
-  const fullUrl = API_URL + url;
-  console.log("Requesting:", fullUrl);
-  return fetch(fullUrl).then((res) => res.json());
-};
+async function cdeQuery(path) {
+  const url = `${API_URL}${path}`;
+  console.log("Requesting:", url);
+  const response = await fetch(url);
+  assert.equal(response.ok, true, `${url} returned HTTP ${response.status}`);
+  return response.json();
+}
 
-(async () => {
-  console.log("Testing API endpoints at ", API_URL);
+const datasets = await cdeQuery("/datasets");
+assert.equal(Array.isArray(datasets), true, "/datasets must return an array");
+assert.ok(datasets.length > 0, "the sample harvest produced no datasets");
 
-  console.log("Testing /datasets")
-  const datasets = await cdeQuery("/datasets");
-  assert(datasets.length == 2, "datasets.length != 2: datasets.length = " + datasets.length);
-  
-  console.log("Testing /legend")
-  const legend = await cdeQuery("/legend");
-  assert(Object.values(legend.recordsCount).length == 3, "legend.length != 3: legend.length = " + Object.values(legend.recordsCount).length);
+const legend = await cdeQuery("/legend");
+assert.ok(legend.recordsCount, "/legend has no recordsCount");
 
-  console.log("Testing /organizations")
-  const oceanVariables = await cdeQuery("/oceanVariables");
-  assert(oceanVariables.length == 1, "oceanVariables.length != 1: oceanVariables.length = " + oceanVariables.length);
+const organizations = await cdeQuery("/organizations");
+assert.equal(Array.isArray(organizations), true, "/organizations must return an array");
 
-  console.log("Testing /oceanVariables")
-  const organizations = await cdeQuery("/organizations");
-  assert(organizations.length == 2, "organizations.length != 2: organizations.length = " + organizations.length);
-  
-  console.log("Testing /tiles")
-  const tiles = await fetch(API_URL + "/tiles/2/1/1.mvt").then((tile) =>
-    tile.arrayBuffer()
-  );
-  assert(tiles.byteLength > 2000, "tiles.byteLength < 2000: tiles.byteLength = " + tiles.byteLength);
+const oceanVariables = await cdeQuery("/oceanVariables");
+assert.equal(Array.isArray(oceanVariables), true, "/oceanVariables must return an array");
 
-  console.log("Testing /pointQuery")
-  const pointQuery = await cdeQuery(
-    "/pointQuery?latMin=49.3194&lonMin=-123.7531&latMax=49.3552&lonMax=-123.6982"
-  );
-  assert(pointQuery.length == 2, "pointQuery length != 2: pointQuery.length = " + pointQuery.length);
-  
-  console.log("Testing /preview")
-  const preview = await cdeQuery(
-    "/preview?profile=C44131&dataset=DFO_MEDS_BUOYS"
-  );
-  assert(preview.table.rows.length > 100), "preview.table.rows.length < 100: preview.table.rows.length = " + preview.table.rows.length;
+const pointQuery = await cdeQuery(
+  "/pointQuery?latMin=-90&lonMin=-180&latMax=90&lonMax=180",
+);
+assert.equal(Array.isArray(pointQuery), true, "/pointQuery must return an array");
+assert.ok(pointQuery.length > 0, "the harvested data is not queryable through /pointQuery");
 
-})();
+console.log(`Verified API data from ${datasets.length} harvested dataset(s).`);

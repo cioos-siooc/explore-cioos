@@ -1,34 +1,20 @@
 name: Unit Tests
 
 on:
-  push:
-    paths:
-      - "harvester/**"
-      - "downloader/**"
   pull_request:
-    paths:
-      - "harvester/**"
-      - "downloader/**"
+    branches:
+      - main
+      - master # Keep coverage while master remains the repository default branch.
+      - "development*"
+  workflow_dispatch:
 
 jobs:
   unit-tests:
-    name: Unit Tests
+    name: Python unit tests
     timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Detect changed paths
-        id: changes
-        uses: dorny/paths-filter@v2
-        with:
-          filters: |
-            harvester:
-              - 'harvester/**'
-            downloader:
-              - 'downloader/**'
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
@@ -38,10 +24,5 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      - name: Run harvester tests
-        if: steps.changes.outputs.harvester == 'true'
-        run: uv run pytest harvester
-
-      - name: Run downloader tests
-        if: steps.changes.outputs.downloader == 'true'
-        run: uv run pytest downloader
+      - name: Run all unit tests
+        run: uv run pytest harvester/tests/unit downloader/tests
