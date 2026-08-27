@@ -914,10 +914,13 @@ export default function CreateMap({
   // fill is nearly transparent (the layer fades out with zoom).
   const coverageHexOutlineColor = () => hexOutlineColor
 
-  // How much of its normal opacity a bottom-quartile hex keeps. Low enough to
-  // read as "little here", high enough that the hex is still visible and still
-  // clickable — the ask was to recede, not to disappear.
-  const FADE_FACTOR = 0.45
+  // How much of its normal opacity a sparse hex keeps, and how much of the
+  // distribution counts as sparse. Refs rather than constants ONLY so the
+  // temporary tuning panel below can move them live — see TEMP_FADE_TUNER.
+  // Once the values are settled these go back to plain consts and the panel
+  // and everything referencing it comes out.
+  const fadeFactorRef = useRef(0.45)
+  const fadePercentileRef = useRef(0.25)
 
   // Is this hex in the sparse band? The count at or below which it counts as
   // sparse comes from the rendered hexes' own distribution (see viewportHexP25).
@@ -935,7 +938,7 @@ export default function CreateMap({
   const fadeFlat = (opacity) => {
     const p25 = viewportHexP25.current
     if (!Number.isFinite(p25)) return opacity
-    return ['case', isSparseHex(p25), opacity * FADE_FACTOR, opacity]
+    return ['case', isSparseHex(p25), opacity * fadeFactorRef.current, opacity]
   }
 
   // The same, for an opacity that already varies with zoom. The 'case' CANNOT
@@ -949,7 +952,7 @@ export default function CreateMap({
     const p25 = viewportHexP25.current
     const output = (v) =>
       Number.isFinite(p25)
-        ? ['case', isSparseHex(p25), v * FADE_FACTOR, v]
+        ? ['case', isSparseHex(p25), v * fadeFactorRef.current, v]
         : v
     return [
       'interpolate',
@@ -1197,7 +1200,7 @@ export default function CreateMap({
       counts.push(count)
     }
     if (!Number.isFinite(hi)) return undefined
-    viewportHexP25.current = percentileOf(counts, 0.25)
+    viewportHexP25.current = percentileOf(counts, fadePercentileRef.current)
     return quantizeCountRange([lo, hi])
   }
 
@@ -1250,6 +1253,110 @@ export default function CreateMap({
     onViewportHexRangeRef.current(range)
     revealHexesIfRamped(range)
   }
+
+  // ===========================================================================
+  // TEMP_FADE_TUNER — throwaway control for dialling in the sparse-hex fade.
+  // Delete this whole block (and put fadeFactorRef / fadePercentileRef back to
+  // plain consts) once the numbers are chosen. Deliberately plain DOM rather
+  // than React: it has to be trivially deletable and must not touch the
+  // component tree or any real state.
+  // ===========================================================================
+  useEffect(() => {
+    const host = document.createElement('div')
+    host.id = 'temp-fade-tuner'
+    host.style.cssText = [
+      'position:fixed', 'bottom:150px', 'right:12px', 'z-index:9999',
+      'background:rgba(255,255,255,0.96)', 'border:1px solid #b9c9c5',
+      'border-radius:8px', 'padding:10px 12px', 'width:232px',
+      'font:12px/1.45 system-ui,sans-serif', 'color:#123',
+      'box-shadow:0 2px 10px rgba(0,0,0,0.18)'
+    ].join(';')
+    host.innerHTML = `
+      <div style="font-weight:600;margin-bottom:8px">Hex fade (temporary)</div>
+      <label style="display:block">Faded opacity &times;
+        <b id="tft-f-val">0.45</b>
+        <input id="tft-f" type="range" min="0.05" max="1" step="0.05" value="0.45"
+               style="width:100%">
+      </label>
+      <label style="display:block;margin-top:6px">Sparse cutoff pctile
+        <b id="tft-p-val">0.25</b>
+        <input id="tft-p" type="range" min="0" max="0.9" step="0.05" value="0.25"
+               style="width:100%">
+      </label>
+      <div id="tft-out" style="margin-top:8px;font-size:11px;color:#456"></div>
+      <button id="tft-reset" style="margin-top:8px;width:100%;font-size:11px;
+              padding:3px;cursor:pointer">reset</button>`
+    document.body.appendChild(host)
+
+    const $ = (id) => host.querySelector(id)
+    // The counts on screen, deduped by feature id exactly as
+    // measureVisibleHexRange does, so the tuner's threshold matches the real one.
+    const visibleCounts = () => {
+      if (!map.current) return { layer: null, counts: [] }
+      const layer = ['hexes', 'coverage-hexes'].find(
+        (id) => map.current.getLayer(id) && map.current.queryRenderedFeatures({ layers: [id] }).length
+      )
+      if (!layer) return { layer: null, counts: [] }
+      const counts = []
+      const seen = new Set()
+      for (const f of map.current.queryRenderedFeatures({ layers: [layer] })) {
+        const c = Number(f.properties?.count)
+        if (!Number.isFinite(c) || c <= 0) continue
+        if (f.id !== undefined) {
+          if (seen.has(f.id)) continue
+          seen.add(f.id)
+        }
+        counts.push(c)
+      }
+      return { layer, counts }
+    }
+    const readout = () => {
+      const { layer, counts } = visibleCounts()
+      const threshold = viewportHexP25.current
+      const faded = Number.isFinite(threshold)
+        ? counts.filter((c) => c <= threshold).length
+        : 0
+      $('#tft-out').textContent = counts.length
+        ? `${layer}: threshold ${threshold} - ${faded}/${counts.length} faded (${(100 * faded / counts.length).toFixed(0)}%)`
+        : 'no hexes on screen'
+    }
+    // Recompute the threshold HERE rather than going through
+    // refreshViewportHexRange: that bails early when the style is mid-load or
+    // the quantized range is unchanged, which left the percentile slider inert.
+    const apply = () => {
+      const { counts } = visibleCounts()
+      if (counts.length) {
+        viewportHexP25.current = percentileOf(counts, fadePercentileRef.current)
+      }
+      applyHexOpacity()
+      readout()
+    }
+    $('#tft-f').addEventListener('input', (e) => {
+      fadeFactorRef.current = Number(e.target.value)
+      $('#tft-f-val').textContent = e.target.value
+      applyHexOpacity()
+      readout()
+    })
+    $('#tft-p').addEventListener('input', (e) => {
+      fadePercentileRef.current = Number(e.target.value)
+      $('#tft-p-val').textContent = e.target.value
+      apply()
+    })
+    $('#tft-reset').addEventListener('click', () => {
+      fadeFactorRef.current = 0.45
+      fadePercentileRef.current = 0.25
+      $('#tft-f').value = '0.45'
+      $('#tft-p').value = '0.25'
+      $('#tft-f-val').textContent = '0.45'
+      $('#tft-p-val').textContent = '0.25'
+      apply()
+    })
+    const poll = setInterval(readout, 1200)
+    return () => {
+      clearInterval(poll)
+      host.remove()
+    }
+  }, [])
 
   // Drop the measurement and fall back to the global tier. For the changes that
   // make the counts on screen mean something else — new filters, a new geometry
