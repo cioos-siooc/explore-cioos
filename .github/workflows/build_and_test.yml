@@ -29,10 +29,10 @@ jobs:
         with:
           version: "0.8.22"
 
-      - name: Run Python unit tests
+      - name: Run all Python tests
         run: |
           uv sync --locked
-          uv run pytest harvester/tests/unit downloader/tests
+          uv run pytest
 
       - name: Prepare CI configuration
         run: |
