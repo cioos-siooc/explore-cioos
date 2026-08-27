@@ -1330,7 +1330,7 @@ export default function CreateMap({
       </label>
       <label style="display:block;margin-top:6px">Sparse cutoff pctile
         <b id="tft-p-val">0.15</b>
-        <input id="tft-p" type="range" min="0" max="0.9" step="0.05" value="0.15"
+        <input id="tft-p" type="range" min="0" max="1" step="0.01" value="0.15"
                style="width:100%">
       </label>
       <div id="tft-out" style="margin-top:8px;font-size:11px;color:#456"></div>
@@ -1445,7 +1445,7 @@ export default function CreateMap({
     })
     $('#tft-p').addEventListener('input', (e) => {
       fadePercentileRef.current = Number(e.target.value)
-      $('#tft-p-val').textContent = e.target.value
+      $('#tft-p-val').textContent = Number(e.target.value).toFixed(2)
       apply()
     })
     $('#tft-reset').addEventListener('click', () => {
