@@ -70,8 +70,14 @@ jobs:
         run: npm ci --quiet
 
       - name: Test harvested API
-        working-directory: test
-        run: node test_api_endpoints.js
+        run: |
+          read -r latitude longitude < <(
+            docker compose $COMPOSE_FILES exec -T db \
+              psql -U postgres -d cde -At -F ' ' \
+              -c "SELECT latitude, longitude FROM cde.profiles WHERE latitude IS NOT NULL AND longitude IS NOT NULL LIMIT 1"
+          )
+          test -n "${latitude:-}" && test -n "${longitude:-}"
+          CI_LATITUDE="$latitude" CI_LONGITUDE="$longitude" node test/test_api_endpoints.js
 
       - name: Submit and complete a download request
         run: |

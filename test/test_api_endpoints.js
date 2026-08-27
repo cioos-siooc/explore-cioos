@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import fetch from "node-fetch";
 
 const API_URL = process.env.API_URL || "http://localhost:8098/api";
+const latitude = Number(process.env.CI_LATITUDE);
+const longitude = Number(process.env.CI_LONGITUDE);
+
+assert.ok(Number.isFinite(latitude), "CI_LATITUDE must be a finite number");
+assert.ok(Number.isFinite(longitude), "CI_LONGITUDE must be a finite number");
 
 async function cdeQuery(path) {
   const url = `${API_URL}${path}`;
@@ -24,8 +29,9 @@ assert.equal(Array.isArray(organizations), true, "/organizations must return an 
 const oceanVariables = await cdeQuery("/oceanVariables");
 assert.equal(Array.isArray(oceanVariables), true, "/oceanVariables must return an array");
 
+const delta = 0.01;
 const pointQuery = await cdeQuery(
-  "/pointQuery?latMin=-90&lonMin=-180&latMax=90&lonMax=180",
+  `/pointQuery?latMin=${latitude - delta}&lonMin=${longitude - delta}&latMax=${latitude + delta}&lonMax=${longitude + delta}`,
 );
 assert.equal(Array.isArray(pointQuery), true, "/pointQuery must return an array");
 assert.ok(pointQuery.length > 0, "the harvested data is not queryable through /pointQuery");
