@@ -24,6 +24,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.22"
+
+      - name: Run Python unit tests
+        run: |
+          uv sync --locked
+          uv run pytest harvester/tests/unit downloader/tests
+
       - name: Prepare CI configuration
         run: |
           cp .env.sample .env
