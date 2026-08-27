@@ -40,10 +40,23 @@ jobs:
 
       - name: Run the sample harvest
         run: |
-          # The worker registers this deployment during startup. --watch returns a
-          # non-zero status if the harvest flow fails.
+          # Compose can report the worker as started before its entrypoint has
+          # registered the deployments with Prefect. Wait for that registration.
+          deployment="Harvest Source/cde-harvester-deployment"
+          registered=false
+          for _ in $(seq 1 60); do
+            if docker compose $COMPOSE_FILES exec -T prefect_worker \
+              uv run prefect deployment inspect "$deployment" >/dev/null 2>&1; then
+              registered=true
+              break
+            fi
+            sleep 5
+          done
+          test "$registered" = true
+
+          # --watch returns a non-zero status if the harvest flow fails.
           timeout 25m docker compose $COMPOSE_FILES exec -T prefect_worker \
-            uv run prefect deployment run "Harvest Source/cde-harvester-deployment" --watch
+            uv run prefect deployment run "$deployment" --watch
 
       - name: Install Node.js
         uses: actions/setup-node@v4
