@@ -8,10 +8,6 @@ on:
       - "development*"
   workflow_dispatch:
 
-concurrency:
-  group: integration-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 jobs:
   docker:
     name: Compose harvest, API, and download
