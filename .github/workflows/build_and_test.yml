@@ -82,13 +82,15 @@ jobs:
       - name: Submit and complete a download request
         run: |
           set -euo pipefail
-          read -r latitude longitude time_min < <(
+          read -r latitude longitude time_min time_max < <(
             docker compose $COMPOSE_FILES exec -T db \
               psql -U postgres -d cde -At -F ' ' \
-              -c "SELECT latitude, longitude, to_char(time_min AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') FROM cde.profiles WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND time_min IS NOT NULL LIMIT 1"
+              -c "SELECT latitude, longitude, to_char(time_min AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'), to_char(time_max AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') FROM cde.profiles WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND time_min IS NOT NULL AND time_max IS NOT NULL LIMIT 1"
           )
-          test -n "${latitude:-}" && test -n "${longitude:-}" && test -n "${time_min:-}"
-          CI_LATITUDE="$latitude" CI_LONGITUDE="$longitude" CI_TIME="$time_min" \
+          test -n "${latitude:-}" && test -n "${longitude:-}" \
+            && test -n "${time_min:-}" && test -n "${time_max:-}"
+          CI_LATITUDE="$latitude" CI_LONGITUDE="$longitude" \
+            CI_TIME_MIN="$time_min" CI_TIME_MAX="$time_max" \
             node test/test_download_request.js
 
           job_id="$(docker compose $COMPOSE_FILES exec -T db \
