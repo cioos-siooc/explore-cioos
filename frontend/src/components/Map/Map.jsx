@@ -435,18 +435,15 @@ export default function CreateMap({
   // they belong to was unreadable off the map. The point circles stay legible
   // over them because they sit above the fill and carry their own white halo,
   // which is a stronger separation than transparency was buying.
-  const coverageHexOpacity = [
-    'interpolate',
-    ['linear'],
-    ['zoom'],
-    hexMaxZoom,
-    0.6,
-    hexMaxZoom + 1.5,
-    0.5,
-    hexMaxZoom + 3,
-    0.4
+  // Kept as [zoom, opacity] pairs rather than a finished expression because the
+  // fade below has to rebuild it: a 'zoom' expression may only be the input to a
+  // TOP-LEVEL step/interpolate, so the sparse-hex 'case' cannot wrap this — it
+  // has to go inside each stop's output instead. See fadeExpression.
+  const COVERAGE_HEX_OPACITY_STOPS = [
+    [hexMaxZoom, 0.6],
+    [hexMaxZoom + 1.5, 0.5],
+    [hexMaxZoom + 3, 0.4]
   ]
-
   const draw = new MapboxDraw(drawControlOptions)
   const drawPolygon = useRef(draw)
   const doFinalCheck = useRef(false)
@@ -922,27 +919,51 @@ export default function CreateMap({
   // clickable — the ask was to recede, not to disappear.
   const FADE_FACTOR = 0.45
 
-  // The count at or below which a hex counts as sparse, from the rendered
-  // hexes' own distribution (see viewportHexP25). undefined -> no threshold has
-  // been measured, so nothing fades.
+  // Is this hex in the sparse band? The count at or below which it counts as
+  // sparse comes from the rendered hexes' own distribution (see viewportHexP25).
   //
   // `<=`, not `<`: the counts are small integers at the bottom of the
   // distribution and p25 is frequently 1, where `<` would fade nothing at all.
-  const fadeExpression = (baseOpacity) => {
+  const isSparseHex = (p25) => [
+    '<=',
+    ['to-number', ['get', 'count'], 0],
+    p25
+  ]
+
+  // A flat opacity, dimmed for sparse hexes. undefined threshold -> nothing has
+  // been measured yet, so nothing fades.
+  const fadeFlat = (opacity) => {
     const p25 = viewportHexP25.current
-    if (!Number.isFinite(p25)) return baseOpacity
+    if (!Number.isFinite(p25)) return opacity
+    return ['case', isSparseHex(p25), opacity * FADE_FACTOR, opacity]
+  }
+
+  // The same, for an opacity that already varies with zoom. The 'case' CANNOT
+  // wrap the zoom interpolate — MapLibre rejects a 'zoom' expression that is not
+  // the input to a top-level step/interpolate, and setPaintProperty throws,
+  // which aborts the rest of the paint pass and leaves the hex layers stuck at
+  // the opacity 0 they are created with. So the interpolate stays outermost and
+  // each of its stop OUTPUTS carries the case instead — the documented
+  // zoom-and-data-driven shape.
+  const fadeZoomStops = (stops) => {
+    const p25 = viewportHexP25.current
+    const output = (v) =>
+      Number.isFinite(p25)
+        ? ['case', isSparseHex(p25), v * FADE_FACTOR, v]
+        : v
     return [
-      'case',
-      ['<=', ['to-number', ['get', 'count'], 0], p25],
-      baseOpacity * FADE_FACTOR,
-      baseOpacity
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      ...stops.flatMap(([zoom, v]) => [zoom, output(v)])
     ]
   }
 
   // Both hex layers fade on the same measured threshold: measureVisibleHexRange
   // queries them together and only one of them is ever on screen at a time.
-  const hexOpacityExpression = () => fadeExpression(hexOpacity)
-  const coverageHexOpacityExpression = () => fadeExpression(coverageHexOpacity)
+  const hexOpacityExpression = () => fadeFlat(hexOpacity)
+  const coverageHexOpacityExpression = () =>
+    fadeZoomStops(COVERAGE_HEX_OPACITY_STOPS)
 
   // Push the current fade threshold onto both hex layers. No-op before the
   // opening reveal, which owns fill-opacity until it has run (writing here
