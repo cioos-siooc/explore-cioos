@@ -25,7 +25,13 @@ const Sentry = require("@sentry/node");
  *         schema: { type: string }
  *     responses:
  *       200:
- *         description: Preview data from ERDDAP in tabledap JSON format.
+ *         description: >
+ *           Preview data from ERDDAP in tabledap JSON format
+ *           (table.columnNames / columnTypes / columnUnits / rows), plus
+ *           table.columnMeta - one harvested per-variable metadata object per
+ *           column, positionally aligned to columnNames, null where the harvest
+ *           knows no such column. The key is absent entirely for a dataset that
+ *           has not been harvested since datasets.table_variables was added.
  *       400:
  *         description: Missing or invalid parameters.
  *       404:
@@ -76,7 +82,7 @@ const TRAJECTORY_TYPES_SQL = ALL_TRAJECTORY_TYPES.map((t) => `'${t}'`).join(",")
  */
 const FEATURE_SQL = `
 WITH ds AS (
-  SELECT pk, dataset_id, erddap_url, cdm_data_type,
+  SELECT pk, dataset_id, erddap_url, cdm_data_type, table_variables,
          timeseries_id_variable, profile_id_variable, trajectory_id_variable
   FROM   cde.datasets
   WHERE  dataset_id = :dataset
@@ -120,6 +126,7 @@ feature AS (
 SELECT ds.dataset_id,
        ds.erddap_url,
        ds.cdm_data_type,
+       ds.table_variables,
        -- The ERDDAP column to constrain on. A TimeSeriesProfile sets BOTH
        -- timeseries_id_variable and profile_id_variable, and the record shown in
        -- the UI is the station, so timeseries wins. A TrajectoryProfile sets
@@ -186,6 +193,7 @@ router.get(
       time_max,
       new_start_time,
       use_whole_profile,
+      table_variables,
     } = rows.rows[0];
 
     if (!profile_variable) {
@@ -225,6 +233,27 @@ router.get(
           .send({ error: "NO_DATA", dataset: dataset_id, profile: profile_id });
       }
       data.table.rows = data.table.rows.slice(0, NUM_RECORDS);
+      // Per-variable metadata (long_name, cf_role, colorBar*, ...) harvested
+      // from ERDDAP's /info document. Attached here rather than in
+      // shapeQuery.js on purpose: that one feeds /pointQuery, which would then
+      // carry ~15 KB per dataset for every dataset in view to serve one modal.
+      //
+      // ERDDAP's column order is authoritative — the harvest can be older than
+      // the dataset, so a column may exist in one and not the other. Indexing
+      // by name and emitting null for anything unmatched keeps columnMeta the
+      // same length as columnNames, so the frontend can zip them positionally.
+      //
+      // The key is omitted entirely when the dataset has never been harvested
+      // with this column, which is what lets the frontend tell "no metadata"
+      // (fall back to column names) from "metadata says nothing about this one".
+      if (Array.isArray(table_variables)) {
+        const byName = new Map(
+          table_variables.map((variable) => [variable.name, variable])
+        );
+        data.table.columnMeta = (data.table.columnNames || []).map(
+          (name) => byName.get(name) ?? null
+        );
+      }
       return res.send(data);
     } catch (error) {
       // ERDDAP answers "no matching results" with a 404, or a 500 whose body

@@ -106,6 +106,7 @@ INSERT INTO _expected_columns (tbl, col, def) VALUES
   ('datasets', 'coverage_time_max',      'timestamptz'),
   ('datasets', 'coverage_depth_min',     'double precision'),
   ('datasets', 'coverage_depth_max',     'double precision'),
+  ('datasets', 'table_variables',        'jsonb'),
   ('datasets', 'grid_variables',         'jsonb'),
   ('datasets', 'grid_dimensions',        'jsonb'),
   ('datasets', 'wms_url',                'text'),

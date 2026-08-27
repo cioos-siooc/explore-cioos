@@ -1,11 +1,49 @@
-.tableAndPlotGridItem {
-  height: 100%;
-  overflow: auto;
+/* THE one scroll container of the preview modal.
+ *
+ * There used to be two: .modal-body scrolled because DatasetPreview passed
+ * `scrollable` to Modal (ui/modalStyles.css), and this element scrolled because
+ * of `height: 100%; overflow: auto`. The outer one always had ~15px to scroll,
+ * from a margin-top on its only child, so it showed a permanent stub scrollbar
+ * next to the real one.
+ *
+ * `scrollable` is no longer passed, and the clipping it provided is done here
+ * instead — locally, because ui/modalStyles.css is shared with the filters and
+ * download modals. The chain is: .modal-content (capped at the viewport) ->
+ * .modal-body (flex column, clips) -> this element (flex child, scrolls).
+ *
+ * min-height: 0 on both is what lets a flex child actually shrink below its
+ * content and hand the overflow to this scroller rather than to the page. */
+.dataPreviewModal .modal-content {
+  overflow: hidden;
+  /* A definite height, not the shared max-height.
+   *
+   * The plot's height is computed from the scroll container's measured height,
+   * and with only a max-height the modal is sized BY its content — so a taller
+   * plot would make a taller modal would make a bigger budget would make a
+   * taller plot. It converges on the viewport cap, but over several observer
+   * ticks, which is visible as the panel growing in steps. Fixing the height to
+   * the cap makes the budget a constant and removes the loop.
+   *
+   * A record preview also always wants the room: it is the largest thing in the
+   * app, and the previous layout was effectively full height anyway via the
+   * 560px floor it forced on the plot. */
+  height: calc(100vh - 2 * var(--cioos-space-lg, 16px));
+}
+
+.dataPreviewModal .modal-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .tableAndPlotGridItem.tableAndPlot {
   position: relative; /* anchors the loading scrim to the preview area */
-  min-height: 100px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Horizontal overflow belongs to the plot area, which sizes its own figure —
+     a scrollbar here would be a second one for the same axis. */
+  overflow-x: hidden;
 }
 
  .backButton {
@@ -68,91 +106,10 @@
   background-color: var(--cioos-primary);
 }
 
-.tableAndPlotGridItem.tableAndPlot {
-  margin-top: 15px;
-}
-
 .tableAndPlotGridItem hr {
   margin-top: 0px;
 }
 
-/* .tableAndPlot .dropDownButton {
-
-} */
-
-/*
-.dataPreviewModal .modal-header button {
-  margin: 0px 10px;
-}
-
-.previewFlexContainer {
-  display: flex;
-  height: 100%;
-}
-
-.recordIDTable {
-  height: 100%;
-  overflow-y: auto;
-  padding-right: 0px;
-  margin: 9px 0 9px 0px;
-}
-
-.metadataGridContainer {
-  display: grid;
-  grid-template-columns: 198px 198px;
-  grid-auto-rows: minmax(66px, auto);
-  gap: 16.5px;
-}
-
-.metadataAndRecordIDTableGridContainer {
-  display: grid;
-}
-
-.metadataGridItem h5 {
-  font-weight: bolder;
-  line-height: 20px;
-}
-
-.selectedRecordID {
-  color: white;
-  background-color: var(--cioos-primary);
-}
-
-.selectedRecordID:hover {
-  color: white;
-}
-
-.tableAndPlotGridContainer {
-  display: grid;
-  height: 100%;
-  grid-template-columns: 100%;
-  grid-template-rows: max-content calc(100% - 76px);
-  margin: 0px 16.5px;
-  gap: 16.5px;
-}
-
-.tableAndPlotGridItem {
-  height: 100%;
-  overflow: auto;
-}
-
-.deselectRecordButton {
-  height: 42px;
-  background-color: white;
-  border-radius: 5px;
-  border: 2px solid var(--cioos-hairline);
-  color: var(--cioos-ink);
-  line-height: 15px;
-  margin: 0px 16.5px;
-}
-
-.deselectRecordButton:hover {
-  background-color: var(--cioos-teal-light);
-}
-
-.tableAndPlot .dropdown {
-  display: inline;
-} */
 /* Copy-link button. Shares the toggle buttons' shape but not their fixed width:
    it holds an icon plus a couple of words, and it is not a toggle. */
 .tableAndPlotGridContainer .copyLinkButton {
@@ -171,4 +128,13 @@
 
 .tableAndPlotGridContainer .copyLinkButton:hover {
   background-color: var(--cioos-teal-light);
+}
+
+/* The lazy chunk's placeholder. Loading is `position: absolute` and contributes
+   no height, so without a floor here the container sat at its minimum at exactly
+   the moment Plotly measured it — which is how the plot ended up drawn at
+   Plotly's own 450px default until the first control change. */
+.datasetPreviewPlotLoading {
+  position: relative;
+  min-height: 420px;
 }

@@ -168,6 +168,89 @@ class TestPlottingAttributes:
         ds = _make_dataset(mock_erddap_server)
         assert len(ds.df_variables) == 6
 
+    def test_positive_attribute_parsed(self, mock_erddap_server):
+        # A depth axis has to be drawn reversed, and `positive` is the only
+        # attribute that says which way is down.
+        ds = _make_dataset(mock_erddap_server)
+        assert ds.df_variables.loc["depth"]["positive"] == "down"
+
+
+class TestTableVariables:
+    """datasets.table_variables — the per-variable metadata the preview reads.
+
+    Before this column existed the whole df_variables frame was rebuilt on every
+    harvest and thrown away for tabledap, leaving the browser unable to title a
+    plot panel with anything but the raw column name.
+    """
+
+    def test_one_entry_per_variable_in_frame_order(self, mock_erddap_server):
+        ds = _make_dataset(mock_erddap_server)
+        names = [v["name"] for v in ds.table_variables]
+        assert names == ds.df_variables["name"].tolist()
+
+    def test_coordinates_and_id_variables_are_included(self, mock_erddap_server):
+        # The preview needs these to choose a shared axis and to keep them out
+        # of the panel set, so unlike grid_variables they are NOT filtered out.
+        ds = _make_dataset(mock_erddap_server)
+        names = [v["name"] for v in ds.table_variables]
+        for name in ["time", "latitude", "longitude", "depth", "station_id"]:
+            assert name in names
+
+    def test_carries_the_attributes_a_panel_needs(self, mock_erddap_server):
+        ds = _make_dataset(mock_erddap_server)
+        temperature = next(
+            v for v in ds.table_variables if v["name"] == "temperature"
+        )
+        assert temperature["long_name"] == "Sea Water Temperature"
+        assert temperature["units"] == "degree_C"
+        assert temperature["standard_name"] == "sea_water_temperature"
+        assert temperature["ioos_category"] == "Temperature"
+        assert temperature["colorBarPalette"] == "KT_thermal"
+        assert temperature["colorBarMinimum"] == "-10.0"
+        assert temperature["colorBarMaximum"] == "40.0"
+        assert temperature["type"] == "double"
+
+    def test_absent_attribute_is_none_not_empty_string(self, mock_erddap_server):
+        # get_metadata() fillna("")s the pivot; storing "" in jsonb would make
+        # "not declared" indistinguishable from "declared empty" and would bloat
+        # the column for no reader.
+        ds = _make_dataset(mock_erddap_server)
+        latitude = next(v for v in ds.table_variables if v["name"] == "latitude")
+        assert latitude["colorBarPalette"] is None
+
+    def test_cf_role_and_positive_survive(self, mock_erddap_server):
+        ds = _make_dataset(mock_erddap_server)
+        by_name = {v["name"]: v for v in ds.table_variables}
+        assert by_name["station_id"]["cf_role"] == "timeseries_id"
+        assert by_name["depth"]["positive"] == "down"
+        assert by_name["depth"]["axis"] == "Z"
+
+    def test_ancillary_variables_survive_for_flag_exclusion(self, mock_erddap_server):
+        ds = _make_dataset(mock_erddap_server, info_csv=ERDDAP_INFO_QC_AND_LOG_CSV)
+        by_name = {v["name"]: v for v in ds.table_variables}
+        assert by_name["chlorophyll"]["ancillary_variables"] == "chlorophyll_qc"
+
+    def test_entries_are_json_serialisable(self, mock_erddap_server):
+        # It lands in a jsonb column via a Python-repr CSV round trip, so a
+        # numpy scalar leaking in here fails far downstream in the loader.
+        import json
+
+        ds = _make_dataset(mock_erddap_server)
+        assert json.loads(json.dumps(ds.table_variables)) == ds.table_variables
+
+    def test_survives_the_csv_repr_round_trip(self, mock_erddap_server):
+        # loading/loader.py reads these back with ast.literal_eval; long_name
+        # values contain apostrophes in real data ("latitude de l'observation").
+        import ast
+
+        ds = _make_dataset(mock_erddap_server)
+        assert ast.literal_eval(repr(ds.table_variables)) == ds.table_variables
+
+    def test_empty_frame_yields_empty_list(self):
+        from cde_harvester.core.variables import extract_variables
+
+        assert extract_variables(None) == []
+
 
 class TestDatasetEOVMapping:
     def test_eovs_populated_when_supported_var_present(self, mock_erddap_server):

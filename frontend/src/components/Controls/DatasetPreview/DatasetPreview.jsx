@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Check2, Clipboard } from 'react-bootstrap-icons'
 
 import Modal from '../../ui/Modal.jsx'
+import useElementSize from '../../ui/useElementSize.js'
 
 import Loading from '../Loading/Loading.jsx'
 import DatasetPreviewTable from '../DatasetPreviewTable/DatasetPreviewTable.jsx'
@@ -17,9 +18,9 @@ const DatasetPreviewPlot = lazy(() =>
   import('../DatasetPreviewPlot/DatasetPreviewPlot.jsx')
 )
 
-const NO_CUSTOM_LABELS = { x: '', y: '', secondary: '', color: '' }
+const NO_CUSTOM_LABELS = {}
 
-export default function DatasetPreview({
+export default function DatasetPreview ({
   datasetPreview,
   inspectDataset,
   inspectRecordID,
@@ -30,31 +31,45 @@ export default function DatasetPreview({
 }) {
   const { t } = useTranslation()
 
+  const [data, setData] = useState()
+
   // What is being looked at and how it is drawn — all of it in the query string,
   // so a link reproduces the plot and Back closes it. Each param is written only
   // when it differs from what this dataset type opens on, so an untouched plot
   // adds nothing to the URL. See usePreviewPlotParams.
   const {
+    variables,
+    variablesByName,
+    plan,
     selectedVis,
     setSelectedVis,
-    plotAxes,
-    setPlotAxes,
+    sharedAxis,
+    setSharedAxis,
+    panels,
+    setPanels,
+    togglePanel,
+    colorBy,
+    setColorBy,
     plotType,
     setPlotType,
-    colorscales,
-    setColorscales,
-    dualColorscale,
-    setDualColorscale
-  } = usePreviewPlotParams(inspectDataset, datasetPreview?.table)
+    colorscale,
+    setColorscale,
+    uirevision,
+    linkKey
+  } = usePreviewPlotParams(inspectDataset, datasetPreview?.table, data)
 
-  // Per-role display names. Lifted out of the plot so they survive the
+  // Per-column display names. Lifted out of the plot so they survive the
   // Table/Plot flip (which unmounts it) like everything else now does, but
   // deliberately NOT in the URL: free text is what makes a query string
   // unreadable, and a rename is a private annotation rather than a view.
   const [customLabels, setCustomLabels] = useState(NO_CUSTOM_LABELS)
   const [linkCopied, setLinkCopied] = useState(false)
 
-  const [data, setData] = useState()
+  // The modal's ONE scroll container. Measured here because its height is set by
+  // the modal (flex, capped at the viewport) and does not move when the plot
+  // grows — which is what makes it safe to feed into the plot's height. See
+  // useElementSize.
+  const [scrollRef, scrollSize] = useElementSize()
 
   useEffect(() => {
     const columnNames = datasetPreview?.table?.columnNames || []
@@ -74,12 +89,17 @@ export default function DatasetPreview({
     setData(data)
   }, [datasetPreview])
 
-  // A different record is a different plot: drop the previous one's names, and
-  // let the copy button offer itself again.
+  // A different record is a different plot: drop the previous one's names.
   useEffect(() => {
     setCustomLabels(NO_CUSTOM_LABELS)
-    setLinkCopied(false)
   }, [inspectRecordID])
+
+  // Anything that changes the URL changes what Copy would hand over — a panel
+  // added, the shared axis moved, or the map panned behind the modal. A button
+  // still reading "Copied!" would be claiming a link that is no longer there.
+  useEffect(() => {
+    setLinkCopied(false)
+  }, [linkKey])
 
   const onModalClose = () => {
     // One call, one history entry: setInspectRecordID clears ?record= and every
@@ -99,7 +119,6 @@ export default function DatasetPreview({
       size='xl'
       onHide={onModalClose}
       centered
-      scrollable
     >
       {inspectDataset && inspectRecordID && (
         <>
@@ -147,7 +166,7 @@ export default function DatasetPreview({
             )}
           </Modal.Header>
           <Modal.Body>
-            <div className='tableAndPlotGridItem tableAndPlot'>
+            <div className='tableAndPlotGridItem tableAndPlot' ref={scrollRef}>
               {recordLoading ? (
                 <Loading variant='inline' />
               ) : (
@@ -159,25 +178,46 @@ export default function DatasetPreview({
                           datasetPreview={datasetPreview}
                           data={data}
                         />
-                      ) : (
-                        <Suspense fallback={<Loading variant='inline' />}>
+                      ) : plan ? (
+                        // The fallback reserves height on purpose: Loading is an
+                        // absolutely-positioned scrim contributing none of its
+                        // own, so without this the plot mounted into a collapsed
+                        // box and Plotly measured it at zero.
+                        <Suspense
+                          fallback={
+                            <div className='datasetPreviewPlotLoading'>
+                              <Loading variant='inline' />
+                            </div>
+                          }
+                        >
                           <DatasetPreviewPlot
-                            inspectDataset={inspectDataset}
-                            plotAxes={plotAxes}
-                            datasetPreview={datasetPreview}
-                            setPlotAxes={setPlotAxes}
                             inspectRecordID={inspectRecordID}
                             data={data}
+                            variables={variables}
+                            variablesByName={variablesByName}
+                            plan={plan}
+                            sharedAxis={sharedAxis}
+                            setSharedAxis={setSharedAxis}
+                            panels={panels}
+                            togglePanel={togglePanel}
+                            setPanels={setPanels}
+                            colorBy={colorBy}
+                            setColorBy={setColorBy}
                             plotType={plotType}
                             setPlotType={setPlotType}
-                            colorscales={colorscales}
-                            setColorscales={setColorscales}
-                            dualColorscale={dualColorscale}
-                            setDualColorscale={setDualColorscale}
+                            colorscale={colorscale}
+                            setColorscale={setColorscale}
                             customLabels={customLabels}
                             setCustomLabels={setCustomLabels}
+                            uirevision={uirevision}
+                            availableHeight={scrollSize.height}
                           />
                         </Suspense>
+                      ) : (
+                        // Reachable only via ?vis=plot on a type with no layout
+                        // (Grid), or a dataset whose columns are all coordinates
+                        // and ids. The table is still right there in the header.
+                        <p>{t('datasetPreviewPlotNotPlottable')}</p>
                       )}
                     </>
                   ) : (

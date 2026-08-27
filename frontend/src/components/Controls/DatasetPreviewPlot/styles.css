@@ -13,6 +13,34 @@
   flex: 0 0 auto;
 }
 
+/* Checkbox rows in the variable picker. The menu is portaled to document.body
+   with its own max-height and overflow (ui/dropdownStyles.css), so a dataset
+   with any number of variables scrolls THERE and never adds a scroller inside
+   the modal. */
+.variablePickerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.variablePickerRow input {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.variablePickerLabel {
+  flex: 1 1 auto;
+  white-space: nowrap;
+}
+
+.dropdownEmptyNote {
+  display: block;
+  padding: 6px 12px;
+  color: var(--cioos-text-muted, #666);
+}
+
 /* One control per row: caption on the left, dropdown button on the right. */
 .controlRow {
   display: flex;
@@ -55,20 +83,33 @@
   margin-bottom: 8px;
 }
 
+/* No height rules here at all, and that is the fix.
+ *
+ * This used to carry `min-height: 100%` plus
+ * `.svg-container { min-height: 560px !important; height: 100% !important }`.
+ * Every one of those percentages resolved against an indefinite ancestor
+ * (.datasetPreviewControls has no height, and nothing sets html/body/#app), so
+ * they collapsed to auto — while Plotly, running plotAutoSize because
+ * layout.autosize was on with no width/height, read getComputedStyle(gd).height
+ * as 0px on first mount and fell back to its schema default of 450px. The
+ * !important 560px then stretched the box around a 450px SVG, and nothing
+ * re-measured: useResizeHandler was never passed and config.responsive only
+ * listens on window (plotly-basic ships no ResizeObserver at all). That 110px
+ * gap was the "renders badly until you change something" bug.
+ *
+ * The figure now gets explicit layout.width/height from useElementSize, so the
+ * container must simply not fight them. */
 .datasetPreviewPlot {
   flex: 1;
   min-width: 0;
-  min-height: 100%;
+  /* Profiles widen past the modal once panels hit their minimum width; that
+     scrolls here rather than in the modal's vertical scroller. */
+  overflow-x: auto;
 }
 
-.datasetPreviewPlot .js-plotly-plot, .datasetPreviewPlot .plot-container.plotly, .datasetPreviewPlot .user-select-none.svg-container {
-  width: 100%;
-  min-height: 100%;
-}
-
-.datasetPreviewPlot .user-select-none.svg-container {
-  min-height: 560px !important;
-  height: 100% !important;
+.datasetPreviewPlotEmpty {
+  padding: 24px 8px;
+  color: var(--cioos-text-muted, #666);
 }
 
 /* The variable pickers can list every column, but the menu height cap lives in

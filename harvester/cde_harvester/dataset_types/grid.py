@@ -14,6 +14,7 @@ dataset has no usable lat/lon extent and is legitimately skipped.
 import re
 
 import pandas as pd
+from cde_harvester.core.variables import extract_variables
 from cde_harvester.dataset_types.base import DatasetTypeHandler
 from cde_harvester.dataset_types.tabledap_features import _axis_bounds_from_metadata
 from cde_harvester.utils import standard_name_to_eovs
@@ -141,24 +142,20 @@ def _extract_variables(dataset):
     names = (
         df_info.query('`Row Type` == "variable"')["Variable Name"].unique().tolist()
     )
-    variables = []
-    for name in names:
-        var_meta = (
-            dataset.df_variables.loc[name]
-            if name in dataset.df_variables.index
-            else {}
-        )
-        standard_name = var_meta.get("standard_name") or None
-        variables.append(
-            {
-                "name": name,
-                "standard_name": standard_name,
-                "long_name": var_meta.get("long_name") or None,
-                "units": var_meta.get("units") or None,
-                "eovs": standard_name_to_eovs.get(standard_name, []),
-            }
-        )
-    return variables
+    # Shares the extraction with datasets.table_variables but NOT its shape:
+    # GriddapDetails.jsx and wmsUtilities.js read these five keys, so the extra
+    # attributes table_variables carries are projected away rather than widening
+    # a column two consumers already depend on.
+    return [
+        {
+            "name": variable["name"],
+            "standard_name": variable["standard_name"],
+            "long_name": variable["long_name"],
+            "units": variable["units"],
+            "eovs": standard_name_to_eovs.get(variable["standard_name"], []),
+        }
+        for variable in extract_variables(dataset.df_variables, names=names)
+    ]
 
 
 def _vertical_extent(dataset, dimensions):

@@ -1,13 +1,13 @@
 import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
+import { variablesFrom, byColumnName } from './previewVariables.js'
 import {
-  EMPTY_PLOT_AXES,
-  axesFromParams,
-  axesToParams,
-  defaultPlotAxesFor,
+  facetPlanFor,
+  resolvePanels,
   defaultVisFor
-} from './previewPlotDefaults.js'
+} from './previewFacetPlan.js'
+import { DEFAULT_COLORSCALE } from './erddapPalettes.js'
 
 // Everything that describes the plot on screen, kept in the query string so a
 // link reproduces it — the same arrangement SelectionProvider already uses for
@@ -25,9 +25,27 @@ import {
 
 const DEFAULT_MODE = 'markers'
 const PLOT_MODES = ['markers', 'lines', 'markers+lines']
-const DEFAULT_SCALES = { primary: 'Viridis', secondary: 'Reds' }
 
-export default function usePreviewPlotParams (inspectDataset, table) {
+// A panel list rides in one param rather than one param per panel: the count is
+// unbounded (as many variables as the dataset has), and pvars=A,B,C stays
+// readable where pv1=A&pv2=B&pv3=C does not.
+//
+// Unticking every variable is a real state and must not read as "use the
+// defaults", so it writes a sentinel. A bare '-' cannot collide with a column
+// name: ERDDAP variable names are CF-legal identifiers (letters, digits,
+// underscore), so none of them is '-'.
+const NO_PANELS = '-'
+const listToParam = (columnNames) =>
+  columnNames.length ? columnNames.join(',') : NO_PANELS
+const paramToList = (value) =>
+  value === NO_PANELS
+    ? []
+    : (value || '').split(',').map((name) => name.trim()).filter(Boolean)
+
+const sameList = (a, b) =>
+  a.length === b.length && a.every((value, index) => value === b[index])
+
+export default function usePreviewPlotParams (inspectDataset, table, data) {
   const [searchParams, setSearchParams] = useSearchParams()
 
   // One writer for all of them. A null/undefined/'' value deletes its param, so
@@ -56,36 +74,91 @@ export default function usePreviewPlotParams (inspectDataset, table) {
     [setSearchParams]
   )
 
-  // The type's own defaults, and the fallback the four roles resolve against.
-  const typeAxes = useMemo(
-    () => defaultPlotAxesFor(inspectDataset, table),
-    [inspectDataset, table]
+  // Every column of the payload, described. Empty until /preview lands, which is
+  // why the vis default below must not depend on it.
+  const variables = useMemo(
+    () => variablesFrom(table, inspectDataset),
+    [table, inspectDataset]
   )
-  const fallbackAxes = typeAxes || EMPTY_PLOT_AXES
+  const variablesByName = useMemo(() => byColumnName(variables), [variables])
+
+  // The layout this dataset type implies: which axis the panels share, which way
+  // they stack, and which variable opens.
+  const plan = useMemo(
+    () => facetPlanFor(inspectDataset, variables, data),
+    [inspectDataset, variables, data]
+  )
 
   // Table or plot. Only the deviation is stored, so `vis` appears in the link
-  // exactly when the user overrode what this dataset type opens on.
+  // exactly when the user overrode what this dataset type opens on. Decided from
+  // cdm_data_type alone so it cannot flip when the payload arrives.
   const defaultVis = defaultVisFor(inspectDataset)
   const visParam = searchParams.get('vis')
-  const selectedVis = visParam === 'table' || visParam === 'plot' ? visParam : defaultVis
+  const selectedVis =
+    visParam === 'table' || visParam === 'plot' ? visParam : defaultVis
   const setSelectedVis = useCallback(
     (vis) => setParams({ vis: vis === defaultVis ? null : vis }),
     [setParams, defaultVis]
   )
 
-  // A role reads its column from the URL and its unit from the payload — the
-  // unit is derivable, so it stays out of the link.
-  const plotAxes = useMemo(
-    () => axesFromParams(searchParams, fallbackAxes, table),
-    [searchParams, fallbackAxes, table]
+  const axisParam = searchParams.get('paxis')
+  // A link may name a column this dataset does not have (a different dataset, a
+  // renamed variable); fall back rather than draw an empty axis.
+  const sharedAxis =
+    axisParam && variablesByName.has(axisParam)
+      ? axisParam
+      : (plan && plan.sharedAxis) || null
+
+  const panels = useMemo(() => {
+    const requested = searchParams.has('pvars')
+      ? paramToList(searchParams.get('pvars'))
+      : (plan && plan.panelDefaults) || []
+    return resolvePanels(requested, variables, sharedAxis)
+  }, [searchParams, plan, variables, sharedAxis])
+
+  const setSharedAxis = useCallback(
+    (columnName) => {
+      const isDefault = plan && columnName === plan.sharedAxis
+      // The shared axis is never also a panel. Moving it onto a selected column
+      // has to drop that column from the panel set in the SAME write, or the
+      // next render resolves it away and the URL keeps a panel that is not drawn.
+      const remaining = panels.filter((name) => name !== columnName)
+      const panelsAreDefault =
+        plan && sameList(remaining, plan.panelDefaults)
+      setParams({
+        paxis: isDefault ? null : columnName,
+        pvars: panelsAreDefault ? null : listToParam(remaining)
+      })
+    },
+    [setParams, plan, panels]
   )
 
-  // Takes a whole axes object, the way the dropdowns already build one
-  // ({ ...plotAxes, [role]: … }); axesToParams keeps only the roles that deviate,
-  // so setting one back to its type default — or to None — drops its param.
-  const setPlotAxes = useCallback(
-    (nextAxes) => setParams(axesToParams(nextAxes, fallbackAxes)),
-    [setParams, fallbackAxes]
+  const setPanels = useCallback(
+    (nextPanels) => {
+      const cleaned = resolvePanels(nextPanels, variables, sharedAxis)
+      const isDefault = plan && sameList(cleaned, plan.panelDefaults)
+      setParams({ pvars: isDefault ? null : listToParam(cleaned) })
+    },
+    [setParams, plan, variables, sharedAxis]
+  )
+
+  const togglePanel = useCallback(
+    (columnName) => {
+      setPanels(
+        panels.includes(columnName)
+          ? panels.filter((name) => name !== columnName)
+          : [...panels, columnName]
+      )
+    },
+    [setPanels, panels]
+  )
+
+  const colorParam = searchParams.get('pcolor')
+  const colorBy =
+    colorParam && variablesByName.has(colorParam) ? colorParam : null
+  const setColorBy = useCallback(
+    (columnName) => setParams({ pcolor: columnName || null }),
+    [setParams]
   )
 
   const modeParam = searchParams.get('pmode')
@@ -95,45 +168,39 @@ export default function usePreviewPlotParams (inspectDataset, table) {
     [setParams]
   )
 
-  // pscale2's PRESENCE is what records "different scale per variable", so the
-  // checkbox needs no param of its own: it is on exactly when a second scale is
-  // named, and turning it on writes the scale even at its default value.
-  const secondaryScaleParam = searchParams.get('pscale2')
-  const dualColorscale = secondaryScaleParam !== null
-  const colorscales = useMemo(
-    () => ({
-      primary: searchParams.get('pscale') || DEFAULT_SCALES.primary,
-      secondary: secondaryScaleParam || DEFAULT_SCALES.secondary
-    }),
-    [searchParams, secondaryScaleParam]
+  const colorscale = searchParams.get('pscale') || DEFAULT_COLORSCALE
+  const setColorscale = useCallback(
+    (scale) => setParams({ pscale: scale === DEFAULT_COLORSCALE ? null : scale }),
+    [setParams]
   )
 
-  const setColorscales = useCallback(
-    (update) => {
-      const next = typeof update === 'function' ? update(colorscales) : update
-      setParams({
-        pscale: next.primary === DEFAULT_SCALES.primary ? null : next.primary,
-        pscale2: dualColorscale ? next.secondary : null
-      })
-    },
-    [setParams, colorscales, dualColorscale]
-  )
+  // Changes whenever the axis SET changes, so Plotly does not try to restore a
+  // zoom onto an axis that no longer exists after a panel is added or removed.
+  const uirevision = `${sharedAxis || ''}|${panels.join(',')}`
 
-  const setDualColorscale = useCallback(
-    (on) => setParams({ pscale2: on ? colorscales.secondary : null }),
-    [setParams, colorscales]
-  )
+  // Anything that alters the link the Copy button would hand over. The whole
+  // search string, not just the plot params: panning the map changes the link
+  // too, and a button still saying "Copied!" would be claiming a stale URL.
+  const linkKey = searchParams.toString()
 
   return {
+    variables,
+    variablesByName,
+    plan,
     selectedVis,
     setSelectedVis,
-    plotAxes,
-    setPlotAxes,
+    sharedAxis,
+    setSharedAxis,
+    panels,
+    setPanels,
+    togglePanel,
+    colorBy,
+    setColorBy,
     plotType,
     setPlotType,
-    colorscales,
-    setColorscales,
-    dualColorscale,
-    setDualColorscale
+    colorscale,
+    setColorscale,
+    uirevision,
+    linkKey
   }
 }

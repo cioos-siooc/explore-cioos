@@ -69,6 +69,7 @@ attribute,longitude,axis,,X
 attribute,longitude,ioos_category,,Location
 variable,depth,,double,
 attribute,depth,axis,,Z
+attribute,depth,positive,,down
 attribute,depth,ioos_category,,Location
 attribute,depth,colorBarPalette,,TopographyDepth
 attribute,depth,colorBarMinimum,double,0.0

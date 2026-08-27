@@ -92,6 +92,11 @@ CREATE TABLE datasets (
     coverage_time_max timestamptz,
     coverage_depth_min double precision,
     coverage_depth_max double precision,
+    -- Per-variable metadata for every dataset type, harvested from
+    -- /info/{id}/index.csv: long_name, units, cf_role, axis, colorBar*, ...
+    -- See harvester/cde_harvester/core/variables.py. NULL until a dataset is
+    -- (re)harvested, so consumers must tolerate its absence.
+    table_variables jsonb,
     grid_variables jsonb,
     grid_dimensions jsonb,
     wms_url text,

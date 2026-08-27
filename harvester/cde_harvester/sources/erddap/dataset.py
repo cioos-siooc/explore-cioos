@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import requests
 from cde_harvester.core.observability import run_logger
+from cde_harvester.core.variables import extract_variables
 from cde_harvester.sources.erddap.platform_vocab import platforms_nerc_ioos
 from cde_harvester.utils import (
     eov_to_standard_name,
@@ -34,6 +35,9 @@ def is_valid_duration(duration):
 #                     palette, so consumers must have a default.
 #   grouping          ioos_category  - variable families (Temperature, Salinity,
 #                     Optical Properties, Identifier...), ~48% coverage.
+#   axis direction    positive       - "down" | "up" on a vertical coordinate.
+#                     A depth axis has to be drawn reversed and this is the only
+#                     attribute that says so; ~41 variables declare it.
 #   quality flags     flag_values, flag_meanings, ancillary_variables - how a QC
 #                     flag column announces itself, so plots can exclude them.
 #
@@ -46,6 +50,7 @@ CONSIDERED_VARIABLE_ATTRIBUTES = [
     "units",
     "long_name",
     "axis",
+    "positive",
     "colorBarPalette",
     "colorBarMinimum",
     "colorBarMaximum",
@@ -102,6 +107,9 @@ class Dataset(object):
         self.coverage_depth_max = None
         self.grid_variables = None
         self.grid_dimensions = None
+        # Per-variable metadata for every column, griddap and tabledap alike.
+        # get_metadata() fills it; see core/variables.py for why.
+        self.table_variables = None
 
         self.get_metadata()
 
@@ -138,6 +146,7 @@ class Dataset(object):
                 "coverage_time_max": [self.coverage_time_max],
                 "coverage_depth_min": [self.coverage_depth_min],
                 "coverage_depth_max": [self.coverage_depth_max],
+                "table_variables": [self.table_variables],
                 "grid_variables": [self.grid_variables],
                 "grid_dimensions": [self.grid_dimensions],
                 "wms_url": [self.wms_url],
@@ -428,6 +437,9 @@ class Dataset(object):
             df_variables["standard_name"] = None
         df_variables.set_index("name", drop=False, inplace=True)
         self.df_variables = df_variables
+        # Every column, coordinates and cf_role variables included: the preview
+        # needs those to choose a shared axis and to exclude them from panels.
+        self.table_variables = extract_variables(df_variables)
         self.eovs = self.get_eovs()
 
         # Try to get organizations list from globals, starting with "institution"

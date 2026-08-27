@@ -8,9 +8,21 @@ import {
   withoutPreviewParams
 } from './previewParams.js'
 
-test('the preview owns the record param and the plot params, nothing else', () => {
+test('the preview owns the record param and the plot params', () => {
   assert.equal(RECORD_PARAM, 'record')
-  assert.deepEqual(PREVIEW_PARAMS, [RECORD_PARAM, ...PLOT_PARAMS])
+  assert.deepEqual(PLOT_PARAMS, ['vis', 'pvars', 'paxis', 'pcolor', 'pmode', 'pscale'])
+  for (const param of [RECORD_PARAM, ...PLOT_PARAMS]) {
+    assert.ok(PREVIEW_PARAMS.includes(param), param)
+  }
+})
+
+test('params retired with the two-axis plot are still cleaned up', () => {
+  // Written by the pre-faceting plot and never read again, but a link made then
+  // must not leave orphans in the address bar once the modal closes.
+  for (const param of ['px', 'py', 'p2', 'pscale2']) {
+    assert.ok(PREVIEW_PARAMS.includes(param), param)
+    assert.ok(!PLOT_PARAMS.includes(param), `${param} must not be written`)
+  }
 })
 
 test('no preview param collides with one the map or the filters already use', () => {
@@ -33,8 +45,10 @@ test('no preview param collides with one the map or the filters already use', ()
 
 test('closing the preview strips all of its params and touches nothing else', () => {
   const params = new URLSearchParams(
-    'lat=45&zoom=5&dataset=X&server=ogsl&record=R1&vis=table&px=time&py=depth' +
-    '&p2=PSAL&pcolor=depth&pmode=lines&pscale=Jet&pscale2=Reds&eovs=salinity'
+    'lat=45&zoom=5&dataset=X&server=ogsl&record=R1&vis=table&paxis=depth' +
+    '&pvars=TE90_01,PSAL_01&pcolor=depth&pmode=lines&pscale=Jet' +
+    // A stale link from before faceting, carried into the same close.
+    '&px=time&py=depth&p2=PSAL&pscale2=Reds&eovs=salinity'
   )
   const stripped = withoutPreviewParams(params)
   assert.equal(stripped.toString(), 'lat=45&zoom=5&dataset=X&server=ogsl&eovs=salinity')

@@ -14,26 +14,35 @@ export const RECORD_PARAM = 'record'
 // from the default the dataset type implies, so an untouched plot adds nothing
 // to the link — the same rule the map's layer switches follow.
 //
-//   vis      table | plot          (default: plot where axes can be named)
-//   px, py   the two axis columns  (default: per cdm_data_type)
-//   p2       optional 2nd variable (default: none)
-//   pcolor   optional color-by     (default: none)
+//   vis      table | plot          (default: plot for every plottable
+//                                  cdm_data_type, table for Grid/unknown)
+//   pvars    the panel variables, comma-separated, one panel each
+//                                  (default: the dataset's first EOV column)
+//   paxis    the axis every panel shares
+//                                  (default: depth / time / track, per type)
+//   pcolor   optional colour-by     (default: none)
 //   pmode    markers | lines | markers+lines
 //   pscale   colorscale name
-//   pscale2  2nd colorscale — its PRESENCE is what records "different scale per
-//            variable", so that checkbox needs no param of its own
 export const PLOT_PARAMS = [
   'vis',
-  'px',
-  'py',
-  'p2',
+  'pvars',
+  'paxis',
   'pcolor',
   'pmode',
-  'pscale',
-  'pscale2'
+  'pscale'
 ]
 
-export const PREVIEW_PARAMS = [RECORD_PARAM, ...PLOT_PARAMS]
+// Written by the pre-faceting plot and never again. They stay in the cleanup
+// list so a link made before faceting does not leave orphans in the address bar
+// after the modal closes, but nothing reads them back: two axis roles plus one
+// overlaid "second variable" has no meaning once every variable gets a panel.
+const RETIRED_PLOT_PARAMS = ['px', 'py', 'p2', 'pscale2']
+
+export const PREVIEW_PARAMS = [
+  RECORD_PARAM,
+  ...PLOT_PARAMS,
+  ...RETIRED_PLOT_PARAMS
+]
 
 // Closing the preview has to delete all of these in ONE setSearchParams call:
 // react-router hands a functional updater the params from the last RENDER, not
