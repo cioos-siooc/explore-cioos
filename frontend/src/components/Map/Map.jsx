@@ -459,6 +459,18 @@ export default function CreateMap({
   // and a re-render of this component is not what it should cause — the legend
   // hears about it through onViewportHexRange instead.
   const viewportHexRange = useRef(undefined)
+  // The count at the 25th percentile of the hexes currently on screen — the top
+  // of the "little data here" band that FADE_OPACITY applies to. undefined when
+  // there was nothing to measure, which means no fading at all rather than a
+  // guessed threshold.
+  //
+  // A real percentile of the rendered counts, NOT a fraction of the min..max
+  // range. The counts are heavily skewed — across the loaded catalogue the hex
+  // totals run 0..149029 with a MEDIAN of 2 — so a quarter of the way along the
+  // range lands at ~37000 and would fade all but a handful of hexes. The
+  // quartile has to come from the distribution, the same reason the ramp itself
+  // is log-spaced (generateColorStops) rather than evenly cut.
+  const viewportHexP25 = useRef(undefined)
   // Latest setColorStops closure (it reads the rangeLevels props), for the map
   // handlers registered once on mount.
   const setColorStopsRef = useRef(undefined)
@@ -905,30 +917,64 @@ export default function CreateMap({
   // fill is nearly transparent (the layer fades out with zoom).
   const coverageHexOutlineColor = () => hexOutlineColor
 
-  // Opacity expression that reduces transparency for hexes in the bottom
-  // quartile (least data). Uses the domain to estimate p25, then applies
-  // reduced opacity below that threshold so sparse hexes don't saturate the map.
-  const hexOpacityExpression = () => {
-    if (!colorStops.current || colorStops.current.length === 0) {
-      return hexOpacity
-    }
-    // Estimate p25 from the color domain's min/max. The minimum is at
-    // colorStops[0][0], maximum at colorStops[last][0].
-    const minStop = colorStops.current[0][0]
-    const maxStop = colorStops.current[colorStops.current.length - 1][0]
-    const p25 = minStop + (maxStop - minStop) * 0.25
-    // Case: if count < p25, use reduced opacity (0.3); otherwise normal (hexOpacity)
-    return ['case', ['<', ['get', 'count'], p25], 0.3, hexOpacity]
+  // How much of its normal opacity a bottom-quartile hex keeps. Low enough to
+  // read as "little here", high enough that the hex is still visible and still
+  // clickable — the ask was to recede, not to disappear.
+  const FADE_FACTOR = 0.45
+
+  // The count at or below which a hex counts as sparse, from the rendered
+  // hexes' own distribution (see viewportHexP25). undefined -> no threshold has
+  // been measured, so nothing fades.
+  //
+  // `<=`, not `<`: the counts are small integers at the bottom of the
+  // distribution and p25 is frequently 1, where `<` would fade nothing at all.
+  const fadeExpression = (baseOpacity) => {
+    const p25 = viewportHexP25.current
+    if (!Number.isFinite(p25)) return baseOpacity
+    return [
+      'case',
+      ['<=', ['to-number', ['get', 'count'], 0], p25],
+      baseOpacity * FADE_FACTOR,
+      baseOpacity
+    ]
   }
 
-  const coverageHexOpacityExpression = () => {
-    if (!coverageColorStops.current || coverageColorStops.current.length === 0) {
-      return coverageHexOpacity
+  // Both hex layers fade on the same measured threshold: measureVisibleHexRange
+  // queries them together and only one of them is ever on screen at a time.
+  const hexOpacityExpression = () => fadeExpression(hexOpacity)
+  const coverageHexOpacityExpression = () => fadeExpression(coverageHexOpacity)
+
+  // Push the current fade threshold onto both hex layers. No-op before the
+  // opening reveal, which owns fill-opacity until it has run (writing here
+  // first would flash the hexes on over the placeholder ramp).
+  function applyHexOpacity () {
+    if (!hexesRevealed.current || !map.current) return
+    if (map.current.getLayer('hexes')) {
+      map.current.setPaintProperty(
+        'hexes',
+        'fill-opacity',
+        hexOpacityExpression()
+      )
     }
-    const minStop = coverageColorStops.current[0][0]
-    const maxStop = coverageColorStops.current[coverageColorStops.current.length - 1][0]
-    const p25 = minStop + (maxStop - minStop) * 0.25
-    return ['case', ['<', ['get', 'count'], p25], 0.3, coverageHexOpacity]
+    if (map.current.getLayer('coverage-hexes')) {
+      map.current.setPaintProperty(
+        'coverage-hexes',
+        'fill-opacity',
+        coverageHexOpacityExpression()
+      )
+    }
+  }
+
+  // The percentile of an unsorted numeric array, by nearest rank. Returns
+  // undefined for an empty one so callers can tell "no data" from "zero".
+  function percentileOf (values, fraction) {
+    if (!values || values.length === 0) return undefined
+    const sorted = [...values].sort((a, b) => a - b)
+    const index = Math.min(
+      sorted.length - 1,
+      Math.max(0, Math.ceil(fraction * sorted.length) - 1)
+    )
+    return sorted[index]
   }
 
   function setColorStops() {
@@ -1080,6 +1126,10 @@ export default function CreateMap({
   // map is drawing, so a viewport-scaled ramp costs no request — one pass over
   // the visible hexes, which is at most a few thousand small objects.
   function measureVisibleHexRange(focusPk) {
+    // Cleared up front so every path that gives up below leaves no stale
+    // threshold behind: a fade band measured over the last view would otherwise
+    // keep being applied to hexes it was never measured against.
+    viewportHexP25.current = undefined
     const layers = HEX_LAYER_IDS.filter((id) => map.current.getLayer(id))
     if (!layers.length) return undefined
     // No trustworthy answer to be had — see viewportQueryIsReliable. Nothing is
@@ -1096,6 +1146,14 @@ export default function CreateMap({
     if (features.length < MIN_VIEWPORT_HEXES) return undefined
     let lo = Infinity
     let hi = -Infinity
+    // Counts kept for the quartile below. One array and one sort per settled
+    // camera — the thing the loop avoids is a map/filter CHAIN allocating an
+    // intermediate per stage, not a single collection. Deduped by feature id
+    // (promoteId lifts the hex pk onto it) because a hex straddling a tile
+    // boundary is returned once per tile: harmless for the min/max, but it
+    // would weight those hexes twice in a percentile.
+    const counts = []
+    const seen = new Set()
     // A plain loop, not a map/filter chain: this runs over every rendered hex,
     // and the intermediate arrays are the only part of it that would be
     // expensive. Features straddling a tile boundary appear more than once —
@@ -1110,8 +1168,15 @@ export default function CreateMap({
       if (!Number.isFinite(count) || count <= 0) continue
       if (count < lo) lo = count
       if (count > hi) hi = count
+      const id = feature.id
+      if (id !== undefined) {
+        if (seen.has(id)) continue
+        seen.add(id)
+      }
+      counts.push(count)
     }
     if (!Number.isFinite(hi)) return undefined
+    viewportHexP25.current = percentileOf(counts, 0.25)
     return quantizeCountRange([lo, hi])
   }
 
@@ -1144,6 +1209,13 @@ export default function CreateMap({
     if (focusPk !== undefined && range !== undefined) {
       rampMeasuredForPk.current = focusPk
     }
+    // The fade threshold has just been re-measured, and it can move while the
+    // QUANTIZED range holds still (coarse rungs, see quantizeCountRange) — so it
+    // is applied here rather than only on the setColorStops path below, which
+    // the equal-ranges branch returns before reaching. Safe against the repaint
+    // -> re-render -> re-measure loop: hexRangeDirty is already false above, so
+    // the call this repaint provokes returns at the top.
+    applyHexOpacity()
     if (rangesEqual(viewportHexRange.current, range)) {
       // Nothing to repaint — but the pass still says the ramp already on the
       // layers is the one this view gets, which is what the first reveal waits
