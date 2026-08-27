@@ -27,6 +27,7 @@ jobs:
       - name: Prepare CI configuration
         run: |
           cp .env.sample .env
+          cp docker-compose.override.yaml.sample docker-compose.override.yaml
           cp harvest_config.sample.yaml harvest_config.yaml
 
       - name: Start the full application
