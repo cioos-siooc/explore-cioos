@@ -921,6 +921,16 @@ export default function CreateMap({
   // and everything referencing it comes out.
   const fadeFactorRef = useRef(0.45)
   const fadePercentileRef = useRef(0.25)
+  // TEMP_FADE_TUNER, ramp half. 'default' = whatever generateColorStops does
+  // (log once max/min >= 100, which every real days domain is), so the tuner
+  // starts on today's behaviour and any change is a deliberate comparison.
+  // rampTopPct caps the ramp's TOP at a percentile of the on-screen counts
+  // instead of their maximum — the lever that matters here, because a handful
+  // of huge hexes otherwise stretch the domain past everything else.
+  const rampModeRef = useRef('default')
+  const rampGammaRef = useRef(1)
+  const rampTopPctRef = useRef(1)
+  const viewportRampTop = useRef(undefined)
 
   // Is this hex in the sparse band? The count at or below which it counts as
   // sparse comes from the rendered hexes' own distribution (see viewportHexP25).
@@ -989,6 +999,34 @@ export default function CreateMap({
     }
   }
 
+  // TEMP_FADE_TUNER: stops for the chosen mode/gamma/top-percentile, or null to
+  // fall through to generateColorStops. Values must be STRICTLY ascending —
+  // MapLibre rejects a repeated interpolate input, and rounding collides
+  // readily at the bottom of a log ramp (1, 1, 2, ...) — hence the running max.
+  function tunedStops (domain) {
+    if (rampModeRef.current === 'default' && rampGammaRef.current === 1 &&
+        rampTopPctRef.current === 1) return null
+    const lo = Math.max(Number.isFinite(domain && domain[0]) ? domain[0] : 1, 1)
+    let hi = domain && domain[1]
+    if (rampTopPctRef.current < 1 && Number.isFinite(viewportRampTop.current)) {
+      hi = viewportRampTop.current
+    }
+    if (!Number.isFinite(hi) || hi <= lo) return null
+    const linear = rampModeRef.current === 'linear'
+    const gamma = rampGammaRef.current
+    const n = colorScale.length
+    const out = []
+    let prev = -Infinity
+    for (let i = 0; i < n; i++) {
+      const t = Math.pow(n === 1 ? 0.5 : i / (n - 1), gamma)
+      const raw = linear ? lo + (hi - lo) * t : lo * Math.pow(hi / lo, t)
+      const v = Math.max(Math.round(raw), prev + 1)
+      prev = v
+      out.push([v, colorScale[i]])
+    }
+    return out
+  }
+
   // The percentile of an unsorted numeric array, by nearest rank. Returns
   // undefined for an empty one so callers can tell "no data" from "zero".
   function percentileOf (values, fraction) {
@@ -1022,22 +1060,23 @@ export default function CreateMap({
     const hexDomain =
       viewportHexRange.current ||
       getCurrentRangeLevel(effectiveRangeLevels, map.current.getZoom())
-    colorStops.current = generateColorStops(colorScale, hexDomain).map(
-      (colorStop) => {
+    colorStops.current =
+      tunedStops(hexDomain) ||
+      generateColorStops(colorScale, hexDomain).map((colorStop) => {
         return [colorStop.stop, colorStop.color]
-      }
-    )
+      })
 
     // Coverage hexes only ever render at zoom >= hexMaxZoom, where the hex_1
     // grid is always used, so there's a single range to apply.
     const effectiveCoverageRangeLevels =
       coverageRangeLevels || defaultCoverageRangeLevels
-    coverageColorStops.current = generateColorStops(
-      colorScale,
+    const coverageDomain =
       viewportHexRange.current || effectiveCoverageRangeLevels.zoom1
-    ).map((colorStop) => {
-      return [colorStop.stop, colorStop.color]
-    })
+    coverageColorStops.current =
+      tunedStops(coverageDomain) ||
+      generateColorStops(colorScale, coverageDomain).map((colorStop) => {
+        return [colorStop.stop, colorStop.color]
+      })
 
     // Point radius now has to be a ramp too. It used to be a hardcoded
     // `count <= 2 ? small : large` split, which meant "one day of data or
@@ -1201,6 +1240,7 @@ export default function CreateMap({
     }
     if (!Number.isFinite(hi)) return undefined
     viewportHexP25.current = percentileOf(counts, fadePercentileRef.current)
+    viewportRampTop.current = percentileOf(counts, rampTopPctRef.current)
     return quantizeCountRange([lo, hi])
   }
 
@@ -1265,9 +1305,10 @@ export default function CreateMap({
     const host = document.createElement('div')
     host.id = 'temp-fade-tuner'
     host.style.cssText = [
-      'position:fixed', 'bottom:150px', 'right:12px', 'z-index:9999',
+      'position:fixed', 'bottom:110px', 'right:12px', 'z-index:9999',
+      'max-height:70vh', 'overflow:auto',
       'background:rgba(255,255,255,0.96)', 'border:1px solid #b9c9c5',
-      'border-radius:8px', 'padding:10px 12px', 'width:232px',
+      'border-radius:8px', 'padding:10px 12px', 'width:250px',
       'font:12px/1.45 system-ui,sans-serif', 'color:#123',
       'box-shadow:0 2px 10px rgba(0,0,0,0.18)'
     ].join(';')
@@ -1284,6 +1325,27 @@ export default function CreateMap({
                style="width:100%">
       </label>
       <div id="tft-out" style="margin-top:8px;font-size:11px;color:#456"></div>
+      <div style="border-top:1px solid #ccd;margin:10px 0 8px"></div>
+      <div style="font-weight:600;margin-bottom:6px">Colour ramp</div>
+      <label style="display:block">Spacing
+        <select id="tft-mode" style="width:100%;font-size:11px;margin-top:2px">
+          <option value="default">default (log here)</option>
+          <option value="log">log (forced)</option>
+          <option value="linear">linear</option>
+        </select>
+      </label>
+      <label style="display:block;margin-top:6px">Top percentile
+        <b id="tft-top-val">1.00</b>
+        <input id="tft-top" type="range" min="0.80" max="1" step="0.01" value="1"
+               style="width:100%">
+      </label>
+      <label style="display:block;margin-top:6px">Gamma
+        <b id="tft-g-val">1.00</b>
+        <input id="tft-g" type="range" min="0.3" max="3" step="0.1" value="1"
+               style="width:100%">
+      </label>
+      <div id="tft-ramp" style="margin-top:6px;font-size:10px;color:#456;
+           word-break:break-all"></div>
       <button id="tft-reset" style="margin-top:8px;width:100%;font-size:11px;
               padding:3px;cursor:pointer">reset</button>`
     document.body.appendChild(host)
@@ -1319,6 +1381,21 @@ export default function CreateMap({
       $('#tft-out').textContent = counts.length
         ? `${layer}: threshold ${threshold} - ${faded}/${counts.length} faded (${(100 * faded / counts.length).toFixed(0)}%)`
         : 'no hexes on screen'
+      // What the ramp is actually doing: its stops, and how many hexes land in
+      // each band. Even buckets mean the palette is being spent on the data.
+      const stops = colorStops.current || []
+      if (stops.length && counts.length) {
+        const per = stops.map((st, i) => {
+          const from = i ? stops[i - 1][0] : 0
+          return counts.filter((c) => c > from && c <= st[0]).length
+        })
+        const over = counts.filter((c) => c > stops[stops.length - 1][0]).length
+        $('#tft-ramp').textContent =
+          `stops ${stops.map((st) => st[0]).join(' ')}\nper band ${per.join(' ')}` +
+          (over ? ` (+${over} above top)` : '')
+      } else {
+        $('#tft-ramp').textContent = ''
+      }
     }
     // Recompute the threshold HERE rather than going through
     // refreshViewportHexRange: that bails early when the style is mid-load or
@@ -1328,9 +1405,29 @@ export default function CreateMap({
       if (counts.length) {
         viewportHexP25.current = percentileOf(counts, fadePercentileRef.current)
       }
+      setColorStops()
       applyHexOpacity()
       readout()
     }
+    $('#tft-mode').addEventListener('change', (e) => {
+      rampModeRef.current = e.target.value
+      apply()
+    })
+    $('#tft-top').addEventListener('input', (e) => {
+      rampTopPctRef.current = Number(e.target.value)
+      $('#tft-top-val').textContent = Number(e.target.value).toFixed(2)
+      // the cap is a percentile of the on-screen counts, so re-measure first
+      const { counts } = visibleCounts()
+      if (counts.length) {
+        viewportRampTop.current = percentileOf(counts, rampTopPctRef.current)
+      }
+      apply()
+    })
+    $('#tft-g').addEventListener('input', (e) => {
+      rampGammaRef.current = Number(e.target.value)
+      $('#tft-g-val').textContent = Number(e.target.value).toFixed(2)
+      apply()
+    })
     $('#tft-f').addEventListener('input', (e) => {
       fadeFactorRef.current = Number(e.target.value)
       $('#tft-f-val').textContent = e.target.value
@@ -1345,10 +1442,18 @@ export default function CreateMap({
     $('#tft-reset').addEventListener('click', () => {
       fadeFactorRef.current = 0.45
       fadePercentileRef.current = 0.25
+      rampModeRef.current = 'default'
+      rampGammaRef.current = 1
+      rampTopPctRef.current = 1
       $('#tft-f').value = '0.45'
       $('#tft-p').value = '0.25'
+      $('#tft-mode').value = 'default'
+      $('#tft-top').value = '1'
+      $('#tft-g').value = '1'
       $('#tft-f-val').textContent = '0.45'
       $('#tft-p-val').textContent = '0.25'
+      $('#tft-top-val').textContent = '1.00'
+      $('#tft-g-val').textContent = '1.00'
       apply()
     })
     const poll = setInterval(readout, 1200)
