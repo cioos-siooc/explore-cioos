@@ -921,7 +921,7 @@ export default function CreateMap({
   // and everything referencing it comes out.
   // Chosen by eye on 2026-08-28. These are what the map actually draws now —
   // the tuner below is hidden unless asked for, so nothing else sets them:
-  // gradient fade, opacity climbing from a floor of 0.20 (0.16 against the 0.80
+  // gradient fade, opacity climbing from a floor of 0.50 (0.40 against the 0.80
   // base) at a count of 1 up to full strength at the threshold, with the
   // threshold at the 95th percentile of the counts on screen.
   //
@@ -945,7 +945,7 @@ export default function CreateMap({
   // modes can be dialled independently and compared without one dragging the
   // other. Starts equal to the binary value, so switching style alone changes
   // only the shape of the fade, not how faint its faintest hex is.
-  const gradientFloorRef = useRef(0.2)
+  const gradientFloorRef = useRef(0.5)
   // TEMP_FADE_TUNER, ramp half. 'default' = whatever generateColorStops does
   // (log once max/min >= 100, which every real days domain is), so the tuner
   // starts on today's behaviour and any change is a deliberate comparison.
@@ -1408,8 +1408,8 @@ export default function CreateMap({
                style="width:100%">
       </label>
       <label id="tft-row-gradient" style="display:block;margin-top:6px">
-        Gradient floor &times; <b id="tft-floor-val">0.20</b>
-        <input id="tft-floor" type="range" min="0.05" max="1" step="0.05" value="0.2"
+        Gradient floor &times; <b id="tft-floor-val">0.50</b>
+        <input id="tft-floor" type="range" min="0.05" max="1" step="0.05" value="0.5"
                style="width:100%">
       </label>
       <label style="display:block;margin-top:6px">Sparse cutoff pctile
@@ -1559,10 +1559,10 @@ export default function CreateMap({
       fadeFactorRef.current = 0.65
       fadePercentileRef.current = 0.95
       fadeStyleRef.current = 'gradient'
-      gradientFloorRef.current = 0.2
+      gradientFloorRef.current = 0.5
       $('#tft-style').value = 'gradient'
-      $('#tft-floor').value = '0.2'
-      $('#tft-floor-val').textContent = '0.20'
+      $('#tft-floor').value = '0.5'
+      $('#tft-floor-val').textContent = '0.50'
       syncRows()
       rampModeRef.current = 'default'
       rampGammaRef.current = 1
