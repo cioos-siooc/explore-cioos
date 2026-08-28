@@ -456,7 +456,7 @@ export default function CreateMap({
   // and a re-render of this component is not what it should cause — the legend
   // hears about it through onViewportHexRange instead.
   const viewportHexRange = useRef(undefined)
-  // The count at fadePercentileRef of the hexes currently on screen — the top
+  // The count at SPARSE_FADE_PERCENTILE of the hexes currently on screen — the top
   // of the faded band. undefined when
   // there was nothing to measure, which means no fading at all rather than a
   // guessed threshold.
@@ -914,14 +914,8 @@ export default function CreateMap({
   // fill is nearly transparent (the layer fades out with zoom).
   const coverageHexOutlineColor = () => hexOutlineColor
 
-  // How much of its normal opacity a sparse hex keeps, and how much of the
-  // distribution counts as sparse. Refs rather than constants ONLY so the
-  // temporary tuning panel below can move them live — see TEMP_FADE_TUNER.
-  // Once the values are settled these go back to plain consts and the panel
-  // and everything referencing it comes out.
-  // Chosen by eye on 2026-08-28. These are what the map actually draws now —
-  // the tuner below is hidden unless asked for, so nothing else sets them:
-  // gradient fade, opacity climbing from a floor of 0.50 (0.40 against the 0.80
+  // The sparse-hex fade. Chosen by eye on 2026-08-28: opacity climbs from a
+  // floor of 0.50 of the layer's normal opacity (0.40 against the 0.80 hex
   // base) at a count of 1 up to full strength at the threshold, with the
   // threshold at the 95th percentile of the counts on screen.
   //
@@ -931,31 +925,15 @@ export default function CreateMap({
   // as a handful of hotspots over a wash. Deliberate: at the low end the fade
   // did almost nothing, because 38% of hexes hold exactly one day and any
   // percentile below ~0.4 lands on a threshold of 1.
-  const fadeFactorRef = useRef(0.65)
-  const fadePercentileRef = useRef(0.95)
-  // 'binary'   — one flat faded opacity for everything at or below the
-  //              threshold, a hard step at it.
-  // 'gradient' — opacity climbs with the count across the faded band and
-  //              reaches full strength AT the threshold, so the step is gone.
-  // fadeFactorRef is the flat faded value in binary; gradientFloorRef is the
-  // floor in gradient. Separate knobs — see gradientFloorRef below.
-  const fadeStyleRef = useRef('gradient')
-  // The gradient's floor — what a count of 1 gets, as a fraction of the layer's
-  // normal opacity. Its own ref rather than sharing fadeFactorRef so the two
-  // modes can be dialled independently and compared without one dragging the
-  // other. Starts equal to the binary value, so switching style alone changes
-  // only the shape of the fade, not how faint its faintest hex is.
-  const gradientFloorRef = useRef(0.5)
-  // TEMP_FADE_TUNER, ramp half. 'default' = whatever generateColorStops does
-  // (log once max/min >= 100, which every real days domain is), so the tuner
-  // starts on today's behaviour and any change is a deliberate comparison.
-  // rampTopPct caps the ramp's TOP at a percentile of the on-screen counts
-  // instead of their maximum — the lever that matters here, because a handful
-  // of huge hexes otherwise stretch the domain past everything else.
-  const rampModeRef = useRef('default')
-  const rampGammaRef = useRef(1)
-  const rampTopPctRef = useRef(1)
-  const viewportRampTop = useRef(undefined)
+  const SPARSE_FADE_PERCENTILE = 0.95
+  // The gradient's floor — what a count of 1 gets, as a fraction of the
+  // layer's normal opacity. Opacity climbs with the count from here and
+  // reaches full strength AT the threshold, so there is no step at it.
+  const SPARSE_GRADIENT_FLOOR = 0.5
+  // The one case the gradient can't cover: a threshold of 1 or less, where the
+  // ramp degenerates (see gradientFade). A flat faded opacity there, so those
+  // hexes still read as sparse instead of snapping to full strength.
+  const SPARSE_FLAT_FADE = 0.65
 
   // Is this hex in the sparse band? The count at or below which it counts as
   // sparse comes from the rendered hexes' own distribution (see viewportFadeThreshold).
@@ -971,7 +949,7 @@ export default function CreateMap({
   // interpolate clamps outside its domain, so counts above the threshold get
   // full strength for free. null when the threshold is 1 or less: log10(1) is
   // 0, which would repeat the interpolate's first input and MapLibre rejects a
-  // duplicate — callers fall back to the binary form there.
+  // duplicate — callers fall back to the flat form there.
   const gradientFade = (opacity, threshold) => {
     const top = Math.log10(threshold)
     if (!(top > 0)) return null
@@ -980,7 +958,7 @@ export default function CreateMap({
       ['linear'],
       LOG_COUNT,
       0,
-      opacity * gradientFloorRef.current,
+      opacity * SPARSE_GRADIENT_FLOOR,
       top,
       opacity
     ]
@@ -997,11 +975,10 @@ export default function CreateMap({
   const fadeFlat = (opacity) => {
     const threshold = viewportFadeThreshold.current
     if (!Number.isFinite(threshold)) return opacity
-    if (fadeStyleRef.current === 'gradient') {
-      const ramp = gradientFade(opacity, threshold)
-      if (ramp) return ramp
-    }
-    return ['case', isSparseHex(threshold), opacity * fadeFactorRef.current, opacity]
+    return (
+      gradientFade(opacity, threshold) ||
+      ['case', isSparseHex(threshold), opacity * SPARSE_FLAT_FADE, opacity]
+    )
   }
 
   // The same, for an opacity that already varies with zoom. The 'case' CANNOT
@@ -1015,11 +992,10 @@ export default function CreateMap({
     const threshold = viewportFadeThreshold.current
     const output = (v) => {
       if (!Number.isFinite(threshold)) return v
-      if (fadeStyleRef.current === 'gradient') {
-        const ramp = gradientFade(v, threshold)
-        if (ramp) return ramp
-      }
-      return ['case', isSparseHex(threshold), v * fadeFactorRef.current, v]
+      return (
+        gradientFade(v, threshold) ||
+        ['case', isSparseHex(threshold), v * SPARSE_FLAT_FADE, v]
+      )
     }
     return [
       'interpolate',
@@ -1056,34 +1032,6 @@ export default function CreateMap({
     }
   }
 
-  // TEMP_FADE_TUNER: stops for the chosen mode/gamma/top-percentile, or null to
-  // fall through to generateColorStops. Values must be STRICTLY ascending —
-  // MapLibre rejects a repeated interpolate input, and rounding collides
-  // readily at the bottom of a log ramp (1, 1, 2, ...) — hence the running max.
-  function tunedStops (domain) {
-    if (rampModeRef.current === 'default' && rampGammaRef.current === 1 &&
-        rampTopPctRef.current === 1) return null
-    const lo = Math.max(Number.isFinite(domain && domain[0]) ? domain[0] : 1, 1)
-    let hi = domain && domain[1]
-    if (rampTopPctRef.current < 1 && Number.isFinite(viewportRampTop.current)) {
-      hi = viewportRampTop.current
-    }
-    if (!Number.isFinite(hi) || hi <= lo) return null
-    const linear = rampModeRef.current === 'linear'
-    const gamma = rampGammaRef.current
-    const n = colorScale.length
-    const out = []
-    let prev = -Infinity
-    for (let i = 0; i < n; i++) {
-      const t = Math.pow(n === 1 ? 0.5 : i / (n - 1), gamma)
-      const raw = linear ? lo + (hi - lo) * t : lo * Math.pow(hi / lo, t)
-      const v = Math.max(Math.round(raw), prev + 1)
-      prev = v
-      out.push([v, colorScale[i]])
-    }
-    return out
-  }
-
   // The percentile of an unsorted numeric array, by nearest rank. Returns
   // undefined for an empty one so callers can tell "no data" from "zero".
   function percentileOf (values, fraction) {
@@ -1117,11 +1065,11 @@ export default function CreateMap({
     const hexDomain =
       viewportHexRange.current ||
       getCurrentRangeLevel(effectiveRangeLevels, map.current.getZoom())
-    colorStops.current =
-      tunedStops(hexDomain) ||
-      generateColorStops(colorScale, hexDomain).map((colorStop) => {
+    colorStops.current = generateColorStops(colorScale, hexDomain).map(
+      (colorStop) => {
         return [colorStop.stop, colorStop.color]
-      })
+      }
+    )
 
     // Coverage hexes only ever render at zoom >= hexMaxZoom, where the hex_1
     // grid is always used, so there's a single range to apply.
@@ -1129,11 +1077,11 @@ export default function CreateMap({
       coverageRangeLevels || defaultCoverageRangeLevels
     const coverageDomain =
       viewportHexRange.current || effectiveCoverageRangeLevels.zoom1
-    coverageColorStops.current =
-      tunedStops(coverageDomain) ||
-      generateColorStops(colorScale, coverageDomain).map((colorStop) => {
+    coverageColorStops.current = generateColorStops(colorScale, coverageDomain).map(
+      (colorStop) => {
         return [colorStop.stop, colorStop.color]
-      })
+      }
+    )
 
     // Point radius now has to be a ramp too. It used to be a hardcoded
     // `count <= 2 ? small : large` split, which meant "one day of data or
@@ -1296,8 +1244,7 @@ export default function CreateMap({
       counts.push(count)
     }
     if (!Number.isFinite(hi)) return undefined
-    viewportFadeThreshold.current = percentileOf(counts, fadePercentileRef.current)
-    viewportRampTop.current = percentileOf(counts, rampTopPctRef.current)
+    viewportFadeThreshold.current = percentileOf(counts, SPARSE_FADE_PERCENTILE)
     return quantizeCountRange([lo, hi])
   }
 
@@ -1350,240 +1297,6 @@ export default function CreateMap({
     onViewportHexRangeRef.current(range)
     revealHexesIfRamped(range)
   }
-
-  // ===========================================================================
-  // TEMP_FADE_TUNER — throwaway control for dialling in the sparse-hex fade.
-  // Delete this whole block (and put fadeFactorRef / fadePercentileRef back to
-  // plain consts) once the numbers are chosen. Deliberately plain DOM rather
-  // than React: it has to be trivially deletable and must not touch the
-  // component tree or any real state.
-  // ===========================================================================
-  useEffect(() => {
-    // Hidden unless asked for: `?tuner=1` in the address bar turns it on,
-    // `?tuner=0` turns it back off.
-    //
-    // The flag has to be latched rather than read from the URL each render,
-    // because useUrlSync rebuilds the query string from a fixed whitelist and
-    // navigates with replace on every map move — an unknown param survives only
-    // until the first pan. sessionStorage keeps it for the tab instead, so the
-    // panel also survives the reload after a rebuild. Wrapped because storage
-    // throws outright in some contexts (private windows, blocked site data).
-    const TUNER_KEY = 'cde:fadeTuner'
-    let enabled = false
-    try {
-      const asked = new URLSearchParams(window.location.search).get('tuner')
-      if (asked !== null) {
-        enabled = asked !== '0' && asked !== 'false'
-        sessionStorage.setItem(TUNER_KEY, enabled ? '1' : '0')
-      } else {
-        enabled = sessionStorage.getItem(TUNER_KEY) === '1'
-      }
-    } catch {
-      const asked = new URLSearchParams(window.location.search).get('tuner')
-      enabled = asked !== null && asked !== '0' && asked !== 'false'
-    }
-    if (!enabled) return
-
-    const host = document.createElement('div')
-    host.id = 'temp-fade-tuner'
-    host.style.cssText = [
-      'position:fixed', 'bottom:110px', 'right:12px', 'z-index:9999',
-      'max-height:70vh', 'overflow:auto',
-      'background:rgba(255,255,255,0.96)', 'border:1px solid #b9c9c5',
-      'border-radius:8px', 'padding:10px 12px', 'width:250px',
-      'font:12px/1.45 system-ui,sans-serif', 'color:#123',
-      'box-shadow:0 2px 10px rgba(0,0,0,0.18)'
-    ].join(';')
-    host.innerHTML = `
-      <div style="font-weight:600;margin-bottom:8px">Hex fade (temporary)</div>
-      <label style="display:block">Style
-        <select id="tft-style" style="width:100%;font-size:11px;margin-top:2px">
-          <option value="binary">binary (hard step)</option>
-          <option value="gradient">gradient (ramps with count)</option>
-        </select>
-      </label>
-      <label id="tft-row-binary" style="display:block;margin-top:6px">
-        Faded opacity &times; <b id="tft-f-val">0.65</b>
-        <input id="tft-f" type="range" min="0.05" max="1" step="0.05" value="0.65"
-               style="width:100%">
-      </label>
-      <label id="tft-row-gradient" style="display:block;margin-top:6px">
-        Gradient floor &times; <b id="tft-floor-val">0.50</b>
-        <input id="tft-floor" type="range" min="0.05" max="1" step="0.05" value="0.5"
-               style="width:100%">
-      </label>
-      <label style="display:block;margin-top:6px">Sparse cutoff pctile
-        <b id="tft-p-val">0.95</b>
-        <input id="tft-p" type="range" min="0" max="1" step="0.01" value="0.95"
-               style="width:100%">
-      </label>
-      <div id="tft-out" style="margin-top:8px;font-size:11px;color:#456"></div>
-      <div style="border-top:1px solid #ccd;margin:10px 0 8px"></div>
-      <div style="font-weight:600;margin-bottom:6px">Colour ramp</div>
-      <label style="display:block">Spacing
-        <select id="tft-mode" style="width:100%;font-size:11px;margin-top:2px">
-          <option value="default">default (log here)</option>
-          <option value="log">log (forced)</option>
-          <option value="linear">linear</option>
-        </select>
-      </label>
-      <label style="display:block;margin-top:6px">Top percentile
-        <b id="tft-top-val">1.00</b>
-        <input id="tft-top" type="range" min="0.80" max="1" step="0.01" value="1"
-               style="width:100%">
-      </label>
-      <label style="display:block;margin-top:6px">Gamma
-        <b id="tft-g-val">1.00</b>
-        <input id="tft-g" type="range" min="0.3" max="3" step="0.1" value="1"
-               style="width:100%">
-      </label>
-      <div id="tft-ramp" style="margin-top:6px;font-size:10px;color:#456;
-           word-break:break-all"></div>
-      <button id="tft-reset" style="margin-top:8px;width:100%;font-size:11px;
-              padding:3px;cursor:pointer">reset</button>`
-    document.body.appendChild(host)
-
-    const $ = (id) => host.querySelector(id)
-    // The counts on screen, deduped by feature id exactly as
-    // measureVisibleHexRange does, so the tuner's threshold matches the real one.
-    const visibleCounts = () => {
-      if (!map.current) return { layer: null, counts: [] }
-      const layer = ['hexes', 'coverage-hexes'].find(
-        (id) => map.current.getLayer(id) && map.current.queryRenderedFeatures({ layers: [id] }).length
-      )
-      if (!layer) return { layer: null, counts: [] }
-      const counts = []
-      const seen = new Set()
-      for (const f of map.current.queryRenderedFeatures({ layers: [layer] })) {
-        const c = Number(f.properties?.count)
-        if (!Number.isFinite(c) || c <= 0) continue
-        if (f.id !== undefined) {
-          if (seen.has(f.id)) continue
-          seen.add(f.id)
-        }
-        counts.push(c)
-      }
-      return { layer, counts }
-    }
-    const readout = () => {
-      const { layer, counts } = visibleCounts()
-      const threshold = viewportFadeThreshold.current
-      const faded = Number.isFinite(threshold)
-        ? counts.filter((c) => c <= threshold).length
-        : 0
-      const style = fadeStyleRef.current
-      $('#tft-out').textContent = counts.length
-        ? `${layer} [${style}]: threshold ${threshold} - ${faded}/${counts.length} ` +
-          `${style === 'gradient' ? 'ramped' : 'faded'} (${(100 * faded / counts.length).toFixed(0)}%)`
-        : 'no hexes on screen'
-      // What the ramp is actually doing: its stops, and how many hexes land in
-      // each band. Even buckets mean the palette is being spent on the data.
-      const stops = colorStops.current || []
-      if (stops.length && counts.length) {
-        const per = stops.map((st, i) => {
-          const from = i ? stops[i - 1][0] : 0
-          return counts.filter((c) => c > from && c <= st[0]).length
-        })
-        const over = counts.filter((c) => c > stops[stops.length - 1][0]).length
-        $('#tft-ramp').textContent =
-          `stops ${stops.map((st) => st[0]).join(' ')}\nper band ${per.join(' ')}` +
-          (over ? ` (+${over} above top)` : '')
-      } else {
-        $('#tft-ramp').textContent = ''
-      }
-    }
-    // Recompute the threshold HERE rather than going through
-    // refreshViewportHexRange: that bails early when the style is mid-load or
-    // the quantized range is unchanged, which left the percentile slider inert.
-    const apply = () => {
-      const { counts } = visibleCounts()
-      if (counts.length) {
-        viewportFadeThreshold.current = percentileOf(counts, fadePercentileRef.current)
-      }
-      setColorStops()
-      applyHexOpacity()
-      readout()
-    }
-    // Only one of the two opacity rows applies at a time; dim the other so the
-    // panel says which knob is live rather than leaving both looking active.
-    const syncRows = () => {
-      const gradient = fadeStyleRef.current === 'gradient'
-      $('#tft-row-binary').style.opacity = gradient ? '0.4' : '1'
-      $('#tft-row-gradient').style.opacity = gradient ? '1' : '0.4'
-    }
-    $('#tft-style').value = fadeStyleRef.current
-    syncRows()
-    $('#tft-style').addEventListener('change', (e) => {
-      fadeStyleRef.current = e.target.value
-      syncRows()
-      applyHexOpacity()
-      readout()
-    })
-    $('#tft-floor').addEventListener('input', (e) => {
-      gradientFloorRef.current = Number(e.target.value)
-      $('#tft-floor-val').textContent = Number(e.target.value).toFixed(2)
-      applyHexOpacity()
-      readout()
-    })
-    $('#tft-mode').addEventListener('change', (e) => {
-      rampModeRef.current = e.target.value
-      apply()
-    })
-    $('#tft-top').addEventListener('input', (e) => {
-      rampTopPctRef.current = Number(e.target.value)
-      $('#tft-top-val').textContent = Number(e.target.value).toFixed(2)
-      // the cap is a percentile of the on-screen counts, so re-measure first
-      const { counts } = visibleCounts()
-      if (counts.length) {
-        viewportRampTop.current = percentileOf(counts, rampTopPctRef.current)
-      }
-      apply()
-    })
-    $('#tft-g').addEventListener('input', (e) => {
-      rampGammaRef.current = Number(e.target.value)
-      $('#tft-g-val').textContent = Number(e.target.value).toFixed(2)
-      apply()
-    })
-    $('#tft-f').addEventListener('input', (e) => {
-      fadeFactorRef.current = Number(e.target.value)
-      $('#tft-f-val').textContent = e.target.value
-      applyHexOpacity()
-      readout()
-    })
-    $('#tft-p').addEventListener('input', (e) => {
-      fadePercentileRef.current = Number(e.target.value)
-      $('#tft-p-val').textContent = Number(e.target.value).toFixed(2)
-      apply()
-    })
-    $('#tft-reset').addEventListener('click', () => {
-      fadeFactorRef.current = 0.65
-      fadePercentileRef.current = 0.95
-      fadeStyleRef.current = 'gradient'
-      gradientFloorRef.current = 0.5
-      $('#tft-style').value = 'gradient'
-      $('#tft-floor').value = '0.5'
-      $('#tft-floor-val').textContent = '0.50'
-      syncRows()
-      rampModeRef.current = 'default'
-      rampGammaRef.current = 1
-      rampTopPctRef.current = 1
-      $('#tft-f').value = '0.65'
-      $('#tft-p').value = '0.95'
-      $('#tft-mode').value = 'default'
-      $('#tft-top').value = '1'
-      $('#tft-g').value = '1'
-      $('#tft-f-val').textContent = '0.65'
-      $('#tft-p-val').textContent = '0.95'
-      $('#tft-top-val').textContent = '1.00'
-      $('#tft-g-val').textContent = '1.00'
-      apply()
-    })
-    const poll = setInterval(readout, 1200)
-    return () => {
-      clearInterval(poll)
-      host.remove()
-    }
-  }, [])
 
   // Drop the measurement and fall back to the global tier. For the changes that
   // make the counts on screen mean something else — new filters, a new geometry
