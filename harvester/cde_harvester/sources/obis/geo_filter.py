@@ -28,6 +28,17 @@ def _packaged_polygon_path() -> Path:
     return Path(str(files("cde_harvester.data") / "canada_eez_land.wkt"))
 
 
+def load_boundary_polygon(polygon_file=None):
+    """Load the boundary polygon: ``polygon_file`` if given, else the packaged one.
+
+    Public because dataset discovery needs the polygon even when the filter runs
+    with ``mode="none"`` — the discovery query and the occurrence clipping are
+    independent concerns (see ``sources/obis/discovery.py``).
+    """
+    path = Path(polygon_file) if polygon_file else _packaged_polygon_path()
+    return shp_wkt.loads(path.read_text().strip())
+
+
 class ObisGeoFilter:
     """Decides whether an OBIS dataset is exempt and which occurrences to keep."""
 
@@ -35,11 +46,27 @@ class ObisGeoFilter:
         if mode not in ("canada", "none"):
             raise ValueError(f"Unsupported geo filter mode: {mode!r}")
         self.mode = mode
+        self.polygon_file = polygon_file
         self.exempt_node_ids = frozenset(exempt_node_ids) if exempt_node_ids else DEFAULT_EXEMPT_NODE_IDS
         self.polygon = None
         if mode == "canada":
-            path = Path(polygon_file) if polygon_file else _packaged_polygon_path()
-            self.polygon = shp_wkt.loads(path.read_text().strip())
+            self.polygon = load_boundary_polygon(polygon_file)
+
+    @classmethod
+    def from_config(cls, cfg=None):
+        """Build from the ``obis_geo_filter`` config block (a dict, or None for defaults)."""
+        cfg = cfg or {}
+        unknown = set(cfg) - {"mode", "polygon_file", "exempt_node_ids"}
+        if unknown:
+            raise ValueError(
+                f"Unknown obis_geo_filter key(s): {sorted(unknown)}. "
+                "Valid keys: mode, polygon_file, exempt_node_ids"
+            )
+        return cls(
+            mode=cfg.get("mode", "canada"),
+            polygon_file=cfg.get("polygon_file"),
+            exempt_node_ids=cfg.get("exempt_node_ids"),
+        )
 
     def is_exempt(self, metadata: dict) -> bool:
         """True when the dataset should be harvested in full (no geo filter applied)."""

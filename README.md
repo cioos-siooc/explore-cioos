@@ -97,7 +97,8 @@ instead of silently harvesting the sample servers.
 | What changed | What's needed |
 |---|---|
 | Values in the mounted file (`cache`, `incremental`, `dataset_ids`, …) | Nothing — the next flow run re-reads the file |
-| `erddap_urls` / OBIS list in the mounted file | `docker compose restart prefect_worker` — startup re-registers the per-source deployments |
+| `erddap_urls`, or turning OBIS on/off (`obis_discovery.enabled`) | `docker compose restart prefect_worker` — startup re-registers the per-source deployments |
+| Which OBIS datasets are harvested | Nothing — `obis_discovery` re-queries the OBIS API on every OBIS harvest, so new Canadian datasets are picked up automatically |
 | Anything set via env (`HARVEST_CONFIG_B64`/`HARVEST_CONFIG_YAML`, `HARVESTER_CRON`, `.env` values) | `docker compose up -d --force-recreate prefect_worker` — a plain `restart` reuses the old container **and its old environment** (on Coolify: redeploy the resource) |
 
 Remote workers (`docker-compose.worker.yaml`) execute flows too, so they need

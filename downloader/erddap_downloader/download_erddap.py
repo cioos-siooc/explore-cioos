@@ -269,6 +269,7 @@ def download_obis_parquet(dataset, user_query, output_path, polygon_regions):
     file_size = 0
     n_records = 0
     obis_error = ""
+    reason_code = None
     try:
         import duckdb
 
@@ -321,6 +322,7 @@ def download_obis_parquet(dataset, user_query, output_path, polygon_regions):
             download_status = EMPTY
     except Exception as e:
         download_status = FAILED
+        reason_code = UNKNOWN_ERROR
         obis_error = str(e)
         logger.error(
             "OBIS parquet download error for {}: {}",
@@ -340,6 +342,7 @@ def download_obis_parquet(dataset, user_query, output_path, polygon_regions):
         "no_data": download_status in (EMPTY, FAILED),
         "dataset_limit_hit": False,
         "query_limit_hit": False,
+        "reason_code": reason_code,
         "erddap_error": obis_error,
         "n_records": n_records,
     }

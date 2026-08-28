@@ -49,6 +49,20 @@ BEGIN
   ', target_table);
 
   -- Calculate days
+  --
+  -- KNOWN DEFECT: this is an elapsed SPAN, not a count of days that have data.
+  -- It counts every empty day between a feature's first and last observation,
+  -- so intermittent datasets are inflated: glisa_general_seasonal_erie reports
+  -- 39,357 days (1917-12-01 -> 2025-09-01) for a seasonal dataset holding
+  -- roughly 430 days of real data. TimeSeries rows are ~80% of all
+  -- profile-days, so this dominates the map's `days` ramp.
+  --
+  -- The correct shape is 4_create_hexes.sql:315 -- count(DISTINCT day) -- which
+  -- trajectories use, and which OBIS now uses via obis_cells.days. Fixing this
+  -- one needs a per-station day count harvested from ERDDAP (the same
+  -- orderByCount("time/86400") that trajectory_features.extract_day_stats
+  -- already issues), because a span is all the profile rows currently carry.
+  -- See TODO.md.
   EXECUTE format('
     UPDATE %I
     SET days = date_part(''days'', time_max - time_min) + 1

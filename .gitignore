@@ -36,4 +36,9 @@ nginx/logs/
 nginx/logrotate_state/
 nginx/logs/*.log
 harvester_logs
-obis/
+# The downloaded OBIS occurrence caches. Anchored with a leading slash: a bare
+# `obis/` matches a directory of that name at ANY depth, which also swallowed
+# the source package at harvester/cde_harvester/sources/obis/ and kept
+# discovery.py out of the repo while its tests were committed.
+/obis/
+/harvester/obis/

@@ -1,17 +1,21 @@
+import gc
 import gzip
 import json
 import logging
 import os
+import tempfile
 import time
 from datetime import datetime, timezone
 
 import pandas as pd
 import requests
 from prefect import task
-from prefect.logging import get_run_logger
+
+from cde_harvester.core.observability import run_logger
 
 from cde_harvester.sources.base import BaseHarvester, HarvestResult
 from cde_harvester.sources.ckan.create_ckan_obis_link import get_ckan_obis_records
+from cde_harvester.sources.obis.discovery import ObisDatasetDiscovery
 from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
 from cde_harvester.core.schemas import (
     DatasetSchema,
@@ -37,6 +41,15 @@ class OBISHarvester(BaseHarvester):
 
     MAX_RETRIES = 5
 
+    # Flush accumulated obis_cells to a temp parquet file every N datasets
+    # instead of holding all of them (up to ~1000 for a full discovery run)
+    # in one Python list for the whole harvest. A full run OOM-killed a 6GB
+    # container at dataset 296/971 — retained per-dataset DataFrames plus
+    # never-reclaimed pandas/duckdb allocator arenas ratchet RSS up with no
+    # release point until the single end-of-run concat. Chunking bounds the
+    # list to CELLS_FLUSH_EVERY entries and forces a gc pass at each flush.
+    CELLS_FLUSH_EVERY = 50
+
     def __init__(self, limit_dataset_ids=None, folder="./obis", prefect_logger=None,
                  geo_filter=None, run_id=None):
         self.limit_dataset_ids = limit_dataset_ids or []
@@ -46,10 +59,36 @@ class OBISHarvester(BaseHarvester):
         self.run_id = run_id
 
     def harvest(self) -> HarvestResult:
+        if not self.limit_dataset_ids:
+            # Returning empty frames here would look like "OBIS has no data" and
+            # let the db-loader prune every OBIS dataset out of the database.
+            raise ValueError(
+                "OBISHarvester was given no dataset ids. Configure obis_discovery, "
+                "obis_dataset_ids, or obis_datasets_file."
+            )
+
         all_cells = []
         all_datasets = []
         all_skipped = []
         all_attempts = []
+        cell_chunk_paths = []
+        chunk_dir_ctx = tempfile.TemporaryDirectory(prefix="obis_cells_")
+        chunk_dir = chunk_dir_ctx.__enter__()
+
+        def flush_cells_chunk():
+            """Write the accumulated cells to disk and free the in-memory list."""
+            if not all_cells:
+                return
+            chunk_df = pd.concat(all_cells, ignore_index=True)
+            # Pickle, not parquet: this is an ephemeral in-process handoff (not
+            # a durable/interchange format), and pyarrow/fastparquet aren't
+            # dependencies here — pickle round-trips dtypes exactly with none.
+            chunk_path = os.path.join(chunk_dir, f"chunk_{len(cell_chunk_paths):05d}.pkl")
+            chunk_df.to_pickle(chunk_path)
+            cell_chunk_paths.append(chunk_path)
+            all_cells.clear()
+            del chunk_df
+            gc.collect()
 
         def record_attempt(dataset_id, status, reason_code=None,
                            error_message=None, duration_ms=None):
@@ -72,122 +111,133 @@ class OBISHarvester(BaseHarvester):
                 "query_urls": "\n".join(query_urls),
             })
 
-        total = len(self.limit_dataset_ids)
-        for i, dataset_id in enumerate(self.limit_dataset_ids, 1):
-            self.logger.info("Processing OBIS dataset %d/%d: %s", i, total, dataset_id)
-            last_error = None
-            t0 = time.monotonic()
-            for attempt in range(1, self.MAX_RETRIES + 1):
-                try:
-                    metadata = self.fetch_dataset_metadata(dataset_id)
-                    exempt = self.geo_filter.is_exempt(metadata)
+        try:
+            total = len(self.limit_dataset_ids)
+            for i, dataset_id in enumerate(self.limit_dataset_ids, 1):
+                self.logger.info("Processing OBIS dataset %d/%d: %s", i, total, dataset_id)
+                last_error = None
+                t0 = time.monotonic()
+                for attempt in range(1, self.MAX_RETRIES + 1):
+                    try:
+                        metadata = self.fetch_dataset_metadata(dataset_id)
+                        exempt = self.geo_filter.is_exempt(metadata)
 
-                    if not exempt:
-                        hit = self.geo_filter.extent_intersects(metadata.get("extent"))
-                        if hit is False:
-                            self.logger.info(
-                                "Skipping %s: extent outside Canadian borders", dataset_id,
-                            )
-                            all_skipped.append([OBIS_SOURCE_URL, dataset_id, "OUT_OF_REGION"])
+                        if not exempt:
+                            hit = self.geo_filter.extent_intersects(metadata.get("extent"))
+                            if hit is False:
+                                self.logger.info(
+                                    "Skipping %s: extent outside Canadian borders", dataset_id,
+                                )
+                                all_skipped.append([OBIS_SOURCE_URL, dataset_id, "OUT_OF_REGION"])
+                                record_attempt(
+                                    dataset_id, status="skipped",
+                                    reason_code="OUT_OF_REGION",
+                                    error_message="Dataset extent outside Canadian borders",
+                                    duration_ms=int((time.monotonic() - t0) * 1000),
+                                )
+                                break
+
+                        occurrences = self.get_occurrences(dataset_id)
+                        results = occurrences.get("results", [])
+
+                        if not results:
+                            self.logger.warning("No occurrences for dataset %s", dataset_id)
+                            all_skipped.append([OBIS_SOURCE_URL, dataset_id, "NO_OCCURRENCES"])
                             record_attempt(
                                 dataset_id, status="skipped",
-                                reason_code="OUT_OF_REGION",
-                                error_message="Dataset extent outside Canadian borders",
+                                reason_code="NO_OCCURRENCES",
+                                error_message="OBIS returned no occurrence records",
                                 duration_ms=int((time.monotonic() - t0) * 1000),
                             )
                             break
 
-                    occurrences = self.get_occurrences(dataset_id)
-                    results = occurrences.get("results", [])
+                        cells = self.aggregate_cells(dataset_id, results, apply_filter=not exempt)
+                        if cells.empty:
+                            all_skipped.append([OBIS_SOURCE_URL, dataset_id, "NO_VALID_COORDINATES"])
+                            record_attempt(
+                                dataset_id, status="skipped",
+                                reason_code="NO_VALID_COORDINATES",
+                                error_message="No occurrences had valid lat/lon after filtering",
+                                duration_ms=int((time.monotonic() - t0) * 1000),
+                            )
+                            break
 
-                    if not results:
-                        self.logger.warning("No occurrences for dataset %s", dataset_id)
-                        all_skipped.append([OBIS_SOURCE_URL, dataset_id, "NO_OCCURRENCES"])
+                        dataset_row = self.build_dataset_row(dataset_id, metadata, results, cells)
+
+                        all_cells.append(cells)
+                        all_datasets.append(dataset_row)
                         record_attempt(
-                            dataset_id, status="skipped",
-                            reason_code="NO_OCCURRENCES",
-                            error_message="OBIS returned no occurrence records",
+                            dataset_id, status="success",
                             duration_ms=int((time.monotonic() - t0) * 1000),
                         )
                         break
 
-                    cells = self.aggregate_cells(dataset_id, results, apply_filter=not exempt)
-                    if cells.empty:
-                        all_skipped.append([OBIS_SOURCE_URL, dataset_id, "NO_VALID_COORDINATES"])
-                        record_attempt(
-                            dataset_id, status="skipped",
-                            reason_code="NO_VALID_COORDINATES",
-                            error_message="No occurrences had valid lat/lon after filtering",
-                            duration_ms=int((time.monotonic() - t0) * 1000),
+                    except Exception as e:
+                        last_error = e
+                        self.logger.error(
+                            "Error processing OBIS dataset %s (attempt %d/%d): %s",
+                            dataset_id, attempt, self.MAX_RETRIES, e, exc_info=True,
                         )
-                        break
-
-                    dataset_row = self.build_dataset_row(dataset_id, metadata, results, cells)
-
-                    all_cells.append(cells)
-                    all_datasets.append(dataset_row)
+                        if attempt < self.MAX_RETRIES:
+                            self._clear_cache(dataset_id)
+                else:
+                    self.logger.error("All %d attempts failed for OBIS dataset %s: %s", self.MAX_RETRIES, dataset_id, last_error)
+                    all_skipped.append([OBIS_SOURCE_URL, dataset_id, "UNKNOWN_ERROR"])
                     record_attempt(
-                        dataset_id, status="success",
+                        dataset_id, status="error",
+                        reason_code="UNKNOWN_ERROR",
+                        error_message=(
+                            f"All {self.MAX_RETRIES} attempts failed: "
+                            f"{type(last_error).__name__}: {last_error}"
+                            if last_error else f"All {self.MAX_RETRIES} attempts failed"
+                        ),
                         duration_ms=int((time.monotonic() - t0) * 1000),
                     )
-                    break
 
-                except Exception as e:
-                    last_error = e
-                    self.logger.error(
-                        "Error processing OBIS dataset %s (attempt %d/%d): %s",
-                        dataset_id, attempt, self.MAX_RETRIES, e, exc_info=True,
-                    )
-                    if attempt < self.MAX_RETRIES:
-                        self._clear_cache(dataset_id)
-            else:
-                self.logger.error("All %d attempts failed for OBIS dataset %s: %s", self.MAX_RETRIES, dataset_id, last_error)
-                all_skipped.append([OBIS_SOURCE_URL, dataset_id, "UNKNOWN_ERROR"])
-                record_attempt(
-                    dataset_id, status="error",
-                    reason_code="UNKNOWN_ERROR",
-                    error_message=(
-                        f"All {self.MAX_RETRIES} attempts failed: "
-                        f"{type(last_error).__name__}: {last_error}"
-                        if last_error else f"All {self.MAX_RETRIES} attempts failed"
-                    ),
-                    duration_ms=int((time.monotonic() - t0) * 1000),
-                )
+                if i % self.CELLS_FLUSH_EVERY == 0:
+                    flush_cells_chunk()
 
-        # Build result DataFrames
-        df_obis_cells = (
-            pd.concat(all_cells, ignore_index=True) if all_cells
-            else pd.DataFrame(columns=ObisCellSchema.to_schema().columns.keys())
-        )
-        df_profiles = pd.DataFrame(columns=ProfileSchema.to_schema().columns.keys())
-        df_datasets = (
-            pd.concat(all_datasets, ignore_index=True) if all_datasets
-            else pd.DataFrame(columns=DatasetSchema.to_schema().columns.keys())
-        )
-        skipped_columns = list(SkippedDatasetSchema.to_schema().columns.keys())
-        df_skipped = (
-            pd.DataFrame(all_skipped, columns=skipped_columns) if all_skipped
-            else pd.DataFrame(columns=skipped_columns)
-        )
-        df_variables = pd.DataFrame(columns=VariableSchema.to_schema().columns.keys())
-        attempt_columns = list(HarvestAttemptSchema.to_schema().columns.keys())
-        df_attempts = (
-            pd.DataFrame(all_attempts) if all_attempts
-            else pd.DataFrame(columns=attempt_columns)
-        )
+            # Flush whatever's left (a run shorter than CELLS_FLUSH_EVERY never
+            # flushed above, and the last partial chunk always needs one).
+            flush_cells_chunk()
 
-        # Enrich datasets with CKAN metadata (EOVs, French titles, CKAN IDs)
-        if not df_datasets.empty:
-            df_datasets = self._enrich_with_ckan(df_datasets)
+            # Build result DataFrames
+            df_obis_cells = (
+                pd.concat([pd.read_pickle(p) for p in cell_chunk_paths], ignore_index=True)
+                if cell_chunk_paths
+                else pd.DataFrame(columns=ObisCellSchema.to_schema().columns.keys())
+            )
+            df_profiles = pd.DataFrame(columns=ProfileSchema.to_schema().columns.keys())
+            df_datasets = (
+                pd.concat(all_datasets, ignore_index=True) if all_datasets
+                else pd.DataFrame(columns=DatasetSchema.to_schema().columns.keys())
+            )
+            skipped_columns = list(SkippedDatasetSchema.to_schema().columns.keys())
+            df_skipped = (
+                pd.DataFrame(all_skipped, columns=skipped_columns) if all_skipped
+                else pd.DataFrame(columns=skipped_columns)
+            )
+            df_variables = pd.DataFrame(columns=VariableSchema.to_schema().columns.keys())
+            attempt_columns = list(HarvestAttemptSchema.to_schema().columns.keys())
+            df_attempts = (
+                pd.DataFrame(all_attempts) if all_attempts
+                else pd.DataFrame(columns=attempt_columns)
+            )
 
-        return HarvestResult(
-            profiles=df_profiles,
-            datasets=df_datasets,
-            variables=df_variables,
-            skipped=df_skipped,
-            obis_cells=df_obis_cells,
-            attempts=df_attempts,
-        )
+            # Enrich datasets with CKAN metadata (EOVs, French titles, CKAN IDs)
+            if not df_datasets.empty:
+                df_datasets = self._enrich_with_ckan(df_datasets)
+
+            return HarvestResult(
+                profiles=df_profiles,
+                datasets=df_datasets,
+                variables=df_variables,
+                skipped=df_skipped,
+                obis_cells=df_obis_cells,
+                attempts=df_attempts,
+            )
+        finally:
+            chunk_dir_ctx.__exit__(None, None, None)
 
     def _enrich_with_ckan(self, df_datasets):
         """Join CKAN metadata onto datasets for EOVs, French titles, and CKAN IDs."""
@@ -260,6 +310,21 @@ class OBISHarvester(BaseHarvester):
             if col not in df.columns:
                 df[col] = None
 
+        # Distinct UTC days with data, the same unit cde.trajectory_hexes.days
+        # carries. date_start, not the date_start..date_end range: OBIS bounds
+        # a coarse eventDate ("1997") as a whole year, and expanding that would
+        # rebuild the span defect this replaces (docs/trajectory-coverage.md).
+        #
+        # Reuses the conversion above when it already ran -- re-parsing an
+        # already-datetime column costs an extra 8 bytes/row at peak (measured),
+        # which is real on the multi-million-occurrence datasets discovery now
+        # turns up. Only the never-had-the-column case pays for a parse, and
+        # there the values are all None anyway.
+        day_source = df["date_start"]
+        if not pd.api.types.is_datetime64_any_dtype(day_source):
+            day_source = pd.to_datetime(day_source, errors="coerce", utc=True)
+        df["day"] = day_source.dt.floor("D")
+
         # Snap coordinates to a ~5 nautical mile grid (1/12 degree)
         # Round to 8 decimal places to avoid floating-point artifacts from the
         # multiply-back step (e.g. 550 * (1/12) can differ in the last bit
@@ -283,6 +348,8 @@ class OBISHarvester(BaseHarvester):
             time_min=("date_start", "min"),
             time_max=("date_end", "max"),
             n_records=("decimalLatitude", "count"),
+            # nunique skips NaT, so undated occurrences contribute no days.
+            days=("day", "nunique"),
             scientific_names=("scientificName", lambda x: sorted(x.dropna().unique().tolist())),
         ).reset_index(drop=True)
 
@@ -469,12 +536,54 @@ class OBISHarvester(BaseHarvester):
 
 
 @task(task_run_name="harvest-obis")
-def harvest_obis(limit_dataset_ids=None, folder="./obis/", geo_filter=None, run_id=None):
-    """Run the OBIS harvester."""
+def harvest_obis(limit_dataset_ids=None, folder="./obis/", geo_filter=None, run_id=None,
+                 discovery=None):
+    """Run the OBIS harvester.
+
+    When no explicit ``limit_dataset_ids`` are given and ``discovery`` is
+    enabled, the dataset list is resolved from the OBIS API first. Discovery
+    failures propagate: the task fails, so ``cde_pipeline`` never reaches the
+    db-loader and nothing is pruned.
+    """
+    # run_logger() rather than get_run_logger() so the task body is callable
+    # (and testable) outside a flow context.
+    prefect_logger = run_logger(logger)
+    geo_filter = geo_filter or ObisGeoFilter(mode="canada")
+
+    if not limit_dataset_ids and discovery is not None and discovery.enabled:
+        result = ObisDatasetDiscovery(
+            discovery, geo_filter=geo_filter, logger=prefect_logger,
+        ).discover()
+        limit_dataset_ids = result.dataset_ids
+        _publish_discovery_artifact(result, prefect_logger)
+    elif limit_dataset_ids:
+        prefect_logger.info(
+            "Harvesting %d explicitly configured OBIS dataset(s); discovery bypassed",
+            len(limit_dataset_ids),
+        )
+
     harvester = OBISHarvester(
         limit_dataset_ids, folder,
-        prefect_logger=get_run_logger(),
+        prefect_logger=prefect_logger,
         geo_filter=geo_filter,
         run_id=run_id,
     )
     return harvester.harvest()
+
+
+def _publish_discovery_artifact(result, prefect_logger):
+    """Best-effort Prefect artifact showing what discovery returned. Never fails the run."""
+    try:
+        from prefect.artifacts import create_table_artifact
+
+        rows = [{"query": label, "datasets": count} for label, count in result.per_query.items()]
+        rows.append({"query": "TOTAL (deduped)", "datasets": len(result.dataset_ids)})
+        if result.geometry_bytes:
+            rows.append({"query": "geometry WKT bytes", "datasets": result.geometry_bytes})
+        create_table_artifact(
+            key="obis-discovery",
+            table=rows,
+            description="OBIS datasets discovered for this harvest run.",
+        )
+    except Exception as e:
+        prefect_logger.warning("Could not publish OBIS discovery artifact: %s", e)

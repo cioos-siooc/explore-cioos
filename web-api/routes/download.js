@@ -144,6 +144,8 @@ router.get(
     // Nothing to download (e.g. a scientific-name selection with OBIS disabled).
     if (!branches.length) return res.send({ count: 0 });
 
+    // (Pre-M2 this interpolated the filter OBJECT into the SQL string instead
+    // of binding filters.shared — fixed to match the other routes.)
     const SQL = `
         WITH combined AS (
         ${branches.join("\n        UNION ALL\n        ")}

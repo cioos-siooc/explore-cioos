@@ -435,18 +435,15 @@ export default function CreateMap({
   // they belong to was unreadable off the map. The point circles stay legible
   // over them because they sit above the fill and carry their own white halo,
   // which is a stronger separation than transparency was buying.
-  const coverageHexOpacity = [
-    'interpolate',
-    ['linear'],
-    ['zoom'],
-    hexMaxZoom,
-    0.6,
-    hexMaxZoom + 1.5,
-    0.5,
-    hexMaxZoom + 3,
-    0.4
+  // Kept as [zoom, opacity] pairs rather than a finished expression because the
+  // fade below has to rebuild it: a 'zoom' expression may only be the input to a
+  // TOP-LEVEL step/interpolate, so the sparse-hex 'case' cannot wrap this — it
+  // has to go inside each stop's output instead. See fadeExpression.
+  const COVERAGE_HEX_OPACITY_STOPS = [
+    [hexMaxZoom, 0.6],
+    [hexMaxZoom + 1.5, 0.5],
+    [hexMaxZoom + 3, 0.4]
   ]
-
   const draw = new MapboxDraw(drawControlOptions)
   const drawPolygon = useRef(draw)
   const doFinalCheck = useRef(false)
@@ -459,6 +456,18 @@ export default function CreateMap({
   // and a re-render of this component is not what it should cause — the legend
   // hears about it through onViewportHexRange instead.
   const viewportHexRange = useRef(undefined)
+  // The count at SPARSE_FADE_PERCENTILE of the hexes currently on screen — the top
+  // of the faded band. undefined when
+  // there was nothing to measure, which means no fading at all rather than a
+  // guessed threshold.
+  //
+  // A real percentile of the rendered counts, NOT a fraction of the min..max
+  // range. The counts are heavily skewed — across the loaded catalogue the hex
+  // totals run 0..149029 with a MEDIAN of 2 — so a quarter of the way along the
+  // range lands at ~37000 and would fade all but a handful of hexes. The
+  // quartile has to come from the distribution, the same reason the ramp itself
+  // is log-spaced (generateColorStops) rather than evenly cut.
+  const viewportFadeThreshold = useRef(undefined)
   // Latest setColorStops closure (it reads the rangeLevels props), for the map
   // handlers registered once on mount.
   const setColorStopsRef = useRef(undefined)
@@ -642,19 +651,23 @@ export default function CreateMap({
   // reading, where a fade to nothing and back would be the more jarring of the
   // two. This is about the first sight of the map only.
   //
-  // The paint change rides MapLibre's default transition, so the hexes fade up
-  // over ~300ms rather than snapping on.
+  // The hexes appear the moment their final ramp is ready. They used to fade
+  // up over MapLibre's default 300ms transition, back when this opacity was a
+  // plain number; a data-driven one cannot be transitioned at all (see the
+  // fill-opacity-transition note on the layers), so the fade is gone and the
+  // wait that replaced it has been turned off rather than left to stall the
+  // reveal.
   function revealHexes() {
     if (hexesRevealed.current || !map.current) return
     hexesRevealed.current = true
     if (map.current.getLayer('hexes')) {
-      map.current.setPaintProperty('hexes', 'fill-opacity', hexOpacity)
+      map.current.setPaintProperty('hexes', 'fill-opacity', hexOpacityExpression())
     }
     if (map.current.getLayer('coverage-hexes')) {
       map.current.setPaintProperty(
         'coverage-hexes',
         'fill-opacity',
-        coverageHexOpacity
+        coverageHexOpacityExpression()
       )
     }
   }
@@ -905,6 +918,136 @@ export default function CreateMap({
   // fill is nearly transparent (the layer fades out with zoom).
   const coverageHexOutlineColor = () => hexOutlineColor
 
+  // The sparse-hex fade. Chosen by eye on 2026-08-28: opacity climbs from a
+  // floor of 0.50 of the layer's normal opacity (0.40 against the 0.80 hex
+  // base) at a count of 1 up to full strength at the threshold, with the
+  // threshold at the 95th percentile of the counts on screen.
+  //
+  // 0.95 inverts what this started as. It is no longer "dim the emptiest few" —
+  // it is "only the busiest few stay at full strength". Unfiltered that leaves
+  // 3,270 hexes of 65,586 bright and fades the other 62,316, so the map reads
+  // as a handful of hotspots over a wash. Deliberate: at the low end the fade
+  // did almost nothing, because 38% of hexes hold exactly one day and any
+  // percentile below ~0.4 lands on a threshold of 1.
+  const SPARSE_FADE_PERCENTILE = 0.95
+  // The gradient's floor — what a count of 1 gets, as a fraction of the
+  // layer's normal opacity. Opacity climbs with the count from here and
+  // reaches full strength AT the threshold, so there is no step at it.
+  const SPARSE_GRADIENT_FLOOR = 0.5
+  // The one case the gradient can't cover: a threshold of 1 or less, where the
+  // ramp degenerates (see gradientFade). A flat faded opacity there, so those
+  // hexes still read as sparse instead of snapping to full strength.
+  const SPARSE_FLAT_FADE = 0.65
+
+  // Is this hex in the sparse band? The count at or below which it counts as
+  // sparse comes from the rendered hexes' own distribution (see viewportFadeThreshold).
+  //
+  // `<=`, not `<`: the counts are small integers at the bottom of the
+  // distribution and the threshold is frequently 1, where `<` would fade nothing.
+  // Counts are >= 1 and span orders of magnitude, so the gradient ramps over
+  // log(count) — the same reason the colour ramp is log. max(...,1) keeps the
+  // log defined and pins anything at or below 1 to the floor.
+  const LOG_COUNT = ['log10', ['max', ['to-number', ['get', 'count'], 0], 1]]
+
+  // Opacity rising from floor at count 1 to `opacity` at the threshold.
+  // interpolate clamps outside its domain, so counts above the threshold get
+  // full strength for free. null when the threshold is 1 or less: log10(1) is
+  // 0, which would repeat the interpolate's first input and MapLibre rejects a
+  // duplicate — callers fall back to the flat form there.
+  const gradientFade = (opacity, threshold) => {
+    const top = Math.log10(threshold)
+    if (!(top > 0)) return null
+    return [
+      'interpolate',
+      ['linear'],
+      LOG_COUNT,
+      0,
+      opacity * SPARSE_GRADIENT_FLOOR,
+      top,
+      opacity
+    ]
+  }
+
+  const isSparseHex = (threshold) => [
+    '<=',
+    ['to-number', ['get', 'count'], 0],
+    threshold
+  ]
+
+  // A flat opacity, dimmed for sparse hexes. undefined threshold -> nothing has
+  // been measured yet, so nothing fades.
+  const fadeFlat = (opacity) => {
+    const threshold = viewportFadeThreshold.current
+    if (!Number.isFinite(threshold)) return opacity
+    return (
+      gradientFade(opacity, threshold) ||
+      ['case', isSparseHex(threshold), opacity * SPARSE_FLAT_FADE, opacity]
+    )
+  }
+
+  // The same, for an opacity that already varies with zoom. The 'case' CANNOT
+  // wrap the zoom interpolate — MapLibre rejects a 'zoom' expression that is not
+  // the input to a top-level step/interpolate, and setPaintProperty throws,
+  // which aborts the rest of the paint pass and leaves the hex layers stuck at
+  // the opacity 0 they are created with. So the interpolate stays outermost and
+  // each of its stop OUTPUTS carries the case instead — the documented
+  // zoom-and-data-driven shape.
+  const fadeZoomStops = (stops) => {
+    const threshold = viewportFadeThreshold.current
+    const output = (v) => {
+      if (!Number.isFinite(threshold)) return v
+      return (
+        gradientFade(v, threshold) ||
+        ['case', isSparseHex(threshold), v * SPARSE_FLAT_FADE, v]
+      )
+    }
+    return [
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      ...stops.flatMap(([zoom, v]) => [zoom, output(v)])
+    ]
+  }
+
+  // Both hex layers fade on the same measured threshold: measureVisibleHexRange
+  // queries them together and only one of them is ever on screen at a time.
+  const hexOpacityExpression = () => fadeFlat(hexOpacity)
+  const coverageHexOpacityExpression = () =>
+    fadeZoomStops(COVERAGE_HEX_OPACITY_STOPS)
+
+  // Push the current fade threshold onto both hex layers. No-op before the
+  // opening reveal, which owns fill-opacity until it has run (writing here
+  // first would flash the hexes on over the placeholder ramp).
+  function applyHexOpacity () {
+    if (!hexesRevealed.current || !map.current) return
+    if (map.current.getLayer('hexes')) {
+      map.current.setPaintProperty(
+        'hexes',
+        'fill-opacity',
+        hexOpacityExpression()
+      )
+    }
+    if (map.current.getLayer('coverage-hexes')) {
+      map.current.setPaintProperty(
+        'coverage-hexes',
+        'fill-opacity',
+        coverageHexOpacityExpression()
+      )
+    }
+  }
+
+  // The percentile of an unsorted numeric array, by nearest rank. Returns
+  // undefined for an empty one so callers can tell "no data" from "zero".
+  function percentileOf (values, fraction) {
+    if (!values || values.length === 0) return undefined
+    const sorted = [...values].sort((a, b) => a - b)
+    const index = Math.min(
+      sorted.length - 1,
+      Math.max(0, Math.ceil(fraction * sorted.length) - 1)
+    )
+    return sorted[index]
+  }
+
   function setColorStops() {
     // The map now mounts before the legend request resolves (first paint is
     // no longer gated on it), so rangeLevels can be undefined on early calls.
@@ -936,12 +1079,13 @@ export default function CreateMap({
     // grid is always used, so there's a single range to apply.
     const effectiveCoverageRangeLevels =
       coverageRangeLevels || defaultCoverageRangeLevels
-    coverageColorStops.current = generateColorStops(
-      colorScale,
+    const coverageDomain =
       viewportHexRange.current || effectiveCoverageRangeLevels.zoom1
-    ).map((colorStop) => {
-      return [colorStop.stop, colorStop.color]
-    })
+    coverageColorStops.current = generateColorStops(colorScale, coverageDomain).map(
+      (colorStop) => {
+        return [colorStop.stop, colorStop.color]
+      }
+    )
 
     // Point radius now has to be a ramp too. It used to be a hardcoded
     // `count <= 2 ? small : large` split, which meant "one day of data or
@@ -1001,6 +1145,15 @@ export default function CreateMap({
         coverageHexOutlineColor()
       )
     }
+
+    // The fade rides on the same measured counts as the ramp, so it is
+    // refreshed with it — but through applyHexOpacity, which stays off
+    // fill-opacity until the opening reveal has run. Writing it directly here
+    // was a flicker: /legend resolving calls this before anything has been
+    // measured, so the hexes came on at FULL opacity over the placeholder ramp,
+    // and the fade then dimmed them a moment later. Both halves of the reveal
+    // this was supposed to avoid, in one load.
+    applyHexOpacity()
   }
   setColorStopsRef.current = setColorStops
 
@@ -1042,6 +1195,10 @@ export default function CreateMap({
   // map is drawing, so a viewport-scaled ramp costs no request — one pass over
   // the visible hexes, which is at most a few thousand small objects.
   function measureVisibleHexRange(focusPk) {
+    // Cleared up front so every path that gives up below leaves no stale
+    // threshold behind: a fade band measured over the last view would otherwise
+    // keep being applied to hexes it was never measured against.
+    viewportFadeThreshold.current = undefined
     const layers = HEX_LAYER_IDS.filter((id) => map.current.getLayer(id))
     if (!layers.length) return undefined
     // No trustworthy answer to be had — see viewportQueryIsReliable. Nothing is
@@ -1058,6 +1215,14 @@ export default function CreateMap({
     if (features.length < MIN_VIEWPORT_HEXES) return undefined
     let lo = Infinity
     let hi = -Infinity
+    // Counts kept for the quartile below. One array and one sort per settled
+    // camera — the thing the loop avoids is a map/filter CHAIN allocating an
+    // intermediate per stage, not a single collection. Deduped by feature id
+    // (promoteId lifts the hex pk onto it) because a hex straddling a tile
+    // boundary is returned once per tile: harmless for the min/max, but it
+    // would weight those hexes twice in a percentile.
+    const counts = []
+    const seen = new Set()
     // A plain loop, not a map/filter chain: this runs over every rendered hex,
     // and the intermediate arrays are the only part of it that would be
     // expensive. Features straddling a tile boundary appear more than once —
@@ -1072,8 +1237,15 @@ export default function CreateMap({
       if (!Number.isFinite(count) || count <= 0) continue
       if (count < lo) lo = count
       if (count > hi) hi = count
+      const id = feature.id
+      if (id !== undefined) {
+        if (seen.has(id)) continue
+        seen.add(id)
+      }
+      counts.push(count)
     }
     if (!Number.isFinite(hi)) return undefined
+    viewportFadeThreshold.current = percentileOf(counts, SPARSE_FADE_PERCENTILE)
     return quantizeCountRange([lo, hi])
   }
 
@@ -1106,6 +1278,13 @@ export default function CreateMap({
     if (focusPk !== undefined && range !== undefined) {
       rampMeasuredForPk.current = focusPk
     }
+    // The fade threshold has just been re-measured, and it can move while the
+    // QUANTIZED range holds still (coarse rungs, see quantizeCountRange) — so it
+    // is applied here rather than only on the setColorStops path below, which
+    // the equal-ranges branch returns before reaching. Safe against the repaint
+    // -> re-render -> re-measure loop: hexRangeDirty is already false above, so
+    // the call this repaint provokes returns at the top.
+    applyHexOpacity()
     if (rangesEqual(viewportHexRange.current, range)) {
       // Nothing to repaint — but the pass still says the ramp already on the
       // layers is the one this view gets, which is what the first reveal waits
@@ -1996,8 +2175,18 @@ export default function CreateMap({
           source: 'cde-cells',
           'source-layer': 'coverage-hexes-layer',
           paint: {
-            // Zero until the ramp is final — see revealHexes.
-            'fill-opacity': hexesRevealed.current ? coverageHexOpacity : 0,
+            // Zero until the ramp is final — see revealHexes. Then data-driven:
+            // sparse hexes ramp up from a floor, others get normal.
+            'fill-opacity': hexesRevealed.current ? coverageHexOpacityExpression() : 0,
+            // No transition on it. MapLibre cannot interpolate a paint
+            // property to or from a data-driven value — DataDrivenProperty
+            // .interpolate returns the OLD value whenever either side is an
+            // expression, and this one always is (see fadeFlat). The default
+            // 300ms therefore does not fade anything: it holds the previous
+            // opacity for 300ms and then snaps. That delay is the flicker, on
+            // the reveal and on every threshold change after it, so take the
+            // snap without the wait.
+            'fill-opacity-transition': { duration: 0 },
             'fill-color': dimmable(coverageHexFillColor()),
             'fill-outline-color': coverageHexOutlineColor()
           }
@@ -2040,8 +2229,18 @@ export default function CreateMap({
         'source-layer': 'internal-layer-name',
 
         paint: {
-          // Zero until the ramp is final — see revealHexes.
-          'fill-opacity': hexesRevealed.current ? hexOpacity : 0,
+          // Zero until the ramp is final — see revealHexes. Then data-driven:
+          // sparse hexes ramp up from a floor, others get normal.
+          'fill-opacity': hexesRevealed.current ? hexOpacityExpression() : 0,
+          // No transition on it. MapLibre cannot interpolate a paint
+          // property to or from a data-driven value — DataDrivenProperty
+          // .interpolate returns the OLD value whenever either side is an
+          // expression, and this one always is (see fadeFlat). The default
+          // 300ms therefore does not fade anything: it holds the previous
+          // opacity for 300ms and then snaps. That delay is the flicker, on
+          // the reveal and on every threshold change after it, so take the
+          // snap without the wait.
+          'fill-opacity-transition': { duration: 0 },
           // A real interpolate expression rather than the legacy
           // { property, stops } paint function, because that form cannot be
           // nested inside the 'case' dimmable wraps it in — the same reason

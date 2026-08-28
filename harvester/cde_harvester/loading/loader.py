@@ -111,6 +111,11 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
                 lambda lists: sorted(set(name for lst in lists for name in lst)),
             ),
             n_records=("n_records", "sum"),
+            # max, not sum: this dedup merges rows that are the SAME cell split
+            # by float noise, so their day sets overlap and summing would
+            # inflate — the defect this column exists to remove. n_records sums
+            # because its occurrence subsets really are disjoint.
+            days=("days", "max"),
             time_min=("time_min", "min"),
             time_max=("time_max", "max"),
             depth_min=("depth_min", "min"),
@@ -130,6 +135,7 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
 
     # Same bigint/COPY constraint as prepare_trajectory_days_dataframe.
     agg["n_records"] = agg["n_records"].round().astype("Int64")
+    agg["days"] = agg["days"].round().astype("Int64")
     return agg
 
 

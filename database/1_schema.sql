@@ -247,6 +247,11 @@ CREATE TABLE obis_cells (
     -- column instead of building a 100k+ name array per tile request.
     aphia_ids integer[] NOT NULL DEFAULT '{}',
     n_records bigint,
+    -- Distinct UTC days with at least one dated occurrence in this cell.
+    -- A COUNT, not a span: matches cde.trajectory_hexes.days so the map's
+    -- `days` ramp sums one unit across sources. Counted by the harvester from
+    -- each occurrence's date_start. NULL until the dataset is re-harvested.
+    days bigint,
     time_min timestamptz,
     time_max timestamptz,
     depth_min double precision,

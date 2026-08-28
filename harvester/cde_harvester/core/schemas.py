@@ -91,6 +91,7 @@ class ObisCellSchema(pa.DataFrameModel):
     longitude: Series[float] = pa.Field(ge=-180, le=180)
     scientific_names: Series[object]  # list column, stored as text[] in DB
     n_records: Series[float] = pa.Field(nullable=True)
+    days: Series[float] = pa.Field(nullable=True)
     time_min: Series[pa.DateTime] = pa.Field(nullable=True)
     time_max: Series[pa.DateTime] = pa.Field(nullable=True)
     depth_min: Series[float] = pa.Field(nullable=True)
