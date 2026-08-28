@@ -651,8 +651,12 @@ export default function CreateMap({
   // reading, where a fade to nothing and back would be the more jarring of the
   // two. This is about the first sight of the map only.
   //
-  // The paint change rides MapLibre's default transition, so the hexes fade up
-  // over ~300ms rather than snapping on.
+  // The hexes appear the moment their final ramp is ready. They used to fade
+  // up over MapLibre's default 300ms transition, back when this opacity was a
+  // plain number; a data-driven one cannot be transitioned at all (see the
+  // fill-opacity-transition note on the layers), so the fade is gone and the
+  // wait that replaced it has been turned off rather than left to stall the
+  // reveal.
   function revealHexes() {
     if (hexesRevealed.current || !map.current) return
     hexesRevealed.current = true
@@ -1113,12 +1117,6 @@ export default function CreateMap({
           'fill-color',
           dimmable(hexFillColor())
         )
-        // Update opacity based on the new fade threshold
-        map.current.setPaintProperty(
-          'hexes',
-          'fill-opacity',
-          hexOpacityExpression()
-        )
       }
     }
 
@@ -1146,13 +1144,16 @@ export default function CreateMap({
         'fill-outline-color',
         coverageHexOutlineColor()
       )
-      // Update opacity based on the new fade threshold
-      map.current.setPaintProperty(
-        'coverage-hexes',
-        'fill-opacity',
-        coverageHexOpacityExpression()
-      )
     }
+
+    // The fade rides on the same measured counts as the ramp, so it is
+    // refreshed with it — but through applyHexOpacity, which stays off
+    // fill-opacity until the opening reveal has run. Writing it directly here
+    // was a flicker: /legend resolving calls this before anything has been
+    // measured, so the hexes came on at FULL opacity over the placeholder ramp,
+    // and the fade then dimmed them a moment later. Both halves of the reveal
+    // this was supposed to avoid, in one load.
+    applyHexOpacity()
   }
   setColorStopsRef.current = setColorStops
 
@@ -2175,8 +2176,17 @@ export default function CreateMap({
           'source-layer': 'coverage-hexes-layer',
           paint: {
             // Zero until the ramp is final — see revealHexes. Then data-driven:
-            // hexes in the bottom quartile get 0.3 opacity, others get normal.
+            // sparse hexes ramp up from a floor, others get normal.
             'fill-opacity': hexesRevealed.current ? coverageHexOpacityExpression() : 0,
+            // No transition on it. MapLibre cannot interpolate a paint
+            // property to or from a data-driven value — DataDrivenProperty
+            // .interpolate returns the OLD value whenever either side is an
+            // expression, and this one always is (see fadeFlat). The default
+            // 300ms therefore does not fade anything: it holds the previous
+            // opacity for 300ms and then snaps. That delay is the flicker, on
+            // the reveal and on every threshold change after it, so take the
+            // snap without the wait.
+            'fill-opacity-transition': { duration: 0 },
             'fill-color': dimmable(coverageHexFillColor()),
             'fill-outline-color': coverageHexOutlineColor()
           }
@@ -2220,8 +2230,17 @@ export default function CreateMap({
 
         paint: {
           // Zero until the ramp is final — see revealHexes. Then data-driven:
-          // hexes in the bottom quartile get 0.3 opacity, others get normal.
+          // sparse hexes ramp up from a floor, others get normal.
           'fill-opacity': hexesRevealed.current ? hexOpacityExpression() : 0,
+          // No transition on it. MapLibre cannot interpolate a paint
+          // property to or from a data-driven value — DataDrivenProperty
+          // .interpolate returns the OLD value whenever either side is an
+          // expression, and this one always is (see fadeFlat). The default
+          // 300ms therefore does not fade anything: it holds the previous
+          // opacity for 300ms and then snaps. That delay is the flicker, on
+          // the reveal and on every threshold change after it, so take the
+          // snap without the wait.
+          'fill-opacity-transition': { duration: 0 },
           // A real interpolate expression rather than the legacy
           // { property, stops } paint function, because that form cannot be
           // nested inside the 'case' dimmable wraps it in — the same reason
