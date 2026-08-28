@@ -935,9 +935,15 @@ export default function CreateMap({
   //              threshold, a hard step at it.
   // 'gradient' — opacity climbs with the count across the faded band and
   //              reaches full strength AT the threshold, so the step is gone.
-  // fadeFactorRef is the faded value in binary and the FLOOR (what a count of
-  // 1 gets) in gradient, so the faintest hex looks the same either way.
+  // fadeFactorRef is the flat faded value in binary; gradientFloorRef is the
+  // floor in gradient. Separate knobs — see gradientFloorRef below.
   const fadeStyleRef = useRef('binary')
+  // The gradient's floor — what a count of 1 gets, as a fraction of the layer's
+  // normal opacity. Its own ref rather than sharing fadeFactorRef so the two
+  // modes can be dialled independently and compared without one dragging the
+  // other. Starts equal to the binary value, so switching style alone changes
+  // only the shape of the fade, not how faint its faintest hex is.
+  const gradientFloorRef = useRef(0.5)
   // TEMP_FADE_TUNER, ramp half. 'default' = whatever generateColorStops does
   // (log once max/min >= 100, which every real days domain is), so the tuner
   // starts on today's behaviour and any change is a deliberate comparison.
@@ -972,7 +978,7 @@ export default function CreateMap({
       ['linear'],
       LOG_COUNT,
       0,
-      opacity * fadeFactorRef.current,
+      opacity * gradientFloorRef.current,
       top,
       opacity
     ]
@@ -1369,10 +1375,14 @@ export default function CreateMap({
           <option value="gradient">gradient (ramps with count)</option>
         </select>
       </label>
-      <label style="display:block;margin-top:6px">Faded opacity &times;
-        <span style="color:#789">(floor in gradient)</span>
-        <b id="tft-f-val">0.50</b>
+      <label id="tft-row-binary" style="display:block;margin-top:6px">
+        Faded opacity &times; <b id="tft-f-val">0.50</b>
         <input id="tft-f" type="range" min="0.05" max="1" step="0.05" value="0.5"
+               style="width:100%">
+      </label>
+      <label id="tft-row-gradient" style="display:block;margin-top:6px">
+        Gradient floor &times; <b id="tft-floor-val">0.50</b>
+        <input id="tft-floor" type="range" min="0.05" max="1" step="0.05" value="0.5"
                style="width:100%">
       </label>
       <label style="display:block;margin-top:6px">Sparse cutoff pctile
@@ -1467,8 +1477,23 @@ export default function CreateMap({
       applyHexOpacity()
       readout()
     }
+    // Only one of the two opacity rows applies at a time; dim the other so the
+    // panel says which knob is live rather than leaving both looking active.
+    const syncRows = () => {
+      const gradient = fadeStyleRef.current === 'gradient'
+      $('#tft-row-binary').style.opacity = gradient ? '0.4' : '1'
+      $('#tft-row-gradient').style.opacity = gradient ? '1' : '0.4'
+    }
+    syncRows()
     $('#tft-style').addEventListener('change', (e) => {
       fadeStyleRef.current = e.target.value
+      syncRows()
+      applyHexOpacity()
+      readout()
+    })
+    $('#tft-floor').addEventListener('input', (e) => {
+      gradientFloorRef.current = Number(e.target.value)
+      $('#tft-floor-val').textContent = Number(e.target.value).toFixed(2)
       applyHexOpacity()
       readout()
     })
@@ -1506,7 +1531,11 @@ export default function CreateMap({
       fadeFactorRef.current = 0.5
       fadePercentileRef.current = 0.95
       fadeStyleRef.current = 'binary'
+      gradientFloorRef.current = 0.5
       $('#tft-style').value = 'binary'
+      $('#tft-floor').value = '0.5'
+      $('#tft-floor-val').textContent = '0.50'
+      syncRows()
       rampModeRef.current = 'default'
       rampGammaRef.current = 1
       rampTopPctRef.current = 1
