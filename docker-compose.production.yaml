@@ -3,9 +3,9 @@
 #
 #   docker compose -f docker-compose.yaml -f docker-compose.production.yaml up -d --build
 #
-# .env sets COMPOSE_FILE + COMPOSE_PROFILES=tools so plain `docker compose`
-# does the same. The profile is required: `scheduler` is profiled `tools` in the
-# base file, and an overlay can add a profile but never remove one.
+# .env sets COMPOSE_FILE so plain `docker compose` does the same. No profile is
+# needed any more: `scheduler` was profiled `tools` in the base file, which made
+# the download-queue consumer opt-in and left Coolify deploys without one.
 services:
   db:
     ports:

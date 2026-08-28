@@ -87,11 +87,20 @@ services:
       - .env
     environment:
       # Docker-network service names so the API reaches Postgres/Redis without a
-      # repo .env (Coolify supplies DB_NAME/USER/PASSWORD/PORT but not the hosts).
-      # web-api/db.js reads DB_HOST and utils/redis.js reads REDIS_HOST; both
-      # default to localhost when unset. Mirrors the prefect_worker service.
+      # repo .env. web-api/db.js reads DB_HOST and utils/redis.js reads REDIS_HOST;
+      # both default to localhost when unset. Mirrors the prefect_worker service.
       DB_HOST: db
       REDIS_HOST: redis
+      # The credentials too, by interpolation rather than only `env_file` above.
+      # Same reasoning as prefect_worker: Coolify reliably populates variables for
+      # interpolation (that is why `db` and `prefect` come up), but the .env that
+      # `env_file` reads can be absent or empty on a deployment — which left the
+      # harvester with no DB settings at all while db/prefect ran on the same
+      # values. Delivering them both ways keeps this service off that cliff.
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: ${DB_PORT:-5432}
     expose:
       - "5000"
     depends_on:
@@ -116,8 +125,14 @@ services:
     build:
       context: .
       dockerfile: ./download_scheduler/Dockerfile
-    profiles:
-      - tools
+    # NOT behind a compose profile. It used to sit in the `tools` profile to
+    # dodge a start-up crash (fc2eae11, since fixed), but a profile is opt-in:
+    # `docker compose up` skips the service unless COMPOSE_PROFILES names it,
+    # and Coolify never sets that — so every Coolify deploy silently ran with no
+    # consumer on the queue and downloads stayed 'open' forever.
+    # Without this, a crash leaves the queue with no consumer: the API keeps
+    # accepting downloads and they pile up as 'open' rows forever.
+    restart: unless-stopped
     depends_on:
       db_migrate:
         condition: service_completed_successfully
@@ -127,6 +142,24 @@ services:
       # Under Coolify, SERVICE_URL_NGINX is injected with nginx's public URL;
       # elsewhere it is unset and APP_DOMAIN from .env is used.
       - "DOWNLOAD_WAF_URL=${SERVICE_URL_NGINX:-${APP_DOMAIN}}/downloads"
+      # Same reason as web-api: Coolify supplies DB_NAME/USER/PASSWORD/PORT but
+      # not the host. download_scheduler.py reads envs["DB_HOST"] unconditionally
+      # at import, so without this the module raises KeyError before it can poll
+      # and the container crash-loops on restart: unless-stopped.
+      - "DB_HOST=db"
+      # As above: interpolation as well as `env_file`, so an empty .env cannot
+      # leave the scheduler unable to reach the queue.
+      - "DB_NAME=${DB_NAME}"
+      - "DB_USER=${DB_USER}"
+      - "DB_PASSWORD=${DB_PASSWORD}"
+      - "DB_PORT=${DB_PORT:-5432}"
+      # Makes each download a Prefect flow run in the same UI as the harvests
+      # (download_scheduler.run_download_observed). Delete this line to turn
+      # that off: the queue still drains, it just stops being visible.
+      # Hardcoded, NOT ${PREFECT_API_URL}, for the same reason prefect_worker
+      # hardcodes it: .env sets that var to localhost:4200 for host-side CLI
+      # use, and interpolating it here points the container at itself.
+      - "PREFECT_API_URL=http://prefect:4200/api"
     volumes:
       - downloads:/usr/src/app/download_scheduler/downloads
   frontend:
@@ -190,6 +223,23 @@ services:
       # In-process flows inherit this container's env for DB / redis access.
       DB_HOST_EXTERNAL: db
       REDIS_HOST: redis
+      # The connection settings themselves, delivered by compose interpolation —
+      # the same way `db` (POSTGRES_DB=$DB_NAME) and `prefect`
+      # (PREFECT_API_DATABASE_CONNECTION_URL) already get them, rather than
+      # relying on `env_file: .env` above.
+      #
+      # These are the SAME values, not different ones. The two delivery paths are
+      # not equally reliable: Coolify always provides variables for interpolation
+      # (which is why db and prefect come up), but the `.env` that `env_file`
+      # reads can be absent or empty on a deployment. When that happened, this
+      # container started with no DB settings at all and every flow run died at
+      # connection time ("DB_NAME is not set") while db and prefect ran happily
+      # on the very same credentials — see harvester/core/db.py:REQUIRED_DB_SETTINGS
+      # and the startup pre-flight in worker-entrypoint.sh.
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: ${DB_PORT:-5432}
       HARVESTER_LOG_DIR: /app/harvester/logs
       # Surface stdlib-logging from harvester/db-loader in Prefect UI logs.
       PREFECT_LOGGING_EXTRA_LOGGERS: populate_vernaculars,cde_db_loader,cde_harvester

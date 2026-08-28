@@ -1,6 +1,5 @@
 import os
 import smtplib
-import traceback
 from email.message import EmailMessage
 
 from loguru import logger
@@ -34,5 +33,8 @@ def send_email(mail_to, mail_message_body, mail_subject):
         s.login(gmail_user, gmail_password)
         s.send_message(msg)
         s.quit()
-    except smtplib.SMTPAuthenticationError as e:
-        logger.error(e, traceback.format_exc())
+    except smtplib.SMTPAuthenticationError:
+        # loguru's logger.error treats its first arg as a format string, so
+        # passing the exception object raised AttributeError. Use logger.exception
+        # to log the message + traceback correctly.
+        logger.exception("SMTP authentication failed for {}", gmail_user)
