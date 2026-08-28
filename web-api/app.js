@@ -100,10 +100,6 @@ if (!process.env.DB_USER) require("dotenv").config();
 })();
 
 
-// view engine setup
-app.set("views", path.join(__dirname, "views"));
-app.set("view engine", "jade");
-
 app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -155,14 +151,30 @@ app.use((req, res, next) => {
 });
 
 // error handler
+//
+// This is a JSON API, so errors have to be machine-readable: the frontend calls
+// response.json() on failures to show the real cause. Returning a rendered HTML
+// page (as this used to) makes every 500 indistinguishable from every other.
 app.use((err, req, res, next) => {
-  // set locals, only providing error in development
-  res.locals.message = err.message;
-  res.locals.error = req.app.get("env") === "development" ? err : {};
+  const status = err.status || err.statusCode || 500;
 
-  // render the error page
-  res.status(err.status || 500);
-  res.render("error");
+  // Server-side faults are ours to see; 4xx are the caller's problem and would
+  // just be log noise.
+  if (status >= 500) console.error("Unhandled error:", err);
+
+  // Something already started writing — the response is no longer ours to shape,
+  // so let Express finalize/destroy it.
+  if (res.headersSent) return next(err);
+
+  // Gated on ENVIRONMENT, not Express's app.get("env"): NODE_ENV is unset in the
+  // container, so Express reports "development" everywhere and would leak stacks.
+  res.status(status).json({
+    error: err.message || "Internal Server Error",
+    // Postgres puts the useful part (missing column, bad syntax) in these.
+    ...(process.env.ENVIRONMENT === "production"
+      ? {}
+      : { detail: err.detail, hint: err.hint, stack: err.stack }),
+  });
 });
 
 module.exports = app;
