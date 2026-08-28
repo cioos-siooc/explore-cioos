@@ -919,9 +919,11 @@ export default function CreateMap({
   // temporary tuning panel below can move them live — see TEMP_FADE_TUNER.
   // Once the values are settled these go back to plain consts and the panel
   // and everything referencing it comes out.
-  // Chosen by eye on 2026-08-28 and kept as the defaults so a reload restores
-  // them: faded hexes keep 0.50 of their normal opacity (0.40 against the 0.80
-  // base), and the faded band is the bottom 95% of the counts on screen.
+  // Chosen by eye on 2026-08-28. These are what the map actually draws now —
+  // the tuner below is hidden unless asked for, so nothing else sets them:
+  // gradient fade, opacity climbing from a floor of 0.20 (0.16 against the 0.80
+  // base) at a count of 1 up to full strength at the threshold, with the
+  // threshold at the 95th percentile of the counts on screen.
   //
   // 0.95 inverts what this started as. It is no longer "dim the emptiest few" —
   // it is "only the busiest few stay at full strength". Unfiltered that leaves
@@ -929,7 +931,7 @@ export default function CreateMap({
   // as a handful of hotspots over a wash. Deliberate: at the low end the fade
   // did almost nothing, because 38% of hexes hold exactly one day and any
   // percentile below ~0.4 lands on a threshold of 1.
-  const fadeFactorRef = useRef(0.5)
+  const fadeFactorRef = useRef(0.65)
   const fadePercentileRef = useRef(0.95)
   // 'binary'   — one flat faded opacity for everything at or below the
   //              threshold, a hard step at it.
@@ -937,13 +939,13 @@ export default function CreateMap({
   //              reaches full strength AT the threshold, so the step is gone.
   // fadeFactorRef is the flat faded value in binary; gradientFloorRef is the
   // floor in gradient. Separate knobs — see gradientFloorRef below.
-  const fadeStyleRef = useRef('binary')
+  const fadeStyleRef = useRef('gradient')
   // The gradient's floor — what a count of 1 gets, as a fraction of the layer's
   // normal opacity. Its own ref rather than sharing fadeFactorRef so the two
   // modes can be dialled independently and compared without one dragging the
   // other. Starts equal to the binary value, so switching style alone changes
   // only the shape of the fade, not how faint its faintest hex is.
-  const gradientFloorRef = useRef(0.5)
+  const gradientFloorRef = useRef(0.2)
   // TEMP_FADE_TUNER, ramp half. 'default' = whatever generateColorStops does
   // (log once max/min >= 100, which every real days domain is), so the tuner
   // starts on today's behaviour and any change is a deliberate comparison.
@@ -1357,6 +1359,31 @@ export default function CreateMap({
   // component tree or any real state.
   // ===========================================================================
   useEffect(() => {
+    // Hidden unless asked for: `?tuner=1` in the address bar turns it on,
+    // `?tuner=0` turns it back off.
+    //
+    // The flag has to be latched rather than read from the URL each render,
+    // because useUrlSync rebuilds the query string from a fixed whitelist and
+    // navigates with replace on every map move — an unknown param survives only
+    // until the first pan. sessionStorage keeps it for the tab instead, so the
+    // panel also survives the reload after a rebuild. Wrapped because storage
+    // throws outright in some contexts (private windows, blocked site data).
+    const TUNER_KEY = 'cde:fadeTuner'
+    let enabled = false
+    try {
+      const asked = new URLSearchParams(window.location.search).get('tuner')
+      if (asked !== null) {
+        enabled = asked !== '0' && asked !== 'false'
+        sessionStorage.setItem(TUNER_KEY, enabled ? '1' : '0')
+      } else {
+        enabled = sessionStorage.getItem(TUNER_KEY) === '1'
+      }
+    } catch {
+      const asked = new URLSearchParams(window.location.search).get('tuner')
+      enabled = asked !== null && asked !== '0' && asked !== 'false'
+    }
+    if (!enabled) return
+
     const host = document.createElement('div')
     host.id = 'temp-fade-tuner'
     host.style.cssText = [
@@ -1376,13 +1403,13 @@ export default function CreateMap({
         </select>
       </label>
       <label id="tft-row-binary" style="display:block;margin-top:6px">
-        Faded opacity &times; <b id="tft-f-val">0.50</b>
-        <input id="tft-f" type="range" min="0.05" max="1" step="0.05" value="0.5"
+        Faded opacity &times; <b id="tft-f-val">0.65</b>
+        <input id="tft-f" type="range" min="0.05" max="1" step="0.05" value="0.65"
                style="width:100%">
       </label>
       <label id="tft-row-gradient" style="display:block;margin-top:6px">
-        Gradient floor &times; <b id="tft-floor-val">0.50</b>
-        <input id="tft-floor" type="range" min="0.05" max="1" step="0.05" value="0.5"
+        Gradient floor &times; <b id="tft-floor-val">0.20</b>
+        <input id="tft-floor" type="range" min="0.05" max="1" step="0.05" value="0.2"
                style="width:100%">
       </label>
       <label style="display:block;margin-top:6px">Sparse cutoff pctile
@@ -1484,6 +1511,7 @@ export default function CreateMap({
       $('#tft-row-binary').style.opacity = gradient ? '0.4' : '1'
       $('#tft-row-gradient').style.opacity = gradient ? '1' : '0.4'
     }
+    $('#tft-style').value = fadeStyleRef.current
     syncRows()
     $('#tft-style').addEventListener('change', (e) => {
       fadeStyleRef.current = e.target.value
@@ -1528,23 +1556,23 @@ export default function CreateMap({
       apply()
     })
     $('#tft-reset').addEventListener('click', () => {
-      fadeFactorRef.current = 0.5
+      fadeFactorRef.current = 0.65
       fadePercentileRef.current = 0.95
-      fadeStyleRef.current = 'binary'
-      gradientFloorRef.current = 0.5
-      $('#tft-style').value = 'binary'
-      $('#tft-floor').value = '0.5'
-      $('#tft-floor-val').textContent = '0.50'
+      fadeStyleRef.current = 'gradient'
+      gradientFloorRef.current = 0.2
+      $('#tft-style').value = 'gradient'
+      $('#tft-floor').value = '0.2'
+      $('#tft-floor-val').textContent = '0.20'
       syncRows()
       rampModeRef.current = 'default'
       rampGammaRef.current = 1
       rampTopPctRef.current = 1
-      $('#tft-f').value = '0.5'
+      $('#tft-f').value = '0.65'
       $('#tft-p').value = '0.95'
       $('#tft-mode').value = 'default'
       $('#tft-top').value = '1'
       $('#tft-g').value = '1'
-      $('#tft-f-val').textContent = '0.50'
+      $('#tft-f-val').textContent = '0.65'
       $('#tft-p-val').textContent = '0.95'
       $('#tft-top-val').textContent = '1.00'
       $('#tft-g-val').textContent = '1.00'
