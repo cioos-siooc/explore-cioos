@@ -2,17 +2,25 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
 import { Funnel, FunnelFill } from 'react-bootstrap-icons'
-import DataTable from 'react-data-table-component'
-import TableFilter, { filterRows } from '../../ui/TableFilter.jsx'
-
 // import platformColors from '../../platformColors'
 import Loading from '../Loading/Loading.jsx'
 import GriddapDetails from '../GriddapDetails/GriddapDetails.jsx'
 import { server } from '../../../config'
 import reportError from '../../../state/reportError.js'
-import { splitLines } from '../../../utilities'
+import {
+  dataLayerKeyForDataset,
+  DATA_LAYER_LABEL_KEYS
+} from '../../../state/dataLayers.js'
 import { gridNodeFactors, totalGridNodes } from '../../../wmsUtilities'
 import FilterButton from '../Filter/FilterButton/FilterButton.jsx'
+import CardList from './CardList.jsx'
+import ListCard, {
+  CardField,
+  CardTags,
+  formatInstantRange,
+  formatRange,
+  useExpandableList
+} from './ListCard.jsx'
 import ZoomToDataset, {
   useZoomToDataset
 } from '../../AppShell/ZoomToDataset/ZoomToDataset.jsx'
@@ -77,16 +85,24 @@ function cfRoleColumn(dataset, roleOrder, t) {
   }
 }
 
-// A table heading that names the role on top and the variable behind it
-// underneath, so the column says both what the ID means and where it came from.
-function ColumnHeading({ label, variable }) {
+// A caption over a list that names the role its cards are identified by and,
+// after it, the variable carrying that role — so the list says both what its
+// IDs mean and where they came from. On a card the id has no column header to
+// carry this, and repeating it on every card would say it a hundred times.
+function IdCaption({ label, variable }) {
   return (
-    <span className='columnHeading'>
-      <span className='columnHeadingLabel'>{label}</span>
-      {variable && <span className='columnHeadingVariable'>{variable}</span>}
+    <span className='recordIdCaption'>
+      {label}
+      {variable && <code className='recordIdVariable'>{variable}</code>}
     </span>
   )
 }
+
+// The metadata sheet's EOV row, expandable past this like the record list's
+// own variable tags (CardTags) — a dataset can carry a dozen ocean variables,
+// which would otherwise push the platform/record-count row that follows well
+// down the sheet.
+const EOV_VISIBLE_LIMIT = 3
 
 export default function DatasetInspector({
   dataset,
@@ -99,20 +115,27 @@ export default function DatasetInspector({
   query,
   selectedTrajectory,
   setSelectedTrajectory,
+  // The one record ({datasetPk, profileId}) an unambiguous map marker click
+  // resolved to — pins that record to the top of the table below rather than
+  // opening its preview outright, until cleared (see markerRecordPinned).
+  highlightedRecord,
+  setHighlightedRecord,
   activeWmsOverlay,
   setActiveWmsOverlay
 }) {
   const { t } = useTranslation()
   const { zoomToDataset } = useZoomToDataset()
   const [datasetRecords, setDatasetRecords] = useState()
-  const [recordFilterText, setRecordFilterText] = useState('')
   const [trajectoryPlatforms, setTrajectoryPlatforms] = useState()
-  const [platformFilterText, setPlatformFilterText] = useState('')
-  // Mirrors the platform table's rows-per-page so the page holding a
-  // map-picked platform is computed against the size the user is actually on.
-  const [platformRowsPerPage, setPlatformRowsPerPage] = useState(100)
   const inspectorRef = useRef(null)
   const isGrid = dataset.cdm_data_type === 'Grid'
+  // Same CF discrete-sampling geometry the map's "Dataset geometry" layer
+  // filter switches on (dataLayers.js) — reused here so the label matches
+  // what that filter calls the same shape.
+  const geometryKey = dataLayerKeyForDataset(dataset)
+  const geometryLabel = geometryKey
+    ? t(DATA_LAYER_LABEL_KEYS[geometryKey])
+    : dataset.cdm_data_type
   // no per-record list for OBIS (external) or griddap (metadata-only)
   const hasRecordList = dataset.source_type !== 'obis' && !isGrid
   // OBIS datasets always link out to OBIS; the rest have whichever of their
@@ -120,6 +143,12 @@ export default function DatasetInspector({
   const hasSources =
     dataset.source_type === 'obis' ||
     Boolean(dataset.erddap_url || dataset.ckan_url)
+  // OBIS is always the one link; ERDDAP + CKAN can both be present, at which
+  // point the row needs the full width to hold two chips.
+  const hasMultipleSources =
+    dataset.source_type !== 'obis' &&
+    Boolean(dataset.erddap_url) &&
+    Boolean(dataset.ckan_url)
   // Start loading rather than false: the fetch below is fired from an effect,
   // so an initial false would paint one frame of an empty record table before
   // the spinner appears.
@@ -205,30 +234,19 @@ export default function DatasetInspector({
   }, [returnToList])
 
   // Swipe left (touch, trackpad two-finger, or mouse horizontal wheel) to
-  // return to the dataset list. Swipes work everywhere, including over the
-  // record table: while the table still has room to scroll left the gesture
-  // scrolls the table, and only once it's at its left edge (or doesn't
-  // overflow) does the same swipe pop back to the list.
+  // return to the dataset list. The page's lists are cards rather than tables
+  // now, so nothing on it scrolls sideways and the gesture means one thing
+  // everywhere on the page.
   useEffect(() => {
     const el = inspectorRef.current
     if (!el) return undefined
 
     const SWIPE_THRESHOLD = 70 // px of leftward travel to count as a swipe
-    const tableUnder = (target) =>
-      target instanceof Element ? target.closest('.recordTableScroll') : null
-    // The table can still absorb a leftward gesture if it overflows
-    // horizontally and isn't yet scrolled to its left edge.
-    const tableCanScrollLeft = (table) =>
-      table &&
-      table.scrollWidth - table.clientWidth > 1 &&
-      table.scrollLeft > 0
 
     let touchStartX = 0
     let touchStartY = 0
-    let startTable = null
 
     const onTouchStart = (e) => {
-      startTable = tableUnder(e.target)
       touchStartX = e.touches[0].clientX
       touchStartY = e.touches[0].clientY
     }
@@ -236,7 +254,6 @@ export default function DatasetInspector({
       const dx = e.changedTouches[0].clientX - touchStartX
       const dy = e.changedTouches[0].clientY - touchStartY
       if (dx > -SWIPE_THRESHOLD || Math.abs(dx) <= Math.abs(dy)) return
-      if (tableCanScrollLeft(startTable)) return
       returnToList()
     }
 
@@ -245,12 +262,6 @@ export default function DatasetInspector({
     const onWheel = (e) => {
       // Only react to predominantly-horizontal gestures.
       if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return
-      // Let the table consume leftward scroll until it bottoms out at its
-      // left edge; reset the back accumulator while it's still scrolling.
-      if (e.deltaX < 0 && tableCanScrollLeft(tableUnder(e.target))) {
-        wheelAccumX = 0
-        return
-      }
       wheelAccumX += e.deltaX
       if (wheelTimer) clearTimeout(wheelTimer)
       wheelTimer = setTimeout(() => {
@@ -274,12 +285,10 @@ export default function DatasetInspector({
     }
   }, [returnToList])
 
-  const dataColumnWith = '105px'
-
   // Trajectory datasets list one row per mission, so their record column is the
   // trajectory role; every other type resolves to whichever of profile_id /
   // timeseries_id the dataset declares.
-  const recordIdColumn = cfRoleColumn(
+  const recordIdField = cfRoleColumn(
     dataset,
     isTrajectoryDataset
       ? ['trajectory_id', 'profile_id', 'timeseries_id']
@@ -287,120 +296,95 @@ export default function DatasetInspector({
     t
   )
 
-  const columns = [
+  // What a card can be sorted by, in place of the column headers a table would
+  // have offered. The ocean variables a record carries are not among them: a
+  // list of names has no order worth sorting on, and the search box above the
+  // cards is the way to find the records carrying one.
+  const recordSortFields = [
     {
-      name: <ColumnHeading {...recordIdColumn} />,
-      selector: (row) => row.profile_id,
-      sortable: true,
-      wrap: true,
-      width: '130px'
+      id: 'id',
+      label: recordIdField.label,
+      type: 'string',
+      value: (row) => row.profile_id
     },
     {
-      name: splitLines(t('timeSelectorStartDate')),
-      selector: (row) => row.time_min,
-      sortable: true,
-      wrap: true,
-      width: dataColumnWith
+      id: 'timeMin',
+      label: t('timeSelectorStartDate'),
+      type: 'string',
+      value: (row) => row.time_min
     },
     {
-      name: splitLines(t('timeSelectorEndDate')),
-      selector: (row) => row.time_max,
-      sortable: true,
-      wrap: true,
-      width: dataColumnWith
+      id: 'timeMax',
+      label: t('timeSelectorEndDate'),
+      type: 'string',
+      value: (row) => row.time_max
     },
     {
-      name: splitLines(t('depthFilterStartDepth')),
-      selector: (row) => row.depth_min,
-      sortable: true,
-      wrap: true,
-      width: dataColumnWith
+      id: 'depthMin',
+      label: t('depthFilterStartDepth'),
+      type: 'number',
+      value: (row) => row.depth_min
     },
     {
-      name: splitLines(t('depthFilterEndDepth')),
-      selector: (row) => row.depth_max,
-      sortable: true,
-      wrap: true,
-      width: dataColumnWith
-    },
-    {
-      // Which ocean variables this individual record carries — a dataset's
-      // records don't all measure everything it lists. Null for the sources
-      // with no per-record detection (trajectory, OBIS, grid), where the
-      // dataset's own list is the best answer available.
-      name: splitLines(t('datasetInspectorOceanVariablesText')),
-      selector: (row) =>
-        (row.eovs ?? dataset.eovs).map((eov) => t(eov)).join(', '),
-      sortable: true,
-      wrap: true,
-      grow: 2
-    }
-  ]
-  const data = filterRows(datasetRecords?.profiles, recordFilterText)
-
-  const platformColumns = [
-    {
-      // Same value the record column carries, named the same way: the
-      // cf_role=trajectory_id variable, or the plain "Platform ID" when the
-      // dataset is a single unnamed trajectory with no such variable.
-      name: (
-        <ColumnHeading
-          label={
-            dataset.trajectory_id_variable
-              ? t('cfRoleTrajectoryIdText')
-              : t('trajectoryPlatformIdText')
-          }
-          variable={dataset.trajectory_id_variable || undefined}
-        />
-      ),
-      selector: (row) => row.trajectory_id,
-      sortable: true,
-      wrap: true,
-      width: '130px'
-    },
-    {
-      name: splitLines(t('timeSelectorStartDate')),
-      selector: (row) => row.time_min?.split('T')[0],
-      sortable: true,
-      wrap: true,
-      width: dataColumnWith
-    },
-    {
-      name: splitLines(t('timeSelectorEndDate')),
-      selector: (row) => row.time_max?.split('T')[0],
-      sortable: true,
-      wrap: true,
-      width: dataColumnWith
-    },
-    {
-      name: splitLines(t('trajectoryPlatformFixesText')),
-      selector: (row) => row.n_points,
-      sortable: true,
-      wrap: true,
-      width: dataColumnWith
+      id: 'depthMax',
+      label: t('depthFilterEndDepth'),
+      type: 'number',
+      value: (row) => row.depth_max
     }
   ]
 
-  // A platform picked on the map (rather than from this table) can sit on any
-  // page of it — turn to the page holding it, so the highlighted row is one the
-  // user can actually see. Rows render in the order the API returned them, so a
-  // row's index is its position in this list; a column sort the user applied
-  // reorders them and can land the jump a page off, which paging fixes.
-  // filterRows passes a null row list straight through, and this runs before the
-  // platforms fetch resolves (and for datasets that never have any).
-  const platformRows = filterRows(trajectoryPlatforms, platformFilterText) || []
-  const selectedPlatformIndex =
-    selectedTrajectory?.datasetPk === dataset.pk
-      ? platformRows.findIndex(
-        (row) => row.trajectory_id === selectedTrajectory.trajectoryId
-      )
-      : -1
-  const selectedPlatformPage =
-    selectedPlatformIndex < 0
-      ? 1
-      : Math.floor(selectedPlatformIndex / platformRowsPerPage) + 1
+  // A record picked on the map (rather than from this list) is pinned to the
+  // front of it rather than filtering the rest away — the same "found here,
+  // sorted to the top" treatment the datasets list itself gives a map click
+  // (see DatasetsTable's pinnedPks).
+  const markerRecordPinned = highlightedRecord?.datasetPk === dataset.pk
+
+  // Same value the record id carries, named the same way: the
+  // cf_role=trajectory_id variable, or the plain "Platform ID" when the dataset
+  // is a single unnamed trajectory with no such variable.
+  const platformIdLabel = dataset.trajectory_id_variable
+    ? t('cfRoleTrajectoryIdText')
+    : t('trajectoryPlatformIdText')
+
+  const platformSortFields = [
+    {
+      id: 'id',
+      label: platformIdLabel,
+      type: 'string',
+      value: (row) => row.trajectory_id
+    },
+    {
+      id: 'timeMin',
+      label: t('timeSelectorStartDate'),
+      type: 'string',
+      value: (row) => row.time_min
+    },
+    {
+      id: 'timeMax',
+      label: t('timeSelectorEndDate'),
+      type: 'string',
+      value: (row) => row.time_max
+    },
+    {
+      id: 'fixes',
+      label: t('trajectoryPlatformFixesText'),
+      type: 'number',
+      value: (row) => row.n_points
+    }
+  ]
 
   const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet
+
+  const {
+    shown: shownEovs,
+    hidden: hiddenEovCount,
+    expanded: eovsExpanded,
+    toggle: toggleEovsExpanded
+  } = useExpandableList(dataset.eovs, EOV_VISIBLE_LIMIT)
+
+  const platformOption = platformFilter.platformsSelected.filter(
+    (p) => dataset.platform === p.title
+  )[0]
 
   // The title bar's filter button: narrow the map to this dataset alone, or
   // release it again. Same toggle the dataset's chip in the Filters panel does
@@ -467,9 +451,11 @@ export default function DatasetInspector({
       </div>
       <div className='datasetInspectorBody'>
         {/* The front matter, as compact as it can be read: each field is a
-            small eyebrow label with its value stacked under it, and the fields
-            flow two-up across the sheet, the chip-carrying ones taking a full
-            row of their own. No row rules — the whitespace separates them. */}
+            small eyebrow label with its value beside it on the same line
+            (wrapping under only when the row is too narrow for both), and the
+            fields flow two-up across the sheet, the chip-carrying ones taking
+            a full row of their own. No row rules — the whitespace separates
+            them. */}
         <dl className='datasetMetaSheet'>
           <div className='metaCell metaCellWide'>
             <dt className='metadataLabel'>
@@ -495,7 +481,7 @@ export default function DatasetInspector({
               {t('datasetInspectorOceanVariablesText')}
             </dt>
             <dd className='metadataValue'>
-              {dataset.eovs.map((eov, index) => {
+              {shownEovs.map((eov, index) => {
                 return (
                   <FilterButton
                     key={index}
@@ -507,6 +493,38 @@ export default function DatasetInspector({
                   />
                 )
               })}
+              {(hiddenEovCount > 0 || eovsExpanded) && (
+                <button
+                  type='button'
+                  className='listCardTagsMore'
+                  onClick={toggleEovsExpanded}
+                  aria-expanded={eovsExpanded}
+                  title={
+                    eovsExpanded
+                      ? t('listCardTagsFewerText')
+                      : t('listCardTagsMoreTitle', {
+                        total: dataset.eovs.length
+                      })
+                  }
+                >
+                  {eovsExpanded
+                    ? t('listCardTagsFewerText')
+                    : `+${hiddenEovCount}`}
+                </button>
+              )}
+            </dd>
+          </div>
+          {/* Geometry, platform, locations and sources: a label with its
+              value(s) as badges beside it, the same badge organizations and
+              EOVs already use (same pill radius, border and padding as
+              .filterButton) — one consistent chip style across every field
+              instead of four different treatments. */}
+          <div className='metaCell'>
+            <dt className='metadataLabel'>
+              {t('datasetInspectorGeometryText')}
+            </dt>
+            <dd className='metadataValue'>
+              <span className='metadataChip'>{geometryLabel}</span>
             </dd>
           </div>
           <div className='metaCell'>
@@ -517,11 +535,7 @@ export default function DatasetInspector({
               <FilterButton
                 setOptionsSelected={platformFilter.setPlatformsSelected}
                 optionsSelected={platformFilter.platformsSelected}
-                option={
-                  platformFilter.platformsSelected.filter(
-                    (p) => dataset.platform === p.title
-                  )[0]
-                }
+                option={platformOption}
               />
             </dd>
           </div>
@@ -531,28 +545,32 @@ export default function DatasetInspector({
             <dt className='metadataLabel'>
               {isGrid ? t('griddapNodesText') : t('datasetInspectorRecordsText')}
             </dt>
-            <dd className='metadataValue recordCount'>
+            <dd className='metadataValue'>
               {isGrid ? (
                 <GridNodeCount dimensions={dataset.grid_dimensions} />
-              ) : dataset.profiles_count !== dataset.n_profiles ? (
-                `${dataset.profiles_count} / ${dataset.n_profiles}`
               ) : (
-                dataset.profiles_count
+                <span className='metadataChip'>
+                  {dataset.profiles_count !== dataset.n_profiles
+                    ? `${dataset.profiles_count} / ${dataset.n_profiles}`
+                    : dataset.profiles_count}
+                </span>
               )}
             </dd>
           </div>
           {/* The outbound links used to be a labelled row each; they say what
               they are in their own text, so one "Sources" line holds them
-              all. */}
+              all — narrow like Locations before it so the two pair up on one
+              row, unless there's more than one link (ERDDAP + CKAN both), in
+              which case the row needs the full width to hold both badges. */}
           {hasSources && (
-            <div className='metaCell metaCellWide'>
+            <div className={classNames('metaCell', { metaCellWide: hasMultipleSources })}>
               <dt className='metadataLabel'>
                 {t('datasetInspectorSourcesText')}
               </dt>
-              <dd className='metadataValue metadataLinks'>
+              <dd className='metadataValue'>
                 {dataset.source_type === 'obis' ? (
                   <a
-                    className='metadataLink'
+                    className='metadataChip metadataLink'
                     href={`https://obis.org/dataset/${dataset.dataset_id}`}
                     target='_blank'
                     rel='noreferrer'
@@ -563,7 +581,7 @@ export default function DatasetInspector({
                   <>
                     {dataset.erddap_url && (
                       <a
-                        className='metadataLink'
+                        className='metadataChip metadataLink'
                         href={dataset.erddap_url}
                         target='_blank'
                         title={t('datasetInspectorERDDAPText')}
@@ -574,7 +592,7 @@ export default function DatasetInspector({
                     )}
                     {dataset.ckan_url && (
                       <a
-                        className='metadataLink'
+                        className='metadataChip metadataLink'
                         href={dataset.ckan_url}
                         target='_blank'
                         title={t('datasetInspectorCKANText')}
@@ -603,52 +621,54 @@ export default function DatasetInspector({
               <span className='recordHint'>
                 {t('trajectoryPlatformsClickText')}
               </span>
-            </div>
-            <div className='recordTableScroll'>
-              <TableFilter
-                value={platformFilterText}
-                onChange={setPlatformFilterText}
-                placeholder={t('trajectoryPlatformsSearchPlaceholder')}
+              <IdCaption
+                label={platformIdLabel}
+                variable={dataset.trajectory_id_variable || undefined}
               />
-              <DataTable
-                onRowClicked={(row) =>
-                  setSelectedTrajectory &&
-                  setSelectedTrajectory(
+            </div>
+            <CardList
+              items={trajectoryPlatforms}
+              keyOf={(row) => row.trajectory_id}
+              sortFields={platformSortFields}
+              defaultSort={{ field: 'id', dir: 'asc' }}
+              filterPlaceholder={t('trajectoryPlatformsSearchPlaceholder')}
+              emptyText={t('trajectoryPlatformsNoResultsText')}
+              focusKey={
+                selectedTrajectory?.datasetPk === dataset.pk
+                  ? selectedTrajectory.trajectoryId
+                  : undefined
+              }
+              pagerLabel={t('trajectoryPlatformsPagerLabel')}
+              perPageLabel={t('trajectoryPlatformsPerPageLabel')}
+              renderItem={(row) => (
+                <ListCard
+                  id={row.trajectory_id || '—'}
+                  pressed={
+                    selectedTrajectory?.datasetPk === dataset.pk &&
                     selectedTrajectory?.trajectoryId === row.trajectory_id
-                      ? undefined // click the active row again to clear
-                      : {
-                        datasetPk: dataset.pk,
-                        datasetTitle: dataset.title,
-                        trajectoryId: row.trajectory_id
-                      }
-                  )
-                }
-                striped
-                pointerOnHover
-                conditionalRowStyles={[
-                  {
-                    when: (row) =>
-                      selectedTrajectory?.datasetPk === dataset.pk &&
-                      selectedTrajectory?.trajectoryId === row.trajectory_id,
-                    style: { backgroundColor: '#d5c9ee' }
                   }
-                ]}
-                columns={platformColumns}
-                data={platformRows}
-                defaultSortField='trajectory_id'
-                pagination
-                paginationPerPage={platformRowsPerPage}
-                paginationDefaultPage={selectedPlatformPage}
-                onChangeRowsPerPage={setPlatformRowsPerPage}
-                paginationRowsPerPageOptions={[100, 150, 200, 250]}
-                paginationComponentOptions={{
-                  rowsPerPageText: t('tableComponentRowsPerPage'),
-                  rangeSeparatorText: t('tableComponentOf'),
-                  selectAllRowsItem: false
-                }}
-                highlightOnHover
-              />
-            </div>
+                  onClick={() =>
+                    setSelectedTrajectory &&
+                    setSelectedTrajectory(
+                      selectedTrajectory?.trajectoryId === row.trajectory_id
+                        ? undefined // click the drawn platform again to clear
+                        : {
+                          datasetPk: dataset.pk,
+                          datasetTitle: dataset.title,
+                          trajectoryId: row.trajectory_id
+                        }
+                    )
+                  }
+                >
+                  <CardField label={t('datasetInspectorTimeframeText')}>
+                    {formatInstantRange(row.time_min, row.time_max)}
+                  </CardField>
+                  <CardField label={t('trajectoryPlatformFixesText')}>
+                    {row.n_points?.toLocaleString()}
+                  </CardField>
+                </ListCard>
+              )}
+            />
           </div>
         )}
         {hasRecordList && (
@@ -658,37 +678,73 @@ export default function DatasetInspector({
               <span className='recordHint'>
                 {t('datasetInspectorClickPreviewText')}
               </span>
+              <IdCaption {...recordIdField} />
             </div>
+            {/* Names the accent ListCard puts on the pinned card below, and
+                offers the way to unpin it again. */}
+            {markerRecordPinned && (
+              <div className='recordMapClickHint'>
+                <span className='recordMapClickSwatch' aria-hidden='true' />
+                {t('datasetInspectorMapClickHint')}
+                <button
+                  type='button'
+                  className='recordShowAll'
+                  onClick={() => setHighlightedRecord(undefined)}
+                >
+                  {t('datasetInspectorClearMapRecordText')}
+                </button>
+              </div>
+            )}
             {loading ? (
               <div className='datasetInspectorLoadingContainer'>
                 <Loading variant='inline' />
               </div>
             ) : (
-              <div className='recordTableScroll'>
-                <TableFilter
-                  value={recordFilterText}
-                  onChange={setRecordFilterText}
-                  placeholder={t('datasetInspectorFilterText')}
-                />
-                <DataTable
-                  onRowClicked={(row) => setInspectRecordID(row.profile_id)}
-                  striped
-                  pointerOnHover
-                  columns={columns}
-                  data={data}
-                  defaultSortField='profile_id'
-                  defaultSortAsc={false}
-                  pagination
-                  paginationPerPage={100}
-                  paginationRowsPerPageOptions={[100, 150, 200, 250]}
-                  paginationComponentOptions={{
-                    rowsPerPageText: t('tableComponentRowsPerPage'),
-                    rangeSeparatorText: t('tableComponentOf'),
-                    selectAllRowsItem: false
-                  }}
-                  highlightOnHover
-                />
-              </div>
+              <CardList
+                items={datasetRecords?.profiles}
+                keyOf={(row) => row.profile_id}
+                sortFields={recordSortFields}
+                defaultSort={{ field: 'id', dir: 'desc' }}
+                filterPlaceholder={t('datasetInspectorFilterText')}
+                emptyText={t('datasetInspectorNoRecordsText')}
+                pinnedKey={
+                  markerRecordPinned ? highlightedRecord.profileId : undefined
+                }
+                pagerLabel={t('datasetInspectorRecordsPagerLabel')}
+                perPageLabel={t('datasetInspectorRecordsPerPageLabel')}
+                renderItem={(row) => {
+                  // Which ocean variables this individual record carries — a
+                  // dataset's records don't all measure everything it lists.
+                  // Null for the sources with no per-record detection
+                  // (trajectory, OBIS, grid), where the dataset's own list is
+                  // the best answer available.
+                  const eovs = (row.eovs ?? dataset.eovs)?.map((eov) => t(eov))
+                  return (
+                    <ListCard
+                      id={row.profile_id}
+                      pinned={
+                        markerRecordPinned &&
+                        row.profile_id === highlightedRecord.profileId
+                      }
+                      onClick={() => setInspectRecordID(row.profile_id)}
+                    >
+                      <CardField label={t('datasetInspectorTimeframeText')}>
+                        {formatInstantRange(row.time_min, row.time_max)}
+                      </CardField>
+                      <CardField label={t('datasetInspectorDepthRangeText')}>
+                        {formatRange(row.depth_min, row.depth_max, 'm')}
+                      </CardField>
+                      {eovs?.length > 0 && (
+                        <CardField
+                          label={t('datasetInspectorOceanVariablesText')}
+                        >
+                          <CardTags values={eovs} />
+                        </CardField>
+                      )}
+                    </ListCard>
+                  )
+                }}
+              />
             )}
           </div>
         )}

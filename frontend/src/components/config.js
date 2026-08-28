@@ -69,6 +69,19 @@ export const colorScale = [
 // ramp — a mid-ramp teal disappeared into the fills it was meant to divide.
 export const hexOutlineColor = '#FFFFFF'
 
+// What the last map click found, wherever that answer shows up: the ring, glow
+// and fill the map draws over the clicked hex/marker/region (the
+// click-highlight-* layers in Map.jsx) and the accent the datasets list and the
+// inspector's record table put on the rows that click named. Goldenrod because
+// the ramp already owns the greens, the tracks the purple and the griddap
+// coverage the amber, so an accent from any of those would read as another data
+// layer rather than as "this is what you just asked about".
+//
+// Same pairing as trackLineColor below: the map paints from here, the chrome
+// from --cioos-map-click in components/theme.css, and the two have to stay in
+// step.
+export const clickHighlightColor = '#DAA520'
+
 // What every count on the map means: the span of time a hexagon or a point
 // covers, in days. See web-api/utils/hexMetric.js — the wire value must match.
 //

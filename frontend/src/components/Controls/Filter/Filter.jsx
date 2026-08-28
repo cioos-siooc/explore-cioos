@@ -10,7 +10,6 @@ import { useTranslation } from 'react-i18next'
 import noop from 'lodash/noop'
 
 import { abbreviateString, useOutsideAlerter } from '../../../utilities'
-import Tooltip from '../../ui/Tooltip.jsx'
 
 import './styles.css'
 
@@ -60,7 +59,7 @@ export default function Filter({
       } ${disabled ? 'disabled' : ''}`}
       aria-current={filterOpen && (!controlled || openFilter) ? 'true' : undefined}
       // aria-disabled rather than the `disabled` attribute: a disabled button
-      // takes no pointer events, and the tooltip explaining why it is off is
+      // takes no pointer events, and the caption explaining why it is off is
       // the whole point of leaving the row there.
       aria-disabled={disabled ? 'true' : undefined}
       onClick={() => {
@@ -80,21 +79,18 @@ export default function Filter({
   // Using tabIndex to enable onBlur() focus loss capturing: https://stackoverflow.com/a/37491578
   return (
     <div className='filter' ref={wrapperRef}>
-      {/* Tooltip text shown on hover (desktop) and on focus/tap (mobile),
-          replacing the old "?" help icon. Suppressed while the dropdown is
-          open so it doesn't overlap the options. */}
-      {(disabled ? disabledTooltip || tooltip : tooltip) && !filterOpen ? (
-        <Tooltip
-          placement='bottom'
-          content={disabled ? disabledTooltip || tooltip : tooltip}
-        >
-          {filterButton}
-        </Tooltip>
-      ) : (
-        filterButton
+      {filterButton}
+      {/* A disabled row never opens, so its explanation has nowhere else to
+          live — shown as plain text right under the row itself, always
+          readable, no hover or tap needed. */}
+      {disabled && (disabledTooltip || tooltip) && (
+        <div className='filterCaption'>{disabledTooltip || tooltip}</div>
       )}
       {!disabled && (controlled ? filterOpen && openFilter : filterOpen) && (
         <div className='filterOptions'>
+          {/* What this filter does, at the top of its section and above the
+              inputs below — plain text again, not a hover/tap tooltip. */}
+          {tooltip && <div className='filterOptionsCaption'>{tooltip}</div>}
           {searchable && (
             <>
               <input

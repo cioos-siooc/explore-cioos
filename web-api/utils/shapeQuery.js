@@ -100,8 +100,16 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                  ) ORDER BY time_min DESC) AS profiles
         FROM     (SELECT   dataset_pk,
                            coalesce(profile_id, timeseries_id) AS profile_id,
-                           min(time_min)::DATE  AS time_min,
-                           max(time_max)::DATE  AS time_max,
+                           -- Spelled out in UTC rather than left to json_agg,
+                           -- which would stamp them with whatever offset the
+                           -- session's timezone happens to be. A record's
+                           -- extent is an instant, not a day: two casts of the
+                           -- same profile an hour apart are one line in the
+                           -- record list otherwise.
+                           to_char(min(time_min) AT TIME ZONE 'UTC',
+                                   'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS time_min,
+                           to_char(max(time_max) AT TIME ZONE 'UTC',
+                                   'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS time_max,
                            min(depth_min)       AS depth_min,
                            max(depth_max)       AS depth_max,
                            -- The EOVs this record carries, unioned across the

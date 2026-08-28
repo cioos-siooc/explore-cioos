@@ -132,7 +132,10 @@ async function createDBFilter(request) {
   }
 
   if (pointPKs) {
-    parameters.pointPKs = pointPKs;
+    // Comma-separated, like datasetPKs/organizations above — this was binding
+    // the raw query string instead of an array, so `= ANY(:pointPKs)` never
+    // worked (Postgres can't cast "12342,34534" to an integer array).
+    parameters.pointPKs = pointPKs.split(",");
     filters.push("point_pk = ANY (:pointPKs)");
   }
 

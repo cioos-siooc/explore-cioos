@@ -10,7 +10,8 @@
   text-align: left;
 }
 
-/* --- Controls: toolbar (select-all + search + count) and the sort chips --- */
+/* --- Controls: toolbar (select-all + search + count) and the sort chips
+   (ui/SortChips.jsx, styled with the pager in ui/) --- */
 .datasetsCardControls {
   flex: 0 0 auto;
   display: flex;
@@ -86,51 +87,6 @@
   color: var(--cioos-ink);
 }
 
-/* --- Sort chips: tap to sort, tap again to flip direction --- */
-.datasetsCardSortRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
-.datasetsCardSortLabel {
-  font-family: var(--cioos-font-display);
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--cioos-ink-40);
-  margin-right: 2px;
-}
-
-.datasetsCardSortChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
-  color: var(--cioos-ink-60);
-  font-size: var(--cioos-font-size-sm);
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color var(--cioos-transition-fast),
-    color var(--cioos-transition-fast), border-color var(--cioos-transition-fast);
-}
-
-.datasetsCardSortChip:hover {
-  background-color: var(--cioos-surface-2);
-  border-color: var(--cioos-primary);
-}
-
-.datasetsCardSortChip.active {
-  background-color: var(--cioos-teal-light);
-  border-color: var(--cioos-primary);
-  color: var(--cioos-primary-700);
-}
-
 /* --- Group-by control --- */
 .datasetsCardGroupRow {
   display: flex;
@@ -176,108 +132,6 @@
   padding: 10px;
 }
 
-/* --- Pager: pinned under the list, so the way to the next page is always in
-   the same place rather than at the end of however long this page runs. --- */
-.datasetsPager {
-  flex: 0 0 auto;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 8px;
-  padding: 8px 10px;
-  border-top: 1px solid var(--cioos-hairline);
-  background-color: var(--cioos-white);
-  font-size: var(--cioos-font-size-sm);
-  color: var(--cioos-ink-60);
-}
-
-.datasetsPagerRange {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-/* Page numbers push to the trailing edge; the per-page select follows them. */
-.datasetsPagerControls {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: auto;
-}
-
-.datasetsPagerStep,
-.datasetsPagerPage {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 5px;
-  border: 1px solid transparent;
-  border-radius: var(--cioos-radius-sm, 4px);
-  background: transparent;
-  font: inherit;
-  font-size: var(--cioos-font-size-sm);
-  font-weight: 600;
-  color: var(--cioos-ink-60);
-  cursor: pointer;
-  transition: background-color var(--cioos-transition-fast),
-    color var(--cioos-transition-fast), border-color var(--cioos-transition-fast);
-}
-
-.datasetsPagerStep:hover:not(:disabled),
-.datasetsPagerPage:hover:not(.active) {
-  background-color: var(--cioos-surface-2);
-  color: var(--cioos-ink);
-}
-
-.datasetsPagerStep:focus-visible,
-.datasetsPagerPage:focus-visible {
-  outline: none;
-  box-shadow: var(--cioos-focus);
-}
-
-.datasetsPagerStep:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-/* The page you are on, marked the same way the active sort chip is. */
-.datasetsPagerPage.active {
-  background-color: var(--cioos-teal-light);
-  border-color: var(--cioos-primary);
-  color: var(--cioos-primary-700);
-  cursor: default;
-}
-
-.datasetsPagerGap {
-  padding: 0 1px;
-  color: var(--cioos-ink-40);
-}
-
-/* Single page: no controls between them, so the select takes the trailing edge
-   the controls would otherwise have held. */
-.datasetsPagerRange + .datasetsPagerSize {
-  margin-left: auto;
-}
-
-.datasetsPagerSize select {
-  padding: 3px 6px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
-  font: inherit;
-  font-size: var(--cioos-font-size-xs);
-  font-weight: 600;
-  color: var(--cioos-ink-60);
-  cursor: pointer;
-}
-
-.datasetsPagerSize select:focus-visible {
-  outline: none;
-  border-color: var(--cioos-primary);
-  box-shadow: var(--cioos-focus);
-}
-
 .datasetsCardEmpty {
   padding: 24px 12px;
   text-align: center;
@@ -300,8 +154,9 @@
   width: 10px;
   height: 10px;
   border-radius: 3px;
-  border: 2px solid var(--cioos-primary);
-  box-shadow: 0 0 0 2px rgba(82, 167, 155, 0.35);
+  border: 2px solid var(--cioos-map-click);
+  background-color: var(--cioos-map-click-surface);
+  box-shadow: 0 0 0 2px var(--cioos-map-click-glow);
 }
 
 /* --- Card --- */
@@ -319,20 +174,27 @@
     background-color var(--cioos-transition-fast);
 }
 
-/* Sorted to the top because the last map click found it here. A solid primary
-   border plus a soft glow, so the tie to the map is unmistakable at a glance
-   rather than a property you have to go looking for — the plain teal-light
-   border tried first read as barely different from the resting hairline.
+/* Sorted to the top because the last map click found it here — wearing the same
+   goldenrod ring, glow and fill the map itself puts on the hex or marker that
+   was clicked (--cioos-map-click, see theme.css), so the two ends of that click
+   are recognisably one thing rather than a colour each. It is a colour no data
+   layer uses, which is what lets it sit next to the teal of the selection
+   without either being mistaken for the other.
    `box-shadow`, not a wider `border`, does the "thicker" part: a real 2px
-   border would grow the card by 2px and jostle its neighbours in the list
-   every time a row's state changed; a shadow ring reads the same but costs no
-   layout. Left to `:not(.selected)` on purpose: a row already in the
-   selection gets its own full-strength border and background wash below, and
-   that is the more important of the two things to know about it. */
+   border would grow the card by 2px and jostle its neighbours in the list every
+   time a row's state changed; a shadow ring reads the same but costs no layout.
+   The glow applies to selected rows too — it says where the row came from,
+   which is orthogonal to whether it is in the download — while the wash and the
+   border are left to `:not(.selected)`, the selection's own teal border and
+   background wash being the more important of the two facts about such a row. */
+.datasetCard.fromMapClick {
+  box-shadow: 0 0 0 2px var(--cioos-map-click-glow),
+    0 0 10px 1px var(--cioos-map-click-glow), var(--cioos-shadow-card);
+}
+
 .datasetCard.fromMapClick:not(.selected) {
-  border-color: var(--cioos-primary);
-  box-shadow: 0 0 0 2px rgba(82, 167, 155, 0.35),
-    0 0 10px 1px rgba(82, 167, 155, 0.35), var(--cioos-shadow-card);
+  border-color: var(--cioos-map-click);
+  background-color: var(--cioos-map-click-surface);
 }
 
 .datasetCard.clickable {
