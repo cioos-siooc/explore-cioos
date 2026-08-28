@@ -456,8 +456,8 @@ export default function CreateMap({
   // and a re-render of this component is not what it should cause — the legend
   // hears about it through onViewportHexRange instead.
   const viewportHexRange = useRef(undefined)
-  // The count at the 25th percentile of the hexes currently on screen — the top
-  // of the "little data here" band that FADE_OPACITY applies to. undefined when
+  // The count at fadePercentileRef of the hexes currently on screen — the top
+  // of the faded band. undefined when
   // there was nothing to measure, which means no fading at all rather than a
   // guessed threshold.
   //
@@ -467,7 +467,7 @@ export default function CreateMap({
   // range lands at ~37000 and would fade all but a handful of hexes. The
   // quartile has to come from the distribution, the same reason the ramp itself
   // is log-spaced (generateColorStops) rather than evenly cut.
-  const viewportHexP25 = useRef(undefined)
+  const viewportFadeThreshold = useRef(undefined)
   // Latest setColorStops closure (it reads the rangeLevels props), for the map
   // handlers registered once on mount.
   const setColorStopsRef = useRef(undefined)
@@ -919,17 +919,18 @@ export default function CreateMap({
   // temporary tuning panel below can move them live — see TEMP_FADE_TUNER.
   // Once the values are settled these go back to plain consts and the panel
   // and everything referencing it comes out.
-  // Chosen by eye on 2026-08-27 against the freshly harvested catalogue and
-  // kept as the defaults so a reload restores them: faded hexes keep 0.70 of
-  // their normal opacity (0.56 against the 0.80 base), and the sparse band is
-  // the bottom 15% of the counts on screen.
+  // Chosen by eye on 2026-08-28 and kept as the defaults so a reload restores
+  // them: faded hexes keep 0.50 of their normal opacity (0.40 against the 0.80
+  // base), and the faded band is the bottom 95% of the counts on screen.
   //
-  // 0.15 rather than 0.25 makes no difference on the UNFILTERED map — 37.3% of
-  // hexes hold exactly 1 day, so both percentiles land on a threshold of 1 and
-  // fade the same 21,016 of 56,413. It only bites on a filtered view, where the
-  // bottom of the distribution is sparser and the two pull apart.
-  const fadeFactorRef = useRef(0.7)
-  const fadePercentileRef = useRef(0.15)
+  // 0.95 inverts what this started as. It is no longer "dim the emptiest few" —
+  // it is "only the busiest few stay at full strength". Unfiltered that leaves
+  // 3,270 hexes of 65,586 bright and fades the other 62,316, so the map reads
+  // as a handful of hotspots over a wash. Deliberate: at the low end the fade
+  // did almost nothing, because 38% of hexes hold exactly one day and any
+  // percentile below ~0.4 lands on a threshold of 1.
+  const fadeFactorRef = useRef(0.5)
+  const fadePercentileRef = useRef(0.95)
   // TEMP_FADE_TUNER, ramp half. 'default' = whatever generateColorStops does
   // (log once max/min >= 100, which every real days domain is), so the tuner
   // starts on today's behaviour and any change is a deliberate comparison.
@@ -942,22 +943,22 @@ export default function CreateMap({
   const viewportRampTop = useRef(undefined)
 
   // Is this hex in the sparse band? The count at or below which it counts as
-  // sparse comes from the rendered hexes' own distribution (see viewportHexP25).
+  // sparse comes from the rendered hexes' own distribution (see viewportFadeThreshold).
   //
   // `<=`, not `<`: the counts are small integers at the bottom of the
-  // distribution and p25 is frequently 1, where `<` would fade nothing at all.
-  const isSparseHex = (p25) => [
+  // distribution and the threshold is frequently 1, where `<` would fade nothing.
+  const isSparseHex = (threshold) => [
     '<=',
     ['to-number', ['get', 'count'], 0],
-    p25
+    threshold
   ]
 
   // A flat opacity, dimmed for sparse hexes. undefined threshold -> nothing has
   // been measured yet, so nothing fades.
   const fadeFlat = (opacity) => {
-    const p25 = viewportHexP25.current
-    if (!Number.isFinite(p25)) return opacity
-    return ['case', isSparseHex(p25), opacity * fadeFactorRef.current, opacity]
+    const threshold = viewportFadeThreshold.current
+    if (!Number.isFinite(threshold)) return opacity
+    return ['case', isSparseHex(threshold), opacity * fadeFactorRef.current, opacity]
   }
 
   // The same, for an opacity that already varies with zoom. The 'case' CANNOT
@@ -968,10 +969,10 @@ export default function CreateMap({
   // each of its stop OUTPUTS carries the case instead — the documented
   // zoom-and-data-driven shape.
   const fadeZoomStops = (stops) => {
-    const p25 = viewportHexP25.current
+    const threshold = viewportFadeThreshold.current
     const output = (v) =>
-      Number.isFinite(p25)
-        ? ['case', isSparseHex(p25), v * fadeFactorRef.current, v]
+      Number.isFinite(threshold)
+        ? ['case', isSparseHex(threshold), v * fadeFactorRef.current, v]
         : v
     return [
       'interpolate',
@@ -1117,7 +1118,7 @@ export default function CreateMap({
           'fill-color',
           dimmable(hexFillColor())
         )
-        // Update opacity based on the new color domain (p25 threshold)
+        // Update opacity based on the new fade threshold
         map.current.setPaintProperty(
           'hexes',
           'fill-opacity',
@@ -1150,7 +1151,7 @@ export default function CreateMap({
         'fill-outline-color',
         coverageHexOutlineColor()
       )
-      // Update opacity based on the new color domain (p25 threshold)
+      // Update opacity based on the new fade threshold
       map.current.setPaintProperty(
         'coverage-hexes',
         'fill-opacity',
@@ -1201,7 +1202,7 @@ export default function CreateMap({
     // Cleared up front so every path that gives up below leaves no stale
     // threshold behind: a fade band measured over the last view would otherwise
     // keep being applied to hexes it was never measured against.
-    viewportHexP25.current = undefined
+    viewportFadeThreshold.current = undefined
     const layers = HEX_LAYER_IDS.filter((id) => map.current.getLayer(id))
     if (!layers.length) return undefined
     // No trustworthy answer to be had — see viewportQueryIsReliable. Nothing is
@@ -1248,7 +1249,7 @@ export default function CreateMap({
       counts.push(count)
     }
     if (!Number.isFinite(hi)) return undefined
-    viewportHexP25.current = percentileOf(counts, fadePercentileRef.current)
+    viewportFadeThreshold.current = percentileOf(counts, fadePercentileRef.current)
     viewportRampTop.current = percentileOf(counts, rampTopPctRef.current)
     return quantizeCountRange([lo, hi])
   }
@@ -1324,13 +1325,13 @@ export default function CreateMap({
     host.innerHTML = `
       <div style="font-weight:600;margin-bottom:8px">Hex fade (temporary)</div>
       <label style="display:block">Faded opacity &times;
-        <b id="tft-f-val">0.7</b>
-        <input id="tft-f" type="range" min="0.05" max="1" step="0.05" value="0.7"
+        <b id="tft-f-val">0.50</b>
+        <input id="tft-f" type="range" min="0.05" max="1" step="0.05" value="0.5"
                style="width:100%">
       </label>
       <label style="display:block;margin-top:6px">Sparse cutoff pctile
-        <b id="tft-p-val">0.15</b>
-        <input id="tft-p" type="range" min="0" max="1" step="0.01" value="0.15"
+        <b id="tft-p-val">0.95</b>
+        <input id="tft-p" type="range" min="0" max="1" step="0.01" value="0.95"
                style="width:100%">
       </label>
       <div id="tft-out" style="margin-top:8px;font-size:11px;color:#456"></div>
@@ -1383,7 +1384,7 @@ export default function CreateMap({
     }
     const readout = () => {
       const { layer, counts } = visibleCounts()
-      const threshold = viewportHexP25.current
+      const threshold = viewportFadeThreshold.current
       const faded = Number.isFinite(threshold)
         ? counts.filter((c) => c <= threshold).length
         : 0
@@ -1412,7 +1413,7 @@ export default function CreateMap({
     const apply = () => {
       const { counts } = visibleCounts()
       if (counts.length) {
-        viewportHexP25.current = percentileOf(counts, fadePercentileRef.current)
+        viewportFadeThreshold.current = percentileOf(counts, fadePercentileRef.current)
       }
       setColorStops()
       applyHexOpacity()
@@ -1449,18 +1450,18 @@ export default function CreateMap({
       apply()
     })
     $('#tft-reset').addEventListener('click', () => {
-      fadeFactorRef.current = 0.7
-      fadePercentileRef.current = 0.15
+      fadeFactorRef.current = 0.5
+      fadePercentileRef.current = 0.95
       rampModeRef.current = 'default'
       rampGammaRef.current = 1
       rampTopPctRef.current = 1
-      $('#tft-f').value = '0.7'
-      $('#tft-p').value = '0.15'
+      $('#tft-f').value = '0.5'
+      $('#tft-p').value = '0.95'
       $('#tft-mode').value = 'default'
       $('#tft-top').value = '1'
       $('#tft-g').value = '1'
-      $('#tft-f-val').textContent = '0.7'
-      $('#tft-p-val').textContent = '0.15'
+      $('#tft-f-val').textContent = '0.50'
+      $('#tft-p-val').textContent = '0.95'
       $('#tft-top-val').textContent = '1.00'
       $('#tft-g-val').textContent = '1.00'
       apply()
