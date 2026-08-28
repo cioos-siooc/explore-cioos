@@ -106,9 +106,9 @@ router.get(
 
     // Which feature sources feed the queue. Mirror shapeQuery.js so the queued
     // set matches the size estimate the user was shown: profiles + trajectory
-    // hexes for ERDDAP data, obis_cells for OBIS. Scientific-name / OBIS-node
-    // selections hide the profile branches (OBIS-only mode) unless ERDDAP
-    // servers are also selected.
+    // coverage hexes for ERDDAP data, obis_cells for OBIS. Scientific-name /
+    // OBIS-node selections hide the profile branches (OBIS-only mode) unless
+    // ERDDAP servers are also selected.
     const { includeObis = "true", scientificNames, obisNodes, erddapServers } = req.query;
     const includeProfiles = !scientificNames && (!obisNodes || Boolean(erddapServers));
     const showObis = includeObis !== "false";
@@ -121,8 +121,9 @@ router.get(
         FROM cde.profiles
         WHERE :profileFilters`;
     // Trajectory coverage hexes are downloadable ERDDAP datasets too, so a
-    // selection over a glider/ship track queues its dataset. 10 km tier only,
-    // hex polygon as search_geom (see shapeQuery.js).
+    // selection over a glider/ship track queues its dataset. 10 km tier only:
+    // the 100 km rows describe the same data at a coarser grain. search_geom is
+    // the hex polygon, not its centroid (see shapeQuery.js).
     const trajectoryBranch = `SELECT t.dataset_pk, NULL::integer AS point_pk, t.geom, t.latitude, t.longitude,
                t.time_min, t.time_max, t.depth_min, t.depth_max, h.geom AS search_geom
         FROM cde.trajectory_hexes t
@@ -169,8 +170,8 @@ router.get(
       let count = 0;
       const tileRaw = await db.raw(SQL, {
         filters: filters.shared,
-        profileFilters: filters.profileOnly,
         obisFilters: filters.obisOnly,
+        profileFilters: filters.profileOnly,
       });
       const tile = tileRaw.rows[0];
       if (tile.json_agg && tile.json_agg.length) {

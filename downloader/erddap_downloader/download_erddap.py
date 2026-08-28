@@ -418,7 +418,9 @@ def get_datasets(json_query, output_path="", create_pdf=False):
             continue
 
         # Per-dataset outcome. Tracked out here so the except below can still
-        # build a report row for a dataset that blew up mid-download.
+        # build a report row for a dataset that blew up mid-download. The
+        # metadata fetch below is inside that try too, so an unreachable ERDDAP
+        # server marks its own dataset FAILED instead of losing the whole job.
         df = pd.DataFrame()
         units = pd.Series(dtype=str)
         bytes_downloaded = 0
