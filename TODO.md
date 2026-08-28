@@ -11,6 +11,9 @@
       handlers doing five unrelated things behind a stand-aside ladder.
 - [ ] Update hexes colormap base on visible hexes
 - [ ] Make icons in dataset page vertically stacked
+- [ ] Some records are duplicated within the dataset list for some reason. 
+- [ ] Filter UI have a select all and reset button which are basically doing the same thing. Just keep a clear button
+- [ ] Make bigger markers always site above smaller markers.
 
 ### Map interaction follow-ups
 - [ ] Give the datasets sheet a mid snap point on phones, so the list and the
