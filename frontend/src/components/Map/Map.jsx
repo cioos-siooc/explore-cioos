@@ -931,6 +931,13 @@ export default function CreateMap({
   // percentile below ~0.4 lands on a threshold of 1.
   const fadeFactorRef = useRef(0.5)
   const fadePercentileRef = useRef(0.95)
+  // 'binary'   — one flat faded opacity for everything at or below the
+  //              threshold, a hard step at it.
+  // 'gradient' — opacity climbs with the count across the faded band and
+  //              reaches full strength AT the threshold, so the step is gone.
+  // fadeFactorRef is the faded value in binary and the FLOOR (what a count of
+  // 1 gets) in gradient, so the faintest hex looks the same either way.
+  const fadeStyleRef = useRef('binary')
   // TEMP_FADE_TUNER, ramp half. 'default' = whatever generateColorStops does
   // (log once max/min >= 100, which every real days domain is), so the tuner
   // starts on today's behaviour and any change is a deliberate comparison.
@@ -947,6 +954,30 @@ export default function CreateMap({
   //
   // `<=`, not `<`: the counts are small integers at the bottom of the
   // distribution and the threshold is frequently 1, where `<` would fade nothing.
+  // Counts are >= 1 and span orders of magnitude, so the gradient ramps over
+  // log(count) — the same reason the colour ramp is log. max(...,1) keeps the
+  // log defined and pins anything at or below 1 to the floor.
+  const LOG_COUNT = ['log10', ['max', ['to-number', ['get', 'count'], 0], 1]]
+
+  // Opacity rising from floor at count 1 to `opacity` at the threshold.
+  // interpolate clamps outside its domain, so counts above the threshold get
+  // full strength for free. null when the threshold is 1 or less: log10(1) is
+  // 0, which would repeat the interpolate's first input and MapLibre rejects a
+  // duplicate — callers fall back to the binary form there.
+  const gradientFade = (opacity, threshold) => {
+    const top = Math.log10(threshold)
+    if (!(top > 0)) return null
+    return [
+      'interpolate',
+      ['linear'],
+      LOG_COUNT,
+      0,
+      opacity * fadeFactorRef.current,
+      top,
+      opacity
+    ]
+  }
+
   const isSparseHex = (threshold) => [
     '<=',
     ['to-number', ['get', 'count'], 0],
@@ -958,6 +989,10 @@ export default function CreateMap({
   const fadeFlat = (opacity) => {
     const threshold = viewportFadeThreshold.current
     if (!Number.isFinite(threshold)) return opacity
+    if (fadeStyleRef.current === 'gradient') {
+      const ramp = gradientFade(opacity, threshold)
+      if (ramp) return ramp
+    }
     return ['case', isSparseHex(threshold), opacity * fadeFactorRef.current, opacity]
   }
 
@@ -970,10 +1005,14 @@ export default function CreateMap({
   // zoom-and-data-driven shape.
   const fadeZoomStops = (stops) => {
     const threshold = viewportFadeThreshold.current
-    const output = (v) =>
-      Number.isFinite(threshold)
-        ? ['case', isSparseHex(threshold), v * fadeFactorRef.current, v]
-        : v
+    const output = (v) => {
+      if (!Number.isFinite(threshold)) return v
+      if (fadeStyleRef.current === 'gradient') {
+        const ramp = gradientFade(v, threshold)
+        if (ramp) return ramp
+      }
+      return ['case', isSparseHex(threshold), v * fadeFactorRef.current, v]
+    }
     return [
       'interpolate',
       ['linear'],
@@ -1324,7 +1363,14 @@ export default function CreateMap({
     ].join(';')
     host.innerHTML = `
       <div style="font-weight:600;margin-bottom:8px">Hex fade (temporary)</div>
-      <label style="display:block">Faded opacity &times;
+      <label style="display:block">Style
+        <select id="tft-style" style="width:100%;font-size:11px;margin-top:2px">
+          <option value="binary">binary (hard step)</option>
+          <option value="gradient">gradient (ramps with count)</option>
+        </select>
+      </label>
+      <label style="display:block;margin-top:6px">Faded opacity &times;
+        <span style="color:#789">(floor in gradient)</span>
         <b id="tft-f-val">0.50</b>
         <input id="tft-f" type="range" min="0.05" max="1" step="0.05" value="0.5"
                style="width:100%">
@@ -1388,8 +1434,10 @@ export default function CreateMap({
       const faded = Number.isFinite(threshold)
         ? counts.filter((c) => c <= threshold).length
         : 0
+      const style = fadeStyleRef.current
       $('#tft-out').textContent = counts.length
-        ? `${layer}: threshold ${threshold} - ${faded}/${counts.length} faded (${(100 * faded / counts.length).toFixed(0)}%)`
+        ? `${layer} [${style}]: threshold ${threshold} - ${faded}/${counts.length} ` +
+          `${style === 'gradient' ? 'ramped' : 'faded'} (${(100 * faded / counts.length).toFixed(0)}%)`
         : 'no hexes on screen'
       // What the ramp is actually doing: its stops, and how many hexes land in
       // each band. Even buckets mean the palette is being spent on the data.
@@ -1419,6 +1467,11 @@ export default function CreateMap({
       applyHexOpacity()
       readout()
     }
+    $('#tft-style').addEventListener('change', (e) => {
+      fadeStyleRef.current = e.target.value
+      applyHexOpacity()
+      readout()
+    })
     $('#tft-mode').addEventListener('change', (e) => {
       rampModeRef.current = e.target.value
       apply()
@@ -1452,6 +1505,8 @@ export default function CreateMap({
     $('#tft-reset').addEventListener('click', () => {
       fadeFactorRef.current = 0.5
       fadePercentileRef.current = 0.95
+      fadeStyleRef.current = 'binary'
+      $('#tft-style').value = 'binary'
       rampModeRef.current = 'default'
       rampGammaRef.current = 1
       rampTopPctRef.current = 1
