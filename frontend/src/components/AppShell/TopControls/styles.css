@@ -212,7 +212,7 @@
   min-height: 22px;
   padding: 4px 12px;
   border-bottom: 1px solid var(--cioos-hairline);
-  font-size: 12px;
+  font-size: var(--cioos-font-size-sm);
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: 0.01em;
@@ -290,35 +290,70 @@
   color: var(--cioos-white);
 }
 
+/* ------------------------------------------------------------------
+ * Mobile: the bar stops being a centered floating card and becomes the
+ * app's header — pinned to the top edge, spanning the full width, with
+ * no strip of map above or beside it. See the TopLeft stylesheet for the
+ * card's own side of this (square corners, no side borders, no tilt).
+ * ------------------------------------------------------------------ */
 @media (max-width: 700px) {
   .topBar {
-    top: 8px;
-    max-width: calc(100vw - 16px);
+    top: 0;
+    left: 0;
+    right: 0;
+    /* The centering translate has nothing left to centre and would only pull
+       the full-width bar off the screen. */
+    transform: none;
+    max-width: none;
+    /* Load-bearing: the column centres its children, which leaves the brand
+       card shrink-to-fit — its own `width: 100%` would then resolve against
+       that shrunken box and never reach the screen edges. */
+    align-items: stretch;
+    /* Only the chips are still a floating layer under the header, so the gap
+       belongs to them rather than to the stack. */
+    gap: 6px;
   }
 
-  .topBarButtonLabel {
-    /* Keep labels — the merged pill is the only dataset/filter entry point on
-       phones now — but tighten type and padding so both segments fit. On a
-       320px-wide phone the card is only ~296px, leaving ~148px per segment,
-       where "Jeux de données" at 14px would wrap onto a second line. */
-    display: inline;
-    font-size: 12px;
+  /* The chips hang under the full-width header, so they take its width too. */
+  .activeFilterBullets {
+    width: 100%;
+    padding: 0 8px;
   }
 
+  /* The header meets the screen edges square, so the tab strip's outer corners
+     — which were cut to match the floating card's — square with it. The 1px
+     side bleed goes with them: it existed to cover the card's side borders,
+     which the full-bleed header no longer draws, and left to itself it would
+     push the strip 2px past the viewport. */
+  .topBarActions {
+    margin: 0 0 -1px;
+  }
+
+  .topBarActions,
+  .topBarActions > .topBarButton:first-child,
+  .topBarActions > .topBarButton:last-child {
+    border-radius: 0;
+  }
+
+  /* Labels stay at the body size the rest of the header uses. They were held
+     down to 12px so both segments fit a 400px card; the card is now as wide as
+     the screen, and .topBarButtonLabel already wraps rather than overflowing on
+     the narrowest phones. */
   .topBar .topBarActions .topBarButton {
     gap: 6px;
+    /* Taller, not wider: a 40px row is a cramped touch target for the app's
+       three primary entry points, and the height is the dimension a phone can
+       spare. */
+    min-height: 48px;
     padding: 4px 8px;
   }
 
-  .topBarCount {
-    padding: 1px 6px;
-    font-size: 11px;
-  }
-
+  /* The tally is a readout between two dense rows, so it gives up its own
+     padding rather than its type size — which the mobile scale has just
+     raised, this being one of the lines that was hardest to read. */
   .topBarCountsRow {
-    margin: 5px 0;
+    min-height: 0;
     padding: 3px 8px;
-    font-size: 10px;
   }
 }
 

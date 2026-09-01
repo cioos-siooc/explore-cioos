@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 
 import { abbreviateString, useDebounce } from '../../../utilities'
 import { buildGriddapLegendUrl } from '../../../wmsUtilities'
+import useMediaQuery from '../../../state/ui/useMediaQuery.js'
 import './styles.css'
 
 // Below this width the centered top bar reaches over the map's top-left corner,
@@ -46,22 +47,8 @@ export default function WmsLegend({
 
   // Only the floating card can be covered by the top bar; the inline one is
   // inside the dataset page and always has its own room.
-  const [isCompact, setIsCompact] = useState(
-    () =>
-      variant === 'floating' && window.matchMedia(COMPACT_QUERY).matches
-  )
+  const isCompact = useMediaQuery(COMPACT_QUERY) && variant === 'floating'
   const [compactOpen, setCompactOpen] = useState(false)
-  useEffect(() => {
-    if (variant !== 'floating') {
-      setIsCompact(false)
-      return undefined
-    }
-    const mql = window.matchMedia(COMPACT_QUERY)
-    const onChange = (e) => setIsCompact(e.matches)
-    setIsCompact(mql.matches)
-    mql.addEventListener('change', onChange)
-    return () => mql.removeEventListener('change', onChange)
-  }, [variant])
 
   const variables = overlay.variables || []
 

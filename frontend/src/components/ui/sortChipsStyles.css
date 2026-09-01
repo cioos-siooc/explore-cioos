@@ -8,7 +8,7 @@
 
 .sortChipsLabel {
   font-family: var(--cioos-font-display);
-  font-size: 10px;
+  font-size: var(--cioos-font-size-2xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;

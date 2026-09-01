@@ -559,18 +559,17 @@
   width: 100%;
 }
 
-@media (max-width: 600px) {
+/* Mobile: the page has the whole screen here rather than a 420px column beside
+   the map, so what it gives up is padding and the label gutter — not type size.
+   The 0.9em this used to shrink the body to was paying for a width the page no
+   longer has to fit. */
+@media (max-width: 700px) {
   .datasetInspectorBody {
     padding: 0 10px 20px 10px;
-    font-size: 0.9em;
   }
 
   .datasetTitleBlock {
     padding: 8px 10px;
-  }
-
-  .datasetTitle {
-    font-size: 1rem;
   }
 
   /* No room for a label gutter: the value takes the line under its label. */

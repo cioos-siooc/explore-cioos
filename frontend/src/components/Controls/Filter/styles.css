@@ -275,9 +275,3 @@
   color: var(--cioos-ink-60);
   font-size: var(--cioos-font-size-sm);
 }
-
-@media (max-width: 600px) {
-  .filterButtonContainer {
-    font-size: 0.9em;
-  }
-}

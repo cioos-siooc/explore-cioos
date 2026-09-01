@@ -205,13 +205,14 @@
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   /* On a phone the legend can't have the width its type wants; the image
      scales down rather than pushing the card off the screen. Nothing to
-     overlap here — the datasets card is a bottom sheet, so this corner is the
-     legend's alone. */
+     overlap here — the datasets list takes the whole screen when it is up, so
+     this corner is the legend's alone. The type is left at the mobile scale
+     rather than shrunk to 0.85em with the card: width is what is short here,
+     and the reading was the thing that suffered for it. */
   .wmsLegend.floating {
     max-width: 280px;
-    font-size: 0.85em;
   }
 }

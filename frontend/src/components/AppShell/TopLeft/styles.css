@@ -88,7 +88,7 @@
 }
 
 .brandTitle span {
-  font-size: 10px;
+  font-size: var(--cioos-font-size-2xs);
   line-height: 1.2;
   letter-spacing: 0.28em;
   /* optically recenter: tracking adds a trailing space after the last glyph */
@@ -141,16 +141,52 @@
   font-weight: 700;
 }
 
-@media (max-width: 600px) {
-  .brandSearchLogo img {
-    height: 30px;
+/* ------------------------------------------------------------------
+ * Mobile: the card stops floating and becomes the app's header. It spans
+ * the screen, sits flush against the top edge with no map showing above
+ * or beside it, and drops the corners and side borders it no longer has
+ * room to justify — the only edge left to draw is the one along the
+ * bottom, where the map starts.
+ * ------------------------------------------------------------------ */
+@media (max-width: 700px) {
+  .brandCard {
+    width: 100%;
+    border-width: 0 0 1px;
+    border-radius: 0;
+    /* A full-bleed header is part of the page rather than a card lifted off
+       it, so the 3D tilt goes and the shadow flattens to the plain drop that
+       separates it from the map underneath. */
+    transform: none;
+    box-shadow: var(--cioos-shadow-float);
   }
 
-  .brandTitle span {
-    font-size: 8px;
+  /* The tilt is gone, so there is no plane for the lockup to float above. */
+  .brandCard .brandCardTop > * {
+    transform: none;
   }
 
+  /* Tighter than the floating card's: the row is as wide as the screen now,
+     so what padding it keeps is spent on the edges rather than on holding a
+     lockup together. */
+  .brandCardTop {
+    gap: 8px;
+    padding: 6px 10px;
+  }
+
+  /* The wordmark is the one thing on this row that grows: it is the app's
+     name, and at 15px it read as a caption on the logo beside it. */
   .brandTitle em {
-    font-size: 15px;
+    font-size: var(--cioos-font-size-lg);
+  }
+
+  .brandSearchLogo img {
+    height: 32px;
+  }
+
+  /* Full touch targets for the three icon actions, the smallest things on
+     the header. */
+  .brandMinorItem {
+    width: 36px;
+    height: 36px;
   }
 }

@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  ArrowsAngleExpand,
   ChevronCompactDown,
   ChevronCompactUp,
   Circle,
@@ -28,10 +29,12 @@ import {
   DEFAULT_DATA_LAYERS,
   anyTrajectoryLayerOn
 } from '../../../state/dataLayers.js'
+import Modal from '../../ui/Modal.jsx'
 import Spinner from '../../ui/Spinner.jsx'
 import Switch from '../../ui/Switch.jsx'
 import LegendFooter from './LegendFooter.jsx'
 import usePublishedFootprint from '../../../state/ui/usePublishedFootprint.js'
+import useMediaQuery, { MOBILE_QUERY } from '../../../state/ui/useMediaQuery.js'
 
 import './styles.css'
 import classNames from 'classnames'
@@ -163,6 +166,12 @@ export default function Legend({
   // shows the whole list — the ramps, their ticks, the marker keys, the track
   // lines, the remaining layer switches; closed, it is the header row alone.
   const [legendOpen, setLegendOpen] = useState(true)
+  // On a phone the card would take a quarter of the map to say what the map is
+  // already showing, so it shrinks to a single button in the corner and the
+  // keys move behind it, opening centred over the map when they are asked for.
+  // That is the right trade for a legend: it is read in glances, not kept open.
+  const compact = useMediaQuery(MOBILE_QUERY)
+  const [detailOpen, setDetailOpen] = useState(false)
   const cardRef = useRef(null)
   usePublishedFootprint(
     cardRef,
@@ -662,26 +671,62 @@ export default function Legend({
     layerSwitches && renderGroup('layers', null, {}, layerSwitches)
   ].filter(Boolean)
 
+  // Compact is the same card with its body taken out: the header row, which now
+  // opens the keys in a dialog instead of unfolding them in place, and the foot
+  // that reads the map rather than the keys. Two short rows in the corner
+  // instead of a quarter of the screen — a legend is read in glances, and on a
+  // phone the glance is worth more than the standing card.
+  //
+  // Keeping the card (rather than swapping in a bare button) is what keeps the
+  // rest true for free: the ref, and so the footprint the griddap legend stacks
+  // against, is still on the thing in the corner; the corner itself is the one
+  // the card already moves to below 900px; and the scale bar and the basemap
+  // credits stay exactly one tap away, mounted once — LegendFooter adopts
+  // MapLibre's own controls, so a second copy would fight this one for them.
   return (
-    <div className='legend' ref={cardRef}>
+    <div className={classNames('legend', { legendCompact: compact })} ref={cardRef}>
       <button
         className='legendHeader'
-        onClick={() => setLegendOpen(!legendOpen)}
-        title={legendOpen ? t('closeLegendTooltip') : t('openLegendTooltip')}
-        aria-expanded={legendOpen}
+        onClick={() =>
+          compact ? setDetailOpen(true) : setLegendOpen(!legendOpen)
+        }
+        title={
+          compact || !legendOpen
+            ? t('openLegendTooltip')
+            : t('closeLegendTooltip')
+        }
+        aria-expanded={compact ? undefined : legendOpen}
+        aria-haspopup={compact ? 'dialog' : undefined}
       >
         <span>{t('legendTitle')}</span>
-        {legendOpen ? (
+        {compact ? (
+          <ArrowsAngleExpand size={11} aria-hidden='true' />
+        ) : legendOpen ? (
           <ChevronCompactUp size={14} aria-hidden='true' />
         ) : (
           <ChevronCompactDown size={14} aria-hidden='true' />
         )}
       </button>
-      {legendOpen && <div className='legendBody'>{groups}</div>}
+      {!compact && legendOpen && <div className='legendBody'>{groups}</div>}
       {/* Outside the collapse: the scale bar reads the map rather than the
           keys, so it is as useful with the card shut as open — closed, the card
           is its header row and the scale row, and nothing more. */}
       <LegendFooter />
+      {compact && (
+        <Modal
+          show={detailOpen}
+          onHide={() => setDetailOpen(false)}
+          className='legendModal'
+          aria-labelledby='legendModalTitle'
+        >
+          <Modal.Header closeButton>
+            <Modal.Title id='legendModalTitle'>{t('legendTitle')}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <div className='legendBody'>{groups}</div>
+          </Modal.Body>
+        </Modal>
+      )}
     </div>
   )
 }

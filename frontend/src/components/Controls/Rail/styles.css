@@ -102,7 +102,7 @@
 .railTicks {
   position: relative;
   height: 11px;
-  font-size: 11px;
+  font-size: var(--cioos-font-size-xs);
   line-height: 1;
   font-variant-numeric: tabular-nums;
   /* Read at a glance against the map showing through — the 40% ink these
@@ -180,7 +180,7 @@
 .railVertical .railTicks {
   /* Smaller than across: down here they are a column of short numbers running
      beside the track, read as a scale, not labels standing on their own. */
-  font-size: 10px;
+  font-size: var(--cioos-font-size-2xs);
 }
 
 .railVertical .railTick {

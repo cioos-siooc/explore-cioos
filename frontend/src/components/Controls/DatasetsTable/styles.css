@@ -96,7 +96,7 @@
 
 .datasetsCardGroupLabel {
   font-family: var(--cioos-font-display);
-  font-size: 10px;
+  font-size: var(--cioos-font-size-2xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -494,7 +494,7 @@
   font-size: var(--cioos-font-size-xs);
 }
 
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   .datasetsCardToolbar {
     flex-wrap: wrap;
   }

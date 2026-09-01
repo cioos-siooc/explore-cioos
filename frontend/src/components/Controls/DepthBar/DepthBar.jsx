@@ -13,6 +13,7 @@ import {
 } from '../../../wmsUtilities'
 import DepthRail, { DepthField } from '../DepthRail/DepthRail.jsx'
 import { createDepthAxis, clampDepth, snapToMetre } from '../DepthRail/depthAxis.js'
+import useMediaQuery, { MOBILE_QUERY } from '../../../state/ui/useMediaQuery.js'
 import './styles.css'
 
 // The levels of the gridded dataset currently drawn, in depth — positive down,
@@ -47,12 +48,19 @@ export function gridDepthNodes (overlay) {
 // Filters panel and the map keeps the room. That entry is also where the
 // ready-made bands live — spelling them out needs width this strip is trying
 // not to spend.
+//
+// On a phone the filter alone no longer buys the strip its column of map — the
+// Depth entry in the Filters panel is the one place the range is set there, as
+// with the time bar. A grid whose levels can be stepped through still mounts
+// it, that control existing nowhere else.
 export default function DepthBar () {
   const { depthFilterActive } = useFilters()
   const { activeWmsOverlay } = useMapState()
+  const isMobile = useMediaQuery(MOBILE_QUERY)
 
   const gridNodes = gridDepthNodes(activeWmsOverlay)
-  if (!depthFilterActive && !gridNodes) return null
+  const filterWantsBar = depthFilterActive && !isMobile
+  if (!filterWantsBar && !gridNodes) return null
 
   return <DepthBarSurface gridNodes={gridNodes} />
 }

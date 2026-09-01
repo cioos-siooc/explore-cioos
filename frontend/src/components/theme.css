@@ -130,7 +130,16 @@
   --cioos-header-padding: 16px 20px;
   --cioos-content-gap: 12px;
 
-  /* --- Typography Scale --- */
+  /* --- Typography Scale ---
+     Every size the chrome uses, including the two rungs below `xs` that the
+     legend ticks, the group labels and the brand's secondary wordmark need.
+     Those used to be hardcoded 8/9/10px values scattered through the component
+     stylesheets, which is why they stayed unreadably small on phones however
+     the rest of the scale was tuned: the mobile bump below can only reach sizes
+     that are on the scale. Nothing should set a font-size in px outside this
+     block — reach for the nearest rung instead. */
+  --cioos-font-size-3xs: 9px;
+  --cioos-font-size-2xs: 10px;
   --cioos-font-size-xs: 11px;
   --cioos-font-size-sm: 12px;
   --cioos-font-size-base: 14px;
@@ -164,13 +173,19 @@
 
   /* --- Z-Index Stack ---
      map (0) < map corner controls < in-panel chrome < shell (brand/search)
-     < sheet < dock < modal < tooltip. */
+     < dock < modal < tooltip.
+
+     Two surfaces sit just above the dock rather than on a rung of their own,
+     each one step at a time so the order between them is stated where it
+     matters: the full-screen datasets list on mobile (dock + 1, over the top
+     bar), and the map's "what's here" card (dock + 2, the topmost non-modal
+     surface anywhere). The --cioos-z-sheet rung they used to share went with
+     the bottom sheet that owned it. */
   --cioos-z-content: 1;
   --cioos-z-map-controls: 2;
   --cioos-z-sticky-search: 9;
   --cioos-z-sticky-header: 10;
   --cioos-z-shell: 30;
-  --cioos-z-sheet: 34;
   --cioos-z-dock: 35;
   --cioos-z-modal: 1055;
   --cioos-z-tooltip: 1080;
@@ -186,11 +201,17 @@
    drifted to seven rungs (600 / 700 / 900 / 991.98 / 992 / 1200 / 1400) with
    nothing saying which belonged to what:
 
-     600px   phone      the panel tokens above; modals go full-viewport
-     700px   phone/lap  the datasets column becomes a bottom sheet, the map's
-                        "what's here" card with it, and the filter chips
-                        collapse. This is THE mobile rung — anything about the
-                        map's own chrome belongs here.
+     600px   phone      the panel token above, and the narrow-phone tweaks a
+                        surface makes on top of the mobile layout
+     700px   phone/lap  THE mobile rung, and where anything about the map's own
+                        chrome belongs. The app stops being a map with chrome
+                        floating over it: the brand bar goes edge-to-edge, the
+                        datasets list and the modals take the whole screen, the
+                        legend collapses to a button, the time/depth bars give
+                        the map its edges back, the filter chips collapse, and
+                        the type scale steps up (below). Mirrored in JS as
+                        MOBILE_QUERY (state/ui/useMediaQuery.js) for the parts
+                        that change markup rather than layout.
      900px   tablet     the legend moves out of the top-right corner
      992px   tablet     legacy Bootstrap rung, modal + intro layout only
      1200px  laptop     the WMS legend goes compact
@@ -201,14 +222,32 @@
 
    Prefer an existing rung over a new one. */
 
-/* Phones: the panel takes over the full viewport so the dataset details and
+/* Phones: every surface is full-screen here, so the type is sized for reading
+   at arm's length rather than for fitting beside a map — one rung up across the
+   whole scale, which is why the sub-`xs` sizes had to join it. The spacing goes
+   the other way: a full-screen surface spends its room on content, so the
+   padding rungs tighten as the type grows.
+
+   The panel also takes over the full viewport, so the dataset details and the
    record table stay usable instead of overflowing a fixed column. */
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   :root {
     --cioos-panel-w: 100vw;
     --cioos-header-height: var(--cioos-header-height-mobile);
     --cioos-row-height: var(--cioos-row-height-mobile);
+
+    --cioos-font-size-3xs: 10px;
+    --cioos-font-size-2xs: 12px;
+    --cioos-font-size-xs: 13px;
+    --cioos-font-size-sm: 14px;
+    --cioos-font-size-base: 16px;
+    --cioos-font-size-md: 17px;
+    --cioos-font-size-lg: 20px;
+
+    --cioos-space-md: 10px;
     --cioos-space-lg: 12px;
+    --cioos-space-xl: 16px;
+    --cioos-space-2xl: 20px;
   }
 }
 

@@ -27,6 +27,7 @@ import TimeRail, {
 import GridTimeRail from '../GridTimeRail/GridTimeRail.jsx'
 import { MS_PER_DAY, isoToMs, msToIso, clampIso } from '../TimeRail/timeAxis.js'
 import usePublishedFootprint from '../../../state/ui/usePublishedFootprint.js'
+import useMediaQuery, { MOBILE_QUERY } from '../../../state/ui/useMediaQuery.js'
 import './styles.css'
 
 // How far up the bar reaches from the bottom of the viewport: its own offset
@@ -81,13 +82,20 @@ export function gridTimeNodes (overlay) {
 // scrub, or a grid whose slice can be stepped through. With none of them, the
 // range is set from the Time entry in the Filters panel and the map keeps the
 // room.
+//
+// On a phone the filter alone no longer buys the bar its strip of map: the Time
+// entry in the Filters panel is the one place the range is set there, which is
+// the whole of what a phone-sized rail could do anyway. The scrub and the grid
+// slice still mount it, because those two controls exist nowhere else.
 export default function TimeBar () {
   const { timeFilterActive } = useFilters()
   const { tracksMode, dataLayers, activeWmsOverlay } = useMapState()
+  const isMobile = useMediaQuery(MOBILE_QUERY)
 
   const scrubActive = tracksMode && anyTrajectoryLayerOn(dataLayers)
   const gridNodes = gridTimeNodes(activeWmsOverlay)
-  if (!timeFilterActive && !scrubActive && !gridNodes) return null
+  const filterWantsBar = timeFilterActive && !isMobile
+  if (!filterWantsBar && !scrubActive && !gridNodes) return null
 
   return <TimeBarSurface scrubActive={scrubActive} gridNodes={gridNodes} />
 }

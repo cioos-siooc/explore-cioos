@@ -4,7 +4,8 @@ import {
   ChevronLeft,
   Download,
   FileEarmarkText,
-  ListUl
+  ListUl,
+  X
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
@@ -13,6 +14,7 @@ import isEmpty from 'lodash/isEmpty'
 import DatasetsPanel from '../Panels/DatasetsPanel.jsx'
 import Spinner from '../../ui/Spinner.jsx'
 import useDatasetCounts from '../../../state/useDatasetCounts.js'
+import useMediaQuery, { MOBILE_QUERY } from '../../../state/ui/useMediaQuery.js'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
@@ -20,14 +22,20 @@ import './styles.css'
 // The left column: the datasets card — a toggle header that shows/hides the
 // dataset list and the counts + Download footer. (The brand and the
 // Datasets/Filters entry points now live in the centered top bar.) On phones
-// the same card rises as a bottom sheet, but only once the top bar's Datasets
-// button asks for it — nothing of it is left at the bottom edge otherwise.
+// the same card takes the whole screen, but only once the top bar's Datasets
+// button asks for it — nothing of it is left at any edge otherwise.
 // Drilling into a single dataset swaps that header for a back banner: the card
 // hosts two different surfaces, and the header is what names the one in view.
 export default function Sidebar () {
   const { t } = useTranslation()
   const { pointsToReview, inspectDataset, returnToDatasetList } = useSelection()
   const { sidebarOpen, setSidebarOpen, setShowDownloadModal } = useUI()
+  // On a phone the card is the whole screen rather than a column beside the
+  // map, so the control that dismisses it is a close button in the corner
+  // rather than a chevron that collapses a card back into the layout. Same
+  // button, same handler — only the icon says which of the two it is.
+  const isMobile = useMediaQuery(MOBILE_QUERY)
+  const DismissIcon = isMobile ? X : ChevronDown
   // Until `ready`, there is no dataset count to show — not even a zero. See
   // useDatasetCounts.
   const {
@@ -83,7 +91,7 @@ export default function Sidebar () {
               title={t('sidebarCollapseTitle')}
               aria-label={t('sidebarCollapseTitle')}
             >
-              <ChevronDown size={16} aria-hidden='true' />
+              <DismissIcon size={isMobile ? 22 : 16} aria-hidden='true' />
             </button>
           </div>
         ) : (
@@ -108,9 +116,9 @@ export default function Sidebar () {
                 <Spinner size='sm' className='countSpinner' />
               )}
             </span>
-            <ChevronDown
+            <DismissIcon
               className='datasetsToggleChevron'
-              size={16}
+              size={isMobile ? 22 : 16}
               aria-hidden='true'
             />
           </button>
