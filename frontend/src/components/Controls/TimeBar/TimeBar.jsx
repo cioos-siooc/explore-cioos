@@ -305,7 +305,11 @@ function TimeBarSurface ({ scrubActive, gridNodes, compact }) {
         )}
 
         {scrubActive && (
-          <div className='railField railFieldScrub' role='group'>
+          <div
+            className='railField railFieldScrub'
+            role='group'
+            aria-label={t('timeBarScrubLabel')}
+          >
             <span className='railFieldLabel'>{t('timeBarScrubLabel')}</span>
             <DateField
               label={t('timeBarScrubLabel')}
@@ -361,7 +365,11 @@ function TimeBarSurface ({ scrubActive, gridNodes, compact }) {
             grids that hold thousands give each slice well under a pixel of any
             rail — and where the drawn one sits among them. */}
         {gridNodes && (
-          <div className='railField railFieldGrid' role='group'>
+          <div
+            className='railField railFieldGrid'
+            role='group'
+            aria-label={t('timeBarGridLabel')}
+          >
             <span className='railFieldLabel'>{t('timeBarGridLabel')}</span>
             <button
               type='button'

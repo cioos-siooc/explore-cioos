@@ -110,23 +110,49 @@
  * ------------------------------------------------------------------ */
 .timeBarCompact .timeBarFields {
   /* Centred rather than pushed to the edges: with one or two pills left,
-     space-between strands them in opposite corners of the screen. */
-  justify-content: center;
-  padding: 0 8px 8px;
+     space-between strands them in opposite corners of the screen. `safe`
+     is load-bearing — plain `center` centres an overflow too, so a pill wider
+     than the phone would hang off BOTH edges with its left end unreachable.
+     `safe` falls back to flex-start the moment anything overflows. */
+  justify-content: safe center;
+  gap: 6px;
+  padding: 0 8px 6px;
   /* Clear of the home indicator on a notched phone. */
-  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
 }
 
-/* The pills are the whole bar here and are meant to be tapped rather than
-   clicked, so they take the height the slider card used to spend — the 2px
-   the desktop row can afford leaves a target well under the 44px minimum. */
+/* The written label goes. It is the widest thing in either pill — "Date des
+   trajectoires" is ~147px against a ~110px date field, "Temps de la grille"
+   ~126px — and it was what pushed the pill past the width of a phone and so
+   into wrapping onto a second line, which is height spent at the bottom of the
+   map to name a control the colour already names. Each pill carries the key
+   colour of the thing it moves (--cioos-track for the trajectory scrub,
+   --cioos-grid for the gridded slice; see theme.css), the same colour that
+   marks it on the map and in the legend. The name is kept for screen readers
+   on the group and on the field itself, so only the pixels are dropped. */
+.timeBarCompact .railFieldLabel {
+  display: none;
+}
+
+/* Without the labels both pills fit a phone on one line, which is the whole
+   point of dropping them: the bar costs one row of controls and its inset.
+   The wrapping below is what happens if a translation or a browser's date
+   chrome is wider than reckoned — the pill grows downward rather than running
+   off the screen — and not what normally happens. */
 .timeBarCompact .railField {
-  gap: 8px;
-  padding: 7px 12px;
+  gap: 6px;
+  padding: 5px 10px;
+  flex-shrink: 1;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 100%;
 }
 
-.timeBarCompact .railFieldScrub {
-  gap: 10px;
+/* The date input and the trailing-window menu carry intrinsic widths of their
+   own (a date input is sized by its own picker chrome), so they need leave to
+   shrink before the pill can honour its max-width. */
+.timeBarCompact .railField > * {
+  min-width: 0;
 }
 
 @media (min-width: 701px) {

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CaretDownFill,
   CaretRightFill,
+  CheckSquare,
   Eye,
   EyeSlash,
   Search
@@ -22,7 +23,8 @@ import {
 } from '../../../state/datasetGroups.js'
 import DatasetCard from './DatasetCard.jsx'
 import Pager, { PAGE_SIZES } from '../../ui/Pager.jsx'
-import SortChips from '../../ui/SortChips.jsx'
+import SelectPill from '../../ui/SelectPill.jsx'
+import SortSelect from '../../ui/SortSelect.jsx'
 import './styles.css'
 
 // Stable default so an absent datasetsInViewPks prop (e.g. the download modal)
@@ -138,7 +140,7 @@ export default function DatasetsTable({
     const sorted = [...(datasets || [])].sort((a, b) => {
       // Datasets under the last map click come first, in the chosen sort order
       // among themselves. This rides on top of the sort rather than replacing
-      // it, so the sort chips still do what they say — they just order the two
+      // it, so the sort control still does what it says — it just orders the two
       // blocks separately.
       const pa = pinnedPks.has(Number(a.pk)) ? 0 : 1
       const pb = pinnedPks.has(Number(b.pk)) ? 0 : 1
@@ -278,6 +280,7 @@ export default function DatasetsTable({
           aria-pressed={selectAll}
           title={t('datasetsTableHeaderSelectAllTitle')}
         >
+          <CheckSquare size={13} aria-hidden='true' />
           {t('datasetsTableHeaderSelectAllTitle')}
         </button>
         {!isDownloadModal && (
@@ -294,37 +297,37 @@ export default function DatasetsTable({
         )}
       </div>
 
-      <SortChips fields={sortFields} sort={sort} onChange={setSort} />
-
-      {!isDownloadModal && (
-        <div className='datasetsCardGroupRow'>
-          <label className='datasetsCardGroupLabel' htmlFor='datasetsGroupBy'>
-            {t('datasetsCardGroupByLabel')}
-          </label>
-          <select
-            id='datasetsGroupBy'
-            className='datasetsCardGroupSelect'
-            value={groupBy}
-            onChange={(e) => setGroupBy(e.target.value)}
-          >
-            {groupByOptions.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          {hiddenGroups.size > 0 && (
-            <button
-              type='button'
-              className='datasetsCardShowAllGroups'
-              onClick={showAllGroups}
-            >
-              <Eye size={12} aria-hidden='true' />
-              {t('datasetsCardGroupShowAllText', { count: hiddenGroups.size })}
-            </button>
-          )}
-        </div>
-      )}
+      {/* How the list is arranged: what it is sorted on and what it is grouped
+          by, as the same pill so the pair reads as one row of settings. */}
+      <div className='datasetsCardArrange'>
+        <SortSelect fields={sortFields} sort={sort} onChange={setSort} />
+        {!isDownloadModal && (
+          <>
+            <SelectPill
+              label={t('datasetsCardGroupByLabel')}
+              value={groupBy}
+              options={groupByOptions}
+              onChange={setGroupBy}
+            />
+            {hiddenGroups.size > 0 && (
+              <button
+                type='button'
+                className='datasetsCardShowAllGroups'
+                onClick={showAllGroups}
+                title={t('datasetsCardGroupShowAllText', {
+                  count: hiddenGroups.size
+                })}
+                aria-label={t('datasetsCardGroupShowAllText', {
+                  count: hiddenGroups.size
+                })}
+              >
+                <Eye size={13} aria-hidden='true' />
+                {hiddenGroups.size}
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 
