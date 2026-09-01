@@ -446,8 +446,8 @@
  * from the 900px rule above, which this width is inside.
  * ------------------------------------------------------------------ */
 
-/* The header is the whole control now, so it is sized as one rather than as a
-   caption with a collapse arrow on the end. */
+/* The header is the control that opens the rest now, so it is sized as one
+   rather than as a caption with a collapse arrow on the end. */
 .legendCompact .legendHeader {
   gap: 10px;
   min-height: 40px;
@@ -457,6 +457,17 @@
 
 .legendCompact .legendHeader svg {
   color: var(--cioos-primary);
+}
+
+/* The hex ramp, the one key left on the card. It is the whole of the body
+   here, so it drops the spacing the body's entries use to stand apart from
+   each other and from a group label above them — there is neither. */
+.legendCompactRamp {
+  flex: 0 0 auto;
+}
+
+.legendCompactRamp .legendSubsection {
+  margin-top: 0;
 }
 
 /* The keys, centred over the map. Sized to what it holds rather than to the

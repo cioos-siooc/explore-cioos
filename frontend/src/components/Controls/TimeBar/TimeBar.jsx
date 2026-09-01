@@ -1,6 +1,7 @@
 import React, { useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CaretLeftFill, CaretRightFill, X } from 'react-bootstrap-icons'
+import classNames from 'classnames'
 
 import {
   defaultStartDate,
@@ -83,10 +84,13 @@ export function gridTimeNodes (overlay) {
 // range is set from the Time entry in the Filters panel and the map keeps the
 // room.
 //
-// On a phone the filter alone no longer buys the bar its strip of map: the Time
-// entry in the Filters panel is the one place the range is set there, which is
-// the whole of what a phone-sized rail could do anyway. The scrub and the grid
-// slice still mount it, because those two controls exist nowhere else.
+// On a phone the bar keeps only the two controls that exist nowhere else — the
+// trajectory scrub date and the gridded dataset's slice — and gives up the rest
+// of its strip of map. The rails go: a full-catalogue axis a finger wide is not
+// something a date can be picked off, and both dates have a field and a stepper
+// in the pills above it. The range pill goes with them, the Time entry in the
+// Filters panel being the one place the filter is set there. Nothing to scrub
+// and no grid on the map, and the bar does not mount at all.
 export default function TimeBar () {
   const { timeFilterActive } = useFilters()
   const { tracksMode, dataLayers, activeWmsOverlay } = useMapState()
@@ -97,14 +101,20 @@ export default function TimeBar () {
   const filterWantsBar = timeFilterActive && !isMobile
   if (!filterWantsBar && !scrubActive && !gridNodes) return null
 
-  return <TimeBarSurface scrubActive={scrubActive} gridNodes={gridNodes} />
+  return (
+    <TimeBarSurface
+      scrubActive={scrubActive}
+      gridNodes={gridNodes}
+      compact={isMobile}
+    />
+  )
 }
 
 // Split out so the bar's footprint is published by a component that only
 // exists while the bar does: the property is cleared on unmount, which is what
 // lets the sidebar, the legend and MapLibre's corners reclaim the bottom edge
 // the moment it goes away.
-function TimeBarSurface ({ scrubActive, gridNodes }) {
+function TimeBarSurface ({ scrubActive, gridNodes, compact }) {
   const { t } = useTranslation()
   const {
     startDate,
@@ -234,58 +244,65 @@ function TimeBarSurface ({ scrubActive, gridNodes }) {
   }
 
   return (
-    <div className='timeBar' ref={barRef} aria-label={t('timeBarAriaLabel')}>
+    <div
+      className={classNames('timeBar', { timeBarCompact: compact })}
+      ref={barRef}
+      aria-label={t('timeBarAriaLabel')}
+    >
       {/* One row for the input groups, above the sliders they drive. Each is
           named, and tinted in the colour of its handle — the label says which
-          control it is, the colour says which mark on the rail it moves. */}
+          control it is, the colour says which mark on the rail it moves.
+          Compact, this row is the whole bar. */}
       <div className='timeBarFields'>
-        <div className='railField railFieldRange' role='group'>
-          <span className='railFieldLabel'>{t('timeBarRangeLabel')}</span>
-          <DateField
-            label={t('timeSelectorStartDate')}
-            value={startDate}
-            min={defaultStartDate}
-            max={endDate}
-            onCommit={(value) => setFieldValue('start', value)}
-          />
-          <span className='railFieldSep'>–</span>
-          <DateField
-            label={t('timeSelectorEndDate')}
-            value={endDate}
-            min={startDate}
-            max={maxIso}
-            onCommit={(value) => setFieldValue('end', value)}
-          />
-          {/* The ready-made windows the Filters panel spells out as a labelled
-              row. There is no room for a label here, so the picker names itself
-              until a window is chosen. */}
-          <IntervalSelect
-            className='railPresetSelect'
-            ariaLabel={t('timeBarPresetLabel')}
-            startDate={startDate}
-            endDate={endDate}
-            defaultStart={defaultStartDate}
-            maxIso={maxIso}
-            onSelect={(start, end) => {
-              setStartDate(start)
-              setEndDate(end)
-            }}
-          />
-          {timeFilterActive && (
-            <button
-              type='button'
-              className='railReset'
-              title={t('timeBarResetRangeTitle')}
-              aria-label={t('timeBarResetRangeTitle')}
-              onClick={() => {
-                setStartDate(defaultStartDate)
-                setEndDate(maxIso)
+        {!compact && (
+          <div className='railField railFieldRange' role='group'>
+            <span className='railFieldLabel'>{t('timeBarRangeLabel')}</span>
+            <DateField
+              label={t('timeSelectorStartDate')}
+              value={startDate}
+              min={defaultStartDate}
+              max={endDate}
+              onCommit={(value) => setFieldValue('start', value)}
+            />
+            <span className='railFieldSep'>–</span>
+            <DateField
+              label={t('timeSelectorEndDate')}
+              value={endDate}
+              min={startDate}
+              max={maxIso}
+              onCommit={(value) => setFieldValue('end', value)}
+            />
+            {/* The ready-made windows the Filters panel spells out as a labelled
+                row. There is no room for a label here, so the picker names itself
+                until a window is chosen. */}
+            <IntervalSelect
+              className='railPresetSelect'
+              ariaLabel={t('timeBarPresetLabel')}
+              startDate={startDate}
+              endDate={endDate}
+              defaultStart={defaultStartDate}
+              maxIso={maxIso}
+              onSelect={(start, end) => {
+                setStartDate(start)
+                setEndDate(end)
               }}
-            >
-              <X size={14} />
-            </button>
-          )}
-        </div>
+            />
+            {timeFilterActive && (
+              <button
+                type='button'
+                className='railReset'
+                title={t('timeBarResetRangeTitle')}
+                aria-label={t('timeBarResetRangeTitle')}
+                onClick={() => {
+                  setStartDate(defaultStartDate)
+                  setEndDate(maxIso)
+                }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        )}
 
         {scrubActive && (
           <div className='railField railFieldScrub' role='group'>
@@ -396,42 +413,49 @@ function TimeBarSurface ({ scrubActive, gridNodes }) {
           grid on the map, the catalogue's underneath. Stacked rather than
           merged — the grid's span is usually a sliver of the catalogue's, and
           a mark on a sliver cannot be moved — but kept in the same surface,
-          since they are read together and the pills above drive both. */}
-      <div className='timeBarSlider'>
-        {gridNodes && (
-          <GridTimeRail
-            className='timeBarGridRail'
-            nodes={gridNodes}
-            value={gridIso}
-            onCommit={(iso) => setHandleValue('grid', iso)}
+          since they are read together and the pills above drive both.
+
+          Gone on a phone: a rail is a way of picking a date by eye off the
+          span it sits in, and at that width there is not enough span to aim
+          at. Both dates keep their field, and the grid its slice steppers, in
+          the pills above. */}
+      {!compact && (
+        <div className='timeBarSlider'>
+          {gridNodes && (
+            <GridTimeRail
+              className='timeBarGridRail'
+              nodes={gridNodes}
+              value={gridIso}
+              onCommit={(iso) => setHandleValue('grid', iso)}
+            />
+          )}
+          <TimeRail
+            axis={axis}
+            startDate={startDate}
+            endDate={endDate}
+            scrub={
+              scrubActive
+                ? {
+                  value: scrubIso,
+                  // The stretch of history the tracks actually cover behind the
+                  // scrub date — the same window the tiles are built from,
+                  // clamp included.
+                  trailStartMs: Math.max(
+                    isoToMs(scrubIso) - loadedTrailDays * MS_PER_DAY,
+                    isoToMs(scrubMinIso)
+                  )
+                }
+                : undefined
+            }
+            gridSpan={
+              gridNodes
+                ? { fromMs: gridNodes.min, toMs: gridNodes.max }
+                : undefined
+            }
+            onCommit={setHandleValue}
           />
-        )}
-        <TimeRail
-          axis={axis}
-          startDate={startDate}
-          endDate={endDate}
-          scrub={
-            scrubActive
-              ? {
-                value: scrubIso,
-                // The stretch of history the tracks actually cover behind the
-                // scrub date — the same window the tiles are built from,
-                // clamp included.
-                trailStartMs: Math.max(
-                  isoToMs(scrubIso) - loadedTrailDays * MS_PER_DAY,
-                  isoToMs(scrubMinIso)
-                )
-              }
-              : undefined
-          }
-          gridSpan={
-            gridNodes
-              ? { fromMs: gridNodes.min, toMs: gridNodes.max }
-              : undefined
-          }
-          onCommit={setHandleValue}
-        />
-      </div>
+        </div>
+      )}
     </div>
   )
 }

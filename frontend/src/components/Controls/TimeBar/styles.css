@@ -101,6 +101,34 @@
   white-space: nowrap;
 }
 
+/* ------------------------------------------------------------------
+ * Compact (phones): the slider card is gone and the pill row is the whole
+ * bar — see TimeBar.jsx, which drops the rails and the range pill and
+ * keeps the trajectory scrub date and the gridded dataset's slice, those
+ * two controls existing nowhere else. What is left has to hold the bottom
+ * edge on its own, so it carries the inset the card used to.
+ * ------------------------------------------------------------------ */
+.timeBarCompact .timeBarFields {
+  /* Centred rather than pushed to the edges: with one or two pills left,
+     space-between strands them in opposite corners of the screen. */
+  justify-content: center;
+  padding: 0 8px 8px;
+  /* Clear of the home indicator on a notched phone. */
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+
+/* The pills are the whole bar here and are meant to be tapped rather than
+   clicked, so they take the height the slider card used to spend — the 2px
+   the desktop row can afford leaves a target well under the 44px minimum. */
+.timeBarCompact .railField {
+  gap: 8px;
+  padding: 7px 12px;
+}
+
+.timeBarCompact .railFieldScrub {
+  gap: 10px;
+}
+
 @media (min-width: 701px) {
   .timeBarSlider {
     width: min(1080px, calc(100vw - 24px));

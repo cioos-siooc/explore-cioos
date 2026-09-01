@@ -167,26 +167,60 @@
 
   /* Tighter than the floating card's: the row is as wide as the screen now,
      so what padding it keeps is spent on the edges rather than on holding a
-     lockup together. */
+     lockup together.
+
+     The tracks change too. `1fr auto 1fr` buys a wordmark centred in the card
+     by giving the side columns equal width — but the centre track is sized to
+     its own content, and the wordmark is nowrap, so its min-content is a floor
+     the row cannot go under: past that the logo and the icon cluster are
+     pushed out from under it and the three draw on top of each other. Here the
+     side columns take only what they need and the wordmark takes what is left,
+     which it can be asked to fit. */
   .brandCardTop {
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 8px;
     padding: 6px 10px;
   }
 
-  /* The wordmark is the one thing on this row that grows: it is the app's
-     name, and at 15px it read as a caption on the logo beside it. */
+  /* Stretched to the track rather than sized to its own text, and clipped by
+     it — the last-ditch guarantee that whatever the sizing below works out to,
+     the wordmark loses a letter rather than being drawn over its neighbours.
+     The lines stay centred inside it (align-items, from the base rule). */
+  .brandTitle {
+    justify-self: stretch;
+    min-width: 0;
+    overflow: hidden;
+  }
+
   .brandTitle em {
-    font-size: var(--cioos-font-size-lg);
+    font-size: var(--cioos-font-size-md);
   }
 
+  /* French is the language this row stops fitting in: a third longer on both
+     lines — EXPLORATEUR against EXPLORER, DE DONNÉES against DATA — and it is
+     the long one that has to share the row with a 98px logo and three icon
+     buttons. It scales with the viewport instead of holding a fixed size, so
+     the narrowest phones shrink the wordmark rather than overlapping it, and
+     every width with room for the full size still gets it. */
+  .brandTitle[lang='fr'] em {
+    font-size: min(var(--cioos-font-size-md), 4vw);
+  }
+
+  .brandTitle[lang='fr'] span {
+    font-size: min(var(--cioos-font-size-2xs), 2.6vw);
+  }
+
+  /* The widest fixed thing on the row — 314x90, so 98px at the height it wants
+     here — and so the one worth letting the viewport scale too. */
   .brandSearchLogo img {
-    height: 32px;
+    width: min(98px, 26vw);
+    height: auto;
   }
 
-  /* Full touch targets for the three icon actions, the smallest things on
-     the header. */
+  /* Touch targets for the three icon actions, the smallest things on the
+     header — and no larger, the row's width being spoken for. */
   .brandMinorItem {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
   }
 }

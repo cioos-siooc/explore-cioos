@@ -286,6 +286,10 @@
      through too. */
   background-color: var(--cioos-track-surface);
   border-color: var(--cioos-track);
+  /* Wider than the shared 4px: this is the densest of the pills — a label, a
+     date and a trailing-window menu, none of which draws an edge of its own —
+     and at the shared gap its three parts ran together as one block of text. */
+  gap: 8px;
 }
 
 .railFieldScrub .railValueInput {

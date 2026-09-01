@@ -108,6 +108,7 @@ function measureLegendAboveSpace (rect) {
 // few, otherwise thins to an evenly spaced subset (always including the first
 // and last) so labels don't overlap on the compact bar.
 function pickTickIndices(n, maxTicks = 5) {
+  if (maxTicks < 2) return [0]
   if (n <= maxTicks) return Array.from({ length: n }, (_, i) => i)
   const step = (n - 1) / (maxTicks - 1)
   const indices = new Set()
@@ -267,7 +268,7 @@ export default function Legend({
   // rather than by value — a linear-value axis would collapse the ramp into the
   // dominant high-count color. Count ticks are drawn at each stop (thinned to
   // keep the compact bar legible), which naturally reads as a log axis.
-  function renderColorBar(scale, rangeLevel, dimmed) {
+  function renderColorBar(scale, rangeLevel, dimmed, maxTicks) {
     const colorStops = generateColorStops(scale, rangeLevel)
     if (!colorStops || !colorStops.length) return null
     const n = colorStops.length
@@ -278,7 +279,7 @@ export default function Legend({
         : `linear-gradient(to right, ${colorStops
           .map((cs, i) => `${cs.color} ${((i / denom) * 100).toFixed(1)}%`)
           .join(', ')})`
-    const tickIndices = pickTickIndices(n)
+    const tickIndices = pickTickIndices(n, maxTicks)
     // /legend clamps the ramp's top to a high percentile so one outlier
     // dataset can't flatten the whole scale (see rampRange in
     // web-api/routes/legend.js). When it did clamp, the top tick is not the
@@ -389,7 +390,7 @@ export default function Legend({
   // count, and a caption naming the one entry present is a line spent saying
   // nothing. The label earns its place only where there is a second entry — the
   // markers — for it to tell the bar apart from.
-  function renderHexEntry(labelled) {
+  function renderHexEntry(labelled, maxTicks) {
     if (!hexesOnMap || isEmpty(hexRangeLevel)) return null
     return (
       <div className='legendSubsection'>
@@ -404,7 +405,12 @@ export default function Legend({
               />
             )
           })}
-        {renderColorBar(colorScale, hexRangeLevel, observationsHidden)}
+        {renderColorBar(
+          colorScale,
+          hexRangeLevel,
+          observationsHidden,
+          maxTicks
+        )}
       </div>
     )
   }
@@ -628,6 +634,16 @@ export default function Legend({
   // naming (see renderHexEntry).
   const markerKeys = renderMarkerKeys()
   const hexEntry = renderHexEntry(Boolean(markerKeys))
+  // The one key the compact card keeps on the map. Everything else in the body
+  // names a shape or a colour the map is already showing — a track line looks
+  // like a track line — but what a hexagon's green is worth in days of data is
+  // a reading nothing on the map can give, so it is the part that has to stay
+  // out where it can be read against the cells. Unlabelled: it is the only
+  // thing on the card, so a caption telling it apart from its neighbours would
+  // be naming it against nothing.
+  // Four ticks, not the five the card affords: this bar is as wide as a phone
+  // corner allows, and the labels are what run into each other first.
+  const compactHexEntry = compact ? renderHexEntry(false, 4) : null
   const trackKeys = renderTrackKeys()
   const bathymetryBar = renderBathymetryBar()
   const layerSwitches = renderLayerSwitches()
@@ -671,11 +687,13 @@ export default function Legend({
     layerSwitches && renderGroup('layers', null, {}, layerSwitches)
   ].filter(Boolean)
 
-  // Compact is the same card with its body taken out: the header row, which now
-  // opens the keys in a dialog instead of unfolding them in place, and the foot
-  // that reads the map rather than the keys. Two short rows in the corner
-  // instead of a quarter of the screen — a legend is read in glances, and on a
-  // phone the glance is worth more than the standing card.
+  // Compact is the same card with its body cut down to the hex ramp: the header
+  // row, which now opens the rest of the keys in a dialog instead of unfolding
+  // them in place; the ramp, which is the one key worth standing on the map
+  // (see compactHexEntry); and the foot, which reads the map rather than the
+  // keys. Three short rows in the corner instead of a quarter of the screen —
+  // the rest of a legend is read in glances, and on a phone the glance is worth
+  // more than the standing card.
   //
   // Keeping the card (rather than swapping in a bare button) is what keeps the
   // rest true for free: the ref, and so the footprint the griddap legend stacks
@@ -707,7 +725,11 @@ export default function Legend({
           <ChevronCompactDown size={14} aria-hidden='true' />
         )}
       </button>
-      {!compact && legendOpen && <div className='legendBody'>{groups}</div>}
+      {compact
+        ? compactHexEntry && (
+          <div className='legendBody legendCompactRamp'>{compactHexEntry}</div>
+        )
+        : legendOpen && <div className='legendBody'>{groups}</div>}
       {/* Outside the collapse: the scale bar reads the map rather than the
           keys, so it is as useful with the card shut as open — closed, the card
           is its header row and the scale row, and nothing more. */}
