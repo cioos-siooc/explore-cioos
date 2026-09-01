@@ -378,12 +378,12 @@ def main(folder, incremental=False):
     else:
         datasets["obis_nodes"] = [[] for _ in range(len(datasets))]
 
-    # Griddap metadata columns. All nullable; absent entirely from
-    # pre-griddap harvest folders. The jsonb columns arrive as Python-repr
-    # strings (same CSV contract as eovs); NaN must become None or the JSONB
-    # binding fails. coverage_time_* is parsed to datetime so NaT binds as
-    # NULL on the timestamptz columns.
-    for col in ("grid_variables", "grid_dimensions"):
+    # jsonb metadata columns (table_variables for every dataset type, the two
+    # grid_* ones for griddap). All nullable; absent entirely from older harvest
+    # folders. They arrive as Python-repr strings (same CSV contract as eovs);
+    # NaN must become None or the JSONB binding fails. coverage_time_* is parsed
+    # to datetime so NaT binds as NULL on the timestamptz columns.
+    for col in ("table_variables", "grid_variables", "grid_dimensions"):
         if col in datasets.columns:
             datasets[col] = datasets[col].apply(
                 lambda x: ast.literal_eval(x) if isinstance(x, str) and x else None

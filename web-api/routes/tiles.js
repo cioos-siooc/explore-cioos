@@ -5,6 +5,10 @@ const router = express.Router();
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { validatorMiddleware } = require("../utils/validatorMiddlewares");
+const {
+  ALL_PROFILE_TYPES,
+  ALL_TRAJECTORY_TYPES,
+} = require("../utils/datasetTypes");
 const cache = require("../utils/cache");
 const {
   parseMetric,
@@ -50,13 +54,12 @@ function tileCellPrefilter(z) {
   return `geom && ST_Expand(ST_TileEnvelope(:z, :x, :y), ${expandM})`;
 }
 
-// The cdm_data_types that share cde.trajectory_hexes / cde.trajectory_points.
-// They are separate layers in the map's geometry selector, so the routes below
-// take a trajectoryTypes param that works exactly like profileTypes: absent =
-// both (pre-split behaviour, and what any older client sends), a comma list =
-// only those, empty = neither. Values are matched against this fixed set, which
-// is what makes them safe to inline into the branch SQL.
-const ALL_TRAJECTORY_TYPES = ["Trajectory", "TrajectoryProfile"];
+// Trajectory types are separate layers in the map's geometry selector, so the
+// routes below take a trajectoryTypes param that works exactly like
+// profileTypes: absent = both (pre-split behaviour, and what any older client
+// sends), a comma list = only those, empty = neither. Values are matched against
+// the fixed set in utils/datasetTypes, which is what makes them safe to inline
+// into the branch SQL.
 
 function requestedTrajectoryTypes(query) {
   if (query.trajectoryTypes === undefined) return ALL_TRAJECTORY_TYPES;
@@ -164,7 +167,6 @@ router.get(
     // TimeSeriesProfile — all three share cde.profiles); absent = all three
     // (pre-toggle behaviour), empty = none. Values are validated against the
     // fixed set below so they can be inlined into the branch SQL safely.
-    const ALL_PROFILE_TYPES = ['Profile', 'TimeSeries', 'TimeSeriesProfile'];
     const profileTypes = req.query.profileTypes === undefined
       ? ALL_PROFILE_TYPES
       : String(req.query.profileTypes)

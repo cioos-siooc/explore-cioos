@@ -36,8 +36,10 @@
 
 .dropdown-menu {
   /* position/top/left/min-width are set inline (DropdownButton computes them
-     from the toggle's bounding rect — the menu portals into document.body). */
-  z-index: 1000;
+     from the toggle's bounding rect — the menu portals into document.body).
+     Because of that portal the menu is a sibling of .modal, not a descendant,
+     so it needs a z-index above --cioos-z-modal to show inside a dialog. */
+  z-index: var(--cioos-z-dropdown, 1060);
   max-height: 260px;
   overflow-y: auto;
   padding: 4px 0;

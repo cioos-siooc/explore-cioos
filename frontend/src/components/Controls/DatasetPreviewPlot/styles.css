@@ -1,14 +1,220 @@
+/* Controls (left column) + plot (fills the rest) laid out side by side. */
+.datasetPreviewControls {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  width: 100%;
+}
+
+.datasetPreviewControlsColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+/* Checkbox rows in the variable picker. The menu is portaled to document.body
+   with its own max-height and overflow (ui/dropdownStyles.css), so a dataset
+   with any number of variables scrolls THERE and never adds a scroller inside
+   the modal. */
+.variablePickerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.variablePickerRow input {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.variablePickerLabel {
+  flex: 1 1 auto;
+  white-space: nowrap;
+}
+
+.dropdownEmptyNote {
+  display: block;
+  padding: 6px 12px;
+  color: var(--cioos-text-muted, #666);
+}
+
+/* One control per row: caption on the left, dropdown button on the right. */
+.controlRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.controlCaption {
+  flex: 0 0 auto;
+  width: 90px;
+  text-align: right;
+  font-size: 0.9em;
+}
+
+.controlButtonWrap {
+  display: inline-block;
+}
+
+/* Right side: nothing but the plot. The plot-type button used to sit in a
+   header row here; it is a control like the other three, so it lives in the left
+   column now and the figure gets the whole height of the scroller. */
+.datasetPreviewPlotArea {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* No height rules here at all, and that is the fix.
+ *
+ * This used to carry `min-height: 100%` plus
+ * `.svg-container { min-height: 560px !important; height: 100% !important }`.
+ * Every one of those percentages resolved against an indefinite ancestor
+ * (.datasetPreviewControls has no height, and nothing sets html/body/#app), so
+ * they collapsed to auto — while Plotly, running plotAutoSize because
+ * layout.autosize was on with no width/height, read getComputedStyle(gd).height
+ * as 0px on first mount and fell back to its schema default of 450px. The
+ * !important 560px then stretched the box around a 450px SVG, and nothing
+ * re-measured: useResizeHandler was never passed and config.responsive only
+ * listens on window (plotly-basic ships no ResizeObserver at all). That 110px
+ * gap was the "renders badly until you change something" bug.
+ *
+ * The figure now gets explicit layout.width/height from useElementSize, so the
+ * container must simply not fight them. */
 .datasetPreviewPlot {
-  width: 100%;
-  min-height: 100%;
+  flex: 1;
+  min-width: 0;
+  /* Profiles widen past the modal once panels hit their minimum width; that
+     scrolls here rather than in the modal's vertical scroller. */
+  overflow-x: auto;
 }
 
-.datasetPreviewPlot .js-plotly-plot, .datasetPreviewPlot .plot-container.plotly, .datasetPreviewPlot .user-select-none.svg-container {
-  width: 100%;
-  min-height: 100%;
+.datasetPreviewPlotEmpty {
+  padding: 24px 8px;
+  color: var(--cioos-text-muted, #666);
 }
 
-.datasetPreviewPlot .user-select-none.svg-container {
-  min-height: 450px !important;
-  height: 100% !important;
+/* The variable pickers can list every column, but the menu height cap lives in
+   ui/dropdownStyles.css rather than here: ui/Dropdown portals the menu into
+   document.body, so it is not a descendant of .dropdownButtonLeft and cannot be
+   styled from this file. Layering is handled there too, via --cioos-z-dropdown. */
+.dropdownButtonLeft .dropdown-toggle {
+  min-width: 120px !important;
+  max-width: 120px !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Collapsible "Customize plot" panel: one block per drawn variable, holding its
+   colour and its display name. */
+.labelEditorToggle {
+  margin-top: 8px;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: #333;
+  font-size: 0.9em;
+}
+
+.labelEditorToggle:hover {
+  color: #52A79B;
+}
+
+.labelEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.labelEditorRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.labelEditorRow label {
+  font-size: 0.8em;
+  color: #555;
+}
+
+/* The colour chip and the rename field share a line; the chip is intrinsically
+   sized and the field takes the rest. min-width: 0 so the field can shrink
+   inside the flex row rather than pushing the column wider. */
+.labelEditorControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.labelEditorRow input[type='text'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 3px 6px;
+  border: 1px solid darkgrey;
+  border-radius: 4px;
+}
+
+/* The colour in use, on the toggle and again on every swatch in the menu. The
+   hairline border is what keeps a pale colour visible against white. */
+.colorSwatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--cioos-hairline, #dce8e5);
+  border-radius: 3px;
+}
+
+/* A toggle holding one 16px chip has nothing to gain from the 120px the variable
+   pickers are pinned to. */
+.dropdownButtonSwatch .dropdown-toggle {
+  padding: 3px 6px;
+}
+
+/* The swatch grid, and the menu rows below it. Not nested under
+   .dropdownButtonSwatch, because ui/Dropdown portals the menu into
+   document.body — the same reason .dropdownButtonLeft's own menu cap lives in
+   ui/dropdownStyles.css. */
+/* Six 26px items a row (16px chip + 4px padding + 1px border, doubled), so the
+   twelve land as two even rows rather than five-five-two. */
+.colorSwatchGrid {
+  display: flex;
+  flex-wrap: wrap;
+  width: 172px;
+  padding: 4px 8px;
+}
+
+.colorSwatchGrid .dropdown-item {
+  width: auto;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.colorSwatchCustom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 12px;
+  font-size: var(--cioos-font-size-sm, 13px);
+  cursor: pointer;
+}
+
+.colorSwatchCustom input {
+  width: 32px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--cioos-hairline, #dce8e5);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
 }

@@ -1,0 +1,64 @@
+// The query-string vocabulary of the record preview, in one place because three
+// modules need to agree on it: SelectionProvider owns `record`,
+// usePreviewPlotParams owns the plot params, and UrlSync has to carry every one
+// of them through (it rebuilds the whole search string from scratch on each map
+// pan and drops anything it does not list).
+//
+// Pure on purpose — no React, no router — so it can be imported from a provider,
+// a component and the sync without pulling any of them into each other.
+
+// Which record of the dataset is open. Its presence is what opens the modal.
+export const RECORD_PARAM = 'record'
+
+// How that record is being drawn. Each of these is written ONLY when it differs
+// from the default the dataset type implies, so an untouched plot adds nothing
+// to the link — the same rule the map's layer switches follow.
+//
+//   vis      table | plot          (default: plot for every plottable
+//                                  cdm_data_type, table for Grid/unknown)
+//   pvars    the panel variables, comma-separated, one panel each
+//                                  (default: the dataset's first EOV column)
+//   paxis    the axis every panel shares
+//                                  (default: depth / time / track, per type)
+//   pmode    markers | lines | markers+lines
+//   pcolors  per-variable colours, `column~rrggbb` comma-separated
+//                                  (default: the variable's own ERDDAP palette)
+export const PLOT_PARAMS = [
+  'vis',
+  'pvars',
+  'paxis',
+  'pmode',
+  'pcolors'
+]
+
+// Written by an earlier version of the plot and never again. They stay in the
+// cleanup list so a link made before them does not leave orphans in the address
+// bar after the modal closes, but nothing reads them back.
+//
+//   px, py, p2, pscale2   two axis roles plus one overlaid "second variable",
+//                         which has no meaning once every variable gets a panel
+//   pcolor, pscale        the colour DIMENSION: one variable whose values shaded
+//                         every panel through one colourscale. Replaced by
+//                         `pcolors`, which gives each variable its own colour —
+//                         note the singular/plural, they are different things,
+//                         and `pcolor` is retired rather than reused so a link
+//                         made yesterday cannot be misread as the new one.
+const RETIRED_PLOT_PARAMS = [
+  'px', 'py', 'p2', 'pscale2', 'pcolor', 'pscale'
+]
+
+export const PREVIEW_PARAMS = [
+  RECORD_PARAM,
+  ...PLOT_PARAMS,
+  ...RETIRED_PLOT_PARAMS
+]
+
+// Closing the preview has to delete all of these in ONE setSearchParams call:
+// react-router hands a functional updater the params from the last RENDER, not
+// the ones the previous call just wrote, so two calls in one handler would leave
+// only the second one's work behind.
+export function withoutPreviewParams (params) {
+  const next = new URLSearchParams(params)
+  PREVIEW_PARAMS.forEach((param) => next.delete(param))
+  return next
+}

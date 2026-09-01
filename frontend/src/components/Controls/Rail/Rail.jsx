@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useMemo, useRef } from 'react'
 
+import useElementSize from '../../ui/useElementSize.js'
 import './styles.css'
 
 // The slider every range control in the app is drawn with — the time rail (the
@@ -22,25 +23,6 @@ import './styles.css'
 //
 // Presentational: every value comes in as a prop and every change goes out
 // through onCommit.
-
-// The length of the track along the axis, in pixels — width or height depending
-// on which way it runs. Live, because it decides how many tick labels fit.
-function useMeasuredLength (ref, vertical) {
-  const [length, setLength] = useState(0)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return undefined
-    const publish = () => {
-      const rect = el.getBoundingClientRect()
-      setLength(vertical ? rect.height : rect.width)
-    }
-    publish()
-    const observer = new ResizeObserver(publish)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [ref, vertical])
-  return length
-}
 
 export default function Rail ({
   axis,
@@ -66,9 +48,9 @@ export default function Rail ({
   className
 }) {
   const vertical = orientation === 'vertical'
-  const trackRef = useRef(null)
+  const [trackRef, trackSize] = useElementSize()
   const draggingRef = useRef(null)
-  const railLength = useMeasuredLength(trackRef, vertical)
+  const railLength = vertical ? trackSize.height : trackSize.width
 
   // Where a pointer sits along the track, 0..1 from the axis minimum.
   const positionFromPointer = useCallback(

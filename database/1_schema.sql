@@ -3,6 +3,14 @@
  
  */
 
+-- NOTE: Postgres runs this file ONCE, on a fresh volume, and db_migrate never
+-- re-applies it (the DROP TABLEs below would wipe live data). So a column added
+-- here reaches new databases only.
+-- WHEN YOU ADD A COLUMN HERE, ADD IT TO migrations/0-migration-helper.sql TOO —
+-- that inventory is what brings existing databases up to date on the next
+-- deploy. Skipping it is how datasets.source_type / .obis_nodes went missing and
+-- took down /obisNodes + /erddapServers.
+
 
 -- We are using features from PostGIS 3
 CREATE EXTENSION IF NOT EXISTS postgis;
@@ -84,6 +92,11 @@ CREATE TABLE datasets (
     coverage_time_max timestamptz,
     coverage_depth_min double precision,
     coverage_depth_max double precision,
+    -- Per-variable metadata for every dataset type, harvested from
+    -- /info/{id}/index.csv: long_name, units, cf_role, axis, colorBar*, ...
+    -- See harvester/cde_harvester/core/variables.py. NULL until a dataset is
+    -- (re)harvested, so consumers must tolerate its absence.
+    table_variables jsonb,
     grid_variables jsonb,
     grid_dimensions jsonb,
     wms_url text,

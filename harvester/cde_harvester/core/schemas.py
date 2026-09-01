@@ -23,6 +23,8 @@ DATASET_ARRAY_DTYPES = {
     "profile_variables": ARRAY(TEXT),
     "organization_pks": ARRAY(INTEGER),
     "obis_nodes": ARRAY(TEXT),
+    # Per-variable metadata: lists of dicts, stored as jsonb.
+    "table_variables": JSONB,
     # Griddap metadata: lists of dicts, stored as jsonb.
     "grid_variables": JSONB,
     "grid_dimensions": JSONB,
@@ -184,6 +186,7 @@ class DatasetSchema(pa.DataFrameModel):
     coverage_time_max: Series[pa.DateTime] = pa.Field(nullable=True)
     coverage_depth_min: Series[float] = pa.Field(nullable=True)
     coverage_depth_max: Series[float] = pa.Field(nullable=True)
+    table_variables: Series[object] = pa.Field(nullable=True)  # list of dicts -> jsonb
     grid_variables: Series[object] = pa.Field(nullable=True)  # list of dicts -> jsonb
     grid_dimensions: Series[object] = pa.Field(nullable=True)  # list of dicts -> jsonb
     wms_url: Series[str] = pa.Field(nullable=True)
