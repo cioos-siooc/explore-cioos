@@ -1,178 +1,62 @@
 /* ------------------------------------------------------------------
- * Time bar — the bottom-edge control carrying both of the app's time
- * inputs on one warped axis: the time-range filter (teal) and the
- * trajectory scrub date with its trailing window (purple, only while the
- * track layers draw). The bar itself is only mounted while one of the two
- * is live — an active time filter, or trajectories on the map. The slider
- * inside it is TimeRail, shared with the Time entry in the Filters panel;
- * this stylesheet is only the chrome that floats it over the map.
+ * Time bar — the bottom-edge control carrying the time-range filter,
+ * and only that. It is mounted while the filter is narrowing something
+ * and gone otherwise, so the strip of map it costs is only spent when
+ * there is a range to see. The slider inside it is TimeRail, shared with
+ * the Time entry in the Filters panel; this stylesheet is the chrome
+ * that floats it over the map.
  *
- * It is the one piece of chrome that spans the map, so it is built to
- * cost as little of it as it can. Rather than one tall card, it is two
- * floating pieces stacked with a gap between them: the two input pills
- * on top, the slider card beneath, and map showing through the gap and
- * between the pills. The wrapper itself paints nothing and is
- * click-through — only the two pieces take the pointer.
+ * One card, not the two floating pieces it used to be: with the
+ * trajectory date and the gridded slice moved onto the cards that
+ * describe those layers (see TrajectoryDate and GridTimeSlice), there is
+ * one control left here and it should look like one thing. The fields
+ * run along the top of it, the rail underneath.
  * ------------------------------------------------------------------ */
 .timeBar {
   position: fixed;
   left: 0;
   right: 0;
-  /* Flush to the bottom edge — no strip of map left stranded under it. The
-     collapsed datasets sheet used to own that edge; it now rests its drag strip
-     on top of the bar instead (see .sidebarDatasets in the Sidebar stylesheet,
-     which offsets by the bar's measured footprint). */
-  bottom: 0;
+  bottom: 12px;
   z-index: var(--cioos-z-shell, 30);
-  display: flex;
-  flex-direction: column;
-  /* The map shows through here. */
-  gap: 10px;
+  /* Centred by the auto margins rather than by a transform, which is spoken
+     for: the card carries the same perspective/shadow pair as the datasets
+     card and the brand bar (see theme.css). */
+  width: min(760px, calc(100vw - 24px));
+  margin: 0 auto;
+  padding: 4px 6px 6px;
+  border: 1px solid var(--cioos-hairline);
+  /* Same corner as the brand card at the top of the map, so the two floating
+     surfaces read as one family. */
+  border-radius: var(--cioos-radius-lg);
+  background-color: var(--cioos-white);
   font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink);
-  pointer-events: none;
+  transform: var(--cioos-perspective);
+  box-shadow: var(--cioos-shadow-3d, var(--cioos-shadow-float));
 }
 
-.timeBar > * {
-  pointer-events: auto;
+/* The fields, on one row inside the card. Inset to the rail's own padding so
+   the label starts over the head of the track rather than over the card's
+   edge, and the reset button lands over its far end. */
+.timeBarFields {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 16px;
+}
+
+.timeBarFields .railFieldLabel {
+  color: var(--cioos-primary-700);
+}
+
+/* The interval picker takes what the row has left, so the reset button keeps
+   the far edge whatever the locale calls the presets. */
+.timeBarFields .railPresetSelect {
+  margin-left: auto;
 }
 
 /* MapLibre's bottom-right stack — now the draw tools alone, the scale bar and
    the attribution ⓘ having moved into the legend card — stands in a corner the
-   centered bar reaches into on narrower screens: below ~1400px the bar's right
-   edge passes the corner, and narrower still it spans the full width. Lift the
-   whole corner by the bar's measured footprint so nothing hides under it. */
-@media (max-width: 1400px) {
-  .maplibregl-ctrl-bottom-right {
-    margin-bottom: var(--cioos-time-bar-space, 0px);
-  }
-}
-
-/* ------------------------------------------------------------------
- * The inputs, on one row above the slider. One pill to each edge, so
- * neither reads as belonging to the other; they stack only when the
- * screen is too narrow to hold both side by side. The row itself is a
- * transparent rail — the map runs behind and between the pills.
- * ------------------------------------------------------------------ */
-.timeBarFields {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 12px;
-  padding: 0 12px;
-  background: transparent;
-  pointer-events: none;
-}
-
-/* Each pill is its own floating surface (its fill and border come from the
-   shared .railField rules), opaque so the map behind cannot muddle the
-   dates. */
-.timeBarFields .railField {
-  box-shadow: var(--cioos-shadow-3d-sm, var(--cioos-shadow-float));
-  pointer-events: auto;
-}
-
-/* ------------------------------------------------------------------
- * The slider's own card: on phones the bottom edge, square and full
- * bleed; wide enough to bubble, a centered floating card.
- * ------------------------------------------------------------------ */
-.timeBarSlider {
-  padding: 6px 0;
-  background-color: var(--cioos-white);
-  border-top: 1px solid var(--cioos-hairline);
-  box-shadow: var(--cioos-shadow-float);
-}
-
-/* The gridded dataset's own axis, stacked above the shared one inside the
-   same card. Enough of a gap to read as a second rail rather than a second
-   row of the first. */
-.timeBarGridRail {
-  margin-bottom: 6px;
-}
-
-/* Where the drawn slice sits among the dataset's — the reading its date can't
-   give, and the one that says whether there is a slice either side of it. */
-.timeBarGridCount {
-  flex-shrink: 0;
-  font-size: var(--cioos-font-size-xs);
-  font-variant-numeric: tabular-nums;
-  color: var(--cioos-grid-700);
-  white-space: nowrap;
-}
-
-/* ------------------------------------------------------------------
- * Compact (phones): the slider card is gone and the pill row is the whole
- * bar — see TimeBar.jsx, which drops the rails and the range pill and
- * keeps the trajectory scrub date and the gridded dataset's slice, those
- * two controls existing nowhere else. What is left has to hold the bottom
- * edge on its own, so it carries the inset the card used to.
- * ------------------------------------------------------------------ */
-.timeBarCompact .timeBarFields {
-  /* Centred rather than pushed to the edges: with one or two pills left,
-     space-between strands them in opposite corners of the screen. `safe`
-     is load-bearing — plain `center` centres an overflow too, so a pill wider
-     than the phone would hang off BOTH edges with its left end unreachable.
-     `safe` falls back to flex-start the moment anything overflows. */
-  justify-content: safe center;
-  gap: 6px;
-  padding: 0 8px 6px;
-  /* Clear of the home indicator on a notched phone. */
-  padding-bottom: max(6px, env(safe-area-inset-bottom));
-}
-
-/* The written label goes. It is the widest thing in either pill — "Date des
-   trajectoires" is ~147px against a ~110px date field, "Temps de la grille"
-   ~126px — and it was what pushed the pill past the width of a phone and so
-   into wrapping onto a second line, which is height spent at the bottom of the
-   map to name a control the colour already names. Each pill carries the key
-   colour of the thing it moves (--cioos-track for the trajectory scrub,
-   --cioos-grid for the gridded slice; see theme.css), the same colour that
-   marks it on the map and in the legend. The name is kept for screen readers
-   on the group and on the field itself, so only the pixels are dropped. */
-.timeBarCompact .railFieldLabel {
-  display: none;
-}
-
-/* Without the labels both pills fit a phone on one line, which is the whole
-   point of dropping them: the bar costs one row of controls and its inset.
-   The wrapping below is what happens if a translation or a browser's date
-   chrome is wider than reckoned — the pill grows downward rather than running
-   off the screen — and not what normally happens. */
-.timeBarCompact .railField {
-  gap: 6px;
-  padding: 5px 10px;
-  flex-shrink: 1;
-  flex-wrap: wrap;
-  justify-content: center;
-  max-width: 100%;
-}
-
-/* The date input and the trailing-window menu carry intrinsic widths of their
-   own (a date input is sized by its own picker chrome), so they need leave to
-   shrink before the pill can honour its max-width. */
-.timeBarCompact .railField > * {
-  min-width: 0;
-}
-
-@media (min-width: 701px) {
-  .timeBarSlider {
-    width: min(1080px, calc(100vw - 24px));
-    margin: 0 auto 12px;
-    padding: 8px 4px;
-    border: 1px solid var(--cioos-hairline);
-    /* Same corner as the brand card at the top of the map, so the two floating
-       surfaces read as one family. */
-    border-radius: var(--cioos-radius-lg);
-    /* Same raised, physical read as the datasets card. */
-    transform: var(--cioos-perspective);
-    box-shadow: var(--cioos-shadow-3d, var(--cioos-shadow-float));
-  }
-
-  /* The pills line up with the ends of the card below them. */
-  .timeBarFields {
-    width: min(1080px, calc(100vw - 24px));
-    margin: 0 auto;
-    padding: 0;
-  }
-}
+   centered bar reaches into on narrower screens, and which the griddap card
+   now holds outright. The clearance for both is written once, in the WmsLegend
+   stylesheet, so the two can never disagree about which of them wins. */

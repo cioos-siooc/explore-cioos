@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { ChevronUp, Grid3x3Gap, X } from 'react-bootstrap-icons'
 import classNames from 'classnames'
 import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
@@ -6,23 +6,35 @@ import { useTranslation } from 'react-i18next'
 
 import { abbreviateString, useDebounce } from '../../../utilities'
 import { buildGriddapLegendUrl } from '../../../wmsUtilities'
-import useMediaQuery from '../../../state/ui/useMediaQuery.js'
+import { GridTimeSlice, GridDepthSlice } from '../GridSlice/GridSlice.jsx'
+import usePublishedFootprint from '../../../state/ui/usePublishedFootprint.js'
+import useMediaQuery, { MOBILE_QUERY } from '../../../state/ui/useMediaQuery.js'
 import './styles.css'
 
-// Below this width the centered top bar reaches over the map's top-left corner,
-// and it draws a layer above this card. The card doesn't move out of the way —
-// being moved by its neighbours is what it is pinned to avoid — so here it
-// stands down to a button instead, and opens over the bar when asked.
+// How far up the bottom-right corner this card reaches, plus a gap — the same
+// measurement whether it is the card or the button it folds into. MapLibre's
+// own controls sit in that corner and step up over whichever is there; the
+// property is cleared when the overlay goes away, and the controls drop back.
+const CORNER_STACK_GAP = 8
+function measureWmsLegendSpace ({ top }) {
+  return window.innerHeight - top + CORNER_STACK_GAP
+}
+
+// Below this width the card is a large fraction of the map it is drawn over,
+// so it stands down to a button and opens only when asked.
 //
-// The number is where the bar's left edge crosses this card's right one:
-// half of (viewport - bar width) against the card's 12px inset + 376px, with
-// the bar around 420px wide before filter chips widen it.
-const COMPACT_QUERY = '(max-width: 1200px)'
+// It used to be the top bar's doing: the card held the top-left corner, the
+// centered bar reached over it below about 1200px, and standing down was how
+// the card got out of the way without being pushed around. The card holds the
+// bottom-right corner now, which nothing else reaches, so what is left is the
+// plain question of how much of a small screen a colorbar should take — which
+// is the app's own phone breakpoint, and not a number of this card's own.
+const COMPACT_QUERY = MOBILE_QUERY
 
 // Card shown while a griddap WMS overlay is active: the colorbar, the variable
 // picker over it, and the overlay's always-available off switch. It renders
 // either inside the dataset page (`inline`) or, when that page isn't open,
-// pinned over the top-left corner of the map (`floating`).
+// pinned to the bottom-right corner of the map (`floating`).
 //
 // The card carries no caption of its own. ERDDAP draws one into the legend
 // image — the variable and its units, the dataset title, and the slice being
@@ -30,12 +42,13 @@ const COMPACT_QUERY = '(max-width: 1200px)'
 // second typeface. The image is the title, and it links where the title used
 // to: the dataset's page on ERDDAP.
 //
-// Which slice of the grid is drawn is not set here either. Time and depth are
-// axes the app already has controls for — the bars along the edges of the map —
-// and the grid's own rails ride those, beside the filters they should be read
-// against; a pair of index-numbered range inputs on this card could say neither
-// where the slice sat in the record nor how it related to anything else on
-// screen.
+// Which slice of the grid is drawn — in time and in depth — is set here, under
+// the image (see GridSlice). Both used to be on the bars along the edges of the
+// map, beside the filters for the same axes, the reasoning being that a date
+// belongs with the other dates. But the caption they change is the one drawn
+// into this image, and a control a screen away from its own reading is a
+// control that has to be hunted for. The bars are the filters now, and this
+// card is the overlay.
 export default function WmsLegend({
   overlay,
   onClose,
@@ -45,10 +58,19 @@ export default function WmsLegend({
   const { t } = useTranslation()
   const [legendFailed, setLegendFailed] = useState(false)
 
-  // Only the floating card can be covered by the top bar; the inline one is
-  // inside the dataset page and always has its own room.
+  // Only the floating card is drawn over the map; the inline one is inside the
+  // dataset page and always has its own room.
   const isCompact = useMediaQuery(COMPACT_QUERY) && variant === 'floating'
   const [compactOpen, setCompactOpen] = useState(false)
+
+  // Attached to whichever of the two the floating variant is showing, and to
+  // neither when this card is inline — nothing in the map's corner then.
+  const cornerRef = useRef(null)
+  usePublishedFootprint(
+    cornerRef,
+    '--cioos-wms-legend-space',
+    measureWmsLegendSpace
+  )
 
   const variables = overlay.variables || []
 
@@ -90,6 +112,7 @@ export default function WmsLegend({
       <button
         type='button'
         className='wmsLegendPeek'
+        ref={cornerRef}
         onClick={() => setCompactOpen(true)}
         title={t('wmsLegendShowTitle')}
       >
@@ -106,6 +129,7 @@ export default function WmsLegend({
   return (
     <div
       className={classNames('wmsLegend', variant, { compactOpen: isCompact })}
+      ref={variant === 'floating' ? cornerRef : undefined}
     >
       {/* One row above the image, holding the two controls: what is drawn, and
           the way out. It sits above rather than over the image because the top
@@ -197,6 +221,17 @@ export default function WmsLegend({
           </div>
         </div>
       )}
+      {/* Under the image, because they change what the image says: the caption
+          ERDDAP draws into the colorbar names the slice being shown. */}
+      <GridTimeSlice
+        overlay={overlay}
+        onChange={(time) => setActiveWmsOverlay({ ...overlay, time })}
+      />
+      <GridDepthSlice
+        overlay={overlay}
+        onChange={(elevation) =>
+          setActiveWmsOverlay({ ...overlay, elevation })}
+      />
     </div>
   )
 }

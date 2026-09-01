@@ -1,8 +1,8 @@
 /* ------------------------------------------------------------------
- * Depth bar — the strip down the right edge of the map carrying both of
- * the app's depth controls on one axis: the depth-range filter (teal)
- * and, while a gridded dataset with a vertical axis is drawn, the level
- * of that grid the map is painting (amber).
+ * Depth bar — the strip down the right edge of the map carrying the
+ * depth-range filter, and only that. The gridded dataset's own level
+ * used to share the axis; it is on the griddap card now, beside the
+ * colorbar it changes (see GridSlice).
  *
  * It runs down rather than across, with 0 m at the top: a water column
  * laid on its side is one the reader has to turn upright again every
@@ -73,25 +73,6 @@
   border-color: var(--cioos-primary);
 }
 
-.depthBarTagGrid {
-  background-color: var(--cioos-grid-surface);
-  border-color: var(--cioos-grid);
-}
-
-.depthBarTagGrid .railValueInput {
-  color: var(--cioos-grid-700);
-}
-
-.depthBarTagGrid .railValueInput:focus-visible {
-  border-color: var(--cioos-grid);
-  box-shadow: 0 0 0 3px rgb(251 176 59 / 55%);
-}
-
-.depthBarUnits {
-  color: var(--cioos-ink-60);
-  font-size: var(--cioos-font-size-xs);
-}
-
 /* Names the strip and, in the same breath, the unit its figures and its tick
    labels are all in — which is what lets both of those be bare numbers. */
 .depthBarLabel {
@@ -107,13 +88,3 @@
   flex-shrink: 0;
 }
 
-/* Phones: the strip would eat a quarter of the width, so it sits tighter
-   against the edge and gives up some height. It only mounts here for a gridded
-   dataset whose levels can be stepped through — the depth filter itself is set
-   from the Filters panel on mobile (see DepthBar.jsx). */
-@media (max-width: 700px) {
-  .depthBar {
-    right: 6px;
-    height: min(320px, 46vh);
-  }
-}

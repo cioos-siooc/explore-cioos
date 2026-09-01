@@ -120,9 +120,19 @@
      it is mounted and clears it on unmount, so anything sitting over the lower
      half of the map — the datasets sidebar, the zoom-to-dataset pill — can hold
      clearance from it without hard-coding its height. 0 when the bar isn't
-     shown. (The depth bar runs down the right edge instead and is measured by
-     nothing: it sits clear of the other floating surfaces.) */
+     shown.
+
+     Its twin down the right edge: how far the depth strip reaches down from
+     the top of the viewport (its foot, plus a gap). 0 when the strip isn't
+     shown.
+
+     And how far the griddap card reaches up from the bottom-right corner,
+     which MapLibre's own controls in that corner step above. The card holds
+     itself off the two bars, so this already includes their clearance; it is 0
+     while no gridded dataset is drawn. */
   --cioos-time-bar-space: 0px;
+  --cioos-depth-bar-space: 0px;
+  --cioos-wms-legend-space: 0px;
 
   /* --- Header & Layout (Modern Sidebar) --- */
   --cioos-header-height: 70px;

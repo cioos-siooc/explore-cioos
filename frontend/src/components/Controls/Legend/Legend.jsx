@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowsAngleExpand,
@@ -20,20 +20,18 @@ import {
   bathymetryLegendMinZoom,
   bathymetryScaleMin,
   bathymetryScaleMax,
-  bathymetryTicks,
-  TRAIL_ALL,
-  effectiveTrailingDays
+  bathymetryTicks
 } from '../../config.js'
 import platformColors from '../../platformColors'
 import {
   DEFAULT_DATA_LAYERS,
   anyTrajectoryLayerOn
 } from '../../../state/dataLayers.js'
+import TrajectoryDate from '../TrajectoryDate/TrajectoryDate.jsx'
 import Modal from '../../ui/Modal.jsx'
 import Spinner from '../../ui/Spinner.jsx'
 import Switch from '../../ui/Switch.jsx'
 import LegendFooter from './LegendFooter.jsx'
-import usePublishedFootprint from '../../../state/ui/usePublishedFootprint.js'
 import useMediaQuery, { MOBILE_QUERY } from '../../../state/ui/useMediaQuery.js'
 
 import './styles.css'
@@ -85,24 +83,6 @@ function depthPosition(metres) {
 // an average hexagon looks like on the map. Picking an end of the ramp would have
 // made the icon claim a count.
 const HEX_ICON_COLOR = colorScale[Math.floor(colorScale.length / 2)]
-
-// Where a surface stacking with this card starts, published as a pair because
-// this card changes corners: top-right on a wide screen, bottom-left under
-// 900px (see the stylesheet). Whichever corner it holds, the surface stacking
-// with it goes on the far side — under the card's foot when it is anchored to
-// the top, over its head when it is anchored to the bottom — so the two
-// measurements are `top:` and `bottom:` values respectively.
-//
-// It collapses to its header row and grows with what is on the map, so its
-// height has to be told rather than assumed. The griddap legend's button is the
-// one thing reading these today (see the WmsLegend stylesheet).
-const LEGEND_STACK_GAP = 8
-function measureLegendBelowSpace (rect) {
-  return rect.bottom + LEGEND_STACK_GAP
-}
-function measureLegendAboveSpace (rect) {
-  return window.innerHeight - rect.top + LEGEND_STACK_GAP
-}
 
 // Choose which stop indices get a tick label. Keeps every stop when there are
 // few, otherwise thins to an evenly spaced subset (always including the first
@@ -156,11 +136,7 @@ export default function Legend({
   // their entry without a switch.
   controls = {},
   layerControls = [],
-  trailingDays,
-  dataLayers,
-  // The date the time bar's scrub handle is on, named in the trajectory keys —
-  // the track lines and the heading arrows are drawn relative to it.
-  scrubTime
+  dataLayers
 }) {
   const { t } = useTranslation()
   // The card's collapse, and the only thing that hides any of this: open, it
@@ -173,17 +149,6 @@ export default function Legend({
   // That is the right trade for a legend: it is read in glances, not kept open.
   const compact = useMediaQuery(MOBILE_QUERY)
   const [detailOpen, setDetailOpen] = useState(false)
-  const cardRef = useRef(null)
-  usePublishedFootprint(
-    cardRef,
-    '--cioos-legend-below-space',
-    measureLegendBelowSpace
-  )
-  usePublishedFootprint(
-    cardRef,
-    '--cioos-legend-above-space',
-    measureLegendAboveSpace
-  )
 
   // Fall back to the default selection when the prop is absent (older callers /
   // initial render) — all-on would claim legend entries the map isn't drawing.
@@ -541,67 +506,21 @@ export default function Legend({
     )
   }
 
-  // The track-line swatches: the line and the heading arrowhead. They are one
-  // drawing, named and switched by their group label — the switch was on the
-  // line's own row once, where it looked like it hid only the line.
+  // The trajectory group's body: the track line and the heading arrowhead,
+  // each carrying the control that sets what it draws — the trailing window on
+  // the line, the date on the arrowhead, and the rail that scrubs it under
+  // both. Drawn by TrajectoryDate, which owns the keys as well as the controls:
+  // they are the same two rows, and a key whose value is set somewhere else is
+  // how the date came to be a floating pill over the bottom of the map.
   //
   // The group appears while at least one trajectory geometry is in the filter
   // selection; the trajectory cells themselves are keyed by the hex ramp in the
   // observations group, like every other geometry's.
-  //
-  // The window shown is the one actually loaded, not the one requested: zoomed
-  // out, the long trails are clamped (see effectiveTrailingDays), and a key that
-  // still claimed "All time" there would be wrong.
   function renderTrackKeys() {
     if (!trajectoryOn) return null
-    const loadedTrail = effectiveTrailingDays(trailingDays, zoom)
-    const zoomClamped = loadedTrail !== trailingDays
-    const trailLabel =
-      loadedTrail === TRAIL_ALL ? t('timeBarTrailAll') : `${loadedTrail}d`
     return (
       <div className={classNames('legendItems', { legendDimmed: !tracksMode })}>
-        <div
-          className='legendItem'
-          title={zoomClamped ? t('legendTrackTrailZoomGated') : undefined}
-        >
-          <svg className='legendSwatch' width='12' height='12'>
-            <line
-              x1='1'
-              y1='10.5'
-              x2='11'
-              y2='1.5'
-              stroke='#6749AC'
-              strokeWidth='2.5'
-              strokeLinecap='round'
-            />
-          </svg>
-          <span className='legendItemLabel'>
-            {`${t('legendTrackLine')} (${trailLabel}${zoomClamped ? '*' : ''})`}
-          </span>
-        </div>
-        <div className='legendItem'>
-          {/* same arrowhead the map draws, pointing along the course */}
-          <svg
-            className='legendSwatch'
-            width='12'
-            height='12'
-            viewBox='0 0 16 16'
-          >
-            <path
-              d='M8 1.5 L13.5 13.5 L8 10.5 L2.5 13.5 Z'
-              fill='#6749AC'
-              stroke='#ffffff'
-              strokeWidth='1.5'
-              strokeLinejoin='round'
-              transform='rotate(45 8 8)'
-            />
-          </svg>
-          <span className='legendItemLabel'>
-            {scrubTime
-              ? t('legendTrackHeadAt', { date: scrubTime })
-              : t('legendTrackHead')}
-          </span>
-        </div>
+        <TrajectoryDate />
       </div>
     )
   }
@@ -702,7 +621,7 @@ export default function Legend({
   // credits stay exactly one tap away, mounted once — LegendFooter adopts
   // MapLibre's own controls, so a second copy would fight this one for them.
   return (
-    <div className={classNames('legend', { legendCompact: compact })} ref={cardRef}>
+    <div className={classNames('legend', { legendCompact: compact })}>
       <button
         className='legendHeader'
         onClick={() =>

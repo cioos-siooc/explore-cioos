@@ -1,10 +1,12 @@
 /* ------------------------------------------------------------------
  * The range slider, wherever it appears — the time bar along the bottom
- * of the map, the Time entry in the Filters panel, and the Depth entry
- * under it. Only the chrome around it differs between the three; the
- * track, its handles and its tick labels are the same control and are
- * styled once, here. What is peculiar to one rail (the time bar's purple
- * scrub marker and its trail band) is styled beside that rail instead.
+ * of the map, the Time and Depth entries in the Filters panel, the depth
+ * strip down the right edge, and the two rails that ride on cards: the
+ * trajectory date in the map legend and the gridded dataset's time slice
+ * on the griddap card. Only the chrome around it differs; the track, its
+ * handles and its tick labels are the same control and are styled once,
+ * here. What is peculiar to one rail (the purple scrub marker and its
+ * trail band) is styled beside that rail instead.
  *
  * The track and the tick row are both full-width children of a box inset
  * far enough that a handle parked at either end, and the label centered
@@ -191,12 +193,12 @@
 
 /* ------------------------------------------------------------------
  * Markers: a mark that says where something *is* rather than what is
- * filtered — the trajectory scrub date, and the slice of a gridded
- * dataset currently drawn. A narrow upright bar rather than another
- * circle, because it can sit anywhere among the range handles —
- * including exactly on one — so it has to read as a different kind of
- * thing and stay grabbable on top of them. The colour is the mark's
- * own; the shape is shared.
+ * filtered — the trajectory date, and the time slice of the gridded
+ * dataset being drawn. A narrow upright bar rather than another circle,
+ * because on the rail it shares with the filter range it can sit
+ * anywhere among those handles — including exactly on one — so it has to
+ * read as a different kind of thing and stay grabbable on top of them.
+ * The colour is the mark's own; the shape is shared.
  * ------------------------------------------------------------------ */
 .rail .railHandleMarker {
   width: 6px;
@@ -205,13 +207,6 @@
   border-radius: var(--cioos-radius-pill);
   box-shadow: var(--cioos-shadow-sm);
   z-index: 2;
-}
-
-/* Turned with the rail: a bar across the track, not along it. */
-.railVertical .railHandleMarker {
-  width: 18px;
-  height: 6px;
-  margin: -3px 0 0 -9px;
 }
 
 .rail .railHandleGrid {
@@ -227,15 +222,16 @@
 }
 
 /* ------------------------------------------------------------------
- * The quiet fields that go with a rail, and the named, tinted pills
- * they sit in — one pill per mark, in that mark's colour, so the label
- * says which control it is and the colour says which mark on the rail
- * it moves. Plain text until pointed at, so a row of them over the map
- * doesn't read as a form.
+ * The quiet fields that go with a rail: plain text until pointed at, so
+ * a row of them on a card over the map doesn't read as a form. Each host
+ * tints its own in the colour of the mark that field moves — teal for the
+ * filter range, purple for the trajectory date, amber for the gridded
+ * slice — which is the whole of the colour key now that the fields sit
+ * inside the cards that name them.
  *
- * Shared by the time bar and the depth bar; the Filters panel boxes the
- * same fields back up into a proper form instead (see the Filter
- * stylesheet).
+ * Shared by the time bar, the depth bar and the two rails on cards; the
+ * Filters panel boxes the same fields back up into a proper form instead
+ * (see the Filter stylesheet).
  * ------------------------------------------------------------------ */
 .railValueInput {
   user-select: text;
@@ -261,60 +257,6 @@
   box-shadow: var(--cioos-focus);
 }
 
-.railField {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-  min-width: 0;
-  padding: 2px 10px;
-  border: 1px solid transparent;
-  border-radius: var(--cioos-radius-pill);
-}
-
-/* The colour key. An even hairline all the way round — a one-sided rule on a
-   pill radius reads as two heavy arcs at the ends rather than as an
-   underline. */
-.railFieldRange {
-  background-color: var(--cioos-surface-2);
-  border-color: var(--cioos-primary);
-}
-
-.railFieldScrub {
-  /* The opaque sibling of --cioos-track-bg: that one is a wash meant to let
-     what is behind it show through, which over the map would let the map
-     through too. */
-  background-color: var(--cioos-track-surface);
-  border-color: var(--cioos-track);
-  /* Wider than the shared 4px: this is the densest of the pills — a label, a
-     date and a trailing-window menu, none of which draws an edge of its own —
-     and at the shared gap its three parts ran together as one block of text. */
-  gap: 8px;
-}
-
-.railFieldScrub .railValueInput {
-  color: var(--cioos-track-700);
-}
-
-.railFieldScrub .railValueInput:focus-visible {
-  border-color: var(--cioos-track);
-  box-shadow: 0 0 0 3px rgb(103 73 172 / 45%);
-}
-
-.railFieldGrid {
-  background-color: var(--cioos-grid-surface);
-  border-color: var(--cioos-grid);
-}
-
-.railFieldGrid .railValueInput {
-  color: var(--cioos-grid-700);
-}
-
-.railFieldGrid .railValueInput:focus-visible {
-  border-color: var(--cioos-grid);
-  box-shadow: 0 0 0 3px rgb(251 176 59 / 55%);
-}
-
 /* Plain body type, just weighted — the tint and the colour do the work that a
    caps/tracking treatment would, and at this size they do it better. */
 .railFieldLabel {
@@ -324,17 +266,6 @@
   white-space: nowrap;
 }
 
-.railFieldRange .railFieldLabel {
-  color: var(--cioos-primary-700);
-}
-
-.railFieldScrub .railFieldLabel {
-  color: var(--cioos-track-700);
-}
-
-.railFieldGrid .railFieldLabel {
-  color: var(--cioos-grid-700);
-}
 
 .railFieldSep,
 .railFieldUnits {
@@ -358,12 +289,17 @@
   background-color: var(--cioos-white);
 }
 
-/* One mark, one step, for a field whose value walks a grid rather than a
-   calendar: the slices of a gridded dataset are routinely thinner than a pixel
-   of any rail, and these are the only way to land on the one next door.
-   Written with every box property it needs — the pill also renders inside the
-   datasets sidebar, which styles its own buttons. */
-.railField .railStep {
+/* One mark, one step, for a value that walks a grid rather than a calendar:
+   the slices of a gridded dataset are routinely thinner than a pixel of any
+   rail, and these are the only way to land on the one next door. The same
+   button steps the trajectory date a day at a time.
+
+   Neutral here and tinted by whoever hosts it, in the colour of the mark it
+   moves. Written with every box property it needs rather than leaning on the
+   base button styles: it renders inside two cards that are themselves dropped
+   into other surfaces (the legend, and the griddap card inside the dataset
+   page), and a host that pills its own buttons must not reshape these. */
+.railStep {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -376,16 +312,20 @@
   border-radius: var(--cioos-radius-pill);
   background: transparent;
   background-image: none;
-  color: var(--cioos-grid-700);
+  color: var(--cioos-ink-60);
   cursor: pointer;
 }
 
-.railField .railStep:hover:not(:disabled) {
-  background-color: var(--cioos-grid);
-  color: var(--cioos-white);
+.railStep:hover:not(:disabled) {
+  background-color: var(--cioos-surface-2);
 }
 
-.railField .railStep:disabled {
+.railStep:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.railStep:disabled {
   opacity: 0.35;
   cursor: default;
 }

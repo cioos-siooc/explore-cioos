@@ -49,8 +49,6 @@ export default function AppShell () {
     setActiveWmsOverlay,
     tracksMode,
     toggleTrackLines,
-    trailingDays,
-    scrubTime,
     dataLayers
   } = useMapState()
   const { startDate, endDate, timeFilterActive } = useFilters()
@@ -158,18 +156,19 @@ export default function AppShell () {
         platformsAvailable={platformsAvailable}
         controls={legendControls}
         layerControls={layerControls}
-        trailingDays={trailingDays}
         dataLayers={dataLayers}
         startDate={startDate}
         endDate={endDate}
         timeFilterActive={timeFilterActive}
-        scrubTime={scrubTime}
       />
-      {/* The two range bars over the map, each carrying the filter for its
-          axis and the marks that say where the drawn data sits on it: time
-          along the bottom edge, depth down the right one, perpendicular the
-          way the axes are. Each comes and goes with whether it has anything to
-          say. Both read their own state from the filter and map providers. */}
+      {/* The two range bars over the map: the time filter along the bottom
+          edge, the depth filter down the right one, perpendicular the way the
+          axes are. Each comes and goes with whether its filter is narrowing
+          anything, and both read their own state from the filter and map
+          providers. The marks that say where the *drawn* data sits — the
+          trajectory date, the gridded dataset's time slice — are on the cards
+          that describe those layers now (the legend, and the griddap card
+          below). */}
       <TimeBar />
       <DepthBar />
       {activeWmsOverlay && !wmsLegendIsInline && (

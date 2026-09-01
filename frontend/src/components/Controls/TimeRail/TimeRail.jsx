@@ -20,12 +20,12 @@ import './styles.css'
 // the same colours in both places, so moving one is recognisably the same act
 // as moving the other.
 //
-// It draws a range (two teal handles bounding the time filter) and, optionally,
-// the marks that say where something *is* rather than what is filtered: the
+// It draws a range (two teal handles bounding the time filter) and/or the
 // scrub marker (purple, the trajectory date) with its trailing window shaded
-// behind it, and the stretch of time covered by the gridded dataset on the map
-// (amber). The track, the handles and the tick row are the shared Rail, which
-// knows nothing about dates; this file is what makes that rail a calendar.
+// behind it. Either may be left out: the bottom bar is the range alone, the
+// legend's trajectory group the marker alone. The track, the handles and the
+// tick row are the shared Rail, which knows nothing about dates; this file is
+// what makes that rail a calendar.
 
 // Keyboard step per key, in days. Arrows walk a day at a time for the exact
 // date; the coarser steps are what make a decades-wide domain navigable
@@ -196,10 +196,7 @@ export function useTimeAxis ({
   timeExtent,
   timeFilterActive,
   startDate,
-  endDate,
-  // Whether the axis has to reach "today" whatever the data says — it does
-  // while the trajectory scrub is on it, since the scrub runs to now.
-  includeToday = false
+  endDate
 }) {
   const maxIso = todayIso()
   const dataStart = clampIso(
@@ -214,11 +211,7 @@ export function useTimeAxis ({
   )
   const domainStart =
     timeFilterActive && startDate < dataStart ? startDate : dataStart
-  const domainEnd = [
-    dataEnd,
-    timeFilterActive ? endDate : '',
-    includeToday ? maxIso : ''
-  ]
+  const domainEnd = [dataEnd, timeFilterActive ? endDate : '']
     .filter(Boolean)
     .reduce((latest, date) => (date > latest ? date : latest))
 
@@ -231,17 +224,13 @@ export function useTimeAxis ({
 
 export default function TimeRail ({
   axis,
+  // The filter range, as two handles and the fill between them. Both dates or
+  // neither — a rail carrying only the scrub passes neither.
   startDate,
   endDate,
-  // { value, trailStartMs } while the trajectory scrub shares this rail;
-  // absent everywhere else.
+  // { value, trailStartMs } on the rail that carries the trajectory date;
+  // absent on the one that carries the filter.
   scrub,
-  // { fromMs, toMs } while a gridded dataset is drawn on the map: the stretch
-  // of time that dataset covers, shaded on the axis so it can be read against
-  // the filtered range. Not a handle — which slice of it is drawn is set on
-  // the dataset's own rail (GridTimeRail), where its span has the whole width
-  // instead of the sliver of this axis it usually occupies.
-  gridSpan,
   onCommit,
   className
 }) {
@@ -261,28 +250,34 @@ export default function TimeRail ({
     [axis]
   )
 
+  const range = Boolean(startDate && endDate)
+
   const handles = [
-    {
-      key: 'start',
-      value: isoToMs(startDate),
-      valueText: startDate,
-      label: t('timeBarRangeStartHandle'),
-      className: 'railHandleRange'
-    },
-    {
-      key: 'end',
-      value: isoToMs(endDate),
-      valueText: endDate,
-      label: t('timeBarRangeEndHandle'),
-      className: 'railHandleRange'
-    },
+    ...(range
+      ? [
+        {
+          key: 'start',
+          value: isoToMs(startDate),
+          valueText: startDate,
+          label: t('timeBarRangeStartHandle'),
+          className: 'railHandleRange'
+        },
+        {
+          key: 'end',
+          value: isoToMs(endDate),
+          valueText: endDate,
+          label: t('timeBarRangeEndHandle'),
+          className: 'railHandleRange'
+        }
+      ]
+      : []),
     ...(scrub
       ? [
         {
           key: 'scrub',
           value: isoToMs(scrub.value),
           valueText: scrub.value,
-          label: t('timeBarScrubLabel'),
+          label: t('trajectoryDateLabel'),
           className: 'railHandleMarker timeRailHandleScrub'
         }
       ]
@@ -290,25 +285,16 @@ export default function TimeRail ({
   ]
 
   const bands = [
-    // First, so the teal fill and the trail wash draw over it rather than
-    // under: it is the backdrop the two live readings are set against.
-    ...(gridSpan
+    ...(range
       ? [
         {
-          key: 'gridSpan',
-          from: gridSpan.fromMs,
-          to: gridSpan.toMs,
-          className: 'timeRailGridBand',
-          title: t('timeBarGridSpanTitle')
+          key: 'range',
+          from: isoToMs(startDate),
+          to: isoToMs(endDate),
+          className: 'railFill'
         }
       ]
       : []),
-    {
-      key: 'range',
-      from: isoToMs(startDate),
-      to: isoToMs(endDate),
-      className: 'railFill'
-    },
     ...(scrub
       ? [
         {
@@ -316,7 +302,7 @@ export default function TimeRail ({
           from: scrub.trailStartMs,
           to: isoToMs(scrub.value),
           className: 'timeRailTrailBand',
-          title: t('timeBarTrailBandTitle')
+          title: t('trajectoryTrailBandTitle')
         }
       ]
       : [])
