@@ -30,7 +30,6 @@ import reportError from '../reportError.js'
 import { useUrlSeededPersistentState } from '../usePersistentState.js'
 import { useFilters } from '../filters/FilterProvider.jsx'
 import {
-  ALL_DATA_LAYERS,
   DATA_LAYER_KEYS,
   DEFAULT_DATA_LAYERS,
   DEFAULT_TRACKS_MODE,
@@ -278,13 +277,6 @@ export default function MapStateProvider ({ children }) {
     setDataLayers({ ...DEFAULT_DATA_LAYERS })
   }
 
-  // Every geometry on. Identical to the reset now that all-on IS the default,
-  // and kept separate only so the filter's Select All button reads the way the
-  // other filters' do.
-  function showAllDataLayers () {
-    setDataLayers({ ...ALL_DATA_LAYERS })
-  }
-
   const { zoom } = mapView
 
   // A failed legend fetch (e.g. gateway timeout) just leaves the current
@@ -469,7 +461,6 @@ export default function MapStateProvider ({ children }) {
     dataLayers,
     toggleDataLayer,
     resetDataLayers,
-    showAllDataLayers,
     griddapCoverage,
     activeWmsOverlay,
     setActiveWmsOverlay,

@@ -10,10 +10,23 @@
   height: min(72vh, 760px);
 }
 
+/* The title is a row now, not a line of text: at the narrow widths its leading
+   segment is a button (below). The filter name is what gives way when the row
+   runs short — never the heading or the close button beside it. */
+.filtersModal .modal-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
 /* The open filter's name, trailing "Filters" as a breadcrumb — the detail pane
    fills most of the dialog, so the title is where you look to know what you are
    editing. Lighter than the title itself: it is the subject, not the heading. */
 .filtersModal .filtersModalTitleCurrent {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--cioos-ink-60);
   font-weight: 500;
 }
@@ -22,6 +35,31 @@
   content: '›';
   margin: 0 8px;
   color: var(--cioos-ink-40);
+}
+
+/* The breadcrumb's first segment, as a control, at the widths where the open
+   filter covers the list it was chosen from. Same pill as the datasets
+   sidebar's back button — it is the same gesture out of the same kind of
+   drill-in. */
+.filtersModal .filtersModalBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 5px 12px 5px 8px;
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+}
+
+.filtersModal .filtersModalBack:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }
 
 .downloadModal .downloadModalDialog {
@@ -131,9 +169,10 @@
     display: none;
   }
 
-  /* Clear of the home indicator on a notched phone: these bodies scroll to
-     their own bottom edge, which is now the screen's. */
-  .filtersModal .modal-body,
+  /* Clear of the home indicator on a notched phone: this body scrolls to its
+     own bottom edge, which is now the screen's. The filters modal is not here
+     because its own footer is the thing that reaches that edge, and pays the
+     inset itself (see Panels/styles.css). */
   .downloadModal .modal-body {
     padding-bottom: env(safe-area-inset-bottom);
   }
