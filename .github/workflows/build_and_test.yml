@@ -18,12 +18,12 @@ jobs:
       COMPOSE_PROJECT_NAME: explore-cioos-ci
       API_URL: http://localhost:8098/api
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v10.0.1
         with:
-          version: "0.8.22"
+          version: "0.12.8"
 
       - name: Run all Python tests
         run: |
@@ -65,7 +65,7 @@ jobs:
             uv run prefect deployment run "$deployment" --watch
 
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm

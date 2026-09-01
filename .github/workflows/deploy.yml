@@ -15,7 +15,7 @@ jobs:
     environment: ${{ (github.event.workflow_run.head_branch || github.ref_name) == 'master' && 'production' || 'development' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - uses: cioos-siooc/cioos-deploy-docker-compose@main
         with:

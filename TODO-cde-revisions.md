@@ -1,6 +1,7 @@
 # Cleanup & maintenance backlog
 
 Produced 2026-08-27 from a full-repo survey at `development-v2 @ 92149f45`.
+Updated 2026-08-27 for CI/CD changes merged through `development-v2 @ 6f64fb41`.
 
 **How to read this.** Every item is independently actionable — take them one at a time.
 Items marked **[verified]** were re-checked directly against the working tree after the
@@ -21,22 +22,24 @@ to record it so a future review does not re-raise it.
 
 ### CI / deploy
 
-- [ ] **CI invokes a compose service that does not exist.** `.github/workflows/build_and_test.yml:38`
-      and `.github/workflows/harvest.yml:36` both run `docker compose … harvester`. There is no
-      `harvester` service in `docker-compose.yaml` — it became `prefect_worker`. Both the build gate
-      and the manual "Run Harvester" workflow fail. **[verified]**
-- [ ] **The active branch has no CI.** `build_and_test.yml` triggers only on PRs into `master` /
-      `development`. All work is on `development-v2`. A frontend-only or web-api-only PR there runs
-      nothing; `test-unit-tests.yaml` only fires on `harvester/**` or `downloader/**` paths. **[verified]**
+- [x] **CI invokes a compose service that does not exist.** Fixed by the CI refresh: the deprecated
+      manual `harvest.yml` workflow was deleted and the integration workflow now runs the harvest via
+      `prefect_worker` after waiting for the Prefect deployment to register. **[verified fixed @ 6f64fb41]**
+- [x] **The active branch has no CI.** Fixed for PRs: both integration and unit-test workflows now
+      trigger on `main`, `master`, and `development*`, which covers `development-v2`; Python tests,
+      the JS API/frontend smoke suite, and the download-request check now run through the integration
+      workflow. **[verified fixed @ 6f64fb41]**
 - [ ] **`deploy.yml` is not gated on tests.** It reads `github.event.workflow_run.head_branch` in three
       places (lines 11, 13, 29) but its `on:` block only has `push` and `workflow_dispatch`, so that
       expression is always null and falls through to `github.ref_name`. A red build still deploys. **[verified]**
-- [ ] CI installs Node 16 (EOL Sept 2023) at `build_and_test.yml:41-44` while `frontend/package.json`
-      declares `engines.node >= 22` and `frontend/Dockerfile` builds on `node:22-alpine`. The `test/`
-      scripts it runs depend on `puppeteer@^24`, which needs Node 18+.
-- [ ] `build_and_test.yml:26` uses `mv .env.sample .env` — destroys the tracked sample. Use `cp`.
-- [ ] Stale action versions: `actions/setup-node@v3` (v6 current), `dorny/paths-filter@v2` (v3 current),
-      alongside `actions/checkout@v6`.
+- [ ] CI now installs Node 20 via `actions/setup-node@v4`, so Puppeteer 24 can run, but this still
+      differs from `frontend/package.json` (`engines.node >= 22`) and `frontend/Dockerfile`
+      (`node:22-alpine`). Align the integration-test runtime with the app runtime.
+- [x] `build_and_test.yml` now uses `cp .env.sample .env`, `cp docker-compose.override.yaml.sample ...`,
+      and `cp harvest_config.sample.yaml ...` during CI setup. **[verified fixed @ 6f64fb41]**
+- [ ] Stale action versions remain partially cleaned up: `actions/checkout@v6` and `setup-uv@v6` are
+      current in these workflows, but `actions/setup-node@v4` is still behind the repo's stated
+      "v6 current" target. `dorny/paths-filter` is gone with the old path-filtered unit workflow.
 
 ### Correctness bugs
 
@@ -143,8 +146,11 @@ to record it so a future review does not re-raise it.
 
 ### Tooling & gates
 
-- [ ] **Add a lint/test/build gate.** Neither `npm run lint` nor any Python linter runs in CI. Both
-      ESLint configs and Prettier are editor-only decoration. **[verified]**
+- [ ] **Add a lint/build gate; expand the new test gate.** CI now runs `uv run pytest`,
+      `harvester/tests/unit`, `downloader/tests`, the JS API/frontend smoke suite, and a bounded
+      download-request integration check. Still missing: `npm run lint`, a Python linter, and a
+      frontend production build gate. ESLint configs and Prettier remain editor-only decoration.
+      **[CI partially fixed @ 6f64fb41]**
 - [ ] **No `.pre-commit-config.yaml`.** Nothing enforces the `.gitattributes` LF policy, and nothing
       would have caught `frontend/.DS_Store` or `.env.production`.
 - [ ] **Commit a ruff config and run `ruff --fix`.** `ruff check` reports **126 errors, 51
@@ -158,9 +164,10 @@ to record it so a future review does not re-raise it.
 - [ ] The two projects use contradictory styles — `frontend` standard/no-semi/single-quote vs
       `web-api` airbnb-base/double-quote. Pick one for shared or copied code.
 - [ ] ESLint 8 (EOL Oct 2024) and Prettier 2 in both, on legacy `.eslintrc` rather than flat config.
-- [ ] **Delete or revive the orphaned root `test/`.** Last touched 2025-09-25; `npm test` is
-      `echo "Error: no test specified" && exit 1`; hardcoded `localhost:8098`; asserts
-      `datasets.length == 2`. It is referenced only by CI and never by the README. **[verified]**
+- [x] **Revive the orphaned root `test/`.** The CI refresh restored the JS suite as an active
+      integration smoke test: `npm --prefix test test` now runs API and frontend checks against
+      harvested data, and `.github/scripts/test-download-request.sh` covers the download path.
+      **[verified fixed @ 6f64fb41]**
 - [ ] Rename `CODEOWNER` → `CODEOWNERS`. GitHub only recognises the plural, so no review is ever
       auto-requested. **[verified]**
 - [ ] Add a `LICENSE` — `frontend/package.json` declares ISC and the repo is public, with no licence text.
@@ -483,7 +490,8 @@ Each of these is a larger piece of work. See the HTML review for before/after di
 
 ### Test coverage gaps
 
-- [ ] **`frontend` and `web-api` have zero tests.** Highest-value first targets, all already pure:
+- [ ] **`frontend` and `web-api` still have zero unit tests.** The root `test/` suite is now a useful
+      CI smoke/integration gate, but the highest-value pure targets remain uncovered:
       `utilities.jsx` `generateColorStops` (and `snapCount`, which has the delicate `log10/pow`
       round-trip), `state/dataLayers.js` (essentially the whole file), `config.js` `isMarkerTier` and
       `effectiveTrailingDays`, and `web-api/utils/hexMetric.js` — the module whose own header warns
