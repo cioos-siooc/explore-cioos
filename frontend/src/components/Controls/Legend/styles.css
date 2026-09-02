@@ -459,9 +459,10 @@
   color: var(--cioos-primary);
 }
 
-/* The hex ramp, the one key left on the card. It is the whole of the body
-   here, so it drops the spacing the body's entries use to stand apart from
-   each other and from a group label above them — there is neither. */
+/* The hex ramp, the one key left on the card: the observations group label row
+   — the metric and its switch — and the bar under it. It is the whole of the
+   body here, so the bar drops the top spacing an entry uses to stand apart from
+   the entries beside it; it has none, only its own label row. */
 .legendCompactRamp {
   flex: 0 0 auto;
 }

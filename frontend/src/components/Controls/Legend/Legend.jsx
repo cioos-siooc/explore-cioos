@@ -187,14 +187,24 @@ export default function Legend({
   //
   // `label` may be absent, for a group whose rows are already self-describing
   // switches — a label there would only name the leftovers.
-  function renderGroup(key, label, { control, tooltip } = {}, children) {
+  //
+  // `idSuffix` distinguishes the switch from a second copy of the same control
+  // elsewhere on screen: in compact mode the observations group is rendered both
+  // on the card and inside the keys dialog, and two inputs sharing an id is
+  // invalid whether or not a label happens to point at it.
+  function renderGroup(
+    key,
+    label,
+    { control, tooltip, idSuffix = '' } = {},
+    children
+  ) {
     return (
       <div className='legendGroup' key={key}>
         {(label || control) && (
           <div className='legendGroupLabelRow'>
             {control && (
               <Switch
-                id={`mapLayer-${control.key}`}
+                id={`mapLayer-${control.key}${idSuffix}`}
                 title={control.label}
                 checked={control.checked}
                 onChange={control.onChange}
@@ -351,10 +361,12 @@ export default function Legend({
   // the tier has no counts at all).
   //
   // `labelled` is false when the markers are not on screen: the bar is then the
-  // only thing in the group, the title above it already says what its colours
+  // only thing in the group, the group's own title already says what its colours
   // count, and a caption naming the one entry present is a line spent saying
   // nothing. The label earns its place only where there is a second entry — the
-  // markers — for it to tell the bar apart from.
+  // markers — for it to tell the bar apart from. That is also why the compact
+  // card passes false: it shows the bar under the same group label row and
+  // nothing else (see compactRamp).
   function renderHexEntry(labelled, maxTicks) {
     if (!hexesOnMap || isEmpty(hexRangeLevel)) return null
     return (
@@ -557,12 +569,29 @@ export default function Legend({
   // names a shape or a colour the map is already showing — a track line looks
   // like a track line — but what a hexagon's green is worth in days of data is
   // a reading nothing on the map can give, so it is the part that has to stay
-  // out where it can be read against the cells. Unlabelled: it is the only
-  // thing on the card, so a caption telling it apart from its neighbours would
-  // be naming it against nothing.
+  // out where it can be read against the cells.
   // Four ticks, not the five the card affords: this bar is as wide as a phone
   // corner allows, and the labels are what run into each other first.
   const compactHexEntry = compact ? renderHexEntry(false, 4) : null
+  // The bar under the same label row it gets in the standing card: the group
+  // title — the metric, in the group labels' upper case — and the switch that
+  // hides the layer it keys. It is the observations group with everything but
+  // the bar left out, so it is built with renderGroup rather than restyled to
+  // look like one; the dialog behind the header then shows the same group in
+  // full, with the marker keys and the platform colours the card left out.
+  const compactRamp =
+    compactHexEntry &&
+    renderGroup(
+      'observations',
+      renderMetricTitle(),
+      {
+        control: controls.observations,
+        tooltip: t('legendMetricDaysTitle'),
+        // The dialog's copy of this switch is on screen at the same time.
+        idSuffix: '-compact'
+      },
+      compactHexEntry
+    )
   const trackKeys = renderTrackKeys()
   const bathymetryBar = renderBathymetryBar()
   const layerSwitches = renderLayerSwitches()
@@ -609,7 +638,7 @@ export default function Legend({
   // Compact is the same card with its body cut down to the hex ramp: the header
   // row, which now opens the rest of the keys in a dialog instead of unfolding
   // them in place; the ramp, which is the one key worth standing on the map
-  // (see compactHexEntry); and the foot, which reads the map rather than the
+  // (see compactRamp); and the foot, which reads the map rather than the
   // keys. Three short rows in the corner instead of a quarter of the screen —
   // the rest of a legend is read in glances, and on a phone the glance is worth
   // more than the standing card.
@@ -645,8 +674,8 @@ export default function Legend({
         )}
       </button>
       {compact
-        ? compactHexEntry && (
-          <div className='legendBody legendCompactRamp'>{compactHexEntry}</div>
+        ? compactRamp && (
+          <div className='legendBody legendCompactRamp'>{compactRamp}</div>
         )
         : legendOpen && <div className='legendBody'>{groups}</div>}
       {/* Outside the collapse: the scale bar reads the map rather than the
