@@ -55,31 +55,20 @@ const CHS_ATTRIBUTION =
 const OSM_ATTRIBUTION =
   '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 
-export const LABEL_LAYER_IDS = ['label-waterway', 'label-water', 'label-place']
+export const LABEL_LAYER_IDS = [
+  'label-waterway',
+  'label-water',
+  'label-water-line',
+  'label-place'
+]
 // Anchor for every data layer Map.js adds: insert *before* this id so data
 // renders under the labels.
 export const FIRST_LABEL_LAYER_ID = 'label-waterway'
 
-// text-field expression per label layer. Water-body names are bilingual
-// (both languages when they differ — oceans/seas read naturally that way);
-// river and place names follow the interface language.
-export function getLabelTextField (lang, layerId) {
-  const primary = ['coalesce', ['get', `name:${lang}`], ['get', 'name']]
-  if (layerId === 'label-water') {
-    const other = lang === 'fr' ? 'en' : 'fr'
-    return [
-      'case',
-      [
-        'all',
-        ['has', 'name:fr'],
-        ['has', 'name:en'],
-        ['!=', ['get', 'name:fr'], ['get', 'name:en']]
-      ],
-      ['concat', primary, '\n', ['get', `name:${other}`]],
-      primary
-    ]
-  }
-  return primary
+// text-field expression for every label layer: interface language, falling
+// back to the tile's default name when no translation exists.
+export function getLabelTextField (lang) {
+  return ['coalesce', ['get', `name:${lang}`], ['get', 'name']]
 }
 
 // Water polygons whose outline reads as a shoreline. Docks and pools are
@@ -91,6 +80,35 @@ const SHORELINE_FILTER = [
   false,
   true
 ]
+
+// Shared between label-water and label-water-line so the two stay in sync:
+// same size/weight tiering and colour regardless of which geometry a given
+// water body happens to be stored as. Lakes get their own tier — larger and
+// bold — so freshwater names read as distinct from the ocean/sea teal text
+// around them without changing colour.
+const WATER_LABEL_TEXT_SIZE = [
+  'match',
+  ['get', 'class'],
+  'ocean',
+  16,
+  'sea',
+  13,
+  'lake',
+  13,
+  11
+]
+const WATER_LABEL_TEXT_FONT = [
+  'match',
+  ['get', 'class'],
+  'lake',
+  ['literal', ['Noto Sans Bold']],
+  ['literal', ['Noto Sans Italic']]
+]
+const WATER_LABEL_PAINT = {
+  'text-color': '#0F6D8E',
+  'text-halo-color': '#F3F0EC',
+  'text-halo-width': 1.5
+}
 
 export function buildBasemapStyle (lang = 'en') {
   const layers = [
@@ -471,7 +489,7 @@ export function buildBasemapStyle (lang = 'en') {
       filter: ['match', ['get', 'class'], ['river', 'canal'], true, false],
       layout: {
         'symbol-placement': 'line',
-        'text-field': getLabelTextField(lang, 'label-waterway'),
+        'text-field': getLabelTextField(lang),
         'text-font': ['Noto Sans Italic'],
         'text-size': 11
       },
@@ -482,30 +500,49 @@ export function buildBasemapStyle (lang = 'en') {
       }
     },
     {
+      // Point-geometry water bodies only (oceans, seas, most lakes) — the
+      // elongated ones (Great Lakes among them) are LineString/MultiLineString
+      // in this source layer and are handled by label-water-line below, since
+      // a point-placed symbol can't reliably anchor on a line's geometry.
       id: 'label-water',
       type: 'symbol',
       source: 'ofm',
       'source-layer': 'water_name',
+      filter: ['!=', ['geometry-type'], 'LineString'],
       layout: {
-        'text-field': getLabelTextField(lang, 'label-water'),
-        'text-font': ['Noto Sans Italic'],
-        'text-size': [
-          'match',
-          ['get', 'class'],
-          'ocean',
-          16,
-          'sea',
-          13,
-          11
-        ],
+        'text-field': getLabelTextField(lang),
+        'text-font': WATER_LABEL_TEXT_FONT,
+        'text-size': WATER_LABEL_TEXT_SIZE,
         'text-letter-spacing': 0.1,
-        'text-max-width': 6
+        'text-max-width': 6,
+        // Large water bodies (bays especially) are often tagged as several
+        // separate same-named point features scattered along a coastline in
+        // OSM — e.g. Hudson Bay is ~217 distinct "Hudson Bay" points. Padding
+        // this far past the glyph box makes MapLibre's own collision system
+        // treat nearby duplicates as overlapping and drop all but one,
+        // without needing to know they share a name.
+        'text-padding': 80
       },
-      paint: {
-        'text-color': '#0F6D8E',
-        'text-halo-color': '#F3F0EC',
-        'text-halo-width': 1.5
-      }
+      paint: WATER_LABEL_PAINT
+    },
+    {
+      // The elongated-water-body half of water_name (see label-water above):
+      // symbol-placement 'line-center' anchors once at the centre of the
+      // feature's line, angled along it, instead of trying to place a point
+      // label on a line geometry.
+      id: 'label-water-line',
+      type: 'symbol',
+      source: 'ofm',
+      'source-layer': 'water_name',
+      filter: ['==', ['geometry-type'], 'LineString'],
+      layout: {
+        'symbol-placement': 'line-center',
+        'text-field': getLabelTextField(lang),
+        'text-font': WATER_LABEL_TEXT_FONT,
+        'text-size': WATER_LABEL_TEXT_SIZE,
+        'text-letter-spacing': 0.1
+      },
+      paint: WATER_LABEL_PAINT
     },
     {
       id: 'label-place',
@@ -520,7 +557,7 @@ export function buildBasemapStyle (lang = 'en') {
         false
       ],
       layout: {
-        'text-field': getLabelTextField(lang, 'label-place'),
+        'text-field': getLabelTextField(lang),
         'text-font': ['Noto Sans Regular'],
         'text-size': [
           'match',

@@ -3840,7 +3840,7 @@ export default function CreateMap({
         map.current.setLayoutProperty(
           id,
           'text-field',
-          getLabelTextField(i18n.language, id)
+          getLabelTextField(i18n.language)
         )
       }
     })
