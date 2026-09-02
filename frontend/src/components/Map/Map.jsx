@@ -3556,7 +3556,7 @@ export default function CreateMap({
   // gap is the one moment the map most needs to say it is still working.
   //
   // Deliberately scoped to the basemap sources: the data tiles already have the
-  // MapBusy pill, and watching everything would just be map.areTilesLoaded().
+  // `loading` flag, and watching everything would just be map.areTilesLoaded().
   useEffect(() => {
     if (!map.current) return
 

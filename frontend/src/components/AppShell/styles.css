@@ -49,32 +49,3 @@
   color: currentColor;
 }
 
-/* "Updating map…" pill: the map is redrawing but is still usable, so this sits
-   quietly at the bottom center rather than dimming the app. It shares that spot
-   with the API error banner and steps above it when both are up. */
-.mapBusy {
-  position: fixed;
-  bottom: calc(12px + var(--cioos-time-bar-space, 0px));
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: var(--cioos-z-dock, 35);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 14px;
-  background-color: var(--cioos-white);
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  box-shadow: var(--cioos-shadow-float);
-  color: var(--cioos-ink-60);
-  font-size: var(--cioos-font-size-sm);
-  pointer-events: none;
-}
-
-.mapBusy .spinner-border {
-  color: var(--cioos-primary);
-}
-
-.apiErrorBanner ~ .mapBusy {
-  bottom: calc(68px + var(--cioos-time-bar-space, 0px));
-}

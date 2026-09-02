@@ -233,7 +233,7 @@ export default function DatasetCard({
                 {t('downloadSizeUnavailableTitle')}
               </span>
             ) : (
-              <Spinner className='datasetsTableSpinner' />
+              <Spinner size='sm' className='datasetsTableSpinner' />
             )}
           </div>
         )}

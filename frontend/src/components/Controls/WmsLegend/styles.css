@@ -11,14 +11,18 @@
    them to duck.
 
    It is positioned against the viewport, so it holds the corner however long
-   the datasets list beside it grows. Two things share the corner and are held
+   the datasets list beside it grows. Three things share the corner and are held
    off rather than overlapped: the time bar, which owns the bottom edge and
-   publishes how far up it reaches, and — with a depth filter on — the strip
-   down the right edge, whose foot the card's height stops short of. */
+   publishes how far up it reaches; the activity badge, which owns the very
+   corner and whose slot is a constant so nothing here moves when it appears;
+   and — with a depth filter on — the strip down the right edge, whose foot the
+   card's height stops short of. */
 .wmsLegend.floating {
   position: fixed;
   right: 12px;
-  bottom: calc(12px + var(--cioos-time-bar-space, 0px));
+  bottom: calc(
+    12px + var(--cioos-time-bar-space, 0px) + var(--cioos-activity-space, 0px)
+  );
   z-index: calc(var(--cioos-z-shell, 30) + 1);
   background-color: var(--cioos-white);
   border-radius: var(--cioos-radius-sm);
@@ -47,17 +51,24 @@
    One rule for the whole corner, written here because this card is the surface
    that holds it, so the two clearances can never disagree about which wins:
    the card's own footprint (which already includes whatever it is holding off
-   the time bar), and the bar itself on the viewports where its right edge
-   passes the corner. */
+   the time bar and the badge), the activity badge on its own for when no card
+   is mounted and that footprint is 0, and the bar itself on the viewports where
+   its right edge passes the corner. */
 .maplibregl-ctrl-bottom-right {
-  margin-bottom: var(--cioos-wms-legend-space, 0px);
+  margin-bottom: max(
+    var(--cioos-wms-legend-space, 0px),
+    calc(12px + var(--cioos-activity-space, 0px))
+  );
 }
 
 @media (max-width: 1100px) {
   .maplibregl-ctrl-bottom-right {
     margin-bottom: max(
       var(--cioos-wms-legend-space, 0px),
-      var(--cioos-time-bar-space, 0px)
+      calc(
+        12px + var(--cioos-activity-space, 0px) +
+          var(--cioos-time-bar-space, 0px)
+      )
     );
   }
 }

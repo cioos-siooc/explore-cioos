@@ -1,37 +1,114 @@
-.spinner-border {
-  display: inline-block;
-  width: 2rem;
-  height: 2rem;
-  vertical-align: -0.125em;
-  border: 0.25em solid currentColor;
-  border-right-color: transparent;
-  border-radius: 50%;
-  animation: cioos-spinner-border 0.75s linear infinite;
+/* The CIOOS mark as the app's loading indicator. Two shapes, one animation: at
+   md and up the full geodesic mesh with its five node dots pulsing in
+   sequence; at xs/sm a three-dot row, because the mesh's facets don't resolve
+   below ~20px. Both shapes and their path data live in Spinner.jsx. */
+
+.cioosSpinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
 }
 
-.spinner-border-sm {
-  width: 1rem;
-  height: 1rem;
-  border-width: 0.2em;
+.cioosSpinnerMark {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* The dots scale past their own bounding box at the peak of the pulse. */
+  overflow: visible;
 }
 
-/* Stand-in for a dataset counter whose number hasn't arrived yet: sized to sit
-   inside a count pill without changing its height. */
-.spinner-border.countSpinner {
-  width: 11px;
-  height: 11px;
-  border-width: 2px;
-  margin: 3px 0;
+/* The three-dot row is sized by width and keeps its viewBox's 3:1 ratio, so it
+   sits on a line of text without changing the line's height. */
+.cioosSpinner-xs {
+  width: 18px;
+  height: 6px;
 }
 
-@keyframes cioos-spinner-border {
-  to {
-    transform: rotate(360deg);
+.cioosSpinner-sm {
+  width: 24px;
+  height: 8px;
+}
+
+/* The full mark. */
+.cioosSpinner-md {
+  width: 28px;
+  height: 28px;
+}
+
+.cioosSpinner-lg {
+  width: 56px;
+  height: 56px;
+}
+
+/* Both parts take currentColor, so one `color` on a call site tints the whole
+   mark and the existing opacity wrappers keep working. */
+.cioosSpinnerMesh {
+  fill: currentColor;
+  /* Heavier than the favicon's own light-background mesh (which is this teal at
+     28%, landing on #C6E3DF): at 28px that reads as a smudge, and the vertices
+     need to be legible for the mark to be recognisable at all. */
+  opacity: 0.55;
+}
+
+.cioosSpinnerNode {
+  fill: currentColor;
+  /* Scale each dot about its own centre rather than the viewBox origin — this
+     is what lets the five mesh nodes stay verbatim copies of the favicon's
+     paths instead of hand-computed circles. */
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cioos-node-pulse 1.4s ease-in-out infinite;
+  animation-delay: var(--cioos-node-delay, 0s);
+}
+
+@keyframes cioos-node-pulse {
+  0%,
+  70%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+
+  /* A big bloom on purpose: in the 28px badge each node is barely a pixel
+     across at rest, and the pulse is the whole signal. */
+  20% {
+    opacity: 1;
+    transform: scale(1.9);
   }
 }
 
+/* theme.css crushes every animation to 0.001ms under reduced motion, with an
+   !important on `*` — so an override here only applies if it carries one too.
+   (The border spinner this replaced had the same rule without !important, and
+   it silently did nothing.) Drop the scale and slow the fade right down: the
+   dots still read as "working" with nothing actually moving. */
 @media (prefers-reduced-motion: reduce) {
-  .spinner-border {
-    animation-duration: 1.5s;
+  .cioosSpinnerNode {
+    animation-name: cioos-node-fade !important;
+    animation-duration: 2.5s !important;
   }
+}
+
+@keyframes cioos-node-fade {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Stand-in for a dataset counter whose number hasn't arrived yet. It replaces
+   a line of text, so it claims that line's height and lets the mark letterbox
+   inside it — otherwise the count pill would shrink while loading and jump
+   back open when the number lands. */
+.countSpinner {
+  /* One line of the pill's own text, so the mark letterboxes inside the height
+     the number would have claimed. 1lh is the exact unit for this; the em
+     fallback covers browsers without it. */
+  height: 1.6em;
+  height: 1lh;
 }

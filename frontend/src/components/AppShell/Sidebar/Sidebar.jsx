@@ -113,7 +113,7 @@ export default function Sidebar () {
               {countsReady ? (
                 countLabel
               ) : (
-                <Spinner size='sm' className='countSpinner' />
+                <Spinner size='xs' className='countSpinner' />
               )}
             </span>
             <DismissIcon
@@ -135,7 +135,7 @@ export default function Sidebar () {
               title={countsTitle}
             >
               {!countsReady ? (
-                <Spinner size='sm' className='countSpinner' />
+                <Spinner size='xs' className='countSpinner' />
               ) : allDatasetsShown ? (
                 t('sidebarCountsDatasetsAll', {
                   total: total ?? filteredCount

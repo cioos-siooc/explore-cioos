@@ -25,6 +25,7 @@
   --cioos-ink-40:      rgba(21, 47, 55, 0.40); /* muted text / icons */
   --cioos-hairline:    #DCE8E5; /* hairline borders between sand & teal-light */
   --cioos-surface-2:   #EEF6F4; /* subtle hover wash on white surfaces */
+  --cioos-scrim:       rgba(238, 246, 244, 0.82); /* surface-2, over content being replaced */
 
   /* --- Status palette (CIOOS-aligned) --- */
   --cioos-success:     #52A79B;
@@ -93,6 +94,12 @@
   /* --- Type --- */
   --cioos-font-body:    'Montserrat', system-ui, -apple-system, sans-serif;
   --cioos-font-display: 'Sora', 'Montserrat', system-ui, sans-serif;
+  /* The brand lockup only (the loading splash's CIOOS/SIOOC wordmark).
+     The real wordmark is set in Volte Rounded, which is a licensed face and
+     not on Google Fonts; Quicksand is the closest thing there — geometric
+     with the same circular bowls and rounded terminals, and within ~3% of
+     the wordmark's own letter widths at matched cap height. */
+  --cioos-font-brand: 'Quicksand', 'Montserrat', 'Segoe UI', sans-serif;
 
   /* --- Signature: the ocean "water column" gradient (surface → depth) --- */
   --cioos-depth-gradient: linear-gradient(180deg, var(--cioos-primary) 0%, var(--cioos-navy) 100%);
@@ -133,6 +140,14 @@
   --cioos-time-bar-space: 0px;
   --cioos-depth-bar-space: 0px;
   --cioos-wms-legend-space: 0px;
+
+  /* --- Layout: bottom-right activity badge ---
+     The slot the activity indicator occupies in that same corner. Unlike the
+     footprints above this is a constant rather than a measured value: the badge
+     is a fixed-size circle that comes and goes with whether anything is
+     loading, and reserving its space permanently is what stops the griddap card
+     and MapLibre's controls from jumping every time it appears. */
+  --cioos-activity-space: 44px;
 
   /* --- Header & Layout (Modern Sidebar) --- */
   --cioos-header-height: 70px;

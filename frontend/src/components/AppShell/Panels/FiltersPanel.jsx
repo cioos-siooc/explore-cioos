@@ -533,7 +533,7 @@ export default function FiltersPanel () {
               filtered: filteredCount,
               total: totalCount
             })
-            : <Spinner size='sm' className='countSpinner' />}
+            : <Spinner size='xs' className='countSpinner' />}
         </span>
         <button
           type='button'

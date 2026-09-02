@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import MapContainer from '../Map/MapContainer.jsx'
 import FeatureCard from '../Map/FeatureCard/FeatureCard.jsx'
 import ApiErrorBanner from './ApiErrorBanner.jsx'
-import MapBusy from './MapBusy.jsx'
+import ActivityIndicator from './ActivityIndicator.jsx'
 import Sidebar from './Sidebar/Sidebar.jsx'
 import TopControls from './TopControls/TopControls.jsx'
 import FiltersModal from './Modals/FiltersModal.jsx'
@@ -30,7 +30,6 @@ export default function AppShell () {
   const { t } = useTranslation()
   const {
     loading,
-    basemapLoading,
     mapLoaded,
     zoom,
     currentRangeLevel,
@@ -121,7 +120,8 @@ export default function AppShell () {
     <>
       {/* The splash covers the first map load only; a redraw after that (new
           filters, a new polygon) happens over a map the user can already see
-          and read, so it gets the MapBusy pill instead of a full-screen dim. */}
+          and read, so it is reported by the corner activity badge below
+          instead of a full-screen dim. */}
       {loading && !mapLoaded && <Loading />}
       {/* Mount the map immediately rather than waiting for /legend (the app's
           heaviest query) to resolve — first paint of the basemap and tile
@@ -135,14 +135,11 @@ export default function AppShell () {
           all outranks it. */}
       <FeatureCard />
       <ApiErrorBanner />
-      {/* One pill, two possible waits. The data redraw wins when both are in
-          flight: it's the one the user's own action started, and the basemap
-          catching up underneath it is the lesser news. */}
-      {mapLoaded && (loading || basemapLoading) && (
-        <MapBusy
-          messageKey={loading ? 'mapUpdatingText' : 'mapTilesLoadingText'}
-        />
-      )}
+      {/* Every wait in the app, in one corner: the map redrawing, the basemap
+          catching up, the legend, the datasets list, a record, the filter
+          catalogue, download estimates. Each is registered with
+          ActivityProvider by whoever owns the flag; this only reports them. */}
+      <ActivityIndicator />
       <Sidebar />
       <TopControls />
       <FiltersModal />

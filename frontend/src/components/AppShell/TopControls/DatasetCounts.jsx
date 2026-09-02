@@ -35,7 +35,7 @@ export default function DatasetCounts () {
     <div className={classNames('topBarCountsRow', { updating: countsUpdating })}>
       {!countsReady
         ? (
-          <Spinner size='sm' className='countSpinner' />
+          <Spinner size='xs' className='countSpinner' />
           )
         : (
           <>
