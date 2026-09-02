@@ -120,8 +120,8 @@ export default function AppShell () {
     <>
       {/* The splash covers the first map load only; a redraw after that (new
           filters, a new polygon) happens over a map the user can already see
-          and read, so it is reported by the corner activity badge below
-          instead of a full-screen dim. */}
+          and read, so it is reported by the brand logo's own mark instead of a
+          full-screen dim. */}
       {loading && !mapLoaded && <Loading />}
       {/* Mount the map immediately rather than waiting for /legend (the app's
           heaviest query) to resolve — first paint of the basemap and tile
@@ -135,10 +135,11 @@ export default function AppShell () {
           all outranks it. */}
       <FeatureCard />
       <ApiErrorBanner />
-      {/* Every wait in the app, in one corner: the map redrawing, the basemap
-          catching up, the legend, the datasets list, a record, the filter
-          catalogue, download estimates. Each is registered with
-          ActivityProvider by whoever owns the flag; this only reports them. */}
+      {/* Every wait in the app, named in one panel: the map redrawing, the
+          basemap catching up, the legend, the datasets list, a record, the
+          filter catalogue, download estimates. Each is registered with
+          ActivityProvider by whoever owns the flag; this only reports them,
+          and only while the brand logo has it open. */}
       <ActivityIndicator />
       <Sidebar />
       <TopControls />

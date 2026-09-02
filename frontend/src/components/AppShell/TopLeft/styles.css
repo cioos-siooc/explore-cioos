@@ -1,9 +1,15 @@
 /* Brand card: logo + two-line title lockup + minor actions on one row.
    Sits at the top of the sidebar column, above the datasets card. */
 :root {
-  /* Fixed brand-card width, sized off the longest row in either language (the
-     French Datasets/Filters tabs) so EN and FR render the same card. */
-  --cioos-brand-width: 400px;
+  /* Fixed brand-card width, sized off the longest row in either language so EN
+     and FR render the same card. That row is the brand row, and it is the logo
+     that sets the number: the logo and the icon cluster sit in equal side
+     tracks (see .brandCardTop), so the French wordmark between them gets what
+     is left after the wider of the two is doubled. At the sizes the lockup is
+     drawn at now that is 127px a side around a 140px "EXPLORATEUR", which
+     needs 447px of card — this is that plus room for a fallback face, which
+     Quicksand failing to load would make ~8% wider. */
+  --cioos-brand-width: 490px;
 }
 
 .brandSearch {
@@ -39,32 +45,26 @@
 }
 
 /* Symmetric three-track grid so the title is centered in the card: the logo
-   and the minor-actions cluster occupy equal-width side columns (1fr each),
-   with the wordmark auto-sized and centered between them. */
+   and the minor-actions cluster occupy equal-width side columns, with the
+   wordmark auto-sized and centered between them.
+   The side tracks are minmax(0, 1fr) rather than a bare 1fr, which floors them
+   at min-content: with a nowrap wordmark in the middle that floor is what turns
+   a row a few pixels short of its content into items spilling out over the
+   card's own border. Given way they shrink instead, and the width above is set
+   so they never have to. */
 .brandCardTop {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
 }
 
-.brandSearchLogo {
-  display: flex;
-  align-items: center;
+/* The logo: nothing to do with it, so it carries no control affordance — its
+   mark simply pulses while the app is loading (see CioosLogo). Placement only
+   here; the lockup styles itself. */
+.brandLogo {
   justify-self: start;
-  border-radius: var(--cioos-radius-sm);
-  transition: background-color var(--cioos-transition-fast);
-}
-
-.brandSearchLogo:hover {
-  background-color: var(--cioos-surface-2);
-}
-
-.brandSearchLogo img {
-  height: 34px;
-  width: auto;
-  display: block;
 }
 
 /* Two-line wordmark lockup, lines centered on each other: the secondary
@@ -198,7 +198,7 @@
 
   /* French is the language this row stops fitting in: a third longer on both
      lines — EXPLORATEUR against EXPLORER, DE DONNÉES against DATA — and it is
-     the long one that has to share the row with a 98px logo and three icon
+     the long one that has to share the row with the logo and three icon
      buttons. It scales with the viewport instead of holding a fixed size, so
      the narrowest phones shrink the wordmark rather than overlapping it, and
      every width with room for the full size still gets it. */
@@ -210,11 +210,13 @@
     font-size: min(var(--cioos-font-size-2xs), 2.6vw);
   }
 
-  /* The widest fixed thing on the row — 314x90, so 98px at the height it wants
-     here — and so the one worth letting the viewport scale too. */
-  .brandSearchLogo img {
-    width: min(98px, 26vw);
-    height: auto;
+  /* Scaled with the viewport rather than held at the rung's mobile size, the
+     same way the wordmark beside it is: this row has no slack to give, and the
+     narrowest phones need to shrink the logo rather than push it under its
+     neighbours. On the lockup as a whole, so the mark comes down with the text
+     instead of being left oversized beside it. */
+  .brandLogo {
+    font-size: min(var(--cioos-font-size-xl), 5.5vw);
   }
 
   /* Touch targets for the three icon actions, the smallest things on the

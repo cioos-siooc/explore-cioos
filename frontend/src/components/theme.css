@@ -94,7 +94,8 @@
   /* --- Type --- */
   --cioos-font-body:    'Montserrat', system-ui, -apple-system, sans-serif;
   --cioos-font-display: 'Sora', 'Montserrat', system-ui, sans-serif;
-  /* The brand lockup only (the loading splash's CIOOS/SIOOC wordmark).
+  /* The CIOOS/SIOOC logo only — the brand card's lockup and the loading
+     splash's, both drawn by CioosLogo rather than loaded as an image.
      The real wordmark is set in Volte Rounded, which is a licensed face and
      not on Google Fonts; Quicksand is the closest thing there — geometric
      with the same circular bowls and rounded terminals, and within ~3% of
@@ -141,15 +142,6 @@
   --cioos-depth-bar-space: 0px;
   --cioos-wms-legend-space: 0px;
 
-  /* --- Layout: bottom-right activity badge ---
-     The slot the activity indicator occupies in that same corner. Unlike the
-     footprints above this is a constant rather than a measured value: the badge
-     is a fixed-size circle (44px, plus a gap) that comes and goes with
-     whether anything is
-     loading, and reserving its space permanently is what stops the griddap card
-     and MapLibre's controls from jumping every time it appears. */
-  --cioos-activity-space: 52px;
-
   /* --- Header & Layout (Modern Sidebar) --- */
   --cioos-header-height: 70px;
   --cioos-header-height-mobile: 60px;
@@ -171,6 +163,10 @@
   --cioos-font-size-base: 14px;
   --cioos-font-size-md: 16px;
   --cioos-font-size-lg: 18px;
+  /* The brand lockup, and the top of the scale: the only thing in the chrome
+     set larger than a heading. It sizes the compact lockup whole — the mark is
+     a multiple of it — so it is the one number that makes the logo bigger. */
+  --cioos-font-size-xl: 26px;
 
   /* --- Spacing Scale --- */
   --cioos-space-xs: 4px;
@@ -269,6 +265,7 @@
     --cioos-font-size-base: 16px;
     --cioos-font-size-md: 17px;
     --cioos-font-size-lg: 20px;
+    --cioos-font-size-xl: 28px;
 
     --cioos-space-md: 10px;
     --cioos-space-lg: 12px;

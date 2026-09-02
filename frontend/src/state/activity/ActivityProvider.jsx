@@ -1,6 +1,11 @@
 import * as React from 'react'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 
+// Don't report work that resolves this fast — a cached filter change would
+// otherwise set the logo pulsing and the status panel open and straight back
+// off again.
+const ANNOUNCE_AFTER_MS = 250
+
 // Defaulted rather than left undefined: index.jsx renders the loading splash as
 // its Suspense fallback, which is outside AppProviders entirely, and that splash
 // reads this registry. Outside a provider there is genuinely nothing registered,
@@ -8,7 +13,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 const ActivityContext = createContext({
   register: () => () => {},
   labelKeys: [],
-  busy: false
+  busy: false,
+  announced: false
 })
 
 // What the app is currently waiting on, as the set of translation keys naming
@@ -70,10 +76,27 @@ export default function ActivityProvider ({ children }) {
   }, [])
 
   const labelKeys = useMemo(() => Object.keys(counts), [counts])
+  const busy = labelKeys.length > 0
+
+  // Both of the app's reports of this — the brand logo's pulse and the status
+  // panel showing itself — wait out the same delay, so they can't disagree
+  // about whether a wait was worth mentioning. `busy` itself stays raw for the
+  // screen-reader commentary, which is spoken rather than seen and so has no
+  // flicker to protect against.
+  const [announced, setAnnounced] = useState(false)
+
+  useEffect(() => {
+    if (!busy) {
+      setAnnounced(false)
+      return undefined
+    }
+    const timer = setTimeout(() => setAnnounced(true), ANNOUNCE_AFTER_MS)
+    return () => clearTimeout(timer)
+  }, [busy])
 
   const value = useMemo(
-    () => ({ register, labelKeys, busy: labelKeys.length > 0 }),
-    [register, labelKeys]
+    () => ({ register, labelKeys, busy, announced }),
+    [register, labelKeys, busy, announced]
   )
 
   return (

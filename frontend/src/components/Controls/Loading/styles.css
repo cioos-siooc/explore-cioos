@@ -1,6 +1,7 @@
 /* The wash is on the scrim's own background rather than an `opacity` on the
-   box: opacity applies to descendants too, and used to fade the mark and the
-   masthead along with it. */
+   box: opacity applies to descendants too, and used to fade the logo and the
+   activity list along with it. The logo lockup itself lives in
+   cioosLogoStyles.css, shared with the brand card. */
 .loading {
   pointer-events: none;
   position: absolute;
@@ -12,55 +13,13 @@
   justify-content: center;
   gap: var(--cioos-space-md, 12px);
   background-color: var(--cioos-scrim);
-  /* The mark takes currentColor for both its mesh and its dots, so this one
-     declaration colours it: primary for the nodes, the same teal at 55% for
-     the mesh behind them. */
+  /* For the inline variant's bare mark: the stacked logo colours its own
+     parts. Both its mesh and its dots take currentColor. */
   color: var(--cioos-primary);
 }
 
 .loading-inline {
   gap: var(--cioos-space-sm, 8px);
-}
-
-.loadingBrand {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  /* The wordmark sets the tagline's cap top 9 units below the name's baseline,
-     on a cap height of 11.5 — a little over half a line. */
-  gap: 0.5em;
-  text-align: center;
-  font-family: var(--cioos-font-brand, sans-serif);
-  /* The tagline's size. Everything else here is a multiple of it, so the
-     lockup keeps the wordmark's proportions at whatever size this is set to. */
-  font-size: var(--cioos-font-size-sm, 12px);
-}
-
-/* Proportions and weights are measured off the wordmark's own outlines: cap
-   heights of 28.19 and 11.52 units (hence the 2.45 ratio), and stems that are
-   8.7% and 17.4% of those cap heights. Note those two stem ratios differ by
-   exactly 2x, so the wordmark is set in two weights of Volte Rounded rather
-   than one — Quicksand's 300 and 600 are the matching pair.
-   Tracking is left alone: Volte Rounded is narrower than Quicksand, and
-   forcing its exact letter widths would need negative tracking. */
-.loadingBrandName {
-  font-size: 2.45em;
-  font-weight: 300;
-  line-height: 1;
-  color: var(--cioos-ink);
-}
-
-.loadingBrandFullName {
-  font-weight: 600;
-  /* The wordmark's two lines sit one cap height plus a hair apart; the extra
-     0.1 is headroom for the accents the French lockup carries. */
-  line-height: 1.1;
-  text-transform: uppercase;
-  /* The break is in the translated string, where the wordmark puts it, rather
-     than left to a max-width to guess. */
-  white-space: pre-line;
-  color: var(--cioos-ink-60);
 }
 
 /* Set apart from the lockup: the wordmark is identity, this is status. */

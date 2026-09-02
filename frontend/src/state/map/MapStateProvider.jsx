@@ -51,7 +51,7 @@ export default function MapStateProvider ({ children }) {
   // filter change, a new selection polygon); Map.jsx flips it back on 'idle'.
   // mapLoaded records that it has settled at least once — the first load is a
   // blank screen and earns the full splash, every later redraw happens over a
-  // usable map and only earns the quiet corner activity badge.
+  // usable map and only earns the brand logo's quiet pulse.
   const [loading, setLoadingState] = useState(true)
   const [mapLoaded, setMapLoaded] = useState(false)
   const setLoading = useCallback((value) => {
