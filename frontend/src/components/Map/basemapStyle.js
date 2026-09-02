@@ -528,8 +528,11 @@ export function buildBasemapStyle (lang = 'en') {
     {
       // The elongated-water-body half of water_name (see label-water above):
       // symbol-placement 'line-center' anchors once at the centre of the
-      // feature's line, angled along it, instead of trying to place a point
-      // label on a line geometry.
+      // feature's line rather than trying to place a point label on a line
+      // geometry. text-rotation-alignment: 'viewport' overrides the default
+      // map-aligned rotation, which otherwise bends the text glyph-by-glyph
+      // to follow the line's own curve — upright, straight text reads more
+      // clearly for a lake name than one bent along its shoreline.
       id: 'label-water-line',
       type: 'symbol',
       source: 'ofm',
@@ -537,6 +540,7 @@ export function buildBasemapStyle (lang = 'en') {
       filter: ['==', ['geometry-type'], 'LineString'],
       layout: {
         'symbol-placement': 'line-center',
+        'text-rotation-alignment': 'viewport',
         'text-field': getLabelTextField(lang),
         'text-font': WATER_LABEL_TEXT_FONT,
         'text-size': WATER_LABEL_TEXT_SIZE,
