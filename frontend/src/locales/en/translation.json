@@ -445,6 +445,7 @@
   "datasetsCardMapClickHint": "Outlined datasets were found under your last click on the map",
   "featureCardTitle": "What's here",
   "featureCardSummary": "{{n}} datasets",
+  "featureCardMapClickHint": "Outlined the same way on the map and in the datasets list",
   "featureCardClose": "Close",
   "featureCardEmpty": "Nothing here is in the current results — the filters have excluded it.",
   "featureCardTrack": "Track",

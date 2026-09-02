@@ -54,9 +54,10 @@
   /* The map-click goldenrod, paired the same way: the map rings whatever the
      last click found in it (the click-highlight-* layers in Map.jsx, painted
      from `clickHighlightColor` in components/config.js), and the chrome that
-     answers "what did that click find" — the pinned rows in the datasets list
-     and the record the click resolved to in the inspector's table — carries it
-     too, so the tie between map and list needs no legend. */
+     answers "what did that click find" — the "what's here" card itself, the
+     pinned rows in the datasets list and the record the click resolved to in
+     the inspector's table — carries it too, so the tie between map, card and
+     list needs no legend. */
   --cioos-map-click:         #DAA520; /* click highlight ring + the row accents */
   --cioos-map-click-glow:    rgba(218, 165, 32, 0.35); /* the ring/glow shadows */
   --cioos-map-click-surface: #FBF1D9; /* opaque tint, the map fill's counterpart */

@@ -446,6 +446,7 @@
   "datasetsCardMapClickHint": "Les jeux de données en surbrillance ont été trouvés sous votre dernier clic sur la carte",
   "featureCardTitle": "Ce qui se trouve ici",
   "featureCardSummary": "{{n}} jeux de données",
+  "featureCardMapClickHint": "Entourés de la même façon sur la carte et dans la liste des jeux de données",
   "featureCardClose": "Fermer",
   "featureCardEmpty": "Rien ici ne figure dans les résultats actuels — les filtres l'ont exclu.",
   "featureCardTrack": "Trajectoire",
