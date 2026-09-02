@@ -116,6 +116,13 @@ const HEX_LAYER_IDS = ['hexes', 'coverage-hexes']
 // what a measurement would find.
 const HEX_SOURCE_IDS = ['cde-tiles', 'cde-cells']
 
+// The basemap the data is drawn on: the world-view raster, the satellite one it
+// hands over to past z10, and the vector the whole thing is labelled with. The
+// CHS soundings (nonna100/nonna10) are NOT here — they are detail on top of a
+// basemap that has long since drawn, and the slowest thing on the map by a wide
+// margin. See reportFirstPaint.
+const BASEMAP_SOURCE_IDS = ['bathymetry', 'imagery', 'ofm']
+
 // What the corner activity badge reports as "still loading", grouped the way a
 // reader thinks about the map rather than the way MapLibre splits its sources:
 // the two hex tilesets are one thing to look at, and so are the three seafloor
@@ -254,7 +261,9 @@ export default function CreateMap({
   projection = 'mercator',
   zoomTarget,
   drawRequest,
-  mapRef
+  mapRef,
+  // Called once, when the map is worth handing over. See reportFirstPaint.
+  onFirstPaint = () => {}
 }) {
   const { t, i18n } = useTranslation()
 
@@ -492,6 +501,7 @@ export default function CreateMap({
   // Whether the hex layers have been let through their opening fade — see
   // revealHexes. False until the ramp on them is the one they will keep.
   const hexesRevealed = useRef(false)
+  const firstPaintReported = useRef(false)
   // Latest rangeLevels, for the once-registered measurement handler: it runs on
   // the first render's closure (like setColorStops, which it reaches through a
   // ref of its own), so the prop it captured is forever the mount-time one.
@@ -679,6 +689,7 @@ export default function CreateMap({
   function revealHexes() {
     if (hexesRevealed.current || !map.current) return
     hexesRevealed.current = true
+    reportFirstPaint()
     if (map.current.getLayer('hexes')) {
       map.current.setPaintProperty('hexes', 'fill-opacity', hexOpacityExpression())
     }
@@ -689,6 +700,30 @@ export default function CreateMap({
         coverageHexOpacityExpression()
       )
     }
+  }
+
+  // The moment the map is worth handing over, reported once — this is what the
+  // first-paint splash waits on (MapStateProvider's firstPaintPending). Two
+  // things have to be true: the hexes painted with the ramp they will keep, and
+  // the basemap under them actually drawn.
+  //
+  // Deliberately not 'idle', which is neither necessary nor sufficient. It
+  // waits for the CHS soundings on top of everything else, and it can also
+  // arrive before the hex sources have been asked for at all — which is how the
+  // splash came to lift off a blank map.
+  function reportFirstPaint() {
+    if (firstPaintReported.current || !map.current) return
+    if (!hexesRevealed.current) return
+    // A source the current camera doesn't use has no tiles pending and reads as
+    // loaded; one the style hasn't added yet is skipped rather than waited for,
+    // which is safe because the hexes above can't have been revealed until the
+    // style was up.
+    const basemapDrawn = BASEMAP_SOURCE_IDS.every(
+      (id) => !map.current.getSource(id) || map.current.isSourceLoaded(id)
+    )
+    if (!basemapDrawn) return
+    firstPaintReported.current = true
+    onFirstPaint()
   }
 
   // Reveal once a measurement pass has settled what the ramp is going to be.
@@ -3724,6 +3759,21 @@ export default function CreateMap({
       if (published.length) setLoadingLayers([])
     }
   }, [setLoadingLayers])
+
+  // The hexes can be revealed before the basemap under them has finished
+  // arriving, in which case the reveal's own call to reportFirstPaint declines
+  // and this is what closes it out. 'idle' is the backstop for the case where
+  // the last basemap tile lands without a further 'sourcedata'.
+  useEffect(() => {
+    if (!map.current) return
+    const check = () => reportFirstPaint()
+    map.current.on('sourcedata', check)
+    map.current.on('idle', check)
+    return () => {
+      map.current.off('sourcedata', check)
+      map.current.off('idle', check)
+    }
+  }, [])
 
   // The hex color stops depend on the zoom band (getCurrentRangeLevel), but
   // were only applied at load or on legend refresh — so returning below

@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import MapContainer from '../Map/MapContainer.jsx'
@@ -29,8 +30,7 @@ import './styles.css'
 export default function AppShell () {
   const { t } = useTranslation()
   const {
-    loading,
-    mapLoaded,
+    firstPaintPending,
     zoom,
     currentRangeLevel,
     hexRangeLevel,
@@ -53,6 +53,16 @@ export default function AppShell () {
   const { startDate, endDate, timeFilterActive } = useFilters()
   const { showIntroModal, setShowIntroModal, sidebarOpen } = useUI()
   const { inspectDataset, platformsAvailable } = useSelection()
+
+  const [splashMounted, setSplashMounted] = useState(firstPaintPending)
+
+  // Raised whenever the splash is called for; lowered by the splash itself once
+  // it has faded. mapLoaded never goes back to false, so in practice this runs
+  // once — but keying off the condition rather than assuming that keeps the two
+  // in step if a later wait ever earns a splash of its own.
+  useEffect(() => {
+    if (firstPaintPending) setSplashMounted(true)
+  }, [firstPaintPending])
 
   // The griddap legend lives inside the dataset page while that page is open
   // (see GriddapDetails); otherwise it pins itself to the top-left corner of
@@ -121,8 +131,19 @@ export default function AppShell () {
       {/* The splash covers the first map load only; a redraw after that (new
           filters, a new polygon) happens over a map the user can already see
           and read, so it is reported by the brand logo's own mark instead of a
-          full-screen dim. */}
-      {loading && !mapLoaded && <Loading />}
+          full-screen dim.
+
+          It outlives the condition that raised it by one fade: the splash is
+          opaque, so dissolving it is what makes the map and the chrome keyed
+          to it arrive together instead of appearing all at once (see Loading).
+          Unmounting on the condition alone would cut that short, so the splash
+          itself says when it is done. */}
+      {splashMounted && (
+        <Loading
+          dismissed={!firstPaintPending}
+          onDismissed={() => setSplashMounted(false)}
+        />
+      )}
       {/* Mount the map immediately rather than waiting for /legend (the app's
           heaviest query) to resolve — first paint of the basemap and tile
           layers no longer blocks on it. The color ramp is applied once

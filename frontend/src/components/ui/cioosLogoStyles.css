@@ -42,6 +42,17 @@
   font-size: var(--cioos-font-size-sm, 12px);
 }
 
+/* …and so is the mark, rather than the fixed pixel size .cioosSpinner-lg would
+   otherwise impose: that left the one part of the lockup that could not follow
+   the font-size, so shrinking the splash shrank the type around an unchanged
+   mark. Same trick as the inline layout above, at the ratio the lockup already
+   wore (56px against this size's 12px). Two classes, so it beats
+   .cioosSpinner-lg whatever order the two stylesheets land in. */
+.cioosLogo-stacked .cioosSpinner {
+  width: 4.65em;
+  height: 4.65em;
+}
+
 .cioosLogoWordmark {
   display: flex;
   flex-direction: column;

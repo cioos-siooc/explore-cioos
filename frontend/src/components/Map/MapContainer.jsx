@@ -15,6 +15,7 @@ export default function MapContainer () {
   const {
     mapQueryString,
     setLoading,
+    reportFirstPaint,
     setLoadingLayers,
     setMapView,
     rangeLevels,
@@ -146,6 +147,7 @@ export default function MapContainer () {
       zoomTarget={zoomTarget}
       drawRequest={drawRequest}
       mapRef={mapRef}
+      onFirstPaint={reportFirstPaint}
     />
   )
 }

@@ -58,6 +58,21 @@ export default function MapStateProvider ({ children }) {
     setLoadingState(value)
     if (!value) setMapLoaded(true)
   }, [])
+
+  // The other way into mapLoaded, and the one the first load actually takes:
+  // Map calls this once the hexes are painted with their final ramp over a
+  // basemap that has drawn (see reportFirstPaint there). 'idle' — what drives
+  // setLoading above — is the wrong moment in both directions: it waits for the
+  // CHS soundings on top of everything else, and it can arrive before the hex
+  // sources have even been asked for. It stays as the backstop for a load that
+  // never reports a first paint at all.
+  const reportFirstPaint = useCallback(() => setMapLoaded(true), [])
+
+  // Whether the app is still on its very first draw — the one state that earns
+  // a full-screen splash. Derived here rather than recomputed by each of the
+  // two things that answer to it (the splash itself, and the corner activity
+  // panel, which stands down while the splash is naming the same waits).
+  const firstPaintPending = loading && !mapLoaded
   // Separate from `loading` above, which is about the *data* the map draws.
   // This one is the basemap rasters — imagery and CHS soundings still arriving
   // after a pan or a zoom — and it is the slow one on a cold cache. Map.jsx
@@ -69,6 +84,7 @@ export default function MapStateProvider ({ children }) {
   // the activity badge can name it. This replaced a single basemap-only flag,
   // which could say no more than "imagery" and knew nothing of the data layers.
   const [loadingLayers, setLoadingLayers] = useState([])
+
   // The camera, as the map reports it (numbers, plus bounds once it has
   // settled). Seeded from the share link — or the default view when the link
   // carries no camera — rather than left empty: MapLibre only pushes a view on
@@ -423,6 +439,8 @@ export default function MapStateProvider ({ children }) {
   const value = {
     loading,
     setLoading,
+    reportFirstPaint,
+    firstPaintPending,
     loadingLayers,
     setLoadingLayers,
     mapLoaded,

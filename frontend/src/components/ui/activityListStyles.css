@@ -21,3 +21,14 @@
   color: var(--cioos-primary);
   flex: 0 0 auto;
 }
+
+/* Markless rows (the splash). With no column of marks to align down, the left
+   edge has nothing to hold, so the rows centre on each other instead — under a
+   lockup that is itself centred. */
+.activityList-plain {
+  text-align: center;
+}
+
+.activityList-plain li {
+  justify-content: center;
+}

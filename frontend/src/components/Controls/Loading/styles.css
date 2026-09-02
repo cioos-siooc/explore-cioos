@@ -1,30 +1,73 @@
-/* The wash is on the scrim's own background rather than an `opacity` on the
-   box: opacity applies to descendants too, and used to fade the logo and the
-   activity list along with it. The logo lockup itself lives in
-   cioosLogoStyles.css, shared with the brand card. */
+/* The wash is on the cover's own background rather than an `opacity` on the
+   box: opacity applies to descendants too, and would fade the logo and the
+   activity list along with it — which is right on the way out (see
+   .loading-dismissed) and wrong for the whole wait before that. The logo
+   lockup itself lives in cioosLogoStyles.css, shared with the brand card. */
 .loading {
   pointer-events: none;
   position: absolute;
   inset: 0;
   z-index: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--cioos-space-md, 12px);
   background-color: var(--cioos-scrim);
   /* For the inline variant's bare mark: the stacked logo colours its own
      parts. Both its mesh and its dots take currentColor. */
   color: var(--cioos-primary);
 }
 
-.loading-inline {
-  gap: var(--cioos-space-sm, 8px);
+/* The first paint covers the app rather than washing over it: opaque, and on
+   the splash rung of the z scale, so the map and everything keyed to it — the
+   legend above all — are behind it. Half a map under a legend describing data
+   that hasn't drawn is not a thing to hand anyone. The brand card and the API
+   error banner sit a rung higher and stay put; the corner activity panel steps
+   aside on its own, since this splash is already naming the same waits. */
+.loading-brand {
+  z-index: var(--cioos-z-splash, 32);
+  background-color: var(--cioos-surface-2, #eef6f4);
+  transition: opacity 0.6s ease-out;
+}
+
+/* The app's arrival: the cover dissolves and everything behind it — map,
+   chrome and all — comes up together. Slower than the UI's own transitions
+   (--cioos-transition-slow is 0.3s) because this one is the app appearing
+   rather than a control responding, and it plays once per session. Reduced
+   motion collapses it to nothing via theme.css's blanket rule, which still
+   fires the transitionend that unmounts the splash. */
+.loading-dismissed {
+  opacity: 0;
+}
+
+/* The splash's own scale, one number for the whole lockup: the stacked layout
+   sizes its mark and its name off this (see cioosLogoStyles.css). Set here
+   rather than taken from the layout's own default because the splash is a
+   full-screen interstitial — it has all the room in the world, and wants less
+   of it than that, on a phone most of all. */
+.loading-brand .cioosLogo-stacked {
+  font-size: var(--cioos-font-size-3xs, 9px);
+}
+
+/* The anchor the lockup keeps: sized by the logo alone, with the list of waits
+   taken out of flow beneath it. A row appearing or finishing then changes the
+   text under the logo and nothing else — the mark does not drift up and down
+   the screen as the app works through its loads. */
+.loadingBrand {
+  position: relative;
+  display: flex;
+  justify-content: center;
 }
 
 /* Set apart from the lockup: the wordmark is identity, this is status. */
 .loadingActivity {
-  margin-top: var(--cioos-space-sm, 8px);
-  font-size: var(--cioos-font-size-sm, 12px);
+  position: absolute;
+  top: calc(100% + var(--cioos-space-md, 12px));
+  left: 50%;
+  transform: translateX(-50%);
+  /* Shrink-wrap the rows rather than inherit the anchor's width, which is the
+     logo's — a long label would otherwise wrap inside the wordmark's column. */
+  width: max-content;
+  max-width: 80vw;
+  font-size: var(--cioos-font-size-xs, 11px);
   color: var(--cioos-ink-60);
 }

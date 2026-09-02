@@ -7,6 +7,9 @@
   bottom: calc(12px + var(--cioos-time-bar-space, 0px));
   left: 50%;
   transform: translateX(-50%);
+  /* On the dock rung, which is above the first-paint splash: a data service
+     that isn't answering means the splash never lifts, and this is the only
+     thing on screen that says why. */
   z-index: var(--cioos-z-dock, 35);
   display: flex;
   align-items: center;

@@ -195,7 +195,15 @@
 
   /* --- Z-Index Stack ---
      map (0) < map corner controls < in-panel chrome < shell (brand/search)
-     < dock < modal < tooltip.
+     < splash < dock < modal < tooltip.
+
+     The splash rung is the app's first paint. It is opaque and sits over the
+     map and everything keyed to it — the legend, the datasets column — because
+     none of that is worth reading until the data has drawn. It stops below the
+     dock on purpose: the brand card and the API error banner both live there
+     and both stay put through the load, the first because the app should look
+     like itself while it starts, the second because it is the one thing that
+     explains a splash that will not leave.
 
      Two surfaces sit just above the dock rather than on a rung of their own,
      each one step at a time so the order between them is stated where it
@@ -208,6 +216,7 @@
   --cioos-z-sticky-search: 9;
   --cioos-z-sticky-header: 10;
   --cioos-z-shell: 30;
+  --cioos-z-splash: 32;
   --cioos-z-dock: 35;
   --cioos-z-modal: 1055;
   --cioos-z-tooltip: 1080;

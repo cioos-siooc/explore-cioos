@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import ActivityList from '../ui/ActivityList.jsx'
 import { useActivity } from '../../state/activity/ActivityProvider.jsx'
+import { useMapState } from '../../state/map/MapStateProvider.jsx'
 import './activityIndicatorStyles.css'
 
 // The app's single report of background work: one panel in the bottom-right
@@ -17,12 +18,18 @@ import './activityIndicatorStyles.css'
 export default function ActivityIndicator () {
   const { t } = useTranslation()
   const { labelKeys, busy, announced } = useActivity()
+  // The first-paint splash names the same waits, in the middle of the screen
+  // and in bigger type. Two lists of one thing is one too many, so the standing
+  // panel stands down until the splash has gone. The spoken commentary below
+  // carries on either way — it is the splash's list that a screen reader would
+  // otherwise be missing.
+  const { firstPaintPending } = useMapState()
 
   return (
     <div className='activityIndicator'>
       {/* `announced` rather than `busy`: a cached filter change resolves inside
           the registry's delay and never flashes the panel open. */}
-      {announced && (
+      {announced && !firstPaintPending && (
         <div className='activityStatus'>
           <p className='activityStatusHeading'>{t('activityStatusHeading')}</p>
           <ActivityList labelKeys={labelKeys} />
