@@ -249,7 +249,7 @@
   "legendMetricDays": "Jours de données",
   "legendMetricDaysTitle": "La couleur des hexagones et la taille des marqueurs indiquent le nombre de jours de données couverts",
   "legendTopTickClamped": "La couleur la plus foncée couvre tout ce qui dépasse cette valeur, jusqu'à {{max}}",
-  "legendScaledToView": "Les couleurs sont ajustées aux hexagones actuellement visibles : une même couleur représente donc des quantités différentes d'un endroit à l'autre",
+  "legendScaledToView": "Les couleurs sont ajustées aux hexagones vus à ce niveau de zoom : une même couleur représente donc des quantités différentes d'un zoom à l'autre",
   "legendMarkerDaysPinned": "La taille des marqueurs indique les jours de données, le même décompte que la couleur des hexagones.",
   "legendGroupTrajectories": "Trajectoires",
   "legendHexes": "Hexagones",

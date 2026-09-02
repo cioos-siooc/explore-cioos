@@ -248,7 +248,7 @@
   "legendMetricDays": "Days of data",
   "legendMetricDaysTitle": "Hexagon colour and marker size both show how many days of data are covered here",
   "legendTopTickClamped": "The darkest colour covers everything above this, up to {{max}}",
-  "legendScaledToView": "The colours are scaled to the hexagons currently in view, so the same colour means different amounts in different places",
+  "legendScaledToView": "The colours are scaled to the hexagons seen at this zoom level, so the same colour means different amounts at different zooms",
   "legendMarkerDaysPinned": "Marker size shows days of data, the same count the hexagon colours show.",
   "legendGroupTrajectories": "Trajectories",
   "legendHexes": "Hexes",

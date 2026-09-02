@@ -485,10 +485,10 @@ export default function CreateMap({
   // Latest setColorStops closure (it reads the rangeLevels props), for the map
   // handlers registered once on mount.
   const setColorStopsRef = useRef(undefined)
-  // Whether anything has happened that could have changed the hexes on screen
-  // since the last measurement. Starts true — the first tiles to arrive have
-  // never been measured.
-  const hexRangeDirty = useRef(true)
+  // Bumped whenever a count stops meaning what it meant — new filters, a new
+  // geometry selection. It is one third of the ramp key below, which is how
+  // those changes reach the measurement without anyone clearing it by hand.
+  const rampQueryEpoch = useRef(0)
   // Whether the hex layers have been let through their opening fade — see
   // revealHexes. False until the ramp on them is the one they will keep.
   const hexesRevealed = useRef(false)
@@ -517,8 +517,13 @@ export default function CreateMap({
   // open page is a state, and while it lasts the ramp describes that dataset's
   // cells rather than every dataset's (see refreshViewportHexRange).
   const rampFocusPk = useRef(undefined)
-  // Which focus the held measurement was taken for, so it is taken once.
-  const rampMeasuredForPk = useRef(undefined)
+  // The ramp key the held measurement was taken for — see rampKey. undefined
+  // means nothing has been measured for the current key yet, so the next idle
+  // takes a pass at it.
+  const rampMeasuredFor = useRef(undefined)
+  // The fade threshold last written to the layers, so re-applying an unchanged
+  // one costs nothing (see applyHexOpacity).
+  const appliedFadeThreshold = useRef(undefined)
   // Latest tracks-mode props for the one-shot map 'load' closure (layers are
   // created once; these refs let it apply the current mode/scrub window).
   const tracksModeRef = useRef(tracksMode)
@@ -909,6 +914,16 @@ export default function CreateMap({
     return smallCircleSize + ratio * (largeCircleSize - smallCircleSize)
   }
 
+  // Every ramp-driven paint property below is ALWAYS an expression, and
+  // MapLibre cannot interpolate a paint property to or from a data-driven value
+  // — DataDrivenProperty.interpolate returns the OLD value whenever either side
+  // is one. A transition on such a property is therefore not a fade, it is a
+  // delay: the previous value is held for the duration and then snapped. The
+  // default 300ms put every re-colouring a third of a second after the map had
+  // visibly finished moving, which is what made it read as a glitch rather than
+  // as the tail of the movement. So they all take the snap without the wait.
+  const NO_TRANSITION = { duration: 0 }
+
   // The four layers that draw the same point features, and the halo's extra
   // radius. They share one paint, so a radius change has to reach all of them
   // or the halo/highlight desync from the markers they sit under.
@@ -1031,9 +1046,14 @@ export default function CreateMap({
 
   // Push the current fade threshold onto both hex layers. No-op before the
   // opening reveal, which owns fill-opacity until it has run (writing here
-  // first would flash the hexes on over the placeholder ramp).
+  // first would flash the hexes on over the placeholder ramp), and no-op when
+  // the threshold is the one already on them: this is called on every settled
+  // camera, and rewriting an identical data-driven opacity is a full repaint of
+  // every hex on screen for no visible change.
   function applyHexOpacity () {
     if (!hexesRevealed.current || !map.current) return
+    if (appliedFadeThreshold.current === viewportFadeThreshold.current) return
+    appliedFadeThreshold.current = viewportFadeThreshold.current
     if (map.current.getLayer('hexes')) {
       map.current.setPaintProperty(
         'hexes',
@@ -1208,11 +1228,13 @@ export default function CreateMap({
   // rendered rather than fetched: the counts are already on the features the
   // map is drawing, so a viewport-scaled ramp costs no request — one pass over
   // the visible hexes, which is at most a few thousand small objects.
+  // The threshold is written only on the success path at the bottom, alongside
+  // the range it belongs to. A pass that gives up leaves the last good one in
+  // place rather than clearing it: giving up means "no answer yet", not "no
+  // fading", and blanking it here made every unmeasurable moment — a globe
+  // zoom-out, a tile still in flight — un-fade the whole map and then fade it
+  // back.
   function measureVisibleHexRange(focusPk) {
-    // Cleared up front so every path that gives up below leaves no stale
-    // threshold behind: a fade band measured over the last view would otherwise
-    // keep being applied to hexes it was never measured against.
-    viewportFadeThreshold.current = undefined
     const layers = HEX_LAYER_IDS.filter((id) => map.current.getLayer(id))
     if (!layers.length) return undefined
     // No trustworthy answer to be had — see viewportQueryIsReliable. Nothing is
@@ -1259,71 +1281,95 @@ export default function CreateMap({
       counts.push(count)
     }
     if (!Number.isFinite(hi)) return undefined
+    const range = quantizeCountRange([lo, hi])
+    if (range === undefined) return undefined
     viewportFadeThreshold.current = percentileOf(counts, SPARSE_FADE_PERCENTILE)
-    return quantizeCountRange([lo, hi])
+    return range
   }
 
-  // Re-scale the ramp to what is on screen. Called on a debounce from the
-  // camera and tile events, and cheap to call spuriously: quantizing the
-  // measurement to coarse rungs (see quantizeCountRange) means an ordinary pan
-  // measures the same domain it started from, and an unchanged domain returns
-  // here without touching the map or the legend. That dedupe is also what stops
-  // the loop — repainting a data-driven paint property makes the map re-render,
-  // which is one of the things that calls this.
+  // What the held measurement describes, and the whole test for whether it
+  // still does. Three things can make the hexes on screen a different
+  // population from the ones the ramp was measured over:
+  //
+  //  - the counts stop meaning what they meant (new filters, a new geometry
+  //    selection) — rampQueryEpoch;
+  //  - the ramp is scaled to one dataset's cells rather than every dataset's
+  //    (a dataset page opening or closing) — rampFocusPk;
+  //  - the zoom level changes, which is the only camera move that changes how
+  //    much each hexagon holds.
+  //
+  // A PAN is deliberately not on that list. Measuring per viewport meant the
+  // whole map re-shaded and the legend renumbered itself every time the camera
+  // settled somewhere new, which is the flicker this key exists to remove: the
+  // domain is measured once per zoom level and then held across every drag at
+  // that zoom. The cost is that panning from a busy region into a quiet one at
+  // a fixed zoom leaves the quiet one pale until the user zooms — the honest
+  // trade for colours that mean the same thing either side of a drag.
+  //
+  // Integer zoom rather than the hex tier (see getCurrentRangeLevel): z0 and z4
+  // share the hex_0 grid but show wildly different extents, and one domain over
+  // both is exactly the flat-pale ramp the measurement exists to avoid.
+  function rampKey() {
+    return [
+      rampQueryEpoch.current,
+      rampFocusPk.current ?? '',
+      Math.floor(map.current.getZoom())
+    ].join('|')
+  }
+
+  // Re-scale the ramp to what is on screen, if the key says the ramp on the
+  // layers was measured for something else. Cheap to call spuriously — the key
+  // test is what stops the loop, since repainting a data-driven paint property
+  // makes the map re-render, which is one of the things that calls this.
   function refreshViewportHexRange() {
     if (!map.current || !map.current.isStyleLoaded()) return
-    // Nothing has moved and no tile has landed since the last measurement, so
-    // the answer is the one already on hand. Worth the flag: 'idle' also
-    // arrives after the re-renders a hover causes, and a viewport full of
-    // hexes is not free to walk.
-    if (!hexRangeDirty.current) return
-    const focusPk = rampFocusPk.current
-    // An open dataset page measures once and then holds. The ramp is scaled to
-    // that dataset's cells, and those cells are being read against each other —
-    // re-scaling under every drag would paint the same cell a different shade
-    // each time the camera settled, which is exactly what the ramp is for
-    // avoiding. Panning has nothing to re-measure until the page closes or a
-    // filter changes what the counts mean (resetViewportHexRange).
-    if (focusPk !== undefined && rampMeasuredForPk.current === focusPk) return
-    hexRangeDirty.current = false
-    const range = measureVisibleHexRange(focusPk)
-    // Only a real measurement locks it: opening a page while its dataset is off
-    // screen finds nothing, and should keep looking until the camera reaches it.
-    if (focusPk !== undefined && range !== undefined) {
-      rampMeasuredForPk.current = focusPk
-    }
-    // The fade threshold has just been re-measured, and it can move while the
-    // QUANTIZED range holds still (coarse rungs, see quantizeCountRange) — so it
-    // is applied here rather than only on the setColorStops path below, which
-    // the equal-ranges branch returns before reaching. Safe against the repaint
-    // -> re-render -> re-measure loop: hexRangeDirty is already false above, so
-    // the call this repaint provokes returns at the top.
-    applyHexOpacity()
-    if (rangesEqual(viewportHexRange.current, range)) {
-      // Nothing to repaint — but the pass still says the ramp already on the
-      // layers is the one this view gets, which is what the first reveal waits
-      // for. (The common way in on a first load: the measurement runs before
-      // any hexes have arrived, finds none, and the legend's tier stands.)
-      revealHexesIfRamped(range)
+    const key = rampKey()
+    if (rampMeasuredFor.current === key) return
+    const range = measureVisibleHexRange(rampFocusPk.current)
+    if (range !== undefined) {
+      // Only a real measurement pins the key. From here every pan at this zoom
+      // returns at the top, which is what holds the colours and the legend's
+      // numbers still through a drag.
+      rampMeasuredFor.current = key
+    } else if (!hexSourcesLoaded()) {
+      // No answer yet, and the tiles this key needs are still on their way in.
+      // Hold whatever is painted and take another pass at the next idle.
+      // Treating "can't tell" as "nothing here" is what handed the ramp back to
+      // the catalogue-wide tier and then took it away again a moment later: two
+      // full re-colourings where the user asked for none.
       return
     }
-    viewportHexRange.current = range
-    setColorStopsRef.current()
-    onViewportHexRangeRef.current(range)
+    // Sources loaded and still nothing on screen IS an answer — no hexes here,
+    // so the catalogue-wide tier takes the ramp back and the legend can say the
+    // filters matched nothing. It is deliberately not pinned, though: pan into
+    // data at this same zoom and the next idle should find it. The retries cost
+    // nothing, since clearing an already-cleared domain repaints nothing.
+
+    // The fade threshold rides on the same measurement and can move while the
+    // QUANTIZED range holds still (coarse rungs, see quantizeCountRange), so it
+    // is applied whether or not the domain below changed. applyHexOpacity drops
+    // an unchanged one, so this is free when it hasn't moved.
+    applyHexOpacity()
+    if (!rangesEqual(viewportHexRange.current, range)) {
+      viewportHexRange.current = range
+      setColorStopsRef.current()
+      onViewportHexRangeRef.current(range)
+    }
+    // Even with nothing repainted the pass still says the ramp already on the
+    // layers is the one this view gets, which is what the first reveal waits
+    // for. (The common way in on a first load: the measurement runs before any
+    // hexes have arrived, finds none, and the legend's tier stands.)
     revealHexesIfRamped(range)
   }
 
-  // Drop the measurement and fall back to the global tier. For the changes that
-  // make the counts on screen mean something else — new filters, a new geometry
-  // selection — where the hexes about to be drawn have nothing to do with the
-  // ones just measured. The next idle re-measures, once the new tiles are up.
-  function resetViewportHexRange() {
-    hexRangeDirty.current = true
-    rampMeasuredForPk.current = undefined
-    if (viewportHexRange.current === undefined) return
-    viewportHexRange.current = undefined
-    setColorStopsRef.current?.()
-    onViewportHexRangeRef.current(undefined)
+  // The counts on screen are about to mean something else — new filters, a new
+  // geometry selection — so the held measurement no longer describes what is
+  // coloured. It is only INVALIDATED, not dropped: the ramp already painted
+  // stays on the map until a fresh measurement replaces it, so a filter change
+  // is one re-colouring rather than a flash through the catalogue-wide domain
+  // on the way to the real one.
+  function invalidateHexRamp() {
+    rampQueryEpoch.current += 1
   }
 
   // The track layers' half of the focus. Unlike the hex/marker layers this is
@@ -1539,10 +1585,11 @@ export default function CreateMap({
     // Showing a layer changes what a measurement would find — a hidden layer
     // returns nothing from queryRenderedFeatures — so the ramp has to be
     // re-measured, and until it is, the hexes are still waiting to be revealed
-    // (see revealHexes). Nothing else raises this flag for a visibility change:
-    // no tile lands and the camera does not move, so only the 'idle' that
-    // follows the repaint is left to act on it.
-    if (visible) hexRangeDirty.current = true
+    // (see revealHexes). This is the one thing that invalidates the measurement
+    // without changing the ramp key: no tile lands, no filter changes and the
+    // camera does not move, so only the 'idle' that follows the repaint is left
+    // to act on it.
+    if (visible) rampMeasuredFor.current = undefined
   }
 
   // WMS overlay show/hide. Hiding takes everything with it, including the
@@ -1686,11 +1733,9 @@ export default function CreateMap({
         inspectDataset && inspectDataset.cdm_data_type !== 'Grid'
           ? inspectDataset.pk
           : undefined
-      if (rampPk !== rampFocusPk.current) {
-        rampFocusPk.current = rampPk
-        rampMeasuredForPk.current = undefined
-        hexRangeDirty.current = true
-      }
+      // rampFocusPk is part of the ramp key, so writing it is all it takes for
+      // the next idle to re-measure (see rampKey).
+      rampFocusPk.current = rampPk
       if (focusedDataset?.cdm_data_type === 'Grid') {
         // A griddap dataset has no map features: highlighting its pk would
         // grey the whole map with nothing selected. Draw its bbox instead.
@@ -1883,9 +1928,10 @@ export default function CreateMap({
     map.current.setFilter('points-highlighted', ['in', 'pk', ''])
 
     // The hexes about to be drawn are a different population from the ones the
-    // ramp was last measured over, so the measurement goes and the global tier
-    // holds the ramp until the new tiles land (see resetViewportHexRange).
-    resetViewportHexRange()
+    // ramp was last measured over, so the held measurement is invalidated — the
+    // ramp on screen stays put until the new tiles land and are measured (see
+    // invalidateHexRamp).
+    invalidateHexRamp()
     refreshCombinedSources(mapQueryString)
     setLoading(true)
     doFinalCheck.current = true
@@ -1911,8 +1957,8 @@ export default function CreateMap({
     // Source existence, not map.loaded() — see the filter effect above.
     if (!map.current || !map.current.getSource('cde-tiles')) return
     // Adding or removing a geometry changes what the hexes sum, so the ramp's
-    // measured domain goes with it.
-    resetViewportHexRange()
+    // held measurement goes with it.
+    invalidateHexRamp()
     refreshCombinedSources(mapQueryString)
     if (tracksModeRef.current && anyTrajectoryLayerOn(dataLayers)) {
       refreshTracksSource(mapQueryString, scrubTimeRef.current, trailingDaysRef.current)
@@ -2166,7 +2212,11 @@ export default function CreateMap({
         'source-layer': 'internal-layer-name',
         paint: {
           'circle-opacity': circleOpacity,
+          'circle-radius-transition': NO_TRANSITION,
           'circle-radius': radiusExpression(pointRadiusRange.current),
+          // setColorStops rewrites this one whenever the ramp moves — see
+          // NO_TRANSITION.
+          'circle-color-transition': NO_TRANSITION,
           'circle-color': dimmable(colors),
           'circle-stroke-color': dimmable(colors),
           'circle-stroke-opacity': 0.001,
@@ -2192,16 +2242,14 @@ export default function CreateMap({
             // Zero until the ramp is final — see revealHexes. Then data-driven:
             // sparse hexes ramp up from a floor, others get normal.
             'fill-opacity': hexesRevealed.current ? coverageHexOpacityExpression() : 0,
-            // No transition on it. MapLibre cannot interpolate a paint
-            // property to or from a data-driven value — DataDrivenProperty
-            // .interpolate returns the OLD value whenever either side is an
-            // expression, and this one always is (see fadeFlat). The default
-            // 300ms therefore does not fade anything: it holds the previous
-            // opacity for 300ms and then snaps. That delay is the flicker, on
-            // the reveal and on every threshold change after it, so take the
-            // snap without the wait.
-            'fill-opacity-transition': { duration: 0 },
+            // Neither this nor the colours below may transition — see
+            // NO_TRANSITION. For the opacity that delay was the flicker on the
+            // opening reveal and on every threshold change after it; for the
+            // colours it is the lag between the tiles landing and the ramp
+            // arriving on them.
+            'fill-opacity-transition': NO_TRANSITION,
             'fill-color': dimmable(coverageHexFillColor()),
+            'fill-color-transition': NO_TRANSITION,
             'fill-outline-color': coverageHexOutlineColor()
           }
         },
@@ -2228,6 +2276,7 @@ export default function CreateMap({
             // quietly, and the casing is what keeps a grey dot legible over a
             // dark sea.
             'circle-opacity': ['case', IS_DIMMED, 0.5, 0.9],
+            'circle-radius-transition': NO_TRANSITION,
             'circle-radius': radiusExpression(pointRadiusRange.current, 1.25)
           }
         },
@@ -2246,20 +2295,18 @@ export default function CreateMap({
           // Zero until the ramp is final — see revealHexes. Then data-driven:
           // sparse hexes ramp up from a floor, others get normal.
           'fill-opacity': hexesRevealed.current ? hexOpacityExpression() : 0,
-          // No transition on it. MapLibre cannot interpolate a paint
-          // property to or from a data-driven value — DataDrivenProperty
-          // .interpolate returns the OLD value whenever either side is an
-          // expression, and this one always is (see fadeFlat). The default
-          // 300ms therefore does not fade anything: it holds the previous
-          // opacity for 300ms and then snaps. That delay is the flicker, on
-          // the reveal and on every threshold change after it, so take the
-          // snap without the wait.
-          'fill-opacity-transition': { duration: 0 },
+          // Neither this nor the colour below may transition — see
+          // NO_TRANSITION. For the opacity that delay was the flicker on the
+          // opening reveal and on every threshold change after it; for the
+          // colour it is the lag between the tiles landing and the ramp
+          // arriving on them.
+          'fill-opacity-transition': NO_TRANSITION,
           // A real interpolate expression rather than the legacy
           // { property, stops } paint function, because that form cannot be
           // nested inside the 'case' dimmable wraps it in — the same reason
           // coverageHexFillColor builds its ramps through rampExpression.
-          'fill-color': dimmable(hexFillColor())
+          'fill-color': dimmable(hexFillColor()),
+          'fill-color-transition': NO_TRANSITION
         }
       }, FIRST_LABEL_LAYER_ID)
 
@@ -2272,6 +2319,7 @@ export default function CreateMap({
         paint: {
           'circle-color': dimmable(colors),
           'circle-opacity': circleOpacity,
+          'circle-radius-transition': NO_TRANSITION,
           'circle-radius': radiusExpression(pointRadiusRange.current),
           'circle-stroke-color': 'black',
           // The selection ring is dropped on dimmed points: a focused dataset
@@ -2425,6 +2473,7 @@ export default function CreateMap({
         source: 'click-highlight',
         filter: ['==', ['geometry-type'], 'Point'],
         paint: {
+          'circle-radius-transition': NO_TRANSITION,
           'circle-radius': radiusExpression(pointRadiusRange.current, 6),
           'circle-color': clickHighlightColor,
           'circle-blur': 0.8,
@@ -2463,6 +2512,7 @@ export default function CreateMap({
         source: 'click-highlight',
         filter: ['==', ['geometry-type'], 'Point'],
         paint: {
+          'circle-radius-transition': NO_TRANSITION,
           'circle-radius': radiusExpression(pointRadiusRange.current),
           'circle-color': 'rgba(0, 0, 0, 0)',
           'circle-stroke-color': '#000000',
@@ -3693,37 +3743,40 @@ export default function CreateMap({
   // debounce survives every re-render and a slow drag really does produce one
   // measurement rather than one per settled frame.
   //
-  // Two things can change the hexes on screen: the camera moving over data
-  // already loaded, and new tiles arriving (a pan into unloaded ground, a
-  // filter change). Both raise the dirty flag; the measurement itself waits for
-  // 'idle', which is the one event that means the new features are rendered —
-  // 'sourcedata' fires while they are still on their way to the screen, and
-  // queryRenderedFeatures only sees what is
-  // actually drawn. All three share one debounce, so a pan that pulls in new
-  // tiles measures once at the end rather than once per event.
+  // 'idle' is the one event that means the camera has settled AND every tile
+  // it asked for is rendered, which is exactly the moment a measurement can be
+  // taken — so it is taken there, undebounced. Waiting out a debounce after
+  // 'idle' only put the re-colouring several hundred milliseconds after the
+  // map had visibly finished, where it read as a glitch rather than as the tail
+  // of the movement that caused it. It is safe against the repaint ->
+  // re-render -> 'idle' loop because refreshViewportHexRange records the key it
+  // measured for and returns at the top for the next call.
+  //
+  // 'moveend' and 'sourcedata' both fire while things are still arriving, so
+  // they keep the debounce: they exist to catch the cases where a map that
+  // never fully settles would otherwise never measure.
   useEffect(() => {
     if (!map.current) return
     const measure = debounce(
       () => refreshViewportHexRange(),
       VIEWPORT_RAMP_DEBOUNCE_MS
     )
-    const onMoveEnd = () => {
-      hexRangeDirty.current = true
-      measure()
+    const measureNow = () => {
+      measure.cancel()
+      refreshViewportHexRange()
     }
     const onDataSourceLoaded = (e) => {
       if (!e.isSourceLoaded || !HEX_SOURCE_IDS.includes(e.sourceId)) return
-      hexRangeDirty.current = true
       measure()
     }
-    map.current.on('moveend', onMoveEnd)
+    map.current.on('moveend', measure)
     map.current.on('sourcedata', onDataSourceLoaded)
-    map.current.on('idle', measure)
+    map.current.on('idle', measureNow)
     return () => {
       measure.cancel()
-      map.current.off('moveend', onMoveEnd)
+      map.current.off('moveend', measure)
       map.current.off('sourcedata', onDataSourceLoaded)
-      map.current.off('idle', measure)
+      map.current.off('idle', measureNow)
     }
   }, [])
 
