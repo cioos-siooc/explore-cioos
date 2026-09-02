@@ -216,6 +216,13 @@ export default function FeatureCard () {
         <div className='featureCardHeading'>
           <span className='featureCardHeadingTitle'>
             {t('featureCardTitle')}
+            {!empty && (
+              <span
+                className='featureCardMapClickSwatch'
+                aria-hidden='true'
+                title={t('featureCardMapClickHint')}
+              />
+            )}
           </span>
           {!empty && (
             <span className='featureCardHeadingMeta'>

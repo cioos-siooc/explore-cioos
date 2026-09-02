@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
 import TableFilter, { filterRows } from '../../ui/TableFilter.jsx'
-import SortChips from '../../ui/SortChips.jsx'
+import SortSelect from '../../ui/SortSelect.jsx'
 import Pager, { PAGE_SIZES } from '../../ui/Pager.jsx'
 
 // A searchable, sortable, paged list of cards — the dataset page's records and
@@ -43,7 +43,7 @@ export default function CardList ({
     const factor = sort.dir === 'asc' ? 1 : -1
     return [...(filterRows(items, filterText) || [])].sort((a, b) => {
       // The pinned item rides on top of the sort rather than replacing it, so
-      // the sort chips still do what they say — the pin just puts one item in
+      // the sort control still does what it says — the pin just puts one item in
       // front of the order they produce.
       const pa = pinnedKey !== undefined && keyOf(a) === pinnedKey ? 0 : 1
       const pb = pinnedKey !== undefined && keyOf(b) === pinnedKey ? 0 : 1
@@ -82,7 +82,7 @@ export default function CardList ({
         onChange={setFilterText}
         placeholder={filterPlaceholder}
       />
-      <SortChips fields={sortFields} sort={sort} onChange={setSort} />
+      <SortSelect fields={sortFields} sort={sort} onChange={setSort} />
       {rows.length === 0 ? (
         <div className='cardListEmpty'>{emptyText}</div>
       ) : (

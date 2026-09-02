@@ -1,12 +1,23 @@
 /* ------------------------------------------------------------------
- * FiltersPanel — master (filter rows) / detail (open filter's options),
- * hosted inside the filters modal. The open filter's options anchor to
- * the modal body (the nearest positioned ancestor).
+ * FiltersPanel — master (filter rows) / detail (open filter's options)
+ * over a footer stating what the filters add up to, hosted inside the
+ * filters modal.
  * ------------------------------------------------------------------ */
 .filtersPanel {
   display: flex;
+  flex-direction: column;
   min-height: 340px;
   height: 100%;
+}
+
+/* Positioned: the detail pane and the placeholder that stands in for it are
+   anchored to this region rather than to the modal body, so they stop at the
+   footer instead of running under it. */
+.filtersPanelBody {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .filtersPanelList {
@@ -17,8 +28,56 @@
   overflow-y: auto;
 }
 
+/* The dialog covers the map at every width and takes the whole screen on a
+   phone, so the count is the only thing telling the user their filters did
+   anything. Reset sits with it: the two things that act on the whole set. */
+.filtersPanelFooter {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-surface-2);
+}
+
+.filtersPanelCount {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  font-weight: 700;
+  color: var(--cioos-ink);
+}
+
+/* A refetch keeps the previous number readable rather than blanking it — the
+   same dimming the top bar's counter uses. */
+.filtersPanelCount.updating {
+  opacity: 0.55;
+}
+
 .filtersPanelReset {
-  margin: 10px 0 4px 10px;
+  flex: 0 0 auto;
+  padding: 0 14px;
+  height: 34px;
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.filtersPanelReset:hover {
+  background-color: var(--cioos-teal-light);
+}
+
+.filtersPanelReset:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }
 
 /* Hint shown in the detail pane while no filter is open. */
@@ -102,7 +161,7 @@
 }
 
 /* The open filter's options fill the detail pane to the right of the list
-   (anchored to the modal body, the nearest positioned ancestor — the list
+   (anchored to .filtersPanelBody, the nearest positioned ancestor — the list
    column is static so it cannot clip the pane).
 
    The pane is a column: search on top, options taking whatever is left, and
@@ -224,7 +283,7 @@
 
 .filtersPanel .filterSectionHeading {
   font-family: var(--cioos-font-display);
-  font-size: 11px;
+  font-size: var(--cioos-font-size-xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -322,38 +381,72 @@
 }
 
 /* ------------------------------------------------------------------
- * Mobile: the filters master/detail stacks, options expanding inline
- * under their row.
+ * Mobile: the filters master and detail become two screens, one filter
+ * at a time, and everything in them becomes a touch target.
  * ------------------------------------------------------------------ */
 @media (max-width: 700px) {
-  .filtersPanel {
-    display: block;
-    overflow-y: auto;
-  }
-
+  /* One column: the list is the whole surface, and so is the open filter. */
   .filtersPanelList {
+    flex: 1 1 auto;
     width: 100%;
-    flex: none;
+    padding: 8px 10px;
     border-right: none;
   }
 
-  /* Stacked inline under its row, the pane has no height of its own to
-     distribute, so it flows normally and the whole panel scrolls instead. */
-  .filtersPanel .filterOptions {
-    position: static;
-    display: block;
-    overflow: visible;
-    margin: 4px 0 8px;
-    border: 1px solid var(--cioos-hairline);
-    border-radius: var(--cioos-radius);
-    padding: 12px;
-  }
+  /* The open filter takes the whole surface instead of expanding under its own
+     row — a drill-in, the shape the datasets sidebar already uses for a dataset
+     page, with the header's breadcrumb as the way back.
 
-  .filtersPanel .filterOptionsBody {
-    overflow: visible;
+     Expanding inline cannot be made to work here. Left unbounded (which is what
+     a static position and visible overflow amount to) a single 47-option filter
+     came to 2900px in a 760px window, pushing the search field, the Select all /
+     Reset actions and every other row off the end of the surface. Bounded, it is
+     routinely taller than the room left below its row, so it has to be scrolled
+     into view — and cannot be, reliably: the filters whose options arrive from
+     the network grow after the scroll has been computed, leaving the actions row
+     under the fold. Filling the surface has no such arithmetic in it, and hands
+     the long option lists every pixel of it. */
+  .filtersPanel .filterOptions {
+    inset: 0;
+    padding: 10px 12px 12px;
   }
 
   .filtersPanelPlaceholder {
     display: none;
+  }
+
+  /* Touch targets. 44px is the floor on a phone and every row here was sized
+     for a pointer — the option rows worst of all, at 34px. */
+  .filtersPanelList .filterHeader {
+    min-height: 48px;
+    padding: 6px 10px;
+  }
+
+  .filtersPanel .filterOptionsBody .optionButton {
+    min-height: 44px;
+    padding: 10px 8px;
+    margin: 0 0 2px;
+  }
+
+  /* The pane covers the list, so its options are the surface's own scroll. */
+  .filtersPanel .filterOptionsBody {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Clear of the home indicator, and roomy enough to be the reset target for
+     the whole surface rather than a caption-sized link. */
+  .filtersPanelFooter {
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .filtersPanelReset {
+    min-height: 44px;
+    padding: 0 18px;
+  }
+
+  /* A status line, not a heading — and at the smaller step it shares the row
+     with the button rather than wrapping under it in the longer locale. */
+  .filtersPanelCount {
+    font-size: var(--cioos-font-size-sm);
   }
 }

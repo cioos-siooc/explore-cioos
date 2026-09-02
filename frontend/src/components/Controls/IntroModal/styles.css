@@ -224,6 +224,52 @@
   }
 }
 
+/* ------------------------------------------------------------------
+ * Mobile: the dialog is already full-screen here (fullscreen='lg-down'),
+ * but it was still laid out as a wide one. The header reserved 160px on
+ * its right for a logo that then sat under the close button, and the four
+ * 250px step tiles were asked to share a row about 100px wider than one
+ * of them.
+ * ------------------------------------------------------------------ */
+@media (max-width: 700px) {
+  /* The brand is on the app's own header two taps away; here it only stands
+     between the title and the button that closes the dialog. */
+  .introModal .introLogo {
+    display: none;
+  }
+
+  .introModal .modalHeader {
+    padding: 0;
+  }
+
+  /* Two up rather than four across, and sized off the column rather than off
+     a fixed 250px. The tiles are hover targets on a pointer device; a tap
+     works the same way here, so they stay as they are otherwise. */
+  .introModal .steps {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--cioos-space-sm);
+  }
+
+  .introModal .stepImage {
+    width: auto;
+    height: 130px;
+    margin: 0;
+    /* Same ~30px of tile left over for the label as the 992px rung leaves. */
+    background-size: 100px 100px;
+  }
+
+  /* The hovered/tapped step's write-up sizes to its text instead of holding
+     open a 250px well under the tiles. */
+  .introModal .stepInfo {
+    min-height: 0;
+  }
+
+  .introModal .infoBox {
+    min-height: 0;
+  }
+}
+
 .infoBox {
   min-height: 300px;
 }

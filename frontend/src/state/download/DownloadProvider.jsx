@@ -72,7 +72,7 @@ export default function DownloadProvider ({ children }) {
     case 'submitted':
       submitRequest()
       setSubmissionFeedback({
-        icon: <Spinner className='submissionSpinner' />,
+        icon: <Spinner size='sm' className='submissionSpinner' />,
         text: t('submissionStateTextSubmitting') // 'Submitting...'
       })
       break

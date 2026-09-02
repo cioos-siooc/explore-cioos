@@ -34,6 +34,6 @@
   gap: 8px;
 }
 
-.scientificNameLoading .spinner-border {
+.scientificNameLoading .cioosSpinner {
   color: var(--cioos-primary);
 }

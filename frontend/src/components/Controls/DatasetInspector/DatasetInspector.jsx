@@ -7,6 +7,7 @@ import Loading from '../Loading/Loading.jsx'
 import GriddapDetails from '../GriddapDetails/GriddapDetails.jsx'
 import { server } from '../../../config'
 import reportError from '../../../state/reportError.js'
+import { useActivityTask } from '../../../state/activity/ActivityProvider.jsx'
 import {
   dataLayerKeyForDataset,
   DATA_LAYER_LABEL_KEYS
@@ -153,6 +154,7 @@ export default function DatasetInspector({
   // so an initial false would paint one frame of an empty record table before
   // the spinner appears.
   const [loading, setLoading] = useState(hasRecordList)
+  useActivityTask('activityRecordListText', loading)
 
   // const platformColor = platformColors.filter(
   //   (pc) => pc.platform === dataset.platform

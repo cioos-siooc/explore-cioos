@@ -1,0 +1,28 @@
+/* SortSelect (SortSelect.jsx) — the direction toggle that shares the sort pill
+   with the field select. Divided off rather than spaced apart, so the field and
+   its direction still read as one control. */
+.sortSelectDirection {
+  flex: 0 0 auto;
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  padding: 0;
+  border: none;
+  border-left: 1px solid var(--cioos-hairline);
+  border-radius: 0 var(--cioos-radius-pill) var(--cioos-radius-pill) 0;
+  background: transparent;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.sortSelectDirection:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.sortSelectDirection:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}

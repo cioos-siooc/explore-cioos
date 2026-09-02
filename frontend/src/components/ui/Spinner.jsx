@@ -2,19 +2,68 @@ import * as React from 'react'
 
 import './spinnerStyles.css'
 
-// Drop-in replacement for react-bootstrap's border Spinner. Matches its
-// behavior of only honouring size='sm' (numeric sizes were always ignored).
-export default function Spinner ({ className = '', size, role = 'status' }) {
-  const classes = [
-    'spinner-border',
-    size === 'sm' && 'spinner-border-sm',
-    className
-  ]
+// The CIOOS mark, animated: the app's one loading indicator at every size.
+//
+// The path data is lifted verbatim from public/ICON_color_dark_bkg.svg (the
+// favicon) — one compound path for the geodesic mesh, plus five separate blobs
+// for the node dots. The dots being their own elements is the whole reason
+// this works: they pulse in sequence while the mesh holds still. The mesh is
+// filled rather than stroked, so a stroke-dasharray draw-on isn't available.
+const MESH = 'M92.48,35.8l-16-23.14L51,0,51,0,20.57,8.83H20.4L4.52,27.7l-.06.06v.16L0,58.81V59L16,82.1,41.5,94.73l.24,0,30-8.83h.17L87.82,67.06l.06-.07v-.24l4.55-30.14m-8.29,3.88-8.26-24L91.43,35.88ZM13.38,57.83,5,34.26l20.07-5.1Zm.24.73.16-.15.32-.33L25.86,29.43l13,24.46Zm25.5-3.72L38.5,80.21,14.39,59.43ZM26.63,29l31.58,2.89L39.62,53.44Zm32.69,1.78L47.12,9.43l26.55,5ZM74.42,15l8.79,25.37L60.07,31.29ZM66.54,63.34,40.28,54.05,59,32.48ZM58.35,31,26.94,28.12,46.11,9.58ZM40,54.89l26.22,9.28L39.46,80.29ZM66.79,65l-1.7,21-24.83-5ZM59.92,32.27l23.31,9.18L67.57,63ZM76,13.53l9.76,14L75.25,14.15ZM75.18,13l-.69.57L61.22,6ZM72,13.12,46.93,8.43l4-7.46Zm-22.24-12L45.92,8.37,24,8.71ZM45.07,9.25,26.13,27.57l-4.91-18ZM20.42,10.34l4.9,17.8L5.46,33.22ZM5.24,28.15l12-14.36L4.77,32.47Zm-.62,7.69,8.1,22.8L.92,58.38ZM1.21,59.35l11.65.27,2.71,20.5Zm12.67.92L37.71,80.8l-21.06.71Zm4.2,22.09,20.45-.7,2.46,12ZM42,94,39.52,81.81,63.6,86.67Zm29.52-8.74-4.72.63L84.18,70.29Zm-5.61.1,1.78-20.77,18.81,2.59Zm2.19-21.62L83.56,42.45,87,66.32Zm19.41.06-3-22.33,7.11-4.54Z'
+
+// Each node with the delay that sweeps the pulse across the mark, left to
+// right. The order is spatial, not the order the paths appear in the source
+// file, which is why the delays live next to the path data instead of as
+// :nth-child rules in the stylesheet.
+const NODES = [
+  { d: 'M16.73,57.79a3.91,3.91,0,1,0-2,5.13,3.9,3.9,0,0,0,2-5.13Z', delay: '0s' }, // bottom left
+  { d: 'M42.87,52.81a3.12,3.12,0,1,0-1.62,4.1A3.12,3.12,0,0,0,42.87,52.81Z', delay: '0.16s' }, // centre
+  { d: 'M62.45,28.29a4.7,4.7,0,0,0-6.1,7.14,4.64,4.64,0,0,0,3,1.12l.39,0a4.71,4.71,0,0,0,2.7-8.24Z', delay: '0.32s' }, // centre right
+  { d: 'M77.36,13.42a3.11,3.11,0,1,0-1.61,4.09A3.11,3.11,0,0,0,77.36,13.42Z', delay: '0.48s' }, // top right
+  { d: 'M86.8,39.7a3.11,3.11,0,1,0-1.62,4.09h0A3.11,3.11,0,0,0,86.8,39.7Z', delay: '0.64s' } // right
+]
+
+// Below ~20px the mesh's sixty-odd facets render as mush, so the small sizes
+// get a three-dot row instead: same pulse, still legible inside a count pill.
+const SIMPLIFIED = ['xs', 'sm']
+
+export default function Spinner ({ className = '', size = 'md', role = 'status' }) {
+  const classes = ['cioosSpinner', `cioosSpinner-${size}`, className]
     .filter(Boolean)
     .join(' ')
+
   return (
-    <span className={classes} role={role} aria-hidden='true'>
-      <span className='sr-only' />
+    <span className={classes} role={role}>
+      {SIMPLIFIED.includes(size) ? (
+        <svg className='cioosSpinnerMark' viewBox='0 0 24 8' aria-hidden='true'>
+          {[4, 12, 20].map((cx, index) => (
+            <circle
+              key={cx}
+              className='cioosSpinnerNode'
+              cx={cx}
+              cy='4'
+              r='3'
+              style={{ '--cioos-node-delay': `${index * 0.16}s` }}
+            />
+          ))}
+        </svg>
+      ) : (
+        <svg
+          className='cioosSpinnerMark'
+          viewBox='0 0 92.48 94.76'
+          aria-hidden='true'
+        >
+          <path className='cioosSpinnerMesh' d={MESH} />
+          {NODES.map(({ d, delay }) => (
+            <path
+              key={delay}
+              className='cioosSpinnerNode'
+              d={d}
+              style={{ '--cioos-node-delay': delay }}
+            />
+          ))}
+        </svg>
+      )}
     </span>
   )
 }

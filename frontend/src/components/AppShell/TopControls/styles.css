@@ -102,13 +102,20 @@
 /* Labels wrap instead of running past the fixed-width brand card. The break
    points come from the strings themselves — French joins "de données" with a
    non-breaking space so it wraps as "Jeux / de données", never "Jeux de /
-   données". There is normally room for one line; this only bites on the
-   narrowest phones. */
+   données". There is normally room for one line; this bites on the narrowest
+   phones, and on any phone in French, where the label is both the longest and
+   set at the larger mobile type size. */
 .topBarButtonLabel {
   /* Floor the label at its longest word so flex shrinking can't squeeze it
      narrower than "données" and split the word. */
   min-width: min-content;
-  text-align: center;
+  /* Not centered: a wrapped label's box is as wide as its longest line, so
+     centering set the short first line ("Jeux") adrift in the middle of it and
+     opened a gap between the icon and the text that read as a layout error.
+     Aligned to the start, the first line stays against the icon it belongs to
+     and the second runs under it. A label that fits on one line is exactly as
+     wide as its text, so this changes nothing for the other segments. */
+  text-align: start;
   line-height: 1.2;
   /* break-word, not anywhere: a word only ever splits when it cannot fit on a
      line of its own, so "données" drops to its own line instead of breaking
@@ -212,7 +219,7 @@
   min-height: 22px;
   padding: 4px 12px;
   border-bottom: 1px solid var(--cioos-hairline);
-  font-size: 12px;
+  font-size: var(--cioos-font-size-sm);
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: 0.01em;
@@ -290,35 +297,80 @@
   color: var(--cioos-white);
 }
 
+/* ------------------------------------------------------------------
+ * Mobile: the bar stops being a centered floating card and becomes the
+ * app's header — pinned to the top edge, spanning the full width, with
+ * no strip of map above or beside it. See the TopLeft stylesheet for the
+ * card's own side of this (square corners, no side borders, no tilt).
+ * ------------------------------------------------------------------ */
 @media (max-width: 700px) {
   .topBar {
-    top: 8px;
-    max-width: calc(100vw - 16px);
+    top: 0;
+    left: 0;
+    right: 0;
+    /* The centering translate has nothing left to centre and would only pull
+       the full-width bar off the screen. */
+    transform: none;
+    max-width: none;
+    /* Load-bearing: the column centres its children, which leaves the brand
+       card shrink-to-fit — its own `width: 100%` would then resolve against
+       that shrunken box and never reach the screen edges. */
+    align-items: stretch;
+    /* Only the chips are still a floating layer under the header, so the gap
+       belongs to them rather than to the stack. */
+    gap: 6px;
   }
 
+  /* The chips hang under the full-width header, so they take its width too. */
+  .activeFilterBullets {
+    width: 100%;
+    padding: 0 8px;
+  }
+
+  /* The header meets the screen edges square, so the tab strip's outer corners
+     — which were cut to match the floating card's — square with it. The 1px
+     side bleed goes with them: it existed to cover the card's side borders,
+     which the full-bleed header no longer draws, and left to itself it would
+     push the strip 2px past the viewport. */
+  .topBarActions {
+    margin: 0 0 -1px;
+  }
+
+  .topBarActions,
+  .topBarActions > .topBarButton:first-child,
+  .topBarActions > .topBarButton:last-child {
+    border-radius: 0;
+  }
+
+  /* One rung under the mobile body size. This strip is a compact segmented
+     control rather than running text, and at the full 16px the French label no
+     longer fitted its half of the row: it wrapped, and a wrapped label is not
+     merely two lines — its box is still as wide as the column gave it, so the
+     text sat in a box half again its own width and the slack read as a gap
+     between the icon and the words. At 14px "Jeux de données" is back on one
+     line from 360px up, so the box is the text and there is no slack to place.
+     Still two rungs above the 12px this label used to be pinned at, and the
+     wrap (with the start alignment above) is left as the fallback for the
+     narrowest phones, where nothing fits on one line. */
   .topBarButtonLabel {
-    /* Keep labels — the merged pill is the only dataset/filter entry point on
-       phones now — but tighten type and padding so both segments fit. On a
-       320px-wide phone the card is only ~296px, leaving ~148px per segment,
-       where "Jeux de données" at 14px would wrap onto a second line. */
-    display: inline;
-    font-size: 12px;
+    font-size: var(--cioos-font-size-sm);
   }
 
   .topBar .topBarActions .topBarButton {
     gap: 6px;
+    /* Taller, not wider: a 40px row is a cramped touch target for the app's
+       three primary entry points, and the height is the dimension a phone can
+       spare. */
+    min-height: 48px;
     padding: 4px 8px;
   }
 
-  .topBarCount {
-    padding: 1px 6px;
-    font-size: 11px;
-  }
-
+  /* The tally is a readout between two dense rows, so it gives up its own
+     padding rather than its type size — which the mobile scale has just
+     raised, this being one of the lines that was hardest to read. */
   .topBarCountsRow {
-    margin: 5px 0;
+    min-height: 0;
     padding: 3px 8px;
-    font-size: 10px;
   }
 }
 

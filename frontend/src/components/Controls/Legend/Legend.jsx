@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react'
+import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  ArrowsAngleExpand,
   ChevronCompactDown,
   ChevronCompactUp,
   Circle,
@@ -19,19 +20,19 @@ import {
   bathymetryLegendMinZoom,
   bathymetryScaleMin,
   bathymetryScaleMax,
-  bathymetryTicks,
-  TRAIL_ALL,
-  effectiveTrailingDays
+  bathymetryTicks
 } from '../../config.js'
 import platformColors from '../../platformColors'
 import {
   DEFAULT_DATA_LAYERS,
   anyTrajectoryLayerOn
 } from '../../../state/dataLayers.js'
+import TrajectoryDate from '../TrajectoryDate/TrajectoryDate.jsx'
+import Modal from '../../ui/Modal.jsx'
 import Spinner from '../../ui/Spinner.jsx'
 import Switch from '../../ui/Switch.jsx'
 import LegendFooter from './LegendFooter.jsx'
-import usePublishedFootprint from '../../../state/ui/usePublishedFootprint.js'
+import useMediaQuery, { MOBILE_QUERY } from '../../../state/ui/useMediaQuery.js'
 
 import './styles.css'
 import classNames from 'classnames'
@@ -83,28 +84,11 @@ function depthPosition(metres) {
 // made the icon claim a count.
 const HEX_ICON_COLOR = colorScale[Math.floor(colorScale.length / 2)]
 
-// Where a surface stacking with this card starts, published as a pair because
-// this card changes corners: top-right on a wide screen, bottom-left under
-// 900px (see the stylesheet). Whichever corner it holds, the surface stacking
-// with it goes on the far side — under the card's foot when it is anchored to
-// the top, over its head when it is anchored to the bottom — so the two
-// measurements are `top:` and `bottom:` values respectively.
-//
-// It collapses to its header row and grows with what is on the map, so its
-// height has to be told rather than assumed. The griddap legend's button is the
-// one thing reading these today (see the WmsLegend stylesheet).
-const LEGEND_STACK_GAP = 8
-function measureLegendBelowSpace (rect) {
-  return rect.bottom + LEGEND_STACK_GAP
-}
-function measureLegendAboveSpace (rect) {
-  return window.innerHeight - rect.top + LEGEND_STACK_GAP
-}
-
 // Choose which stop indices get a tick label. Keeps every stop when there are
 // few, otherwise thins to an evenly spaced subset (always including the first
 // and last) so labels don't overlap on the compact bar.
 function pickTickIndices(n, maxTicks = 5) {
+  if (maxTicks < 2) return [0]
   if (n <= maxTicks) return Array.from({ length: n }, (_, i) => i)
   const step = (n - 1) / (maxTicks - 1)
   const indices = new Set()
@@ -152,28 +136,19 @@ export default function Legend({
   // their entry without a switch.
   controls = {},
   layerControls = [],
-  trailingDays,
-  dataLayers,
-  // The date the time bar's scrub handle is on, named in the trajectory keys —
-  // the track lines and the heading arrows are drawn relative to it.
-  scrubTime
+  dataLayers
 }) {
   const { t } = useTranslation()
   // The card's collapse, and the only thing that hides any of this: open, it
   // shows the whole list — the ramps, their ticks, the marker keys, the track
   // lines, the remaining layer switches; closed, it is the header row alone.
   const [legendOpen, setLegendOpen] = useState(true)
-  const cardRef = useRef(null)
-  usePublishedFootprint(
-    cardRef,
-    '--cioos-legend-below-space',
-    measureLegendBelowSpace
-  )
-  usePublishedFootprint(
-    cardRef,
-    '--cioos-legend-above-space',
-    measureLegendAboveSpace
-  )
+  // On a phone the card would take a quarter of the map to say what the map is
+  // already showing, so it shrinks to a single button in the corner and the
+  // keys move behind it, opening centred over the map when they are asked for.
+  // That is the right trade for a legend: it is read in glances, not kept open.
+  const compact = useMediaQuery(MOBILE_QUERY)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   // Fall back to the default selection when the prop is absent (older callers /
   // initial render) — all-on would claim legend entries the map isn't drawing.
@@ -212,14 +187,24 @@ export default function Legend({
   //
   // `label` may be absent, for a group whose rows are already self-describing
   // switches — a label there would only name the leftovers.
-  function renderGroup(key, label, { control, tooltip } = {}, children) {
+  //
+  // `idSuffix` distinguishes the switch from a second copy of the same control
+  // elsewhere on screen: in compact mode the observations group is rendered both
+  // on the card and inside the keys dialog, and two inputs sharing an id is
+  // invalid whether or not a label happens to point at it.
+  function renderGroup(
+    key,
+    label,
+    { control, tooltip, idSuffix = '' } = {},
+    children
+  ) {
     return (
       <div className='legendGroup' key={key}>
         {(label || control) && (
           <div className='legendGroupLabelRow'>
             {control && (
               <Switch
-                id={`mapLayer-${control.key}`}
+                id={`mapLayer-${control.key}${idSuffix}`}
                 title={control.label}
                 checked={control.checked}
                 onChange={control.onChange}
@@ -258,7 +243,7 @@ export default function Legend({
   // rather than by value — a linear-value axis would collapse the ramp into the
   // dominant high-count color. Count ticks are drawn at each stop (thinned to
   // keep the compact bar legible), which naturally reads as a log axis.
-  function renderColorBar(scale, rangeLevel, dimmed) {
+  function renderColorBar(scale, rangeLevel, dimmed, maxTicks) {
     const colorStops = generateColorStops(scale, rangeLevel)
     if (!colorStops || !colorStops.length) return null
     const n = colorStops.length
@@ -269,7 +254,7 @@ export default function Legend({
         : `linear-gradient(to right, ${colorStops
           .map((cs, i) => `${cs.color} ${((i / denom) * 100).toFixed(1)}%`)
           .join(', ')})`
-    const tickIndices = pickTickIndices(n)
+    const tickIndices = pickTickIndices(n, maxTicks)
     // /legend clamps the ramp's top to a high percentile so one outlier
     // dataset can't flatten the whole scale (see rampRange in
     // web-api/routes/legend.js). When it did clamp, the top tick is not the
@@ -376,11 +361,13 @@ export default function Legend({
   // the tier has no counts at all).
   //
   // `labelled` is false when the markers are not on screen: the bar is then the
-  // only thing in the group, the title above it already says what its colours
+  // only thing in the group, the group's own title already says what its colours
   // count, and a caption naming the one entry present is a line spent saying
   // nothing. The label earns its place only where there is a second entry — the
-  // markers — for it to tell the bar apart from.
-  function renderHexEntry(labelled) {
+  // markers — for it to tell the bar apart from. That is also why the compact
+  // card passes false: it shows the bar under the same group label row and
+  // nothing else (see compactRamp).
+  function renderHexEntry(labelled, maxTicks) {
     if (!hexesOnMap || isEmpty(hexRangeLevel)) return null
     return (
       <div className='legendSubsection'>
@@ -395,7 +382,12 @@ export default function Legend({
               />
             )
           })}
-        {renderColorBar(colorScale, hexRangeLevel, observationsHidden)}
+        {renderColorBar(
+          colorScale,
+          hexRangeLevel,
+          observationsHidden,
+          maxTicks
+        )}
       </div>
     )
   }
@@ -526,67 +518,21 @@ export default function Legend({
     )
   }
 
-  // The track-line swatches: the line and the heading arrowhead. They are one
-  // drawing, named and switched by their group label — the switch was on the
-  // line's own row once, where it looked like it hid only the line.
+  // The trajectory group's body: the track line and the heading arrowhead,
+  // each carrying the control that sets what it draws — the trailing window on
+  // the line, the date on the arrowhead, and the rail that scrubs it under
+  // both. Drawn by TrajectoryDate, which owns the keys as well as the controls:
+  // they are the same two rows, and a key whose value is set somewhere else is
+  // how the date came to be a floating pill over the bottom of the map.
   //
   // The group appears while at least one trajectory geometry is in the filter
   // selection; the trajectory cells themselves are keyed by the hex ramp in the
   // observations group, like every other geometry's.
-  //
-  // The window shown is the one actually loaded, not the one requested: zoomed
-  // out, the long trails are clamped (see effectiveTrailingDays), and a key that
-  // still claimed "All time" there would be wrong.
   function renderTrackKeys() {
     if (!trajectoryOn) return null
-    const loadedTrail = effectiveTrailingDays(trailingDays, zoom)
-    const zoomClamped = loadedTrail !== trailingDays
-    const trailLabel =
-      loadedTrail === TRAIL_ALL ? t('timeBarTrailAll') : `${loadedTrail}d`
     return (
       <div className={classNames('legendItems', { legendDimmed: !tracksMode })}>
-        <div
-          className='legendItem'
-          title={zoomClamped ? t('legendTrackTrailZoomGated') : undefined}
-        >
-          <svg className='legendSwatch' width='12' height='12'>
-            <line
-              x1='1'
-              y1='10.5'
-              x2='11'
-              y2='1.5'
-              stroke='#6749AC'
-              strokeWidth='2.5'
-              strokeLinecap='round'
-            />
-          </svg>
-          <span className='legendItemLabel'>
-            {`${t('legendTrackLine')} (${trailLabel}${zoomClamped ? '*' : ''})`}
-          </span>
-        </div>
-        <div className='legendItem'>
-          {/* same arrowhead the map draws, pointing along the course */}
-          <svg
-            className='legendSwatch'
-            width='12'
-            height='12'
-            viewBox='0 0 16 16'
-          >
-            <path
-              d='M8 1.5 L13.5 13.5 L8 10.5 L2.5 13.5 Z'
-              fill='#6749AC'
-              stroke='#ffffff'
-              strokeWidth='1.5'
-              strokeLinejoin='round'
-              transform='rotate(45 8 8)'
-            />
-          </svg>
-          <span className='legendItemLabel'>
-            {scrubTime
-              ? t('legendTrackHeadAt', { date: scrubTime })
-              : t('legendTrackHead')}
-          </span>
-        </div>
+        <TrajectoryDate />
       </div>
     )
   }
@@ -619,6 +565,33 @@ export default function Legend({
   // naming (see renderHexEntry).
   const markerKeys = renderMarkerKeys()
   const hexEntry = renderHexEntry(Boolean(markerKeys))
+  // The one key the compact card keeps on the map. Everything else in the body
+  // names a shape or a colour the map is already showing — a track line looks
+  // like a track line — but what a hexagon's green is worth in days of data is
+  // a reading nothing on the map can give, so it is the part that has to stay
+  // out where it can be read against the cells.
+  // Four ticks, not the five the card affords: this bar is as wide as a phone
+  // corner allows, and the labels are what run into each other first.
+  const compactHexEntry = compact ? renderHexEntry(false, 4) : null
+  // The bar under the same label row it gets in the standing card: the group
+  // title — the metric, in the group labels' upper case — and the switch that
+  // hides the layer it keys. It is the observations group with everything but
+  // the bar left out, so it is built with renderGroup rather than restyled to
+  // look like one; the dialog behind the header then shows the same group in
+  // full, with the marker keys and the platform colours the card left out.
+  const compactRamp =
+    compactHexEntry &&
+    renderGroup(
+      'observations',
+      renderMetricTitle(),
+      {
+        control: controls.observations,
+        tooltip: t('legendMetricDaysTitle'),
+        // The dialog's copy of this switch is on screen at the same time.
+        idSuffix: '-compact'
+      },
+      compactHexEntry
+    )
   const trackKeys = renderTrackKeys()
   const bathymetryBar = renderBathymetryBar()
   const layerSwitches = renderLayerSwitches()
@@ -662,26 +635,68 @@ export default function Legend({
     layerSwitches && renderGroup('layers', null, {}, layerSwitches)
   ].filter(Boolean)
 
+  // Compact is the same card with its body cut down to the hex ramp: the header
+  // row, which now opens the rest of the keys in a dialog instead of unfolding
+  // them in place; the ramp, which is the one key worth standing on the map
+  // (see compactRamp); and the foot, which reads the map rather than the
+  // keys. Three short rows in the corner instead of a quarter of the screen —
+  // the rest of a legend is read in glances, and on a phone the glance is worth
+  // more than the standing card.
+  //
+  // Keeping the card (rather than swapping in a bare button) is what keeps the
+  // rest true for free: the ref, and so the footprint the griddap legend stacks
+  // against, is still on the thing in the corner; the corner itself is the one
+  // the card already moves to below 900px; and the scale bar and the basemap
+  // credits stay exactly one tap away, mounted once — LegendFooter adopts
+  // MapLibre's own controls, so a second copy would fight this one for them.
   return (
-    <div className='legend' ref={cardRef}>
+    <div className={classNames('legend', { legendCompact: compact })}>
       <button
         className='legendHeader'
-        onClick={() => setLegendOpen(!legendOpen)}
-        title={legendOpen ? t('closeLegendTooltip') : t('openLegendTooltip')}
-        aria-expanded={legendOpen}
+        onClick={() =>
+          compact ? setDetailOpen(true) : setLegendOpen(!legendOpen)
+        }
+        title={
+          compact || !legendOpen
+            ? t('openLegendTooltip')
+            : t('closeLegendTooltip')
+        }
+        aria-expanded={compact ? undefined : legendOpen}
+        aria-haspopup={compact ? 'dialog' : undefined}
       >
         <span>{t('legendTitle')}</span>
-        {legendOpen ? (
+        {compact ? (
+          <ArrowsAngleExpand size={11} aria-hidden='true' />
+        ) : legendOpen ? (
           <ChevronCompactUp size={14} aria-hidden='true' />
         ) : (
           <ChevronCompactDown size={14} aria-hidden='true' />
         )}
       </button>
-      {legendOpen && <div className='legendBody'>{groups}</div>}
+      {compact
+        ? compactRamp && (
+          <div className='legendBody legendCompactRamp'>{compactRamp}</div>
+        )
+        : legendOpen && <div className='legendBody'>{groups}</div>}
       {/* Outside the collapse: the scale bar reads the map rather than the
           keys, so it is as useful with the card shut as open — closed, the card
           is its header row and the scale row, and nothing more. */}
       <LegendFooter />
+      {compact && (
+        <Modal
+          show={detailOpen}
+          onHide={() => setDetailOpen(false)}
+          className='legendModal'
+          aria-labelledby='legendModalTitle'
+        >
+          <Modal.Header closeButton>
+            <Modal.Title id='legendModalTitle'>{t('legendTitle')}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <div className='legendBody'>{groups}</div>
+          </Modal.Body>
+        </Modal>
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 /* DatasetsTable — the datasets list rendered as cards (DatasetCard.jsx), used
    in the sidebar and the download-review modal (.downloadModal). Fills its
-   container's height: the controls (search + sort chips) stay put and only the
+   container's height: the controls (search, sort, grouping) stay put and only the
    card list (.datasetsCardList) scrolls. */
 .datasetsTable {
   height: 100%;
@@ -10,14 +10,16 @@
   text-align: left;
 }
 
-/* --- Controls: toolbar (select-all + search + count) and the sort chips
-   (ui/SortChips.jsx, styled with the pager in ui/) --- */
+/* --- Controls: two rows above the list — select-all and search, then how the
+   list is arranged (sort and grouping, both ui/SelectPill.jsx). Two, and not
+   the four they were, because this block sits between the panel header and the
+   first card: every row it takes is a row of results a phone doesn't show. --- */
 .datasetsCardControls {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
+  gap: 6px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--cioos-hairline);
   background-color: var(--cioos-white);
 }
@@ -25,23 +27,36 @@
 .datasetsCardToolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
 }
 
+/* Keeps its label at every width, unlike the two pills below it: it is the one
+   control here that commits the reader to something — every dataset in the
+   results joins the download — and the search box beside it still has room to
+   be typed in without the row it would take to spell that out. */
 .selectAllToggle {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   white-space: nowrap;
   background: transparent;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
-  padding: 6px 12px;
+  padding: 5px 10px;
   font-size: var(--cioos-font-size-sm);
   font-weight: 600;
   color: var(--cioos-ink-60);
   cursor: pointer;
   transition: background-color var(--cioos-transition-fast),
     color var(--cioos-transition-fast);
+}
+
+.selectAllToggle:focus-visible {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
 }
 
 .selectAllToggle:hover {
@@ -63,7 +78,7 @@
   gap: 6px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
-  padding: 0 12px;
+  padding: 0 10px;
   background-color: var(--cioos-white);
   color: var(--cioos-ink-40);
 }
@@ -81,44 +96,19 @@
   flex: 1 1 auto;
   min-width: 0;
   border: none;
-  padding: 6px 0;
+  padding: 5px 0;
   outline: none;
   background: transparent;
   color: var(--cioos-ink);
 }
 
-/* --- Group-by control --- */
-.datasetsCardGroupRow {
+/* Sort and grouping. Wrapping is the safety valve for a long localized option
+   ("Ocean variable", "Variable oceanique") on the narrowest phone. */
+.datasetsCardArrange {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-}
-
-.datasetsCardGroupLabel {
-  font-family: var(--cioos-font-display);
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--cioos-ink-40);
-}
-
-.datasetsCardGroupSelect {
-  flex: 0 1 auto;
-  padding: 4px 8px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
-  color: var(--cioos-ink);
-  font-size: var(--cioos-font-size-sm);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.datasetsCardGroupSelect:focus-visible {
-  outline: none;
-  border-color: var(--cioos-primary);
-  box-shadow: var(--cioos-focus);
+  gap: 6px;
 }
 
 /* --- Card list: the one scroll region --- */
@@ -292,12 +282,15 @@
   white-space: nowrap;
 }
 
-/* "Show all on map": only present while something is hidden. */
+/* "Show all on map": only present while something is hidden, and then only as
+   the eye and the count — the sentence is the tooltip and the accessible name,
+   so an occasional control doesn't take a row of the arrange line from the two
+   permanent ones. */
 .datasetsCardShowAllGroups {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
+  padding: 4px 9px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);
@@ -305,6 +298,12 @@
   font-size: var(--cioos-font-size-xs);
   font-weight: 700;
   cursor: pointer;
+}
+
+.datasetsCardShowAllGroups:focus-visible {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
 }
 
 .datasetsCardShowAllGroups:hover {
@@ -492,10 +491,4 @@
 .datasetCardSizeUnavailable {
   color: var(--cioos-ink-40);
   font-size: var(--cioos-font-size-xs);
-}
-
-@media (max-width: 600px) {
-  .datasetsCardToolbar {
-    flex-wrap: wrap;
-  }
 }

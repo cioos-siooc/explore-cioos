@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { X } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 
@@ -64,18 +64,13 @@ export default function ActiveFilterChips () {
   const { setShowFiltersModal, setOpenFilter, setSidebarOpen } = useUI()
   const { dataLayers, toggleDataLayer, resetDataLayers, requestDraw } = useMapState()
 
-  // The chips can be collapsed behind a Show/Hide toggle. They start hidden on
-  // phones — where they would eat most of the map — and shown on desktop. The
-  // live listener flips the default when the viewport crosses the breakpoint.
-  const [collapsed, setCollapsed] = useState(
-    () => window.matchMedia('(max-width: 700px)').matches
-  )
-  useEffect(() => {
-    const mql = window.matchMedia('(max-width: 700px)')
-    const onChange = (e) => setCollapsed(e.matches)
-    mql.addEventListener('change', onChange)
-    return () => mql.removeEventListener('change', onChange)
-  }, [])
+  // What is filtering the map, at every width. The chips used to start
+  // collapsed on phones, on the reasoning that they would eat the map — but
+  // they are the only thing on screen that says which filters are on, and a
+  // filtered map with nothing saying so is worse than a smaller one. The
+  // Show/Hide toggle below is still here for putting them away by hand; it is
+  // no longer the screen size's decision to make.
+  const [collapsed, setCollapsed] = useState(false)
 
   const timeframesBadgeTitle = generateRangeSelectBadgeTitle(
     t('timeframeFilterName'),
