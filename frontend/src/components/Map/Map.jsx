@@ -115,6 +115,20 @@ const HEX_LAYER_IDS = ['hexes', 'coverage-hexes']
 // The sources those layers draw from — tiles landing in either one can change
 // what a measurement would find.
 const HEX_SOURCE_IDS = ['cde-tiles', 'cde-cells']
+
+// What the corner activity badge reports as "still loading", grouped the way a
+// reader thinks about the map rather than the way MapLibre splits its sources:
+// the two hex tilesets are one thing to look at, and so are the three seafloor
+// rasters. `id` is matched to a translated label in ActivityTasks, so nothing
+// here needs to know about i18n.
+const WATCHED_MAP_LAYERS = [
+  { id: 'observations', sources: HEX_SOURCE_IDS },
+  { id: 'tracks', sources: ['tracks', 'selected-track'] },
+  { id: 'bathymetry', sources: ['bathymetry', 'nonna100', 'nonna10'] },
+  { id: 'imagery', sources: ['imagery'] },
+  { id: 'griddap', sources: ['griddap-coverage'] },
+  { id: 'wmsOverlay', sources: ['wms-overlay'] }
+]
 // How far a screen corner may move across an unproject/project round trip and
 // still count as a point on the map surface. One pixel: the round trip is exact
 // to floating-point noise for a point that is really on the surface, and off by
@@ -203,7 +217,7 @@ export default function CreateMap({
   polygon,
   setPolygon,
   setLoading,
-  setBasemapLoading = () => { },
+  setLoadingLayers = () => { },
   setMapView,
   // Hands the "what's here" card its payload: everything one click found under
   // it, or null for a click on empty water. See handleMapClick.
@@ -3544,96 +3558,122 @@ export default function CreateMap({
     map.current.addControl(drawPolygon.current, 'bottom-right')
   }, [])
 
-  // Tell the user when the basemap imagery is still on the wire.
+  // Tell the user which of the map's layers are still on the wire.
   //
-  // The four basemap rasters are fetched per view, and a pan or a zoom into
-  // ground the map hasn't seen leaves MapLibre showing stretched parent tiles
-  // until they land — a blurry map that looks finished. The wait is real:
-  // EMODnet and Esri come from their own CDNs, and the two CHS products come
-  // through our proxy, which on a cold cache has to fetch from GeoServer before
-  // it can answer. Now that the hand-off is a half-zoom swap rather than a
-  // two-zoom blend, all of that arrives at once instead of easing in, so the
-  // gap is the one moment the map most needs to say it is still working.
+  // Tiles are fetched per view, and a pan or a zoom into ground the map hasn't
+  // seen leaves MapLibre showing stretched parent tiles until they land — a
+  // blurry map that looks finished. The wait is real: EMODnet and Esri come
+  // from their own CDNs, and the two CHS products come through our proxy, which
+  // on a cold cache has to fetch from GeoServer before it can answer. Now that
+  // the basemap hand-off is a half-zoom swap rather than a two-zoom blend, all
+  // of that arrives at once instead of easing in, so the gap is the one moment
+  // the map most needs to say it is still working.
   //
-  // Deliberately scoped to the basemap sources: the data tiles already have the
-  // `loading` flag, and watching everything would just be map.areTilesLoaded().
+  // Reported per layer rather than as one flag, so the badge can say which of
+  // them is still fetching. Each layer keeps its own copy of the announce /
+  // settle state below, because they start and finish independently.
   useEffect(() => {
     if (!map.current) return
 
-    const basemapSourceIds = ['bathymetry', 'imagery', 'nonna100', 'nonna10']
-    const tilesPending = () =>
-      basemapSourceIds.some(
-        // A source can be absent mid style-change, and isSourceLoaded throws on
-        // an id it doesn't know rather than answering false.
-        (id) => map.current.getSource(id) && !map.current.isSourceLoaded(id)
-      )
-
     // Most views resolve from the browser cache within a frame or two, and
-    // announcing those would flash the pill on every wheel notch. Only a fetch
+    // announcing those would flash the badge on every wheel notch. Only a fetch
     // that outlives this delay is worth telling the user about.
     const ANNOUNCE_AFTER_MS = 300
     // …and the clear is held for a moment too, because tiles arrive in waves:
     // MapLibre requests a screenful, and between one wave landing and the next
     // being requested there are frames where nothing is in flight and the check
-    // below reads "done". Acting on those instantly would both flicker the pill
-    // and — worse — keep resetting the announce countdown, so a load made of
-    // several short waves would never be announced at all however long it ran.
+    // below reads "done". Acting on those instantly would both flicker the
+    // badge and — worse — keep resetting the announce countdown, so a load made
+    // of several short waves would never be announced at all however long it
+    // ran.
     const SETTLE_MS = 250
-    let announceTimer = null
-    let settleTimer = null
-    let announced = false
 
-    const sync = () => {
-      if (tilesPending()) {
-        clearTimeout(settleTimer)
-        settleTimer = null
-        if (announced || announceTimer) return
-        announceTimer = setTimeout(() => {
-          announceTimer = null
-          announced = true
-          setBasemapLoading(true)
+    const timers = new Map(
+      WATCHED_MAP_LAYERS.map((layer) => [
+        layer.id,
+        { announceTimer: null, settleTimer: null, announced: false }
+      ])
+    )
+    let published = []
+
+    const publish = () => {
+      const next = WATCHED_MAP_LAYERS.filter(
+        (layer) => timers.get(layer.id).announced
+      ).map((layer) => layer.id)
+      // Same set, same order — don't hand the provider a new array to re-render
+      // everything downstream over.
+      if (
+        next.length === published.length &&
+        next.every((id, index) => id === published[index])
+      ) {
+        return
+      }
+      published = next
+      setLoadingLayers(next)
+    }
+
+    const pending = (layer) =>
+      layer.sources.some(
+        // A source can be absent mid style-change, and isSourceLoaded throws on
+        // an id it doesn't know rather than answering false.
+        (id) => map.current.getSource(id) && !map.current.isSourceLoaded(id)
+      )
+
+    const sync = (layer) => {
+      const state = timers.get(layer.id)
+      if (pending(layer)) {
+        clearTimeout(state.settleTimer)
+        state.settleTimer = null
+        if (state.announced || state.announceTimer) return
+        state.announceTimer = setTimeout(() => {
+          state.announceTimer = null
+          state.announced = true
+          publish()
         }, ANNOUNCE_AFTER_MS)
         return
       }
       // Nothing pending — but see SETTLE_MS. Let the countdown keep running and
       // confirm the quiet is real before acting on it.
-      if (settleTimer || (!announced && !announceTimer)) return
-      settleTimer = setTimeout(() => {
-        settleTimer = null
-        if (tilesPending()) return sync()
-        clearTimeout(announceTimer)
-        announceTimer = null
-        if (announced) {
-          announced = false
-          setBasemapLoading(false)
+      if (state.settleTimer || (!state.announced && !state.announceTimer)) return
+      state.settleTimer = setTimeout(() => {
+        state.settleTimer = null
+        if (pending(layer)) return sync(layer)
+        clearTimeout(state.announceTimer)
+        state.announceTimer = null
+        if (state.announced) {
+          state.announced = false
+          publish()
         }
       }, SETTLE_MS)
     }
 
-    // 'data'/'dataloading' fire per tile for every source on the map, so they
-    // are filtered down to the four before the check runs. 'idle' is the
-    // backstop: it is the one event guaranteed to arrive once everything has
-    // settled, including the cases where a source is dropped rather than loaded
-    // (zooming back out past the layers' minzoom).
+    const syncAll = () => WATCHED_MAP_LAYERS.forEach(sync)
+
+    // 'data'/'dataloading' fire per tile for every source on the map, so each
+    // is routed to the one layer that owns that source. 'idle' is the backstop:
+    // it is the one event guaranteed to arrive once everything has settled,
+    // including the cases where a source is dropped rather than loaded (zooming
+    // back out past a layer's minzoom).
     const onSourceEvent = (e) => {
-      if (e.dataType !== 'source' || !basemapSourceIds.includes(e.sourceId)) {
-        return
-      }
-      sync()
+      if (e.dataType !== 'source') return
+      const layer = WATCHED_MAP_LAYERS.find((l) => l.sources.includes(e.sourceId))
+      if (layer) sync(layer)
     }
     map.current.on('dataloading', onSourceEvent)
     map.current.on('data', onSourceEvent)
-    map.current.on('idle', sync)
+    map.current.on('idle', syncAll)
 
     return () => {
-      clearTimeout(announceTimer)
-      clearTimeout(settleTimer)
+      timers.forEach((state) => {
+        clearTimeout(state.announceTimer)
+        clearTimeout(state.settleTimer)
+      })
       map.current.off('dataloading', onSourceEvent)
       map.current.off('data', onSourceEvent)
-      map.current.off('idle', sync)
-      if (announced) setBasemapLoading(false)
+      map.current.off('idle', syncAll)
+      if (published.length) setLoadingLayers([])
     }
-  }, [setBasemapLoading])
+  }, [setLoadingLayers])
 
   // The hex color stops depend on the zoom band (getCurrentRangeLevel), but
   // were only applied at load or on legend refresh — so returning below

@@ -1,0 +1,23 @@
+/* A block of named waits. Rows stay left-aligned to each other even where the
+   block itself is centred (the loading splash), because a ragged column of
+   individually-centred rows is harder to read down. */
+.activityList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.activityList li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.activityList .cioosSpinner {
+  color: var(--cioos-primary);
+  flex: 0 0 auto;
+}

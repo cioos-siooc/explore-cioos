@@ -15,7 +15,7 @@ export default function MapContainer () {
   const {
     mapQueryString,
     setLoading,
-    setBasemapLoading,
+    setLoadingLayers,
     setMapView,
     rangeLevels,
     coverageRangeLevels,
@@ -120,7 +120,7 @@ export default function MapContainer () {
       polygon={polygon}
       setPolygon={setPolygon}
       setLoading={setLoading}
-      setBasemapLoading={setBasemapLoading}
+      setLoadingLayers={setLoadingLayers}
       mapQueryString={mapQueryString}
       setMapView={setMapView}
       rangeLevels={rangeLevels}

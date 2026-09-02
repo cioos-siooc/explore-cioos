@@ -63,7 +63,12 @@ export default function MapStateProvider ({ children }) {
   // after a pan or a zoom — and it is the slow one on a cold cache. Map.jsx
   // only raises it for waits long enough to be worth a word (see the effect
   // there); AppShell decides which of the two pills gets the spot.
-  const [basemapLoading, setBasemapLoading] = useState(false)
+  // Which of the map's layers are currently fetching tiles, as the layer ids in
+  // Map.jsx's WATCHED_MAP_LAYERS. Separate from `loading` above, which is about
+  // the map redrawing as a whole; this says what specifically is on the wire, so
+  // the activity badge can name it. This replaced a single basemap-only flag,
+  // which could say no more than "imagery" and knew nothing of the data layers.
+  const [loadingLayers, setLoadingLayers] = useState([])
   // The camera, as the map reports it (numbers, plus bounds once it has
   // settled). Seeded from the share link — or the default view when the link
   // carries no camera — rather than left empty: MapLibre only pushes a view on
@@ -418,8 +423,8 @@ export default function MapStateProvider ({ children }) {
   const value = {
     loading,
     setLoading,
-    basemapLoading,
-    setBasemapLoading,
+    loadingLayers,
+    setLoadingLayers,
     mapLoaded,
     mapView,
     setMapView,

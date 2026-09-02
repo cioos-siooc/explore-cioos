@@ -62,3 +62,10 @@
   white-space: pre-line;
   color: var(--cioos-ink-60);
 }
+
+/* Set apart from the lockup: the wordmark is identity, this is status. */
+.loadingActivity {
+  margin-top: var(--cioos-space-sm, 8px);
+  font-size: var(--cioos-font-size-sm, 12px);
+  color: var(--cioos-ink-60);
+}

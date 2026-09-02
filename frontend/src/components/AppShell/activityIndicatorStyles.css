@@ -1,7 +1,8 @@
-/* The activity badge, in the corner the app leaves free-est. It shares that
-   corner with the griddap card and MapLibre's own controls, which step above
-   it: see WmsLegend's stylesheet, where all the bottom-right clearances live
-   together so they can't disagree about which wins.
+/* The activity badge and its status panel, in the corner the app leaves
+   free-est. It shares that corner with the griddap card and MapLibre's own
+   controls, which step above it: see WmsLegend's stylesheet, where all the
+   bottom-right clearances live together so they can't disagree about which
+   wins.
 
    Above the modal rung deliberately. Work goes on behind a modal — the
    download modal's size estimates, a filter change still redrawing the map —
@@ -13,29 +14,81 @@
   bottom: calc(12px + var(--cioos-time-bar-space, 0px));
   z-index: calc(var(--cioos-z-modal, 1055) + 1);
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  /* The wrapper grows as tall as the open panel, so it must not swallow clicks
+     on the map around it — only the button and the panel take pointer events. */
+  pointer-events: none;
+}
+
+.activityIndicatorToggle {
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 4px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
   border: 1px solid var(--cioos-hairline);
   border-radius: 50%;
   background-color: var(--cioos-white);
   box-shadow: var(--cioos-shadow-float);
   color: var(--cioos-primary);
-  opacity: 0;
-  transform: scale(0.8);
+  cursor: pointer;
+  pointer-events: auto;
+  /* Receded while nothing is loading — present enough to be found and clicked,
+     quiet enough not to read as a live status. */
+  opacity: 0.45;
   transition: opacity var(--cioos-transition-normal, 0.2s ease-in-out),
-    transform var(--cioos-transition-normal, 0.2s ease-in-out);
-  /* Idle: invisible and untouchable, so it never eats a click on the map. */
-  pointer-events: none;
+    border-color var(--cioos-transition-fast, 0.15s ease-out);
 }
 
-.activityIndicatorBusy {
+.activityIndicatorBusy .activityIndicatorToggle,
+.activityIndicatorToggle:hover,
+.activityIndicatorToggle:focus-visible,
+.activityIndicatorToggle[aria-expanded='true'] {
   opacity: 1;
-  transform: scale(1);
-  /* Hoverable only while it has something to say. Unlike the pill this
-     replaced, it has to take pointer events at all — which is why it is a
-     36px circle in a corner rather than a labelled bar. */
+}
+
+.activityStatus {
   pointer-events: auto;
+}
+
+.activityIndicatorToggle:hover,
+.activityIndicatorToggle[aria-expanded='true'] {
+  border-color: var(--cioos-primary);
+}
+
+/* Two classes, so this beats .cioosSpinner-md's own 28px whatever order the
+   two stylesheets land in. The badge wants the mark a little larger than the
+   ladder's md step. */
+.activityIndicatorToggle .cioosSpinner {
+  width: 32px;
+  height: 32px;
+}
+
+/* Nothing is in flight but the panel is open: hold the mark still rather than
+   have it pulse at a reader who is being told there is nothing to wait for. */
+.activityIndicator:not(.activityIndicatorBusy) .cioosSpinnerNode {
+  animation-play-state: paused;
+}
+
+.activityStatus {
+  max-width: min(280px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius, 8px);
+  background-color: var(--cioos-white);
+  box-shadow: var(--cioos-shadow-float);
+  font-size: var(--cioos-font-size-sm, 12px);
+  color: var(--cioos-ink-60);
+}
+
+.activityStatusHeading {
+  margin: 0 0 6px;
+  font-size: var(--cioos-font-size-2xs, 10px);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cioos-ink-40);
 }

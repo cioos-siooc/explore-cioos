@@ -144,10 +144,11 @@
   /* --- Layout: bottom-right activity badge ---
      The slot the activity indicator occupies in that same corner. Unlike the
      footprints above this is a constant rather than a measured value: the badge
-     is a fixed-size circle that comes and goes with whether anything is
+     is a fixed-size circle (44px, plus a gap) that comes and goes with
+     whether anything is
      loading, and reserving its space permanently is what stops the griddap card
      and MapLibre's controls from jumping every time it appears. */
-  --cioos-activity-space: 44px;
+  --cioos-activity-space: 52px;
 
   /* --- Header & Layout (Modern Sidebar) --- */
   --cioos-header-height: 70px;
