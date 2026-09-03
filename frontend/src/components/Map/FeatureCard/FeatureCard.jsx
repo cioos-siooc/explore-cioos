@@ -208,6 +208,7 @@ export default function FeatureCard () {
   // `top` and friends wholesale.
   return (
     <div
+      data-testid='feature-card'
       className={classNames('featureCard', { featureCardEmpty: empty })}
       role='dialog'
       aria-label={t('featureCardTitle')}

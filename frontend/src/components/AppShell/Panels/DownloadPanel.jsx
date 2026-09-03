@@ -39,14 +39,14 @@ export default function DownloadPanel() {
 
   if (isEmpty(pointsToReview)) {
     return (
-      <div className='downloadPanel downloadPanelEmpty'>
+      <div className='downloadPanel downloadPanelEmpty' data-testid='download-panel'>
         {t('dockDownloadEmptyMessage')}
       </div>
     )
   }
 
   return (
-    <div className='downloadPanel'>
+    <div className='downloadPanel' data-testid='download-panel'>
       <DownloadDetails
         width={650}
         pointsToReview={pointsToReview}

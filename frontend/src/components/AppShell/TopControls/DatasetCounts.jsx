@@ -32,11 +32,14 @@ export default function DatasetCounts () {
   const totalCount = total ?? filteredCount
 
   return (
-    <div className={classNames('topBarCountsRow', { updating: countsUpdating })}>
+    <div
+      className={classNames('topBarCountsRow', { updating: countsUpdating })}
+      data-testid='dataset-counts'
+    >
       {!countsReady
         ? (
           <Spinner size='xs' className='countSpinner' />
-          )
+        )
         : (
           <>
             <span
@@ -57,6 +60,7 @@ export default function DatasetCounts () {
               (
               <button
                 type='button'
+                data-testid='counts-only-in-view'
                 className={classNames('topBarCountsInView', {
                   active: onlyInView
                 })}
@@ -73,7 +77,7 @@ export default function DatasetCounts () {
               )
             </span>
           </>
-          )}
+        )}
     </div>
   )
 }

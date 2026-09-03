@@ -52,7 +52,8 @@ export default function Pager ({
   onPageChange,
   onPageSizeChange,
   label,
-  perPageLabel
+  perPageLabel,
+  'data-testid': testId
 }) {
   const { t } = useTranslation()
   if (!total) return null
@@ -60,7 +61,7 @@ export default function Pager ({
   const firstItem = (page - 1) * pageSize
 
   return (
-    <nav className='pager' aria-label={label}>
+    <nav className='pager' aria-label={label} data-testid={testId}>
       <span className='pagerRange'>
         {t('pagerRangeText', {
           first: firstItem + 1,

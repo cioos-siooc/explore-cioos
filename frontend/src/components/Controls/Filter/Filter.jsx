@@ -57,6 +57,7 @@ export default function Filter({
   // active at once and exactly one is being edited.
   const filterButton = (
     <button
+      data-testid='filter-header'
       className={`filterHeader ${active && !disabled ? 'active' : ''} ${
         isOpen ? 'open' : ''
       } ${disabled ? 'disabled' : ''}`}
@@ -81,7 +82,7 @@ export default function Filter({
 
   // Using tabIndex to enable onBlur() focus loss capturing: https://stackoverflow.com/a/37491578
   return (
-    <div className='filter' ref={wrapperRef}>
+    <div className='filter' ref={wrapperRef} data-testid='filter' data-filter-name={filterName}>
       {filterButton}
       {/* A disabled row never opens, so its explanation has nowhere else to
           live — shown as plain text right under the row itself, always
@@ -90,7 +91,7 @@ export default function Filter({
         <div className='filterCaption'>{disabledTooltip || tooltip}</div>
       )}
       {paneShown && (
-        <div className='filterOptions'>
+        <div className='filterOptions' data-testid='filter-options'>
           {/* What this filter does, at the top of its section and above the
               inputs below — plain text again, not a hover/tap tooltip. */}
           {tooltip && <div className='filterOptionsCaption'>{tooltip}</div>}

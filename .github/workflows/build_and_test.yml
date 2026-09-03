@@ -67,15 +67,19 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          # Matches frontend/package.json engines.node >= 22, which the
+          # frontend smoke test below runs under.
+          node-version: 22
           cache: npm
-          cache-dependency-path: test/package-lock.json
+          cache-dependency-path: |
+            test/package-lock.json
+            frontend/package-lock.json
 
       - name: Install integration-test dependencies
         working-directory: test
         run: npm ci --quiet
 
-      - name: Run JavaScript API and frontend tests
+      - name: Run the API tests
         env:
           CI: "true"
         run: |
@@ -86,6 +90,31 @@ jobs:
           )
           test -n "${latitude:-}" && test -n "${longitude:-}"
           CI_LATITUDE="$latitude" CI_LONGITUDE="$longitude" npm --prefix test test
+
+      # The frontend half of this job used to be a puppeteer script asserting
+      # "no console errors on load". It is now a Playwright spec doing the same
+      # thing against the same stack — one browser-automation stack in the repo
+      # instead of two, and this one keeps a trace and a video when it fails.
+      # Unlike the mocked suite in test-frontend.yaml, nothing here is stubbed:
+      # this is the check that the real API and database actually serve the app.
+      - name: Frontend smoke test against the compose stack
+        working-directory: frontend
+        env:
+          CI: "true"
+          LIVE_BASE_URL: http://localhost:8098
+        run: |
+          npm ci --quiet
+          npx playwright install --with-deps chromium
+          npm run test:e2e:live
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: frontend-live-smoke-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
 
       - name: Submit and complete a download request
         run: .github/scripts/test-download-request.sh

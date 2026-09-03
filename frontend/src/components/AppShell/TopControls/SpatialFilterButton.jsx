@@ -65,6 +65,7 @@ export default function SpatialFilterButton() {
 
   return (
     <DropdownButton
+      data-testid='topbar-spatial-filter'
       onOpenChange={handleOpenChange}
       toggleClassName={classNames(
         'topBarButton topBarSpatialFilterToggle',

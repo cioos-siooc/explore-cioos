@@ -17,6 +17,10 @@ export default function FilterButton({ setOptionsSelected, optionsSelected, opti
     <Tooltip placement='bottom' delay={150} content={tooltipText}>
       <button
         className={`filterButton ${filterOptionSelected && 'selected'}`}
+        data-testid='filter-option'
+        data-option-pk={option.pk}
+        data-selected={filterOptionSelected}
+        aria-pressed={filterOptionSelected}
         onClick={() => {
           setOptionsSelected(optionsSelected.map(opt => {
             if (option.pk === opt.pk) {

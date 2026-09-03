@@ -307,14 +307,14 @@ export default function CreateMap({
     const oldCoord = state.feature.getCoordinate(path)
     const newCoord = [oldCoord[0] + delta.lng, oldCoord[1] + delta.lat]
       ;[(index + 3) % 4, (index + 1) % 4].forEach((neighborIndex) => {
-        const neighborPath = `${ringIndex}.${neighborIndex}`
-        const neighborOld = state.feature.getCoordinate(neighborPath)
-        if (neighborOld[0] === oldCoord[0]) {
-          state.feature.updateCoordinate(neighborPath, newCoord[0], neighborOld[1])
-        } else {
-          state.feature.updateCoordinate(neighborPath, neighborOld[0], newCoord[1])
-        }
-      })
+      const neighborPath = `${ringIndex}.${neighborIndex}`
+      const neighborOld = state.feature.getCoordinate(neighborPath)
+      if (neighborOld[0] === oldCoord[0]) {
+        state.feature.updateCoordinate(neighborPath, newCoord[0], neighborOld[1])
+      } else {
+        state.feature.updateCoordinate(neighborPath, neighborOld[0], newCoord[1])
+      }
+    })
     state.feature.updateCoordinate(path, newCoord[0], newCoord[1])
   }
 
@@ -502,6 +502,10 @@ export default function CreateMap({
   // revealHexes. False until the ramp on them is the one they will keep.
   const hexesRevealed = useRef(false)
   const firstPaintReported = useRef(false)
+  // The same fact as firstPaintReported, in state rather than a ref, purely so
+  // it can reach the DOM as an attribute. The ref stays the guard — it is read
+  // synchronously inside reportFirstPaint, where a state value would be stale.
+  const [firstPainted, setFirstPainted] = useState(false)
   // Latest rangeLevels, for the once-registered measurement handler: it runs on
   // the first render's closure (like setColorStops, which it reaches through a
   // ref of its own), so the prop it captured is forever the mount-time one.
@@ -645,8 +649,8 @@ export default function CreateMap({
     const trajOn = anyTrajectoryLayerOn(dataLayersRef.current)
     const showTracks = trajOn && tracksModeRef.current
       ;['track-lines', 'track-heads', 'track-heads-fixed'].forEach((id) =>
-        map.current.setLayoutProperty(id, 'visibility', showTracks ? 'visible' : 'none')
-      )
+      map.current.setLayoutProperty(id, 'visibility', showTracks ? 'visible' : 'none')
+    )
   }
 
   // Placeholder count ranges used only until the /legend request resolves.
@@ -723,6 +727,10 @@ export default function CreateMap({
     )
     if (!basemapDrawn) return
     firstPaintReported.current = true
+    // Mirrored onto the container as data-map-ready so tests can wait on the
+    // same condition the splash trusts, rather than on the splash's CSS fade —
+    // which is exactly what screenshot capture disables.
+    setFirstPainted(true)
     onFirstPaint()
   }
 
@@ -3846,5 +3854,12 @@ export default function CreateMap({
     })
   }, [i18n.language])
 
-  return <div ref={mapContainer} className='map' />
+  return (
+    <div
+      ref={mapContainer}
+      className='map'
+      data-testid='map-container'
+      data-map-ready={firstPainted || undefined}
+    />
+  )
 }

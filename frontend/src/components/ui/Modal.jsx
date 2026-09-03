@@ -20,7 +20,8 @@ export default function Modal ({
   className = '',
   dialogClassName = '',
   children,
-  'aria-labelledby': ariaLabelledby
+  'aria-labelledby': ariaLabelledby,
+  'data-testid': testId
 }) {
   const contentRef = useRef(null)
   const previousFocus = useRef(null)
@@ -80,6 +81,7 @@ export default function Modal ({
     <ModalContext.Provider value={{ onHide }}>
       <div
         className={`modal ${className}`}
+        data-testid={testId}
         role='dialog'
         aria-modal='true'
         aria-labelledby={ariaLabelledby}

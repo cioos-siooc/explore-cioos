@@ -76,13 +76,14 @@ export default function TopControls () {
   ].filter(Boolean).length
 
   return (
-    <div className='topBar' ref={barRef}>
+    <div className='topBar' ref={barRef} data-testid='top-bar'>
       <BrandSearch>
         <DatasetCounts />
-        <div className='topBarActions'>
+        <div className='topBarActions' data-testid='top-bar-actions'>
           <button
             type='button'
             className={classNames('topBarButton', { active: sidebarOpen })}
+            data-testid='topbar-datasets-button'
             onClick={() => {
               if (inspectDataset) returnToDatasetList()
               setSidebarOpen(!sidebarOpen)
@@ -107,6 +108,7 @@ export default function TopControls () {
               active: showFiltersModal,
               applied: !showFiltersModal && activeFilterCount > 0
             })}
+            data-testid='topbar-filters-button'
             onClick={() => setShowFiltersModal(true)}
             aria-pressed={showFiltersModal}
             title={t('dockFiltersCountTitle', { count: activeFilterCount })}
@@ -114,7 +116,9 @@ export default function TopControls () {
             <Filter size={18} aria-hidden='true' />
             <span className='topBarButtonLabel'>{t('filtersMenuButton')}</span>
             {activeFilterCount > 0 && (
-              <span className='topBarCount'>{activeFilterCount}</span>
+              <span className='topBarCount' data-testid='topbar-filter-count'>
+                {activeFilterCount}
+              </span>
             )}
           </button>
         </div>

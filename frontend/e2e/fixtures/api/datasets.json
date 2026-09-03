@@ -1,0 +1,482 @@
+[
+  {
+    "title": "63rd St., Chicago, IL Weather Station",
+    "pk": 2337,
+    "organization_pks": [
+      54
+    ],
+    "platform": "land or seafloor",
+    "title_translated": {
+      "en": "63rd St., Chicago, IL Weather Station",
+      "fr": null
+    }
+  },
+  {
+    "title": "Acoustic Doppler Current Profiler Time Series from Fixed Platform on the British Columbia Central Coast (Provisional)",
+    "pk": 7,
+    "organization_pks": [
+      66
+    ],
+    "platform": "land or seafloor",
+    "title_translated": {
+      "en": "Acoustic Doppler Current Profiler Time Series from Fixed Platform on the British Columbia Central Coast (Provisional)",
+      "fr": "Série chronologique de profileur de courant à effet Doppler acoustique depuis une plateforme fixe sur la côte centrale de la Colombie-Britannique (Provisoire)"
+    }
+  },
+  {
+    "title": "Alpena Thunder Bay Buoy: Realtime Coastal Observation Network (ReCON) Station",
+    "pk": 1969,
+    "organization_pks": [
+      96
+    ],
+    "platform": "mooring",
+    "title_translated": {
+      "en": "Alpena Thunder Bay Buoy: Realtime Coastal Observation Network (ReCON) Station",
+      "fr": null
+    }
+  },
+  {
+    "title": "Alpena Thunder Bay Buoy: Realtime Coastal Observation Network (ReCON) Station",
+    "pk": 1962,
+    "organization_pks": [
+      96
+    ],
+    "platform": "mooring",
+    "title_translated": {
+      "en": "Alpena Thunder Bay Buoy: Realtime Coastal Observation Network (ReCON) Station",
+      "fr": null
+    }
+  },
+  {
+    "title": "Alpena Thunder Bay Buoy: Realtime Coastal Observation Network (ReCON) Station",
+    "pk": 1968,
+    "organization_pks": [
+      96
+    ],
+    "platform": "mooring",
+    "title_translated": {
+      "en": "Alpena Thunder Bay Buoy: Realtime Coastal Observation Network (ReCON) Station",
+      "fr": null
+    }
+  },
+  {
+    "title": "Annapolis County Water Quality Data",
+    "pk": 88,
+    "organization_pks": [
+      30
+    ],
+    "platform": "unknown",
+    "title_translated": {
+      "en": "Annapolis County Water Quality Data",
+      "fr": "Données de qualité de l'eau du comté d'Annapolis"
+    }
+  },
+  {
+    "title": "Annapolis County Wave Data",
+    "pk": 85,
+    "organization_pks": [
+      30
+    ],
+    "platform": "unknown",
+    "title_translated": {
+      "en": "Annapolis County Wave Data",
+      "fr": "Données sur les vagues du comté d'Annapolis"
+    }
+  },
+  {
+    "title": "Antigonish County Water Quality Data",
+    "pk": 86,
+    "organization_pks": [
+      30
+    ],
+    "platform": "unknown",
+    "title_translated": {
+      "en": "Antigonish County Water Quality Data",
+      "fr": "Données de qualité de l'eau du comté d'Antigonish"
+    }
+  },
+  {
+    "title": "ArcticNet - Arctic SOLAS 0706a - Northern Baffin Bay CTD data",
+    "pk": 1670,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet - Arctic SOLAS 0706a - Northern Baffin Bay CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet - Arctic SOLAS 0706b - Northwest Passage CTD data",
+    "pk": 1671,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet - Arctic SOLAS 0706b - Northwest Passage CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet - CFL - Arctic SOLAS 0706c - Beaufort Sea CTD data",
+    "pk": 1673,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet - CFL - Arctic SOLAS 0706c - Beaufort Sea CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 0501a - Northern Baffin Bay CTD data",
+    "pk": 1672,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 0501a - Northern Baffin Bay CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 0501b - Northwest Passage CTD data",
+    "pk": 1645,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 0501b - Northwest Passage CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 0502a - Northwest Passage CTD data",
+    "pk": 1646,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 0502a - Northwest Passage CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 0502b - Hudson Bay CTD data",
+    "pk": 1647,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 0502b - Hudson Bay CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 0602a - Labrador CTD data",
+    "pk": 1648,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 0602a - Labrador CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 0602b - Northern Baffin Bay CTD data",
+    "pk": 1649,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 0602b - Northern Baffin Bay CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 0602c - Northwest Passage CTD data",
+    "pk": 1650,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 0602c - Northwest Passage CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 0603a - Beaufort Sea CTD data",
+    "pk": 1652,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 0603a - Beaufort Sea CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 0603b - Northwest Passage CTD data",
+    "pk": 1651,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 0603b - Northwest Passage CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 0603c - Hudson Bay and Foxe Basin CTD data",
+    "pk": 1653,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 0603c - Hudson Bay and Foxe Basin CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 0603d - Labrador Sea and fjords CTD data",
+    "pk": 1654,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 0603d - Labrador Sea and fjords CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 0704a - Labrador fjords and sea CTD data",
+    "pk": 1668,
+    "organization_pks": [
+      21
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 0704a - Labrador fjords and sea CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 0704b - Hudson Bay CTD data",
+    "pk": 1669,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 0704b - Hudson Bay CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 0806 - Baffin Bay CTD data",
+    "pk": 1644,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 0806 - Baffin Bay CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 0904a - Canadian Arctic CTD Data",
+    "pk": 1598,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 0904a - Canadian Arctic CTD Data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 0904b - Labrador Fjords CTD Data",
+    "pk": 1599,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 0904b - Labrador Fjords CTD Data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 1001a - Hudson Bay CTD Data",
+    "pk": 1600,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 1001a - Hudson Bay CTD Data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 1001b - Northwest Passage CTD Data",
+    "pk": 1601,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 1001b - Northwest Passage CTD Data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 1003a - Beaufort Sea CTD Data",
+    "pk": 1604,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 1003a - Beaufort Sea CTD Data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 1003b - Northwest Passage CTD Data",
+    "pk": 1614,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 1003b - Northwest Passage CTD Data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 1003c - Labrador Fjords CTD Data",
+    "pk": 1605,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 1003c - Labrador Fjords CTD Data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 1101 - Baffin Bay and Northwest Passage CTD data",
+    "pk": 1609,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 1101 - Baffin Bay and Northwest Passage CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 1103a - Beaufort Sea CTD data",
+    "pk": 1610,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 1103a - Beaufort Sea CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 1103b - Baffin Bay and Northwest Passage CTD data",
+    "pk": 1611,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 1103b - Baffin Bay and Northwest Passage CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 1304 - Baffin Bay and Northwest Passage CTD data",
+    "pk": 1613,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 1304 - Baffin Bay and Northwest Passage CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet 1305 - Northwest Passage CTD data",
+    "pk": 1612,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet 1305 - Northwest Passage CTD data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet/BP 1002a - Beaufort Sea CTD Data",
+    "pk": 1602,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet/BP 1002a - Beaufort Sea CTD Data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet/BP 1002b - Beaufort Sea CTD Data",
+    "pk": 1603,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet/BP 1002b - Beaufort Sea CTD Data",
+      "fr": null
+    }
+  },
+  {
+    "title": "ArcticNet/BP 1102c - Beaufort Sea CTD data",
+    "pk": 1608,
+    "organization_pks": [
+      28
+    ],
+    "platform": "surface vessel",
+    "title_translated": {
+      "en": "ArcticNet/BP 1102c - Beaufort Sea CTD data",
+      "fr": null
+    }
+  }
+]

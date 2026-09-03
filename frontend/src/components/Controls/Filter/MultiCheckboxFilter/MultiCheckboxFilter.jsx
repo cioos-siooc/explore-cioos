@@ -59,7 +59,17 @@ export default function MultiCheckboxFilter({
         <>
           <div
             className='searchResultsButton'
+            role='checkbox'
+            aria-checked={optionsSelected.every(isChecked)}
+            tabIndex={0}
+            data-testid='filter-select-all-results'
             onClick={() => selectAllSearchResultsToggle()}
+            onKeyDown={(event) => {
+              if (event.key === ' ' || event.key === 'Enter') {
+                event.preventDefault()
+                selectAllSearchResultsToggle()
+              }
+            }}
           >
             {optionsSelected.every(isChecked) ? <CheckSquare /> : <Square />}
             {t('multiCheckboxFilterSelectSearchResults')}{' '}
@@ -114,7 +124,24 @@ export default function MultiCheckboxFilter({
                 className={`optionButton ${isChecked(option) && 'selected'}`}
                 key={index}
                 title={hoverText ? '' : t(title)}
+                // A checkbox in everything but tag name: it was a bare div, so
+                // it announced no name, no role and no state, and could not be
+                // reached or toggled from the keyboard at all.
+                role='checkbox'
+                aria-checked={isChecked(option)}
+                tabIndex={0}
+                data-testid='filter-option'
+                data-option-pk={option.pk}
+                data-selected={isChecked(option)}
                 onClick={() => toggleOption(option)}
+                onKeyDown={(event) => {
+                  if (event.key === ' ' || event.key === 'Enter') {
+                    // Space would otherwise scroll the flyout out from under
+                    // the option being ticked.
+                    event.preventDefault()
+                    toggleOption(option)
+                  }
+                }}
               >
                 {isChecked(option) ? <CheckSquare /> : <Square />}
                 <span className='optionName'>
