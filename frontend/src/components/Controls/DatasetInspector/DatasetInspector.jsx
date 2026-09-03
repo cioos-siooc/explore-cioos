@@ -197,7 +197,7 @@ export default function DatasetInspector({
   }, [dataset])
 
   // Trajectory datasets: list the platforms (trajectory ids) so one can be
-  // picked to draw its full track on the map.
+  // picked to draw its track on the map.
   useEffect(() => {
     if (!isTrajectoryDataset) {
       setTrajectoryPlatforms()
@@ -656,7 +656,12 @@ export default function DatasetInspector({
                         : {
                           datasetPk: dataset.pk,
                           datasetTitle: dataset.title,
-                          trajectoryId: row.trajectory_id
+                          trajectoryId: row.trajectory_id,
+                          // A row in this list gives no clue where its
+                          // platform sailed, so the map has to go there —
+                          // unlike a track clicked on the map, which is
+                          // already in view (see selectTrajectoryFromMap).
+                          frameView: true
                         }
                     )
                   }

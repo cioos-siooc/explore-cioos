@@ -77,6 +77,11 @@ export const hexOutlineColor = '#FFFFFF'
 // coverage the amber, so an accent from any of those would read as another data
 // layer rather than as "this is what you just asked about".
 //
+// It is also what the map paints a selected platform's drawn track in (the
+// selected-track-* layers): a track drawn because it was clicked is an answer
+// to the same question, and it used to have a crimson of its own that read as
+// another data layer beside the purple tracks and the amber coverage.
+//
 // Same pairing as trackLineColor below: the map paints from here, the chrome
 // from --cioos-map-click in components/theme.css, and the two have to stay in
 // step.
@@ -234,7 +239,6 @@ export function effectiveTrailingDays (trailing, zoom) {
 // Scrub bar domain start; today is the end. Argo-era default.
 export const tracksMinDate = '2000-01-01'
 export const trackLineColor = '#6749AC'
-export const selectedTrackColor = '#E3285E'
 
 export const languages = [
   {

@@ -47,7 +47,6 @@ import {
   HEX_METRIC,
   MARKER_MIN_ZOOM,
   trackLineColor,
-  selectedTrackColor,
   tracksMinDate,
   defaultMapCenter,
   defaultMapZoom,
@@ -167,6 +166,28 @@ function buildHeadArrowImage(fillColor, strokeColor = '#ffffff') {
   ctx.strokeStyle = strokeColor
   ctx.stroke()
   return ctx.getImageData(0, 0, size, size)
+}
+
+// The time filter as two instants, read back out of the map query string —
+// the same timeMin/timeMax the hexes, the points, the counts and the record
+// lists are filtered by (createDataFilterQueryString writes them, and leaves
+// them out entirely while the range is still the full default one). Bounds are
+// the API's own: date-only strings at UTC midnight, both ends inclusive, so a
+// track is clipped to exactly the span the numbers beside it are counted over.
+//
+// Not to be confused with tracksTimeWindow below, which is the scrub bar's
+// trailing window — the tracks TILES are drawn for that and deliberately
+// ignore this filter (see buildTracksTileUrl and TrajectoryDate.jsx).
+function filterTimeWindow(queryString) {
+  const params = new URLSearchParams(queryString)
+  const instant = (value) => {
+    const ms = value ? Date.parse(value) : NaN
+    return Number.isNaN(ms) ? undefined : ms
+  }
+  return {
+    min: instant(params.get('timeMin')),
+    max: instant(params.get('timeMax'))
+  }
 }
 
 // Combine the filter-derived query string with the geometry selection into a
@@ -553,6 +574,9 @@ export default function CreateMap({
   onViewportHexRangeRef.current = onViewportHexRange
   // Raw selected-track response, cached so re-renders don't re-fetch.
   const rawTrackRef = useRef(null)
+  // The selection the camera was last framed for, so a redraw from a filter
+  // change doesn't re-frame it (see renderSelectedTrack).
+  const framedTrackRef = useRef(null)
 
   // UTC-day-snapped scrub window: [scrub date - N days, scrub date + 1 day),
   // or [tracksMinDate, scrub date + 1 day) for the 'all' trail (full tracks
@@ -2032,8 +2056,9 @@ export default function CreateMap({
     refreshTracksSource(mapQueryString, scrubTime, trailingDays)
   }, [mapQueryString, scrubTime, trailingDays])
 
-  // Selected platform: fetch its full track once (cached in rawTrackRef), dim
-  // the global track layers, and fit the view to the track.
+  // Selected platform: fetch its full track once (cached in rawTrackRef), draw
+  // the part of it the time filter admits, dim the global track layers, and —
+  // only when the selection asks to be framed — fit the view to what was drawn.
   useEffect(() => {
     // Clicking tracks on the map makes picking a second platform mid-fetch
     // routine (the table's one-row-at-a-time rhythm did not), so the in-flight
@@ -2048,6 +2073,10 @@ export default function CreateMap({
 
       if (!selectedTrajectory) {
         rawTrackRef.current = null
+        // Forgotten with the selection, so re-picking the same platform from
+        // the list frames it again rather than treating the second pick as a
+        // redraw of the first.
+        framedTrackRef.current = null
         source.setData({ type: 'FeatureCollection', features: [] })
         // Back to whatever the dataset focus asks for — full colour when no
         // dataset page is open, the focused dataset's tracks alone when one is.
@@ -2081,17 +2110,49 @@ export default function CreateMap({
           profileIds: track.profile_ids
         }
       }
-      const {
-        coordinates: rawCoordinates,
-        times: rawTimes,
-        profileIds: rawProfileIds
-      } = rawTrackRef.current
-      if (!rawCoordinates || rawCoordinates.length === 0) return
+      const rawCoordinates = rawTrackRef.current.coordinates || []
+      const rawTimes = rawTrackRef.current.times || []
+      const rawProfileIds = rawTrackRef.current.profileIds
+
+      // Clipped to the time filter, so the drawn track answers to the dates
+      // the rest of the page does: the platform list beside it, the record
+      // table under it and every count on the map are all reporting that same
+      // range, and a line running centuries past it was the one thing on
+      // screen still claiming the platform's whole history. The full response
+      // stays cached, so widening the range redraws from memory.
+      //
+      // The response is ordered by time (see /trajectories/track), so the
+      // fixes inside the window are one contiguous slice — no per-fix filter,
+      // and the three parallel arrays stay parallel. An unreadable or missing
+      // fix time compares false either way, which stops the walk instead of
+      // clipping it out: a track whose times the API did not send draws whole
+      // rather than vanishing.
+      const { min: windowMin, max: windowMax } = filterTimeWindow(mapQueryString)
+      let from = 0
+      let to = rawCoordinates.length
+      if (windowMin !== undefined) {
+        while (from < to && Date.parse(rawTimes[from]) < windowMin) from++
+      }
+      if (windowMax !== undefined) {
+        while (to > from && Date.parse(rawTimes[to - 1]) > windowMax) to--
+      }
+      const coordinates = rawCoordinates.slice(from, to)
+      const times = rawTimes.slice(from, to)
+      const profileIds = rawProfileIds?.slice(from, to)
+
+      // Nothing of this platform lies inside the filtered range — or the
+      // response was empty. Either way draw nothing rather than leaving the
+      // last selection's track on screen under this one's name.
+      if (coordinates.length === 0) {
+        source.setData(emptyFeatureCollection)
+        applyTrackFocus()
+        return
+      }
 
       // Split at the antimeridian and at large time gaps so a line never
       // spans the seam or a data gap (same segmentation rule as the
       // /tiles/tracks layer).
-      const runs = splitTrackRuns(rawCoordinates, rawTimes)
+      const runs = splitTrackRuns(coordinates, times)
       const lineFeatures = runs
         .filter((run) => run.length >= 2)
         .map((run) => ({
@@ -2108,16 +2169,16 @@ export default function CreateMap({
       // Bearings never span run breaks — direction across a data gap or the
       // antimeridian seam would be meaningless. cog stays unset when a run
       // has a single fix, which the -nocog circle layer picks up.
-      // runs partitions rawCoordinates in place (every input point appears
-      // exactly once, in order) so a running cursor recovers each point's
-      // original fix time for the tooltip below.
-      let rawIndex = 0
+      // runs partitions the clipped coordinates in place (every input point
+      // appears exactly once, in order) so a running cursor recovers each
+      // point's own fix time for the tooltip below.
+      let fixIndex = 0
       const fixFeatures = runs.flatMap((run) => {
         let lastCog = null
         return run.map((coordinate, i) => {
-          const time = rawTimes[rawIndex]
-          const profileId = rawProfileIds?.[rawIndex]
-          rawIndex++
+          const time = times[fixIndex]
+          const profileId = profileIds?.[fixIndex]
+          fixIndex++
           const cog =
             i > 0
               ? initialBearing(run[i - 1], coordinate)
@@ -2146,8 +2207,26 @@ export default function CreateMap({
       // Everything under the selected track goes flat grey so it reads alone.
       applyTrackFocus()
 
-      const longitudes = rawCoordinates.map((c) => c[0])
-      const latitudes = rawCoordinates.map((c) => c[1])
+      // Framing is for a platform picked out of a list, which can be anywhere
+      // — it has to be brought into view or the click appears to do nothing.
+      // A track clicked on the map is already under the cursor, so flying out
+      // to the whole voyage would throw away the view the user was reading,
+      // which no other geometry's click does: clicking a marker or a hex opens
+      // the dataset page and leaves the camera alone. So the requester says
+      // which it wants (see selectTrajectoryFromMap and the inspector's
+      // platform list) and the default is to leave the camera where it is.
+      if (!selectedTrajectory.frameView) return
+      // Once per selection, not once per redraw: this effect re-runs whenever
+      // the time filter moves, and a camera that flew back to the track on
+      // every drag of the time rail would take the map away from whatever the
+      // user was looking at while they set the dates.
+      if (framedTrackRef.current === cacheKey) return
+      framedTrackRef.current = cacheKey
+
+      // The drawn extent, not the whole history: with the range narrowed, the
+      // stretch that survived the clip is what there is to look at.
+      const longitudes = coordinates.map((c) => c[0])
+      const latitudes = coordinates.map((c) => c[1])
       // Same framing the "zoom to dataset" button uses: the track centred in the
       // canvas, with the sidebar left out of the reckoning.
       map.current.fitBounds(
@@ -2163,7 +2242,7 @@ export default function CreateMap({
       superseded = true
       abortController.abort()
     }
-  }, [selectedTrajectory])
+  }, [selectedTrajectory, mapQueryString])
 
   const mapZoom = searchParams.get('zoom')
   const mapLongitude = searchParams.get('lon')
@@ -2645,8 +2724,8 @@ export default function CreateMap({
       })
 
       // No per-fix markers on the global tracks layer: clicking a track draws
-      // that platform's full history with a marker at every fix ('selected-track'
-      // below), which is the detail view breadcrumb dots only hinted at.
+      // that platform's own track, marked fix by fix ('selected-track' below),
+      // which is the detail view breadcrumb dots only hinted at.
       //
       // Heads with a known course over ground render as arrowheads rotated
       // to the direction of travel; heads where cog is undefined (single-fix
@@ -2706,13 +2785,20 @@ export default function CreateMap({
       trackFocusApplied.current = undefined
       applyTrackFocus()
 
-      // One selected platform's full track (GeoJSON from /trajectories/track).
+      // One selected platform's track (GeoJSON from /trajectories/track, clipped
+      // to the time filter — see renderSelectedTrack).
       // Line features render the path; point features are the raw fixes.
       map.current.addSource('selected-track', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] }
       })
 
+      // Painted in the click-highlight colour rather than one of its own: a
+      // drawn track is what the last click found, the same as the ring around
+      // a clicked marker or the outline around a clicked hex, so it wears the
+      // same accent instead of teaching the reader a second "this is what you
+      // asked about" colour. It used to be crimson, which read as one more
+      // data layer beside the purple tracks and the amber griddap coverage.
       map.current.addLayer({
         id: 'selected-track-line',
         type: 'line',
@@ -2720,18 +2806,18 @@ export default function CreateMap({
         filter: ['==', ['geometry-type'], 'LineString'],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': selectedTrackColor,
+          'line-color': clickHighlightColor,
           'line-width': 3
         }
       })
 
       // Raw fixes with a known course over ground render as arrowheads
-      // (white fill, selected-track-coloured outline — the inverse of the
-      // global heads, matching the old fix circles); fixes where cog is
-      // undefined (singleton runs) keep circles.
+      // (white fill, highlight-coloured outline — the inverse of the global
+      // heads, matching the old fix circles); fixes where cog is undefined
+      // (singleton runs) keep circles.
       map.current.addImage(
         'selected-fix-arrow',
-        buildHeadArrowImage('#ffffff', selectedTrackColor),
+        buildHeadArrowImage('#ffffff', clickHighlightColor),
         { pixelRatio: 2 }
       )
 
@@ -2747,8 +2833,25 @@ export default function CreateMap({
           'icon-size': 0.75,
           'icon-rotate': ['get', 'cog'],
           'icon-rotation-alignment': 'map',
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true
+          // Breadcrumbs, not one arrowhead per fix. A retained track runs to
+          // tens of thousands of fixes (the harvester's per-trajectory cap is
+          // 60k), and forcing every one to draw — which allow-overlap true did
+          // — buried the line under a solid mass of overlapping arrows at any
+          // zoom that showed more than a few hours of it.
+          //
+          // Letting MapLibre's collision index do the thinning keeps a subset
+          // spaced icon-padding apart on SCREEN, so the density is right at
+          // every zoom and fills back in as you zoom into a stretch — no
+          // decimation constant to pick, and no re-generating the source on
+          // zoom. Placement walks the layer in feature order, which is time
+          // order here, so the survivors are an even walk along the track
+          // rather than an arbitrary subset. This layer is the top-most symbol
+          // layer, so it is placed before (and therefore wins against) the
+          // basemap labels underneath it, which the old solid mass of arrows
+          // covered up anyway.
+          'icon-allow-overlap': false,
+          'icon-ignore-placement': false,
+          'icon-padding': 4
         }
       })
 
@@ -2760,7 +2863,7 @@ export default function CreateMap({
         paint: {
           'circle-color': '#ffffff',
           'circle-radius': 3,
-          'circle-stroke-color': selectedTrackColor,
+          'circle-stroke-color': clickHighlightColor,
           'circle-stroke-width': 1.5
         }
       })

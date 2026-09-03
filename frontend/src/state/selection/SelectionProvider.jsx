@@ -89,7 +89,8 @@ export default function SelectionProvider ({ children }) {
   const hoveredDataset = useDebounce(hoveredDatasetTarget, 120)
 
   // One platform (trajectory id) picked in the dataset inspector to draw its
-  // full track on the map: {datasetPk, datasetTitle, trajectoryId} | undefined.
+  // track on the map, clipped to the time filter: {datasetPk, datasetTitle,
+  // trajectoryId, frameView} | undefined.
   const [selectedTrajectory, setSelectedTrajectory] = useState()
 
   // The one record (timeseries_id/profile_id) an unambiguous map marker click
@@ -343,7 +344,7 @@ export default function SelectionProvider ({ children }) {
 
   // A track clicked on the map does what clicking a platform row in the dataset
   // inspector does (DatasetInspector's onRowClicked): open that dataset's page
-  // AND draw the platform's full history. Both writes happen in this one call so
+  // AND draw the platform's track. Both writes happen in this one call so
   // React batches them into a single render — which is what stops the
   // [inspectDataset] effect below from clearing the selection it just made (it
   // sees the new inspectDataset and the matching selectedTrajectory together).
@@ -373,6 +374,12 @@ export default function SelectionProvider ({ children }) {
         setInspectDataset(dataset)
       }
 
+      // No frameView: the user clicked this track where it is drawn, so the
+      // camera is already showing the stretch they asked about. Framing the
+      // whole voyage from here would pull them away from it — and clicking a
+      // marker or a hex doesn't move the camera either. The inspector's
+      // platform list, whose rows can name a track anywhere on earth, is the
+      // one caller that asks for framing.
       setSelectedTrajectory({
         datasetPk,
         datasetTitle: dataset?.title || datasetTitle,
