@@ -818,3 +818,16 @@ export function initialBearing(a, b) {
     Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl)
   return (Math.atan2(y, x) / rad + 360) % 360
 }
+
+// A '#RRGGBB' from the palette, given an alpha channel, in the CSS form
+// MapLibre parses. Anything that is not a six-digit hex comes back untouched:
+// an unparseable colour throws out of setPaintProperty and takes the rest of
+// the paint pass with it, so a palette entry written in some other notation
+// should degrade to opaque rather than to 'rgba(NaN, NaN, NaN, 1)'.
+export function withAlpha(color, alpha) {
+  const match = /^#([0-9a-f]{6})$/i.exec(color)
+  if (!match) return color
+  const int = parseInt(match[1], 16)
+  const a = Math.round(alpha * 1000) / 1000
+  return `rgba(${(int >> 16) & 255}, ${(int >> 8) & 255}, ${int & 255}, ${a})`
+}
