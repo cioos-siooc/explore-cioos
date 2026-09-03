@@ -27,25 +27,32 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
   // for the already-fine-grained OBIS cells, and the hex polygon for
   // trajectory coverage.
   const profilesBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, records_per_day,
+               day_ranges,
                profile_id, timeseries_id, eovs AS feature_eovs,
                latitude, longitude, point_pk, geom, bbox AS search_geom
         FROM cde.profiles
         WHERE :profileFilters`;
   // Trajectory coverage hexes: ERDDAP data, gated with profiles. The
   // trajectory_id doubles as the profile_id surrogate so the records list
-  // labels rows by mission/deployment; records_per_day is derived from the
-  // hex's own record count and day count, so the estimate math below applies
-  // unchanged. Only the 10 km tier: the 100 km rows describe the same data at
+  // labels rows by mission/deployment. records_per_day here is records over
+  // DAYS WITH DATA (n_records / count(distinct day), 4_create_hexes.sql), which
+  // is why the estimate below multiplies it by a day-set overlap rather than an
+  // elapsed span — pairing this rate with a span over-counted every trajectory
+  // estimate by span/days-with-data, which for a ship that samples a few weeks
+  // a year is an order of magnitude.
+  // Only the 10 km tier: the 100 km rows describe the same data at
   // a coarser grain and would double-count every estimate.
   // search_geom is the HEX POLYGON, not its centroid — a drawn polygon smaller
   // than a hex still selects the data the track left inside it.
   const trajectoryBranch = `SELECT t.dataset_pk, t.time_min, t.time_max, t.depth_min, t.depth_max, t.records_per_day,
+               t.day_ranges,
                t.trajectory_id as profile_id, NULL as timeseries_id, NULL::text[] as feature_eovs,
                t.latitude, t.longitude, NULL::integer AS point_pk, t.geom, h.geom AS search_geom
         FROM cde.trajectory_hexes t
         JOIN cde.hexes_zoom_1 h ON h.pk = t.hex_pk
         WHERE t.hex_tier = 1`;
   const obisBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, 0 as records_per_day,
+               day_ranges,
                NULL as profile_id, NULL as timeseries_id, NULL::text[] as feature_eovs,
                latitude, longitude, point_pk, geom, geom AS search_geom
         FROM cde.obis_cells
@@ -62,6 +69,7 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                coalesce(coverage_depth_min, 0) AS depth_min,
                coalesce(coverage_depth_max, 0) AS depth_max,
                0 AS records_per_day,
+               NULL::daterange[] AS day_ranges,
                NULL::text AS profile_id, NULL::text AS timeseries_id,
                NULL::text[] AS feature_eovs,
                NULL::double precision AS latitude, NULL::double precision AS longitude,
@@ -188,13 +196,26 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                   ST_AsGeoJSON(
                     ST_Transform(ST_SetSRID(ST_Extent(p.search_geom)::geometry, 3857), 4326), 6
                   )::json AS filtered_bbox_geojson
-                  -- replace '0 days' with '1 day' when its a single day profile
-                  -- query records count = sum((number of days covered by the query that are in the profile) * profile records per day * fraction of the depth range that profile covers)
+                  -- estimated records = sum(days of this query that the feature holds data on
+                  --   * records per day of data
+                  --   * fraction of the depth range the query overlaps)
                   ${
   doEstimate
     ? `,SUM(
-                  -- number of days covered by this query that overlap this profile time range
-                  coalesce(nullif(date_part('days',range_intersection_length(tstzrange(:timeMin,:timeMax),tstzrange(p.time_min,p.time_max))),0),1) * p.records_per_day *
+                  -- Days of the query window this feature actually holds data on.
+                  -- records_per_day is a rate over days WITH DATA, so the day factor
+                  -- has to be too: multiplying it by an elapsed span over-counts a
+                  -- seasonal station by the ratio between the two. day_ranges is the
+                  -- feature's day set; where it is unknown (a dataset not re-harvested
+                  -- since the day sets landed) the span is still the best available
+                  -- answer, and matches the rate that was derived from it.
+                  -- Zero becomes one, as before, so a row the filter kept never
+                  -- estimates as no data at all.
+                  coalesce(nullif(
+                    CASE WHEN coalesce(array_length(p.day_ranges, 1), 0) > 0
+                         THEN day_range_overlap_days(p.day_ranges, daterange(:timeMin::date, (:timeMax::date) + 1))
+                         ELSE date_part('days',range_intersection_length(tstzrange(:timeMin,:timeMax),tstzrange(p.time_min,p.time_max)))
+                    END, 0), 1) * p.records_per_day *
                   -- depth multiplier - fraction of depth range that this query overlaps with profile depth range
                   coalesce(nullif(range_intersection_length(numrange(:depthMin,:depthMax),numrange(p.depth_min::NUMERIC,p.depth_max::NUMERIC)),0),1) / (coalesce(nullif(p.depth_max-p.depth_min,0),1)) ) AS records_count`
     : ""

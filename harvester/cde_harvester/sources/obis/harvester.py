@@ -11,6 +11,7 @@ import pandas as pd
 import requests
 from prefect import task
 
+from cde_harvester.core.day_sets import days_to_ranges
 from cde_harvester.core.observability import run_logger
 
 from cde_harvester.sources.base import BaseHarvester, HarvestResult
@@ -350,6 +351,11 @@ class OBISHarvester(BaseHarvester):
             n_records=("decimalLatitude", "count"),
             # nunique skips NaT, so undated occurrences contribute no days.
             days=("day", "nunique"),
+            # The same day set as `days`, as maximal runs of consecutive days.
+            # The map UNIONS these across the cells in a hex rather than adding
+            # day counts up, so it needs to know WHICH days, not how many: two
+            # cells reporting on the same day are one day of coverage.
+            day_ranges=("day", days_to_ranges),
             scientific_names=("scientificName", lambda x: sorted(x.dropna().unique().tolist())),
         ).reset_index(drop=True)
 

@@ -8,7 +8,9 @@ const { validatorMiddleware } = require("../utils/validatorMiddlewares");
 const cache = require("../utils/cache");
 const {
   parseMetric,
-  recordCountExpr,
+  metricValueExpr,
+  metricJoin,
+  nullMetricExpr,
   countAggregate,
 } = require("../utils/hexMetric");
 
@@ -201,9 +203,10 @@ router.get(
             .map((t) => `'${t}'`)
             .join(',')}))`
         : '';
-    const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${recordCountExpr('profiles', metric)},
+    const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${metricValueExpr('profiles', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
-    FROM cde.profiles WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ''} AND :profileFilters`;
+    FROM cde.profiles ${metricJoin('profiles', metric)}
+    WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ''} AND :profileFilters`;
     // Both cell tables (trajectory coverage cells and OBIS occurrence cells)
     // merge into the combined hex counts (z<7, the green ramp) but never
     // appear as individual points (z>=7). Their cell spacing is a grid
@@ -221,13 +224,14 @@ router.get(
     // (dataset, trajectory, tier, hex) — hence `hex_pk as zoom_pk` and a tier
     // predicate where the other branches carry two hex FK columns. point_pk is
     // NULL because trajectory coverage never renders at the point tier.
-    const trajectoryBranch = `SELECT NULL::integer as point_pk, dataset_pk, hex_pk as zoom_pk, geom as point_geom, ${recordCountExpr('trajectory_hexes', metric)},
+    const trajectoryBranch = `SELECT NULL::integer as point_pk, dataset_pk, hex_pk as zoom_pk, geom as point_geom, ${metricValueExpr('trajectory_hexes', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_hexes WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(' AND ')}` : ''}`;
+    FROM cde.trajectory_hexes ${metricJoin('trajectory_hexes', metric)}
+    WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(' AND ')}` : ''}`;
     const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
-           ${recordCountExpr('obis_cells', metric)},
+           ${metricValueExpr('obis_cells', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.obis_cells
+    FROM cde.obis_cells ${metricJoin('obis_cells', metric)}
     WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
 
     const branches = [];
@@ -243,11 +247,14 @@ router.get(
       ? branches.join("\n    UNION ALL\n    ")
       : `SELECT * FROM (${profilesBranch}) empty_combined WHERE FALSE`;
 
-    // `count` is the same quantity at both tiers — the summed metric. It used
-    // to be count(distinct point_pk) at hex zoom and sum(record_count) at point
-    // zoom, so the property changed meaning mid-zoom and the hex ramp ranked a
-    // 20-year mooring level with a single CTD cast. Summing at both tiers fixes
-    // the ramp and drops a distinct-aggregate at the same time.
+    // `count` is the same quantity at both tiers — the aggregated metric. It
+    // used to be count(distinct point_pk) at hex zoom and a sum at point zoom,
+    // so the property changed meaning mid-zoom and the hex ramp ranked a
+    // 20-year mooring level with a single CTD cast. Aggregating the same way at
+    // both tiers fixes the ramp and drops a distinct-aggregate at the same
+    // time. What the aggregate IS depends on the metric — a sum for `records`,
+    // a day-set union for `days` — which is why it comes from countAggregate
+    // rather than being spelled out here.
     const relevantPointsSQL = isHexGrid
       ? `SELECT p.zoom_pk pk, ${countAggregate(metric, 'p')} count,
                 array_to_json(array_agg(distinct d.pk_url)) datasets,
@@ -414,13 +421,14 @@ router.get(
       trajectoryTypePredicate(trajectoryTypes),
     ].filter(Boolean);
     const trajectoryBranch = `SELECT dataset_pk, hex_pk as zoom_pk, 'trajectory' as src,
-           trajectory_id, ${recordCountExpr('trajectory_hexes', metric)},
+           trajectory_id, ${metricValueExpr('trajectory_hexes', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_hexes WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(' AND ')}` : ''}`;
+    FROM cde.trajectory_hexes ${metricJoin('trajectory_hexes', metric)}
+    WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(' AND ')}` : ''}`;
     const obisBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'obis' as src,
-           NULL as trajectory_id, ${recordCountExpr('obis_cells', metric)},
+           NULL as trajectory_id, ${metricValueExpr('obis_cells', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.obis_cells
+    FROM cde.obis_cells ${metricJoin('obis_cells', metric)}
     WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
 
     const branches = [];
@@ -461,7 +469,7 @@ router.get(
              -- same unit.
              count(distinct (c.dataset_pk, c.trajectory_id))
                FILTER (WHERE c.src = 'trajectory') trajectory_count,
-             coalesce(sum(c.record_count) FILTER (WHERE c.src = 'obis'), 0)::bigint obis_count,
+             ${countAggregate(metric, 'c', "c.src = 'obis'")} obis_count,
              array_to_json(array_agg(distinct d.pk_url)) datasets
       FROM combined c
       JOIN cde.datasets d ON c.dataset_pk = d.pk

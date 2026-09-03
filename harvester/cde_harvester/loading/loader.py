@@ -12,6 +12,12 @@ from sqlalchemy import text
 
 from prefect import get_run_logger, task
 
+from cde_harvester.core.day_sets import (
+    merge_ranges,
+    ranges_from_iso,
+    ranges_to_pg_literal,
+    ranges_to_psycopg,
+)
 from cde_harvester.core.db import create_db_engine, db_host
 from cde_harvester.core.observability import init_sentry
 from cde_harvester.core.schemas import (
@@ -68,6 +74,25 @@ init_sentry()
 def prepare_profiles_dataframe(profiles):
     """Clean and prepare profiles DataFrame for insertion."""
     profiles = profiles.replace("", np.NaN)
+    # day_ranges arrives as a repr'd list of ISO pairs from the CSV, or as the
+    # live list when the harvester hands the frame over in-process. to_sql
+    # binds parameters rather than running them through a column input
+    # function, and psycopg2 adapts a list of strings as text[] — which
+    # PostgreSQL refuses to assign to a daterange[] column. Its own DateRange
+    # type adapts correctly, so convert here, at the one place both callers
+    # pass through.
+    if "day_ranges" in profiles.columns:
+
+        def _to_ranges(value):
+            # NaN is truthy, so `value or []` would let a missing cell through
+            # into ranges_from_iso; check the types explicitly instead.
+            if isinstance(value, str):
+                value = ast.literal_eval(value)
+            if not isinstance(value, (list, tuple)):
+                return []
+            return ranges_to_psycopg(ranges_from_iso(value))
+
+        profiles["day_ranges"] = profiles["day_ranges"].apply(_to_ranges)
     # Both time bounds are NOT NULL in cde.profiles. Drop either-null rows here,
     # mirroring the harvester's filter (profiles.py): a time_max that passes the
     # harvester's null check but fails parse_erddap_dates' coerce becomes NaT and
@@ -101,26 +126,38 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
     obis_cells["latitude"] = obis_cells["latitude"].round(8)
     obis_cells["longitude"] = obis_cells["longitude"].round(8)
 
+    # A CSV written before day sets existed has no day_ranges column; the map
+    # falls back to the cell's span for those rows, so treat it as absent
+    # rather than requiring a re-harvest to load at all.
+    has_day_ranges = "day_ranges" in obis_cells.columns
+
     # Deduplicate on unique key, merging scientific_names and aggregating numeric columns
     key_cols = ["dataset_id", "latitude", "longitude"]
+    aggregations = dict(
+        scientific_names=(
+            "scientific_names",
+            lambda lists: sorted(set(name for lst in lists for name in lst)),
+        ),
+        n_records=("n_records", "sum"),
+        # max, not sum: this dedup merges rows that are the SAME cell split by
+        # float noise, so their day sets overlap and summing would inflate —
+        # the defect this column exists to remove. n_records sums because its
+        # occurrence subsets really are disjoint.
+        days=("days", "max"),
+        time_min=("time_min", "min"),
+        time_max=("time_max", "max"),
+        depth_min=("depth_min", "min"),
+        depth_max=("depth_max", "max"),
+    )
+    if has_day_ranges:
+        # Union, not max or concat: these rows are the SAME cell split by float
+        # noise, so their day sets overlap. merge_ranges is the Python twin of
+        # day_union_days, keeping `days` and `day_ranges` consistent.
+        aggregations["day_ranges"] = ("day_ranges", merge_ranges)
+
     agg = (
         obis_cells.groupby(key_cols, dropna=False)
-        .agg(
-            scientific_names=(
-                "scientific_names",
-                lambda lists: sorted(set(name for lst in lists for name in lst)),
-            ),
-            n_records=("n_records", "sum"),
-            # max, not sum: this dedup merges rows that are the SAME cell split
-            # by float noise, so their day sets overlap and summing would
-            # inflate — the defect this column exists to remove. n_records sums
-            # because its occurrence subsets really are disjoint.
-            days=("days", "max"),
-            time_min=("time_min", "min"),
-            time_max=("time_max", "max"),
-            depth_min=("depth_min", "min"),
-            depth_max=("depth_max", "max"),
-        )
+        .agg(**aggregations)
         .reset_index()
     )
 
@@ -186,6 +223,13 @@ def load_cells_copy(df, table_name, transaction, schema=None):
                 )
             elif col == "aphia_ids":
                 out.append(_pg_int_array(val if isinstance(val, (list, tuple)) else []))
+            elif col == "day_ranges":
+                # COPY runs each field through the column's input function, so
+                # the text literal is coerced to daterange[] for free. (The
+                # to_sql path can't do this — see day_sets.ranges_to_psycopg.)
+                out.append(
+                    ranges_to_pg_literal(val if isinstance(val, (list, tuple)) else [])
+                )
             else:
                 out.append(val)
         writer.writerow(out)

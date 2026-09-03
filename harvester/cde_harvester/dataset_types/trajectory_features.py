@@ -36,6 +36,7 @@ from requests.exceptions import HTTPError
 from shapely.geometry import LineString
 
 from cde_harvester.core.errors import ResponseTooLargeError
+from cde_harvester.core.day_sets import bucket_index_to_day, day_bucket_group
 from cde_harvester.sources.erddap.client import ERDDAP
 
 logger = logging.getLogger(__name__)
@@ -101,38 +102,19 @@ TRACK_MAX_CHORD_KM = 25
 
 
 def _day_group(traj_var):
-    """orderBy* grouping clause: one group per (trajectory, UTC day).
-
-    ERDDAP's ``time/86400`` interval buckets are epoch-aligned, which is UTC
-    midnight — the same day boundary the database uses when it counts distinct
-    days per hex.
-    """
-    parts = ([traj_var] if traj_var else []) + [f"time/{TRACK_DAY_SECONDS}"]
-    return ",".join(parts)
+    """orderBy* grouping clause: one group per (trajectory, UTC day)."""
+    return day_bucket_group([traj_var] if traj_var else [])
 
 
 def _bucket_index_to_day(series):
     """Turn an orderByCount interval-group column into the bucket's UTC day.
 
-    For an interval group (`time/86400`) orderByCount returns the BUCKET INDEX
-    in the grouped column, not the bucket's value — verified live against
-    ERDDAP 2.x: `time/86400` came back as 13017, formatted as
-    "1970-01-01T03:36:57Z" (13017 SECONDS), and `time/3600` as the matching
-    hour index. Taken at face value every row collapses onto 1970-01-01, which
-    is exactly how the previous per-cell design lost its counts: it read the
-    same response's `latitude/0.08333333` group as a latitude, got a bin index
-    like 531.0, merged on it, matched nothing, and silently kept the 2-row
-    min/max count — production trajectory n_records are all 1..7 because of it.
-
-    orderByMin/orderByMax are unaffected (they return the actual extreme row,
-    so a real timestamp), so both shapes have to be handled here: an index for
-    day buckets is ~2e4, a real timestamp is ~1.5e9, and no plausible ocean
-    dataset sits in between.
+    Thin wrapper over the shared decoder so the ERDDAP date parser stays an
+    argument there — see core/day_sets.py for what makes this necessary. The
+    tabledap per-feature day count issues the same kind of query and shares the
+    same trap.
     """
-    epoch = ERDDAP.parse_erddap_dates(series).astype("int64") // 10**9
-    if len(epoch) and epoch.abs().max() < 10**6:
-        epoch = epoch * TRACK_DAY_SECONDS
-    return pd.to_datetime(epoch, unit="s", utc=True).dt.floor("D")
+    return bucket_index_to_day(series, ERDDAP.parse_erddap_dates)
 
 
 def _day_counts(dataset, traj_var):

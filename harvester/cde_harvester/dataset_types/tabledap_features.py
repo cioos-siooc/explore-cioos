@@ -9,8 +9,17 @@ this module contains no cdm_data_type branches.
 from datetime import datetime
 
 import pandas as pd
+import requests
+from cde_harvester.core.day_sets import (
+    bucket_index_to_day,
+    day_bucket_group,
+    days_to_ranges,
+    ranges_to_psycopg,
+    total_days,
+)
 from cde_harvester.dataset_types.geo import classify_profile_location
-from cde_harvester.sources.erddap.client import ERDDAP
+from cde_harvester.sources.erddap.client import ERDDAP, ResponseTooLargeError
+from requests.exceptions import HTTPError
 
 
 def _axis_bounds_from_metadata(dataset, axis):
@@ -98,6 +107,155 @@ def _lat_lon_box(dataset, profiles, profile_variable_list, logger):
     if lat_mm.empty or lon_mm.empty:
         return pd.DataFrame()
     return lat_mm.join(lon_mm)
+
+
+# Rough ceiling on the rows a per-feature day count may ask for
+# (features x days in the dataset's span). A 3,447-station dataset spanning 14
+# years would ask for ~17M rows; the response cap would reject it and, unlike
+# the depth/EOV enrichments, a raised ResponseTooLargeError propagates out of
+# extract_features and loses the WHOLE dataset. Estimating first means the
+# expensive datasets fall back to the span instead of dying, and costs nothing
+# on the ~99% that are nowhere near it.
+# Sanity ceiling on features x span-days, to skip a request that is certainly
+# not worth making. Deliberately loose: measured against live servers the
+# response is a small fraction of this estimate, because it only holds days
+# that actually have data — 290,080 estimated vs 76,242 real rows (26%) for
+# amundsen11975_ctd, 2,028,390 vs 16,524 (1%) for a Hakai station set. A tight
+# cap would skip exactly the intermittent datasets this exists to fix. The real
+# backstops are the response-size limit and the server itself, both of which are
+# caught below and fall back rather than failing the dataset.
+MAX_DAY_COUNT_ROWS = 20_000_000
+
+# Variables to count, in preference order. orderByCount counts non-null values
+# of a variable that is NOT one of the grouped ones — group it and ERDDAP
+# returns the bins with no count column at all. Every tabledap dataset here has
+# passed the compliance check, so it has all three.
+_COUNT_CANDIDATES = ("latitude", "longitude", "time")
+
+
+def _string_key(index):
+    """`index` with every level cast to string, for dtype-proof alignment."""
+    frame = index.to_frame(index=False).astype(str)
+    if frame.shape[1] > 1:
+        return pd.MultiIndex.from_frame(frame)
+    return pd.Index(frame.iloc[:, 0], name=index.name)
+
+
+def _extract_day_sets(dataset, profiles, profile_variable_list, logger):
+    """Per-feature day sets, from one grouped request.
+
+    Returns a (days, day_ranges) frame indexed like ``profiles``, or None when
+    the day set could not be determined — in which case the caller leaves both
+    columns unset and the database fills ``days`` from the time span
+    (5_profile_process.sql). That fallback is a strict over-count, which is the
+    whole reason this function exists, but it is never wrong enough to justify
+    dropping a dataset.
+
+    One `orderByCount("<cf_role vars>,time/86400")` answers it for every feature
+    at once. Three things about that query are easy to get wrong:
+
+      * the counted variable must DIFFER from every grouped one, or ERDDAP
+        returns the bins with no count column;
+      * a cf_role variable can BE `time` (mpoSgdoADCP tags cf_role=profile_id
+        on time itself). Grouping by both the raw time and its day bucket asks
+        for one group per record, and repeating it in the variable list is a
+        400 outright — so time is dropped from the grouping, which is what the
+        day bucket already stands for;
+      * the grouped time column comes back as the bucket INDEX, not a
+        timestamp. `bucket_index_to_day` decodes it; reading it at face value
+        silently collapses every row onto 1970-01-01.
+    """
+    # time_min/time_max are still the raw ERDDAP strings here — the frame is
+    # only parsed to datetimes further down, after the identity index is reset.
+    # This runs before that on purpose: the grouped request answers per cf_role
+    # variable, so it needs the frame while those are still the index.
+    span_start = ERDDAP.parse_erddap_date(profiles["time_min"].min())
+    span_end = ERDDAP.parse_erddap_date(profiles["time_max"].max())
+    if pd.isna(span_start) or pd.isna(span_end):
+        logger.warning("Cannot size the per-feature day count; using the time span")
+        return None
+    span_days = max((span_end - span_start).days, 1)
+    estimated_rows = len(profiles) * span_days
+    if estimated_rows > MAX_DAY_COUNT_ROWS:
+        logger.warning(
+            "Skipping per-feature day count: ~%d rows (%d features x %d days) "
+            "exceeds the %d cap; falling back to the time span",
+            estimated_rows, len(profiles), span_days, MAX_DAY_COUNT_ROWS,
+        )
+        return None
+
+    group_vars = [v for v in profile_variable_list if v != "time"]
+    counted = next((v for v in _COUNT_CANDIDATES if v not in group_vars), None)
+    if counted is None:
+        logger.warning("No countable variable outside the group; using the time span")
+        return None
+
+    request_vars = group_vars + ["time", counted]
+    url = ",".join(request_vars) + requests.utils.quote(
+        f'&orderByCount("{day_bucket_group(group_vars)}")'
+    )
+    try:
+        df_days = dataset.dataset_tabledap_query(url)
+    except (HTTPError, ResponseTooLargeError):
+        # Both are recoverable here: an old ERDDAP without orderBy interval
+        # grouping, a server refusing the request, or a response over the cap.
+        logger.warning("Per-feature day count failed; falling back to the time span")
+        return None
+
+    if df_days.empty:
+        # erddap_csv_to_df turns "no operator found in constraint" and "too
+        # much data" 500s into an empty frame rather than raising, so this is
+        # the same class of miss as the exception above.
+        logger.warning("Per-feature day count returned nothing; using the time span")
+        return None
+
+    df_days = df_days.copy()
+    df_days["day"] = bucket_index_to_day(df_days["time"], ERDDAP.parse_erddap_dates)
+    df_days = df_days.dropna(subset=["day"])
+    if df_days.empty:
+        logger.warning("Per-feature day count had no usable dates; using the time span")
+        return None
+
+    if group_vars:
+        for column in group_vars:
+            df_days[column] = df_days[column].astype(str)
+        grouped = df_days.groupby(group_vars if len(group_vars) > 1 else group_vars[0])
+    else:
+        # Single-feature dataset with no cf_role variable: one group, whose key
+        # has to match the frame's index for the caller's join to land.
+        grouped = df_days.groupby(lambda _: profiles.index[0])
+
+    day_sets = grouped["day"].apply(days_to_ranges).rename("day_ranges").to_frame()
+    day_sets["days"] = day_sets["day_ranges"].apply(total_days)
+
+    # Align to the caller's index rather than leaving it to join on dtype. The
+    # identity frame's keys come from the distinct() CSV — an integer station id
+    # is read as int64 there — while the count response's are cast to str above.
+    # Joined as they are, those two never match and EVERY row silently falls
+    # back to the span: the exact defect this function exists to remove, with no
+    # error to notice. Comparing as strings is also what makes a grouping that
+    # lost a level (time dropped above) fail loudly here instead.
+    if day_sets.index.nlevels != profiles.index.nlevels:
+        logger.warning(
+            "Day-set grouping does not match the feature identity; using the time span"
+        )
+        return None
+
+    day_sets = day_sets.reindex(_string_key(profiles.index))
+    matched = day_sets["days"].notna()
+    if not matched.any():
+        logger.warning("No day set matched a feature; using the time span")
+        return None
+    if not matched.all():
+        logger.info(
+            "Day sets found for %d of %d features; the rest use the time span",
+            int(matched.sum()), len(day_sets),
+        )
+    day_sets.index = profiles.index
+    day_sets["day_ranges"] = day_sets["day_ranges"].apply(
+        lambda runs: runs if isinstance(runs, list) else []
+    )
+    return day_sets
 
 
 def extract_features(dataset, handler):
@@ -310,6 +468,15 @@ def extract_features(dataset, handler):
         logger.error("Error counting records")
         return profiles
 
+    # Per-feature day sets, while the frame is still indexed by the cf_role
+    # variables the grouped request answers on. Only for types whose features
+    # can span more than one day: a Profile feature is a single cast, so its
+    # span already IS its day set and a second request would buy nothing.
+    if handler.features_span_multiple_days:
+        day_sets = _extract_day_sets(dataset, profiles, profile_variable_list, logger)
+        if day_sets is not None:
+            profiles = profiles.join(day_sets)
+
     profiles = profiles.reset_index(drop=False).copy()
 
     # Rename cf_role variables as cf_role and drop from index.
@@ -355,13 +522,34 @@ def extract_features(dataset, handler):
     profiles[cols_to_convert] = profiles[cols_to_convert].apply(
         pd.to_numeric, errors="coerce"
     )
-    # calculate records_per_day
-    days = (profiles["time_max"] - profiles["time_min"]).dt.days
+    # records_per_day is a rate over days that HAVE data, so the denominator is
+    # the day set where we harvested one and the elapsed span only where we
+    # didn't. The distinction matters: a seasonal station sampled ~430 days
+    # across a 39,357-day span reads ~90x busier on the real denominator, and
+    # the download estimator pairs this rate with a matching day-set overlap
+    # (day_range_overlap_days, web-api/utils/shapeQuery.js) so the two stay
+    # dimensionally consistent.
+    span_days = (profiles["time_max"] - profiles["time_min"]).dt.days
+    # a start and end on the same day is one day of data, not zero
+    span_days = span_days.replace(0, 1)
 
-    # if the start and end date is same day
-    days = days.replace(0, 1)
+    if "days" in profiles:
+        # Harvested for some rows and not others only when a dataset's day
+        # count failed; fill those from the span so the column is never null.
+        profiles["days"] = profiles["days"].fillna(span_days).replace(0, 1)
+    else:
+        profiles["days"] = span_days
 
-    profiles["records_per_day"] = profiles["n_records"] / (days)
+    profiles["records_per_day"] = profiles["n_records"] / profiles["days"]
+
+    # Always present, so the loader's array dtype and the CSV round-trip have a
+    # column to work with; empty means "day set unknown" and the web-api falls
+    # back to the row's span.
+    if "day_ranges" not in profiles:
+        profiles["day_ranges"] = [[] for _ in range(len(profiles))]
+    profiles["day_ranges"] = profiles["day_ranges"].apply(
+        lambda runs: list(runs) if isinstance(runs, (list, tuple)) else []
+    )
 
     profiles = profiles.round(4)
 

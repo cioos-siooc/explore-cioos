@@ -158,14 +158,14 @@ BEGIN
     time_min, time_max, latitude, longitude,
     latitude_min, latitude_max, longitude_min, longitude_max, show_as_point,
     depth_min, depth_max, n_records, records_per_day, n_profiles, eovs,
-    hex_0_pk, hex_1_pk, point_pk, days
+    hex_0_pk, hex_1_pk, point_pk, days, day_ranges
   )
   SELECT
     geom, dataset_pk, erddap_url, dataset_id, timeseries_id, profile_id,
     time_min, time_max, latitude, longitude,
     latitude_min, latitude_max, longitude_min, longitude_max, show_as_point,
     depth_min, depth_max, n_records, records_per_day, n_profiles, eovs,
-    hex_0_pk, hex_1_pk, point_pk, days
+    hex_0_pk, hex_1_pk, point_pk, days, day_ranges
   FROM temp_profiles;
 END;
 $$ LANGUAGE plpgsql;
@@ -203,14 +203,15 @@ BEGIN
   -- Insert new obis_cells from temp table. aphia_ids is pre-resolved by the
   -- db-loader from cde.scientific_name_vernaculars at COPY time; carried
   -- through here so the post-load backfill UPDATE sees fewer empty rows.
-  INSERT INTO cde.obis_cells (dataset_id, latitude, longitude, scientific_names, aphia_ids, n_records, days, time_min, time_max, depth_min, depth_max)
-  SELECT dataset_id, latitude, longitude, scientific_names, aphia_ids, n_records, days, time_min, time_max, depth_min, depth_max
+  INSERT INTO cde.obis_cells (dataset_id, latitude, longitude, scientific_names, aphia_ids, n_records, days, day_ranges, time_min, time_max, depth_min, depth_max)
+  SELECT dataset_id, latitude, longitude, scientific_names, aphia_ids, n_records, days, day_ranges, time_min, time_max, depth_min, depth_max
   FROM temp_obis_cells
   ON CONFLICT (dataset_id, latitude, longitude) DO UPDATE SET
     scientific_names = EXCLUDED.scientific_names,
     aphia_ids = EXCLUDED.aphia_ids,
     n_records = EXCLUDED.n_records,
     days = EXCLUDED.days,
+    day_ranges = EXCLUDED.day_ranges,
     time_min = EXCLUDED.time_min,
     time_max = EXCLUDED.time_max,
     depth_min = EXCLUDED.depth_min,

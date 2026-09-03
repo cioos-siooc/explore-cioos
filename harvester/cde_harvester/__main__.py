@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
+from cde_harvester.core.day_sets import ranges_to_iso
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     get_ckan_records,
     unescape_ascii,
@@ -281,6 +282,13 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     if "eovs" in erddap_profiles.columns:
         erddap_profiles["eovs"] = erddap_profiles["eovs"].apply(
             lambda x: repr(list(x)) if isinstance(x, (list, tuple)) else x
+        )
+    # Same treatment for the day set, with one extra step: literal_eval only
+    # accepts literals, and the repr of a datetime.date is a constructor call —
+    # so the runs go through as ISO-string pairs (day_sets.ranges_to_iso).
+    if "day_ranges" in erddap_profiles.columns:
+        erddap_profiles["day_ranges"] = erddap_profiles["day_ranges"].apply(
+            lambda x: repr(ranges_to_iso(x)) if isinstance(x, (list, tuple)) else x
         )
     erddap_profiles.drop_duplicates().to_csv(profiles_file, index=False)
     if not df_ckan.empty:
