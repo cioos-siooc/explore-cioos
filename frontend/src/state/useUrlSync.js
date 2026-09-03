@@ -6,6 +6,7 @@ import {
   createDataFilterQueryString,
   createSelectionQueryString
 } from '../utilities.jsx'
+import { wmsSliceParams } from '../wmsUtilities.js'
 import {
   anyTrajectoryLayerOn,
   dataLayersAreDefault
@@ -18,9 +19,10 @@ import { useSelection } from './selection/SelectionProvider.jsx'
 
 // Sole owner of the URL format: serializes everything that shapes what the
 // user is looking at — the debounced filter query, the drawn selection, the
-// list's own narrowing (title search, in-view, grouping) and the map view —
-// into the search params, so the link reproduces the view. It also keeps i18n
-// in sync with the lang param.
+// list's own narrowing (title search, in-view, grouping), the map view, and
+// what the open dataset page or the "what's here" card is pointing at — into
+// the search params, so the link reproduces the view. It also keeps i18n in
+// sync with the lang param.
 //
 // Reading URL state back on load happens where the state lives (FilterProvider
 // seeds the filters, MapStateProvider the camera, SelectionProvider the
@@ -52,14 +54,18 @@ export default function UrlSync () {
     dataLayersVisible,
     bathymetryVisible,
     griddapCoverageVisible,
-    projection
+    projection,
+    activeWmsOverlay,
+    featureQuery
   } = useMapState()
   const {
     polygon,
     datasetTitleSearchText,
     onlyInView,
     groupBy,
-    hiddenGroups
+    hiddenGroups,
+    highlightedRecord,
+    selectedTrajectory
   } = useSelection()
   const [isPageLoad, setIsPageLoad] = useState(true)
 
@@ -90,7 +96,23 @@ export default function UrlSync () {
       ...(groupBy && groupBy !== GROUP_NONE ? { groupBy } : {}),
       ...(hiddenGroupsParam ? { hiddenGroups: hiddenGroupsParam } : {}),
       ...(dataset ? { dataset } : {}),
-      ...(dataset && server ? { server } : {})
+      ...(dataset && server ? { server } : {}),
+      // What the open dataset page is pointing at, all of it keyed to the
+      // ?dataset= above and gone with it: which slice of a griddap overlay is
+      // drawn, and which subset of the dataset is highlighted — the record a
+      // marker click pinned, or the platform whose track is on the map.
+      ...(activeWmsOverlay ? wmsSliceParams(activeWmsOverlay) : {}),
+      ...(highlightedRecord ? { record: highlightedRecord.profileId } : {}),
+      ...(selectedTrajectory
+        ? { track: selectedTrajectory.trajectoryId }
+        : {}),
+      // Where the "what's here" card was opened. The card's contents are
+      // whatever is drawn under that point, so the point is the whole of it —
+      // Map asks the question again on load. Six decimals is ~0.1 m, well
+      // past the size of anything the hit-test can distinguish.
+      ...(featureQuery
+        ? { at: featureQuery.lngLat.map((n) => Number(n.toFixed(6))).join(',') }
+        : {})
     }
     // The track-lines switch only means anything while a trajectory geometry is
     // on, and the param records its non-default state: it defaults on, so
@@ -138,7 +160,11 @@ export default function UrlSync () {
     dataLayersVisible,
     bathymetryVisible,
     griddapCoverageVisible,
-    projection
+    projection,
+    activeWmsOverlay,
+    featureQuery,
+    highlightedRecord,
+    selectedTrajectory
   ])
 
   useEffect(() => {

@@ -32,6 +32,7 @@ export default function MapContainer () {
     mapRef,
     featureQuery,
     setFeatureQuery,
+    sharedFeatureQueryAt,
     tracksMode,
     debouncedScrubTime,
     trailingDays,
@@ -136,6 +137,7 @@ export default function MapContainer () {
       onViewportHexRange={setViewportHexRange}
       onFeatureQuery={handleFeatureQuery}
       featureQuery={featureQuery}
+      sharedFeatureQueryAt={sharedFeatureQueryAt}
       onMarkerClick={onMarkerClick}
       onTrackClick={selectTrajectoryFromMap}
       setHoveredDataset={setHoveredDataset}

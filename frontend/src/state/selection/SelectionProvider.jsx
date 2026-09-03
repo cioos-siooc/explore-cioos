@@ -102,6 +102,23 @@ export default function SelectionProvider ({ children }) {
   // jumping straight into the preview the user hasn't asked to see yet.
   const [highlightedRecord, setHighlightedRecord] = useState()
 
+  // Both of those as a share link carries them: the subset of the dataset the
+  // link points at — a record (?record=<profile_id>) or a platform
+  // (?track=<trajectory_id>) — waiting for the dataset itself to resolve out
+  // of pointsData, since neither means anything without the page they are
+  // highlighted on. Consumed once, by the effect below.
+  const [pendingHighlight, setPendingHighlight] = useState(() => {
+    // A trajectory_id is legitimately '' (a dataset with a single unnamed
+    // trajectory — the schema default), so presence is the test, not truth.
+    const record = initialParams.get('record') || undefined
+    const track = initialParams.has('track')
+      ? initialParams.get('track')
+      : undefined
+    return record !== undefined || track !== undefined
+      ? { record, track }
+      : undefined
+  })
+
   const [selectAll, setSelectAll] = useState(false)
   const [pointsData, setPointsData] = useState([])
   const [selectionLoading, setSelectionLoading] = useState(true)
@@ -562,6 +579,27 @@ export default function SelectionProvider ({ children }) {
       current && current.datasetPk !== inspectDataset?.pk ? undefined : current
     )
   }, [inspectDataset])
+
+  // The share link's highlight, once its dataset is in hand. Declared after the
+  // effect above so that on the render where the page resolves, this one runs
+  // second and its highlight isn't the stale value that one clears.
+  useEffect(() => {
+    if (!pendingHighlight || !inspectDataset) return
+    const { record, track } = pendingHighlight
+    setPendingHighlight(undefined)
+    if (record !== undefined) {
+      setHighlightedRecord({ datasetPk: inspectDataset.pk, profileId: record })
+    }
+    // No frameView: the link carries its own camera (lat/lon/zoom), and
+    // framing the whole voyage would overrule it.
+    if (track !== undefined) {
+      setSelectedTrajectory({
+        datasetPk: inspectDataset.pk,
+        datasetTitle: inspectDataset.title,
+        trajectoryId: track
+      })
+    }
+  }, [pendingHighlight, inspectDataset])
 
   useEffect(() => {
     if (inspectDataset) {

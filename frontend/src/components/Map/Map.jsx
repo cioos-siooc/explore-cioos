@@ -271,6 +271,9 @@ export default function CreateMap({
   // The same payload handed back, so the map can outline the region the open
   // card is describing.
   featureQuery,
+  // [lng, lat] a share link's card was opened at, replayed once the map has
+  // drawn — read at mount only. See the mount effect.
+  sharedFeatureQueryAt,
   // A click that landed on exactly one individual marker naming exactly one
   // dataset — nothing else under the cursor, no ambiguity about which station
   // the user meant. Called with (datasetPk, pointPk) instead of building a
@@ -1903,6 +1906,9 @@ export default function CreateMap({
   // click handler; the card does that itself now, straight from the provider.)
   const onFeatureQueryRef = useRef(onFeatureQuery)
   onFeatureQueryRef.current = onFeatureQuery
+  // Consumed once by the mount effect; a ref rather than the prop so replaying
+  // it can't be re-triggered by a later render.
+  const sharedFeatureQueryAtRef = useRef(sharedFeatureQueryAt)
   const onMarkerClickRef = useRef(onMarkerClick)
   onMarkerClickRef.current = onMarkerClick
   const onTrackClickRef = useRef(onTrackClick)
@@ -2014,7 +2020,19 @@ export default function CreateMap({
     let superseded = false
 
     async function renderSelectedTrack() {
-      if (!map.current || !map.current.getSource('selected-track')) return
+      if (!map.current) return
+      // A share link's platform (?track=) is resolved out of the first
+      // pointQuery, which routinely lands before the style has finished adding
+      // layers — the source this draws into doesn't exist yet. Come back on the
+      // load that adds it rather than dropping the selection: this effect is
+      // keyed on the selection alone, so nothing re-runs it once the map
+      // catches up, and the track never appeared. Registered from here, so it
+      // runs after the handler that adds the sources ('load' fires its
+      // listeners in registration order).
+      if (!map.current.getSource('selected-track')) {
+        map.current.once('load', renderSelectedTrack)
+        return
+      }
       const source = map.current.getSource('selected-track')
 
       if (!selectedTrajectory) {
@@ -2187,6 +2205,10 @@ export default function CreateMap({
     return () => {
       superseded = true
       abortController.abort()
+      // Including a retry still waiting on 'load' — a selection replaced while
+      // the map was still coming up must not draw over the one that replaced
+      // it. (Evented.off clears once-listeners too.)
+      map.current?.off('load', renderSelectedTrack)
     }
   }, [selectedTrajectory, mapQueryString])
 
@@ -3268,6 +3290,33 @@ export default function CreateMap({
       'griddap-coverage-fill'
     ]
 
+    // Everything the click layers have under a point — the hit-test both a
+    // click and a share link's remembered point (see the replay at the end of
+    // this effect) ask the map.
+    //
+    // A marker is a specific station and a track is a specific voyage; the hex
+    // layers are the neighbourhood aggregate drawn under both — a trajectory's
+    // own coverage hexes lie beneath every metre of its track, and
+    // 'coverage-hexes' shares the marker tier's zoom band (both render at
+    // z >= hexMaxZoom). Either precise geometry is what the user pointed at, so
+    // once one is under the point the hex hits are dropped rather than merged
+    // into it: a click here means "this station" or "this track", never
+    // "…plus whatever hex happens to be under it".
+    const hitsAt = (point) => {
+      const layers = clickLayerIds.filter((id) => map.current.getLayer(id))
+      const hits = layers.length
+        ? map.current.queryRenderedFeatures(point, { layers })
+        : []
+      const precise =
+        hits.some((feature) => feature.layer.id === 'points') ||
+        trackItemsIn(hits).length > 0
+      return precise
+        ? hits.filter(
+          (feature) => !['hexes', 'coverage-hexes'].includes(feature.layer.id)
+        )
+        : hits
+    }
+
     const datasetPksOf = (feature) => {
       try {
         const pks = JSON.parse(feature.properties.datasets)
@@ -3534,26 +3583,9 @@ export default function CreateMap({
       }
       if (draw.getMode().includes('draw')) return
 
-      const layers = clickLayerIds.filter((id) => map.current.getLayer(id))
-      let hits = layers.length
-        ? map.current.queryRenderedFeatures(e.point, { layers })
-        : []
-
-      // A marker is a specific station and a track is a specific voyage;
-      // the hex layers are the neighbourhood aggregate drawn under both — a
-      // trajectory's own coverage hexes lie beneath every metre of its track,
-      // and 'coverage-hexes' shares the marker tier's zoom band (both render
-      // at z >= hexMaxZoom). Either precise geometry is what the user pointed
-      // at, so once one is under the click the hex hits are dropped rather
-      // than merged into it: a click here means "this station" or "this
-      // track", never "…plus whatever hex happens to be under it".
+      const hits = hitsAt(e.point)
       const markerHits = hits.filter((feature) => feature.layer.id === 'points')
       const tracks = trackItemsIn(hits)
-      if (markerHits.length > 0 || tracks.length > 0) {
-        hits = hits.filter(
-          (feature) => !['hexes', 'coverage-hexes'].includes(feature.layer.id)
-        )
-      }
 
       // 'points' carries a wide invisible hit stroke (circle-stroke-width: 10,
       // circle-stroke-opacity: 0.001 — see the layer below) so a marker stays
@@ -3824,6 +3856,28 @@ export default function CreateMap({
       if (dx * dx + dy * dy > TAP_SLOP_PX ** 2) return
       handleMapClick(e)
     })
+
+    // The card a share link arrived with (?at=lng,lat): ask the same question
+    // of the same point, once every source the hit-test reads has been
+    // rendered — which is what 'idle' means, and the earliest moment the
+    // answer is the one the link's author saw.
+    //
+    // Only the card is reproduced, not the click: the shortcut paths above and
+    // the clear-everything one below are things the user did, and a link is
+    // written with the card open — so replaying a click here could only undo
+    // the selection and the page the same link just restored.
+    if (sharedFeatureQueryAtRef.current) {
+      map.current.once('idle', () => {
+        const lngLat = sharedFeatureQueryAtRef.current
+        if (!lngLat || !map.current) return
+        sharedFeatureQueryAtRef.current = null
+        const query = buildFeatureQuery(
+          { lngLat: { lng: lngLat[0], lat: lngLat[1] } },
+          hitsAt(map.current.project(lngLat))
+        )
+        if (query) onFeatureQueryRef.current(query)
+      })
+    }
 
     // No visible buttons (drawControlOptions.controls) — the draw/box/trash
     // triggers moved into the top bar's spatial filter button, which drives
