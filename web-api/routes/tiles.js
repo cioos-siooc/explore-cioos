@@ -514,8 +514,10 @@ router.get(
  *     description: >
  *       Returns a Mapbox Vector Tile with TWO layers built from
  *       cde.trajectory_points: 'track-lines' (per-trajectory LineStrings over
- *       the requested time window, ordered by time) and 'track-heads' (each
- *       trajectory's latest fix within the window, with 'cog' — course over
+ *       the requested time window, ordered by time, each carrying the segment's
+ *       own 'time_min'/'time_max' as epoch ms) and 'track-heads' (each
+ *       trajectory's latest fix within the window, with its 'head_time' and
+ *       'profile_id', and 'cog' — course over
  *       ground in degrees clockwise from north, absent when undefined).
  *       timeMin/timeMax are
  *       REQUIRED — the window is the scrub bar's trailing interval. Clients
@@ -639,7 +641,7 @@ router.get(
     ),
     pts AS (
       SELECT p.dataset_pk, p.trajectory_id, p.time, p.longitude, p.latitude,
-             p.geom, d.pk_url, d.title AS dataset_title, c.gap_secs
+             p.geom, p.profile_id, d.pk_url, d.title AS dataset_title, c.gap_secs
       FROM cde.trajectory_points p
       JOIN cand c ON c.dataset_pk = p.dataset_pk
                  AND c.trajectory_id = p.trajectory_id
@@ -686,7 +688,15 @@ router.get(
       -- dataset_title rides along so a track-line click can name its dataset
       -- without a second lookup (MVT dedupes strings per layer, so the whole
       -- tile carries one copy of each title).
+      --
+      -- time_min/time_max are the segment's own span — when this segment was
+      -- sailed, which is what a hover over it can honestly say. A single fix's
+      -- instant is not available on a line: MVT properties are per feature, and
+      -- a LineString is many fixes. Epoch ms, like head_time below, because MVT
+      -- has no timestamp type.
       SELECT trajectory_id, pk_url, dataset_title,
+             (extract(epoch FROM min(time)) * 1000)::bigint AS time_min,
+             (extract(epoch FROM max(time)) * 1000)::bigint AS time_max,
              ST_MakeLine(geom ORDER BY time) AS geom
       FROM segs
       GROUP BY dataset_pk, trajectory_id, pk_url, dataset_title, seg
@@ -698,8 +708,11 @@ router.get(
       -- when undefined: single-fix trajectories (lag is NULL) or a
       -- stationary platform (coincident fixes make ST_Azimuth NULL); the
       -- frontend renders those heads as circles instead of arrows.
+      -- profile_id: the record this fix belongs to, for datasets whose
+      -- trajectories are made of profiles (NULL for a plain Trajectory, whose
+      -- fixes are not records). Free here — the head row is already this fix.
       SELECT DISTINCT ON (dataset_pk, trajectory_id)
-             trajectory_id, pk_url, dataset_title,
+             trajectory_id, pk_url, dataset_title, profile_id,
              (extract(epoch FROM time) * 1000)::bigint AS head_time,
              round(degrees(ST_Azimuth(
                ST_SetSRID(ST_MakePoint(lag(longitude) OVER w, lag(latitude) OVER w), 4326)::geography,
@@ -715,7 +728,7 @@ router.get(
       -- (tile width / 4096), the resolution ST_AsMVTGeom snaps to anyway, so it
       -- drops vertices that would collapse on encode — visually lossless, fewer
       -- vertices to encode/transfer at low zoom where tracks carry long history.
-      SELECT l.trajectory_id, l.pk_url, l.dataset_title,
+      SELECT l.trajectory_id, l.pk_url, l.dataset_title, l.time_min, l.time_max,
              ST_AsMVTGeom(
                ST_Simplify(
                  l.geom,
@@ -727,7 +740,8 @@ router.get(
       WHERE l.geom && te.tile_envelope
     ),
     head_mvt AS (
-      SELECT h.trajectory_id, h.pk_url, h.dataset_title, h.head_time, h.cog,
+      SELECT h.trajectory_id, h.pk_url, h.dataset_title, h.profile_id,
+             h.head_time, h.cog,
              ST_AsMVTGeom(h.geom, te.tile_envelope) AS geom
       FROM heads h, te
       WHERE h.geom && te.tile_envelope

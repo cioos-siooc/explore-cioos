@@ -299,6 +299,56 @@ export function formatDatasetCount (filtered, total) {
   return `${filtered} / ${total}`
 }
 
+// The instants either list carries, formatted as the UTC they are: the record
+// list spells them out in UTC (see shapeQuery.js) and the platform list sends
+// timestamptz, which JSON serializes as UTC too, so a Z is the truth in both
+// and no local-time conversion is wanted — an oceanographic record's time is
+// the time it was taken at sea, not the reader's wall clock.
+//
+// Where the two ends share a day, the second one drops it: a cast that ran
+// from 18:32 to 19:05 says so in one line rather than repeating the date.
+export function formatInstantRange (min, max) {
+  const from = splitInstant(min)
+  const to = splitInstant(max)
+  if (!from) return formatInstant(max)
+  if (!to || (from.day === to.day && from.time === to.time)) {
+    return formatInstant(min)
+  }
+  if (from.day === to.day) return `${from.day} ${from.time} → ${to.time}Z`
+  return `${from.day} ${from.time}Z → ${to.day} ${to.time}Z`
+}
+
+// One instant, under the same UTC rule: a single fix's time on the map's
+// hover chip, and the degenerate ends of the range above.
+export function formatInstant (value) {
+  const at = splitInstant(value)
+  return at ? `${at.day} ${at.time}Z` : undefined
+}
+
+// Either shape an instant reaches the app in: an ISO string from JSON, or the
+// epoch milliseconds a vector tile carries (MVT has no timestamp type, so the
+// track tiles encode their times as numbers).
+function splitInstant (value) {
+  if (value === null || value === undefined || value === '') return undefined
+  const iso =
+    typeof value === 'number' ? new Date(value).toISOString() : String(value)
+  const [day, rest] = iso.split('T')
+  return { day, time: (rest || '00:00').slice(0, 5) }
+}
+
+// "min – max", or the one bound that exists, or the single value when the two
+// are the same.
+export function formatRange (min, max, unit = '') {
+  const suffix = unit ? ` ${unit}` : ''
+  if (min === null || min === undefined) {
+    return max === null || max === undefined ? undefined : `${max}${suffix}`
+  }
+  if (max === null || max === undefined || String(min) === String(max)) {
+    return `${min}${suffix}`
+  }
+  return `${min} – ${max}${suffix}`
+}
+
 export function useDebounce (value, delay) {
   // State and setters for debounced value
   const [debouncedValue, setDebouncedValue] = useState(value)

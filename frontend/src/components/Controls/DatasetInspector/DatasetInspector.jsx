@@ -13,13 +13,12 @@ import {
   DATA_LAYER_LABEL_KEYS
 } from '../../../state/dataLayers.js'
 import { gridNodeFactors, totalGridNodes } from '../../../wmsUtilities'
+import { formatInstantRange, formatRange } from '../../../utilities.jsx'
 import FilterButton from '../Filter/FilterButton/FilterButton.jsx'
 import CardList from './CardList.jsx'
 import ListCard, {
   CardField,
   CardTags,
-  formatInstantRange,
-  formatRange,
   useExpandableList
 } from './ListCard.jsx'
 import ZoomToDataset, {

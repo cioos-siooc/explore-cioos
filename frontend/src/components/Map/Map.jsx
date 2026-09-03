@@ -22,6 +22,8 @@ import reportError from '../../state/reportError.js'
 import {
   boundsFromGeoJson,
   escapeHtml,
+  formatInstant,
+  formatInstantRange,
   generateColorStops,
   getCurrentRangeLevel,
   polygonIsRectangle,
@@ -238,6 +240,11 @@ export default function CreateMap({
   // featureQuery, so the caller can jump straight to that station's record
   // rather than making the user open a card and pick a row. See handleMapClick.
   onMarkerClick = () => { },
+  // A click that landed on exactly one track and nothing else — no ambiguity
+  // about which voyage the user meant. Called with (datasetPk, trajectoryId,
+  // datasetTitle) instead of building a featureQuery, so the caller can open
+  // that dataset's page with the trajectory drawn. See handleMapClick.
+  onTrackClick = () => { },
   rangeLevels,
   coverageRangeLevels,
   // Reports the count range the hexes on screen actually span, so the legend
@@ -1928,6 +1935,8 @@ export default function CreateMap({
   onFeatureQueryRef.current = onFeatureQuery
   const onMarkerClickRef = useRef(onMarkerClick)
   onMarkerClickRef.current = onMarkerClick
+  const onTrackClickRef = useRef(onTrackClick)
+  onTrackClickRef.current = onTrackClick
 
   // Read by the track-focus paint (see applyTrackFocus). It also fed a
   // "click to show this platform's full track" line on the track tooltips,
@@ -2065,10 +2074,18 @@ export default function CreateMap({
         rawTrackRef.current = {
           key: cacheKey,
           coordinates: track.coordinates,
-          times: track.times
+          times: track.times,
+          // Parallel to coordinates/times, and null per fix for a plain
+          // Trajectory dataset (only TrajectoryProfile fixes are records with
+          // an id). The hover chip names it where there is one.
+          profileIds: track.profile_ids
         }
       }
-      const { coordinates: rawCoordinates, times: rawTimes } = rawTrackRef.current
+      const {
+        coordinates: rawCoordinates,
+        times: rawTimes,
+        profileIds: rawProfileIds
+      } = rawTrackRef.current
       if (!rawCoordinates || rawCoordinates.length === 0) return
 
       // Split at the antimeridian and at large time gaps so a line never
@@ -2099,6 +2116,7 @@ export default function CreateMap({
         let lastCog = null
         return run.map((coordinate, i) => {
           const time = rawTimes[rawIndex]
+          const profileId = rawProfileIds?.[rawIndex]
           rawIndex++
           const cog =
             i > 0
@@ -2112,6 +2130,7 @@ export default function CreateMap({
             geometry: { type: 'Point', coordinates: coordinate },
             properties: {
               ...(lastCog === null ? {} : { cog: lastCog }),
+              ...(profileId ? { profile_id: profileId } : {}),
               time,
               trajectory_id: trajectoryId,
               dataset_title: selectedTrajectory.datasetTitle
@@ -2848,29 +2867,48 @@ export default function CreateMap({
       map.current.getZoom() >= griddapPriorityZoom &&
       hits.some((feature) => feature.layer.id === 'griddap-coverage-fill')
 
-    // The whole hover vocabulary: one line, no markup, no click hint.
+    // The whole hover vocabulary: a chip naming what is under the cursor, with
+    // no markup and no click hint.
     //
     // Every tooltip here used to carry a bold dataset title, a secondary line or
     // two, and a "Click to …" hint — a card's worth of content in a popup, shown
     // on a gesture the user did not ask anything with. All of it is one click
     // away in the real card now, and the hint is the same sentence everywhere,
     // so hover is back to what it is good at: naming the thing under the cursor
-    // so you know it is hittable. Titles are truncated rather than wrapped, so
-    // the chip stays one line whatever it is given.
-    const CHIP_MAX_CHARS = 34
+    // so you know it is hittable.
+    //
+    // Nearly every rule below passes a single string. A fix on the drawn track
+    // passes several, because it is the one hover that has a whole record
+    // behind it — its dataset, its record id and its instant — and reading a
+    // point off a track means reading those together. Lines are truncated
+    // rather than wrapped, so the chip keeps one line per fact whatever it is
+    // given.
+    // Sized to the longest line any rule can produce: a full instant range,
+    // "2014-09-30 15:11Z → 2014-11-04 10:23Z" (37). Anything wider than the
+    // chip itself is still ellipsised by CSS.
+    const CHIP_MAX_CHARS = 40
     const showChip = (lngLat, text) => {
-      const label = String(text ?? '').trim()
-      if (!label) {
+      const lines = (Array.isArray(text) ? text : [text])
+        .map((line) => String(line ?? '').trim())
+        .filter(Boolean)
+        .map((line) =>
+          line.length > CHIP_MAX_CHARS
+            ? `${line.slice(0, CHIP_MAX_CHARS - 1)}…`
+            : line
+        )
+      if (lines.length === 0) {
         popup.remove()
         return
       }
-      const clipped =
-        label.length > CHIP_MAX_CHARS
-          ? `${label.slice(0, CHIP_MAX_CHARS - 1)}…`
-          : label
       popup
         .setLngLat(lngLat)
-        .setHTML(`<span class="mapChip">${escapeHtml(clipped)}</span>`)
+        .setHTML(
+          `<span class="mapChip">${lines
+            .map(
+              (line) => `<span class="mapChipLine">${escapeHtml(line)}</span>`
+            )
+            .join('')}</span>`
+        )
         .addTo(map.current)
     }
 
@@ -2935,15 +2973,24 @@ export default function CreateMap({
       {
         id: 'selected-fixes',
         layers: ['selected-track-fixes', 'selected-track-fixes-nocog'],
-        // The date is the whole point of hovering a fix on the drawn track —
-        // the platform is already named in the page that drew it.
-        show: (e, features) =>
-          showChip(
-            e.lngLat,
-            features[0].properties.time
-              ? features[0].properties.time.slice(0, 10)
-              : features[0].properties.trajectory_id
-          )
+        // A fix on the drawn track is one record, so the chip reads it out as
+        // one: the dataset it came from, the record id (absent on a plain
+        // Trajectory dataset, whose fixes are not records), and the instant it
+        // was taken at — in UTC, the truth the record list spells out too.
+        // Falls back to the platform where a fix carries no time.
+        show: (e, features) => {
+          const {
+            dataset_title: datasetTitle,
+            profile_id: profileId,
+            time,
+            trajectory_id: trajectoryId
+          } = features[0].properties
+          showChip(e.lngLat, [
+            datasetTitle,
+            profileId,
+            formatInstant(time) || trajectoryId
+          ])
+        }
       },
       {
         id: 'track-lines',
@@ -2955,17 +3002,47 @@ export default function CreateMap({
               feature.layer.id
             )
           ),
-        // The platform, which is what tells one of a dozen crossing lines from
-        // another. Its dataset is in the card.
-        show: (e, features) =>
-          showChip(e.lngLat, features[0].properties.trajectory_id)
+        // The dataset and the platform — the platform is what tells one of a
+        // dozen crossing lines from another — then when this stretch of it was
+        // sailed. No single instant and no record id: a line is many fixes, and
+        // an MVT feature carries one set of properties, so the segment's own
+        // span is what it can honestly say (see the lines CTE in tiles.js).
+        show: (e, features) => {
+          const {
+            dataset_title: datasetTitle,
+            trajectory_id: trajectoryId,
+            time_min: timeMin,
+            time_max: timeMax
+          } = features[0].properties
+          showChip(e.lngLat, [
+            datasetTitle,
+            trajectoryId,
+            formatInstantRange(timeMin, timeMax)
+          ])
+        }
       },
       {
         id: 'track-heads',
         layers: ['track-heads', 'track-heads-fixed'],
         when: (hits, point) => !isOnAPointIn(hits, point),
-        show: (e, features) =>
-          showChip(e.lngLat, features[0].properties.trajectory_id)
+        // A head IS one fix — the platform's last one in the scrubbed window —
+        // so it reads out like a fix on the drawn track: dataset, platform, the
+        // record there (absent on a plain Trajectory, whose fixes are not
+        // records) and its instant.
+        show: (e, features) => {
+          const {
+            dataset_title: datasetTitle,
+            trajectory_id: trajectoryId,
+            profile_id: profileId,
+            head_time: headTime
+          } = features[0].properties
+          showChip(e.lngLat, [
+            datasetTitle,
+            trajectoryId,
+            profileId,
+            formatInstant(headTime)
+          ])
+        }
       },
       {
         id: 'points',
@@ -3117,16 +3194,14 @@ export default function CreateMap({
       }
     }
 
-    // Everything one click found, grouped the way the card reads it out. Returns
-    // null when the click landed on empty water.
-    const buildFeatureQuery = (e, hits) => {
-      if (hits.length === 0) return null
-
-      // Tracks first and deduped by (dataset, trajectory): a click on an
-      // arrowhead sitting on its own line hits both layers, and a track that
-      // doubles back can be hit several times over.
+    // The tracks one hit-test found, deduped by (dataset, trajectory): a click
+    // on an arrowhead sitting on its own line hits both layers, and a track
+    // that doubles back can be hit several times over. Shared by the card's
+    // query and by the single-track shortcut below, which both have to agree
+    // on how many distinct tracks a click actually landed on.
+    const trackItemsIn = (hits) => {
       const tracks = []
-      const seenTracks = new Set()
+      const seen = new Set()
       hits
         .filter((feature) =>
           [...trackClickLayers, ...selectedTrackLayers].includes(feature.layer.id)
@@ -3142,8 +3217,8 @@ export default function CreateMap({
           // test for absence rather than falsiness.
           if (pk == null || trajectoryId == null) return
           const key = `${pk}:${trajectoryId}`
-          if (seenTracks.has(key)) return
-          seenTracks.add(key)
+          if (seen.has(key)) return
+          seen.add(key)
           tracks.push({
             kind: 'track',
             pk: Number(pk),
@@ -3151,6 +3226,16 @@ export default function CreateMap({
             title: datasetTitle
           })
         })
+      return tracks
+    }
+
+    // Everything one click found, grouped the way the card reads it out. Returns
+    // null when the click landed on empty water.
+    const buildFeatureQuery = (e, hits) => {
+      if (hits.length === 0) return null
+
+      // Tracks first — see trackItemsIn.
+      const tracks = trackItemsIn(hits)
 
       // Observations: individual markers where they are drawn, the aggregate
       // cell otherwise. A marker also names its platform, which the cell can't.
@@ -3371,15 +3456,17 @@ export default function CreateMap({
         ? map.current.queryRenderedFeatures(e.point, { layers })
         : []
 
-      // A marker is a specific station; 'coverage-hexes' shares the marker
-      // tier's zoom band (both render at z >= hexMaxZoom) and can sit right
-      // under it as a neighbourhood aggregate covering the same pixel. The
-      // marker is what the user pointed at, so once one is under the click the
-      // hex hits are dropped rather than merged into it — a click here always
-      // means "this station", never "this station, plus whatever hex happens
-      // to be under it".
+      // A marker is a specific station and a track is a specific voyage;
+      // the hex layers are the neighbourhood aggregate drawn under both — a
+      // trajectory's own coverage hexes lie beneath every metre of its track,
+      // and 'coverage-hexes' shares the marker tier's zoom band (both render
+      // at z >= hexMaxZoom). Either precise geometry is what the user pointed
+      // at, so once one is under the click the hex hits are dropped rather
+      // than merged into it: a click here means "this station" or "this
+      // track", never "…plus whatever hex happens to be under it".
       const markerHits = hits.filter((feature) => feature.layer.id === 'points')
-      if (markerHits.length > 0) {
+      const tracks = trackItemsIn(hits)
+      if (markerHits.length > 0 || tracks.length > 0) {
         hits = hits.filter(
           (feature) => !['hexes', 'coverage-hexes'].includes(feature.layer.id)
         )
@@ -3449,6 +3536,28 @@ export default function CreateMap({
           )
           return
         }
+      }
+
+      // The same shortcut for a track: one track under the click and nothing
+      // else (the hexes beneath it were dropped above) names exactly one
+      // voyage, so open that dataset's page with the trajectory drawn and
+      // highlighted rather than asking the user to pick the single row a card
+      // would list. Two overlapping tracks, or a marker or grid sharing the
+      // pixel, stay ambiguous and fall through to the card.
+      const gridHits = hits.filter(
+        (feature) => feature.layer.id === 'griddap-coverage-fill'
+      )
+      if (tracks.length === 1 && markerHits.length === 0 && gridHits.length === 0) {
+        popup.remove()
+        // The selected track's own drawing is this click's highlight (see the
+        // selectedTrajectory effect), so drop whatever region an earlier click
+        // had outlined instead of leaving it pointing at nothing — this path
+        // skips onFeatureQueryRef, so the featureQuery-driven highlight effect
+        // never runs to clear it.
+        map.current.getSource('click-highlight')?.setData(emptyFeatureCollection)
+        const track = tracks[0]
+        onTrackClickRef.current(track.pk, track.trajectoryId, track.title)
+        return
       }
 
       const query = buildFeatureQuery(e, hits)
