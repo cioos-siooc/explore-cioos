@@ -1,8 +1,9 @@
 /* ------------------------------------------------------------------
  * TopBar — the centered top header floating over the map. First layer:
  * the brand bar. Second layer: the merged Datasets/Filters segmented
- * pill. Active-filter chips flow beneath. Everything stays centered on
- * the horizontal midline of the viewport.
+ * pill. Active-filter chips flow beneath, and under those the
+ * single-dataset card (SingleDatasetView) when one is up. Everything
+ * stays centered on the horizontal midline of the viewport.
  * ------------------------------------------------------------------ */
 .topBar {
   position: fixed;
@@ -574,4 +575,92 @@
 .spatialFilterWktSection {
   padding-top: 4px;
   border-top: 1px solid var(--cioos-hairline);
+}
+
+/* ------------------------------------------------------------------
+ * Single-dataset card: the last layer of the bar, under the chips. A
+ * dataset page keys the map to one dataset and greys the rest, and the
+ * datasets card's banner is what says so — collapse that card and this
+ * is the only thing left that does (see SingleDatasetView). Mounted
+ * only then, so the stack's gap closes up again the rest of the time.
+ *
+ * The dataset named above, its two actions in a row below. Tinted like
+ * the sidebar banner it stands in for rather than washed like the three
+ * entry points above — it reports a state, it is not a way in.
+ * ------------------------------------------------------------------ */
+.singleDatasetView {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  /* The chips' width, so the bar's lower layers line up as one column. */
+  max-width: min(var(--cioos-brand-width), calc(100vw - 24px));
+  padding: 6px 10px 8px;
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-lg);
+  background-color: var(--cioos-white);
+  box-shadow: var(--cioos-shadow-float);
+}
+
+/* The name, as a label and nothing more: the actions are the buttons below.
+   Kept to one line — the card is a marker, not the page — with the full title
+   on hover for anything longer than the card. */
+.singleDatasetViewTitle {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  color: var(--cioos-primary-700);
+}
+
+.singleDatasetViewActions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.singleDatasetViewButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-teal-light);
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  color: var(--cioos-primary-700);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.singleDatasetViewButton:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.singleDatasetViewButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.singleDatasetViewButton > svg {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 700px) {
+  /* Touch targets; the two share the row's width rather than shrinking. */
+  .singleDatasetViewButton {
+    flex: 1 1 auto;
+    min-height: 40px;
+  }
+
+  .singleDatasetViewActions {
+    align-self: stretch;
+  }
 }

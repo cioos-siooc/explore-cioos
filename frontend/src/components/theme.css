@@ -26,6 +26,12 @@
   --cioos-hairline:    #DCE8E5; /* hairline borders between sand & teal-light */
   --cioos-surface-2:   #EEF6F4; /* subtle hover wash on white surfaces */
   --cioos-scrim:       rgba(238, 246, 244, 0.82); /* surface-2, over content being replaced */
+  /* Deliberately thinner than the scrim above. That one covers content being
+     replaced, where what's underneath no longer means anything and the overlay's
+     legibility wins. This one covers content still arriving, where seeing it come
+     in is the whole point — the first-paint splash uses it so the basemap and its
+     coastlines read from the first frame. At 0.82 they barely register. */
+  --cioos-scrim-soft:  rgba(238, 246, 244, 0.55); /* surface-2, over content still arriving */
 
   /* --- Status palette (CIOOS-aligned) --- */
   --cioos-success:     #52A79B;

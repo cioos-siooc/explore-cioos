@@ -17,15 +17,19 @@
   color: var(--cioos-primary);
 }
 
-/* The first paint covers the app rather than washing over it: opaque, and on
-   the splash rung of the z scale, so the map and everything keyed to it — the
-   legend above all — are behind it. Half a map under a legend describing data
-   that hasn't drawn is not a thing to hand anyone. The brand card and the API
-   error banner sit a rung higher and stay put; the corner activity panel steps
-   aside on its own, since this splash is already naming the same waits. */
+/* The first paint veils the app rather than hiding it. It sits on the splash
+   rung of the z scale, over the map and everything keyed to it, but thin enough
+   that the basemap under it reads: the coastlines are the one thing that means
+   anything before the data lands, and an opaque sheet left the user watching a
+   logo with no idea what they were looking at. What must not show through is
+   data painted on a ramp that hasn't arrived — and that is held at zero opacity
+   by the reveal gate in Map.jsx (see revealData), not by this background, so
+   thinning the wash costs nothing. The brand card and the API error banner sit
+   a rung higher and stay put; the corner activity panel steps aside on its own,
+   since this splash is already naming the same waits. */
 .loading-brand {
   z-index: var(--cioos-z-splash, 32);
-  background-color: var(--cioos-surface-2, #eef6f4);
+  background-color: var(--cioos-scrim-soft, rgba(238, 246, 244, 0.55));
   transition: opacity 0.6s ease-out;
 }
 

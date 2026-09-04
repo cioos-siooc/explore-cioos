@@ -6,6 +6,7 @@ import classNames from 'classnames'
 
 import BrandSearch from '../TopLeft/BrandSearch.jsx'
 import ActiveFilterChips from './ActiveFilterChips.jsx'
+import SingleDatasetView from './SingleDatasetView.jsx'
 import DatasetCounts from './DatasetCounts.jsx'
 import SpatialFilterButton from './SpatialFilterButton.jsx'
 import usePublishedFootprint from '../../../state/ui/usePublishedFootprint.js'
@@ -120,6 +121,10 @@ export default function TopControls () {
         </div>
       </BrandSearch>
       <ActiveFilterChips />
+      {/* Last in the stack: the dataset the map is keyed to, and the way out
+          of it. Only up while the datasets card — whose banner otherwise says
+          this — is collapsed. */}
+      <SingleDatasetView />
     </div>
   )
 }

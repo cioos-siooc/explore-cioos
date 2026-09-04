@@ -550,9 +550,10 @@ export default function CreateMap({
   // geometry selection. It is one third of the ramp key below, which is how
   // those changes reach the measurement without anyone clearing it by hand.
   const rampQueryEpoch = useRef(0)
-  // Whether the hex layers have been let through their opening fade — see
-  // revealHexes. False until the ramp on them is the one they will keep.
-  const hexesRevealed = useRef(false)
+  // Whether the count-driven layers — the hexes and the markers both — have
+  // been let through their opening fade. See revealData. False until the ramp
+  // on them is the one they will keep.
+  const dataRevealed = useRef(false)
   const firstPaintReported = useRef(false)
   // Latest rangeLevels, for the once-registered measurement handler: it runs on
   // the first render's closure (like setColorStops, which it reaches through a
@@ -709,18 +710,27 @@ export default function CreateMap({
   // them missing entirely. The real ramp replaces these as soon as the legend
   // lands (setColorStops re-runs via the [rangeLevels] effect).
   //
-  // Nobody ever sees them: the hex layers are drawn at zero opacity until the
-  // ramp is the real one (see revealHexes), which is what these stops exist to
-  // hold the layers open for.
+  // Nobody ever sees them: the count-driven layers are drawn at zero opacity
+  // until the ramp is the real one (see revealData), which is what these stops
+  // exist to hold the layers open for.
   const defaultRangeLevels = { zoom0: [1, 100], zoom1: [1, 100], zoom2: [1, 100] }
   const defaultCoverageRangeLevels = { zoom1: [1, 100] }
 
-  // The hex layers' opening fade. They are created at zero opacity and stay
-  // there until the colours on them are the colours they will keep, because a
-  // first load otherwise painted every hexagon twice: once from the placeholder
-  // ranges above (or the catalogue-wide tier), and again a moment later from the
-  // real domain — a full-map colour change a second into the load, which reads
-  // as a glitch rather than as data arriving.
+  // The opening fade for every layer the count ramp paints — the two hex layers
+  // below the marker tier, and the points and their casing at and above it. They
+  // are created at zero opacity and stay there until the colours on them are the
+  // colours they will keep, because a first load otherwise painted every feature
+  // twice: once from the placeholder ranges above (or the catalogue-wide tier),
+  // and again a moment later from the real domain — a full-map colour change a
+  // second into the load, which reads as a glitch rather than as data arriving.
+  // For the points the same double paint moves their radius too, since
+  // setColorStops sizes them off the ramp as well.
+  //
+  // The points used to be left out of this, and got away with it only because
+  // the splash in front of them was opaque: they are minzoom MARKER_MIN_ZOOM,
+  // so the default world view never shows them, but a share link or a restored
+  // view at that zoom does. Now that the splash is a veil (see Loading.jsx),
+  // this gate is the only thing hiding that repaint, so it has to cover them.
   //
   // Zero opacity rather than 'visibility: none': queryRenderedFeatures skips a
   // hidden layer entirely, and measuring the hexes on screen is exactly what
@@ -732,15 +742,15 @@ export default function CreateMap({
   // reading, where a fade to nothing and back would be the more jarring of the
   // two. This is about the first sight of the map only.
   //
-  // The hexes appear the moment their final ramp is ready. They used to fade
-  // up over MapLibre's default 300ms transition, back when this opacity was a
-  // plain number; a data-driven one cannot be transitioned at all (see the
+  // The features appear the moment their final ramp is ready. The hexes used to
+  // fade up over MapLibre's default 300ms transition, back when their opacity was
+  // a plain number; a data-driven one cannot be transitioned at all (see the
   // fill-opacity-transition note on the layers), so the fade is gone and the
   // wait that replaced it has been turned off rather than left to stall the
   // reveal.
-  function revealHexes() {
-    if (hexesRevealed.current || !map.current) return
-    hexesRevealed.current = true
+  function revealData() {
+    if (dataRevealed.current || !map.current) return
+    dataRevealed.current = true
     reportFirstPaint()
     if (map.current.getLayer('hexes')) {
       map.current.setPaintProperty('hexes', 'fill-opacity', hexOpacityExpression())
@@ -759,6 +769,12 @@ export default function CreateMap({
         coverageHexOutlineOpacityExpression()
       )
     }
+    if (map.current.getLayer('points')) {
+      map.current.setPaintProperty('points', 'circle-opacity', circleOpacity)
+    }
+    if (map.current.getLayer('points-halo')) {
+      map.current.setPaintProperty('points-halo', 'circle-opacity', pointsHaloOpacity)
+    }
   }
 
   // The moment the map is worth handing over, reported once — this is what the
@@ -772,7 +788,7 @@ export default function CreateMap({
   // splash came to lift off a blank map.
   function reportFirstPaint() {
     if (firstPaintReported.current || !map.current) return
-    if (!hexesRevealed.current) return
+    if (!dataRevealed.current) return
     // A source the current camera doesn't use has no tiles pending and reads as
     // loaded; one the style hasn't added yet is skipped rather than waited for,
     // which is safe because the hexes above can't have been revealed until the
@@ -801,10 +817,10 @@ export default function CreateMap({
   // actually arrived — otherwise a legend that lands first would reveal an empty
   // map and let the tiles behind it paint over the catalogue-wide tier, which is
   // the double colouring this exists to avoid.
-  function revealHexesIfRamped(measuredRange) {
-    if (measuredRange !== undefined) return revealHexes()
+  function revealDataIfRamped(measuredRange) {
+    if (measuredRange !== undefined) return revealData()
     if (!rangeLevelsRef.current || !hexSourcesLoaded()) return
-    revealHexes()
+    revealData()
   }
 
   // Both hex sources have everything the current view asks for. Deliberately
@@ -860,6 +876,16 @@ export default function CreateMap({
   // focused subset in colour over the greyed base.
   const IS_DIMMED = ['boolean', ['feature-state', 'dimmed'], false]
   const dimmable = (color) => ['case', IS_DIMMED, 'lightgrey', color]
+
+  // The casing's own transparency, named because two places need the same
+  // value: the layer, which is created with it or with zero depending on the
+  // reveal, and revealData, which puts it back. A white casing is what makes a
+  // marker pop, which is the last thing a greyed-out one should do — it shares
+  // its source layer with 'points', so the same dimmed state reaches it and
+  // fades it back rather than leaving grey dots ringed in white. Only halfway
+  // back: the other datasets stay on the map to be seen, just quietly, and the
+  // casing is what keeps a grey dot legible over a dark sea.
+  const pointsHaloOpacity = ['case', IS_DIMMED, 0.5, 0.9]
 
   // setFeatureState addresses a source and source-layer, not a style layer, so
   // this maps the layers a focus can dim onto where their features live.
@@ -1375,7 +1401,7 @@ export default function CreateMap({
     // layers is the one this view gets, which is what the first reveal waits
     // for. (The common way in on a first load: the measurement runs before any
     // hexes have arrived, finds none, and the legend's tier stands.)
-    revealHexesIfRamped(range)
+    revealDataIfRamped(range)
   }
 
   // The counts on screen are about to mean something else — new filters, a new
@@ -1602,7 +1628,7 @@ export default function CreateMap({
     // Showing a layer changes what a measurement would find — a hidden layer
     // returns nothing from queryRenderedFeatures — so the ramp has to be
     // re-measured, and until it is, the hexes are still waiting to be revealed
-    // (see revealHexes). This is the one thing that invalidates the measurement
+    // (see revealData). This is the one thing that invalidates the measurement
     // without changing the ramp key: no tile lands, no filter changes and the
     // camera does not move, so only the 'idle' that follows the repaint is left
     // to act on it.
@@ -2313,8 +2339,14 @@ export default function CreateMap({
         minzoom: hexMaxZoom,
         source: 'cde-tiles',
         'source-layer': 'internal-layer-name',
+        layout: {
+          'circle-sort-key': ['get', 'count']
+        },
         paint: {
-          'circle-opacity': circleOpacity,
+          // Zero until the ramp is final — see revealData. Both the colour
+          // below and the radius above come off the ramp, so before it lands
+          // these are placeholder values.
+          'circle-opacity': dataRevealed.current ? circleOpacity : 0,
           'circle-radius-transition': NO_TRANSITION,
           'circle-radius': radiusExpression(pointRadiusRange.current),
           // setColorStops rewrites this one whenever the ramp moves — see
@@ -2342,10 +2374,10 @@ export default function CreateMap({
           source: 'cde-cells',
           'source-layer': 'coverage-hexes-layer',
           paint: {
-            // Zero until the ramp is final — see revealHexes. Then a plain
+            // Zero until the ramp is final — see revealData. Then a plain
             // taper with zoom; the count's share of the transparency rides on
             // the fill colour's alpha (toRampStops).
-            'fill-opacity': hexesRevealed.current ? coverageHexOpacityExpression() : 0,
+            'fill-opacity': dataRevealed.current ? coverageHexOpacityExpression() : 0,
             // Neither this nor the colours below may transition — see
             // NO_TRANSITION. For the opacity that delay was the flicker on the
             // opening reveal and on every threshold change after it; for the
@@ -2381,7 +2413,7 @@ export default function CreateMap({
             'line-color-transition': NO_TRANSITION,
             'line-color': coverageHexBorderColor(),
             'line-opacity-transition': NO_TRANSITION,
-            'line-opacity': hexesRevealed.current
+            'line-opacity': dataRevealed.current
               ? coverageHexOutlineOpacityExpression()
               : 0,
             // Wide enough that a colour reads off it — it is standing in for a
@@ -2395,6 +2427,14 @@ export default function CreateMap({
       // Purely visual white casing under the points so they stay readable
       // over the coverage hex fills; all interaction stays on 'points',
       // which keeps its invisible wide-stroke hit area.
+      //
+      // No 'circle-sort-key' here, unlike 'points' and 'points-highlighted',
+      // and deliberately so rather than by oversight. Every feature in this
+      // layer is the same #ffffff, and alpha-over compositing of identical RGB
+      // is order-independent — two overlapping casings come out white at
+      // 1-(1-a1)(1-a2) whichever is drawn first, including the dimmed 0.5 /
+      // undimmed 0.9 mix pointsHaloOpacity produces. A sort key here would be
+      // invisible and would still cost a per-tile sort on the worker.
       map.current.addLayer(
         {
           id: 'points-halo',
@@ -2404,14 +2444,10 @@ export default function CreateMap({
           'source-layer': 'internal-layer-name',
           paint: {
             'circle-color': '#ffffff',
-            // A white casing is what makes a marker pop, which is the last
-            // thing a greyed-out one should do — it shares this source layer
-            // with 'points', so the same dimmed state reaches it and fades it
-            // back rather than leaving grey dots ringed in white. Only halfway
-            // back: the other datasets stay on the map to be seen, just
-            // quietly, and the casing is what keeps a grey dot legible over a
-            // dark sea.
-            'circle-opacity': ['case', IS_DIMMED, 0.5, 0.9],
+            // Zero until the ramp is final — see revealData. It has no colour
+            // on the ramp, but its radius is sized off the same one the points
+            // are, and a casing without its point is just a white dot.
+            'circle-opacity': dataRevealed.current ? pointsHaloOpacity : 0,
             'circle-radius-transition': NO_TRANSITION,
             'circle-radius': radiusExpression(pointRadiusRange.current, 1.25)
           }
@@ -2428,10 +2464,10 @@ export default function CreateMap({
         'source-layer': 'internal-layer-name',
 
         paint: {
-          // Zero until the ramp is final — see revealHexes. Then a plain taper
+          // Zero until the ramp is final — see revealData. Then a plain taper
           // with zoom; the count's share of the transparency rides on the fill
           // colour's alpha (toRampStops).
-          'fill-opacity': hexesRevealed.current ? hexOpacityExpression() : 0,
+          'fill-opacity': dataRevealed.current ? hexOpacityExpression() : 0,
           // Neither this nor the colour below may transition — see
           // NO_TRANSITION. For the opacity that delay was the flicker on the
           // opening reveal and on every threshold change after it; for the
@@ -2453,6 +2489,13 @@ export default function CreateMap({
         minzoom: hexMaxZoom,
         source: 'cde-tiles',
         'source-layer': 'internal-layer-name',
+        layout: {
+          // The same key 'points' carries, and it has to be: this layer draws a
+          // filled circle plus a selection ring over the same features, so if
+          // the two sorted differently the rings and the markers under them
+          // would disagree about which of an overlapping pair is on top.
+          'circle-sort-key': ['get', 'count']
+        },
         paint: {
           'circle-color': dimmable(colors),
           'circle-opacity': circleOpacity,
