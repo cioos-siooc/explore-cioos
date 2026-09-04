@@ -52,7 +52,17 @@ router.get("/", validatorMiddleware(), async (req, res, next) => {
                               COALESCE(profile_id, timeseries_id) profile_id,
                               time_min,
                               time_max,
-                              CEIL( :NUM_RECORDS /(records_per_day/24)) num_hours_needed
+                              -- How far back from time_max to reach NUM_RECORDS,
+                              -- at the feature's hourly rate. records_per_day is
+                              -- nullable and can be 0 (a feature whose count came
+                              -- back empty), and this runs for every row of the
+                              -- join before the WHERE narrows it — so one bad row
+                              -- would divide by zero and take down the whole
+                              -- request, not just its own preview. nullif sends
+                              -- those to NULL, which step2 turns into a NULL
+                              -- new_start_time and the caller reads as
+                              -- use_whole_profile.
+                              CEIL( :NUM_RECORDS /nullif(records_per_day/24, 0)) num_hours_needed
                       FROM   cde.profiles p
                       JOIN cde.datasets d
                       ON d.dataset_id = p.dataset_id

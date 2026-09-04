@@ -457,7 +457,8 @@ export default function Legend({
     const [lo, hi] = currentRangeLevel
     // That same expression drops to one flat radius when the range is
     // degenerate — every location holding the same number of days, which is
-    // common zoomed right in, where the answer is usually "1". There is no
+    // common zoomed right in, where the answer is usually "1", and more common
+    // since the count became a union of day sets rather than a sum. There is no
     // "grows from there" to show then, so the large circle goes away.
     const ramped = Number.isFinite(lo) && Number.isFinite(hi) && hi > lo
     const dimClass = classNames('legendSubsection', {

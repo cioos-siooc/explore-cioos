@@ -9,7 +9,7 @@ volume reset + re-harvest, there are no incremental table migrations).
 
 import pandera as pa
 from pandera.typing import Series
-from sqlalchemy.dialects.postgresql import ARRAY, INTEGER, JSONB, TEXT
+from sqlalchemy.dialects.postgresql import ARRAY, DATERANGE, INTEGER, JSONB, TEXT
 
 # --- Loader-side column metadata ------------------------------------------
 # List-valued columns are serialized by the harvester as Python-repr strings in
@@ -30,6 +30,9 @@ DATASET_ARRAY_DTYPES = {
 
 PROFILE_ARRAY_DTYPES = {
     "eovs": ARRAY(TEXT),
+    # psycopg2 range objects, not strings — parameter binding does not coerce
+    # text[] to daterange[] (see core/day_sets.ranges_to_psycopg).
+    "day_ranges": ARRAY(DATERANGE),
 }
 
 OBIS_ARRAY_DTYPES = {
@@ -66,8 +69,19 @@ class ProfileSchema(pa.DataFrameModel):
     time_min: Series[pa.DateTime] = pa.Field(nullable=True)
     time_max: Series[pa.DateTime] = pa.Field(nullable=True)
     n_records: Series[float] = pa.Field(nullable=True)
+    # Mean records on days that HAVE data, not over the elapsed span — the
+    # download estimator pairs it with a day-set overlap to match
+    # (web-api/utils/shapeQuery.js).
     records_per_day: Series[float] = pa.Field(nullable=True)
     n_profiles: Series[float] = pa.Field(nullable=True)
+    # Distinct UTC days this feature holds data on, and the same set as maximal
+    # runs of consecutive days. The map UNIONS day_ranges across the features in
+    # a hex rather than summing `days`, so overlapping stations don't multiply a
+    # year of coverage into a decade (see core/day_sets.py). Both are NULL for
+    # dataset types whose features can't span more than one day — the database
+    # fills `days` from the time span there, and the web-api falls back to it.
+    days: Series[float] = pa.Field(nullable=True)
+    day_ranges: Series[object] = pa.Field(nullable=True)
     # The EOVs this feature actually carries — a subset of its dataset's eovs,
     # detected from the per-variable record counts at harvest. Falls back to
     # the dataset's full list when detection isn't possible, never empty: the
@@ -92,6 +106,8 @@ class ObisCellSchema(pa.DataFrameModel):
     scientific_names: Series[object]  # list column, stored as text[] in DB
     n_records: Series[float] = pa.Field(nullable=True)
     days: Series[float] = pa.Field(nullable=True)
+    # The same day set as `days`, as maximal runs — see ProfileSchema.
+    day_ranges: Series[object] = pa.Field(nullable=True)
     time_min: Series[pa.DateTime] = pa.Field(nullable=True)
     time_max: Series[pa.DateTime] = pa.Field(nullable=True)
     depth_min: Series[float] = pa.Field(nullable=True)

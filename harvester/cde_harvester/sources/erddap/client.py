@@ -3,10 +3,11 @@
 # The ERDDAP class contains functions relating to querying the ERDDAP server
 
 import hashlib
+import io
 import json
 import logging
 import re
-from io import StringIO
+import tempfile
 from urllib.parse import unquote, urlparse
 
 import diskcache as dc
@@ -28,6 +29,32 @@ from cde_harvester.core.errors import (
 
 # size in bytes
 MAX_RESPONSE_SIZE = 2e8
+
+# Bodies are streamed into a SpooledTemporaryFile: anything under this stays in
+# memory, anything larger transparently becomes a real file on disk. Most ERDDAP
+# metadata answers are a few KB, so the common case never touches the disk,
+# while a multi-hundred-MB orderByCount no longer has to fit in RAM.
+SPOOL_MAX_IN_MEMORY = 8 * 1024 * 1024
+DOWNLOAD_CHUNK_SIZE = 1024 * 1024
+
+
+class _SpooledBody(tempfile.SpooledTemporaryFile):
+    """SpooledTemporaryFile that io.TextIOWrapper will accept.
+
+    Python 3.10's SpooledTemporaryFile is not a full IOBase — it has no
+    readable/writable/seekable, which TextIOWrapper requires before it will
+    wrap a stream. Python 3.11 added them; this bridges the gap until the
+    runtime moves, and can be deleted then.
+    """
+
+    def readable(self):
+        return True
+
+    def writable(self):
+        return True
+
+    def seekable(self):
+        return True
 
 # Transient HTTP statuses we should retry. 500 is included even though some
 # ERDDAPs use it semantically for "no data" / "query too big"; those responses
@@ -198,67 +225,133 @@ class ERDDAP(object):
         if dataset is not None:
             dataset.queried_urls.append(decoded_url)
 
-        response = None
-        if self.cache_requests:
-            cache = self.cache
-            if url_combined in self.cache:
-                response = cache[url_combined]
+        response, body = self._fetch(url_combined, decoded_url, logger)
+
+        try:
+            original_hostname = urlparse(url_combined).hostname
+            actual_hostname = urlparse(response.url).hostname
+
+            if original_hostname != actual_hostname:
+                # redirect due to EDDTableFromErddap
+                if dataset:
+                    logger.debug("Redirecting %s to %s", original_hostname, actual_hostname)
+                    dataset.erddap_url = response.url.split("/erddap")[0] + "/erddap"
+
+            no_data = False
+            # Newer erddaps respond with 404 for no data
+            if response.status_code == 404:
+                no_data = True
+            elif (
+                response.status_code == 500
+                and "Query error: No operator found in constraint=&quot;orderByCount"
+                in response.text
+            ):
+                logger.error("OrderByCount not available within this ERDDAP Version")
+                no_data = True
+            elif (
+                # Older erddaps respond with 500 for no data
+                response.status_code == 500
+                and "Your query produced no matching results" in response.text
+            ):
+                no_data = True
+
+            elif (
+                response.status_code == 500
+                and "You are requesting too much data." in response.text
+            ):
+                logger.error("Query too big for the server")
+                no_data = True
+            elif response.status_code != 200:
+                # Report if not All OK
+                response.raise_for_status()
             else:
-                logger.debug("CACHE MISS")
-                response = self.session.get(url_combined, timeout=3600)
-                cache[url_combined] = response
-        else:
-            response = self.session.get(url_combined, timeout=3600)
+                # Decode exactly the way requests' .text would have (same
+                # encoding, same errors="replace"), but incrementally as pandas
+                # reads instead of building one big str up front. read_csv is
+                # deliberately NOT given encoding="unicode_escape" here: pandas
+                # ignores that for an already-decoded text buffer, which is what
+                # it always got, and applying it to raw bytes would turn every
+                # UTF-8 accent into mojibake.
+                text_body = io.TextIOWrapper(
+                    body, encoding=response.encoding or "utf-8", errors="replace"
+                )
+                # skip units line
+                return pd.read_csv(text_body, skiprows=skiprows)
+            if no_data:
+                logger.error("Empty response")
+                return pd.DataFrame()
+        finally:
+            body.close()
 
-        if len(response.content) > MAX_RESPONSE_SIZE:
-            raise ResponseTooLargeError(
-                f"Response {len(response.content)} bytes exceeds {MAX_RESPONSE_SIZE:.0f}: {decoded_url}"
+    def _fetch(self, url_combined, decoded_url, logger):
+        """GET a URL, returning (response, body) where body is a seekable binary
+        stream positioned at 0.
+
+        The body is streamed in and abandoned the moment it crosses
+        MAX_RESPONSE_SIZE, so an oversize query costs the cap rather than its
+        full size. Reading response.content instead materialized the entire body
+        first and only then allowed us to reject it — and on the success path it
+        was materialized three more times (bytes, decoded str, StringIO copy)
+        before pandas even saw it, which is how a single at-cap request came to
+        need most of a gigabyte.
+
+        Non-200 bodies are read whole on purpose: they are small ERDDAP error
+        pages, and the caller matches on their .text to tell "no matching
+        results" and "requesting too much data" apart from a real failure.
+        """
+        if self.cache_requests and url_combined in self.cache:
+            status_code, url, reason, encoding, content = self.cache[url_combined]
+            response = requests.Response()
+            response.status_code = status_code
+            response.url = url
+            response.reason = reason
+            response.encoding = encoding
+            response._content = content
+            return response, io.BytesIO(content)
+
+        response = self.session.get(url_combined, timeout=3600, stream=True)
+        try:
+            if response.status_code != 200:
+                body = io.BytesIO(response.content)
+            else:
+                body = self._spool(response, decoded_url)
+        finally:
+            response.close()
+
+        if self.cache_requests:
+            logger.debug("CACHE MISS")
+            # diskcache pickles values, so store the parts actually used rather
+            # than the Response object — a streamed Response has no reusable
+            # .content to pickle. This re-materializes the body in memory, which
+            # is why caching stays a local-development convenience
+            # (harvest_config.production.yaml runs with cache: False).
+            content = body.read()
+            body.seek(0)
+            self.cache[url_combined] = (
+                response.status_code, response.url, response.reason,
+                response.encoding, content,
             )
+        return response, body
 
-        original_hostname = urlparse(url_combined).hostname
-        actual_hostname = urlparse(response.url).hostname
-
-        if original_hostname != actual_hostname:
-            # redirect due to EDDTableFromErddap
-            if dataset:
-                logger.debug("Redirecting %s to %s", original_hostname, actual_hostname)
-                dataset.erddap_url = response.url.split("/erddap")[0] + "/erddap"
-
-        no_data = False
-        # Newer erddaps respond with 404 for no data
-        if response.status_code == 404:
-            no_data = True
-        elif (
-            response.status_code == 500
-            and "Query error: No operator found in constraint=&quot;orderByCount"
-            in response.text
-        ):
-            logger.error("OrderByCount not available within this ERDDAP Version")
-            no_data = True
-        elif (
-            # Older erddaps respond with 500 for no data
-            response.status_code == 500
-            and "Your query produced no matching results" in response.text
-        ):
-            no_data = True
-
-        elif (
-            response.status_code == 500
-            and "You are requesting too much data." in response.text
-        ):
-            logger.error("Query too big for the server")
-            no_data = True
-        elif response.status_code != 200:
-            # Report if not All OK
-            response.raise_for_status()
-        else:
-            # skip units line
-            return pd.read_csv(
-                StringIO(response.text), skiprows=skiprows, encoding="unicode_escape"
-            )
-        if no_data:
-            logger.error("Empty response")
-            return pd.DataFrame()
+    @staticmethod
+    def _spool(response, decoded_url):
+        """Stream a 200 body to a spooled temp file, aborting past the cap."""
+        spool = _SpooledBody(max_size=SPOOL_MAX_IN_MEMORY)
+        total = 0
+        try:
+            for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
+                total += len(chunk)
+                if total > MAX_RESPONSE_SIZE:
+                    raise ResponseTooLargeError(
+                        f"Response exceeds {MAX_RESPONSE_SIZE:.0f} bytes "
+                        f"(aborted after {total}): {decoded_url}"
+                    )
+                spool.write(chunk)
+        except BaseException:
+            spool.close()
+            raise
+        spool.seek(0)
+        return spool
 
     def get_croissant_fingerprint(self, erddap_base, dataset_id, _hops=0,
                                   dap="tabledap"):
