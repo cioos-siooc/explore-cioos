@@ -38,7 +38,7 @@ export default function Loading ({ variant = 'brand', dismissed = false, onDismi
 
   if (variant !== 'brand') {
     return (
-      <div className='loading loading-inline'>
+      <div className='loading loading-inline' data-testid='loading-inline' role='status'>
         <Spinner />
       </div>
     )
@@ -47,6 +47,10 @@ export default function Loading ({ variant = 'brand', dismissed = false, onDismi
   return (
     <div
       className={`loading loading-brand${dismissed ? ' loading-dismissed' : ''}`}
+      data-testid='app-splash'
+      // A full-screen opaque cover that announces nothing is a gap for a screen
+      // reader, and this is the app's longest wait.
+      role='status'
       // Only the cover's own fade ends the splash: the mark's pulse is an
       // animation rather than a transition, so nothing else here fires this.
       onTransitionEnd={(event) => {

@@ -67,13 +67,19 @@ export default function Sidebar () {
     <aside
       className={classNames('sidebar', { sheetExpanded: expanded })}
       aria-label={t('datasetsFilterName')}
+      data-testid='sidebar'
     >
-      <section className={classNames('sidebarDatasets', { expanded })}>
+      <section
+        className={classNames('sidebarDatasets', { expanded })}
+        data-testid='sidebar-datasets'
+        data-expanded={expanded}
+      >
         {inspecting ? (
           <div className='datasetsBanner'>
             <button
               type='button'
               className='datasetsBackButton'
+              data-testid='sidebar-back'
               onClick={returnToDatasetList}
               title={t('datasetInspectorBackButtonTitle')}
             >
@@ -98,6 +104,7 @@ export default function Sidebar () {
           <button
             type='button'
             className='datasetsToggle'
+            data-testid='sidebar-toggle'
             onClick={() => setSidebarOpen(!expanded)}
             aria-expanded={expanded}
             title={expanded ? t('sidebarCollapseTitle') : t('sidebarShowTitle')}
@@ -108,6 +115,7 @@ export default function Sidebar () {
               className={classNames('datasetsToggleCount', {
                 updating: countsUpdating
               })}
+              data-testid='sidebar-toggle-count'
               title={countsTitle}
             >
               {countsReady ? (
@@ -123,10 +131,10 @@ export default function Sidebar () {
             />
           </button>
         )}
-        <div className='sidebarBody'>
+        <div className='sidebarBody' data-testid='sidebar-body'>
           <DatasetsPanel />
         </div>
-        <footer className='sidebarFooter'>
+        <footer className='sidebarFooter' data-testid='sidebar-footer'>
           <div className='sidebarCounts'>
             <span
               className={classNames('sidebarCountsDatasets', {

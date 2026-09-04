@@ -1,0 +1,1051 @@
+[
+  {
+    "pk": 1811,
+    "pk_url": 1811,
+    "dataset_id": "obs_270",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Green Bay LoRaWAN Buoy 4",
+    "platform": "mooring",
+    "num_columns": 25,
+    "first_eov_column": "sea_water_temperature_1",
+    "title_translated": {
+      "en": "Green Bay LoRaWAN Buoy 4",
+      "fr": null
+    },
+    "eovs": [
+      "oxygen",
+      "subSurfaceTemperature"
+    ],
+    "organizations": [
+      "University of Wisconsin-Green Bay and University of Wisconsin-Milwaukee"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://seagull-erddap.glos.org/erddap/tabledap/obs_270.html",
+    "ckan_url": null
+  },
+  {
+    "pk": 1524,
+    "pk_url": 1524,
+    "dataset_id": "scalar_1542",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Strait of Georgia East Conductivity Temperature Depth Deployed 2008-02-29",
+    "platform": "unknown",
+    "num_columns": 13,
+    "first_eov_column": "Sound_Speed",
+    "title_translated": {
+      "en": "Strait of Georgia East Conductivity Temperature Depth Deployed 2008-02-29",
+      "fr": "Strait of Georgia East Conductivité/Température/Profondeur déployé 2008-02-29"
+    },
+    "eovs": [
+      "subSurfaceSalinity",
+      "subSurfaceTemperature",
+      "oceanSound"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1542.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/2f1fe3a6-70bd-4943-badb-aa46e09b25fc"
+  },
+  {
+    "pk": 1302,
+    "pk_url": 1302,
+    "dataset_id": "scalar_1213924",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Endeavour South Current Meter Deployed 2023-07-09",
+    "platform": "unknown",
+    "num_columns": 17,
+    "first_eov_column": "Sound_Speed",
+    "title_translated": {
+      "en": "Endeavour South Current Meter Deployed 2023-07-09",
+      "fr": "Endeavour South Courantometre déployé 2023-07-09"
+    },
+    "eovs": [
+      "subSurfaceTemperature",
+      "subSurfaceCurrents",
+      "oceanSound"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1213924.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/ac0325c5-0517-485a-9f12-93b97aea0de4"
+  },
+  {
+    "pk": 672,
+    "pk_url": 672,
+    "dataset_id": "scalar_1194987",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Patricia Bay Oxygen Sensor Deployed 2016-10-06",
+    "platform": "unknown",
+    "num_columns": 6,
+    "first_eov_column": "oxygen_corrected",
+    "title_translated": {
+      "en": "Patricia Bay Oxygen Sensor Deployed 2016-10-06",
+      "fr": "Patricia Bay Capteur d'Oxygène déployé 2016-10-06"
+    },
+    "eovs": [
+      "oxygen"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1194987.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/48ee54b2-d1d6-4024-9e1d-e97aab373d0b"
+  },
+  {
+    "pk": 288,
+    "pk_url": 288,
+    "dataset_id": "scalar_118774",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Patricia Bay Fluorometer Turbidity Deployed 2012-03-22",
+    "platform": "unknown",
+    "num_columns": 7,
+    "first_eov_column": "chlorophyll",
+    "title_translated": {
+      "en": "Patricia Bay Fluorometer Turbidity Deployed 2012-03-22",
+      "fr": "Patricia Bay Fluorimètre et Turbidité déployé 2012-03-22"
+    },
+    "eovs": [
+      "particulateMatter",
+      "phytoplanktonBiomassAndDiversity",
+      "oceanColour"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_118774.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/22ae543f-29f4-4cd3-aa5e-0e545dfc9005"
+  },
+  {
+    "pk": 61,
+    "pk_url": 61,
+    "dataset_id": "NatureTrustWaterPropertiesVerticalProfilesResearch_Koeye",
+    "n_profiles": 11,
+    "cdm_data_type": "TimeSeriesProfile",
+    "title": "BC Estuary Water Quality Monitoring Data - Koeye (Research)",
+    "platform": "surface vessel",
+    "num_columns": 34,
+    "first_eov_column": "flc",
+    "title_translated": {
+      "en": "BC Estuary Water Quality Monitoring Data - Koeye (Research)",
+      "fr": null
+    },
+    "eovs": [
+      "oxygen",
+      "inorganicCarbon",
+      "subSurfaceSalinity",
+      "subSurfaceTemperature",
+      "particulateMatter",
+      "phytoplanktonBiomassAndDiversity",
+      "oceanColour"
+    ],
+    "organizations": [
+      "Nature Trust"
+    ],
+    "profiles_count": 11,
+    "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesResearch_Koeye.html",
+    "ckan_url": null
+  },
+  {
+    "pk": 1595,
+    "pk_url": 1595,
+    "dataset_id": "amundsen10988",
+    "n_profiles": 24,
+    "cdm_data_type": "Profile",
+    "title": "ArcticNet/IOL 0902a - Beaufort Sea CTD Data",
+    "platform": "surface vessel",
+    "num_columns": 24,
+    "first_eov_column": "FLOR",
+    "title_translated": {
+      "en": "ArcticNet/IOL 0902a - Beaufort Sea CTD Data",
+      "fr": null
+    },
+    "eovs": [
+      "oxygen",
+      "nutrients",
+      "inorganicCarbon",
+      "subSurfaceSalinity",
+      "subSurfaceTemperature",
+      "particulateMatter",
+      "phytoplanktonBiomassAndDiversity",
+      "oceanColour"
+    ],
+    "organizations": [
+      "ArcticNet"
+    ],
+    "profiles_count": 24,
+    "erddap_url": "https://erddap.amundsenscience.com/erddap/tabledap/amundsen10988.html",
+    "ckan_url": null
+  },
+  {
+    "pk": 2586,
+    "pk_url": 2586,
+    "dataset_id": "obs_60",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Green Bay East (45184) :meteorological and water quality station",
+    "platform": "mooring",
+    "num_columns": 57,
+    "first_eov_column": "surface_downwelling_photosynthetic_photon_flux_in_air",
+    "title_translated": {
+      "en": "Green Bay East (45184) :meteorological and water quality station",
+      "fr": null
+    },
+    "eovs": [
+      "oxygen",
+      "inorganicCarbon",
+      "subSurfaceSalinity",
+      "subSurfaceTemperature",
+      "particulateMatter",
+      "oceanColour"
+    ],
+    "organizations": [
+      "University of Wisconsin-Milwaukee"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://seagull-erddap.glos.org/erddap/tabledap/obs_60.html",
+    "ckan_url": null
+  },
+  {
+    "pk": 975,
+    "pk_url": 975,
+    "dataset_id": "scalar_1207525",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Bullseye Conductivity Temperature Depth Deployed 2020-06-14",
+    "platform": "unknown",
+    "num_columns": 13,
+    "first_eov_column": "Sound_Speed",
+    "title_translated": {
+      "en": "Bullseye Conductivity Temperature Depth Deployed 2020-06-14",
+      "fr": "Bullseye Conductivité/Température/Profondeur déployé 2020-06-14"
+    },
+    "eovs": [
+      "subSurfaceSalinity",
+      "subSurfaceTemperature",
+      "oceanSound"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1207525.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/144512dc-bb07-4b42-aa73-c5440253199d"
+  },
+  {
+    "pk": 1908,
+    "pk_url": 1908,
+    "dataset_id": "obs_61",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Little Traverse Bay : meteorological station",
+    "platform": "mooring",
+    "num_columns": 143,
+    "first_eov_column": "sea_surface_wave_from_direction",
+    "title_translated": {
+      "en": "Little Traverse Bay : meteorological station",
+      "fr": null
+    },
+    "eovs": [
+      "seaState",
+      "subSurfaceTemperature",
+      "oceanColour",
+      "oceanSurfaceStress"
+    ],
+    "organizations": [
+      "University of Michigan CIGLR"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://seagull-erddap.glos.org/erddap/tabledap/obs_61.html",
+    "ckan_url": null
+  },
+  {
+    "pk": 79,
+    "pk_url": 79,
+    "dataset_id": "cmar_fca0_698a_0716",
+    "n_profiles": 2,
+    "cdm_data_type": "TimeSeries",
+    "title": "CMAR - Jordan Bay",
+    "platform": "unknown",
+    "num_columns": 23,
+    "first_eov_column": "sea_water_temperature",
+    "title_translated": {
+      "en": "CMAR - Jordan Bay",
+      "fr": "CMAR - Jordan Bay"
+    },
+    "eovs": [
+      "seaState",
+      "subSurfaceTemperature"
+    ],
+    "organizations": [
+      "Centre for Marine Applied Research (CMAR)"
+    ],
+    "profiles_count": 2,
+    "erddap_url": "https://cioosatlantic.ca/erddap/tabledap/cmar_fca0_698a_0716.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/9c2f3246-c8ba-463b-b387-c8ce2353aa2c"
+  },
+  {
+    "pk": 366,
+    "pk_url": 366,
+    "dataset_id": "scalar_1189845",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Strait of Georgia Central Conductivity Temperature Depth Deployed 2013-10-24",
+    "platform": "unknown",
+    "num_columns": 8,
+    "first_eov_column": "density",
+    "title_translated": {
+      "en": "Strait of Georgia Central Conductivity Temperature Depth Deployed 2013-10-24",
+      "fr": "Strait of Georgia Central Conductivité/Température/Profondeur déployé 2013-10-24"
+    },
+    "eovs": [
+      "subSurfaceSalinity",
+      "subSurfaceTemperature"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1189845.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/5816f741-df18-4b52-807f-efc50641005d"
+  },
+  {
+    "pk": 782,
+    "pk_url": 782,
+    "dataset_id": "scalar_1200222",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Endeavour North Current Meter Deployed 2018-06-27",
+    "platform": "unknown",
+    "num_columns": 17,
+    "first_eov_column": "Sound_Speed",
+    "title_translated": {
+      "en": "Endeavour North Current Meter Deployed 2018-06-27",
+      "fr": "Endeavour North Courantometre déployé 2018-06-27"
+    },
+    "eovs": [
+      "subSurfaceTemperature",
+      "subSurfaceCurrents",
+      "oceanSound"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1200222.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/bd9d3438-7c24-4ae0-b36d-d18f00f6cf86"
+  },
+  {
+    "pk": 2438,
+    "pk_url": 2438,
+    "dataset_id": "obs_217",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Grand Traverse Bay South Buoy",
+    "platform": "mooring",
+    "num_columns": 143,
+    "first_eov_column": "sea_surface_wave_from_direction",
+    "title_translated": {
+      "en": "Grand Traverse Bay South Buoy",
+      "fr": null
+    },
+    "eovs": [
+      "seaState",
+      "subSurfaceTemperature",
+      "oceanColour",
+      "oceanSurfaceStress"
+    ],
+    "organizations": [
+      "Northwestern Michigan College"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://seagull-erddap.glos.org/erddap/tabledap/obs_217.html",
+    "ckan_url": null
+  },
+  {
+    "pk": 1763,
+    "pk_url": 1763,
+    "dataset_id": "obs_18",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Avon Pump Station:water quality station",
+    "platform": "land or seafloor",
+    "num_columns": 20,
+    "first_eov_column": "sea_water_turbidity",
+    "title_translated": {
+      "en": "Avon Pump Station:water quality station",
+      "fr": null
+    },
+    "eovs": [
+      "oxygen",
+      "inorganicCarbon",
+      "subSurfaceSalinity",
+      "subSurfaceTemperature",
+      "particulateMatter"
+    ],
+    "organizations": [
+      "Avon Lake Regional Water"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://seagull-erddap.glos.org/erddap/tabledap/obs_18.html",
+    "ckan_url": null
+  },
+  {
+    "pk": 1163,
+    "pk_url": 1163,
+    "dataset_id": "scalar_1211302",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Cascadia Seaweed Burrough Point Reference Site Turbidity Meter Deployed 2022-03-08",
+    "platform": "unknown",
+    "num_columns": 6,
+    "first_eov_column": "turbidity",
+    "title_translated": {
+      "en": "Cascadia Seaweed Burrough Point Reference Site Turbidity Meter Deployed 2022-03-08",
+      "fr": "Site de référence de Cascadia Seaweed à la Pointe Burrough Turbidimètre déployé 2022-03-08"
+    },
+    "eovs": [
+      "particulateMatter"
+    ],
+    "organizations": [
+      "Uchucklesaht Tribe Government",
+      "Cascadia Seaweed Corporation",
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1211302.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/d7ffaffc-961f-49ab-9c3d-1849a508e254"
+  },
+  {
+    "pk": 190,
+    "pk_url": 190,
+    "dataset_id": "scalar_117564",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Patricia Bay Oxygen Sensor Deployed 2010-02-20",
+    "platform": "unknown",
+    "num_columns": 7,
+    "first_eov_column": "Temperature",
+    "title_translated": {
+      "en": "Patricia Bay Oxygen Sensor Deployed 2010-02-20",
+      "fr": "Patricia Bay Capteur d'Oxygène déployé 2010-02-20"
+    },
+    "eovs": [
+      "oxygen",
+      "subSurfaceTemperature"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_117564.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/bb2ecc2b-901e-4719-8f45-3889527e1fc4"
+  },
+  {
+    "pk": 596,
+    "pk_url": 596,
+    "dataset_id": "scalar_119335",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Boundary Pass Oxygen Sensor Deployed 2012-10-14",
+    "platform": "unknown",
+    "num_columns": 6,
+    "first_eov_column": "oxygen_corrected",
+    "title_translated": {
+      "en": "Boundary Pass Oxygen Sensor Deployed 2012-10-14",
+      "fr": "Boundary Pass Capteur d'Oxygène déployé 2012-10-14"
+    },
+    "eovs": [
+      "oxygen"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_119335.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/01f01771-199c-46ae-8b65-df9a00397595"
+  },
+  {
+    "pk": 2585,
+    "pk_url": 2585,
+    "dataset_id": "obs_5_latest",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "TREC Weather Station Tower",
+    "platform": "land or seafloor",
+    "num_columns": 11,
+    "first_eov_column": "surface_downwelling_shortwave_flux_in_air",
+    "title_translated": {
+      "en": "TREC Weather Station Tower",
+      "fr": null
+    },
+    "eovs": [
+      "oceanColour"
+    ],
+    "organizations": [
+      "Regional Science Consortium"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://seagull-erddap.glos.org/erddap/tabledap/obs_5_latest.html",
+    "ckan_url": null
+  },
+  {
+    "pk": 134,
+    "pk_url": 134,
+    "dataset_id": "obs_4",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Beach 2 Tower",
+    "platform": "land or seafloor",
+    "num_columns": 41,
+    "first_eov_column": "surface_downwelling_shortwave_flux_in_air",
+    "title_translated": {
+      "en": "Beach 2 Tower",
+      "fr": null
+    },
+    "eovs": [
+      "oceanColour"
+    ],
+    "organizations": [
+      "Regional Science Consortium"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://seagull-erddap.glos.org/erddap/tabledap/obs_4.html",
+    "ckan_url": null
+  },
+  {
+    "pk": 1027,
+    "pk_url": 1027,
+    "dataset_id": "scalar_1209148",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Strait of Georgia East Fluorometer Turbidity Deployed 2021-03-26",
+    "platform": "unknown",
+    "num_columns": 7,
+    "first_eov_column": "chlorophyll",
+    "title_translated": {
+      "en": "Strait of Georgia East Fluorometer Turbidity Deployed 2021-03-26",
+      "fr": "Strait of Georgia East Fluorimètre et Turbidité déployé 2021-03-26"
+    },
+    "eovs": [
+      "particulateMatter",
+      "phytoplanktonBiomassAndDiversity",
+      "oceanColour"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1209148.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/ce0af27c-744f-40c4-a165-5aa28e521d52"
+  },
+  {
+    "pk": 307,
+    "pk_url": 307,
+    "dataset_id": "scalar_1189138",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Strait of Georgia East Oxygen Sensor Deployed 2013-05-05",
+    "platform": "unknown",
+    "num_columns": 6,
+    "first_eov_column": "oxygen_saturation",
+    "title_translated": {
+      "en": "Strait of Georgia East Oxygen Sensor Deployed 2013-05-05",
+      "fr": "Strait of Georgia East Capteur d'Oxygène déployé 2013-05-05"
+    },
+    "eovs": [
+      "oxygen"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1189138.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/268521a3-b2ab-4615-b2e1-92746815ffdb"
+  },
+  {
+    "pk": 1364,
+    "pk_url": 1364,
+    "dataset_id": "scalar_1215125",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Discovery Passage Conductivity Temperature Depth Deployed 2024-03-19",
+    "platform": "unknown",
+    "num_columns": 12,
+    "first_eov_column": "Sound_Speed",
+    "title_translated": {
+      "en": "Discovery Passage Conductivity Temperature Depth Deployed 2024-03-19",
+      "fr": "Discovery Passage Conductivité/Température/Profondeur déployé 2024-03-19"
+    },
+    "eovs": [
+      "subSurfaceSalinity",
+      "subSurfaceTemperature",
+      "particulateMatter",
+      "oceanSound"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1215125.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/03ec3b40-b21b-4537-8e5f-c92e4689e50f"
+  },
+  {
+    "pk": 954,
+    "pk_url": 954,
+    "dataset_id": "scalar_1206547",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Folger Deep Oxygen Sensor Deployed 2020-03-08",
+    "platform": "unknown",
+    "num_columns": 8,
+    "first_eov_column": "temperature",
+    "title_translated": {
+      "en": "Folger Deep Oxygen Sensor Deployed 2020-03-08",
+      "fr": "Folger Deep Capteur d'Oxygène déployé 2020-03-08"
+    },
+    "eovs": [
+      "oxygen",
+      "subSurfaceTemperature"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1206547.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/44e452d7-c9b7-4f2f-914b-bfe271a9a4e9"
+  },
+  {
+    "pk": 683,
+    "pk_url": 683,
+    "dataset_id": "scalar_1195200",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Juan de Fuca Strait Conductivity Temperature Depth Deployed 2016-10-28",
+    "platform": "unknown",
+    "num_columns": 13,
+    "first_eov_column": "Sound_Speed",
+    "title_translated": {
+      "en": "Juan de Fuca Strait Conductivity Temperature Depth Deployed 2016-10-28",
+      "fr": "Juan de Fuca Strait Conductivité/Température/Profondeur déployé 2016-10-28"
+    },
+    "eovs": [
+      "subSurfaceSalinity",
+      "subSurfaceTemperature",
+      "oceanSound"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1195200.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/44126a8e-2b58-4ebf-bc9b-d07ba502962b"
+  },
+  {
+    "pk": 1587,
+    "pk_url": 1587,
+    "dataset_id": "IYS_2019_CTD",
+    "n_profiles": 60,
+    "cdm_data_type": "TimeSeriesProfile",
+    "title": "CTD Data from the 2019 International Year of the Salmon Gulf of Alaska Expedition",
+    "platform": "surface vessel",
+    "num_columns": 31,
+    "first_eov_column": "chlorophyll_flu",
+    "title_translated": {
+      "en": "CTD Data from the 2019 International Year of the Salmon Gulf of Alaska Expedition",
+      "fr": null
+    },
+    "eovs": [
+      "oxygen",
+      "inorganicCarbon",
+      "seaSurfaceHeight",
+      "subSurfaceSalinity",
+      "subSurfaceTemperature",
+      "particulateMatter",
+      "phytoplanktonBiomassAndDiversity",
+      "oceanColour"
+    ],
+    "organizations": [
+      "Russian Federal Institute of Fisheries and Oceanography"
+    ],
+    "profiles_count": 60,
+    "erddap_url": "https://data.cioospacific.ca/erddap/tabledap/IYS_2019_CTD.html",
+    "ckan_url": null
+  },
+  {
+    "pk": 1624,
+    "pk_url": 1624,
+    "dataset_id": "amundsen13107_ctd",
+    "n_profiles": 41,
+    "cdm_data_type": "TimeSeries",
+    "title": "Mooring data of the Integrated Beaufort Observatory (iBO), a project from the Beaufort Regional Environmental Assessment (BREA) Marine Observatories in the Canadian Arctic.",
+    "platform": "mooring",
+    "num_columns": 35,
+    "first_eov_column": "CPHL",
+    "title_translated": {
+      "en": "Mooring data of the Integrated Beaufort Observatory (iBO), a project from the Beaufort Regional Environmental Assessment (BREA) Marine Observatories in the Canadian Arctic.",
+      "fr": null
+    },
+    "eovs": [
+      "oxygen",
+      "subSurfaceSalinity",
+      "subSurfaceTemperature",
+      "particulateMatter",
+      "phytoplanktonBiomassAndDiversity",
+      "oceanColour"
+    ],
+    "organizations": [
+      "ArcticNet"
+    ],
+    "profiles_count": 41,
+    "erddap_url": "https://erddap.amundsenscience.com/erddap/tabledap/amundsen13107_ctd.html",
+    "ckan_url": null
+  },
+  {
+    "pk": 1528,
+    "pk_url": 1528,
+    "dataset_id": "scalar_1559",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Patricia Bay Conductivity Temperature Depth Deployed 2008-09-28",
+    "platform": "unknown",
+    "num_columns": 7,
+    "first_eov_column": "Temperature",
+    "title_translated": {
+      "en": "Patricia Bay Conductivity Temperature Depth Deployed 2008-09-28",
+      "fr": "Patricia Bay Conductivité/Température/Profondeur déployé 2008-09-28"
+    },
+    "eovs": [
+      "subSurfaceSalinity",
+      "subSurfaceTemperature"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1559.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/776b07f4-515d-40c7-a546-1f2c8e6530e8"
+  },
+  {
+    "pk": 1823,
+    "pk_url": 1823,
+    "dataset_id": "obs_3",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Port Sheldon Buoy(45029): meteorological and water station",
+    "platform": "mooring",
+    "num_columns": 201,
+    "first_eov_column": "sea_surface_wave_from_direction",
+    "title_translated": {
+      "en": "Port Sheldon Buoy(45029): meteorological and water station",
+      "fr": null
+    },
+    "eovs": [
+      "seaState",
+      "subSurfaceTemperature",
+      "oceanSurfaceStress"
+    ],
+    "organizations": [
+      "Limnotech Inc."
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://seagull-erddap.glos.org/erddap/tabledap/obs_3.html",
+    "ckan_url": null
+  },
+  {
+    "pk": 1407,
+    "pk_url": 1407,
+    "dataset_id": "scalar_1215712",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Barkley Canyon Axis Oxygen Sensor Deployed 2024-06-25",
+    "platform": "unknown",
+    "num_columns": 8,
+    "first_eov_column": "temperature",
+    "title_translated": {
+      "en": "Barkley Canyon Axis Oxygen Sensor Deployed 2024-06-25",
+      "fr": "Barkley Canyon Axis  Capteur d'Oxygène déployé 2024-06-25"
+    },
+    "eovs": [
+      "oxygen",
+      "subSurfaceTemperature"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1215712.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/fe01c44f-9eec-4a74-8413-3950749df868"
+  },
+  {
+    "pk": 576,
+    "pk_url": 576,
+    "dataset_id": "scalar_1192795",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Barkley Canyon Axis Oxygen Sensor Deployed 2015-09-17",
+    "platform": "unknown",
+    "num_columns": 8,
+    "first_eov_column": "temperature",
+    "title_translated": {
+      "en": "Barkley Canyon Axis Oxygen Sensor Deployed 2015-09-17",
+      "fr": "Barkley Canyon Axis  Capteur d'Oxygène déployé 2015-09-17"
+    },
+    "eovs": [
+      "oxygen",
+      "subSurfaceTemperature"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1192795.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/38ea6c17-3378-4195-9df1-c08b7148443b"
+  },
+  {
+    "pk": 788,
+    "pk_url": 788,
+    "dataset_id": "scalar_1200229",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Endeavour North Current Meter Deployed 2018-06-27",
+    "platform": "unknown",
+    "num_columns": 17,
+    "first_eov_column": "Sound_Speed",
+    "title_translated": {
+      "en": "Endeavour North Current Meter Deployed 2018-06-27",
+      "fr": "Endeavour North Courantometre déployé 2018-06-27"
+    },
+    "eovs": [
+      "subSurfaceTemperature",
+      "subSurfaceCurrents",
+      "oceanSound"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1200229.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/7360fb14-14f3-4b3b-b3c0-2388ebcaaae0"
+  },
+  {
+    "pk": 1301,
+    "pk_url": 1301,
+    "dataset_id": "scalar_1213923",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Endeavour South Current Meter Deployed 2023-07-09",
+    "platform": "unknown",
+    "num_columns": 17,
+    "first_eov_column": "Sound_Speed",
+    "title_translated": {
+      "en": "Endeavour South Current Meter Deployed 2023-07-09",
+      "fr": "Endeavour South Courantometre déployé 2023-07-09"
+    },
+    "eovs": [
+      "subSurfaceTemperature",
+      "subSurfaceCurrents",
+      "oceanSound"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1213923.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/ea2f6c5c-dfa5-4dbb-9e48-ec81564aa1e5"
+  },
+  {
+    "pk": 657,
+    "pk_url": 657,
+    "dataset_id": "scalar_1194500",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "West Flank Bottom Pressure Recorder Deployed 2016-06-21",
+    "platform": "unknown",
+    "num_columns": 7,
+    "first_eov_column": "Pressure",
+    "title_translated": {
+      "en": "West Flank Bottom Pressure Recorder Deployed 2016-06-21",
+      "fr": "West Flank Enregistreur de Pression du Fond Marin déployé 2016-06-21"
+    },
+    "eovs": [
+      "seaSurfaceHeight"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1194500.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/bd5817e5-2cff-4037-a64c-75570817f5af"
+  },
+  {
+    "pk": 965,
+    "pk_url": 965,
+    "dataset_id": "scalar_1206958",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Juan de Fuca Strait Oxygen Sensor Deployed 2020-04-28",
+    "platform": "unknown",
+    "num_columns": 6,
+    "first_eov_column": "oxygen_corrected",
+    "title_translated": {
+      "en": "Juan de Fuca Strait Oxygen Sensor Deployed 2020-04-28",
+      "fr": "Juan de Fuca Strait Capteur d'Oxygène déployé 2020-04-28"
+    },
+    "eovs": [
+      "oxygen"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1206958.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/83d463cd-caa5-4cbe-be97-156b5a9a28db"
+  },
+  {
+    "pk": 187,
+    "pk_url": 187,
+    "dataset_id": "scalar_117549",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Strait of Georgia East Conductivity Temperature Depth Deployed 2010-02-20",
+    "platform": "unknown",
+    "num_columns": 13,
+    "first_eov_column": "Sound_Speed",
+    "title_translated": {
+      "en": "Strait of Georgia East Conductivity Temperature Depth Deployed 2010-02-20",
+      "fr": "Strait of Georgia East Conductivité/Température/Profondeur déployé 2010-02-20"
+    },
+    "eovs": [
+      "subSurfaceSalinity",
+      "subSurfaceTemperature",
+      "oceanSound"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_117549.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/4b948039-be71-4b75-9c46-d828a5d6ebb3"
+  },
+  {
+    "pk": 1966,
+    "pk_url": 1966,
+    "dataset_id": "obs_676",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "UWRAEON7-26",
+    "platform": "mooring",
+    "num_columns": 158,
+    "first_eov_column": "sea_surface_wave_from_direction",
+    "title_translated": {
+      "en": "UWRAEON7-26",
+      "fr": null
+    },
+    "eovs": [
+      "oxygen",
+      "seaState",
+      "subSurfaceTemperature",
+      "subSurfaceCurrents",
+      "particulateMatter",
+      "phytoplanktonBiomassAndDiversity",
+      "oceanColour",
+      "oceanSurfaceStress"
+    ],
+    "organizations": [
+      "University of Windsor (RAEON)"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://seagull-erddap.glos.org/erddap/tabledap/obs_676.html",
+    "ckan_url": null
+  },
+  {
+    "pk": 52,
+    "pk_url": 52,
+    "dataset_id": "NatureTrustWaterPropertiesVerticalProfilesProvisional_Salmon",
+    "n_profiles": 16,
+    "cdm_data_type": "TimeSeriesProfile",
+    "title": "BC Estuary Water Quality Monitoring Data - Salmon (Provisional)",
+    "platform": "surface vessel",
+    "num_columns": 56,
+    "first_eov_column": "flc",
+    "title_translated": {
+      "en": "BC Estuary Water Quality Monitoring Data - Salmon (Provisional)",
+      "fr": null
+    },
+    "eovs": [
+      "oxygen",
+      "inorganicCarbon",
+      "subSurfaceSalinity",
+      "subSurfaceTemperature",
+      "particulateMatter",
+      "phytoplanktonBiomassAndDiversity",
+      "oceanColour"
+    ],
+    "organizations": [
+      "Nature Trust"
+    ],
+    "profiles_count": 16,
+    "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_Salmon.html",
+    "ckan_url": null
+  },
+  {
+    "pk": 902,
+    "pk_url": 902,
+    "dataset_id": "scalar_1205256",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Chatham Sound Oxygen Sensor Deployed 2019-08-29",
+    "platform": "unknown",
+    "num_columns": 7,
+    "first_eov_column": "oxygen_corrected",
+    "title_translated": {
+      "en": "Chatham Sound Oxygen Sensor Deployed 2019-08-29",
+      "fr": "Chatham Sound Capteur d'Oxygène déployé 2019-08-29"
+    },
+    "eovs": [
+      "oxygen"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_1205256.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/6c967388-fa8c-483f-9d1f-bd4b85acc760"
+  },
+  {
+    "pk": 175,
+    "pk_url": 175,
+    "dataset_id": "scalar_117456",
+    "n_profiles": 1,
+    "cdm_data_type": "TimeSeries",
+    "title": "Strait of Georgia Central Oxygen Sensor Deployed 2009-09-28",
+    "platform": "unknown",
+    "num_columns": 7,
+    "first_eov_column": "Temperature",
+    "title_translated": {
+      "en": "Strait of Georgia Central Oxygen Sensor Deployed 2009-09-28",
+      "fr": "Strait of Georgia Central Capteur d'Oxygène déployé 2009-09-28"
+    },
+    "eovs": [
+      "oxygen",
+      "subSurfaceTemperature"
+    ],
+    "organizations": [
+      "Ocean Networks Canada Society"
+    ],
+    "profiles_count": 1,
+    "erddap_url": "https://dap.oceannetworks.ca/erddap/tabledap/scalar_117456.html",
+    "ckan_url": "https://catalogue.cioos.ca/dataset/5d98e7d1-0299-4271-8450-481353a38279"
+  }
+]

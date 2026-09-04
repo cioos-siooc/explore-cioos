@@ -212,9 +212,9 @@ export default function FiltersPanel () {
   }
 
   return (
-    <div className='filtersPanel'>
+    <div className='filtersPanel' data-testid='filters-panel'>
       <div className='filtersPanelBody'>
-        <div className='filtersPanelList'>
+        <div className='filtersPanelList' data-testid='filters-panel-list'>
           <FilterSection title={t('filterGroupWhat')}>
             {/* First in the section: this is the coarsest "what" there is — it
                 decides which families of data exist for the filters below to

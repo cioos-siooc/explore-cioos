@@ -53,7 +53,7 @@ export default function DatasetsPanel () {
   // Before the first /pointQuery lands there is no list to show at all.
   if (!initialPointsQueryComplete) {
     return (
-      <div className='datasetsPanel'>
+      <div className='datasetsPanel' data-testid='datasets-panel'>
         <Loading variant='inline' />
       </div>
     )
@@ -61,6 +61,7 @@ export default function DatasetsPanel () {
 
   return (
     <div
+      data-testid='datasets-panel'
       className='datasetsPanel'
       onMouseEnter={() => setHoveredDataset(inspectDataset)}
       onMouseLeave={() => setHoveredDataset()}

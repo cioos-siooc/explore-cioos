@@ -15,7 +15,14 @@ import './selectPillStyles.css'
 //
 // `options` is [{ id, label }]. `children` is an optional trailing segment
 // inside the same pill — SortSelect puts its direction toggle there.
-export default function SelectPill ({ label, value, options, onChange, children }) {
+export default function SelectPill ({
+  label,
+  value,
+  options,
+  onChange,
+  children,
+  'data-testid': testId
+}) {
   // Ties the caption to the select, so the caption is the control's name and
   // clicking it reaches the menu.
   const id = useId()
@@ -26,7 +33,7 @@ export default function SelectPill ({ label, value, options, onChange, children 
   const selected = options.find((option) => option.id === value)
 
   return (
-    <span className='selectPill'>
+    <span className='selectPill' data-testid={testId}>
       <label className='selectPillLabel' htmlFor={id}>
         {label}
       </label>

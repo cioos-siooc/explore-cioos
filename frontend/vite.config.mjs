@@ -44,6 +44,35 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 8000
     },
+    // Vitest reads this file, so the unit suite inherits the define{} above —
+    // without it src/config.js throws 'API_URL is not defined' at import and the
+    // whole module graph fails to load. API_URL comes from .env.test, which
+    // loadEnv picks up because vitest runs in mode 'test'.
+    test: {
+      environment: 'jsdom',
+      // A fixed origin, because renderWithProviders seeds state through
+      // window.history and the providers read it back off window.location.
+      environmentOptions: { jsdom: { url: 'http://localhost:8000/' } },
+      globals: true,
+      setupFiles: ['./src/test/setup.js'],
+      include: ['src/**/*.test.{js,jsx}'],
+      // Component styles are irrelevant to assertions and parsing them is the
+      // single biggest cost in a jsdom run.
+      css: false,
+      // LegendFooter imports AttributionControl/ScaleControl from maplibre-gl at
+      // module scope, which needs a WebGL canvas jsdom does not have. Anything
+      // that actually depends on map behaviour is covered by the e2e suite.
+      alias: {
+        'maplibre-gl': new URL('./src/test/stubs/maplibre.js', import.meta.url)
+          .pathname
+      },
+      coverage: {
+        provider: 'v8',
+        reportsDirectory: './coverage',
+        include: ['src/**/*.{js,jsx}'],
+        exclude: ['src/test/**', 'src/**/*.test.{js,jsx}', 'src/locales/**']
+      }
+    },
     build: {
       outDir: 'dist',
       sourcemap: true,

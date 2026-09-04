@@ -147,12 +147,22 @@ export default function ActiveFilterChips () {
   if (activeFilters.length === 0 && !polygon) return null
 
   return (
-    <ul className='activeFilterBullets' aria-label={t('activeFiltersLabel')}>
+    <ul
+      className='activeFilterBullets'
+      aria-label={t('activeFiltersLabel')}
+      data-testid='active-filter-chips'
+    >
       {!collapsed && activeFilters.map((f) => (
-        <li key={f.key} className='activeFilterGroup'>
+        <li
+          key={f.key}
+          className='activeFilterGroup'
+          data-testid='filter-chip-group'
+          data-filter-key={f.key}
+        >
           <button
             type='button'
             className='activeFilterGroupLabel'
+            data-testid='filter-chip-label'
             onClick={f.goToFilter}
             title={t('activeFilterGoToFilterTitle', { filter: f.label })}
           >
@@ -160,15 +170,26 @@ export default function ActiveFilterChips () {
           </button>
           <div className='activeFilterItems'>
             {f.items.map((item) => (
-              <span key={item.id} className='activeFilterItem'>
+              <span
+                key={item.id}
+                className='activeFilterItem'
+                data-testid='filter-chip-item'
+                data-item-id={item.id}
+              >
                 <span className='activeFilterItemLabel' title={item.label}>
                   {item.label}
                 </span>
                 <button
                   type='button'
                   className='activeFilterItemRemove'
+                  data-testid='filter-chip-item-remove'
                   onClick={item.remove}
                   title={t('activeFilterRemoveItemTitle')}
+                  // Every chip's X carried the same accessible name, so
+                  // "Remove filter" matched all of them at once — ambiguous for
+                  // a test and useless to a screen reader reading the page's
+                  // buttons. Composed here rather than as a new i18n key.
+                  aria-label={`${t('activeFilterRemoveItemTitle')}: ${item.label}`}
                 >
                   <X size={14} aria-hidden='true' />
                 </button>
@@ -178,6 +199,8 @@ export default function ActiveFilterChips () {
           <button
             type='button'
             className='activeFilterGroupRemove'
+            data-testid='filter-chip-group-remove'
+            aria-label={t('activeFilterRemoveAllTitle', { filter: f.label })}
             onClick={f.removeAll}
             title={t('activeFilterRemoveAllTitle', { filter: f.label })}
           >
@@ -186,16 +209,22 @@ export default function ActiveFilterChips () {
         </li>
       ))}
       {!collapsed && polygon && (
-        <li className='activeFilterGroup'>
-          <span className='activeFilterItem'>
+        <li
+          className='activeFilterGroup'
+          data-testid='filter-chip-group'
+          data-filter-key='polygon'
+        >
+          <span className='activeFilterItem' data-testid='filter-chip-item'>
             <span className='activeFilterItemLabel'>
               {t('chipMapSelectionLabel')}
             </span>
             <button
               type='button'
               className='activeFilterItemRemove'
+              data-testid='filter-chip-item-remove'
               onClick={() => requestDraw('clear')}
               title={t('activeFilterRemoveItemTitle')}
+              aria-label={`${t('activeFilterRemoveItemTitle')}: ${t('chipMapSelectionLabel')}`}
             >
               <X size={14} aria-hidden='true' />
             </button>
@@ -206,6 +235,7 @@ export default function ActiveFilterChips () {
         <button
           type='button'
           className='filterMenuReset'
+          data-testid='filter-chips-toggle'
           onClick={() => setCollapsed((c) => !c)}
           aria-expanded={!collapsed}
         >
@@ -214,6 +244,7 @@ export default function ActiveFilterChips () {
         <button
           type='button'
           className='filterMenuReset'
+          data-testid='filter-chips-reset'
           onClick={() => {
             resetFilters()
             resetDataLayers()
