@@ -3,7 +3,28 @@ const { polygonJSONToWKT } = require("./polygon");
 const unique = (arr) => [...new Set(arr)];
 const db = require("../db");
 
-function createDBFilter(request) {
+// Hard cap on the AphiaID rolldown expansion. Selections expanding to more
+// than this many distinct AphiaIDs are rejected with HTTP 400 — a Phylum or
+// Kingdom selection blows past this and would force a multi-minute GIN OR
+// against tens of thousands of posting lists. The frontend already hides
+// those ranks from the dropdown; this is the API-level safety net for
+// programmatic clients.
+const MAX_EXPANDED_APHIA_IDS = 5000;
+
+class ScientificNameSelectionTooBroadError extends Error {
+  constructor(expandedCount, threshold) {
+    super(
+      `Scientific-name selection rolls down to ${expandedCount} taxa (max ${threshold}). ` +
+      "Pick a Family or below.",
+    );
+    this.name = "ScientificNameSelectionTooBroadError";
+    this.statusCode = 400;
+    this.expandedCount = expandedCount;
+    this.threshold = threshold;
+  }
+}
+
+async function createDBFilter(request) {
   const {
     timeMin,
     timeMax,
@@ -21,14 +42,38 @@ function createDBFilter(request) {
     organizations,
     datasetPKs,
     pointPKs,
+    scientificNames,
+    obisNodes,
+    erddapServers,
   } = request;
 
   const filters = [];
+  const obisFilters = [];
+  const profileFilters = [];
   const parameters = {};
 
   if (eovs) {
     parameters.eovsCommaSeparatedString = unique(eovs.split(","));
+    // Dataset level: bare `eovs` here resolves to cde.datasets.eovs, because
+    // every route applies this blob after joining cde.datasets.
     filters.push("eovs && :eovsCommaSeparatedString");
+    // Feature level: cde.profiles carries the EOVs each feature actually holds
+    // (a subset of its dataset's), so a multi-EOV dataset contributes only the
+    // stations/casts that measured the selected variable instead of all of
+    // them. Applied INSIDE the profiles branch, where cde.profiles is the only
+    // table in scope and bare `eovs` is unambiguously profiles.eovs — it
+    // cannot go in `filters` above, where it would be ambiguous against
+    // datasets.eovs.
+    //
+    // Every branch reading FROM cde.profiles must apply this, or it silently
+    // keeps the old dataset-level behaviour — there is no error to catch it.
+    // The five today: shapeQuery's profilesBranch, tiles.js (the hex/point
+    // route), legend.js, timeExtent.js and download.js. Branches that cannot
+    // answer it stay dataset-level via `filters`, which is why that clause is
+    // kept there: obis_cells, trajectory cells and track stats, the griddap
+    // pseudo-branch, and the two coverage-cell queries (/tiles/cells and the
+    // legend's coverage ramp) which read only trajectory + OBIS cells.
+    profileFilters.push("eovs && :eovsCommaSeparatedString");
   }
 
   if (platforms) {
@@ -45,23 +90,30 @@ function createDBFilter(request) {
     filters.push("time_min <= :timeMax::timestamptz");
   }
 
-  // This would be used if there was a rectangle selection for download
-  if (latMin) {
-    parameters.latMin = latMin;
-    filters.push("latitude >= (:latMin)::double precision");
-  }
-  if (latMax) {
-    parameters.latMax = latMax;
-    filters.push("latitude <= (:latMax)::double precision");
-  }
-
-  if (lonMin) {
-    parameters.lonMin = lonMin;
-    filters.push("longitude >= (:lonMin)::double precision");
-  }
-  if (lonMax) {
-    parameters.lonMax = lonMax;
-    filters.push("longitude <= (:lonMax)::double precision");
+  // Rectangle selection (download bbox). Matched against each feature's
+  // extent (search_geom = the profiles bbox, or the cell point for
+  // obis/trajectory) via ST_Intersects, so a feature that passes through the
+  // rectangle is found even if its display point sits outside it. Missing
+  // bounds default to the world extent so a partial rectangle still works.
+  if (latMin || latMax || lonMin || lonMax) {
+    // search_geom lives in Web Mercator (EPSG:3857), so the envelope is
+    // transformed 4326->3857. Mercator is only defined to ~±85.06° latitude;
+    // transforming a ±90° envelope throws "transform: tolerance condition
+    // error" in PostGIS and crashes the request. Clamp latitude to the valid
+    // range — nothing outside it can exist in a 3857 geometry anyway.
+    const clampLat = (v, dflt) => {
+      const n = v === undefined || v === null || v === "" ? dflt : Number(v);
+      return Math.max(-85.05, Math.min(85.05, n));
+    };
+    parameters.rectLonMin = lonMin || -180;
+    parameters.rectLatMin = clampLat(latMin, -85.05);
+    parameters.rectLonMax = lonMax || 180;
+    parameters.rectLatMax = clampLat(latMax, 85.05);
+    filters.push(
+      "ST_Intersects(search_geom, ST_Transform(ST_MakeEnvelope("
+      + "(:rectLonMin)::double precision,(:rectLatMin)::double precision,"
+      + "(:rectLonMax)::double precision,(:rectLatMax)::double precision,4326),3857))",
+    );
   }
 
   // disabled until we get depth data into the database
@@ -80,7 +132,10 @@ function createDBFilter(request) {
   }
 
   if (pointPKs) {
-    parameters.pointPKs = pointPKs;
+    // Comma-separated, like datasetPKs/organizations above — this was binding
+    // the raw query string instead of an array, so `= ANY(:pointPKs)` never
+    // worked (Postgres can't cast "12342,34534" to an integer array).
+    parameters.pointPKs = pointPKs.split(",");
     filters.push("point_pk = ANY (:pointPKs)");
   }
 
@@ -89,15 +144,101 @@ function createDBFilter(request) {
     filters.push("organization_pks && :organizationsString");
   }
 
+  // Both live on cde.datasets; the join alias `d` is present in tile, legend
+  // and shape queries. They form the combined "Data Source" filter: ERDDAP
+  // datasets have NULL obis_nodes and OBIS datasets carry the sentinel
+  // https://obis.org as erddap_url (never offered by /erddapServers), so
+  // when both params are present a dataset matches if it comes from a
+  // selected server OR a selected node. obisNodes without erddapServers
+  // implies OBIS-only mode (the tile/legend/shape routes drop the profiles
+  // branch when this is set).
+  if (obisNodes) {
+    parameters.obisNodesArr = obisNodes.split(",");
+  }
+  if (erddapServers) {
+    parameters.erddapServersArray = erddapServers.split(",");
+  }
+  if (obisNodes && erddapServers) {
+    filters.push("(d.obis_nodes && :obisNodesArr OR d.erddap_url = ANY(:erddapServersArray))");
+  } else if (obisNodes) {
+    filters.push("d.obis_nodes && :obisNodesArr");
+  } else if (erddapServers) {
+    filters.push("d.erddap_url = ANY(:erddapServersArray)");
+  }
+
   if (polygon) {
     const wktPolygon = polygonJSONToWKT(polygon);
     parameters.wktPolygon = wktPolygon;
-    filters.push("ST_Contains(ST_GeomFromText(:wktPolygon,4326),ST_Transform(geom,4326)) is true");
+    // Extent-based: a feature matches when its search_geom intersects the drawn
+    // polygon (was ST_Contains on the single point).
+    filters.push("ST_Intersects(search_geom, ST_Transform(ST_GeomFromText(:wktPolygon,4326),3857)) is true");
   }
-  const sql = filters.join(" AND \n");
-  const query = db.raw(sql, parameters);
 
-  return query;
+  if (scientificNames) {
+    const scientificNamesArr = unique(
+      scientificNames.split(",").map((s) => s.trim()).filter(Boolean),
+    );
+    parameters.scientificNamesArr = scientificNamesArr;
+
+    // Pre-compute the rolldown expansion in one fast query (~30ms even for
+    // Phylum). Returns the set of AphiaIDs that selection rolls down to:
+    // selected names' accepted AphiaIDs (covers synonyms via shared
+    // valid_AphiaID) UNION every taxon whose ancestor chain contains one.
+    // The GIN index on ancestor_aphia_ids makes this index-only.
+    const expansionSql = `
+      WITH selected_aids AS (
+        SELECT DISTINCT aphia_id
+          FROM cde.scientific_name_vernaculars
+         WHERE scientific_name = ANY(:scientificNamesArr)
+           AND aphia_id IS NOT NULL
+      )
+      SELECT aphia_id FROM selected_aids
+      UNION
+      SELECT v.aphia_id
+        FROM cde.scientific_name_vernaculars v
+       WHERE v.ancestor_aphia_ids && ARRAY(SELECT aphia_id FROM selected_aids)
+         AND v.aphia_id IS NOT NULL`;
+    const { rows: expRows } = await db.raw(expansionSql, { scientificNamesArr });
+    const expandedAphiaIds = expRows
+      .map((r) => r.aphia_id)
+      .filter((n) => Number.isInteger(n));
+
+    if (expandedAphiaIds.length > MAX_EXPANDED_APHIA_IDS) {
+      throw new ScientificNameSelectionTooBroadError(
+        expandedAphiaIds.length,
+        MAX_EXPANDED_APHIA_IDS,
+      );
+    }
+
+    parameters.expandedAphiaIds = expandedAphiaIds;
+
+    // Rank-aware match against obis_cells.aphia_ids using the precomputed
+    // expansion (a flat int[] parameter — PG plans this as one BitmapOr over
+    // GIN posting lists, no nested InitPlan, no per-row recheck of an inline
+    // subquery). The literal scientific_names branch is the back-compat
+    // fallback for selections WoRMS never resolved (aphia_id IS NULL on
+    // not_found rows) and for any obis_cells whose aphia_ids weren't
+    // backfilled yet — e.g. freshly harvested cells before
+    // 5_profile_process.sql runs.
+    obisFilters.push(
+      "(aphia_ids && :expandedAphiaIds OR scientific_names && :scientificNamesArr)",
+    );
+  }
+
+  const sharedSql = filters.join(" AND \n") || "TRUE";
+  const obisSql = obisFilters.join(" AND \n") || "TRUE";
+  const profileSql = profileFilters.join(" AND \n") || "TRUE";
+
+  return {
+    shared: db.raw(sharedSql, parameters),
+    obisOnly: db.raw(obisSql, parameters),
+    profileOnly: db.raw(profileSql, parameters),
+    hasShared: filters.length > 0,
+    hasObisOnly: obisFilters.length > 0,
+    hasProfileOnly: profileFilters.length > 0,
+  };
 }
 
 module.exports = createDBFilter;
+module.exports.ScientificNameSelectionTooBroadError = ScientificNameSelectionTooBroadError;
+module.exports.MAX_EXPANDED_APHIA_IDS = MAX_EXPANDED_APHIA_IDS;

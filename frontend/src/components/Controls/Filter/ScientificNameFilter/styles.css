@@ -1,0 +1,39 @@
+/* The Scientific Name options are the shared checkbox rows (see the
+   MultiCheckboxFilter stylesheet, which owns their hover and ticked states);
+   all that is left here is what a taxon row has that an organization row does
+   not — a name that is set in italics by convention, and a second line naming
+   the rank and the common name it was found under. */
+.scientificNameFilter .optionName {
+  display: flex;
+  flex-direction: column;
+}
+
+.scientificNameOptionName {
+  font-style: italic;
+}
+
+.scientificNameOptionDetail {
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+}
+
+.scientificNameOptionRank {
+  font-style: italic;
+}
+
+.scientificNameEmpty,
+.scientificNameLoading {
+  padding: 8px;
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-sm);
+}
+
+.scientificNameLoading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scientificNameLoading .cioosSpinner {
+  color: var(--cioos-primary);
+}

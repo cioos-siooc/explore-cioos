@@ -1,0 +1,58 @@
+/* ------------------------------------------------------------------
+ * What is peculiar to the time rail: the purple scrub marker and its
+ * trail band, and the date input's own quirks. The track, the teal range
+ * handles, the tick row and the marker shape are all the shared Rail's
+ * (see Controls/Rail/styles.css) — the depth rail and the depth bar draw
+ * the same ones.
+ * ------------------------------------------------------------------ */
+
+/* The scrub date's own colour; the shape it wears is the shared
+   .railHandleMarker. */
+.rail .timeRailHandleScrub {
+  background-color: var(--cioos-track);
+}
+
+.rail .timeRailHandleScrub:hover {
+  background-color: var(--cioos-track-700);
+}
+
+.rail .timeRailHandleScrub:focus-visible {
+  box-shadow: 0 0 0 3px rgb(103 73 172 / 45%);
+}
+
+/* How far back the drawn tracks reach behind the scrub date — the window the
+   tiles are actually built from, so the zoom clamp shows here too. A soft
+   block behind the rail line rather than on it, keeping the two readings
+   (what is filtered, what is drawn) from being mistaken for one another. */
+.timeRailTrailBand {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  /* The default 90-day window is a hundredth of the tracks' domain and would
+     round away to nothing on a rail this size. Off by a pixel or two and
+     visible beats exact and invisible — it is a wash saying roughly how far
+     back the drawn tracks reach, not a value to read off. */
+  min-width: 3px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-track-bg);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------
+ * The date fields that go with the rail. Plain text until pointed at,
+ * so a row of them over the map doesn't read as a form; the shared
+ * .railValueInput does that part, and this adds what only a date input
+ * has. The Filters panel's Time entry, where they *are* a form, boxes
+ * them back up along with the depth fields beside them (see the Filter
+ * stylesheet's range form rules).
+ * ------------------------------------------------------------------ */
+
+/* Chrome draws the picker button at full contrast; dim it to match the rest. */
+.timeRailDateInput::-webkit-calendar-picker-indicator {
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.timeRailDateInput:hover::-webkit-calendar-picker-indicator {
+  opacity: 0.8;
+}

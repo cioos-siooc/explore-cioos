@@ -1,0 +1,429 @@
+/*
+ * CIOOS National — design tokens & base layer
+ * ------------------------------------------------------------------
+ * Single source of truth for the CIOOS Data Explorer's visual identity.
+ * Palette and type rules come from the official CIOOS National theme
+ * (Navy / Sand / Light-teal base + #52A79B teal primary; Sora display,
+ * Montserrat body). Component stylesheets should reference these tokens
+ * via var(--cioos-*) rather than re-hardcoding hex values.
+ */
+
+:root {
+  /* --- Shared base palette --- */
+  --cioos-navy:        #152F37;
+  --cioos-sand:        #F3F0EC;
+  --cioos-teal-light:  #C6E3DF;
+  --cioos-white:       #FFFFFF;
+
+  /* --- National primary --- */
+  --cioos-primary:     #52A79B;
+  --cioos-primary-700: #3C8377; /* hover/pressed — darker teal */
+
+  /* --- Derived neutrals (navy-tinted, never pure grey/black) --- */
+  --cioos-ink:         #152F37; /* body + heading text */
+  --cioos-ink-60:      rgba(21, 47, 55, 0.62); /* secondary text */
+  --cioos-ink-40:      rgba(21, 47, 55, 0.40); /* muted text / icons */
+  --cioos-hairline:    #DCE8E5; /* hairline borders between sand & teal-light */
+  --cioos-surface-2:   #EEF6F4; /* subtle hover wash on white surfaces */
+  --cioos-scrim:       rgba(238, 246, 244, 0.82); /* surface-2, over content being replaced */
+  /* Deliberately thinner than the scrim above. That one covers content being
+     replaced, where what's underneath no longer means anything and the overlay's
+     legibility wins. This one covers content still arriving, where seeing it come
+     in is the whole point — the first-paint splash uses it so the basemap and its
+     coastlines read from the first frame. At 0.82 they barely register. */
+  --cioos-scrim-soft:  rgba(238, 246, 244, 0.55); /* surface-2, over content still arriving */
+
+  /* --- Status palette (CIOOS-aligned) --- */
+  --cioos-success:     #52A79B;
+  --cioos-success-bg:  #C6E3DF;
+  --cioos-error:       #E25563; /* Atlantic red-coral, reused for errors */
+  --cioos-error-bg:    #FBE3E6;
+  --cioos-warn:        #B07A00;
+  --cioos-info:        #0F6D8E;
+
+  /* --- Map data keys --- */
+  /* Colours that identify one layer or tool wherever it shows up: the paint on
+     the map, its legend swatch, and the control that drives it. The track
+     purple is `trackLineColor` in components/config.js — the map paints from
+     there, the chrome from here, and the two have to stay in step. */
+  --cioos-track:       #6749AC; /* trajectory track lines + the scrub control */
+  --cioos-track-700:   #543A90; /* hover/pressed */
+  --cioos-track-bg:    rgba(103, 73, 172, 0.14); /* trailing-window wash */
+  --cioos-track-surface: #EFEAF8; /* opaque sibling of -bg, for cards over the map */
+  /* The gridded-data amber, paired the same way: the map paints the active
+     grid's footprint in it (griddap-highlight in Map.jsx), and the controls
+     that say which slice of that grid is drawn — its marker on the time bar and
+     on the depth strip — carry it too. */
+  --cioos-grid:        #FBB03B; /* griddap coverage highlight + its markers */
+  --cioos-grid-700:    #C77F14; /* hover/pressed, and label text on white */
+  --cioos-grid-surface: #FDF1DC; /* opaque tint, for pills over the map */
+  /* The map-click goldenrod, paired the same way: the map rings whatever the
+     last click found in it (the click-highlight-* layers in Map.jsx, painted
+     from `clickHighlightColor` in components/config.js), and the chrome that
+     answers "what did that click find" — the "what's here" card itself, the
+     pinned rows in the datasets list and the record the click resolved to in
+     the inspector's table — carries it too, so the tie between map, card and
+     list needs no legend. */
+  --cioos-map-click:         #DAA520; /* click highlight ring + the row accents */
+  --cioos-map-click-glow:    rgba(218, 165, 32, 0.35); /* the ring/glow shadows */
+  --cioos-map-click-surface: #FBF1D9; /* opaque tint, the map fill's counterpart */
+
+  /* --- Elevation --- */
+  --cioos-shadow-card:    0 2px 8px rgba(21, 47, 55, 0.08);
+  --cioos-shadow-float:   0 4px 16px rgba(21, 47, 55, 0.16);
+  --cioos-ring:           0 0 0 2px rgba(21, 47, 55, 0.10); /* default chrome ring */
+  /* 3D depth: a bright inset top-highlight + darker inset base sculpt the
+     element's edge thickness, and the graduated ambient spread lifts it
+     strongly off the map. Pair with `--cioos-perspective` on the same element
+     for the raised, physical read. `-3d` is for cards/panels, `-3d-sm` for
+     chips/pills. */
+  --cioos-shadow-3d:
+    inset 0 1px 0 rgba(255, 255, 255, 0.90),
+    inset 0 -2px 3px rgba(21, 47, 55, 0.08),
+    0 1px 2px rgba(21, 47, 55, 0.14),
+    0 4px 8px rgba(21, 47, 55, 0.16),
+    0 10px 20px rgba(21, 47, 55, 0.18),
+    0 20px 40px rgba(21, 47, 55, 0.20);
+  --cioos-shadow-3d-sm:
+    inset 0 1px 0 rgba(255, 255, 255, 0.90),
+    inset 0 -1px 2px rgba(21, 47, 55, 0.08),
+    0 1px 2px rgba(21, 47, 55, 0.14),
+    0 3px 6px rgba(21, 47, 55, 0.16),
+    0 6px 14px rgba(21, 47, 55, 0.18);
+  --cioos-perspective:    perspective(800px) translateZ(0);
+
+  /* --- Shape --- */
+  --cioos-radius-lg:   16px;  /* floating panels / menus */
+  --cioos-radius:      8px;   /* cards, surfaces, buttons */
+  --cioos-radius-sm:   6px;   /* inputs, small controls */
+  --cioos-radius-pill: 999px; /* filter chips, toggles */
+
+  /* --- Type --- */
+  --cioos-font-body:    'Montserrat', system-ui, -apple-system, sans-serif;
+  --cioos-font-display: 'Sora', 'Montserrat', system-ui, sans-serif;
+  /* The CIOOS/SIOOC logo only — the brand card's lockup and the loading
+     splash's, both drawn by CioosLogo rather than loaded as an image.
+     The real wordmark is set in Volte Rounded, which is a licensed face and
+     not on Google Fonts; Quicksand is the closest thing there — geometric
+     with the same circular bowls and rounded terminals, and within ~3% of
+     the wordmark's own letter widths at matched cap height. */
+  --cioos-font-brand: 'Quicksand', 'Montserrat', 'Segoe UI', sans-serif;
+
+  /* --- Signature: the ocean "water column" gradient (surface → depth) --- */
+  --cioos-depth-gradient: linear-gradient(180deg, var(--cioos-primary) 0%, var(--cioos-navy) 100%);
+
+  --cioos-focus: 0 0 0 3px rgba(82, 167, 155, 0.55);
+
+  /* --- Layout: selection-panel width ---
+     Single source of truth for how wide the sidebar reads. Capped at 580px on
+     wide screens, proportional on tablets, and overridden to full-width on
+     phones (see media query below). The legend offset and the panel's own
+     closed-state transforms all derive from this token so they stay in sync. */
+  --cioos-panel-w: clamp(360px, 42vw, 580px);
+
+  /* --- Layout: top-bar footprint ---
+     How far down the centered top bar (brand card, Datasets/Filters pill, and
+     the active-filter chips flowing under them) reaches over the datasets
+     column on the left. TopControls publishes the real number, which grows as
+     chips wrap onto new rows, and 0 once the screen is wide enough for the bar
+     to sit clear of that column. */
+  --cioos-top-bar-space: 0px;
+
+  /* --- Layout: bottom time-bar footprint ---
+     How far the time bar reaches up from the bottom of the viewport (its own
+     offset + measured height). TimeBar publishes the real number on :root while
+     it is mounted and clears it on unmount, so anything sitting over the lower
+     half of the map — the datasets sidebar, the zoom-to-dataset pill — can hold
+     clearance from it without hard-coding its height. 0 when the bar isn't
+     shown.
+
+     Its twin down the right edge: how far the depth strip reaches down from
+     the top of the viewport (its foot, plus a gap). 0 when the strip isn't
+     shown.
+
+     And how far the griddap card reaches up from the bottom-right corner,
+     which MapLibre's own controls in that corner step above. The card holds
+     itself off the two bars, so this already includes their clearance; it is 0
+     while no gridded dataset is drawn. */
+  --cioos-time-bar-space: 0px;
+  --cioos-depth-bar-space: 0px;
+  --cioos-wms-legend-space: 0px;
+
+  /* --- Header & Layout (Modern Sidebar) --- */
+  --cioos-header-height: 70px;
+  --cioos-header-height-mobile: 60px;
+  --cioos-header-padding: 16px 20px;
+  --cioos-content-gap: 12px;
+
+  /* --- Typography Scale ---
+     Every size the chrome uses, including the two rungs below `xs` that the
+     legend ticks, the group labels and the brand's secondary wordmark need.
+     Those used to be hardcoded 8/9/10px values scattered through the component
+     stylesheets, which is why they stayed unreadably small on phones however
+     the rest of the scale was tuned: the mobile bump below can only reach sizes
+     that are on the scale. Nothing should set a font-size in px outside this
+     block — reach for the nearest rung instead. */
+  --cioos-font-size-3xs: 9px;
+  --cioos-font-size-2xs: 10px;
+  --cioos-font-size-xs: 11px;
+  --cioos-font-size-sm: 12px;
+  --cioos-font-size-base: 14px;
+  --cioos-font-size-md: 16px;
+  --cioos-font-size-lg: 18px;
+  /* The brand lockup, and the top of the scale: the only thing in the chrome
+     set larger than a heading. It sizes the compact lockup whole — the mark is
+     a multiple of it — so it is the one number that makes the logo bigger. */
+  --cioos-font-size-xl: 26px;
+
+  /* --- Spacing Scale --- */
+  --cioos-space-xs: 4px;
+  --cioos-space-sm: 8px;
+  --cioos-space-md: 12px;
+  --cioos-space-lg: 16px;
+  --cioos-space-xl: 24px;
+  --cioos-space-2xl: 32px;
+
+  /* --- Transitions --- */
+  --cioos-transition-fast: 0.15s ease-out;
+  --cioos-transition-normal: 0.2s ease-in-out;
+  --cioos-transition-slow: 0.3s ease-in-out;
+
+  /* --- Table & Rows --- */
+  --cioos-row-height: 80px;
+  --cioos-row-height-mobile: 72px;
+  --cioos-row-hover-bg: linear-gradient(90deg, var(--cioos-teal-light) 0%, transparent 100%);
+  --cioos-row-stripe-bg: var(--cioos-surface-2);
+
+  /* --- Shadows (Enhanced) --- */
+  --cioos-shadow-sm: 0 1px 3px rgba(21, 47, 55, 0.12);
+  --cioos-shadow-md: 0 2px 8px rgba(21, 47, 55, 0.08);
+  --cioos-shadow-lg: 0 4px 12px rgba(21, 47, 55, 0.10);
+  --cioos-shadow-lift: 0 6px 16px rgba(21, 47, 55, 0.08);
+
+  /* --- Z-Index Stack ---
+     map (0) < map corner controls < in-panel chrome < shell (brand/search)
+     < splash < dock < modal < tooltip.
+
+     The splash rung is the app's first paint. It is opaque and sits over the
+     map and everything keyed to it — the legend, the datasets column — because
+     none of that is worth reading until the data has drawn. It stops below the
+     dock on purpose: the brand card and the API error banner both live there
+     and both stay put through the load, the first because the app should look
+     like itself while it starts, the second because it is the one thing that
+     explains a splash that will not leave.
+
+     Two surfaces sit just above the dock rather than on a rung of their own,
+     each one step at a time so the order between them is stated where it
+     matters: the full-screen datasets list on mobile (dock + 1, over the top
+     bar), and the map's "what's here" card (dock + 2, the topmost non-modal
+     surface anywhere). The --cioos-z-sheet rung they used to share went with
+     the bottom sheet that owned it. */
+  --cioos-z-content: 1;
+  --cioos-z-map-controls: 2;
+  --cioos-z-sticky-search: 9;
+  --cioos-z-sticky-header: 10;
+  --cioos-z-shell: 30;
+  --cioos-z-splash: 32;
+  --cioos-z-dock: 35;
+  --cioos-z-modal: 1055;
+  --cioos-z-tooltip: 1080;
+
+  /* --- Button States --- */
+  --cioos-button-height-lg: 44px;
+  --cioos-button-hover-scale: 1.02;
+}
+
+/* --- Breakpoints ---
+   A custom property cannot be read inside a @media query, so these can only be
+   a convention rather than a token. Written down anyway, because the scale had
+   drifted to seven rungs (600 / 700 / 900 / 991.98 / 992 / 1200 / 1400) with
+   nothing saying which belonged to what:
+
+     600px   phone      the panel token above, and the narrow-phone tweaks a
+                        surface makes on top of the mobile layout
+     700px   phone/lap  THE mobile rung, and where anything about the map's own
+                        chrome belongs. The app stops being a map with chrome
+                        floating over it: the brand bar goes edge-to-edge, the
+                        datasets list and the modals take the whole screen, the
+                        legend collapses to a button, the time/depth bars give
+                        the map its edges back, the filter chips collapse, and
+                        the type scale steps up (below). Mirrored in JS as
+                        MOBILE_QUERY (state/ui/useMediaQuery.js) for the parts
+                        that change markup rather than layout.
+     900px   tablet     the legend moves out of the top-right corner
+     992px   tablet     legacy Bootstrap rung, modal + intro layout only
+     1200px  laptop     the WMS legend goes compact
+     1400px  desktop    wide enough for the datasets column to sit beside the
+                        map rather than over it, so it opens by default
+                        (WIDE_SCREEN_QUERY in UIProvider) and the time bar
+                        stops lifting MapLibre's corner controls
+
+   Prefer an existing rung over a new one. */
+
+/* Phones: every surface is full-screen here, so the type is sized for reading
+   at arm's length rather than for fitting beside a map — one rung up across the
+   whole scale, which is why the sub-`xs` sizes had to join it. The spacing goes
+   the other way: a full-screen surface spends its room on content, so the
+   padding rungs tighten as the type grows.
+
+   The panel also takes over the full viewport, so the dataset details and the
+   record table stay usable instead of overflowing a fixed column. */
+@media (max-width: 700px) {
+  :root {
+    --cioos-panel-w: 100vw;
+    --cioos-header-height: var(--cioos-header-height-mobile);
+    --cioos-row-height: var(--cioos-row-height-mobile);
+
+    --cioos-font-size-3xs: 10px;
+    --cioos-font-size-2xs: 12px;
+    --cioos-font-size-xs: 13px;
+    --cioos-font-size-sm: 14px;
+    --cioos-font-size-base: 16px;
+    --cioos-font-size-md: 17px;
+    --cioos-font-size-lg: 20px;
+    --cioos-font-size-xl: 28px;
+
+    --cioos-space-md: 10px;
+    --cioos-space-lg: 12px;
+    --cioos-space-xl: 16px;
+    --cioos-space-2xl: 20px;
+  }
+}
+
+/* --- Base reset (replaces Bootstrap's reboot, which is no longer loaded) --- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--cioos-font-body);
+  font-size: var(--cioos-font-size-base);
+  line-height: 1.5;
+  color: var(--cioos-ink);
+  -webkit-text-size-adjust: 100%;
+}
+
+p,
+ul,
+ol {
+  margin-top: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: var(--cioos-primary-700);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+img,
+svg {
+  vertical-align: middle;
+}
+
+/* Minimal flex grid, matching the Bootstrap class names still used in the
+   markup (.container/.row/.col) so component overrides keep working. */
+.container,
+.container-fluid {
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: 12px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.col {
+  flex: 1 0 0%;
+  min-width: 0;
+}
+
+.col-auto {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-family: var(--cioos-font-display);
+  color: var(--cioos-ink);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* Accessible, on-brand keyboard focus for every interactive chrome element.
+   Scoped away from native form fields so it doesn't fight Bootstrap inputs. */
+.filterHeader:focus-visible,
+.filterButton:focus-visible,
+.panelHandle:focus-visible,
+.resetFiltersButton:focus-visible,
+.introButton:focus-visible,
+.downloadButton:focus-visible,
+.submitRequestButton:focus-visible,
+.legendToggleButton:focus-visible,
+.pointDetailsHeaderIntroButton:focus-visible,
+.feedbackButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* Text inputs across the app (email + dataset search) share one quiet,
+   on-brand treatment with a teal focus ring. */
+.emailAddress,
+.emailInput,
+.pointDetailsSearchBar input {
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  padding: 8px 12px;
+  font: inherit;
+  color: var(--cioos-ink);
+}
+
+.emailAddress:focus,
+.emailInput:focus,
+.pointDetailsSearchBar input:focus {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
+}
+
+/* Screen reader only: hide content visually but keep it accessible */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Honour reduced-motion: the panel/legend slide transitions are decorative. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+  }
+}

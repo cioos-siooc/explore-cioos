@@ -1,0 +1,83 @@
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+import logging
+
+import pandas as pd
+from pandera.typing import DataFrame
+
+from cde_harvester.core.schemas import (
+    DatasetSchema,
+    HarvestAttemptSchema,
+    ObisCellSchema,
+    ProfileSchema,
+    SkippedDatasetSchema,
+    TrajectoryDaySchema,
+    TrajectoryPointSchema,
+    VariableSchema,
+    VerifiedDatasetSchema,
+)
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class HarvestResult:
+    """Standardized output for all harvesters."""
+
+    profiles: DataFrame[ProfileSchema]
+    datasets: DataFrame[DatasetSchema]
+    variables: DataFrame[VariableSchema]
+    skipped: DataFrame[SkippedDatasetSchema]
+    obis_cells: DataFrame[ObisCellSchema] = None
+    trajectory_days: DataFrame[TrajectoryDaySchema] = None
+    trajectory_points: DataFrame[TrajectoryPointSchema] = None
+    attempts: DataFrame[HarvestAttemptSchema] = None
+    verified: DataFrame[VerifiedDatasetSchema] = None
+
+    def __post_init__(self):
+        if self.obis_cells is None:
+            self.obis_cells = pd.DataFrame(columns=ObisCellSchema.to_schema().columns.keys())
+        if self.trajectory_days is None:
+            self.trajectory_days = pd.DataFrame(
+                columns=TrajectoryDaySchema.to_schema().columns.keys()
+            )
+        if self.trajectory_points is None:
+            self.trajectory_points = pd.DataFrame(
+                columns=TrajectoryPointSchema.to_schema().columns.keys()
+            )
+        if self.attempts is None:
+            self.attempts = pd.DataFrame(columns=HarvestAttemptSchema.to_schema().columns.keys())
+        if self.verified is None:
+            self.verified = pd.DataFrame(columns=VerifiedDatasetSchema.to_schema().columns.keys())
+
+    def validate(self):
+        """Validate all DataFrames against their schemas."""
+        for name, schema in [
+            ("profiles", ProfileSchema),
+            ("datasets", DatasetSchema),
+            ("variables", VariableSchema),
+            ("skipped", SkippedDatasetSchema),
+            ("obis_cells", ObisCellSchema),
+            ("trajectory_days", TrajectoryDaySchema),
+            ("trajectory_points", TrajectoryPointSchema),
+            ("attempts", HarvestAttemptSchema),
+        ]:
+            df = getattr(self, name)
+            schema.validate(df)
+
+
+class BaseHarvester(ABC):
+    """Abstract base class for CDE harvesters.
+
+    All harvesters must implement the harvest() method which returns
+    a HarvestResult containing the harvested DataFrames.
+    """
+
+    @abstractmethod
+    def harvest(self) -> HarvestResult:
+        """Execute the harvest process.
+
+        Returns:
+            HarvestResult: The harvested data.
+        """
+        pass

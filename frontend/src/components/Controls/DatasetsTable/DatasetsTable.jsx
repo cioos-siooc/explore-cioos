@@ -1,357 +1,434 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  CaretDownFill,
+  CaretRightFill,
   CheckSquare,
-  CircleFill,
-  Square,
-  Check2Circle,
-  XCircle,
-  Download,
-  BroadcastPin,
-  FileEarmarkSpreadsheet,
-  PinMapFill
+  Eye,
+  EyeSlash,
+  Search
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
-import platformColors from '../../platformColors'
-import './styles.css'
-import DataTable from 'react-data-table-component'
-import DataTableExtensions from 'react-data-table-component-extensions'
-import bytes from 'bytes'
-import isEmpty from 'lodash/isEmpty'
-
 import classNames from 'classnames'
-import { Spinner, OverlayTrigger, Tooltip } from 'react-bootstrap'
 
+import { useMapState } from '../../../state/map/MapStateProvider.jsx'
+import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
+import {
+  GROUP_NONE,
+  HIDEABLE_DIMENSIONS,
+  groupKeysFor,
+  groupLabel,
+  groupOptions,
+  isGroupDimension,
+  sortGroupKeys
+} from '../../../state/datasetGroups.js'
+import DatasetCard from './DatasetCard.jsx'
+import Pager, { PAGE_SIZES } from '../../ui/Pager.jsx'
+import SelectPill from '../../ui/SelectPill.jsx'
+import SortSelect from '../../ui/SortSelect.jsx'
+import './styles.css'
+
+// Stable default so an absent datasetsInViewPks prop (e.g. the download modal)
+// doesn't create a new Set every render and thrash memo deps.
+const EMPTY_SET = new Set()
+
+// The datasets list, rendered as cards (replaces the old data table). Used in
+// two contexts: the sidebar results list and the download-review modal
+// (isDownloadModal), which surfaces size estimates and download status.
 export default function DatasetsTable({
   handleSelectAllDatasets,
   handleSelectDataset,
   datasets,
   selectAll,
   setInspectDataset,
-  setHoveredDataset = () => { },
+  setHoveredDataset = () => {},
   isDownloadModal,
   downloadSizeEstimates,
-  loading
+  estimatesLoading,
+  datasetsInViewPks = EMPTY_SET
 }) {
-  const { t } = useTranslation()
-  const [tableData, setTableData] = useState({
-    columns: generateColumns(),
-    data: datasets
-  })
-  const checkBoxOnclick = (point) => () => {
-    if (!isDownloadModal || point.internalDownload) {
-      handleSelectDataset(point)
-    }
-  }
-  const selectAllOnclick = (e) => {
-    e.stopPropagation()
-    handleSelectAllDatasets()
-  }
+  const { t, i18n } = useTranslation()
+  // Lifted to SelectionProvider so it can surface as a removable chip
+  // (ActiveFilterChips) alongside the rest of the active filters. The grouping
+  // lives there too: the hidden groups decide what the map draws, and both are
+  // carried in the URL.
+  const {
+    datasetTitleSearchText: searchText,
+    setDatasetTitleSearchText: setSearchText,
+    groupBy: selectedGroupBy,
+    setGroupBy,
+    hiddenGroups,
+    toggleGroupHidden,
+    showAllGroups
+  } = useSelection()
+  // The datasets the open "what's here" card is about. They sort to the top of
+  // the list, which is what ties the card to this list at all — without it the
+  // card named datasets that could be on page 6 of 8, and there was no way to
+  // tell which rows it meant. The download modal is reviewing an order, not
+  // exploring the map, so it ignores this.
+  const { featureQuery } = useMapState()
+  const pinnedPks = useMemo(() => {
+    if (isDownloadModal || !featureQuery?.datasetPks?.length) return EMPTY_SET
+    return new Set(featureQuery.datasetPks.map(Number))
+  }, [featureQuery, isDownloadModal])
 
-  useEffect(() => {
-    setTableData({ columns: generateColumns(), data: datasets })
-  }, [datasets, downloadSizeEstimates])
+  // The download modal is a flat review list — it never groups, whatever the
+  // sidebar is grouped by.
+  const groupBy = isDownloadModal ? GROUP_NONE : selectedGroupBy
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0])
+  const [page, setPage] = useState(1)
+  const listRef = useRef(null)
 
-  function generateColumns() {
-    // const cellPadding = '0px'
-    const disabledCheckboxStyle = {
-      backgroundColor: 'lightgrey'
-    }
-
-    const columns = [
-      {
-        name: (
-          <div title={t('datasetsTableDownloadModalDatasetCheckboxTooltip')}>
-            {selectAll ? (
-              <CheckSquare onClick={selectAllOnclick} size={16} />
-            ) : (
-              <Square onClick={selectAllOnclick} size={16} />
-            )}
-            <Download className='downloadIcon' onClick={selectAllOnclick} size={18} title={t('datasetInspectorDownloadText')} />
-          </div>
-        ),
-        selector: (row) => row.selected,
-        cell: (row) => {
-          return (
-            <div title={t('datasetsTableDownloadModalDatasetCheckboxTooltip')}>
-              {row.selected ? (
-                <CheckSquare onClick={checkBoxOnclick(row)} size={16} />
-              ) : (
-                <Square
-                  style={
-                    isDownloadModal &&
-                    !row.internalDownload &&
-                    disabledCheckboxStyle
-                  }
-                  onClick={checkBoxOnclick(row)}
-                  size={16}
-                />
-              )}
-              <Download className='downloadIcon' onClick={checkBoxOnclick(row)} size={18} />
-              {/* <Download className='downloadIcon' /> */}
-            </div>
-          )
-        },
-        ignoreRowClick: true,
-        sortable: true,
-        width: '60px',
-        // paddingLeft: cellPadding,
-        // paddingRight: cellPadding
-      },
-
-      {
-        name: (
-          <div>
-            <BroadcastPin size={20} title={t('datasetInspectorPlatformText')} />
-          </div>
-        ),
-        // compact: true,
-        wrap: true,
-        center: true,
-        selector: (row) => row.platform,
-        cell: (point) => {
-          const platformColor = platformColors.find(
-            (pc) => pc.platform === point.platform
-          )
-
-          return (
-            <CircleFill
-              title={t(point.platform)}
-              className='optionColorCircle'
-              fill={platformColor?.color || '#000000'}
-              size={15}
-            />
-          )
-        },
-        sortable: true,
-        width: '60px',
-        // paddingLeft: cellPadding,
-        // paddingRight: cellPadding
-      },
-      {
-        name: (
-          <div>
-            <FileEarmarkSpreadsheet size={17} title={t('datasetsTableHeaderTitleText')} />
-          </div>
-        ),
-        selector: (row) => row.title,
-        wrap: true,
-        width: '280px',
-        sortable: true
-      },
-      {
-        name: t('datasetsTableHeaderTypeText'),
-        selector: (row) => row.cdm_data_type,
-        cell: (row) =>
-          row.cdm_data_type
-            .replace('TimeSeriesProfile', 'Time series / Profile')
-            .replace('TimeSeries', 'Time series'),
-        wrap: true,
-        sortable: true,
-        width: '80px',
-        // paddingLeft: cellPadding,
-        // paddingRight: cellPadding
-      },
-      {
-        name: (
-          <div>
-            <PinMapFill size={18} title={t('datasetsTableHeaderLocationsText')} />
-          </div>
-        ),
-        selector: (row) => row.profiles_count,
-        cell: (row) => {
-          if (row.profiles_count !== row.n_profiles) {
-            return `${row.profiles_count} / ${row.n_profiles}`
-          } else {
-            return row.profiles_count
-          }
-        },
-        wrap: true,
-        sortable: true,
-        width: '60px',
-        // paddingLeft: cellPadding,
-        // paddingRight: cellPadding
-      }
+  // Sort fields differ by context: the download modal exposes the size and
+  // downloadable status; the sidebar exposes the locations count.
+  const sortFields = useMemo(() => {
+    const base = [
+      { id: 'title', label: t('datasetsTableHeaderTitleText'), type: 'string' },
+      { id: 'type', label: t('datasetsTableHeaderTypeText'), type: 'string' },
+      { id: 'platform', label: t('datasetsCardSortPlatformText'), type: 'string' }
     ]
-
     if (isDownloadModal) {
-      columns.push({
-        name: t('datasetsTableDownloadModalEstimateDownloadSizeColumnName'),
-        selector: (row) => row.sizeEstimate.filteredSize,
-        cell: (row) => {
-          const estimatedFilteredDownloadSizeRowClassName = classNames(
-            'downloadSizeEstimateFiltered',
-            { downloadable: row?.sizeEstimate?.filteredSize < 1000000000 }
-          )
-          if (!isEmpty(downloadSizeEstimates)) {
+      base.push({ id: 'size', label: t('datasetsTableHeaderSizeText'), type: 'number' })
+      base.push({
+        id: 'downloadable',
+        label: t('datasetsCardSortDownloadableText'),
+        type: 'number'
+      })
+    } else {
+      base.push({
+        id: 'locations',
+        label: t('datasetsTableHeaderLocationsText'),
+        type: 'number'
+      })
+    }
+    return base
+  }, [isDownloadModal, i18n.language])
+
+  const [sort, setSort] = useState({ field: 'title', dir: 'asc' })
+  const [collapsedGroups, setCollapsedGroups] = useState(() => new Set())
+
+  const groupByOptions = useMemo(() => groupOptions(t), [i18n.language])
+  // Hiding a group takes its datasets off the map. Not offered for the
+  // viewport-based dimension ('inView'), whose membership changes on every pan.
+  const canHideGroups = HIDEABLE_DIMENSIONS.has(groupBy)
+
+  function sortValue(row, field) {
+    const isGrid = row.cdm_data_type === 'Grid'
+    switch (field) {
+    case 'title':
+      return (row.title || '').toLowerCase()
+    case 'type':
+      return (isGrid ? t('griddapTypeLabel') : row.cdm_data_type || '').toLowerCase()
+    case 'platform':
+      return (isGrid ? t('griddapTypeLabel') : row.platform || '').toLowerCase()
+    case 'locations':
+      return isGrid ? -1 : Number(row.profiles_count) || 0
+    case 'size':
+      return Number(row?.sizeEstimate?.filteredSize) || 0
+    case 'downloadable':
+      return row.internalDownload ? 1 : 0
+    default:
+      return 0
+    }
+  }
+
+  // Search filtering happens upstream (SelectionProvider's filteredDatasets),
+  // so it's reflected in the shared dataset counters too — this just sorts
+  // whatever it's handed.
+  const visibleRows = useMemo(() => {
+    const field = sortFields.find((f) => f.id === sort.field)
+    const factor = sort.dir === 'asc' ? 1 : -1
+    const sorted = [...(datasets || [])].sort((a, b) => {
+      // Datasets under the last map click come first, in the chosen sort order
+      // among themselves. This rides on top of the sort rather than replacing
+      // it, so the sort control still does what it says — it just orders the two
+      // blocks separately.
+      const pa = pinnedPks.has(Number(a.pk)) ? 0 : 1
+      const pb = pinnedPks.has(Number(b.pk)) ? 0 : 1
+      if (pa !== pb) return pa - pb
+      const va = sortValue(a, sort.field)
+      const vb = sortValue(b, sort.field)
+      if (field?.type === 'number') return (va - vb) * factor
+      return String(va).localeCompare(String(vb), i18n.language) * factor
+    })
+    return sorted
+  }, [datasets, sort, downloadSizeEstimates, i18n.language, pinnedPks])
+
+  // Flat render list: without grouping it's just the sorted rows; with grouping
+  // it's the rows bucketed under headers. Each entry is either
+  // { header, group, count } or { row, group }, where group is the stable group
+  // key (see state/datasetGroups.js — labels are derived at render time). Rows
+  // stay in their sorted order within a group; groups are alphabetical by label
+  // with Other/Uncategorized last. Array-valued dims place a dataset under each
+  // of its values, so the total row entries can exceed the unique dataset count
+  // (the toolbar count stays unique — see below).
+  const renderItems = useMemo(() => {
+    if (!isGroupDimension(groupBy)) return visibleRows.map((row) => ({ row }))
+    const byGroup = new Map()
+    for (const row of visibleRows) {
+      for (const key of groupKeysFor(row, groupBy, datasetsInViewPks)) {
+        if (!byGroup.has(key)) byGroup.set(key, [])
+        byGroup.get(key).push(row)
+      }
+    }
+    const items = []
+    for (const key of sortGroupKeys(
+      byGroup.keys(),
+      groupBy,
+      t,
+      i18n.language
+    )) {
+      const rows = byGroup.get(key)
+      items.push({ header: true, group: key, count: rows.length })
+      if (!collapsedGroups.has(key)) {
+        for (const row of rows) items.push({ row, group: key })
+      }
+    }
+    return items
+  }, [visibleRows, groupBy, collapsedGroups, datasetsInViewPks, i18n.language])
+
+  // Total data rows currently expanded (excludes headers and collapsed groups).
+  // This — not the dataset count — is what the pages divide up, because an
+  // array-valued grouping dimension lists a dataset under each of its values.
+  const totalRowCount = useMemo(
+    () => renderItems.reduce((n, item) => (item.header ? n : n + 1), 0),
+    [renderItems]
+  )
+
+  const pageCount = Math.max(1, Math.ceil(totalRowCount / pageSize))
+  // Clamped rather than stored: a page can vanish under the list (the filters
+  // narrowed the results, a group was collapsed) between renders.
+  const currentPage = Math.min(page, pageCount)
+  const firstRow = (currentPage - 1) * pageSize
+
+  // This page's slice of the render list. Headers don't consume the page's
+  // budget: a group header is re-shown at the top of every page its rows run
+  // onto, so a page opened mid-group still says which group it is in. A
+  // collapsed group has no rows of its own, so its header shows on the page
+  // its position falls into — once, never twice.
+  const pageItems = useMemo(() => {
+    // The last page runs to the end so that collapsed groups trailing the final
+    // row still land somewhere — with an exact multiple of pageSize there is no
+    // further page for them to fall onto.
+    const lastRow =
+      currentPage === pageCount ? Number.POSITIVE_INFINITY : firstRow + pageSize
+    const out = []
+    let rowIndex = 0
+    let pendingHeader = null
+    for (const item of renderItems) {
+      if (item.header) {
+        if (collapsedGroups.has(item.group)) {
+          pendingHeader = null
+          if (rowIndex >= firstRow && rowIndex < lastRow) out.push(item)
+        } else {
+          pendingHeader = item
+        }
+        continue
+      }
+      if (rowIndex >= lastRow) break
+      if (rowIndex >= firstRow) {
+        if (pendingHeader) {
+          out.push(pendingHeader)
+          pendingHeader = null
+        }
+        out.push(item)
+      }
+      rowIndex++
+    }
+    return out
+  }, [renderItems, firstRow, pageSize, currentPage, pageCount, collapsedGroups])
+
+  const toggleGroupCollapsed = (group) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(group)) next.delete(group)
+      else next.add(group)
+      return next
+    })
+  }
+
+  // Which datasets are in the results, as a value rather than an array
+  // identity. Adding one to the selection rewrites every row object (the
+  // provider maps over pointsData), so keying the reset below on `datasets`
+  // itself sent the reader back to page 1 on every "+" — which is exactly the
+  // action they are most likely to repeat.
+  const datasetsKey = useMemo(
+    () => (datasets || []).map((row) => row.pk).join(','),
+    [datasets]
+  )
+
+  // Back to page one whenever the result set or its ordering changes: page 7 of
+  // the previous results is not page 7 of these.
+  useEffect(() => {
+    setPage(1)
+    if (listRef.current) listRef.current.scrollTop = 0
+  }, [datasetsKey, sort, isDownloadModal, groupBy, pageSize, pinnedPks])
+
+  // Every page starts at its top — the reader is at a new place in the list,
+  // not where they left the scroll bar on the page before.
+  const goToPage = (next) => {
+    setPage(Math.min(Math.max(next, 1), pageCount))
+    if (listRef.current) listRef.current.scrollTop = 0
+  }
+
+  const controls = (
+    <div className='datasetsCardControls'>
+      <div className='datasetsCardToolbar'>
+        <button
+          type='button'
+          className={classNames('selectAllToggle', { active: selectAll })}
+          onClick={handleSelectAllDatasets}
+          aria-pressed={selectAll}
+          title={t('datasetsTableHeaderSelectAllTitle')}
+        >
+          <CheckSquare size={13} aria-hidden='true' />
+          {t('datasetsTableHeaderSelectAllTitle')}
+        </button>
+        {!isDownloadModal && (
+          <div className='datasetsTableSearchWrap'>
+            <Search size={13} aria-hidden='true' />
+            <input
+              className='datasetsTableSearch'
+              type='text'
+              value={searchText}
+              placeholder={t('datasetInspectorFilterText')}
+              onChange={(e) => setSearchText(e.target.value)}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* How the list is arranged: what it is sorted on and what it is grouped
+          by, as the same pill so the pair reads as one row of settings. */}
+      <div className='datasetsCardArrange'>
+        <SortSelect fields={sortFields} sort={sort} onChange={setSort} />
+        {!isDownloadModal && (
+          <>
+            <SelectPill
+              label={t('datasetsCardGroupByLabel')}
+              value={groupBy}
+              options={groupByOptions}
+              onChange={setGroupBy}
+            />
+            {hiddenGroups.size > 0 && (
+              <button
+                type='button'
+                className='datasetsCardShowAllGroups'
+                onClick={showAllGroups}
+                title={t('datasetsCardGroupShowAllText', {
+                  count: hiddenGroups.size
+                })}
+                aria-label={t('datasetsCardGroupShowAllText', {
+                  count: hiddenGroups.size
+                })}
+              >
+                <Eye size={13} aria-hidden='true' />
+                {hiddenGroups.size}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+
+  return (
+    <div className={classNames('datasetsTable', { downloadModal: isDownloadModal })}>
+      {controls}
+      {/* Explains the accent DatasetCard puts on rows the last map click found
+          (see .datasetCard.fromMapClick in styles.css) — otherwise the only
+          place that colour is named is a hover tooltip on the row itself,
+          which a touch user never sees and a mouse user has no reason to go
+          looking for. Only worth saying while there is a click to explain. */}
+      {!isDownloadModal && pinnedPks.size > 0 && (
+        <div className='datasetsCardMapClickHint'>
+          <span className='datasetsCardMapClickSwatch' aria-hidden='true' />
+          {t('datasetsCardMapClickHint')}
+        </div>
+      )}
+      <div className='datasetsCardList' ref={listRef}>
+        {visibleRows.length === 0 ? (
+          <div className='datasetsCardEmpty'>{t('datasetsCardNoResultsText')}</div>
+        ) : (
+          pageItems.map((item) => {
+            if (!item.header) {
+              return (
+                <DatasetCard
+                  key={`${item.group ?? ''}:${item.row.pk ?? item.row.dataset_id ?? item.row.title}`}
+                  row={item.row}
+                  isDownloadModal={isDownloadModal}
+                  downloadSizeEstimates={downloadSizeEstimates}
+                  estimatesLoading={estimatesLoading}
+                  onSelect={handleSelectDataset}
+                  onInspect={isDownloadModal ? undefined : setInspectDataset}
+                  onHover={setHoveredDataset}
+                  onHoverEnd={() => setHoveredDataset()}
+                  hiddenFromMap={
+                    item.group !== undefined && hiddenGroups.has(item.group)
+                  }
+                  fromMapClick={pinnedPks.has(Number(item.row.pk))}
+                  t={t}
+                  i18n={i18n}
+                />
+              )
+            }
+            const collapsed = collapsedGroups.has(item.group)
+            const hidden = hiddenGroups.has(item.group)
+            const label = groupLabel(item.group, groupBy, t)
             return (
-              <div className='downloadSizeEstimate'>
-                {!isEmpty(downloadSizeEstimates) && (
-                  <>
-                    <div className={estimatedFilteredDownloadSizeRowClassName}>
-                      {bytes(row?.sizeEstimate?.filteredSize)}
-                    </div>
-                    {` / ${bytes(row?.sizeEstimate?.unfilteredSize)}`}
-                  </>
+              <div
+                key={`group:${item.group}`}
+                className={classNames('datasetsCardGroupHeader', { hidden })}
+              >
+                <button
+                  type='button'
+                  className='datasetsCardGroupToggle'
+                  onClick={() => toggleGroupCollapsed(item.group)}
+                  aria-expanded={!collapsed}
+                >
+                  {collapsed ? (
+                    <CaretRightFill size={10} aria-hidden='true' />
+                  ) : (
+                    <CaretDownFill size={10} aria-hidden='true' />
+                  )}
+                  <span className='datasetsCardGroupTitle' title={label}>
+                    {label}
+                  </span>
+                  <span className='datasetsCardGroupCount'>{item.count}</span>
+                </button>
+                {canHideGroups && (
+                  <button
+                    type='button'
+                    className='datasetsCardGroupHide'
+                    onClick={() => toggleGroupHidden(item.group)}
+                    aria-pressed={hidden}
+                    title={
+                      hidden
+                        ? t('datasetsCardGroupShowOnMapTitle')
+                        : t('datasetsCardGroupHideFromMapTitle')
+                    }
+                  >
+                    {hidden ? (
+                      <EyeSlash size={13} aria-hidden='true' />
+                    ) : (
+                      <Eye size={13} aria-hidden='true' />
+                    )}
+                  </button>
                 )}
               </div>
             )
-          } else {
-            return (
-              <Spinner
-                className='datasetsTableSpinner'
-                as='span'
-                animation='border'
-                size={50}
-                role='status'
-                aria-hidden='true'
-              />
-            )
-          }
-        },
-        wrap: true,
-        sortable: true,
-        width: '200px',
-        // paddingLeft: cellPadding,
-        // paddingRight: cellPadding
-      })
-      columns.push({
-        name: t('datasetTableDownloadModalCDEDownloadableColumnName'),
-        selector: (row) => row.internalDownload,
-        cell: (row) => {
-          if (!isEmpty(downloadSizeEstimates)) {
-            return row.internalDownload ? (
-              <OverlayTrigger
-                placement='top'
-                overlay={
-                  <Tooltip>
-                    {t(
-                      'datasetTableDownloadModalCDEDownloadableColumnNameTooltip'
-                    )}
-                  </Tooltip>
-                }
-              >
-                <Check2Circle
-                  className='downloadableIcon'
-                  color='#52a79b'
-                  size='25'
-                />
-              </OverlayTrigger>
-            ) : (
-              <OverlayTrigger
-                placement='top'
-                overlay={
-                  <Tooltip>
-                    {t(
-                      'datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip'
-                    )}
-                  </Tooltip>
-                }
-              >
-                <XCircle className='downloadableIcon' color='#e3285e' size='25' />
-              </OverlayTrigger>
-            )
-          } else {
-            return (
-              <Spinner
-                className='datasetsTableSpinner'
-                as='span'
-                animation='border'
-                size={50}
-                role='status'
-                aria-hidden='true'
-              />
-            )
-          }
-        },
-        wrap: true,
-        sortable: true,
-        width: '170px',
-        // paddingLeft: cellPadding,
-        // paddingRight: cellPadding
-      })
-      columns.push({
-        name: t('datasetTableDownloadModalExternalDownloadColumnName'),
-        selector: (row) => row.erddapLink,
-        cell: (row) => {
-          if (!isEmpty(downloadSizeEstimates) && row.erddapLink) {
-            return (
-              <a href={row.erddapLink} target='_blank' rel='noreferrer'>
-                ERDDAP
-              </a>
-            )
-          } else {
-            return (
-              <Spinner
-                className='datasetsTableSpinner'
-                as='span'
-                animation='border'
-                size={50}
-                role='status'
-                aria-hidden='true'
-              />
-            )
-          }
-        },
-        wrap: true,
-        sortable: true,
-        width: '150px',
-        // paddingLeft: cellPadding,
-        // paddingRight: cellPadding
-      })
-    }
-
-    return columns
-  }
-
-  return (
-    <div className='datasetsTable'>
-      <DataTableExtensions
-        {...tableData}
-        print={false}
-        export={false}
-        filterPlaceholder={t('datasetInspectorFilterText')}
-        filter={true}
-      >
-        <DataTable
-          striped
-          columns={tableData.columns}
-          data={tableData.data}
-          defaultSortFieldId={3}
-          onRowClicked={isDownloadModal ? undefined : setInspectDataset}
-          onRowMouseEnter={setHoveredDataset}
-          onRowMouseLeave={() => setHoveredDataset()}
-          highlightOnHover={!isDownloadModal}
-          pointerOnHover={!isDownloadModal}
-          pagination={tableData.data?.length > 100}
-          paginationPerPage={50}
-          paginationRowsPerPageOptions={[50, 100, 150, 200]}
-          paginationComponentOptions={{
-            rowsPerPageText: t('tableComponentRowsPerPage'),
-            rangeSeparatorText: t('tableComponentOf'),
-            selectAllRowsItem: false
-          }}
-          // compact
-          customStyles={{
-            rows: {
-              style: {
-                minHeight: '72px', // override the row height
-              },
-            },
-            headCells: {
-              style: {
-                paddingLeft: '5px', // override the cell padding for head cells
-                paddingRight: '0px',
-              },
-            },
-            cells: {
-              style: {
-                paddingLeft: '5px', // override the cell padding for data cells
-                paddingRight: '0px',
-              },
-            },
-          }}
-        />
-      </DataTableExtensions>
+          })
+        )}
+      </div>
+      <Pager
+        page={currentPage}
+        pageCount={pageCount}
+        pageSize={pageSize}
+        total={totalRowCount}
+        onPageChange={goToPage}
+        onPageSizeChange={setPageSize}
+        label={t('datasetsPagerLabel')}
+        perPageLabel={t('datasetsPagerPerPageLabel')}
+      />
     </div>
   )
 }

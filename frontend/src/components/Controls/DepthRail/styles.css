@@ -1,0 +1,20 @@
+/* The depth fields that go with the rail, where the time rail has date ones.
+   The quiet box is the shared .railValueInput; this is what only a number
+   input has.
+
+   No spinner arrows: over the map they sit in a pill barely taller than the
+   text, where Chrome's stepper crowds the figure out and, on a rail whose
+   whole point is dragging, buys nothing the arrow keys don't already give. */
+.depthRailNumberInput {
+  width: 5ch;
+  text-align: right;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.depthRailNumberInput::-webkit-outer-spin-button,
+.depthRailNumberInput::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}

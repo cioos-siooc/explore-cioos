@@ -1,0 +1,437 @@
+/* ------------------------------------------------------------------
+ * Sidebar — the left column holding the datasets card (a toggle header
+ * that shows/hides the dataset list body and the counts + Download
+ * footer). The brand + Datasets/Filters entry points live in the
+ * centered top bar. On phones the datasets card takes the whole screen,
+ * shown only while the top bar's Datasets button is on — closed, it
+ * leaves nothing at any edge and the map reads full-screen.
+ *
+ * The griddap legend pins itself over this column's top-left corner
+ * rather than stacking inside it (see the WmsLegend stylesheet), so the
+ * column is a single card again.
+ * ------------------------------------------------------------------ */
+:root {
+  --cioos-sidebar-width: 420px;
+}
+
+/* Transparent positioning shell: the two cards inside carry the chrome,
+   and the empty space between/below them stays click-through to the map. */
+.sidebar {
+  position: fixed;
+  /* Start below the centered top bar whenever it reaches over this column —
+     which it does on narrower screens, and does further down the more
+     active-filter chips are wrapped under it. TopControls publishes that reach
+     as --cioos-top-bar-space and leaves it at 0 once the bar sits clear, where
+     the column goes back to starting at the top of the map. */
+  top: max(12px, var(--cioos-top-bar-space, 0px));
+  left: 12px;
+  /* Stop above the tracks-mode time bar rather than running under it. --cioos-
+     time-bar-space is 0 unless the bar is mounted (TimeBar publishes its
+     measured footprint), so with the bar absent this is the plain 12px inset.
+     Past 1944px wide this undoes itself again — see the media query below —
+     because the bar is centered and only 1080px wide, and at that width its
+     left edge (half of viewport-minus-1080) has cleared this column's right
+     edge (12px inset + 420px width), leaving nothing here left to clear. */
+  bottom: calc(12px + var(--cioos-time-bar-space, 0px));
+  z-index: var(--cioos-z-shell, 30);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(var(--cioos-sidebar-width), calc(100vw - 24px));
+  pointer-events: none;
+}
+
+/* 1080px (the bar's own cap) + 2 * 432px (this column's 12px inset + 420px
+   width) — the narrowest viewport whose centered bar no longer reaches the
+   column's right edge. Update this if --cioos-sidebar-width or the bar's
+   1080px cap (TimeBar/styles.css) changes. */
+@media (min-width: 1944px) {
+  .sidebar {
+    bottom: 12px;
+  }
+}
+
+.sidebar > * {
+  pointer-events: auto;
+}
+
+/* ------------------------------------------------------------------
+ * Datasets card: toggle header + list body + counts/Download footer.
+ * ------------------------------------------------------------------ */
+.sidebarDatasets {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-lg);
+  overflow: hidden;
+  /* 3D depth (shared tokens; see theme.css). The panel clips its content, so
+     preserve-3d/inner-lift can't apply here; the shadow ladder carries it. */
+  transform: var(--cioos-perspective);
+  box-shadow: var(--cioos-shadow-3d);
+}
+
+/* Expanded: fill the remaining height so the list can scroll, and slide in from
+   the left edge of the screen — the column is asked for from the top bar, so it
+   should read as arriving rather than blinking into place. The perspective is
+   carried through both keyframes so the card keeps its 3D lift while it
+   travels, and the duration is spelled out rather than taken from
+   --cioos-transition-*: those tokens carry a timing function of their own, and
+   a second one after them makes the shorthand invalid — the animation is then
+   dropped without a word. */
+.sidebarDatasets.expanded {
+  flex: 1 1 auto;
+  animation: sidebarSlideIn 0.32s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+
+@keyframes sidebarSlideIn {
+  from {
+    /* Its own width plus the column's left inset: clear of the screen edge, so
+       the card travels in rather than growing out of it. */
+    transform: translateX(calc(-100% - 16px)) var(--cioos-perspective);
+  }
+  to {
+    transform: translateX(0) var(--cioos-perspective);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebarDatasets.expanded {
+    animation: none;
+  }
+}
+
+/* The datasets card is opened from the top-bar Datasets button, so when
+   collapsed the whole card (banner included) disappears — the map is
+   unobstructed at every width. When expanded its banner stays clickable to
+   hide it again. */
+.sidebarDatasets:not(.expanded) {
+  display: none;
+}
+
+.datasetsToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  color: var(--cioos-ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.datasetsToggle:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.datasetsToggle > svg:first-child {
+  color: var(--cioos-primary);
+  flex-shrink: 0;
+}
+
+.datasetsToggleLabel {
+  flex-shrink: 0;
+}
+
+.datasetsToggleCount {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-navy);
+  color: var(--cioos-white);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* Chevron pushed to the far edge; points down when collapsed, flips up
+   once the list is open. */
+.datasetsToggleChevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--cioos-ink-60);
+  transition: transform var(--cioos-transition-fast);
+}
+
+.sidebarDatasets.expanded .datasetsToggleChevron {
+  transform: rotate(180deg);
+}
+
+/* ------------------------------------------------------------------
+ * Dataset-page banner: replaces the datasets toggle while a single
+ * dataset is open. Reads differently on purpose — tinted — so the card
+ * is never mistaken for the list it drilled in from. Back on the left,
+ * what-you-are-looking-at on the right, and the collapse chevron kept
+ * where the toggle's was.
+ * ------------------------------------------------------------------ */
+.datasetsBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 8px 10px;
+  background-color: var(--cioos-teal-light);
+}
+
+.datasetsBackButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 5px 12px 5px 8px;
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.datasetsBackButton:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.datasetsBackButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* Names the surface, not the dataset — the dataset's own title is the
+   heading directly below, and repeating it here would just crowd the row. */
+.datasetsBannerMode {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  margin-left: auto;
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  color: var(--cioos-primary-700);
+}
+
+.datasetsBannerCollapse {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+}
+
+.datasetsBannerCollapse:hover {
+  color: var(--cioos-ink);
+}
+
+/* The list body sits below the toggle, visually separated by a hairline. */
+.sidebarBody {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* The list and the dataset page slide in horizontally (Panels/styles.css);
+     clipped rather than scrolled, so those few frames can't flash a horizontal
+     scrollbar (a scroll box with overflow-y: auto resolves overflow-x to auto
+     unless it is set). Nothing in this column is meant to reach past its edge. */
+  overflow-x: hidden;
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+/* ------------------------------------------------------------------
+ * Footer: dataset counts on the left, the Download action on the right.
+ * ------------------------------------------------------------------ */
+.sidebarFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-top: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-sand, var(--cioos-surface-2));
+}
+
+.sidebarCounts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink);
+}
+
+.sidebarCountsDatasets {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* A refetch is in flight: the numbers on screen are the previous ones, so fade
+   them rather than swapping in a spinner and making the counters flicker. */
+.datasetsToggleCount.updating,
+.sidebarCountsDatasets.updating {
+  opacity: 0.55;
+}
+
+.sidebarCountsSelected {
+  color: var(--cioos-ink-60);
+  white-space: nowrap;
+}
+
+.sidebarDownloadButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border: 1px solid var(--cioos-primary-700);
+  /* Same corner radius as the dataset cards it sits under. */
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-primary);
+  font: inherit;
+  font-weight: 700;
+  color: var(--cioos-white);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.sidebarDownloadButton:hover:not(:disabled) {
+  background-color: var(--cioos-primary-700);
+}
+
+.sidebarDownloadButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.sidebarDownloadCount {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-700);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+/* ------------------------------------------------------------------
+ * Mobile: the card is the screen. It covers the map edge to edge — the
+ * top bar included, which is what separates "I am reading the list" from
+ * "I am reading the map" on a viewport too small to do both at once. It
+ * is dismissed from the close button in its own top-right corner (see
+ * Sidebar.jsx, which swaps the collapse chevron for an X here) rather
+ * than by uncovering something behind it.
+ *
+ * Closed, the card is not rendered at all (see the collapsed rule above),
+ * so the map has the whole screen back.
+ * ------------------------------------------------------------------ */
+@media (max-width: 700px) {
+  .sidebar {
+    inset: 0;
+    width: auto;
+  }
+
+  /* One step over the top bar — the one piece of chrome that outranks this
+     column everywhere else, and the last thing between it and the whole
+     screen. Deliberately not higher: the map's "what's here" card sits two
+     steps above the dock and stays the topmost non-modal surface here as it is
+     everywhere else, so a click's answer is never buried by the list it feeds.
+     The modals keep their own layer well above both. */
+  .sidebar.sheetExpanded {
+    z-index: calc(var(--cioos-z-dock, 35) + 1);
+  }
+
+  .sidebarDatasets {
+    position: fixed;
+    inset: 0;
+    height: 100dvh;
+    max-height: 100dvh;
+    /* Nothing shows past it, so it has no edges of its own to draw and no
+       plane to be lifted off. */
+    border: none;
+    border-radius: 0;
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* Rises from the bottom edge on open — the same gesture the sheet had, kept
+     because it is what says the surface came from the button that was pressed
+     rather than replacing the page. (Silenced under prefers-reduced-motion by
+     the rule the desktop slide-in already shares.) */
+  .sidebarDatasets.expanded {
+    animation: sheetRise var(--cioos-transition-normal, 0.25s ease);
+  }
+
+  /* The header is now the top of the screen rather than the top of a card, so
+     it is sized like one — a taller row, whose whole width is the toggle, so
+     the X in its corner already has the touch target it needs. */
+  .datasetsToggle {
+    padding: var(--cioos-space-md) var(--cioos-space-lg);
+  }
+
+  /* Full ink: an X in the corner of a full-screen surface is the way out of
+     it, not the muted hint a collapse chevron on a card can afford to be. No
+     box sizing here — this is the bare <svg>, so a width/height would scale
+     the glyph rather than pad it; the row around it is the target. */
+  .datasetsToggleChevron {
+    color: var(--cioos-ink);
+  }
+
+  /* The dataset page's dismiss is a button of its own rather than part of a
+     full-width row, so this one does need a target built for it. */
+  .datasetsBannerCollapse {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-right: -6px;
+    border-radius: 50%;
+    color: var(--cioos-ink);
+  }
+
+  /* An X means the same thing whichever way up it is; the chevron's flip
+     would only make the icon twitch as the card opens. */
+  .sidebarDatasets.expanded .datasetsToggleChevron {
+    transform: none;
+  }
+
+  /* The footer is the surface's action bar: the Download button gets a full
+     touch target, and the counts beside it stay on one line each. */
+  .sidebarFooter {
+    padding: var(--cioos-space-md) var(--cioos-space-lg);
+    /* Clear of the home indicator on a notched phone. */
+    padding-bottom: max(var(--cioos-space-md), env(safe-area-inset-bottom));
+  }
+
+  .sidebarDownloadButton {
+    min-height: 44px;
+  }
+}
+
+@keyframes sheetRise {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}

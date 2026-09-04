@@ -15,7 +15,7 @@ jobs:
     environment: ${{ (github.event.workflow_run.head_branch || github.ref_name) == 'master' && 'production' || 'development' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - uses: cioos-siooc/cioos-deploy-docker-compose@main
         with:
@@ -25,7 +25,8 @@ jobs:
           ssh_key: ${{ secrets.BELUGA_RUNNER_PRIVATE_KEY }}
           deploy_path: "/srv/services/explore-cioos"
           stack_name: "explore-cioos-${{ (github.event.workflow_run.head_branch || github.ref_name) == 'master' && 'production' || 'development' }}"
-          compose_files: "docker-compose.production.yaml"
+          # Production is an OVERLAY on the base file, not a standalone stack.
+          compose_files: "docker-compose.yaml docker-compose.production.yaml"
           op_secret_files: ".env.production:.env"
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
           docker_compose_down: "true"

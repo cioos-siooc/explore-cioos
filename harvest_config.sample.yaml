@@ -9,10 +9,93 @@ cache: true
 # defaults to 'harvest'
 folder:
 
-# use to test select datasets, eg: dataset_one,dataset_two
+# Keep the default sample harvest small and deterministic. Add additional IDs
+# locally when testing a particular dataset.
 dataset_ids:
-  - ECCC_MSC_BUOYS
   - DFO_MEDS_BUOYS
 
 # defaults to false
 log_time:
+
+# defaults to false
+flush_redis: false
+
+# defaults to false
+incremental: true
+
+# --- OBIS Configuration ---
+#
+# How the dataset list is chosen, highest precedence first:
+#   1. obis_dataset_ids     -> harvest exactly these (test mode); discovery is bypassed
+#   2. obis_discovery       -> resolve the list from the OBIS API at harvest time
+#   3. obis_datasets_file   -> legacy static list (rollback only)
+#   4. none of the above    -> OBIS is not harvested
+#
+# EVERY option below is commented out, so the sample harvests no OBIS at all.
+# Deliberate: .github/workflows/build_and_test.yml copies this file to
+# harvest_config.yaml, and discovery resolves ~971 datasets — not something a
+# local or CI run should start by accident. harvest_config.production.yaml is
+# where discovery is actually enabled.
+
+# Discover datasets from the OBIS API. The default selection is the union of
+# every dataset from the OBIS Canada node, every dataset from OTN-OBIS, and
+# every dataset with occurrences inside the Canadian EEZ + land boundary.
+# The OBIS geometry filter is record-level exact, so this is a much tighter
+# selection than a bounding-box list.
+# obis_discovery:
+#   enabled: true
+#   # OBIS nodes harvested in full.
+#   nodes:
+#     - 7dfb2d90-9317-434d-8d4e-64adf324579a   # OBIS Canada
+#     - 68f83ea7-69a7-44fd-be77-3c3afd6f3cf8   # OTN-OBIS
+#   # 'eez' derives the query polygon from the boundary WKT (the same file the
+#   # geo filter uses). Can also be 'none', or an inline WKT string.
+#   geometry: eez
+#   # Optional OBIS area ids (Marine Regions / IHO / LME / EBSA), e.g. ['32'].
+#   areas: []
+#   # Dataset UUIDs always added to / removed from the discovered union.
+#   include: []
+#   exclude: []
+#   # Abort the OBIS harvest if the final list is smaller than this. Discovery is
+#   # all-or-nothing, but this is the backstop: a short list would let the
+#   # db-loader prune real datasets out of the database.
+#   min_datasets: 700
+#   # `size` on /v3/dataset. That endpoint ignores the `from` offset param, so a
+#   # single request must cover the whole result set.
+#   # page_size: 3000
+#   # Budget for the geometry WKT in the query string; OBIS returns HTTP 400 for
+#   # much more than ~6 KB, and the packaged polygon is ~11 KB, so it is
+#   # simplified (outward, so it stays a superset) until it fits.
+#   # geometry_max_bytes: 4500
+#   # geometry_simplify_tolerance: 0.25
+#   # timeout: 120
+
+# Individual OBIS dataset IDs (for small sets / testing). When set, these are
+# harvested verbatim and obis_discovery is skipped entirely. The geo filter
+# still applies, so a test run reproduces production per-dataset behaviour.
+# obis_dataset_ids:
+#   - 4b5e4ccb-cf66-44e4-8890-fa68f8404c3f
+
+# Legacy static list, kept as the rollback lever. Ignored when obis_discovery
+# is enabled.
+# obis_datasets_file: ./Obis_Datasets.json
+
+# Cache folder for OBIS occurrence and metadata data
+# Defaults to obis_cache/ next to the output folder
+# obis_folder: ./obis_cache
+
+# Geographic filter for OBIS occurrences. Defaults to canada (only ingest
+# occurrences inside Canadian EEZ + Canadian land territory). Datasets
+# contributed via the OBIS Canada or OTN-OBIS regional nodes are exempt
+# and harvested in their entirety.
+#
+# mode: none disables occurrence clipping AND makes every dataset exempt, so
+# all discovered datasets would be harvested worldwide — test use only. It does
+# not disable obis_discovery.geometry; those are independent.
+# obis_geo_filter:
+#   mode: canada
+#   # polygon_file:
+#   exempt_node_ids:
+#     - 7dfb2d90-9317-434d-8d4e-64adf324579a   # OBIS Canada
+#     - 68f83ea7-69a7-44fd-be77-3c3afd6f3cf8   # OTN-OBIS
+

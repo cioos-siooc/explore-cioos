@@ -1,0 +1,179 @@
+/* ------------------------------------------------------------------
+ * FiltersModal / DownloadModal — dialog sizing for the two shell modals.
+ * The panel content itself is styled in ../Panels/styles.css.
+ * ------------------------------------------------------------------ */
+.filtersModal .filtersModalDialog {
+  max-width: min(880px, calc(100vw - 24px));
+}
+
+.filtersModal .modal-content {
+  height: min(72vh, 760px);
+}
+
+/* The title is a row now, not a line of text: at the narrow widths its leading
+   segment is a button (below). The filter name is what gives way when the row
+   runs short — never the heading or the close button beside it. */
+.filtersModal .modal-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* The open filter's name, trailing "Filters" as a breadcrumb — the detail pane
+   fills most of the dialog, so the title is where you look to know what you are
+   editing. Lighter than the title itself: it is the subject, not the heading. */
+.filtersModal .filtersModalTitleCurrent {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--cioos-ink-60);
+  font-weight: 500;
+}
+
+.filtersModal .filtersModalTitleCurrent::before {
+  content: '›';
+  margin: 0 8px;
+  color: var(--cioos-ink-40);
+}
+
+/* The breadcrumb's first segment, as a control, at the widths where the open
+   filter covers the list it was chosen from. Same pill as the datasets
+   sidebar's back button — it is the same gesture out of the same kind of
+   drill-in. */
+.filtersModal .filtersModalBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 5px 12px 5px 8px;
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+}
+
+.filtersModal .filtersModalBack:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.downloadModal .downloadModalDialog {
+  max-width: min(1040px, calc(100vw - 24px));
+}
+
+.downloadModal .modal-content {
+  height: min(78vh, 820px);
+  /* Clip the full-bleed header + sand order bar to the modal's rounded
+     corners (tooltips render in a portal, so they still escape). */
+  overflow: hidden;
+}
+
+/* Branded download header: icon tile + title stacked over a helper subtitle. */
+.downloadModal .modal-header {
+  background-color: var(--cioos-white);
+  align-items: flex-start;
+}
+
+.downloadModal .modal-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.downloadModalTitleIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-teal-light);
+  color: var(--cioos-primary-700);
+}
+
+.downloadModalTitleText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.downloadModalTitleHeading {
+  font-family: var(--cioos-font-display);
+  font-weight: 700;
+  font-size: var(--cioos-font-size-lg);
+  line-height: 1.2;
+  color: var(--cioos-navy);
+}
+
+.downloadModalTitleSubtitle {
+  font-family: var(--cioos-font-body);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 400;
+  line-height: 1.25;
+  color: var(--cioos-ink-60);
+}
+
+/* Both modals host panels that manage their own scrolling; the body is the
+   positioned, non-padded frame they fill. */
+.filtersModal .modal-body,
+.downloadModal .modal-body {
+  position: relative;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+@media (max-height: 560px) {
+  .filtersModal .modal-content,
+  .downloadModal .modal-content {
+    height: calc(100vh - 32px);
+  }
+}
+
+/* ------------------------------------------------------------------
+ * Mobile: both dialogs take the whole viewport. A centred card with the
+ * map showing around it has nothing to offer at this width — the filters
+ * master/detail stacks into a single scrolling column (Panels/styles.css)
+ * and the download order bar squeezes the dataset list to nothing — and
+ * the close button in the header's top-right corner is the way out of
+ * either, as it is for the datasets surface beside them.
+ * ------------------------------------------------------------------ */
+@media (max-width: 700px) {
+  .filtersModal .filtersModalDialog,
+  .downloadModal .downloadModalDialog {
+    width: 100vw;
+    max-width: 100vw;
+    min-height: 100dvh;
+    margin: 0;
+  }
+
+  .filtersModal .modal-content,
+  .downloadModal .modal-content {
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  /* The header is the surface's title bar now, so it gets the room to be one
+     — and the download title's icon tile comes off, its 40px square being the
+     first thing worth spending on a heading that has to share its row with a
+     close button. */
+  .downloadModalTitleIcon {
+    display: none;
+  }
+
+  /* Clear of the home indicator on a notched phone: this body scrolls to its
+     own bottom edge, which is now the screen's. The filters modal is not here
+     because its own footer is the thing that reaches that edge, and pays the
+     inset itself (see Panels/styles.css). */
+  .downloadModal .modal-body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}

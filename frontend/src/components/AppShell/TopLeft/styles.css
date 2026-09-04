@@ -1,0 +1,228 @@
+/* Brand card: logo + two-line title lockup + minor actions on one row.
+   Sits at the top of the sidebar column, above the datasets card. */
+:root {
+  /* Fixed brand-card width, sized off the longest row in either language so EN
+     and FR render the same card. That row is the brand row, and it is the logo
+     that sets the number: the logo and the icon cluster sit in equal side
+     tracks (see .brandCardTop), so the French wordmark between them gets what
+     is left after the wider of the two is doubled. At the sizes the lockup is
+     drawn at now that is 127px a side around a 140px "EXPLORATEUR", which
+     needs 447px of card — this is that plus room for a fallback face, which
+     Quicksand failing to load would make ~8% wider. */
+  --cioos-brand-width: 490px;
+}
+
+.brandSearch {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.brandCard {
+  display: flex;
+  flex-direction: column;
+  /* Fixed width (capped to the viewport) rather than sized to content: the
+     card must not resize when the language changes, and it is wide enough for
+     the longer French labels — "Jeux de données", "EXPLORATEUR". */
+  width: min(var(--cioos-brand-width), calc(100vw - 24px));
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-lg);
+  /* No padding on the card itself: the brand row carries its own, and the
+     tab strip below is full-bleed, bleeding over the card border. */
+  padding: 0;
+  /* 3D depth (shared tokens; see theme.css). preserve-3d additionally lets the
+     inner lockup items lift off the card face. */
+  transform: var(--cioos-perspective);
+  transform-style: preserve-3d;
+  box-shadow: var(--cioos-shadow-3d);
+}
+
+/* Float the interactive lockup items well above the card face so the depth is
+   strongly layered, not a single flat plane. */
+.brandCard .brandCardTop > * {
+  transform: translateZ(28px);
+}
+
+/* Symmetric three-track grid so the title is centered in the card: the logo
+   and the minor-actions cluster occupy equal-width side columns, with the
+   wordmark auto-sized and centered between them.
+   The side tracks are minmax(0, 1fr) rather than a bare 1fr, which floors them
+   at min-content: with a nowrap wordmark in the middle that floor is what turns
+   a row a few pixels short of its content into items spilling out over the
+   card's own border. Given way they shrink instead, and the width above is set
+   so they never have to. */
+.brandCardTop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+/* The logo: nothing to do with it, so it carries no control affordance — its
+   mark simply pulses while the app is loading (see CioosLogo). Placement only
+   here; the lockup styles itself. */
+.brandLogo {
+  justify-self: start;
+}
+
+/* Two-line wordmark lockup, lines centered on each other: the secondary
+   word(s) (span — DATA / DE DONNÉES) small and widely tracked, the main word
+   (em — EXPLORER / EXPLORATEUR) large and light. */
+.brandTitle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Auto-sized centre column of the grid; the equal 1fr side columns keep it
+     centered in the card regardless of the language's word length. */
+  justify-self: center;
+  min-width: 0;
+  margin: 0;
+  /* Montserrat light to match the CIOOS wordmark — Sora (font-display) only
+     ships in 600/700 here and would synthesize a heavy fake-light. */
+  font-family: var(--cioos-font-body);
+  font-weight: 300;
+  color: var(--cioos-ink);
+  white-space: nowrap;
+}
+
+.brandTitle span {
+  font-size: var(--cioos-font-size-2xs);
+  line-height: 1.2;
+  letter-spacing: 0.28em;
+  /* optically recenter: tracking adds a trailing space after the last glyph */
+  margin-right: -0.28em;
+}
+
+.brandTitle em {
+  font-style: normal;
+  /* sized so EXPLORATEUR fits the slot the sidebar leaves for the title */
+  font-size: 17px;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  margin-right: -0.06em;
+  font-weight: 500;
+}
+
+/* Minor actions (intro / feedback / language): right-hand side column,
+   mirroring the logo column's width so the wordmark stays centered. */
+.brandMinorItems {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 4px;
+}
+
+.brandMinorItem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+.brandMinorItem:hover {
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink);
+  text-decoration: none;
+}
+
+.brandLanguage {
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------------
+ * Mobile: the card stops floating and becomes the app's header. It spans
+ * the screen, sits flush against the top edge with no map showing above
+ * or beside it, and drops the corners and side borders it no longer has
+ * room to justify — the only edge left to draw is the one along the
+ * bottom, where the map starts.
+ * ------------------------------------------------------------------ */
+@media (max-width: 700px) {
+  .brandCard {
+    width: 100%;
+    border-width: 0 0 1px;
+    border-radius: 0;
+    /* A full-bleed header is part of the page rather than a card lifted off
+       it, so the 3D tilt goes and the shadow flattens to the plain drop that
+       separates it from the map underneath. */
+    transform: none;
+    box-shadow: var(--cioos-shadow-float);
+  }
+
+  /* The tilt is gone, so there is no plane for the lockup to float above. */
+  .brandCard .brandCardTop > * {
+    transform: none;
+  }
+
+  /* Tighter than the floating card's: the row is as wide as the screen now,
+     so what padding it keeps is spent on the edges rather than on holding a
+     lockup together.
+
+     The tracks change too. `1fr auto 1fr` buys a wordmark centred in the card
+     by giving the side columns equal width — but the centre track is sized to
+     its own content, and the wordmark is nowrap, so its min-content is a floor
+     the row cannot go under: past that the logo and the icon cluster are
+     pushed out from under it and the three draw on top of each other. Here the
+     side columns take only what they need and the wordmark takes what is left,
+     which it can be asked to fit. */
+  .brandCardTop {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 6px 10px;
+  }
+
+  /* Stretched to the track rather than sized to its own text, and clipped by
+     it — the last-ditch guarantee that whatever the sizing below works out to,
+     the wordmark loses a letter rather than being drawn over its neighbours.
+     The lines stay centred inside it (align-items, from the base rule). */
+  .brandTitle {
+    justify-self: stretch;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .brandTitle em {
+    font-size: var(--cioos-font-size-md);
+  }
+
+  /* French is the language this row stops fitting in: a third longer on both
+     lines — EXPLORATEUR against EXPLORER, DE DONNÉES against DATA — and it is
+     the long one that has to share the row with the logo and three icon
+     buttons. It scales with the viewport instead of holding a fixed size, so
+     the narrowest phones shrink the wordmark rather than overlapping it, and
+     every width with room for the full size still gets it. */
+  .brandTitle[lang='fr'] em {
+    font-size: min(var(--cioos-font-size-md), 4vw);
+  }
+
+  .brandTitle[lang='fr'] span {
+    font-size: min(var(--cioos-font-size-2xs), 2.6vw);
+  }
+
+  /* Scaled with the viewport rather than held at the rung's mobile size, the
+     same way the wordmark beside it is: this row has no slack to give, and the
+     narrowest phones need to shrink the logo rather than push it under its
+     neighbours. On the lockup as a whole, so the mark comes down with the text
+     instead of being left oversized beside it. */
+  .brandLogo {
+    font-size: min(var(--cioos-font-size-xl), 5.5vw);
+  }
+
+  /* Touch targets for the three icon actions, the smallest things on the
+     header — and no larger, the row's width being spoken for. */
+  .brandMinorItem {
+    width: 32px;
+    height: 32px;
+  }
+}

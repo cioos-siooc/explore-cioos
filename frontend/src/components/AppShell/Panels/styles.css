@@ -1,0 +1,452 @@
+/* ------------------------------------------------------------------
+ * FiltersPanel — master (filter rows) / detail (open filter's options)
+ * over a footer stating what the filters add up to, hosted inside the
+ * filters modal.
+ * ------------------------------------------------------------------ */
+.filtersPanel {
+  display: flex;
+  flex-direction: column;
+  min-height: 340px;
+  height: 100%;
+}
+
+/* Positioned: the detail pane and the placeholder that stands in for it are
+   anchored to this region rather than to the modal body, so they stop at the
+   footer instead of running under it. */
+.filtersPanelBody {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.filtersPanelList {
+  flex: 0 0 280px;
+  width: 280px;
+  padding: 10px;
+  border-right: 1px solid var(--cioos-hairline);
+  overflow-y: auto;
+}
+
+/* The dialog covers the map at every width and takes the whole screen on a
+   phone, so the count is the only thing telling the user their filters did
+   anything. Reset sits with it: the two things that act on the whole set. */
+.filtersPanelFooter {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-surface-2);
+}
+
+.filtersPanelCount {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  font-weight: 700;
+  color: var(--cioos-ink);
+}
+
+/* A refetch keeps the previous number readable rather than blanking it — the
+   same dimming the top bar's counter uses. */
+.filtersPanelCount.updating {
+  opacity: 0.55;
+}
+
+.filtersPanelReset {
+  flex: 0 0 auto;
+  padding: 0 14px;
+  height: 34px;
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.filtersPanelReset:hover {
+  background-color: var(--cioos-teal-light);
+}
+
+.filtersPanelReset:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* Hint shown in the detail pane while no filter is open. */
+.filtersPanelPlaceholder {
+  position: absolute;
+  top: 12px;
+  left: 296px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  color: var(--cioos-ink-40);
+  font-size: var(--cioos-font-size-sm);
+  pointer-events: none;
+}
+
+/* Each filter is a full-width row inside the list column. */
+.filtersPanelList .filter {
+  position: static;
+  width: 100%;
+  pointer-events: all;
+}
+
+.filtersPanelList .filterHeader {
+  width: 100%;
+  justify-content: flex-start;
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius);
+  box-shadow: none;
+  padding: 6px 12px;
+}
+
+.filtersPanelList .filterHeader .badgeTitle {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.filtersPanelList .filterHeader:hover {
+  background-color: var(--cioos-surface-2);
+  border-color: var(--cioos-hairline);
+}
+
+/* A row that can't open stays exactly as it rests (see .filterHeader.disabled
+   in the Filter stylesheet — its hover restates the white of the pills over
+   the map, which is not this column's resting colour). */
+.filtersPanelList .filterHeader.disabled:hover {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+/* Has a selection: a teal ring, readable at a glance down the column. */
+.filtersPanelList .filterHeader.active {
+  background-color: var(--cioos-teal-light);
+  border-color: var(--cioos-primary);
+}
+
+/* Is the one being edited: a filled row with a bar on the leading edge, so the
+   pane on the right is unambiguously attached to a row on the left. Distinct
+   from .active because a row can be either, both, or neither — the bar is the
+   part that only ever means "you are here". */
+.filtersPanelList .filterHeader.open {
+  background-color: var(--cioos-surface-2);
+  border-color: var(--cioos-primary);
+  box-shadow: inset 3px 0 0 0 var(--cioos-primary);
+  font-weight: 700;
+}
+
+.filtersPanelList .filterHeader.open.active {
+  background-color: var(--cioos-teal-light);
+}
+
+.filtersPanelList .filterHeader.open:hover {
+  background-color: var(--cioos-teal-light);
+}
+
+/* The open filter's options fill the detail pane to the right of the list
+   (anchored to .filtersPanelBody, the nearest positioned ancestor — the list
+   column is static so it cannot clip the pane).
+
+   The pane is a column: search on top, options taking whatever is left, and
+   the actions pinned under them. The pane itself never scrolls in either
+   direction — the options do, vertically — so the actions stay reachable
+   however long the list is, and nothing can push the modal sideways. */
+.filtersPanel .filterOptions {
+  position: absolute;
+  top: 12px;
+  left: 296px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: none;
+  max-height: none;
+  overflow: hidden;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 4px 8px 12px;
+}
+
+/* What the filter does, at the top of its section above the search box and
+   options — the pane's own intro line. */
+.filtersPanel .filterOptionsCaption {
+  flex: 0 0 auto;
+  margin: 0 0 8px;
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.35;
+}
+
+.filtersPanel .filterOptionsBody {
+  flex: 1 1 auto;
+  /* min-*: 0 lets a flex item shrink below its content size — without it the
+     list refuses to shrink and overflows the pane instead of scrolling. */
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.filtersPanel .filterOptionsActions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+/* The filter bodies each brought their own scroll box and minimum width, sized
+   for the old free-floating dropdown. Inside the pane that meant a second
+   scrollbar, a list capped well short of the space available, and — with the
+   negative margin below — a horizontal scrollbar on every filter. The pane now
+   owns the scrolling and the width; the bodies just fill it. */
+.filtersPanel .filterOptionsBody > *,
+.filtersPanel .multiCheckboxFilter {
+  max-height: none;
+  min-width: 0;
+  max-width: none;
+  overflow: visible;
+  margin-right: 0;
+}
+
+/* Long names (dataset titles above all) wrap instead of widening the pane.
+   Qualified by .filterOptionsBody purely to outrank the single-line row rules
+   these bodies ship (.multiCheckboxFilter .optionButton and friends, same
+   specificity as a bare .filtersPanel prefix and loaded after it) — those set a
+   30px line box for one-line rows, which both breaks wrapped labels and leaves
+   the checkbox sitting ~6px above the text it belongs to. */
+.filtersPanel .filterOptionsBody .optionButton {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.35;
+  padding: 6px 8px;
+  margin: 0 0 4px;
+  min-width: 0;
+}
+
+/* The box sits on the first line of the label, centred on it. The icons are
+   1em tall and the line box is 1.35em, so half the difference is the offset —
+   in em, because a fixed pixel nudge stops being centred the moment the label
+   or the icon changes size. align-items alone can't do this: it would centre
+   the box against the whole (possibly three-line) label. */
+.filtersPanel .filterOptionsBody .optionButton > svg {
+  flex: 0 0 auto;
+  margin-top: 0.175em;
+}
+
+.filtersPanel .filterOptionsBody .optionName {
+  margin-left: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Was pinned to the pane's bottom-right, where it now lands on top of the
+   actions row it belongs in. */
+.filtersPanel .filterInfoButton {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 0 8px;
+  height: 30px;
+}
+
+/* Sections stay compact inside the modal. */
+.filtersPanel .filterSection + .filterSection {
+  margin-top: 6px;
+  border-top: 1px solid var(--cioos-hairline);
+  padding-top: 6px;
+}
+
+.filtersPanel .filterSectionHeading {
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cioos-ink-60);
+  padding: 6px 10px 4px;
+}
+
+.filtersPanel .filterSectionItems {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* ------------------------------------------------------------------
+ * DatasetsPanel (sidebar body) / DownloadPanel (download modal).
+ * ------------------------------------------------------------------ */
+.datasetsPanel {
+  position: relative; /* anchors the refetch scrim (Loading) */
+  height: 100%;
+  min-height: 300px;
+  /* Each of the two views below manages its own scrolling — the list scrolls
+     its cards under a fixed toolbar and pager, a dataset page scrolls its body
+     under a pinned title. So the panel itself must never scroll: without this,
+     the enter animation's overflow leaks up to .sidebarBody and the column
+     shows a second scrollbar beside the one that actually moves the content. */
+  overflow: hidden;
+}
+
+/* The panel's two surfaces — the list, and a single dataset's page. They are
+   different places, so each enters from the direction it came: the page from
+   the right (a drill-in), the list back in from the left. */
+.datasetsPanelView {
+  height: 100%;
+  min-height: 0;
+}
+
+.datasetsPanelDetail {
+  /* Tinted, so a dataset page never reads as another view of the list: the
+     page's own title block and sections sit as white cards on this wash. */
+  background-color: var(--cioos-sand, var(--cioos-surface-2));
+  /* Duration spelled out: --cioos-transition-* carries its own timing function,
+     and a second one after it invalidates the shorthand. */
+  animation: datasetsDetailIn 0.22s ease-out;
+}
+
+.datasetsPanelList {
+  animation: datasetsListIn 0.22s ease-out;
+}
+
+@keyframes datasetsDetailIn {
+  from {
+    transform: translateX(14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes datasetsListIn {
+  from {
+    transform: translateX(-14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .datasetsPanelDetail,
+  .datasetsPanelList {
+    animation: none;
+  }
+}
+
+.downloadPanel {
+  height: 100%;
+}
+
+.downloadPanel:not(.downloadPanelEmpty) {
+  display: flex;
+  flex-direction: column;
+}
+
+.downloadPanelEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--cioos-ink-60);
+}
+
+/* ------------------------------------------------------------------
+ * Mobile: the filters master and detail become two screens, one filter
+ * at a time, and everything in them becomes a touch target.
+ * ------------------------------------------------------------------ */
+@media (max-width: 700px) {
+  /* One column: the list is the whole surface, and so is the open filter. */
+  .filtersPanelList {
+    flex: 1 1 auto;
+    width: 100%;
+    padding: 8px 10px;
+    border-right: none;
+  }
+
+  /* The open filter takes the whole surface instead of expanding under its own
+     row — a drill-in, the shape the datasets sidebar already uses for a dataset
+     page, with the header's breadcrumb as the way back.
+
+     Expanding inline cannot be made to work here. Left unbounded (which is what
+     a static position and visible overflow amount to) a single 47-option filter
+     came to 2900px in a 760px window, pushing the search field, the Select all /
+     Reset actions and every other row off the end of the surface. Bounded, it is
+     routinely taller than the room left below its row, so it has to be scrolled
+     into view — and cannot be, reliably: the filters whose options arrive from
+     the network grow after the scroll has been computed, leaving the actions row
+     under the fold. Filling the surface has no such arithmetic in it, and hands
+     the long option lists every pixel of it. */
+  .filtersPanel .filterOptions {
+    inset: 0;
+    padding: 10px 12px 12px;
+  }
+
+  .filtersPanelPlaceholder {
+    display: none;
+  }
+
+  /* Touch targets. 44px is the floor on a phone and every row here was sized
+     for a pointer — the option rows worst of all, at 34px. */
+  .filtersPanelList .filterHeader {
+    min-height: 48px;
+    padding: 6px 10px;
+  }
+
+  .filtersPanel .filterOptionsBody .optionButton {
+    min-height: 44px;
+    padding: 10px 8px;
+    margin: 0 0 2px;
+  }
+
+  /* The pane covers the list, so its options are the surface's own scroll. */
+  .filtersPanel .filterOptionsBody {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Clear of the home indicator, and roomy enough to be the reset target for
+     the whole surface rather than a caption-sized link. */
+  .filtersPanelFooter {
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .filtersPanelReset {
+    min-height: 44px;
+    padding: 0 18px;
+  }
+
+  /* A status line, not a heading — and at the smaller step it shares the row
+     with the button rather than wrapping under it in the longer locale. */
+  .filtersPanelCount {
+    font-size: var(--cioos-font-size-sm);
+  }
+}

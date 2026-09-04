@@ -10,5 +10,18 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-download-scheduler = { path = "download_scheduler" }
-harvester = { path = "harvester" }
+download-scheduler = { path = "download_scheduler", editable = true }
+harvester = { path = "harvester", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-mock>=3.15.1",
+]
+
+[tool.pytest.ini_options]
+# 'integration' tests need a running stack; they self-skip when none is
+# reachable. Deselect them entirely with: -m "not integration"
+markers = [
+    "integration: requires a live database/stack",
+]

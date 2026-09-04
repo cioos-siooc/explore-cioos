@@ -12,6 +12,7 @@ cde_download*
 venv
 *.rdb
 *.env
+docker-compose.override.yaml
 .ipynb_checkpoints
 *.ipynb
 harvester_cache
@@ -30,5 +31,14 @@ out1
 log
 
 most_common_queries
-harvester_logs
+
+nginx/logs/
+nginx/logrotate_state/
 nginx/logs/*.log
+harvester_logs
+# The downloaded OBIS occurrence caches. Anchored with a leading slash: a bare
+# `obis/` matches a directory of that name at ANY depth, which also swallowed
+# the source package at harvester/cde_harvester/sources/obis/ and kept
+# discovery.py out of the repo while its tests were committed.
+/obis/
+/harvester/obis/

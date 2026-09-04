@@ -1,0 +1,152 @@
+/* Bootstrap-compatible modal layout, token-styled. Class names intentionally
+   match Bootstrap's so existing per-component overrides keep working. */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--cioos-z-modal, 1055);
+  display: block;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background-color: rgba(21, 47, 55, 0.45); /* navy-tinted backdrop */
+}
+
+body.cioos-modal-open {
+  overflow: hidden;
+}
+
+/* All dialogs are vertically centered by default; tall content still scrolls
+   because .modal keeps overflow-y auto. .modal-dialog-centered stays valid
+   as a (now redundant) Bootstrap-compat alias. */
+.modal-dialog {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: auto;
+  margin: var(--cioos-space-lg, 16px) auto;
+  max-width: 500px;
+  min-height: calc(100% - 2 * var(--cioos-space-lg, 16px));
+  pointer-events: none;
+}
+
+.modal-lg {
+  max-width: 800px;
+}
+
+.modal-xl {
+  max-width: min(1140px, calc(100vw - 32px));
+}
+
+.modal-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: calc(100vh - 2 * var(--cioos-space-lg, 16px));
+  pointer-events: auto;
+  background-color: var(--cioos-white, #fff);
+  border-radius: var(--cioos-radius-lg, 16px);
+  box-shadow: var(--cioos-shadow-float, 0 8px 30px rgba(21, 47, 55, 0.25));
+  outline: 0;
+}
+
+.modal-dialog-scrollable .modal-content {
+  overflow: hidden;
+}
+
+.modal-dialog-scrollable .modal-body {
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--cioos-space-md, 12px) var(--cioos-space-lg, 16px);
+  border-bottom: 1px solid var(--cioos-hairline, #dce8e5);
+}
+
+.modal-title {
+  font-family: var(--cioos-font-display, sans-serif);
+  font-size: var(--cioos-font-size-lg, 18px);
+  line-height: 1.4;
+}
+
+.modal-body {
+  position: relative;
+  flex: 1 1 auto;
+  padding: var(--cioos-space-lg, 16px);
+}
+
+.btn-close {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--cioos-radius-sm, 6px);
+  background: transparent;
+  color: var(--cioos-ink, #152f37);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.btn-close::before {
+  content: '\00d7';
+}
+
+.btn-close:hover {
+  background-color: var(--cioos-surface-2, #eef6f4);
+}
+
+/* fullscreen variants */
+.modal-fullscreen {
+  width: 100vw;
+  max-width: none;
+  height: 100%;
+  margin: 0;
+}
+
+.modal-fullscreen .modal-content {
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+}
+
+/* Mobile: the close button is the way out of every full-screen dialog (see the
+   shell modals' stylesheet and the datasets surface), so it is sized as a real
+   touch target rather than as a corner glyph. */
+@media (max-width: 700px) {
+  .btn-close {
+    width: 44px;
+    height: 44px;
+    margin-right: -8px;
+    font-size: 30px;
+  }
+
+  .modal-header {
+    /* The title and the button both grew; the row gives back the padding it
+       no longer needs to look like a header. */
+    padding: var(--cioos-space-sm, 8px) var(--cioos-space-md, 12px);
+  }
+}
+
+/* 992px, the tablet rung of the shared scale (theme.css). The .98 this carried
+   was Bootstrap's, which built its max-widths off `min-width - 0.02` to avoid
+   overlapping its own min-width queries; nothing here has a matching
+   min-width: 992px rule for it to avoid. */
+@media (max-width: 992px) {
+  .modal-fullscreen-lg-down {
+    width: 100vw;
+    max-width: none;
+    height: 100%;
+    margin: 0;
+  }
+
+  .modal-fullscreen-lg-down .modal-content {
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+  }
+}

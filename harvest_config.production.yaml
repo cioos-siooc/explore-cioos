@@ -1,28 +1,71 @@
 # list of erddap URLs. Should end in /erddap
 erddap_urls:
+  - https://erddap.amundsenscience.com/erddap/
   - https://data.cioospacific.ca/erddap
   - https://seagull-erddap.glos.org/erddap
-  - https://erddap.amundsenscience.com/erddap
   - https://erddap.ogsl.ca/erddap
   - https://www.smartatlantic.ca/erddap
   - https://catalogue.hakai.org/erddap
+  - https://cioosatlantic.ca/erddap
   - https://dap.oceannetworks.ca/erddap
   - https://data.ceotr.ca/erddap
-  - https://cioosatlantic.ca/erddap
+  - https://cnodc-cndoc.azure.cloud-nuage.dfo-mpo.gc.ca/erddap/
 
-# set to true to test with caching. Not available in production docker compose file
+# set to true to test with caching. Turn to False for production.
 # defaults to false
-cache: false
+cache: False
 
 # defaults to 'harvest'
 folder:
 
 # use to test select datasets, eg: dataset_one,dataset_two
 dataset_ids:
-# defaults to false
-log_time: true
+#   - amundsen798,amundsen796,amundsen11975_aquadopp,amundsen13109_compact_lw,amundsen13107_isus,SMA_halifax,SMA_MAMKA_Buoy
 
-# Directory to save log files (optional)
-# Use absolute path for Docker: /app/harvester/logs
-# Use relative path for local: ../harvester_logs
-log_dir: ../harvester_logs
+# defaults to false
+log_time:
+
+#defaults to false
+flush_redis: True
+
+# defaults to false. Incremental now fully replaces routine full reloads:
+# it is delta-proportional, prunes datasets that disappeared upstream
+# (prune_stale_datasets), and never TRUNCATEs — so the site keeps serving
+# during loads. A full reload (False) TRUNCATEs every table and holds an
+# ACCESS EXCLUSIVE lock for the whole rebuild, taking the site down; keep it
+# for disaster recovery only.
+incremental: True
+
+# Discover OBIS datasets from the OBIS API: OBIS Canada + OTN-OBIS + anything
+# with occurrences inside the Canadian EEZ. Discovery is all-or-nothing — if any
+# query fails the OBIS harvest fails, so the db-loader never runs and nothing is
+# pruned. min_datasets is the backstop against a short list.
+obis_discovery:
+  enabled: true
+  nodes:
+    - 7dfb2d90-9317-434d-8d4e-64adf324579a   # OBIS Canada
+    - 68f83ea7-69a7-44fd-be77-3c3afd6f3cf8   # OTN-OBIS
+  geometry: eez
+  areas: []
+  include: []
+  exclude:
+    # iNaturalist Research-grade Observations Marine Subset (OBIS UK).
+    # 11.5M global occurrences: get_occurrences bounds the parquet read only by
+    # world lat/lon and materialises every row before the EEZ filter runs, so it
+    # peaks at ~18GB RSS and OOM-kills the 6GB prefect_worker. Newly reachable
+    # via geometry: eez. Drop this entry once the geo filter is pushed into the
+    # DuckDB query.
+    - eaea291a-1e1d-4382-b86f-ac3cc15b8d5a
+  min_datasets: 700
+
+# Rollback lever: comment out obis_discovery and uncomment this to go back to
+# the frozen static list.
+# obis_datasets_file: ./Obis_Datasets.json
+
+# Today's effective defaults, spelled out now that this block is actually read
+# on the Prefect path (it used to be silently ignored there).
+obis_geo_filter:
+  mode: canada
+  exempt_node_ids:
+    - 7dfb2d90-9317-434d-8d4e-64adf324579a   # OBIS Canada
+    - 68f83ea7-69a7-44fd-be77-3c3afd6f3cf8   # OTN-OBIS

@@ -2,245 +2,322 @@ import argparse
 import logging
 import os
 import queue
+import subprocess
 import sys
 import threading
 import time
-from datetime import datetime
+import uuid
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
-import sentry_sdk
-import yaml
-from cde_harvester.ckan.create_ckan_erddap_link import (
+from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     get_ckan_records,
     unescape_ascii,
     unescape_ascii_list,
 )
-from cde_harvester.harvest_erddap import harvest_erddap
+from cde_harvester.core.config import load_config, resolve_obis_config
+from cde_harvester.sources import resolve_source
+from cde_harvester.core.observability import (
+    cleanup_old_logs,
+    init_sentry,
+    setup_logging,
+)
+from cde_harvester.core.issues import report_issues
+from cde_harvester.core.schemas import HarvestAttemptSchema
+from cde_harvester.sources.erddap.harvester import harvest_erddap
+from cde_harvester.sources.obis.discovery import ObisDiscoveryConfig
+from cde_harvester.sources.obis.geo_filter import DEFAULT_EXEMPT_NODE_IDS, ObisGeoFilter
+from cde_harvester.sources.obis.harvester import harvest_obis
 from cde_harvester.utils import cf_standard_names, supported_standard_names
 from dotenv import load_dotenv
 from sentry_sdk.crons import monitor
-from sentry_sdk.integrations.logging import LoggingIntegration
+from prefect import flow, get_run_logger, task
 
 load_dotenv()
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logger = logging.getLogger()
 
-sentry_sdk.init(
-    dsn=os.environ.get("SENTRY_DSN"),
-    integrations=[
-        LoggingIntegration(
-            level=logging.INFO,  # Capture info and above as breadcrumbs
-            event_level=logging.WARNING,  # Send records as events
-        ),
-    ],
-    environment=os.environ.get("ENVIRONMENT", "development"),
-)
+init_sentry()
 
 # Ignored standard names that are not EOVs, mostly coordinate variables
 IGNORED_STANDARD_NAMES= ["latitude", "longitude", "time", "depth", "","altitude","sea_water_pressure","sea_water_pressure_due_to_sea_water"]
 
-def cleanup_old_logs(log_dir, days=30):
-    """Remove log files older than specified days."""
-    if not os.path.exists(log_dir):
+def _resolve_git_sha():
+    """Best-effort git SHA for the harvester source. Returns None if unavailable."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            capture_output=True, text=True, timeout=2,
+        )
+        if out.returncode == 0:
+            return out.stdout.strip() or None
+    except (FileNotFoundError, subprocess.SubprocessError):
+        pass
+    return os.environ.get("GIT_SHA") or None
+
+
+# Order statuses worst-first so failures sort to the top of the artifact table.
+_STATUS_SORT = {"error": 0, "skipped": 1, "success": 2}
+
+
+def _publish_status_artifact(df_attempts, run_id, run_status, logger):
+    """Publish the per-dataset harvest status as a Prefect table artifact (keyed
+    'harvest-dataset-status') so it shows in the run's Artifacts tab. No-op
+    (debug-logged) outside a flow/task run context — never fails the run."""
+    try:
+        from prefect.artifacts import create_table_artifact
+    except Exception:
+        return
+    if df_attempts is None or df_attempts.empty:
         return
 
-    cutoff_time = time.time() - (days * 86400)  # 86400 seconds in a day
-    removed_count = 0
+    # Readable subset; drop run_id (constant), query_urls (long) and attempted_at.
+    cols = ["dataset_id", "source", "status", "reason_code", "duration_ms",
+            "error_message", "erddap_url"]
+    df = df_attempts[[c for c in cols if c in df_attempts.columns]].copy()
+    if "status" in df.columns:
+        df = (
+            df.assign(_o=df["status"].map(lambda s: _STATUS_SORT.get(s, 3)))
+            .sort_values(["_o", "dataset_id"])
+            .drop(columns="_o")
+        )
+    # JSON-safe rows: NaN/NaT -> None.
+    rows = [
+        {k: (None if pd.isna(v) else v) for k, v in r.items()}
+        for r in df.to_dict("records")
+    ]
+    counts = (
+        df["status"].value_counts().to_dict() if "status" in df.columns else {}
+    )
+    summary = ", ".join(f"{k}={v}" for k, v in sorted(counts.items())) or "no attempts"
+    try:
+        create_table_artifact(
+            key="harvest-dataset-status",
+            table=rows,
+            description=f"Per-dataset harvest status (run {run_id}, {run_status}): {summary}",
+        )
+        logger.info("Published dataset-status Prefect artifact (%d rows): %s", len(rows), summary)
+    except Exception as e:
+        logger.debug("Could not publish dataset-status artifact: %s", e)
 
-    for filename in os.listdir(log_dir):
-        if filename.startswith("harvest_") and filename.endswith(".log"):
-            filepath = os.path.join(log_dir, filename)
-            if os.path.isfile(filepath) and os.path.getmtime(filepath) < cutoff_time:
-                try:
-                    os.remove(filepath)
-                    removed_count += 1
-                    logger.info(f"Removed old log file: {filename}")
-                except OSError as e:
-                    logger.warning(f"Warning: Failed to remove old log file {filename}: {e}")
 
-    if removed_count > 0:
-        logger.info(f"Cleaned up {removed_count} log file(s) older than {days} days")
+def _write_run_audit_csvs(folder, run_id, started_at, finished_at, git_sha,
+                          status, error_message, attempts_frames, logger,
+                          prefect_flow_run_id=None, scope="full",
+                          triggered_source=None, triggered_by=None):
+    """Write harvest_runs.csv and harvest_attempts.csv into the harvest folder.
 
+    Always called at the end of a run (success or failure) so the
+    harvest-dashboard service has a consistent audit trail per-run.
+    """
+    if not os.path.exists(folder):
+        os.makedirs(folder, exist_ok=True)
 
-def setup_logging(log_time, log_level, log_dir=None):
-    # Clean up old log files before setting up logging
-    if log_dir:
-        cleanup_old_logs(log_dir, days=30)
+    runs_file = f"{folder}/harvest_runs.csv"
+    attempts_file = f"{folder}/harvest_attempts.csv"
 
-    # setup logging
-    logger.setLevel(logging.getLevelName(log_level.upper()))
-    logger.handlers.clear()
+    run_row = pd.DataFrame([{
+        "run_id": run_id,
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "git_sha": git_sha,
+        "status": status,
+        "error_message": error_message,
+        "prefect_flow_run_id": prefect_flow_run_id,
+        "scope": scope,
+        "triggered_source": triggered_source,
+        "triggered_by": triggered_by,
+    }])
+    run_row.to_csv(runs_file, index=False)
 
-    # Define log format
-    log_format = (
-        ("%(asctime)s - " if log_time else "")
-        + "%(levelname)-8s - %(name)s : %(message)s"
+    attempt_columns = list(HarvestAttemptSchema.to_schema().columns.keys())
+    frames = [f for f in attempts_frames if f is not None and not f.empty]
+    if frames:
+        df_attempts = pd.concat(frames, ignore_index=True)
+    else:
+        df_attempts = pd.DataFrame(columns=attempt_columns)
+    df_attempts.to_csv(attempts_file, index=False)
+
+    logger.info(
+        "Wrote run audit: %s (status=%s) + %s (%d attempts)",
+        runs_file, status, attempts_file, len(df_attempts),
     )
 
-    # Add console handler
-    c_handler = logging.StreamHandler()
-    c_handler.setLevel(logging.getLevelName(log_level.upper()))
-    c_format = logging.Formatter(log_format)
-    c_handler.setFormatter(c_format)
-    logger.addHandler(c_handler)
+    # Surface the same per-dataset statuses in the Prefect UI as a table artifact.
+    _publish_status_artifact(df_attempts, run_id, status, logger)
 
-    # Add file handler with timestamped filename if log directory is specified
-    if log_dir:
-        os.makedirs(log_dir, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = os.path.join(log_dir, f"harvest_{timestamp}.log")
-
-        f_handler = logging.FileHandler(log_file)
-        f_handler.setLevel(logging.getLevelName(log_level.upper()))
-        f_format = logging.Formatter(
-            "%(asctime)s - %(levelname)-8s - %(name)s : %(message)s"
-        )
-        f_handler.setFormatter(f_format)
-        logger.addHandler(f_handler)
-        logger.info(f"Logging to file: {log_file}")
-
-    return logger
+    # Collapse the run's errors into one report per (server, distinct error) and
+    # hand them to Sentry, which de-dupes on the fingerprint so only a problem we
+    # haven't seen before raises an alert. Runs here because this is the one seam
+    # every exit path goes through, with all attempts already concatenated.
+    report_issues("harvester", df_attempts, logger)
 
 
-@monitor(monitor_slug="main-harvester")
-def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
-    erddap_urls = erddap_urls.split(",")
-    limit_dataset_ids = None
-    if dataset_ids:
-        limit_dataset_ids = dataset_ids.split(",")
+def _run_logger():
+    """Prefect run logger when inside a run, else the module logger.
 
-    result = []
+    `main` is a plain function now (no longer a @flow), so it can be called
+    outside a flow context (the bare CLI wraps it in an ad-hoc flow, but the
+    fallback keeps it safe regardless).
+    """
+    try:
+        return get_run_logger()
+    except Exception:
+        return logger
 
-    q = queue.Queue()
 
-    def worker():
-        while True:
-            (erddap_url, result, limit_dataset_ids, cache_requests) = q.get()
-            harvest_erddap(erddap_url, result, limit_dataset_ids, cache_requests)
-            time.sleep(1)
-            q.task_done()
-
-    # Turn-on the worker thread.
-    for x in range(max_workers):
-        threading.Thread(target=worker, daemon=True).start()
-
-    # Send thirty task requests to the worker.
-
-    for erddap_url in erddap_urls:
-        logger.info("Adding to queue %s", erddap_url)
-        q.put((erddap_url, result, limit_dataset_ids, cache_requests))
-
-    q.join()
-    logger.info("All work completed")
-
-    profiles = pd.DataFrame()
-    datasets = pd.DataFrame()
-    variables = pd.DataFrame()
-    skipped_datasets = pd.DataFrame()
-
-    for [profile, dataset, variable, skipped_dataset] in result:
-        profiles = pd.concat([profiles, profile])
-        datasets = pd.concat([datasets, dataset])
-        variables = pd.concat([variables, variable])
-        skipped_datasets = pd.concat([skipped_datasets, skipped_dataset])
-
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-
+@task(task_run_name="merge-and-write-csvs")
+def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skipped,
+                         obis_datasets, obis_cells, obis_skipped, df_ckan,
+                         erddap_verified=None, erddap_trajectory_days=None,
+                         erddap_trajectory_points=None):
+    """Join CKAN metadata, merge all sources, and write the output CSVs (@task)."""
+    logger = _run_logger()
     datasets_file = f"{folder}/datasets.csv"
     profiles_file = f"{folder}/profiles.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
     ckan_file = f"{folder}/ckan.csv"
+    obis_cells_file = f"{folder}/obis_cells.csv"
+    trajectory_days_file = f"{folder}/trajectory_days.csv"
+    trajectory_points_file = f"{folder}/trajectory_points.csv"
+    verified_file = f"{folder}/verified.csv"
 
-    if datasets.empty:
-        logging.info("No datasets harvested")
-        sys.exit(1)
+    if erddap_trajectory_days is None:
+        erddap_trajectory_days = pd.DataFrame()
+    if erddap_trajectory_points is None:
+        erddap_trajectory_points = pd.DataFrame()
 
-    # see what standard names arent covered by our EOVs:
-    standard_names_harvested = (
-        variables.query("not standard_name.isnull()")["standard_name"].unique().tolist()
-    )
-
-    # this gets a list of all the standard names
-
-    standard_names_not_harvested = [
-        x
-        for x in standard_names_harvested
-        if (x not in supported_standard_names + IGNORED_STANDARD_NAMES) and (not x.startswith("platform_"))
-    ]
-
-    standard_names_not_harvested_that_are_real = [
-        x for x in standard_names_not_harvested if x in cf_standard_names
-    ]
-
-    if standard_names_not_harvested_that_are_real:
-        logger.warning(
-            "Found these standard_names that CDE doesnt support yet: %s",
-            standard_names_not_harvested_that_are_real,
+    # --- ERDDAP-specific post-processing ---
+    if not erddap_datasets.empty:
+        erddap_datasets = (
+            erddap_datasets.set_index(["erddap_url", "dataset_id"])
+            .join(df_ckan.set_index(["erddap_url", "dataset_id"]), how="left")
+            .reset_index()
         )
 
-    # query CKAN national for more metadata related to the ERDDAP datsets we have so far
-    logger.info("Gathering CKAN data")
-    df_ckan = get_ckan_records(datasets["dataset_id"].to_list(), cache=cache_requests)
-    datasets = (
-        datasets.set_index(["erddap_url", "dataset_id"])
-        .join(df_ckan.set_index(["erddap_url", "dataset_id"]), how="left")
-        .reset_index()
+        logger.info("Cleaning up ERDDAP data")
+        erddap_datasets = erddap_datasets.replace(np.nan, None)
+
+        erddap_datasets["title"] = erddap_datasets["title"].apply(lambda x: unescape_ascii(x))
+
+        erddap_datasets["ckan_title"].fillna(erddap_datasets["title"], inplace=True)
+
+        # prioritize with organizations from CKAN and then pull ERDDAP if needed
+        erddap_datasets["organizations"] = erddap_datasets.apply(
+            lambda x: x["ckan_organizations"] or unescape_ascii_list(x["organizations"]),
+            axis=1,
+        )
+        del erddap_datasets["title"]
+        del erddap_datasets["ckan_organizations"]
+
+        erddap_datasets.rename(
+            columns={
+                "ckan_title": "title",
+                "ckan_title_fr": "title_fr",
+            },
+            inplace=True,
+        )
+
+        erddap_datasets = erddap_datasets.replace(r"\n", " ", regex=True)
+
+        erddap_profiles["depth_min"] = erddap_profiles["depth_min"].fillna(0)
+        erddap_profiles["depth_max"] = erddap_profiles["depth_max"].fillna(0)
+        erddap_profiles.drop(columns=['altitutde_min', 'altitutde_max'], inplace=True, errors='ignore')
+
+    # --- Merge all sources ---
+    datasets = pd.concat([erddap_datasets, obis_datasets], ignore_index=True)
+    skipped_datasets = pd.concat([erddap_skipped, obis_skipped], ignore_index=True)
+
+    # Safety net: title is a required column on cde.datasets (checked by
+    # validate_loaded_data()), but upstream metadata occasionally lacks one — an
+    # ERDDAP dataset with no title attr + no matching CKAN record, or an OBIS
+    # dataset whose metadata fetch returned an empty dict. Without this, the WHOLE
+    # harvest rolls back at the final validation step. Fall back to dataset_id
+    # (always populated) and log a WARNING so the source data quality issue is
+    # visible without blocking ingest.
+    _missing_title = datasets["title"].isna() | (
+        datasets["title"].astype(str).str.strip() == ""
+    )
+    if _missing_title.any():
+        offenders = datasets.loc[_missing_title, ["erddap_url", "dataset_id"]]
+        logger.warning(
+            "%d dataset(s) missing title from source metadata; falling back to "
+            "dataset_id. Offenders: %s",
+            len(offenders),
+            offenders.to_dict(orient="records"),
+        )
+        datasets.loc[_missing_title, "title"] = datasets.loc[
+            _missing_title, "dataset_id"
+        ]
+
+    # ERDDAP rows don't have obis_nodes — fill with empty lists so the loader's
+    # ast.literal_eval doesn't choke on NaN, and so the column exists when only
+    # the ERDDAP source is being harvested.
+    if "obis_nodes" not in datasets.columns:
+        datasets["obis_nodes"] = [[] for _ in range(len(datasets))]
+    else:
+        datasets["obis_nodes"] = datasets["obis_nodes"].apply(
+            lambda x: x if isinstance(x, list) else []
+        )
+
+    logger.info(
+        "Adding %s datasets, %s profiles, %s obis_cells, %s trajectory_days, "
+        "%s trajectory_points",
+        len(datasets), len(erddap_profiles), len(obis_cells),
+        len(erddap_trajectory_days), len(erddap_trajectory_points),
     )
 
-    logger.info("Cleaning up data")
-    datasets = datasets.replace(np.nan, None)
-
-    # datasets["summary"] = datasets["summary"].apply(lambda x: unescape_ascii(x))
-    datasets["title"] = datasets["title"].apply(lambda x: unescape_ascii(x))
-
-    datasets["ckan_title"].fillna(datasets["title"], inplace=True)
-    # datasets["ckan_summary"].fillna(datasets["summary"], inplace=True)
-
-    # prioritize with organizations from CKAN and then pull ERDDAP if needed
-    datasets["organizations"] = datasets.apply(
-        lambda x: x["ckan_organizations"] or unescape_ascii_list(x["organizations"]),
-        axis=1,
-    )
-    del datasets["title"]
-    # del datasets["summary"]
-    del datasets["ckan_organizations"]
-
-    datasets.rename(
-        columns={
-            "ckan_title": "title",
-            "ckan_title_fr": "title_fr",
-            # "ckan_summary": "summary",
-            # "ckan_summary_fr": "summary_fr",
-        },
-        inplace=True,
-    )
-
-    datasets = datasets.replace(r"\n", " ", regex=True)
-
-    profiles["depth_min"] = profiles["depth_min"].fillna(0)
-    profiles["depth_max"] = profiles["depth_max"].fillna(0)
-    profiles.drop(columns=['altitutde_min', 'altitutde_max'], inplace=True, errors='ignore')
-
-    logger.info("Adding %s datasets and %s profiles", len(datasets), len(profiles))
-
-    # drop duplicates caused by EDDTableFromErddap redirects
+    # Write output CSVs
     datasets.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
         datasets_file, index=False
     )
-    profiles.drop_duplicates().to_csv(profiles_file, index=False)
-    df_ckan.to_csv(ckan_file, index=False)
+    # Serialize the per-feature EOV list to its Python repr up front: the CSV
+    # round-trip would do it anyway (the loader reads it back with
+    # ast.literal_eval, as it does for the dataset arrays), and lists are
+    # unhashable, so drop_duplicates() below cannot see the column otherwise.
+    if "eovs" in erddap_profiles.columns:
+        erddap_profiles["eovs"] = erddap_profiles["eovs"].apply(
+            lambda x: repr(list(x)) if isinstance(x, (list, tuple)) else x
+        )
+    erddap_profiles.drop_duplicates().to_csv(profiles_file, index=False)
+    if not df_ckan.empty:
+        df_ckan.to_csv(ckan_file, index=False)
     skipped_datasets.drop_duplicates().to_csv(skipped_datasets_file, index=False)
 
-    logger.info(
-        "Wrote %s %s %s %s",
-        datasets_file,
-        profiles_file,
-        ckan_file,
-        skipped_datasets_file,
-    )
+    if not obis_cells.empty:
+        obis_cells.to_csv(obis_cells_file, index=False)
+
+    if not erddap_trajectory_days.empty:
+        erddap_trajectory_days.to_csv(trajectory_days_file, index=False)
+
+    if not erddap_trajectory_points.empty:
+        erddap_trajectory_points.to_csv(trajectory_points_file, index=False)
+
+    # Datasets skipped as unchanged — only their verified_at is bumped by the loader.
+    if erddap_verified is not None and not erddap_verified.empty:
+        erddap_verified.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
+            verified_file, index=False
+        )
+        logger.info("Wrote %s (%d unchanged datasets)", verified_file, len(erddap_verified))
+
+    written_files = [datasets_file, profiles_file, skipped_datasets_file]
+    if not df_ckan.empty:
+        written_files.append(ckan_file)
+    logger.info("Wrote %s", " ".join(str(f) for f in written_files))
+    if not obis_cells.empty:
+        logger.info("Wrote %s (%d cells)", obis_cells_file, len(obis_cells))
+    if not erddap_trajectory_days.empty:
+        logger.info(
+            "Wrote %s (%d days)", trajectory_days_file, len(erddap_trajectory_days)
+        )
+    if not erddap_trajectory_points.empty:
+        logger.info(
+            "Wrote %s (%d track points)",
+            trajectory_points_file, len(erddap_trajectory_points),
+        )
 
     if not skipped_datasets.empty:
         logger.info(
@@ -248,17 +325,255 @@ def main(erddap_urls, cache_requests, folder, dataset_ids, max_workers):
             len(skipped_datasets),
             skipped_datasets["dataset_id"].to_list(),
         )
+    return written_files
 
 
-def load_config(config_file):
-    # get config settings from file, eg harvest_config.yaml
-    with open(config_file, "r") as stream:
-        try:
-            config = yaml.safe_load(stream)
-            return config
+@monitor(monitor_slug="main-harvester")
+def main(erddap_urls, cache_requests, folder, dataset_ids,
+         obis_dataset_ids=None, obis_folder=None, obis_geo_filter=None,
+         obis_discovery=None, source=None, triggered_by=None, skip_unchanged=False):
+    logger = _run_logger()
+    # Both entry points pass the raw config blocks; build the objects here so
+    # the CLI and the Prefect pipeline can never construct them differently.
+    if obis_geo_filter is None or isinstance(obis_geo_filter, dict):
+        obis_geo_filter = ObisGeoFilter.from_config(obis_geo_filter)
+    if obis_discovery is None or isinstance(obis_discovery, dict):
+        obis_discovery = ObisDiscoveryConfig.from_config(obis_discovery)
+    limit_dataset_ids = None
+    if dataset_ids:
+        limit_dataset_ids = dataset_ids.split(",")
 
-        except yaml.YAMLError:
-            logger.error("Failed to load config yaml", exc_info=True)
+    # Open a harvest run: one row in cde.harvest_runs, written out as a CSV at
+    # the end alongside the existing harvest outputs. Every per-dataset attempt
+    # (success / skipped / error) gets stamped with this run_id so the
+    # harvest-dashboard service can show history per dataset.
+    run_id = str(uuid.uuid4())
+    # Tie the run to its Prefect flow run so the dashboard can deep-link to the
+    # Prefect UI. None when invoked outside a flow (bare CLI).
+    try:
+        from prefect.runtime import flow_run as _pf_flow_run
+        prefect_flow_run_id = _pf_flow_run.id
+    except Exception:
+        prefect_flow_run_id = None
+    # scope/triggered_source describe whether this is a full harvest or a
+    # single-source run, recorded straight from the request so the except
+    # handler below always has them even if source resolution raises.
+    run_scope = "single" if source else "full"
+    triggered_source = source or None
+    started_at = datetime.now(timezone.utc)
+    git_sha = _resolve_git_sha()
+    run_status = "ok"
+    run_error_message = None
+    erddap_attempts = pd.DataFrame()
+    obis_attempts = pd.DataFrame()
+    erddap_verified = pd.DataFrame()
+    logger.info(
+        "Harvest run started: run_id=%s git_sha=%s scope=%s source=%s flow_run=%s",
+        run_id, git_sha, run_scope, triggered_source, prefect_flow_run_id,
+    )
+
+    try:
+        # Submit ERDDAP tasks concurrently using Prefect
+        erddap_futures = []
+        erddap_urls_list = [u.strip() for u in erddap_urls.split(",") if u.strip()] if erddap_urls else []
+
+        # Single-source narrowing. Resolve BEFORE submitting any task so a bad
+        # source hard-fails the run instead of harvesting nothing. OBIS is
+        # monolithic, so an OBIS-source run keeps the full obis_dataset_ids
+        # list and drops all ERDDAP work, and vice-versa.
+        resolved_source = resolve_source(source, erddap_urls_list)
+        if resolved_source == "obis":
+            logger.info("Single-source harvest: OBIS only")
+            erddap_urls_list = []
+        elif resolved_source:
+            logger.info("Single-source harvest: %s", resolved_source)
+            erddap_urls_list = [resolved_source]
+            obis_dataset_ids = None
+            # Clear discovery too, so an ERDDAP-only run never calls the OBIS API.
+            obis_discovery = None
+
+        for erddap_url in erddap_urls_list:
+            logger.info("Submitting harvest task for %s", erddap_url)
+            future = harvest_erddap.submit(erddap_url, limit_dataset_ids, cache_requests, run_id=run_id, skip_unchanged=skip_unchanged)
+            erddap_futures.append(future)
+
+        # Submit OBIS task (runs concurrently with ERDDAP tasks)
+        obis_future = None
+        obis_discovery_enabled = bool(obis_discovery and obis_discovery.enabled)
+        if obis_dataset_ids or obis_discovery_enabled:
+            if obis_dataset_ids:
+                logger.info("Submitting OBIS harvest task for %d configured datasets", len(obis_dataset_ids))
+            else:
+                logger.info("Submitting OBIS harvest task; dataset list resolved by discovery")
+            obis_cache = obis_folder or os.path.join(os.path.dirname(os.path.abspath(folder)), "obis_cache")
+            obis_future = harvest_obis.submit(
+                limit_dataset_ids=obis_dataset_ids,
+                folder=obis_cache,
+                geo_filter=obis_geo_filter,
+                run_id=run_id,
+                discovery=obis_discovery if obis_discovery_enabled else None,
+            )
+
+        # Wait for all tasks to complete
+        logger.info("Waiting for all harvest tasks to complete")
+        erddap_results = [f.result() for f in erddap_futures]
+        logger.info("All ERDDAP work completed")
+
+        # Collect ERDDAP results
+        erddap_profiles = pd.DataFrame()
+        erddap_trajectory_days = pd.DataFrame()
+        erddap_trajectory_points = pd.DataFrame()
+        erddap_datasets = pd.DataFrame()
+        variables = pd.DataFrame()
+        erddap_skipped = pd.DataFrame()
+
+        for result in erddap_results:
+            erddap_profiles = pd.concat([erddap_profiles, result.profiles])
+            erddap_trajectory_days = pd.concat(
+                [erddap_trajectory_days, result.trajectory_days]
+            )
+            erddap_trajectory_points = pd.concat(
+                [erddap_trajectory_points, result.trajectory_points]
+            )
+            erddap_datasets = pd.concat([erddap_datasets, result.datasets])
+            variables = pd.concat([variables, result.variables])
+            erddap_skipped = pd.concat([erddap_skipped, result.skipped])
+            erddap_attempts = pd.concat([erddap_attempts, result.attempts])
+            erddap_verified = pd.concat([erddap_verified, result.verified])
+
+        # Collect OBIS results
+        obis_cells = pd.DataFrame()
+        obis_datasets = pd.DataFrame()
+        obis_skipped = pd.DataFrame()
+        if obis_future:
+            obis_result = obis_future.result()
+            obis_cells = obis_result.obis_cells
+            obis_datasets = obis_result.datasets
+            obis_skipped = obis_result.skipped
+            obis_attempts = obis_result.attempts
+            logger.info("OBIS harvest completed: %d datasets, %d cells", len(obis_datasets), len(obis_cells))
+    except Exception as e:
+        run_status = "failed"
+        run_error_message = f"{type(e).__name__}: {e}"
+        _write_run_audit_csvs(
+            folder=folder,
+            run_id=run_id,
+            started_at=started_at,
+            finished_at=datetime.now(timezone.utc),
+            git_sha=git_sha,
+            status=run_status,
+            error_message=run_error_message,
+            attempts_frames=[erddap_attempts, obis_attempts],
+            logger=logger,
+            prefect_flow_run_id=prefect_flow_run_id,
+            scope=run_scope,
+            triggered_source=triggered_source,
+            triggered_by=triggered_by,
+        )
+        raise
+
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+    # Empty erddap_datasets/obis_datasets is NOT a failure when skip_unchanged
+    # caching is on and every dataset hashed unchanged: those rows live in
+    # erddap_verified and still need their verified_at bumped via
+    # merge_and_write_csvs below. Only a run that harvested nothing AND verified
+    # nothing genuinely had no datasets to process.
+    if erddap_datasets.empty and obis_datasets.empty and erddap_verified.empty:
+        logging.info("No datasets harvested from any source")
+        _write_run_audit_csvs(
+            folder=folder,
+            run_id=run_id,
+            started_at=started_at,
+            finished_at=datetime.now(timezone.utc),
+            git_sha=git_sha,
+            status="failed",
+            error_message="No datasets harvested from any source",
+            attempts_frames=[erddap_attempts, obis_attempts],
+            logger=logger,
+            prefect_flow_run_id=prefect_flow_run_id,
+            scope=run_scope,
+            triggered_source=triggered_source,
+            triggered_by=triggered_by,
+        )
+        # Raise, don't sys.exit: main() also runs INSIDE a Prefect flow, where
+        # SystemExit reports as "Crashed" (no message, no failure handling)
+        # instead of a clean Failed. The CLI path still exits non-zero on an
+        # uncaught exception.
+        raise RuntimeError("No datasets harvested from any source")
+
+    if erddap_datasets.empty and obis_datasets.empty:
+        logging.info(
+            "No new/changed datasets to harvest; %d unchanged datasets to verify",
+            len(erddap_verified),
+        )
+
+    # --- ERDDAP-specific post-processing ---
+    df_ckan = pd.DataFrame()
+    if not erddap_datasets.empty:
+        # see what standard names arent covered by our EOVs:
+        standard_names_harvested = (
+            variables.query("not standard_name.isnull()")["standard_name"].unique().tolist()
+        )
+
+        standard_names_not_harvested = [
+            x
+            for x in standard_names_harvested
+            if (x not in supported_standard_names + IGNORED_STANDARD_NAMES) and (not x.startswith("platform_"))
+        ]
+
+        standard_names_not_harvested_that_are_real = [
+            x for x in standard_names_not_harvested if x in cf_standard_names
+        ]
+
+        if standard_names_not_harvested_that_are_real:
+            logger.warning(
+                "Found these standard_names that CDE doesnt support yet: %s",
+                standard_names_not_harvested_that_are_real,
+            )
+
+        # query CKAN national for more metadata related to the ERDDAP datsets we have so far
+        logger.info("Gathering CKAN data")
+        # .submit() + wait_for (instead of a direct call) so the Prefect flow
+        # graph draws the real pipeline order: harvest -> fetch-ckan -> merge.
+        # The futures are already resolved, so this adds no waiting.
+        df_ckan = get_ckan_records.submit(
+            erddap_datasets["dataset_id"].to_list(), cache=cache_requests,
+            wait_for=erddap_futures,
+        )
+
+    # df_ckan may be a future; Prefect resolves it (and draws the edge) on submit.
+    merge_and_write_csvs.submit(
+        folder=folder,
+        erddap_datasets=erddap_datasets,
+        erddap_profiles=erddap_profiles,
+        erddap_trajectory_days=erddap_trajectory_days,
+        erddap_trajectory_points=erddap_trajectory_points,
+        erddap_skipped=erddap_skipped,
+        obis_datasets=obis_datasets,
+        obis_cells=obis_cells,
+        obis_skipped=obis_skipped,
+        df_ckan=df_ckan,
+        erddap_verified=erddap_verified,
+        wait_for=[f for f in [*erddap_futures, obis_future] if f is not None],
+    ).result()
+
+    _write_run_audit_csvs(
+        folder=folder,
+        run_id=run_id,
+        started_at=started_at,
+        finished_at=datetime.now(timezone.utc),
+        git_sha=git_sha,
+        status=run_status,
+        error_message=run_error_message,
+        attempts_frames=[erddap_attempts, obis_attempts],
+        logger=logger,
+        prefect_flow_run_id=prefect_flow_run_id,
+        scope=run_scope,
+        triggered_source=triggered_source,
+        triggered_by=triggered_by,
+    )
 
 
 if __name__ == "__main__":
@@ -292,18 +607,23 @@ if __name__ == "__main__":
         urls = ",".join(config.get("erddap_urls") or [])
         cache = config.get("cache")
         folder = config.get("folder")
-        max_workers = config.get("max-workers", 1)
         dataset_ids = ",".join(config.get("dataset_ids") or [])
         log_time = config.get("log_time")
         log_level = config.get("log_level", "INFO")
         log_dir = os.environ.get("HARVESTER_LOG_DIR") or config.get("log_dir")
+        obis = resolve_obis_config(config)
+        logger.info("OBIS selection mode: %s", obis.mode)
+        obis_dataset_ids = obis.dataset_ids
+        obis_discovery = obis.discovery
+        obis_geo_filter = obis.geo_filter
+        obis_folder = config.get("obis_folder")
 
     else:
         logger.info("Using command line arguments")
         parser.add_argument(
             "--urls",
-            help="harvest from these erddap servers, comme separated",
-            required=True,
+            help="harvest from these erddap servers, comma separated",
+            default="",
         )
         parser.add_argument(
             "--dataset_ids",
@@ -332,14 +652,58 @@ if __name__ == "__main__":
             action="store_true",
         )
         parser.add_argument(
-            "--max-workers",
-            default=1,
-            help="max threads that harvester will use",
-        )
-        parser.add_argument(
             "--log-dir",
             default=None,
             help="Directory to save log files to",
+        )
+        parser.add_argument(
+            "--obis-datasets-file",
+            default=None,
+            help='Path to JSON file with OBIS dataset IDs (format: {"datasets": ["uuid", ...]})',
+        )
+        parser.add_argument(
+            "--obis-dataset-ids",
+            default=None,
+            help="Comma-separated list of OBIS dataset UUIDs",
+        )
+        parser.add_argument(
+            "--obis-folder",
+            default=None,
+            help="Cache folder for OBIS occurrence data",
+        )
+        parser.add_argument(
+            "--obis-geo-filter",
+            choices=["canada", "none"],
+            default="canada",
+            help="Geographic filter for OBIS occurrences (default: canada)",
+        )
+        parser.add_argument(
+            "--obis-polygon-file",
+            default=None,
+            help="Override path to the boundary polygon WKT file",
+        )
+        parser.add_argument(
+            "--obis-discover",
+            action="store_true",
+            help="Discover OBIS datasets from the OBIS API instead of a static list",
+        )
+        parser.add_argument(
+            "--obis-discovery-nodes",
+            default=None,
+            help="Comma-separated OBIS node UUIDs to harvest in full "
+                 "(default: OBIS Canada and OTN-OBIS)",
+        )
+        parser.add_argument(
+            "--obis-discovery-geometry",
+            default="eez",
+            help="Discovery geometry: 'eez' (packaged Canada polygon), 'none', or inline WKT",
+        )
+        parser.add_argument(
+            "--obis-discovery-min-datasets",
+            type=int,
+            default=0,
+            help="Abort discovery if fewer than this many datasets are found "
+                 "(default 0 for ad-hoc CLI runs; production sets a real floor)",
         )
 
         args = parser.parse_args()
@@ -349,13 +713,53 @@ if __name__ == "__main__":
         urls = args.urls or ""
         cache = args.cache
         dataset_ids = args.dataset_ids
-        max_workers = args.max_workers
         folder = args.folder
         log_dir = args.log_dir
 
+        discover_overlay = None
+        if args.obis_discover:
+            discover_overlay = {
+                "enabled": True,
+                "nodes": (
+                    args.obis_discovery_nodes.split(",")
+                    if args.obis_discovery_nodes
+                    else sorted(DEFAULT_EXEMPT_NODE_IDS)
+                ),
+                "geometry": args.obis_discovery_geometry,
+                "min_datasets": args.obis_discovery_min_datasets,
+            }
+        obis = resolve_obis_config(
+            {
+                "obis_geo_filter": {
+                    "mode": args.obis_geo_filter,
+                    "polygon_file": args.obis_polygon_file,
+                },
+            },
+            dataset_ids=args.obis_dataset_ids.split(",") if args.obis_dataset_ids else None,
+            datasets_file=args.obis_datasets_file,
+            discover=discover_overlay,
+        )
+        logger.info("OBIS selection mode: %s", obis.mode)
+        obis_dataset_ids = obis.dataset_ids
+        obis_discovery = obis.discovery
+        obis_geo_filter = obis.geo_filter
+        obis_folder = args.obis_folder
+
+        if not urls and obis.mode == "off":
+            parser.error(
+                "At least one of --urls, --obis-discover, or "
+                "--obis-datasets-file/--obis-dataset-ids is required"
+            )
+
     logger = setup_logging(log_time, log_level, log_dir)
     try:
-        main(urls, cache, folder or "harvest", dataset_ids, max_workers)
+        # main is a plain function now; wrap it in an ad-hoc flow so the
+        # standalone CLI still has a flow context (the harvest .submit() tasks
+        # need a task runner).
+        flow(name="cde-main", log_prints=True)(main)(
+            urls, cache, folder or "harvest", dataset_ids,
+            obis_dataset_ids=obis_dataset_ids, obis_folder=obis_folder,
+            obis_geo_filter=obis_geo_filter, obis_discovery=obis_discovery)
     except Exception as e:
         logger.error("Harvester failed!!!", exc_info=True)
         raise e

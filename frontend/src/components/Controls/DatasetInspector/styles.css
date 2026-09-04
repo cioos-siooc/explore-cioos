@@ -1,22 +1,551 @@
+/* The inspector owns its scrolling: the title block stays pinned at the top
+   and only the body below it scrolls. */
 .datasetInspector {
   height: 100%;
-  padding: -2px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-.datasetInspector .backButton {
-  text-align: center;
-  margin: 10px 10px 10px 10px;
-  border: 2px solid darkgrey;
-  border-radius: 10px;
-  max-width: fit-content;
-  /* height: 40px; */
-  justify-content: space-between;
-  padding: 5px;
+/* The panel hosting this page washes its background (see .datasetsPanelDetail),
+   which is what separates a dataset page from the list it drilled in from. The
+   sections below sit on that wash as white cards. */
+.datasetInspectorBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 12px 24px 12px;
 }
 
-.datasetInspector .backButton:hover {
-  background-color: #c6e3df;
+/* --- Dataset title: set like the title of a research record. The two actions
+   that belong to the dataset — filter the map to it, frame the map on it —
+   share the line at the right edge. --- */
+.datasetTitleBlock {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-white);
+}
+
+.datasetTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 2px 0;
+  font-family: var(--cioos-font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--cioos-ink);
+}
+
+/* Stacked, not side by side: the title takes the width it needs and the two
+   actions sit in a narrow column against the right edge. */
+.datasetTitleActions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Both title-bar actions, including the zoom button ZoomToDataset renders into
+   this row: a small bordered icon button, the same treatment the page's other
+   controls wear. Defined here because this row is the only place either one
+   appears. */
+.datasetTitleAction,
+.datasetTitleActions .zoomToDatasetButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-700, var(--cioos-primary));
   cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.datasetTitleAction:hover,
+.datasetTitleAction:focus-visible,
+.datasetTitleActions .zoomToDatasetButton:hover,
+.datasetTitleActions .zoomToDatasetButton:focus-visible {
+  background-color: var(--cioos-sand);
+  border-color: var(--cioos-primary);
+  outline: none;
+}
+
+.datasetTitleAction:focus-visible,
+.datasetTitleActions .zoomToDatasetButton:focus-visible {
+  box-shadow: var(--cioos-focus);
+}
+
+.datasetTitleAction:active,
+.datasetTitleActions .zoomToDatasetButton:active {
+  transform: translateY(1px);
+}
+
+/* Filtering is a state, not a one-shot action: while the map is narrowed to
+   this dataset the button stays filled, and its icon is the solid funnel. */
+.datasetTitleAction.active {
+  background-color: var(--cioos-primary);
+  border-color: var(--cioos-primary);
+  color: var(--cioos-white);
+}
+
+.datasetTitleAction.active:hover,
+.datasetTitleAction.active:focus-visible {
+  background-color: var(--cioos-primary-700);
+  border-color: var(--cioos-primary-700);
+  color: var(--cioos-white);
+}
+
+/* Metadata chips read as informational values that can wrap to two lines
+   (long organization / variable names). Give the wrapped text room to breathe
+   and use a tighter corner so a taller, multi-line chip reads as a neat
+   rounded rectangle rather than an oversized lozenge. */
+.datasetInspector .filterButton {
+  padding: 2px 8px;
+  border-radius: var(--cioos-radius-sm);
+  white-space: normal;
+  text-align: left;
+  line-height: 1.3;
+}
+
+/* These chips double as filter toggles, but here they read as informational
+   metadata values. Hide the inherited "deselect" X (shown on selected chips
+   in the filter sidebar) so a selected platform/EOV/org value stays clean —
+   selection is still conveyed by the chip's .selected fill. */
+.datasetInspector .filterButton > svg {
+  display: none;
+}
+
+/* Shared eyebrow label for every metadata field. */
+.metadataLabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cioos-ink-60);
+}
+
+/* --- Metadata record sheet ---
+   The front matter of a journal article, compressed: each field is a tiny
+   eyebrow label with its value beside it on the same line — the same
+   label/value baseline pairing the record cards use (.listCardField) — and
+   the fields flow two to a row. The narrow ones (platform, record count) pair
+   up; the ones carrying chips or links take a full row. Whitespace does the
+   dividing, so there are no rules and no 86px label gutter eating the width. */
+/* No top rule of its own: the pinned title block above already draws one. */
+.datasetMetaSheet {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+  margin: 0 0 10px 0;
+  padding: 9px 11px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+}
+
+/* Label and value share a line while there is room for both, and the value
+   drops under its label when there isn't — the same wrapping rule
+   .listCardField uses on the record cards. */
+.datasetMetaSheet .metaCell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  min-width: 0;
+}
+
+/* Chips, link lists and a grid's node product need the whole width. */
+.datasetMetaSheet .metaCellWide {
+  grid-column: 1 / -1;
+}
+
+.datasetMetaSheet .metadataLabel {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+  font-size: 0.65rem;
+  line-height: 1.2;
+}
+
+.metadataValue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.datasetMetaSheet .metadataValue {
+  flex: 1 1 140px;
+  margin: 0;
+  /* Chips wrap onto new lines when there are many; top-align them so each
+     wrapped row lines up cleanly under the label. */
+  align-items: flex-start;
+  align-content: flex-start;
+  gap: 4px;
+}
+
+/* Chips sit flush inside their field; the field's gap handles spacing. */
+.datasetMetaSheet .filterButton {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+/* Grid node count: the axis factors read as small stacked value/name pairs,
+   with the total as the bold figure the row is really about. */
+.gridNodeCount {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.gridNodeFactors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.gridNodeFactor {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+
+.gridNodeFactorValue {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cioos-ink);
+}
+
+.gridNodeFactorName {
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--cioos-ink-60);
+}
+
+.gridNodeOperator {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--cioos-ink-60);
+}
+
+.gridNodeTotal {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--cioos-ink);
+  white-space: nowrap;
+}
+
+/* A badge for a value that isn't itself a filter (geometry, the record
+   count) or that is a link rather than a button (the source links) — the
+   exact box .filterButton uses (same pill radius, hairline border, white
+   fill, padding and font-size), so every field's value reads as one
+   consistent badge family regardless of what renders it. */
+.datasetMetaSheet .metadataChip,
+.datasetMetaSheet .metadataLink {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 12px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.datasetMetaSheet .metadataChip {
+  font-weight: 500;
+  color: var(--cioos-ink);
+}
+
+/* Source links (ERDDAP / CKAN / OBIS): the same badge, coloured and weighted
+   like a link so it still reads as clickable. */
+.datasetMetaSheet .metadataLink {
+  font-weight: 600;
+  color: var(--cioos-primary-700);
+  text-decoration: none;
+}
+
+.datasetMetaSheet .metadataLink:hover,
+.datasetMetaSheet .metadataLink:focus-visible {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-surface-2);
+  outline: none;
+}
+
+.datasetMetaSheet .metadataLink:focus-visible {
+  box-shadow: var(--cioos-focus);
+}
+
+/* --- Record table section --- */
+.recordSection {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+}
+
+.recordSectionHeader {
+  margin-bottom: 10px;
+}
+
+.recordSectionHeader strong {
+  display: block;
+  font-family: var(--cioos-font-display);
+  font-size: 1rem;
+}
+
+.recordHint {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.85rem;
+  color: var(--cioos-ink-60);
+}
+
+/* Explains the accent conditionalRowStyles puts on the record pinned to the
+   top of the table below — see markerRecordPinned in DatasetInspector.jsx.
+   Same shape as DatasetsTable's .datasetsCardMapClickHint. */
+.recordMapClickHint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-surface-2);
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+}
+
+.recordMapClickSwatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 2px solid var(--cioos-map-click);
+  background-color: var(--cioos-map-click-surface);
+  box-shadow: 0 0 0 2px var(--cioos-map-click-glow);
+}
+
+.recordShowAll {
+  margin-left: auto;
+  padding: 4px 8px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-700);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.recordShowAll:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-surface-2);
+}
+
+/* The caption over a record or platform list: the CF role its ids carry
+   (cf_role=profile_id / timeseries_id / trajectory_id) and, after it, the
+   variable carrying that role — set in mono so it reads as the source column's
+   own name rather than more prose. */
+.recordIdCaption {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  color: var(--cioos-ink-60);
+}
+
+.recordIdVariable {
+  margin-left: 6px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: var(--cioos-ink-40);
+  overflow-wrap: anywhere;
+}
+
+/* --- Record and platform cards (ListCard.jsx, listed by CardList.jsx) ---
+   The lists these replace were data tables ~550px wide inside a column that is
+   often half that, so every one of them had to be read by dragging it
+   sideways. A card puts the same fields down the page instead: the id on its
+   own line, then one label/value line per field, so a record reads whole at
+   any width. */
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cardListEmpty {
+  padding: 20px 12px;
+  text-align: center;
+  color: var(--cioos-ink-60);
+  font-style: italic;
+}
+
+/* The pager sits inside the section's white card, so it needs no background or
+   top rule of its own beyond the hairline. */
+.recordSection .pager {
+  padding: 8px 0 0 0;
+  background: none;
+}
+
+.listCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+  box-shadow: var(--cioos-shadow-card);
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast),
+    border-color var(--cioos-transition-fast),
+    box-shadow var(--cioos-transition-fast);
+}
+
+.listCard:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-surface-2);
+}
+
+.listCard:focus-visible {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
+}
+
+/* The record a map click resolved to, held at the top of the list: the same
+   goldenrod ring, glow and fill the map puts on the marker that named it
+   (--cioos-map-click, see theme.css), so the two ends of that click are
+   recognisably one thing. A ring rather than a thicker border, so marking a
+   card costs it no layout. */
+.listCard.pinned {
+  border-color: var(--cioos-map-click);
+  background-color: var(--cioos-map-click-surface);
+  box-shadow: 0 0 0 2px var(--cioos-map-click-glow),
+    0 0 10px 1px var(--cioos-map-click-glow), var(--cioos-shadow-card);
+}
+
+/* The platform whose track is drawn on the map, in the purple the map draws it
+   in (--cioos-track). Clicking it again clears the track. */
+.listCard.selected {
+  border-color: var(--cioos-track);
+  background-color: var(--cioos-track-surface);
+}
+
+.listCard.selected:hover {
+  background-color: var(--cioos-track-surface);
+  border-color: var(--cioos-track-700);
+}
+
+/* The id is what the card is called: given the width of the card and set in
+   mono, since it is a value out of the dataset rather than prose. */
+.listCardId {
+  font-family: ui-monospace, monospace;
+  font-size: var(--cioos-font-size-base);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--cioos-ink);
+  overflow-wrap: anywhere;
+}
+
+.listCardFields {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+
+/* Label and value share a line while there is room for both, and the value
+   drops under its label when there isn't — which is what keeps a long value
+   readable in a narrow column instead of squeezed into a sliver. */
+.listCardField {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+
+.listCardFieldLabel {
+  flex: 0 0 auto;
+  min-width: 96px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cioos-ink-60);
+}
+
+.listCardFieldValue {
+  flex: 1 1 140px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink);
+  overflow-wrap: anywhere;
+}
+
+/* Ocean variables: quiet tags, not the filter chips the metadata sheet uses —
+   these say what one record measured, they don't filter anything. Only the
+   first few are shown (see CardTags) — the rest are behind the "+n" beside
+   them, which is a tag in the page's link colour so it reads as the one item
+   in the row that can be pressed. */
+.listCardTag,
+.listCardTagsMore {
+  padding: 1px 7px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-surface-2);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  color: var(--cioos-ink-60);
+}
+
+.listCardTagsMore {
+  border: 1px solid var(--cioos-hairline);
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+}
+
+/* The card's own hover wash is the same surface-2 the tags sit on, which
+   swallows their bubble outline whole. Lift the tags onto white so they stay
+   visible against the hovered card. */
+.listCard:hover .listCardTag {
+  background-color: var(--cioos-white);
+}
+
+.listCardTagsMore:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-white);
+}
+
+.listCardTagsMore:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }
 
 .datasetInspector .optionColorCircle {
@@ -24,74 +553,27 @@
   margin-bottom: 5px;
 }
 
-.datasetInspectorLoadingContainer{
-  position: absolute; 
+.datasetInspectorLoadingContainer {
+  position: relative;
   height: 200px;
   width: 100%;
 }
 
-.inspectorTable tbody tr:hover {
-  background-color: #c6e3df;
-  cursor: pointer;
-}
+/* Mobile: the page has the whole screen here rather than a 420px column beside
+   the map, so what it gives up is padding and the label gutter — not type size.
+   The 0.9em this used to shrink the body to was paying for a width the page no
+   longer has to fit. */
+@media (max-width: 700px) {
+  .datasetInspectorBody {
+    padding: 0 10px 20px 10px;
+  }
 
-.metadataGridContainer {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-auto-rows: max-content;
-}
+  .datasetTitleBlock {
+    padding: 8px 10px;
+  }
 
-.metadataAndRecordIDTableGridContainer {
-  border: 2px solid transparent;
+  /* No room for a label gutter: the value takes the line under its label. */
+  .listCardFieldLabel {
+    min-width: 100%;
+  }
 }
-
-.metadataAndRecordIDTableGridContainer button, .metadataAndRecordIDTableGridContainer a {
-  border: 1px solid transparent;
-  border-radius: 10px;
-  padding: 5px; 
-  min-height: 20px;
-  margin: 5px 5px;
-  background-color: #f3f3f3;
-}
-
-.metadataAndRecordIDTableGridContainer strong {
-  /* margin-top: 10px; */
-  display: block;
-}
-
-.metadataAndRecordIDTableGridContainer a:hover {
-  background-color: #c6e3df;
-}
-
-.metadataAndRecordIDTableGridContainer:hover {
-  border: 2px solid #c6e3df;
-}
-
-.metadataGridItem{
-  margin-bottom: 10px;
-}
-
-.metadataGridItem a {
-  line-height: 42px;
-}
-
-.metadataGridItem a.unavailable:hover {
-  background-color: #f3f3f3;
-  cursor:not-allowed;
-}
-
-/* .datasetInspector {
-  display: flex;
-  max-height: 50%;
-  overflow: auto;
-}
-
-.datasetInspector .inspectorTable {
-  max-width: 50%;
-  min-width: 50%;
-}
-
-.datasetInspector .datasetMetadata {
-  max-width: 50%;
-  min-width: 50%;
-} */

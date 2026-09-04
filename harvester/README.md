@@ -25,16 +25,20 @@ The harvester is typically run periodically (via the Docker harvester profile) t
 
 ### Using Docker (Recommended)
 
-The harvester runs as a Docker profile in the main compose file. See the main [README.md](../README.md) for setup instructions.
+The harvester runs as a Prefect **process worker** (`prefect_worker`) in the main
+compose file — there is no standalone `harvester` service. The worker registers
+the work pool and deployments on startup, then polls; harvests are triggered by
+schedule, by the Prefect UI, or by the dashboard. See the main
+[README.md](../README.md) for setup instructions.
 
-To run the harvester with Docker:
+To run the worker with Docker:
 
 ```bash
 # Development environment
-docker compose up -d harvester
+docker compose up -d prefect_worker
 
-# Production environment
-docker compose -f docker-compose.production.yaml up -d harvester
+# Production (docker-compose.production.yaml is an overlay on the base file)
+docker compose -f docker-compose.yaml -f docker-compose.production.yaml up -d prefect_worker
 ```
 ### Using uv (recommended for local development)
 
@@ -77,7 +81,23 @@ python -m cde_harvester --urls https://catalogue.hakai.org/erddap --cache
 
 The harvester is typically run via Docker Compose. See the main [README](../README.md) for details.
 
-The `HARVEST_CONFIG_FILE` environment variable is automatically set in the docker-compose files to `/app/harvester/harvest_config.yaml`. This allows the harvester to automatically use the mounted config file without needing the `-f` flag.
+The harvest config is **not baked into the image** — it must be provided at
+runtime. It is resolved in priority order (see
+`cde_harvester/core/config.py:resolve_harvest_config_file`):
+
+1. `HARVEST_CONFIG_B64` env var — the whole YAML file base64-encoded on one
+   line (used on Coolify, where raw multi-line env values get mangled).
+   Generate it with `base64 < harvest_config.yaml | tr -d '\n'`.
+2. `HARVEST_CONFIG_YAML` env var — the raw YAML text. Deprecated (multi-line
+   env values get mangled in transit); kept for existing deployments.
+3. `HARVEST_CONFIG_FILE` env var — path to a mounted config file. The
+   docker-compose files set this to `/app/harvester/harvest_config.yaml`, so
+   the mounted config is used without needing the `-f` flag.
+4. A file mounted at `/app/harvester/harvest_config.yaml`.
+
+If none exists, startup fails with an error listing these options. See the main
+[README](../README.md#harvest-configuration) for how config changes propagate
+to a running deployment.
 
 ### Full Reload Mode (default)
 Clears all existing data and reloads everything from scratch:
@@ -107,7 +127,31 @@ The harvester generates CSV files in the `harvest/` directory:
 - `ckan.csv` - CKAN metadata
 - `skipped.csv` - Datasets that were skipped (with reasons)
 
-These files are then loaded into the database by the [db-loader](../db-loader/README.md).
+These files are then loaded into the database by the
+[db-loader](cde_harvester/loading/README.md), which lives in this package at
+`cde_harvester.loading` (`python -m cde_harvester.loading --folder harvest`).
+
+## Package layout
+
+```
+cde_harvester/
+├── __main__.py           # harvest CLI (python -m cde_harvester -f config.yaml)
+├── prefect_pipeline.py   # Prefect flows/deployments (harvest -> db-load)
+├── core/                 # shared: schemas (CSV contract), db, observability,
+│                         # config, harvest reason codes
+├── sources/              # one subpackage per harvest source
+│   ├── base.py           # BaseHarvester + HarvestResult
+│   ├── erddap/           # ERDDAP client, harvester, dataset, compliance, state
+│   ├── obis/             # OBIS harvester + geo filter
+│   └── ckan/             # CKAN metadata enrichment
+├── dataset_types/        # one DatasetTypeHandler per cdm_data_type; the
+│                         # registry drives the listing filter + allowlist.
+│                         # New type (Trajectory, griddap) = new handler module.
+└── loading/              # db-loader (CSV folder -> PostgreSQL cde schema)
+```
+
+`cde_db_loader/` is a deprecated shim kept so `python -m cde_db_loader` keeps
+working for one deploy cycle.
 
 ## Configuration
 
@@ -147,6 +191,16 @@ DB_NAME=cde
 SENTRY_DSN=your_sentry_dsn_here
 ENVIRONMENT=development  # or production
 
+# Path to your project root on the host machine (required for Docker volume mounting)
+HOST_ROOT=/path/to/your/workspace/explore-cioos
+
+# Optional: Harvester schedule (defaults to None unset)
+HARVESTER_CRON=10 0 */3 * *
+# Optional: WoRMS vernaculars backfill schedule (unset = none)
+VERNACULARS_CRON=
+# Optional: fire one harvest immediately on (re)deploy (default false)
+RUN_ON_DEPLOY=false
+
 # Harvest config file path (optional)
 # When set, automatically uses this config file without needing -f flag
 # Defaults to harvest_config.yaml if not provided
@@ -155,6 +209,23 @@ HARVEST_CONFIG_FILE=/app/harvester/harvest_config.yaml
 # Harvester log directory (optional)
 HARVESTER_LOG_DIR=/app/harvester/logs
 ```
+
+The `prefect_worker` runs harvest flows in-process on the `cde-process-pool`
+work pool and registers all deployments on startup. Scale with
+`docker compose up -d --scale prefect_worker=N`; run extra workers on another
+host via `docker-compose.worker.yaml` (set `REGISTER_DEPLOYMENTS=false` there).
+
+On each `HARVESTER_CRON` tick the **`cde-harvest-all`** orchestrator deployment
+fans out into **one harvest job per server**: it triggers the per-source
+deployment (`cde-harvester-<slug>`) for every configured ERDDAP url plus `obis`,
+so each server runs as its own Prefect flow run (own subprocess) with its own
+per-server log (`harvest_<ts>_<slug>.log`) and data folder
+(`harvest/<slug>/<timestamp>/`), and each loads its own data to the DB
+incrementally. Because the orchestrator waits on all of them concurrently, the
+worker must allow enough concurrency to run them alongside it — the default
+process worker has no `--limit`, which satisfies this. The single-run
+`cde-harvester-deployment` (all sources in one flow run) remains registered as an
+on-demand fallback with no schedule.
 
 ### Configuration File
 
@@ -187,9 +258,62 @@ log_dir: ../harvester_logs
 # Logging level (DEBUG, INFO, WARNING, ERROR)
 log_level: INFO
 
-# Maximum concurrent threads for harvesting
-max_workers: 1
+# --- OBIS ---
+# Discover which OBIS datasets to harvest from the OBIS API: everything from
+# the OBIS Canada node, everything from OTN-OBIS, and anything with occurrences
+# inside the Canadian EEZ. Resolved fresh at the start of each OBIS harvest.
+obis_discovery:
+  enabled: true
+  nodes:
+    - 7dfb2d90-9317-434d-8d4e-64adf324579a   # OBIS Canada
+    - 68f83ea7-69a7-44fd-be77-3c3afd6f3cf8   # OTN-OBIS
+  geometry: eez        # 'eez' | 'none' | inline WKT
+  areas: []            # optional OBIS areaids
+  include: []          # dataset UUIDs always added
+  exclude: []          # dataset UUIDs always removed
+  min_datasets: 700    # abort rather than harvest an implausibly short list
+
+# Harvest a fixed set instead (test mode) — bypasses obis_discovery entirely.
+# obis_dataset_ids:
+#   - 4b5e4ccb-cf66-44e4-8890-fa68f8404c3f
+
+# Clip OBIS occurrences to Canadian waters. Datasets from the exempt nodes are
+# harvested in full. mode: none disables clipping (test use only).
+obis_geo_filter:
+  mode: canada
+  exempt_node_ids:
+    - 7dfb2d90-9317-434d-8d4e-64adf324579a
+    - 68f83ea7-69a7-44fd-be77-3c3afd6f3cf8
+
+# Shared cache for OBIS occurrence/metadata downloads. Must live outside
+# `folder` (per-run directories get pruned).
+# obis_folder: ./obis_cache
 ```
+
+`harvest_config.sample.yaml` in the project root documents every key, including
+the precedence rules between `obis_dataset_ids`, `obis_discovery`, and the
+legacy `obis_datasets_file`.
+
+### Which OBIS datasets get harvested
+
+Discovery replaces the old hand-maintained `Obis_Datasets.json`, so adding a
+Canadian OBIS dataset no longer needs a code change — it is picked up on the
+next harvest. To see what the current config would resolve to, without running
+a harvest:
+
+```bash
+uv run python scripts/discover_obis_datasets.py -f ../harvest_config.yaml \
+    --compare ../Obis_Datasets.json --cells ../harvest/obis_cells.csv
+```
+
+That prints the per-query counts, the reduced query geometry, and a diff
+against a previous list — including how many datasets that actually produced
+map cells would be dropped. Re-run it whenever the boundary polygon or the node
+list changes.
+
+Discovery is all-or-nothing: if any of its queries fails, the OBIS harvest
+fails, so the db-loader never runs and nothing is pruned. `min_datasets` is the
+backstop against a short-but-successful list.
 
 A list of CIOOS ERDDAP servers is maintained in [cioos_erddap_servers.csv](cioos_erddap_servers.csv).
 

@@ -1,0 +1,62 @@
+/* ------------------------------------------------------------------
+ * Time bar — the bottom-edge control carrying the time-range filter,
+ * and only that. It is mounted while the filter is narrowing something
+ * and gone otherwise, so the strip of map it costs is only spent when
+ * there is a range to see. The slider inside it is TimeRail, shared with
+ * the Time entry in the Filters panel; this stylesheet is the chrome
+ * that floats it over the map.
+ *
+ * One card, not the two floating pieces it used to be: with the
+ * trajectory date and the gridded slice moved onto the cards that
+ * describe those layers (see TrajectoryDate and GridTimeSlice), there is
+ * one control left here and it should look like one thing. The fields
+ * run along the top of it, the rail underneath.
+ * ------------------------------------------------------------------ */
+.timeBar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  z-index: var(--cioos-z-shell, 30);
+  /* Centred by the auto margins rather than by a transform, which is spoken
+     for: the card carries the same perspective/shadow pair as the datasets
+     card and the brand bar (see theme.css). */
+  width: min(760px, calc(100vw - 24px));
+  margin: 0 auto;
+  padding: 4px 6px 6px;
+  border: 1px solid var(--cioos-hairline);
+  /* Same corner as the brand card at the top of the map, so the two floating
+     surfaces read as one family. */
+  border-radius: var(--cioos-radius-lg);
+  background-color: var(--cioos-white);
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink);
+  transform: var(--cioos-perspective);
+  box-shadow: var(--cioos-shadow-3d, var(--cioos-shadow-float));
+}
+
+/* The fields, on one row inside the card. Inset to the rail's own padding so
+   the label starts over the head of the track rather than over the card's
+   edge, and the reset button lands over its far end. */
+.timeBarFields {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 16px;
+}
+
+.timeBarFields .railFieldLabel {
+  color: var(--cioos-primary-700);
+}
+
+/* The interval picker takes what the row has left, so the reset button keeps
+   the far edge whatever the locale calls the presets. */
+.timeBarFields .railPresetSelect {
+  margin-left: auto;
+}
+
+/* MapLibre's bottom-right stack — now the draw tools alone, the scale bar and
+   the attribution ⓘ having moved into the legend card — stands in a corner the
+   centered bar reaches into on narrower screens, and which the griddap card
+   now holds outright. The clearance for both is written once, in the WmsLegend
+   stylesheet, so the two can never disagree about which of them wins. */
