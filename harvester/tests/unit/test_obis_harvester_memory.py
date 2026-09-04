@@ -6,13 +6,17 @@ because all_cells held every processed dataset's DataFrame in memory for the
 whole run, with no flush point until the final concat. These tests verify
 cells are periodically flushed to disk and correctly reassembled, and that
 the returned result is identical regardless of chunk size.
+
+The flushing itself now lives in core.frame_spill.SpillSet (shared with the
+ERDDAP harvester), but these stay end-to-end through OBISHarvester.harvest():
+they are the contract for the behavior, not for where it is implemented.
 """
 import os
 
 import pandas as pd
 import pytest
 
-import cde_harvester.sources.obis.harvester as obis_harvester_module
+import cde_harvester.core.frame_spill as frame_spill_module
 from cde_harvester.sources.obis.harvester import OBISHarvester
 
 
@@ -112,7 +116,7 @@ def test_final_result_is_identical_regardless_of_chunk_size(monkeypatch, tmp_pat
 def test_chunk_temp_directory_is_cleaned_up_after_harvest(harvester):
     """The TemporaryDirectory used for chunk files must not leak on disk."""
     seen_dirs = []
-    original_cls = obis_harvester_module.tempfile.TemporaryDirectory
+    original_cls = frame_spill_module.tempfile.TemporaryDirectory
 
     class SpyTempDir(original_cls):
         def __enter__(self):
@@ -120,11 +124,11 @@ def test_chunk_temp_directory_is_cleaned_up_after_harvest(harvester):
             seen_dirs.append(path)
             return path
 
-    obis_harvester_module.tempfile.TemporaryDirectory = SpyTempDir
+    frame_spill_module.tempfile.TemporaryDirectory = SpyTempDir
     try:
         harvester.harvest()
     finally:
-        obis_harvester_module.tempfile.TemporaryDirectory = original_cls
+        frame_spill_module.tempfile.TemporaryDirectory = original_cls
 
     assert seen_dirs, "expected the harvest to create a chunk temp dir"
     assert not os.path.isdir(seen_dirs[0])
@@ -144,7 +148,7 @@ def test_chunk_temp_directory_is_cleaned_up_even_on_error(tmp_path, monkeypatch)
     monkeypatch.setattr(h, "fetch_dataset_metadata", boom)
 
     seen_dirs = []
-    original_cls = obis_harvester_module.tempfile.TemporaryDirectory
+    original_cls = frame_spill_module.tempfile.TemporaryDirectory
 
     class SpyTempDir(original_cls):
         def __enter__(self):
@@ -152,11 +156,11 @@ def test_chunk_temp_directory_is_cleaned_up_even_on_error(tmp_path, monkeypatch)
             seen_dirs.append(path)
             return path
 
-    obis_harvester_module.tempfile.TemporaryDirectory = SpyTempDir
+    frame_spill_module.tempfile.TemporaryDirectory = SpyTempDir
     try:
         result = h.harvest()
     finally:
-        obis_harvester_module.tempfile.TemporaryDirectory = original_cls
+        frame_spill_module.tempfile.TemporaryDirectory = original_cls
 
     # Retries are exhausted and the dataset is recorded as an error, not raised.
     assert result.skipped.shape[0] == 1

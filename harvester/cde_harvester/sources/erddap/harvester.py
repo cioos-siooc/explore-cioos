@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 import pandas as pd
+from cde_harvester.core.frame_spill import SpillSet
 from cde_harvester.sources.base import BaseHarvester, HarvestResult
 from cde_harvester.sources.erddap.compliance import CDEComplianceChecker
 from cde_harvester.sources.erddap.client import ERDDAP
@@ -120,6 +121,13 @@ class DatasetHarvestError(Exception):
 class ERDDAPHarvester(BaseHarvester):
     """Harvester for ERDDAP servers."""
 
+    # How many datasets' output rows to hold before spilling them to disk (see
+    # core.frame_spill.SpillSet, which owns the mechanism and the rationale).
+    # A server like cioospacific/cioosatlantic carries hundreds of large CTD
+    # profile datasets; holding every one's features until the end of the
+    # server exhausted the container the same way a full OBIS run did.
+    DATASET_FLUSH_EVERY = 50
+
     def __init__(self, erddap_url, limit_dataset_ids=None, cache_requests=False,
                  run_id=None, skip_unchanged=False):
         self.erddap_url = erddap_url
@@ -143,27 +151,25 @@ class ERDDAPHarvester(BaseHarvester):
         return {}
 
     def harvest(self) -> HarvestResult:
+        # The SpillSet owns a temp dir, so it must be closed even when the
+        # harvest raises; _harvest holds the actual logic.
+        with SpillSet(
+            flush_every=self.DATASET_FLUSH_EVERY, prefix="erddap_harvest_"
+        ) as spills:
+            return self._harvest(spills)
+
+    def _harvest(self, spills) -> HarvestResult:
         skipped_datasets_reasons = []
         attempt_records = []
         verified_rows = []
         hostname = urlparse(self.erddap_url).hostname
         datasets_to_skip = self.get_datasets_to_skip().get(hostname, [])
 
-        df_profiles_all = pd.DataFrame(
-            columns=ProfileSchema.to_schema().columns.keys()
-        )
-        df_trajectory_days_all = pd.DataFrame(
-            columns=TrajectoryDaySchema.to_schema().columns.keys()
-        )
-        df_trajectory_points_all = pd.DataFrame(
-            columns=TrajectoryPointSchema.to_schema().columns.keys()
-        )
-        df_datasets_all = pd.DataFrame(
-            columns=DatasetSchema.to_schema().columns.keys()
-        )
-        df_variables_all = pd.DataFrame(
-            columns=VariableSchema.to_schema().columns.keys()
-        )
+        spills.register("profiles", ProfileSchema.to_schema().columns.keys())
+        spills.register("trajectory_days", TrajectoryDaySchema.to_schema().columns.keys())
+        spills.register("trajectory_points", TrajectoryPointSchema.to_schema().columns.keys())
+        spills.register("datasets", DatasetSchema.to_schema().columns.keys())
+        spills.register("variables", VariableSchema.to_schema().columns.keys())
 
         erddap = ERDDAP(self.erddap_url, self.cache_requests)
         erddap_logger = erddap.get_logger()
@@ -185,9 +191,9 @@ class ERDDAPHarvester(BaseHarvester):
 
         if df_all_datasets.empty:
             return HarvestResult(
-                profiles=df_profiles_all,
-                datasets=df_datasets_all,
-                variables=df_variables_all,
+                profiles=spills.collect("profiles"),
+                datasets=spills.collect("datasets"),
+                variables=spills.collect("variables"),
                 skipped=pd.DataFrame(columns=SkippedDatasetSchema.to_schema().columns.keys()),
                 attempts=empty_attempts,
                 verified=empty_verified,
@@ -267,21 +273,16 @@ class ERDDAPHarvester(BaseHarvester):
                 attempt_records.append(result.attempt)
                 if result.status == "success":
                     if result.feature_kind == "trajectory_days":
-                        df_trajectory_days_all = pd.concat(
-                            [df_trajectory_days_all, result.features]
-                        )
+                        spills.append("trajectory_days", result.features)
                     elif result.feature_kind == "dataset_extent":
                         # Metadata-only (griddap): the extent lives on the
                         # dataset row itself, no feature table.
                         pass
                     else:
-                        df_profiles_all = pd.concat([df_profiles_all, result.features])
-                    if result.track_points is not None and not result.track_points.empty:
-                        df_trajectory_points_all = pd.concat(
-                            [df_trajectory_points_all, result.track_points]
-                        )
-                    df_datasets_all = pd.concat([df_datasets_all, result.dataset_df])
-                    df_variables_all = pd.concat([df_variables_all, result.variables])
+                        spills.append("profiles", result.features)
+                    spills.append("trajectory_points", result.track_points)
+                    spills.append("datasets", result.dataset_df)
+                    spills.append("variables", result.variables)
                 elif result.status == "skipped_unchanged":
                     verified_rows.append({
                         "erddap_url": self.erddap_url.rstrip("/"),
@@ -298,6 +299,10 @@ class ERDDAPHarvester(BaseHarvester):
                 skipped_datasets_reasons += [
                     [erddap.domain, dataset_id, e.skipped_reason_code]
                 ]
+            finally:
+                # One unit of work done, whatever the outcome — the spill
+                # cadence must not stall on a server that errors a lot.
+                spills.checkpoint()
 
         skipped_columns = list(SkippedDatasetSchema.to_schema().columns.keys())
 
@@ -353,12 +358,12 @@ class ERDDAPHarvester(BaseHarvester):
 
         # Return the results
         return HarvestResult(
-            profiles=df_profiles_all,
-            datasets=df_datasets_all,
-            variables=df_variables_all,
+            profiles=spills.collect("profiles"),
+            datasets=spills.collect("datasets"),
+            variables=spills.collect("variables"),
             skipped=df_skipped_datasets,
-            trajectory_days=df_trajectory_days_all,
-            trajectory_points=df_trajectory_points_all,
+            trajectory_days=spills.collect("trajectory_days"),
+            trajectory_points=spills.collect("trajectory_points"),
             attempts=df_attempts,
             verified=df_verified,
         )

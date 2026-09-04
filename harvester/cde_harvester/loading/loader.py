@@ -61,6 +61,14 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 # constant ("CDE-LOADER").
 DB_LOADER_ADVISORY_LOCK_KEY = 738825001
 
+# Rows per INSERT for the to_sql(method="multi") paths. Without a chunksize,
+# method="multi" puts EVERY row into a single statement: psycopg2 interpolates
+# client-side, so there is no parameter-count error to warn you — just one
+# enormous SQL string plus its bound-parameter list held in Python memory on
+# top of the DataFrame it came from. At the 100K+ profile-row scale of a full
+# load that is the largest single allocation the loader makes.
+SQL_INSERT_CHUNKSIZE = 5000
+
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(levelname)-8s - %(name)s : %(message)s"
 )
@@ -202,6 +210,42 @@ def _pg_int_array(values):
     return "{" + ",".join(str(int(v)) for v in values) + "}"
 
 
+class _RowStream:
+    """Adapts an iterator of CSV lines to the read(size) interface psycopg2's
+    copy_expert expects.
+
+    Lets COPY pull its payload row by row instead of requiring the whole thing
+    up front: the previous StringIO held a full text rendering of the frame in
+    memory alongside the frame itself, doubling the cost of the largest load
+    in the run right at its peak.
+    """
+
+    def __init__(self, lines):
+        self._lines = lines
+        self._buf = ""
+
+    def read(self, size=-1):
+        if size is None or size < 0:
+            rest, self._buf = self._buf, ""
+            return rest + "".join(self._lines)
+        while len(self._buf) < size:
+            try:
+                self._buf += next(self._lines)
+            except StopIteration:
+                break
+        chunk, self._buf = self._buf[:size], self._buf[size:]
+        return chunk
+
+    def readline(self):
+        while "\n" not in self._buf:
+            try:
+                self._buf += next(self._lines)
+            except StopIteration:
+                break
+        line, sep, self._buf = self._buf.partition("\n")
+        return line + sep
+
+
 def load_cells_copy(df, table_name, transaction, schema=None):
     """Bulk-load a cells DataFrame (obis_cells / trajectory_days) via COPY
     FROM STDIN.
@@ -209,31 +253,38 @@ def load_cells_copy(df, table_name, transaction, schema=None):
     Replaces the previous to_sql-based loader: COPY runs ~10-50x faster than
     pandas to_sql() for the 100K+ row scale we hit on a full rebuild.
     """
-    buf = io.StringIO()
-    writer = csv.writer(buf, quoting=csv.QUOTE_MINIMAL)
     cols = list(df.columns)
-    for row in df.itertuples(index=False, name=None):
-        out = []
-        for col, val in zip(cols, row):
-            if val is None or val is pd.NA or (isinstance(val, float) and pd.isna(val)):
-                out.append(r"\N")
-            elif col == "scientific_names":
-                out.append(
-                    _pg_text_array(val if isinstance(val, (list, tuple)) else [])
-                )
-            elif col == "aphia_ids":
-                out.append(_pg_int_array(val if isinstance(val, (list, tuple)) else []))
-            elif col == "day_ranges":
-                # COPY runs each field through the column's input function, so
-                # the text literal is coerced to daterange[] for free. (The
-                # to_sql path can't do this — see day_sets.ranges_to_psycopg.)
-                out.append(
-                    ranges_to_pg_literal(val if isinstance(val, (list, tuple)) else [])
-                )
-            else:
-                out.append(val)
-        writer.writerow(out)
-    buf.seek(0)
+
+    def rows():
+        line = io.StringIO()
+        writer = csv.writer(line, quoting=csv.QUOTE_MINIMAL)
+        for row in df.itertuples(index=False, name=None):
+            out = []
+            for col, val in zip(cols, row):
+                if val is None or val is pd.NA or (isinstance(val, float) and pd.isna(val)):
+                    out.append(r"\N")
+                elif col == "scientific_names":
+                    out.append(
+                        _pg_text_array(val if isinstance(val, (list, tuple)) else [])
+                    )
+                elif col == "aphia_ids":
+                    out.append(_pg_int_array(val if isinstance(val, (list, tuple)) else []))
+                elif col == "day_ranges":
+                    # COPY runs each field through the column's input function,
+                    # so the text literal is coerced to daterange[] for free.
+                    # (The to_sql path can't do this — see
+                    # day_sets.ranges_to_psycopg.)
+                    out.append(
+                        ranges_to_pg_literal(val if isinstance(val, (list, tuple)) else [])
+                    )
+                else:
+                    out.append(val)
+            writer.writerow(out)
+            yield line.getvalue()
+            line.seek(0)
+            line.truncate(0)
+
+    buf = _RowStream(rows())
 
     qualified = f"{schema}.{table_name}" if schema else table_name
     raw = getattr(
@@ -582,6 +633,7 @@ def main(folder, incremental=False):
                         index=False,
                         dtype=DATASET_ARRAY_DTYPES,
                         method="multi",
+                        chunksize=SQL_INSERT_CHUNKSIZE,
                     )
 
             if not profiles.empty:
@@ -594,6 +646,7 @@ def main(folder, incremental=False):
                         index=False,
                         dtype=PROFILE_ARRAY_DTYPES,
                         method="multi",
+                        chunksize=SQL_INSERT_CHUNKSIZE,
                     )
 
             if obis_cells is not None:
@@ -631,6 +684,7 @@ def main(folder, incremental=False):
                         if_exists="append",
                         index=False,
                         method="multi",
+                        chunksize=SQL_INSERT_CHUNKSIZE,
                     )
 
             # Temp-table uploads above are session-private and contend with nothing,
@@ -665,6 +719,7 @@ def main(folder, incremental=False):
                         if_exists="append",
                         index=False,
                         method="multi",
+                        chunksize=SQL_INSERT_CHUNKSIZE,
                     )
                     transaction.execute(text(
                         "UPDATE cde.datasets d SET verified_at = v.verified_at "
@@ -761,6 +816,7 @@ def main(folder, incremental=False):
                     index=False,
                     dtype=DATASET_ARRAY_DTYPES,
                     method="multi",
+                    chunksize=SQL_INSERT_CHUNKSIZE,
                 )
 
             if profiles.empty:
@@ -776,6 +832,7 @@ def main(folder, incremental=False):
                         index=False,
                         dtype=PROFILE_ARRAY_DTYPES,
                         method="multi",
+                        chunksize=SQL_INSERT_CHUNKSIZE,
                     )
 
             if obis_cells is not None:
@@ -839,6 +896,7 @@ def main(folder, incremental=False):
                     schema=schema,
                     index=False,
                     method="multi",
+                    chunksize=SQL_INSERT_CHUNKSIZE,
                 )
 
             with _timed("profile_process", logger):
@@ -930,6 +988,7 @@ def main(folder, incremental=False):
                     schema=schema,
                     index=False,
                     method="multi",
+                    chunksize=SQL_INSERT_CHUNKSIZE,
                 )
         if harvest_attempts_df is not None and not harvest_attempts_df.empty:
             with _timed("harvest_attempts to_sql", logger):
@@ -943,6 +1002,7 @@ def main(folder, incremental=False):
                     schema=schema,
                     index=False,
                     method="multi",
+                    chunksize=SQL_INSERT_CHUNKSIZE,
                 )
 
         # Commit the locked phase (engine.connect() does not auto-commit the
