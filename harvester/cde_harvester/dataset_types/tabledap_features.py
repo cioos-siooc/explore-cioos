@@ -123,7 +123,13 @@ def _lat_lon_box(dataset, profiles, profile_variable_list, logger):
 # amundsen11975_ctd, 2,028,390 vs 16,524 (1%) for a Hakai station set. A tight
 # cap would skip exactly the intermittent datasets this exists to fix. The real
 # backstops are the response-size limit and the server itself, both of which are
-# caught below and fall back rather than failing the dataset.
+# caught below and fall back rather than failing the dataset. Since the client
+# streams and aborts at MAX_RESPONSE_SIZE mid-download rather than buffering the
+# whole body first, overshooting here costs a truncated transfer, not the
+# response's full size in RAM — so this stays loose on purpose. Tightening it to
+# match the byte cap would trade day-set accuracy (the span-based `days`
+# fallback over-counts, which is the whole reason for this query) for memory
+# that is no longer at risk.
 MAX_DAY_COUNT_ROWS = 20_000_000
 
 # Variables to count, in preference order. orderByCount counts non-null values
