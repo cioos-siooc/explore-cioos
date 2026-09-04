@@ -12,8 +12,13 @@ import './styles.css'
 // variant='brand' (default) is the app's first paint — index.jsx's Suspense
 // fallback and the initial map load. It shows the full stacked logo, which is
 // the same drawn mark-and-name lockup the brand card wears (see CioosLogo), and
-// it is opaque and over everything: a half-built map showing through it, or a
-// legend keyed to data that hasn't drawn, is not worth reading.
+// it veils the app rather than hiding it: thin enough that the basemap and its
+// coastlines read through from the first frame, which is what tells the user
+// where they are while the data is still on its way. It used to be opaque, to
+// keep a half-built map from showing through — but the layers that would look
+// half-built are the ones painted from the count ramp, and those hold at zero
+// opacity until the ramp is the one they will keep (see revealData in Map.jsx).
+// The basemap is not one of them and is nearly never what the wait is for.
 // variant='inline' is the mark alone over a translucent scrim, for a panel or
 // section refreshing in place, where a wait of a few hundred milliseconds
 // hasn't earned a masthead and the content underneath still means something.
