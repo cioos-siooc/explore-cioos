@@ -263,7 +263,7 @@ export default function CreateMap({
   drawRequest,
   mapRef,
   // Called once, when the map is worth handing over. See reportFirstPaint.
-  onFirstPaint = () => {}
+  onFirstPaint = () => { }
 }) {
   const { t, i18n } = useTranslation()
 
@@ -1111,7 +1111,7 @@ export default function CreateMap({
   // the threshold is the one already on them: this is called on every settled
   // camera, and rewriting an identical data-driven opacity is a full repaint of
   // every hex on screen for no visible change.
-  function applyHexOpacity () {
+  function applyHexOpacity() {
     if (!dataRevealed.current || !map.current) return
     if (appliedFadeThreshold.current === viewportFadeThreshold.current) return
     appliedFadeThreshold.current = viewportFadeThreshold.current
@@ -1133,7 +1133,7 @@ export default function CreateMap({
 
   // The percentile of an unsorted numeric array, by nearest rank. Returns
   // undefined for an empty one so callers can tell "no data" from "zero".
-  function percentileOf (values, fraction) {
+  function percentileOf(values, fraction) {
     if (!values || values.length === 0) return undefined
     const sorted = [...values].sort((a, b) => a - b)
     const index = Math.min(
@@ -2271,6 +2271,9 @@ export default function CreateMap({
         minzoom: hexMaxZoom,
         source: 'cde-tiles',
         'source-layer': 'internal-layer-name',
+        layout: {
+          'circle-sort-key': ['get', 'count']
+        },
         paint: {
           // Zero until the ramp is final — see revealData. Both the colour
           // below and the radius above come off the ramp, so before it lands
@@ -2323,6 +2326,14 @@ export default function CreateMap({
       // Purely visual white casing under the points so they stay readable
       // over the coverage hex fills; all interaction stays on 'points',
       // which keeps its invisible wide-stroke hit area.
+      //
+      // No 'circle-sort-key' here, unlike 'points' and 'points-highlighted',
+      // and deliberately so rather than by oversight. Every feature in this
+      // layer is the same #ffffff, and alpha-over compositing of identical RGB
+      // is order-independent — two overlapping casings come out white at
+      // 1-(1-a1)(1-a2) whichever is drawn first, including the dimmed 0.5 /
+      // undimmed 0.9 mix pointsHaloOpacity produces. A sort key here would be
+      // invisible and would still cost a per-tile sort on the worker.
       map.current.addLayer(
         {
           id: 'points-halo',
@@ -2376,6 +2387,13 @@ export default function CreateMap({
         minzoom: hexMaxZoom,
         source: 'cde-tiles',
         'source-layer': 'internal-layer-name',
+        layout: {
+          // The same key 'points' carries, and it has to be: this layer draws a
+          // filled circle plus a selection ring over the same features, so if
+          // the two sorted differently the rings and the markers under them
+          // would disagree about which of an overlapping pair is on top.
+          'circle-sort-key': ['get', 'count']
+        },
         paint: {
           'circle-color': dimmable(colors),
           'circle-opacity': circleOpacity,
