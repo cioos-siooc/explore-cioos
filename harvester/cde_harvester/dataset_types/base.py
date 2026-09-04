@@ -21,6 +21,12 @@ class DatasetTypeHandler(ABC):
     # HarvestResult attribute the extracted features land in
     # ("profiles" for point-like types, "trajectory_days" for trajectories).
     feature_kind: str = "profiles"
+    # Whether a feature of this type can span more than one UTC day, and so
+    # needs its day SET harvested (one extra grouped request per dataset — see
+    # tabledap_features._extract_day_sets). False for single-cast types, where
+    # the [time_min, time_max] span already IS the day set and the database
+    # fills `days` from it.
+    features_span_multiple_days: bool = False
 
     @abstractmethod
     def extract_features(self, dataset) -> pd.DataFrame:

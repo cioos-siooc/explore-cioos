@@ -25,6 +25,7 @@ import {
   rangesEqual,
   useDebounce
 } from '../../utilities.jsx'
+import { wmsSliceFromParams } from '../../wmsUtilities.js'
 import fetchJson from '../fetchJson.js'
 import reportError from '../reportError.js'
 import { useUrlSeededPersistentState } from '../usePersistentState.js'
@@ -159,6 +160,14 @@ export default function MapStateProvider ({ children }) {
     )
   const [griddapCoverage, setGriddapCoverage] = useState()
   const [activeWmsOverlay, setActiveWmsOverlay] = useState()
+  // The slice a share link named for that overlay — its variable, instant and
+  // level (?var=&date=&z=). Consumed once, by the first overlay built: the
+  // link's dataset is the one the page opens on, and a later toggle or another
+  // dataset defaults as usual rather than inheriting a slice from a grid it
+  // has nothing to do with. Same one-shot shape as pendingDatasetZoom below.
+  const [pendingWmsSlice, setPendingWmsSlice] = useState(() =>
+    wmsSliceFromParams(new URL(window.location.href).searchParams)
+  )
   // Layer visibility switch for the observation layers (hexes / points /
   // coverage cells). On by default.
   const [dataLayersVisible, setDataLayersVisible] = useUrlSeededPersistentState(
@@ -216,6 +225,18 @@ export default function MapStateProvider ({ children }) {
   // not a selection: opening the card changes nothing about the filters, the
   // camera, or the dataset page. Only the buttons inside it do.
   const [featureQuery, setFeatureQuery] = useState(null)
+
+  // Where a share link's card was opened (?at=lng,lat). Everything in the card
+  // is derived from what is drawn under that point — the rows, the count, the
+  // outlined region — so there is nothing to carry in the link but the question
+  // itself, and Map replays it once the map has drawn (see the mount effect
+  // there). Read at mount only, which is why it is a plain value and not state.
+  const sharedFeatureQueryAt = useState(() => {
+    const parts = (new URL(window.location.href).searchParams.get('at') || '')
+      .split(',')
+      .map(Number)
+    return parts.length === 2 && parts.every(Number.isFinite) ? parts : null
+  })[0]
 
   function zoomToGeometry (geometry) {
     if (geometry) setZoomTarget({ geometry, nonce: Date.now() })
@@ -487,6 +508,8 @@ export default function MapStateProvider ({ children }) {
     griddapCoverage,
     activeWmsOverlay,
     setActiveWmsOverlay,
+    pendingWmsSlice,
+    setPendingWmsSlice,
     zoomTarget,
     zoomToGeometry,
     drawRequest,
@@ -495,6 +518,7 @@ export default function MapStateProvider ({ children }) {
     setPendingDatasetZoom,
     mapRef,
     featureQuery,
+    sharedFeatureQueryAt,
     setFeatureQuery,
     mapDatasetPKs,
     setMapDatasetPKs,

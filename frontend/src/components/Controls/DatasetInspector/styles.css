@@ -449,16 +449,25 @@
     0 0 10px 1px var(--cioos-map-click-glow), var(--cioos-shadow-card);
 }
 
-/* The platform whose track is drawn on the map, in the purple the map draws it
-   in (--cioos-track). Clicking it again clears the track. */
+/* The platform whose track is drawn on the map, in the goldenrod the map now
+   draws that track in (--cioos-map-click, see theme.css) — the same pairing as
+   .pinned above, and for the same reason: this row and that line are two ends
+   of one answer. It carried the track purple while the map drew the selected
+   track in a crimson of its own, so the row matched neither. Ring-less, so the
+   record a click resolved to still stands out from it. Clicking it again
+   clears the track. */
 .listCard.selected {
-  border-color: var(--cioos-track);
-  background-color: var(--cioos-track-surface);
+  border-color: var(--cioos-map-click);
+  background-color: var(--cioos-map-click-surface);
 }
 
+/* Holds the selected look against the generic row hover, which would otherwise
+   repaint the border and ground of the one row the map is drawing. The
+   goldenrod family has no darker shade to hover into, so hovering a selected
+   row simply leaves it as it is. */
 .listCard.selected:hover {
-  background-color: var(--cioos-track-surface);
-  border-color: var(--cioos-track-700);
+  background-color: var(--cioos-map-click-surface);
+  border-color: var(--cioos-map-click);
 }
 
 /* The id is what the card is called: given the width of the card and set in

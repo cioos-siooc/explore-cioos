@@ -8,7 +8,9 @@ const { validatorMiddleware } = require("../utils/validatorMiddlewares");
 const cache = require("../utils/cache");
 const {
   parseMetric,
-  recordCountExpr,
+  metricValueExpr,
+  metricJoin,
+  nullMetricExpr,
   countAggregate,
 } = require("../utils/hexMetric");
 
@@ -201,9 +203,10 @@ router.get(
             .map((t) => `'${t}'`)
             .join(',')}))`
         : '';
-    const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${recordCountExpr('profiles', metric)},
+    const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${metricValueExpr('profiles', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
-    FROM cde.profiles WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ''} AND :profileFilters`;
+    FROM cde.profiles ${metricJoin('profiles', metric)}
+    WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ''} AND :profileFilters`;
     // Both cell tables (trajectory coverage cells and OBIS occurrence cells)
     // merge into the combined hex counts (z<7, the green ramp) but never
     // appear as individual points (z>=7). Their cell spacing is a grid
@@ -221,13 +224,14 @@ router.get(
     // (dataset, trajectory, tier, hex) — hence `hex_pk as zoom_pk` and a tier
     // predicate where the other branches carry two hex FK columns. point_pk is
     // NULL because trajectory coverage never renders at the point tier.
-    const trajectoryBranch = `SELECT NULL::integer as point_pk, dataset_pk, hex_pk as zoom_pk, geom as point_geom, ${recordCountExpr('trajectory_hexes', metric)},
+    const trajectoryBranch = `SELECT NULL::integer as point_pk, dataset_pk, hex_pk as zoom_pk, geom as point_geom, ${metricValueExpr('trajectory_hexes', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_hexes WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(' AND ')}` : ''}`;
+    FROM cde.trajectory_hexes ${metricJoin('trajectory_hexes', metric)}
+    WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(' AND ')}` : ''}`;
     const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
-           ${recordCountExpr('obis_cells', metric)},
+           ${metricValueExpr('obis_cells', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.obis_cells
+    FROM cde.obis_cells ${metricJoin('obis_cells', metric)}
     WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
 
     const branches = [];
@@ -243,11 +247,14 @@ router.get(
       ? branches.join("\n    UNION ALL\n    ")
       : `SELECT * FROM (${profilesBranch}) empty_combined WHERE FALSE`;
 
-    // `count` is the same quantity at both tiers — the summed metric. It used
-    // to be count(distinct point_pk) at hex zoom and sum(record_count) at point
-    // zoom, so the property changed meaning mid-zoom and the hex ramp ranked a
-    // 20-year mooring level with a single CTD cast. Summing at both tiers fixes
-    // the ramp and drops a distinct-aggregate at the same time.
+    // `count` is the same quantity at both tiers — the aggregated metric. It
+    // used to be count(distinct point_pk) at hex zoom and a sum at point zoom,
+    // so the property changed meaning mid-zoom and the hex ramp ranked a
+    // 20-year mooring level with a single CTD cast. Aggregating the same way at
+    // both tiers fixes the ramp and drops a distinct-aggregate at the same
+    // time. What the aggregate IS depends on the metric — a sum for `records`,
+    // a day-set union for `days` — which is why it comes from countAggregate
+    // rather than being spelled out here.
     const relevantPointsSQL = isHexGrid
       ? `SELECT p.zoom_pk pk, ${countAggregate(metric, 'p')} count,
                 array_to_json(array_agg(distinct d.pk_url)) datasets,
@@ -414,13 +421,14 @@ router.get(
       trajectoryTypePredicate(trajectoryTypes),
     ].filter(Boolean);
     const trajectoryBranch = `SELECT dataset_pk, hex_pk as zoom_pk, 'trajectory' as src,
-           trajectory_id, ${recordCountExpr('trajectory_hexes', metric)},
+           trajectory_id, ${metricValueExpr('trajectory_hexes', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_hexes WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(' AND ')}` : ''}`;
+    FROM cde.trajectory_hexes ${metricJoin('trajectory_hexes', metric)}
+    WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(' AND ')}` : ''}`;
     const obisBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'obis' as src,
-           NULL as trajectory_id, ${recordCountExpr('obis_cells', metric)},
+           NULL as trajectory_id, ${metricValueExpr('obis_cells', metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.obis_cells
+    FROM cde.obis_cells ${metricJoin('obis_cells', metric)}
     WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
 
     const branches = [];
@@ -461,7 +469,7 @@ router.get(
              -- same unit.
              count(distinct (c.dataset_pk, c.trajectory_id))
                FILTER (WHERE c.src = 'trajectory') trajectory_count,
-             coalesce(sum(c.record_count) FILTER (WHERE c.src = 'obis'), 0)::bigint obis_count,
+             ${countAggregate(metric, 'c', "c.src = 'obis'")} obis_count,
              array_to_json(array_agg(distinct d.pk_url)) datasets
       FROM combined c
       JOIN cde.datasets d ON c.dataset_pk = d.pk
@@ -514,8 +522,10 @@ router.get(
  *     description: >
  *       Returns a Mapbox Vector Tile with TWO layers built from
  *       cde.trajectory_points: 'track-lines' (per-trajectory LineStrings over
- *       the requested time window, ordered by time) and 'track-heads' (each
- *       trajectory's latest fix within the window, with 'cog' — course over
+ *       the requested time window, ordered by time, each carrying the segment's
+ *       own 'time_min'/'time_max' as epoch ms) and 'track-heads' (each
+ *       trajectory's latest fix within the window, with its 'head_time' and
+ *       'profile_id', and 'cog' — course over
  *       ground in degrees clockwise from north, absent when undefined).
  *       timeMin/timeMax are
  *       REQUIRED — the window is the scrub bar's trailing interval. Clients
@@ -639,7 +649,7 @@ router.get(
     ),
     pts AS (
       SELECT p.dataset_pk, p.trajectory_id, p.time, p.longitude, p.latitude,
-             p.geom, d.pk_url, d.title AS dataset_title, c.gap_secs
+             p.geom, p.profile_id, d.pk_url, d.title AS dataset_title, c.gap_secs
       FROM cde.trajectory_points p
       JOIN cand c ON c.dataset_pk = p.dataset_pk
                  AND c.trajectory_id = p.trajectory_id
@@ -686,7 +696,15 @@ router.get(
       -- dataset_title rides along so a track-line click can name its dataset
       -- without a second lookup (MVT dedupes strings per layer, so the whole
       -- tile carries one copy of each title).
+      --
+      -- time_min/time_max are the segment's own span — when this segment was
+      -- sailed, which is what a hover over it can honestly say. A single fix's
+      -- instant is not available on a line: MVT properties are per feature, and
+      -- a LineString is many fixes. Epoch ms, like head_time below, because MVT
+      -- has no timestamp type.
       SELECT trajectory_id, pk_url, dataset_title,
+             (extract(epoch FROM min(time)) * 1000)::bigint AS time_min,
+             (extract(epoch FROM max(time)) * 1000)::bigint AS time_max,
              ST_MakeLine(geom ORDER BY time) AS geom
       FROM segs
       GROUP BY dataset_pk, trajectory_id, pk_url, dataset_title, seg
@@ -698,8 +716,11 @@ router.get(
       -- when undefined: single-fix trajectories (lag is NULL) or a
       -- stationary platform (coincident fixes make ST_Azimuth NULL); the
       -- frontend renders those heads as circles instead of arrows.
+      -- profile_id: the record this fix belongs to, for datasets whose
+      -- trajectories are made of profiles (NULL for a plain Trajectory, whose
+      -- fixes are not records). Free here — the head row is already this fix.
       SELECT DISTINCT ON (dataset_pk, trajectory_id)
-             trajectory_id, pk_url, dataset_title,
+             trajectory_id, pk_url, dataset_title, profile_id,
              (extract(epoch FROM time) * 1000)::bigint AS head_time,
              round(degrees(ST_Azimuth(
                ST_SetSRID(ST_MakePoint(lag(longitude) OVER w, lag(latitude) OVER w), 4326)::geography,
@@ -715,7 +736,7 @@ router.get(
       -- (tile width / 4096), the resolution ST_AsMVTGeom snaps to anyway, so it
       -- drops vertices that would collapse on encode — visually lossless, fewer
       -- vertices to encode/transfer at low zoom where tracks carry long history.
-      SELECT l.trajectory_id, l.pk_url, l.dataset_title,
+      SELECT l.trajectory_id, l.pk_url, l.dataset_title, l.time_min, l.time_max,
              ST_AsMVTGeom(
                ST_Simplify(
                  l.geom,
@@ -727,7 +748,8 @@ router.get(
       WHERE l.geom && te.tile_envelope
     ),
     head_mvt AS (
-      SELECT h.trajectory_id, h.pk_url, h.dataset_title, h.head_time, h.cog,
+      SELECT h.trajectory_id, h.pk_url, h.dataset_title, h.profile_id,
+             h.head_time, h.cog,
              ST_AsMVTGeom(h.geom, te.tile_envelope) AS geom
       FROM heads h, te
       WHERE h.geom && te.tile_envelope

@@ -32,6 +32,7 @@ export default function MapContainer () {
     mapRef,
     featureQuery,
     setFeatureQuery,
+    sharedFeatureQueryAt,
     tracksMode,
     debouncedScrubTime,
     trailingDays,
@@ -49,6 +50,7 @@ export default function MapContainer () {
     setShowPreviewModal,
     returnToDatasetList,
     selectedTrajectory,
+    selectTrajectoryFromMap,
     pointsData,
     combinedQueries
   } = useSelection()
@@ -116,6 +118,12 @@ export default function MapContainer () {
     }
   }
 
+  // A click that landed on exactly one track (see Map.jsx's handleMapClick) is
+  // handed to selectTrajectoryFromMap below — onTrackClick is to a track what
+  // onMarkerClick is to a marker, and it ends where the "what's here" card's
+  // track row already did: that dataset's page open, the platform's track
+  // drawn on the map, and its row pinned in the page's platform list.
+
   return (
     <Map
       polygon={polygon}
@@ -129,7 +137,9 @@ export default function MapContainer () {
       onViewportHexRange={setViewportHexRange}
       onFeatureQuery={handleFeatureQuery}
       featureQuery={featureQuery}
+      sharedFeatureQueryAt={sharedFeatureQueryAt}
       onMarkerClick={onMarkerClick}
+      onTrackClick={selectTrajectoryFromMap}
       setHoveredDataset={setHoveredDataset}
       hoveredDataset={hoveredDataset}
       inspectDataset={inspectDataset}

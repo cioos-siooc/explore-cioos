@@ -299,6 +299,56 @@ export function formatDatasetCount (filtered, total) {
   return `${filtered} / ${total}`
 }
 
+// The instants either list carries, formatted as the UTC they are: the record
+// list spells them out in UTC (see shapeQuery.js) and the platform list sends
+// timestamptz, which JSON serializes as UTC too, so a Z is the truth in both
+// and no local-time conversion is wanted — an oceanographic record's time is
+// the time it was taken at sea, not the reader's wall clock.
+//
+// Where the two ends share a day, the second one drops it: a cast that ran
+// from 18:32 to 19:05 says so in one line rather than repeating the date.
+export function formatInstantRange (min, max) {
+  const from = splitInstant(min)
+  const to = splitInstant(max)
+  if (!from) return formatInstant(max)
+  if (!to || (from.day === to.day && from.time === to.time)) {
+    return formatInstant(min)
+  }
+  if (from.day === to.day) return `${from.day} ${from.time} → ${to.time}Z`
+  return `${from.day} ${from.time}Z → ${to.day} ${to.time}Z`
+}
+
+// One instant, under the same UTC rule: a single fix's time on the map's
+// hover chip, and the degenerate ends of the range above.
+export function formatInstant (value) {
+  const at = splitInstant(value)
+  return at ? `${at.day} ${at.time}Z` : undefined
+}
+
+// Either shape an instant reaches the app in: an ISO string from JSON, or the
+// epoch milliseconds a vector tile carries (MVT has no timestamp type, so the
+// track tiles encode their times as numbers).
+function splitInstant (value) {
+  if (value === null || value === undefined || value === '') return undefined
+  const iso =
+    typeof value === 'number' ? new Date(value).toISOString() : String(value)
+  const [day, rest] = iso.split('T')
+  return { day, time: (rest || '00:00').slice(0, 5) }
+}
+
+// "min – max", or the one bound that exists, or the single value when the two
+// are the same.
+export function formatRange (min, max, unit = '') {
+  const suffix = unit ? ` ${unit}` : ''
+  if (min === null || min === undefined) {
+    return max === null || max === undefined ? undefined : `${max}${suffix}`
+  }
+  if (max === null || max === undefined || String(min) === String(max)) {
+    return `${min}${suffix}`
+  }
+  return `${min} – ${max}${suffix}`
+}
+
 export function useDebounce (value, delay) {
   // State and setters for debounced value
   const [debouncedValue, setDebouncedValue] = useState(value)
@@ -767,4 +817,17 @@ export function initialBearing(a, b) {
   const x =
     Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl)
   return (Math.atan2(y, x) / rad + 360) % 360
+}
+
+// A '#RRGGBB' from the palette, given an alpha channel, in the CSS form
+// MapLibre parses. Anything that is not a six-digit hex comes back untouched:
+// an unparseable colour throws out of setPaintProperty and takes the rest of
+// the paint pass with it, so a palette entry written in some other notation
+// should degrade to opaque rather than to 'rgba(NaN, NaN, NaN, 1)'.
+export function withAlpha(color, alpha) {
+  const match = /^#([0-9a-f]{6})$/i.exec(color)
+  if (!match) return color
+  const int = parseInt(match[1], 16)
+  const a = Math.round(alpha * 1000) / 1000
+  return `rgba(${(int >> 16) & 255}, ${(int >> 8) & 255}, ${int & 255}, ${a})`
 }

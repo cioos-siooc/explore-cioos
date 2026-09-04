@@ -1,0 +1,32 @@
+-- Add the `day_ranges` day-set columns to databases created before they existed.
+--
+-- The canonical DDL is in 1_schema.sql, which only ever runs on a fresh volume.
+-- This file is picked up by the db_migrate compose service, which applies
+-- [3-9]_*.sql on every deploy, so live databases get the columns without the
+-- volume drop + full re-harvest that database/README.md otherwise requires for
+-- a schema change. Adding nullable columns is safe and idempotent.
+--
+-- Numbered 3 rather than 9 so it sorts ahead of 4_create_hexes.sql (whose
+-- trajectory_build_hexes() writes day_ranges) and 9_incremental_upsert.sql
+-- (whose replace_*_from_temp() name the column). plpgsql bodies resolve columns
+-- at runtime rather than at CREATE, so a later order would also work — this
+-- just removes the question.
+--
+-- No-op on fresh volumes: 1_schema.sql has already created them.
+--
+-- WHY: the map's `days` metric used to SUM each feature's day count into a hex,
+-- which multiplied overlapping coverage — ten moorings deployed over the same
+-- year read as 3650 days, and one live hex read 451,305 days over a calendar
+-- span of 5,197. It is now a UNION of day sets (day_union_days in
+-- 8_range_functions.sql, wired up in web-api/utils/hexMetric.js), and these
+-- columns are what each row contributes to that union.
+--
+-- Safe to deploy in any order relative to the harvester and the web-api: a NULL
+-- day_ranges means "day set unknown", and hexMetric.js falls back to the row's
+-- [time_min, time_max] span. Rows keep their old (over-counted) contribution
+-- until their dataset is re-harvested, rather than dropping out of the ramp —
+-- unlike the obis_cells.days rollout (3_obis_days_migration.sql), which needed
+-- the re-harvest to land first.
+ALTER TABLE cde.profiles          ADD COLUMN IF NOT EXISTS day_ranges daterange[];
+ALTER TABLE cde.obis_cells        ADD COLUMN IF NOT EXISTS day_ranges daterange[];
+ALTER TABLE cde.trajectory_hexes  ADD COLUMN IF NOT EXISTS day_ranges daterange[];
