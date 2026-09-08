@@ -25,20 +25,6 @@ services:
     ports:
       - "${NGINX_PORT:-8098}:4000"
 
-  frontend:
-    build:
-      args:
-        ENVIRONMENT: $ENVIRONMENT
-        SENTRY_RELEASE: $SENTRY_RELEASE
-        SENTRY_ORG: $SENTRY_ORG
-        SENTRY_PROJECT: $SENTRY_PROJECT
-      # SENTRY_AUTH_TOKEN is no longer a build ARG: as an ARG promoted to ENV it
-      # stayed recoverable from the image with `docker history`/`inspect`. As a
-      # secret it is mounted only for the `npm run build` layer that uploads
-      # source maps. Requires Compose >= 2.23 for the `environment:` source.
-      secrets:
-        - sentry_auth_token
-
   prefect:
     ports:
       - "${PREFECT_PORT:-4200}:4200"
@@ -64,12 +50,6 @@ services:
     command: redis-server /usr/local/etc/redis/redis.conf
     volumes:
       - ./redis-config/redis.conf:/usr/local/etc/redis/redis.conf:ro
-
-# Build-time only. Read from the deploy environment (deploy.yml resolves it
-# from 1Password into .env), never written into an image layer.
-secrets:
-  sentry_auth_token:
-    environment: SENTRY_AUTH_TOKEN
 
 # Project default => every service joins it, including inherited ones.
 # Must exist: docker network create explore-cioos_default

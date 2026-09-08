@@ -183,6 +183,20 @@ services:
         # Same DSN web-api uses; empty leaves Sentry inert in the browser.
         # Needed at BUILD time here (vite bakes it in), not at runtime.
         SENTRY_DSN: ${SENTRY_DSN:-}
+        ENVIRONMENT: ${ENVIRONMENT:-}
+        # Optional: sourcemap upload + release tagging. Empty ORG/PROJECT/
+        # RELEASE leave the Sentry plugin inert; see .env.sample.
+        SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+        SENTRY_ORG: ${SENTRY_ORG:-}
+        SENTRY_PROJECT: ${SENTRY_PROJECT:-}
+      # SENTRY_AUTH_TOKEN is a secret, not a build ARG: an ARG promoted to ENV
+      # stays recoverable from the image with `docker history`/`inspect`. As a
+      # secret it is mounted only for the `npm run build` layer that uploads
+      # source maps (see frontend/Dockerfile). Requires Compose >= 2.23 for
+      # the `environment:` secret source below. Unset SENTRY_AUTH_TOKEN => the
+      # mounted secret is empty => upload is skipped, same as omitting it.
+      secrets:
+        - sentry_auth_token
     expose:
       - "80"
   # Prefect PROCESS worker: runs harvest flows in-process (no spawned flow-run
@@ -398,3 +412,10 @@ volumes:
   harvester_cache:
   harvest_data:
   obis_cache:
+
+# Build-time only. Read from the deploy environment (Coolify's own env vars,
+# or .env via deploy.yml resolving it from 1Password), never written into an
+# image layer.
+secrets:
+  sentry_auth_token:
+    environment: SENTRY_AUTH_TOKEN
