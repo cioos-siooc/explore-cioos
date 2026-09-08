@@ -104,119 +104,192 @@ to record it so a future review does not re-raise it.
 
 ---
 
-## P1 — Cheap, independent, safe
+## P1 — Cheap, independent, safe — **DONE except four deferred items** (2026-09-08)
+
+Everything below is closed unless marked **[deferred]**. The four deferred items were
+scoped out deliberately: they are not cheap, and each needs its own pass. Verification for
+the whole P1 sweep is at the end of this section.
 
 ### Ignore files & tracked junk
 
-- [ ] `.gitignore` says `venv`, which does not match `.venv`. The four venvs (1.6 GB) are ignored
-      only by uv's own generated `.venv/.gitignore`. Add `.venv/`. **[verified]**
-- [ ] **`.claude/` is not ignored, and holds three full worktrees (1.5 GB) inside the repo**
-      (`coastline-visibility`, `harvest-point-datasets`, `topbar-corner-radius`). A `git add -A`
-      commits three broken gitlinks. Add `.claude/` to `.gitignore`. **[verified]**
-- [ ] `*.env` does not match `.env.production` or `.env.development`, so both are tracked and
-      unprotected. The six sensitive values in `.env.production` are `op://` 1Password refs resolved
-      at deploy (`deploy.yml:30-31`) — **no live credential is committed and no rotation is needed** —
-      but a future literal edit would commit cleanly with no warning. Tighten the pattern. **[verified]**
-- [ ] `harvest-prod/` (96 MB) is not ignored by name — it is invisible only because a blanket
-      `.gitignore:19 *.csv` catches its contents. That blanket will also swallow future CSV fixtures
-      outside `harvester/`. Ignore the directory explicitly.
-- [ ] Also unignored: `.pytest_cache/`, `.ruff_cache/`, `downloads/`. **[verified]**
-- [ ] `frontend/.DS_Store` is tracked despite `.gitignore:1` — added before the rule. `git rm --cached`.
-- [ ] `downloader/` has no `.gitignore` at all (harvester and download_scheduler each have one).
+- [x] `.venv/` added (`venv` alone never matched it). `venv/` anchored as a directory too.
+- [x] `.claude/` ignored. The three worktrees named in the survey are already gone; the
+      remaining `settings.local.json` was ignored only by the developer's *global* git
+      config, so it would have been committed from any other machine.
+- [x] Env pattern tightened: `*.env` + `.env.*`, with negations for the four deliberately
+      tracked files (`.env.sample`, `.env.coolify.sample`, `.env.production`,
+      `frontend/.env.development`, plus `*/.env.sample`). Note the limit of this: gitignore
+      does not protect a file that is already tracked, so it guards against a *new*
+      `.env.local`/`.env.staging`, not against a literal edit to `.env.production`.
+- [x] `harvest-prod/` ignored explicitly, so it no longer depends on the blanket `*.csv`.
+- [x] `.pytest_cache/`, `.ruff_cache/` ignored. `downloads/` is a tracked mount point with a
+      README, so it is `/downloads/*` + `!/downloads/README.md`, not a blanket ignore.
+- [x] `frontend/.DS_Store` untracked (`git rm --cached`).
+- [x] `downloader/.gitignore` added, matching the other two Python projects.
 
 ### Docker
 
-- [ ] **Add a `.dockerignore` per build context.** Only the root one exists, and it applies only to
-      its own context. `frontend` ships 529 MB and `web-api` 104 MB per build. **[verified]**
-- [ ] **Both JS images `COPY` host `node_modules` over `npm ci`** — so the image's dependency tree is
-      whatever was on the developer's laptop, not the lockfile. `frontend/Dockerfile:26` copies after
-      `npm ci` (defeating the layer-cache split at 22-23); `web-api/Dockerfile` copies *before*
-      `npm ci` (no caching at all, and `.env.sample` lands in the image).
-- [ ] Root-context builds send ~3.8 GB: the root `.dockerignore` says `venv` not `.venv`, and omits
-      `.claude/`, `harvester_cache/` (712 MB), `harvester_logs/`, `nginx/logs/`, `obis/`,
-      `harvest_config.yaml`. It has drifted from `.gitignore`.
-- [ ] **`SENTRY_AUTH_TOKEN` is passed as a build ARG then promoted to ENV**
-      (`docker-compose.production.yaml:29`, `frontend/Dockerfile:9,18`) — recoverable from image
-      metadata via `docker history` / `inspect`. Use a BuildKit secret mount; the repo already does
-      this for the uv cache.
-- [ ] **Zero `HEALTHCHECK` and zero `USER` across all six Dockerfiles.** 7 of 9 compose services have
-      no healthcheck, including `web-api` and `nginx`. `nginx` uses plain `depends_on: [web-api]`
-      without `condition: service_healthy`, so it serves 502s during every deploy window. An unmerged
-      `feat/add-health-checks` branch (`3efc16ad`) exists. **[verified]**
-- [ ] Pin floating images: `web-api/Dockerfile:1` `node:alpine` (no version at all),
-      `frontend/Dockerfile:30` `nginx` (untagged), `docker-compose.yaml:305` `redis:alpine`.
-      `nginx/Dockerfile:1` correctly pins `nginx:1.27.4` — match that.
-- [ ] `harvester/Dockerfile:15` falls back to `uv lock && uv sync` on a lock mismatch, silently
-      regenerating the lockfile mid-build and defeating `--locked`. `download_scheduler/Dockerfile:22`
-      omits `--locked` entirely and its `apt-get` has no `--no-install-recommends` and no list cleanup.
-- [ ] `docker-compose.production.yaml:12` publishes the Postgres port to the host in production while
-      local dev deliberately does not — inverted from a security standpoint.
-- [ ] Four services repeat `env_file: [.env]` with no YAML anchor; `DB_HOST_EXTERNAL` and `REDIS_HOST`
-      are set in three places with different defaults. `TODO.md` already names "Fix docker compose
-      handling with override or not" as an open item.
+- [x] **`.dockerignore` per build context** — added for `frontend`, `web-api`, `nginx` and
+      `database`, and the root one rewritten. Measured context sizes after:
+      root **3.8 GB → 32 kB**, frontend **529 MB → 3.1 MB**, web-api **104 MB → 4 kB**.
+      The root file carries a syntax warning worth keeping in mind: `.dockerignore` is *not*
+      `.gitignore` — a bare `node_modules` matches only the context root, which is how
+      148 MB of `harvester/ckan_harvester_cache` survived the first rewrite. Depth patterns
+      need an explicit `**/`.
+- [x] **Host `node_modules` no longer copied over `npm ci`.** `frontend/Dockerfile` is fixed
+      by its `.dockerignore`; `web-api/Dockerfile` now copies `package*.json`, runs
+      `npm ci --omit=dev`, and only then copies source — so a source edit reuses the install
+      layer, and `.env.sample` no longer lands in the image.
+- [x] Root context drift fixed — see the measurement above.
+- [x] **`SENTRY_AUTH_TOKEN` is a BuildKit secret**, not an ARG promoted to ENV. Mounted only
+      for the `npm run build` layer that uploads source maps; `docker-compose.production.yaml`
+      passes it via `build.secrets` from the deploy environment (needs Compose ≥ 2.23).
+      Verified: the token appears in neither `docker inspect` env nor `docker history`.
+- [x] **HEALTHCHECK** added to `web-api` (`/health`, a new liveness route — deliberately not
+      a DB probe, since nginx gates on it), `frontend` and `nginx` (a local `/healthz` stub
+      in `nginx.conf`, answered by nginx itself so an upstream 502 is not read as the proxy
+      being dead). `redis` gets one in compose. `nginx`'s `depends_on` is now
+      `condition: service_healthy` on both upstreams, which closes the 502 window on every
+      deploy. All three verified reporting `healthy` in a live container run.
+      **USER**: added to `web-api` (runs as `node`). Not added to `nginx` (cron + logrotate
+      in `start.sh`; workers already drop to the `nginx` user) or to the two Python services
+      (they own named volumes whose ownership is fixed at first creation — switching now
+      would need a manual `chown` on every existing deployment). Both are commented in place.
+- [x] Floating images pinned: `web-api` `node:alpine` → `node:22-alpine`, `frontend` stage 2
+      `nginx` → `nginx:1.27.4-alpine`, `redis:alpine` → `redis:7.4-alpine`.
+- [x] `harvester/Dockerfile`'s `|| uv lock && uv sync` fallback removed — it regenerated the
+      lockfile mid-build, so the image could pin untested transitive versions and the final
+      `--locked` would still pass. `download_scheduler/Dockerfile` gained `--locked`.
+      *This immediately surfaced two stale lockfiles* (`downloader`, `download_scheduler`);
+      both relocked. The `apt-get` half of that bullet was already fixed:
+      `--no-install-recommends` and the list cleanup are both present.
+- [x] `docker-compose.production.yaml` no longer publishes Postgres on `0.0.0.0`. The port is
+      genuinely needed — the external harvester and any remote `prefect_worker` reach it over
+      the VPN — so it binds `${DB_BIND_ADDRESS:-127.0.0.1}`, defaulting closed, with
+      `DB_BIND_ADDRESS` set to the VPN address in `.env.production`.
+- [x] `env_file: [.env]` collapsed to an `x-env-file` anchor across the four services. The
+      differing `DB_HOST_EXTERNAL`/`REDIS_HOST` defaults are per-service on purpose and were
+      left alone; restructuring the override files remains the `TODO.md` item.
 
 ### Tooling & gates
 
-- [ ] **Add a lint/build gate; expand the new test gate.** CI now runs `uv run pytest`,
-      `harvester/tests/unit`, `downloader/tests`, the JS API/frontend smoke suite, and a bounded
-      download-request integration check. Still missing: `npm run lint`, a Python linter, and a
-      frontend production build gate. ESLint configs and Prettier remain editor-only decoration.
-      **[CI partially fixed @ 6f64fb41]**
-- [ ] **No `.pre-commit-config.yaml`.** Nothing enforces the `.gitattributes` LF policy, and nothing
-      would have caught `frontend/.DS_Store` or `.env.production`.
-- [ ] **Commit a ruff config and run `ruff --fix`.** `ruff check` reports **126 errors, 51
-      auto-fixable**: 15 unsorted-import, 10 unused-import, 8 `logging-exc-info`, 6 *stale* `noqa`
-      (someone silenced findings with a tool no longer in use), 4 f-string-no-placeholder, 4
-      `logging-warn`, 4 unused-variable, 2 bare-except, 2 try-except-pass, 2 naive-datetime.
-      No `[tool.ruff]`, `[tool.black]` or `[tool.mypy]` exists anywhere despite a `.ruff_cache/` on disk.
-- [ ] `web-api/.eslintrc.js` declares `sourceType: "module"` and `env.browser: true` for CommonJS
-      Node code. `web-api` has `lint:fix` but no `lint` script. Prettier is installed with no config
-      and is never extended.
-- [ ] The two projects use contradictory styles — `frontend` standard/no-semi/single-quote vs
-      `web-api` airbnb-base/double-quote. Pick one for shared or copied code.
-- [ ] ESLint 8 (EOL Oct 2024) and Prettier 2 in both, on legacy `.eslintrc` rather than flat config.
-- [x] **Revive the orphaned root `test/`.** The CI refresh restored the JS suite as an active
-      integration smoke test: `npm --prefix test test` now runs API and frontend checks against
-      harvested data, and `.github/scripts/test-download-request.sh` covers the download path.
-      **[verified fixed @ 6f64fb41]**
-- [ ] Rename `CODEOWNER` → `CODEOWNERS`. GitHub only recognises the plural, so no review is ever
-      auto-requested. **[verified]**
-- [ ] Add a `LICENSE` — `frontend/package.json` declares ISC and the repo is public, with no licence text.
-- [ ] Add `CONTRIBUTING.md` and a `dependabot.yml`. There is nowhere a new contributor can learn the
-      conventions, especially with two ESLint configs and no gate.
+- [x] **Lint/build gate added.** A new `lint` job in the **Integration Tests** workflow —
+      the workflow `deploy.yml` gates on — runs `ruff check`, `uv lock --check` across all
+      four projects, `npm run lint` for web-api and frontend, and `npm run build` for the
+      frontend. It is a separate fast job, so it fails the workflow (and blocks deploy)
+      without waiting on the 45-minute compose job.
+- [x] **`.pre-commit-config.yaml` added**: LF enforcement (matching `.gitattributes`),
+      end-of-file/trailing-whitespace, large files, private keys, YAML/JSON, ruff, and
+      `uv lock` for all four projects. Jinja2 `.j2` templates are excluded from the
+      whitespace hooks — their whitespace is rendered email content. Runs clean and
+      idempotent over the whole repo.
+- [x] **Ruff config committed and applied.** `[tool.ruff]` in the root `pyproject.toml` only;
+      ruff walks up to the nearest section, so it governs all three Python projects.
+      `line-length = 120`, `select = ["E","W","F","I","UP","B","C4","LOG","DTZ","SIM","RUF100"]`.
+      `G` (logging-f-string) is deliberately not selected: its 44 hits are loguru calls,
+      where an f-string is the documented style. 224 findings → **0**; `ruff check` passes.
+      Notable real fixes among them: two naive-datetime call sites (log filenames and the
+      "ongoing dataset" end bound were built from local time while everything else is UTC),
+      a bare `except:` around `pd.Timedelta`, two root-logger calls in `__main__.py`, six
+      `zip()`s now `strict=True`, a mutable `skiprows=[1]` default, and the six stale `noqa`
+      the survey called out. Three `# noqa: F841` remain with reasons — pandas `.query()`
+      resolves `@name` out of the caller's locals, which ruff cannot see.
+- [x] `web-api/.eslintrc.js` fixed: `env.node`/`sourceType: "script"` instead of
+      `env.browser`/`"module"` for CommonJS Node code, and a `lint` script added next to
+      `lint:fix`. 218 errors → **0** (28 `no-console` warnings remain, which are intentional
+      — stdout is this service's log). Each airbnb rule relaxed is annotated with its reason
+      in the config (snake_case DB columns, express `consistent-return`, `next` arity).
+      Real fixes: six dead bindings, a `requiredShapeMiddleware(req,res,next)` that took
+      three parameters it never used, eight `!= undefined` → `!== undefined`, and six
+      redundant regex escapes (equivalence checked before removing).
+      `frontend` lint: 503 → **0**, 500 by autofix across 14 files (the Harvest components,
+      written in a different style) plus two dead bindings.
+- [ ] **[deferred]** Unify the two JS styles. `frontend` (standard/no-semi/single-quote) and
+      `web-api` (airbnb/semi/double-quote) still disagree. Both now lint clean *against their
+      own config*, which is what makes the gate possible; converging them is a separate
+      reformat and was scoped out.
+- [x] Root `test/` — already fixed by the CI refresh. **[verified fixed @ 6f64fb41]**
+- [x] `CODEOWNER` → `CODEOWNERS`.
+- [ ] **[deferred]** `LICENSE`. Not a cleanup decision: this repo is a fork of
+      `HakaiInstitute/cde`, which has no licence of its own, and the `cioos-siooc` org uses
+      five different ones across its repos. Being handled elsewhere.
+- [x] `CONTRIBUTING.md` and `.github/dependabot.yml` added. Dependabot covers three npm
+      projects, four uv projects, six Docker contexts and the GitHub Actions, grouped so a
+      week's patches arrive as one PR per ecosystem.
+- [ ] **[deferred]** ESLint 8 → 9 flat config. Both projects are still on ESLint 8 and
+      `.eslintrc`. A two-project flat-config migration is not a cheap item.
 
 ### Dependencies
 
-- [ ] **Drop 7 unused `web-api` dependencies**: `@mapbox/sphericalmercator`, `cache-manager`,
-      `ioredis`, `lru-cache`, `validator` — plus `prettier` and `eslint-config-prettier`, which are in
-      production `dependencies`.
-- [ ] Collapse three overlapping stacks: two Redis clients (`redis` used, `ioredis` dead), three cache
-      libraries (only `apicache` used), two validators (`express-validator` used, standalone
-      `validator` dead and already transitive). Note `utils/cache.js` carries a hand-written shim
-      because `apicache@1.6.3` speaks the node_redis v2/v3 callback API while `redis@5` is
-      promise-based — the used pair is itself a version mismatch being papered over.
-- [ ] **Sentry is four majors apart** — `@sentry/node@^6` plus the long-deprecated `@sentry/tracing`
-      in `web-api` vs `@sentry/react@^10` in `frontend`, both reporting to the same org.
-- [ ] Stale `web-api` pins: `dotenv@^10` (17.x current), `uuid@^8` (11.x), `debug@~2.6.9` (2017),
-      `http-errors@~1.6.3`, `cookie-parser@~1.4.4`. `cookie-parser`, `http-errors`, `views/` and
-      `public/` are express-generator remnants in a stateless JSON/tile service.
-- [ ] Three dead frontend dev deps: `eslint-config-airbnb-base` (never extended),
-      `eslint-plugin-node` (renamed to `eslint-plugin-n` upstream), `eslint-plugin-standard`
-      (dropped by `eslint-config-standard@17`). Also a dead `allowScripts` block naming
-      `@lavamoat/allow-scripts`, which is not installed, with stale pinned versions; and an empty
-      `"overrides": {}`.
-- [ ] `@turf/*` pinned `^6.5.0`, two majors behind. `lodash` imported 13× as full CJS rather than
-      `lodash-es` — a bundle-size cost in a Vite build.
-- [ ] **Consolidate the Python packaging.** Four `.venv` (1.6 GB) and four `uv.lock` for one
-      deployable system. CI resolves from the root lock but `harvester/Dockerfile` resolves from
-      `harvester/uv.lock`, so the image and the tested code can pin different transitive versions.
-      Note the root `pyproject.toml` workspace omits `downloader` entirely. **[verified]**
-- [ ] Python floors disagree: `>=3.10,<3.11` in harvester and downloader, unbounded `>=3.10` in
-      download_scheduler, root `>=3.10` — so the root lock carries markers for 3.11–3.13 that can
-      never be satisfied. `erddapy` and `shapely` bounds have drifted between projects for no stated
-      reason. `downloader/pyproject.toml:4` has download_scheduler's description pasted in.
-- [ ] `download_scheduler` has no dev group and no pytest at all; `downloader` pins pytest 8 while
-      harvester pins 9.
+- [x] **Seven unused `web-api` dependencies dropped** — `@mapbox/sphericalmercator`,
+      `cache-manager`, `ioredis`, `lru-cache`, `validator`, plus `prettier` and
+      `eslint-config-prettier` (both of which were in production `dependencies`).
+      `cookie-parser` went too, with the view scaffolding below.
+- [x] Overlapping stacks collapsed as far as the dead code went: `ioredis` and `validator`
+      are gone, leaving one Redis client and one validator. The `apicache`/`redis@5` shim in
+      `utils/cache.js` stays — replacing `apicache` is a behaviour change, not a prune.
+- [ ] **[deferred]** Sentry majors. `web-api` is still on `@sentry/node@^6` +
+      `@sentry/tracing` against `frontend`'s `@sentry/react@^10`. A four-major upgrade
+      rewrites the init and handler API; it needs its own pass.
+- [x] Stale `web-api` pins bumped: `dotenv` 10 → 17 (all six `config()` calls now pass
+      `{ quiet: true }`; v17 prints a promo banner otherwise), `uuid` 8 → 11, `debug` 2.6.9
+      → 4, `http-errors` 1.6 → 2. The express-generator remnants are gone: `views/`,
+      `public/`, `cookie-parser` and the jade view engine. **This fixed a live bug** — see
+      the note under Verification.
+- [x] Three dead frontend dev deps removed (`eslint-config-airbnb-base`, `eslint-plugin-node`,
+      `eslint-plugin-standard`), `eslint-plugin-n` added (it is `eslint-config-standard@17`'s
+      real peer and was only resolving transitively), plus the dead `allowScripts` block and
+      the empty `overrides`.
+- [x] `@turf/*` 6.5 → 7.4 and `lodash` → `lodash-es`. `@turf/union` changed signature in v7
+      (two features → one FeatureCollection); both call sites in `Map.jsx` updated, still
+      folded pairwise so one degenerate fragment costs only itself.
+- [ ] **[deferred]** Consolidate the Python packaging. Still four `.venv` and four `uv.lock`.
+      All four locks are now current and CI checks them, which removes the acute risk
+      (image and tested code resolving differently); merging them into one workspace is the
+      structural item.
+- [x] Python floors reconciled: `download_scheduler` and the root were unbounded `>=3.10`
+      while harvester and downloader are `>=3.10,<3.11`, so the root lock carried
+      3.11–3.13 markers no deployment can satisfy. All four are `>=3.10,<3.11` now.
+      `downloader/pyproject.toml`'s pasted-in description fixed.
+- [x] `download_scheduler` has a dev group with pytest 9 (it had three test suites and no
+      pytest at all, so they only ran from the root workspace); `downloader`'s pytest 8
+      raised to 9 to match harvester.
+
+### Found while doing this — new items, not from the original survey
+
+- [ ] **`web-api` never initialises Sentry in production.** `app.js:46` gates on
+      `process.env.ENVIRONMENT === "production"`, but `.env.production` sets
+      `ENVIRONMENT=juno-cioos-co-production`. One-word fix, but it *enables* error reporting
+      that is currently off, so it wants a deliberate decision rather than a drive-by.
+- [ ] **57 React hooks findings.** Enabling `plugin:react-hooks/recommended` reports 54
+      `exhaustive-deps` and 3 `rules-of-hooks`. The three look like genuine bugs:
+      `DatasetPreviewTable.jsx:12-13` calls `useTranslation`/`useState` conditionally, and
+      `utilities.jsx:23` calls `useTranslation` inside a plain function. The plugin is now
+      registered in `frontend/.eslintrc.js` (so the existing disable comment resolves) with
+      both rules **off** and this pointer in a comment. Fixing them changes render behaviour.
+- [ ] `harvester/tests/unit/test_schema_rebuild.py::test_database_url_still_builds_when_complete`
+      fails in a full-suite run but passes alone: the repo `.env`'s `DB_PORT=5433` leaks in
+      via a `load_dotenv()` at import time. Pre-existing (confirmed identical on a stashed
+      tree) and environment-dependent, so CI does not see it. Worth an isolated fixture.
+
+### Verification for this sweep
+
+- `ruff check .` — clean (was 224).
+- `uv run pytest -m "not integration"` — 535 passed, 6 skipped; the one failure above is
+  pre-existing and reproduces identically on the pre-change tree.
+- `uv lock --check` — clean in all four projects.
+- `npm run lint` — clean in `web-api` (0 errors) and `frontend` (0).
+- `npm test` in `web-api`, `npm run build` in `frontend` — both pass.
+- `uvx pre-commit run --all-files` — passes, and is idempotent on a second run.
+- All six images build, including the frontend with the BuildKit secret. `web-api`, `nginx`
+  and `frontend` verified reaching `healthy` in a live run, with nginx proxying
+  `/api/health` through to web-api.
+- **Live bug fixed in passing:** `jade` was never in `web-api/package.json`, so `res.render()`
+  threw — `GET /` and *every* 404 and 500 fell through to express's default handler, which
+  answered **500 with the full stack trace in the response body**. Routes and the error
+  handler now return JSON, and `NODE_ENV=production` in the Dockerfile keeps the stack out
+  of the response (express defaults to `development` when it is unset, which the container
+  never set).
 
 ---
 
