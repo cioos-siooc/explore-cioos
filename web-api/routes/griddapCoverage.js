@@ -35,7 +35,8 @@ router.get("/", cache.route(), async (req, res, next) => {
   const { scientificNames, obisNodes, erddapServers } = req.query;
   // Same gating as shapeQuery's includeProfiles: scientific-name filters and
   // OBIS-node-only selections hide ERDDAP data, and griddap is ERDDAP-only.
-  const includeProfiles = !scientificNames && (!obisNodes || Boolean(erddapServers));
+  const includeProfiles =
+    !scientificNames && (!obisNodes || Boolean(erddapServers));
   if (!includeProfiles) {
     return res.send({ type: "FeatureCollection", features: [] });
   }
@@ -44,7 +45,8 @@ router.get("/", cache.route(), async (req, res, next) => {
   try {
     filters = await createDBFilter(req.query);
   } catch (err) {
-    if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+    if (err.statusCode === 400)
+      return res.status(400).json({ error: err.message });
     throw err;
   }
 

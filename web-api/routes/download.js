@@ -9,7 +9,10 @@ const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { getShapeQuery } = require("../utils/shapeQuery");
 const { polygonJSONToWKT } = require("../utils/polygon");
-const { requiredShapeMiddleware, errorHandler } = require("../utils/validatorMiddlewares");
+const {
+  requiredShapeMiddleware,
+  errorHandler,
+} = require("../utils/validatorMiddlewares");
 
 /**
  * /download
@@ -99,7 +102,8 @@ router.get(
       shapeQueryResponse = await getShapeQuery(req.query, true, false);
       filters = await createDBFilter(req.query);
     } catch (err) {
-      if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+      if (err.statusCode === 400)
+        return res.status(400).json({ error: err.message });
       throw err;
     }
     const estimateTotalSize = shapeQueryResponse.reduce(
@@ -115,9 +119,13 @@ router.get(
     // OBIS-node selections hide the profile branches (OBIS-only mode) unless
     // ERDDAP servers are also selected.
     const {
-      includeObis = "true", scientificNames, obisNodes, erddapServers,
+      includeObis = "true",
+      scientificNames,
+      obisNodes,
+      erddapServers,
     } = req.query;
-    const includeProfiles = !scientificNames && (!obisNodes || Boolean(erddapServers));
+    const includeProfiles =
+      !scientificNames && (!obisNodes || Boolean(erddapServers));
     const showObis = includeObis !== "false";
 
     // search_geom is the geometry filters.shared matches against: the per-feature

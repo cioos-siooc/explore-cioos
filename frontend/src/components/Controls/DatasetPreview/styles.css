@@ -8,7 +8,7 @@
   min-height: 100px;
 }
 
- .backButton {
+.backButton {
   text-align: center;
   border: 2px solid var(--cioos-hairline);
   border-radius: 10px;
@@ -30,7 +30,7 @@
 .tableAndPlotGridContainer .toggleButton {
   min-width: 66px;
   height: 42px;
-  margin: 0px 16.5px;
+  margin: 0 16.5px;
   background-color: white;
   border-radius: 5px;
   border: 2px solid var(--cioos-hairline);
@@ -51,7 +51,7 @@
   margin: 10px auto;
 }
 
-.tableAndPlotGridItem .dropdown{
+.tableAndPlotGridItem .dropdown {
   display: inline;
   margin-right: 10px;
 }
@@ -65,7 +65,7 @@
 }
 
 .tableAndPlotGridItem hr {
-  margin-top: 0px;
+  margin-top: 0;
 }
 
 /* .tableAndPlot .dropDownButton {

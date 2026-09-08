@@ -140,7 +140,8 @@ router.get(
     try {
       filters = await createDBFilter(req.query);
     } catch (err) {
-      if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+      if (err.statusCode === 400)
+        return res.status(400).json({ error: err.message });
       throw err;
     }
 
@@ -166,11 +167,12 @@ router.get(
     // (pre-toggle behaviour), empty = none. Values are validated against the
     // fixed set below so they can be inlined into the branch SQL safely.
     const ALL_PROFILE_TYPES = ["Profile", "TimeSeries", "TimeSeriesProfile"];
-    const profileTypes = req.query.profileTypes === undefined
-      ? ALL_PROFILE_TYPES
-      : String(req.query.profileTypes)
-        .split(",")
-        .filter((t) => ALL_PROFILE_TYPES.includes(t));
+    const profileTypes =
+      req.query.profileTypes === undefined
+        ? ALL_PROFILE_TYPES
+        : String(req.query.profileTypes)
+            .split(",")
+            .filter((t) => ALL_PROFILE_TYPES.includes(t));
     const trajectoryToggledOn = req.query.includeTrajectory !== "false";
     const trajectoryTypes = requestedTrajectoryTypes(req.query);
     // ERDDAP-sourced data (profiles + trajectory coverage) is hidden wholesale
@@ -178,11 +180,12 @@ router.get(
     // OBIS-only, and an OBIS-node selection also hides it, unless ERDDAP
     // servers are selected alongside it (combined Source filter — show both,
     // OR'd in the shared dataset filter).
-    const erddapVisible = !req.query.scientificNames
-      && (!req.query.obisNodes || Boolean(req.query.erddapServers));
+    const erddapVisible =
+      !req.query.scientificNames &&
+      (!req.query.obisNodes || Boolean(req.query.erddapServers));
     const includeProfiles = erddapVisible && profileTypes.length > 0;
-    const includeTrajectory = trajectoryToggledOn
-      && erddapVisible && trajectoryTypes.length > 0;
+    const includeTrajectory =
+      trajectoryToggledOn && erddapVisible && trajectoryTypes.length > 0;
 
     // At hex zoom we only need the hex FK and point_pk (for distinct counts);
     // the polygon is fetched once per hex via JOIN to hexes_zoom_*. At point
@@ -196,11 +199,12 @@ router.get(
     // branch to datasets of those cdm_data_types (values allowlisted above →
     // safe to inline). All-three or none → no type filter (none never reaches
     // the branch).
-    const profilesTypeFilter = profileTypes.length && profileTypes.length < ALL_PROFILE_TYPES.length
-      ? ` AND dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${profileTypes
-        .map((t) => `'${t}'`)
-        .join(",")}))`
-      : "";
+    const profilesTypeFilter =
+      profileTypes.length && profileTypes.length < ALL_PROFILE_TYPES.length
+        ? ` AND dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${profileTypes
+            .map((t) => `'${t}'`)
+            .join(",")}))`
+        : "";
     const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${metricValueExpr("profiles", metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
     FROM cde.profiles ${metricJoin("profiles", metric)}
@@ -382,7 +386,8 @@ router.get(
     try {
       filters = await createDBFilter(req.query);
     } catch (err) {
-      if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+      if (err.statusCode === 400)
+        return res.status(400).json({ error: err.message });
       throw err;
     }
 
@@ -405,10 +410,11 @@ router.get(
     // ...and, since the two trajectory geometries are separate layers, the
     // requested subset of them; with neither on there is nothing to draw.
     const trajectoryTypes = requestedTrajectoryTypes(req.query);
-    const includeProfiles = req.query.includeTrajectory !== "false"
-      && trajectoryTypes.length > 0
-      && !req.query.scientificNames
-      && (!req.query.obisNodes || Boolean(req.query.erddapServers));
+    const includeProfiles =
+      req.query.includeTrajectory !== "false" &&
+      trajectoryTypes.length > 0 &&
+      !req.query.scientificNames &&
+      (!req.query.obisNodes || Boolean(req.query.erddapServers));
 
     // A `src` discriminator lets one pass over the union produce both the
     // unified count that colours the hex AND the per-kind figures the hover
@@ -586,8 +592,16 @@ router.get(
     // reference columns cde.trajectory_track_stats doesn't have — the time
     // window is bound explicitly below instead.
     const datasetLevelQuery = {};
-    ["eovs", "platforms", "datasetPKs", "organizations", "obisNodes", "erddapServers"]
-      .forEach((k) => { if (req.query[k]) datasetLevelQuery[k] = req.query[k]; });
+    [
+      "eovs",
+      "platforms",
+      "datasetPKs",
+      "organizations",
+      "obisNodes",
+      "erddapServers",
+    ].forEach((k) => {
+      if (req.query[k]) datasetLevelQuery[k] = req.query[k];
+    });
 
     // Track lines are drawn for whichever trajectory geometries are switched
     // on. With neither on the client stops asking for this layer at all, but
@@ -598,15 +612,17 @@ router.get(
     }
     // The cand CTE already joins cde.datasets, so the type test rides along
     // there — filtering candidate trajectories before any fix is pulled.
-    const trackTypeFilter = trajectoryTypes.length < ALL_TRAJECTORY_TYPES.length
-      ? ` AND d.cdm_data_type IN (${trajectoryTypes.map((t) => `'${t}'`).join(",")})`
-      : "";
+    const trackTypeFilter =
+      trajectoryTypes.length < ALL_TRAJECTORY_TYPES.length
+        ? ` AND d.cdm_data_type IN (${trajectoryTypes.map((t) => `'${t}'`).join(",")})`
+        : "";
 
     let filters;
     try {
       filters = await createDBFilter(datasetLevelQuery);
     } catch (err) {
-      if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+      if (err.statusCode === 400)
+        return res.status(400).json({ error: err.message });
       throw err;
     }
 

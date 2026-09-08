@@ -4,8 +4,13 @@ require("pg-parse-float")(pg);
 require("dotenv").config({ quiet: true });
 
 const {
-  DB_USER, DB_PASSWORD, DB_HOST, DB_NAME, DB_PORT,
-  DB_POOL_MIN, DB_POOL_MAX,
+  DB_USER,
+  DB_PASSWORD,
+  DB_HOST,
+  DB_NAME,
+  DB_PORT,
+  DB_POOL_MIN,
+  DB_POOL_MAX,
 } = process.env;
 
 console.log("Connected to DB:", DB_HOST, DB_NAME, DB_PORT);

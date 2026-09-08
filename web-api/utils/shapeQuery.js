@@ -8,7 +8,10 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
   const filters = await createDBFilter(query);
 
   const {
-    timeMin = null, timeMax = null, depthMin = null, depthMax = null,
+    timeMin = null,
+    timeMax = null,
+    depthMin = null,
+    depthMax = null,
     includeObis = "true",
     scientificNames,
     obisNodes,
@@ -19,7 +22,8 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
   // OBIS-node selection also hides profiles, unless ERDDAP servers are
   // selected alongside it (combined Source filter — show both, OR'd in the
   // shared dataset filter).
-  const includeProfiles = !scientificNames && (!obisNodes || Boolean(erddapServers));
+  const includeProfiles =
+    !scientificNames && (!obisNodes || Boolean(erddapServers));
   const showObis = includeObis !== "false";
 
   // search_geom is the geometry the shared spatial filter (dbFilter) matches
@@ -200,8 +204,8 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                   --   * records per day of data
                   --   * fraction of the depth range the query overlaps)
                   ${
-  doEstimate
-    ? `,SUM(
+                    doEstimate
+                      ? `,SUM(
                   -- Days of the query window this feature actually holds data on.
                   -- records_per_day is a rate over days WITH DATA, so the day factor
                   -- has to be too: multiplying it by an elapsed span over-counts a
@@ -218,8 +222,8 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
                     END, 0), 1) * p.records_per_day *
                   -- depth multiplier - fraction of depth range that this query overlaps with profile depth range
                   coalesce(nullif(range_intersection_length(numrange(:depthMin,:depthMax),numrange(p.depth_min::NUMERIC,p.depth_max::NUMERIC)),0),1) / (coalesce(nullif(p.depth_max-p.depth_min,0),1)) ) AS records_count`
-    : ""
-}
+                      : ""
+                  }
 
          FROM     filtered p
          JOIN     cde.datasets d

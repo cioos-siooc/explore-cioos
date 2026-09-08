@@ -1,26 +1,23 @@
-/* eslint-disable react/prop-types */
-/* eslint-disable multiline-ternary */
-
-import * as React from 'react'
-import { CheckSquare, CircleFill, Square } from 'react-bootstrap-icons'
-import { useTranslation } from 'react-i18next'
-import Tooltip from '../../../ui/Tooltip.jsx'
-import { capitalizeFirstLetter } from '../../../../utilities'
-import platformColors from '../../../platformColors'
-import './styles.css'
+import * as React from "react";
+import { CheckSquare, CircleFill, Square } from "react-bootstrap-icons";
+import { useTranslation } from "react-i18next";
+import Tooltip from "../../../ui/Tooltip.jsx";
+import { capitalizeFirstLetter } from "../../../../utilities";
+import platformColors from "../../../platformColors";
+import "./styles.css";
 
 export default function MultiCheckboxFilter({
   optionsSelected,
   setOptionsSelected,
   translatable,
   colored,
-  allOptions
+  allOptions,
 }) {
-  const { t, i18n } = useTranslation()
+  const { t, i18n } = useTranslation();
 
   const optionsSelectedSorted = optionsSelected.sort((a, b) =>
-    t(a.title).localeCompare(t(b.title), i18n.language)
-  )
+    t(a.title).localeCompare(t(b.title), i18n.language),
+  );
 
   // Nothing ticked constrains nothing, so an empty selection already means
   // "all of them" — which is why unticking the last box is safe and lands back
@@ -29,48 +26,48 @@ export default function MultiCheckboxFilter({
   // automatically instead of being absent from a frozen list of everything),
   // and shown that way: no ticks in the default state, so the pane reports what
   // the user has actually chosen rather than pre-answering for them.
-  const universe = allOptions || optionsSelected
-  const isChecked = (option) => option.isSelected
+  const universe = allOptions || optionsSelected;
+  const isChecked = (option) => option.isSelected;
 
-  function toggleOption (option) {
+  function toggleOption(option) {
     setOptionsSelected(
       universe.map((opt) =>
-        opt.pk === option.pk ? { ...opt, isSelected: !opt.isSelected } : opt
-      )
-    )
+        opt.pk === option.pk ? { ...opt, isSelected: !opt.isSelected } : opt,
+      ),
+    );
   }
 
-  function selectAllSearchResultsToggle () {
-    const listOfPKs = optionsSelected.map((option) => option.pk)
-    const allShownChecked = optionsSelected.every(isChecked)
+  function selectAllSearchResultsToggle() {
+    const listOfPKs = optionsSelected.map((option) => option.pk);
+    const allShownChecked = optionsSelected.every(isChecked);
     setOptionsSelected(
       universe.map((option) =>
         listOfPKs.includes(option.pk)
           ? { ...option, isSelected: !allShownChecked }
-          : option
-      )
-    )
+          : option,
+      ),
+    );
   }
 
   return (
-    <div className={'multiCheckboxFilter'}>
+    <div className={"multiCheckboxFilter"}>
       {optionsSelected.length > 0 &&
         optionsSelected.length !== allOptions.length && ( // search results exist
-        <>
-          <div
-            className='searchResultsButton'
-            onClick={() => selectAllSearchResultsToggle()}
-          >
-            {optionsSelected.every(isChecked) ? <CheckSquare /> : <Square />}
-            {t('multiCheckboxFilterSelectSearchResults')}{' '}
-            {`(${optionsSelected.length})`}
-            <hr />
-          </div>
-        </>
-      )}
+          <>
+            <div
+              className="searchResultsButton"
+              onClick={() => selectAllSearchResultsToggle()}
+            >
+              {optionsSelected.every(isChecked) ? <CheckSquare /> : <Square />}
+              {t("multiCheckboxFilterSelectSearchResults")}{" "}
+              {`(${optionsSelected.length})`}
+              <hr />
+            </div>
+          </>
+        )}
       {optionsSelected.length > 0 ? (
         optionsSelectedSorted.map((option, index) => {
-          let title
+          let title;
           if (translatable) {
             // Translation in title_translation
             if (
@@ -78,62 +75,62 @@ export default function MultiCheckboxFilter({
               option.titleTranslated[i18n.languages[0]] &&
               option.titleTranslated[i18n.languages[1]]
             ) {
-              title = option.titleTranslated[i18n.language]
+              title = option.titleTranslated[i18n.language];
             } else if (t(option.title)) {
               // Translation in t(title)
-              title = t(option.title)
+              title = t(option.title);
             } else {
-              title = option.title // this shouldn't really happen, but its a catch-all fallback
+              title = option.title; // this shouldn't really happen, but its a catch-all fallback
             }
           } else {
-            title = option.title
+            title = option.title;
           }
 
-          let platformColor
+          let platformColor;
           if (colored) {
             platformColor = platformColors.filter(
-              (pc) => pc.platform === option.title
-            )
+              (pc) => pc.platform === option.title,
+            );
             if (colored && !platformColor.length) {
-              platformColor = '#000000'
+              platformColor = "#000000";
             } else {
-              platformColor = platformColor[0].color
+              platformColor = platformColor[0].color;
             }
           }
-          const hoverText = option[`hover_${i18n.language}`] || title
+          const hoverText = option[`hover_${i18n.language}`] || title;
 
           // No translation
           return (
             <Tooltip
               key={index}
-              placement='bottom'
+              placement="bottom"
               delay={150}
               content={hoverText}
             >
               <div
-                className={`optionButton ${isChecked(option) && 'selected'}`}
+                className={`optionButton ${isChecked(option) && "selected"}`}
                 key={index}
-                title={hoverText ? '' : t(title)}
+                title={hoverText ? "" : t(title)}
                 onClick={() => toggleOption(option)}
               >
                 {isChecked(option) ? <CheckSquare /> : <Square />}
-                <span className='optionName'>
+                <span className="optionName">
                   {capitalizeFirstLetter(title)}
                 </span>
                 {colored && (
                   <CircleFill
-                    className='optionColorCircle'
+                    className="optionColorCircle"
                     fill={platformColor}
-                    size='15'
+                    size="15"
                   />
                 )}
               </div>
             </Tooltip>
-          )
+          );
         })
       ) : (
-        <div>{t('multiCheckboxFilterNoFilterWarning')}</div>
+        <div>{t("multiCheckboxFilterNoFilterWarning")}</div>
       )}
     </div>
-  )
+  );
 }

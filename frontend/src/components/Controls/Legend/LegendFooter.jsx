@@ -1,10 +1,10 @@
-import * as React from 'react'
-import { useEffect, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { AttributionControl, ScaleControl } from 'maplibre-gl'
-import { InfoCircle } from 'react-bootstrap-icons'
+import * as React from "react";
+import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { AttributionControl, ScaleControl } from "maplibre-gl";
+import { InfoCircle } from "react-bootstrap-icons";
 
-import { useMapState } from '../../../state/map/MapStateProvider.jsx'
+import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 
 // The foot of the legend card: the map's scale bar, and the ⓘ that opens the
 // basemap credits.
@@ -20,12 +20,12 @@ import { useMapState } from '../../../state/map/MapStateProvider.jsx'
 // re-parented rather than reimplemented, so it still redraws on every move; the
 // credits are the real AttributionControl, so they still aggregate whatever
 // sources the style has loaded — including any added after mount.
-export default function LegendFooter () {
-  const { t } = useTranslation()
-  const { mapRef, mapLoaded } = useMapState()
-  const scaleHost = useRef(null)
-  const creditsHost = useRef(null)
-  const [creditsOpen, setCreditsOpen] = useState(false)
+export default function LegendFooter() {
+  const { t } = useTranslation();
+  const { mapRef, mapLoaded } = useMapState();
+  const scaleHost = useRef(null);
+  const creditsHost = useRef(null);
+  const [creditsOpen, setCreditsOpen] = useState(false);
 
   // Adopt the two controls into this card instead of handing them to
   // map.addControl, which would put them back in a corner. onAdd/onRemove is
@@ -37,48 +37,44 @@ export default function LegendFooter () {
   // constructs the instance, which normally lands before this effect, and the
   // flag is what re-runs it if it ever doesn't.
   useEffect(() => {
-    const map = mapRef?.current
-    if (!map || !scaleHost.current || !creditsHost.current) return
+    const map = mapRef?.current;
+    if (!map || !scaleHost.current || !creditsHost.current) return;
 
     // Capped short: it shares its row with the ⓘ inside a card that is at most
     // 190px wide.
-    const scale = new ScaleControl({ maxWidth: 120, unit: 'metric' })
-    scaleHost.current.appendChild(scale.onAdd(map))
+    const scale = new ScaleControl({ maxWidth: 120, unit: "metric" });
+    scaleHost.current.appendChild(scale.onAdd(map));
 
     // compact: false keeps the control expanded and inert — its own <summary>
     // toggle is hidden in the stylesheet, because the disclosure here is the ⓘ
     // button, and two toggles for one block of text would fight each other.
-    const credits = new AttributionControl({ compact: false })
-    creditsHost.current.appendChild(credits.onAdd(map))
+    const credits = new AttributionControl({ compact: false });
+    creditsHost.current.appendChild(credits.onAdd(map));
 
     return () => {
-      scale.onRemove()
-      credits.onRemove()
-    }
-  }, [mapRef, mapLoaded])
+      scale.onRemove();
+      credits.onRemove();
+    };
+  }, [mapRef, mapLoaded]);
 
   return (
-    <div className='legendFooter'>
-      <div className='legendFooterRow'>
-        <div className='legendScale' ref={scaleHost} />
+    <div className="legendFooter">
+      <div className="legendFooterRow">
+        <div className="legendScale" ref={scaleHost} />
         <button
-          className='legendCreditsButton'
+          className="legendCreditsButton"
           onClick={() => setCreditsOpen(!creditsOpen)}
-          title={t('legendCreditsTooltip')}
-          aria-label={t('legendCreditsTooltip')}
+          title={t("legendCreditsTooltip")}
+          aria-label={t("legendCreditsTooltip")}
           aria-expanded={creditsOpen}
         >
-          <InfoCircle size={13} aria-hidden='true' />
+          <InfoCircle size={13} aria-hidden="true" />
         </button>
       </div>
       {/* Mounted whether or not it is shown: the control keeps itself current
           from the map's own events, and a host that came and went would have to
           be re-adopted every time the ⓘ is pressed. */}
-      <div
-        className='legendCredits'
-        ref={creditsHost}
-        hidden={!creditsOpen}
-      />
+      <div className="legendCredits" ref={creditsHost} hidden={!creditsOpen} />
     </div>
-  )
+  );
 }

@@ -1,14 +1,14 @@
-import React, { useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
-import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
-import './styles.css'
+import React, { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
+import "./styles.css";
 
-import Plotly from 'plotly.js-basic-dist-min'
-import createPlotlyComponent from 'react-plotly.js/factory'
-import frLocale from 'plotly.js-locales/fr'
+import Plotly from "plotly.js-basic-dist-min";
+import createPlotlyComponent from "react-plotly.js/factory";
+import frLocale from "plotly.js-locales/fr";
 
-Plotly.register(frLocale)
-const Plot = createPlotlyComponent(Plotly)
+Plotly.register(frLocale);
+const Plot = createPlotlyComponent(Plotly);
 
 export default function DatasetPreviewPlot({
   inspectDataset,
@@ -16,80 +16,108 @@ export default function DatasetPreviewPlot({
   datasetPreview,
   setPlotAxes,
   inspectRecordID,
-  data
+  data,
 }) {
-  const { t, i18n } = useTranslation()
+  const { t, i18n } = useTranslation();
 
   const isProfile = inspectDataset.cdm_data_type
     .toLowerCase()
-    .includes('profile')
+    .includes("profile");
 
   useEffect(() => {
     switch (inspectDataset.cdm_data_type) {
-    case 'Profile':
-    case 'TimeSeriesProfile':
-      setPlotAxes({
-        x: {
-          columnName: inspectDataset.first_eov_column,
-          unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
-        },
-        y: {
-          columnName: 'depth',
-          unit: 'm'
-        }
-      })
-      break
-    case 'TimeSeries':
-      setPlotAxes({
-        x: {
-          columnName: 'time',
-          unit: 'UTC'
-        },
-        y: {
-          columnName: inspectDataset.first_eov_column,
-          unit: datasetPreview?.table?.columnUnits[datasetPreview?.table?.columnNames.indexOf(inspectDataset.first_eov_column)]
-        }
-      })
-      break
+      case "Profile":
+      case "TimeSeriesProfile":
+        setPlotAxes({
+          x: {
+            columnName: inspectDataset.first_eov_column,
+            unit: datasetPreview?.table?.columnUnits[
+              datasetPreview?.table?.columnNames.indexOf(
+                inspectDataset.first_eov_column,
+              )
+            ],
+          },
+          y: {
+            columnName: "depth",
+            unit: "m",
+          },
+        });
+        break;
+      case "TimeSeries":
+        setPlotAxes({
+          x: {
+            columnName: "time",
+            unit: "UTC",
+          },
+          y: {
+            columnName: inspectDataset.first_eov_column,
+            unit: datasetPreview?.table?.columnUnits[
+              datasetPreview?.table?.columnNames.indexOf(
+                inspectDataset.first_eov_column,
+              )
+            ],
+          },
+        });
+        break;
 
-    default:
-      break
+      default:
+        break;
     }
-  }, [inspectRecordID])
+  }, [inspectRecordID]);
 
   return (
     <>
       <DropdownButton
-        title={t('datasetPreviewPlotXAxisSelect') + ': ' + plotAxes.x.columnName}
+        title={
+          t("datasetPreviewPlotXAxisSelect") + ": " + plotAxes.x.columnName
+        }
       >
         {datasetPreview &&
           datasetPreview?.table?.columnNames.map((columnName, index) => {
             return (
               <Dropdown.Item
                 key={columnName}
-                onClick={() => setPlotAxes({ x: { columnName, unit: datasetPreview.table.columnUnits[index] }, y: plotAxes.y })}
+                onClick={() =>
+                  setPlotAxes({
+                    x: {
+                      columnName,
+                      unit: datasetPreview.table.columnUnits[index],
+                    },
+                    y: plotAxes.y,
+                  })
+                }
               >
                 {columnName}
               </Dropdown.Item>
-            )
+            );
           })}
       </DropdownButton>
       <DropdownButton
-        title={t('datasetPreviewPlotYAxisSelect') + ': ' + plotAxes.y.columnName}
+        title={
+          t("datasetPreviewPlotYAxisSelect") + ": " + plotAxes.y.columnName
+        }
       >
         {datasetPreview &&
           datasetPreview?.table?.columnNames.map((columnName, index) => {
             return (
               <Dropdown.Item
                 key={columnName}
-                onClick={() => setPlotAxes({ x: plotAxes.x, y: { columnName, unit: datasetPreview.table.columnUnits[index] } })}
+                onClick={() =>
+                  setPlotAxes({
+                    x: plotAxes.x,
+                    y: {
+                      columnName,
+                      unit: datasetPreview.table.columnUnits[index],
+                    },
+                  })
+                }
               >
                 {columnName}
               </Dropdown.Item>
-            )
+            );
           })}
       </DropdownButton>
-      <div className='datasetPreviewPlot'>
+      <div className="datasetPreviewPlot">
         <>
           {plotAxes.x !== undefined && plotAxes.y !== undefined && data && (
             <Plot
@@ -97,9 +125,9 @@ export default function DatasetPreviewPlot({
                 {
                   x: data.map((row) => row[plotAxes.x.columnName]) || [],
                   y: data.map((row) => row[plotAxes.y.columnName]) || [],
-                  type: 'scatter',
-                  mode: 'markers'
-                }
+                  type: "scatter",
+                  mode: "markers",
+                },
               ]}
               layout={{
                 uirevision: true,
@@ -107,32 +135,37 @@ export default function DatasetPreviewPlot({
                 // dragmode: false,
                 yaxis: {
                   automargin: true,
-                  side: isProfile ? 'top' : undefined,
-                  autorange: isProfile ? 'reversed' : undefined,
+                  side: isProfile ? "top" : undefined,
+                  autorange: isProfile ? "reversed" : undefined,
                   title: { text: `( ${plotAxes.y.unit} )` },
-                  uirevision: true
+                  uirevision: true,
                 },
                 xaxis: {
                   automargin: true,
                   title: { text: `( ${plotAxes.x.unit} )` },
-                  uirevision: true
+                  uirevision: true,
                 },
-                dragmode: 'zoom',
+                dragmode: "zoom",
                 modebar: {
-                  uirevision: true
-                }
+                  uirevision: true,
+                },
               }}
               config={{
                 displaylogo: false,
-                modeBarButtonsToRemove: ['select2d', 'lasso2d', 'resetScale2d', 'pan2d'],
+                modeBarButtonsToRemove: [
+                  "select2d",
+                  "lasso2d",
+                  "resetScale2d",
+                  "pan2d",
+                ],
                 responsive: true,
                 scrollZoom: true,
-                locale: i18n.language === 'fr' ? 'fr' : 'en',
+                locale: i18n.language === "fr" ? "fr" : "en",
               }}
             />
           )}
         </>
       </div>
     </>
-  )
+  );
 }

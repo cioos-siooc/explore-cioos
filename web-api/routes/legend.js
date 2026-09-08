@@ -133,7 +133,8 @@ router.get(
     try {
       filters = await createDBFilter(req.query);
     } catch (err) {
-      if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+      if (err.statusCode === 400)
+        return res.status(400).json({ error: err.message });
       // Rethrowing would reject the async handler, which Express 4 leaves
       // unhandled — that kills the process, not just this request.
       console.error(err);
@@ -147,8 +148,9 @@ router.get(
     // OBIS-node selection also hides profiles, unless ERDDAP servers are
     // selected alongside it (combined Source filter — show both, OR'd in
     // the shared dataset filter).
-    const includeProfiles = !req.query.scientificNames
-      && (!req.query.obisNodes || Boolean(req.query.erddapServers));
+    const includeProfiles =
+      !req.query.scientificNames &&
+      (!req.query.obisNodes || Boolean(req.query.erddapServers));
 
     // GROUP BY the hex FK (integer) instead of the polygon geom; the polygon
     // lives on cde.hexes_zoom_0/1 and isn't needed here — only the summed
@@ -244,8 +246,8 @@ router.get(
     // filter query (which carries includeObis) to /legend, not the data-layer
     // toggles, so includeTrajectory defaults to on here — same as before this
     // change.
-    const includeTrajectoryCells = req.query.includeTrajectory !== "false"
-      && includeProfiles;
+    const includeTrajectoryCells =
+      req.query.includeTrajectory !== "false" && includeProfiles;
     // Every branch carries the columns the shared dataset filter predicates
     // against (time, depth, position), not just the ones this query groups on.
     // dbFilter emits unqualified time_min/depth_min/... predicates, so a branch
@@ -306,13 +308,18 @@ router.get(
           obisFilters: filters.obisOnly,
           profileFilters: filters.profileOnly,
         }),
-        db.raw(coverageSql, { filters: filters.shared, obisFilters: filters.obisOnly }),
+        db.raw(coverageSql, {
+          filters: filters.shared,
+          obisFilters: filters.obisOnly,
+        }),
       ]);
 
-      res.send(rows && {
-        recordsCount: rows.rows[0],
-        coverageCount: coverageRows.rows[0],
-      });
+      res.send(
+        rows && {
+          recordsCount: rows.rows[0],
+          coverageCount: coverageRows.rows[0],
+        },
+      );
     } catch (e) {
       console.error(e);
       res.status(500).send({

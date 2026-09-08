@@ -13,9 +13,12 @@ const SPARKLINE_DEPTH = 10;
 // "Last update" lagging "Last check", not by a skipped status. These SQL
 // fragments normalise an attempt's status/reason accordingly. (Per-run audit
 // views deliberately keep the raw 'skipped' so a run still shows what it did.)
-const NORM_STATUS = (col) => `CASE WHEN ${col}.status = 'skipped' AND ${col}.reason_code = 'UNCHANGED' THEN 'success' ELSE ${col}.status END`;
-const NORM_REASON = (col) => `CASE WHEN ${col}.status = 'skipped' AND ${col}.reason_code = 'UNCHANGED' THEN NULL ELSE ${col}.reason_code END`;
-const NORM_ERRMSG = (col) => `CASE WHEN ${col}.status = 'skipped' AND ${col}.reason_code = 'UNCHANGED' THEN NULL ELSE ${col}.error_message END`;
+const NORM_STATUS = (col) =>
+  `CASE WHEN ${col}.status = 'skipped' AND ${col}.reason_code = 'UNCHANGED' THEN 'success' ELSE ${col}.status END`;
+const NORM_REASON = (col) =>
+  `CASE WHEN ${col}.status = 'skipped' AND ${col}.reason_code = 'UNCHANGED' THEN NULL ELSE ${col}.reason_code END`;
+const NORM_ERRMSG = (col) =>
+  `CASE WHEN ${col}.status = 'skipped' AND ${col}.reason_code = 'UNCHANGED' THEN NULL ELSE ${col}.error_message END`;
 
 // ── URL helpers ───────────────────────────────────────────────────────────────
 
@@ -37,7 +40,9 @@ async function resolveErddapUrl(slug) {
   try {
     const decoded = unslug(slug);
     if (/^https?:\/\//i.test(decoded)) return decoded;
-  } catch { /* not a base64 slug — fall through to the transform lookup */ }
+  } catch {
+    /* not a base64 slug — fall through to the transform lookup */
+  }
   // NB: avoid '?' in the regexes — knex treats it as a positional binding.
   const sql = `
     SELECT erddap_url
@@ -201,9 +206,15 @@ async function serverDatasets(erddapUrl, statusFilter = null, q = null) {
       la.dataset_id
   `;
   const result = await db.raw(sql, [
-    erddapUrl, erddapUrl, SPARKLINE_DEPTH,
-    statusFilter, statusFilter,
-    q, q, q, q,
+    erddapUrl,
+    erddapUrl,
+    SPARKLINE_DEPTH,
+    statusFilter,
+    statusFilter,
+    q,
+    q,
+    q,
+    q,
   ]);
   return result.rows;
 }
@@ -314,28 +325,37 @@ router.get("/servers", cache.route("2 minutes"), async (req, res, next) => {
   }
 });
 
-router.get("/servers/:slug", cache.route("30 seconds"), async (req, res, next) => {
-  try {
-    const erddapUrl = await resolveErddapUrl(req.params.slug);
-    const status = req.query.status || null;
-    const q = req.query.q || null;
-    res.json(await serverDatasets(erddapUrl, status, q));
-  } catch (err) {
-    next(err);
-  }
-});
+router.get(
+  "/servers/:slug",
+  cache.route("30 seconds"),
+  async (req, res, next) => {
+    try {
+      const erddapUrl = await resolveErddapUrl(req.params.slug);
+      const status = req.query.status || null;
+      const q = req.query.q || null;
+      res.json(await serverDatasets(erddapUrl, status, q));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
-router.get("/dataset/:slug/:datasetId", cache.route("1 minute"), async (req, res, next) => {
-  try {
-    const erddapUrl = await resolveErddapUrl(req.params.slug);
-    const history = await datasetHistory(erddapUrl, req.params.datasetId);
-    if (!history.length) return res.status(404).json({ error: "No harvest history found" });
-    const meta = await datasetMeta(erddapUrl, req.params.datasetId);
-    res.json({ history, meta, erddap_url: erddapUrl });
-  } catch (err) {
-    next(err);
-  }
-});
+router.get(
+  "/dataset/:slug/:datasetId",
+  cache.route("1 minute"),
+  async (req, res, next) => {
+    try {
+      const erddapUrl = await resolveErddapUrl(req.params.slug);
+      const history = await datasetHistory(erddapUrl, req.params.datasetId);
+      if (!history.length)
+        return res.status(404).json({ error: "No harvest history found" });
+      const meta = await datasetMeta(erddapUrl, req.params.datasetId);
+      res.json({ history, meta, erddap_url: erddapUrl });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.get("/runs/recent", cache.route("1 minute"), async (req, res, next) => {
   try {
@@ -366,13 +386,17 @@ router.get("/reasons", cache.route("2 minutes"), async (req, res, next) => {
   }
 });
 
-router.get("/reasons/:slug", cache.route("2 minutes"), async (req, res, next) => {
-  try {
-    const erddapUrl = await resolveErddapUrl(req.params.slug);
-    res.json(await reasonBreakdown(erddapUrl));
-  } catch (err) {
-    next(err);
-  }
-});
+router.get(
+  "/reasons/:slug",
+  cache.route("2 minutes"),
+  async (req, res, next) => {
+    try {
+      const erddapUrl = await resolveErddapUrl(req.params.slug);
+      res.json(await reasonBreakdown(erddapUrl));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 module.exports = router;

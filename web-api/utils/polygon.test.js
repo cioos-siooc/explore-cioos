@@ -30,5 +30,14 @@ test("rejects rings and payloads that cannot make a polygon", () => {
   assert.equal(polygonJSONToWKT("not json"), false);
   assert.equal(polygonJSONToWKT("{}"), false);
   // A triangle needs its closing point: 3 coordinates is not a ring.
-  assert.equal(polygonJSONToWKT(JSON.stringify([[-130, 48], [-125, 48], [-125, 52]])), false);
+  assert.equal(
+    polygonJSONToWKT(
+      JSON.stringify([
+        [-130, 48],
+        [-125, 48],
+        [-125, 52],
+      ]),
+    ),
+    false,
+  );
 });

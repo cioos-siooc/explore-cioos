@@ -27,8 +27,8 @@
 }
 
 .dropdown .dropdown-toggle::after {
-  content: '';
-  border-top: 5px solid currentColor;
+  content: "";
+  border-top: 5px solid currentcolor;
   border-right: 4px solid transparent;
   border-left: 4px solid transparent;
   margin-left: 2px;
@@ -44,7 +44,7 @@
   background-color: var(--cioos-white, #fff);
   border: 1px solid var(--cioos-hairline, #dce8e5);
   border-radius: var(--cioos-radius-sm, 6px);
-  box-shadow: var(--cioos-shadow-md, 0 2px 8px rgba(21, 47, 55, 0.2));
+  box-shadow: var(--cioos-shadow-md, 0 2px 8px rgb(21 47 55 / 20%));
 }
 
 .dropdown-item {

@@ -22,7 +22,8 @@ const RECENT_JOB_LIMIT = 25;
 // is empty for a queued job and holds a stack trace for a job that died before
 // the downloader returned. Guard the cast so one bad row can't 500 the route:
 // Postgres 13 has no pg_input_is_valid(), so screen on the leading brace.
-const REPORT_JSON = (col) => `CASE WHEN ${col}.erddap_report LIKE '{%' THEN ${col}.erddap_report::jsonb END`;
+const REPORT_JSON = (col) =>
+  `CASE WHEN ${col}.erddap_report LIKE '{%' THEN ${col}.erddap_report::jsonb END`;
 
 // Datasets that made it into the zip. Anything else was left out, and the
 // per-dataset status says why (mirrors _INCLUDED in download_scheduler).
@@ -189,7 +190,10 @@ router.get("/summary", cache.route("30 seconds"), async (req, res, next) => {
 
 router.get("/recent", cache.route("30 seconds"), async (req, res, next) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit, 10) || RECENT_JOB_LIMIT, 200);
+    const limit = Math.min(
+      parseInt(req.query.limit, 10) || RECENT_JOB_LIMIT,
+      200,
+    );
     res.json(await recentJobs(limit));
   } catch (err) {
     next(err);
@@ -198,7 +202,9 @@ router.get("/recent", cache.route("30 seconds"), async (req, res, next) => {
 
 router.get("/datasets", cache.route("1 minute"), async (req, res, next) => {
   try {
-    res.json(await datasetOutcomes(req.query.status || null, req.query.q || null));
+    res.json(
+      await datasetOutcomes(req.query.status || null, req.query.q || null),
+    );
   } catch (err) {
     next(err);
   }

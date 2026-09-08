@@ -1,11 +1,11 @@
-import * as React from 'react'
-import { useCallback, useMemo } from 'react'
-import { ZoomIn } from 'react-bootstrap-icons'
-import { useTranslation } from 'react-i18next'
+import * as React from "react";
+import { useCallback, useMemo } from "react";
+import { ZoomIn } from "react-bootstrap-icons";
+import { useTranslation } from "react-i18next";
 
-import { useMapState } from '../../../state/map/MapStateProvider.jsx'
-import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
-import { boundsAreFramed, boundsFromGeoJson } from '../../../utilities.jsx'
+import { useMapState } from "../../../state/map/MapStateProvider.jsx";
+import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { boundsAreFramed, boundsFromGeoJson } from "../../../utilities.jsx";
 
 // Framing the map on the open dataset's footprint. The map never does this on
 // its own — opening a dataset page only highlights that dataset among the rest
@@ -24,43 +24,43 @@ import { boundsAreFramed, boundsFromGeoJson } from '../../../utilities.jsx'
 // `framed` is true once the map already shows that extent: there is nothing
 // left to do, and the button hides itself rather than sit there inviting a
 // no-op click. Panning or zooming away brings it back.
-export function useZoomToDataset () {
-  const { inspectDataset } = useSelection()
-  const { zoomToGeometry, mapRef, mapView } = useMapState()
+export function useZoomToDataset() {
+  const { inspectDataset } = useSelection();
+  const { zoomToGeometry, mapRef, mapView } = useMapState();
 
   const footprint =
     inspectDataset?.filtered_bbox_geojson ||
-    inspectDataset?.coverage_bbox_geojson
-  const bounds = useMemo(() => boundsFromGeoJson(footprint), [footprint])
+    inspectDataset?.coverage_bbox_geojson;
+  const bounds = useMemo(() => boundsFromGeoJson(footprint), [footprint]);
 
   // mapView changes on every moveend, which is the cue to re-check the camera.
   const framed = useMemo(
     () => boundsAreFramed(mapRef.current, bounds),
-    [bounds, mapView]
-  )
+    [bounds, mapView],
+  );
 
   const zoomToDataset = useCallback(() => {
-    if (footprint) zoomToGeometry(footprint)
-  }, [footprint, zoomToGeometry])
+    if (footprint) zoomToGeometry(footprint);
+  }, [footprint, zoomToGeometry]);
 
-  return { zoomToDataset, canZoom: Boolean(bounds), framed }
+  return { zoomToDataset, canZoom: Boolean(bounds), framed };
 }
 
-export default function ZoomToDataset () {
-  const { t } = useTranslation()
-  const { zoomToDataset, canZoom, framed } = useZoomToDataset()
+export default function ZoomToDataset() {
+  const { t } = useTranslation();
+  const { zoomToDataset, canZoom, framed } = useZoomToDataset();
 
-  if (!canZoom || framed) return null
+  if (!canZoom || framed) return null;
 
   return (
     <button
-      type='button'
-      className='zoomToDatasetButton'
+      type="button"
+      className="zoomToDatasetButton"
       onClick={zoomToDataset}
-      title={t('zoomToDatasetTitle')}
-      aria-label={t('zoomToDatasetText')}
+      title={t("zoomToDatasetTitle")}
+      aria-label={t("zoomToDatasetText")}
     >
-      <ZoomIn size={15} aria-hidden='true' />
+      <ZoomIn size={15} aria-hidden="true" />
     </button>
-  )
+  );
 }

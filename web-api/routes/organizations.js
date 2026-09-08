@@ -29,7 +29,11 @@ const { changePKtoPkURL } = require("../utils/misc");
  */
 
 router.get("/", cache.route(), async (req, res, next) => {
-  res.send((await db("cde.organizations").orderByRaw("UPPER(name)")).map(changePKtoPkURL));
+  res.send(
+    (await db("cde.organizations").orderByRaw("UPPER(name)")).map(
+      changePKtoPkURL,
+    ),
+  );
 });
 
 module.exports = router;

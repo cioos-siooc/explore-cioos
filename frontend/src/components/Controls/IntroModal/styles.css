@@ -6,7 +6,7 @@
   background-color: var(--cioos-white);
   box-shadow: var(--cioos-shadow-card);
   border-radius: var(--cioos-radius);
-  border: 0px;
+  border: 0;
   height: 42px;
   width: 42px;
   text-align: center;
@@ -18,7 +18,7 @@
 }
 
 .introModal .modalHeader {
-  padding: 0px 160px 0px 0px;
+  padding: 0 160px 0 0;
 }
 
 /* Modal chrome — brand the onboarding "hero". A thin primary rule at the
@@ -55,7 +55,7 @@
   position: absolute;
   top: 10px;
   right: 10px;
-  background-image: url(../../Images/NationalLogoEnglish.png);
+  background-image: url("../../Images/NationalLogoEnglish.png");
   background-color: var(--cioos-white);
   background-repeat: no-repeat;
   background-size: contain;
@@ -72,7 +72,7 @@
   position: absolute;
   top: 10px;
   right: 10px;
-  background-image: url(../../Images/NationalLogoFrench.png);
+  background-image: url("../../Images/NationalLogoFrench.png");
   background-color: var(--cioos-white);
   background-repeat: no-repeat;
   background-size: contain;
@@ -100,6 +100,7 @@
   font-size: large;
   font-weight: 600;
   color: var(--cioos-navy);
+
   /* flex-grow: 1; */
   flex-shrink: 1;
   flex-wrap: nowrap;
@@ -131,31 +132,31 @@
 }
 
 .stepImage.filterStep {
-  background-image: url(../../Images/filtersImage.png);
+  background-image: url("../../Images/filtersImage.png");
 }
 
 .stepImage.filterStep.fr {
-  background-image: url(../../Images/filtersImage_FR.png);
+  background-image: url("../../Images/filtersImage_FR.png");
 }
 
 .stepImage.selectStep {
-  background-image: url(../../Images/selectionImage.png);
+  background-image: url("../../Images/selectionImage.png");
 }
 
 .stepImage.inspectStep {
-  background-image: url(../../Images/inspectImage.png);
+  background-image: url("../../Images/inspectImage.png");
 }
 
 .stepImage.inspectStep.fr {
-  background-image: url(../../Images/inspectImage_FR.png);
+  background-image: url("../../Images/inspectImage_FR.png");
 }
 
 .stepImage.downloadStep {
-  background-image: url(../../Images/downloadImage.png);
+  background-image: url("../../Images/downloadImage.png");
 }
 
 .stepImage.downloadStep.fr {
-  background-image: url(../../Images/downloadImage_FR.png);
+  background-image: url("../../Images/downloadImage_FR.png");
 }
 
 .stepImage:hover {
@@ -180,11 +181,12 @@
 
 .tipInfo {
   margin-top: 15px;
+
   /* min-height: 275px; */
 }
 
 .tipInfo p {
-  margin: 15px 0px;
+  margin: 15px 0;
 }
 
 .tipInfo a {
@@ -195,9 +197,11 @@
   display: inline;
   margin: auto;
   font-style: italic;
+
   /* text-align: center; */
   font-size: smaller;
   width: 100%;
+
   /* margin: 0px 0px 15px 0px; */
 }
 
@@ -215,7 +219,7 @@
 } */
 
 .infoButtonImage {
-  background-image: url(../../Images/infoButton.png);
+  background-image: url("../../Images/infoButton.png");
 }
 
 @media all and (max-height: 500px) {
@@ -255,6 +259,7 @@
     width: auto;
     height: 130px;
     margin: 0;
+
     /* Same ~30px of tile left over for the label as the 992px rung leaves. */
     background-size: 100px 100px;
   }

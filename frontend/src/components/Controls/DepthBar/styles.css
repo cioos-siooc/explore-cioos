@@ -26,6 +26,7 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
+
   /* Tall enough to be worth dragging, short enough to leave the legend above
      it and MapLibre's corner below it alone. */
   height: min(420px, 52vh);
@@ -33,6 +34,7 @@
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-lg);
+
   /* Same raised, physical read as the time bar's card. */
   box-shadow: var(--cioos-shadow-3d, var(--cioos-shadow-float));
   font-size: var(--cioos-font-size-sm);

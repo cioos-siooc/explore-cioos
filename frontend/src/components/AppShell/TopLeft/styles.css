@@ -21,6 +21,7 @@
 .brandCard {
   display: flex;
   flex-direction: column;
+
   /* Fixed width (capped to the viewport) rather than sized to content: the
      card must not resize when the language changes, and it is wide enough for
      the longer French labels — "Jeux de données", "EXPLORATEUR". */
@@ -28,9 +29,11 @@
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-lg);
+
   /* No padding on the card itself: the brand row carries its own, and the
      tab strip below is full-bleed, bleeding over the card border. */
   padding: 0;
+
   /* 3D depth (shared tokens; see theme.css). preserve-3d additionally lets the
      inner lockup items lift off the card face. */
   transform: var(--cioos-perspective);
@@ -74,11 +77,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+
   /* Auto-sized centre column of the grid; the equal 1fr side columns keep it
      centered in the card regardless of the language's word length. */
   justify-self: center;
   min-width: 0;
   margin: 0;
+
   /* Montserrat light to match the CIOOS wordmark — Sora (font-display) only
      ships in 600/700 here and would synthesize a heavy fake-light. */
   font-family: var(--cioos-font-body);
@@ -91,12 +96,14 @@
   font-size: var(--cioos-font-size-2xs);
   line-height: 1.2;
   letter-spacing: 0.28em;
+
   /* optically recenter: tracking adds a trailing space after the last glyph */
   margin-right: -0.28em;
 }
 
 .brandTitle em {
   font-style: normal;
+
   /* sized so EXPLORATEUR fits the slot the sidebar leaves for the title */
   font-size: 17px;
   line-height: 1.1;
@@ -126,7 +133,8 @@
   background: transparent;
   color: var(--cioos-ink-60);
   cursor: pointer;
-  transition: background-color var(--cioos-transition-fast),
+  transition:
+    background-color var(--cioos-transition-fast),
     color var(--cioos-transition-fast);
 }
 
@@ -153,6 +161,7 @@
     width: 100%;
     border-width: 0 0 1px;
     border-radius: 0;
+
     /* A full-bleed header is part of the page rather than a card lifted off
        it, so the 3D tilt goes and the shadow flattens to the plain drop that
        separates it from the map underneath. */
@@ -202,11 +211,11 @@
      buttons. It scales with the viewport instead of holding a fixed size, so
      the narrowest phones shrink the wordmark rather than overlapping it, and
      every width with room for the full size still gets it. */
-  .brandTitle[lang='fr'] em {
+  .brandTitle[lang="fr"] em {
     font-size: min(var(--cioos-font-size-md), 4vw);
   }
 
-  .brandTitle[lang='fr'] span {
+  .brandTitle[lang="fr"] span {
     font-size: min(var(--cioos-font-size-2xs), 2.6vw);
   }
 

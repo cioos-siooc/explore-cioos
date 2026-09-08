@@ -1,57 +1,57 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { useTranslation } from 'react-i18next'
-import classNames from 'classnames'
-import { Funnel, FunnelFill } from 'react-bootstrap-icons'
+import React, { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
+import classNames from "classnames";
+import { Funnel, FunnelFill } from "react-bootstrap-icons";
 // import platformColors from '../../platformColors'
-import Loading from '../Loading/Loading.jsx'
-import GriddapDetails from '../GriddapDetails/GriddapDetails.jsx'
-import { server } from '../../../config'
-import reportError from '../../../state/reportError.js'
-import { useActivityTask } from '../../../state/activity/ActivityProvider.jsx'
+import Loading from "../Loading/Loading.jsx";
+import GriddapDetails from "../GriddapDetails/GriddapDetails.jsx";
+import { server } from "../../../config";
+import reportError from "../../../state/reportError.js";
+import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
 import {
   dataLayerKeyForDataset,
-  DATA_LAYER_LABEL_KEYS
-} from '../../../state/dataLayers.js'
-import { gridNodeFactors, totalGridNodes } from '../../../wmsUtilities'
-import { formatInstantRange, formatRange } from '../../../utilities.jsx'
-import FilterButton from '../Filter/FilterButton/FilterButton.jsx'
-import CardList from './CardList.jsx'
+  DATA_LAYER_LABEL_KEYS,
+} from "../../../state/dataLayers.js";
+import { gridNodeFactors, totalGridNodes } from "../../../wmsUtilities";
+import { formatInstantRange, formatRange } from "../../../utilities.jsx";
+import FilterButton from "../Filter/FilterButton/FilterButton.jsx";
+import CardList from "./CardList.jsx";
 import ListCard, {
   CardField,
   CardTags,
-  useExpandableList
-} from './ListCard.jsx'
+  useExpandableList,
+} from "./ListCard.jsx";
 import ZoomToDataset, {
-  useZoomToDataset
-} from '../../AppShell/ZoomToDataset/ZoomToDataset.jsx'
-import './styles.css'
+  useZoomToDataset,
+} from "../../AppShell/ZoomToDataset/ZoomToDataset.jsx";
+import "./styles.css";
 
 // The grid's node count spelled out as the product of its axes —
 // longitude × latitude × time × depth = total — so the number is traceable to
 // the grid's shape rather than dropped on the reader as a bare total.
 function GridNodeCount({ dimensions }) {
-  const factors = gridNodeFactors(dimensions)
-  const total = totalGridNodes(dimensions)
-  if (!factors.length) return total?.toLocaleString() ?? null
+  const factors = gridNodeFactors(dimensions);
+  const total = totalGridNodes(dimensions);
+  if (!factors.length) return total?.toLocaleString() ?? null;
 
   return (
-    <span className='gridNodeCount'>
-      <span className='gridNodeFactors'>
+    <span className="gridNodeCount">
+      <span className="gridNodeFactors">
         {factors.map((dim, index) => (
           <React.Fragment key={dim.name}>
-            {index > 0 && <span className='gridNodeOperator'>×</span>}
-            <span className='gridNodeFactor' title={dim.name}>
-              <span className='gridNodeFactorValue'>
+            {index > 0 && <span className="gridNodeOperator">×</span>}
+            <span className="gridNodeFactor" title={dim.name}>
+              <span className="gridNodeFactorValue">
                 {dim.n_values.toLocaleString()}
               </span>
-              <span className='gridNodeFactorName'>{dim.name}</span>
+              <span className="gridNodeFactorName">{dim.name}</span>
             </span>
           </React.Fragment>
         ))}
       </span>
-      <span className='gridNodeTotal'>= {total?.toLocaleString()}</span>
+      <span className="gridNodeTotal">= {total?.toLocaleString()}</span>
     </span>
-  )
+  );
 }
 
 // Which CF discrete-sampling role identifies one record of this dataset, and
@@ -64,25 +64,25 @@ function GridNodeCount({ dimensions }) {
 // tabledap table with no cf_role attribute anywhere) fall back to the generic
 // "Record ID".
 const CF_ROLE_LABELS = {
-  timeseries_id: 'cfRoleTimeseriesIdText',
-  profile_id: 'cfRoleProfileIdText',
-  trajectory_id: 'cfRoleTrajectoryIdText'
-}
+  timeseries_id: "cfRoleTimeseriesIdText",
+  profile_id: "cfRoleProfileIdText",
+  trajectory_id: "cfRoleTrajectoryIdText",
+};
 
 function cfRoleColumn(dataset, roleOrder, t) {
   const variableFor = {
     timeseries_id: dataset.timeseries_id_variable,
     profile_id: dataset.profile_id_variable,
-    trajectory_id: dataset.trajectory_id_variable
-  }
+    trajectory_id: dataset.trajectory_id_variable,
+  };
   // '' is the harvester's sentinel for "this dataset has no such role"
   // (cf_role attributes are parsed as strings), and NULL means the same thing
   // once it has been through the database.
-  const role = roleOrder.find((r) => variableFor[r])
+  const role = roleOrder.find((r) => variableFor[r]);
   return {
-    label: role ? t(CF_ROLE_LABELS[role]) : t('datasetInspectorRecordIDText'),
-    variable: role ? variableFor[role] : undefined
-  }
+    label: role ? t(CF_ROLE_LABELS[role]) : t("datasetInspectorRecordIDText"),
+    variable: role ? variableFor[role] : undefined,
+  };
 }
 
 // A caption over a list that names the role its cards are identified by and,
@@ -91,18 +91,18 @@ function cfRoleColumn(dataset, roleOrder, t) {
 // carry this, and repeating it on every card would say it a hundred times.
 function IdCaption({ label, variable }) {
   return (
-    <span className='recordIdCaption'>
+    <span className="recordIdCaption">
       {label}
-      {variable && <code className='recordIdVariable'>{variable}</code>}
+      {variable && <code className="recordIdVariable">{variable}</code>}
     </span>
-  )
+  );
 }
 
 // The metadata sheet's EOV row, expandable past this like the record list's
 // own variable tags (CardTags) — a dataset can carry a dozen ocean variables,
 // which would otherwise push the platform/record-count row that follows well
 // down the sheet.
-const EOV_VISIBLE_LIMIT = 3
+const EOV_VISIBLE_LIMIT = 3;
 
 export default function DatasetInspector({
   dataset,
@@ -121,96 +121,96 @@ export default function DatasetInspector({
   highlightedRecord,
   setHighlightedRecord,
   activeWmsOverlay,
-  setActiveWmsOverlay
+  setActiveWmsOverlay,
 }) {
-  const { t } = useTranslation()
-  const { zoomToDataset } = useZoomToDataset()
-  const [datasetRecords, setDatasetRecords] = useState()
-  const [trajectoryPlatforms, setTrajectoryPlatforms] = useState()
-  const inspectorRef = useRef(null)
-  const isGrid = dataset.cdm_data_type === 'Grid'
+  const { t } = useTranslation();
+  const { zoomToDataset } = useZoomToDataset();
+  const [datasetRecords, setDatasetRecords] = useState();
+  const [trajectoryPlatforms, setTrajectoryPlatforms] = useState();
+  const inspectorRef = useRef(null);
+  const isGrid = dataset.cdm_data_type === "Grid";
   // Same CF discrete-sampling geometry the map's "Dataset geometry" layer
   // filter switches on (dataLayers.js) — reused here so the label matches
   // what that filter calls the same shape.
-  const geometryKey = dataLayerKeyForDataset(dataset)
+  const geometryKey = dataLayerKeyForDataset(dataset);
   const geometryLabel = geometryKey
     ? t(DATA_LAYER_LABEL_KEYS[geometryKey])
-    : dataset.cdm_data_type
+    : dataset.cdm_data_type;
   // no per-record list for OBIS (external) or griddap (metadata-only)
-  const hasRecordList = dataset.source_type !== 'obis' && !isGrid
+  const hasRecordList = dataset.source_type !== "obis" && !isGrid;
   // OBIS datasets always link out to OBIS; the rest have whichever of their
   // ERDDAP / CKAN URLs the harvest found.
   const hasSources =
-    dataset.source_type === 'obis' ||
-    Boolean(dataset.erddap_url || dataset.ckan_url)
+    dataset.source_type === "obis" ||
+    Boolean(dataset.erddap_url || dataset.ckan_url);
   // OBIS is always the one link; ERDDAP + CKAN can both be present, at which
   // point the row needs the full width to hold two chips.
   const hasMultipleSources =
-    dataset.source_type !== 'obis' &&
+    dataset.source_type !== "obis" &&
     Boolean(dataset.erddap_url) &&
-    Boolean(dataset.ckan_url)
+    Boolean(dataset.ckan_url);
   // Start loading rather than false: the fetch below is fired from an effect,
   // so an initial false would paint one frame of an empty record table before
   // the spinner appears.
-  const [loading, setLoading] = useState(hasRecordList)
-  useActivityTask('activityRecordListText', loading)
+  const [loading, setLoading] = useState(hasRecordList);
+  useActivityTask("activityRecordListText", loading);
 
   // const platformColor = platformColors.filter(
   //   (pc) => pc.platform === dataset.platform
   // )
   const isTrajectoryDataset =
-    dataset.source_type !== 'obis' &&
-    (dataset.cdm_data_type || '').includes('Trajectory')
+    dataset.source_type !== "obis" &&
+    (dataset.cdm_data_type || "").includes("Trajectory");
 
   useEffect(() => {
     if (!hasRecordList) {
-      setLoading(false)
-      return
+      setLoading(false);
+      return;
     }
-    let cancelled = false
-    setLoading(true)
-    const queryParams = new URLSearchParams(query)
-    queryParams.set('datasetPKs', dataset.pk)
+    let cancelled = false;
+    setLoading(true);
+    const queryParams = new URLSearchParams(query);
+    queryParams.set("datasetPKs", dataset.pk);
 
     fetch(`${server}/datasetRecordsList?${queryParams.toString()}`)
       .then((response) => {
         if (!response.ok) {
-          throw new Error(`datasetRecordsList failed: ${response.status}`)
+          throw new Error(`datasetRecordsList failed: ${response.status}`);
         }
-        return response.json()
+        return response.json();
       })
       .then((data) => {
-        if (!cancelled) setDatasetRecords(data)
+        if (!cancelled) setDatasetRecords(data);
       })
       .catch((error) => {
         // An error response used to leave the spinner running forever. Land on
         // an empty record table instead — the rest of the page still reads.
-        reportError('datasetRecordsList fetch failed', error)
-        if (!cancelled) setDatasetRecords([])
+        reportError("datasetRecordsList fetch failed", error);
+        if (!cancelled) setDatasetRecords([]);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+        if (!cancelled) setLoading(false);
+      });
     return () => {
-      cancelled = true
-    }
-  }, [dataset])
+      cancelled = true;
+    };
+  }, [dataset]);
 
   // Trajectory datasets: list the platforms (trajectory ids) so one can be
   // picked to draw its track on the map.
   useEffect(() => {
     if (!isTrajectoryDataset) {
-      setTrajectoryPlatforms()
-      return
+      setTrajectoryPlatforms();
+      return;
     }
     fetch(`${server}/trajectories/platforms?datasetPKs=${dataset.pk}`)
       .then((response) => (response.ok ? response.json() : []))
       .then((platforms) => setTrajectoryPlatforms(platforms))
       .catch((error) => {
-        reportError('trajectory platforms fetch failed', error)
-        setTrajectoryPlatforms([])
-      })
-  }, [dataset])
+        reportError("trajectory platforms fetch failed", error);
+        setTrajectoryPlatforms([]);
+      });
+  }, [dataset]);
 
   // Browser Back needs no handling here: the open dataset lives in the URL
   // (?dataset=…&server=…, owned by SelectionProvider), so popping that history
@@ -222,69 +222,69 @@ export default function DatasetInspector({
     const typingIn = (target) =>
       target instanceof Element &&
       (target.isContentEditable ||
-        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+        ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 
     const onKeyDown = (e) => {
-      if (e.key !== 'Backspace' || typingIn(e.target)) return
-      e.preventDefault()
-      returnToList()
-    }
+      if (e.key !== "Backspace" || typingIn(e.target)) return;
+      e.preventDefault();
+      returnToList();
+    };
 
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [returnToList])
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [returnToList]);
 
   // Swipe left (touch, trackpad two-finger, or mouse horizontal wheel) to
   // return to the dataset list. The page's lists are cards rather than tables
   // now, so nothing on it scrolls sideways and the gesture means one thing
   // everywhere on the page.
   useEffect(() => {
-    const el = inspectorRef.current
-    if (!el) return undefined
+    const el = inspectorRef.current;
+    if (!el) return undefined;
 
-    const SWIPE_THRESHOLD = 70 // px of leftward travel to count as a swipe
+    const SWIPE_THRESHOLD = 70; // px of leftward travel to count as a swipe
 
-    let touchStartX = 0
-    let touchStartY = 0
+    let touchStartX = 0;
+    let touchStartY = 0;
 
     const onTouchStart = (e) => {
-      touchStartX = e.touches[0].clientX
-      touchStartY = e.touches[0].clientY
-    }
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    };
     const onTouchEnd = (e) => {
-      const dx = e.changedTouches[0].clientX - touchStartX
-      const dy = e.changedTouches[0].clientY - touchStartY
-      if (dx > -SWIPE_THRESHOLD || Math.abs(dx) <= Math.abs(dy)) return
-      returnToList()
-    }
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if (dx > -SWIPE_THRESHOLD || Math.abs(dx) <= Math.abs(dy)) return;
+      returnToList();
+    };
 
-    let wheelAccumX = 0
-    let wheelTimer = null
+    let wheelAccumX = 0;
+    let wheelTimer = null;
     const onWheel = (e) => {
       // Only react to predominantly-horizontal gestures.
-      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return
-      wheelAccumX += e.deltaX
-      if (wheelTimer) clearTimeout(wheelTimer)
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+      wheelAccumX += e.deltaX;
+      if (wheelTimer) clearTimeout(wheelTimer);
       wheelTimer = setTimeout(() => {
-        wheelAccumX = 0
-      }, 150)
+        wheelAccumX = 0;
+      }, 150);
       if (wheelAccumX <= -SWIPE_THRESHOLD) {
-        wheelAccumX = 0
-        returnToList()
+        wheelAccumX = 0;
+        returnToList();
       }
-    }
+    };
 
-    el.addEventListener('touchstart', onTouchStart, { passive: true })
-    el.addEventListener('touchend', onTouchEnd, { passive: true })
-    el.addEventListener('wheel', onWheel, { passive: true })
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    el.addEventListener("wheel", onWheel, { passive: true });
 
     return () => {
-      el.removeEventListener('touchstart', onTouchStart)
-      el.removeEventListener('touchend', onTouchEnd)
-      el.removeEventListener('wheel', onWheel)
-      if (wheelTimer) clearTimeout(wheelTimer)
-    }
-  }, [returnToList])
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("wheel", onWheel);
+      if (wheelTimer) clearTimeout(wheelTimer);
+    };
+  }, [returnToList]);
 
   // Trajectory datasets list one row per mission, so their record column is the
   // trajectory role; every other type resolves to whichever of profile_id /
@@ -292,10 +292,10 @@ export default function DatasetInspector({
   const recordIdField = cfRoleColumn(
     dataset,
     isTrajectoryDataset
-      ? ['trajectory_id', 'profile_id', 'timeseries_id']
-      : ['profile_id', 'timeseries_id', 'trajectory_id'],
-    t
-  )
+      ? ["trajectory_id", "profile_id", "timeseries_id"]
+      : ["profile_id", "timeseries_id", "trajectory_id"],
+    t,
+  );
 
   // What a card can be sorted by, in place of the column headers a table would
   // have offered. The ocean variables a record carries are not among them: a
@@ -303,108 +303,108 @@ export default function DatasetInspector({
   // cards is the way to find the records carrying one.
   const recordSortFields = [
     {
-      id: 'id',
+      id: "id",
       label: recordIdField.label,
-      type: 'string',
-      value: (row) => row.profile_id
+      type: "string",
+      value: (row) => row.profile_id,
     },
     {
-      id: 'timeMin',
-      label: t('timeSelectorStartDate'),
-      type: 'string',
-      value: (row) => row.time_min
+      id: "timeMin",
+      label: t("timeSelectorStartDate"),
+      type: "string",
+      value: (row) => row.time_min,
     },
     {
-      id: 'timeMax',
-      label: t('timeSelectorEndDate'),
-      type: 'string',
-      value: (row) => row.time_max
+      id: "timeMax",
+      label: t("timeSelectorEndDate"),
+      type: "string",
+      value: (row) => row.time_max,
     },
     {
-      id: 'depthMin',
-      label: t('depthFilterStartDepth'),
-      type: 'number',
-      value: (row) => row.depth_min
+      id: "depthMin",
+      label: t("depthFilterStartDepth"),
+      type: "number",
+      value: (row) => row.depth_min,
     },
     {
-      id: 'depthMax',
-      label: t('depthFilterEndDepth'),
-      type: 'number',
-      value: (row) => row.depth_max
-    }
-  ]
+      id: "depthMax",
+      label: t("depthFilterEndDepth"),
+      type: "number",
+      value: (row) => row.depth_max,
+    },
+  ];
 
   // A record picked on the map (rather than from this list) is pinned to the
   // front of it rather than filtering the rest away — the same "found here,
   // sorted to the top" treatment the datasets list itself gives a map click
   // (see DatasetsTable's pinnedPks).
-  const markerRecordPinned = highlightedRecord?.datasetPk === dataset.pk
+  const markerRecordPinned = highlightedRecord?.datasetPk === dataset.pk;
 
   // Same value the record id carries, named the same way: the
   // cf_role=trajectory_id variable, or the plain "Platform ID" when the dataset
   // is a single unnamed trajectory with no such variable.
   const platformIdLabel = dataset.trajectory_id_variable
-    ? t('cfRoleTrajectoryIdText')
-    : t('trajectoryPlatformIdText')
+    ? t("cfRoleTrajectoryIdText")
+    : t("trajectoryPlatformIdText");
 
   const platformSortFields = [
     {
-      id: 'id',
+      id: "id",
       label: platformIdLabel,
-      type: 'string',
-      value: (row) => row.trajectory_id
+      type: "string",
+      value: (row) => row.trajectory_id,
     },
     {
-      id: 'timeMin',
-      label: t('timeSelectorStartDate'),
-      type: 'string',
-      value: (row) => row.time_min
+      id: "timeMin",
+      label: t("timeSelectorStartDate"),
+      type: "string",
+      value: (row) => row.time_min,
     },
     {
-      id: 'timeMax',
-      label: t('timeSelectorEndDate'),
-      type: 'string',
-      value: (row) => row.time_max
+      id: "timeMax",
+      label: t("timeSelectorEndDate"),
+      type: "string",
+      value: (row) => row.time_max,
     },
     {
-      id: 'fixes',
-      label: t('trajectoryPlatformFixesText'),
-      type: 'number',
-      value: (row) => row.n_points
-    }
-  ]
+      id: "fixes",
+      label: t("trajectoryPlatformFixesText"),
+      type: "number",
+      value: (row) => row.n_points,
+    },
+  ];
 
-  const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet
+  const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet;
 
   const {
     shown: shownEovs,
     hidden: hiddenEovCount,
     expanded: eovsExpanded,
-    toggle: toggleEovsExpanded
-  } = useExpandableList(dataset.eovs, EOV_VISIBLE_LIMIT)
+    toggle: toggleEovsExpanded,
+  } = useExpandableList(dataset.eovs, EOV_VISIBLE_LIMIT);
 
   const platformOption = platformFilter.platformsSelected.filter(
-    (p) => dataset.platform === p.title
-  )[0]
+    (p) => dataset.platform === p.title,
+  )[0];
 
   // The title bar's filter button: narrow the map to this dataset alone, or
   // release it again. Same toggle the dataset's chip in the Filters panel does
   // (FilterButton), on the one dataset this page is about.
   const datasetIsFiltered = datasetFilter.datasetsSelected.some(
-    (option) => option.pk === dataset.pk && option.isSelected
-  )
+    (option) => option.pk === dataset.pk && option.isSelected,
+  );
   const toggleDatasetFilter = () =>
     datasetFilter.setDatasetsSelected(
       datasetFilter.datasetsSelected.map((option) =>
         option.pk === dataset.pk
           ? { ...option, isSelected: !option.isSelected }
-          : option
-      )
-    )
+          : option,
+      ),
+    );
 
   return (
     <div
-      className='datasetInspector'
+      className="datasetInspector"
       ref={inspectorRef}
       onMouseEnter={() => setHoveredDataset(dataset)}
       onMouseLeave={() => setHoveredDataset()}
@@ -421,48 +421,48 @@ export default function DatasetInspector({
           which replaces the datasets banner while this page is open — one
           control, in the one place that marks the panel as being on a dataset
           rather than the list. */}
-      <div className='datasetTitleBlock' onDoubleClick={zoomToDataset}>
+      <div className="datasetTitleBlock" onDoubleClick={zoomToDataset}>
         {/* A heading, and only a heading. Filtering the map to this dataset
             used to be a click on the title itself, which no reader expects of
             a page's title — it is the button beside the zoom one now. */}
-        <h2 className='datasetTitle'>{dataset.title}</h2>
-        <div className='datasetTitleActions'>
+        <h2 className="datasetTitle">{dataset.title}</h2>
+        <div className="datasetTitleActions">
           <button
-            type='button'
-            className={classNames('datasetTitleAction', {
-              active: datasetIsFiltered
+            type="button"
+            className={classNames("datasetTitleAction", {
+              active: datasetIsFiltered,
             })}
             onClick={toggleDatasetFilter}
             aria-pressed={datasetIsFiltered}
             title={t(
               datasetIsFiltered
-                ? 'datasetFilterButtonRemove'
-                : 'datasetFilterButtonApply'
+                ? "datasetFilterButtonRemove"
+                : "datasetFilterButtonApply",
             )}
           >
             {datasetIsFiltered ? (
-              <FunnelFill size={15} aria-hidden='true' />
+              <FunnelFill size={15} aria-hidden="true" />
             ) : (
-              <Funnel size={15} aria-hidden='true' />
+              <Funnel size={15} aria-hidden="true" />
             )}
           </button>
           {/* Frames the map on this dataset; vanishes once it already is. */}
           <ZoomToDataset />
         </div>
       </div>
-      <div className='datasetInspectorBody'>
+      <div className="datasetInspectorBody">
         {/* The front matter, as compact as it can be read: each field is a
             small eyebrow label with its value beside it on the same line
             (wrapping under only when the row is too narrow for both), and the
             fields flow two-up across the sheet, the chip-carrying ones taking
             a full row of their own. No row rules — the whitespace separates
             them. */}
-        <dl className='datasetMetaSheet'>
-          <div className='metaCell metaCellWide'>
-            <dt className='metadataLabel'>
-              {t('datasetInspectorOrganizationText')}
+        <dl className="datasetMetaSheet">
+          <div className="metaCell metaCellWide">
+            <dt className="metadataLabel">
+              {t("datasetInspectorOrganizationText")}
             </dt>
-            <dd className='metadataValue'>
+            <dd className="metadataValue">
               {dataset.organizations.map((org, index) => {
                 return (
                   <FilterButton
@@ -473,15 +473,15 @@ export default function DatasetInspector({
                       orgFilter.orgsSelected.filter((o) => org === o.title)[0]
                     }
                   />
-                )
+                );
               })}
             </dd>
           </div>
-          <div className='metaCell metaCellWide'>
-            <dt className='metadataLabel'>
-              {t('datasetInspectorOceanVariablesText')}
+          <div className="metaCell metaCellWide">
+            <dt className="metadataLabel">
+              {t("datasetInspectorOceanVariablesText")}
             </dt>
-            <dd className='metadataValue'>
+            <dd className="metadataValue">
               {shownEovs.map((eov, index) => {
                 return (
                   <FilterButton
@@ -492,24 +492,24 @@ export default function DatasetInspector({
                       eovFilter.eovsSelected.filter((e) => eov === e.title)[0]
                     }
                   />
-                )
+                );
               })}
               {(hiddenEovCount > 0 || eovsExpanded) && (
                 <button
-                  type='button'
-                  className='listCardTagsMore'
+                  type="button"
+                  className="listCardTagsMore"
                   onClick={toggleEovsExpanded}
                   aria-expanded={eovsExpanded}
                   title={
                     eovsExpanded
-                      ? t('listCardTagsFewerText')
-                      : t('listCardTagsMoreTitle', {
-                        total: dataset.eovs.length
-                      })
+                      ? t("listCardTagsFewerText")
+                      : t("listCardTagsMoreTitle", {
+                          total: dataset.eovs.length,
+                        })
                   }
                 >
                   {eovsExpanded
-                    ? t('listCardTagsFewerText')
+                    ? t("listCardTagsFewerText")
                     : `+${hiddenEovCount}`}
                 </button>
               )}
@@ -520,19 +520,19 @@ export default function DatasetInspector({
               EOVs already use (same pill radius, border and padding as
               .filterButton) — one consistent chip style across every field
               instead of four different treatments. */}
-          <div className='metaCell'>
-            <dt className='metadataLabel'>
-              {t('datasetInspectorGeometryText')}
+          <div className="metaCell">
+            <dt className="metadataLabel">
+              {t("datasetInspectorGeometryText")}
             </dt>
-            <dd className='metadataValue'>
-              <span className='metadataChip'>{geometryLabel}</span>
+            <dd className="metadataValue">
+              <span className="metadataChip">{geometryLabel}</span>
             </dd>
           </div>
-          <div className='metaCell'>
-            <dt className='metadataLabel'>
-              {t('datasetInspectorPlatformText')}
+          <div className="metaCell">
+            <dt className="metadataLabel">
+              {t("datasetInspectorPlatformText")}
             </dt>
-            <dd className='metadataValue'>
+            <dd className="metadataValue">
               <FilterButton
                 setOptionsSelected={platformFilter.setPlatformsSelected}
                 optionsSelected={platformFilter.platformsSelected}
@@ -542,15 +542,17 @@ export default function DatasetInspector({
           </div>
           {/* A grid spells its node count out as a product of its axes, which
               needs the full width; a plain record count shares its row. */}
-          <div className={isGrid ? 'metaCell metaCellWide' : 'metaCell'}>
-            <dt className='metadataLabel'>
-              {isGrid ? t('griddapNodesText') : t('datasetInspectorRecordsText')}
+          <div className={isGrid ? "metaCell metaCellWide" : "metaCell"}>
+            <dt className="metadataLabel">
+              {isGrid
+                ? t("griddapNodesText")
+                : t("datasetInspectorRecordsText")}
             </dt>
-            <dd className='metadataValue'>
+            <dd className="metadataValue">
               {isGrid ? (
                 <GridNodeCount dimensions={dataset.grid_dimensions} />
               ) : (
-                <span className='metadataChip'>
+                <span className="metadataChip">
                   {dataset.profiles_count !== dataset.n_profiles
                     ? `${dataset.profiles_count} / ${dataset.n_profiles}`
                     : dataset.profiles_count}
@@ -564,42 +566,46 @@ export default function DatasetInspector({
               row, unless there's more than one link (ERDDAP + CKAN both), in
               which case the row needs the full width to hold both badges. */}
           {hasSources && (
-            <div className={classNames('metaCell', { metaCellWide: hasMultipleSources })}>
-              <dt className='metadataLabel'>
-                {t('datasetInspectorSourcesText')}
+            <div
+              className={classNames("metaCell", {
+                metaCellWide: hasMultipleSources,
+              })}
+            >
+              <dt className="metadataLabel">
+                {t("datasetInspectorSourcesText")}
               </dt>
-              <dd className='metadataValue'>
-                {dataset.source_type === 'obis' ? (
+              <dd className="metadataValue">
+                {dataset.source_type === "obis" ? (
                   <a
-                    className='metadataChip metadataLink'
+                    className="metadataChip metadataLink"
                     href={`https://obis.org/dataset/${dataset.dataset_id}`}
-                    target='_blank'
-                    rel='noreferrer'
+                    target="_blank"
+                    rel="noreferrer"
                   >
-                    {t('datasetInspectorOBISURL')}
+                    {t("datasetInspectorOBISURL")}
                   </a>
                 ) : (
                   <>
                     {dataset.erddap_url && (
                       <a
-                        className='metadataChip metadataLink'
+                        className="metadataChip metadataLink"
                         href={dataset.erddap_url}
-                        target='_blank'
-                        title={t('datasetInspectorERDDAPText')}
-                        rel='noreferrer'
+                        target="_blank"
+                        title={t("datasetInspectorERDDAPText")}
+                        rel="noreferrer"
                       >
-                        {t('datasetInspectorERDDAPURL')} (ERDDAP™)
+                        {t("datasetInspectorERDDAPURL")} (ERDDAP™)
                       </a>
                     )}
                     {dataset.ckan_url && (
                       <a
-                        className='metadataChip metadataLink'
+                        className="metadataChip metadataLink"
                         href={dataset.ckan_url}
-                        target='_blank'
-                        title={t('datasetInspectorCKANText')}
-                        rel='noreferrer'
+                        target="_blank"
+                        title={t("datasetInspectorCKANText")}
+                        rel="noreferrer"
                       >
-                        {t('datasetInspectorCKANURL')} (CKAN)
+                        {t("datasetInspectorCKANURL")} (CKAN)
                       </a>
                     )}
                   </>
@@ -616,11 +622,11 @@ export default function DatasetInspector({
           />
         )}
         {isTrajectoryDataset && trajectoryPlatforms?.length > 0 && (
-          <div className='recordSection'>
-            <div className='recordSectionHeader'>
-              <strong>{t('trajectoryPlatformsTitle')}</strong>
-              <span className='recordHint'>
-                {t('trajectoryPlatformsClickText')}
+          <div className="recordSection">
+            <div className="recordSectionHeader">
+              <strong>{t("trajectoryPlatformsTitle")}</strong>
+              <span className="recordHint">
+                {t("trajectoryPlatformsClickText")}
               </span>
               <IdCaption
                 label={platformIdLabel}
@@ -631,19 +637,19 @@ export default function DatasetInspector({
               items={trajectoryPlatforms}
               keyOf={(row) => row.trajectory_id}
               sortFields={platformSortFields}
-              defaultSort={{ field: 'id', dir: 'asc' }}
-              filterPlaceholder={t('trajectoryPlatformsSearchPlaceholder')}
-              emptyText={t('trajectoryPlatformsNoResultsText')}
+              defaultSort={{ field: "id", dir: "asc" }}
+              filterPlaceholder={t("trajectoryPlatformsSearchPlaceholder")}
+              emptyText={t("trajectoryPlatformsNoResultsText")}
               focusKey={
                 selectedTrajectory?.datasetPk === dataset.pk
                   ? selectedTrajectory.trajectoryId
                   : undefined
               }
-              pagerLabel={t('trajectoryPlatformsPagerLabel')}
-              perPageLabel={t('trajectoryPlatformsPerPageLabel')}
+              pagerLabel={t("trajectoryPlatformsPagerLabel")}
+              perPageLabel={t("trajectoryPlatformsPerPageLabel")}
               renderItem={(row) => (
                 <ListCard
-                  id={row.trajectory_id || '—'}
+                  id={row.trajectory_id || "—"}
                   pressed={
                     selectedTrajectory?.datasetPk === dataset.pk &&
                     selectedTrajectory?.trajectoryId === row.trajectory_id
@@ -654,22 +660,22 @@ export default function DatasetInspector({
                       selectedTrajectory?.trajectoryId === row.trajectory_id
                         ? undefined // click the drawn platform again to clear
                         : {
-                          datasetPk: dataset.pk,
-                          datasetTitle: dataset.title,
-                          trajectoryId: row.trajectory_id,
-                          // A row in this list gives no clue where its
-                          // platform sailed, so the map has to go there —
-                          // unlike a track clicked on the map, which is
-                          // already in view (see selectTrajectoryFromMap).
-                          frameView: true
-                        }
+                            datasetPk: dataset.pk,
+                            datasetTitle: dataset.title,
+                            trajectoryId: row.trajectory_id,
+                            // A row in this list gives no clue where its
+                            // platform sailed, so the map has to go there —
+                            // unlike a track clicked on the map, which is
+                            // already in view (see selectTrajectoryFromMap).
+                            frameView: true,
+                          },
                     )
                   }
                 >
-                  <CardField label={t('datasetInspectorTimeframeText')}>
+                  <CardField label={t("datasetInspectorTimeframeText")}>
                     {formatInstantRange(row.time_min, row.time_max)}
                   </CardField>
-                  <CardField label={t('trajectoryPlatformFixesText')}>
+                  <CardField label={t("trajectoryPlatformFixesText")}>
                     {row.n_points?.toLocaleString()}
                   </CardField>
                 </ListCard>
@@ -678,53 +684,53 @@ export default function DatasetInspector({
           </div>
         )}
         {hasRecordList && (
-          <div className='recordSection'>
-            <div className='recordSectionHeader'>
-              <strong>{t('datasetInspectorRecordTable')}</strong>
-              <span className='recordHint'>
-                {t('datasetInspectorClickPreviewText')}
+          <div className="recordSection">
+            <div className="recordSectionHeader">
+              <strong>{t("datasetInspectorRecordTable")}</strong>
+              <span className="recordHint">
+                {t("datasetInspectorClickPreviewText")}
               </span>
               <IdCaption {...recordIdField} />
             </div>
             {/* Names the accent ListCard puts on the pinned card below, and
                 offers the way to unpin it again. */}
             {markerRecordPinned && (
-              <div className='recordMapClickHint'>
-                <span className='recordMapClickSwatch' aria-hidden='true' />
-                {t('datasetInspectorMapClickHint')}
+              <div className="recordMapClickHint">
+                <span className="recordMapClickSwatch" aria-hidden="true" />
+                {t("datasetInspectorMapClickHint")}
                 <button
-                  type='button'
-                  className='recordShowAll'
+                  type="button"
+                  className="recordShowAll"
                   onClick={() => setHighlightedRecord(undefined)}
                 >
-                  {t('datasetInspectorClearMapRecordText')}
+                  {t("datasetInspectorClearMapRecordText")}
                 </button>
               </div>
             )}
             {loading ? (
-              <div className='datasetInspectorLoadingContainer'>
-                <Loading variant='inline' />
+              <div className="datasetInspectorLoadingContainer">
+                <Loading variant="inline" />
               </div>
             ) : (
               <CardList
                 items={datasetRecords?.profiles}
                 keyOf={(row) => row.profile_id}
                 sortFields={recordSortFields}
-                defaultSort={{ field: 'id', dir: 'desc' }}
-                filterPlaceholder={t('datasetInspectorFilterText')}
-                emptyText={t('datasetInspectorNoRecordsText')}
+                defaultSort={{ field: "id", dir: "desc" }}
+                filterPlaceholder={t("datasetInspectorFilterText")}
+                emptyText={t("datasetInspectorNoRecordsText")}
                 pinnedKey={
                   markerRecordPinned ? highlightedRecord.profileId : undefined
                 }
-                pagerLabel={t('datasetInspectorRecordsPagerLabel')}
-                perPageLabel={t('datasetInspectorRecordsPerPageLabel')}
+                pagerLabel={t("datasetInspectorRecordsPagerLabel")}
+                perPageLabel={t("datasetInspectorRecordsPerPageLabel")}
                 renderItem={(row) => {
                   // Which ocean variables this individual record carries — a
                   // dataset's records don't all measure everything it lists.
                   // Null for the sources with no per-record detection
                   // (trajectory, OBIS, grid), where the dataset's own list is
                   // the best answer available.
-                  const eovs = (row.eovs ?? dataset.eovs)?.map((eov) => t(eov))
+                  const eovs = (row.eovs ?? dataset.eovs)?.map((eov) => t(eov));
                   return (
                     <ListCard
                       id={row.profile_id}
@@ -734,21 +740,21 @@ export default function DatasetInspector({
                       }
                       onClick={() => setInspectRecordID(row.profile_id)}
                     >
-                      <CardField label={t('datasetInspectorTimeframeText')}>
+                      <CardField label={t("datasetInspectorTimeframeText")}>
                         {formatInstantRange(row.time_min, row.time_max)}
                       </CardField>
-                      <CardField label={t('datasetInspectorDepthRangeText')}>
-                        {formatRange(row.depth_min, row.depth_max, 'm')}
+                      <CardField label={t("datasetInspectorDepthRangeText")}>
+                        {formatRange(row.depth_min, row.depth_max, "m")}
                       </CardField>
                       {eovs?.length > 0 && (
                         <CardField
-                          label={t('datasetInspectorOceanVariablesText')}
+                          label={t("datasetInspectorOceanVariablesText")}
                         >
                           <CardTags values={eovs} />
                         </CardField>
                       )}
                     </ListCard>
-                  )
+                  );
                 }}
               />
             )}
@@ -756,5 +762,5 @@ export default function DatasetInspector({
         )}
       </div>
     </div>
-  )
+  );
 }

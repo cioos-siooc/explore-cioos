@@ -83,10 +83,7 @@
 /* Hint shown in the detail pane while no filter is open. */
 .filtersPanelPlaceholder {
   position: absolute;
-  top: 12px;
-  left: 296px;
-  right: 12px;
-  bottom: 12px;
+  inset: 12px 12px 12px 296px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -170,10 +167,7 @@
    however long the list is, and nothing can push the modal sideways. */
 .filtersPanel .filterOptions {
   position: absolute;
-  top: 12px;
-  left: 296px;
-  right: 12px;
-  bottom: 12px;
+  inset: 12px 12px 12px 296px;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -198,12 +192,12 @@
 
 .filtersPanel .filterOptionsBody {
   flex: 1 1 auto;
+
   /* min-*: 0 lets a flex item shrink below its content size — without it the
      list refuses to shrink and overflows the pane instead of scrolling. */
   min-height: 0;
   min-width: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden auto;
 }
 
 .filtersPanel .filterOptionsActions {
@@ -304,6 +298,7 @@
   position: relative; /* anchors the refetch scrim (Loading) */
   height: 100%;
   min-height: 300px;
+
   /* Each of the two views below manages its own scrolling — the list scrolls
      its cards under a fixed toolbar and pager, a dataset page scrolls its body
      under a pinned title. So the panel itself must never scroll: without this,
@@ -324,6 +319,7 @@
   /* Tinted, so a dataset page never reads as another view of the list: the
      page's own title block and sections sit as white cards on this wash. */
   background-color: var(--cioos-sand, var(--cioos-surface-2));
+
   /* Duration spelled out: --cioos-transition-* carries its own timing function,
      and a second one after it invalidates the shorthand. */
   animation: datasetsDetailIn 0.22s ease-out;
@@ -338,6 +334,7 @@
     transform: translateX(14px);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;
@@ -349,6 +346,7 @@
     transform: translateX(-14px);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;

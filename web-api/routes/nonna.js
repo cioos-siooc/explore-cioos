@@ -35,7 +35,8 @@ const router = express.Router();
  * and the frontend pointed straight at the upstream URL.
  */
 
-const NONNA_WMTS = "https://nonna-geoserver.data.chs-shc.ca/geoserver/gwc/service/wmts";
+const NONNA_WMTS =
+  "https://nonna-geoserver.data.chs-shc.ca/geoserver/gwc/service/wmts";
 
 // The two published grids. NONNA 10 is the 10 m product — sharp enough at z16
 // to show individual wharves — but it only covers surveyed areas; NONNA 100 is
@@ -99,9 +100,10 @@ const ERROR_MAX_AGE_S = 60;
  * MB in practice. Override with NONNA_TILE_CACHE_MAX where the container is
  * memory-tight.
  */
-const TILE_CACHE_MAX = Number(process.env.NONNA_TILE_CACHE_MAX) > 0
-  ? Number(process.env.NONNA_TILE_CACHE_MAX)
-  : 3000;
+const TILE_CACHE_MAX =
+  Number(process.env.NONNA_TILE_CACHE_MAX) > 0
+    ? Number(process.env.NONNA_TILE_CACHE_MAX)
+    : 3000;
 const TILE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const tileCache = new Map();
 
@@ -151,7 +153,10 @@ let redisUnavailableUntil = 0;
 function withTimeout(promise, ms, label) {
   let timer;
   const bell = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms}ms`)),
+      ms,
+    );
     // Don't let a pending timer keep the process alive.
     if (timer.unref) timer.unref();
   });
@@ -278,9 +283,7 @@ function sendTile(res, body, maxAgeSeconds) {
  */
 /* GET /nonna/:layer/:z/:x/:y.png */
 router.get("/:layer/:z/:x/:y.png", async (req, res) => {
-  const {
-    layer, z, x, y,
-  } = req.params;
+  const { layer, z, x, y } = req.params;
 
   const wmtsLayer = LAYERS[layer];
   if (!wmtsLayer) {
@@ -293,18 +296,24 @@ router.get("/:layer/:z/:x/:y.png", async (req, res) => {
   const col = Number(x);
   const row = Number(y);
   if (!Number.isInteger(zoom) || zoom < 0 || zoom > MAX_ZOOM) {
-    return res.status(400).json({ error: `zoom must be an integer 0-${MAX_ZOOM}` });
+    return res
+      .status(400)
+      .json({ error: `zoom must be an integer 0-${MAX_ZOOM}` });
   }
   // Reject out-of-grid indices rather than forwarding them: upstream would
   // answer anyway, and each forwarded request is one we made CHS serve.
   const tilesPerAxis = 2 ** zoom;
   if (
-    !Number.isInteger(col) || col < 0 || col >= tilesPerAxis
-    || !Number.isInteger(row) || row < 0 || row >= tilesPerAxis
+    !Number.isInteger(col) ||
+    col < 0 ||
+    col >= tilesPerAxis ||
+    !Number.isInteger(row) ||
+    row < 0 ||
+    row >= tilesPerAxis
   ) {
-    return res
-      .status(400)
-      .json({ error: `tile ${col}/${row} is outside the grid at zoom ${zoom}` });
+    return res.status(400).json({
+      error: `tile ${col}/${row} is outside the grid at zoom ${zoom}`,
+    });
   }
 
   const key = `${layer}/${zoom}/${col}/${row}`;

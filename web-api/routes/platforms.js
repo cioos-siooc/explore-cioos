@@ -22,7 +22,13 @@ const cache = require("../utils/cache");
  */
 
 router.get("/", cache.route(), async (req, res, next) => {
-  res.send((await db.raw("SELECT DISTINCT  platform FROM cde.datasets WHERE platform IS NOT NULL")).rows.map((e) => e.platform));
+  res.send(
+    (
+      await db.raw(
+        "SELECT DISTINCT  platform FROM cde.datasets WHERE platform IS NOT NULL",
+      )
+    ).rows.map((e) => e.platform),
+  );
 });
 
 module.exports = router;

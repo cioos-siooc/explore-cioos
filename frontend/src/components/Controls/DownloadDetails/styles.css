@@ -2,18 +2,18 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 0px !important;
+  padding: 0 !important;
   max-width: none !important;
 }
 
 .downloadDetails .col {
-  padding: 0px 0px;
-  margin-left: 0px;
-  margin-right: 0px;
+  padding: 0;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .downloadDetails > hr {
-  margin: 0px;
+  margin: 0;
 }
 
 /* --- Header: back affordance + modal title ---
@@ -121,7 +121,9 @@
   padding: 0 14px 0 10px;
   color: var(--cioos-ink);
   font-weight: 500;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .filterDownloadToggle .filterToggleIcon {
@@ -364,13 +366,16 @@
     align-items: stretch;
     gap: 12px;
   }
+
   .downloadSummary {
     justify-content: center;
   }
+
   .downloadSubmit {
     flex: 0 0 auto;
     max-width: 100%;
   }
+
   .downloadSubmit .emailAddress,
   .submitRequestButton {
     flex: 1 1 100%;

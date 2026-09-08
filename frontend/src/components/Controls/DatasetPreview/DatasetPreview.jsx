@@ -1,16 +1,16 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react'
-import { useTranslation } from 'react-i18next'
+import React, { useState, useEffect, Suspense, lazy } from "react";
+import { useTranslation } from "react-i18next";
 
-import Modal from '../../ui/Modal.jsx'
+import Modal from "../../ui/Modal.jsx";
 
-import Loading from '../Loading/Loading.jsx'
-import DatasetPreviewTable from '../DatasetPreviewTable/DatasetPreviewTable.jsx'
-import './styles.css'
+import Loading from "../Loading/Loading.jsx";
+import DatasetPreviewTable from "../DatasetPreviewTable/DatasetPreviewTable.jsx";
+import "./styles.css";
 
 // Lazy so the ~1 MB Plotly chunk only downloads when the Plot tab is opened.
-const DatasetPreviewPlot = lazy(() =>
-  import('../DatasetPreviewPlot/DatasetPreviewPlot.jsx')
-)
+const DatasetPreviewPlot = lazy(
+  () => import("../DatasetPreviewPlot/DatasetPreviewPlot.jsx"),
+);
 
 export default function DatasetPreview({
   datasetPreview,
@@ -20,102 +20,107 @@ export default function DatasetPreview({
   showModal,
   setShowModal,
   recordLoading,
-  setRecordLoading
+  setRecordLoading,
 }) {
-  const { t } = useTranslation()
-  const clearAxes = { x: { columnName: null, unit: null }, y: { columnName: null, unit: null } }
-  const [plotAxes, setPlotAxes] = useState(clearAxes)
-  const [selectedVis, setSelectedVis] = useState('table')
+  const { t } = useTranslation();
+  const clearAxes = {
+    x: { columnName: null, unit: null },
+    y: { columnName: null, unit: null },
+  };
+  const [plotAxes, setPlotAxes] = useState(clearAxes);
+  const [selectedVis, setSelectedVis] = useState("table");
 
-  const [data, setData] = useState()
+  const [data, setData] = useState();
 
   useEffect(() => {
-    const columnNames = datasetPreview?.table?.columnNames || []
+    const columnNames = datasetPreview?.table?.columnNames || [];
 
-    const rows = datasetPreview?.table?.rows || []
+    const rows = datasetPreview?.table?.rows || [];
 
     // reformat datasetPreview into array of objects
     const data = rows.map((row) => {
-      const keys = columnNames
-      const values = row
+      const keys = columnNames;
+      const values = row;
       const merged = keys.reduce(
         (obj, key, index) => ({ ...obj, [key]: values[index] }),
-        {}
-      )
-      return merged
-    })
-    setData(data)
-  }, [datasetPreview])
+        {},
+      );
+      return merged;
+    });
+    setData(data);
+  }, [datasetPreview]);
 
   const onModalClose = () => {
-    setInspectRecordID()
-    setShowModal(false)
-    setPlotAxes(clearAxes)
-    setSelectedVis('table')
-    setInspectRecordID()
-    setData()
-    setRecordLoading(false)
-  }
-  const dataIsReady = !recordLoading && datasetPreview?.table?.rows
+    setInspectRecordID();
+    setShowModal(false);
+    setPlotAxes(clearAxes);
+    setSelectedVis("table");
+    setInspectRecordID();
+    setData();
+    setRecordLoading(false);
+  };
+  const dataIsReady = !recordLoading && datasetPreview?.table?.rows;
 
   return (
     <Modal
-      className='dataPreviewModal'
+      className="dataPreviewModal"
       show={showModal}
-      size='xl'
+      size="xl"
       onHide={onModalClose}
       centered
       scrollable
     >
       {inspectDataset && inspectRecordID && (
         <>
-          <Modal.Header closeButton className='tableAndPlotGridContainer'>
+          <Modal.Header closeButton className="tableAndPlotGridContainer">
             {dataIsReady && (
               <>
                 <button
-                  className={`toggleButton ${selectedVis === 'table' && 'selected'
+                  className={`toggleButton ${
+                    selectedVis === "table" && "selected"
                   }`}
                   onClick={() => {
-                    setSelectedVis('table')
+                    setSelectedVis("table");
                     // setRecordLoading(true)
                   }}
                 >
-                  {t('datasetPreviewTableText')}
+                  {t("datasetPreviewTableText")}
                 </button>
                 <button
-                  className={`toggleButton ${selectedVis === 'plot' && 'selected'
+                  className={`toggleButton ${
+                    selectedVis === "plot" && "selected"
                   }`}
                   onClick={() => {
-                    setSelectedVis('plot')
+                    setSelectedVis("plot");
                     // setRecordLoading(true)
                   }}
                 >
-                  {t('datasetPreviewPlotText')}
+                  {t("datasetPreviewPlotText")}
                 </button>
               </>
             )}
 
-            <h4 className='datasetTitle'>
+            <h4 className="datasetTitle">
               {inspectDataset.title}: <i>{inspectRecordID}</i>
               {/* {t('datasetInspectorModalTitle')} */}
               {/* Dataset Preview */}
             </h4>
           </Modal.Header>
           <Modal.Body>
-            <div className='tableAndPlotGridItem tableAndPlot'>
+            <div className="tableAndPlotGridItem tableAndPlot">
               {recordLoading ? (
-                <Loading variant='inline' />
+                <Loading variant="inline" />
               ) : (
                 <>
                   {datasetPreview?.table?.rows ? (
                     <>
-                      {selectedVis === 'table' ? (
+                      {selectedVis === "table" ? (
                         <DatasetPreviewTable
                           datasetPreview={datasetPreview}
                           data={data}
                         />
                       ) : (
-                        <Suspense fallback={<Loading variant='inline' />}>
+                        <Suspense fallback={<Loading variant="inline" />}>
                           <DatasetPreviewPlot
                             inspectDataset={inspectDataset}
                             plotAxes={plotAxes}
@@ -129,7 +134,7 @@ export default function DatasetPreview({
                     </>
                   ) : (
                     <>
-                      <p>{t('datasetPreviewNoData')}</p>
+                      <p>{t("datasetPreviewNoData")}</p>
                     </>
                   )}
                 </>
@@ -139,5 +144,5 @@ export default function DatasetPreview({
         </>
       )}
     </Modal>
-  )
+  );
 }

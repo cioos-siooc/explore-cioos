@@ -16,17 +16,16 @@ const wkt = require("wkt");
  */
 function polygonJSONToWKT(polygon) {
   try {
-    const wktPolygon = `POLYGON((${
-      JSON.parse(polygon)
-        .map(([lon, lat]) => `${lon} ${lat}`)
-        .join()
-    }))`;
+    const wktPolygon = `POLYGON((${JSON.parse(polygon)
+      .map(([lon, lat]) => `${lon} ${lat}`)
+      .join()}))`;
     const wktInstance = wkt.parse(wktPolygon);
 
     if (
-      wktInstance.type === "Polygon"
-      && wktInstance.coordinates[0].length >= 4
-    ) return wktPolygon;
+      wktInstance.type === "Polygon" &&
+      wktInstance.coordinates[0].length >= 4
+    )
+      return wktPolygon;
     return false;
   } catch (e) {
     console.error(e);

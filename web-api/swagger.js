@@ -6,7 +6,8 @@ const options = {
     info: {
       title: "CIOOS Data Explorer API",
       version: "1.0.0",
-      description: "API documentation for Data Explorer endpoints. All endpoints are served under the /api prefix.",
+      description:
+        "API documentation for Data Explorer endpoints. All endpoints are served under the /api prefix.",
     },
     servers: [
       {
@@ -15,10 +16,7 @@ const options = {
       },
     ],
   },
-  apis: [
-    "./routes/*.js",
-  ],
-
+  apis: ["./routes/*.js"],
 };
 
 module.exports = swaggerJSDoc(options);

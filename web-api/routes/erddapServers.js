@@ -14,7 +14,13 @@ const cache = require("../utils/cache");
  * */
 
 router.get("/", cache.route(), async (req, res, next) => {
-  res.send((await db.raw("SELECT DISTINCT erddap_url FROM cde.datasets WHERE erddap_url IS NOT NULL AND source_type IS DISTINCT FROM 'obis' ORDER BY erddap_url")).rows.map((e) => e.erddap_url));
+  res.send(
+    (
+      await db.raw(
+        "SELECT DISTINCT erddap_url FROM cde.datasets WHERE erddap_url IS NOT NULL AND source_type IS DISTINCT FROM 'obis' ORDER BY erddap_url",
+      )
+    ).rows.map((e) => e.erddap_url),
+  );
 });
 
 module.exports = router;

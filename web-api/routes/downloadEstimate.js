@@ -38,7 +38,8 @@ router.get("/", cache.route(), async (req, res, next) => {
   try {
     shapeQueryResponse = await getShapeQuery(req.query, true, false);
   } catch (err) {
-    if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+    if (err.statusCode === 400)
+      return res.status(400).json({ error: err.message });
     throw err;
   }
   res.send(

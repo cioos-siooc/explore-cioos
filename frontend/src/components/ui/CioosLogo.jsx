@@ -1,9 +1,9 @@
-import * as React from 'react'
-import { useTranslation } from 'react-i18next'
+import * as React from "react";
+import { useTranslation } from "react-i18next";
 
-import Spinner from './Spinner.jsx'
-import { useActivity } from '../../state/activity/ActivityProvider.jsx'
-import './cioosLogoStyles.css'
+import Spinner from "./Spinner.jsx";
+import { useActivity } from "../../state/activity/ActivityProvider.jsx";
+import "./cioosLogoStyles.css";
 
 // The CIOOS/SIOOC logo, as the animated mark plus live text — no wordmark
 // image. Drawing the name rather than loading NationalLogo{English,French}.png
@@ -22,25 +22,25 @@ import './cioosLogoStyles.css'
 // worn by the brand card, where the row is ~100px wide and the full name would
 // land at four pixels tall. That one is permanent, so it moves only while there
 // is something to move for.
-export default function CioosLogo ({ layout = 'inline', className = '' }) {
-  const { t } = useTranslation()
-  const { announced } = useActivity()
-  const stacked = layout === 'stacked'
-  const idle = !stacked && !announced
+export default function CioosLogo({ layout = "inline", className = "" }) {
+  const { t } = useTranslation();
+  const { announced } = useActivity();
+  const stacked = layout === "stacked";
+  const idle = !stacked && !announced;
 
   return (
     <span
       className={`cioosLogo cioosLogo-${layout}${
-        idle ? ' cioosLogo-idle' : ''
+        idle ? " cioosLogo-idle" : ""
       } ${className}`.trim()}
     >
-      <Spinner size={stacked ? 'lg' : 'md'} role='presentation' />
-      <span className='cioosLogoWordmark'>
-        <span className='cioosLogoName'>{t('brandName')}</span>
+      <Spinner size={stacked ? "lg" : "md"} role="presentation" />
+      <span className="cioosLogoWordmark">
+        <span className="cioosLogoName">{t("brandName")}</span>
         {stacked && (
-          <span className='cioosLogoFullName'>{t('brandFullName')}</span>
+          <span className="cioosLogoFullName">{t("brandFullName")}</span>
         )}
       </span>
     </span>
-  )
+  );
 }

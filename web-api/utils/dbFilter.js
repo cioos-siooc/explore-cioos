@@ -17,7 +17,9 @@ class InvalidPolygonError extends Error {
     // ring with fewer than 4 points. Binding that false into ST_GeomFromText
     // is a 500 on every route that takes a polygon, so reject it here as the
     // client error it is.
-    super("Invalid polygon: expected a closed ring of at least 4 [lon,lat] pairs.");
+    super(
+      "Invalid polygon: expected a closed ring of at least 4 [lon,lat] pairs.",
+    );
     this.name = "InvalidPolygonError";
     this.statusCode = 400;
   }
@@ -26,8 +28,8 @@ class InvalidPolygonError extends Error {
 class ScientificNameSelectionTooBroadError extends Error {
   constructor(expandedCount, threshold) {
     super(
-      `Scientific-name selection rolls down to ${expandedCount} taxa (max ${threshold}). `
-      + "Pick a Family or below.",
+      `Scientific-name selection rolls down to ${expandedCount} taxa (max ${threshold}). ` +
+        "Pick a Family or below.",
     );
     this.name = "ScientificNameSelectionTooBroadError";
     this.statusCode = 400;
@@ -122,9 +124,9 @@ async function createDBFilter(request) {
     parameters.rectLonMax = lonMax || 180;
     parameters.rectLatMax = clampLat(latMax, 85.05);
     filters.push(
-      "ST_Intersects(search_geom, ST_Transform(ST_MakeEnvelope("
-      + "(:rectLonMin)::double precision,(:rectLatMin)::double precision,"
-      + "(:rectLonMax)::double precision,(:rectLatMax)::double precision,4326),3857))",
+      "ST_Intersects(search_geom, ST_Transform(ST_MakeEnvelope(" +
+        "(:rectLonMin)::double precision,(:rectLatMin)::double precision," +
+        "(:rectLonMax)::double precision,(:rectLatMax)::double precision,4326),3857))",
     );
   }
 
@@ -171,7 +173,9 @@ async function createDBFilter(request) {
     parameters.erddapServersArray = erddapServers.split(",");
   }
   if (obisNodes && erddapServers) {
-    filters.push("(d.obis_nodes && :obisNodesArr OR d.erddap_url = ANY(:erddapServersArray))");
+    filters.push(
+      "(d.obis_nodes && :obisNodesArr OR d.erddap_url = ANY(:erddapServersArray))",
+    );
   } else if (obisNodes) {
     filters.push("d.obis_nodes && :obisNodesArr");
   } else if (erddapServers) {
@@ -184,12 +188,17 @@ async function createDBFilter(request) {
     parameters.wktPolygon = wktPolygon;
     // Extent-based: a feature matches when its search_geom intersects the drawn
     // polygon (was ST_Contains on the single point).
-    filters.push("ST_Intersects(search_geom, ST_Transform(ST_GeomFromText(:wktPolygon,4326),3857)) is true");
+    filters.push(
+      "ST_Intersects(search_geom, ST_Transform(ST_GeomFromText(:wktPolygon,4326),3857)) is true",
+    );
   }
 
   if (scientificNames) {
     const scientificNamesArr = unique(
-      scientificNames.split(",").map((s) => s.trim()).filter(Boolean),
+      scientificNames
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
     );
     parameters.scientificNamesArr = scientificNamesArr;
 
@@ -211,7 +220,9 @@ async function createDBFilter(request) {
         FROM cde.scientific_name_vernaculars v
        WHERE v.ancestor_aphia_ids && ARRAY(SELECT aphia_id FROM selected_aids)
          AND v.aphia_id IS NOT NULL`;
-    const { rows: expRows } = await db.raw(expansionSql, { scientificNamesArr });
+    const { rows: expRows } = await db.raw(expansionSql, {
+      scientificNamesArr,
+    });
     const expandedAphiaIds = expRows
       .map((r) => r.aphia_id)
       .filter((n) => Number.isInteger(n));
@@ -253,6 +264,7 @@ async function createDBFilter(request) {
 }
 
 module.exports = createDBFilter;
-module.exports.ScientificNameSelectionTooBroadError = ScientificNameSelectionTooBroadError;
+module.exports.ScientificNameSelectionTooBroadError =
+  ScientificNameSelectionTooBroadError;
 module.exports.InvalidPolygonError = InvalidPolygonError;
 module.exports.MAX_EXPANDED_APHIA_IDS = MAX_EXPANDED_APHIA_IDS;

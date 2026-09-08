@@ -6,6 +6,7 @@
   display: inline-flex;
   align-items: center;
   min-width: 0;
+
   /* The mark takes currentColor for both its mesh and its dots, so this one
      declaration colours it: primary for the nodes, the same teal at 55% for
      the mesh behind them. */
@@ -37,6 +38,7 @@
 .cioosLogo-stacked {
   flex-direction: column;
   gap: var(--cioos-space-md, 12px);
+
   /* The full name's size. The name is a multiple of it, so the lockup keeps
      the wordmark's proportions at whatever size this is set to. */
   font-size: var(--cioos-font-size-sm, 12px);
@@ -56,6 +58,7 @@
 .cioosLogoWordmark {
   display: flex;
   flex-direction: column;
+
   /* The wordmark sets the full name's cap top 9 units below the name's
      baseline, on a cap height of 11.5 — a little over half a line. */
   gap: 0.5em;
@@ -97,10 +100,12 @@
 
 .cioosLogoFullName {
   font-weight: 600;
+
   /* The wordmark's two lines sit one cap height plus a hair apart; the extra
      0.1 is headroom for the accents the French lockup carries. */
   line-height: 1.1;
   text-transform: uppercase;
+
   /* The break is in the translated string, where the wordmark puts it, rather
      than left to a max-width to guess. */
   white-space: pre-line;

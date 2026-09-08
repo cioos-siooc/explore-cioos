@@ -2,11 +2,13 @@
    center is the brand/Datasets/Filters bar. */
 .apiErrorBanner {
   position: fixed;
+
   /* Stacked above the time bar, which holds the bottom center now that it is
      always mounted. TimeBar publishes its measured footprint. */
   bottom: calc(12px + var(--cioos-time-bar-space, 0px));
   left: 50%;
   transform: translateX(-50%);
+
   /* On the dock rung, which is above the first-paint splash: a data service
      that isn't answering means the splash never lifts, and this is the only
      thing on screen that says why. */
@@ -49,5 +51,5 @@
 }
 
 .apiErrorBanner button svg {
-  color: currentColor;
+  color: currentcolor;
 }
