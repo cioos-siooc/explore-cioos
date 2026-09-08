@@ -7,16 +7,9 @@ from datetime import datetime, timezone
 
 import pandas as pd
 import requests
-from prefect import task
-
 from cde_harvester.core.day_sets import days_to_ranges
 from cde_harvester.core.frame_spill import SpillSet
 from cde_harvester.core.observability import run_logger
-
-from cde_harvester.sources.base import BaseHarvester, HarvestResult
-from cde_harvester.sources.ckan.create_ckan_obis_link import get_ckan_obis_records
-from cde_harvester.sources.obis.discovery import ObisDatasetDiscovery
-from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
 from cde_harvester.core.schemas import (
     DatasetSchema,
     HarvestAttemptSchema,
@@ -25,6 +18,11 @@ from cde_harvester.core.schemas import (
     SkippedDatasetSchema,
     VariableSchema,
 )
+from cde_harvester.sources.base import BaseHarvester, HarvestResult
+from cde_harvester.sources.ckan.create_ckan_obis_link import get_ckan_obis_records
+from cde_harvester.sources.obis.discovery import ObisDatasetDiscovery
+from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
+from prefect import task
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +160,12 @@ class OBISHarvester(BaseHarvester):
                         if attempt < self.MAX_RETRIES:
                             self._clear_cache(dataset_id)
                 else:
-                    self.logger.error("All %d attempts failed for OBIS dataset %s: %s", self.MAX_RETRIES, dataset_id, last_error)
+                    self.logger.error(
+                        "All %d attempts failed for OBIS dataset %s: %s",
+                        self.MAX_RETRIES,
+                        dataset_id,
+                        last_error,
+                    )
                     all_skipped.append([OBIS_SOURCE_URL, dataset_id, "UNKNOWN_ERROR"])
                     record_attempt(
                         dataset_id, status="error",
@@ -393,7 +396,7 @@ class OBISHarvester(BaseHarvester):
                 with gzip.open(gz_path, "rt") as f:
                     return json.load(f)
             if os.path.isfile(path):
-                with open(path, "r") as f:
+                with open(path) as f:
                     return json.load(f)
         except (json.JSONDecodeError, OSError) as e:
             self.logger.warning("Corrupt cache file %s, will re-fetch: %s", path, e)

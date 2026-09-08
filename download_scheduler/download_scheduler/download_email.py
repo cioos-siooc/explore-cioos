@@ -2,8 +2,8 @@ import os
 import smtplib
 from email.message import EmailMessage
 
-from loguru import logger
 from dotenv import load_dotenv
+from loguru import logger
 
 envs = os.environ
 

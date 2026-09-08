@@ -18,17 +18,17 @@ CACHE_WARM_TIMEOUT_SECONDS = 60
 @task(name="clear-redis-cache")
 def clearRedisCache():
     logger = get_run_logger()
-    
+
     ##TODO use env varibles here
     r = redis.Redis(host='redis', port=6379) # No need to specify db for flushall()
     # Clear all keys in all databases
     r.flushall()
     logger.info("redis cache flushed")
-    
+
 @task(name="reload-top-requests")
 def reloadTopRequests():
     logger = get_run_logger()
-    
+
     apiRequests = []
     log_files = sorted(glob.glob("/app/nginx/logs/access.log*"))
     for log_file in log_files:
@@ -40,7 +40,7 @@ def reloadTopRequests():
         else:
             open_func = open
             mode = "r"
-        
+
         with open_func(log_file, mode) as log:
             for line in log:
                 try:
@@ -50,8 +50,8 @@ def reloadTopRequests():
                     elif "/api" in request:
                         apiRequests.append(request)
                 except IndexError:
-                    continue 
-                    
+                    continue
+
     counts = Counter(apiRequests)
     result = [[count, item] for item, count in sorted(counts.items(), key=lambda x: x[1], reverse = True)]
     for _count, request in result[0:4999]:
@@ -75,10 +75,7 @@ def redisFlow():
     tasks directly. No longer a @flow (avoids a ceremony subflow box)."""
     clearRedisCache()
     reloadTopRequests()
-    
+
 
 if __name__ == "__main__":
     redisFlow()
-    
-
-

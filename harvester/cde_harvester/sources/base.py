@@ -1,6 +1,6 @@
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-import logging
 
 import pandas as pd
 from pandera.typing import DataFrame

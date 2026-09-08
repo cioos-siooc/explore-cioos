@@ -11,7 +11,7 @@ from cde_harvester.utils import (
 )
 
 
-class CDEComplianceChecker(object):
+class CDEComplianceChecker:
     def __init__(self, dataset):
         self.dataset = dataset
         self.logger = dataset.logger

@@ -14,10 +14,11 @@ import requests
 import shapely.wkt
 from cde_harvester.core.errors import HTTP_ERROR, UNKNOWN_ERROR
 from cde_harvester.core.issues import erddap_error_text
-from erddap_downloader.download_pdf import download_pdf
 from erddapy import ERDDAP
 from loguru import logger
 from shapely.geometry import Point
+
+from erddap_downloader.download_pdf import download_pdf
 
 ONE_MB = 10**6
 DATASET_SIZE_LIMIT = 1000 * ONE_MB
@@ -65,7 +66,7 @@ def get_variable_list(df_variables: list, all_variables: bool = True):
         return df_variables["name"].to_list()
 
     # Reduced set: mandatory coordinates plus any cf_role-tagged variable.
-    mandatory_variables = ["time", "latitude", "longitude", "depth"]
+    mandatory_variables = ["time", "latitude", "longitude", "depth"]  # noqa: F841 — read by the @-reference in the query below
     variables_to_download = df_variables.query(
         "(name in @mandatory_variables) or (cf_role != '')"
     )["name"].to_list()
@@ -181,7 +182,7 @@ def get_file_name_output(dataset_info, output_path, extension):
     :return:
     """
     # Output file is {erddap server}_{dataset_id}_{CKAN_ID}
-    file_name = "{0}_{1}".format(
+    file_name = "{}_{}".format(
         dataset_info["dataset_id"], erddap_server_to_name(dataset_info["erddap_url"])
     )
     return os.path.join(output_path, f"{file_name}.{extension}")
@@ -383,21 +384,17 @@ def get_datasets(json_query, output_path="", create_pdf=False):
     # Convert WKT polygon to shapely polygon object
     polygon_region_wkt = json_query["user_query"].get("polygon_region")
 
-    if polygon_region_wkt:
-        polygon_regions = [shapely.wkt.loads(polygon_region_wkt)]
-    else:
-        polygon_regions = []
+    polygon_regions = [shapely.wkt.loads(polygon_region_wkt)] if polygon_region_wkt else []
 
     # Duplicate polygon over -180 to 180 limit and generate multiple queries to match each side
-    if polygon_regions:
-        if polygon_regions[0].bounds[0] < -180 or polygon_regions[0].bounds[2] > 180:
-            for shift in [-360, 360]:
-                new_region = shapely.affinity.translate(polygon_regions[0], xoff=shift)
-                if (
-                    -180 < new_region.bounds[0] < 180
-                    or -180 < new_region.bounds[2] < 180
-                ):
-                    polygon_regions += [new_region]
+    if polygon_regions and (polygon_regions[0].bounds[0] < -180 or polygon_regions[0].bounds[2] > 180):
+        for shift in [-360, 360]:
+            new_region = shapely.affinity.translate(polygon_regions[0], xoff=shift)
+            if (
+                -180 < new_region.bounds[0] < 180
+                or -180 < new_region.bounds[2] < 180
+            ):
+                polygon_regions += [new_region]
 
     # Download file locally
     chunksize = 1024**2  # 1MB

@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
-
 from erddap_downloader import downloader_wrapper
 
 QUERIES = list((Path(__file__).parent / "queries").glob("*.json"))
@@ -12,10 +11,10 @@ QUERIES = list((Path(__file__).parent / "queries").glob("*.json"))
 # Minimal ERDDAP CSV: header row + units row + one data row.
 # Point (52.0, -130.0) is inside the ADCP polygon used by adcp_query.json.
 _FAKE_CSV_BYTES = (
-    "time,latitude,longitude,depth\r\n"
-    "UTC,degrees_north,degrees_east,m\r\n"
-    "2020-01-01T00:00:00Z,52.0,-130.0,5.0\r\n"
-).encode()
+    b"time,latitude,longitude,depth\r\n"
+    b"UTC,degrees_north,degrees_east,m\r\n"
+    b"2020-01-01T00:00:00Z,52.0,-130.0,5.0\r\n"
+)
 
 _FAKE_VARS = pd.DataFrame(
     {"name": ["time", "latitude", "longitude", "depth"], "cf_role": ["", "", "", ""]}

@@ -39,7 +39,7 @@ def get_l06_codes_and_labels():
 
     for platform in platforms:
         # first entry describes the vocabulary, skip it
-        if not "dce:identifier" in platform:
+        if "dce:identifier" not in platform:
             continue
 
         label = platform["skos:prefLabel"]["@value"]
@@ -73,7 +73,7 @@ def get_ioos_to_l06_mapping():
     if PLATFORM_L06_MAPPING_CSV.exists():
         logger.info(f"Loading existing IOOS to L06 mapping from {PLATFORM_L06_MAPPING_CSV}")
         return pd.read_csv(PLATFORM_L06_MAPPING_CSV, index_col="l06_code")
-    
+
     # download mapping
     url = "https://mmisw.org/ont/api/v0/ont?format=jsonld&iri=http://mmisw.org/ont/bodc/MapSeaVoxPlatforms2IOOSandRDIPlatforms"
     logger.info("Downloading %s", url)

@@ -1,49 +1,55 @@
 import argparse
 import logging
 import os
-import queue
 import subprocess
 import sys
-import threading
-import time
 import uuid
 from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
+from dotenv import load_dotenv
+from prefect import flow, get_run_logger, task
+from sentry_sdk.crons import monitor
+
+from cde_harvester.core.config import load_config, resolve_obis_config
 from cde_harvester.core.day_sets import ranges_to_iso
+from cde_harvester.core.issues import report_issues
+from cde_harvester.core.observability import (
+    init_sentry,
+    setup_logging,
+)
+from cde_harvester.core.schemas import HarvestAttemptSchema
+from cde_harvester.sources import resolve_source
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     get_ckan_records,
     unescape_ascii,
     unescape_ascii_list,
 )
-from cde_harvester.core.config import load_config, resolve_obis_config
-from cde_harvester.sources import resolve_source
-from cde_harvester.core.observability import (
-    cleanup_old_logs,
-    init_sentry,
-    setup_logging,
-)
-from cde_harvester.core.issues import report_issues
-from cde_harvester.core.schemas import HarvestAttemptSchema
 from cde_harvester.sources.erddap.harvester import harvest_erddap
 from cde_harvester.sources.obis.discovery import ObisDiscoveryConfig
 from cde_harvester.sources.obis.geo_filter import DEFAULT_EXEMPT_NODE_IDS, ObisGeoFilter
 from cde_harvester.sources.obis.harvester import harvest_obis
 from cde_harvester.utils import cf_standard_names, supported_standard_names
-from dotenv import load_dotenv
-from sentry_sdk.crons import monitor
-from prefect import flow, get_run_logger, task
 
 load_dotenv()
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 init_sentry()
 
 # Ignored standard names that are not EOVs, mostly coordinate variables
-IGNORED_STANDARD_NAMES= ["latitude", "longitude", "time", "depth", "","altitude","sea_water_pressure","sea_water_pressure_due_to_sea_water"]
+IGNORED_STANDARD_NAMES = [
+    "latitude",
+    "longitude",
+    "time",
+    "depth",
+    "",
+    "altitude",
+    "sea_water_pressure",
+    "sea_water_pressure_due_to_sea_water",
+]
 
 def _resolve_git_sha():
     """Best-effort git SHA for the harvester source. Returns None if unavailable."""
@@ -136,10 +142,7 @@ def _write_run_audit_csvs(folder, run_id, started_at, finished_at, git_sha,
 
     attempt_columns = list(HarvestAttemptSchema.to_schema().columns.keys())
     frames = [f for f in attempts_frames if f is not None and not f.empty]
-    if frames:
-        df_attempts = pd.concat(frames, ignore_index=True)
-    else:
-        df_attempts = pd.DataFrame(columns=attempt_columns)
+    df_attempts = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=attempt_columns)
     df_attempts.to_csv(attempts_file, index=False)
 
     logger.info(
@@ -402,7 +405,13 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
 
         for erddap_url in erddap_urls_list:
             logger.info("Submitting harvest task for %s", erddap_url)
-            future = harvest_erddap.submit(erddap_url, limit_dataset_ids, cache_requests, run_id=run_id, skip_unchanged=skip_unchanged)
+            future = harvest_erddap.submit(
+                erddap_url,
+                limit_dataset_ids,
+                cache_requests,
+                run_id=run_id,
+                skip_unchanged=skip_unchanged,
+            )
             erddap_futures.append(future)
 
         # Submit OBIS task (runs concurrently with ERDDAP tasks)
@@ -498,7 +507,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
     # merge_and_write_csvs below. Only a run that harvested nothing AND verified
     # nothing genuinely had no datasets to process.
     if erddap_datasets.empty and obis_datasets.empty and erddap_verified.empty:
-        logging.info("No datasets harvested from any source")
+        logger.info("No datasets harvested from any source")
         _write_run_audit_csvs(
             folder=folder,
             run_id=run_id,
@@ -521,7 +530,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         raise RuntimeError("No datasets harvested from any source")
 
     if erddap_datasets.empty and obis_datasets.empty:
-        logging.info(
+        logger.info(
             "No new/changed datasets to harvest; %d unchanged datasets to verify",
             len(erddap_verified),
         )

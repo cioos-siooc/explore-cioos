@@ -7,7 +7,7 @@ def zip_folder(path, zip_full_path):
     ziph = zipfile.ZipFile(zip_full_path, "w", zipfile.ZIP_DEFLATED)
 
     # ziph is zipfile handle
-    for root, dirs, files in os.walk(path):
+    for root, _dirs, files in os.walk(path):
         for file in files:
             res = ziph.write(
                 os.path.join(root, file),

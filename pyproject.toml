@@ -28,3 +28,37 @@ dev = [
 markers = [
     "integration: requires a live database/stack",
 ]
+
+# Ruff config lives here only. ruff walks up from each file to the nearest
+# pyproject.toml that HAS a [tool.ruff] section, so this one governs harvester,
+# downloader and download_scheduler too — one place to change, no per-project
+# copies to drift. There was no ruff/black/mypy config anywhere despite a
+# .ruff_cache on disk, so `ruff check` ran on defaults and nobody's run agreed
+# with anyone else's.
+[tool.ruff]
+# Not 88: 65 lines in the existing source sit between 100 and 120, written
+# that way deliberately. 120 is a ceiling for runaway lines, not a reformat
+# mandate — no formatter is configured and none is implied.
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+# E/W/F   pycodestyle + pyflakes: the real errors.
+# I       import sorting (46 files were unsorted).
+# UP      pyupgrade: this code targets 3.10, some of it was written for 2.7.
+# B       bugbear: mutable defaults, unstrict zip, warn without stacklevel.
+# C4      comprehension misuse.
+# LOG     logging misuse (root-logger calls).
+# DTZ     naive datetimes — this project is all UTC timestamps.
+# SIM     the uncontroversial simplifications.
+# RUF100  stale `noqa`, i.e. findings silenced with a tool no longer in use.
+#
+# Deliberately NOT selected: G (logging-f-string). It reports 44 sites, but
+# they are loguru calls, where an f-string is the documented style — the rule
+# is written for stdlib %-style lazy formatting.
+select = ["E", "W", "F", "I", "UP", "B", "C4", "LOG", "DTZ", "SIM", "RUF100"]
+
+[tool.ruff.lint.per-file-ignores]
+# pytest passes fixtures as parameters, so every test that uses a fixture
+# "redefines" the fixture function name. 24 findings, all of them this.
+"**/tests/**" = ["F811"]

@@ -3,7 +3,8 @@ import json
 
 from erddap_downloader import downloader_wrapper
 
-# This file is just used for testing. In production downloader_wrapper.run_download_query is called by the download scheduler
+# This file is just used for testing. In production
+# downloader_wrapper.run_download_query is called by the download scheduler
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

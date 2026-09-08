@@ -32,14 +32,13 @@ import logging
 from dataclasses import dataclass, field
 
 import requests
-from requests.adapters import HTTPAdapter
-from shapely import wkt as shp_wkt
-from urllib3.util.retry import Retry
-
 from cde_harvester.sources.obis.geo_filter import (
     DEFAULT_EXEMPT_NODE_IDS,
     load_boundary_polygon,
 )
+from requests.adapters import HTTPAdapter
+from shapely import wkt as shp_wkt
+from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 

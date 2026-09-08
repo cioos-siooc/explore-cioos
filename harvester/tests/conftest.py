@@ -330,7 +330,8 @@ def build_variables_df(csv_text: str = ERDDAP_INFO_CSV) -> pd.DataFrame:
     so unit tests for ComplianceChecker / profiles can use a realistic object.
     """
     df = build_info_df(csv_text)
-    considered_attributes = [
+    # Read by the @-reference in the df.query() below.
+    considered_attributes = [  # noqa: F841
         "cf_role", "standard_name", "actual_range", "units", "long_name",
         "axis",
     ]
@@ -410,7 +411,7 @@ def build_mock_dataset(
         .to_dict()
     )
     mock.profile_variables = pv
-    mock.profile_variable_list = sorted(list(pv.values()))
+    mock.profile_variable_list = sorted(pv.values())
 
     # timeseries_id / profile_id / trajectory_id
     mock.timeseries_id_variable = pv.get("timeseries_id")

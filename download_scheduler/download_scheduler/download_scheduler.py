@@ -6,14 +6,14 @@ import pathlib
 import traceback
 
 import sentry_sdk
-from dotenv import load_dotenv
-from sentry_sdk.integrations.loguru import LoguruIntegration
 from cde_harvester.core.issues import error_signature, report_issues
+from dotenv import load_dotenv
 from erddap_downloader import downloader_wrapper
 from jinja2 import Environment, FileSystemLoader
+from loguru import logger
+from sentry_sdk.integrations.loguru import LoguruIntegration
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
-from loguru import logger
 
 from download_scheduler.download_email import send_email
 
@@ -44,7 +44,10 @@ sentry_sdk.init(
 )
 
 
-database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
+database_link = (
+    f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}"
+    f"@{envs['DB_HOST']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
+)
 logger.debug("Connecting to {}", envs["DB_HOST"])
 engine = create_engine(database_link)
 
@@ -158,7 +161,10 @@ def email_user(email, status, zip_filename, downloader_output, language):
         },
         "over-limit": {
             "en": "Your CIOOS Data Explorer data query completed but found too much data.",
-            "fr": "Votre requête à l'Explorateur de Données du SIOOC est terminée mais a atteint la limite de téléchargement.",
+            "fr": (
+                "Votre requête à l'Explorateur de Données du SIOOC est terminée "
+                "mais a atteint la limite de téléchargement."
+            ),
         },
         "no-data": {
             "en": "Your CIOOS Data Explorer data query failed.",
@@ -170,15 +176,9 @@ def email_user(email, status, zip_filename, downloader_output, language):
         },
     }
 
-    if status == "over-limit":
-        template_name = "completed"
-    else:
-        template_name = status
+    template_name = "completed" if status == "over-limit" else status
 
-    if language == "en":
-        language_list = ["en", "fr"]
-    else:
-        language_list = ["fr", "en"]
+    language_list = ["en", "fr"] if language == "en" else ["fr", "en"]
 
     subject = []
     body = []

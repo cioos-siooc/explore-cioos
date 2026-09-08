@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 import requests
+from requests.exceptions import HTTPError
+
 from cde_harvester.core.observability import run_logger
 from cde_harvester.sources.erddap.platform_vocab import platforms_nerc_ioos
 from cde_harvester.utils import (
@@ -11,18 +13,19 @@ from cde_harvester.utils import (
     intersection,
     standard_name_to_eovs,
 )
-from requests.exceptions import HTTPError
 
 
 def is_valid_duration(duration):
     try:
         pd.Timedelta(duration)
         return True
-    except:
+    except (ValueError, TypeError):
+        # pd.Timedelta rejects an unparseable string with ValueError and a
+        # non-string with TypeError; anything else here is a real bug.
         return False
 
 
-class Dataset(object):
+class Dataset:
     def __init__(self, erddap_server, id, data_structure="table"):
         self.id = id
         self.erddap_server = erddap_server
@@ -118,7 +121,8 @@ class Dataset(object):
     def get_max_min(self, vars):
         """
         Get max/min values for each of certain variables, in each profile
-        usually time,depth (lat/long are handle differently since the min of lat,lon might not be a point in the dataset)
+        usually time,depth (lat/long are handle differently since the min of
+        lat,lon might not be a point in the dataset)
         """
 
         url = f"{','.join(vars)}" + requests.utils.quote(
@@ -160,7 +164,7 @@ class Dataset(object):
         )
 
         # sorting so the url is consistent every time for query caching
-        profile_variable_list = sorted(list(profile_variables.values()))
+        profile_variable_list = sorted(profile_variables.values())
         self.profile_variables = profile_variables
 
         self.timeseries_id_variable = profile_variables.get("timeseries_id")
@@ -216,7 +220,7 @@ class Dataset(object):
             and time_coverage_resolution
             and is_valid_duration(time_coverage_resolution)
         ):
-            self.logger.debug(f"Using time_coverage_resolution for count")
+            self.logger.debug("Using time_coverage_resolution for count")
             df_profile_ids = self.profile_ids.copy()
             readings_per_day = np.timedelta64(1, "D") / pd.Timedelta(
                 time_coverage_resolution
@@ -340,7 +344,7 @@ class Dataset(object):
 
         # transform this JSON to an easier to use format
         url = "/info/" + self.id + "/index.csv"
-        # erddap_csv_to_df's skiprows defaults to [1]
+        # erddap_csv_to_df's skiprows defaults to (1,)
         df = self.erddap_csv_to_df(url, skiprows=[], dataset=self).fillna("")
 
         if df.empty:
@@ -351,7 +355,9 @@ class Dataset(object):
         # "dimension"/"variable" rows (tabledap types never need it).
         self.df_info = df
 
-        considered_attributes = [
+        # Read by the @-reference in the df.query() below, which ruff
+        # cannot see into.
+        considered_attributes = [  # noqa: F841
             "cf_role", "standard_name", "actual_range", "units", "long_name",
             "axis",
         ]
@@ -391,7 +397,7 @@ class Dataset(object):
         )
         self.globals = globals_dict
 
-        if not "standard_name" in df_variables:
+        if "standard_name" not in df_variables:
             df_variables["standard_name"] = None
         df_variables.set_index("name", drop=False, inplace=True)
         self.df_variables = df_variables
@@ -413,7 +419,7 @@ class Dataset(object):
             organization_fields.append("contributor")
 
         self.organizations = list(
-            filter(None, set([globals_dict.get(x) for x in organization_fields]))
+            filter(None, {globals_dict.get(x) for x in organization_fields})
         )
 
         self.platform = self.get_platform_code()
