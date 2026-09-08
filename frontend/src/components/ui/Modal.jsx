@@ -60,7 +60,7 @@ export default function Modal({
         previousFocus.current.focus();
       }
     };
-  }, [show]);
+  }, [show, onHide]);
 
   if (!show) return null;
 

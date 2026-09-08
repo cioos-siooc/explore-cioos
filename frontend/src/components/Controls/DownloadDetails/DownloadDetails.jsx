@@ -76,8 +76,18 @@ export default function DownloadDetails({
   // have looked away from it.
   useActivityTask("activityEstimatesText", estimatesLoading);
 
+  // The three effects below are a pipeline, and each one's dependency array is
+  // deliberately shorter than what it reads:
+  //
+  //   fetch estimates  ->  merge them into pointsData  ->  totals + basket
+  //
+  // The middle step writes `pointsData`, which the first and second both read.
+  // Listing it in either would feed the pipeline its own output. The third
+  // cannot list `downloadSizeEstimates` either: it would then run once against
+  // the pre-merge rows, where `sizeEstimate` does not exist yet.
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEstimatesLoading(true);
     setDownloadSizeEstimates();
 
@@ -142,12 +152,14 @@ export default function DownloadDetails({
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     query,
     polygon,
     filterDownloadByTime,
     filterDownloadByDepth,
     filterDownloadByPolygon,
+    setSubmissionState,
   ]);
 
   useEffect(() => {
@@ -179,12 +191,14 @@ export default function DownloadDetails({
           downloadDisabled: estimates.filteredSize > 1000000000,
         };
       });
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPointsData(tempData);
       setDataTotal({
         unfilteredSize: tempDataTotal,
         filteredSize: tempDataDownloadable,
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [downloadSizeEstimates]);
 
   useEffect(() => {
@@ -202,13 +216,15 @@ export default function DownloadDetails({
               tempDataDownloadable + point.sizeEstimate.filteredSize;
           }
         });
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setDataTotal({
           unfilteredSize: tempDataTotal,
           filteredSize: tempDataDownloadable,
         });
       }
     }
-  }, [pointsData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pointsData, setPointsToDownload]);
 
   function handleSelectDataset(point) {
     const dataset = pointsData.filter((p) => p.pk === point.pk)[0];

@@ -42,7 +42,6 @@ export default function HarvestDataset() {
 
   const { data, loading, error } = useHarvestFetch(
     `/dataset/${slug}/${encodeURIComponent(datasetId)}`,
-    [slug, datasetId],
   );
 
   const history = (data && data.history) || [];

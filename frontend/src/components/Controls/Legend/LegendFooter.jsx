@@ -22,7 +22,7 @@ import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 // sources the style has loaded — including any added after mount.
 export default function LegendFooter() {
   const { t } = useTranslation();
-  const { mapRef, mapLoaded } = useMapState();
+  const { mapInstance } = useMapState();
   const scaleHost = useRef(null);
   const creditsHost = useRef(null);
   const [creditsOpen, setCreditsOpen] = useState(false);
@@ -33,11 +33,10 @@ export default function LegendFooter() {
   // the element — so calling it ourselves is the supported way to choose the
   // parent.
   //
-  // mapLoaded is a dependency rather than a guard: mapRef is filled when Map
-  // constructs the instance, which normally lands before this effect, and the
-  // flag is what re-runs it if it ever doesn't.
+  // mapInstance is state, so this effect re-runs on its own the moment Map
+  // hands the instance over — no mapLoaded flag needed to chase it.
   useEffect(() => {
-    const map = mapRef?.current;
+    const map = mapInstance;
     if (!map || !scaleHost.current || !creditsHost.current) return;
 
     // Capped short: it shares its row with the ⓘ inside a card that is at most
@@ -55,7 +54,7 @@ export default function LegendFooter() {
       scale.onRemove();
       credits.onRemove();
     };
-  }, [mapRef, mapLoaded]);
+  }, [mapInstance]);
 
   return (
     <div className="legendFooter">

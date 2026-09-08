@@ -9,7 +9,7 @@ import {
 } from "react";
 import isEmpty from "lodash-es/isEmpty";
 
-import { getCookieValue } from "../../utilities.jsx";
+import { getCookieValue, useChanged } from "../../utilities.jsx";
 import { useSelection } from "../selection/SelectionProvider.jsx";
 import useMediaQuery from "./useMediaQuery.js";
 
@@ -23,6 +23,14 @@ const WIDE_SCREEN_QUERY = "(min-width: 1400px)";
 
 export function useUI() {
   return useContext(UIContext);
+}
+
+// "Something new arrived that lives in the sidebar — raise it." Written as an
+// adjust-during-render rather than an effect so the sidebar and the thing it is
+// being raised for land in the same paint; an effect showed one frame of the
+// closed sidebar first, which on a phone read as a dropped tap.
+function useRevealSidebar(value, isPresent, setSidebarOpenState) {
+  if (useChanged(value) && isPresent(value)) setSidebarOpenState(true);
 }
 
 export default function UIProvider({ children }) {
@@ -66,9 +74,7 @@ export default function UIProvider({ children }) {
   // A map selection (click or draw) surfaces the matching datasets. These reveal
   // the list without counting as the user's choice about it, so the screen-size
   // default still applies afterwards.
-  useEffect(() => {
-    if (!isEmpty(polygon)) setSidebarOpenState(true);
-  }, [polygon]);
+  useRevealSidebar(polygon, (value) => !isEmpty(value), setSidebarOpenState);
 
   // A dataset page has to be somewhere the user can see it. Opening one used to
   // imply a track click or a filter narrowed to a single dataset, both of which
@@ -76,15 +82,11 @@ export default function UIProvider({ children }) {
   // directly, with no filter change to notice, so the panel is raised for the
   // page itself rather than for whatever happened to precede it. Covers a share
   // link carrying ?dataset= too, which lands with the page already open.
-  useEffect(() => {
-    if (inspectDataset) setSidebarOpenState(true);
-  }, [inspectDataset]);
+  useRevealSidebar(inspectDataset, Boolean, setSidebarOpenState);
 
   // Clicking a track on the map draws its platform history — surface the panel
   // holding the page that shows it.
-  useEffect(() => {
-    if (selectedTrajectory) setSidebarOpenState(true);
-  }, [selectedTrajectory]);
+  useRevealSidebar(selectedTrajectory, Boolean, setSidebarOpenState);
 
   // Adding datasets to the download from the map's "what's here" card puts
   // something in the list's footer — show the list so the user sees the basket

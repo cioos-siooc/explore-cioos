@@ -253,6 +253,61 @@ function buildTileSuffix(baseQuery, dataLayers) {
 }
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
+// While a WMS overlay is active every other data layer is hidden so the
+// gridded field reads cleanly; only the basemap, the raster and the
+// dataset's bbox outline stay visible. The observation layers (hexes,
+// points, coverage cells) are listed separately from the griddap coverage
+// layers because the layer picker can hide them independently.
+const observationLayerIds = [
+  "hexes",
+  "points",
+  "points-halo",
+  "points-highlighted",
+  "coverage-hexes",
+  "coverage-hex-outlines",
+];
+// The track layers are deliberately NOT in observationLayerIds: the picker
+// switch reads as "hexes and points", and it used to hide the tracks too, so
+// unchecking it silently threw away the user's track lines. They are owned by
+// the trajectories layer and its track-lines switch instead
+// (applyLayerVisibility) — this list exists only for the WMS overlay, which
+// hides everything regardless of who owns it.
+const trackLayerIds = [
+  "track-lines",
+  "track-heads",
+  "track-heads-fixed",
+  "selected-track-line",
+  "selected-track-fixes",
+  "selected-track-fixes-nocog",
+];
+const griddapLayerIds = ["griddap-coverage-fill", "griddap-coverage-line"];
+// The CHS NONNA depth rasters the legend's depth ramp keys. They belong to
+// the basemap, not to the data, so they are owned by their own switch and are
+// left out of every group above — including the WMS overlay's blanket hide,
+// which is about data layers competing with the gridded field.
+const bathymetryLayerIds = ["bathymetry-nonna-100", "bathymetry-nonna-10"];
+
+const emptyFeatureCollection = { type: "FeatureCollection", features: [] };
+
+// A note on the eslint-disable comments below.
+//
+// Almost every effect in this component is an imperative instruction to
+// MapLibre — add a layer, set a source's data, repaint a filter — keyed on the
+// one piece of state that should trigger it. What they read is much wider than
+// what they should re-run for: they call the helpers defined further down this
+// file (setColorStops, hoverHighlightPoints, applyTrackFocus, refreshTracksSource
+// and friends), which are rebuilt on every render of a component that re-renders
+// on every map move. Listing those helpers would re-issue the map commands
+// continuously; listing the extra state they read would re-issue them on changes
+// the map has already been told about through another route.
+//
+// The mount effect is the extreme case: it builds the map and every layer and
+// handler on it, and must run exactly once, so its list is empty by design.
+//
+// Making the helpers stable with useCallback is the real fix and is a piece of
+// work in its own right — they close over refs, props and each other. Until
+// then each site is marked individually rather than the file being exempted,
+// so effects added later are still checked.
 export default function CreateMap({
   // The query string the map draws from: the filters, narrowed to the dataset
   // groups still shown (MapStateProvider assembles it — the sidebar list keeps
@@ -310,7 +365,8 @@ export default function CreateMap({
   projection = "mercator",
   zoomTarget,
   drawRequest,
-  mapRef,
+  // Called once with the MapLibre instance, as soon as it is constructed.
+  onMapReady = () => {},
   // Called once, when the map is worth handing over. See reportFirstPaint.
   onFirstPaint = () => {},
 }) {
@@ -983,6 +1039,7 @@ export default function CreateMap({
 
   useEffect(() => {
     setColorStops();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rangeLevels, coverageRangeLevels]);
 
   useEffect(() => {
@@ -994,6 +1051,7 @@ export default function CreateMap({
         boxSelectEndCoords,
       ]);
       const bboxPolygonObj = turfBboxPolygon(turfBbox(lineStringObj));
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBoxSelectEndCoords();
       setBoxSelectStartCoords();
       setLoading(true);
@@ -1007,6 +1065,7 @@ export default function CreateMap({
       highlightPoints(bboxPolygonObj.geometry.coordinates[0]);
       setPolygon(bboxPolygonObj.geometry.coordinates[0]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boxSelectEndCoords]);
 
   function deleteAllShapes() {
@@ -1578,8 +1637,6 @@ export default function CreateMap({
     );
   }
 
-  const emptyFeatureCollection = { type: "FeatureCollection", features: [] };
-
   // Latest coverage prop, readable from the map 'load' closure (which would
   // otherwise capture the initial render's value).
   const griddapCoverageRef = useRef(null);
@@ -1651,39 +1708,6 @@ export default function CreateMap({
     }
   }
 
-  // While a WMS overlay is active every other data layer is hidden so the
-  // gridded field reads cleanly; only the basemap, the raster and the
-  // dataset's bbox outline stay visible. The observation layers (hexes,
-  // points, coverage cells) are listed separately from the griddap coverage
-  // layers because the layer picker can hide them independently.
-  const observationLayerIds = [
-    "hexes",
-    "points",
-    "points-halo",
-    "points-highlighted",
-    "coverage-hexes",
-    "coverage-hex-outlines",
-  ];
-  // The track layers are deliberately NOT in observationLayerIds: the picker
-  // switch reads as "hexes and points", and it used to hide the tracks too, so
-  // unchecking it silently threw away the user's track lines. They are owned by
-  // the trajectories layer and its track-lines switch instead
-  // (applyLayerVisibility) — this list exists only for the WMS overlay, which
-  // hides everything regardless of who owns it.
-  const trackLayerIds = [
-    "track-lines",
-    "track-heads",
-    "track-heads-fixed",
-    "selected-track-line",
-    "selected-track-fixes",
-    "selected-track-fixes-nocog",
-  ];
-  const griddapLayerIds = ["griddap-coverage-fill", "griddap-coverage-line"];
-  // The CHS NONNA depth rasters the legend's depth ramp keys. They belong to
-  // the basemap, not to the data, so they are owned by their own switch and are
-  // left out of every group above — including the WMS overlay's blanket hide,
-  // which is about data layers competing with the gridded field.
-  const bathymetryLayerIds = ["bathymetry-nonna-100", "bathymetry-nonna-10"];
   // Mirrors the dataLayersVisible prop so removeWmsOverlay (called from map
   // event handlers) restores the user's toggle instead of forcing layers on.
   const dataLayersVisibleRef = useRef(true);
@@ -1870,6 +1894,7 @@ export default function CreateMap({
       // have settled, and clearing a focus has no later event to ride in on.
       applyTrackFocus();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hoveredDataset, inspectDataset, activeWmsOverlay]);
 
   useEffect(() => {
@@ -1888,6 +1913,7 @@ export default function CreateMap({
     dataLayersVisibleRef.current = dataLayersVisible;
     if (!map.current || activeWmsOverlay) return;
     setLayersVisibility(observationLayerIds, dataLayersVisible);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataLayersVisible]);
 
   // The depth-raster switch, on the legend's depth ramp. Unlike the observation
@@ -1940,6 +1966,7 @@ export default function CreateMap({
     drawPolygon.current.changeMode(
       drawRequest.mode === "box" ? "draw_rectangle" : "draw_polygon",
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawRequest]);
 
   // Re-runs when the spatial filter changes too, so the overlay is re-requested
@@ -1960,6 +1987,7 @@ export default function CreateMap({
     // pin the dataset's footprint outline while its overlay is shown
     setGriddapHighlight(activeWmsOverlay.bbox);
     return () => removeWmsOverlay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeWmsOverlay, polygon]);
 
   function highlightPoints(polygon) {
@@ -2067,6 +2095,7 @@ export default function CreateMap({
     } else {
       setPolygon();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapQueryString]);
 
   // Geometry toggle: it changes the tile-URL params (profileTypes/
@@ -2091,6 +2120,7 @@ export default function CreateMap({
       );
     }
     applyLayerVisibility();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataLayers]);
 
   // Track-lines switch: show/hide the track layers and load the scrub window.
@@ -2105,6 +2135,7 @@ export default function CreateMap({
     if (tracksMode) {
       refreshTracksSource(mapQueryString, scrubTime, trailingDays);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracksMode]);
 
   // Scrubbing / trailing-window / filter changes re-query the tracks tiles.
@@ -2113,6 +2144,7 @@ export default function CreateMap({
     trailingDaysRef.current = trailingDays;
     if (!tracksMode) return;
     refreshTracksSource(mapQueryString, scrubTime, trailingDays);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapQueryString, scrubTime, trailingDays]);
 
   // Selected platform: fetch its full track once (cached in rawTrackRef), draw
@@ -2318,6 +2350,7 @@ export default function CreateMap({
       // it. (Evented.off clears once-listeners too.)
       map.current?.off("load", renderSelectedTrack);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTrajectory, mapQueryString]);
 
   const mapZoom = searchParams.get("zoom");
@@ -2364,8 +2397,8 @@ export default function CreateMap({
       // that tile is never reached on land, without masking anything off.
       maxZoom: 17,
     });
-    // Share the instance with MapStateProvider (see mapRef there).
-    if (mapRef) mapRef.current = map.current;
+    // Share the instance with MapStateProvider (see mapInstance there).
+    onMapReady(map.current);
 
     // disable map rotation using right click + drag
     map.current.dragRotate.disable();
@@ -4071,6 +4104,7 @@ export default function CreateMap({
     // into the foot of the legend card (see LegendFooter.jsx), and there is no
     // NavigationControl either, since scroll/pinch/double-tap already zoom.
     map.current.addControl(drawPolygon.current, "bottom-right");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Tell the user which of the map's layers are still on the wire.
@@ -4206,6 +4240,7 @@ export default function CreateMap({
       map.current.off("sourcedata", check);
       map.current.off("idle", check);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // The hex color stops depend on the zoom band (getCurrentRangeLevel), but
@@ -4219,6 +4254,7 @@ export default function CreateMap({
     const reapplyColorStops = () => setColorStops();
     map.current.on("zoomend", reapplyColorStops);
     return () => map.current.off("zoomend", reapplyColorStops);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rangeLevels, coverageRangeLevels]);
 
   // Keep the ramp scaled to the hexes actually on screen. Registered once —
@@ -4261,6 +4297,7 @@ export default function CreateMap({
       map.current.off("sourcedata", onDataSourceLoaded);
       map.current.off("idle", measureNow);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Live-swap basemap label languages on EN⇄FR toggle. The initial language

@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { ChevronUp, Grid3x3Gap, X } from "react-bootstrap-icons";
 import classNames from "classnames";
 import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
 import { useTranslation } from "react-i18next";
 
-import { abbreviateString, useDebounce } from "../../../utilities";
+import { abbreviateString, useChanged, useDebounce } from "../../../utilities";
 import { buildGriddapLegendUrl } from "../../../wmsUtilities";
 import { GridTimeSlice, GridDepthSlice } from "../GridSlice/GridSlice.jsx";
 import usePublishedFootprint from "../../../state/ui/usePublishedFootprint.js";
@@ -98,7 +98,8 @@ export default function WmsLegend({
     400,
   );
 
-  useEffect(() => setLegendFailed(false), [legendUrl]);
+  // A new legend image gets a fresh chance to load.
+  if (useChanged(legendUrl)) setLegendFailed(false);
 
   // Stood down to a button (see COMPACT_QUERY). It names the variable rather
   // than saying "Legend": what the overlay is drawing is the one thing worth

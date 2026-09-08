@@ -11,7 +11,11 @@ import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
 import { DropdownButton, Dropdown } from "../../ui/Dropdown.jsx";
-import { polygonIsRectangle, polygonToWkt } from "../../../utilities.jsx";
+import {
+  polygonIsRectangle,
+  polygonToWkt,
+  useChanged,
+} from "../../../utilities.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 
@@ -52,11 +56,10 @@ export default function SpatialFilterButton() {
   // shape restored from a share link (never chosen through this menu) still
   // counts as "last used" once it exists.
   const [lastMode, setLastMode] = useState("box");
-  useEffect(() => {
-    if (hasSelection) setLastMode(isBox ? "box" : "polygon");
-  }, [hasSelection, isBox]);
+  const selectionMode = hasSelection ? (isBox ? "box" : "polygon") : undefined;
+  if (useChanged(selectionMode) && selectionMode) setLastMode(selectionMode);
 
-  const activeMode = hasSelection ? (isBox ? "box" : "polygon") : lastMode;
+  const activeMode = selectionMode || lastMode;
   const Icon = activeMode === "polygon" ? Pentagon : BoundingBox;
 
   // Opening the menu with nothing drawn yet arms the last-used tool

@@ -137,21 +137,25 @@ export default function FiltersPanel() {
 
   const eovsFilterTranslationKey = "oceanVariablesFiltername";
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(
+    t,
     eovsFilterTranslationKey,
     eovsSelected,
   );
   const orgsFilterTranslationKey = "organizationFilterName";
   const orgsBadgeTitle = generateMultipleSelectBadgeTitle(
+    t,
     orgsFilterTranslationKey,
     orgsSelected,
   );
   const datasetsFilterTranslationKey = "datasetsFilterName";
   const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(
+    t,
     datasetsFilterTranslationKey,
     datasetsSelected,
   );
   const platformsFilterTranslationKey = "platformsFilterName";
   const platformsBadgeTitle = generateMultipleSelectBadgeTitle(
+    t,
     platformsFilterTranslationKey,
     platformsSelected,
   );

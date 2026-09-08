@@ -9,6 +9,8 @@ import {
   useState,
 } from "react";
 
+import { useChanged } from "../../utilities.jsx";
+
 // Don't report work that resolves this fast — a cached filter change would
 // otherwise set the logo pulsing and the status panel open and straight back
 // off again.
@@ -93,11 +95,12 @@ export default function ActivityProvider({ children }) {
   // flicker to protect against.
   const [announced, setAnnounced] = useState(false);
 
+  // Going quiet retracts the announcement immediately, so that half is an
+  // adjust-during-render; only the delay before announcing needs a timer.
+  if (useChanged(busy) && !busy) setAnnounced(false);
+
   useEffect(() => {
-    if (!busy) {
-      setAnnounced(false);
-      return undefined;
-    }
+    if (!busy) return undefined;
     const timer = setTimeout(() => setAnnounced(true), ANNOUNCE_AFTER_MS);
     return () => clearTimeout(timer);
   }, [busy]);

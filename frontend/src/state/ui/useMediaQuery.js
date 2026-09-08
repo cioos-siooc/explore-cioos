@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 // The viewport rung at which the app stops being a map with chrome floating
 // over it and becomes a stack of full-screen surfaces: the brand bar goes
@@ -14,19 +14,23 @@ export const MOBILE_QUERY = "(max-width: 700px)";
 // carry belongs in CSS; this is for the cases where the markup itself differs —
 // a different icon, a card that becomes a modal, a control that isn't rendered
 // at all.
+//
+// matchMedia is an external store, so it is read through useSyncExternalStore
+// rather than mirrored into state by an effect. That closes the gap the effect
+// version had to paper over: between the first render and the effect, a query
+// that had already flipped would render at the wrong rung for one frame.
 export default function useMediaQuery(query) {
-  const [matches, setMatches] = useState(
-    () => window.matchMedia(query).matches,
+  const subscribe = useCallback(
+    (onStoreChange) => {
+      const mql = window.matchMedia(query);
+      mql.addEventListener("change", onStoreChange);
+      return () => mql.removeEventListener("change", onStoreChange);
+    },
+    [query],
   );
 
-  useEffect(() => {
-    const mql = window.matchMedia(query);
-    const onChange = (e) => setMatches(e.matches);
-    // The query may have changed since the state initialiser ran.
-    setMatches(mql.matches);
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, [query]);
-
-  return matches;
+  return useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia(query).matches,
+  );
 }

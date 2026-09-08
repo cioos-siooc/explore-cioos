@@ -2,7 +2,11 @@ import { useState, useEffect } from "react";
 import { server } from "../../config.js";
 import reportError from "../../state/reportError.js";
 
-export default function useHarvestFetch(path, deps = []) {
+// The path is the whole cache key: every caller builds it from the ids it
+// varies on, so it is also the complete dependency list. It used to take a
+// separate `deps` array, which the linter could not check and which every
+// caller filled with exactly the values already in the path.
+export default function useHarvestFetch(path) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -10,6 +14,7 @@ export default function useHarvestFetch(path, deps = []) {
   useEffect(() => {
     if (!path) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
     fetch(`${server}/harvest${path}`)
@@ -33,7 +38,7 @@ export default function useHarvestFetch(path, deps = []) {
     return () => {
       cancelled = true;
     };
-  }, deps);
+  }, [path]);
 
   return { data, loading, error };
 }

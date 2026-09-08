@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from "react";
+import React, { useState, useMemo, Suspense, lazy } from "react";
 import { useTranslation } from "react-i18next";
 
 import Modal from "../../ui/Modal.jsx";
@@ -30,24 +30,19 @@ export default function DatasetPreview({
   const [plotAxes, setPlotAxes] = useState(clearAxes);
   const [selectedVis, setSelectedVis] = useState("table");
 
-  const [data, setData] = useState();
-
-  useEffect(() => {
+  // The response arrives as parallel arrays; the table wants row objects.
+  // That is a reading of the response, so it is derived rather than copied
+  // into state by an effect — which also means there is nothing to clear when
+  // the modal closes.
+  const data = useMemo(() => {
     const columnNames = datasetPreview?.table?.columnNames || [];
-
     const rows = datasetPreview?.table?.rows || [];
-
-    // reformat datasetPreview into array of objects
-    const data = rows.map((row) => {
-      const keys = columnNames;
-      const values = row;
-      const merged = keys.reduce(
-        (obj, key, index) => ({ ...obj, [key]: values[index] }),
+    return rows.map((row) =>
+      columnNames.reduce(
+        (merged, key, index) => ({ ...merged, [key]: row[index] }),
         {},
-      );
-      return merged;
-    });
-    setData(data);
+      ),
+    );
   }, [datasetPreview]);
 
   const onModalClose = () => {
@@ -56,7 +51,6 @@ export default function DatasetPreview({
     setPlotAxes(clearAxes);
     setSelectedVis("table");
     setInspectRecordID();
-    setData();
     setRecordLoading(false);
   };
   const dataIsReady = !recordLoading && datasetPreview?.table?.rows;

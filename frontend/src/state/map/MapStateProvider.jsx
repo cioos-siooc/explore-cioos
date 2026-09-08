@@ -29,6 +29,16 @@ import { wmsSliceFromParams } from "../../wmsUtilities.js";
 import fetchJson from "../fetchJson.js";
 import reportError from "../reportError.js";
 import { useUrlSeededPersistentState } from "../usePersistentState.js";
+
+// The metric travels with the filters: a range taken over one count can't
+// scale a ramp painted over another. It is always written out, never omitted
+// — the API counts something else when the param is absent (see HEX_METRIC) —
+// and the tile URLs spell it out the same way (buildTileSuffix in Map.jsx).
+function legendUrl(legendQuery) {
+  const params = new URLSearchParams(legendQuery || "");
+  params.set("metric", HEX_METRIC);
+  return `${server}/legend?${params.toString()}`;
+}
 import { useFilters } from "../filters/FilterProvider.jsx";
 import {
   DATA_LAYER_KEYS,
@@ -134,12 +144,10 @@ export default function MapStateProvider({ children }) {
   // The in-flight /legend request, so a newer one can cancel it (see loadLegend).
   const legendRequest = useRef(undefined);
   const [legendLoading, setLegendLoading] = useState(true);
-  const [currentRangeLevel, setCurrentRangeLevel] = useState();
   // The always-hex coverage layer (trajectory + OBIS cells) at zoom >= 7. One
   // range, because both kinds now share one ramp — it was three, one per
   // colour scale.
   const [coverageRangeLevels, setCoverageRangeLevels] = useState();
-  const [currentCoverageRangeLevel, setCurrentCoverageRangeLevel] = useState();
   // The map-appearance switches below are both preferences AND shareable: they
   // persist in localStorage so a reload comes back to the map the user left,
   // and UrlSync writes the non-default ones into the link so a shared view
@@ -216,7 +224,11 @@ export default function MapStateProvider({ children }) {
   // The MapLibre instance, handed over by Map.jsx once created. ZoomToDataset
   // needs it to ask what camera a footprint would produce (cameraForBounds
   // depends on the canvas size, which only the map knows).
-  const mapRef = useRef(null);
+  //
+  // State, not a ref: ZoomToDataset derives `framed` from it during render, and
+  // a ref read there is invisible to React — nothing would re-render when the
+  // instance arrived. As state, "the map exists" is a render the consumers see.
+  const [mapInstance, setMapInstance] = useState(null);
 
   // What the last click on the map found under it — the payload behind the
   // "what's here" card. Map.jsx builds it from one hit-test over every data
@@ -240,13 +252,16 @@ export default function MapStateProvider({ children }) {
     return parts.length === 2 && parts.every(Number.isFinite) ? parts : null;
   })[0];
 
-  function zoomToGeometry(geometry) {
+  // Both are stable for the life of the provider — they only call setters — so
+  // consumers can list them in a dependency array without re-running on every
+  // render of this provider.
+  const zoomToGeometry = useCallback((geometry) => {
     if (geometry) setZoomTarget({ geometry, nonce: Date.now() });
-  }
+  }, []);
 
-  function requestDraw(mode) {
+  const requestDraw = useCallback((mode) => {
     setDrawRequest({ mode, nonce: Date.now() });
-  }
+  }, []);
 
   // Tracks mode (trajectory track lines + time scrub bar) and the data-type
   // layer selection, both restored from share-link params (UrlSync writes
@@ -331,15 +346,6 @@ export default function MapStateProvider({ children }) {
   // filters" are indistinguishable from the values alone, and /legend is the
   // app's slowest query: without it the legend card claimed "No Data" for the
   // first few seconds of every load.
-  // The metric travels with the filters: a range taken over one count can't
-  // scale a ramp painted over another. It is always written out, never omitted
-  // — the API counts something else when the param is absent (see HEX_METRIC) —
-  // and the tile URLs spell it out the same way (buildTileSuffix in Map.jsx).
-  function legendUrl(legendQuery) {
-    const params = new URLSearchParams(legendQuery || "");
-    params.set("metric", HEX_METRIC);
-    return `${server}/legend?${params.toString()}`;
-  }
 
   // Only the newest request may write the ranges. Two filter changes in a row
   // put two /legend calls in flight and they can land in either order — the
@@ -347,7 +353,7 @@ export default function MapStateProvider({ children }) {
   // bar numbered for filters the tiles no longer carry. The previous request is
   // aborted as well, so a fast succession of changes isn't holding several
   // copies of the app's heaviest query open at once.
-  function loadLegend(legendQuery) {
+  const loadLegend = useCallback((legendQuery) => {
     legendRequest.current?.abort();
     const controller = new AbortController();
     legendRequest.current = controller;
@@ -372,7 +378,9 @@ export default function MapStateProvider({ children }) {
         legendRequest.current = undefined;
         setLegendLoading(false);
       });
-  }
+    // Only refs, state setters and module-level imports — stable for the life
+    // of the provider, which is what lets the refetch effect depend on it.
+  }, []);
 
   // Fetch the legend for whatever the map is drawing: on mount, whenever the
   // (debounced) query changes, and whenever a group is hidden from / restored to
@@ -390,7 +398,7 @@ export default function MapStateProvider({ children }) {
   useEffect(() => {
     if (requestedLegendQuery.current === mapQueryString) return;
     loadLegend(mapQueryString);
-  }, [mapQueryString]);
+  }, [mapQueryString, loadLegend]);
 
   // Fetch griddap coverage bboxes when the layer is visible, in lockstep
   // with the same debounced query the tiles and /pointQuery use. Data is
@@ -411,22 +419,26 @@ export default function MapStateProvider({ children }) {
     return () => controller.abort();
   }, [mapQueryString, griddapCoverageVisible]);
 
-  useEffect(() => {
-    if (rangeLevels) {
-      setCurrentRangeLevel(getCurrentRangeLevel(rangeLevels, zoom));
-    }
-  }, [rangeLevels, zoom]);
+  // Both tiers are a pure function of the fetched ranges and the zoom, so they
+  // are derived during render rather than mirrored into state by an effect:
+  // an effect would paint one frame with the previous zoom's domain before
+  // correcting itself. getCurrentRangeLevel already answers undefined for
+  // ranges that have not arrived yet.
+  const currentRangeLevel = useMemo(
+    () => getCurrentRangeLevel(rangeLevels, zoom),
+    [rangeLevels, zoom],
+  );
 
-  useEffect(() => {
-    // Coverage hexes (trajectory and OBIS cells) only render at the marker
-    // tier — below that, their counts are merged into the main hex ramp — so
-    // there is no separate domain to report otherwise.
-    if (coverageRangeLevels && isMarkerTier(zoom)) {
-      setCurrentCoverageRangeLevel(coverageRangeLevels.zoom1);
-    } else {
-      setCurrentCoverageRangeLevel();
-    }
-  }, [coverageRangeLevels, zoom]);
+  // Coverage hexes (trajectory and OBIS cells) only render at the marker
+  // tier — below that, their counts are merged into the main hex ramp — so
+  // there is no separate domain to report otherwise.
+  const currentCoverageRangeLevel = useMemo(
+    () =>
+      coverageRangeLevels && isMarkerTier(zoom)
+        ? coverageRangeLevels.zoom1
+        : undefined,
+    [coverageRangeLevels, zoom],
+  );
 
   // The domain the hexes on screen actually span, measured from the rendered
   // tiles and reported by Map.jsx (see refreshViewportHexRange there). It is
@@ -518,7 +530,8 @@ export default function MapStateProvider({ children }) {
     requestDraw,
     pendingDatasetZoom,
     setPendingDatasetZoom,
-    mapRef,
+    mapInstance,
+    setMapInstance,
     featureQuery,
     sharedFeatureQueryAt,
     setFeatureQuery,

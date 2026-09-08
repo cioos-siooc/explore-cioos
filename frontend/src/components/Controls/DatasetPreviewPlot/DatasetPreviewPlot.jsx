@@ -63,6 +63,9 @@ export default function DatasetPreviewPlot({
       default:
         break;
     }
+    // Keyed on the record: this only picks the default axes for a newly opened
+    // record, and must not overwrite the axes the user then chose.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inspectRecordID]);
 
   return (

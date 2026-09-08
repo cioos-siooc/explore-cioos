@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   createContext,
+  useCallback,
   useContext,
   useLayoutEffect,
   useRef,
@@ -44,10 +45,13 @@ export function DropdownButton({
   children,
 }) {
   const [open, setOpenState] = useState(false);
-  const setOpen = (value) => {
-    setOpenState(value);
-    onOpenChange?.(value);
-  };
+  const setOpen = useCallback(
+    (value) => {
+      setOpenState(value);
+      onOpenChange?.(value);
+    },
+    [onOpenChange],
+  );
   const [menuStyle, setMenuStyle] = useState(null);
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
@@ -85,7 +89,7 @@ export function DropdownButton({
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open]);
+  }, [open, setOpen]);
 
   const buttonClasses = [
     "btn",

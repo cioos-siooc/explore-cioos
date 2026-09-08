@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { defaultStartDate } from "../../config.js";
@@ -13,6 +13,7 @@ import {
   todayIso,
   tickYearsFor,
 } from "./timeAxis.js";
+import { useChanged } from "../../../utilities.jsx";
 import "./styles.css";
 
 // The time slider itself, shared by the bar along the bottom of the map and by
@@ -58,9 +59,7 @@ export function DateField({ value, min, max, onCommit, label, className }) {
 
   // Follow the committed value while the field is idle — the slider and the
   // share link both move it — but never while it is being typed into.
-  useEffect(() => {
-    if (!editing) setDraft(value);
-  }, [value, editing]);
+  if (useChanged(value, editing) && !editing) setDraft(value);
 
   return (
     <input

@@ -17,7 +17,7 @@ import {
 export default function HarvestRun() {
   const { t } = useTranslation();
   const { runId } = useParams();
-  const { data, loading, error } = useHarvestFetch(`/runs/${runId}`, [runId]);
+  const { data, loading, error } = useHarvestFetch(`/runs/${runId}`);
 
   const run = data?.run;
   const attempts = data?.attempts || [];

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 import { Funnel, FunnelFill } from "react-bootstrap-icons";
@@ -104,6 +104,11 @@ function IdCaption({ label, variable }) {
 // down the sheet.
 const EOV_VISIBLE_LIMIT = 3;
 
+// Stable identities so CardList's sort memo is not rebuilt on every render of
+// this page.
+const trajectoryKeyOf = (row) => row.trajectory_id;
+const recordKeyOf = (row) => row.profile_id;
+
 export default function DatasetInspector({
   dataset,
   // Shared with the sidebar header's back control (SelectionProvider), so both
@@ -164,6 +169,7 @@ export default function DatasetInspector({
 
   useEffect(() => {
     if (!hasRecordList) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false);
       return;
     }
@@ -194,12 +200,18 @@ export default function DatasetInspector({
     return () => {
       cancelled = true;
     };
-  }, [dataset]);
+    // Keyed on the dataset alone. `query` is read to scope the record list to
+    // the current filters, but listing it would refetch the whole list on every
+    // filter change while the page is open; the list is refreshed when the page
+    // is reopened instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataset, hasRecordList]);
 
   // Trajectory datasets: list the platforms (trajectory ids) so one can be
   // picked to draw its track on the map.
   useEffect(() => {
     if (!isTrajectoryDataset) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTrajectoryPlatforms();
       return;
     }
@@ -210,7 +222,7 @@ export default function DatasetInspector({
         reportError("trajectory platforms fetch failed", error);
         setTrajectoryPlatforms([]);
       });
-  }, [dataset]);
+  }, [dataset, isTrajectoryDataset]);
 
   // Browser Back needs no handling here: the open dataset lives in the URL
   // (?dataset=…&server=…, owned by SelectionProvider), so popping that history
@@ -301,38 +313,41 @@ export default function DatasetInspector({
   // have offered. The ocean variables a record carries are not among them: a
   // list of names has no order worth sorting on, and the search box above the
   // cards is the way to find the records carrying one.
-  const recordSortFields = [
-    {
-      id: "id",
-      label: recordIdField.label,
-      type: "string",
-      value: (row) => row.profile_id,
-    },
-    {
-      id: "timeMin",
-      label: t("timeSelectorStartDate"),
-      type: "string",
-      value: (row) => row.time_min,
-    },
-    {
-      id: "timeMax",
-      label: t("timeSelectorEndDate"),
-      type: "string",
-      value: (row) => row.time_max,
-    },
-    {
-      id: "depthMin",
-      label: t("depthFilterStartDepth"),
-      type: "number",
-      value: (row) => row.depth_min,
-    },
-    {
-      id: "depthMax",
-      label: t("depthFilterEndDepth"),
-      type: "number",
-      value: (row) => row.depth_max,
-    },
-  ];
+  const recordSortFields = useMemo(
+    () => [
+      {
+        id: "id",
+        label: recordIdField.label,
+        type: "string",
+        value: (row) => row.profile_id,
+      },
+      {
+        id: "timeMin",
+        label: t("timeSelectorStartDate"),
+        type: "string",
+        value: (row) => row.time_min,
+      },
+      {
+        id: "timeMax",
+        label: t("timeSelectorEndDate"),
+        type: "string",
+        value: (row) => row.time_max,
+      },
+      {
+        id: "depthMin",
+        label: t("depthFilterStartDepth"),
+        type: "number",
+        value: (row) => row.depth_min,
+      },
+      {
+        id: "depthMax",
+        label: t("depthFilterEndDepth"),
+        type: "number",
+        value: (row) => row.depth_max,
+      },
+    ],
+    [t, recordIdField.label],
+  );
 
   // A record picked on the map (rather than from this list) is pinned to the
   // front of it rather than filtering the rest away — the same "found here,
@@ -347,32 +362,35 @@ export default function DatasetInspector({
     ? t("cfRoleTrajectoryIdText")
     : t("trajectoryPlatformIdText");
 
-  const platformSortFields = [
-    {
-      id: "id",
-      label: platformIdLabel,
-      type: "string",
-      value: (row) => row.trajectory_id,
-    },
-    {
-      id: "timeMin",
-      label: t("timeSelectorStartDate"),
-      type: "string",
-      value: (row) => row.time_min,
-    },
-    {
-      id: "timeMax",
-      label: t("timeSelectorEndDate"),
-      type: "string",
-      value: (row) => row.time_max,
-    },
-    {
-      id: "fixes",
-      label: t("trajectoryPlatformFixesText"),
-      type: "number",
-      value: (row) => row.n_points,
-    },
-  ];
+  const platformSortFields = useMemo(
+    () => [
+      {
+        id: "id",
+        label: platformIdLabel,
+        type: "string",
+        value: (row) => row.trajectory_id,
+      },
+      {
+        id: "timeMin",
+        label: t("timeSelectorStartDate"),
+        type: "string",
+        value: (row) => row.time_min,
+      },
+      {
+        id: "timeMax",
+        label: t("timeSelectorEndDate"),
+        type: "string",
+        value: (row) => row.time_max,
+      },
+      {
+        id: "fixes",
+        label: t("trajectoryPlatformFixesText"),
+        type: "number",
+        value: (row) => row.n_points,
+      },
+    ],
+    [t, platformIdLabel],
+  );
 
   const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet;
 
@@ -635,7 +653,7 @@ export default function DatasetInspector({
             </div>
             <CardList
               items={trajectoryPlatforms}
-              keyOf={(row) => row.trajectory_id}
+              keyOf={trajectoryKeyOf}
               sortFields={platformSortFields}
               defaultSort={{ field: "id", dir: "asc" }}
               filterPlaceholder={t("trajectoryPlatformsSearchPlaceholder")}
@@ -714,7 +732,7 @@ export default function DatasetInspector({
             ) : (
               <CardList
                 items={datasetRecords?.profiles}
-                keyOf={(row) => row.profile_id}
+                keyOf={recordKeyOf}
                 sortFields={recordSortFields}
                 defaultSort={{ field: "id", dir: "desc" }}
                 filterPlaceholder={t("datasetInspectorFilterText")}

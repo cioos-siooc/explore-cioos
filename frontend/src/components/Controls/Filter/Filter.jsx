@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import {
   ChevronCompactDown,
   ChevronCompactUp,
@@ -7,9 +7,12 @@ import {
   BoxArrowUpRight,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
-import noop from "lodash-es/noop";
 
-import { abbreviateString, useOutsideAlerter } from "../../../utilities";
+import {
+  abbreviateString,
+  useChanged,
+  useOutsideAlerter,
+} from "../../../utilities";
 
 import "./styles.css";
 
@@ -42,9 +45,11 @@ export default function Filter({
   const wrapperRef = useRef(null);
   useOutsideAlerter(wrapperRef, setFilterOpen, false);
 
-  useEffect(() => {
-    controlled ? setFilterOpen(openFilter) : noop();
-  }, [openFilter]);
+  // A controlled Filter follows the panel's idea of which row is open, but it
+  // keeps its own state so an outside click can still close it. Mirroring the
+  // prop during render rather than in an effect keeps the two from disagreeing
+  // for a frame.
+  if (useChanged(openFilter) && controlled) setFilterOpen(openFilter);
 
   // This is the filter being edited. Controlled, that also takes the panel
   // agreeing it is the open one; either way a disabled row never opens.

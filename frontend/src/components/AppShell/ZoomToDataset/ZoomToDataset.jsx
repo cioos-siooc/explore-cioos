@@ -26,7 +26,7 @@ import { boundsAreFramed, boundsFromGeoJson } from "../../../utilities.jsx";
 // no-op click. Panning or zooming away brings it back.
 export function useZoomToDataset() {
   const { inspectDataset } = useSelection();
-  const { zoomToGeometry, mapRef, mapView } = useMapState();
+  const { zoomToGeometry, mapInstance, mapView } = useMapState();
 
   const footprint =
     inspectDataset?.filtered_bbox_geojson ||
@@ -34,9 +34,13 @@ export function useZoomToDataset() {
   const bounds = useMemo(() => boundsFromGeoJson(footprint), [footprint]);
 
   // mapView changes on every moveend, which is the cue to re-check the camera.
+  // mapView is not read by boundsAreFramed — it is here because the answer is
+  // measured off the live camera, and mapView changing is how this component
+  // learns the camera moved.
   const framed = useMemo(
-    () => boundsAreFramed(mapRef.current, bounds),
-    [bounds, mapView],
+    () => boundsAreFramed(mapInstance, bounds),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mapInstance, bounds, mapView],
   );
 
   const zoomToDataset = useCallback(() => {

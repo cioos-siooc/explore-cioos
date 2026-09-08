@@ -74,6 +74,7 @@ export default function UrlSync() {
     .join(",");
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsPageLoad(false);
     if (isPageLoad) return;
     const filterParams = new URLSearchParams(
@@ -142,6 +143,12 @@ export default function UrlSync() {
     // the URL, so an entry per map pan would only bury the history entries
     // that do mean something (opening a dataset page).
     navigate("?" + combined.toString(), { replace: true });
+    // What this effect reads is not what it should re-run for. `isPageLoad` is
+    // the one-shot guard it consumes; `scrubTime` is represented by its
+    // debounced twin above; `dataset`, `server` and `lang` are carried through
+    // the URL untouched, and re-navigating when they change would fight the
+    // navigations that set them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     query,
     mapView,
@@ -168,7 +175,7 @@ export default function UrlSync() {
     if (lang !== i18n.language) {
       i18n.changeLanguage(lang);
     }
-  }, [lang]);
+  }, [lang, i18n]);
 
   return null;
 }

@@ -48,6 +48,7 @@ export default function GriddapDetails({
   // different dataset is inspected.
   useEffect(() => {
     if (dataset.wms_url && variables.length) showOverlay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset.pk]);
 
   function formatDimensionValue(value) {

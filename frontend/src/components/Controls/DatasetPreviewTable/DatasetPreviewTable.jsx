@@ -7,12 +7,13 @@ import TableFilter, { filterRows } from "../../ui/TableFilter.jsx";
 import { splitLines } from "../../../utilities";
 
 export default function DatasetPreviewTable({ datasetPreview, data }) {
-  if (!datasetPreview) return <div />;
-
+  // Hooks run before the empty-state guard: `datasetPreview` arrives
+  // asynchronously, so returning early above them would change the hook order
+  // between renders.
   const { t } = useTranslation();
   const [filterText, setFilterText] = useState("");
 
-  const { columnNames, columnUnits } = datasetPreview.table || {
+  const { columnNames, columnUnits } = datasetPreview?.table || {
     rows: [],
     columnNames: [],
   };
@@ -28,6 +29,8 @@ export default function DatasetPreviewTable({ datasetPreview, data }) {
   }));
 
   const filteredData = filterRows(data, filterText);
+
+  if (!datasetPreview) return <div />;
 
   return (
     <>

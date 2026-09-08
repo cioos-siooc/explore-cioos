@@ -2,7 +2,6 @@ import isEmpty from "lodash-es/isEmpty";
 import { scaleLinear, scaleLog } from "d3-scale";
 import React, { useState, useEffect } from "react";
 import { defaultQuery } from "./components/config.js";
-import { useTranslation } from "react-i18next";
 
 export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
   setOptions(
@@ -19,9 +18,14 @@ export function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
-export function generateMultipleSelectBadgeTitle(badgeTitle, optionsSelected) {
-  const { t } = useTranslation();
-
+// Unlike `generateRangeSelectBadgeTitle`, which takes an already-translated
+// title, this one looks up several keys, so the caller hands it its own `t`
+// rather than the helper calling `useTranslation` outside a component.
+export function generateMultipleSelectBadgeTitle(
+  t,
+  badgeTitle,
+  optionsSelected,
+) {
   if (optionsSelected) {
     const optionsSelectedFiltered = optionsSelected.filter(
       (option) => option.isSelected,
@@ -631,6 +635,30 @@ export function filterObjectPropertyByPropertyList(
   return result;
 }
 
+// React's "adjusting state when an input changes", as a hook: true on the one
+// render where `value` differs from the previous render's, false otherwise.
+//
+// Mirroring an input into state during render — `if (changed) setDraft(value)` —
+// is what the React docs prescribe over an effect for this, and it lands the
+// copy in the same paint as the input; an effect paints one frame of the stale
+// copy first. React re-runs the component immediately on a render-phase update,
+// so nothing else sees the intermediate state.
+//
+// Compares by identity, and takes several values for the common "any of these
+// moved" case: pass primitives, or values that keep their identity while they
+// have not changed.
+export function useChanged(...values) {
+  const [previous, setPrevious] = useState(values);
+  if (
+    previous.length === values.length &&
+    values.every((value, i) => value === previous[i])
+  ) {
+    return false;
+  }
+  setPrevious(values);
+  return true;
+}
+
 // https://stackoverflow.com/questions/32553158/detect-click-outside-react-component
 export function useOutsideAlerter(ref, callback, value) {
   useEffect(() => {
@@ -648,7 +676,7 @@ export function useOutsideAlerter(ref, callback, value) {
       // Unbind the event listener on clean up
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [ref]);
+  }, [ref, callback, value]);
 }
 
 export function getCookieValue(cookieName) {

@@ -1,5 +1,12 @@
 import * as React from "react";
-import { createContext, useContext, useState, useEffect, useMemo } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import { useTranslation } from "react-i18next";
 import isEmpty from "lodash-es/isEmpty";
 
@@ -9,6 +16,14 @@ import reportError from "../reportError.js";
 import platformsJSONfile from "../../platforms.json";
 import eovsJSONfile from "../../eovs.json";
 import erddapServersJSONfile from "../../erddapServers.json";
+
+// An ERDDAP server's display name in the current language. erddapServers.json
+// is the label source; a server we carry no metadata for shows its URL.
+function erddapServerTitle(url, language) {
+  const metadata = erddapServersJSONfile.find((s) => s.url === url);
+  if (!metadata) return url;
+  return language === "fr" ? metadata.label_fr : metadata.label_en;
+}
 import { server } from "../../config.js";
 import {
   defaultEovsSelected,
@@ -53,8 +68,6 @@ export const defaultQuery = {
 export default function FilterProvider({ children }) {
   const { t, i18n } = useTranslation();
 
-  const [query, setQuery] = useState(defaultQuery);
-
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected);
   const debouncedEovsSelected = useDebounce(eovsSelected, 500);
   const [eovsSearchTerms, setEovsSearchTerms] = useState("");
@@ -78,8 +91,19 @@ export default function FilterProvider({ children }) {
   // Source filter (ERDDAP servers + OBIS nodes): the two lists stay separate
   // under the hood — they map to different API parameters — but render as a
   // single "Data Source" filter.
-  const [erddapServersSelected, setErddapServersSelected] = useState(
+  const [erddapServerSelections, setErddapServersSelected] = useState(
     defaultErddapServersSelected,
+  );
+  // Only `url` and `isSelected` are stored; the label is a function of the
+  // language, so it is applied here instead of being mirrored into the
+  // selections by an effect that re-ran on every language switch.
+  const erddapServersSelected = useMemo(
+    () =>
+      erddapServerSelections.map((server) => ({
+        ...server,
+        title: erddapServerTitle(server.url, i18n.language),
+      })),
+    [erddapServerSelections, i18n.language],
   );
   const debouncedErddapServersSelected = useDebounce(
     erddapServersSelected,
@@ -110,9 +134,6 @@ export default function FilterProvider({ children }) {
     500,
   );
 
-  const [timeFilterActive, setTimeFilterActive] = useState(false);
-  const [depthFilterActive, setDepthFilterActive] = useState(false);
-
   const [totalNumberOfDatasets, setTotalNumberOfDatasets] = useState();
 
   const anyServersSelected = erddapServersSelected.some((s) => s.isSelected);
@@ -127,38 +148,43 @@ export default function FilterProvider({ children }) {
   // so OBIS-only UI (the Scientific Name filter) is hidden entirely.
   const obisDataAvailable = obisNodesSelected.length > 0;
 
-  // Update query
-  useEffect(() => {
-    setQuery({
-      startDate,
-      endDate,
-      startDepth,
-      endDepth,
-      eovsSelected,
-      orgsSelected,
-      datasetsSelected,
-      platformsSelected,
+  // The query every fetch in the app is keyed on. Built straight from the
+  // debounced selections rather than mirrored into state by an effect keyed on
+  // them: useDebounce is a trailing debounce, so at the moment it fires the
+  // debounced value already equals the live one, and a memo over the same
+  // inputs lands the same object one render earlier and with no extra pass.
+  const query = useMemo(
+    () => ({
+      startDate: debouncedStartDate,
+      endDate: debouncedEndDate,
+      startDepth: debouncedStartDepth,
+      endDepth: debouncedEndDepth,
+      eovsSelected: debouncedEovsSelected,
+      orgsSelected: debouncedOrgsSelected,
+      datasetsSelected: debouncedDatasetsSelected,
+      platformsSelected: debouncedPlatformsSelected,
       // Scientific name only applies to OBIS data; when OBIS isn't shown the
       // filter is disabled in the UI, so don't apply stale selections to the
       // query (the selection state is preserved for when OBIS is re-enabled).
-      scientificNamesSelected: showObis ? scientificNamesSelected : [],
-      obisNodesSelected,
-      erddapServersSelected,
-    });
-  }, [
-    debouncedStartDate,
-    debouncedEndDate,
-    debouncedStartDepth,
-    debouncedEndDepth,
-    debouncedEovsSelected,
-    debouncedOrgsSelected,
-    debouncedDatasetsSelected,
-    debouncedPlatformsSelected,
-    debouncedScientificNamesSelected,
-    debouncedObisNodesSelected,
-    debouncedErddapServersSelected,
-    showObis,
-  ]);
+      scientificNamesSelected: showObis ? debouncedScientificNamesSelected : [],
+      obisNodesSelected: debouncedObisNodesSelected,
+      erddapServersSelected: debouncedErddapServersSelected,
+    }),
+    [
+      debouncedStartDate,
+      debouncedEndDate,
+      debouncedStartDepth,
+      debouncedEndDepth,
+      debouncedEovsSelected,
+      debouncedOrgsSelected,
+      debouncedDatasetsSelected,
+      debouncedPlatformsSelected,
+      debouncedScientificNamesSelected,
+      debouncedObisNodesSelected,
+      debouncedErddapServersSelected,
+      showObis,
+    ],
+  );
 
   // How much observation time the current selection actually covers, which is
   // what the time slider draws its axis over — there is no point handing a
@@ -198,35 +224,15 @@ export default function FilterProvider({ children }) {
     };
   }, [extentQueryString]);
 
-  useEffect(() => {
-    setTimeFilterActive(
-      startDate !== defaultStartDate || endDate !== defaultEndDate,
-    );
-    setDepthFilterActive(
-      startDepth !== defaultStartDepth || endDepth !== defaultEndDepth,
-    );
-  }, [query]);
-
-  // Update ERDDAP server names when language changes
-  useEffect(() => {
-    if (erddapServersSelected.length > 0) {
-      setErddapServersSelected(
-        erddapServersSelected.map((server) => {
-          const serverMetadata = erddapServersJSONfile.find(
-            (s) => s.url === server.url,
-          );
-          return {
-            ...server,
-            title: serverMetadata
-              ? i18n.language === "fr"
-                ? serverMetadata.label_fr
-                : serverMetadata.label_en
-              : server.url,
-          };
-        }),
-      );
-    }
-  }, [i18n.language]);
+  // "Is this filter doing anything?" is just the selection compared with the
+  // defaults, so it is derived during render rather than mirrored into state
+  // by an effect keyed on the debounced query. That effect left a window —
+  // one debounce long — where the dates had moved but the flag had not, and
+  // TimeRail reads the two together to size its axis.
+  const timeFilterActive =
+    startDate !== defaultStartDate || endDate !== defaultEndDate;
+  const depthFilterActive =
+    startDepth !== defaultStartDepth || endDepth !== defaultEndDepth;
 
   // Set when any catalog fetch fails (e.g. API gateway timeouts) so the UI
   // can surface a retry instead of silently empty filters.
@@ -237,7 +243,7 @@ export default function FilterProvider({ children }) {
 
   // One-shot catalog fetches, seeded with any selections carried in the URL
   // so share links hydrate the filters. Retryable via loadCatalog().
-  function loadCatalog() {
+  const loadCatalog = useCallback(() => {
     setCatalogError(false);
     const filtersFromURL = Object.fromEntries(
       new URL(window.location.href).searchParams,
@@ -383,23 +389,12 @@ export default function FilterProvider({ children }) {
             // OBIS datasets carry https://obis.org as their erddap_url
             // sentinel; OBIS is represented by its node group instead.
             .filter((serverUrl) => serverUrl !== "https://obis.org")
-            .map((serverUrl, index) => {
-              const serverMetadata = erddapServersJSONfile.find(
-                (s) => s.url === serverUrl,
-              );
-
-              return {
-                title: serverMetadata
-                  ? i18n.language === "fr"
-                    ? serverMetadata.label_fr
-                    : serverMetadata.label_en
-                  : serverUrl,
-                url: serverUrl,
-                isSelected:
-                  selectAllServers || erddapServersFromURL.includes(serverUrl),
-                pk: index,
-              };
-            }),
+            .map((serverUrl, index) => ({
+              url: serverUrl,
+              isSelected:
+                selectAllServers || erddapServersFromURL.includes(serverUrl),
+              pk: index,
+            })),
         );
       },
     );
@@ -424,11 +419,18 @@ export default function FilterProvider({ children }) {
       if (serviceDown) setCatalogError(true);
       setCatalogLoaded(true);
     });
-  }
+    // Reads the URL and module-level config only — nothing from this render.
+  }, []);
 
   useEffect(() => {
+    // Kicking off the catalogue fetches is the one thing this provider has to
+    // do on mount, and loadCatalog clears the retry banner before it starts.
+    // That clear is a synchronous setState in an effect body, which is what
+    // the rule is about; there is no cascade to avoid here, since the flag is
+    // already false on the render that runs this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadCatalog();
-  }, []);
+  }, [loadCatalog]);
 
   function resetFilters() {
     setStartDate(defaultStartDate);

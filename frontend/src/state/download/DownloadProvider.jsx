@@ -1,5 +1,5 @@
 import * as React from "react";
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useMemo } from "react";
 import { Check2Circle, XCircle } from "react-bootstrap-icons";
 import Spinner from "../../components/ui/Spinner.jsx";
 import { useTranslation } from "react-i18next";
@@ -17,11 +17,18 @@ import {
   createDataFilterQueryString,
   validateEmail,
   getCookieValue,
+  useChanged,
 } from "../../utilities.jsx";
 import { useFilters } from "../filters/FilterProvider.jsx";
 import { useSelection } from "../selection/SelectionProvider.jsx";
 
 const DownloadContext = createContext();
+
+// Remember the address for a month so the next download does not have to be
+// retyped. Read back by getCookieValue when the provider mounts.
+function rememberEmail(email) {
+  document.cookie = `email=${email}; Secure; max-age=${60 * 60 * 24 * 31}`;
+}
 
 export function useDownload() {
   return useContext(DownloadContext);
@@ -33,79 +40,81 @@ export default function DownloadProvider({ children }) {
   const { polygon, pointsToDownload } = useSelection();
 
   const [email, setEmail] = useState(getCookieValue("email"));
-  const [emailValid, setEmailValid] = useState(false);
   const [submissionState, setSubmissionState] = useState();
-  const [submissionFeedback, setSubmissionFeedback] = useState();
 
+  // Whether each filter is carried into the download. These are checkboxes the
+  // user owns, so they are state — but they start out matching the filters that
+  // are actually doing something, and go back to matching them whenever those
+  // change (see the reset below).
   const [filterDownloadByTime, setFilterDownloadByTime] = useState(false);
   const [filterDownloadByDepth, setFilterDownloadByDepth] = useState(false);
   const [filterDownloadByPolygon, setFilterDownloadByPolygon] = useState(false);
-  const [polygonFilterActive, setPolygonFilterActive] = useState(false);
 
-  useEffect(() => {
+  const emailValid = validateEmail(email);
+  const polygonFilterActive = !isEmpty(polygon);
+
+  // Re-seeding the checkboxes when the filters move is React's "adjust state
+  // when an input changes" — done during render against the previous value
+  // rather than in an effect, so the panel never paints one frame with the
+  // previous filters' boxes ticked. `query` carries the debounced filter
+  // values, so comparing it is the same test the boxes are seeded from.
+  if (useChanged(query)) {
     setFilterDownloadByTime(
-      startDate !== defaultStartDate || endDate !== defaultEndDate,
+      query.startDate !== defaultStartDate || query.endDate !== defaultEndDate,
     );
     setFilterDownloadByDepth(
-      startDepth !== defaultStartDepth || endDepth !== defaultEndDepth,
+      query.startDepth !== defaultStartDepth ||
+        query.endDepth !== defaultEndDepth,
     );
-  }, [query]);
+  }
 
-  useEffect(() => {
-    setPolygonFilterActive(!isEmpty(polygon));
-    setFilterDownloadByPolygon(!isEmpty(polygon));
-  }, [polygon]);
+  if (useChanged(polygon)) setFilterDownloadByPolygon(polygonFilterActive);
 
-  useEffect(() => {
-    if (isEmpty(pointsToDownload)) {
-      setSubmissionFeedback();
-    }
-  }, [pointsToDownload]);
+  // Emptying the selection retires whatever the last submission said about it.
+  // The submit button is disabled while the selection is empty either way, so
+  // this only clears the message.
+  if (useChanged(pointsToDownload) && isEmpty(pointsToDownload)) {
+    setSubmissionState(undefined);
+  }
 
-  useEffect(() => {
-    setEmailValid(validateEmail(email));
-    setSubmissionState();
-  }, [email]);
-
-  useEffect(() => {
+  // What the panel shows under the submit button — a pure reading of the
+  // submission state, so it is derived here rather than pushed into a second
+  // piece of state that has to be kept in step with the first.
+  const submissionFeedback = useMemo(() => {
     switch (submissionState) {
       case "submitted":
-        submitRequest();
-        setSubmissionFeedback({
+        return {
           icon: <Spinner size="sm" className="submissionSpinner" />,
           text: t("submissionStateTextSubmitting"), // 'Submitting...'
-        });
-        break;
-
+        };
       case "successful":
-        setSubmissionFeedback({
+        return {
           icon: <Check2Circle size={18} className="success" />,
           text: t("submissionStateTextSuccess"), // Request successful. Download link will be sent to: ' + email
-        });
-        break;
-
+        };
       case "failed":
-        setSubmissionFeedback({
+        return {
           icon: <XCircle size={18} className="error" />,
           text: t("submissionStateTextFailed"), // 'Request failed'
-        });
-        break;
-
+        };
       default:
-        setSubmissionFeedback();
-        break;
+        return undefined;
     }
-  }, [submissionState]);
+  }, [submissionState, t]);
 
   function handleEmailChange(value) {
     setEmail(value);
+    // Editing the address retracts the previous attempt's verdict: it was
+    // about a different recipient.
+    setSubmissionState(undefined);
   }
 
   function handleSubmission() {
     setSubmissionState("submitted");
-    if (validateEmail(email)) {
-      document.cookie = `email=${email}; Secure; max-age=${60 * 60 * 24 * 31}`;
-    }
+    if (validateEmail(email)) rememberEmail(email);
+    // Submitting is what the click does, so it happens here rather than in an
+    // effect watching for the state to become "submitted".
+    submitRequest();
   }
 
   function submitRequest() {

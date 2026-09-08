@@ -47,19 +47,12 @@ function ServerCard({ server, t }) {
 
 export default function HarvestOverview() {
   const { t } = useTranslation();
-  const { data: servers, loading: loadingServers } = useHarvestFetch(
-    "/servers",
-    [],
-  );
-  const { data: runs, loading: loadingRuns } = useHarvestFetch(
-    "/runs/recent",
-    [],
-  );
-  const { data: reasons, loading: loadingReasons } = useHarvestFetch(
-    "/reasons",
-    [],
-  );
-  const { data: downloads } = useHarvestFetch("/downloads/summary", []);
+  const { data: servers, loading: loadingServers } =
+    useHarvestFetch("/servers");
+  const { data: runs, loading: loadingRuns } = useHarvestFetch("/runs/recent");
+  const { data: reasons, loading: loadingReasons } =
+    useHarvestFetch("/reasons");
+  const { data: downloads } = useHarvestFetch("/downloads/summary");
 
   const stuckDownloads = downloads
     ? Number(downloads.n_stuck || 0) + Number(downloads.n_stalled || 0)

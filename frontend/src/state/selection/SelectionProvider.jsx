@@ -23,6 +23,7 @@ import {
   formatErddapServerName,
   selectionFromSearchParams,
   useDebounce,
+  useChanged,
 } from "../../utilities.jsx";
 import erddapServersJSONfile from "../../erddapServers.json";
 import { useFilters } from "../filters/FilterProvider.jsx";
@@ -283,6 +284,10 @@ export default function SelectionProvider({ children }) {
   // take an include list (datasetPKs), so the exclusion is expressed as its
   // complement over the current results; undefined while nothing is hidden
   // leaves those queries as the filters wrote them.
+  //
+  // The value is derived, but it lives in MapStateProvider, which renders
+  // above this one and so cannot read the results itself. Pushing it up in an
+  // effect is the only direction available.
   useEffect(() => {
     setMapDatasetPKs(
       hiddenDatasetPks.size === 0
@@ -291,7 +296,7 @@ export default function SelectionProvider({ children }) {
             .filter((row) => !hiddenDatasetPks.has(row.pk))
             .map((row) => row.pk),
     );
-  }, [hiddenDatasetPks, pointsData]);
+  }, [hiddenDatasetPks, pointsData, setMapDatasetPKs]);
 
   // The open dataset page lives in the URL (?dataset=…&server=…) rather than in
   // component state, so Back/Forward move through it natively and the page can
@@ -312,7 +317,12 @@ export default function SelectionProvider({ children }) {
       inspectDataset.coverage_bbox_geojson;
     if (footprint) zoomToGeometry(footprint);
     setPendingDatasetZoom(false);
-  }, [pendingDatasetZoom, inspectDataset]);
+  }, [
+    pendingDatasetZoom,
+    inspectDataset,
+    zoomToGeometry,
+    setPendingDatasetZoom,
+  ]);
 
   // Opening or closing a dataset page is a navigation the user made, so it
   // pushes an entry that Back reverses. Automatic opens/closes (auto-inspecting
@@ -436,29 +446,40 @@ export default function SelectionProvider({ children }) {
     );
   }, []);
 
-  useEffect(() => {
-    if (isEmpty(pointsToReview)) {
-      setPointsToDownload();
-    }
-  }, [pointsToReview]);
+  // Adjust-on-change during render rather than in an effect: the download
+  // panel would otherwise paint one frame listing rows the review list has
+  // already dropped.
+  if (useChanged(pointsToReview) && isEmpty(pointsToReview)) {
+    setPointsToDownload();
+  }
 
-  useEffect(() => {
+  // What arriving results mean for this provider's own state: the selection
+  // summary, and the end of the load. Adjusted during render rather than in an
+  // effect so the list and its "n selected" footer paint from the same results
+  // — an effect showed the new rows against the previous count for a frame.
+  // The empty-results guard is deliberate and carried over unchanged: a query
+  // that matches nothing leaves the download selection alone.
+  if (useChanged(pointsData)) {
     if (!isEmpty(pointsData)) {
-      let count = 0;
-      pointsData.forEach((point) => {
-        if (point.selected) count++;
-      });
-      setDatasetsSelectedCount(count);
+      setDatasetsSelectedCount(
+        pointsData.filter((point) => point.selected).length,
+      );
       setPointsToReview(pointsData.filter((point) => point.selected));
     }
     setSelectionLoading(false);
-    // A single remaining result used to open its own dataset page. That made
-    // the outcome of a map click depend on how dense the data happened to be —
-    // clicking a griddap footprint or a hex narrowed the filter, and you landed
-    // on a dataset page or on a one-row list depending on whether the narrowing
-    // bottomed out at exactly one. Opening a dataset page is now always an
-    // explicit act: a row in the "what's here" card, a card in the list, or a
-    // ?dataset= link.
+  }
+
+  // A single remaining result used to open its own dataset page. That made
+  // the outcome of a map click depend on how dense the data happened to be —
+  // clicking a griddap footprint or a hex narrowed the filter, and you landed
+  // on a dataset page or on a one-row list depending on whether the narrowing
+  // bottomed out at exactly one. Opening a dataset page is now always an
+  // explicit act: a row in the "what's here" card, a card in the list, or a
+  // ?dataset= link.
+  //
+  // This half stays an effect: it navigates, which is not something to do
+  // while rendering.
+  useEffect(() => {
     if (
       !isEmpty(pointsData) &&
       searchParams.get("dataset") &&
@@ -470,15 +491,16 @@ export default function SelectionProvider({ children }) {
       // it left behind rather than carry a dead key in the URL.
       setInspectDataset(undefined, { replace: true });
     }
-  }, [pointsData]);
+  }, [pointsData, searchParams, setInspectDataset]);
 
-  function datasetsInLanguage(point) {
-    return {
+  const datasetsInLanguage = useCallback(
+    (point) => ({
       ...point,
       title: point.title_translated?.[i18n.language] || point.title,
       selected: false,
-    };
-  }
+    }),
+    [i18n.language],
+  );
 
   // The pointQuery waits for the catalog so the filters it sends are hydrated
   // from the URL first. It must not wait for a non-empty EOV list: OBIS
@@ -486,6 +508,13 @@ export default function SelectionProvider({ children }) {
   // empty /oceanVariables and would never query at all. catalogLoaded resolves
   // even when the fetches fail, so a dead API lands on an empty list rather
   // than an endless spinner.
+  // KNOWN LIMITATION (tracked separately): `selectionLoading` is read as a
+  // mutex but deliberately left out of the dependencies. Listing it would
+  // re-enter this effect every time a load finished and immediately re-issue
+  // the same query, so the array cannot simply be completed — the fix is to
+  // drop the mutex and let an AbortController/request id discard stale
+  // responses instead. Until then, a filter or polygon change made while a
+  // /pointQuery is in flight is dropped and not retried.
   useEffect(() => {
     if (!selectionLoading && catalogLoaded) {
       const filtersQuery = createDataFilterQueryString(query);
@@ -499,6 +528,7 @@ export default function SelectionProvider({ children }) {
       // An open dataset page is deliberately NOT closed here: it survives a
       // filter change as long as the dataset is still in the results. If it
       // isn't, it closes when the new results land (see the pointsData effect).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectionLoading(true);
       setCombinedQueries(combinedQueries);
       const urlString = `${server}/pointQuery${
@@ -523,13 +553,17 @@ export default function SelectionProvider({ children }) {
           setInitialPointsQueryComplete(true);
         });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, polygon, catalogLoaded]);
 
+  // Re-title the results in place when the language changes. A functional
+  // update keeps the current rows out of the dependency array — listing them
+  // would re-enter this effect on its own output.
+  // i18n is an external store; this is the "copy its state into React" case.
   useEffect(() => {
-    if (!selectionLoading) {
-      setPointsData(pointsData.map(datasetsInLanguage));
-    }
-  }, [i18n.language]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPointsData((points) => points.map(datasetsInLanguage));
+  }, [datasetsInLanguage]);
 
   function handleSelectDataset(point) {
     // Griddap datasets are metadata-only: they never enter the download
@@ -571,6 +605,7 @@ export default function SelectionProvider({ children }) {
     );
     // The selected track follows the inspected dataset: leaving the inspector
     // (or moving to another dataset) clears it from the map.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedTrajectory((current) =>
       current && current.datasetPk !== inspectDataset?.pk ? undefined : current,
     );
@@ -579,7 +614,7 @@ export default function SelectionProvider({ children }) {
     setHighlightedRecord((current) =>
       current && current.datasetPk !== inspectDataset?.pk ? undefined : current,
     );
-  }, [inspectDataset]);
+  }, [inspectDataset, setActiveWmsOverlay]);
 
   // The share link's highlight, once its dataset is in hand. Declared after the
   // effect above so that on the render where the page resolves, this one runs
@@ -587,6 +622,9 @@ export default function SelectionProvider({ children }) {
   useEffect(() => {
     if (!pendingHighlight || !inspectDataset) return;
     const { record, track } = pendingHighlight;
+    // Consuming the one-shot flag is what stops the link's highlight from
+    // being reapplied every time the dataset page re-resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPendingHighlight(undefined);
     if (record !== undefined) {
       setHighlightedRecord({ datasetPk: inspectDataset.pk, profileId: record });
@@ -605,6 +643,9 @@ export default function SelectionProvider({ children }) {
   useEffect(() => {
     if (inspectDataset) {
       if (inspectRecordID) {
+        // Opening the modal and marking it busy is the start of this fetch,
+        // not state derived from anything.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setShowPreviewModal(true);
         setRecordLoading(true);
         fetch(
@@ -623,6 +664,10 @@ export default function SelectionProvider({ children }) {
     } else {
       setInspectRecordID();
     }
+    // Keyed on the record id alone: inspectDataset is read for its ids, and
+    // listing it would refetch the same preview every time the results are
+    // replaced and the dataset object changes identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inspectRecordID]);
 
   const value = {

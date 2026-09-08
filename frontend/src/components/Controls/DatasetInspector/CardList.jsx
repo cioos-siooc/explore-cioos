@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 
+import { useChanged } from "../../../utilities.jsx";
 import TableFilter, { filterRows } from "../../ui/TableFilter.jsx";
 import SortSelect from "../../ui/SortSelect.jsx";
 import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
@@ -53,7 +54,7 @@ export default function CardList({
       if (field?.type === "number") return ((va ?? 0) - (vb ?? 0)) * factor;
       return String(va ?? "").localeCompare(String(vb ?? "")) * factor;
     });
-  }, [items, filterText, sort, pinnedKey]);
+  }, [items, filterText, sort, pinnedKey, keyOf, sortFields]);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   // Clamped rather than stored: a page can vanish under the list when the
@@ -63,17 +64,16 @@ export default function CardList({
 
   // Back to page one whenever the list or its ordering changes: page 7 of the
   // previous results is not page 7 of these.
-  useEffect(() => setPage(1), [items, filterText, sort, pageSize]);
+  if (useChanged(items, filterText, sort, pageSize)) setPage(1);
 
   // An item picked on the map can sit on any page of the list — turn to the
   // page holding it, so the highlighted card is one the user can actually see.
   // Runs on `items` too: the pick is usually already made when the list is
   // still loading, and the effect above sends that arrival back to page one.
-  useEffect(() => {
-    if (focusKey === undefined) return;
+  if (useChanged(focusKey, items, pageSize) && focusKey !== undefined) {
     const index = rows.findIndex((row) => keyOf(row) === focusKey);
     if (index >= 0) setPage(Math.floor(index / pageSize) + 1);
-  }, [focusKey, items, pageSize]);
+  }
 
   return (
     <>

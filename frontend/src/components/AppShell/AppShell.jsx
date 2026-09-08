@@ -1,6 +1,8 @@
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+
+import { useChanged } from "../../utilities.jsx";
 
 import MapContainer from "../Map/MapContainer.jsx";
 import FeatureCard from "../Map/FeatureCard/FeatureCard.jsx";
@@ -60,9 +62,8 @@ export default function AppShell() {
   // it has faded. mapLoaded never goes back to false, so in practice this runs
   // once — but keying off the condition rather than assuming that keeps the two
   // in step if a later wait ever earns a splash of its own.
-  useEffect(() => {
-    if (firstPaintPending) setSplashMounted(true);
-  }, [firstPaintPending]);
+  if (useChanged(firstPaintPending) && firstPaintPending)
+    setSplashMounted(true);
 
   // The griddap legend lives inside the dataset page while that page is open
   // (see GriddapDetails); otherwise it pins itself to the top-left corner of

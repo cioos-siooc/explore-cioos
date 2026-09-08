@@ -27,13 +27,12 @@ export default function HarvestServer() {
 
   const { data: datasets, loading } = useHarvestFetch(
     `/servers/${slug}${queryStr ? "?" + queryStr : ""}`,
-    [slug, statusFilter, q],
   );
   // The slug is a transformed source URL; the full erddap_url (and a clean
   // hostname for display) come from the dataset rows once loaded.
   const erddapUrl = (datasets && datasets[0] && datasets[0].erddap_url) || "";
   const host = hostname(erddapUrl) || slug;
-  const { data: reasons } = useHarvestFetch(`/reasons/${slug}`, [slug]);
+  const { data: reasons } = useHarvestFetch(`/reasons/${slug}`);
 
   function applyFilters(newStatus, newQ) {
     const p = {};

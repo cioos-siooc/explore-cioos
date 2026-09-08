@@ -58,14 +58,11 @@ export default [
     rules: {
       ...shared,
       "react/prop-types": "off",
-      // The other 11 rules in react-hooks/recommended pass and stay on. These
-      // five have pre-existing findings whose fixes change render behaviour,
-      // so they are their own task — see TODO-cde-revisions.md.
-      "react-hooks/rules-of-hooks": "off",
-      "react-hooks/exhaustive-deps": "off",
-      "react-hooks/set-state-in-effect": "off",
-      "react-hooks/refs": "off",
-      "react-hooks/immutability": "off",
+      // All 16 rules in react-hooks/recommended are on. exhaustive-deps is the
+      // one kept at "warn" — it is the rule with legitimate exceptions (a
+      // debounce, a one-shot, an imperative map command), and each of those is
+      // marked with an eslint-disable comment saying which it is.
+      "react-hooks/exhaustive-deps": "warn",
     },
   },
   {

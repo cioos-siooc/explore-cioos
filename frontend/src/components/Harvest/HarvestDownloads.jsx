@@ -127,14 +127,11 @@ export default function HarvestDownloads() {
   if (activeQ) query.set("q", activeQ);
   const qs = query.toString();
 
-  const { data: summary } = useHarvestFetch("/downloads/summary", []);
-  const { data: jobs, loading: loadingJobs } = useHarvestFetch(
-    "/downloads/recent",
-    [],
-  );
+  const { data: summary } = useHarvestFetch("/downloads/summary");
+  const { data: jobs, loading: loadingJobs } =
+    useHarvestFetch("/downloads/recent");
   const { data: datasets, loading: loadingDatasets } = useHarvestFetch(
     `/downloads/datasets${qs ? `?${qs}` : ""}`,
-    [qs],
   );
 
   function applyFilters(status, search) {

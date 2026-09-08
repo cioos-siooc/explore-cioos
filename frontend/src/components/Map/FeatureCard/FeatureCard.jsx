@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
 import platformColors from "../../platformColors";
+import { useChanged } from "../../../utilities.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
@@ -59,7 +60,7 @@ export default function FeatureCard() {
 
   // A fresh query is a fresh card: collapse any "show all" the last one was
   // left in.
-  useEffect(() => setExpanded(false), [featureQuery?.nonce]);
+  if (useChanged(featureQuery?.nonce)) setExpanded(false);
 
   // Escape closes, like every other dismissable surface in the app.
   useEffect(() => {

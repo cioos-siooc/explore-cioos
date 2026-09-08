@@ -19,9 +19,7 @@ import {
 export default function HarvestDownloadJob() {
   const { t } = useTranslation();
   const { jobId } = useParams();
-  const { data, loading, error } = useHarvestFetch(`/downloads/${jobId}`, [
-    jobId,
-  ]);
+  const { data, loading, error } = useHarvestFetch(`/downloads/${jobId}`);
 
   const breadcrumbs = (
     <>

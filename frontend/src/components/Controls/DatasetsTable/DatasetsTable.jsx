@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   CaretDownFill,
   CaretRightFill,
@@ -109,39 +115,42 @@ export default function DatasetsTable({
       });
     }
     return base;
-  }, [isDownloadModal, i18n.language]);
+  }, [isDownloadModal, t]);
 
   const [sort, setSort] = useState({ field: "title", dir: "asc" });
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
 
-  const groupByOptions = useMemo(() => groupOptions(t), [i18n.language]);
+  const groupByOptions = useMemo(() => groupOptions(t), [t]);
   // Hiding a group takes its datasets off the map. Not offered for the
   // viewport-based dimension ('inView'), whose membership changes on every pan.
   const canHideGroups = HIDEABLE_DIMENSIONS.has(groupBy);
 
-  function sortValue(row, field) {
-    const isGrid = row.cdm_data_type === "Grid";
-    switch (field) {
-      case "title":
-        return (row.title || "").toLowerCase();
-      case "type":
-        return (
-          isGrid ? t("griddapTypeLabel") : row.cdm_data_type || ""
-        ).toLowerCase();
-      case "platform":
-        return (
-          isGrid ? t("griddapTypeLabel") : row.platform || ""
-        ).toLowerCase();
-      case "locations":
-        return isGrid ? -1 : Number(row.profiles_count) || 0;
-      case "size":
-        return Number(row?.sizeEstimate?.filteredSize) || 0;
-      case "downloadable":
-        return row.internalDownload ? 1 : 0;
-      default:
-        return 0;
-    }
-  }
+  const sortValue = useCallback(
+    (row, field) => {
+      const isGrid = row.cdm_data_type === "Grid";
+      switch (field) {
+        case "title":
+          return (row.title || "").toLowerCase();
+        case "type":
+          return (
+            isGrid ? t("griddapTypeLabel") : row.cdm_data_type || ""
+          ).toLowerCase();
+        case "platform":
+          return (
+            isGrid ? t("griddapTypeLabel") : row.platform || ""
+          ).toLowerCase();
+        case "locations":
+          return isGrid ? -1 : Number(row.profiles_count) || 0;
+        case "size":
+          return Number(row?.sizeEstimate?.filteredSize) || 0;
+        case "downloadable":
+          return row.internalDownload ? 1 : 0;
+        default:
+          return 0;
+      }
+    },
+    [t],
+  );
 
   // Search filtering happens upstream (SelectionProvider's filteredDatasets),
   // so it's reflected in the shared dataset counters too — this just sorts
@@ -163,7 +172,7 @@ export default function DatasetsTable({
       return String(va).localeCompare(String(vb), i18n.language) * factor;
     });
     return sorted;
-  }, [datasets, sort, downloadSizeEstimates, i18n.language, pinnedPks]);
+  }, [datasets, sort, i18n.language, pinnedPks, sortFields, sortValue]);
 
   // Flat render list: without grouping it's just the sorted rows; with grouping
   // it's the rows bucketed under headers. Each entry is either
@@ -196,7 +205,14 @@ export default function DatasetsTable({
       }
     }
     return items;
-  }, [visibleRows, groupBy, collapsedGroups, datasetsInViewPks, i18n.language]);
+  }, [
+    visibleRows,
+    groupBy,
+    collapsedGroups,
+    datasetsInViewPks,
+    i18n.language,
+    t,
+  ]);
 
   // Total data rows currently expanded (excludes headers and collapsed groups).
   // This — not the dataset count — is what the pages divide up, because an
@@ -280,6 +296,9 @@ export default function DatasetsTable({
   // Back to page one whenever the result set or its ordering changes: page 7 of
   // the previous results is not page 7 of these.
   useEffect(() => {
+    // Paired with the scroll reset below, which is a DOM write and so has to
+    // happen in an effect either way.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
     if (listRef.current) listRef.current.scrollTop = 0;
   }, [datasetsKey, sort, isDownloadModal, groupBy, pageSize, pinnedPks]);

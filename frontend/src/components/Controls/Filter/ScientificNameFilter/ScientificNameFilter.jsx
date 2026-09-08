@@ -93,6 +93,7 @@ export default function ScientificNameFilter({
 
   useEffect(() => {
     const controller = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     const q = encodeURIComponent(debouncedSearchTerms);
     fetch(`${server}/scientificNames?q=${q}&lang=${lang}&limit=200`, {
@@ -132,6 +133,9 @@ export default function ScientificNameFilter({
         reportError("scientificNames search failed", err);
       });
     return () => controller.abort();
+    // detailsByName is read to find the names still missing, and written by
+    // mergeDetails below — listing it would feed this effect its own output.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scientificNamesSelected, lang]);
 
   const toggleName = (name) => {

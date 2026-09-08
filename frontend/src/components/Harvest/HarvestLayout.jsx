@@ -12,7 +12,7 @@ export default function HarvestLayout({ breadcrumbs, children }) {
 
   useEffect(() => {
     if (lang !== i18n.language) i18n.changeLanguage(lang);
-  }, [lang]);
+  }, [lang, i18n]);
 
   function toggleLanguage() {
     const params = new URLSearchParams(searchParams);

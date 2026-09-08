@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import Rail from "../Rail/Rail.jsx";
@@ -9,6 +9,7 @@ import {
   MIN_TICK_GAP_PX,
   MIN_TICK_GAP_PX_VERTICAL,
 } from "./depthAxis.js";
+import { useChanged } from "../../../utilities.jsx";
 import "./styles.css";
 
 // The depth slider, built the same way the time one is: the shared Rail, given
@@ -46,9 +47,7 @@ export function DepthField({ value, min, max, onCommit, label, className }) {
 
   // Follow the committed value while the field is idle — the rail and the share
   // link both move it — but never while it is being typed into.
-  useEffect(() => {
-    if (!editing) setDraft(String(value));
-  }, [value, editing]);
+  if (useChanged(value, editing) && !editing) setDraft(String(value));
 
   return (
     <input
