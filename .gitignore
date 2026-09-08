@@ -9,9 +9,22 @@ notforrepo
 .vscode_
 out
 cde_download*
-venv
+venv/
+.venv/
 *.rdb
+# Environment files. `*.env` matched `.env` and `foo.env` but not the
+# `.env.<name>` family, so a new per-environment file (`.env.local`,
+# `.env.staging`) could be committed with no warning. Ignore the family and
+# allow back the ones that are deliberately tracked: the samples, and the two
+# templated files whose secrets are `op://` 1Password refs resolved at deploy
+# (deploy.yml `op_secret_files`) rather than literals.
 *.env
+.env.*
+!.env.sample
+!.env.coolify.sample
+!.env.production
+!*/.env.sample
+!frontend/.env.development
 docker-compose.override.yaml
 .ipynb_checkpoints
 *.ipynb
@@ -42,3 +55,21 @@ harvester_logs
 # discovery.py out of the repo while its tests were committed.
 /obis/
 /harvester/obis/
+
+# Agent worktrees and local agent settings. `.claude/` has held full checkouts
+# of this repo before now; a `git add -A` then commits broken gitlinks.
+.claude/
+
+# Tool caches. Each of these ships its own generated `.gitignore`, which is not
+# ours to rely on — a cache created by an older tool version has none.
+.pytest_cache/
+.ruff_cache/
+
+# Harvest and download outputs. harvest-prod/ (96 MB) was invisible only
+# because the blanket `*.csv` above swallowed its contents.
+harvest-prod/
+
+# downloads/ is a tracked mount point (README.md explains it); ignore only the
+# generated archives inside it.
+/downloads/*
+!/downloads/README.md
