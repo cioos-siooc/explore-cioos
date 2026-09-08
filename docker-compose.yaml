@@ -6,6 +6,12 @@
 # collide. For standalone local development, host ports (nginx / prefect) come
 # from docker-compose.override.yaml — see docker-compose.override.yaml.sample.
 # For non-Coolify production, use docker-compose.production.yaml.
+# The single .env every service reads. Four services repeated this list
+# verbatim; an anchor means a change to it cannot be applied to three of them
+# and missed on the fourth.
+x-env-file: &env-file
+  - .env
+
 services:
   db:
     build: ./database
@@ -83,8 +89,7 @@ services:
   web-api:
     build: ./web-api
     restart: always
-    env_file:
-      - .env
+    env_file: *env-file
     environment:
       # Docker-network service names so the API reaches Postgres/Redis without a
       # repo .env. web-api/db.js reads DB_HOST and utils/redis.js reads REDIS_HOST;
@@ -119,8 +124,14 @@ services:
       # Coolify "magic" var: tells Coolify to generate a public FQDN for this
       # service and proxy it to container port 4000. Inert outside Coolify.
       - SERVICE_FQDN_NGINX_4000
+    # `depends_on: [web-api]` only waits for the container to be CREATED, so
+    # every deploy served 502s for the whole web-api start-up window. Both
+    # upstreams now have healthchecks (see their Dockerfiles); gate on them.
     depends_on:
-      - web-api
+      web-api:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
   scheduler:
     build:
       context: .
@@ -136,8 +147,7 @@ services:
     depends_on:
       db_migrate:
         condition: service_completed_successfully
-    env_file:
-      - .env
+    env_file: *env-file
     environment:
       # Under Coolify, SERVICE_URL_NGINX is injected with nginx's public URL;
       # elsewhere it is unset and APP_DOMAIN from .env is used.
@@ -214,8 +224,7 @@ services:
       # Caches persisted across runs (cheap re-fetch if lost).
       - harvester_cache:/app/harvester/harvester_cache
       - obis_cache:/app/harvester/obis_cache
-    env_file:
-      - .env
+    env_file: *env-file
     environment:
       PREFECT_API_URL: http://prefect:4200/api
       PREFECT_LOGGING_LEVEL: INFO
@@ -329,8 +338,8 @@ services:
         asyncio.run(ensure_db())
         PY
         exec prefect server start --host 0.0.0.0
-    env_file:
-      - .env  # DB_USER / DB_PASSWORD / DB_NAME / DB_PORT for the connection URL
+    # DB_USER / DB_PASSWORD / DB_NAME / DB_PORT for the connection URL.
+    env_file: *env-file
     environment:
       # Under Coolify: declare a domain for the UI (port 4200) so the proxy
       # routes to it, mirroring SERVICE_FQDN_NGINX_4000 on nginx. Empty value =>
@@ -364,9 +373,16 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:alpine
+    # Pinned. `redis:alpine` is a floating tag: the cache could cross a major
+    # version on any rebuild. 7.4 is the line these deployments have been on.
+    image: redis:7.4-alpine
     expose:
       - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
 
 volumes:

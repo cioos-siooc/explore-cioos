@@ -1,0 +1,5 @@
+# Build context for the `db` service (context: ./database).
+# Only the numbered *.sql files and the Dockerfile are build input.
+.DS_Store
+*.log
+*.csv
