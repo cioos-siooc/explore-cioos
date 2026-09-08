@@ -12,7 +12,7 @@ const { errorHandler } = require("../utils/validatorMiddlewares");
 // datasets with one unnamed trajectory). The charset stays permissive for
 // glider mission names; length-capped as a safety net.
 const trajectoryIdCheck = check("trajectoryId")
-  .matches(/^[\w .:/\-]*$/)
+  .matches(/^[\w .:/-]*$/)
   .isLength({ max: 256 });
 
 /**
@@ -61,9 +61,7 @@ router.get(
       ORDER BY s.trajectory_id`;
 
     try {
-      const rows = (
-        await db.raw(SQL, { datasetPK: parseInt(datasetPKs, 10) })
-      ).rows;
+      const { rows } = await db.raw(SQL, { datasetPK: parseInt(datasetPKs, 10) });
       res.send(rows);
     } catch (e) {
       console.error(e);
@@ -135,9 +133,7 @@ router.get(
       ORDER BY p.time`;
 
     try {
-      const rows = (
-        await db.raw(SQL, { datasetPK: parseInt(datasetPKs, 10), trajectoryId })
-      ).rows;
+      const { rows } = await db.raw(SQL, { datasetPK: parseInt(datasetPKs, 10), trajectoryId });
       res.send({
         trajectory_id: trajectoryId,
         n_points: rows.length,

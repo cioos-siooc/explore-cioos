@@ -34,7 +34,7 @@ const cache = require("../utils/cache");
  *                     type: object
  */
 router.get("/", cache.route(), async (req, res, next) => {
-  const SQL = `SELECT title, 
+  const SQL = `SELECT title,
                       pk_url pk,
                       organization_pks,
                       platform,

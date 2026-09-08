@@ -139,7 +139,7 @@ router.get(
       console.error(err);
       return res.status(500).json({ error: err.toString() });
     }
-    const includeObis = req.query.includeObis !== 'false';
+    const includeObis = req.query.includeObis !== "false";
     // Must match the metric the tiles were requested with, or the ramp domain
     // won't match the numbers being ramped — see utils/hexMetric.js.
     const metric = parseMetric(req.query.metric);
@@ -157,9 +157,9 @@ router.get(
     // spatial filter, matching tiles/shapeQuery. show_as_point gates profiles
     // out of every tier (hex and point) so the legend ranges match the tiles,
     // which keep large-region features off the map entirely.
-    const profilesBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, ${metricValueExpr('profiles', metric)},
+    const profilesBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, ${metricValueExpr("profiles", metric)},
                time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
-        FROM cde.profiles ${metricJoin('profiles', metric)}
+        FROM cde.profiles ${metricJoin("profiles", metric)}
         WHERE show_as_point AND :profileFilters`;
     // Trajectory and OBIS coverage cells merge into the hex-tier ranges
     // (zoom0/zoom1, the green ramp) but not the point-tier range (zoom2) — at
@@ -173,13 +173,13 @@ router.get(
     // stretch the ramp domain.
     const trajectoryBranch = `SELECT CASE WHEN hex_tier = 0 THEN hex_pk END AS hex_0_pk,
                CASE WHEN hex_tier = 1 THEN hex_pk END AS hex_1_pk,
-               NULL::integer AS point_pk, dataset_pk, ${metricValueExpr('trajectory_hexes', metric)},
+               NULL::integer AS point_pk, dataset_pk, ${metricValueExpr("trajectory_hexes", metric)},
                time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-        FROM cde.trajectory_hexes ${metricJoin('trajectory_hexes', metric)}`;
+        FROM cde.trajectory_hexes ${metricJoin("trajectory_hexes", metric)}`;
     const obisBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk,
-               ${metricValueExpr('obis_cells', metric)},
+               ${metricValueExpr("obis_cells", metric)},
                time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-        FROM cde.obis_cells ${metricJoin('obis_cells', metric)}
+        FROM cde.obis_cells ${metricJoin("obis_cells", metric)}
         WHERE :obisFilters`;
 
     const hexBranches = [];
@@ -224,9 +224,9 @@ router.get(
         -- they hold, so its domain has to be over the same quantity the tiles
         -- emit as \`count\`, aggregated the same way (countAggregate) — a sum
         -- for \`records\`, a day-set union for \`days\`.
-        sub1 AS (SELECT ${rampRange()} zoom0 FROM (SELECT ${countAggregate(metric, 'hex_records')} count FROM hex_records WHERE hex_0_pk IS NOT NULL GROUP BY hex_0_pk) s),
-        sub2 AS (SELECT ${rampRange()} zoom1 FROM (SELECT ${countAggregate(metric, 'hex_records')} count FROM hex_records WHERE hex_1_pk IS NOT NULL GROUP BY hex_1_pk) s),
-        sub3 AS (SELECT ${rampRange()} zoom2 FROM (SELECT ${countAggregate(metric, 'point_records')} count FROM point_records GROUP BY point_pk) s)
+        sub1 AS (SELECT ${rampRange()} zoom0 FROM (SELECT ${countAggregate(metric, "hex_records")} count FROM hex_records WHERE hex_0_pk IS NOT NULL GROUP BY hex_0_pk) s),
+        sub2 AS (SELECT ${rampRange()} zoom1 FROM (SELECT ${countAggregate(metric, "hex_records")} count FROM hex_records WHERE hex_1_pk IS NOT NULL GROUP BY hex_1_pk) s),
+        sub3 AS (SELECT ${rampRange()} zoom2 FROM (SELECT ${countAggregate(metric, "point_records")} count FROM point_records GROUP BY point_pk) s)
 
         SELECT * from sub1,sub2,sub3
         `;
@@ -244,7 +244,7 @@ router.get(
     // filter query (which carries includeObis) to /legend, not the data-layer
     // toggles, so includeTrajectory defaults to on here — same as before this
     // change.
-    const includeTrajectoryCells = req.query.includeTrajectory !== 'false'
+    const includeTrajectoryCells = req.query.includeTrajectory !== "false"
       && includeProfiles;
     // Every branch carries the columns the shared dataset filter predicates
     // against (time, depth, position), not just the ones this query groups on.
@@ -255,15 +255,15 @@ router.get(
     // narrowed it.
     const coverageBranches = [];
     if (includeTrajectoryCells) {
-      coverageBranches.push(`SELECT hex_pk AS hex_1_pk, dataset_pk, ${metricValueExpr('trajectory_hexes', metric)},
+      coverageBranches.push(`SELECT hex_pk AS hex_1_pk, dataset_pk, ${metricValueExpr("trajectory_hexes", metric)},
         time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-        FROM cde.trajectory_hexes ${metricJoin('trajectory_hexes', metric)}
+        FROM cde.trajectory_hexes ${metricJoin("trajectory_hexes", metric)}
         WHERE hex_tier = 1`);
     }
     if (includeObis) {
-      coverageBranches.push(`SELECT hex_1_pk, dataset_pk, ${metricValueExpr('obis_cells', metric)},
+      coverageBranches.push(`SELECT hex_1_pk, dataset_pk, ${metricValueExpr("obis_cells", metric)},
         time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-        FROM cde.obis_cells ${metricJoin('obis_cells', metric)}
+        FROM cde.obis_cells ${metricJoin("obis_cells", metric)}
         WHERE :obisFilters`);
     }
     const coverageInner = coverageBranches.length
@@ -287,7 +287,7 @@ router.get(
         ${filters.hasShared ? "WHERE :filters" : ""}
         ),
 
-        sub1 AS (SELECT ${rampRange()} zoom1 FROM (SELECT ${countAggregate(metric, 'records')} count FROM records GROUP BY hex_1_pk) s)
+        sub1 AS (SELECT ${rampRange()} zoom1 FROM (SELECT ${countAggregate(metric, "records")} count FROM records GROUP BY hex_1_pk) s)
 
         SELECT * from sub1
         `;

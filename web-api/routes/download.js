@@ -1,4 +1,4 @@
-require("dotenv").config();
+require("dotenv").config({ quiet: true });
 
 const { v4: uuidv4 } = require("uuid");
 const express = require("express");
@@ -114,7 +114,9 @@ router.get(
     // coverage hexes for ERDDAP data, obis_cells for OBIS. Scientific-name /
     // OBIS-node selections hide the profile branches (OBIS-only mode) unless
     // ERDDAP servers are also selected.
-    const { includeObis = "true", scientificNames, obisNodes, erddapServers } = req.query;
+    const {
+      includeObis = "true", scientificNames, obisNodes, erddapServers,
+    } = req.query;
     const includeProfiles = !scientificNames && (!obisNodes || Boolean(erddapServers));
     const showObis = includeObis !== "false";
 

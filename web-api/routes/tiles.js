@@ -1,4 +1,4 @@
-require("dotenv").config();
+require("dotenv").config({ quiet: true });
 const express = require("express");
 
 const router = express.Router();
@@ -10,7 +10,6 @@ const {
   parseMetric,
   metricValueExpr,
   metricJoin,
-  nullMetricExpr,
   countAggregate,
 } = require("../utils/hexMetric");
 
@@ -156,7 +155,7 @@ router.get(
     // Prune each branch's scan to the tile region (see tileCellPrefilter).
     const cellPrefilter = tileCellPrefilter(z);
 
-    const includeObis = req.query.includeObis !== 'false';
+    const includeObis = req.query.includeObis !== "false";
     // What the hex/point `count` property means — see utils/hexMetric.js. The
     // same metric must reach /legend, or the ramp domain won't match the tiles.
     const metric = parseMetric(req.query.metric);
@@ -166,13 +165,13 @@ router.get(
     // TimeSeriesProfile — all three share cde.profiles); absent = all three
     // (pre-toggle behaviour), empty = none. Values are validated against the
     // fixed set below so they can be inlined into the branch SQL safely.
-    const ALL_PROFILE_TYPES = ['Profile', 'TimeSeries', 'TimeSeriesProfile'];
+    const ALL_PROFILE_TYPES = ["Profile", "TimeSeries", "TimeSeriesProfile"];
     const profileTypes = req.query.profileTypes === undefined
       ? ALL_PROFILE_TYPES
       : String(req.query.profileTypes)
-          .split(',')
-          .filter((t) => ALL_PROFILE_TYPES.includes(t));
-    const trajectoryToggledOn = req.query.includeTrajectory !== 'false';
+        .split(",")
+        .filter((t) => ALL_PROFILE_TYPES.includes(t));
+    const trajectoryToggledOn = req.query.includeTrajectory !== "false";
     const trajectoryTypes = requestedTrajectoryTypes(req.query);
     // ERDDAP-sourced data (profiles + trajectory coverage) is hidden wholesale
     // when an OBIS-only filter is active: scientific-name filters are
@@ -197,16 +196,15 @@ router.get(
     // branch to datasets of those cdm_data_types (values allowlisted above →
     // safe to inline). All-three or none → no type filter (none never reaches
     // the branch).
-    const profilesTypeFilter =
-      profileTypes.length && profileTypes.length < ALL_PROFILE_TYPES.length
-        ? ` AND dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${profileTypes
-            .map((t) => `'${t}'`)
-            .join(',')}))`
-        : '';
-    const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${metricValueExpr('profiles', metric)},
+    const profilesTypeFilter = profileTypes.length && profileTypes.length < ALL_PROFILE_TYPES.length
+      ? ` AND dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${profileTypes
+        .map((t) => `'${t}'`)
+        .join(",")}))`
+      : "";
+    const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${metricValueExpr("profiles", metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
-    FROM cde.profiles ${metricJoin('profiles', metric)}
-    WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ''} AND :profileFilters`;
+    FROM cde.profiles ${metricJoin("profiles", metric)}
+    WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ""} AND :profileFilters`;
     // Both cell tables (trajectory coverage cells and OBIS occurrence cells)
     // merge into the combined hex counts (z<7, the green ramp) but never
     // appear as individual points (z>=7). Their cell spacing is a grid
@@ -224,15 +222,15 @@ router.get(
     // (dataset, trajectory, tier, hex) — hence `hex_pk as zoom_pk` and a tier
     // predicate where the other branches carry two hex FK columns. point_pk is
     // NULL because trajectory coverage never renders at the point tier.
-    const trajectoryBranch = `SELECT NULL::integer as point_pk, dataset_pk, hex_pk as zoom_pk, geom as point_geom, ${metricValueExpr('trajectory_hexes', metric)},
+    const trajectoryBranch = `SELECT NULL::integer as point_pk, dataset_pk, hex_pk as zoom_pk, geom as point_geom, ${metricValueExpr("trajectory_hexes", metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_hexes ${metricJoin('trajectory_hexes', metric)}
-    WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(' AND ')}` : ''}`;
+    FROM cde.trajectory_hexes ${metricJoin("trajectory_hexes", metric)}
+    WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(" AND ")}` : ""}`;
     const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
-           ${metricValueExpr('obis_cells', metric)},
+           ${metricValueExpr("obis_cells", metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.obis_cells ${metricJoin('obis_cells', metric)}
-    WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
+    FROM cde.obis_cells ${metricJoin("obis_cells", metric)}
+    WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ""}`;
 
     const branches = [];
     if (includeProfiles) branches.push(profilesBranch);
@@ -256,7 +254,7 @@ router.get(
     // a day-set union for `days` — which is why it comes from countAggregate
     // rather than being spelled out here.
     const relevantPointsSQL = isHexGrid
-      ? `SELECT p.zoom_pk pk, ${countAggregate(metric, 'p')} count,
+      ? `SELECT p.zoom_pk pk, ${countAggregate(metric, "p")} count,
                 array_to_json(array_agg(distinct d.pk_url)) datasets,
                 h.geom AS geom
          FROM combined p
@@ -264,7 +262,7 @@ router.get(
          JOIN ${hexesTable} h ON h.pk = p.zoom_pk
          ${filters.hasShared ? "WHERE :filters" : ""}
          GROUP BY p.zoom_pk, h.geom`
-      : `SELECT p.point_pk pk, d.platform as platform, ${countAggregate(metric, 'p')} count,
+      : `SELECT p.point_pk pk, d.platform as platform, ${countAggregate(metric, "p")} count,
                 array_to_json(array_agg(distinct d.pk_url)) datasets,
                 p.point_geom AS geom
          FROM combined p
@@ -396,7 +394,7 @@ router.get(
     // Prune each branch's scan to the tile region (see tileCellPrefilter).
     const cellPrefilter = tileCellPrefilter(z);
 
-    const includeObis = req.query.includeObis !== 'false';
+    const includeObis = req.query.includeObis !== "false";
     const metric = parseMetric(req.query.metric);
     // Same gating as the main tile route: scientific-name filters are
     // OBIS-only, so they hide the (ERDDAP) trajectory cells; an OBIS-node
@@ -407,7 +405,7 @@ router.get(
     // ...and, since the two trajectory geometries are separate layers, the
     // requested subset of them; with neither on there is nothing to draw.
     const trajectoryTypes = requestedTrajectoryTypes(req.query);
-    const includeProfiles = req.query.includeTrajectory !== 'false'
+    const includeProfiles = req.query.includeTrajectory !== "false"
       && trajectoryTypes.length > 0
       && !req.query.scientificNames
       && (!req.query.obisNodes || Boolean(req.query.erddapServers));
@@ -421,15 +419,15 @@ router.get(
       trajectoryTypePredicate(trajectoryTypes),
     ].filter(Boolean);
     const trajectoryBranch = `SELECT dataset_pk, hex_pk as zoom_pk, 'trajectory' as src,
-           trajectory_id, ${metricValueExpr('trajectory_hexes', metric)},
+           trajectory_id, ${metricValueExpr("trajectory_hexes", metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_hexes ${metricJoin('trajectory_hexes', metric)}
-    WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(' AND ')}` : ''}`;
+    FROM cde.trajectory_hexes ${metricJoin("trajectory_hexes", metric)}
+    WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(" AND ")}` : ""}`;
     const obisBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'obis' as src,
-           NULL as trajectory_id, ${metricValueExpr('obis_cells', metric)},
+           NULL as trajectory_id, ${metricValueExpr("obis_cells", metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.obis_cells ${metricJoin('obis_cells', metric)}
-    WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ''}`;
+    FROM cde.obis_cells ${metricJoin("obis_cells", metric)}
+    WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ""}`;
 
     const branches = [];
     if (includeProfiles) branches.push(trajectoryBranch);
@@ -462,14 +460,14 @@ router.get(
       SELECT c.zoom_pk pk,
              -- What colours the hex: one ramp over both kinds of coverage
              -- cell, the same quantity the main /tiles layer emits.
-             ${countAggregate(metric, 'c')} count,
+             ${countAggregate(metric, "c")} count,
              -- Kept for the hover tooltip only. The ramp folds the two kinds
              -- together; the tooltip is where the breakdown stays reachable,
              -- since a trajectory fix and an occurrence record aren't the
              -- same unit.
              count(distinct (c.dataset_pk, c.trajectory_id))
                FILTER (WHERE c.src = 'trajectory') trajectory_count,
-             ${countAggregate(metric, 'c', "c.src = 'obis'")} obis_count,
+             ${countAggregate(metric, "c", "c.src = 'obis'")} obis_count,
              array_to_json(array_agg(distinct d.pk_url)) datasets
       FROM combined c
       JOIN cde.datasets d ON c.dataset_pk = d.pk

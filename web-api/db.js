@@ -1,7 +1,7 @@
 const pg = require("pg");
 
 require("pg-parse-float")(pg);
-require("dotenv").config();
+require("dotenv").config({ quiet: true });
 
 const {
   DB_USER, DB_PASSWORD, DB_HOST, DB_NAME, DB_PORT,

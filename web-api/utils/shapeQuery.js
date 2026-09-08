@@ -9,7 +9,7 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
 
   const {
     timeMin = null, timeMax = null, depthMin = null, depthMax = null,
-    includeObis = 'true',
+    includeObis = "true",
     scientificNames,
     obisNodes,
     erddapServers,
@@ -20,7 +20,7 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
   // selected alongside it (combined Source filter — show both, OR'd in the
   // shared dataset filter).
   const includeProfiles = !scientificNames && (!obisNodes || Boolean(erddapServers));
-  const showObis = includeObis !== 'false';
+  const showObis = includeObis !== "false";
 
   // search_geom is the geometry the shared spatial filter (dbFilter) matches
   // against: the per-feature bbox for profiles (extent search), the cell point

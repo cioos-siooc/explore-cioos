@@ -26,8 +26,8 @@ class InvalidPolygonError extends Error {
 class ScientificNameSelectionTooBroadError extends Error {
   constructor(expandedCount, threshold) {
     super(
-      `Scientific-name selection rolls down to ${expandedCount} taxa (max ${threshold}). ` +
-      "Pick a Family or below.",
+      `Scientific-name selection rolls down to ${expandedCount} taxa (max ${threshold}). `
+      + "Pick a Family or below.",
     );
     this.name = "ScientificNameSelectionTooBroadError";
     this.statusCode = 400;

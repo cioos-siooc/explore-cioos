@@ -1,5 +1,5 @@
-const apicache = require('apicache');
-const redisClient = require('./redis');
+const apicache = require("apicache");
+const redisClient = require("./redis");
 
 let middlewarePromise; // single-flight init (see ensureReady)
 
@@ -22,7 +22,7 @@ function apicacheRedisAdapter(client) {
     // optional cb anyway. Values must be strings for redis@5's hSet.
     hset(key, field, value, cb) {
       client
-        .hSet(key, field, typeof value === 'string' ? value : String(value))
+        .hSet(key, field, typeof value === "string" ? value : String(value))
         .then((res) => cb && cb(null, res))
         .catch((err) => cb && cb(err));
     },
@@ -66,9 +66,9 @@ function ensureReady() {
     try {
       if (!redisClient.isOpen) await redisClient.connect();
       apicache.options({ redisClient: apicacheRedisAdapter(redisClient) });
-      console.log('Cache: using Redis backend');
+      console.log("Cache: using Redis backend");
     } catch (e) {
-      console.warn('Cache: Redis unavailable, using in-memory cache:', e.message);
+      console.warn("Cache: Redis unavailable, using in-memory cache:", e.message);
     }
     // Same middleware factory either way; when the adapter is set it uses redis,
     // otherwise apicache's built-in in-memory store.
@@ -78,10 +78,8 @@ function ensureReady() {
 }
 
 module.exports = {
-  route: (duration = '5 minutes') => {
-    return async (req, res, next) => {
-      const mw = await ensureReady();
-      return mw(duration)(req, res, next);
-    };
+  route: (duration = "5 minutes") => async (req, res, next) => {
+    const mw = await ensureReady();
+    return mw(duration)(req, res, next);
   },
 };

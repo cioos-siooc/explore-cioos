@@ -51,13 +51,13 @@ const { errorHandler } = require("../utils/validatorMiddlewares");
 router.get(
   "/",
   check("q")
-    .matches(/^[\p{L}\p{N} .,'()\-]*$/u)
+    .matches(/^[\p{L}\p{N} .,'()-]*$/u)
     .isLength({ max: 200 })
     .optional(),
   check("limit").isInt({ min: 1, max: 500 }).optional(),
   check("lang").isIn(["en", "fr"]).optional(),
   check("names")
-    .matches(/^[\p{L}\p{N} .,'()\-]*(,[\p{L}\p{N} .,'()\-]*)*$/u)
+    .matches(/^[\p{L}\p{N} .,'()-]*(,[\p{L}\p{N} .,'()-]*)*$/u)
     .isLength({ max: 4000 })
     .optional(),
   errorHandler,

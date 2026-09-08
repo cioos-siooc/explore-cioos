@@ -1,5 +1,4 @@
 const express = require("express");
-const db = require("../db");
 const { getShapeQuery } = require("../utils/shapeQuery");
 const cache = require("../utils/cache");
 

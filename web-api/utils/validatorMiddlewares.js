@@ -25,7 +25,7 @@ function generalFiltersMiddleWare() {
     check("scientificNames")
       // letters, digits, space, period, comma, apostrophe, parens, hyphen
       // (accommodates subgenus notation like "Halichondria (Halichondria) phakellioides")
-      .matches(/^[A-Za-z0-9 .,'()\-]*$/)
+      .matches(/^[A-Za-z0-9 .,'()-]*$/)
       .isLength({ max: 4000 })
       .optional(),
   ];
@@ -40,7 +40,7 @@ function datasetDetailsMiddleware() {
 function shapeFiltersMiddleware() {
   return [
     check("polygon")
-      .matches(/^[-.0-9,\[\]]+$/)
+      .matches(/^[-.0-9,[\]]+$/)
       .isJSON()
       .optional(),
 
@@ -55,15 +55,15 @@ function shapeFiltersMiddleware() {
       const isValidPolygon = Boolean(polygon && polygonJSONToWKT(polygon));
 
       // these have already been checked for type and value range
-      const isBoundingBox = latMin != undefined
-        || latMax != undefined
-        || lonMin != undefined
-        || lonMax != undefined;
+      const isBoundingBox = latMin !== undefined
+        || latMax !== undefined
+        || lonMin !== undefined
+        || lonMax !== undefined;
 
-      const isValidLatLongMaxMin = latMin != undefined
-        && latMax != undefined
-        && lonMin != undefined
-        && lonMax != undefined;
+      const isValidLatLongMaxMin = latMin !== undefined
+        && latMax !== undefined
+        && lonMin !== undefined
+        && lonMax !== undefined;
 
       if ((polygon && isValidPolygon) || (isBoundingBox && isValidLatLongMaxMin) || (!isBoundingBox && !polygon)) {
         await next();
@@ -87,7 +87,7 @@ function validatorMiddleware() {
   return [generalFiltersMiddleWare(), errorHandler];
 }
 // Used by /download and /pointQuery, these both require a shape
-function requiredShapeMiddleware(req, res, next) {
+function requiredShapeMiddleware() {
   return router.use([
     generalFiltersMiddleWare(),
     shapeFiltersMiddleware(),
