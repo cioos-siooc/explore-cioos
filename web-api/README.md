@@ -63,9 +63,9 @@ The API uses environment variables from `.env`:
 - `DB_PORT`: Database port (default: `5432`)
 - `REDIS_HOST`: Redis hostname (default: `redis` for Docker, `localhost` for local)
 - `API_URL`: Base URL for the API
-- `ENVIRONMENT`: Deployment environment; Sentry is only initialized when this is `production`
-- `SENTRY_DSN`: Sentry DSN for error/performance reporting
-- `SENTRY_TRACES_SAMPLE_RATE`: Fraction of transactions Sentry traces, `0.0`–`1.0`. Optional; defaults to `1.0` in development and `0.1` in production
+- `ENVIRONMENT`: Deployment environment, reported to Sentry as the environment tag
+- `SENTRY_DSN`: Sentry DSN. Setting it enables Sentry; leaving it empty disables it
+- `SENTRY_TRACES_SAMPLE_RATE`: Fraction of transactions Sentry traces, `0.0`–`1.0`. Optional; defaults to `0.1`
 
 ## Technology Stack
 

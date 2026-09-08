@@ -12,8 +12,6 @@ const logger = require("morgan");
 const cors = require("cors");
 
 const Sentry = require("@sentry/node");
-// Side-effect import: patches the global Sentry hub so tracing works.
-require("@sentry/tracing");
 const swaggerUi = require("swagger-ui-express");
 const downloadRouter = require("./routes/download");
 const indexRouter = require("./routes/index");
@@ -40,28 +38,10 @@ const swaggerSpec = require("./swagger");
 
 const app = express();
 
-// Importing @sentry/tracing patches the global hub for tracing to work.
-
-if (process.env.ENVIRONMENT === "production") {
-  console.log("Using sentry");
-  // Tracing every request (1.0) adds per-request overhead across the
-  // initial-load burst, so sample only a fraction in production. Defaults to
-  // 1.0 in development and 0.1 in production; override with
-  // SENTRY_TRACES_SAMPLE_RATE (e.g. set it to 1.0 to trace everything).
-  const defaultTracesSampleRate = process.env.ENVIRONMENT === "production" ? 0.1 : 1.0;
-  const tracesSampleRate = process.env.SENTRY_TRACES_SAMPLE_RATE
-    ? Number(process.env.SENTRY_TRACES_SAMPLE_RATE)
-    : defaultTracesSampleRate;
-  Sentry.init({
-    dsn: "https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595",
-    tracesSampleRate,
-  });
-  app.use(Sentry.Handlers.requestHandler());
-}
+// Sentry.init() runs in instrument.js, loaded first by bin/www.
 
 // if environement variables are set via docker, leave them
 // otherwise load from .env
-// eslint-disable-next-line global-require -- only loaded when docker did not supply the env
 if (!process.env.DB_USER) require("dotenv").config({ quiet: true });
 
 // CORS configuration via environment variable:
@@ -133,7 +113,11 @@ app.use("/nonna", nonnaRouter);
 
 // Swagger docs - conditionally enabled via ENABLE_API_DOCS environment variable
 if (process.env.ENABLE_API_DOCS !== "false") {
-  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: true }));
+  app.use(
+    "/docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, { explorer: true }),
+  );
   app.get("/openapi.json", (_req, res) => res.json(swaggerSpec));
   console.log("API documentation enabled at /docs and /openapi.json");
 } else {
@@ -141,20 +125,23 @@ if (process.env.ENABLE_API_DOCS !== "false") {
   const redirectUrl = process.env.BASE_URL || "/";
   app.use("/docs", (_req, res) => res.redirect(redirectUrl));
   app.get("/openapi.json", (_req, res) => res.redirect(redirectUrl));
-  console.log(`API documentation disabled via ENABLE_API_DOCS=false (redirecting to ${redirectUrl})`);
+  console.log(
+    `API documentation disabled via ENABLE_API_DOCS=false (redirecting to ${redirectUrl})`,
+  );
 }
-
-app.use(Sentry.Handlers.errorHandler());
 
 // catch 404 and forward to error handler
 app.use((req, res, next) => {
   next(createError(404));
 });
 
+// After the routes and the 404, before the JSON handler below — it only
+// sees errors from middleware registered above it, and it reports 500s.
+Sentry.setupExpressErrorHandler(app);
+
 // error handler. JSON, and the stack only outside production — express's
 // default handler was answering every error with an HTML page containing the
 // full stack trace, because the res.render() above it threw first.
-// eslint-disable-next-line no-unused-vars -- express identifies error handlers by arity
 app.use((err, req, res, next) => {
   const status = err.status || 500;
   res.status(status).json({

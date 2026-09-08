@@ -110,7 +110,9 @@ router.get("/", validatorMiddleware(), async (req, res, next) => {
   } catch (error) {
     if (error.response) {
       console.error(error.response);
-      Sentry.captureMessage("No preview data found at", erddapQuery);
+      Sentry.captureMessage("No preview data found", {
+        extra: { erddapQuery },
+      });
     }
     res.send([]);
   }
