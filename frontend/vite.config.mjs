@@ -35,6 +35,7 @@ export default defineConfig(({ mode }) => {
     define: {
       "process.env.API_URL": JSON.stringify(env.API_URL),
       "process.env.BASE_URL": JSON.stringify(env.BASE_URL || "/"),
+      "process.env.SENTRY_DSN": JSON.stringify(env.SENTRY_DSN),
       "process.env.SENTRY_TRACES_SAMPLE_RATE": JSON.stringify(
         env.SENTRY_TRACES_SAMPLE_RATE,
       ),

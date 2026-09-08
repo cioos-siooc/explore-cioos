@@ -361,8 +361,36 @@ by the styling-unification pass; see that section and the verification at the en
       `DownloadDetails` build `backgroundImage` from a Vite asset import.
 - [ ] `logo.jsx` still holds six static inline styles and has no stylesheet. Left alone:
       it is a self-contained brand component, not part of the half-migrated Harvest subtree.
-- [ ] The frontend has no `reactRouterV6BrowserTracingIntegration`, so Sentry transactions
-      carry raw URLs rather than parameterised route names despite react-router-dom 6.30.4.
+- [x] **Sentry transactions now carry route names.** `reactRouterBrowserTracingIntegration`
+      replaces the plain `browserTracingIntegration`, so `/harvest/run/run-abc-123` reports as
+      `/harvest/run/:runId` with `transaction_info.source: route` instead of `url` — the six
+      parameterised routes no longer split into one transaction per id. (The `…V6…` spelling of
+      both helpers is deprecated in @sentry/react 10; the version-agnostic pair is used instead,
+      which differs only in the span `origin` label.)
+      `Sentry.init` moved out of `App.jsx` (a *route element*) into `src/sentry.js`, which also
+      exports the wrapped `SentryRoutes`. That pairing is not cosmetic: the wrapper reads the
+      router hooks the integration captures during `init` and, if it runs first, returns an
+      unwrapped `<Routes>` **silently** — no error, just raw URLs again. Keeping both in one
+      module makes that ordering unbreakable rather than a property of import order.
+- [x] **Frontend Sentry DSN is configuration, not a literal.** It comes from `SENTRY_DSN`
+      (vite `define` → Docker build arg → base compose, which is the file Coolify deploys
+      from), and it is also the on/off switch: `enabled: Boolean(dsn)`, matching how
+      `web-api/instrument.js` gates on the same variable. One value now covers both services.
+      Two asymmetries this creates, both documented where they bite: web-api reads it at
+      **runtime**, the frontend at **build time**, so changing it needs a frontend rebuild; and
+      because vite bakes it into the JS bundle, the value is **public** to anyone loading the
+      site. That is normal for a browser DSN, but it is now also true of the DSN web-api uses —
+      a DSN permits sending events to the project, so the exposure is quota/noise abuse, not
+      data access. Kept as a plain build ARG rather than a BuildKit secret for that reason:
+      hiding it from `docker history` would hide it nowhere else.
+      **Deploy action required:** no fallback is baked in, so `SENTRY_DSN` must be set wherever
+      the frontend image is built or browser error reporting stays off. The value the bundle
+      used to hardcode is
+      `https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595`.
+      Noted while moving it: the old comment claimed the SDK is initialised everywhere so the
+      feedback dialog works locally. It never was — with no DSN (previously `enabled: false`)
+      `Client.init()` skips integration setup entirely, so `getFeedback()` is `undefined` and
+      the dialog cannot open. Comment corrected; `captureException` stays safe either way.
 
 ### Verification for this sweep
 

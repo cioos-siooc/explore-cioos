@@ -4,6 +4,7 @@ WORKDIR /usr/src/app
 
 ARG API_URL
 ARG BASE_URL
+ARG SENTRY_DSN
 ARG SENTRY_TRACES_SAMPLE_RATE
 ARG ENVIRONMENT
 ARG SENTRY_RELEASE
@@ -11,11 +12,16 @@ ARG SENTRY_ORG
 ARG SENTRY_PROJECT
 ENV API_URL=$API_URL
 ENV BASE_URL=$BASE_URL
+ENV SENTRY_DSN=$SENTRY_DSN
 ENV SENTRY_TRACES_SAMPLE_RATE=$SENTRY_TRACES_SAMPLE_RATE
 ENV ENVIRONMENT=$ENVIRONMENT
 ENV SENTRY_RELEASE=$SENTRY_RELEASE
 ENV SENTRY_ORG=$SENTRY_ORG
 ENV SENTRY_PROJECT=$SENTRY_PROJECT
+
+# SENTRY_DSN is deliberately a plain ARG, unlike the auth token below: vite
+# bakes it into the JS bundle, so it is served to every visitor regardless.
+# Making it a build secret would hide it from `docker history` and nowhere else.
 
 # SENTRY_AUTH_TOKEN is deliberately NOT an ARG/ENV. As a build ARG promoted to
 # ENV it stayed readable in the image's own metadata — `docker history` and

@@ -1,5 +1,8 @@
 // This is the app entry point, loaded as a module script by index.html (Vite).
 
+// Imported first: Sentry.init must run before the rest of the app is
+// evaluated, and SentryRoutes is only instrumented once it has.
+import { SentryRoutes } from "./sentry.js";
 import React, { Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import i18n from "i18next";
@@ -15,7 +18,7 @@ import HarvestDataset from "./components/Harvest/HarvestDataset.jsx";
 import HarvestRun from "./components/Harvest/HarvestRun.jsx";
 import HarvestDownloads from "./components/Harvest/HarvestDownloads.jsx";
 import HarvestDownloadJob from "./components/Harvest/HarvestDownloadJob.jsx";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Route } from "react-router-dom";
 
 // CIOOS National design tokens + base typography. Imported first so the
 // var(--cioos-*) tokens and base font rules are available to every component.
@@ -58,7 +61,7 @@ const domContainer = document.querySelector("#app");
 createRoot(domContainer).render(
   <Suspense fallback={<Loading />}>
     <BrowserRouter basename={process.env.BASE_URL}>
-      <Routes>
+      <SentryRoutes>
         <Route path="/" element={<App />} />
         <Route path="/harvest" element={<HarvestOverview />} />
         <Route path="/harvest/server/:slug" element={<HarvestServer />} />
@@ -72,7 +75,7 @@ createRoot(domContainer).render(
           path="/harvest/downloads/:jobId"
           element={<HarvestDownloadJob />}
         />
-      </Routes>
+      </SentryRoutes>
     </BrowserRouter>
   </Suspense>,
 );

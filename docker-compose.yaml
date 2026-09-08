@@ -180,6 +180,9 @@ services:
         # public hostname serves it without a rebuild.
         API_URL: ${API_URL:-/api}
         BASE_URL: ${BASE_URL:-/}
+        # Same DSN web-api uses; empty leaves Sentry inert in the browser.
+        # Needed at BUILD time here (vite bakes it in), not at runtime.
+        SENTRY_DSN: ${SENTRY_DSN:-}
     expose:
       - "80"
   # Prefect PROCESS worker: runs harvest flows in-process (no spawned flow-run
