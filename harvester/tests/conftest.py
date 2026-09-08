@@ -21,6 +21,42 @@ import pytest
 _sentry_init_patcher = patch("sentry_sdk.init")
 _sentry_init_patcher.start()
 
+
+# ---------------------------------------------------------------------------
+# Database environment isolation
+# ---------------------------------------------------------------------------
+# The connection settings cde_harvester.core.db resolves. Kept out of every
+# test's environment so the suite reads the same on a developer machine as it
+# does in CI.
+DB_ENV_SETTINGS = (
+    "DB_NAME",
+    "DB_USER",
+    "DB_PASSWORD",
+    "DB_HOST_EXTERNAL",
+    "DB_PORT",
+)
+
+
+@pytest.fixture(autouse=True)
+def isolate_db_env(monkeypatch):
+    """Run every test against an empty database environment.
+
+    ``cde_harvester.prefect_pipeline`` and ``cde_harvester.__main__`` both call
+    ``load_dotenv()`` at import time, which copies the repo's ``.env`` into
+    ``os.environ`` for the rest of the session. Whichever test imports one of
+    them first therefore changes what every later test sees — which is how
+    ``test_database_url_still_builds_when_complete`` came to pass on its own and
+    fail in a full run: it asserts the default port 5432, and the repo ``.env``
+    sets ``DB_PORT=5433``. CI has no ``.env``, so CI never saw it.
+
+    Every test that needs one of these settings already sets it with
+    ``monkeypatch.setenv``, so clearing them takes nothing away — it only stops
+    the ambient value from standing in for one that was never set.
+    """
+    for name in DB_ENV_SETTINGS:
+        monkeypatch.delenv(name, raising=False)
+
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
