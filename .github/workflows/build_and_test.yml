@@ -6,6 +6,12 @@ on:
       - main
       - master # Keep coverage while master remains the repository default branch.
       - "development*"
+  # Deploy is triggered by this workflow completing successfully on a
+  # deployable branch, so it has to run on those pushes and not only on PRs.
+  push:
+    branches:
+      - master
+      - development
   workflow_dispatch:
 
 jobs:
@@ -67,7 +73,9 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          # Match the app runtime: frontend/package.json requires >=22 and
+          # frontend/Dockerfile builds on node:22-alpine.
+          node-version: 22
           cache: npm
           cache-dependency-path: test/package-lock.json
 

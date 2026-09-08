@@ -6,6 +6,12 @@ on:
       - main
       - master # Keep coverage while master remains the repository default branch.
       - "development*"
+  # Deploy is gated on the Integration Tests run for the pushed commit; these
+  # run on the same pushes so a deployable branch always has both results.
+  push:
+    branches:
+      - master
+      - development
   workflow_dispatch:
 
 jobs:
@@ -26,3 +32,26 @@ jobs:
 
       - name: Run all unit tests
         run: uv run pytest harvester/tests/unit downloader/tests
+
+  web-api-unit-tests:
+    name: Web API unit tests
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          # Matches frontend/package.json engines and frontend/Dockerfile.
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web-api/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web-api
+        run: npm ci --quiet
+
+      - name: Run web-api unit tests
+        working-directory: web-api
+        run: npm test
