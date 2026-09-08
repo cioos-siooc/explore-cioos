@@ -29,6 +29,27 @@ repos:
       - id: detect-private-key
       - id: check-case-conflict
 
+  # ESLint, Prettier and stylelint run from the root install (node_modules
+  # must be present), so these are local hooks rather than mirror repos —
+  # a mirror would resolve its own copy and drift from what CI uses.
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint
+        entry: npx --no-install eslint --fix
+        language: system
+        files: \.(js|jsx|mjs)$
+      - id: stylelint
+        name: stylelint
+        entry: npx --no-install stylelint --fix
+        language: system
+        files: ^frontend/src/.*\.css$
+      - id: prettier
+        name: prettier
+        entry: npx --no-install prettier --write
+        language: system
+        files: ^(frontend|web-api|test)/.*\.(js|jsx|mjs|css|json)$
+
   # Same config the CI gate uses: [tool.ruff] in the root pyproject.toml.
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.16.6

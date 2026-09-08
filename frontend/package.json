@@ -36,16 +36,6 @@
   "devDependencies": {
     "@sentry/vite-plugin": "^5.4.0",
     "@vitejs/plugin-react": "^5.0.0",
-    "eslint": "^8.16.0",
-    "eslint-config-prettier": "^8.5.0",
-    "eslint-config-standard": "^17.0.0",
-    "eslint-plugin-import": "^2.26.0",
-    "eslint-plugin-n": "^16.6.2",
-    "eslint-plugin-prettier": "^4.2.1",
-    "eslint-plugin-promise": "^6.0.0",
-    "eslint-plugin-react": "^7.30.0",
-    "eslint-plugin-react-hooks": "^4.6.2",
-    "prettier": "^2.7.1",
     "rollup-plugin-visualizer": "^7.0.1",
     "vite": "^7.0.0"
   },
@@ -55,9 +45,7 @@
     "start": "vite --open",
     "build": "vite build",
     "build:analyze": "ANALYZE=1 vite build",
-    "preview": "vite preview",
-    "lint": "eslint . --ext .js,.jsx --ignore-path .gitignore",
-    "lint:fix": "eslint --fix . --ext .js,.jsx --ignore-path .gitignore"
+    "preview": "vite preview"
   },
   "author": "",
   "license": "ISC"

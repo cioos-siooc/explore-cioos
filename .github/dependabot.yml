@@ -2,6 +2,15 @@ version: 2
 updates:
   # Grouped so a week's patches arrive as one PR per ecosystem rather than a
   # dozen. Majors are separate: they need a human either way.
+  # Root holds the shared lint/format toolchain (ESLint, Prettier, stylelint).
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    groups:
+      tooling-minor-patch:
+        update-types: [minor, patch]
+
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly, day: monday }

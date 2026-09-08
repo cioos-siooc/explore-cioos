@@ -50,18 +50,22 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
 
-      - name: Lint web-api
-        working-directory: web-api
+      # ESLint, Prettier and stylelint are configured once at the root and
+      # cover frontend/, web-api/ and test/ together.
+      - name: Lint and check formatting
         run: |
           npm ci --quiet
           npm run lint
+          npm run lint:css
+          npm run format:check
 
-      - name: Lint and build frontend
+      - name: Build frontend
         working-directory: frontend
         run: |
           npm ci --quiet
-          npm run lint
           npm run build
 
   docker:

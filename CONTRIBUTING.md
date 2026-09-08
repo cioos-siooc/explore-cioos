@@ -35,7 +35,9 @@ docker compose up -d --build
 ## Before you push
 
 Install the hooks once — they cover line endings (`.gitattributes` mandates
-LF), stray large files, private keys, ruff, and the four `uv.lock` files:
+LF), stray large files, private keys, ruff, ESLint/Prettier/stylelint, and
+the four `uv.lock` files. The JS hooks run from the root `node_modules`, so
+`npm ci` at the root first:
 
 ```sh
 uvx pre-commit install
@@ -45,10 +47,12 @@ Then run what CI runs. **Integration Tests** is the deploy gate, so anything
 failing here blocks a release:
 
 ```sh
-uvx ruff check .                                     # config: [tool.ruff] in ./pyproject.toml
-uv run pytest -m "not integration"                   # 535 unit tests
-npm --prefix web-api run lint && npm --prefix web-api test
-npm --prefix frontend run lint && npm --prefix frontend run build
+uvx ruff check .                    # config: [tool.ruff] in ./pyproject.toml
+uv run pytest -m "not integration"  # 535 unit tests
+npm ci                              # root: the shared JS/CSS toolchain
+npm run lint && npm run lint:css && npm run format:check
+npm --prefix web-api test
+npm --prefix frontend run build
 ```
 
 `uv lock --check` must pass in `.`, `harvester`, `downloader` and
@@ -57,18 +61,23 @@ so a stale lockfile is a broken image, not just a noisy diff.
 
 ## Style
 
-There is no formatter. The linters are the contract, and they differ per
-project because the code does:
+Formatting is Prettier's job; the linters cover everything else. Both are
+configured once at the repo root and cover `frontend/`, `web-api/` and `test/`
+together — there is no per-project lint config.
 
 - **Python** — ruff, `line-length = 120`. One config for all three projects;
   ruff finds it by walking up to the root `pyproject.toml`.
-- **`web-api/`** — ESLint `airbnb-base`: double quotes, semicolons. The rules
-  it relaxes are listed with reasons in `web-api/.eslintrc.js`.
-- **`frontend/`** — ESLint `standard` + `plugin:react/recommended`: single
-  quotes, **no** semicolons, 2-space indent.
+- **JavaScript** — Prettier (defaults) for formatting, ESLint flat config
+  (`eslint.config.mjs`) for correctness. One style across both services now:
+  double quotes, semicolons, 2-space indent. `frontend/` additionally gets the
+  React and React-hooks rules; `web-api/` is linted as Node CommonJS, including
+  the extensionless `bin/www`.
+- **CSS** — stylelint (`stylelint.config.mjs`). Class names stay camelCase to
+  match the JSX; the rules that are off are annotated with why.
 
-The two JS styles genuinely conflict. Don't copy code between them without
-re-running that project's linter.
+Values come from the `--cioos-*` tokens in `frontend/src/components/theme.css`,
+not from hardcoded hex. The exception is MapLibre paint, which needs JS strings
+and cannot read CSS custom properties.
 
 Comments should say *why*, not *what* — the existing code leans heavily on
 this, especially where a fix encodes something non-obvious about ERDDAP,
