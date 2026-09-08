@@ -559,10 +559,15 @@ def get_datasets(json_query, output_path="", create_pdf=False):
             # Generate report for each download
             # Return download report
             if download_status in [COMPLETED, PARTIAL]:
-                if create_pdf and dataset["ckan_url"] and dataset["ckan_id"]:
-                    ckan_url = dataset["ckan_url"] + dataset["ckan_id"]
+                # ckan_url is the full catalogue URL for the dataset, as built
+                # by the API (web-api/routes/download.js, matching shapeQuery.js)
+                # and by the scheduler's email. It used to be emitted as a bare
+                # prefix that this line completed, which made the name mean two
+                # different things in two services; it is NULL when the dataset
+                # has no ckan_id.
+                if create_pdf and dataset["ckan_url"]:
                     pdf_filename = get_file_name_output(dataset, output_path, "pdf")
-                    download_pdf(ckan_url, pdf_filename)
+                    download_pdf(dataset["ckan_url"], pdf_filename)
 
                 # Retrieve metadata
                 save_erddap_metadata(dataset, output_path=output_path)
