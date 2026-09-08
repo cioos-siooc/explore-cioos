@@ -566,7 +566,10 @@ router.get(
 router.get(
   "/tracks/:z/:x/:y.mvt",
   validatorMiddleware(),
-  cache.route({ binary: true }),
+  // `binary` is not an apicache option: passing an object here landed in
+  // cache.route's `duration` slot, so apicache fell back to its own 1-hour
+  // default instead of the 5 minutes the other tile routes use.
+  cache.route(),
   async (req, res) => {
     const { z, x, y } = req.params;
     const { timeMin, timeMax } = req.query;

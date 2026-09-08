@@ -9,7 +9,7 @@ const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { getShapeQuery } = require("../utils/shapeQuery");
 const { polygonJSONToWKT } = require("../utils/polygon");
-const { requiredShapeMiddleware } = require("../utils/validatorMiddlewares");
+const { requiredShapeMiddleware, errorHandler } = require("../utils/validatorMiddlewares");
 
 /**
  * /download
@@ -72,7 +72,12 @@ const { requiredShapeMiddleware } = require("../utils/validatorMiddlewares");
 router.get(
   "/",
   requiredShapeMiddleware(),
+  // requiredShapeMiddleware ends in its OWN errorHandler, which runs before
+  // this check is even registered — so without the errorHandler below nothing
+  // ever calls validationResult for `email` and it reached cde.download_jobs
+  // unvalidated.
   check("email").isEmail(),
+  errorHandler,
   async (req, res, next) => {
     const {
       timeMin,
@@ -158,7 +163,7 @@ router.get(
                d.cdm_data_type,
                d.source_type,
                d.ckan_id ckan_id,
-               'https://catalogue.cioos.ca/dataset/' ckan_url
+               'https://catalogue.cioos.ca/dataset/' || d.ckan_id AS ckan_url
         FROM combined p
         JOIN cde.datasets d ON p.dataset_pk = d.pk
         ${filters.hasShared ? "WHERE :filters" : ""}

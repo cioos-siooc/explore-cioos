@@ -11,6 +11,18 @@ const db = require("../db");
 // programmatic clients.
 const MAX_EXPANDED_APHIA_IDS = 5000;
 
+class InvalidPolygonError extends Error {
+  constructor() {
+    // polygonJSONToWKT returns false for unparseable JSON, a non-array, or a
+    // ring with fewer than 4 points. Binding that false into ST_GeomFromText
+    // is a 500 on every route that takes a polygon, so reject it here as the
+    // client error it is.
+    super("Invalid polygon: expected a closed ring of at least 4 [lon,lat] pairs.");
+    this.name = "InvalidPolygonError";
+    this.statusCode = 400;
+  }
+}
+
 class ScientificNameSelectionTooBroadError extends Error {
   constructor(expandedCount, threshold) {
     super(
@@ -168,6 +180,7 @@ async function createDBFilter(request) {
 
   if (polygon) {
     const wktPolygon = polygonJSONToWKT(polygon);
+    if (!wktPolygon) throw new InvalidPolygonError();
     parameters.wktPolygon = wktPolygon;
     // Extent-based: a feature matches when its search_geom intersects the drawn
     // polygon (was ST_Contains on the single point).
@@ -241,4 +254,5 @@ async function createDBFilter(request) {
 
 module.exports = createDBFilter;
 module.exports.ScientificNameSelectionTooBroadError = ScientificNameSelectionTooBroadError;
+module.exports.InvalidPolygonError = InvalidPolygonError;
 module.exports.MAX_EXPANDED_APHIA_IDS = MAX_EXPANDED_APHIA_IDS;
