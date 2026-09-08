@@ -253,7 +253,14 @@ services:
       # per source (10+ of them); each is its own OS process under
       # `--type process`. Unbounded, they exhausted a 15.7 GB host on
       # 2026-08-04. See HARVEST_WORKER_LIMIT in worker-entrypoint.sh.
-      HARVEST_WORKER_LIMIT: ${HARVEST_WORKER_LIMIT:-6}
+      #
+      # Budget this against mem_limit below, not against CPU: every concurrent
+      # flow run is a separate pandas working set. At 6 they could each claim a
+      # sixth of the cap and still collectively OOM the container, which is what
+      # happened on a CIOOS Pacific/Atlantic profile harvest. 2 matches the
+      # worker-entrypoint.sh default so the two no longer disagree; raise it
+      # deliberately, together with HARVESTER_MEM_LIMIT.
+      HARVEST_WORKER_LIMIT: ${HARVEST_WORKER_LIMIT:-2}
     # Resource containment. Setting memswap_limit == mem_limit gives this
     # container ZERO swap (cgroup v2: memory.swap.max = memswap_limit -
     # mem_limit = 0), so a runaway harvest is OOM-killed inside its own cgroup
@@ -266,8 +273,13 @@ services:
     # NOTE: deliberately no mem_swappiness — that is cgroup v1 only, and these
     # hosts are cgroup v2, where Compose silently drops it. memswap_limit is
     # what actually disables swap here.
+    # Both default to the SAME value on purpose: memswap_limit is TOTAL memory
+    # plus swap, so any larger default silently hands the container that
+    # difference as swap and re-creates the livelock described above. It read
+    # 6g/10g here until 2026-09-03 — 4 GB of swap, on a host that often has
+    # about that much free in total.
     mem_limit: ${HARVESTER_MEM_LIMIT:-6g}
-    memswap_limit: ${HARVESTER_MEM_LIMIT:-10g}
+    memswap_limit: ${HARVESTER_MEM_LIMIT:-6g}
 
   prefect:
     # Non-conda image: ships asyncpg, so Prefect can use Postgres as its

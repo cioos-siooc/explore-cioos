@@ -226,18 +226,56 @@ CKAN_EMPTY_RESPONSE = {"result": {"count": 1, "results": []}}
 # ---------------------------------------------------------------------------
 
 class MockResponse:
-    """Minimal requests.Response substitute for HTTP mocking."""
+    """Minimal requests.Response substitute for HTTP mocking.
 
-    def __init__(self, text="", status_code=200, url=None):
+    Supports the streaming contract the client uses (iter_content/close), not
+    just .content/.text: 200 bodies are streamed in and size-capped as they
+    arrive, so a double that only offers .content no longer stands in for a
+    real response.
+    """
+
+    def __init__(self, text="", status_code=200, url=None, encoding="utf-8"):
         self.text = text
         self.content = text.encode("utf-8") if isinstance(text, str) else text
         self.status_code = status_code
         self.url = url or ERDDAP_URL + "/mocked"
+        self.encoding = encoding
+        self.reason = None
+        self.closed = False
+
+    def iter_content(self, chunk_size=1):
+        for start in range(0, len(self.content), chunk_size):
+            yield self.content[start:start + chunk_size]
+
+    def close(self):
+        self.closed = True
 
     def raise_for_status(self):
         if self.status_code >= 400:
             import requests
             raise requests.exceptions.HTTPError(response=self)
+
+
+class MockStreamingResponse(MockResponse):
+    """A 200 response whose body is produced lazily, chunk by chunk.
+
+    Lets a test assert that an oversize body is abandoned mid-download rather
+    than materialized and then rejected: `bytes_produced` counts what the
+    client actually pulled off the wire.
+    """
+
+    def __init__(self, chunk=b"x" * 1024, total_bytes=0, url=None):
+        super().__init__(text="", url=url)
+        self._chunk = chunk
+        self._total_bytes = total_bytes
+        self.bytes_produced = 0
+
+    def iter_content(self, chunk_size=1):
+        while self.bytes_produced < self._total_bytes:
+            remaining = self._total_bytes - self.bytes_produced
+            out = self._chunk[:remaining] if remaining < len(self._chunk) else self._chunk
+            self.bytes_produced += len(out)
+            yield out
 
 
 # ---------------------------------------------------------------------------

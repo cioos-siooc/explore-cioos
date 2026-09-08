@@ -1,9 +1,7 @@
-import gc
 import gzip
 import json
 import logging
 import os
-import tempfile
 import time
 from datetime import datetime, timezone
 
@@ -11,6 +9,8 @@ import pandas as pd
 import requests
 from prefect import task
 
+from cde_harvester.core.day_sets import days_to_ranges
+from cde_harvester.core.frame_spill import SpillSet
 from cde_harvester.core.observability import run_logger
 
 from cde_harvester.sources.base import BaseHarvester, HarvestResult
@@ -41,13 +41,11 @@ class OBISHarvester(BaseHarvester):
 
     MAX_RETRIES = 5
 
-    # Flush accumulated obis_cells to a temp parquet file every N datasets
-    # instead of holding all of them (up to ~1000 for a full discovery run)
-    # in one Python list for the whole harvest. A full run OOM-killed a 6GB
-    # container at dataset 296/971 — retained per-dataset DataFrames plus
-    # never-reclaimed pandas/duckdb allocator arenas ratchet RSS up with no
-    # release point until the single end-of-run concat. Chunking bounds the
-    # list to CELLS_FLUSH_EVERY entries and forces a gc pass at each flush.
+    # How many datasets' obis_cells to hold before spilling them to disk (see
+    # core.frame_spill.SpillSet, which owns the mechanism and the full
+    # rationale). A full discovery run is ~1000 datasets and OOM-killed a 6GB
+    # container at 296/971 when they were all held in one list; the duckdb
+    # allocator arenas on this path make it worse than most.
     CELLS_FLUSH_EVERY = 50
 
     def __init__(self, limit_dataset_ids=None, folder="./obis", prefect_logger=None,
@@ -67,28 +65,10 @@ class OBISHarvester(BaseHarvester):
                 "obis_dataset_ids, or obis_datasets_file."
             )
 
-        all_cells = []
         all_datasets = []
         all_skipped = []
         all_attempts = []
-        cell_chunk_paths = []
-        chunk_dir_ctx = tempfile.TemporaryDirectory(prefix="obis_cells_")
-        chunk_dir = chunk_dir_ctx.__enter__()
-
-        def flush_cells_chunk():
-            """Write the accumulated cells to disk and free the in-memory list."""
-            if not all_cells:
-                return
-            chunk_df = pd.concat(all_cells, ignore_index=True)
-            # Pickle, not parquet: this is an ephemeral in-process handoff (not
-            # a durable/interchange format), and pyarrow/fastparquet aren't
-            # dependencies here — pickle round-trips dtypes exactly with none.
-            chunk_path = os.path.join(chunk_dir, f"chunk_{len(cell_chunk_paths):05d}.pkl")
-            chunk_df.to_pickle(chunk_path)
-            cell_chunk_paths.append(chunk_path)
-            all_cells.clear()
-            del chunk_df
-            gc.collect()
+        spills = SpillSet(flush_every=self.CELLS_FLUSH_EVERY, prefix="obis_cells_")
 
         def record_attempt(dataset_id, status, reason_code=None,
                            error_message=None, duration_ms=None):
@@ -111,7 +91,8 @@ class OBISHarvester(BaseHarvester):
                 "query_urls": "\n".join(query_urls),
             })
 
-        try:
+        with spills:
+            spills.register("cells", ObisCellSchema.to_schema().columns.keys())
             total = len(self.limit_dataset_ids)
             for i, dataset_id in enumerate(self.limit_dataset_ids, 1):
                 self.logger.info("Processing OBIS dataset %d/%d: %s", i, total, dataset_id)
@@ -164,7 +145,7 @@ class OBISHarvester(BaseHarvester):
 
                         dataset_row = self.build_dataset_row(dataset_id, metadata, results, cells)
 
-                        all_cells.append(cells)
+                        spills.append("cells", cells)
                         all_datasets.append(dataset_row)
                         record_attempt(
                             dataset_id, status="success",
@@ -194,19 +175,11 @@ class OBISHarvester(BaseHarvester):
                         duration_ms=int((time.monotonic() - t0) * 1000),
                     )
 
-                if i % self.CELLS_FLUSH_EVERY == 0:
-                    flush_cells_chunk()
+                spills.checkpoint()
 
-            # Flush whatever's left (a run shorter than CELLS_FLUSH_EVERY never
-            # flushed above, and the last partial chunk always needs one).
-            flush_cells_chunk()
-
-            # Build result DataFrames
-            df_obis_cells = (
-                pd.concat([pd.read_pickle(p) for p in cell_chunk_paths], ignore_index=True)
-                if cell_chunk_paths
-                else pd.DataFrame(columns=ObisCellSchema.to_schema().columns.keys())
-            )
+            # Build result DataFrames. collect() flushes the trailing partial
+            # batch, so a run shorter than CELLS_FLUSH_EVERY still lands.
+            df_obis_cells = spills.collect("cells")
             df_profiles = pd.DataFrame(columns=ProfileSchema.to_schema().columns.keys())
             df_datasets = (
                 pd.concat(all_datasets, ignore_index=True) if all_datasets
@@ -236,8 +209,6 @@ class OBISHarvester(BaseHarvester):
                 obis_cells=df_obis_cells,
                 attempts=df_attempts,
             )
-        finally:
-            chunk_dir_ctx.__exit__(None, None, None)
 
     def _enrich_with_ckan(self, df_datasets):
         """Join CKAN metadata onto datasets for EOVs, French titles, and CKAN IDs."""
@@ -350,6 +321,11 @@ class OBISHarvester(BaseHarvester):
             n_records=("decimalLatitude", "count"),
             # nunique skips NaT, so undated occurrences contribute no days.
             days=("day", "nunique"),
+            # The same day set as `days`, as maximal runs of consecutive days.
+            # The map UNIONS these across the cells in a hex rather than adding
+            # day counts up, so it needs to know WHICH days, not how many: two
+            # cells reporting on the same day are one day of coverage.
+            day_ranges=("day", days_to_ranges),
             scientific_names=("scientificName", lambda x: sorted(x.dropna().unique().tolist())),
         ).reset_index(drop=True)
 

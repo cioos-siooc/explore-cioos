@@ -63,7 +63,9 @@
      answers "what did that click find" — the "what's here" card itself, the
      pinned rows in the datasets list and the record the click resolved to in
      the inspector's table — carries it too, so the tie between map, card and
-     list needs no legend. */
+     list needs no legend. A clicked platform's drawn track is the same answer
+     in line form, so it and its row in the inspector's platform list are
+     goldenrod as well. */
   --cioos-map-click:         #DAA520; /* click highlight ring + the row accents */
   --cioos-map-click-glow:    rgba(218, 165, 32, 0.35); /* the ring/glow shadows */
   --cioos-map-click-surface: #FBF1D9; /* opaque tint, the map fill's counterpart */

@@ -8,7 +8,9 @@ const cache = require("../utils/cache");
 const createDBFilter = require("../utils/dbFilter");
 const {
   parseMetric,
-  recordCountExpr,
+  metricValueExpr,
+  metricJoin,
+  nullMetricExpr,
   countAggregate,
 } = require("../utils/hexMetric");
 
@@ -155,9 +157,10 @@ router.get(
     // spatial filter, matching tiles/shapeQuery. show_as_point gates profiles
     // out of every tier (hex and point) so the legend ranges match the tiles,
     // which keep large-region features off the map entirely.
-    const profilesBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, ${recordCountExpr('profiles', metric)},
+    const profilesBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, ${metricValueExpr('profiles', metric)},
                time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
-        FROM cde.profiles WHERE show_as_point AND :profileFilters`;
+        FROM cde.profiles ${metricJoin('profiles', metric)}
+        WHERE show_as_point AND :profileFilters`;
     // Trajectory and OBIS coverage cells merge into the hex-tier ranges
     // (zoom0/zoom1, the green ramp) but not the point-tier range (zoom2) — at
     // that zoom they only render via the dedicated always-hex coverage layer,
@@ -170,13 +173,13 @@ router.get(
     // stretch the ramp domain.
     const trajectoryBranch = `SELECT CASE WHEN hex_tier = 0 THEN hex_pk END AS hex_0_pk,
                CASE WHEN hex_tier = 1 THEN hex_pk END AS hex_1_pk,
-               NULL::integer AS point_pk, dataset_pk, ${recordCountExpr('trajectory_hexes', metric)},
+               NULL::integer AS point_pk, dataset_pk, ${metricValueExpr('trajectory_hexes', metric)},
                time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-        FROM cde.trajectory_hexes`;
+        FROM cde.trajectory_hexes ${metricJoin('trajectory_hexes', metric)}`;
     const obisBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk,
-               ${recordCountExpr('obis_cells', metric)},
+               ${metricValueExpr('obis_cells', metric)},
                time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-        FROM cde.obis_cells
+        FROM cde.obis_cells ${metricJoin('obis_cells', metric)}
         WHERE :obisFilters`;
 
     const hexBranches = [];
@@ -203,23 +206,24 @@ router.get(
         ${combinedPointInner}
         ),
         hex_records AS (
-        SELECT hex_0_pk, hex_1_pk, point_pk, p.dataset_pk, record_count
+        SELECT hex_0_pk, hex_1_pk, point_pk, p.dataset_pk, metric_value
         FROM combined_hex p
         JOIN cde.datasets d
         ON p.dataset_pk = d.pk
         ${filters.hasShared ? "WHERE :filters" : ""}
         ),
         point_records AS (
-        SELECT point_pk, p.dataset_pk, record_count
+        SELECT point_pk, p.dataset_pk, metric_value
         FROM combined_point p
         JOIN cde.datasets d
         ON p.dataset_pk = d.pk
         ${filters.hasShared ? "WHERE :filters" : ""}
         ),
 
-        -- sum, not count(distinct point_pk): the ramp ranks hexes by how much
-        -- data they hold, so its domain has to be over the same quantity the
-        -- tiles emit as \`count\`.
+        -- Not count(distinct point_pk): the ramp ranks hexes by how much data
+        -- they hold, so its domain has to be over the same quantity the tiles
+        -- emit as \`count\`, aggregated the same way (countAggregate) — a sum
+        -- for \`records\`, a day-set union for \`days\`.
         sub1 AS (SELECT ${rampRange()} zoom0 FROM (SELECT ${countAggregate(metric, 'hex_records')} count FROM hex_records WHERE hex_0_pk IS NOT NULL GROUP BY hex_0_pk) s),
         sub2 AS (SELECT ${rampRange()} zoom1 FROM (SELECT ${countAggregate(metric, 'hex_records')} count FROM hex_records WHERE hex_1_pk IS NOT NULL GROUP BY hex_1_pk) s),
         sub3 AS (SELECT ${rampRange()} zoom2 FROM (SELECT ${countAggregate(metric, 'point_records')} count FROM point_records GROUP BY point_pk) s)
@@ -242,25 +246,41 @@ router.get(
     // change.
     const includeTrajectoryCells = req.query.includeTrajectory !== 'false'
       && includeProfiles;
+    // Every branch carries the columns the shared dataset filter predicates
+    // against (time, depth, position), not just the ones this query groups on.
+    // dbFilter emits unqualified time_min/depth_min/... predicates, so a branch
+    // that omits them makes the whole statement fail to parse — which is what
+    // made /legend 500 for every request carrying a time or depth filter,
+    // silently leaving the map without a ramp domain exactly when the user
+    // narrowed it.
     const coverageBranches = [];
     if (includeTrajectoryCells) {
-      coverageBranches.push(`SELECT hex_pk AS hex_1_pk, dataset_pk, ${recordCountExpr('trajectory_hexes', metric)}
-        FROM cde.trajectory_hexes WHERE hex_tier = 1`);
+      coverageBranches.push(`SELECT hex_pk AS hex_1_pk, dataset_pk, ${metricValueExpr('trajectory_hexes', metric)},
+        time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
+        FROM cde.trajectory_hexes ${metricJoin('trajectory_hexes', metric)}
+        WHERE hex_tier = 1`);
     }
     if (includeObis) {
-      coverageBranches.push(`SELECT hex_1_pk, dataset_pk, ${recordCountExpr('obis_cells', metric)}
-        FROM cde.obis_cells WHERE :obisFilters`);
+      coverageBranches.push(`SELECT hex_1_pk, dataset_pk, ${metricValueExpr('obis_cells', metric)},
+        time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
+        FROM cde.obis_cells ${metricJoin('obis_cells', metric)}
+        WHERE :obisFilters`);
     }
     const coverageInner = coverageBranches.length
       ? coverageBranches.join("\n        UNION ALL\n        ")
-      : `SELECT hex_1_pk, dataset_pk, 0 as record_count FROM cde.obis_cells WHERE FALSE`;
+      : `SELECT hex_1_pk, dataset_pk, ${nullMetricExpr(metric)},
+         NULL::timestamptz AS time_min, NULL::timestamptz AS time_max,
+         NULL::double precision AS latitude, NULL::double precision AS longitude,
+         NULL::double precision AS depth_min, NULL::double precision AS depth_max,
+         geom AS search_geom
+         FROM cde.obis_cells WHERE FALSE`;
 
     const coverageSql = `
         WITH cells AS (
         ${coverageInner}
         ),
         records AS (
-        SELECT hex_1_pk, p.dataset_pk, record_count
+        SELECT hex_1_pk, p.dataset_pk, metric_value
         FROM cells p
         JOIN cde.datasets d
         ON p.dataset_pk = d.pk

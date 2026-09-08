@@ -429,7 +429,7 @@
   "depthBarResetRangeTitle": "Reset the depth range to all depths",
   "trajectoryTrailBandTitle": "Track history drawn behind the trajectory date",
   "trajectoryPlatformsTitle": "Platforms / Trajectories",
-  "trajectoryPlatformsClickText": "Click a platform to draw its full track on the map",
+  "trajectoryPlatformsClickText": "Click a platform to draw its track on the map",
   "trajectoryPlatformsSearchPlaceholder": "Filter platforms",
   "trajectoryPlatformIdText": "Platform ID",
   "trajectoryPlatformFixesText": "Track fixes",

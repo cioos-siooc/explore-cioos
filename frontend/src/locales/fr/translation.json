@@ -430,7 +430,7 @@
   "depthBarResetRangeTitle": "Réinitialiser la plage de profondeur",
   "trajectoryTrailBandTitle": "Historique des trajets tracé avant la date des trajectoires",
   "trajectoryPlatformsTitle": "Plateformes / Trajectoires",
-  "trajectoryPlatformsClickText": "Cliquez sur une plateforme pour tracer sa trajectoire complète sur la carte",
+  "trajectoryPlatformsClickText": "Cliquez sur une plateforme pour tracer sa trajectoire sur la carte",
   "trajectoryPlatformsSearchPlaceholder": "Filtrer les plateformes",
   "trajectoryPlatformIdText": "ID de plateforme",
   "trajectoryPlatformFixesText": "Positions",

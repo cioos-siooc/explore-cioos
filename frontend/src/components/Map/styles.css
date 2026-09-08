@@ -8,7 +8,7 @@
   width: 100%;
 }
 
-/* The hover chip. One line, one label, nothing else — see the showChip comment
+/* The hover chip. One label per line, nothing else — see the showChip comment
    in Map.jsx for what this replaced and why.
    The popup's own frame is stripped back to nothing: MapLibre's default content
    box carries padding, a radius, a white ground and a shadow, which around a
@@ -35,7 +35,8 @@
 
 .mapChip {
   display: inline-block;
-  max-width: 240px;
+  /* Fits a full instant range (see CHIP_MAX_CHARS) without wrapping. */
+  max-width: 280px;
   padding: 3px 7px;
   border-radius: var(--cioos-radius-sm);
   background-color: var(--cioos-navy);
@@ -43,11 +44,28 @@
   font-family: var(--cioos-font-body);
   font-size: var(--cioos-font-size-xs);
   line-height: 1.35;
+  overflow: hidden;
+  /* Reads over both a pale hex and dark bathymetry without a border. */
+  box-shadow: var(--cioos-shadow-sm);
+}
+
+/* One fact per line, each clipped on its own: a long dataset title must not
+   push the record id and the instant under it out of the chip. */
+.mapChipLine {
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  /* Reads over both a pale hex and dark bathymetry without a border. */
-  box-shadow: var(--cioos-shadow-sm);
+}
+
+/* Where there is more than one line, the first names the thing and the rest
+   describe it. A single-line chip is the label itself and stays plain. */
+.mapChipLine:first-child:not(:last-child) {
+  font-weight: 600;
+}
+
+.mapChipLine:not(:first-child) {
+  opacity: 0.85;
 }
 
 /* The picker that used to list overlapping gridded datasets lived here. Every

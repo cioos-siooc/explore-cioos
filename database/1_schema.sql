@@ -202,7 +202,16 @@ CREATE TABLE profiles (
     hex_0_pk integer CONSTRAINT hexes_zoom_0_foreign REFERENCES hexes_zoom_0(pk) DEFERRABLE INITIALLY DEFERRED,
     hex_1_pk integer CONSTRAINT hexes_zoom_1_foreign REFERENCES hexes_zoom_1(pk) DEFERRABLE INITIALLY DEFERRED,
     point_pk INTEGER,
+    -- Distinct UTC days this feature holds data on. Harvested for the types
+    -- whose features can span more than one day; otherwise filled in by
+    -- 5_profile_process.sql from the [time_min, time_max] span.
     days bigint,
+    -- The same day set as `days`, as maximal runs of consecutive UTC days
+    -- ('[)' bounds). The map's `days` metric UNIONS these across the features
+    -- in a hex (day_union_days) instead of adding day counts up, so overlapping
+    -- deployments don't multiply a year of coverage into a decade. NULL means
+    -- "day set unknown" — the web-api falls back to the span.
+    day_ranges daterange[],
     UNIQUE(erddap_url,dataset_id,timeseries_id,profile_id)
 );
 
@@ -249,9 +258,14 @@ CREATE TABLE obis_cells (
     n_records bigint,
     -- Distinct UTC days with at least one dated occurrence in this cell.
     -- A COUNT, not a span: matches cde.trajectory_hexes.days so the map's
-    -- `days` ramp sums one unit across sources. Counted by the harvester from
-    -- each occurrence's date_start. NULL until the dataset is re-harvested.
+    -- `days` ramp speaks one unit across sources. Counted by the harvester
+    -- from each occurrence's date_start. NULL until the dataset is
+    -- re-harvested.
     days bigint,
+    -- The same day set as `days`, as maximal runs of consecutive UTC days —
+    -- see the note on cde.profiles.day_ranges. NULL until re-harvest, and the
+    -- web-api falls back to the cell's span meanwhile.
+    day_ranges daterange[],
     time_min timestamptz,
     time_max timestamptz,
     depth_min double precision,
@@ -363,6 +377,11 @@ CREATE TABLE trajectory_hexes (
     depth_max double precision,
     -- distinct UTC days the trajectory was inside this hex
     days integer,
+    -- The same day set as `days`, as maximal runs of consecutive UTC days —
+    -- see the note on cde.profiles.day_ranges. Built in SQL by
+    -- trajectory_build_hexes(), so it is never NULL for a row that function
+    -- wrote.
+    day_ranges daterange[],
     -- apportioned from cde.trajectory_days by time spent in the hex each day;
     -- per-dataset totals are preserved, per-hex values are estimates
     n_records bigint,

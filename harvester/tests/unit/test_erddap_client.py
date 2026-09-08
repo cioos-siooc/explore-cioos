@@ -17,6 +17,7 @@ from conftest import (
     ERDDAP_INFO_CSV,
     ERDDAP_URL,
     MockResponse,
+    MockStreamingResponse,
 )
 
 # ---------------------------------------------------------------------------
@@ -124,13 +125,51 @@ class TestErddapCsvToDf:
 
     def test_response_too_large_raises(self):
         erddap = _make_erddap()
-        big_content = b"x" * int(2e8 + 1)
-        mock_resp = MockResponse(text="", url=ERDDAP_URL)
-        mock_resp.content = big_content
+        from cde_harvester.sources.erddap.client import MAX_RESPONSE_SIZE
+        mock_resp = MockStreamingResponse(
+            total_bytes=int(MAX_RESPONSE_SIZE) * 4, url=ERDDAP_URL
+        )
         erddap.session.get.return_value = mock_resp
         from cde_harvester.core.errors import ResponseTooLargeError
         with pytest.raises(ResponseTooLargeError):
             erddap.erddap_csv_to_df("/tabledap/ds.csv")
+
+    def test_oversize_response_is_abandoned_mid_download(self):
+        """The cap must be enforced while the body streams in, not after.
+
+        Reading the whole body and only then rejecting it is what made a single
+        at-cap request cost most of a gigabyte; a server offering four times the
+        cap must never be pulled down in full.
+        """
+        erddap = _make_erddap()
+        from cde_harvester.sources.erddap.client import MAX_RESPONSE_SIZE
+        from cde_harvester.core.errors import ResponseTooLargeError
+        mock_resp = MockStreamingResponse(
+            total_bytes=int(MAX_RESPONSE_SIZE) * 4, url=ERDDAP_URL
+        )
+        erddap.session.get.return_value = mock_resp
+
+        with pytest.raises(ResponseTooLargeError):
+            erddap.erddap_csv_to_df("/tabledap/ds.csv")
+
+        # Stopped as soon as the cap was crossed: at most one chunk past it.
+        assert mock_resp.bytes_produced <= MAX_RESPONSE_SIZE + 1024 * 1024
+        assert mock_resp.closed
+
+    def test_streamed_body_decodes_like_response_text(self):
+        """Non-ASCII must survive the stream exactly as requests' .text gave it.
+
+        Handing pandas raw bytes with encoding="unicode_escape" (which is what
+        the old call passed, and which pandas ignored for a str buffer) would
+        turn every UTF-8 accent into mojibake.
+        """
+        erddap = _make_erddap()
+        csv = "dataset_id,title\n(String),(String)\nds1,Bouée Côtière\n"
+        erddap.session.get.return_value = MockResponse(
+            text=csv, url=ERDDAP_URL + "/info/ds/index.csv"
+        )
+        df = erddap.erddap_csv_to_df("/info/ds/index.csv")
+        assert df["title"].iloc[0] == "Bouée Côtière"
 
 
 class TestParseErddapDate:

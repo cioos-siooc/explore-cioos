@@ -51,6 +51,12 @@ services:
       - harvester_logs:/app/harvester/logs
       - harvester_cache:/app/harvester/harvester_cache
       - obis_cache:/app/harvester/obis_cache
+    # Same containment as the primary stack's prefect_worker: a remote worker
+    # runs the identical harvest code and had no memory limit at all, so a
+    # runaway harvest here takes its whole host rather than just itself.
+    # memswap_limit must equal mem_limit — see the note in docker-compose.yaml.
+    mem_limit: ${HARVESTER_MEM_LIMIT:-6g}
+    memswap_limit: ${HARVESTER_MEM_LIMIT:-6g}
 
 volumes:
   harvest_data:

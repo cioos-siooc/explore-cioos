@@ -123,23 +123,61 @@ export function pickDefaultVariable(variables, selectedEovTitles) {
   )
 }
 
+// The slice of the grid the overlay is drawing, as share-link params and back
+// — the variable, the instant, and the level. What the map is painting rather
+// than what the dataset offers, so a link reopens the page on the same field
+// instead of on the dataset's defaults. Named short like the rest of the
+// link's params (see UrlSync); `z` is the ELEVATION the WMS request carries,
+// which is altitude, not depth (see toElevation).
+export function wmsSliceParams(overlay) {
+  const params = {}
+  if (overlay.variable?.name) params.var = overlay.variable.name
+  if (overlay.time) params.date = overlay.time
+  if (overlay.elevation !== undefined && overlay.elevation !== null) {
+    params.z = overlay.elevation
+  }
+  return params
+}
+
+export function wmsSliceFromParams(searchParams) {
+  const slice = {}
+  const variable = searchParams.get('var')
+  const time = searchParams.get('date')
+  const elevation = Number.parseFloat(searchParams.get('z'))
+  if (variable) slice.variable = variable
+  // Only a time the rails can place: they snap it onto one of the axis's own
+  // nodes by arithmetic (see GridSlice), and NaN snaps to NaN — which reaches
+  // `new Date(...).toISOString()` and throws, taking the card down with it.
+  if (time && Number.isFinite(Date.parse(time))) slice.time = time
+  if (Number.isFinite(elevation)) slice.elevation = elevation
+  return Object.keys(slice).length ? slice : undefined
+}
+
 // The griddap overlay descriptor consumed by the Map image source and the
 // WmsLegend card. Shared by the auto-show-on-inspect effect and the manual
 // "show on map" toggle so both default the variable the same way.
-export function buildWmsOverlay(dataset, selectedEovTitles) {
+//
+// `slice` is a share link's remembered slice (wmsSliceFromParams), honoured as
+// far as this dataset can: a variable it doesn't serve falls back to the
+// default pick, and a time or level between two of its own nodes is snapped
+// onto one by the rails that read them.
+export function buildWmsOverlay(dataset, selectedEovTitles, slice) {
   const dimensions = dataset.grid_dimensions || []
   const variables = dataset.grid_variables || []
   const timeDimension = getTimeDimension(dimensions)
+  const named =
+    slice?.variable &&
+    variables.find((variable) => variable.name === slice.variable)
   return {
     pk: dataset.pk,
     datasetId: dataset.dataset_id,
     title: dataset.title,
     wmsUrl: dataset.wms_url,
     erddapUrl: dataset.erddap_url,
-    variable: pickDefaultVariable(variables, selectedEovTitles),
+    variable: named || pickDefaultVariable(variables, selectedEovTitles),
     variables,
-    time: timeDimension?.max,
-    elevation: defaultElevation(dimensions),
+    time: slice?.time || timeDimension?.max,
+    elevation: slice?.elevation ?? defaultElevation(dimensions),
     bbox: dataset.coverage_bbox_geojson,
     dimensions
   }

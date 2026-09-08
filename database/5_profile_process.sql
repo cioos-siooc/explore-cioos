@@ -48,21 +48,25 @@ BEGIN
       AND p.dataset_pk IS NULL
   ', target_table);
 
-  -- Calculate days
+  -- Fallback `days`, for rows that arrived without a harvested day count.
   --
-  -- KNOWN DEFECT: this is an elapsed SPAN, not a count of days that have data.
-  -- It counts every empty day between a feature's first and last observation,
-  -- so intermittent datasets are inflated: glisa_general_seasonal_erie reports
-  -- 39,357 days (1917-12-01 -> 2025-09-01) for a seasonal dataset holding
-  -- roughly 430 days of real data. TimeSeries rows are ~80% of all
-  -- profile-days, so this dominates the map's `days` ramp.
+  -- This is an elapsed SPAN, not a count of days that have data: it counts
+  -- every empty day between a feature's first and last observation. That used
+  -- to be the only value the column ever held, and it inflated intermittent
+  -- datasets badly -- glisa_general_seasonal_erie reported 39,357 days
+  -- (1917-12-01 -> 2025-09-01) for a seasonal dataset holding roughly 430 days
+  -- of real data.
   --
-  -- The correct shape is 4_create_hexes.sql:315 -- count(DISTINCT day) -- which
-  -- trajectories use, and which OBIS now uses via obis_cells.days. Fixing this
-  -- one needs a per-station day count harvested from ERDDAP (the same
-  -- orderByCount("time/86400") that trajectory_features.extract_day_stats
-  -- already issues), because a span is all the profile rows currently carry.
-  -- See TODO.md.
+  -- The harvester now counts the real days for the types whose features can
+  -- span more than one (TimeSeries, TimeSeriesProfile) and ships them in
+  -- `days` + `day_ranges`, so WHERE days IS NULL leaves those rows alone. The
+  -- span still applies to two cases, and is right or harmless in both:
+  --   * single-cast types (Profile), where the span IS the day set;
+  --   * a dataset whose day-count request failed, which falls back rather than
+  --     being dropped (tabledap_features._extract_day_sets).
+  --
+  -- The map does not read this column: it unions `day_ranges` instead, falling
+  -- back to the same span when that is NULL (web-api/utils/hexMetric.js).
   EXECUTE format('
     UPDATE %I
     SET days = date_part(''days'', time_max - time_min) + 1

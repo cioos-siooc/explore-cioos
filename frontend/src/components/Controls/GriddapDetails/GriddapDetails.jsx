@@ -4,6 +4,7 @@ import Switch from '../../ui/Switch.jsx'
 
 import { buildWmsOverlay } from '../../../wmsUtilities'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
+import { useMapState } from '../../../state/map/MapStateProvider.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
 import WmsLegend from '../WmsLegend/WmsLegend.jsx'
 import './styles.css'
@@ -21,6 +22,7 @@ export default function GriddapDetails({
 }) {
   const { t } = useTranslation()
   const { eovsSelected } = useFilters()
+  const { pendingWmsSlice, setPendingWmsSlice } = useMapState()
   const { sidebarOpen } = useUI()
   const dimensions = dataset.grid_dimensions || []
   const variables = dataset.grid_variables || []
@@ -30,8 +32,14 @@ export default function GriddapDetails({
     .filter((eov) => eov.isSelected)
     .map((eov) => eov.title)
 
+  // The share link's slice, if this is the overlay it was written for, applies
+  // to the first overlay built and then gets out of the way — turning the
+  // overlay off and back on is a fresh start, not a return to the link.
   function showOverlay() {
-    setActiveWmsOverlay(buildWmsOverlay(dataset, selectedEovTitles))
+    setActiveWmsOverlay(
+      buildWmsOverlay(dataset, selectedEovTitles, pendingWmsSlice)
+    )
+    if (pendingWmsSlice) setPendingWmsSlice(undefined)
   }
 
   // Auto-show the WMS overlay when a griddap dataset with a WMS endpoint is

@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
+from cde_harvester.core.day_sets import ranges_to_iso
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     get_ckan_records,
     unescape_ascii,
@@ -282,6 +283,13 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
         erddap_profiles["eovs"] = erddap_profiles["eovs"].apply(
             lambda x: repr(list(x)) if isinstance(x, (list, tuple)) else x
         )
+    # Same treatment for the day set, with one extra step: literal_eval only
+    # accepts literals, and the repr of a datetime.date is a constructor call —
+    # so the runs go through as ISO-string pairs (day_sets.ranges_to_iso).
+    if "day_ranges" in erddap_profiles.columns:
+        erddap_profiles["day_ranges"] = erddap_profiles["day_ranges"].apply(
+            lambda x: repr(ranges_to_iso(x)) if isinstance(x, (list, tuple)) else x
+        )
     erddap_profiles.drop_duplicates().to_csv(profiles_file, index=False)
     if not df_ckan.empty:
         df_ckan.to_csv(ckan_file, index=False)
@@ -416,8 +424,6 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
 
         # Wait for all tasks to complete
         logger.info("Waiting for all harvest tasks to complete")
-        erddap_results = [f.result() for f in erddap_futures]
-        logger.info("All ERDDAP work completed")
 
         # Collect ERDDAP results
         erddap_profiles = pd.DataFrame()
@@ -427,7 +433,16 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         variables = pd.DataFrame()
         erddap_skipped = pd.DataFrame()
 
-        for result in erddap_results:
+        # Drain the futures one server at a time and drop each result as soon as
+        # it has been merged. Resolving them all up front
+        # (`[f.result() for f in erddap_futures]`) held every server's frames in
+        # memory simultaneously, and the merge loop then grew a second full copy
+        # alongside them — the peak landed at roughly three times the harvest
+        # right when it is already carrying the most data. The concats stay as
+        # they were: an empty frame still contributes its columns, which is what
+        # keeps the output CSV headers stable when a server harvests nothing.
+        while erddap_futures:
+            result = erddap_futures.pop(0).result()
             erddap_profiles = pd.concat([erddap_profiles, result.profiles])
             erddap_trajectory_days = pd.concat(
                 [erddap_trajectory_days, result.trajectory_days]
@@ -440,6 +455,8 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             erddap_skipped = pd.concat([erddap_skipped, result.skipped])
             erddap_attempts = pd.concat([erddap_attempts, result.attempts])
             erddap_verified = pd.concat([erddap_verified, result.verified])
+            del result
+        logger.info("All ERDDAP work completed")
 
         # Collect OBIS results
         obis_cells = pd.DataFrame()
