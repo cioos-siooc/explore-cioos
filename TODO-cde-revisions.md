@@ -293,21 +293,53 @@ by the styling-unification pass; see that section and the verification at the en
       `process.env.ENVIRONMENT === "production"`, but `.env.production` sets
       `ENVIRONMENT=juno-cioos-co-production`. One-word fix, but it *enables* error reporting
       that is currently off, so it wants a deliberate decision rather than a drive-by.
-- [ ] **React hooks findings, now 45 under the v7 plugin.** `eslint-plugin-react-hooks@7`
-      ships 16 rules; **11 pass and are enabled**. Five are off because they have
-      pre-existing findings whose fixes change render behaviour: `rules-of-hooks`,
-      `exhaustive-deps`, and the new React Compiler rules `set-state-in-effect` (43),
-      `refs` (1) and `immutability` (1).
-      Original note (eslint 8 / plugin v4): enabling `plugin:react-hooks/recommended` reports 54
-      `exhaustive-deps` and 3 `rules-of-hooks`. The three look like genuine bugs:
-      `DatasetPreviewTable.jsx:12-13` calls `useTranslation`/`useState` conditionally, and
-      `utilities.jsx:23` calls `useTranslation` inside a plain function. The plugin is now
-      registered in `frontend/.eslintrc.js` (so the existing disable comment resolves) with
-      both rules **off** and this pointer in a comment. Fixing them changes render behaviour.
-- [ ] `harvester/tests/unit/test_schema_rebuild.py::test_database_url_still_builds_when_complete`
-      fails in a full-suite run but passes alone: the repo `.env`'s `DB_PORT=5433` leaks in
-      via a `load_dotenv()` at import time. Pre-existing (confirmed identical on a stashed
-      tree) and environment-dependent, so CI does not see it. Worth an isolated fixture.
+- [x] **React hooks: all 16 rules of `eslint-plugin-react-hooks@7` are on.** The five that
+      were off (`rules-of-hooks`, `exhaustive-deps`, `set-state-in-effect`, `refs`,
+      `immutability`) reported 104 findings between them; all 104 are resolved.
+      `exhaustive-deps` sits at `warn`, the rest at `error`.
+
+      The three `rules-of-hooks` findings were the real bugs the original note suspected:
+      `DatasetPreviewTable` called `useTranslation`/`useState` after an early return (the
+      hook order changed whenever `datasetPreview` arrived), and
+      `generateMultipleSelectBadgeTitle` called `useTranslation` from a plain function — it
+      now takes `t` as a parameter, like its sibling `generateRangeSelectBadgeTitle`.
+
+      Most of the rest were state that did not need to be state:
+      - `utilities.useChanged(...values)` is the shared form of React's "adjust state when
+        an input changes" — a render-phase update instead of an effect. It replaced 13
+        mirror-into-state effects (the rail date/depth fields, the filter panel's
+        controlled/uncontrolled sync, the download checkboxes, the sidebar reveals, the
+        pager resets, the feature card).
+      - Derived-during-render replaced more: the legend's zoom tier and the filter query
+        (`MapStateProvider`, `FilterProvider`), the download submission's feedback, the
+        preview table's row objects, `timeFilterActive`/`depthFilterActive`, and the
+        ERDDAP server titles (which were being rewritten by an effect on every language
+        change — now a memo over `i18n.language`).
+      - `useMediaQuery` is a `useSyncExternalStore` now, which is what it always was.
+      - `mapRef` became `mapInstance` state: `ZoomToDataset` was reading the ref during
+        render, which is what the `refs` rule caught. `LegendFooter` no longer needs
+        `mapLoaded` to notice the map arriving.
+      - `useHarvestFetch(path, deps)` lost its unverifiable `deps` argument — every one of
+        its 12 call sites passed exactly the values already interpolated into `path`.
+
+      What is left is marked at each site with an `eslint-disable-next-line` and a reason:
+      deliberate debounces, one-shot flags, fetch kickoffs, self-feeding effects, and —
+      the bulk of them — `Map.jsx`'s imperative MapLibre effects, which are keyed on the
+      state that should trigger them rather than on everything they read. See the note at
+      the top of `Map.jsx`; making its helpers stable with `useCallback` is the follow-up
+      that would remove those 16.
+
+      One known bug is documented rather than fixed, since it has its own entry: the
+      `/pointQuery` effect in `SelectionProvider` uses `selectionLoading` as a mutex and
+      drops filter changes made while a query is in flight. Completing its dependency
+      array would put it in a refetch loop; the fix is an `AbortController`/request id.
+- [x] `harvester/tests/unit/test_schema_rebuild.py::test_database_url_still_builds_when_complete`
+      failed in a full-suite run but passed alone: the repo `.env`'s `DB_PORT=5433` leaked in
+      via the `load_dotenv()` that `prefect_pipeline` runs at import time, so whichever test
+      imported it first changed what every later test saw. Fixed with an autouse
+      `isolate_db_env` fixture in `harvester/tests/conftest.py` that clears the five DB
+      settings for every test — the suite now reads the same locally as it does in CI, where
+      there is no `.env`. Every test that needs one of those settings already sets it itself.
 
 ### Styling unification (2026-09-08)
 
