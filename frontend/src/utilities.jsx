@@ -1,4 +1,4 @@
-import isEmpty from 'lodash/isEmpty'
+import isEmpty from 'lodash-es/isEmpty'
 import { scaleLinear, scaleLog } from 'd3-scale'
 import React, { useState, useEffect } from 'react'
 import { defaultQuery } from './components/config.js'
@@ -655,7 +655,7 @@ export function getCookieValue (cookieName) {
 
 export function formatErddapServerName(url, lang = 'en', serversData = null) {
   if (!url) return ''
-  
+
   // If serversData is provided, use it to look up the server name
   if (serversData && Array.isArray(serversData)) {
     const server = serversData.find(s => s.url === url)
@@ -663,7 +663,7 @@ export function formatErddapServerName(url, lang = 'en', serversData = null) {
       return lang === 'fr' ? server.label_fr : server.label_en
     }
   }
-  
+
   // Fallback: extract domain from URL
   try {
     const urlObj = new URL(url)

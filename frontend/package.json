@@ -10,16 +10,16 @@
   "dependencies": {
     "@mapbox/mapbox-gl-draw": "^1.5.1",
     "@sentry/react": "^10.65.0",
-    "@turf/bbox": "^6.5.0",
-    "@turf/bbox-polygon": "^6.5.0",
-    "@turf/points-within-polygon": "^6.5.0",
-    "@turf/union": "^6.5.0",
+    "@turf/bbox": "^7.4.0",
+    "@turf/bbox-polygon": "^7.4.0",
+    "@turf/points-within-polygon": "^7.4.0",
+    "@turf/union": "^7.4.0",
     "bytes": "^3.1.2",
     "classnames": "^2.5.1",
     "d3-scale": "^4.0.2",
     "i18next": "^25.10.10",
     "i18next-browser-languagedetector": "^8.2.1",
-    "lodash": "^4.17.21",
+    "lodash-es": "^4.18.1",
     "mapbox-gl-draw-rectangle-mode": "^1.0.4",
     "maplibre-gl": "^5.24.0",
     "plotly.js-basic-dist-min": "^3.0.0",
@@ -37,15 +37,14 @@
     "@sentry/vite-plugin": "^5.4.0",
     "@vitejs/plugin-react": "^5.0.0",
     "eslint": "^8.16.0",
-    "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^8.5.0",
     "eslint-config-standard": "^17.0.0",
     "eslint-plugin-import": "^2.26.0",
-    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-n": "^16.6.2",
     "eslint-plugin-prettier": "^4.2.1",
     "eslint-plugin-promise": "^6.0.0",
     "eslint-plugin-react": "^7.30.0",
-    "eslint-plugin-standard": "^4.1.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
     "prettier": "^2.7.1",
     "rollup-plugin-visualizer": "^7.0.1",
     "vite": "^7.0.0"
@@ -61,12 +60,5 @@
     "lint:fix": "eslint --fix . --ext .js,.jsx --ignore-path .gitignore"
   },
   "author": "",
-  "license": "ISC",
-  "overrides": {},
-  "allowScripts": {
-    "esbuild@0.28.1": true,
-    "maplibre-gl@4.7.1": true,
-    "es5-ext@0.10.64": true,
-    "maplibre-gl@5.24.0": true
-  }
+  "license": "ISC"
 }

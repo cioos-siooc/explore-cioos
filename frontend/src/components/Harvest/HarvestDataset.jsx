@@ -13,7 +13,7 @@ function QueryUrls({ blob, isError }) {
   const urls = blob.split('\n').filter(Boolean)
   if (!urls.length) return null
   return (
-    <ul className="harvest-query-urls">
+    <ul className='harvest-query-urls'>
       {urls.map((url, i) => {
         const isFailed = isError && i === urls.length - 1
         return (
@@ -21,7 +21,7 @@ function QueryUrls({ blob, isError }) {
             <span className={isFailed ? 'harvest-url-fail' : 'harvest-url-ok'}>
               {isFailed ? '✗' : '✓'}
             </span>
-            <a href={url} target="_blank" rel="noreferrer" className="harvest-link" style={{ fontSize: '0.78rem' }}>
+            <a href={url} target='_blank' rel='noreferrer' className='harvest-link' style={{ fontSize: '0.78rem' }}>
               {url}
             </a>
           </li>
@@ -54,46 +54,46 @@ export default function HarvestDataset() {
 
   const breadcrumbs = (
     <>
-      <Link to="/harvest">{t('harvest.title')}</Link>
+      <Link to='/harvest'>{t('harvest.title')}</Link>
       {' / '}
       <Link to={`/harvest/server/${slug}`}>{host}</Link>
       {' / '}
-      <span className="harvest-mono">{datasetId}</span>
+      <span className='harvest-mono'>{datasetId}</span>
     </>
   )
 
-  if (loading) return <HarvestLayout breadcrumbs={breadcrumbs}><div className="harvest-loading">{t('harvest.loading')}</div></HarvestLayout>
-  if (error)   return <HarvestLayout breadcrumbs={breadcrumbs}><div className="harvest-fetch-error">{error}</div></HarvestLayout>
+  if (loading) return <HarvestLayout breadcrumbs={breadcrumbs}><div className='harvest-loading'>{t('harvest.loading')}</div></HarvestLayout>
+  if (error)   return <HarvestLayout breadcrumbs={breadcrumbs}><div className='harvest-fetch-error'>{error}</div></HarvestLayout>
 
   return (
     <HarvestLayout breadcrumbs={breadcrumbs}>
-      <h1 className="harvest-page-title harvest-mono" style={{ fontSize: '1.2rem' }}>{datasetId}</h1>
-      <p className="harvest-page-sub">
-        <Link to={`/harvest/server/${slug}`} className="harvest-link">{host}</Link>
+      <h1 className='harvest-page-title harvest-mono' style={{ fontSize: '1.2rem' }}>{datasetId}</h1>
+      <p className='harvest-page-sub'>
+        <Link to={`/harvest/server/${slug}`} className='harvest-link'>{host}</Link>
         {' · '}
-        <a href={sourceUrl} target="_blank" rel="noreferrer" className="harvest-link">
+        <a href={sourceUrl} target='_blank' rel='noreferrer' className='harvest-link'>
           {viewOnLabel}
         </a>
       </p>
 
       {latest && (
-        <div className="harvest-latest-card">
+        <div className='harvest-latest-card'>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
             <StatusBadge status={latest.status} />
             {meta && <HarvestModeBadge dataset={meta} />}
             {latest.reason_code && (
               <span title={latest.reason_code} style={{ fontSize: '0.85rem' }}>{reasonLabel(t, latest.reason_code)}</span>
             )}
-            <span className="harvest-muted" style={{ fontSize: '0.82rem' }}>
+            <span className='harvest-muted' style={{ fontSize: '0.82rem' }}>
               {t('harvest.col.lastCheck')}: {fmtDt(latest.attempted_at)}
             </span>
           </div>
           {meta && (meta.content_hash || meta.content_hash_reason || meta.last_updated_at) && (
-            <div className="harvest-muted" style={{ fontSize: '0.8rem', marginBottom: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '1.25rem' }}>
+            <div className='harvest-muted' style={{ fontSize: '0.8rem', marginBottom: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '1.25rem' }}>
               {meta.last_updated_at && <span>{t('harvest.col.lastUpdate')}: {fmtDt(meta.last_updated_at)}</span>}
               {meta.content_hash && (
                 <span title={meta.content_hash}>
-                  {t('harvest.col.contentHash')}: <span className="harvest-mono">{meta.content_hash.slice(0, 16)}…</span>
+                  {t('harvest.col.contentHash')}: <span className='harvest-mono'>{meta.content_hash.slice(0, 16)}…</span>
                 </span>
               )}
               {!meta.content_hash && meta.content_hash_reason && (
@@ -104,10 +104,10 @@ export default function HarvestDataset() {
             </div>
           )}
           {latest.error_message && (
-            <div className="harvest-error-box">{latest.error_message}</div>
+            <div className='harvest-error-box'>{latest.error_message}</div>
           )}
           {latest.warnings && (
-            <div className="harvest-warning-box">⚠ {latest.warnings}</div>
+            <div className='harvest-warning-box'>⚠ {latest.warnings}</div>
           )}
           {latest.query_urls && (
             <details open={latest.status === 'error'}>
@@ -120,8 +120,8 @@ export default function HarvestDataset() {
         </div>
       )}
 
-      <h2 className="harvest-section-title">{t('harvest.dataset.historyTitle')}</h2>
-      <table className="harvest-table">
+      <h2 className='harvest-section-title'>{t('harvest.dataset.historyTitle')}</h2>
+      <table className='harvest-table'>
         <thead>
           <tr>
             <th>{t('harvest.col.when')}</th>
@@ -156,7 +156,7 @@ export default function HarvestDataset() {
               </td>
               <td style={{ fontSize: '0.82rem' }}>{fmtDurationMs(row.duration_ms)}</td>
               <td>
-                <Link to={`/harvest/run/${row.run_id}`} className="harvest-link harvest-mono" style={{ fontSize: '0.78rem' }}>
+                <Link to={`/harvest/run/${row.run_id}`} className='harvest-link harvest-mono' style={{ fontSize: '0.78rem' }}>
                   {row.git_sha ? row.git_sha.slice(0, 7) : row.run_id.slice(0, 8)}
                 </Link>
               </td>

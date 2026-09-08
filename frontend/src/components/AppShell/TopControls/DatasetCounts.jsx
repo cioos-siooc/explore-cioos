@@ -36,7 +36,7 @@ export default function DatasetCounts () {
       {!countsReady
         ? (
           <Spinner size='xs' className='countSpinner' />
-          )
+        )
         : (
           <>
             <span
@@ -73,7 +73,7 @@ export default function DatasetCounts () {
               )
             </span>
           </>
-          )}
+        )}
     </div>
   )
 }

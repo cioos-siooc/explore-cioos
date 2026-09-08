@@ -12,7 +12,7 @@ import {
 } from 'react-bootstrap-icons'
 import classNames from 'classnames'
 import bytes from 'bytes'
-import isEmpty from 'lodash/isEmpty'
+import isEmpty from 'lodash-es/isEmpty'
 
 import platformColors from '../../platformColors'
 import { formatErddapServerName } from '../../../utilities'

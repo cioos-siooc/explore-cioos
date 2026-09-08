@@ -7,7 +7,7 @@ import {
   BoxArrowUpRight
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
-import noop from 'lodash/noop'
+import noop from 'lodash-es/noop'
 
 import { abbreviateString, useOutsideAlerter } from '../../../utilities'
 

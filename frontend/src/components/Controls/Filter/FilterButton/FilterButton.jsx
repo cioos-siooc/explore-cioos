@@ -1,7 +1,7 @@
 import React from 'react'
 import { X } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
-import isEmpty from 'lodash/isEmpty'
+import isEmpty from 'lodash-es/isEmpty'
 
 import Tooltip from '../../../ui/Tooltip.jsx'
 import './styles.css'

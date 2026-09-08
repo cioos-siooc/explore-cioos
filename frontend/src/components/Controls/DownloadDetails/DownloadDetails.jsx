@@ -7,7 +7,7 @@ import bytes from 'bytes'
 import DatasetsTable from '../DatasetsTable/DatasetsTable.jsx'
 import polygonImage from '../../Images/polygonIcon.png'
 import rectangleImage from '../../Images/rectangleIcon.png'
-import isEmpty from 'lodash/isEmpty'
+import isEmpty from 'lodash-es/isEmpty'
 
 import { useActivityTask } from '../../../state/activity/ActivityProvider.jsx'
 

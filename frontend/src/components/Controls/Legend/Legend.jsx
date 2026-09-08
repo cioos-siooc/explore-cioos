@@ -36,7 +36,7 @@ import useMediaQuery, { MOBILE_QUERY } from '../../../state/ui/useMediaQuery.js'
 
 import './styles.css'
 import classNames from 'classnames'
-import isEmpty from 'lodash/isEmpty'
+import isEmpty from 'lodash-es/isEmpty'
 
 // Abbreviate large counts so the color-bar ticks stay short (e.g. 12345 -> 12k).
 // Goes up to billions: the ramp now counts measurements, not locations, and a

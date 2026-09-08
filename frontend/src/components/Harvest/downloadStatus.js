@@ -33,15 +33,15 @@ export function jobBadgeClass(status) {
 export function datasetReason(t, dataset) {
   if (dataset.erddap_error) return dataset.erddap_error
   switch (dataset.last_status || dataset.status) {
-    case 'FAILED':
-      return t('harvest.downloads.reason.failed')
-    case 'EMPTY':
-      return t('harvest.downloads.reason.empty')
-    case 'IGNORED':
-      return t('harvest.downloads.reason.ignored')
-    case 'PARTIAL':
-      return t('harvest.downloads.reason.partial')
-    default:
-      return null
+  case 'FAILED':
+    return t('harvest.downloads.reason.failed')
+  case 'EMPTY':
+    return t('harvest.downloads.reason.empty')
+  case 'IGNORED':
+    return t('harvest.downloads.reason.ignored')
+  case 'PARTIAL':
+    return t('harvest.downloads.reason.partial')
+  default:
+    return null
   }
 }

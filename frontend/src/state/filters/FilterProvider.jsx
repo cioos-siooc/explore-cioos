@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createContext, useContext, useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import isEmpty from 'lodash/isEmpty'
+import isEmpty from 'lodash-es/isEmpty'
 
 import fetchJson from '../fetchJson.js'
 import reportError from '../reportError.js'

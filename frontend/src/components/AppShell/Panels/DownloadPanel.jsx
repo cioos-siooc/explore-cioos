@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
-import isEmpty from 'lodash/isEmpty'
+import isEmpty from 'lodash-es/isEmpty'
 
 import DownloadDetails from '../../Controls/DownloadDetails/DownloadDetails.jsx'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'

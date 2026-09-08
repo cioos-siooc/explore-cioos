@@ -9,7 +9,7 @@ import {
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
-import isEmpty from 'lodash/isEmpty'
+import isEmpty from 'lodash-es/isEmpty'
 
 import DatasetsPanel from '../Panels/DatasetsPanel.jsx'
 import Spinner from '../../ui/Spinner.jsx'

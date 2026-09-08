@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import isEmpty from 'lodash/isEmpty'
+import isEmpty from 'lodash-es/isEmpty'
 
 import { server } from '../../config.js'
 import reportError from '../reportError.js'
@@ -54,7 +54,7 @@ export function useSelection () {
 // Note: datasets and points are exchangable terminology
 export default function SelectionProvider ({ children }) {
   const { i18n } = useTranslation()
-  const { query, catalogLoaded, setDatasetsSelected } = useFilters()
+  const { query, catalogLoaded } = useFilters()
   const {
     setActiveWmsOverlay,
     zoomToGeometry,

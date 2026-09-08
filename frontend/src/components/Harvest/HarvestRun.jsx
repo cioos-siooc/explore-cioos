@@ -22,68 +22,68 @@ export default function HarvestRun() {
   )
 
   const breadcrumbs = (
-    <><Link to="/harvest">{t('harvest.title')}</Link> / {t('harvest.run.title')} {runId.slice(0, 8)}…</>
+    <><Link to='/harvest'>{t('harvest.title')}</Link> / {t('harvest.run.title')} {runId.slice(0, 8)}…</>
   )
 
-  if (loading) return <HarvestLayout breadcrumbs={breadcrumbs}><div className="harvest-loading">{t('harvest.loading')}</div></HarvestLayout>
-  if (error)   return <HarvestLayout breadcrumbs={breadcrumbs}><div className="harvest-fetch-error">{error}</div></HarvestLayout>
-  if (!run)    return <HarvestLayout breadcrumbs={breadcrumbs}><div className="harvest-fetch-error">{t('harvest.run.notFound')}</div></HarvestLayout>
+  if (loading) return <HarvestLayout breadcrumbs={breadcrumbs}><div className='harvest-loading'>{t('harvest.loading')}</div></HarvestLayout>
+  if (error)   return <HarvestLayout breadcrumbs={breadcrumbs}><div className='harvest-fetch-error'>{error}</div></HarvestLayout>
+  if (!run)    return <HarvestLayout breadcrumbs={breadcrumbs}><div className='harvest-fetch-error'>{t('harvest.run.notFound')}</div></HarvestLayout>
 
   return (
     <HarvestLayout breadcrumbs={breadcrumbs}>
-      <h1 className="harvest-page-title">
+      <h1 className='harvest-page-title'>
         {t('harvest.run.title')} <StatusBadge status={run.status} />
       </h1>
-      <p className="harvest-page-sub harvest-mono" style={{ fontSize: '0.78rem' }}>{run.run_id}</p>
+      <p className='harvest-page-sub harvest-mono' style={{ fontSize: '0.78rem' }}>{run.run_id}</p>
 
-      <div className="harvest-run-meta">
-        <div className="harvest-run-meta-item">
-          <span className="harvest-run-meta-label">{t('harvest.col.started')}</span>
-          <span className="harvest-run-meta-value">{fmtDt(run.started_at)}</span>
+      <div className='harvest-run-meta'>
+        <div className='harvest-run-meta-item'>
+          <span className='harvest-run-meta-label'>{t('harvest.col.started')}</span>
+          <span className='harvest-run-meta-value'>{fmtDt(run.started_at)}</span>
         </div>
-        <div className="harvest-run-meta-item">
-          <span className="harvest-run-meta-label">{t('harvest.col.finished')}</span>
-          <span className="harvest-run-meta-value">{fmtDt(run.finished_at)}</span>
+        <div className='harvest-run-meta-item'>
+          <span className='harvest-run-meta-label'>{t('harvest.col.finished')}</span>
+          <span className='harvest-run-meta-value'>{fmtDt(run.finished_at)}</span>
         </div>
-        <div className="harvest-run-meta-item">
-          <span className="harvest-run-meta-label">{t('harvest.col.duration')}</span>
-          <span className="harvest-run-meta-value">{fmtDurationS(run.duration_s)}</span>
+        <div className='harvest-run-meta-item'>
+          <span className='harvest-run-meta-label'>{t('harvest.col.duration')}</span>
+          <span className='harvest-run-meta-value'>{fmtDurationS(run.duration_s)}</span>
         </div>
         {run.git_sha && (
-          <div className="harvest-run-meta-item">
-            <span className="harvest-run-meta-label">{t('harvest.col.gitSha')}</span>
-            <span className="harvest-run-meta-value harvest-mono">{run.git_sha.slice(0, 7)}</span>
+          <div className='harvest-run-meta-item'>
+            <span className='harvest-run-meta-label'>{t('harvest.col.gitSha')}</span>
+            <span className='harvest-run-meta-value harvest-mono'>{run.git_sha.slice(0, 7)}</span>
           </div>
         )}
         {run.scope && (
-          <div className="harvest-run-meta-item">
-            <span className="harvest-run-meta-label">{t('harvest.col.scope')}</span>
-            <span className="harvest-run-meta-value">{run.scope}</span>
+          <div className='harvest-run-meta-item'>
+            <span className='harvest-run-meta-label'>{t('harvest.col.scope')}</span>
+            <span className='harvest-run-meta-value'>{run.scope}</span>
           </div>
         )}
         {run.triggered_by && (
-          <div className="harvest-run-meta-item">
-            <span className="harvest-run-meta-label">{t('harvest.col.triggeredBy')}</span>
-            <span className="harvest-run-meta-value">{run.triggered_by}</span>
+          <div className='harvest-run-meta-item'>
+            <span className='harvest-run-meta-label'>{t('harvest.col.triggeredBy')}</span>
+            <span className='harvest-run-meta-value'>{run.triggered_by}</span>
           </div>
         )}
       </div>
 
       {run.error_message && (
-        <div className="harvest-error-box">{run.error_message}</div>
+        <div className='harvest-error-box'>{run.error_message}</div>
       )}
 
-      <div className="harvest-summary" style={{ marginBottom: '1rem' }}>
-        <span className="harvest-count-pill harvest-count-success">✓ {summary.success}</span>
-        <span className="harvest-count-pill harvest-count-unchanged" title={t('harvest.reason.UNCHANGED')}>↻ {summary.unchanged}</span>
-        <span className="harvest-count-pill harvest-count-skipped">· {summary.skipped}</span>
-        <span className="harvest-count-pill harvest-count-error">✗ {summary.error}</span>
-        <span className="harvest-muted" style={{ fontSize: '0.85rem', alignSelf: 'center' }}>
+      <div className='harvest-summary' style={{ marginBottom: '1rem' }}>
+        <span className='harvest-count-pill harvest-count-success'>✓ {summary.success}</span>
+        <span className='harvest-count-pill harvest-count-unchanged' title={t('harvest.reason.UNCHANGED')}>↻ {summary.unchanged}</span>
+        <span className='harvest-count-pill harvest-count-skipped'>· {summary.skipped}</span>
+        <span className='harvest-count-pill harvest-count-error'>✗ {summary.error}</span>
+        <span className='harvest-muted' style={{ fontSize: '0.85rem', alignSelf: 'center' }}>
           {t('harvest.datasetsCount', { count: summary.total })}
         </span>
       </div>
 
-      <table className="harvest-table">
+      <table className='harvest-table'>
         <thead>
           <tr>
             <th>{t('harvest.col.server')}</th>
@@ -99,14 +99,14 @@ export default function HarvestRun() {
             return (
               <tr key={`${a.erddap_url}-${a.dataset_id}-${i}`}>
                 <td style={{ fontSize: '0.82rem' }}>
-                  <Link to={`/harvest/server/${serverSlug}`} className="harvest-link">
+                  <Link to={`/harvest/server/${serverSlug}`} className='harvest-link'>
                     {hostname(a.erddap_url)}
                   </Link>
                 </td>
                 <td>
                   <Link
                     to={`/harvest/dataset/${serverSlug}/${encodeURIComponent(a.dataset_id)}`}
-                    className="harvest-link harvest-mono"
+                    className='harvest-link harvest-mono'
                     style={{ fontSize: '0.8rem' }}
                   >
                     {a.dataset_id}
@@ -134,7 +134,7 @@ export default function HarvestRun() {
           })}
           {!attempts.length && (
             <tr>
-              <td colSpan="5" style={{ textAlign: 'center', padding: '1.5rem', color: '#8a9ea2' }}>
+              <td colSpan='5' style={{ textAlign: 'center', padding: '1.5rem', color: '#8a9ea2' }}>
                 {t('harvest.run.noAttempts')}
               </td>
             </tr>

@@ -3,7 +3,7 @@ import { createContext, useContext, useState, useEffect } from 'react'
 import { Check2Circle, XCircle } from 'react-bootstrap-icons'
 import Spinner from '../../components/ui/Spinner.jsx'
 import { useTranslation } from 'react-i18next'
-import isEmpty from 'lodash/isEmpty'
+import isEmpty from 'lodash-es/isEmpty'
 
 import { server } from '../../config.js'
 import reportError from '../reportError.js'

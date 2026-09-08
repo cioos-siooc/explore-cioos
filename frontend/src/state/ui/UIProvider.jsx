@@ -7,7 +7,7 @@ import {
   useRef,
   useState
 } from 'react'
-import isEmpty from 'lodash/isEmpty'
+import isEmpty from 'lodash-es/isEmpty'
 
 import { getCookieValue } from '../../utilities.jsx'
 import { useSelection } from '../selection/SelectionProvider.jsx'

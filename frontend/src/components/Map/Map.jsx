@@ -12,7 +12,7 @@ import turfBbox from '@turf/bbox'
 import turfUnion from '@turf/union'
 
 import DrawRectangle from 'mapbox-gl-draw-rectangle-mode'
-import debounce from 'lodash/debounce'
+import debounce from 'lodash-es/debounce'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import './styles.css'
@@ -354,14 +354,14 @@ export default function CreateMap({
     const oldCoord = state.feature.getCoordinate(path)
     const newCoord = [oldCoord[0] + delta.lng, oldCoord[1] + delta.lat]
       ;[(index + 3) % 4, (index + 1) % 4].forEach((neighborIndex) => {
-        const neighborPath = `${ringIndex}.${neighborIndex}`
-        const neighborOld = state.feature.getCoordinate(neighborPath)
-        if (neighborOld[0] === oldCoord[0]) {
-          state.feature.updateCoordinate(neighborPath, newCoord[0], neighborOld[1])
-        } else {
-          state.feature.updateCoordinate(neighborPath, neighborOld[0], newCoord[1])
-        }
-      })
+      const neighborPath = `${ringIndex}.${neighborIndex}`
+      const neighborOld = state.feature.getCoordinate(neighborPath)
+      if (neighborOld[0] === oldCoord[0]) {
+        state.feature.updateCoordinate(neighborPath, newCoord[0], neighborOld[1])
+      } else {
+        state.feature.updateCoordinate(neighborPath, neighborOld[0], newCoord[1])
+      }
+    })
     state.feature.updateCoordinate(path, newCoord[0], newCoord[1])
   }
 
@@ -698,8 +698,8 @@ export default function CreateMap({
     const trajOn = anyTrajectoryLayerOn(dataLayersRef.current)
     const showTracks = trajOn && tracksModeRef.current
       ;['track-lines', 'track-heads', 'track-heads-fixed'].forEach((id) =>
-        map.current.setLayoutProperty(id, 'visibility', showTracks ? 'visible' : 'none')
-      )
+      map.current.setLayoutProperty(id, 'visibility', showTracks ? 'visible' : 'none')
+    )
   }
 
   // Placeholder count ranges used only until the /legend request resolves.
@@ -3460,7 +3460,12 @@ export default function CreateMap({
           let merged = parts[0]
           for (let i = 1; i < parts.length; i++) {
             try {
-              merged = turfUnion(merged, parts[i]) || merged
+              // @turf/union 7 takes ONE FeatureCollection, not two
+              // features. Still folded pairwise rather than unioning the
+              // whole collection in one call, so a single degenerate
+              // fragment costs only itself (see catch below).
+              merged =
+                turfUnion(helpers.featureCollection([merged, parts[i]])) || merged
             } catch (error) {
               // A degenerate fragment (e.g. a sliver from the MVT buffer
               // overlap) fails to union — keep what merged so far rather
@@ -3528,7 +3533,11 @@ export default function CreateMap({
       let mergedGrid = gridFeatures[0] || null
       for (let i = 1; i < gridFeatures.length; i++) {
         try {
-          mergedGrid = turfUnion(mergedGrid, gridFeatures[i]) || mergedGrid
+          // One FeatureCollection per call — see the note in the hex
+          // fragment union above.
+          mergedGrid =
+            turfUnion(helpers.featureCollection([mergedGrid, gridFeatures[i]])) ||
+            mergedGrid
         } catch (error) {
           // A degenerate polygon fails to union — keep what merged so far
           // rather than losing the highlight entirely.
