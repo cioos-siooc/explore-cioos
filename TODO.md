@@ -9,16 +9,21 @@
 - [x] Fix click on map grid box / hex / marker interaction — one click handler
       for every layer, answered by the "what's here" card, instead of six
       handlers doing five unrelated things behind a stand-aside ladder.
-- [ ] Update hexes colormap base on visible hexes
-- [ ] Make icons in dataset page vertically stacked
+- [x] Update hexes colormap base on visible hexes
+- [x] Make icons in dataset page vertically stacked
 - [ ] Some records are duplicated within the dataset list for some reason. 
-- [ ] Filter UI have a select all and reset button which are basically doing the same thing. Just keep a clear button
+- [x] Filter UI have a select all and reset button which are basically doing the same thing. Just keep a clear button
 - [ ] Make bigger markers always site above smaller markers.
-
+- [x] WMS server slide selection should be linked in the url parametrization
+- [x] trajectory lines and makers should point to the record.
+- [x] trajectory line and point marker tooltip should have the timestamp assocaited
+- [ ] Tooltip show split the different datasets geometries 
+- [x] Make hexes more transparent and no filling at high zoom levels perhaps
 ### Map interaction follow-ups
 - [ ] Give the datasets sheet a mid snap point on phones, so the list and the
       map are visible together. Deliberately left alone for now: the sheet drag
       was removed on purpose in "on phones the sheet waits to be asked for".
+- [ ] Same view for the wms map layer, improve that too
 - [ ] Long-press on the map as "add everything here" without opening the card.
 
 ### Downloader — test and fix
