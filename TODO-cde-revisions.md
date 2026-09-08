@@ -104,11 +104,12 @@ to record it so a future review does not re-raise it.
 
 ---
 
-## P1 — Cheap, independent, safe — **DONE except four deferred items** (2026-09-08)
+## P1 — Cheap, independent, safe — **DONE except two deferred items** (2026-09-08)
 
-Everything below is closed unless marked **[deferred]**. The four deferred items were
-scoped out deliberately: they are not cheap, and each needs its own pass. Verification for
-the whole P1 sweep is at the end of this section.
+Everything below is closed unless marked **[deferred]**. The two that remain — `LICENSE`
+and the Python packaging consolidation — were scoped out deliberately: they are not cheap,
+and each needs its own pass. The JS-style, ESLint-flat-config and Sentry items were closed
+by the styling-unification pass; see that section and the verification at the end.
 
 ### Ignore files & tracked junk
 
@@ -204,10 +205,10 @@ the whole P1 sweep is at the end of this section.
       redundant regex escapes (equivalence checked before removing).
       `frontend` lint: 503 → **0**, 500 by autofix across 14 files (the Harvest components,
       written in a different style) plus two dead bindings.
-- [ ] **[deferred]** Unify the two JS styles. `frontend` (standard/no-semi/single-quote) and
-      `web-api` (airbnb/semi/double-quote) still disagree. Both now lint clean *against their
-      own config*, which is what makes the gate possible; converging them is a separate
-      reformat and was scoped out.
+- [x] **Unified the two JS styles.** Prettier (defaults: double quotes, semicolons,
+      2-space, 80 cols) now owns formatting for `frontend`, `web-api` and `test`, and both
+      `.eslintrc` files are gone. `standard` and `airbnb-base` were dropped rather than
+      ported — being eslintrc-only is exactly what pinned the repo to ESLint 8.
 - [x] Root `test/` — already fixed by the CI refresh. **[verified fixed @ 6f64fb41]**
 - [x] `CODEOWNER` → `CODEOWNERS`.
 - [ ] **[deferred]** `LICENSE`. Not a cleanup decision: this repo is a fork of
@@ -216,8 +217,23 @@ the whole P1 sweep is at the end of this section.
 - [x] `CONTRIBUTING.md` and `.github/dependabot.yml` added. Dependabot covers three npm
       projects, four uv projects, six Docker contexts and the GitHub Actions, grouped so a
       week's patches arrive as one PR per ecosystem.
-- [ ] **[deferred]** ESLint 8 → 9 flat config. Both projects are still on ESLint 8 and
-      `.eslintrc`. A two-project flat-config migration is not a cheap item.
+- [x] **ESLint 8 → 9 flat config.** One root `eslint.config.mjs` scopes all three
+      runtimes (browser ESM + JSX, Node CJS, Node ESM), which also picked up the two
+      things nothing linted before: `test/` and `web-api/bin/www`. ESLint **9**.39.5, not
+      10: `eslint-plugin-react@7.37.5` caps its peer at `^9.7` and has no v10 release.
+      Revisit when it ships one.
+    - The toolchain now lives in a root `package.json` (ESLint, Prettier, stylelint) —
+      one install, one version, and `--ignore-path .gitignore` is gone. Neither Dockerfile
+      is affected: each copies only its own manifest, and `web-api` already built with
+      `--omit=dev`.
+    - **stylelint added** (`stylelint.config.mjs`); CSS was entirely unlinted. ~300
+      findings autofixed. It immediately found a live bug: `width: 60` (no unit) in
+      `Controls/Filter/styles.css` is invalid CSS that browsers silently drop. Seven rules
+      are off, each annotated with why.
+    - **Prettier 3 reads `.gitignore` by default**, and the root `.gitignore` has a bare
+      `harvest` pattern for build artifacts — so all 17 files under
+      `frontend/src/components/Harvest/` were being silently skipped by the formatter.
+      Both `format` scripts now pass `--ignore-path .prettierignore`.
 
 ### Dependencies
 
@@ -228,9 +244,15 @@ the whole P1 sweep is at the end of this section.
 - [x] Overlapping stacks collapsed as far as the dead code went: `ioredis` and `validator`
       are gone, leaving one Redis client and one validator. The `apicache`/`redis@5` shim in
       `utils/cache.js` stays — replacing `apicache` is a behaviour change, not a prune.
-- [ ] **[deferred]** Sentry majors. `web-api` is still on `@sentry/node@^6` +
-      `@sentry/tracing` against `frontend`'s `@sentry/react@^10`. A four-major upgrade
-      rewrites the init and handler API; it needs its own pass.
+- [x] **Sentry majors.** `@sentry/node` 6.19.7 → 10.73.0 and `@sentry/tracing` deleted
+      (folded into the SDK). The frontend needed **no** API changes — it was already v10
+      and idiomatic, so the "four-major gap" was web-api alone. Init moved to
+      `web-api/instrument.js`, required as the first statement of `bin/www`: v8+
+      auto-instrumentation patches modules as they load, and the old code called
+      `Sentry.init` at `app.js:45`, thirty lines after `require("express")`, so tracing
+      could never attach. The three `Sentry.Handlers.*` calls collapse into one
+      `Sentry.setupExpressErrorHandler(app)`. Note this pulls OpenTelemetry v2 into the
+      image.
 - [x] Stale `web-api` pins bumped: `dotenv` 10 → 17 (all six `config()` calls now pass
       `{ quiet: true }`; v17 prints a promo banner otherwise), `uuid` 8 → 11, `debug` 2.6.9
       → 4, `http-errors` 1.6 → 2. The express-generator remnants are gone: `views/`,
@@ -257,11 +279,26 @@ the whole P1 sweep is at the end of this section.
 
 ### Found while doing this — new items, not from the original survey
 
-- [ ] **`web-api` never initialises Sentry in production.** `app.js:46` gates on
+- [x] **`web-api` never initialises Sentry in production.** Fixed as part of the Sentry
+      upgrade, deliberately: the gate is now `if (process.env.SENTRY_DSN)`, and the DSN is
+      read from the environment instead of being hardcoded. **This enables error reporting
+      that has never been on in production — expect a burst of previously-invisible errors
+      on the first deploy.** The handler also moved after the 404 middleware; it sat before
+      it, so nothing registered later could ever reach Sentry. Verified both ways locally:
+      with a DSN the app boots and `/sentry-test` flows through the handler, without one it
+      starts clean. The frontend DSN is deliberately left hardcoded — browser DSNs are
+      public by design, and making it a build arg would risk a deploy contract that cannot
+      be tested from here.
+      Superseded detail: `app.js:46` gated on
       `process.env.ENVIRONMENT === "production"`, but `.env.production` sets
       `ENVIRONMENT=juno-cioos-co-production`. One-word fix, but it *enables* error reporting
       that is currently off, so it wants a deliberate decision rather than a drive-by.
-- [ ] **57 React hooks findings.** Enabling `plugin:react-hooks/recommended` reports 54
+- [ ] **React hooks findings, now 45 under the v7 plugin.** `eslint-plugin-react-hooks@7`
+      ships 16 rules; **11 pass and are enabled**. Five are off because they have
+      pre-existing findings whose fixes change render behaviour: `rules-of-hooks`,
+      `exhaustive-deps`, and the new React Compiler rules `set-state-in-effect` (43),
+      `refs` (1) and `immutability` (1).
+      Original note (eslint 8 / plugin v4): enabling `plugin:react-hooks/recommended` reports 54
       `exhaustive-deps` and 3 `rules-of-hooks`. The three look like genuine bugs:
       `DatasetPreviewTable.jsx:12-13` calls `useTranslation`/`useState` conditionally, and
       `utilities.jsx:23` calls `useTranslation` inside a plain function. The plugin is now
@@ -271,6 +308,29 @@ the whole P1 sweep is at the end of this section.
       fails in a full-suite run but passes alone: the repo `.env`'s `DB_PORT=5433` leaks in
       via a `load_dotenv()` at import time. Pre-existing (confirmed identical on a stashed
       tree) and environment-dependent, so CI does not see it. Worth an isolated fixture.
+
+### Styling unification (2026-09-08)
+
+- [x] **Frontend CSS tokenised.** `Harvest/styles.css` was the only sheet with real
+      hardcoded colour (78 values); the `ui/*.css` hits were all `var(--cioos-x, #fallback)`
+      fallbacks, which are fine as they are. 39 values that matched a theme token became
+      `var(--cioos-*)`, chosen per selector (`color` → `ink`, `background` → `navy`, status
+      selectors → `success-bg`/`error-bg`). The other 39 had no global equivalent and are
+      now 15 named locals on `.harvest-root` — they are admin status tints, not brand
+      values, so they stay out of `theme.css`. Verified every `.harvest-*` element renders
+      inside `.harvest-root`, including the early-return loading/error paths.
+- [x] **Harvest inline styles moved into the stylesheet**, 114 → 33 across the repo. The
+      subtree had 95 inline styles beside a 398-line sheet. Conditional colours became
+      conditional classes rather than inline hex, so no hardcoded colour is left in any
+      Harvest JSX. Seven near-identical font sizes (0.72–0.85rem) collapsed to a four-rung
+      scale; the widest change moves text by about half a pixel.
+      What stays inline is deliberate: `Legend.jsx` computes gradients and positions from
+      data, `Spinner.jsx` sets a per-node `--cioos-node-delay`, and `IntroModal` /
+      `DownloadDetails` build `backgroundImage` from a Vite asset import.
+- [ ] `logo.jsx` still holds six static inline styles and has no stylesheet. Left alone:
+      it is a self-contained brand component, not part of the half-migrated Harvest subtree.
+- [ ] The frontend has no `reactRouterV6BrowserTracingIntegration`, so Sentry transactions
+      carry raw URLs rather than parameterised route names despite react-router-dom 6.30.4.
 
 ### Verification for this sweep
 
