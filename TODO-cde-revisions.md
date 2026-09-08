@@ -18,7 +18,7 @@ to record it so a future review does not re-raise it.
 
 ---
 
-## P0 — Broken now
+## P0 — Broken now — **COMPLETE** (2026-09-08)
 
 ### CI / deploy
 
@@ -29,67 +29,78 @@ to record it so a future review does not re-raise it.
       trigger on `main`, `master`, and `development*`, which covers `development-v2`; Python tests,
       the JS API/frontend smoke suite, and the download-request check now run through the integration
       workflow. **[verified fixed @ 6f64fb41]**
-- [ ] **`deploy.yml` is not gated on tests.** It reads `github.event.workflow_run.head_branch` in three
-      places (lines 11, 13, 29) but its `on:` block only has `push` and `workflow_dispatch`, so that
-      expression is always null and falls through to `github.ref_name`. A red build still deploys. **[verified]**
-- [ ] CI now installs Node 20 via `actions/setup-node@v4`, so Puppeteer 24 can run, but this still
-      differs from `frontend/package.json` (`engines.node >= 22`) and `frontend/Dockerfile`
-      (`node:22-alpine`). Align the integration-test runtime with the app runtime.
+- [x] **`deploy.yml` is not gated on tests.** Fixed: `on:` is now `workflow_run` on **Integration
+      Tests** (a superset — it runs the whole Python suite before compose) restricted to
+      `master`/`development`, with `if: … workflow_run.conclusion == 'success'`, so the
+      `workflow_run` expressions the file already used now resolve. Both test workflows gained a
+      `push` trigger on those branches so the gate has a run to fire from, and the checkout pins
+      `ref: workflow_run.head_sha` — a workflow_run checkout defaults to the DEFAULT branch, which
+      would have deployed master's compose files to development. `workflow_dispatch` is unchanged
+      and stays a deliberate manual override. **[fixed]**
+- [x] CI now installs Node 22, matching `frontend/package.json` (`engines.node >= 22`) and
+      `frontend/Dockerfile` (`node:22-alpine`). **[fixed]**
 - [x] `build_and_test.yml` now uses `cp .env.sample .env`, `cp docker-compose.override.yaml.sample ...`,
       and `cp harvest_config.sample.yaml ...` during CI setup. **[verified fixed @ 6f64fb41]**
-- [ ] Stale action versions remain partially cleaned up: `actions/checkout@v6` and `setup-uv@v6` are
-      current in these workflows, but `actions/setup-node@v4` is still behind the repo's stated
-      "v6 current" target. `dorny/paths-filter` is gone with the old path-filtered unit workflow.
+- [x] Action versions are current across all three workflows: `actions/checkout@v7`,
+      `actions/setup-node@v7`, `astral-sh/setup-uv@v10.0.1`. `dorny/paths-filter` is gone with the
+      old path-filtered unit workflow. **[verified]**
 
 ### Correctness bugs
 
-- [ ] **`download.js:177` assigns an undeclared global.** `count = tile.json_agg.length;` with no
-      `let`/`const`. In non-strict CommonJS this is `global.count`, shared across all requests — if
-      `tile.json_agg` is empty the previous request's count is returned. **[verified]**
-- [ ] **`/download` never validates `email`.** `download.js:75` registers `check("email").isEmail()`
-      *after* `requiredShapeMiddleware()`, whose own `errorHandler` runs first
-      (`validatorMiddlewares.js:94`). Nothing calls `validationResult` afterwards, so `email` is
-      inserted into `cde.download_jobs` unvalidated at `download.js:175`. **[verified]**
-- [ ] **Every download job carries a broken CKAN link.** `download.js:132` is
-      `'https://catalogue.cioos.ca/dataset/' ckan_url` — missing `|| ckan_id`. Compare the correct
-      form at `shapeQuery.js:173-174`. **[verified]**
-- [ ] **`redisFunctions.py:56-58` has an exception handler that always raises.** A bare `except:`
-      whose body calls `log.error(...)`, where `log` is the closed file handle from the `with` block
-      at line 38. Every entry raises `AttributeError` from inside the handler. The `requests.get` it
-      guards (line 54) also has no timeout, discards the response, and hardcodes `http://nginx:4000`. **[verified]**
-- [ ] **Three loguru calls silently drop their arguments.** `download_scheduler.py:48, 59, 79` use
-      print-style commas (e.g. `logger.info("Starting job:", pk, job_id)`). Loguru formats via
-      `str.format`, so with no `{}` in the message the DB host, the PDF flag and the job id are never
-      logged. **[verified]**
-- [ ] **`downloader` would fail a non-dev install.** `downloader/pyproject.toml` lists `harvester`
-      only in `[dependency-groups].dev`, but `download_erddap.py:10,14,15` import it at module scope.
-      It works today only because `download_scheduler` also declares it. **[verified]**
-- [ ] **`database/7_range_functions.sql` is dead but still executed.** Fully superseded by
-      `8_range_functions.sql`; the `db_migrate` glob `[3-9]_*.sql` applies both on every deploy, so
-      7 creates the two `range_intersection_length` overloads and 8 immediately drops and recreates
-      them. Editing either is quietly pointless. Delete `7_range_functions.sql`. **[verified]**
-- [ ] **`/tiles/tracks` caches for 1 hour, not 5 minutes.** `tiles.js:560` passes
-      `cache.route({ binary: true })`; `cache.js:81` takes `(duration = '5 minutes')`, so the object
-      lands in the duration slot and apicache falls back to its own 1-hour default. `binary` is not
-      an apicache option. **[verified]**
-- [ ] `preview.js:55` can divide by zero — `CEIL(:NUM_RECORDS / (records_per_day/24))` where
-      `records_per_day` is a nullable float, evaluated for every row of an unfiltered join. One bad
-      row poisons every `/preview` request.
-- [ ] `polygon.js` returns `false` on an invalid polygon (lines 21, 25) and `dbFilter.js:160-165`
-      never checks the return value, so `false` is bound into `ST_GeomFromText` → 500. Reachable on
-      every route except `/download`.
-- [ ] `download_scheduler.py:270-271` builds `UPDATE cde.download_jobs SET {params}` by string
-      interpolation, defended by manual `.replace("%","").replace("'","")` at lines 191, 214-216,
-      250-251. Convert to bound parameters. **[verified]**
-- [ ] `1_schema.sql:573-575` points at `database/migrations/add-harvest-run-prefect-columns.sql` —
-      the directory does not exist. Either restore it or drop the reference. **[verified]**
+- [x] **`download.js` assigns an undeclared global.** Already fixed before this pass — `count` is
+      declared `let count = 0;` inside the handler. **[verified fixed]**
+- [x] **`/download` never validates `email`.** Fixed: `errorHandler` (already exported by
+      `validatorMiddlewares.js`) now runs after the `check("email")` in the chain, so
+      `validationResult` is actually consulted and a bad address is a 400 instead of a row in
+      `cde.download_jobs`. **[fixed]**
+- [x] **Every download job carries a broken CKAN link.** Fixed to
+      `'https://catalogue.cioos.ca/dataset/' || d.ckan_id AS ckan_url`, matching `shapeQuery.js`.
+      Note the consumer disagreed about what the column meant: `download_erddap.py` re-appended
+      `ckan_id` to it, i.e. treated `ckan_url` as a bare prefix while `shapeQuery.js` and the
+      scheduler's email builder treat it as the full URL. `ckan_url` is now the full URL
+      everywhere and the downloader uses it directly. **[fixed]**
+- [x] **`redisFunctions.py` has an exception handler that always raises.** Fixed: the handler is
+      `except requests.RequestException` logging through the Prefect run logger, the request has a
+      timeout and a `raise_for_status()`, and the base URL is `CACHE_WARM_BASE_URL` (defaulting to
+      the compose service `http://nginx:4000`). Discarding the body is intentional and now says so —
+      the side effect of the request is the point. **[fixed]**
+- [x] **Three loguru calls silently drop their arguments.** All three now carry `{}` placeholders,
+      so the DB host, the PDF flag and the job id are actually logged. **[fixed]**
+- [x] **`downloader` would fail a non-dev install.** `harvester` moved from `[dependency-groups].dev`
+      to `[project].dependencies`; `uv.lock` regenerated (3-line diff). **[fixed]**
+- [x] **`database/7_range_functions.sql` is dead but still executed.** Deleted — confirmed a strict
+      subset of `8_range_functions.sql` by diff before removing. `database/README.md`'s file map no
+      longer lists a `7_/8_` pair. **[fixed]**
+- [x] **`/tiles/tracks` caches for 1 hour, not 5 minutes.** Now `cache.route()` like the other two
+      tile routes, with a comment recording why the object argument was wrong. **[fixed]**
+- [x] `preview.js` divide by zero. Already fixed before this pass — the expression is
+      `CEIL(:NUM_RECORDS / nullif(records_per_day/24, 0))`, with a comment explaining the NULL
+      path. **[verified fixed]**
+- [x] `polygon.js` returns `false` on an invalid polygon and `dbFilter.js` never checked it.
+      Fixed: `createDBFilter` throws `InvalidPolygonError` (`statusCode = 400`), which every route
+      already propagates — they all have the `if (err.statusCode === 400)` branch for
+      `ScientificNameSelectionTooBroadError`. **[fixed]**
+- [x] `download_scheduler.py` builds its `UPDATE` by string interpolation. Converted to bound
+      parameters; all four `.replace("%","").replace("'","")` sites are gone, so tracebacks and the
+      downloader's JSON report are stored verbatim. Column names are still formatted in (they are
+      module literals); a `SQL_NOW` sentinel keeps `time_start`/`time_complete` on the database
+      clock rather than binding the string. Covered by `TestUpdateDownloadJobs` in
+      `download_scheduler/tests/test_worker_loop.py`. **[fixed]**
+- [x] `1_schema.sql` points at a `database/migrations/…` file that has never existed. Reference
+      dropped; the note now just states the actual rule (this file is outside the `[3-9]_*.sql`
+      migrate glob, so a live DB gets column changes by hand). **[fixed]**
 
-### Open question — resolve before touching spatial code
+### Open question — RESOLVED
 
-- [ ] **`polygon.js:13` lat/lon order is unverifiable from that module.** It emits `` `${lat} ${lon}` ``
-      into WKT, but `ST_GeomFromText(…,4326)` reads `X Y` — lon first. Either the frontend sends
-      `[lon,lat]` pairs and the destructuring names are wrong, or every spatial selection is
-      transposed. Confirm against a known selection, then add the test.
+- [x] **`polygon.js` lat/lon order.** Resolved: **the names were wrong, the WKT was right.** The ring
+      is produced by turf's `bboxPolygon` and mapbox-gl-draw (`Map.jsx` `setPolygon` is fed
+      `geometry.coordinates[0]`) and serialized verbatim by `createSelectionQueryString`, all of
+      which are GeoJSON-order `[lon, lat]`; the destructuring named it `[lat, lon]` but emitted the
+      pair unswapped, which is the lon-first `X Y` that `ST_GeomFromText` wants. Spatial selections
+      were never transposed. Names corrected, the invariant is documented in the module, and
+      `web-api/utils/polygon.test.js` pins it with a ring whose two axes cannot be confused
+      (lon ≈ -130, lat ≈ 50). Run by the new **Web API unit tests** CI job (`node --test`, no new
+      dependency).
 
 ---
 
