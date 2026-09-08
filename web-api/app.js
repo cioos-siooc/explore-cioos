@@ -8,13 +8,13 @@ require("express-async-errors");
 
 const createError = require("http-errors");
 const express = require("express");
-const path = require("path");
-const cookieParser = require("cookie-parser");
 const logger = require("morgan");
 const cors = require("cors");
 
 const Sentry = require("@sentry/node");
-const Tracing = require("@sentry/tracing");
+// Side-effect import: patches the global Sentry hub so tracing works.
+require("@sentry/tracing");
+const swaggerUi = require("swagger-ui-express");
 const downloadRouter = require("./routes/download");
 const indexRouter = require("./routes/index");
 const legendRouter = require("./routes/legend");
@@ -36,8 +36,7 @@ const harvestRouter = require("./routes/harvest");
 const harvestDownloadsRouter = require("./routes/harvestDownloads");
 const trajectoriesRouter = require("./routes/trajectories");
 const nonnaRouter = require("./routes/nonna");
-const swaggerSpec = require('./swagger');
-const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require("./swagger");
 
 const app = express();
 
@@ -62,7 +61,8 @@ if (process.env.ENVIRONMENT === "production") {
 
 // if environement variables are set via docker, leave them
 // otherwise load from .env
-if (!process.env.DB_USER) require("dotenv").config();
+// eslint-disable-next-line global-require -- only loaded when docker did not supply the env
+if (!process.env.DB_USER) require("dotenv").config({ quiet: true });
 
 // CORS configuration via environment variable:
 //  - CORS_ORIGINS="*" (default) allows all origins
@@ -99,16 +99,13 @@ if (!process.env.DB_USER) require("dotenv").config();
   app.use(cors(corsOptions));
 })();
 
-
-// view engine setup
-app.set("views", path.join(__dirname, "views"));
-app.set("view engine", "jade");
-
+// No view engine and no static dir. views/*.jade, public/, cookie-parser and
+// the jade engine were express-generator scaffolding in a service that only
+// ever answers JSON and vector tiles — and `jade` was never installed, so
+// every res.render() threw. Nothing here sets or reads a cookie either.
 app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, "public")));
 
 app.use("/", indexRouter);
 app.use("/download", downloadRouter);
@@ -135,15 +132,15 @@ app.use("/trajectories", trajectoriesRouter);
 app.use("/nonna", nonnaRouter);
 
 // Swagger docs - conditionally enabled via ENABLE_API_DOCS environment variable
-if (process.env.ENABLE_API_DOCS !== 'false') {
-  app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: true }));
-  app.get('/openapi.json', (_req, res) => res.json(swaggerSpec));
+if (process.env.ENABLE_API_DOCS !== "false") {
+  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: true }));
+  app.get("/openapi.json", (_req, res) => res.json(swaggerSpec));
   console.log("API documentation enabled at /docs and /openapi.json");
 } else {
   // Redirect to BASE_URL when API docs are disabled
-  const redirectUrl = process.env.BASE_URL || '/';
-  app.use('/docs', (_req, res) => res.redirect(redirectUrl));
-  app.get('/openapi.json', (_req, res) => res.redirect(redirectUrl));
+  const redirectUrl = process.env.BASE_URL || "/";
+  app.use("/docs", (_req, res) => res.redirect(redirectUrl));
+  app.get("/openapi.json", (_req, res) => res.redirect(redirectUrl));
   console.log(`API documentation disabled via ENABLE_API_DOCS=false (redirecting to ${redirectUrl})`);
 }
 
@@ -154,15 +151,16 @@ app.use((req, res, next) => {
   next(createError(404));
 });
 
-// error handler
+// error handler. JSON, and the stack only outside production — express's
+// default handler was answering every error with an HTML page containing the
+// full stack trace, because the res.render() above it threw first.
+// eslint-disable-next-line no-unused-vars -- express identifies error handlers by arity
 app.use((err, req, res, next) => {
-  // set locals, only providing error in development
-  res.locals.message = err.message;
-  res.locals.error = req.app.get("env") === "development" ? err : {};
-
-  // render the error page
-  res.status(err.status || 500);
-  res.render("error");
+  const status = err.status || 500;
+  res.status(status).json({
+    error: err.message || "Internal Server Error",
+    ...(req.app.get("env") === "development" ? { stack: err.stack } : {}),
+  });
 });
 
 module.exports = app;
