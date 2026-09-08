@@ -3,7 +3,10 @@ name = "explore-cioos"
 version = "0.1.0"
 description = "CIOOS Explorer"
 readme = "README.md"
-requires-python = ">=3.10"
+# Upper bound matches every member project (harvester, downloader,
+# download_scheduler) and .python-version. Unbounded, the root lock
+# resolved markers for 3.11-3.13 that no image can satisfy.
+requires-python = ">=3.10,<3.11"
 dependencies = [
     "download-scheduler",
     "harvester",
