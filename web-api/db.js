@@ -13,8 +13,10 @@ const {
   DB_POOL_MAX,
 } = process.env;
 
-console.log("Connected to DB:", DB_HOST, DB_NAME, DB_PORT);
-
+// Deliberately silent at import. knex is lazy — it connects on the first query,
+// not here — so the "Connected to DB" banner this module used to print was both
+// untrue and emitted by merely requiring any util that touches the database.
+// bin/www logs the *target* at startup instead.
 const db = require("knex")({
   client: "pg",
   connection: {

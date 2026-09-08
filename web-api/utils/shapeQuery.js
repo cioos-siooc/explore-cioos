@@ -3,9 +3,23 @@ const { changePKtoPkURL } = require("./misc");
 
 const createDBFilter = require("./dbFilter");
 
-async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
+/*
+ * Assembles the shape query without running it: returns { sql, params } ready
+ * for db.raw. Split out from getShapeQuery so the largest SQL contract in the
+ * service can be asserted without a live Postgres — the only thing here that
+ * touches the database is the optional scientific-name expansion inside
+ * createDBFilter, which takes an injectable fetcher for the same reason.
+ *
+ * `params` carries the three knex Raw fragments dbFilter returns; they are
+ * interpolated as bindings by the caller's db.raw and each carries its own
+ * nested bindings (see utils/rawBindings.test.js).
+ */
+async function buildShapeSql(
+  query,
+  { doEstimate = true, getRecordsList = true, fetchAphiaIds } = {},
+) {
   // Caller propagates ScientificNameSelectionTooBroadError as a 400.
-  const filters = await createDBFilter(query);
+  const filters = await createDBFilter(query, { fetchAphiaIds });
 
   const {
     timeMin = null,
@@ -256,10 +270,18 @@ FROM   sub
     };
   }
 
-  const q = db.raw(sql, queryParams);
+  return { sql, params: queryParams };
+}
 
-  const rows = await q;
+async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
+  const { sql, params } = await buildShapeSql(query, {
+    doEstimate,
+    getRecordsList,
+  });
+
+  const rows = await db.raw(sql, params);
 
   return rows.rows.map(changePKtoPkURL);
 }
-module.exports = { getShapeQuery };
+
+module.exports = { getShapeQuery, buildShapeSql };

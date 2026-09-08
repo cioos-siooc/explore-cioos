@@ -11,6 +11,36 @@ const db = require("../db");
 // programmatic clients.
 const MAX_EXPANDED_APHIA_IDS = 5000;
 
+// Pre-computes the rolldown expansion in one fast query (~30ms even for
+// Phylum). Returns the set of AphiaIDs a selection rolls down to: the selected
+// names' accepted AphiaIDs (covers synonyms via shared valid_AphiaID) UNION
+// every taxon whose ancestor chain contains one. The GIN index on
+// ancestor_aphia_ids makes this index-only.
+const APHIA_EXPANSION_SQL = `
+      WITH selected_aids AS (
+        SELECT DISTINCT aphia_id
+          FROM cde.scientific_name_vernaculars
+         WHERE scientific_name = ANY(:scientificNamesArr)
+           AND aphia_id IS NOT NULL
+      )
+      SELECT aphia_id FROM selected_aids
+      UNION
+      SELECT v.aphia_id
+        FROM cde.scientific_name_vernaculars v
+       WHERE v.ancestor_aphia_ids && ARRAY(SELECT aphia_id FROM selected_aids)
+         AND v.aphia_id IS NOT NULL`;
+
+/*
+ * The ONLY query this module runs — everything else it does is string
+ * assembly, which is why it is injectable: with a fetcher supplied,
+ * createDBFilter is pure and every predicate it emits can be asserted without
+ * a live Postgres. Reached only when `scientificNames` is set.
+ */
+async function fetchAphiaIdsFromDb(scientificNamesArr) {
+  const { rows } = await db.raw(APHIA_EXPANSION_SQL, { scientificNamesArr });
+  return rows.map((r) => r.aphia_id);
+}
+
 class InvalidPolygonError extends Error {
   constructor() {
     // polygonJSONToWKT returns false for unparseable JSON, a non-array, or a
@@ -38,7 +68,10 @@ class ScientificNameSelectionTooBroadError extends Error {
   }
 }
 
-async function createDBFilter(request) {
+async function createDBFilter(
+  request,
+  { fetchAphiaIds = fetchAphiaIdsFromDb } = {},
+) {
   const {
     timeMin,
     timeMax,
@@ -202,30 +235,11 @@ async function createDBFilter(request) {
     );
     parameters.scientificNamesArr = scientificNamesArr;
 
-    // Pre-compute the rolldown expansion in one fast query (~30ms even for
-    // Phylum). Returns the set of AphiaIDs that selection rolls down to:
-    // selected names' accepted AphiaIDs (covers synonyms via shared
-    // valid_AphiaID) UNION every taxon whose ancestor chain contains one.
-    // The GIN index on ancestor_aphia_ids makes this index-only.
-    const expansionSql = `
-      WITH selected_aids AS (
-        SELECT DISTINCT aphia_id
-          FROM cde.scientific_name_vernaculars
-         WHERE scientific_name = ANY(:scientificNamesArr)
-           AND aphia_id IS NOT NULL
-      )
-      SELECT aphia_id FROM selected_aids
-      UNION
-      SELECT v.aphia_id
-        FROM cde.scientific_name_vernaculars v
-       WHERE v.ancestor_aphia_ids && ARRAY(SELECT aphia_id FROM selected_aids)
-         AND v.aphia_id IS NOT NULL`;
-    const { rows: expRows } = await db.raw(expansionSql, {
-      scientificNamesArr,
-    });
-    const expandedAphiaIds = expRows
-      .map((r) => r.aphia_id)
-      .filter((n) => Number.isInteger(n));
+    // Non-integer ids (NULL on not_found rows) are dropped here rather than in
+    // the fetcher, so the guarantee holds whatever supplied them.
+    const expandedAphiaIds = (await fetchAphiaIds(scientificNamesArr)).filter(
+      (n) => Number.isInteger(n),
+    );
 
     if (expandedAphiaIds.length > MAX_EXPANDED_APHIA_IDS) {
       throw new ScientificNameSelectionTooBroadError(

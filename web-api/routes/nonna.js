@@ -2,7 +2,7 @@ require("dotenv").config({ quiet: true });
 const express = require("express");
 const axios = require("axios");
 const { RESP_TYPES } = require("redis");
-const redisClient = require("../utils/redis");
+const { ensureConnected, markDown, withTimeout } = require("../utils/redis");
 
 const router = express.Router();
 
@@ -133,73 +133,22 @@ function cacheSet(key, body) {
 const REDIS_TTL_S = 30 * 24 * 60 * 60;
 const redisKey = (key) => `nonna:tile:${key}`;
 
-/*
- * Every redis call is bounded. node-redis keeps retrying a refused connection
- * under its default reconnect strategy, so an un-raced `await connect()` never
- * settles when redis is down — which stalls the tile request behind it and
- * hangs the layer. The cache is an optimisation; it must fail in milliseconds,
- * not hold the map hostage.
- */
-const REDIS_CONNECT_TIMEOUT_MS = 2000;
+// Reads and writes are bounded for the same reason the connect is (see
+// utils/redis): the tile cache is an optimisation and must fail in
+// milliseconds rather than hang the bathymetry layer.
 const REDIS_OP_TIMEOUT_MS = 1000;
-// After a failure, stop trying for a while rather than paying the timeout on
-// every tile — but do retry eventually, so a redis that comes back is picked up
-// without restarting the API.
-const REDIS_RETRY_AFTER_MS = 60000;
-
-let redisReadyPromise = null;
-let redisUnavailableUntil = 0;
-
-function withTimeout(promise, ms, label) {
-  let timer;
-  const bell = new Promise((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error(`${label} timed out after ${ms}ms`)),
-      ms,
-    );
-    // Don't let a pending timer keep the process alive.
-    if (timer.unref) timer.unref();
-  });
-  return Promise.race([promise, bell]).finally(() => clearTimeout(timer));
-}
-
-function markRedisDown(reason) {
-  console.warn("NONNA: redis unavailable, serving without it:", reason);
-  redisUnavailableUntil = Date.now() + REDIS_RETRY_AFTER_MS;
-  redisReadyPromise = null;
-}
 
 /*
  * Resolves to a redis client that returns Buffers, or null if redis is not
- * usable right now.
- *
- * The connect is single-flight for the reason utils/cache documents: redis@5
- * throws "Socket already opened" on a second connect(). That module races this
- * one at startup on the SAME shared client, so `isOpen` can still be false
- * while its connect is in flight — hence catching that specific error and
- * carrying on rather than treating it as a failure.
+ * usable right now. The connect lifecycle — single-flight, timeout, retry
+ * window — lives in utils/redis, which owns the client that utils/cache shares
+ * with this module; all that is left here is the Buffer type mapping the tile
+ * bodies need.
  */
-function ensureRedis() {
-  if (Date.now() < redisUnavailableUntil) return Promise.resolve(null);
-  if (redisReadyPromise) return redisReadyPromise;
-  redisReadyPromise = (async () => {
-    try {
-      if (!redisClient.isOpen) {
-        await withTimeout(
-          redisClient.connect(),
-          REDIS_CONNECT_TIMEOUT_MS,
-          "redis connect",
-        );
-      }
-    } catch (e) {
-      if (!/already opened/i.test(e.message) || !redisClient.isOpen) {
-        markRedisDown(e.message);
-        return null;
-      }
-    }
-    return redisClient.withTypeMapping({ [RESP_TYPES.BLOB_STRING]: Buffer });
-  })();
-  return redisReadyPromise;
+async function ensureRedis() {
+  const client = await ensureConnected();
+  if (!client) return null;
+  return client.withTypeMapping({ [RESP_TYPES.BLOB_STRING]: Buffer });
 }
 
 async function redisGet(key) {
@@ -213,7 +162,7 @@ async function redisGet(key) {
     );
     return Buffer.isBuffer(body) && body.length ? body : null;
   } catch (e) {
-    markRedisDown(`read failed: ${e.message}`);
+    markDown(`NONNA tile read failed: ${e.message}`);
     return null;
   }
 }
@@ -228,7 +177,7 @@ async function redisSet(key, body) {
       "redis set",
     );
   } catch (e) {
-    markRedisDown(`write failed: ${e.message}`);
+    markDown(`NONNA tile write failed: ${e.message}`);
   }
 }
 

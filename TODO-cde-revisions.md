@@ -434,22 +434,68 @@ Each of these is a larger piece of work. See the HTML review for before/after di
 - [ ] `dbFilter.js` returns `hasObisOnly` and `hasProfileOnly`, which have **zero consumers**.
 - [ ] Target: one module returning the branch set for a query; routes compose it.
 
-### P2.2 — Accept the database, don't construct it `[Strong]` — *best first move*
+### P2.2 — Accept the database, don't construct it — **DONE, SCOPED DOWN** (2026-09-08)
 
-`web-api/db.js`, `utils/*.js`, all 20 route modules
+`web-api/db.js`, `bin/www`, `utils/{dbFilter,shapeQuery,redis,cache}.js`, `routes/nonna.js`
 
-- [ ] `db.js:13` constructs the knex pool at import and exports the instance; 16 route modules and
-      both filter utils `require("../db")` directly. Merely `require`-ing `dbFilter.js` opens a pool
-      and logs "Connected to DB".
-- [ ] Consequence: the ~95% of the data-access code that is pure string assembly cannot run without
-      a live Postgres. `dbFilter.js:224-226` returns `db.raw(...)` *objects*, so even asserting the
-      emitted predicate needs a knex instance.
-- [ ] `utils/redis.js` exports a client constructed from env at import, not a factory.
-      `utils/cache.js` memoizes a module-level promise, so a test can exercise only one of its two
-      branches per process — and its `catch` degrades to in-memory silently, which its own comment
-      says took a production debugging session to find.
-- [ ] Target: pass the database in; let the filter modules return SQL rather than execute it. Two
-      adapters (Postgres, fake) justify the seam. This unlocks P2.1 and P2.3.
+**The premise was measured and is largely false, so the route-wide DI target was rejected.**
+With every `DB_*`/`REDIS_*` var unset and no Postgres or Redis running, `require("./app")` — all
+21 routers, both filter utils, redis and cache — returns in 1.6 s and opens **zero** connections:
+knex does not connect at construction, only when a query executes. What was actually fused, and is
+now split, was two specific call sites.
+
+- [x] **`db.js:13` "opens a pool" — it does not.** knex is lazy; the only observable import side
+      effect was `db.js:16` logging `Connected to DB: undefined undefined undefined`, i.e. a line
+      that claimed a connection that had not happened and printed nothing useful without env. It is
+      deleted, with a comment saying why, and `bin/www` now logs the *target*
+      (`DB target: host/name:port`) once at startup instead. Requiring a util is silent.
+- [x] **"~95% cannot run without a live Postgres" — it already could.** `createDBFilter` resolves
+      with no database and its predicates were already assertable via `.toString()`. The returned
+      `db.raw(...)` objects need a knex *instance*, not a live Postgres — and a builder-only
+      `knex({client:"pg"})` is exactly that. Pinned by `utils/rawBindings.test.js`, which records
+      the previously undocumented contract those six call sites rely on: a `Raw` carries its own SQL
+      and nested bindings, so it interpolates correctly into a *different* instance's `db.raw`.
+      That is why the objects were kept rather than flattened to strings — flattening moves
+      parameter merging into `shapeQuery`, `griddapCoverage`, `tiles`, `legend`, `download` and
+      `timeExtent` for no gain.
+- [x] **The two genuinely fused seams, now split.** `shapeQuery.js` gained
+      `buildShapeSql(query, {doEstimate, getRecordsList, fetchAphiaIds})` returning `{sql, params}`;
+      `getShapeQuery` is that plus `db.raw` and is unchanged for its three callers. `dbFilter.js`'s
+      aphia-expansion — the *only* query the module ran, and the reason it is async — takes an
+      injectable `fetchAphiaIds`, defaulting to the live one. Verified behaviour-preserving by
+      comparing against the pre-change module across a 20-selection matrix: **SQL and bindings
+      byte-identical in all 20**, including every branch combination and both option flags. The
+      expansion SQL was hoisted to a module constant, also byte-identical by diff.
+- [x] **`cache.js`'s silent degradation was the real bug here, and is fixed.** It memoized the init
+      promise *including its failure*, so one Redis blip at startup pinned the process to apicache's
+      per-process in-memory store for its entire lifetime behind a single `console.warn` — the
+      retry could never happen. The connect lifecycle (single-flight, 2 s timeout, 60 s retry
+      window) moved into `utils/redis.js`, which owns the client, and `routes/nonna.js` — which had
+      its own parallel copy and a comment apologising for racing `cache.js` on the same client —
+      now calls it. One owner, one promise, one retry window; only the successful adapter install
+      is memoized, and the warn is now an `error`. Verified live: against real Redis the adapter
+      installs and round-trips; against a dead port `ensureConnected` returns null in 2005 ms
+      (bounded, does not throw, cache still serves) and the second call inside the window costs
+      0 ms.
+- [x] `utils/redis.js` is still a module-level client rather than a factory — deliberately. The
+      testability complaint behind that bullet was that only one of `cache.js`'s two branches was
+      reachable per process; `createCache({ redis })` fixes that (the module surface stays exactly
+      `route` for all 29 call sites across 17 routes), and `utils/cache.test.js` drives success, failure **and
+      the retry** in one process.
+- [x] **REJECTED — `db.js` as a factory, `(deps) => router` across the 20 route modules,
+      `createApp({db, cache})`, "two adapters".** ~24 files touched during an intensive development
+      phase to buy something already available. It would also not be the clean seam it sounds like:
+      `require("pg-parse-float")(pg)` (`db.js:3`) and `apicache.options()` (`cache.js:68`) mutate
+      process-global state and must run exactly once regardless of how many "adapters" exist.
+      Recorded here rather than as an ADR because there is no `docs/adr/` in this repo and P0/P1
+      record their decisions inline; if a `docs/adr/` is ever created, this belongs in it.
+- [x] Tests added, all hermetic (`node --test`, no new dependency, and the existing
+      `utils/**/*.test.js` glob already covers them): `dbFilter.test.js` (14),
+      `shapeQuery.test.js` (13, two of them **characterisation** tests pinning the §P2.1 drift so
+      whoever unifies the branch set can see exactly which queries change), `cache.test.js` (5) and
+      `rawBindings.test.js` (4). **38 pass**, up from 3.
+- [ ] Still open, and belongs to P2.1/P2.3 rather than here: `dbFilter.js` returns `hasObisOnly` and
+      `hasProfileOnly` with zero consumers, and the branch set is still written out five times.
 
 ### P2.3 — Every route through the same shape `[Strong]`
 
@@ -501,6 +547,29 @@ Each of these is a larger piece of work. See the HTML review for before/after di
 
 `database/*.sql`, `database/Dockerfile`, `docker-compose.yaml:55-81`
 
+> **Deliberate policy for now (recorded 2026-09-08) — do not raise versioned migrations again
+> until this changes.** The project is in an intensive development phase and the active database is
+> **not** treated as an important asset. A schema change is handled by rebuilding and re-harvesting,
+> not by migrating, and that is the accepted cost of keeping maintenance minimal. Migrating a
+> production database is expected eventually, but there is no production database to migrate yet.
+>
+> The mechanism for this already exists — use it rather than building another:
+> `rebuild_schema()` in `harvester/cde_harvester/core/schema.py:206-238` runs in **one**
+> transaction with `SET lock_timeout = '30s'`, does `DROP SCHEMA IF EXISTS cde CASCADE`, then
+> applies `1_schema.sql` followed by the `[3-9]_*.sql` files sorted by *numeric* prefix (so unlike
+> the compose glob it would order a future `10_` correctly), resetting `search_path` before each
+> file to reproduce psql's per-file isolation. It is exposed as the on-demand Prefect deployment
+> `cde-rebuild-database` (`prefect_pipeline.py:693,734,744`), which can re-trigger the harvest
+> afterwards, and requires the caller to type the database name to confirm. `recreate_database.sh`
+> is the local drop-the-volume path. Covered by `harvester/tests/unit/test_schema_rebuild.py` and
+> `test_schema_drift.py`.
+>
+> **Consequently deferred:** a schema-version table, a real migration tool, per-file transactions
+> and rollback. **Still worth fixing regardless of the policy**, because each bites a *development*
+> database or a deploy today: the `[3-9]` glob silently skipping a future `10_*.sql`, the
+> availability window below, the unqualified `search_path` in `3_`–`9_`, and `remove_all_data()`
+> truncating `hexes_zoom_0/1` against the stated stable-pk invariant.
+
 - [ ] Two disjoint mechanisms, neither versioned: initdb (fresh volume only) and the `db_migrate`
       one-shot globbing `/database/[3-9]_*.sql` on every deploy. No version table, no transaction
       across files, no rollback — nothing can tell you which state a database is in.
@@ -509,9 +578,14 @@ Each of these is a larger piece of work. See the HTML review for before/after di
       (`database/README.md:7-9`, `recreate_database.sh`).
 - [ ] The `[3-9]` single-character class silently skips a future `10_*.sql`. Two files already share
       the `7_` prefix. **[verified]**
-- [ ] **A live availability window on every deploy**: `8_range_functions.sql:67-68` drops
-      `cde.day_union_count` and recreates it at :120, and `psql -f` gives each statement its own
-      transaction. Any `/legend` or `/tiles?metric=days` request in that gap fails.
+- [ ] **A live availability window on every deploy**: `8_range_functions.sql:63` drops
+      `day_union_days(daterange[])` and recreates it at :64-110, and `psql -f` gives each statement
+      its own transaction (`db_migrate` passes no `--single-transaction`, and the file has no
+      top-level `BEGIN`). Any `/legend` or `/tiles?metric=days` request in that gap fails. The same
+      DROP-then-CREATE shape appears three more times in the file (`:15`, `:27`, `:135`) and twice
+      in `5_profile_process.sql` (`:159-161`, `:364-365`). **[verified — the survey named this
+      `cde.day_union_count` at `:67-68`/`:120`; the function is `day_union_days`, is declared
+      unqualified with no `cde.` prefix, and the lines were wrong]**
 - [ ] `remove_all_data()` truncates `hexes_zoom_0/1`, destroying the "hex pks are stable forever"
       invariant asserted at `1_schema.sql:13-19`.
 - [ ] Unqualified `CREATE OR REPLACE FUNCTION` in `3_`–`9_`: `1_schema.sql:11`'s `SET search_path` is
