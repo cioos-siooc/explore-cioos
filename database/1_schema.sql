@@ -1,6 +1,6 @@
-/* 
+/*
     Create the tables
- 
+
  */
 
 
@@ -39,7 +39,7 @@ CREATE TABLE hexes_zoom_1 (
 CREATE INDEX ON cde.hexes_zoom_1 USING GIST (geom);
 CREATE UNIQUE INDEX hexes_zoom_1_ij_key ON cde.hexes_zoom_1 (i, j);
 
- 
+
 
 -- ERDDAP Datasets
 DROP TABLE IF EXISTS datasets;

@@ -1,7 +1,7 @@
-/* 
+/*
 
     ckan_process()
-    
+
     - updates datasets with data from CKAN
     - rewrites the organization table
 

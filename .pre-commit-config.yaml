@@ -1,0 +1,54 @@
+# Enable with: uvx pre-commit install   (or `pre-commit install`)
+#
+# Nothing enforced the .gitattributes LF policy before this, and nothing would
+# have caught frontend/.DS_Store or a literal-secret .env being committed. The
+# hooks here are the cheap ones that run on the changed files only; the full
+# lint/test gate lives in .github/workflows.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: mixed-line-ending
+        args: [--fix=lf] # .gitattributes declares `* text=auto eol=lf`
+      # Jinja2 email templates are excluded from both: their whitespace is
+      # rendered content, so "fixing" it changes what users receive.
+      - id: end-of-file-fixer
+        exclude: \.j2$
+      - id: trailing-whitespace
+        exclude: \.j2$
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=2048]
+      - id: check-yaml
+        # Compose anchors (x-env-file) and multi-document CI files.
+        args: [--allow-multiple-documents]
+      - id: check-json
+        # VS Code files are JSON-with-comments, which is not JSON. There is
+        # one set at the root and one under frontend/.
+        exclude: (^|/)\.vscode/
+      - id: detect-private-key
+      - id: check-case-conflict
+
+  # Same config the CI gate uses: [tool.ruff] in the root pyproject.toml.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.6
+    hooks:
+      - id: ruff
+        args: [--fix]
+
+  # uv keeps four lockfiles in step with their pyproject.toml. Both Dockerfiles
+  # now build with `uv sync --locked`, so a stale lock is a broken image.
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.9.9
+    hooks:
+      - id: uv-lock
+        name: uv-lock (root)
+      - id: uv-lock
+        name: uv-lock (harvester)
+        args: [--project, harvester]
+      - id: uv-lock
+        name: uv-lock (downloader)
+        args: [--project, downloader]
+      - id: uv-lock
+        name: uv-lock (download_scheduler)
+        args: [--project, download_scheduler]
