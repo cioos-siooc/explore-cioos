@@ -594,9 +594,11 @@ CREATE TABLE cde.harvest_runs (
 );
 CREATE INDEX harvest_runs_started_at_idx
     ON cde.harvest_runs (started_at DESC);
--- NOTE: applying this file DROP/CREATEs harvest_runs (wiping audit history). To
--- add the columns above to a LIVE database without dropping it, run the
--- idempotent migration in database/migrations/add-harvest-run-prefect-columns.sql.
+-- NOTE: applying this file DROP/CREATEs harvest_runs, wiping audit history. It
+-- is not part of the db_migrate glob ([3-9]_*.sql) for that reason — a live
+-- database gets column changes by hand, and this file describes the target
+-- shape. (It used to point at database/migrations/add-harvest-run-prefect-columns.sql,
+-- which has never existed in this repo.)
 
 CREATE TABLE cde.harvest_attempts (
     run_id        uuid NOT NULL REFERENCES cde.harvest_runs(run_id) ON DELETE CASCADE,
