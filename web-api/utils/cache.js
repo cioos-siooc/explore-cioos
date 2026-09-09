@@ -86,11 +86,21 @@ function createCache({ redis: redisModule = redis } = {}) {
 
   return {
     ensureReady,
+    // `toggle` is apicache's middlewareToggle, forwarded verbatim. In apicache
+    // 1.6.3 the pre-request toggle check is commented out, so it is consulted
+    // in exactly two places, both with the response in hand:
+    //   - shouldCacheResponse() — decides whether to STORE
+    //   - sendCachedResponse()  — decides whether to SERVE a hit
+    // That makes it the only way to keep error responses out of the cache:
+    // `statusCodes` is read from globalOptions, so passing it as a per-route
+    // localOption is silently ignored. On the serve path nothing has been
+    // written yet, so res.statusCode is still the default 200 and a
+    // `res.statusCode === 200` toggle correctly serves hits.
     route:
-      (duration = "5 minutes") =>
+      (duration = "5 minutes", toggle) =>
       async (req, res, next) => {
         const mw = await ensureReady();
-        return mw(duration)(req, res, next);
+        return mw(duration, toggle)(req, res, next);
       },
   };
 }
@@ -101,6 +111,9 @@ module.exports = {
   // process.
   route: createCache().route,
   createCache,
+  // Ready-made toggle for routes that proxy an upstream which can fail: cache
+  // the good answer, never the failure.
+  onlyOk: (req, res) => res.statusCode === 200,
   // Test seam: apicache's adapter is process-global, so a test exercising the
   // redis branch has to be able to put that global back.
   _resetAdapterForTests: () => {

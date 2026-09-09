@@ -97,7 +97,6 @@ export default function DatasetsPanel() {
             handleSelectAllDatasets={handleSelectAllDatasets}
             handleSelectDataset={handleSelectDataset}
             setInspectDataset={setInspectDataset}
-            setInspectRecordID={setInspectRecordID}
             filterSet={filterSet}
             selectAll={selectAll}
             setDatasets={setPointsData}

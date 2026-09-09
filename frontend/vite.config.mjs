@@ -44,6 +44,17 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 8000,
+      // Dev-only: forward /api to the docker-compose nginx (published on
+      // NGINX_PORT, default 8098, by docker-compose.override.yaml), which
+      // proxies on to web-api:5000. Keeps dev same-origin and on the exact
+      // same /api path production uses. Point at a different port or a
+      // remote stack with DEV_API_PROXY_TARGET.
+      proxy: {
+        "/api": {
+          target: env.DEV_API_PROXY_TARGET || "http://localhost:8098",
+          changeOrigin: true,
+        },
+      },
     },
     // Vitest reads this file, so the unit suite inherits the define{} above —
     // without it src/config.js throws 'API_URL is not defined' at import and the
