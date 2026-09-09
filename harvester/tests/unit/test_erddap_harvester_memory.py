@@ -14,11 +14,12 @@ depend on the flush interval.
 import os
 from unittest.mock import MagicMock, patch
 
-import cde_harvester.core.frame_spill as frame_spill_module
 import pandas as pd
 import pytest
-from cde_harvester.sources.erddap.harvester import ERDDAPHarvester
 from conftest import ERDDAP_URL, build_mock_dataset
+
+import cde_harvester.core.frame_spill as frame_spill_module
+from cde_harvester.sources.erddap.harvester import ERDDAPHarvester
 
 
 def _erddap_mock(n_datasets):

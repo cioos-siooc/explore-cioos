@@ -5,12 +5,13 @@ description = "CIOOS Explorer Downloader Scheduler"
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
 dependencies = [
+    # `harvester` used to be here too, purely to reach the issue grouping and
+    # the error codes — so a scheduler image installed Prefect, duckdb, redis,
+    # pandera and erddapy for them. Those live in cde-python-common now.
+    "cde-python-common",
     "downloader",
-    "harvester",
     "jinja2>=3.1.6",
     "loguru>=0.7.3",
-    "psycopg2-binary>=2.9.10",
-    "python-dotenv>=1.1.1",
     "sentry-sdk>=2.38.0",
     "sqlalchemy>=2.0.0,<3.0.0"
 ]
@@ -26,5 +27,5 @@ dev = [
 ]
 
 [tool.uv.sources]
+cde-python-common = { path = "../python-common", editable = true }
 downloader = { path = "../downloader", editable = true }
-harvester = { path = "../harvester", editable = true }

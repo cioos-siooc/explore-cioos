@@ -1,4 +1,4 @@
-"""Unit tests for cde_harvester.core.issues.
+"""Unit tests for cde_common.issues.
 
 Covers the two properties the grouping depends on: the same complaint about
 different values collapses into one signature, and genuinely different complaints
@@ -9,7 +9,8 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
-from cde_harvester.core.issues import (
+
+from cde_common.issues import (
     erddap_error_text,
     error_signature,
     group_issues,
@@ -193,7 +194,7 @@ def test_reports_one_sentry_event_per_group_with_a_scoped_fingerprint():
         _attempt("ds3", "https://b.ca/erddap", "KeyError: time",
                  reason_code="UNKNOWN_ERROR"),
     ]
-    with patch("cde_harvester.core.issues.sentry_sdk.capture_event") as capture:
+    with patch("cde_common.issues.sentry_sdk.capture_event") as capture:
         groups = report_issues("harvester", records)
 
     assert len(groups) == 2
@@ -218,7 +219,7 @@ def test_repeat_of_the_same_problem_reuses_the_fingerprint():
             _attempt(ds, "https://a.ca/erddap", CONSTRAINT_ERROR.format(ds))
             for ds in dataset_ids
         ]
-        with patch("cde_harvester.core.issues.sentry_sdk.capture_event") as capture:
+        with patch("cde_common.issues.sentry_sdk.capture_event") as capture:
             report_issues("harvester", records)
         return [call.args[0]["fingerprint"] for call in capture.call_args_list]
 
@@ -229,7 +230,7 @@ def test_component_separates_harvester_from_downloader():
     records = [_attempt("ds1", "https://a.ca/erddap", "KeyError: time")]
     fingerprints = []
     for component in ("harvester", "downloader"):
-        with patch("cde_harvester.core.issues.sentry_sdk.capture_event") as capture:
+        with patch("cde_common.issues.sentry_sdk.capture_event") as capture:
             report_issues(component, records)
         fingerprints.append(capture.call_args_list[0].args[0]["fingerprint"])
     assert fingerprints[0] != fingerprints[1]
@@ -240,7 +241,7 @@ def test_dataset_id_list_is_capped_but_the_count_is_not():
         _attempt(f"ds{n}", "https://a.ca/erddap", "KeyError: time")
         for n in range(120)
     ]
-    with patch("cde_harvester.core.issues.sentry_sdk.capture_event") as capture:
+    with patch("cde_common.issues.sentry_sdk.capture_event") as capture:
         report_issues("harvester", records)
     extra = capture.call_args_list[0].args[0]["extra"]
     assert extra["dataset_count"] == 120
@@ -251,6 +252,6 @@ def test_dataset_id_list_is_capped_but_the_count_is_not():
 def test_reporting_never_raises_into_the_caller():
     """Observability must not fail a run that otherwise succeeded."""
     records = [_attempt("ds1", "https://a.ca/erddap", "KeyError: time")]
-    with patch("cde_harvester.core.issues.sentry_sdk.capture_event",
+    with patch("cde_common.issues.sentry_sdk.capture_event",
                side_effect=RuntimeError("sentry down")):
         assert len(report_issues("harvester", records)) == 1

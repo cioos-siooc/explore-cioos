@@ -71,12 +71,14 @@ class TestERDDAPInit:
 
     def test_empty_response_gives_empty_dataframe(self):
         empty_csv = "datasetID,cdm_data_type\n(String),(String)\n,\n"
-        with patch("cde_harvester.sources.erddap.client.requests") as mock_requests:
-            mock_session = MagicMock()
-            mock_requests.Session.return_value = mock_session
-            mock_session.get.return_value = MockResponse(
-                text=empty_csv, url=ERDDAP_URL + "/tabledap/allDatasets.csv"
-            )
+        mock_session = MagicMock()
+        mock_session.get.return_value = MockResponse(
+            text=empty_csv, url=ERDDAP_URL + "/tabledap/allDatasets.csv"
+        )
+        with patch(
+            "cde_harvester.sources.erddap.client.retry_session",
+            return_value=mock_session,
+        ):
             from cde_harvester.sources.erddap.client import ERDDAP
             erddap = ERDDAP(ERDDAP_URL, cache_requests=False)
             erddap.df_all_datasets = erddap.get_all_datasets()
@@ -128,7 +130,7 @@ class TestErddapCsvToDf:
             total_bytes=int(MAX_RESPONSE_SIZE) * 4, url=ERDDAP_URL
         )
         erddap.session.get.return_value = mock_resp
-        from cde_harvester.core.errors import ResponseTooLargeError
+        from cde_common.errors import ResponseTooLargeError
         with pytest.raises(ResponseTooLargeError):
             erddap.erddap_csv_to_df("/tabledap/ds.csv")
 
@@ -140,7 +142,7 @@ class TestErddapCsvToDf:
         cap must never be pulled down in full.
         """
         erddap = _make_erddap()
-        from cde_harvester.core.errors import ResponseTooLargeError
+        from cde_common.errors import ResponseTooLargeError
         from cde_harvester.sources.erddap.client import MAX_RESPONSE_SIZE
         mock_resp = MockStreamingResponse(
             total_bytes=int(MAX_RESPONSE_SIZE) * 4, url=ERDDAP_URL

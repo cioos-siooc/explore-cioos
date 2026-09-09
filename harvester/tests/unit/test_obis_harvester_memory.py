@@ -13,9 +13,10 @@ they are the contract for the behavior, not for where it is implemented.
 """
 import os
 
-import cde_harvester.core.frame_spill as frame_spill_module
 import pandas as pd
 import pytest
+
+import cde_harvester.core.frame_spill as frame_spill_module
 from cde_harvester.sources.obis.harvester import OBISHarvester
 
 

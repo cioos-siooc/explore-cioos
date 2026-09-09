@@ -14,10 +14,6 @@ import ast
 from io import StringIO
 
 import pandas as pd
-from cde_harvester.core.schemas import SkippedDatasetSchema
-from cde_harvester.dataset_types import extract_features as get_profiles
-from cde_harvester.sources.erddap.compliance import CDEComplianceChecker
-from cde_harvester.sources.erddap.dataset import Dataset
 from conftest import (
     DATASET_ID,
     DOMAIN,
@@ -27,6 +23,11 @@ from conftest import (
     build_mock_dataset,
     mock_erddap_server,  # noqa: F401 — imported so pytest discovers the fixture
 )
+
+from cde_harvester.core.schemas import SkippedDatasetSchema
+from cde_harvester.dataset_types import extract_features as get_profiles
+from cde_harvester.sources.erddap.compliance import CDEComplianceChecker
+from cde_harvester.sources.erddap.dataset import Dataset
 
 # ---------------------------------------------------------------------------
 # Shared helpers

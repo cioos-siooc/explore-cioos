@@ -35,8 +35,8 @@ import requests
 from requests.exceptions import HTTPError
 from shapely.geometry import LineString
 
+from cde_common.errors import ResponseTooLargeError
 from cde_harvester.core.day_sets import bucket_index_to_day, day_bucket_group
-from cde_harvester.core.errors import ResponseTooLargeError
 from cde_harvester.sources.erddap.client import ERDDAP
 
 logger = logging.getLogger(__name__)

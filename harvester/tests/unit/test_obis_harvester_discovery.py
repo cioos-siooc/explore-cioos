@@ -9,6 +9,7 @@ db-loader prune every OBIS dataset out of the database).
 from unittest.mock import MagicMock
 
 import pytest
+
 from cde_harvester.sources.obis import harvester as obis_harvester
 from cde_harvester.sources.obis.discovery import (
     DiscoveryResult,

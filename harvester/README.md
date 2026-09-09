@@ -184,7 +184,8 @@ Configure the harvester through a `.env` file in the harvester directory (copy f
 # Database connection
 DB_USER=postgres
 DB_PASSWORD=password
-DB_HOST=localhost  # Use 'db' when running in Docker
+DB_HOST=localhost  # Use 'db' when running in Docker.
+                   # DB_HOST_EXTERNAL is preferred if both are set; see python-common/README.md
 DB_NAME=cde
 
 # Sentry error tracking (optional)
@@ -436,5 +437,5 @@ Check the `*_skipped.json` files in the output folder for details.
 
 If running locally outside Docker:
 - Ensure PostgreSQL is running (can use `docker compose up -d db`)
-- Set `DB_HOST=localhost` in your `.env` file
+- Set `DB_HOST=localhost` (or `DB_HOST_EXTERNAL`, which wins if both are set) in your `.env` file
 - Verify database credentials match your PostgreSQL configuration

@@ -9,17 +9,18 @@ harvest_erddap is a Prefect @task; .fn() bypasses the task wrapper.
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
-from cde_harvester.core.errors import (
-    CDM_DATA_TYPE_UNSUPPORTED,
-    HTTP_ERROR,
-)
-from cde_harvester.sources.erddap.harvester import harvest_erddap
 from conftest import (
     DATASET_ID,
     ERDDAP_INFO_NO_EOVS_CSV,
     ERDDAP_URL,
     build_mock_dataset,
 )
+
+from cde_common.errors import (
+    CDM_DATA_TYPE_UNSUPPORTED,
+    HTTP_ERROR,
+)
+from cde_harvester.sources.erddap.harvester import harvest_erddap
 
 # ---------------------------------------------------------------------------
 # Fixture helpers

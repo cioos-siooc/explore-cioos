@@ -31,7 +31,7 @@ jobs:
         run: uv sync --locked
 
       - name: Run all unit tests
-        run: uv run pytest harvester/tests/unit downloader/tests
+        run: uv run pytest python-common/tests harvester/tests/unit downloader/tests
 
   web-api-unit-tests:
     name: Web API unit tests

@@ -10,15 +10,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
-from dotenv import load_dotenv
 from prefect import flow, get_run_logger, task
 from prefect.client.orchestration import get_client
 from prefect.client.schemas.actions import WorkPoolCreate
 from prefect.deployments import run_deployment
 from prefect.exceptions import ObjectNotFound
 
+from cde_common import db as core_db
+from cde_common.env import load_env
 from cde_harvester.__main__ import main as harvester_main
-from cde_harvester.core import db as core_db
 from cde_harvester.core.config import (
     load_config,
     resolve_harvest_config_file,
@@ -37,7 +37,7 @@ from cde_harvester.sources import OBIS_ALIASES
 from cde_harvester.sources.obis.discovery import ObisDiscoveryConfig
 from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
 
-load_dotenv()
+load_env()
 
 logger = logging.getLogger(__name__)
 

@@ -19,6 +19,15 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from conftest import (
+    CKAN_EMPTY_RESPONSE,
+    CKAN_PACKAGE_SEARCH_RESPONSE,
+    DATASET_ID,
+    ERDDAP_URL,
+    MockResponse,
+    _route_erddap_url,
+)
+
 from cde_harvester.__main__ import (
     get_ckan_records,
     merge_and_write_csvs,
@@ -29,14 +38,6 @@ from cde_harvester.__main__ import (
 from cde_harvester.loading.loader import main as db_main
 from cde_harvester.sources.base import HarvestResult
 from cde_harvester.sources.erddap.harvester import harvest_erddap
-from conftest import (
-    CKAN_EMPTY_RESPONSE,
-    CKAN_PACKAGE_SEARCH_RESPONSE,
-    DATASET_ID,
-    ERDDAP_URL,
-    MockResponse,
-    _route_erddap_url,
-)
 
 # ---------------------------------------------------------------------------
 # Session-level mock for all ERDDAP HTTP calls
@@ -68,7 +69,9 @@ def harvest_result(tmp_path_factory):
     Uses harvest_erddap.fn() to bypass the Prefect @task decorator.
     """
     with (
-        patch("cde_harvester.sources.erddap.client.requests.Session") as mock_session_cls,
+        patch(
+            "cde_harvester.sources.erddap.client.retry_session"
+        ) as mock_session_cls,
         patch(
             "cde_harvester.sources.ckan.create_ckan_erddap_link.requests.get",
             side_effect=_ckan_side_effects(),
@@ -175,12 +178,14 @@ def written_csv_folder(tmp_path_factory, harvest_result):
     mock_future.result.return_value = hr
 
     with (
-        patch("cde_harvester.sources.erddap.client.requests.Session") as mock_session_cls,
-        # CKAN fetching now goes through a requests.Session built by
-        # _build_ckan_session() and read with resp.json(), so patch the session
-        # builder rather than the (now unused) module-level requests.get.
+        # Both the ERDDAP client and the CKAN reader build their session with
+        # cde_common.http.retry_session(), so patch that per module rather than
+        # the (unused) module-level requests.get.
         patch(
-            "cde_harvester.sources.ckan.create_ckan_erddap_link._build_ckan_session",
+            "cde_harvester.sources.erddap.client.retry_session"
+        ) as mock_session_cls,
+        patch(
+            "cde_harvester.sources.ckan.create_ckan_erddap_link.retry_session",
         ) as mock_ckan_session_builder,
         patch(
             "cde_harvester.__main__.get_run_logger",

@@ -40,60 +40,15 @@ from urllib.parse import urlencode
 
 import requests
 from sqlalchemy import text
-from urllib3.util.retry import Retry
 
-from cde_harvester.core.db import create_db_engine, db_host
+from cde_common.db import create_db_engine, db_host
+from cde_common.http import retry_session
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)-8s - %(name)s : %(message)s",
 )
 logger = logging.getLogger("populate_vernaculars")
-
-# Silence urllib3's generic "Retrying (Retry(total=3, …)) after connection
-# broken by '…': /rest/…" warning — our LoggingRetry below emits a richer line
-# with the full URL and remaining attempts, so leaving the default in would
-# just duplicate every retry.
-logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
-
-
-class LoggingRetry(Retry):
-    """urllib3.Retry that logs each retry with full URL and reason."""
-
-    def increment(
-        self,
-        method=None,
-        url=None,
-        response=None,
-        error=None,
-        _pool=None,
-        _stacktrace=None,
-    ):
-        full_url = url or ""
-        if _pool is not None and url:
-            full_url = f"{_pool.scheme}://{_pool.host}{url}"
-        if error is not None:
-            reason = f"{type(error).__name__}: {error}"
-        elif response is not None:
-            reason = f"HTTP {response.status}"
-        else:
-            reason = "unknown"
-        attempts_left = self.total - 1 if isinstance(self.total, int) else "?"
-        logger.info(
-            "Retrying %s %s (attempts left=%s) after %s",
-            method or "GET",
-            full_url,
-            attempts_left,
-            reason,
-        )
-        return super().increment(
-            method=method,
-            url=url,
-            response=response,
-            error=error,
-            _pool=_pool,
-            _stacktrace=_stacktrace,
-        )
 
 
 WORMS_BASE = "https://www.marinespecies.org/rest"
@@ -129,34 +84,21 @@ def build_engine(workers: int = DEFAULT_WORKERS):
 
 
 def build_session(workers: int = DEFAULT_WORKERS):
-    s = requests.Session()
-    s.headers["User-Agent"] = "cioos-cde/populate_vernaculars (+https://cioos.ca)"
-    s.headers["Accept"] = "application/json"
-    # Auto-retry transient server-side issues: stale keep-alive disconnects
-    # (RemoteDisconnected), 429 rate-limit pushes, and 5xx server errors.
-    # Connection errors are retried by default; status_forcelist covers HTTP
-    # responses that succeeded in reaching us but the server signalled retry.
-    retry = LoggingRetry(
-        total=4,
-        connect=4,
-        read=4,
-        backoff_factor=0.5,  # 0.5s, 1s, 2s, 4s between attempts
-        status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=frozenset(["GET"]),
-        raise_on_status=False,
-        respect_retry_after_header=True,
+    """WoRMS session: gentler backoff than the shared default, pooled per worker.
+
+    backoff_factor 0.5 (0.5s/1s/2s/4s) rather than 1.0 because WoRMS publishes no
+    hard rate limit and recovers quickly. The pool is sized to the worker count
+    to avoid the urllib3 "Connection pool is full, discarding connection" churn
+    that thrashes WoRMS with TLS reconnects when --workers exceeds the default.
+    """
+    return retry_session(
+        backoff_factor=0.5,
+        pool_size=workers + 2,
+        headers={
+            "User-Agent": "cioos-cde/populate_vernaculars (+https://cioos.ca)",
+            "Accept": "application/json",
+        },
     )
-    # Connection pool sized to the worker count to avoid the urllib3
-    # "Connection pool is full, discarding connection" churn that thrashes
-    # WoRMS with TLS reconnects when --workers exceeds the default.
-    adapter = requests.adapters.HTTPAdapter(
-        pool_connections=workers + 2,
-        pool_maxsize=workers + 2,
-        max_retries=retry,
-    )
-    s.mount("https://", adapter)
-    s.mount("http://", adapter)
-    return s
 
 
 def match_aphia_ids(session: requests.Session, names: list[str]):

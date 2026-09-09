@@ -1,3 +1,11 @@
+"""The ``reason_code`` vocabulary, shared by everything that writes one.
+
+These strings land in the database (``cde.harvest_attempts.reason_code``,
+``cde.datasets.content_hash_reason``) and in the download-job reports, so the
+harvester and the downloader have to agree on them, and
+:mod:`cde_common.issues` groups on them. One file, so they cannot drift.
+"""
+
 CDM_DATA_TYPE_UNSUPPORTED = "CDM_DATA_TYPE_UNSUPPORTED"
 HTTP_ERROR = "HTTP_ERROR"
 MISSING_REQUIRED_VARS = "MISSING_REQUIRED_VARS"

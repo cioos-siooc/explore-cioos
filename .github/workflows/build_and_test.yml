@@ -40,7 +40,7 @@ jobs:
       # it here instead of at deploy time.
       - name: Lockfiles are current
         run: |
-          for project in . harvester downloader download_scheduler; do
+          for project in . python-common harvester downloader download_scheduler; do
             echo "::group::uv lock --check $project"
             (cd "$project" && uv lock --check)
             echo "::endgroup::"

@@ -4,12 +4,13 @@ import logging
 from unittest.mock import MagicMock
 
 import pytest
+from conftest import ERDDAP_URL, build_info_df, build_variables_df
+
 from cde_harvester.dataset_types.grid import (
     GridHandler,
     extract_grid_extent,
     normalize_lon_extent,
 )
-from conftest import ERDDAP_URL, build_info_df, build_variables_df
 
 # Modeled on erddap.ogsl.ca/erddap/info/mpoChloroSatellitesAqua/index.csv —
 # the exact CSV shape ERDDAP emits for a griddap dataset (dimension rows carry

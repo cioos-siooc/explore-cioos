@@ -12,7 +12,7 @@ import pandas as pd
 from prefect import task
 from requests.exceptions import HTTPError
 
-from cde_harvester.core.errors import (
+from cde_common.errors import (
     CDM_DATA_TYPE_UNSUPPORTED,
     HTTP_ERROR,
     NO_PROFILES_FOUND,
@@ -22,8 +22,8 @@ from cde_harvester.core.errors import (
     UNKNOWN_ERROR,
     ResponseTooLargeError,
 )
+from cde_common.issues import erddap_error_text
 from cde_harvester.core.frame_spill import SpillSet
-from cde_harvester.core.issues import erddap_error_text
 from cde_harvester.core.schemas import (
     DatasetSchema,
     HarvestAttemptSchema,

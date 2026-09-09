@@ -15,16 +15,15 @@ import pandas as pd
 import requests
 from prefect import get_run_logger, task
 from prefect.cache_policies import NO_CACHE
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
-from cde_harvester.core.errors import (
+from cde_common.errors import (
     HASH_CROISSANT_HTTP_ERROR,
     HASH_CROISSANT_UNREADABLE,
     HASH_FEDERATED_UNRESOLVED,
     HASH_NO_FILE_LIST,
     ResponseTooLargeError,
 )
+from cde_common.http import DATA_TIMEOUT, DEFAULT_TIMEOUT, retry_session
 from cde_harvester.sources.erddap.dataset import Dataset
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -58,19 +57,6 @@ class _SpooledBody(tempfile.SpooledTemporaryFile):
     def seekable(self):
         return True
 
-# Transient HTTP statuses we should retry. 500 is included even though some
-# ERDDAPs use it semantically for "no data" / "query too big"; those responses
-# have a body we still need to inspect, so the retry only kicks in when the
-# server keeps returning 500 across attempts — i.e. it really is broken.
-# 413 is here because seagull-erddap's WAF returns it when the harvester
-# issues parallel requests too quickly; the queries themselves are tiny and
-# succeed when retried after backoff.
-# 408 (Request Timeout) and 520 (Cloudflare "unknown error") are transient
-# timeouts seen on the cioosatlantic/cioospacific CTD-profile endpoints under
-# load; the same queries succeed on a later attempt, so retry rather than skip.
-_RETRY_STATUSES = (408, 413, 500, 502, 503, 504, 520, 522, 524)
-
-
 _ERDDAP_SOURCE_RE = re.compile(
     r"(https?://.+?/erddap)/(tabledap|griddap)/([^/?.\s]+)"
 )
@@ -87,22 +73,6 @@ def _parse_erddap_source(source_url):
     endpoint."""
     match = _ERDDAP_SOURCE_RE.match(source_url) if source_url else None
     return (match.group(1), match.group(2), match.group(3)) if match else None
-
-
-def _build_retry_session() -> requests.Session:
-    session = requests.Session()
-    retry = Retry(
-        total=3,
-        backoff_factor=1.0,         # waits 0s, 2s, 4s between attempts
-        status_forcelist=_RETRY_STATUSES,
-        allowed_methods=frozenset(["GET", "HEAD"]),
-        raise_on_status=False,      # let the existing 5xx-handling logic run
-        respect_retry_after_header=True,
-    )
-    adapter = HTTPAdapter(max_retries=retry)
-    session.mount("https://", adapter)
-    session.mount("http://", adapter)
-    return session
 
 
 class ERDDAP:
@@ -128,7 +98,10 @@ class ERDDAP:
 
         self.domain = urlparse(erddap_url).netloc
         self.host_slug = self.domain.lower().replace(".", "-")  # for the task run label
-        self.session = _build_retry_session()
+        # total=3 rather than the shared default of 4: this is by far the
+        # highest-volume caller in the tree, and a fourth attempt against a
+        # server that is genuinely down costs another 8s per request.
+        self.session = retry_session(total=3)
 
         try:
             self.logger = get_run_logger()
@@ -310,7 +283,7 @@ class ERDDAP:
             response._content = content
             return response, io.BytesIO(content)
 
-        response = self.session.get(url_combined, timeout=3600, stream=True)
+        response = self.session.get(url_combined, timeout=DATA_TIMEOUT, stream=True)
         try:
             body = io.BytesIO(response.content) if response.status_code != 200 else self._spool(response, decoded_url)
         finally:
@@ -367,7 +340,7 @@ class ERDDAP:
             # Small metadata doc — don't inherit the 1h data-query timeout; a
             # hung .croissant endpoint would otherwise stall every dataset.
             response = self.session.get(
-                f"{erddap_base}/{dap}/{dataset_id}.croissant", timeout=60
+                f"{erddap_base}/{dap}/{dataset_id}.croissant", timeout=DEFAULT_TIMEOUT
             )
             if response.status_code != 200:
                 return None, False, HASH_CROISSANT_HTTP_ERROR

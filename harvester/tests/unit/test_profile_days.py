@@ -21,6 +21,8 @@ import logging
 
 import pandas as pd
 import pytest
+from requests.exceptions import HTTPError
+
 from cde_harvester.core.day_sets import (
     bucket_index_to_day,
     day_bucket_group,
@@ -40,7 +42,6 @@ from cde_harvester.dataset_types.tabledap_features import (
 from cde_harvester.dataset_types.timeseries import TimeSeriesHandler
 from cde_harvester.dataset_types.timeseries_profile import TimeSeriesProfileHandler
 from cde_harvester.sources.erddap.client import ERDDAP, ResponseTooLargeError
-from requests.exceptions import HTTPError
 
 LOG = logging.getLogger("test.profile_days")
 

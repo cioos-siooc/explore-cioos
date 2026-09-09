@@ -25,14 +25,17 @@ _sentry_init_patcher.start()
 # ---------------------------------------------------------------------------
 # Database environment isolation
 # ---------------------------------------------------------------------------
-# The connection settings cde_harvester.core.db resolves. Kept out of every
+# The connection settings cde_common.db resolves. Kept out of every
 # test's environment so the suite reads the same on a developer machine as it
-# does in CI.
+# does in CI. Both host names are here: cde_common.db falls back from
+# DB_HOST_EXTERNAL to DB_HOST, so leaving the second one ambient would let it
+# stand in for a setting a test never made.
 DB_ENV_SETTINGS = (
     "DB_NAME",
     "DB_USER",
     "DB_PASSWORD",
     "DB_HOST_EXTERNAL",
+    "DB_HOST",
     "DB_PORT",
 )
 
@@ -42,7 +45,7 @@ def isolate_db_env(monkeypatch):
     """Run every test against an empty database environment.
 
     ``cde_harvester.prefect_pipeline`` and ``cde_harvester.__main__`` both call
-    ``load_dotenv()`` at import time, which copies the repo's ``.env`` into
+    ``load_env()`` at import time, which copies the repo's ``.env`` into
     ``os.environ`` for the rest of the session. Whichever test imports one of
     them first therefore changes what every later test sees — which is how
     ``test_database_url_still_builds_when_complete`` came to pass on its own and

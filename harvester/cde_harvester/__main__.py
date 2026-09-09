@@ -8,17 +8,15 @@ from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
-from dotenv import load_dotenv
 from prefect import flow, get_run_logger, task
 from sentry_sdk.crons import monitor
 
+from cde_common.env import load_env
+from cde_common.issues import report_issues
+from cde_common.observability import init_sentry
 from cde_harvester.core.config import load_config, resolve_obis_config
 from cde_harvester.core.day_sets import ranges_to_iso
-from cde_harvester.core.issues import report_issues
-from cde_harvester.core.observability import (
-    init_sentry,
-    setup_logging,
-)
+from cde_harvester.core.observability import setup_logging
 from cde_harvester.core.schemas import HarvestAttemptSchema
 from cde_harvester.sources import resolve_source
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
@@ -32,7 +30,7 @@ from cde_harvester.sources.obis.geo_filter import DEFAULT_EXEMPT_NODE_IDS, ObisG
 from cde_harvester.sources.obis.harvester import harvest_obis
 from cde_harvester.utils import cf_standard_names, supported_standard_names
 
-load_dotenv()
+load_env()
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)

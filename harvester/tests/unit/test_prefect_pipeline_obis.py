@@ -15,6 +15,7 @@ Two real bugs are pinned here:
 
 import pytest
 import yaml
+
 from cde_harvester import prefect_pipeline
 from cde_harvester.prefect_pipeline import PrefectCDEPipeline, _configured_sources
 

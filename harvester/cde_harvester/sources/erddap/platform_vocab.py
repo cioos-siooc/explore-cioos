@@ -3,7 +3,8 @@ from importlib.resources import files
 from pathlib import Path
 
 import pandas as pd
-import requests
+
+from cde_common.http import DEFAULT_TIMEOUT, retry_session
 
 """
 
@@ -24,6 +25,15 @@ PLATFORM_L06_MAPPING_CSV = Path(
 )
 
 
+def _download_json(url):
+    """Fetch a vocabulary document. Reached only when the bundled CSV is absent,
+    so the session is built per call rather than at import."""
+    logger.info("Downloading %s", url)
+    response = retry_session().get(url, timeout=DEFAULT_TIMEOUT)
+    response.raise_for_status()
+    return response.json()
+
+
 def get_l06_codes_and_labels():
 
     if PLATFORM_L06_CODES_AND_LABELS_CSV.exists():
@@ -31,8 +41,7 @@ def get_l06_codes_and_labels():
         return pd.read_csv(PLATFORM_L06_CODES_AND_LABELS_CSV, index_col="l06_code")
 
     url = "http://vocab.nerc.ac.uk/collection/L06/current/?_profile=nvs&_mediatype=application/ld+json"
-    logger.info("Downloading %s", url)
-    platforms = requests.get(url).json()["@graph"]
+    platforms = _download_json(url)["@graph"]
 
     platforms_parsed = {}
     l06Lookup = {}
@@ -76,8 +85,7 @@ def get_ioos_to_l06_mapping():
 
     # download mapping
     url = "https://mmisw.org/ont/api/v0/ont?format=jsonld&iri=http://mmisw.org/ont/bodc/MapSeaVoxPlatforms2IOOSandRDIPlatforms"
-    logger.info("Downloading %s", url)
-    res = requests.get(url).json()
+    res = _download_json(url)
     rows = []
     # parse mapping
     for k in res["@graph"]:

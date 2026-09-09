@@ -4,7 +4,7 @@ import logging
 
 from sqlalchemy import text
 
-from cde_harvester.core.db import create_db_engine
+from cde_common.db import create_db_engine
 from cde_harvester.core.observability import run_logger
 
 _module_logger = logging.getLogger(__name__)

@@ -2,13 +2,18 @@ import os
 import smtplib
 from email.message import EmailMessage
 
-from dotenv import load_dotenv
 from loguru import logger
+
+from cde_common.env import load_env
 
 envs = os.environ
 
-if not os.getenv("GMAIL_USER"):
-    load_dotenv(os.getcwd() + "/.env")
+# Not behind an `if not os.getenv("GMAIL_USER")` sentinel any more: guessing at
+# one variable to decide whether the whole file had been supplied meant a
+# container that set DB_HOST but no GMAIL_* loaded the .env for the database and
+# not for the mail settings. load_env() searches once per working directory, so
+# calling it unconditionally costs nothing.
+load_env()
 
 
 def send_email(mail_to, mail_message_body, mail_subject):

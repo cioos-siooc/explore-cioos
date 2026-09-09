@@ -8,16 +8,17 @@ offline and deterministically.
 
 import pandas as pd
 import pytest
+from conftest import (
+    CKAN_EMPTY_RESPONSE,
+    CKAN_PACKAGE_SEARCH_RESPONSE,
+    DATASET_ID,
+)
+
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     get_ckan_records,
     split_erddap_url,
     unescape_ascii,
     unescape_ascii_list,
-)
-from conftest import (
-    CKAN_EMPTY_RESPONSE,
-    CKAN_PACKAGE_SEARCH_RESPONSE,
-    DATASET_ID,
 )
 
 # ---------------------------------------------------------------------------
@@ -26,9 +27,9 @@ from conftest import (
 
 def _make_ckan_get(mocker, pages):
     """
-    Patch the CKAN session builder so session.get() yields the given page
-    responses. CKAN fetching now goes through a requests.Session built by
-    _build_ckan_session() rather than the module-level requests.get.
+    Patch the shared session builder so session.get() yields the given page
+    responses. CKAN fetching goes through a requests.Session built by
+    cde_common.http.retry_session() rather than the module-level requests.get.
     Each call to list_ckan_records_with_erddap_urls paginates until results empty.
     """
     responses = []
@@ -40,7 +41,7 @@ def _make_ckan_get(mocker, pages):
     mock_session = mocker.MagicMock()
     mock_session.get.side_effect = responses
     mocker.patch(
-        "cde_harvester.sources.ckan.create_ckan_erddap_link._build_ckan_session",
+        "cde_harvester.sources.ckan.create_ckan_erddap_link.retry_session",
         return_value=mock_session,
     )
 

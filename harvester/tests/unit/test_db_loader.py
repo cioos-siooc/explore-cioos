@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
+
 from cde_harvester.loading.loader import (
     ensure_organization_pks,
     load_cells_copy,

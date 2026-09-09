@@ -10,6 +10,7 @@ reached 65454, which is why OBIS outweighed every other source in 87% of the
 hexes holding both.
 """
 import pandas as pd
+
 from cde_harvester.sources.obis.harvester import OBISHarvester
 
 DAY = 86_400_000  # OBIS dates are epoch milliseconds
