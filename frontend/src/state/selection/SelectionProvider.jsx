@@ -568,7 +568,9 @@ export default function SelectionProvider({ children }) {
           if (response.ok) {
             response.json().then((data) => {
               setPointsData(
-                data.map((point) => datasetInLanguage(point, languageRef.current)),
+                data.map((point) =>
+                  datasetInLanguage(point, languageRef.current),
+                ),
               );
             });
           } else {

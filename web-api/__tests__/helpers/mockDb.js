@@ -16,15 +16,14 @@
  * Returns an object that is both awaitable and carries the Knex Raw metadata
  * that the application code inspects (.sql, .toSQL).
  */
-function buildRawMock(rows = [], sql = 'SELECT 1') {
+function buildRawMock(rows = [], sql = "SELECT 1") {
   return {
-    rows,          // direct rows property (used by shapeQuery: rows.rows)
-    sql,           // .sql property checked by shapeQuery.js
+    rows, // direct rows property (used by shapeQuery: rows.rows)
+    sql, // .sql property checked by shapeQuery.js
     toSQL: jest.fn(() => ({ sql, bindings: [] })),
     then: (onFulfilled, onRejected) =>
       Promise.resolve({ rows }).then(onFulfilled, onRejected),
-    catch: (onRejected) =>
-      Promise.resolve({ rows }).catch(onRejected),
+    catch: (onRejected) => Promise.resolve({ rows }).catch(onRejected),
     toString: () => sql,
   };
 }
@@ -44,8 +43,7 @@ function buildQueryBuilderMock(rows = []) {
     insert: jest.fn().mockResolvedValue([1]),
     then: (onFulfilled, onRejected) =>
       Promise.resolve(rows).then(onFulfilled, onRejected),
-    catch: (onRejected) =>
-      Promise.resolve(rows).catch(onRejected),
+    catch: (onRejected) => Promise.resolve(rows).catch(onRejected),
   };
   return qb;
 }
@@ -63,13 +61,17 @@ function setupDbMock(mockDb) {
   let rawRows = [];
   let tableRows = [];
 
-  const rawMock = jest.fn((sql = 'SELECT 1') => buildRawMock(rawRows, sql));
+  const rawMock = jest.fn((sql = "SELECT 1") => buildRawMock(rawRows, sql));
   mockDb.mockImplementation(() => buildQueryBuilderMock(tableRows));
   mockDb.raw = rawMock;
 
   return {
-    setRawRows: (rows) => { rawRows = rows; },
-    setTableRows: (rows) => { tableRows = rows; },
+    setRawRows: (rows) => {
+      rawRows = rows;
+    },
+    setTableRows: (rows) => {
+      tableRows = rows;
+    },
     getRawMock: () => rawMock,
   };
 }
