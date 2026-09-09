@@ -34,22 +34,15 @@ describe("GET /platforms", () => {
     expect(res.status).toBe(200);
   });
 
-  it("returns an array of strings", async () => {
+  it("maps the database column to platform strings", async () => {
     const res = await request(app).get("/platforms");
-    expect(Array.isArray(res.body)).toBe(true);
-    res.body.forEach((p) => expect(typeof p).toBe("string"));
+    expect(res.body).toEqual(["buoy", "ship", "mooring"]);
   });
 
-  it("extracts the platform field from each row", async () => {
-    const res = await request(app).get("/platforms");
-    expect(res.body).toContain("buoy");
-    expect(res.body).toContain("ship");
-    expect(res.body).toContain("mooring");
-  });
-
-  it("returns empty array when no platforms exist", async () => {
-    setRawRows([]);
-    const res = await request(app).get("/platforms");
-    expect(res.body).toEqual([]);
+  it("queries distinct non-null platforms", async () => {
+    await request(app).get("/platforms");
+    const [sql] = db.raw.mock.calls[0];
+    expect(sql).toContain("SELECT DISTINCT  platform");
+    expect(sql).toContain("WHERE platform IS NOT NULL");
   });
 });

@@ -22,20 +22,8 @@ const { setupDbMock } = require("../helpers/mockDb");
 
 const { setRawRows } = setupDbMock(db);
 
-const RESULT_ROWS = [
-  {
-    scientificName: "Orcinus orca",
-    vernacular: "killer whale",
-    rank: "Species",
-  },
-  {
-    scientificName: "Tursiops truncatus",
-    vernacular: "common bottlenose dolphin",
-    rank: "Species",
-  },
-];
-
-beforeEach(() => setRawRows(RESULT_ROWS));
+beforeEach(() => setRawRows([]));
+afterEach(() => jest.clearAllMocks());
 
 describe("GET /scientificNames", () => {
   describe("search by q", () => {
@@ -44,19 +32,17 @@ describe("GET /scientificNames", () => {
       expect(res.status).toBe(200);
     });
 
-    it("returns an array of { scientificName, vernacular, rank } objects", async () => {
-      const res = await request(app).get("/scientificNames?q=Orcinus");
-      expect(Array.isArray(res.body)).toBe(true);
-      expect(res.body[0]).toHaveProperty("scientificName");
-      expect(res.body[0]).toHaveProperty("vernacular");
-      expect(res.body[0]).toHaveProperty("rank");
-    });
-
-    it("returns 200 with empty array when no results", async () => {
-      setRawRows([]);
-      const res = await request(app).get("/scientificNames?q=nonexistent");
-      expect(res.status).toBe(200);
-      expect(res.body).toEqual([]);
+    it("binds q as both a scientific-name prefix and vernacular substring", async () => {
+      await request(app).get("/scientificNames?q=Orcinus&limit=10");
+      const [sql, bindings] = db.raw.mock.calls[0];
+      expect(sql).toContain("n.scientific_name ILIKE :prefix");
+      expect(sql).toContain("WHERE vn ILIKE :sub");
+      expect(bindings).toEqual({
+        q: "Orcinus",
+        prefix: "Orcinus%",
+        sub: "%Orcinus%",
+        limit: 10,
+      });
     });
 
     it("returns 400 for invalid q (special characters)", async () => {
@@ -64,9 +50,9 @@ describe("GET /scientificNames", () => {
       expect(res.status).toBe(400);
     });
 
-    it("accepts lang=fr parameter", async () => {
-      const res = await request(app).get("/scientificNames?q=orque&lang=fr");
-      expect(res.status).toBe(200);
+    it("selects French vernaculars when lang=fr", async () => {
+      await request(app).get("/scientificNames?q=orque&lang=fr");
+      expect(db.raw.mock.calls[0][0]).toContain("v.vernaculars_fr");
     });
 
     it("returns 400 for unsupported lang value", async () => {
@@ -76,25 +62,22 @@ describe("GET /scientificNames", () => {
   });
 
   describe("exact lookup via names param", () => {
-    it("returns 200 for exact names lookup", async () => {
-      const res = await request(app).get(
-        "/scientificNames?names=Orcinus%20orca",
-      );
-      expect(res.status).toBe(200);
-    });
-
-    it("returns matched rows when names are found", async () => {
-      const res = await request(app).get(
+    it("binds exact names as an array", async () => {
+      await request(app).get(
         "/scientificNames?names=Orcinus%20orca,Tursiops%20truncatus",
       );
-      expect(Array.isArray(res.body)).toBe(true);
+      const [sql, bindings] = db.raw.mock.calls[0];
+      expect(sql).toContain("n.scientific_name = ANY(:names)");
+      expect(bindings).toEqual({
+        names: ["Orcinus orca", "Tursiops truncatus"],
+      });
     });
 
-    it("treats names= as no names param and falls through to search", async () => {
-      setRawRows([]);
-      const res = await request(app).get("/scientificNames?names=");
-      expect(res.status).toBe(200);
-      expect(Array.isArray(res.body)).toBe(true);
+    it("treats names= as a search request", async () => {
+      await request(app).get("/scientificNames?names=");
+      const [sql, bindings] = db.raw.mock.calls[0];
+      expect(sql).toContain("n.scientific_name ILIKE :prefix");
+      expect(bindings.q).toBe("");
     });
   });
 });

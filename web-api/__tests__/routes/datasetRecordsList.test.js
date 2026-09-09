@@ -19,23 +19,7 @@ const request = require("supertest");
 const app = require("../../app");
 const { getShapeQuery } = require("../../utils/shapeQuery");
 
-const RECORD_DETAILS = {
-  pk: "ds-1",
-  pk_url: "ds-1",
-  dataset_id: "test_ds_001",
-  title: "Test Dataset",
-  profiles: [
-    {
-      profile_id: "PROF-1",
-      time_min: "2020-01-01",
-      time_max: "2022-12-31",
-      depth_min: 0,
-      depth_max: 200,
-    },
-  ],
-};
-
-beforeEach(() => getShapeQuery.mockResolvedValue([RECORD_DETAILS]));
+beforeEach(() => getShapeQuery.mockResolvedValue([]));
 afterEach(() => jest.clearAllMocks());
 
 describe("GET /datasetRecordsList", () => {
@@ -44,9 +28,10 @@ describe("GET /datasetRecordsList", () => {
     expect(res.status).toBe(200);
   });
 
-  it("returns the single dataset object (pop of results array)", async () => {
+  it("returns the final result rather than the query-result array", async () => {
+    getShapeQuery.mockResolvedValue([{ pk: "first" }, { pk: "last" }]);
     const res = await request(app).get("/datasetRecordsList?datasetPKs=42");
-    expect(res.body).toHaveProperty("dataset_id", "test_ds_001");
+    expect(res.body).toEqual({ pk: "last" });
   });
 
   it("returns 400 when datasetPKs is missing", async () => {

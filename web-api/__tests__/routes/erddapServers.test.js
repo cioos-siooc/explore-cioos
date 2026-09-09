@@ -39,10 +39,11 @@ describe("GET /erddapServers", () => {
     expect(res.body).toContain("https://erddap.cioos.ca/erddap");
   });
 
-  it("returns empty array when no datasets exist", async () => {
-    setRawRows([]);
-    const res = await request(app).get("/erddapServers");
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual([]);
+  it("queries distinct non-OBIS servers in URL order", async () => {
+    await request(app).get("/erddapServers");
+    const [sql] = db.raw.mock.calls[0];
+    expect(sql).toContain("SELECT DISTINCT erddap_url");
+    expect(sql).toContain("source_type IS DISTINCT FROM 'obis'");
+    expect(sql).toContain("ORDER BY erddap_url");
   });
 });

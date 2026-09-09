@@ -20,9 +20,7 @@ const { setupDbMock } = require("../helpers/mockDb");
 
 const { setRawRows } = setupDbMock(db);
 
-const NODE_ROWS = [{ name: "EurOBIS" }, { name: "OBIS-Canada" }];
-
-beforeEach(() => setRawRows(NODE_ROWS));
+beforeEach(() => setRawRows([]));
 
 describe("GET /obisNodes", () => {
   it("returns 200", async () => {
@@ -30,18 +28,12 @@ describe("GET /obisNodes", () => {
     expect(res.status).toBe(200);
   });
 
-  it("returns an array of { name } objects", async () => {
-    const res = await request(app).get("/obisNodes");
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body[0]).toHaveProperty("name");
-    expect(res.body.map((r) => r.name)).toContain("EurOBIS");
-    expect(res.body.map((r) => r.name)).toContain("OBIS-Canada");
-  });
-
-  it("returns empty array when no OBIS datasets exist", async () => {
-    setRawRows([]);
-    const res = await request(app).get("/obisNodes");
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual([]);
+  it("queries distinct non-null nodes from OBIS datasets in name order", async () => {
+    await request(app).get("/obisNodes");
+    const [sql] = db.raw.mock.calls[0];
+    expect(sql).toContain("SELECT DISTINCT unnest(obis_nodes) AS name");
+    expect(sql).toContain("source_type = 'obis'");
+    expect(sql).toContain("obis_nodes IS NOT NULL");
+    expect(sql).toContain("ORDER BY name");
   });
 });

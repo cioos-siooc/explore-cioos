@@ -34,22 +34,15 @@ describe("GET /oceanVariables", () => {
     expect(res.status).toBe(200);
   });
 
-  it("returns an array of strings", async () => {
+  it("maps the database column to variable strings", async () => {
     const res = await request(app).get("/oceanVariables");
-    expect(Array.isArray(res.body)).toBe(true);
-    res.body.forEach((v) => expect(typeof v).toBe("string"));
+    expect(res.body).toEqual(["seaSurfaceTemperature", "salinity", "oxygen"]);
   });
 
-  it("extracts the ocean_variables field from each row", async () => {
-    const res = await request(app).get("/oceanVariables");
-    expect(res.body).toContain("seaSurfaceTemperature");
-    expect(res.body).toContain("salinity");
-    expect(res.body).toContain("oxygen");
-  });
-
-  it("returns empty array when no EOVs exist", async () => {
-    setRawRows([]);
-    const res = await request(app).get("/oceanVariables");
-    expect(res.body).toEqual([]);
+  it("queries distinct EOV values", async () => {
+    await request(app).get("/oceanVariables");
+    expect(db.raw.mock.calls[0][0]).toContain(
+      "SELECT DISTINCT UNNEST(eovs) ocean_variables",
+    );
   });
 });
