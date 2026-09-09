@@ -118,20 +118,6 @@ describe('createDBFilter', () => {
 // a thenable mock for the first call.
 // ---------------------------------------------------------------------------
 
-function makeRawMock(firstCallRows = []) {
-  const calls = [];
-  const mock = jest.fn((sql, params) => {
-    calls.push({ sql: sql || '', params: params || {} });
-    if (calls.length === 1 && firstCallRows !== null) {
-      // First call: expansion query — must be awaitable and return { rows }
-      return Promise.resolve({ rows: firstCallRows });
-    }
-    return { sql: sql || '', toSQL: () => ({ sql: sql || '', bindings: [] }) };
-  });
-  mock.calls = calls;
-  return mock;
-}
-
 describe('createDBFilter — obisNodes filter', () => {
   beforeEach(() => {
     db.mockImplementation(() => ({}));
@@ -246,7 +232,7 @@ describe('createDBFilter — scientificNames filter', () => {
   it('throws ScientificNameSelectionTooBroadError when expansion exceeds cap', async () => {
     db.mockImplementation(() => ({}));
     const bigRows = Array.from({ length: MAX_EXPANDED_APHIA_IDS + 1 }, (_, i) => ({ aphia_id: i + 1 }));
-    db.raw = jest.fn((sql, params) => {
+    db.raw = jest.fn(() => {
       return Promise.resolve({ rows: bigRows });
     });
 
@@ -280,7 +266,7 @@ describe('createDBFilter — scientificNames filter', () => {
       return { sql: sql || '', toSQL: () => ({ sql: sql || '', bindings: [] }) };
     });
 
-    const result = await createDBFilter({ scientificNames: 'Orcinus orca' });
+    await createDBFilter({ scientificNames: 'Orcinus orca' });
     const obisCall = rawCalls[2];
     expect(obisCall.params.expandedAphiaIds).toEqual([7]);
   });

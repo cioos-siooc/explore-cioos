@@ -189,7 +189,7 @@ export default function UrlSync() {
     if (lang !== i18n.language) {
       i18n.changeLanguage(lang);
     }
-  }, [lang]);
+  }, [i18n, lang]);
 
   return null;
 }
