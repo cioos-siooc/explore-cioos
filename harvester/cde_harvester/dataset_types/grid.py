@@ -3,7 +3,7 @@
 Griddap datasets are harvested METADATA-ONLY: no per-feature rows are
 produced. ``feature_kind = "dataset_extent"`` is routed to no feature table by
 the harvester — the grid's extent, structure and variable list are set on the
-Dataset object here and flow into datasets.csv via ``Dataset.get_df()``
+Dataset object here and flow into the datasets table via ``Dataset.get_df()``
 (coverage_*, grid_variables, grid_dimensions columns on cde.datasets).
 
 The one-row frame returned by ``extract_features`` only signals "extent

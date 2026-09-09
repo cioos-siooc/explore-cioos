@@ -141,12 +141,12 @@ def total_days(ranges):
 
 
 def ranges_to_iso(ranges):
-    """Run list as plain ISO-string pairs, for the CSV round-trip.
+    """Run list as plain ISO-string pairs, for the harvest-folder round-trip.
 
-    The harvester writes list columns to the CSV as Python reprs and the loader
-    reads them back with ast.literal_eval, which only accepts literals — the
-    repr of a datetime.date is a constructor call, so the dates cannot go
-    through as themselves.
+    Parquet can carry real DATE lists, but duckdb hands them back as
+    numpy.datetime64 rather than datetime.date, which is neither what
+    ranges_to_psycopg wants nor something ranges_from_iso accepts. ISO pairs
+    survive the trip as themselves and cost one parse on the way out.
     """
     return [[lo.isoformat(), hi.isoformat()] for lo, hi in ranges or []]
 

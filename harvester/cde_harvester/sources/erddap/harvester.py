@@ -64,7 +64,7 @@ def _attempt_urls(erddap_url, dataset, dataset_id):
 def _build_attempt(run_id, erddap_url, dataset_id, status, reason_code=None,
                    error_message=None, duration_ms=None, query_urls=None,
                    warnings=None):
-    """Build one harvest_attempts.csv row (kept identical to the legacy
+    """Build one harvest_attempts row (kept identical to the legacy
     record_attempt closure so the harvest-dashboard contract is unchanged).
 
     ``warnings`` is a non-fatal note surfaced on the harvest dashboard for an
@@ -96,7 +96,7 @@ class DatasetHarvestResult:
     """Outcome of harvesting a single dataset (success or non-error skip)."""
 
     status: str                      # "success" | "skipped" | "skipped_unchanged"
-    attempt: dict                    # one harvest_attempts.csv row
+    attempt: dict                    # one harvest_attempts row
     features: pd.DataFrame = None    # populated only on success
     # Which HarvestResult attribute `features` belongs in: "profiles" for
     # point-like types, "trajectory_days" for trajectory per-day aggregates.
@@ -115,7 +115,7 @@ class DatasetHarvestError(Exception):
 
     def __init__(self, attempt, skipped_reason_code, message):
         super().__init__(message)
-        self.attempt = attempt                       # error row for harvest_attempts.csv
+        self.attempt = attempt                       # error row for harvest_attempts
         self.skipped_reason_code = skipped_reason_code
 
 

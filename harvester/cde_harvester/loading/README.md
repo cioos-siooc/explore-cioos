@@ -154,11 +154,11 @@ Options:
 
 ## Input Files
 
-The loader expects these CSV files in the specified folder:
+The loader expects these Parquet files in the specified folder:
 
-- `datasets.csv`: Dataset metadata (one row per dataset)
-- `profiles.csv`: Profile/timeseries data (one row per profile)
-- `skipped.csv`: Datasets that were skipped during harvesting
+- `datasets.parquet`: Dataset metadata (one row per dataset)
+- `profiles.parquet`: Profile/timeseries data (one row per profile)
+- `skipped.parquet`: Datasets that were skipped during harvesting
 
 ## Environment Variables
 
