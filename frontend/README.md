@@ -73,6 +73,31 @@ The production build will be generated in the `dist` folder.
 
 To inspect bundle composition, run `npm run build:analyze` — it writes and opens `dist/stats.html`.
 
+## Tests
+
+```sh
+npm test            # vitest + Testing Library, jsdom
+npm run test:e2e    # Playwright behaviour specs, API mocked from e2e/fixtures
+npm run test:visual # screenshot baselines, 4 states x 3 viewports
+npm run test:a11y   # axe, against the ratcheting e2e/a11y-baseline.json
+npm run test:all    # all of the above
+```
+
+`test:visual` and `test:a11y` need Docker: they run through `e2e/in-container.sh`,
+which is the same Playwright image CI uses. Both compare readings of a rendered
+page, and the suite deliberately serves the webfonts empty so no screenshot
+depends on a third-party asset — which leaves every family falling through to
+`sans-serif`, a different physical face on each machine. A phone-width list then
+holds a different number of cards, and axe, which can only judge contrast inside
+the viewport, counts a different number of nodes. Recording on a host and
+enforcing in CI does not work; these run where the numbers were taken.
+
+Rewrite the baselines with `npm run test:visual:update` and
+`npm run test:a11y:baseline` after reviewing what changed. The a11y file is a
+to-do list of pre-existing violations: a rule missing from it fails immediately,
+a baselined rule may only ever match fewer nodes, and the run says so when it
+does. Refresh the API fixtures with `npm run test:e2e:record`.
+
 ## Map projections
 
 The layer picker (top-right of the map) includes a **Globe view** toggle. The globe projection renders high latitudes — notably the Arctic — without Mercator distortion; MapLibre automatically transitions back to Mercator at high zoom levels. All data layers (hex bins, points, trajectories) work in both projections.

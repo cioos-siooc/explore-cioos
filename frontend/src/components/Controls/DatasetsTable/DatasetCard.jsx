@@ -97,6 +97,9 @@ export default function DatasetCard({
 
   return (
     <div
+      data-testid="dataset-card"
+      data-dataset-pk={row.pk}
+      data-selected={Boolean(row.selected)}
       className={classNames("datasetCard", {
         selected: row.selected,
         clickable,

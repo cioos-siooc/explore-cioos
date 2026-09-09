@@ -4,16 +4,14 @@
   "description": "",
   "main": "tst.js",
   "scripts": {
-    "test": "npm run test:api && npm run test:frontend",
+    "test": "npm run test:api",
     "test:api": "node test_api_endpoints.js",
-    "test:download": "node test_download_request.js",
-    "test:frontend": "node frontend_loads_without_errors.js"
+    "test:download": "node test_download_request.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "node-fetch": "^3.2.6",
-    "puppeteer": "^24.22.3"
+    "node-fetch": "^3.2.6"
   },
   "type": "module"
 }
