@@ -21,6 +21,7 @@ export default function SelectPill({
   options,
   onChange,
   children,
+  "data-testid": testId,
 }) {
   // Ties the caption to the select, so the caption is the control's name and
   // clicking it reaches the menu.
@@ -32,7 +33,7 @@ export default function SelectPill({
   const selected = options.find((option) => option.id === value);
 
   return (
-    <span className="selectPill">
+    <span className="selectPill" data-testid={testId}>
       <label className="selectPillLabel" htmlFor={id}>
         {label}
       </label>

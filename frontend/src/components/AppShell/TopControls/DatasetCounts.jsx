@@ -34,6 +34,7 @@ export default function DatasetCounts() {
   return (
     <div
       className={classNames("topBarCountsRow", { updating: countsUpdating })}
+      data-testid="dataset-counts"
     >
       {!countsReady ? (
         <Spinner size="xs" className="countSpinner" />
@@ -57,6 +58,7 @@ export default function DatasetCounts() {
             (
             <button
               type="button"
+              data-testid="counts-only-in-view"
               className={classNames("topBarCountsInView", {
                 active: onlyInView,
               })}

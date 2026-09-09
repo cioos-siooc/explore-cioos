@@ -14,11 +14,13 @@ export default function Switch({
   checked,
   disabled,
   onChange,
+  "data-testid": testId,
 }) {
   return (
     <div className="form-check form-switch">
       <input
         className="form-check-input"
+        data-testid={testId}
         type="checkbox"
         role="switch"
         id={id}

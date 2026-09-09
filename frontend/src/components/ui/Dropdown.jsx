@@ -43,6 +43,7 @@ export function DropdownButton({
   // use this to mirror it into their own state.
   onOpenChange,
   children,
+  "data-testid": testId,
 }) {
   const [open, setOpenState] = useState(false);
   const setOpen = useCallback(
@@ -102,10 +103,11 @@ export function DropdownButton({
     .join(" ");
 
   return (
-    <div className={`dropdown ${className}`}>
+    <div className={`dropdown ${className}`} data-testid={testId}>
       <button
         type="button"
         ref={buttonRef}
+        data-testid={testId && `${testId}-toggle`}
         className={buttonClasses}
         title={tooltip}
         aria-expanded={open}
