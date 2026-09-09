@@ -42,7 +42,21 @@ docs
 **/harvest-prod
 **/downloads
 **/cde_download*
-**/obis
+# The harvest OUTPUT directory (harvest_obis()'s default folder="./obis/", so
+# it lands beside the run's cwd: repo root, or harvester/ when run from there).
+# ANCHORED deliberately. harvester/cde_harvester/sources/obis is a source
+# package of the same name, and a bare `**/obis` matched it too: the worker
+# image shipped without it, and `python -m cde_harvester` died on
+# `ModuleNotFoundError: No module named 'cde_harvester.sources.obis'` before it
+# could register its deployments, so every harvest failed.
+#
+# Do not reach for a `!` exception instead. `!harvester/**/*.csv` at the bottom
+# of this file already makes BuildKit walk into excluded directories and judge
+# each file on its own, and a directory pattern does not match the paths
+# beneath it — which is why harvester/obis/*.csv reaches the context today even
+# though harvester/obis is listed here. Another exception widens that hole.
+/obis
+harvester/obis
 **/obis_cache
 # ...but `**/obis` also matched harvester/cde_harvester/sources/obis, so the
 # image shipped without the OBIS source package and every container died on

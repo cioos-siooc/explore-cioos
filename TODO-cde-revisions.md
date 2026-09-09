@@ -2,6 +2,11 @@
 
 Produced 2026-08-27 from a full-repo survey at `development-v2 @ 92149f45`.
 Updated 2026-08-27 for CI/CD changes merged through `development-v2 @ 6f64fb41`.
+Updated 2026-09-09 with a second audit pass (GPT Sol 5.6) at `fix/p0-cleanup-backlog @ 26bd6f4d`. Its ten items are folded into the sections below
+and tagged **[2026-09-09]**; they are re-prioritised against *this* document's ladder
+(P0 = broken now, P1 = cheap and independent, P2 = structural), which is not the
+severity ladder the audit used. All ten were re-verified against the working tree
+before merging, and line references were corrected where the files had drifted.
 
 **How to read this.** Every item is independently actionable — take them one at a time.
 Items marked **[verified]** were re-checked directly against the working tree after the
@@ -18,7 +23,7 @@ to record it so a future review does not re-raise it.
 
 ---
 
-## P0 — Broken now — **COMPLETE** (2026-09-08)
+## P0 — Broken now — **first pass COMPLETE** (2026-09-08), one item added 2026-09-09
 
 ### CI / deploy
 
@@ -90,6 +95,25 @@ to record it so a future review does not re-raise it.
       dropped; the note now just states the actual rule (this file is outside the `[3-9]_*.sql`
       migrate glob, so a live DB gets column changes by hand). **[fixed]**
 
+### Correctness bugs — added 2026-09-09 **[2026-09-09]**
+
+- [ ] **A transient ERDDAP failure makes the next incremental harvest delete the dataset.**
+      `cde.skipped_datasets.erddap_url` is filled with `erddap.domain` — the bare hostname — at all
+      four write sites (`sources/erddap/harvester.py:221,246,296,302`), while `cde.datasets` and
+      every other temp table carry the full configured URL. `harvester.py:75-81` states the
+      divergence outright and calls it "legacy compatibility"; what it misses is that the column is
+      now load-bearing for pruning. `temp_skipped_datasets` is `LIKE cde.skipped_datasets`
+      (`9_incremental_upsert.sql:34`), so `prune_stale_datasets` (`:415-431`) compares a hostname
+      against a full URL in both the `covered` join and its `NOT EXISTS` guard. The guard therefore
+      never matches, and a dataset that merely **errored** this run is indistinguishable from one the
+      server no longer lists — so it is deleted, as long as the failure count stays under the 50%
+      `max_fraction` circuit breaker. One flaky response is enough; the breaker only catches the case
+      where *most* of a server fails.
+      Fix: write `self.erddap_url.rstrip("/")` at those four sites — the `verified_rows` branch 6
+      lines away (`:290-292`) already does exactly that — and backfill the hostnames already in
+      `cde.skipped_datasets`. Note the rebuild-not-migrate policy in §P2.5 makes the backfill a
+      re-harvest rather than a migration. **[verified]**
+
 ### Open question — RESOLVED
 
 - [x] **`polygon.js` lat/lon order.** Resolved: **the names were wrong, the WKT was right.** The ring
@@ -104,12 +128,15 @@ to record it so a future review does not re-raise it.
 
 ---
 
-## P1 — Cheap, independent, safe — **DONE except two deferred items** (2026-09-08)
+## P1 — Cheap, independent, safe — **first pass DONE except two deferred items** (2026-09-08)
 
-Everything below is closed unless marked **[deferred]**. The two that remain — `LICENSE`
-and the Python packaging consolidation — were scoped out deliberately: they are not cheap,
-and each needs its own pass. The JS-style, ESLint-flat-config and Sentry items were closed
-by the styling-unification pass; see that section and the verification at the end.
+The original survey's items are closed unless marked **[deferred]**. The two that remain —
+`LICENSE` and the Python packaging consolidation — were scoped out deliberately: they are not
+cheap, and each needs its own pass. The JS-style, ESLint-flat-config and Sentry items were
+closed by the styling-unification pass; see that section and the verification at the end.
+
+**Nine items added 2026-09-09** are open, in their own section at the end of P1. They are
+independent of each other and of everything above.
 
 ### Ignore files & tracked junk
 
@@ -329,10 +356,11 @@ by the styling-unification pass; see that section and the verification at the en
       the top of `Map.jsx`; making its helpers stable with `useCallback` is the follow-up
       that would remove those 16.
 
-      One known bug is documented rather than fixed, since it has its own entry: the
-      `/pointQuery` effect in `SelectionProvider` uses `selectionLoading` as a mutex and
-      drops filter changes made while a query is in flight. Completing its dependency
-      array would put it in a refetch loop; the fix is an `AbortController`/request id.
+      One known bug is documented rather than fixed: the `/pointQuery` effect in
+      `SelectionProvider` uses `selectionLoading` as a mutex and drops filter changes made
+      while a query is in flight. Completing its dependency array would put it in a refetch
+      loop; the fix is an `AbortController`/request id. It now has the entry this note
+      promised — see the 2026-09-09 section at the end of P1.
 - [x] `harvester/tests/unit/test_schema_rebuild.py::test_database_url_still_builds_when_complete`
       failed in a full-suite run but passed alone: the repo `.env`'s `DB_PORT=5433` leaked in
       via the `load_dotenv()` that `prefect_pipeline` runs at import time, so whichever test
@@ -392,7 +420,7 @@ by the styling-unification pass; see that section and the verification at the en
       `Client.init()` skips integration setup entirely, so `getFeedback()` is `undefined` and
       the dialog cannot open. Comment corrected; `captureException` stays safe either way.
 
-### Verification for this sweep
+### Verification for the 2026-09-08 sweep
 
 - `ruff check .` — clean (was 224).
 - `uv run pytest -m "not integration"` — 535 passed, 6 skipped; the one failure above is
@@ -411,6 +439,94 @@ by the styling-unification pass; see that section and the verification at the en
   of the response (express defaults to `development` when it is unset, which the container
   never set).
 
+### Second audit pass — download, scheduler and viewport **[2026-09-09]**
+
+Nine items from the GPT Sol 5.6 pass. All verified against the working tree; none depends on
+another. The four download-pipeline items (`over_limit`, the OBIS budget, the lease, the email
+isolation) touch the same two files and are cheapest taken as one sitting.
+
+- [ ] **Short download IDs collide, and a collision serves one user's data to another.**
+      `download.js:178` mints the id as `uuidv4().substr(0, 6)` — 24 bits, 16.7 M values, so the
+      birthday bound puts a first collision at ~50% by about 4,800 jobs. `download_jobs.job_id` is
+      plain `text` with no unique constraint (`1_schema.sql:541`), and the id is the *only* thing
+      naming the artifact: `downloader_wrapper.py:9` derives the temp folder from it and
+      `download_scheduler.py:220` derives `cde_download_<job_id>.zip`, which is what
+      `:155` emails as `DOWNLOAD_WAF_URL/<zip_filename>`. So a collision silently overwrites the
+      earlier archive, and the first user's emailed link then downloads the second user's data. The
+      24-bit space is also small enough to enumerate against `/downloads/` directly (nginx has
+      `autoindex off`, but a direct URL still serves).
+      Fix: store the full `uuidv4()`, add `UNIQUE` on `job_id`, and prefer a separate unguessable
+      token for the public filename so the job identifier is not also the capability. **[verified]**
+- [ ] **OBIS downloads bypass both size limits entirely.** `download_erddap.py:277` runs
+      `duckdb.sql(query).df()`, materialising the whole parquet result in memory with no budget, and
+      `:344-345` hardcodes `dataset_limit_hit`/`query_limit_hit` to `False`. `get_datasets` then
+      `continue`s at `:414` before reaching any of the checks the ERDDAP path runs at `:467-470` and
+      `:509-513`, so neither the 1 GB per-dataset nor the 5 GB per-query limit applies to an OBIS
+      dataset. Fix: stream the DuckDB result instead of calling `.df()`, and charge its bytes to the
+      same cumulative budget. **[verified]**
+- [ ] **`report["over_limit"]` is never assigned, so a truncated download is emailed as complete.**
+      It is initialised `False` at `download_erddap.py:379` and written nowhere in the repo — the
+      per-dataset `dataset_limit_hit`/`query_limit_hit` at `:596-597` are computed but never
+      aggregated. `download_scheduler.py:271` is the only reader, so the `over-limit` status and its
+      email template (`:162,179`) are unreachable: a job that hit `PARTIAL` at `:515-518` or skipped
+      datasets as `IGNORED` at `:469` is reported as having completed successfully.
+      Second bug in the same place: the antimeridian loop at `:450` reassigns `download_status`, so a
+      later region's `IGNORED` overwrites an earlier region's `PARTIAL` — the more informative
+      outcome loses. Fix: set the aggregate flag wherever either budget is hit, and rank the
+      per-dataset statuses instead of overwriting. **[verified]**
+- [ ] **An interrupted download job is unclaimable forever.** `get_a_download_job()`
+      (`download_scheduler.py:70-92`) flips `open` → `downloading` and commits, with no lease and no
+      attempt count, and `__main__.py:12-16` is a bare `while True` with no startup recovery. An OOM,
+      a deploy, or a `docker kill` mid-download strands the row in `downloading` permanently: the
+      `status='open'` predicate never sees it again and the user is never emailed. The
+      `FOR UPDATE SKIP LOCKED` protects against two live workers, not against a worker that dies.
+      Fix: model the claim as a lease (`claimed_at` + attempts) and requeue expired claims, which
+      also gives the retry ceiling the current design has no place for. **[verified]**
+- [ ] **An SMTP failure rewrites a successful download as failed.** `run_download` commits the
+      completed row at `:288-298` and *then* calls `email_user` at `:300-306`. `send_email`
+      (`download_email.py:31-40`) only catches `SMTPAuthenticationError`, so every other SMTP failure
+      — connect, TLS, recipient refused, timeout — propagates out of `run_download`, is caught by
+      `process_next_job`'s blanket handler at `:439-449`, and `fail_job` overwrites the row with
+      `failed` plus a mail traceback. The archive exists and is downloadable; the record says the job
+      failed. Fix: separate notification delivery from the download outcome — the status is already
+      committed, so the mail failure belongs in its own retry/record, not in the job status.
+      **[verified]**
+- [ ] **A filter or polygon change during an in-flight `/pointQuery` is dropped and never retried.**
+      `SelectionProvider.jsx:519` guards on `!selectionLoading`, but `selectionLoading` is
+      deliberately absent from the dependency array, so nothing re-runs the effect when the load
+      finishes — the change is lost until some other dependency happens to change. This is the bug
+      the React-hooks item above documents rather than fixes; this is the entry it points to, and the
+      `KNOWN LIMITATION (tracked separately)` comment at `:511-517` should name this section.
+      Fix: drop the mutex and discard stale responses with an `AbortController` or a request
+      generation id — completing the dependency array alone would put it in a refetch loop.
+      **[verified]**
+- [ ] **Oversized trajectory responses skip the documented chunked fallback.** `client.py:342-348`
+      raises `ResponseTooLargeError` (`core/errors.py:22`, a bare `Exception` subclass — *not* an
+      `HTTPError`), but all four fallback handlers in `trajectory_features.py` catch `HTTPError`
+      only: `:206` (the chunk loop), `:515` (finer track interval), `:520` (server-side track
+      grouping) and `:648` (server-side day grouping). So a grouped query that is merely too large
+      either suppresses track extraction or fails the whole dataset, instead of taking the chunked
+      path those two handlers' own log messages promise (`:521-524`, `:649-652` — "falling back to
+      chunked download"). `:206` has the same gap from the other side: an oversized *chunk* is fatal
+      rather than subdivided. Fix: catch both exceptions at all
+      four sites, and halve an oversized chunk rather than skipping it. **[verified]**
+- [ ] **A stale WMS image can overwrite the current viewport.** `renderWmsImage` captures
+      `wmsRenderToken.current` at `Map.jsx:1812` and re-checks it in `img.onload` at `:1816`, but the
+      token is only incremented in `removeWmsOverlay` (`:1754`). Two renders of the *same* overlay —
+      which is the normal case: `:1983` re-renders on a debounced `moveend` — therefore share one
+      token, so an earlier GetMap that resolves after a newer pan passes the check and paints its
+      stale bounds. One-line fix: increment the token at the top of `renderWmsImage` and capture the
+      new value. Related but separate from §P2.6's guard inventory, which counts this ref as one of
+      the five ad-hoc idempotence guards. **[verified]**
+- [ ] **Generated archives have no retention policy.** `downloader_wrapper.py:32-40` writes each ZIP
+      into the `downloads` volume (`docker-compose.yaml:174`, served read-only by nginx at `:122` and
+      `nginx.conf:62-68`), and nothing in the repo ever removes one — no cron, no TTL, no cleanup on
+      job completion. Multi-gigabyte jobs accumulate until the volume fills, at which point every
+      download fails; the short guessable ids above make the growing pile publicly addressable too.
+      Fix: expire archives and their `download_jobs` rows together on a TTL. Needs a retention
+      decision (how long is a link good for?) before it can be implemented, which is the only reason
+      this is not a one-sitting item. **[verified]**
+
 ---
 
 ## P2 — Structural (the deepening candidates)
@@ -418,21 +534,53 @@ by the styling-unification pass; see that section and the verification at the en
 Each of these is a larger piece of work. See the HTML review for before/after diagrams.
 **Do not start these until P0's CI items are done.**
 
-### P2.1 — One module owns what a selection is `[Strong]`
+### P2.1 — One module owns what a selection is — **DONE** (2026-09-09)
 
-`web-api/utils/dbFilter.js`, `utils/shapeQuery.js`, `routes/{tiles,legend,timeExtent,download,griddapCoverage}.js`
+`web-api/utils/selection.js` and `utils/hexTiers.js` (new), `utils/{dbFilter,shapeQuery,hexMetric}.js`,
+`routes/{tiles,legend,timeExtent,download,griddapCoverage}.js`
 
-- [ ] The profiles / trajectory / obis / griddap branch set is written out **five times** and its
-      `includeProfiles` gating predicate **six times**, verbatim. The copies have already drifted —
-      three of the P0 correctness bugs above are that drift.
-- [ ] Also drifted: `download.js:113-124` omits the obis branch entirely, so `/downloadEstimate` and
-      `/download` disagree about what a selection contains. `shapeQuery.js:29` omits `show_as_point`
-      where `timeExtent.js:99` applies it, so the time axis and the dataset list are computed over
-      different feature sets.
-- [ ] Hex-tier thresholds are encoded four times: `tiles.js:148-154`, `tiles.js:387-389`,
-      `tiles.js:47`, and again in SQL at `4_create_hexes.sql:49,56,66,78`.
-- [ ] `dbFilter.js` returns `hasObisOnly` and `hasProfileOnly`, which have **zero consumers**.
-- [ ] Target: one module returning the branch set for a query; routes compose it.
+- [x] **The gates now have one owner.** `utils/selection.js` exports `erddapVisible(query)` and
+      `obisVisible(query)` — the two predicates that were written out **eight** and **six** times
+      respectively, verbatim, across five files. Every route asks; none answers for itself.
+- [x] **What was left of the branch-set duplication, likewise.** `TRAJECTORY_COVERAGE_FROM` (three
+      copies), `GRIDDAP_FROM` + `GRIDDAP_TIME_DEPTH_COLUMNS` (two), and `unionBranches()` — the
+      UNION-ALL-plus-empty-guard idiom, six copies of a subtle four-liner. The **projections stay
+      with the routes**: each selects the columns its own query needs, and forcing those through a
+      shared shape would have been a parameter list as long as the thing it replaced.
+- [x] **`show_as_point` resolved in favour of the selection.** It is a *display* flag — the harvester
+      (`dataset_types/geo.py`) sets it false for a feature whose bbox has no meaningful single point,
+      which is "still searchable via the stored bbox". So the map keeps it (`/tiles`, `/tiles/cells`,
+      `/legend`, now via the named `DRAWN_AS_POINT` so its absence elsewhere reads as deliberate) and
+      **`/timeExtent` drops it**, joining the shape query and `/download`. The time axis now spans the
+      same features as the dataset list it bounds. *This is the pass's one behaviour change:* the
+      slider's axis can widen on a selection holding region-spanning features.
+- [x] **Hex tiers.** `utils/hexTiers.js` owns the two grids and the four names the schema gives each
+      one (tier number, `cde.hexes_zoom_*`, `hex_*_pk`, edge length) plus `tierForZoom(z)`. That
+      replaces seven encodings across five files, including `tiles.js`'s `250000 / 25000` prefilter
+      constants (now `edgeMetres * 2.5`). `database/4_create_hexes.sql` still spells the two edge
+      lengths independently — JS cannot share a constant with it — so hexTiers.js cross-references it
+      and says changing one means changing both and re-tiling.
+- [x] `hasObisOnly` / `hasProfileOnly` deleted from `dbFilter.js` (zero consumers). `hasShared` stays,
+      with a comment saying why it is the only one anybody needs: it gates an *outer* WHERE that is
+      dropped entirely when nothing narrows it, where the other two land inside a branch's own WHERE
+      and "TRUE" is the right answer.
+- [x] `hexMetric.js`'s `nullMetricExpr` deleted: the legend's coverage guard used to spell out a
+      typed NULL shell whose column names and types had to be kept in step with the real branch by
+      hand. It now wraps the real branch, like the other five guards, so it cannot fall out of sync.
+- [x] **The drift now has a gate.** `utils/selectionAgreement.test.js` drives each route's handler
+      with `../db` stubbed by a builder-only knex that captures SQL instead of executing, and asserts
+      the cross-route rules: same gate everywhere, every `cde.profiles` branch binds the
+      feature-level EOV filter, only the map routes restrict to `show_as_point`, trajectory coverage
+      read at one tier outside the map, and an empty selection still yields runnable SQL. Verified by
+      mutation — reinstating `show_as_point` in `/timeExtent`, pointing `/download` at the coarse
+      tier, dropping a gate or an EOV filter each turn it red. Plus `selection.test.js` (10) and
+      `hexTiers.test.js` (4). **68 pass**, up from 47.
+- [x] **Behaviour-preservation proof.** A throwaway harness captured every statement all six routes
+      emit across 15 selections x 4 zooms — 995 statements — before and after. **955 byte-identical
+      modulo whitespace**; the 40 that differ are exactly three intended groups: 26 the griddap arm
+      gaining the table alias `d` (`FROM cde.datasets d`, same statement), 13 `/timeExtent` losing
+      `show_as_point`, 1 the legend's empty coverage guard. The trajectory/profiles/obis branch set
+      itself is unchanged in every one of the 995.
 
 ### P2.2 — Accept the database, don't construct it — **DONE, SCOPED DOWN** (2026-09-08)
 
@@ -494,8 +642,9 @@ now split, was two specific call sites.
       `shapeQuery.test.js` (13, two of them **characterisation** tests pinning the §P2.1 drift so
       whoever unifies the branch set can see exactly which queries change), `cache.test.js` (5) and
       `rawBindings.test.js` (4). **38 pass**, up from 3.
-- [ ] Still open, and belongs to P2.1/P2.3 rather than here: `dbFilter.js` returns `hasObisOnly` and
-      `hasProfileOnly` with zero consumers, and the branch set is still written out five times.
+- [x] Handed to §P2.1 and done there: `dbFilter.js`'s consumer-less `hasObisOnly` / `hasProfileOnly`
+      are deleted, and the branch set has one owner. The two characterisation tests
+      `shapeQuery.test.js` carried for it now assert the agreed contract instead.
 
 ### P2.3 — Every route through the same shape — **DONE** (2026-09-08)
 
@@ -684,31 +833,78 @@ missing directory surfaced as a confusing import error rather than an empty pack
 
 ### P2.6 — Give `Map.jsx` a seam that isn't WebGL `[Strong]` — *largest prize, largest risk*
 
-`frontend/src/components/Map/Map.jsx` — 3508 lines, one default export
+`frontend/src/components/Map/Map.jsx` — 4320 lines, one default export
 
-- [ ] 21 `useEffect`, 38 `useRef`, 2 `useState`, 29 props, 21 `addLayer`. **~1900 lines sit behind a
-      live WebGL context.** The mount effect alone is 1481 lines (1879–3359). **[verified]**
-- [ ] The render body monkey-patches MapboxDraw's mode table (266–331) and allocates a fresh
-      `MapboxDraw` (450) and `Popup` (699) on **every render**, plus nine ref writes during render.
-- [ ] **Twin maths kept in step by hand**: `radiusExpression` (854–869) builds a MapLibre expression
-      and `pointRadiusFor` (873–884) re-implements the same arithmetic in JS. The test that would
-      keep them honest cannot be written — neither is exported, and one reads
-      `pointRadiusRange.current` from closure rather than taking it as an argument. **Fix this slice first.**
-- [ ] Re-entrancy is held by **eight ad-hoc idempotence guards** (`hexRangeDirty`, `appliedFocus`,
-      `trackFocusApplied`, `hexesRevealed`, `rampMeasuredForPk`, `wmsRenderToken`,
-      `lastClickHandledAt`, `appliedTrailRef`), each documented as fixing one loop or flicker.
-- [ ] Pure but unexported, so untestable: `buildTileSuffix` (163–190, the whole tile query contract),
-      `tracksTimeWindow` (519–537), `rampExpression` (826–830), `featureHasDataset` (752–758),
-      `dedupeGriddapByPk`, `datasetPksOf`, and the dedupe/role/bbox rules inside `buildFeatureQuery`
-      (2824–3049, 225 lines).
-- [ ] `setColorStops` (908–1004, 96 lines) has **five entry points** — an effect, a `zoomend`
-      listener, the `load` handler, and two functions reached via `setColorStopsRef`.
-- [ ] Dead: prop `setDatasetsSelected` (:230) is never used, yet `MapContainer.jsx:14` reads it from
-      context solely to forward it. Layer id `'points-hovered'` (:894) is in `POINT_LAYERS` but never
-      added; a `getLayer` guard makes it silently inert. **[verified]**
-- [ ] `Map.jsx` reads the URL directly twice (`useSearchParams` at 247, and `new URL(window.location.href)`
-      at 2467 inside the `load` handler), bypassing both context and its props. There are five
-      independent readers of `window.location` across the state modules.
+> **Re-verified 2026-09-09 against `fix/p0-cleanup-backlog @ b233d792`.** The file has grown 23%
+> since the 2026-08-27 survey (3508 → 4320), so every reference below has been refreshed and will
+> drift again. Every finding still holds, and all but one of the counts understated it.
+>
+> **Prerequisite — do not start this item yet.** Its whole payoff is testability, and there is no
+> frontend test harness on this branch: `frontend/package.json:43` is still
+> `"test": "echo \"Error: no test specified\" && exit 1"` — no vitest, no `*.test.jsx`, no
+> `playwright.config`. The four-layer suite exists on `feat/frontend-test-suite` (`8abc8b87`) and is
+> **unmerged**. CI's only frontend gate is `test/frontend_loads_without_errors.js`, 62 lines that
+> exit 1 on a console error: it catches a mount-effect crash, not a radius formula drifting from its
+> expression or a hit-test ranking regression. Extracting these functions without it is an
+> unverified refactor with a live WebGL blast radius — which is the failure this file's own preamble
+> names. **Merge `feat/frontend-test-suite` first.**
+
+- [ ] 22 `useEffect`, 42 `useRef`, 2 `useState`, 32 props, 22 `addLayer`. **~1900 lines sit behind a
+      live WebGL context.** The mount effect alone is 1750 lines (2359–4108). **[re-verified]**
+- [ ] The render body monkey-patches MapboxDraw's mode table (393–478, plus 79–81 at module scope)
+      and allocates a fresh `MapboxDraw` (640) and `Popup` (963) on **every render**, plus eight ref
+      writes during render (668, 702, 1380, 2032, 2039, 2044, 2046, 2053).
+- [ ] **Twin maths kept in step by hand**: `radiusExpression` (1157–1170) builds a MapLibre
+      expression and `pointRadiusFor` (1176–1186) re-implements the same arithmetic in JS. The test
+      that would keep them honest cannot be written — neither is exported, and one reads
+      `pointRadiusRange.current` from closure rather than taking it as an argument. They agree today
+      (both clamp outside the domain; the comment at 1172–1175 says why), which is exactly the state
+      that rots silently.
+- [ ] Re-entrancy is held by **five ad-hoc idempotence guards** (`appliedFocus` :679,
+      `trackFocusApplied` :683, `appliedTrailRef` :758, `wmsRenderToken` :1646,
+      `lastClickHandledAt` :3769 — a plain `let`, not a ref), each documented as fixing one loop or flicker.
+      One of them is also wrong today: `wmsRenderToken` is bumped only on overlay removal, so it does
+      not discard a stale same-overlay render — a one-line fix, filed in P1 (2026-09-09) so it is not
+      blocked behind this section's test-suite prerequisite. **[re-verified — the
+      survey named eight: `hexesRevealed` is now `dataRevealed` (:662), `rampMeasuredForPk` is now
+      `rampMeasuredFor` (:692), and `hexRangeDirty` is gone entirely]**
+- [ ] Pure but unexported, so untestable: `buildTileSuffix` (226–253, the whole tile query contract —
+      already at module scope, so `export` is a one-word diff), `tracksTimeWindow` (716–726),
+      `rampExpression` (1127–1131), `featureHasDataset` (1026–1032), `dedupeGriddapByPk` (1676–1683),
+      `datasetPksOf` (3507–3514), and the dedupe/role/bbox rules inside `buildFeatureQuery`
+      (3555–3762, 208 lines).
+- [ ] **The seam is the hit-test group, and it is only two map methods wide.** `isOnAPointIn` (3116),
+      `trackFeatureIn` (3131), `griddapCoveredIn` (3145), `griddapOutranksHexesIn` (3156),
+      `datasetPksOf` (3507), `trackItemsIn` (3521) and `buildFeatureQuery` (3555) are ~420 lines of
+      array-of-feature ranking and dedupe buried inside the mount effect. Their *entire* dependency
+      on MapLibre is `map.current.getZoom()` and `map.current.project(lngLat)`. A module taking
+      `(hits, { zoom, project })` lifts all of it out — a camera seam, not a WebGL abstraction.
+      **[new — the survey scattered these across bullets and missed that they group]**
+- [ ] `setColorStops` (1274–1379, 106 lines) has **four entry points** — the `[rangeLevels,
+      coverageRangeLevels]` effect (1041), the `load` handler (2410), a `zoomend` listener (4254),
+      and `refreshViewportHexRange` via `setColorStopsRef` (1522). **[re-verified — the survey said
+      five, counting two functions through the ref; only one reaches it now]**
+- [ ] Dead: `Map.jsx` no longer declares a `setDatasetsSelected` prop, yet `MapContainer.jsx:14`
+      still reads it from context and `:146` still forwards it — a prop handed to a component that
+      does not accept it. Layer id `'points-hovered'` (:1207) is in `POINT_LAYERS` but never added
+      anywhere in the repo; a `getLayer` guard makes it silently inert. Both are safe to delete
+      today, independently of everything else in this section. **[re-verified]**
+- [ ] `Map.jsx` reads the URL directly twice (`useSearchParams` at 375, and
+      `new URL(window.location.href)` at 3076 inside the `load` handler), bypassing both context and
+      its props. There are now **eight** independent modules reading `window.location` across eleven
+      sites (`index.jsx:36`, `config.js:13`, `state/usePersistentState.js:46`,
+      `FilterProvider.jsx:249`, `SelectionProvider.jsx:75`, `MapStateProvider.jsx:107,177,218,249,269`),
+      up from the five the survey counted.
+
+**Suggested order once the test suite is merged**, cheapest proof first:
+
+1. `buildTileSuffix` — already module-level and pure, zero closure captures. Add `export`, test the
+   tile query contract. The cheapest possible demonstration that the seam works.
+2. The twin maths — give `pointRadiusFor` the range as a parameter instead of reading the ref, move
+   both into a module, and test that they agree across a swept range.
+3. The hit-test group above — the largest prize, and much narrower than "largest risk" implies.
+4. The 1750-line mount effect and the guards — leave alone until there is a Playwright gate.
+   Nothing in 1–3 requires moving them.
 
 ### P2.7 — One descriptor for the metric and the tiers `[Worth exploring]`
 
@@ -811,7 +1007,9 @@ missing directory surfaced as a confusing import error rather than an empty pack
 ### Dead SQL objects
 
 - [ ] `cde.organizations.color` — zero references anywhere.
-- [ ] `cde.skipped_datasets` — written by the harvester and SQL, never read by web-api.
+- [ ] `cde.skipped_datasets` — written by the harvester and SQL, never read by web-api. **Do not
+      delete it**: `prune_stale_datasets` reads `temp_skipped_datasets` as the "this dataset errored,
+      don't prune it" signal, which is the P0 item added 2026-09-09. Unread by web-api is not unused.
 - [ ] `cde.profiles.days` — written by `9_incremental_upsert.sql`, not in the Pandera schema, never read.
 - [ ] Indexes no query can use, since all geometry filtering goes through `ST_Intersects`:
       `profiles(latitude)`, `profiles(longitude)`, `obis_cells(latitude, longitude)`,
@@ -854,6 +1052,9 @@ missing directory surfaced as a confusing import error rather than an empty pack
       streams HTTP with a byte budget, parses CSV, filters by polygon, writes files, generates PDFs.
       Also mixes two definitions of a megabyte in one file (`ONE_MB = 10**6` vs `1024**2`) and
       accumulates via `sys.getsizeof(chunk)`, overcounting by the bytes-object header per chunk.
+      Two of the P1 items added 2026-09-09 (the unset `over_limit`, the OBIS path that skips the
+      budget) are consequences of this function owning the byte accounting and the OBIS branch
+      leaving before it — worth reading together with them before splitting it.
 - [ ] `prefect_pipeline.py` — 671 lines, the largest **untested** module, holding 10 of the 43 broad
       `except Exception` handlers, four of them a log-and-`raise` in 40 lines.
 
@@ -870,7 +1071,12 @@ missing directory surfaced as a confusing import error rather than an empty pack
       `legend.js` `rampRange`, `harvest.js` `slugify`/`unslug`, `nonna.js` LRU and `withTimeout`.
 - [ ] **`download_scheduler` has no tests at all** — no `tests/` dir, no pytest dependency. That
       includes `run_download` (105 lines), `email_user` (73 lines, bilingual templating),
-      `update_download_jobs` (the string-built SQL) and `send_email`.
+      `update_download_jobs` (the string-built SQL) and `send_email`. **Stale as written
+      [2026-09-09]:** `download_scheduler/tests/` now holds `conftest.py`, `test_worker_loop.py`,
+      `test_download_email.py` and `test_queue_liveness.py`, and `pyproject.toml:24-25` has pytest +
+      pytest-mock. `run_download`'s success/failure paths and `email_user`'s templating are still the
+      uncovered part; the lease and email-isolation items in P1 (2026-09-09) both land here and are
+      the natural next tests.
 - [ ] `downloader` has one 81-line test file; `download_pdf.py`, `zip_folder.py` and
       `downloader_wrapper.py` are untested.
 - [ ] Largest untested harvester modules: `prefect_pipeline.py` (671), `sources/obis/harvester.py`

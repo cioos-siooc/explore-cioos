@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const { buildShapeSql } = require("./shapeQuery");
+const { FINE } = require("./hexTiers");
 
 /*
  * The shape query is the largest SQL contract in the service and feeds
@@ -148,24 +149,27 @@ test("record collapsing stamps its extents in UTC", async () => {
 });
 
 /*
- * CHARACTERISATION — current behaviour, not desired behaviour.
- *
- * These pin the drift TODO-cde-revisions.md §P2.1 records, so that whoever
- * unifies the branch set sees exactly which queries change. A failure here is
- * not a regression: it means the drift was fixed, and the test should be
- * updated to the new agreed behaviour.
+ * These two were characterisation tests pinning the drift
+ * TODO-cde-revisions.md §P2.1 recorded. §P2.1 resolved it, so they now assert
+ * the agreed contract rather than merely recording what the code happened to
+ * do. utils/selectionAgreement.test.js checks the other routes against the
+ * same two rules.
  */
-test("[characterisation] the profiles arm does NOT filter on show_as_point", async () => {
-  // timeExtent.js applies show_as_point where this does not, so the time axis
-  // and the dataset list are computed over different feature sets. §P2.1.
+test("the profiles arm does NOT filter on show_as_point", async () => {
+  // show_as_point decides whether the MAP can draw a feature, not whether the
+  // selection contains it — a region-spanning feature is still listed, still
+  // estimated and still downloadable. Only the tile and legend routes apply
+  // it; /timeExtent used to as well, which computed the time axis over a
+  // different feature set than the list that axis bounds.
   const { sql } = await build({});
   assert.doesNotMatch(sql, /show_as_point/);
 });
 
-test("[characterisation] the trajectory arm is pinned to the 10 km tier", async () => {
-  // The 100 km rows describe the same data at a coarser grain; including them
-  // would double-count every estimate. The tier number is spelled out here and
-  // in three other places — §P2.1's hex-tier item.
+test("the trajectory arm is pinned to one tier", async () => {
+  // Coverage rows exist at both tiers describing the same data, so reading
+  // both would double-count every estimate. Which tier is FINE's, from
+  // utils/hexTiers.js — the one place that answers it.
   const { sql } = await build({});
-  assert.match(sql, /t\.hex_tier = 1/);
+  assert.match(sql, new RegExp(`t\\.hex_tier = ${FINE.tier}\\b`));
+  assert.match(sql, new RegExp(`JOIN ${FINE.hexesTable} h`));
 });

@@ -9,9 +9,15 @@ const {
   parseMetric,
   metricValueExpr,
   metricJoin,
-  nullMetricExpr,
   countAggregate,
 } = require("../utils/hexMetric");
+const { FINE } = require("../utils/hexTiers");
+const {
+  erddapVisible,
+  obisVisible,
+  DRAWN_AS_POINT,
+  unionBranches,
+} = require("../utils/selection");
 
 // The ramp's domain, as [min, rampMax, trueMax], over a subquery whose bucket
 // value is aliased `count`.
@@ -125,29 +131,25 @@ function rampRange() {
  */
 router.get("/", ...pipeline(), async (req, res) => {
   const filters = await createDBFilter(req.query);
-  const includeObis = req.query.includeObis !== "false";
   // Must match the metric the tiles were requested with, or the ramp domain
   // won't match the numbers being ramped — see utils/hexMetric.js.
   const metric = parseMetric(req.query.metric);
-  // Scientific-name filters are OBIS-only: hide profiles when set. An
-  // OBIS-node selection also hides profiles, unless ERDDAP servers are
-  // selected alongside it (combined Source filter — show both, OR'd in
-  // the shared dataset filter).
-  const includeProfiles =
-    !req.query.scientificNames &&
-    (!req.query.obisNodes || Boolean(req.query.erddapServers));
+  // Which feature sources the selection contains — utils/selection.js, shared
+  // with the tile routes so the ramp's domain is over what the tiles draw.
+  const includeObis = obisVisible(req.query);
+  const includeProfiles = erddapVisible(req.query);
 
   // GROUP BY the hex FK (integer) instead of the polygon geom; the polygon
   // lives on cde.hexes_zoom_0/1 and isn't needed here — only the summed
   // metric per bucket.
   // search_geom (bbox for profiles, cell point otherwise) backs the shared
-  // spatial filter, matching tiles/shapeQuery. show_as_point gates profiles
+  // spatial filter, matching tiles/shapeQuery. DRAWN_AS_POINT gates profiles
   // out of every tier (hex and point) so the legend ranges match the tiles,
   // which keep large-region features off the map entirely.
   const profilesBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, ${metricValueExpr("profiles", metric)},
                time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
         FROM cde.profiles ${metricJoin("profiles", metric)}
-        WHERE show_as_point AND :profileFilters`;
+        WHERE ${DRAWN_AS_POINT} AND :profileFilters`;
   // Trajectory and OBIS coverage cells merge into the hex-tier ranges
   // (zoom0/zoom1, the green ramp) but not the point-tier range (zoom2) — at
   // that zoom they only render via the dedicated always-hex coverage layer,
@@ -172,18 +174,15 @@ router.get("/", ...pipeline(), async (req, res) => {
   const hexBranches = [];
   if (includeProfiles) hexBranches.push(profilesBranch, trajectoryBranch);
   if (includeObis) hexBranches.push(obisBranch);
-  // Empty-branch guard: profilesBranch carries its own WHERE (show_as_point),
-  // so `${profilesBranch} WHERE FALSE` is a syntax error — wrap it in a
-  // subquery, as the tile route does.
-  const emptyBranch = `SELECT * FROM (${profilesBranch}) empty_branch WHERE FALSE`;
-  const combinedHexInner = hexBranches.length
-    ? hexBranches.join("\n        UNION ALL\n        ")
-    : emptyBranch;
+  const combinedHexInner = unionBranches(hexBranches, profilesBranch);
 
   // Only profiles reach the point tier: both cell tables are drawn as hexes
   // at every zoom, so counting them here would ramp the point circles
   // against data they don't contain.
-  const combinedPointInner = includeProfiles ? profilesBranch : emptyBranch;
+  const combinedPointInner = unionBranches(
+    includeProfiles ? [profilesBranch] : [],
+    profilesBranch,
+  );
 
   const sql = `
         WITH combined_hex AS (
@@ -240,27 +239,22 @@ router.get("/", ...pipeline(), async (req, res) => {
   // made /legend 500 for every request carrying a time or depth filter,
   // silently leaving the map without a ramp domain exactly when the user
   // narrowed it.
-  const coverageBranches = [];
-  if (includeTrajectoryCells) {
-    coverageBranches.push(`SELECT hex_pk AS hex_1_pk, dataset_pk, ${metricValueExpr("trajectory_hexes", metric)},
+  const trajectoryCoverageBranch = `SELECT hex_pk AS hex_1_pk, dataset_pk, ${metricValueExpr("trajectory_hexes", metric)},
         time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
         FROM cde.trajectory_hexes ${metricJoin("trajectory_hexes", metric)}
-        WHERE hex_tier = 1`);
-  }
-  if (includeObis) {
-    coverageBranches.push(`SELECT hex_1_pk, dataset_pk, ${metricValueExpr("obis_cells", metric)},
+        WHERE hex_tier = ${FINE.tier}`;
+  const obisCoverageBranch = `SELECT hex_1_pk, dataset_pk, ${metricValueExpr("obis_cells", metric)},
         time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
         FROM cde.obis_cells ${metricJoin("obis_cells", metric)}
-        WHERE :obisFilters`);
-  }
-  const coverageInner = coverageBranches.length
-    ? coverageBranches.join("\n        UNION ALL\n        ")
-    : `SELECT hex_1_pk, dataset_pk, ${nullMetricExpr(metric)},
-         NULL::timestamptz AS time_min, NULL::timestamptz AS time_max,
-         NULL::double precision AS latitude, NULL::double precision AS longitude,
-         NULL::double precision AS depth_min, NULL::double precision AS depth_max,
-         geom AS search_geom
-         FROM cde.obis_cells WHERE FALSE`;
+        WHERE :obisFilters`;
+
+  const coverageBranches = [];
+  if (includeTrajectoryCells) coverageBranches.push(trajectoryCoverageBranch);
+  if (includeObis) coverageBranches.push(obisCoverageBranch);
+  // The empty case wraps a real branch rather than spelling out a typed NULL
+  // shell: metric_value is a bigint for two metrics and a daterange for the
+  // third, and a hand-written shell had to be kept in step with that by hand.
+  const coverageInner = unionBranches(coverageBranches, obisCoverageBranch);
 
   const coverageSql = `
         WITH cells AS (

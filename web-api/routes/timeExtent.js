@@ -5,6 +5,12 @@ const db = require("../db");
 const { pipeline } = require("../utils/routePipeline");
 
 const createDBFilter = require("../utils/dbFilter");
+const {
+  erddapVisible,
+  obisVisible,
+  TRAJECTORY_COVERAGE_FROM,
+  unionBranches,
+} = require("../utils/selection");
 
 /*
  * /timeExtent
@@ -67,15 +73,19 @@ router.get("/", ...pipeline(), async (req, res) => {
 
   const filters = await createDBFilter(queryWithoutTime);
 
-  const includeObis = req.query.includeObis !== "false";
-  // Scientific-name filters are OBIS-only: hide profiles when set. An
-  // OBIS-node selection also hides profiles, unless ERDDAP servers are
-  // selected alongside it. Same gating as /legend and /tiles, so the axis
-  // spans the data those actually draw.
-  const includeProfiles =
-    !req.query.scientificNames &&
-    (!req.query.obisNodes || Boolean(req.query.erddapServers));
+  // Which feature sources the selection contains — utils/selection.js, shared
+  // with the map, the dataset list and the download so the axis spans the
+  // data they are built from.
+  const includeProfiles = erddapVisible(req.query);
+  const includeObis = obisVisible(req.query);
 
+  // Deliberately NOT restricted to show_as_point, unlike the tile and legend
+  // routes: that flag decides whether a feature can be drawn, not whether it
+  // is selected, and this axis bounds a time filter that the dataset list and
+  // the download apply to region-spanning features too. (Applying it here was
+  // the drift TODO-cde-revisions.md §P2.1 recorded — the axis and the list it
+  // bounds were computed over different feature sets.)
+  //
   // The column list is what the shared filter can reference (time, depth,
   // point_pk and search_geom); platform/organization_pks live on
   // cde.datasets and resolve through the join. EOVs are the exception:
@@ -83,14 +93,10 @@ router.get("/", ...pipeline(), async (req, res) => {
   // applied in the branch below rather than after the join.
   const profilesBranch = `SELECT dataset_pk, point_pk, time_min, time_max,
                depth_min, depth_max, bbox AS search_geom
-        FROM cde.profiles WHERE show_as_point AND :profileFilters`;
-  // 10 km tier only (the 100 km rows are the same data, coarser), and the
-  // hex polygon as search_geom — see shapeQuery.js.
+        FROM cde.profiles WHERE :profileFilters`;
   const trajectoryBranch = `SELECT t.dataset_pk, NULL::integer AS point_pk, t.time_min, t.time_max,
                t.depth_min, t.depth_max, h.geom AS search_geom
-        FROM cde.trajectory_hexes t
-        JOIN cde.hexes_zoom_1 h ON h.pk = t.hex_pk
-        WHERE t.hex_tier = 1`;
+        ${TRAJECTORY_COVERAGE_FROM}`;
   const obisBranch = `SELECT dataset_pk, point_pk, time_min, time_max,
                depth_min, depth_max, geom AS search_geom
         FROM cde.obis_cells
@@ -99,11 +105,7 @@ router.get("/", ...pipeline(), async (req, res) => {
   const branches = [];
   if (includeProfiles) branches.push(profilesBranch, trajectoryBranch);
   if (includeObis) branches.push(obisBranch);
-  // profilesBranch carries its own WHERE, so `${profilesBranch} WHERE FALSE`
-  // is a syntax error — wrap it, the way the tile and legend routes do.
-  const inner = branches.length
-    ? branches.join("\n        UNION ALL\n        ")
-    : `SELECT * FROM (${profilesBranch}) empty_branch WHERE FALSE`;
+  const inner = unionBranches(branches, profilesBranch);
 
   const sql = `
         WITH cells AS (
