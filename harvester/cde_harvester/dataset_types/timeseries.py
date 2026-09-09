@@ -5,6 +5,7 @@ from cde_harvester.dataset_types.base import DatasetTypeHandler
 
 
 class TimeSeriesHandler(DatasetTypeHandler):
+    features_span_multiple_days = True
     cdm_data_type = "TimeSeries"
 
     def extract_features(self, dataset):

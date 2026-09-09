@@ -40,4 +40,36 @@ Configure the downloader through environment variables in `.env` file at the pro
 
 ## Usage
 
-The downloader is typically invoked by the download scheduler service. For testing individual downloads, use the test JSON files located in `downloader/test/*.json`.
+The downloader is typically invoked by the download scheduler service.
+
+### Testing
+
+Run the test suite (mocked ERDDAP and OBIS parquet reads, runs offline):
+
+```sh
+uv run pytest
+# or
+./test_downloader.sh
+```
+
+Test query fixtures live in `downloader/tests/queries/*.json` (Profile, TimeSeries,
+Point, Trajectory) plus `downloader/tests/obis_query.json` for the OBIS parquet path.
+
+To smoke-test a single query against the **live** ERDDAP / OBIS S3 export (network
+required):
+
+```sh
+./test_downloader.sh tests/queries/no_polygon.json
+# or directly:
+uv run python -m erddap_downloader tests/queries/no_polygon.json --output_folder out
+```
+
+### Dataset types
+
+- **Points / Profile / TimeSeries / Trajectory** — downloaded from ERDDAP as tabledap
+  CSV (all variables), filtered to the query's bbox/polygon/time/depth.
+- **OBIS** (`source_type = "obis"`) — read from the OBIS open-data GeoParquet export
+  (`s3://obis-open-data/occurrence/{id}.parquet`) via DuckDB and written as filtered
+  occurrence CSV; these datasets are not ERDDAP-backed.
+- **Griddap** (`cdm_data_type = "Grid"`) — not downloadable through this service
+  (metadata-only in CDE); users are directed to the dataset's ERDDAP griddap page.

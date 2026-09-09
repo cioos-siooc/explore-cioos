@@ -2,9 +2,9 @@
  * Sidebar — the left column holding the datasets card (a toggle header
  * that shows/hides the dataset list body and the counts + Download
  * footer). The brand + Datasets/Filters entry points live in the
- * centered top bar. On phones the datasets card becomes a bottom sheet,
+ * centered top bar. On phones the datasets card takes the whole screen,
  * shown only while the top bar's Datasets button is on — closed, it
- * leaves nothing at the bottom edge and the map reads full-screen.
+ * leaves nothing at any edge and the map reads full-screen.
  *
  * The griddap legend pins itself over this column's top-left corner
  * rather than stacking inside it (see the WmsLegend stylesheet), so the
@@ -12,11 +12,6 @@
  * ------------------------------------------------------------------ */
 :root {
   --cioos-sidebar-width: 420px;
-  /* Floor for the clearance held below the top bar on mobile, so the sheet's
-     top edge rests under it (logo row + Datasets/Filters pill) instead of
-     sliding behind it. The measured --cioos-top-bar-space takes over whenever
-     it is larger — with filter chips wrapped under the bar, it usually is. */
-  --sheet-top-gap: 110px;
 }
 
 /* Transparent positioning shell: the two cards inside carry the chrome,
@@ -222,7 +217,7 @@
   min-width: 0;
   margin-left: auto;
   font-family: var(--cioos-font-display);
-  font-size: 10px;
+  font-size: var(--cioos-font-size-2xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -338,63 +333,105 @@
 }
 
 /* ------------------------------------------------------------------
- * Mobile: brand card floats top-left; the datasets card becomes a
- * bottom sheet that the top bar's Datasets button raises. Closed, the
- * card is not rendered at all (see the collapsed rule above), so the
- * bottom edge belongs to the map.
+ * Mobile: the card is the screen. It covers the map edge to edge — the
+ * top bar included, which is what separates "I am reading the list" from
+ * "I am reading the map" on a viewport too small to do both at once. It
+ * is dismissed from the close button in its own top-right corner (see
+ * Sidebar.jsx, which swaps the collapse chevron for an X here) rather
+ * than by uncovering something behind it.
+ *
+ * Closed, the card is not rendered at all (see the collapsed rule above),
+ * so the map has the whole screen back.
  * ------------------------------------------------------------------ */
 @media (max-width: 700px) {
   .sidebar {
-    inset: 8px;
+    inset: 0;
     width: auto;
   }
 
-  /* Open, the sheet owns the screen — including the time bar, which the shell
-     otherwise keeps above this column. */
+  /* One step over the top bar — the one piece of chrome that outranks this
+     column everywhere else, and the last thing between it and the whole
+     screen. Deliberately not higher: the map's "what's here" card sits two
+     steps above the dock and stays the topmost non-modal surface here as it is
+     everywhere else, so a click's answer is never buried by the list it feeds.
+     The modals keep their own layer well above both. */
   .sidebar.sheetExpanded {
-    z-index: var(--cioos-z-sheet, 34);
+    z-index: calc(var(--cioos-z-dock, 35) + 1);
   }
 
   .sidebarDatasets {
     position: fixed;
-    left: 0;
-    right: 0;
-    /* The sheet owns the screen here: it rises over the time bar instead of
-       holding clearance from it the way the desktop column does. */
-    bottom: 0;
-    /* Full height minus the top-bar clearance, so the sheet reaches nearly the
-       top of the screen while stopping below the bar (and below the filter
-       chips wrapped under it, which is what pushes the measured
-       --cioos-top-bar-space past the floor). */
-    height: calc(
-      100dvh - max(var(--sheet-top-gap), var(--cioos-top-bar-space, 0px))
-    );
-    max-height: calc(
-      100dvh - max(var(--sheet-top-gap), var(--cioos-top-bar-space, 0px))
-    );
-    border-radius: var(--cioos-radius-lg) var(--cioos-radius-lg) 0 0;
-    box-shadow: var(--cioos-shadow-lift, var(--cioos-shadow-float));
+    inset: 0;
+    height: 100dvh;
+    max-height: 100dvh;
+    /* Nothing shows past it, so it has no edges of its own to draw and no
+       plane to be lifted off. */
+    border: none;
+    border-radius: 0;
+    transform: none;
+    box-shadow: none;
   }
 
+  /* Rises from the bottom edge on open — the same gesture the sheet had, kept
+     because it is what says the surface came from the button that was pressed
+     rather than replacing the page. (Silenced under prefers-reduced-motion by
+     the rule the desktop slide-in already shares.) */
   .sidebarDatasets.expanded {
-    flex: none;
-    /* Rises from the bottom edge on open — the sheet is mounted by the toggle,
-       so this plays once rather than tracking a gesture. */
     animation: sheetRise var(--cioos-transition-normal, 0.25s ease);
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .sidebarDatasets.expanded {
-      animation: none;
-    }
+  /* The header is now the top of the screen rather than the top of a card, so
+     it is sized like one — a taller row, whose whole width is the toggle, so
+     the X in its corner already has the touch target it needs. */
+  .datasetsToggle {
+    padding: var(--cioos-space-md) var(--cioos-space-lg);
+  }
+
+  /* Full ink: an X in the corner of a full-screen surface is the way out of
+     it, not the muted hint a collapse chevron on a card can afford to be. No
+     box sizing here — this is the bare <svg>, so a width/height would scale
+     the glyph rather than pad it; the row around it is the target. */
+  .datasetsToggleChevron {
+    color: var(--cioos-ink);
+  }
+
+  /* The dataset page's dismiss is a button of its own rather than part of a
+     full-width row, so this one does need a target built for it. */
+  .datasetsBannerCollapse {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-right: -6px;
+    border-radius: 50%;
+    color: var(--cioos-ink);
+  }
+
+  /* An X means the same thing whichever way up it is; the chevron's flip
+     would only make the icon twitch as the card opens. */
+  .sidebarDatasets.expanded .datasetsToggleChevron {
+    transform: none;
+  }
+
+  /* The footer is the surface's action bar: the Download button gets a full
+     touch target, and the counts beside it stay on one line each. */
+  .sidebarFooter {
+    padding: var(--cioos-space-md) var(--cioos-space-lg);
+    /* Clear of the home indicator on a notched phone. */
+    padding-bottom: max(var(--cioos-space-md), env(safe-area-inset-bottom));
+  }
+
+  .sidebarDownloadButton {
+    min-height: 44px;
   }
 }
 
 @keyframes sheetRise {
   from {
-    transform: translateY(100%) var(--cioos-perspective);
+    transform: translateY(100%);
   }
   to {
-    transform: translateY(0) var(--cioos-perspective);
+    transform: translateY(0);
   }
 }

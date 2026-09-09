@@ -11,12 +11,13 @@ from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
+from cde_harvester.core.day_sets import ranges_to_iso
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     get_ckan_records,
     unescape_ascii,
     unescape_ascii_list,
 )
-from cde_harvester.core.config import load_config, load_obis_dataset_ids
+from cde_harvester.core.config import load_config, resolve_obis_config
 from cde_harvester.sources import resolve_source
 from cde_harvester.core.observability import (
     cleanup_old_logs,
@@ -26,7 +27,8 @@ from cde_harvester.core.observability import (
 from cde_harvester.core.issues import report_issues
 from cde_harvester.core.schemas import HarvestAttemptSchema
 from cde_harvester.sources.erddap.harvester import harvest_erddap
-from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
+from cde_harvester.sources.obis.discovery import ObisDiscoveryConfig
+from cde_harvester.sources.obis.geo_filter import DEFAULT_EXEMPT_NODE_IDS, ObisGeoFilter
 from cde_harvester.sources.obis.harvester import harvest_obis
 from cde_harvester.utils import cf_standard_names, supported_standard_names
 from dotenv import load_dotenv
@@ -281,6 +283,13 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
         erddap_profiles["eovs"] = erddap_profiles["eovs"].apply(
             lambda x: repr(list(x)) if isinstance(x, (list, tuple)) else x
         )
+    # Same treatment for the day set, with one extra step: literal_eval only
+    # accepts literals, and the repr of a datetime.date is a constructor call —
+    # so the runs go through as ISO-string pairs (day_sets.ranges_to_iso).
+    if "day_ranges" in erddap_profiles.columns:
+        erddap_profiles["day_ranges"] = erddap_profiles["day_ranges"].apply(
+            lambda x: repr(ranges_to_iso(x)) if isinstance(x, (list, tuple)) else x
+        )
     erddap_profiles.drop_duplicates().to_csv(profiles_file, index=False)
     if not df_ckan.empty:
         df_ckan.to_csv(ckan_file, index=False)
@@ -330,8 +339,14 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
 @monitor(monitor_slug="main-harvester")
 def main(erddap_urls, cache_requests, folder, dataset_ids,
          obis_dataset_ids=None, obis_folder=None, obis_geo_filter=None,
-         source=None, triggered_by=None, skip_unchanged=False):
+         obis_discovery=None, source=None, triggered_by=None, skip_unchanged=False):
     logger = _run_logger()
+    # Both entry points pass the raw config blocks; build the objects here so
+    # the CLI and the Prefect pipeline can never construct them differently.
+    if obis_geo_filter is None or isinstance(obis_geo_filter, dict):
+        obis_geo_filter = ObisGeoFilter.from_config(obis_geo_filter)
+    if obis_discovery is None or isinstance(obis_discovery, dict):
+        obis_discovery = ObisDiscoveryConfig.from_config(obis_discovery)
     limit_dataset_ids = None
     if dataset_ids:
         limit_dataset_ids = dataset_ids.split(",")
@@ -382,6 +397,8 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             logger.info("Single-source harvest: %s", resolved_source)
             erddap_urls_list = [resolved_source]
             obis_dataset_ids = None
+            # Clear discovery too, so an ERDDAP-only run never calls the OBIS API.
+            obis_discovery = None
 
         for erddap_url in erddap_urls_list:
             logger.info("Submitting harvest task for %s", erddap_url)
@@ -390,20 +407,23 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
 
         # Submit OBIS task (runs concurrently with ERDDAP tasks)
         obis_future = None
-        if obis_dataset_ids:
-            logger.info("Submitting OBIS harvest task for %d datasets", len(obis_dataset_ids))
+        obis_discovery_enabled = bool(obis_discovery and obis_discovery.enabled)
+        if obis_dataset_ids or obis_discovery_enabled:
+            if obis_dataset_ids:
+                logger.info("Submitting OBIS harvest task for %d configured datasets", len(obis_dataset_ids))
+            else:
+                logger.info("Submitting OBIS harvest task; dataset list resolved by discovery")
             obis_cache = obis_folder or os.path.join(os.path.dirname(os.path.abspath(folder)), "obis_cache")
             obis_future = harvest_obis.submit(
                 limit_dataset_ids=obis_dataset_ids,
                 folder=obis_cache,
                 geo_filter=obis_geo_filter,
                 run_id=run_id,
+                discovery=obis_discovery if obis_discovery_enabled else None,
             )
 
         # Wait for all tasks to complete
         logger.info("Waiting for all harvest tasks to complete")
-        erddap_results = [f.result() for f in erddap_futures]
-        logger.info("All ERDDAP work completed")
 
         # Collect ERDDAP results
         erddap_profiles = pd.DataFrame()
@@ -413,7 +433,16 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         variables = pd.DataFrame()
         erddap_skipped = pd.DataFrame()
 
-        for result in erddap_results:
+        # Drain the futures one server at a time and drop each result as soon as
+        # it has been merged. Resolving them all up front
+        # (`[f.result() for f in erddap_futures]`) held every server's frames in
+        # memory simultaneously, and the merge loop then grew a second full copy
+        # alongside them — the peak landed at roughly three times the harvest
+        # right when it is already carrying the most data. The concats stay as
+        # they were: an empty frame still contributes its columns, which is what
+        # keeps the output CSV headers stable when a server harvests nothing.
+        while erddap_futures:
+            result = erddap_futures.pop(0).result()
             erddap_profiles = pd.concat([erddap_profiles, result.profiles])
             erddap_trajectory_days = pd.concat(
                 [erddap_trajectory_days, result.trajectory_days]
@@ -426,6 +455,8 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             erddap_skipped = pd.concat([erddap_skipped, result.skipped])
             erddap_attempts = pd.concat([erddap_attempts, result.attempts])
             erddap_verified = pd.concat([erddap_verified, result.verified])
+            del result
+        logger.info("All ERDDAP work completed")
 
         # Collect OBIS results
         obis_cells = pd.DataFrame()
@@ -597,17 +628,12 @@ if __name__ == "__main__":
         log_time = config.get("log_time")
         log_level = config.get("log_level", "INFO")
         log_dir = os.environ.get("HARVESTER_LOG_DIR") or config.get("log_dir")
-        obis_dataset_ids = load_obis_dataset_ids(
-            dataset_ids=config.get("obis_dataset_ids"),
-            datasets_file=config.get("obis_datasets_file"),
-        )
+        obis = resolve_obis_config(config)
+        logger.info("OBIS selection mode: %s", obis.mode)
+        obis_dataset_ids = obis.dataset_ids
+        obis_discovery = obis.discovery
+        obis_geo_filter = obis.geo_filter
         obis_folder = config.get("obis_folder")
-        geo_cfg = config.get("obis_geo_filter") or {}
-        obis_geo_filter = ObisGeoFilter(
-            mode=geo_cfg.get("mode", "canada"),
-            polygon_file=geo_cfg.get("polygon_file"),
-            exempt_node_ids=geo_cfg.get("exempt_node_ids"),
-        )
 
     else:
         logger.info("Using command line arguments")
@@ -673,6 +699,29 @@ if __name__ == "__main__":
             default=None,
             help="Override path to the boundary polygon WKT file",
         )
+        parser.add_argument(
+            "--obis-discover",
+            action="store_true",
+            help="Discover OBIS datasets from the OBIS API instead of a static list",
+        )
+        parser.add_argument(
+            "--obis-discovery-nodes",
+            default=None,
+            help="Comma-separated OBIS node UUIDs to harvest in full "
+                 "(default: OBIS Canada and OTN-OBIS)",
+        )
+        parser.add_argument(
+            "--obis-discovery-geometry",
+            default="eez",
+            help="Discovery geometry: 'eez' (packaged Canada polygon), 'none', or inline WKT",
+        )
+        parser.add_argument(
+            "--obis-discovery-min-datasets",
+            type=int,
+            default=0,
+            help="Abort discovery if fewer than this many datasets are found "
+                 "(default 0 for ad-hoc CLI runs; production sets a real floor)",
+        )
 
         args = parser.parse_args()
 
@@ -684,18 +733,40 @@ if __name__ == "__main__":
         folder = args.folder
         log_dir = args.log_dir
 
-        obis_dataset_ids = load_obis_dataset_ids(
+        discover_overlay = None
+        if args.obis_discover:
+            discover_overlay = {
+                "enabled": True,
+                "nodes": (
+                    args.obis_discovery_nodes.split(",")
+                    if args.obis_discovery_nodes
+                    else sorted(DEFAULT_EXEMPT_NODE_IDS)
+                ),
+                "geometry": args.obis_discovery_geometry,
+                "min_datasets": args.obis_discovery_min_datasets,
+            }
+        obis = resolve_obis_config(
+            {
+                "obis_geo_filter": {
+                    "mode": args.obis_geo_filter,
+                    "polygon_file": args.obis_polygon_file,
+                },
+            },
             dataset_ids=args.obis_dataset_ids.split(",") if args.obis_dataset_ids else None,
             datasets_file=args.obis_datasets_file,
+            discover=discover_overlay,
         )
+        logger.info("OBIS selection mode: %s", obis.mode)
+        obis_dataset_ids = obis.dataset_ids
+        obis_discovery = obis.discovery
+        obis_geo_filter = obis.geo_filter
         obis_folder = args.obis_folder
-        obis_geo_filter = ObisGeoFilter(
-            mode=args.obis_geo_filter,
-            polygon_file=args.obis_polygon_file,
-        )
 
-        if not urls and not obis_dataset_ids:
-            parser.error("At least one of --urls or --obis-datasets-file/--obis-dataset-ids is required")
+        if not urls and obis.mode == "off":
+            parser.error(
+                "At least one of --urls, --obis-discover, or "
+                "--obis-datasets-file/--obis-dataset-ids is required"
+            )
 
     logger = setup_logging(log_time, log_level, log_dir)
     try:
@@ -705,7 +776,7 @@ if __name__ == "__main__":
         flow(name="cde-main", log_prints=True)(main)(
             urls, cache, folder or "harvest", dataset_ids,
             obis_dataset_ids=obis_dataset_ids, obis_folder=obis_folder,
-            obis_geo_filter=obis_geo_filter)
+            obis_geo_filter=obis_geo_filter, obis_discovery=obis_discovery)
     except Exception as e:
         logger.error("Harvester failed!!!", exc_info=True)
         raise e

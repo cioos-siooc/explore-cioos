@@ -4,7 +4,10 @@
   "description": "",
   "main": "tst.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm run test:api && npm run test:frontend",
+    "test:api": "node test_api_endpoints.js",
+    "test:download": "node test_download_request.js",
+    "test:frontend": "node frontend_loads_without_errors.js"
   },
   "author": "",
   "license": "ISC",

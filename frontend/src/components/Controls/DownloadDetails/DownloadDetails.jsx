@@ -9,6 +9,8 @@ import polygonImage from '../../Images/polygonIcon.png'
 import rectangleImage from '../../Images/rectangleIcon.png'
 import isEmpty from 'lodash/isEmpty'
 
+import { useActivityTask } from '../../../state/activity/ActivityProvider.jsx'
+
 import {
   createDataFilterQueryString,
   polygonIsRectangle
@@ -70,6 +72,10 @@ export default function DownloadDetails({
   // them — a failing /downloadEstimate spun forever, in every card and in the
   // order summary.
   const [estimatesLoading, setEstimatesLoading] = useState(true)
+  // Reported by the corner badge as well as by the figures it stands in for:
+  // the estimate is the slowest thing in this modal and the user may well
+  // have looked away from it.
+  useActivityTask('activityEstimatesText', estimatesLoading)
 
   useEffect(() => {
     let cancelled = false
@@ -377,7 +383,7 @@ export default function DownloadDetails({
               fail outright, the sizes are unknowable but the counts aren't. */}
           <div className='downloadSummaryStat'>
             {estimatesLoading ? (
-              <Spinner className='datasetSizeTotalSpinner' />
+              <Spinner size='sm' className='datasetSizeTotalSpinner' />
             ) : (
               <span className='downloadSummaryValue'>
                 {selectedCount}
@@ -391,7 +397,7 @@ export default function DownloadDetails({
           <div className='downloadSummaryDivider' aria-hidden='true' />
           <div className='downloadSummaryStat'>
             {estimatesLoading ? (
-              <Spinner className='datasetSizeTotalSpinner' />
+              <Spinner size='sm' className='datasetSizeTotalSpinner' />
             ) : downloadSizeEstimates ? (
               <span className='downloadSummaryValue'>
                 {bytes(dataTotal.filteredSize) || '0B'}

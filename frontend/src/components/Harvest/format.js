@@ -24,6 +24,22 @@ export function fmtDurationMs(ms) {
   return (ms / 1000).toFixed(1) + 's'
 }
 
+// Byte counts (download sizes).
+export function fmtBytes(bytes) {
+  if (bytes == null) return '—'
+  const n = Number(bytes)
+  if (isNaN(n)) return '—'
+  if (n < 1024) return `${n} B`
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let value = n / 1024
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit++
+  }
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`
+}
+
 // Link to the dataset on its source (ERDDAP data page or OBIS).
 export function datasetLink(erddapUrl, datasetId, source) {
   if (source === 'obis') return `https://obis.org/dataset/${datasetId}`

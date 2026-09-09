@@ -61,6 +61,16 @@ export default function Tooltip ({
 
   let style
   if (rect) {
+    // The side placements grow away from whichever horizontal half the trigger
+    // sits in, aligned to its near edge rather than centred on it. Centring
+    // needs a translate, and a translated box can't be kept inside the
+    // viewport without knowing its own height — which is how a trigger in a
+    // bottom corner used to push a multi-line bubble off the screen.
+    const verticalAnchor =
+      rect.top + rect.height / 2 > window.innerHeight / 2
+        ? { bottom: window.innerHeight - rect.bottom }
+        : { top: rect.top }
+
     switch (placement) {
     case 'top':
       style = {
@@ -70,18 +80,14 @@ export default function Tooltip ({
       }
       break
     case 'right':
-      style = {
-        left: rect.right + GAP,
-        top: rect.top + rect.height / 2,
-        transform: 'translateY(-50%)'
-      }
+      style = { left: rect.right + GAP, ...verticalAnchor }
       break
     case 'left':
-      style = {
-        left: rect.left - GAP,
-        top: rect.top + rect.height / 2,
-        transform: 'translate(-100%, -50%)'
-      }
+      // Positioned by `right` rather than `left` + a -100% translate: a box
+      // offset from the left with only a few pixels of viewport beyond it
+      // shrink-to-fits into those pixels, so every line wrapped and the
+      // max-width never applied.
+      style = { right: window.innerWidth - rect.left + GAP, ...verticalAnchor }
       break
     case 'bottom':
     default:

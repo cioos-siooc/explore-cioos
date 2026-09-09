@@ -1,5 +1,5 @@
 // The query-string vocabulary of the record preview, in one place because three
-// modules need to agree on it: SelectionProvider owns `record`,
+// modules need to agree on it: SelectionProvider owns `preview`,
 // usePreviewPlotParams owns the plot params, and UrlSync has to carry every one
 // of them through (it rebuilds the whole search string from scratch on each map
 // pan and drops anything it does not list).
@@ -8,7 +8,13 @@
 // a component and the sync without pulling any of them into each other.
 
 // Which record of the dataset is open. Its presence is what opens the modal.
-export const RECORD_PARAM = 'record'
+//
+// Deliberately NOT `record`: that name belongs to the dataset page's HIGHLIGHT
+// — the row a marker click pinned, which pairs with `track` for a platform (see
+// SelectionProvider's pendingHighlight). A highlight points a row out; this
+// opens its plot. Sharing one name would have made every marker click open the
+// modal the user had not asked to see.
+export const RECORD_PARAM = 'preview'
 
 // How that record is being drawn. Each of these is written ONLY when it differs
 // from the default the dataset type implies, so an untouched plot adds nothing

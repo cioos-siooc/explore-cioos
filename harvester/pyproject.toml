@@ -44,4 +44,5 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests/unit", "tests/integration"]
 addopts = "-v --tb=short"
+markers = ["network: hits live upstream APIs (set CDE_LIVE_TESTS=1 to run)"]
 

@@ -1,0 +1,124 @@
+/* The CIOOS logo drawn from the mark plus live text. Both layouts share the
+   type; they differ in the axis they run on and whether the organisation's
+   full name is along for the ride. */
+
+.cioosLogo {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  /* The mark takes currentColor for both its mesh and its dots, so this one
+     declaration colours it: primary for the nodes, the same teal at 55% for
+     the mesh behind them. */
+  color: var(--cioos-primary);
+  font-family: var(--cioos-font-brand, sans-serif);
+}
+
+/* The inline lockup is sized by this one declaration: it has no full name, so
+   the base size *is* the name's, and the mark and the gap are multiples of it.
+   One number to change, and the mobile clamp in the brand card's stylesheet
+   scales the mark along with the text instead of leaving it behind. */
+.cioosLogo-inline {
+  gap: 0.35em;
+  font-size: var(--cioos-font-size-xl, 26px);
+}
+
+/* The wordmark's own proportion is a mark 2.35x the name's font size (a 94.76
+   unit mark against a 28.19 cap height, at the ~0.7 cap-to-em Quicksand runs).
+   That is a 61px mark next to this name, and a brand row half again as tall as
+   the one the card can spend — so the compact lockup keeps the mark's share
+   deliberately short of the full ratio, at the largest that fits the row.
+   Two classes, so this beats .cioosSpinner-md's own 28px whatever order the
+   two stylesheets land in. */
+.cioosLogo-inline .cioosSpinner {
+  width: 1.55em;
+  height: 1.55em;
+}
+
+.cioosLogo-stacked {
+  flex-direction: column;
+  gap: var(--cioos-space-md, 12px);
+  /* The full name's size. The name is a multiple of it, so the lockup keeps
+     the wordmark's proportions at whatever size this is set to. */
+  font-size: var(--cioos-font-size-sm, 12px);
+}
+
+/* …and so is the mark, rather than the fixed pixel size .cioosSpinner-lg would
+   otherwise impose: that left the one part of the lockup that could not follow
+   the font-size, so shrinking the splash shrank the type around an unchanged
+   mark. Same trick as the inline layout above, at the ratio the lockup already
+   wore (56px against this size's 12px). Two classes, so it beats
+   .cioosSpinner-lg whatever order the two stylesheets land in. */
+.cioosLogo-stacked .cioosSpinner {
+  width: 4.65em;
+  height: 4.65em;
+}
+
+.cioosLogoWordmark {
+  display: flex;
+  flex-direction: column;
+  /* The wordmark sets the full name's cap top 9 units below the name's
+     baseline, on a cap height of 11.5 — a little over half a line. */
+  gap: 0.5em;
+  min-width: 0;
+}
+
+.cioosLogo-stacked .cioosLogoWordmark {
+  align-items: center;
+  text-align: center;
+}
+
+/* The compact lockup shares its row with two other things, and is the one that
+   gives way: squeezed past its content it clips the name rather than letting it
+   run out over its neighbours. On the wordmark rather than the whole lockup so
+   the mark keeps the overflow its pulse needs. */
+.cioosLogo-inline .cioosLogoWordmark {
+  overflow: hidden;
+}
+
+/* Proportions and weights are measured off the wordmark's own outlines: cap
+   heights of 28.19 and 11.52 units (hence the 2.45 ratio below), and stems
+   that are 8.7% and 17.4% of those cap heights. Note those two stem ratios
+   differ by exactly 2x, so the wordmark is set in two weights of Volte Rounded
+   rather than one — Quicksand's 300 and 600 are the matching pair.
+   Tracking is left alone: Volte Rounded is narrower than Quicksand, and
+   forcing its exact letter widths would need negative tracking. */
+.cioosLogoName {
+  font-weight: 300;
+  line-height: 1;
+  color: var(--cioos-ink);
+}
+
+/* Only the stacked lockup carries the full name, so only there does the name
+   have a second line to hold its ratio against. The inline one inherits its
+   layout's base size, which is the name's. */
+.cioosLogo-stacked .cioosLogoName {
+  font-size: 2.45em;
+}
+
+.cioosLogoFullName {
+  font-weight: 600;
+  /* The wordmark's two lines sit one cap height plus a hair apart; the extra
+     0.1 is headroom for the accents the French lockup carries. */
+  line-height: 1.1;
+  text-transform: uppercase;
+  /* The break is in the translated string, where the wordmark puts it, rather
+     than left to a max-width to guess. */
+  white-space: pre-line;
+  color: var(--cioos-ink-60);
+}
+
+/* Idle: the logo is still the logo, so it keeps its full presence and simply
+   stops moving — rather than pulsing at a user who is waiting for nothing.
+   Set by CioosLogo, which decides it from the activity registry.
+
+   The animation is dropped rather than paused. Pausing freezes each node
+   wherever its own staggered pulse had got to, and the keyframes rest at 0.3,
+   so a settled logo was left with most of its nodes faded and a couple
+   mid-bloom. With no animation applied the nodes fall back to their own
+   values — full opacity, unscaled — so finishing completes the mark instead of
+   dimming it. `!important` because the reduced-motion rule below carries one on
+   animation-name, and would otherwise put the fade back on a still logo. */
+.cioosLogo-idle .cioosSpinnerNode {
+  animation: none !important;
+  opacity: 1;
+}

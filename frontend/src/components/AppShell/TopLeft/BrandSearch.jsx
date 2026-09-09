@@ -2,17 +2,17 @@ import * as React from 'react'
 import { InfoSquare } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
 
-import CIOOSLogoEN from '../../Images/NationalLogoEnglish.png'
-import CIOOSLogoFR from '../../Images/NationalLogoFrench.png'
+import CioosLogo from '../../ui/CioosLogo.jsx'
 import FeedbackButton from '../../Controls/FeedbackButton/FeedbackButton.jsx'
 import LanguageSelector from '../../Controls/LanguageSelector/LanguageSelector.jsx'
 import { useUI } from '../../../state/ui/UIProvider.jsx'
 import './styles.css'
 
 // The brand card: logo, the two-line app title lockup, and the minor actions
-// (intro / feedback / language) on the top row. The centered top bar passes
-// the merged Datasets/Filters control in as children, so it renders as a
-// second row welded into this same card.
+// (intro / feedback / language) on the top row. The logo is drawn rather than
+// loaded, and is also the app's loading indicator — see CioosLogo. The
+// centered top bar passes the merged Datasets/Filters control in as children,
+// so it renders as a second row welded into this same card.
 export default function BrandSearch ({ children }) {
   const { t, i18n } = useTranslation()
   const { setShowIntroModal } = useUI()
@@ -23,20 +23,7 @@ export default function BrandSearch ({ children }) {
     <div className='brandSearch'>
       <div className='brandCard'>
         <div className='brandCardTop'>
-          <a
-            className='brandSearchLogo'
-            href={
-              isFrench ? 'https://www.siooc.ca/fr/accueil/' : 'https://www.cioos.ca'
-            }
-            target='_blank'
-            rel='noreferrer'
-            title={isFrench ? 'Visitez SIOOC' : 'Visit CIOOS National'}
-          >
-            <img
-              src={isFrench ? CIOOSLogoFR : CIOOSLogoEN}
-              alt={isFrench ? 'SIOOC' : 'CIOOS'}
-            />
-          </a>
+          <CioosLogo className='brandLogo' />
           {/* Two-line wordmark; the em word gets the large treatment. */}
           <h1 className='brandTitle' lang={isFrench ? 'fr' : 'en'}>
             {isFrench ? (

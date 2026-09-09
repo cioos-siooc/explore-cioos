@@ -9,7 +9,7 @@ import {
 } from './previewParams.js'
 
 test('the preview owns the record param and the plot params', () => {
-  assert.equal(RECORD_PARAM, 'record')
+  assert.equal(RECORD_PARAM, 'preview')
   assert.deepEqual(PLOT_PARAMS, ['vis', 'pvars', 'paxis', 'pmode', 'pcolors'])
   for (const param of [RECORD_PARAM, ...PLOT_PARAMS]) {
     assert.ok(PREVIEW_PARAMS.includes(param), param)
@@ -43,7 +43,12 @@ test('no preview param collides with one the map or the filters already use', ()
     'lat', 'lon', 'zoom', 'tracks', 'scrubTime', 'trail', 'layers',
     'obs', 'bathy', 'griddap', 'globe',
     'lang', 'search', 'onlyInView', 'groupBy', 'hiddenGroups',
-    'dataset', 'server'
+    'dataset', 'server',
+    // The dataset page's own params, added alongside the preview and the
+    // reason it is `preview` and not `record`: the first two are the
+    // highlight (a pinned row, a drawn platform), then the griddap slice
+    // wmsSliceParams writes, then where the "what's here" card was opened.
+    'record', 'track', 'var', 'date', 'z', 'at'
   ])
   for (const param of PREVIEW_PARAMS) {
     assert.equal(taken.has(param), false, `${param} is already used elsewhere`)
@@ -52,7 +57,7 @@ test('no preview param collides with one the map or the filters already use', ()
 
 test('closing the preview strips all of its params and touches nothing else', () => {
   const params = new URLSearchParams(
-    'lat=45&zoom=5&dataset=X&server=ogsl&record=R1&vis=table&paxis=depth' +
+    'lat=45&zoom=5&dataset=X&server=ogsl&preview=R1&vis=table&paxis=depth' +
     '&pvars=TE90_01,PSAL_01&pmode=lines&pcolors=TE90_01~a52c60' +
     // The colour dimension's two params, from a link made before it was replaced.
     '&pcolor=depth&pscale=Jet' +
@@ -62,7 +67,21 @@ test('closing the preview strips all of its params and touches nothing else', ()
   const stripped = withoutPreviewParams(params)
   assert.equal(stripped.toString(), 'lat=45&zoom=5&dataset=X&server=ogsl&eovs=salinity')
   // Non-destructive: the caller's params are untouched.
-  assert.equal(params.get('record'), 'R1')
+  assert.equal(params.get('preview'), 'R1')
+})
+
+test('the dataset page highlight survives closing the preview', () => {
+  // `record` and `track` are the highlight — the row a marker click pinned and
+  // the platform whose track is drawn — not the preview. Closing the plot must
+  // leave the page still pointing at them, which is why the preview took
+  // `preview` rather than the `record` name it once had.
+  const params = new URLSearchParams(
+    'dataset=X&record=R1&track=T1&preview=R1&pvars=TE90_01'
+  )
+  assert.equal(
+    withoutPreviewParams(params).toString(),
+    'dataset=X&record=R1&track=T1'
+  )
 })
 
 test('stripping is safe when no preview is open', () => {

@@ -136,7 +136,7 @@ export default function FeatureCard () {
   const openDataset = (entry) => {
     if (entry.kind === 'track') {
       // Same call the inspector's platform table makes: open the page and draw
-      // the platform's full history in one batched write.
+      // the platform's track in one batched write.
       selectTrajectoryFromMap(entry.pk, entry.trajectoryId, entry.title)
       close()
       return
@@ -216,6 +216,13 @@ export default function FeatureCard () {
         <div className='featureCardHeading'>
           <span className='featureCardHeadingTitle'>
             {t('featureCardTitle')}
+            {!empty && (
+              <span
+                className='featureCardMapClickSwatch'
+                aria-hidden='true'
+                title={t('featureCardMapClickHint')}
+              />
+            )}
           </span>
           {!empty && (
             <span className='featureCardHeadingMeta'>

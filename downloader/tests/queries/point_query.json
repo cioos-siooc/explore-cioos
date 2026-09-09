@@ -1,0 +1,27 @@
+{
+  "user_query": {
+    "language": "en",
+    "time_min": "2019-01-01",
+    "time_max": "2020-01-01",
+    "lat_min": 48.0,
+    "lat_max": 50.0,
+    "lon_min": -128.0,
+    "lon_max": -123.0,
+    "depth_min": 0,
+    "depth_max": 100,
+    "polygon_region": null,
+    "email": "test@example.com",
+    "job_id": "point1"
+  },
+  "cache_filtered": [
+    {
+      "erddap_url": "https://data.cioospacific.ca/erddap",
+      "dataset_id": "SomePointDataset",
+      "title": "A point-type dataset",
+      "cdm_data_type": "Point",
+      "source_type": "erddap",
+      "ckan_id": "0b0b0b0b-0000-0000-0000-000000000002",
+      "ckan_url": "https://catalogue.cioos.ca/dataset/"
+    }
+  ]
+}

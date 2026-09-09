@@ -100,7 +100,7 @@ export default function DatasetPreview ({
   }, [linkKey])
 
   const onModalClose = () => {
-    // One call, one history entry: setInspectRecordID clears ?record= and every
+    // One call, one history entry: setInspectRecordID clears ?preview= and every
     // plot param together, because react-router would drop one of two writes
     // made in the same tick (see previewParams.js).
     setInspectRecordID()

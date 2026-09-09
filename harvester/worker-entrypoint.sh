@@ -47,6 +47,29 @@ else
   exit 1
 fi
 
+# --- Database pre-flight -----------------------------------------------------
+# Every flow builds its connection from DB_NAME/DB_USER/DB_PASSWORD via
+# cde_harvester/core/db.py. Coolify supplies NONE of these automatically (see
+# .env.coolify.sample), and without them the worker still starts and registers
+# deployments happily — then every single flow run dies at connection time. On the
+# "Rebuild Database" flow that surfaces as "DB_NAME is not set", which reads like a
+# code bug rather than missing deployment config. Fail here instead, naming exactly
+# what is absent, the same way the harvest-config check above does.
+MISSING_DB="$(uv run python -m cde_harvester.core.db --print-missing 2>/dev/null || true)"
+if [ -n "${MISSING_DB}" ]; then
+  echo "[worker-entrypoint] ERROR: missing database settings: ${MISSING_DB}" >&2
+  echo "[worker-entrypoint] Every harvest and the Rebuild Database flow need these to" >&2
+  echo "[worker-entrypoint] connect. Set them on the deployment (Coolify: the app's" >&2
+  echo "[worker-entrypoint] Environment Variables tab) or in a .env, then redeploy:" >&2
+  echo "[worker-entrypoint]   DB_NAME=cde" >&2
+  echo "[worker-entrypoint]   DB_USER=postgres" >&2
+  echo "[worker-entrypoint]   DB_PASSWORD=<the db superuser password>" >&2
+  echo "[worker-entrypoint] DB_HOST_EXTERNAL defaults to 'db' in compose; DB_PORT to 5432." >&2
+  echo "[worker-entrypoint] See .env.coolify.sample for the full list." >&2
+  exit 1
+fi
+echo "[worker-entrypoint] Database settings present for ${DB_NAME}"
+
 if [ "${REGISTER_DEPLOYMENTS:-true}" = "true" ]; then
   echo "[worker-entrypoint] Registering process work pool + deployments..."
   # Re-runs on EVERY container start, so config changes are picked up by a

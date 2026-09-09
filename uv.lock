@@ -558,7 +558,7 @@ wheels = [
 [[package]]
 name = "download-scheduler"
 version = "0.1.0"
-source = { directory = "download_scheduler" }
+source = { editable = "download_scheduler" }
 dependencies = [
     { name = "downloader" },
     { name = "harvester" },
@@ -587,6 +587,7 @@ name = "downloader"
 version = "0.1.0"
 source = { editable = "downloader" }
 dependencies = [
+    { name = "duckdb" },
     { name = "erddapy" },
     { name = "loguru" },
     { name = "numpy" },
@@ -598,6 +599,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "duckdb", specifier = ">=1.1.0" },
     { name = "erddapy", specifier = ">=2.2.4" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "numpy", specifier = "<2.0.0" },
@@ -698,7 +700,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "download-scheduler", directory = "download_scheduler" },
+    { name = "download-scheduler", editable = "download_scheduler" },
     { name = "harvester", editable = "harvester" },
 ]
 

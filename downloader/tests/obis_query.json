@@ -1,0 +1,27 @@
+{
+  "user_query": {
+    "language": "en",
+    "time_min": "2000-01-01",
+    "time_max": "2020-01-01",
+    "lat_min": 50.0,
+    "lat_max": 56.0,
+    "lon_min": -135.0,
+    "lon_max": -125.0,
+    "depth_min": 0,
+    "depth_max": 200,
+    "polygon_region": "POLYGON((-125.52734375000045 55.3462909172126,-133.96484375000045 55.3462909172126,-133.96484375000045 50.47669407439406,-125.52734375000045 50.47669407439406,-125.52734375000045 55.3462909172126))",
+    "email": "test@example.com",
+    "job_id": "obis01"
+  },
+  "cache_filtered": [
+    {
+      "erddap_url": "https://obis.org",
+      "dataset_id": "00017595-e015-4ec6-bf8a-b013e0dca521",
+      "title": "An OBIS occurrence dataset",
+      "cdm_data_type": "Point",
+      "source_type": "obis",
+      "ckan_id": "0b0b0b0b-0000-0000-0000-000000000003",
+      "ckan_url": "https://catalogue.cioos.ca/dataset/"
+    }
+  ]
+}

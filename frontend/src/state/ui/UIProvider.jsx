@@ -11,13 +11,14 @@ import isEmpty from 'lodash/isEmpty'
 
 import { getCookieValue } from '../../utilities.jsx'
 import { useSelection } from '../selection/SelectionProvider.jsx'
+import useMediaQuery from './useMediaQuery.js'
 
 const UIContext = createContext()
 
 // Above this width the datasets list is shown by default — there is enough map
 // left over for it to sit beside rather than on top of. Below it the map leads
-// and the list is opened from the top bar — on phones that raises it as a
-// bottom sheet.
+// and the list is opened from the top bar — on phones that takes the whole
+// screen.
 const WIDE_SCREEN_QUERY = '(min-width: 1400px)'
 
 export function useUI () {
@@ -28,11 +29,10 @@ export default function UIProvider ({ children }) {
   const { polygon, selectedTrajectory, inspectDataset, pointsToReview } =
     useSelection()
 
+  const wideScreen = useMediaQuery(WIDE_SCREEN_QUERY)
   // The datasets sidebar: open by default on wide screens, closed on anything
   // narrower, where it would take too much of the map.
-  const [sidebarOpen, setSidebarOpenState] = useState(
-    () => window.matchMedia(WIDE_SCREEN_QUERY).matches
-  )
+  const [sidebarOpen, setSidebarOpenState] = useState(wideScreen)
   // Set once the user opens or closes the list themselves; from then on their
   // choice sticks and the screen-size default no longer applies.
   const sidebarChosenRef = useRef(false)
@@ -45,13 +45,8 @@ export default function UIProvider ({ children }) {
   // resized (or a tablet rotated) into a wide screen gets the default for the
   // size it is now rather than keeping the one it booted at.
   useEffect(() => {
-    const mql = window.matchMedia(WIDE_SCREEN_QUERY)
-    const onChange = (e) => {
-      if (!sidebarChosenRef.current) setSidebarOpenState(e.matches)
-    }
-    mql.addEventListener('change', onChange)
-    return () => mql.removeEventListener('change', onChange)
-  }, [])
+    if (!sidebarChosenRef.current) setSidebarOpenState(wideScreen)
+  }, [wideScreen])
   // The two modal surfaces: filter management and the download order.
   const [showFiltersModal, setShowFiltersModal] = useState(false)
   const [showDownloadModal, setShowDownloadModal] = useState(false)

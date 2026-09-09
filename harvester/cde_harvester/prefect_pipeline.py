@@ -20,11 +20,19 @@ from prefect.exceptions import ObjectNotFound
 from cde_harvester.__main__ import main as harvester_main
 from cde_harvester.core.config import (
     load_config,
-    load_obis_dataset_ids,
     resolve_harvest_config_file,
+    resolve_obis_config,
 )
+from cde_harvester.core import db as core_db
 from cde_harvester.core.observability import cleanup_old_logs, run_logger
+from cde_harvester.core.schema import (
+    check_confirmation,
+    ensure_database,
+    rebuild_schema,
+)
 from cde_harvester.sources import OBIS_ALIASES
+from cde_harvester.sources.obis.discovery import ObisDiscoveryConfig
+from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
 from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
 from cde_harvester.loading.loader import main as db_loader_main
 from cde_harvester.loading.populate_vernaculars import main as vernaculars_main
@@ -173,6 +181,22 @@ def _cron_env(var_name):
     return (os.getenv(var_name) or "").strip() or None
 
 
+def _configured_sources(erddap_urls, obis_dataset_ids, obis_discovery):
+    """The list of harvestable sources: each ERDDAP url, plus "obis" when OBIS is on.
+
+    Shared by create_deployment() and cde_harvest_all_run() — the registered
+    per-source deployments and the fan-out list must never disagree, or OBIS
+    ends up registered but never triggered (or vice versa), which is silent
+    data loss. Note that under discovery `obis_dataset_ids` is empty at config
+    time, so it can't be used alone to decide whether OBIS is configured.
+    """
+    sources = [u.strip() for u in (erddap_urls or "").split(",") if u.strip()] \
+        if isinstance(erddap_urls, str) else [u.strip() for u in (erddap_urls or []) if u and u.strip()]
+    if obis_dataset_ids or (obis_discovery or {}).get("enabled", bool(obis_discovery)):
+        sources.append("obis")
+    return sources
+
+
 class PrefectCDEPipeline:
     erddap_urls: str
     cache_requests: bool
@@ -184,6 +208,8 @@ class PrefectCDEPipeline:
     incremental: bool
     flush_redis: bool
     obis_dataset_ids: list
+    obis_discovery: dict
+    obis_geo_filter: dict
     obis_folder: str
     source: str
     triggered_by: str
@@ -209,11 +235,22 @@ class PrefectCDEPipeline:
         # Defaults; cde_pipeline_run() overrides these for a single-source run.
         self.source = None
         self.triggered_by = None
-        self.obis_dataset_ids = load_obis_dataset_ids(
-            dataset_ids=config.get("obis_dataset_ids"),
-            datasets_file=config.get("obis_datasets_file"),
-        )
+        # Declarative only — discovery itself runs inside the OBIS harvest task.
+        # init_config() is also called at deployment-registration time, so a
+        # network call here would make container startup depend on api.obis.org
+        # and would fire on every ERDDAP-only per-source run.
+        obis = resolve_obis_config(config)
+        logger.info("OBIS selection mode: %s", obis.mode)
+        self.obis_dataset_ids = obis.dataset_ids
+        self.obis_discovery = obis.discovery
+        self.obis_geo_filter = obis.geo_filter
         self.obis_folder = config.get("obis_folder")
+
+        # Parse-and-discard so a malformed OBIS block fails here — at container
+        # startup / deployment registration — instead of at the first harvest.
+        # Neither call touches the network.
+        ObisDiscoveryConfig.from_config(self.obis_discovery)
+        ObisGeoFilter.from_config(self.obis_geo_filter)
 
         logger.info("CDE Pipeline initialized with configuration:")
         logger.info(f"{vars(self)}")
@@ -262,6 +299,11 @@ class PrefectCDEPipeline:
                         dataset_ids=self.dataset_ids,
                         obis_dataset_ids=self.obis_dataset_ids,
                         obis_folder=str(obis_folder),
+                        # Both of these were previously never passed, so the
+                        # documented obis_geo_filter config block was silently
+                        # ignored on the Prefect (production) path.
+                        obis_geo_filter=self.obis_geo_filter,
+                        obis_discovery=self.obis_discovery,
                         source=self.source,
                         triggered_by=self.triggered_by,
                         skip_unchanged=effective_incremental,
@@ -397,9 +439,9 @@ class PrefectCDEPipeline:
         # One on-demand deployment per source (re-deploy updates rather than
         # duplicates). The dashboard "Trigger harvest" button and the orchestrator
         # both run these by name; each forces incremental db-load (see cde_pipeline).
-        per_source = [u.strip() for u in (self.erddap_urls or "").split(",") if u.strip()]
-        if self.obis_dataset_ids:
-            per_source.append("obis")
+        per_source = _configured_sources(
+            self.erddap_urls, self.obis_dataset_ids, self.obis_discovery
+        )
         source_deployment_names = []
         for src in per_source:
             dep_name = f"cde-harvester-{deployment_slug(src)}"
@@ -419,6 +461,18 @@ class PrefectCDEPipeline:
             source_deployment_names.append(dep_name)
             logger.info("Per-source deployment registered: %s (source=%s)", dep_name, src)
 
+        # Destructive schema rebuild, on-demand only — never scheduled, and gated on a
+        # confirm parameter matching DB_NAME (see cde_rebuild_database_run).
+        rebuild_id = flow.from_source(
+            source=source_dir,
+            entrypoint="cde_harvester/prefect_pipeline.py:cde_rebuild_database_run",
+        ).deploy(
+            name="cde-rebuild-database",
+            work_pool_name=POOL_NAME,
+            cron=None,
+            job_variables=job_vars,
+        )
+
         # Scheduled fan-out orchestrator: on each HARVESTER_CRON tick it triggers
         # the per-source deployments above (registered first so they resolve at run time).
         orchestrator_id = flow.from_source(
@@ -436,8 +490,8 @@ class PrefectCDEPipeline:
         print(f"  uv run prefect worker start --pool {POOL_NAME} --type process")
         logger.info(
             "Deployments created: cde-harvester=%s cde-harvest-all=%s "
-            "populate-vernaculars=%s per-source=%s",
-            harvest_id, orchestrator_id, vernaculars_id, source_deployment_names,
+            "populate-vernaculars=%s rebuild-database=%s per-source=%s",
+            harvest_id, orchestrator_id, vernaculars_id, rebuild_id, source_deployment_names,
         )
         return harvest_id
 
@@ -554,20 +608,22 @@ def cde_harvest_all_run(
 ):
     """Scheduled fan-out: trigger one independent per-source harvest job per configured source,
     wait for all, and fail red if any did not complete (a failure doesn't cancel the others)."""
-    logger = get_run_logger()
+    # _run_logger() rather than get_run_logger() so the source-resolution logic
+    # below is callable (and testable) outside a flow context.
+    logger = _run_logger()
 
     config_file = resolve_harvest_config_file(config_file)
     config = load_config(config_file)
 
-    sources = [u.strip() for u in (config.get("erddap_urls") or []) if u and u.strip()]
-    obis_ids = load_obis_dataset_ids(
-        dataset_ids=config.get("obis_dataset_ids"),
-        datasets_file=config.get("obis_datasets_file"),
+    obis = resolve_obis_config(config)
+    sources = _configured_sources(
+        config.get("erddap_urls") or [], obis.dataset_ids, obis.discovery
     )
-    if obis_ids:
-        sources.append("obis")
     if not sources:
-        raise ValueError("No sources configured to harvest (erddap_urls / obis_dataset_ids)")
+        raise ValueError(
+            "No sources configured to harvest (erddap_urls / obis_discovery / "
+            "obis_dataset_ids / obis_datasets_file)"
+        )
 
     logger.info("Fanning out %d per-source harvest job(s): %s", len(sources), sources)
     futures = [_trigger_source_harvest.submit(src, triggered_by) for src in sources]
@@ -625,6 +681,107 @@ def populate_vernaculars_run(
     finally:
         sys.argv = saved_argv
     print("vernaculars_main() returned")
+
+
+@flow(name="Rebuild Database", log_prints=True)
+def cde_rebuild_database_run(
+    confirm: str = "",
+    run_harvest: bool = True,
+    flush_redis: bool = True,
+    triggered_by: str | None = None,
+):
+    """DESTRUCTIVE: drop the cde schema, recreate it from database/*.sql, re-harvest.
+
+    For when a deploy changes the table layout. Postgres applies 1_schema.sql only on a
+    fresh volume and db_migrate re-applies only the [3-9] function files, so the tables
+    silently stay on the old layout and every query against a new table fails with
+    `relation "cde.x" does not exist`. This rebuilds them without volume surgery or host
+    shell access.
+
+    ALL HARVESTED DATA IS LOST — same as deleting the Postgres volume. To proceed,
+    `confirm` must be the database name (DB_NAME); anything else aborts before touching
+    the schema, so a stray Run in the Prefect UI cannot wipe a database by accident.
+
+    run_harvest: trigger "Harvest All Sources" afterwards to repopulate (the rebuilt
+    schema is empty, so the app has no data until a harvest completes).
+    """
+    # _run_logger (not get_run_logger) so the flow body also works when called
+    # directly via .fn outside a run context — which is how it is tested, and how it
+    # can be driven by hand if the Prefect API is unreachable.
+    logger = _run_logger()
+
+    expected = check_confirmation(
+        confirm, db_name=core_db.db_name(), host=core_db.db_host()
+    )
+
+    logger.warning(
+        "Rebuilding schema '%s' on %s — dropping all harvested data%s",
+        expected, core_db.db_host(), f" (triggered by {triggered_by})" if triggered_by else "",
+    )
+
+    # The database itself may not exist: a volume that initialised before DB_NAME was
+    # set has only the default `postgres` database (POSTGRES_DB=$DB_NAME was empty), and
+    # every connection then fails with 'database "cde" does not exist'. Create it first —
+    # the rebuild cannot, since CREATE DATABASE will not run inside a transaction.
+    maint = core_db.maintenance_engine()
+    try:
+        if ensure_database(maint, expected):
+            logger.warning(
+                "Database %r did not exist on %s — created it. This deployment's Postgres "
+                "volume was initialised before DB_NAME was set.", expected, core_db.db_host(),
+            )
+    finally:
+        maint.dispose()
+
+    engine = core_db.create_db_engine()
+    try:
+        report = rebuild_schema(engine)
+    finally:
+        engine.dispose()
+
+    logger.info(
+        "Schema rebuilt: %s + %s -> %d tables",
+        report["init_file"], ", ".join(report["function_files"]), report["tables_created"],
+    )
+
+    # Tiles and legend ranges are cached per-geometry; after a wipe they describe data
+    # that no longer exists, so serve-stale would outlive the rebuild.
+    if flush_redis:
+        try:
+            clearRedisCache()
+        except Exception as e:  # cache is best-effort — never fail the rebuild on it
+            logger.warning("Could not flush the redis cache (%s); tiles may serve stale data", e)
+
+    if not run_harvest:
+        logger.warning(
+            "run_harvest=False — the schema is empty. Trigger a harvest before expecting "
+            "the app to show data."
+        )
+        return report
+
+    # The schema rebuild above is already committed and irreversible. A failure to
+    # SUBMIT the follow-up harvest (deployment not registered yet on a brand-new
+    # install, API hiccup) must not fail this flow: a red run after a successful drop
+    # invites someone to re-run a destructive operation that already did its job. Report
+    # it in the result and let the harvest be triggered by hand.
+    logger.info("Triggering 'Harvest All Sources' to repopulate the empty schema")
+    try:
+        run_deployment(
+            name="Harvest All Sources/cde-harvest-all",
+            parameters={"triggered_by": triggered_by or "rebuild-database"},
+            timeout=0,
+        )
+        report["harvest_triggered"] = True
+    except Exception as e:
+        report["harvest_triggered"] = False
+        report["harvest_trigger_error"] = str(e)
+        logger.error(
+            "Schema was rebuilt, but triggering 'Harvest All Sources' failed (%s). The "
+            "database is EMPTY until a harvest runs — trigger it manually. Do NOT re-run "
+            "the rebuild; it already completed.",
+            e,
+        )
+    return report
 
 
 def deploy(pipeline):

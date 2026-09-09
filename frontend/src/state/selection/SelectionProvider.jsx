@@ -90,8 +90,35 @@ export default function SelectionProvider ({ children }) {
   const hoveredDataset = useDebounce(hoveredDatasetTarget, 120)
 
   // One platform (trajectory id) picked in the dataset inspector to draw its
-  // full track on the map: {datasetPk, datasetTitle, trajectoryId} | undefined.
+  // track on the map, clipped to the time filter: {datasetPk, datasetTitle,
+  // trajectoryId, frameView} | undefined.
   const [selectedTrajectory, setSelectedTrajectory] = useState()
+
+  // The one record (timeseries_id/profile_id) an unambiguous map marker click
+  // resolved to: {datasetPk, profileId} | undefined. Distinct from
+  // inspectRecordID — that one means "show this record's preview", and is set
+  // by an explicit click on a row (here, or in the inspector's own table).
+  // This one only marks a row for the inspector to highlight and scroll to, so
+  // a marker click opens the dataset page and points at the record rather than
+  // jumping straight into the preview the user hasn't asked to see yet.
+  const [highlightedRecord, setHighlightedRecord] = useState()
+
+  // Both of those as a share link carries them: the subset of the dataset the
+  // link points at — a record (?record=<profile_id>) or a platform
+  // (?track=<trajectory_id>) — waiting for the dataset itself to resolve out
+  // of pointsData, since neither means anything without the page they are
+  // highlighted on. Consumed once, by the effect below.
+  const [pendingHighlight, setPendingHighlight] = useState(() => {
+    // A trajectory_id is legitimately '' (a dataset with a single unnamed
+    // trajectory — the schema default), so presence is the test, not truth.
+    const record = initialParams.get('record') || undefined
+    const track = initialParams.has('track')
+      ? initialParams.get('track')
+      : undefined
+    return record !== undefined || track !== undefined
+      ? { record, track }
+      : undefined
+  })
 
   const [selectAll, setSelectAll] = useState(false)
   const [pointsData, setPointsData] = useState([])
@@ -324,7 +351,7 @@ export default function SelectionProvider ({ children }) {
     [setSearchParams]
   )
 
-  // The open record lives in the URL as well (?record=…), for the same payoffs
+  // The open record lives in the URL as well (?preview=…), for the same payoffs
   // as the dataset above: Back closes the preview natively, and the link
   // reproduces it.
   const inspectRecordID = searchParams.get(RECORD_PARAM) || undefined
@@ -370,7 +397,7 @@ export default function SelectionProvider ({ children }) {
 
   // A track clicked on the map does what clicking a platform row in the dataset
   // inspector does (DatasetInspector's onRowClicked): open that dataset's page
-  // AND draw the platform's full history. Both writes happen in this one call so
+  // AND draw the platform's track. Both writes happen in this one call so
   // React batches them into a single render — which is what stops the
   // [inspectDataset] effect below from clearing the selection it just made (it
   // sees the new inspectDataset and the matching selectedTrajectory together).
@@ -400,6 +427,12 @@ export default function SelectionProvider ({ children }) {
         setInspectDataset(dataset)
       }
 
+      // No frameView: the user clicked this track where it is drawn, so the
+      // camera is already showing the stretch they asked about. Framing the
+      // whole voyage from here would pull them away from it — and clicking a
+      // marker or a hex doesn't move the camera either. The inspector's
+      // platform list, whose rows can name a track anywhere on earth, is the
+      // one caller that asks for framing.
       setSelectedTrajectory({
         datasetPk,
         datasetTitle: dataset?.title || datasetTitle,
@@ -576,7 +609,33 @@ export default function SelectionProvider ({ children }) {
     setSelectedTrajectory((current) =>
       current && current.datasetPk !== inspectDataset?.pk ? undefined : current
     )
+    // Same for a marker's highlighted record: it only means anything on the
+    // dataset page the marker opened.
+    setHighlightedRecord((current) =>
+      current && current.datasetPk !== inspectDataset?.pk ? undefined : current
+    )
   }, [inspectDataset])
+
+  // The share link's highlight, once its dataset is in hand. Declared after the
+  // effect above so that on the render where the page resolves, this one runs
+  // second and its highlight isn't the stale value that one clears.
+  useEffect(() => {
+    if (!pendingHighlight || !inspectDataset) return
+    const { record, track } = pendingHighlight
+    setPendingHighlight(undefined)
+    if (record !== undefined) {
+      setHighlightedRecord({ datasetPk: inspectDataset.pk, profileId: record })
+    }
+    // No frameView: the link carries its own camera (lat/lon/zoom), and
+    // framing the whole voyage would overrule it.
+    if (track !== undefined) {
+      setSelectedTrajectory({
+        datasetPk: inspectDataset.pk,
+        datasetTitle: inspectDataset.title,
+        trajectoryId: track
+      })
+    }
+  }, [pendingHighlight, inspectDataset])
 
   // Fetch the open record's rows.
   //
@@ -586,7 +645,7 @@ export default function SelectionProvider ({ children }) {
   // measured at up to 59 MB.
   //
   // Both halves have to be present, and on a link opened cold they arrive at
-  // different times — ?record= is readable on the first render while pointsData
+  // different times — ?preview= is readable on the first render while pointsData
   // is still empty, so inspectDataset resolves only once /pointQuery returns.
   // Waiting is all this can do; a record left with no dataset is cleaned up
   // where the dataset param is (setInspectDataset drops the whole preview), not
@@ -635,6 +694,8 @@ export default function SelectionProvider ({ children }) {
     selectedTrajectory,
     setSelectedTrajectory,
     selectTrajectoryFromMap,
+    highlightedRecord,
+    setHighlightedRecord,
     selectAll,
     pointsData,
     setPointsData,

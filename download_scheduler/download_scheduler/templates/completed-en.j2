@@ -8,7 +8,12 @@ Your CIOOS Data Explorer download has completed successfully.
 
 Your download is available at {{download_url}}
 
-
+{% if failed_datasets %}
+Please note: some datasets in your selection could not be included in this download:
+{% for d in failed_datasets %}
+- {{ d['dataset_id'] }} — {{ d['reason'] }}.
+{% endfor %}
+{% endif %}
 Note: The data included in this zip file includes observations that have been downloaded from data hosted on open-access ERDDAP servers and CKAN catalogues. The links to the sources are included in this email. Please refer to metadata included in the ERDDAP servers and CKAN catalogues to identify the applicable licenses and correct way to cite these resources.
 
 Please visit the following websites to find the latest information on how to correctly cite these resources:

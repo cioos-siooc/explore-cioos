@@ -25,12 +25,12 @@ import {
   rangesEqual,
   useDebounce
 } from '../../utilities.jsx'
+import { wmsSliceFromParams } from '../../wmsUtilities.js'
 import fetchJson from '../fetchJson.js'
 import reportError from '../reportError.js'
 import { useUrlSeededPersistentState } from '../usePersistentState.js'
 import { useFilters } from '../filters/FilterProvider.jsx'
 import {
-  ALL_DATA_LAYERS,
   DATA_LAYER_KEYS,
   DEFAULT_DATA_LAYERS,
   DEFAULT_TRACKS_MODE,
@@ -52,19 +52,40 @@ export default function MapStateProvider ({ children }) {
   // filter change, a new selection polygon); Map.jsx flips it back on 'idle'.
   // mapLoaded records that it has settled at least once — the first load is a
   // blank screen and earns the full splash, every later redraw happens over a
-  // usable map and only earns the quiet MapBusy pill.
+  // usable map and only earns the brand logo's quiet pulse.
   const [loading, setLoadingState] = useState(true)
   const [mapLoaded, setMapLoaded] = useState(false)
   const setLoading = useCallback((value) => {
     setLoadingState(value)
     if (!value) setMapLoaded(true)
   }, [])
+
+  // The other way into mapLoaded, and the one the first load actually takes:
+  // Map calls this once the hexes are painted with their final ramp over a
+  // basemap that has drawn (see reportFirstPaint there). 'idle' — what drives
+  // setLoading above — is the wrong moment in both directions: it waits for the
+  // CHS soundings on top of everything else, and it can arrive before the hex
+  // sources have even been asked for. It stays as the backstop for a load that
+  // never reports a first paint at all.
+  const reportFirstPaint = useCallback(() => setMapLoaded(true), [])
+
+  // Whether the app is still on its very first draw — the one state that earns
+  // a full-screen splash. Derived here rather than recomputed by each of the
+  // two things that answer to it (the splash itself, and the corner activity
+  // panel, which stands down while the splash is naming the same waits).
+  const firstPaintPending = loading && !mapLoaded
   // Separate from `loading` above, which is about the *data* the map draws.
   // This one is the basemap rasters — imagery and CHS soundings still arriving
   // after a pan or a zoom — and it is the slow one on a cold cache. Map.jsx
   // only raises it for waits long enough to be worth a word (see the effect
   // there); AppShell decides which of the two pills gets the spot.
-  const [basemapLoading, setBasemapLoading] = useState(false)
+  // Which of the map's layers are currently fetching tiles, as the layer ids in
+  // Map.jsx's WATCHED_MAP_LAYERS. Separate from `loading` above, which is about
+  // the map redrawing as a whole; this says what specifically is on the wire, so
+  // the activity badge can name it. This replaced a single basemap-only flag,
+  // which could say no more than "imagery" and knew nothing of the data layers.
+  const [loadingLayers, setLoadingLayers] = useState([])
+
   // The camera, as the map reports it (numbers, plus bounds once it has
   // settled). Seeded from the share link — or the default view when the link
   // carries no camera — rather than left empty: MapLibre only pushes a view on
@@ -139,6 +160,14 @@ export default function MapStateProvider ({ children }) {
     )
   const [griddapCoverage, setGriddapCoverage] = useState()
   const [activeWmsOverlay, setActiveWmsOverlay] = useState()
+  // The slice a share link named for that overlay — its variable, instant and
+  // level (?var=&date=&z=). Consumed once, by the first overlay built: the
+  // link's dataset is the one the page opens on, and a later toggle or another
+  // dataset defaults as usual rather than inheriting a slice from a grid it
+  // has nothing to do with. Same one-shot shape as pendingDatasetZoom below.
+  const [pendingWmsSlice, setPendingWmsSlice] = useState(() =>
+    wmsSliceFromParams(new URL(window.location.href).searchParams)
+  )
   // Layer visibility switch for the observation layers (hexes / points /
   // coverage cells). On by default.
   const [dataLayersVisible, setDataLayersVisible] = useUrlSeededPersistentState(
@@ -196,6 +225,18 @@ export default function MapStateProvider ({ children }) {
   // not a selection: opening the card changes nothing about the filters, the
   // camera, or the dataset page. Only the buttons inside it do.
   const [featureQuery, setFeatureQuery] = useState(null)
+
+  // Where a share link's card was opened (?at=lng,lat). Everything in the card
+  // is derived from what is drawn under that point — the rows, the count, the
+  // outlined region — so there is nothing to carry in the link but the question
+  // itself, and Map replays it once the map has drawn (see the mount effect
+  // there). Read at mount only, which is why it is a plain value and not state.
+  const sharedFeatureQueryAt = useState(() => {
+    const parts = (new URL(window.location.href).searchParams.get('at') || '')
+      .split(',')
+      .map(Number)
+    return parts.length === 2 && parts.every(Number.isFinite) ? parts : null
+  })[0]
 
   function zoomToGeometry (geometry) {
     if (geometry) setZoomTarget({ geometry, nonce: Date.now() })
@@ -276,13 +317,6 @@ export default function MapStateProvider ({ children }) {
   // filter, so a filter reset has no business changing them.
   function resetDataLayers () {
     setDataLayers({ ...DEFAULT_DATA_LAYERS })
-  }
-
-  // Every geometry on. Identical to the reset now that all-on IS the default,
-  // and kept separate only so the filter's Select All button reads the way the
-  // other filters' do.
-  function showAllDataLayers () {
-    setDataLayers({ ...ALL_DATA_LAYERS })
   }
 
   const { zoom } = mapView
@@ -426,8 +460,10 @@ export default function MapStateProvider ({ children }) {
   const value = {
     loading,
     setLoading,
-    basemapLoading,
-    setBasemapLoading,
+    reportFirstPaint,
+    firstPaintPending,
+    loadingLayers,
+    setLoadingLayers,
     mapLoaded,
     mapView,
     setMapView,
@@ -469,10 +505,11 @@ export default function MapStateProvider ({ children }) {
     dataLayers,
     toggleDataLayer,
     resetDataLayers,
-    showAllDataLayers,
     griddapCoverage,
     activeWmsOverlay,
     setActiveWmsOverlay,
+    pendingWmsSlice,
+    setPendingWmsSlice,
     zoomTarget,
     zoomToGeometry,
     drawRequest,
@@ -481,6 +518,7 @@ export default function MapStateProvider ({ children }) {
     setPendingDatasetZoom,
     mapRef,
     featureQuery,
+    sharedFeatureQueryAt,
     setFeatureQuery,
     mapDatasetPKs,
     setMapDatasetPKs,

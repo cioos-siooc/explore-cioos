@@ -310,21 +310,49 @@ BEGIN
            (hd.secs + 1) / sum(hd.secs + 1) OVER w AS share
       FROM _traj_hex_day hd
     WINDOW w AS (PARTITION BY hd.dataset_pk, hd.trajectory_id, hd.tier, hd.day)
+  ), agg AS (
+    SELECT w.dataset_pk, w.trajectory_id, w.tier, w.i, w.j,
+           count(DISTINCT w.day)::integer         AS days,
+           min(w.time_min)                        AS time_min,
+           max(w.time_max)                        AS time_max,
+           min(d.depth_min)                       AS depth_min,
+           max(d.depth_max)                       AS depth_max,
+           round(sum(coalesce(d.n_records, 0) * w.share))::bigint  AS n_records,
+           round(sum(coalesce(d.n_profiles, 0) * w.share))::bigint AS n_profiles
+      FROM weighted w
+      LEFT JOIN cde.trajectory_days d
+             ON d.dataset_pk = w.dataset_pk
+            AND d.trajectory_id = w.trajectory_id
+            AND d.day = w.day
+     GROUP BY 1,2,3,4,5
+  ), runs AS (
+    -- The same day set as `days`, kept as the maximal runs of consecutive UTC
+    -- days rather than a single count, so the map can union day sets across
+    -- features instead of adding them up (see day_union_days in
+    -- 8_range_functions.sql). `day - row_number()` is constant within a run of
+    -- consecutive days, which is what collapses the days into runs. Storing
+    -- runs rather than the [time_min, time_max] envelope is what keeps a ship
+    -- that crosses a hex every January from reading as decades of coverage.
+    SELECT dataset_pk, trajectory_id, tier, i, j,
+           array_agg(daterange(lo, hi + 1) ORDER BY lo) AS day_ranges
+      FROM (
+        SELECT dataset_pk, trajectory_id, tier, i, j,
+               min(day) AS lo, max(day) AS hi
+          FROM (
+            SELECT dataset_pk, trajectory_id, tier, i, j, day,
+                   day - (row_number() OVER (PARTITION BY dataset_pk,
+                                                          trajectory_id,
+                                                          tier, i, j
+                                                 ORDER BY day))::integer AS run
+              FROM _traj_hex_day
+          ) numbered
+         GROUP BY 1,2,3,4,5, run
+      ) r
+     GROUP BY 1,2,3,4,5
   )
-  SELECT w.dataset_pk, w.trajectory_id, w.tier, w.i, w.j,
-         count(DISTINCT w.day)::integer         AS days,
-         min(w.time_min)                        AS time_min,
-         max(w.time_max)                        AS time_max,
-         min(d.depth_min)                       AS depth_min,
-         max(d.depth_max)                       AS depth_max,
-         round(sum(coalesce(d.n_records, 0) * w.share))::bigint  AS n_records,
-         round(sum(coalesce(d.n_profiles, 0) * w.share))::bigint AS n_profiles
-    FROM weighted w
-    LEFT JOIN cde.trajectory_days d
-           ON d.dataset_pk = w.dataset_pk
-          AND d.trajectory_id = w.trajectory_id
-          AND d.day = w.day
-   GROUP BY 1,2,3,4,5;
+  SELECT agg.*, runs.day_ranges
+    FROM agg
+    JOIN runs USING (dataset_pk, trajectory_id, tier, i, j);
 
   -- 5. Swap in the new rows for the scoped datasets. DELETE+INSERT (not
   --    TRUNCATE): TRUNCATE takes ACCESS EXCLUSIVE and deadlocks with live
@@ -334,12 +362,12 @@ BEGIN
 
   INSERT INTO cde.trajectory_hexes
         (dataset_pk, trajectory_id, hex_tier, hex_pk, latitude, longitude,
-         time_min, time_max, depth_min, depth_max, days, n_records, n_profiles,
-         records_per_day)
+         time_min, time_max, depth_min, depth_max, days, day_ranges,
+         n_records, n_profiles, records_per_day)
   SELECT a.dataset_pk, a.trajectory_id, a.tier, h.pk,
          ST_Y(ST_Transform(ST_Centroid(h.geom), 4326)),
          ST_X(ST_Transform(ST_Centroid(h.geom), 4326)),
-         a.time_min, a.time_max, a.depth_min, a.depth_max, a.days,
+         a.time_min, a.time_max, a.depth_min, a.depth_max, a.days, a.day_ranges,
          a.n_records, a.n_profiles,
          a.n_records::float / GREATEST(a.days, 1)
     FROM _traj_hex_agg a
@@ -348,7 +376,7 @@ BEGIN
   SELECT a.dataset_pk, a.trajectory_id, a.tier, h.pk,
          ST_Y(ST_Transform(ST_Centroid(h.geom), 4326)),
          ST_X(ST_Transform(ST_Centroid(h.geom), 4326)),
-         a.time_min, a.time_max, a.depth_min, a.depth_max, a.days,
+         a.time_min, a.time_max, a.depth_min, a.depth_max, a.days, a.day_ranges,
          a.n_records, a.n_profiles,
          a.n_records::float / GREATEST(a.days, 1)
     FROM _traj_hex_agg a

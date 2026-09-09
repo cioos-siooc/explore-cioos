@@ -13,7 +13,9 @@ import {
   Server
 } from 'react-bootstrap-icons'
 import { useTranslation } from 'react-i18next'
+import classNames from 'classnames'
 
+import Spinner from '../../ui/Spinner.jsx'
 import Filter from '../../Controls/Filter/Filter.jsx'
 import FilterSection from '../../Controls/Filter/FilterMenu/FilterSection.jsx'
 import DataLayersFilter from '../../Controls/Filter/DataLayersFilter/DataLayersFilter.jsx'
@@ -35,10 +37,10 @@ import {
   setAllOptionsIsSelectedTo
 } from '../../../utilities.jsx'
 import {
-  DATA_LAYER_KEYS,
   DATA_LAYER_LABEL_KEYS,
   selectedDataLayerKeys
 } from '../../../state/dataLayers.js'
+import useDatasetCounts from '../../../state/useDatasetCounts.js'
 import { useFilters } from '../../../state/filters/FilterProvider.jsx'
 import { useMapState } from '../../../state/map/MapStateProvider.jsx'
 import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
@@ -57,7 +59,8 @@ function createOptionSubset (searchTerms, allOptions) {
 
 // The Filters panel: filter rows grouped into sections on the left, with the
 // open filter's options in the detail pane on the right (see styles.css —
-// the .filterOptions flyout is re-anchored inside the sheet).
+// the .filterOptions flyout is re-anchored inside the sheet), over a footer
+// that reports what the filters currently add up to.
 export default function FiltersPanel () {
   const { t } = useTranslation()
   const {
@@ -109,7 +112,13 @@ export default function FiltersPanel () {
     inViewCount
   } = useSelection()
   const { openFilter, setOpenFilter } = useUI()
-  const { dataLayers, resetDataLayers, showAllDataLayers, requestDraw } = useMapState()
+  const {
+    ready: countsReady,
+    updating: countsUpdating,
+    filteredCount,
+    total
+  } = useDatasetCounts()
+  const { dataLayers, resetDataLayers, requestDraw } = useMapState()
 
   // The one search box whose terms aren't a filter over options already in
   // state — it is a query against WoRMS — so it is kept here rather than in the
@@ -190,356 +199,351 @@ export default function FiltersPanel () {
     '(m)'
   )
 
+  // A failed /datasets leaves no catalogue total; what came back filtered is
+  // then all we know it to be (same fallback as the top bar's counter).
+  const totalCount = total ?? filteredCount
+
+  function resetEverything () {
+    resetFilters()
+    resetDataLayers()
+    requestDraw('clear')
+    setDatasetTitleSearchText('')
+    setOnlyInView(false)
+  }
+
   return (
     <div className='filtersPanel'>
-      <div className='filtersPanelList'>
-        <FilterSection title={t('filterGroupWhat')}>
-          {/* First in the section: this is the coarsest "what" there is — it
-              decides which families of data exist for the filters below to
-              narrow. */}
-          <Filter
-            active={dataLayersChosen.length > 0}
-            badgeTitle={dataLayersBadgeTitle}
-            tooltip={t('dataLayersFilterTooltip')}
-            icon={<Stack />}
-            controlled
-            filterName={dataLayersFilterTranslationKey}
-            openFilter={openFilter === dataLayersFilterTranslationKey}
-            setOpenFilter={setOpenFilter}
-            selectAllButton={showAllDataLayers}
-            resetButton={resetDataLayers}
-            numberOfOptions={DATA_LAYER_KEYS.length}
-          >
-            <DataLayersFilter />
-          </Filter>
-          <Filter
-            active={eovsSelected.filter((eov) => eov.isSelected).length !== 0}
-            badgeTitle={eovsBadgeTitle}
-            optionsSelected={eovsSelected}
-            setOptionsSelected={setEovsSelected}
-            tooltip={t('oceanVariableFilterTooltip')}
-            icon={<Water />}
-            controlled
-            searchable
-            searchTerms={eovsSearchTerms}
-            setSearchTerms={setEovsSearchTerms}
-            searchPlaceholder={t('oceanVariableFilterSeachPlaceholder')}
-            filterName={eovsFilterTranslationKey}
-            openFilter={openFilter === eovsFilterTranslationKey}
-            setOpenFilter={setOpenFilter}
-            selectAllButton={() =>
-              setAllOptionsIsSelectedTo(true, eovsSelected, setEovsSelected)
-            }
-            resetButton={() =>
-              setAllOptionsIsSelectedTo(false, eovsSelected, setEovsSelected)
-            }
-            numberOfOptions={eovsSelected.length}
-          >
-            <MultiCheckboxFilter
-              optionsSelected={createOptionSubset(eovsSearchTerms, eovsSelected)}
-              setOptionsSelected={setEovsSelected}
-              searchable
-              translatable
-              allOptions={eovsSelected}
-            />
-          </Filter>
-          <Filter
-            active={
-              platformsSelected.filter((eov) => eov.isSelected).length !== 0
-            }
-            badgeTitle={platformsBadgeTitle}
-            setOptionsSelected={setPlatformsSelected}
-            tooltip={t('platformFilterTooltip')}
-            icon={<BroadcastPin />}
-            controlled
-            searchable
-            searchTerms={platformsSearchTerms}
-            setSearchTerms={setPlatformsSearchTerms}
-            searchPlaceholder={t('platformsFilterSeachPlaceholder')}
-            filterName={platformsFilterTranslationKey}
-            openFilter={openFilter === platformsFilterTranslationKey}
-            setOpenFilter={setOpenFilter}
-            selectAllButton={() =>
-              setAllOptionsIsSelectedTo(
-                true,
-                platformsSelected,
-                setPlatformsSelected
-              )
-            }
-            resetButton={() =>
-              setAllOptionsIsSelectedTo(
-                false,
-                platformsSelected,
-                setPlatformsSelected
-              )
-            }
-            numberOfOptions={platformsSelected.length}
-            infoButton='http://vocab.nerc.ac.uk/collection/L06/current/'
-          >
-            <MultiCheckboxFilter
-              optionsSelected={createOptionSubset(
-                platformsSearchTerms,
-                platformsSelected
-              )}
-              setOptionsSelected={setPlatformsSelected}
-              searchable
-              colored
-              translatable
-              allOptions={platformsSelected}
-            />
-          </Filter>
-        </FilterSection>
-        <FilterSection title={t('filterGroupFrom')}>
-          <Filter
-            active={orgsSelected.filter((eov) => eov.isSelected).length !== 0}
-            badgeTitle={orgsBadgeTitle}
-            optionsSelected={orgsSelected}
-            setOptionsSelected={setOrgsSelected}
-            tooltip={t('organizationFilterTooltip')}
-            icon={<Building />}
-            controlled
-            searchable
-            searchTerms={orgsSearchTerms}
-            setSearchTerms={setOrgsSearchTerms}
-            searchPlaceholder={t('organizationFilterSearchPlaceholder')}
-            filterName={orgsFilterTranslationKey}
-            openFilter={openFilter === orgsFilterTranslationKey}
-            setOpenFilter={setOpenFilter}
-            selectAllButton={() =>
-              setAllOptionsIsSelectedTo(true, orgsSelected, setOrgsSelected)
-            }
-            resetButton={() =>
-              setAllOptionsIsSelectedTo(false, orgsSelected, setOrgsSelected)
-            }
-            numberOfOptions={orgsSelected.length}
-          >
-            <MultiCheckboxFilter
-              optionsSelected={createOptionSubset(orgsSearchTerms, orgsSelected)}
-              setOptionsSelected={setOrgsSelected}
-              searchable
-              allOptions={orgsSelected}
-            />
-          </Filter>
-          <Filter
-            active={
-              datasetsSelected.filter((eov) => eov.isSelected).length !== 0
-            }
-            badgeTitle={datasetsBadgeTitle}
-            optionsSelected={datasetsSelected}
-            setOptionsSelected={setDatasetsSelected}
-            tooltip={t('datasetFilterTooltip')}
-            icon={<FileEarmarkSpreadsheet />}
-            controlled
-            searchable
-            searchTerms={datasetSearchTerms}
-            setSearchTerms={setDatasetSearchTerms}
-            searchPlaceholder={t('datasetSearchPlaceholder')}
-            filterName={datasetsFilterTranslationKey}
-            openFilter={openFilter === datasetsFilterTranslationKey}
-            setOpenFilter={setOpenFilter}
-            selectAllButton={() =>
-              setAllOptionsIsSelectedTo(
-                true,
-                datasetsSelected,
-                setDatasetsSelected
-              )
-            }
-            resetButton={() =>
-              setAllOptionsIsSelectedTo(
-                false,
-                datasetsSelected,
-                setDatasetsSelected
-              )
-            }
-            numberOfOptions={datasetsSelected.length}
-          >
-            <MultiCheckboxFilter
-              optionsSelected={createOptionSubset(
-                datasetSearchTerms,
-                datasetsSelected
-              )}
-              setOptionsSelected={setDatasetsSelected}
-              searchable
-              allOptions={datasetsSelected}
-              translatable
-            />
-          </Filter>
-          <Filter
-            active={anyServersSelected || anyObisNodesSelected}
-            badgeTitle={sourcesBadgeTitle}
-            tooltip={t('sourceFilterTooltip')}
-            icon={<Server />}
-            controlled
-            searchable
-            searchTerms={sourcesSearchTerms}
-            setSearchTerms={setSourcesSearchTerms}
-            searchPlaceholder={t('sourceFilterSearchPlaceholder')}
-            filterName={sourcesFilterTranslationKey}
-            openFilter={openFilter === sourcesFilterTranslationKey}
-            setOpenFilter={setOpenFilter}
-            selectAllButton={() => {
-              setAllOptionsIsSelectedTo(
-                true,
-                erddapServersSelected,
-                setErddapServersSelected
-              )
-              setAllOptionsIsSelectedTo(
-                true,
-                obisNodesSelected,
-                setObisNodesSelected
-              )
-            }}
-            resetButton={() => {
-              setAllOptionsIsSelectedTo(
-                false,
-                erddapServersSelected,
-                setErddapServersSelected
-              )
-              setAllOptionsIsSelectedTo(
-                false,
-                obisNodesSelected,
-                setObisNodesSelected
-              )
-            }}
-            numberOfOptions={
-              erddapServersSelected.length + obisNodesSelected.length
-            }
-          >
-            <SourceFilter
-              erddapServersSelected={erddapServersSelected}
-              setErddapServersSelected={setErddapServersSelected}
-              obisNodesSelected={obisNodesSelected}
-              setObisNodesSelected={setObisNodesSelected}
-              searchTerms={sourcesSearchTerms}
-            />
-          </Filter>
-        </FilterSection>
-        <FilterSection title={t('filterGroupWhenWhere')}>
-          <Filter
-            active={timeFilterActive}
-            badgeTitle={timeframesBadgeTitle}
-            setOptionsSelected={() => {
-              setStartDate(defaultStartDate)
-              setEndDate(defaultEndDate)
-            }}
-            tooltip={t('timeframeFilterTooltip')}
-            icon={<CalendarWeek />}
-            controlled
-            filterName={timeframesFilterName}
-            openFilter={openFilter === timeframesFilterName}
-            setOpenFilter={setOpenFilter}
-            resetButton={() => {
-              setStartDate(defaultStartDate)
-              setEndDate(defaultEndDate)
-            }}
-          >
-            <TimeSelector
-              startDate={startDate}
-              setStartDate={setStartDate}
-              endDate={endDate}
-              setEndDate={setEndDate}
-            />
-          </Filter>
-          <Filter
-            active={depthFilterActive}
-            badgeTitle={depthRangeBadgeTitle}
-            setOptionsSelected={() => {
-              setStartDepth(defaultStartDepth)
-              setEndDepth(defaultEndDepth)
-            }}
-            tooltip={t('depthrangeFilterTooltip')}
-            icon={<ArrowsExpand />}
-            controlled
-            filterName={depthRangeFilterName}
-            openFilter={openFilter === depthRangeFilterName}
-            setOpenFilter={setOpenFilter}
-            resetButton={() => {
-              setStartDepth(defaultStartDepth)
-              setEndDepth(defaultEndDepth)
-            }}
-          >
-            <DepthSelector
-              startDepth={startDepth}
-              setStartDepth={setStartDepth}
-              endDepth={endDepth}
-              setEndDepth={setEndDepth}
-            />
-          </Filter>
-          <Filter
-            active={onlyInView}
-            badgeTitle={t('datasetsCardOnlyInViewText')}
-            tooltip={t('datasetsCardOnlyInViewTitle')}
-            icon={<BoundingBox />}
-            controlled
-            filterName={inViewFilterName}
-            openFilter={openFilter === inViewFilterName}
-            setOpenFilter={setOpenFilter}
-            resetButton={onlyInView ? () => setOnlyInView(false) : undefined}
-          >
-            <label className='inViewFilterToggle'>
-              <input
-                type='checkbox'
-                checked={onlyInView}
-                onChange={(e) => setOnlyInView(e.target.checked)}
-              />
-              <span>{t('datasetsCardOnlyInViewTitle')}</span>
-            </label>
-            <div className='inViewFilterCount'>
-              {t('datasetsCardInViewCountText', { count: inViewCount })}
-            </div>
-          </Filter>
-        </FilterSection>
-        {obisDataAvailable && (
-          <FilterSection title={t('filterGroupBiodiversity')}>
+      <div className='filtersPanelBody'>
+        <div className='filtersPanelList'>
+          <FilterSection title={t('filterGroupWhat')}>
+            {/* First in the section: this is the coarsest "what" there is — it
+                decides which families of data exist for the filters below to
+                narrow. */}
             <Filter
-              active={scientificNamesSelected.length > 0}
-              badgeTitle={scientificNamesBadgeTitle}
-              tooltip={t('scientificNameFilterTooltip')}
-              disabled={!showObis}
-              disabledTooltip={t('scientificNameFilterDisabledTooltip')}
-              icon={<Tag />}
+              active={dataLayersChosen.length > 0}
+              badgeTitle={dataLayersBadgeTitle}
+              tooltip={t('dataLayersFilterTooltip')}
+              icon={<Stack />}
+              controlled
+              filterName={dataLayersFilterTranslationKey}
+              openFilter={openFilter === dataLayersFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              resetButton={resetDataLayers}
+            >
+              <DataLayersFilter />
+            </Filter>
+            <Filter
+              active={eovsSelected.filter((eov) => eov.isSelected).length !== 0}
+              badgeTitle={eovsBadgeTitle}
+              optionsSelected={eovsSelected}
+              setOptionsSelected={setEovsSelected}
+              tooltip={t('oceanVariableFilterTooltip')}
+              icon={<Water />}
               controlled
               searchable
-              searchTerms={scientificNameSearchTerms}
-              setSearchTerms={setScientificNameSearchTerms}
-              searchPlaceholder={t('scientificNameFilterSearchPlaceholder')}
-              filterName={scientificNamesFilterTranslationKey}
-              openFilter={openFilter === scientificNamesFilterTranslationKey}
+              searchTerms={eovsSearchTerms}
+              setSearchTerms={setEovsSearchTerms}
+              searchPlaceholder={t('oceanVariableFilterSeachPlaceholder')}
+              filterName={eovsFilterTranslationKey}
+              openFilter={openFilter === eovsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
-              resetButton={
-                scientificNamesSelected.length > 0
-                  ? () => setScientificNamesSelected([])
-                  : undefined
+              resetButton={() =>
+                setAllOptionsIsSelectedTo(false, eovsSelected, setEovsSelected)
               }
             >
-              <ScientificNameFilter
-                scientificNamesSelected={scientificNamesSelected}
-                setScientificNamesSelected={setScientificNamesSelected}
-                searchTerms={scientificNameSearchTerms}
+              <MultiCheckboxFilter
+                optionsSelected={createOptionSubset(eovsSearchTerms, eovsSelected)}
+                setOptionsSelected={setEovsSelected}
+                searchable
+                translatable
+                allOptions={eovsSelected}
+              />
+            </Filter>
+            <Filter
+              active={
+                platformsSelected.filter((eov) => eov.isSelected).length !== 0
+              }
+              badgeTitle={platformsBadgeTitle}
+              setOptionsSelected={setPlatformsSelected}
+              tooltip={t('platformFilterTooltip')}
+              icon={<BroadcastPin />}
+              controlled
+              searchable
+              searchTerms={platformsSearchTerms}
+              setSearchTerms={setPlatformsSearchTerms}
+              searchPlaceholder={t('platformsFilterSeachPlaceholder')}
+              filterName={platformsFilterTranslationKey}
+              openFilter={openFilter === platformsFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              resetButton={() =>
+                setAllOptionsIsSelectedTo(
+                  false,
+                  platformsSelected,
+                  setPlatformsSelected
+                )
+              }
+              infoButton='http://vocab.nerc.ac.uk/collection/L06/current/'
+            >
+              <MultiCheckboxFilter
+                optionsSelected={createOptionSubset(
+                  platformsSearchTerms,
+                  platformsSelected
+                )}
+                setOptionsSelected={setPlatformsSelected}
+                searchable
+                colored
+                translatable
+                allOptions={platformsSelected}
               />
             </Filter>
           </FilterSection>
+          <FilterSection title={t('filterGroupFrom')}>
+            <Filter
+              active={orgsSelected.filter((eov) => eov.isSelected).length !== 0}
+              badgeTitle={orgsBadgeTitle}
+              optionsSelected={orgsSelected}
+              setOptionsSelected={setOrgsSelected}
+              tooltip={t('organizationFilterTooltip')}
+              icon={<Building />}
+              controlled
+              searchable
+              searchTerms={orgsSearchTerms}
+              setSearchTerms={setOrgsSearchTerms}
+              searchPlaceholder={t('organizationFilterSearchPlaceholder')}
+              filterName={orgsFilterTranslationKey}
+              openFilter={openFilter === orgsFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              resetButton={() =>
+                setAllOptionsIsSelectedTo(false, orgsSelected, setOrgsSelected)
+              }
+            >
+              <MultiCheckboxFilter
+                optionsSelected={createOptionSubset(orgsSearchTerms, orgsSelected)}
+                setOptionsSelected={setOrgsSelected}
+                searchable
+                allOptions={orgsSelected}
+              />
+            </Filter>
+            <Filter
+              active={
+                datasetsSelected.filter((eov) => eov.isSelected).length !== 0
+              }
+              badgeTitle={datasetsBadgeTitle}
+              optionsSelected={datasetsSelected}
+              setOptionsSelected={setDatasetsSelected}
+              tooltip={t('datasetFilterTooltip')}
+              icon={<FileEarmarkSpreadsheet />}
+              controlled
+              searchable
+              searchTerms={datasetSearchTerms}
+              setSearchTerms={setDatasetSearchTerms}
+              searchPlaceholder={t('datasetSearchPlaceholder')}
+              filterName={datasetsFilterTranslationKey}
+              openFilter={openFilter === datasetsFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              resetButton={() =>
+                setAllOptionsIsSelectedTo(
+                  false,
+                  datasetsSelected,
+                  setDatasetsSelected
+                )
+              }
+            >
+              <MultiCheckboxFilter
+                optionsSelected={createOptionSubset(
+                  datasetSearchTerms,
+                  datasetsSelected
+                )}
+                setOptionsSelected={setDatasetsSelected}
+                searchable
+                allOptions={datasetsSelected}
+                translatable
+              />
+            </Filter>
+            <Filter
+              active={anyServersSelected || anyObisNodesSelected}
+              badgeTitle={sourcesBadgeTitle}
+              tooltip={t('sourceFilterTooltip')}
+              icon={<Server />}
+              controlled
+              searchable
+              searchTerms={sourcesSearchTerms}
+              setSearchTerms={setSourcesSearchTerms}
+              searchPlaceholder={t('sourceFilterSearchPlaceholder')}
+              filterName={sourcesFilterTranslationKey}
+              openFilter={openFilter === sourcesFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              resetButton={() => {
+                setAllOptionsIsSelectedTo(
+                  false,
+                  erddapServersSelected,
+                  setErddapServersSelected
+                )
+                setAllOptionsIsSelectedTo(
+                  false,
+                  obisNodesSelected,
+                  setObisNodesSelected
+                )
+              }}
+            >
+              <SourceFilter
+                erddapServersSelected={erddapServersSelected}
+                setErddapServersSelected={setErddapServersSelected}
+                obisNodesSelected={obisNodesSelected}
+                setObisNodesSelected={setObisNodesSelected}
+                searchTerms={sourcesSearchTerms}
+              />
+            </Filter>
+          </FilterSection>
+          <FilterSection title={t('filterGroupWhenWhere')}>
+            <Filter
+              active={timeFilterActive}
+              badgeTitle={timeframesBadgeTitle}
+              setOptionsSelected={() => {
+                setStartDate(defaultStartDate)
+                setEndDate(defaultEndDate)
+              }}
+              tooltip={t('timeframeFilterTooltip')}
+              icon={<CalendarWeek />}
+              controlled
+              filterName={timeframesFilterName}
+              openFilter={openFilter === timeframesFilterName}
+              setOpenFilter={setOpenFilter}
+              resetButton={() => {
+                setStartDate(defaultStartDate)
+                setEndDate(defaultEndDate)
+              }}
+            >
+              <TimeSelector
+                startDate={startDate}
+                setStartDate={setStartDate}
+                endDate={endDate}
+                setEndDate={setEndDate}
+              />
+            </Filter>
+            <Filter
+              active={depthFilterActive}
+              badgeTitle={depthRangeBadgeTitle}
+              setOptionsSelected={() => {
+                setStartDepth(defaultStartDepth)
+                setEndDepth(defaultEndDepth)
+              }}
+              tooltip={t('depthrangeFilterTooltip')}
+              icon={<ArrowsExpand />}
+              controlled
+              filterName={depthRangeFilterName}
+              openFilter={openFilter === depthRangeFilterName}
+              setOpenFilter={setOpenFilter}
+              resetButton={() => {
+                setStartDepth(defaultStartDepth)
+                setEndDepth(defaultEndDepth)
+              }}
+            >
+              <DepthSelector
+                startDepth={startDepth}
+                setStartDepth={setStartDepth}
+                endDepth={endDepth}
+                setEndDepth={setEndDepth}
+              />
+            </Filter>
+            <Filter
+              active={onlyInView}
+              badgeTitle={t('datasetsCardOnlyInViewText')}
+              tooltip={t('datasetsCardOnlyInViewTitle')}
+              icon={<BoundingBox />}
+              controlled
+              filterName={inViewFilterName}
+              openFilter={openFilter === inViewFilterName}
+              setOpenFilter={setOpenFilter}
+              resetButton={onlyInView ? () => setOnlyInView(false) : undefined}
+            >
+              <label className='inViewFilterToggle'>
+                <input
+                  type='checkbox'
+                  checked={onlyInView}
+                  onChange={(e) => setOnlyInView(e.target.checked)}
+                />
+                <span>{t('datasetsCardOnlyInViewTitle')}</span>
+              </label>
+              <div className='inViewFilterCount'>
+                {t('datasetsCardInViewCountText', { count: inViewCount })}
+              </div>
+            </Filter>
+          </FilterSection>
+          {obisDataAvailable && (
+            <FilterSection title={t('filterGroupBiodiversity')}>
+              <Filter
+                active={scientificNamesSelected.length > 0}
+                badgeTitle={scientificNamesBadgeTitle}
+                tooltip={t('scientificNameFilterTooltip')}
+                disabled={!showObis}
+                disabledTooltip={t('scientificNameFilterDisabledTooltip')}
+                icon={<Tag />}
+                controlled
+                searchable
+                searchTerms={scientificNameSearchTerms}
+                setSearchTerms={setScientificNameSearchTerms}
+                searchPlaceholder={t('scientificNameFilterSearchPlaceholder')}
+                filterName={scientificNamesFilterTranslationKey}
+                openFilter={openFilter === scientificNamesFilterTranslationKey}
+                setOpenFilter={setOpenFilter}
+                resetButton={
+                  scientificNamesSelected.length > 0
+                    ? () => setScientificNamesSelected([])
+                    : undefined
+                }
+              >
+                <ScientificNameFilter
+                  scientificNamesSelected={scientificNamesSelected}
+                  setScientificNamesSelected={setScientificNamesSelected}
+                  searchTerms={scientificNameSearchTerms}
+                />
+              </Filter>
+            </FilterSection>
+          )}
+        </div>
+        {!openFilter && (
+          <div className='filtersPanelPlaceholder'>
+            {t('filtersPanelHint')}
+          </div>
         )}
+      </div>
+      {/* Filters apply live, so there is nothing to confirm here — but the
+          dialog covers the map at every width and takes the whole screen on a
+          phone, so the one thing it owes the user is the number they are
+          filtering towards. Reset sits beside it because it is the other thing
+          you do to the whole set, rather than at the end of a list that has to
+          be scrolled past to reach it. */}
+      <div className='filtersPanelFooter'>
+        <span
+          className={classNames('filtersPanelCount', {
+            updating: countsUpdating
+          })}
+          title={
+            countsReady
+              ? t('dockDatasetsCountTitle', {
+                filtered: filteredCount,
+                total: totalCount
+              })
+              : t('datasetsCountLoadingTitle')
+          }
+        >
+          {countsReady
+            ? t('topBarCountsSummary', {
+              filtered: filteredCount,
+              total: totalCount
+            })
+            : <Spinner size='xs' className='countSpinner' />}
+        </span>
         <button
           type='button'
-          className='filtersPanelReset filterMenuReset'
-          onClick={() => {
-            resetFilters()
-            resetDataLayers()
-            requestDraw('clear')
-            setDatasetTitleSearchText('')
-            setOnlyInView(false)
-          }}
+          className='filtersPanelReset'
+          onClick={resetEverything}
           title={t('resetFiltersButtonTooltipText')}
         >
-          {t('resetButtonText')}
+          {t('filtersPanelResetAll')}
         </button>
       </div>
-      {!openFilter && (
-        <div className='filtersPanelPlaceholder'>
-          {t('filtersPanelHint')}
-        </div>
-      )}
     </div>
   )
 }

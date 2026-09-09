@@ -1,0 +1,27 @@
+{
+  "user_query": {
+    "language": "en",
+    "time_min": "2016-01-01",
+    "time_max": "2016-12-31",
+    "lat_min": 50.0,
+    "lat_max": 55.0,
+    "lon_min": -135.0,
+    "lon_max": -125.0,
+    "depth_min": 0,
+    "depth_max": 1000,
+    "polygon_region": null,
+    "email": "test@example.com",
+    "job_id": "traj01"
+  },
+  "cache_filtered": [
+    {
+      "erddap_url": "https://data.cioospacific.ca/erddap",
+      "dataset_id": "mun_glider_unit_473_labrador_sea_2016",
+      "title": "Memorial University glider unit 473, Labrador Sea, 2016",
+      "cdm_data_type": "TrajectoryProfile",
+      "source_type": "erddap",
+      "ckan_id": "0b0b0b0b-0000-0000-0000-000000000001",
+      "ckan_url": "https://catalogue.cioos.ca/dataset/"
+    }
+  ]
+}

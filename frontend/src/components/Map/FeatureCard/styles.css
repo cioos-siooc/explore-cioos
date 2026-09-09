@@ -18,11 +18,12 @@
   left: 12px;
   top: 12px;
   z-index: calc(var(--cioos-z-dock, 35) + 2);
-  /* The same navy that outlines the clicked region on the map and edges the
-     rows this card pulled to the top of the datasets list. Three surfaces, one
-     colour, so "the map region", "this card" and "those rows" read as one
-     thing rather than three coincidences. */
-  border-top: 3px solid var(--cioos-navy);
+  /* The same goldenrod the map rings the clicked region in and the pinned
+     rows in the datasets list and the inspector's table wear too
+     (--cioos-map-click, see theme.css). Three surfaces, one colour, so "the
+     map region", "this card" and "those rows" read as one thing rather than
+     three coincidences. */
+  border-top: 3px solid var(--cioos-map-click);
   width: 320px;
   max-width: calc(100vw - 24px);
   background-color: var(--cioos-white);
@@ -52,11 +53,29 @@
 }
 
 .featureCardHeadingTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--cioos-font-size-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--cioos-ink-60);
+}
+
+/* Names the goldenrod this card's own top border borrows from the map's
+   click ring. Hexagonal rather than the datasets list's square swatch
+   (datasetsCardMapClickSwatch in DatasetsTable/styles.css) — a click that
+   opens this card is a click on a hex cell. `drop-shadow`, not `box-shadow`:
+   a box-shadow ring is clipped away by the hexagon's own clip-path, while
+   drop-shadow haloes the shape that's actually painted. */
+.featureCardMapClickSwatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 9px;
+  background-color: var(--cioos-map-click);
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  filter: drop-shadow(0 0 2px var(--cioos-map-click-glow));
 }
 
 .featureCardHeadingMeta {

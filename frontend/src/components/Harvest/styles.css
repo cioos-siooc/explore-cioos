@@ -229,6 +229,44 @@
   border-bottom: 2px solid #C6E3DF;
 }
 
+/* A "view all" link sitting on the right of a section heading. */
+.harvest-section-link {
+  float: right;
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+
+/* Downloads queued with nothing consuming them — the scheduler being down.
+   Loud on purpose: nothing else in the UI reveals that state. */
+.harvest-queue-warning {
+  background: #FBE3E6;
+  color: #7a1520;
+  border: 1px solid #e8b9bf;
+  border-radius: 4px;
+  padding: 0.6rem 0.9rem;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+
+.harvest-queue-warning a {
+  color: #7a1520;
+}
+
+/* Stack traces on the download job page. */
+.harvest-error-block {
+  background: #FBE3E6;
+  color: #7a1520;
+  border: 1px solid #e8b9bf;
+  border-radius: 4px;
+  padding: 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow: auto;
+}
+
 /* ── Filter bar ──────────────────────────────────────────────────────────── */
 .harvest-filter-bar {
   display: flex;

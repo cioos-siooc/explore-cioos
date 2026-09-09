@@ -1,10 +1,11 @@
 import * as React from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import MapContainer from '../Map/MapContainer.jsx'
 import FeatureCard from '../Map/FeatureCard/FeatureCard.jsx'
 import ApiErrorBanner from './ApiErrorBanner.jsx'
-import MapBusy from './MapBusy.jsx'
+import ActivityIndicator from './ActivityIndicator.jsx'
 import Sidebar from './Sidebar/Sidebar.jsx'
 import TopControls from './TopControls/TopControls.jsx'
 import FiltersModal from './Modals/FiltersModal.jsx'
@@ -29,9 +30,7 @@ import './styles.css'
 export default function AppShell () {
   const { t } = useTranslation()
   const {
-    loading,
-    basemapLoading,
-    mapLoaded,
+    firstPaintPending,
     zoom,
     currentRangeLevel,
     hexRangeLevel,
@@ -49,13 +48,21 @@ export default function AppShell () {
     setActiveWmsOverlay,
     tracksMode,
     toggleTrackLines,
-    trailingDays,
-    scrubTime,
     dataLayers
   } = useMapState()
   const { startDate, endDate, timeFilterActive } = useFilters()
   const { showIntroModal, setShowIntroModal, sidebarOpen } = useUI()
   const { inspectDataset, platformsAvailable } = useSelection()
+
+  const [splashMounted, setSplashMounted] = useState(firstPaintPending)
+
+  // Raised whenever the splash is called for; lowered by the splash itself once
+  // it has faded. mapLoaded never goes back to false, so in practice this runs
+  // once — but keying off the condition rather than assuming that keeps the two
+  // in step if a later wait ever earns a splash of its own.
+  useEffect(() => {
+    if (firstPaintPending) setSplashMounted(true)
+  }, [firstPaintPending])
 
   // The griddap legend lives inside the dataset page while that page is open
   // (see GriddapDetails); otherwise it pins itself to the top-left corner of
@@ -123,8 +130,20 @@ export default function AppShell () {
     <>
       {/* The splash covers the first map load only; a redraw after that (new
           filters, a new polygon) happens over a map the user can already see
-          and read, so it gets the MapBusy pill instead of a full-screen dim. */}
-      {loading && !mapLoaded && <Loading />}
+          and read, so it is reported by the brand logo's own mark instead of a
+          full-screen dim.
+
+          It outlives the condition that raised it by one fade: the splash is
+          opaque, so dissolving it is what makes the map and the chrome keyed
+          to it arrive together instead of appearing all at once (see Loading).
+          Unmounting on the condition alone would cut that short, so the splash
+          itself says when it is done. */}
+      {splashMounted && (
+        <Loading
+          dismissed={!firstPaintPending}
+          onDismissed={() => setSplashMounted(false)}
+        />
+      )}
       {/* Mount the map immediately rather than waiting for /legend (the app's
           heaviest query) to resolve — first paint of the basemap and tile
           layers no longer blocks on it. The color ramp is applied once
@@ -137,14 +156,12 @@ export default function AppShell () {
           all outranks it. */}
       <FeatureCard />
       <ApiErrorBanner />
-      {/* One pill, two possible waits. The data redraw wins when both are in
-          flight: it's the one the user's own action started, and the basemap
-          catching up underneath it is the lesser news. */}
-      {mapLoaded && (loading || basemapLoading) && (
-        <MapBusy
-          messageKey={loading ? 'mapUpdatingText' : 'mapTilesLoadingText'}
-        />
-      )}
+      {/* Every wait in the app, named in one panel: the map redrawing, the
+          basemap catching up, the legend, the datasets list, a record, the
+          filter catalogue, download estimates. Each is registered with
+          ActivityProvider by whoever owns the flag; this only reports them,
+          and only while the brand logo has it open. */}
+      <ActivityIndicator />
       <Sidebar />
       <TopControls />
       <FiltersModal />
@@ -158,18 +175,19 @@ export default function AppShell () {
         platformsAvailable={platformsAvailable}
         controls={legendControls}
         layerControls={layerControls}
-        trailingDays={trailingDays}
         dataLayers={dataLayers}
         startDate={startDate}
         endDate={endDate}
         timeFilterActive={timeFilterActive}
-        scrubTime={scrubTime}
       />
-      {/* The two range bars over the map, each carrying the filter for its
-          axis and the marks that say where the drawn data sits on it: time
-          along the bottom edge, depth down the right one, perpendicular the
-          way the axes are. Each comes and goes with whether it has anything to
-          say. Both read their own state from the filter and map providers. */}
+      {/* The two range bars over the map: the time filter along the bottom
+          edge, the depth filter down the right one, perpendicular the way the
+          axes are. Each comes and goes with whether its filter is narrowing
+          anything, and both read their own state from the filter and map
+          providers. The marks that say where the *drawn* data sits — the
+          trajectory date, the gridded dataset's time slice — are on the cards
+          that describe those layers now (the legend, and the griddap card
+          below). */}
       <TimeBar />
       <DepthBar />
       {activeWmsOverlay && !wmsLegendIsInline && (

@@ -36,6 +36,11 @@ export default function HarvestOverview() {
   const { data: servers, loading: loadingServers } = useHarvestFetch('/servers', [])
   const { data: runs,    loading: loadingRuns }    = useHarvestFetch('/runs/recent', [])
   const { data: reasons, loading: loadingReasons } = useHarvestFetch('/reasons', [])
+  const { data: downloads }                        = useHarvestFetch('/downloads/summary', [])
+
+  const stuckDownloads = downloads
+    ? Number(downloads.n_stuck || 0) + Number(downloads.n_stalled || 0)
+    : 0
 
   return (
     <HarvestLayout>
@@ -50,6 +55,37 @@ export default function HarvestOverview() {
             {(servers || []).map(s => <ServerCard key={s.erddap_url} server={s} t={t} />)}
           </div>
       }
+
+      {stuckDownloads > 0 && (
+        <div className="harvest-queue-warning">
+          <Link to="/harvest/downloads" className="harvest-link">
+            {t('harvest.downloads.queueStalled', { count: stuckDownloads })}
+          </Link>
+        </div>
+      )}
+
+      <h2 className="harvest-section-title">
+        {t('harvest.downloads.title')}
+        <Link to="/harvest/downloads" className="harvest-link harvest-section-link">
+          {t('harvest.downloads.viewAll')}
+        </Link>
+      </h2>
+      {downloads && (
+        <div className="harvest-card-counts">
+          <span className="harvest-count-pill harvest-count-success">
+            ✓ {downloads.n_completed} {t('harvest.downloads.completed')}
+          </span>
+          <span className="harvest-count-pill harvest-count-error">
+            ✗ {downloads.n_failed} {t('harvest.downloads.failed')}
+          </span>
+          <span className="harvest-count-pill harvest-count-unchanged">
+            {downloads.n_open} {t('harvest.downloads.queued')}
+          </span>
+          <span className="harvest-muted" style={{ fontSize: '0.8rem', alignSelf: 'center' }}>
+            {t('harvest.downloads.lastRequest', { date: fmtDt(downloads.last_request_at) })}
+          </span>
+        </div>
+      )}
 
       <h2 className="harvest-section-title">{t('harvest.recentRuns')}</h2>
       {loadingRuns

@@ -1,0 +1,92 @@
+/* ------------------------------------------------------------------
+ * The trajectory date, inside the legend's trajectories group. It
+ * borrows that card's row classes (.legendItem, .legendSwatch,
+ * .legendItemLabel) on purpose — it is two of the card's own keys with
+ * controls on them, and it has to read as part of the list it sits in,
+ * not as a form dropped into it. Only what the controls add is here.
+ * ------------------------------------------------------------------ */
+
+/* The rows are the legend's; what they gain is a control pushed to the far
+   edge, so the two pickers line up down the right of the card however long
+   the label beside them runs. */
+.trajectoryDateRow > .trajectoryTrailSelect,
+.trajectoryDateRow > .trajectoryDateInput {
+  margin-left: auto;
+}
+
+/* The date is the widest thing in the group and the steppers must stay beside
+   it, so it takes the room the row has left rather than the width the browser's
+   own date chrome asks for. */
+.trajectoryDateInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--cioos-track-700);
+}
+
+.trajectoryDateInput:focus-visible {
+  border-color: var(--cioos-track);
+  box-shadow: 0 0 0 3px rgb(103 73 172 / 45%);
+}
+
+.trajectoryTrailSelect {
+  flex: 0 0 auto;
+  max-width: 88px;
+  padding: 1px 2px 1px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-track-700);
+  cursor: pointer;
+}
+
+.trajectoryTrailSelect:hover {
+  background-color: var(--cioos-track-surface);
+}
+
+.trajectoryTrailSelect:focus-visible {
+  outline: none;
+  border-color: var(--cioos-track);
+}
+
+/* Marks a trail the zoom gate is currently clamping; carries the explanation
+   as a tooltip. */
+.trajectoryTrailClamped {
+  flex: 0 0 auto;
+  margin-left: -3px;
+  color: var(--cioos-track-700);
+  font-weight: 700;
+  cursor: help;
+}
+
+/* The steppers take the mark's colour here rather than the neutral one the
+   shared button carries, so the whole group reads as one control. */
+.trajectoryDate .railStep {
+  color: var(--cioos-track-700);
+}
+
+.trajectoryDate .railStep:hover:not(:disabled) {
+  background-color: var(--cioos-track);
+  color: var(--cioos-white);
+}
+
+/* The rail runs the width of the card's body. The shared inset (16px, sized so
+   an end handle and the label centred under it stay inside a bar hundreds of
+   pixels wide) is most of a 172px column, so it is cut to what the 6px marker
+   and its two-label tick row actually need. */
+.trajectoryDateRail {
+  margin-top: 2px;
+  padding: 0 6px;
+}
+
+/* Shorter than the bar's: this rail is read as an annotation of the two rows
+   above it, and the full 18px track left it floating clear of them. */
+.trajectoryDateRail .railTrack {
+  height: 14px;
+}
+
+.trajectoryDateRail .railTicks {
+  height: 10px;
+  font-size: var(--cioos-font-size-2xs);
+}

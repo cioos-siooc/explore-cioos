@@ -96,10 +96,19 @@ async function createDBFilter(request) {
   // rectangle is found even if its display point sits outside it. Missing
   // bounds default to the world extent so a partial rectangle still works.
   if (latMin || latMax || lonMin || lonMax) {
+    // search_geom lives in Web Mercator (EPSG:3857), so the envelope is
+    // transformed 4326->3857. Mercator is only defined to ~±85.06° latitude;
+    // transforming a ±90° envelope throws "transform: tolerance condition
+    // error" in PostGIS and crashes the request. Clamp latitude to the valid
+    // range — nothing outside it can exist in a 3857 geometry anyway.
+    const clampLat = (v, dflt) => {
+      const n = v === undefined || v === null || v === "" ? dflt : Number(v);
+      return Math.max(-85.05, Math.min(85.05, n));
+    };
     parameters.rectLonMin = lonMin || -180;
-    parameters.rectLatMin = latMin || -90;
+    parameters.rectLatMin = clampLat(latMin, -85.05);
     parameters.rectLonMax = lonMax || 180;
-    parameters.rectLatMax = latMax || 90;
+    parameters.rectLatMax = clampLat(latMax, 85.05);
     filters.push(
       "ST_Intersects(search_geom, ST_Transform(ST_MakeEnvelope("
       + "(:rectLonMin)::double precision,(:rectLatMin)::double precision,"
@@ -123,7 +132,10 @@ async function createDBFilter(request) {
   }
 
   if (pointPKs) {
-    parameters.pointPKs = pointPKs;
+    // Comma-separated, like datasetPKs/organizations above — this was binding
+    // the raw query string instead of an array, so `= ANY(:pointPKs)` never
+    // worked (Postgres can't cast "12342,34534" to an integer array).
+    parameters.pointPKs = pointPKs.split(",");
     filters.push("point_pk = ANY (:pointPKs)");
   }
 

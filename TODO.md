@@ -9,20 +9,28 @@
 - [x] Fix click on map grid box / hex / marker interaction — one click handler
       for every layer, answered by the "what's here" card, instead of six
       handlers doing five unrelated things behind a stand-aside ladder.
-- [ ] Update hexes colormap base on visible hexes
-- [ ] Make icons in dataset page vertically stacked
-
+- [x] Update hexes colormap base on visible hexes
+- [x] Make icons in dataset page vertically stacked
+- [ ] Some records are duplicated within the dataset list for some reason. 
+- [x] Filter UI have a select all and reset button which are basically doing the same thing. Just keep a clear button
+- [ ] Make bigger markers always site above smaller markers.
+- [x] WMS server slide selection should be linked in the url parametrization
+- [x] trajectory lines and makers should point to the record.
+- [x] trajectory line and point marker tooltip should have the timestamp assocaited
+- [ ] Tooltip show split the different datasets geometries 
+- [x] Make hexes more transparent and no filling at high zoom levels perhaps
 ### Map interaction follow-ups
 - [ ] Give the datasets sheet a mid snap point on phones, so the list and the
       map are visible together. Deliberately left alone for now: the sheet drag
       was removed on purpose in "on phones the sheet waits to be asked for".
+- [ ] Same view for the wms map layer, improve that too
 - [ ] Long-press on the map as "add everything here" without opening the card.
 
 ### Downloader — test and fix
-- [ ] Trajectory
-- [ ] Griddap
-- [ ] Points
-- [ ] OBIS
+- [x] Trajectory
+- [x] Griddap
+- [x] Points
+- [x] OBIS
 
 ## New features
 - [ ] Add Optional Banner to present to user the very first time for form or question with markdown and date limit option.
@@ -36,13 +44,45 @@
 
 ## Infrastructure & backend
 - [ ] Fix docker compose handling with override or not.
-- [ ] Drop db migration container.
+- [x] Drop db migration container.
 - [ ] Review prefect-worker container.
 - [ ] Test redis caching refresh.
 - [ ] Review DB partial load of table and improve efficiency and stability.
 - [x] Drop log message "i18next is made possible by our own product, Locize".
 
 ### Database & harvesting (see docs for reference)
+- [x] `profiles.days` is an elapsed span, not a count of days with data — fixed
+      in two parts. The map's `days` metric is now a UNION of per-feature day
+      sets (`day_union_days`, `database/8_range_functions.sql`) instead of a sum
+      of day counts, and `profiles`/`obis_cells` carry a real harvested day set
+      in `day_ranges` alongside `trajectory_hexes`. Dev measurements: worst hex
+      451,305 → 5,197 days; the point holding 59 republished copies of one
+      375-day mooring 21,996 → 376.
+    - `5_profile_process.sql` still fills `days` from the span, but only as the
+      fallback for single-cast types and for datasets whose day-count request
+      failed.
+    - `records_per_day` is now records over days-with-data, and the download
+      estimator multiplies it by a matching day-set overlap
+      (`day_range_overlap_days`) rather than an elapsed span — which also fixed
+      the same mismatch that was already inflating trajectory estimates.
+- [ ] Republished duplicate features: `amundsen11975_ctd` publishes one
+      deployment under 59 `timeseries_id` filenames (FV00/FV01, `AMOS_` vs
+      `Amundsen-Science_`, differing reprocessing stamps). The day-set union
+      means they no longer inflate the map, but they are still 59 rows in the
+      dataset list — likely the same root cause as the duplicate-records item
+      above. Needs a rule for which copy wins before it can be collapsed.
+- [ ] `timeseries_profile.py`: `len(profiles_per_timeseries > 2000)` is `len()`
+      of a boolean Series, so it is always truthy — every TimeSeriesProfile
+      dataset unconditionally collapses to one row per station and `profile_id`
+      is always empty. Probably meant `.max() > 2000`. Fixing it changes what a
+      profiles row IS across the whole table, so it needs its own pass.
+- [ ] `/legend` 500s whenever a time filter is applied (pre-existing, not from
+      the day-set work): the coverage-ramp query's branches don't select
+      `time_min`/`time_max`, but the shared dataset filter references them.
+- [ ] Add a post-deploy check that `populate_vernaculars` actually finished — a partial run fails silently.
+    - Symptom: Family-and-above scientific-name filters quietly under-match while Species-level looks perfect (only the higher ranks need the AphiaID rolldown; species also match on the literal name).
+    - Not visible in the typeahead: the rows exist with rank and vernacular, it's `ancestor_aphia_ids` that's incomplete — so it reads as missing OBIS data rather than an unfinished backfill.
+    - Suggested check: assert a known family (e.g. Laridae) expands to the expected order of magnitude of AphiaIDs. Hit on dev 2026-08-07 when a redeploy landed mid-run.
 - [x] Improve dataset incremental upload to db.
 - [x] Improve database indexing for speeding up calls.
 - [x] Harvester incremental update freezes the database and frontend on load — avoid doing that.
