@@ -2,7 +2,7 @@ const express = require("express");
 
 const router = express.Router();
 const db = require("../db");
-const cache = require("../utils/cache");
+const { pipeline } = require("../utils/routePipeline");
 
 /**
  * @swagger
@@ -33,8 +33,11 @@ const cache = require("../utils/cache");
  *                   title_translated:
  *                     type: object
  */
-router.get("/", cache.route(), async (req, res, next) => {
-  const SQL = `SELECT title,
+router.get(
+  "/",
+  ...pipeline({ filters: false, cacheFor: "5 minutes" }),
+  async (req, res) => {
+    const SQL = `SELECT title,
                       pk_url pk,
                       organization_pks,
                       platform,
@@ -43,7 +46,8 @@ router.get("/", cache.route(), async (req, res, next) => {
                       FROM cde.datasets
                       ORDER BY UPPER(title)`;
 
-  res.send((await db.raw(SQL)).rows);
-});
+    res.send((await db.raw(SQL)).rows);
+  },
+);
 
 module.exports = router;

@@ -2,8 +2,7 @@ const express = require("express");
 
 const router = express.Router();
 const db = require("../db");
-const { validatorMiddleware } = require("../utils/validatorMiddlewares");
-const cache = require("../utils/cache");
+const { pipeline } = require("../utils/routePipeline");
 
 const createDBFilter = require("../utils/dbFilter");
 const {
@@ -124,83 +123,69 @@ function rampRange() {
  *                       type: array
  *                       items: { type: integer }
  */
-router.get(
-  "/",
-  cache.route(),
-  validatorMiddleware(),
-  async (req, res, next) => {
-    let filters;
-    try {
-      filters = await createDBFilter(req.query);
-    } catch (err) {
-      if (err.statusCode === 400)
-        return res.status(400).json({ error: err.message });
-      // Rethrowing would reject the async handler, which Express 4 leaves
-      // unhandled — that kills the process, not just this request.
-      console.error(err);
-      return res.status(500).json({ error: err.toString() });
-    }
-    const includeObis = req.query.includeObis !== "false";
-    // Must match the metric the tiles were requested with, or the ramp domain
-    // won't match the numbers being ramped — see utils/hexMetric.js.
-    const metric = parseMetric(req.query.metric);
-    // Scientific-name filters are OBIS-only: hide profiles when set. An
-    // OBIS-node selection also hides profiles, unless ERDDAP servers are
-    // selected alongside it (combined Source filter — show both, OR'd in
-    // the shared dataset filter).
-    const includeProfiles =
-      !req.query.scientificNames &&
-      (!req.query.obisNodes || Boolean(req.query.erddapServers));
+router.get("/", ...pipeline(), async (req, res) => {
+  const filters = await createDBFilter(req.query);
+  const includeObis = req.query.includeObis !== "false";
+  // Must match the metric the tiles were requested with, or the ramp domain
+  // won't match the numbers being ramped — see utils/hexMetric.js.
+  const metric = parseMetric(req.query.metric);
+  // Scientific-name filters are OBIS-only: hide profiles when set. An
+  // OBIS-node selection also hides profiles, unless ERDDAP servers are
+  // selected alongside it (combined Source filter — show both, OR'd in
+  // the shared dataset filter).
+  const includeProfiles =
+    !req.query.scientificNames &&
+    (!req.query.obisNodes || Boolean(req.query.erddapServers));
 
-    // GROUP BY the hex FK (integer) instead of the polygon geom; the polygon
-    // lives on cde.hexes_zoom_0/1 and isn't needed here — only the summed
-    // metric per bucket.
-    // search_geom (bbox for profiles, cell point otherwise) backs the shared
-    // spatial filter, matching tiles/shapeQuery. show_as_point gates profiles
-    // out of every tier (hex and point) so the legend ranges match the tiles,
-    // which keep large-region features off the map entirely.
-    const profilesBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, ${metricValueExpr("profiles", metric)},
+  // GROUP BY the hex FK (integer) instead of the polygon geom; the polygon
+  // lives on cde.hexes_zoom_0/1 and isn't needed here — only the summed
+  // metric per bucket.
+  // search_geom (bbox for profiles, cell point otherwise) backs the shared
+  // spatial filter, matching tiles/shapeQuery. show_as_point gates profiles
+  // out of every tier (hex and point) so the legend ranges match the tiles,
+  // which keep large-region features off the map entirely.
+  const profilesBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, ${metricValueExpr("profiles", metric)},
                time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
         FROM cde.profiles ${metricJoin("profiles", metric)}
         WHERE show_as_point AND :profileFilters`;
-    // Trajectory and OBIS coverage cells merge into the hex-tier ranges
-    // (zoom0/zoom1, the green ramp) but not the point-tier range (zoom2) — at
-    // that zoom they only render via the dedicated always-hex coverage layer,
-    // whose own range comes from the second query below.
-    // cde.trajectory_hexes carries ONE hex per row plus its tier (each tier's
-    // day count is aggregated independently), so the two hex FK columns the
-    // other branches select are split out of hex_pk here. The NULL that leaves
-    // in the other tier's column is why sub1/sub2 below exclude NULL keys —
-    // otherwise every tier-1 row would pile into one bogus hex_0 bucket and
-    // stretch the ramp domain.
-    const trajectoryBranch = `SELECT CASE WHEN hex_tier = 0 THEN hex_pk END AS hex_0_pk,
+  // Trajectory and OBIS coverage cells merge into the hex-tier ranges
+  // (zoom0/zoom1, the green ramp) but not the point-tier range (zoom2) — at
+  // that zoom they only render via the dedicated always-hex coverage layer,
+  // whose own range comes from the second query below.
+  // cde.trajectory_hexes carries ONE hex per row plus its tier (each tier's
+  // day count is aggregated independently), so the two hex FK columns the
+  // other branches select are split out of hex_pk here. The NULL that leaves
+  // in the other tier's column is why sub1/sub2 below exclude NULL keys —
+  // otherwise every tier-1 row would pile into one bogus hex_0 bucket and
+  // stretch the ramp domain.
+  const trajectoryBranch = `SELECT CASE WHEN hex_tier = 0 THEN hex_pk END AS hex_0_pk,
                CASE WHEN hex_tier = 1 THEN hex_pk END AS hex_1_pk,
                NULL::integer AS point_pk, dataset_pk, ${metricValueExpr("trajectory_hexes", metric)},
                time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
         FROM cde.trajectory_hexes ${metricJoin("trajectory_hexes", metric)}`;
-    const obisBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk,
+  const obisBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk,
                ${metricValueExpr("obis_cells", metric)},
                time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
         FROM cde.obis_cells ${metricJoin("obis_cells", metric)}
         WHERE :obisFilters`;
 
-    const hexBranches = [];
-    if (includeProfiles) hexBranches.push(profilesBranch, trajectoryBranch);
-    if (includeObis) hexBranches.push(obisBranch);
-    // Empty-branch guard: profilesBranch carries its own WHERE (show_as_point),
-    // so `${profilesBranch} WHERE FALSE` is a syntax error — wrap it in a
-    // subquery, as the tile route does.
-    const emptyBranch = `SELECT * FROM (${profilesBranch}) empty_branch WHERE FALSE`;
-    const combinedHexInner = hexBranches.length
-      ? hexBranches.join("\n        UNION ALL\n        ")
-      : emptyBranch;
+  const hexBranches = [];
+  if (includeProfiles) hexBranches.push(profilesBranch, trajectoryBranch);
+  if (includeObis) hexBranches.push(obisBranch);
+  // Empty-branch guard: profilesBranch carries its own WHERE (show_as_point),
+  // so `${profilesBranch} WHERE FALSE` is a syntax error — wrap it in a
+  // subquery, as the tile route does.
+  const emptyBranch = `SELECT * FROM (${profilesBranch}) empty_branch WHERE FALSE`;
+  const combinedHexInner = hexBranches.length
+    ? hexBranches.join("\n        UNION ALL\n        ")
+    : emptyBranch;
 
-    // Only profiles reach the point tier: both cell tables are drawn as hexes
-    // at every zoom, so counting them here would ramp the point circles
-    // against data they don't contain.
-    const combinedPointInner = includeProfiles ? profilesBranch : emptyBranch;
+  // Only profiles reach the point tier: both cell tables are drawn as hexes
+  // at every zoom, so counting them here would ramp the point circles
+  // against data they don't contain.
+  const combinedPointInner = includeProfiles ? profilesBranch : emptyBranch;
 
-    const sql = `
+  const sql = `
         WITH combined_hex AS (
         ${combinedHexInner}
         ),
@@ -233,51 +218,51 @@ router.get(
         SELECT * from sub1,sub2,sub3
         `;
 
-    // The always-hex coverage layer (trajectory + OBIS cells), which takes
-    // over from the main hexes at z>=7. Both kinds now share one ramp, so
-    // this is one domain over both — it used to be three separate ranges
-    // feeding three separate colour scales (purple / amber / plum), which put
-    // four colour families on screen at once at high zoom.
-    //
-    // Only the hex_1 tier is needed: below z7 these cells are folded into the
-    // main hexes above, and the layer reuses hexes_zoom_1 uncapped past z6.
-    //
-    // Gating mirrors /tiles/cells. Note the frontend currently sends only the
-    // filter query (which carries includeObis) to /legend, not the data-layer
-    // toggles, so includeTrajectory defaults to on here — same as before this
-    // change.
-    const includeTrajectoryCells =
-      req.query.includeTrajectory !== "false" && includeProfiles;
-    // Every branch carries the columns the shared dataset filter predicates
-    // against (time, depth, position), not just the ones this query groups on.
-    // dbFilter emits unqualified time_min/depth_min/... predicates, so a branch
-    // that omits them makes the whole statement fail to parse — which is what
-    // made /legend 500 for every request carrying a time or depth filter,
-    // silently leaving the map without a ramp domain exactly when the user
-    // narrowed it.
-    const coverageBranches = [];
-    if (includeTrajectoryCells) {
-      coverageBranches.push(`SELECT hex_pk AS hex_1_pk, dataset_pk, ${metricValueExpr("trajectory_hexes", metric)},
+  // The always-hex coverage layer (trajectory + OBIS cells), which takes
+  // over from the main hexes at z>=7. Both kinds now share one ramp, so
+  // this is one domain over both — it used to be three separate ranges
+  // feeding three separate colour scales (purple / amber / plum), which put
+  // four colour families on screen at once at high zoom.
+  //
+  // Only the hex_1 tier is needed: below z7 these cells are folded into the
+  // main hexes above, and the layer reuses hexes_zoom_1 uncapped past z6.
+  //
+  // Gating mirrors /tiles/cells. Note the frontend currently sends only the
+  // filter query (which carries includeObis) to /legend, not the data-layer
+  // toggles, so includeTrajectory defaults to on here — same as before this
+  // change.
+  const includeTrajectoryCells =
+    req.query.includeTrajectory !== "false" && includeProfiles;
+  // Every branch carries the columns the shared dataset filter predicates
+  // against (time, depth, position), not just the ones this query groups on.
+  // dbFilter emits unqualified time_min/depth_min/... predicates, so a branch
+  // that omits them makes the whole statement fail to parse — which is what
+  // made /legend 500 for every request carrying a time or depth filter,
+  // silently leaving the map without a ramp domain exactly when the user
+  // narrowed it.
+  const coverageBranches = [];
+  if (includeTrajectoryCells) {
+    coverageBranches.push(`SELECT hex_pk AS hex_1_pk, dataset_pk, ${metricValueExpr("trajectory_hexes", metric)},
         time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
         FROM cde.trajectory_hexes ${metricJoin("trajectory_hexes", metric)}
         WHERE hex_tier = 1`);
-    }
-    if (includeObis) {
-      coverageBranches.push(`SELECT hex_1_pk, dataset_pk, ${metricValueExpr("obis_cells", metric)},
+  }
+  if (includeObis) {
+    coverageBranches.push(`SELECT hex_1_pk, dataset_pk, ${metricValueExpr("obis_cells", metric)},
         time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
         FROM cde.obis_cells ${metricJoin("obis_cells", metric)}
         WHERE :obisFilters`);
-    }
-    const coverageInner = coverageBranches.length
-      ? coverageBranches.join("\n        UNION ALL\n        ")
-      : `SELECT hex_1_pk, dataset_pk, ${nullMetricExpr(metric)},
+  }
+  const coverageInner = coverageBranches.length
+    ? coverageBranches.join("\n        UNION ALL\n        ")
+    : `SELECT hex_1_pk, dataset_pk, ${nullMetricExpr(metric)},
          NULL::timestamptz AS time_min, NULL::timestamptz AS time_max,
          NULL::double precision AS latitude, NULL::double precision AS longitude,
          NULL::double precision AS depth_min, NULL::double precision AS depth_max,
          geom AS search_geom
          FROM cde.obis_cells WHERE FALSE`;
 
-    const coverageSql = `
+  const coverageSql = `
         WITH cells AS (
         ${coverageInner}
         ),
@@ -294,39 +279,28 @@ router.get(
         SELECT * from sub1
         `;
 
-    // Both aggregations scan the same large tables independently; run them
-    // concurrently rather than back-to-back so legend latency is bounded by
-    // the slower, not their sum. The legend gates first map paint, so this is
-    // on the critical path.
-    // Express 4 does not forward rejections from async handlers, so an
-    // uncaught DB error here takes down the whole API process rather than
-    // failing the one request. Contained the same way the tile routes do it.
-    try {
-      const [rows, coverageRows] = await Promise.all([
-        db.raw(sql, {
-          filters: filters.shared,
-          obisFilters: filters.obisOnly,
-          profileFilters: filters.profileOnly,
-        }),
-        db.raw(coverageSql, {
-          filters: filters.shared,
-          obisFilters: filters.obisOnly,
-        }),
-      ]);
+  // Both aggregations scan the same large tables independently; run them
+  // concurrently rather than back-to-back so legend latency is bounded by
+  // the slower, not their sum. The legend gates first map paint, so this is
+  // on the critical path.
+  const [rows, coverageRows] = await Promise.all([
+    db.raw(sql, {
+      filters: filters.shared,
+      obisFilters: filters.obisOnly,
+      profileFilters: filters.profileOnly,
+    }),
+    db.raw(coverageSql, {
+      filters: filters.shared,
+      obisFilters: filters.obisOnly,
+    }),
+  ]);
 
-      res.send(
-        rows && {
-          recordsCount: rows.rows[0],
-          coverageCount: coverageRows.rows[0],
-        },
-      );
-    } catch (e) {
-      console.error(e);
-      res.status(500).send({
-        error: e.toString(),
-      });
-    }
-  },
-);
+  res.send(
+    rows && {
+      recordsCount: rows.rows[0],
+      coverageCount: coverageRows.rows[0],
+    },
+  );
+});
 
 module.exports = router;

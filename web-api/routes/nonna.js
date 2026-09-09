@@ -3,6 +3,7 @@ const express = require("express");
 const axios = require("axios");
 const { RESP_TYPES } = require("redis");
 const { ensureConnected, markDown, withTimeout } = require("../utils/redis");
+const { pipeline } = require("../utils/routePipeline");
 
 const router = express.Router();
 
@@ -231,88 +232,80 @@ function sendTile(res, body, maxAgeSeconds) {
  *         description: Unknown layer, or tile coordinates outside the zoom's grid.
  */
 /* GET /nonna/:layer/:z/:x/:y.png */
-router.get("/:layer/:z/:x/:y.png", async (req, res) => {
-  const { layer, z, x, y } = req.params;
+// The tile-coordinate check is the shared one (utils/routePipeline.js) — it
+// rejects out-of-grid indices rather than forwarding them, because upstream
+// would answer anyway and each forwarded request is one we made CHS serve.
+// No apicache: this route runs its own two-tier tile cache below.
+router.get(
+  "/:layer/:z/:x/:y.png",
+  ...pipeline({
+    filters: false,
+    cacheFor: null,
+    tileParams: { maxZoom: MAX_ZOOM },
+  }),
+  async (req, res) => {
+    const { layer, z, x, y } = req.params;
 
-  const wmtsLayer = LAYERS[layer];
-  if (!wmtsLayer) {
-    return res
-      .status(400)
-      .json({ error: `unknown NONNA layer '${layer}'; expected 10 or 100` });
-  }
+    const wmtsLayer = LAYERS[layer];
+    if (!wmtsLayer) {
+      return res.status(400).json({
+        errors: [`unknown NONNA layer '${layer}'; expected 10 or 100`],
+      });
+    }
 
-  const zoom = Number(z);
-  const col = Number(x);
-  const row = Number(y);
-  if (!Number.isInteger(zoom) || zoom < 0 || zoom > MAX_ZOOM) {
-    return res
-      .status(400)
-      .json({ error: `zoom must be an integer 0-${MAX_ZOOM}` });
-  }
-  // Reject out-of-grid indices rather than forwarding them: upstream would
-  // answer anyway, and each forwarded request is one we made CHS serve.
-  const tilesPerAxis = 2 ** zoom;
-  if (
-    !Number.isInteger(col) ||
-    col < 0 ||
-    col >= tilesPerAxis ||
-    !Number.isInteger(row) ||
-    row < 0 ||
-    row >= tilesPerAxis
-  ) {
-    return res.status(400).json({
-      error: `tile ${col}/${row} is outside the grid at zoom ${zoom}`,
-    });
-  }
+    const zoom = Number(z);
+    const col = Number(x);
+    const row = Number(y);
 
-  const key = `${layer}/${zoom}/${col}/${row}`;
-  const cached = cacheGet(key);
-  if (cached) {
-    return sendTile(res, cached, BROWSER_MAX_AGE_S);
-  }
+    const key = `${layer}/${zoom}/${col}/${row}`;
+    const cached = cacheGet(key);
+    if (cached) {
+      return sendTile(res, cached, BROWSER_MAX_AGE_S);
+    }
 
-  // L2. Promote into L1 on the way out so a region being panned around does not
-  // pay the redis round trip per tile.
-  const fromRedis = await redisGet(key);
-  if (fromRedis) {
-    cacheSet(key, fromRedis);
-    return sendTile(res, fromRedis, BROWSER_MAX_AGE_S);
-  }
+    // L2. Promote into L1 on the way out so a region being panned around does not
+    // pay the redis round trip per tile.
+    const fromRedis = await redisGet(key);
+    if (fromRedis) {
+      cacheSet(key, fromRedis);
+      return sendTile(res, fromRedis, BROWSER_MAX_AGE_S);
+    }
 
-  try {
-    const upstream = await axios.get(NONNA_WMTS, {
-      params: {
-        service: "WMTS",
-        version: "1.0.0",
-        request: "GetTile",
-        layer: wmtsLayer,
-        style: "",
-        tilematrixset: TILE_MATRIX_SET,
-        format: "image/png",
-        tilematrix: `${TILE_MATRIX_SET}:${zoom}`,
-        tilerow: row,
-        tilecol: col,
-      },
-      responseType: "arraybuffer",
-      timeout: UPSTREAM_TIMEOUT_MS,
-    });
+    try {
+      const upstream = await axios.get(NONNA_WMTS, {
+        params: {
+          service: "WMTS",
+          version: "1.0.0",
+          request: "GetTile",
+          layer: wmtsLayer,
+          style: "",
+          tilematrixset: TILE_MATRIX_SET,
+          format: "image/png",
+          tilematrix: `${TILE_MATRIX_SET}:${zoom}`,
+          tilerow: row,
+          tilecol: col,
+        },
+        responseType: "arraybuffer",
+        timeout: UPSTREAM_TIMEOUT_MS,
+      });
 
-    const body = Buffer.from(upstream.data);
-    cacheSet(key, body);
-    // Not awaited: the tile is already in hand, and a slow or dead redis must
-    // not hold up the response. redisSet swallows its own errors.
-    redisSet(key, body);
-    return sendTile(res, body, BROWSER_MAX_AGE_S);
-  } catch (e) {
-    // A 403 here means CHS changed the allowlist or the gateway rules; anything
-    // else is a timeout or an upstream error. Either way the map should stay
-    // usable, so serve a transparent tile on a short TTL.
-    console.error(
-      `NONNA tile ${key} failed:`,
-      e.response ? `upstream ${e.response.status}` : e.message,
-    );
-    return sendTile(res, TRANSPARENT_PNG, ERROR_MAX_AGE_S);
-  }
-});
+      const body = Buffer.from(upstream.data);
+      cacheSet(key, body);
+      // Not awaited: the tile is already in hand, and a slow or dead redis must
+      // not hold up the response. redisSet swallows its own errors.
+      redisSet(key, body);
+      return sendTile(res, body, BROWSER_MAX_AGE_S);
+    } catch (e) {
+      // A 403 here means CHS changed the allowlist or the gateway rules; anything
+      // else is a timeout or an upstream error. Either way the map should stay
+      // usable, so serve a transparent tile on a short TTL.
+      console.error(
+        `NONNA tile ${key} failed:`,
+        e.response ? `upstream ${e.response.status}` : e.message,
+      );
+      return sendTile(res, TRANSPARENT_PNG, ERROR_MAX_AGE_S);
+    }
+  },
+);
 
 module.exports = router;

@@ -14,7 +14,7 @@ const express = require("express");
 
 const router = express.Router();
 const db = require("../db");
-const cache = require("../utils/cache");
+const { pipeline } = require("../utils/routePipeline");
 
 const RECENT_JOB_LIMIT = 25;
 
@@ -180,46 +180,46 @@ async function summary() {
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-router.get("/summary", cache.route("30 seconds"), async (req, res, next) => {
-  try {
+router.get(
+  "/summary",
+  ...pipeline({ filters: false, cacheFor: "30 seconds" }),
+  async (req, res) => {
     res.json(await summary());
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
-router.get("/recent", cache.route("30 seconds"), async (req, res, next) => {
-  try {
+router.get(
+  "/recent",
+  ...pipeline({ filters: false, cacheFor: "30 seconds" }),
+  async (req, res) => {
     const limit = Math.min(
       parseInt(req.query.limit, 10) || RECENT_JOB_LIMIT,
       200,
     );
     res.json(await recentJobs(limit));
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
-router.get("/datasets", cache.route("1 minute"), async (req, res, next) => {
-  try {
+router.get(
+  "/datasets",
+  ...pipeline({ filters: false, cacheFor: "1 minute" }),
+  async (req, res) => {
     res.json(
       await datasetOutcomes(req.query.status || null, req.query.q || null),
     );
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
 // Defined after /summary, /recent and /datasets so those literals aren't
 // swallowed by :jobId.
-router.get("/:jobId", cache.route("1 minute"), async (req, res, next) => {
-  try {
+router.get(
+  "/:jobId",
+  ...pipeline({ filters: false, cacheFor: "1 minute" }),
+  async (req, res) => {
     const job = await jobDetail(req.params.jobId);
     if (!job) return res.status(404).json({ error: "Download job not found" });
     res.json({ job, datasets: await jobDatasets(req.params.jobId) });
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
 module.exports = router;

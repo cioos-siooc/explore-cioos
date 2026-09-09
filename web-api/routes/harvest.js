@@ -2,7 +2,7 @@ const express = require("express");
 
 const router = express.Router();
 const db = require("../db");
-const cache = require("../utils/cache");
+const { pipeline } = require("../utils/routePipeline");
 
 const SPARKLINE_DEPTH = 10;
 
@@ -317,85 +317,73 @@ async function reasonBreakdown(erddapUrl = null) {
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-router.get("/servers", cache.route("2 minutes"), async (req, res, next) => {
-  try {
+router.get(
+  "/servers",
+  ...pipeline({ filters: false, cacheFor: "2 minutes" }),
+  async (req, res) => {
     res.json(await listServers());
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
 router.get(
   "/servers/:slug",
-  cache.route("30 seconds"),
-  async (req, res, next) => {
-    try {
-      const erddapUrl = await resolveErddapUrl(req.params.slug);
-      const status = req.query.status || null;
-      const q = req.query.q || null;
-      res.json(await serverDatasets(erddapUrl, status, q));
-    } catch (err) {
-      next(err);
-    }
+  ...pipeline({ filters: false, cacheFor: "30 seconds" }),
+  async (req, res) => {
+    const erddapUrl = await resolveErddapUrl(req.params.slug);
+    const status = req.query.status || null;
+    const q = req.query.q || null;
+    res.json(await serverDatasets(erddapUrl, status, q));
   },
 );
 
 router.get(
   "/dataset/:slug/:datasetId",
-  cache.route("1 minute"),
-  async (req, res, next) => {
-    try {
-      const erddapUrl = await resolveErddapUrl(req.params.slug);
-      const history = await datasetHistory(erddapUrl, req.params.datasetId);
-      if (!history.length)
-        return res.status(404).json({ error: "No harvest history found" });
-      const meta = await datasetMeta(erddapUrl, req.params.datasetId);
-      res.json({ history, meta, erddap_url: erddapUrl });
-    } catch (err) {
-      next(err);
-    }
+  ...pipeline({ filters: false, cacheFor: "1 minute" }),
+  async (req, res) => {
+    const erddapUrl = await resolveErddapUrl(req.params.slug);
+    const history = await datasetHistory(erddapUrl, req.params.datasetId);
+    if (!history.length)
+      return res.status(404).json({ error: "No harvest history found" });
+    const meta = await datasetMeta(erddapUrl, req.params.datasetId);
+    res.json({ history, meta, erddap_url: erddapUrl });
   },
 );
 
-router.get("/runs/recent", cache.route("1 minute"), async (req, res, next) => {
-  try {
+router.get(
+  "/runs/recent",
+  ...pipeline({ filters: false, cacheFor: "1 minute" }),
+  async (req, res) => {
     res.json(await recentRuns());
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
 // Note: /runs/recent must be defined before /runs/:runId to avoid :runId
 // matching the literal string "recent".
-router.get("/runs/:runId", cache.route("1 minute"), async (req, res, next) => {
-  try {
+router.get(
+  "/runs/:runId",
+  ...pipeline({ filters: false, cacheFor: "1 minute" }),
+  async (req, res) => {
     const run = await runDetail(req.params.runId);
     if (!run) return res.status(404).json({ error: "Run not found" });
     const attempts = await runAttempts(req.params.runId);
     res.json({ run, attempts });
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
-router.get("/reasons", cache.route("2 minutes"), async (req, res, next) => {
-  try {
+router.get(
+  "/reasons",
+  ...pipeline({ filters: false, cacheFor: "2 minutes" }),
+  async (req, res) => {
     res.json(await reasonBreakdown());
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
 router.get(
   "/reasons/:slug",
-  cache.route("2 minutes"),
-  async (req, res, next) => {
-    try {
-      const erddapUrl = await resolveErddapUrl(req.params.slug);
-      res.json(await reasonBreakdown(erddapUrl));
-    } catch (err) {
-      next(err);
-    }
+  ...pipeline({ filters: false, cacheFor: "2 minutes" }),
+  async (req, res) => {
+    const erddapUrl = await resolveErddapUrl(req.params.slug);
+    res.json(await reasonBreakdown(erddapUrl));
   },
 );
 

@@ -1,9 +1,9 @@
 const express = require("express");
+const { check } = require("express-validator");
 const { getShapeQuery } = require("../utils/shapeQuery");
-const cache = require("../utils/cache");
+const { pipeline } = require("../utils/routePipeline");
 
 const router = express.Router();
-const { datasetDetailsMiddleware } = require("../utils/validatorMiddlewares");
 
 /**
  * @swagger
@@ -40,17 +40,9 @@ const { datasetDetailsMiddleware } = require("../utils/validatorMiddlewares");
  */
 router.get(
   "/",
-  datasetDetailsMiddleware(),
-  cache.route(),
-  async (req, res, next) => {
-    let rows;
-    try {
-      rows = await getShapeQuery(req.query, false, true);
-    } catch (err) {
-      if (err.statusCode === 400)
-        return res.status(400).json({ error: err.message });
-      throw err;
-    }
+  ...pipeline({ checks: [check("datasetPKs").isInt()] }),
+  async (req, res) => {
+    const rows = await getShapeQuery(req.query, false, true);
     res.send(rows.pop());
   },
 );

@@ -139,11 +139,21 @@ app.use((req, res, next) => {
 // sees errors from middleware registered above it, and it reports 500s.
 Sentry.setupExpressErrorHandler(app);
 
-// error handler. JSON, and the stack only outside production — express's
-// default handler was answering every error with an HTML page containing the
-// full stack trace, because the res.render() above it threw first.
+// The one place a route error becomes a response. Routes throw (or let a
+// rejection escape — express-async-errors, required at the top of this file,
+// forwards it here) and this decides the status: `statusCode` is what
+// utils/dbFilter.js marks its client errors with, `status` is http-errors'
+// spelling, and anything unlabelled is a 500. Routes used to each re-shape the
+// same database error, in four different ways — 500, rethrow, next(err), and
+// /download answering 404 — with the `ScientificNameSelectionTooBroadError` ->
+// 400 block copy-pasted ten times.
+//
+// JSON, and the stack only outside production — express's default handler was
+// answering every error with an HTML page containing the full stack trace,
+// because the res.render() above it threw first.
 app.use((err, req, res, next) => {
-  const status = err.status || 500;
+  const status = err.statusCode || err.status || 500;
+  if (status >= 500) console.error(err);
   res.status(status).json({
     error: err.message || "Internal Server Error",
     ...(req.app.get("env") === "development" ? { stack: err.stack } : {}),

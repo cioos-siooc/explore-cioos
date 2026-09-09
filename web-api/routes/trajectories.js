@@ -3,8 +3,7 @@ const { check } = require("express-validator");
 
 const router = express.Router();
 const db = require("../db");
-const cache = require("../utils/cache");
-const { errorHandler } = require("../utils/validatorMiddlewares");
+const { pipeline } = require("../utils/routePipeline");
 
 // datasetPKs here is a single dataset's pk_url (same key the tile/filter
 // queries use — the plural name kept for consistency, but only one pk is
@@ -48,8 +47,7 @@ const trajectoryIdCheck = check("trajectoryId")
  */
 router.get(
   "/platforms",
-  [check("datasetPKs").isInt(), errorHandler],
-  cache.route(),
+  ...pipeline({ filters: false, checks: [check("datasetPKs").isInt()] }),
   async (req, res) => {
     const { datasetPKs } = req.query;
 
@@ -60,15 +58,10 @@ router.get(
       WHERE d.pk_url = :datasetPK
       ORDER BY s.trajectory_id`;
 
-    try {
-      const { rows } = await db.raw(SQL, {
-        datasetPK: parseInt(datasetPKs, 10),
-      });
-      res.send(rows);
-    } catch (e) {
-      console.error(e);
-      res.status(500).send({ error: e.toString() });
-    }
+    const { rows } = await db.raw(SQL, {
+      datasetPK: parseInt(datasetPKs, 10),
+    });
+    res.send(rows);
   },
 );
 
@@ -117,8 +110,10 @@ router.get(
  */
 router.get(
   "/track",
-  [check("datasetPKs").isInt(), trajectoryIdCheck, errorHandler],
-  cache.route(),
+  ...pipeline({
+    filters: false,
+    checks: [check("datasetPKs").isInt(), trajectoryIdCheck],
+  }),
   async (req, res) => {
     const { datasetPKs, trajectoryId } = req.query;
 
@@ -134,22 +129,17 @@ router.get(
         AND p.trajectory_id = :trajectoryId
       ORDER BY p.time`;
 
-    try {
-      const { rows } = await db.raw(SQL, {
-        datasetPK: parseInt(datasetPKs, 10),
-        trajectoryId,
-      });
-      res.send({
-        trajectory_id: trajectoryId,
-        n_points: rows.length,
-        coordinates: rows.map((r) => [r.longitude, r.latitude]),
-        times: rows.map((r) => r.time),
-        profile_ids: rows.map((r) => r.profile_id),
-      });
-    } catch (e) {
-      console.error(e);
-      res.status(500).send({ error: e.toString() });
-    }
+    const { rows } = await db.raw(SQL, {
+      datasetPK: parseInt(datasetPKs, 10),
+      trajectoryId,
+    });
+    res.send({
+      trajectory_id: trajectoryId,
+      n_points: rows.length,
+      coordinates: rows.map((r) => [r.longitude, r.latitude]),
+      times: rows.map((r) => r.time),
+      profile_ids: rows.map((r) => r.profile_id),
+    });
   },
 );
 

@@ -2,7 +2,7 @@ const express = require("express");
 
 const router = express.Router();
 const { getShapeQuery } = require("../utils/shapeQuery");
-const cache = require("../utils/cache");
+const { pipeline } = require("../utils/routePipeline");
 
 /**
  * /pointQuery
@@ -59,15 +59,7 @@ const cache = require("../utils/cache");
  *               items:
  *                 type: object
  */
-router.get("/", cache.route(), async (req, res, next) => {
-  let rows;
-  try {
-    rows = await getShapeQuery(req.query, false, false);
-  } catch (err) {
-    if (err.statusCode === 400)
-      return res.status(400).json({ error: err.message });
-    throw err;
-  }
-  res.send(rows);
+router.get("/", ...pipeline(), async (req, res) => {
+  res.send(await getShapeQuery(req.query, false, false));
 });
 module.exports = router;

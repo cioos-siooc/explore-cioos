@@ -9,10 +9,7 @@ const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { getShapeQuery } = require("../utils/shapeQuery");
 const { polygonJSONToWKT } = require("../utils/polygon");
-const {
-  requiredShapeMiddleware,
-  errorHandler,
-} = require("../utils/validatorMiddlewares");
+const { pipeline } = require("../utils/routePipeline");
 
 /**
  * /download
@@ -72,16 +69,21 @@ const {
  *       400:
  *         description: Validation error
  */
+// Not cached: this route enqueues a job, and a cached 200 would drop the
+// second identical request on the floor.
 router.get(
   "/",
-  requiredShapeMiddleware(),
-  // requiredShapeMiddleware ends in its OWN errorHandler, which runs before
-  // this check is even registered — so without the errorHandler below nothing
-  // ever calls validationResult for `email` and it reached cde.download_jobs
-  // unvalidated.
-  check("email").isEmail(),
-  errorHandler,
-  async (req, res, next) => {
+  ...pipeline({
+    shape: true,
+    // lang picks the language of the job's confirmation email and rides into
+    // cde.download_jobs as part of downloader_input.
+    checks: [
+      check("email").isEmail(),
+      check("lang").isIn(["en", "fr"]).optional(),
+    ],
+    cacheFor: null,
+  }),
+  async (req, res) => {
     const {
       timeMin,
       timeMax,
@@ -96,16 +98,8 @@ router.get(
       lang = "en",
     } = req.query;
 
-    let shapeQueryResponse;
-    let filters;
-    try {
-      shapeQueryResponse = await getShapeQuery(req.query, true, false);
-      filters = await createDBFilter(req.query);
-    } catch (err) {
-      if (err.statusCode === 400)
-        return res.status(400).json({ error: err.message });
-      throw err;
-    }
+    const shapeQueryResponse = await getShapeQuery(req.query, true, false);
+    const filters = await createDBFilter(req.query);
     const estimateTotalSize = shapeQueryResponse.reduce(
       (partialSum, { size }) => partialSum + size,
       0,
@@ -181,53 +175,47 @@ router.get(
         SELECT json_agg(t) FROM profiles_subset t;
       `;
 
-    try {
-      let count = 0;
-      const tileRaw = await db.raw(SQL, {
-        filters: filters.shared,
-        obisFilters: filters.obisOnly,
-        profileFilters: filters.profileOnly,
-      });
-      const tile = tileRaw.rows[0];
-      if (tile.json_agg && tile.json_agg.length) {
-        const jobID = uuidv4().substr(0, 6);
-        const downloaderInput = {
-          user_query: {
-            language: lang,
-            time_min: timeMin,
-            time_max: timeMax,
-            lat_min: Number.parseFloat(latMin),
-            lat_max: Number.parseFloat(latMax),
-            lon_min: Number.parseFloat(lonMin),
-            lon_max: Number.parseFloat(lonMax),
-            depth_min: Number.parseFloat(depthMin),
-            depth_max: Number.parseFloat(depthMax),
-            polygon_region: wktPolygon,
-            email,
-            job_id: jobID,
-          },
-          cache_filtered: tile.json_agg,
-        };
-        // add to the jobs queue
-
-        const downloadJobEntry = {
-          job_id: jobID,
+    let count = 0;
+    const tileRaw = await db.raw(SQL, {
+      filters: filters.shared,
+      obisFilters: filters.obisOnly,
+      profileFilters: filters.profileOnly,
+    });
+    const tile = tileRaw.rows[0];
+    if (tile.json_agg && tile.json_agg.length) {
+      const jobID = uuidv4().substr(0, 6);
+      const downloaderInput = {
+        user_query: {
+          language: lang,
+          time_min: timeMin,
+          time_max: timeMax,
+          lat_min: Number.parseFloat(latMin),
+          lat_max: Number.parseFloat(latMax),
+          lon_min: Number.parseFloat(lonMin),
+          lon_max: Number.parseFloat(lonMax),
+          depth_min: Number.parseFloat(depthMin),
+          depth_max: Number.parseFloat(depthMax),
+          polygon_region: wktPolygon,
           email,
-          downloader_input: downloaderInput,
-          estimate_details: JSON.stringify(shapeQueryResponse),
-          estimate_size: estimateTotalSize,
-        };
-        console.log(downloadJobEntry);
-        await db("cde.download_jobs").insert(downloadJobEntry);
+          job_id: jobID,
+        },
+        cache_filtered: tile.json_agg,
+      };
+      // add to the jobs queue
 
-        count = tile.json_agg.length;
-      }
-      res.send({ count });
-    } catch (e) {
-      res.status(404).send({
-        error: e.toString(),
-      });
+      const downloadJobEntry = {
+        job_id: jobID,
+        email,
+        downloader_input: downloaderInput,
+        estimate_details: JSON.stringify(shapeQueryResponse),
+        estimate_size: estimateTotalSize,
+      };
+      console.log(downloadJobEntry);
+      await db("cde.download_jobs").insert(downloadJobEntry);
+
+      count = tile.json_agg.length;
     }
+    res.send({ count });
   },
 );
 

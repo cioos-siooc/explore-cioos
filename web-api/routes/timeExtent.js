@@ -2,8 +2,7 @@ const express = require("express");
 
 const router = express.Router();
 const db = require("../db");
-const { validatorMiddleware } = require("../utils/validatorMiddlewares");
-const cache = require("../utils/cache");
+const { pipeline } = require("../utils/routePipeline");
 
 const createDBFilter = require("../utils/dbFilter");
 
@@ -60,23 +59,13 @@ const createDBFilter = require("../utils/dbFilter");
  *                 min: { type: string, format: date-time, nullable: true }
  *                 max: { type: string, format: date-time, nullable: true }
  */
-router.get("/", cache.route(), validatorMiddleware(), async (req, res) => {
+router.get("/", ...pipeline(), async (req, res) => {
   // Everything except the time filter. Dropping it here rather than asking
   // the caller not to send it keeps share links (which carry timeMin/timeMax)
   // working without the frontend having to strip them.
   const { timeMin, timeMax, ...queryWithoutTime } = req.query;
 
-  let filters;
-  try {
-    filters = await createDBFilter(queryWithoutTime);
-  } catch (err) {
-    if (err.statusCode === 400)
-      return res.status(400).json({ error: err.message });
-    // Rethrowing would reject the async handler, which Express 4 leaves
-    // unhandled — that kills the process, not just this request.
-    console.error(err);
-    return res.status(500).json({ error: err.toString() });
-  }
+  const filters = await createDBFilter(queryWithoutTime);
 
   const includeObis = req.query.includeObis !== "false";
   // Scientific-name filters are OBIS-only: hide profiles when set. An
@@ -130,17 +119,12 @@ router.get("/", cache.route(), validatorMiddleware(), async (req, res) => {
         SELECT min(time_min) AS min, max(time_max) AS max FROM matched
         `;
 
-  try {
-    const { rows } = await db.raw(sql, {
-      filters: filters.shared,
-      obisFilters: filters.obisOnly,
-      profileFilters: filters.profileOnly,
-    });
-    return res.send(rows[0] || { min: null, max: null });
-  } catch (e) {
-    console.error(e);
-    return res.status(500).send({ error: e.toString() });
-  }
+  const { rows } = await db.raw(sql, {
+    filters: filters.shared,
+    obisFilters: filters.obisOnly,
+    profileFilters: filters.profileOnly,
+  });
+  res.send(rows[0] || { min: null, max: null });
 });
 
 module.exports = router;

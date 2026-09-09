@@ -497,26 +497,61 @@ now split, was two specific call sites.
 - [ ] Still open, and belongs to P2.1/P2.3 rather than here: `dbFilter.js` returns `hasObisOnly` and
       `hasProfileOnly` with zero consumers, and the branch set is still written out five times.
 
-### P2.3 — Every route through the same shape `[Strong]`
+### P2.3 — Every route through the same shape — **DONE** (2026-09-08)
 
-`web-api/routes/*.js`, `utils/validatorMiddlewares.js`
+`web-api/utils/routePipeline.js` (was `validatorMiddlewares.js`), `utils/dataTypes.js`,
+`routes/*.js`, `app.js`
 
-- [ ] Each of the 20 routes reinvents the validate → filter → query → cache pipeline, and the stage
-      *order* differs: `/legend` and `/timeExtent` register cache **before** the validator, while
-      `/tiles` and `/datasetRecordsList` do the reverse.
-- [ ] Never validated on any route: `platforms`, `obisNodes`, `erddapServers`, `includeObis`,
-      `includeTrajectory`, `metric`, `profileTypes`, `trajectoryTypes`. Route `:params` are
-      unvalidated everywhere except `/nonna` — a non-numeric `z` reaches `ST_Expand(…, NaN)` → 500.
-- [ ] `validatorMiddlewares.js:9-11` claims `/pointQuery` is covered; it has no validation at all,
-      and neither do `/downloadEstimate` or `/griddapCoverage`, all three of which take the full filter set.
-- [ ] `requiredShapeMiddleware` is declared `(req,res,next)` but called with no arguments and returns
-      a module-level shared `router`; every invocation appends another copy of the stack to it.
-- [ ] Four different failure modes for the same DB error: 500, rethrow-to-`express-async-errors`,
-      `next(err)`, and **404** (`download.js:180-184`). The `ScientificNameSelectionTooBroadError`
-      → 400 block is copy-pasted **ten times**.
-- [ ] `/tiles/tracks` hand-picks six filter keys (`tiles.js:578-580`), silently dropping `polygon`,
-      the lat/lon envelope, depth, `pointPKs` and `scientificNames` — and applies `eovs` at
-      dataset level where the other branches apply it at feature level.
+- [x] **One assembly point, one stage order.** `utils/validatorMiddlewares.js` is now
+      `utils/routePipeline.js`, and `pipeline({filters, shape, tileParams, checks, cacheFor})`
+      returns the whole chain: validate → reject → cache → handler. Every route that had a
+      validator or a cache stage registers `...pipeline(...)` instead of hand-assembling one, so
+      the order cannot drift again. **The cache moved last on purpose**: apicache caches every
+      status code unless told otherwise, so `/legend` and `/timeExtent` registering it first meant
+      a 400 was stored under the request's key and replayed from there.
+- [x] **The eight never-validated params are validated.** `includeObis` / `includeTrajectory` are
+      `true|false`; `metric` is checked against `METRICS` (a *present* but unknown value is now a
+      400 rather than a silent fall back to `records`, which the caller could not detect);
+      `profileTypes` / `trajectoryTypes` are matched against the fixed cdm_data_type vocabulary,
+      with **empty accepted** — `profileTypes=` is how the map says "none of that geometry", which
+      is not the same as the param being absent. `platforms`, `obisNodes` and `erddapServers` are
+      length-capped only: their values are free text handed back by `/platforms`, `/obisNodes` and
+      `/erddapServers` verbatim (node titles, ERDDAP URLs), and all three are bound, never
+      interpolated — so size is the only thing worth bounding.
+- [x] **Route `:params` are validated.** `tileParamValidators` rejects a non-integer or
+      out-of-grid `z/x/y` — `GET /tiles/abc/1/1.mvt` was a 500 from `ST_TileEnvelope(NaN)` and is
+      now a 400. `/nonna` had its own copy of exactly this check; it now calls the shared one with
+      its lower `maxZoom`.
+- [x] `/pointQuery`, `/downloadEstimate` and `/griddapCoverage` take the full filter set and had
+      **no validation at all** (the stale comment claimed otherwise). All three go through
+      `pipeline()` now.
+- [x] `requiredShapeMiddleware`'s module-level `router` is gone — `pipeline()` returns a fresh
+      array on every call, pinned by a test.
+- [x] **One failure mode.** The `statusCode === 400` re-shaping block (ten copies), the two
+      `console.error` + 500 blocks, the eight `catch (err) { next(err) }` wrappers and
+      `/download`'s **404-on-DB-error** are all deleted. Routes throw;
+      `express-async-errors` (already required first in `app.js`) forwards it; `app.js`'s handler
+      reads `err.statusCode || err.status || 500` and logs 5xx. Verified by probe that a 2-arity
+      `async (req, res)` handler's rejection reaches the handler with no unhandled rejection —
+      the "Express 4 leaves this unhandled, it kills the process" comments in `legend.js` and
+      `timeExtent.js` predated that require and were no longer true.
+- [x] **`/tiles/tracks` no longer hand-picks six filter keys.** It now passes the whole query to
+      `createDBFilter` minus `depthMin`/`depthMax`/`pointPKs` — the only two fragments
+      `cde.trajectory_track_stats` has no column to answer — and its `cand` CTE exposes the track's
+      summary `bbox` as `search_geom` plus the dataset columns the filter references (the same
+      aliasing trick `griddapCoverage.js` already uses), so **the polygon and the lat/lon rectangle
+      apply where they were silently dropped**. `scientificNames` (and an OBIS-node-only selection)
+      now hides the layer wholesale like every other ERDDAP branch, instead of leaving every track
+      drawn over an OBIS-only map. Verified live: a rectangle over the South Pacific returns an
+      empty tile where the unfiltered one is 633 kB, one over Nova Scotia 561 kB.
+- [x] **Not a defect: `eovs` at dataset level here is deliberate.** `dbFilter.js:117-122` already
+      records why — track stats cannot answer a feature-level EOV, so it stays dataset-level along
+      with obis_cells, trajectory cells and the griddap pseudo-branch. Unchanged.
+- [x] The cdm_data_type vocabulary and its comma-list parsing moved out of `tiles.js` into
+      `utils/dataTypes.js`, because the validator needs the same set the branch SQL inlines from.
+- [x] Tests: `utils/routePipeline.test.js` (9) — stage order, the fresh-array guarantee, each
+      newly-validated param, tile coordinates, the empty-type-list selection, and the
+      throw-with-`statusCode` contract. **47 pass**, up from 38.
 
 ### P2.4 — A neutral module under the Python tree `[Strong]`
 

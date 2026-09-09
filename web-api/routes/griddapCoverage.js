@@ -3,7 +3,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
-const cache = require("../utils/cache");
+const { pipeline } = require("../utils/routePipeline");
 
 /**
  * /griddapCoverage
@@ -31,7 +31,7 @@ const cache = require("../utils/cache");
  *             schema:
  *               type: object
  */
-router.get("/", cache.route(), async (req, res, next) => {
+router.get("/", ...pipeline(), async (req, res) => {
   const { scientificNames, obisNodes, erddapServers } = req.query;
   // Same gating as shapeQuery's includeProfiles: scientific-name filters and
   // OBIS-node-only selections hide ERDDAP data, and griddap is ERDDAP-only.
@@ -41,14 +41,7 @@ router.get("/", cache.route(), async (req, res, next) => {
     return res.send({ type: "FeatureCollection", features: [] });
   }
 
-  let filters;
-  try {
-    filters = await createDBFilter(req.query);
-  } catch (err) {
-    if (err.statusCode === 400)
-      return res.status(400).json({ error: err.message });
-    throw err;
-  }
+  const filters = await createDBFilter(req.query);
 
   // The CTE aliases the coverage_* columns back to the names dbFilter's
   // unqualified predicates expect (time_min, depth_min, point_pk,

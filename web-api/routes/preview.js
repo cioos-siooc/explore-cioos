@@ -1,6 +1,5 @@
 const express = require("express");
-// helps with async error handling in express < v5
-require("express-async-errors");
+const { check } = require("express-validator");
 const Sentry = require("@sentry/node");
 
 /**
@@ -29,7 +28,7 @@ const Sentry = require("@sentry/node");
 const router = express.Router();
 const axios = require("axios");
 const db = require("../db");
-const { validatorMiddleware } = require("../utils/validatorMiddlewares");
+const { pipeline } = require("../utils/routePipeline");
 
 /*
  * /preview
@@ -38,10 +37,21 @@ const { validatorMiddleware } = require("../utils/validatorMiddlewares");
  * TODO: How will this work with timeseries profiles?
  */
 
-router.get("/", validatorMiddleware(), async (req, res, next) => {
-  const NUM_RECORDS = 1000;
-  const { dataset, profile } = req.query;
-  const sql = `WITH step1 AS (
+// dataset and profile are the only params this route reads; the shared
+// filter set does not apply to it. Both are bound into the query below, so the
+// caps are about size, not injection. Not cached: it proxies ERDDAP, which
+// answers with whatever it has now.
+router.get(
+  "/",
+  ...pipeline({
+    filters: false,
+    cacheFor: null,
+    checks: [check(["dataset", "profile"]).isLength({ max: 256 })],
+  }),
+  async (req, res) => {
+    const NUM_RECORDS = 1000;
+    const { dataset, profile } = req.query;
+    const sql = `WITH step1 AS (
                SELECT d.dataset_id,
                       d.first_eov_column,
                       COALESCE(d.timeseries_id_variable,d.profile_id_variable) profile_variable,
@@ -78,44 +88,45 @@ router.get("/", validatorMiddleware(), async (req, res, next) => {
                 FROM   step2
                 WHERE  profile=:profile
                 AND    dataset_id=:dataset`;
-  const q = db.raw(sql, { profile, dataset, NUM_RECORDS });
-  const rows = await q;
+    const q = db.raw(sql, { profile, dataset, NUM_RECORDS });
+    const rows = await q;
 
-  if (!rows.rows?.length) {
-    throw new Error("No datasets found");
-  }
-
-  const {
-    profile_variable,
-    dataset_id,
-    erddap_url,
-    profile_id,
-    time_max,
-    new_start_time,
-    use_whole_profile,
-  } = rows.rows[0];
-
-  let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?&${profile_variable}=~"${profile_id}"`;
-  if (!use_whole_profile) {
-    // putting timeMax in case many new records were added since the profile was harvested
-    erddapQuery += `&time>${new_start_time}&time<${time_max}`;
-  }
-
-  console.log("Fetching preview from ", erddapQuery);
-  try {
-    const { data } = await axios.get(erddapQuery);
-    console.log("FOUND ", data.table?.rows?.length, " ROWS", erddapQuery);
-    data.table.rows = data.table.rows.slice(0, 1000);
-    res.send(data);
-  } catch (error) {
-    if (error.response) {
-      console.error(error.response);
-      Sentry.captureMessage("No preview data found", {
-        extra: { erddapQuery },
-      });
+    if (!rows.rows?.length) {
+      throw new Error("No datasets found");
     }
-    res.send([]);
-  }
-});
+
+    const {
+      profile_variable,
+      dataset_id,
+      erddap_url,
+      profile_id,
+      time_max,
+      new_start_time,
+      use_whole_profile,
+    } = rows.rows[0];
+
+    let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?&${profile_variable}=~"${profile_id}"`;
+    if (!use_whole_profile) {
+      // putting timeMax in case many new records were added since the profile was harvested
+      erddapQuery += `&time>${new_start_time}&time<${time_max}`;
+    }
+
+    console.log("Fetching preview from ", erddapQuery);
+    try {
+      const { data } = await axios.get(erddapQuery);
+      console.log("FOUND ", data.table?.rows?.length, " ROWS", erddapQuery);
+      data.table.rows = data.table.rows.slice(0, 1000);
+      res.send(data);
+    } catch (error) {
+      if (error.response) {
+        console.error(error.response);
+        Sentry.captureMessage("No preview data found", {
+          extra: { erddapQuery },
+        });
+      }
+      res.send([]);
+    }
+  },
+);
 
 module.exports = router;

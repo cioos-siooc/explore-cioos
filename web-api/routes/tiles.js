@@ -4,8 +4,13 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
-const { validatorMiddleware } = require("../utils/validatorMiddlewares");
-const cache = require("../utils/cache");
+const { pipeline } = require("../utils/routePipeline");
+const {
+  ALL_PROFILE_TYPES,
+  ALL_TRAJECTORY_TYPES,
+  requestedProfileTypes,
+  requestedTrajectoryTypes,
+} = require("../utils/dataTypes");
 const {
   parseMetric,
   metricValueExpr,
@@ -49,21 +54,6 @@ function tileCellPrefilter(z) {
   const tileWidthM = 40075016.686 / 2 ** zi;
   const expandM = Math.ceil(Math.max(tileWidthM * 0.25, hexDiameterM));
   return `geom && ST_Expand(ST_TileEnvelope(:z, :x, :y), ${expandM})`;
-}
-
-// The cdm_data_types that share cde.trajectory_hexes / cde.trajectory_points.
-// They are separate layers in the map's geometry selector, so the routes below
-// take a trajectoryTypes param that works exactly like profileTypes: absent =
-// both (pre-split behaviour, and what any older client sends), a comma list =
-// only those, empty = neither. Values are matched against this fixed set, which
-// is what makes them safe to inline into the branch SQL.
-const ALL_TRAJECTORY_TYPES = ["Trajectory", "TrajectoryProfile"];
-
-function requestedTrajectoryTypes(query) {
-  if (query.trajectoryTypes === undefined) return ALL_TRAJECTORY_TYPES;
-  return String(query.trajectoryTypes)
-    .split(",")
-    .filter((t) => ALL_TRAJECTORY_TYPES.includes(t));
 }
 
 // A predicate restricting a trajectory table to the requested types, or '' when
@@ -131,19 +121,11 @@ function trajectoryTypePredicate(types) {
 /* Retreive a vector tile by tileid */
 router.get(
   "/:z/:x/:y.mvt",
-  validatorMiddleware(),
-  cache.route(),
+  ...pipeline({ tileParams: {} }),
   async (req, res) => {
     const { z, x, y } = req.params;
 
-    let filters;
-    try {
-      filters = await createDBFilter(req.query);
-    } catch (err) {
-      if (err.statusCode === 400)
-        return res.status(400).json({ error: err.message });
-      throw err;
-    }
+    const filters = await createDBFilter(req.query);
 
     // zoom levels: 0-4,5-6,7+
     const isHexGrid = z < 7;
@@ -161,18 +143,11 @@ router.get(
     // same metric must reach /legend, or the ramp domain won't match the tiles.
     const metric = parseMetric(req.query.metric);
     // Data-type layer toggle (map layer selector). Trajectories: an explicit
-    // includeTrajectory=false hides them. Profiles: the profileTypes param is
-    // the comma list of cdm_data_types to show (Profile / TimeSeries /
-    // TimeSeriesProfile — all three share cde.profiles); absent = all three
-    // (pre-toggle behaviour), empty = none. Values are validated against the
-    // fixed set below so they can be inlined into the branch SQL safely.
-    const ALL_PROFILE_TYPES = ["Profile", "TimeSeries", "TimeSeriesProfile"];
-    const profileTypes =
-      req.query.profileTypes === undefined
-        ? ALL_PROFILE_TYPES
-        : String(req.query.profileTypes)
-            .split(",")
-            .filter((t) => ALL_PROFILE_TYPES.includes(t));
+    // includeTrajectory=false hides them. Profiles: the profileTypes comma
+    // list names the cdm_data_types to show — see utils/dataTypes.js, which
+    // owns the vocabulary the values are matched against (that match is what
+    // makes them safe to inline into the branch SQL below).
+    const profileTypes = requestedProfileTypes(req.query);
     const trajectoryToggledOn = req.query.includeTrajectory !== "false";
     const trajectoryTypes = requestedTrajectoryTypes(req.query);
     // ERDDAP-sourced data (profiles + trajectory coverage) is hidden wholesale
@@ -297,28 +272,18 @@ router.get(
     SELECT ST_AsMVT(mvtgeom.*, 'internal-layer-name', 4096, 'geom') AS st_asmvt from mvtgeom;
   `;
 
-    try {
-      const q = db.raw(SQL, {
-        filters: filters.shared,
-        obisFilters: filters.obisOnly,
-        profileFilters: filters.profileOnly,
-        zoomPKColumn,
-        z,
-        x,
-        y,
-      });
+    const tileRaw = await db.raw(SQL, {
+      filters: filters.shared,
+      obisFilters: filters.obisOnly,
+      profileFilters: filters.profileOnly,
+      zoomPKColumn,
+      z,
+      x,
+      y,
+    });
 
-      const tileRaw = await q;
-      const tile = tileRaw.rows[0];
-
-      res.setHeader("Content-Type", "application/x-protobuf");
-      res.status(200).send(tile.st_asmvt);
-    } catch (e) {
-      console.error(e);
-      res.status(500).send({
-        error: e.toString(),
-      });
-    }
+    res.setHeader("Content-Type", "application/x-protobuf");
+    res.status(200).send(tileRaw.rows[0].st_asmvt);
   },
 );
 
@@ -377,19 +342,11 @@ router.get(
 /* Trajectory + OBIS coverage cells, always rendered as hexagons regardless of zoom */
 router.get(
   "/cells/:z/:x/:y.mvt",
-  validatorMiddleware(),
-  cache.route(),
+  ...pipeline({ tileParams: {} }),
   async (req, res) => {
     const { z, x, y } = req.params;
 
-    let filters;
-    try {
-      filters = await createDBFilter(req.query);
-    } catch (err) {
-      if (err.statusCode === 400)
-        return res.status(400).json({ error: err.message });
-      throw err;
-    }
+    const filters = await createDBFilter(req.query);
 
     // Only two hex grids exist (hex_0 for z<5, hex_1 for z>=5); hex_1 is
     // reused uncapped past zoom 6 so coverage cells never become points.
@@ -493,27 +450,17 @@ router.get(
     SELECT ST_AsMVT(mvtgeom.*, 'coverage-hexes-layer', 4096, 'geom') AS st_asmvt from mvtgeom;
   `;
 
-    try {
-      const q = db.raw(SQL, {
-        filters: filters.shared,
-        obisFilters: filters.obisOnly,
-        zoomPKColumn,
-        z,
-        x,
-        y,
-      });
+    const tileRaw = await db.raw(SQL, {
+      filters: filters.shared,
+      obisFilters: filters.obisOnly,
+      zoomPKColumn,
+      z,
+      x,
+      y,
+    });
 
-      const tileRaw = await q;
-      const tile = tileRaw.rows[0];
-
-      res.setHeader("Content-Type", "application/x-protobuf");
-      res.status(200).send(tile.st_asmvt);
-    } catch (e) {
-      console.error(e);
-      res.status(500).send({
-        error: e.toString(),
-      });
-    }
+    res.setHeader("Content-Type", "application/x-protobuf");
+    res.status(200).send(tileRaw.rows[0].st_asmvt);
   },
 );
 
@@ -569,11 +516,11 @@ router.get(
 /* Trajectory track lines + head positions from cde.trajectory_points */
 router.get(
   "/tracks/:z/:x/:y.mvt",
-  validatorMiddleware(),
-  // `binary` is not an apicache option: passing an object here landed in
-  // cache.route's `duration` slot, so apicache fell back to its own 1-hour
-  // default instead of the 5 minutes the other tile routes use.
-  cache.route(),
+  // The cache duration is the shared default, like the other two tile routes.
+  // It used to be spelled `cache.route({ binary: true })` — not an apicache
+  // option, and the object landed in its `duration` slot, so apicache fell
+  // back to its own 1-hour default. Nothing here can pass one by accident now.
+  ...pipeline({ tileParams: {} }),
   async (req, res) => {
     const { z, x, y } = req.params;
     const { timeMin, timeMax } = req.query;
@@ -583,31 +530,25 @@ router.get(
     if (!timeMin || !timeMax) {
       return res
         .status(400)
-        .json({ error: "timeMin and timeMax are required for track tiles" });
+        .json({ errors: ["timeMin and timeMax are required for track tiles"] });
     }
 
-    // Only dataset-level filters apply here. The shared filter's per-point
-    // fragments (depth_min/max, lat/lon bounds, polygon-on-geom, pointPKs,
-    // and its OWN time fragments which target time_min/time_max columns)
-    // reference columns cde.trajectory_track_stats doesn't have — the time
-    // window is bound explicitly below instead.
-    const datasetLevelQuery = {};
-    [
-      "eovs",
-      "platforms",
-      "datasetPKs",
-      "organizations",
-      "obisNodes",
-      "erddapServers",
-    ].forEach((k) => {
-      if (req.query[k]) datasetLevelQuery[k] = req.query[k];
-    });
-
+    // Tracks are ERDDAP data, so the OBIS-only modes hide them wholesale —
+    // same gate as the hex, cell, legend and shape queries. This route used to
+    // hand-pick six filter keys, which dropped scientificNames on the floor:
+    // a taxon selection left every track drawn over an otherwise OBIS-only map.
+    const erddapVisible =
+      !req.query.scientificNames &&
+      (!req.query.obisNodes || Boolean(req.query.erddapServers));
     // Track lines are drawn for whichever trajectory geometries are switched
     // on. With neither on the client stops asking for this layer at all, but
     // answer honestly rather than serving every track if a request arrives.
     const trajectoryTypes = requestedTrajectoryTypes(req.query);
-    if (!trajectoryTypes.length) {
+    if (
+      !erddapVisible ||
+      !trajectoryTypes.length ||
+      req.query.includeTrajectory === "false"
+    ) {
       return res.status(204).send();
     }
     // The cand CTE already joins cde.datasets, so the type test rides along
@@ -617,14 +558,14 @@ router.get(
         ? ` AND d.cdm_data_type IN (${trajectoryTypes.map((t) => `'${t}'`).join(",")})`
         : "";
 
-    let filters;
-    try {
-      filters = await createDBFilter(datasetLevelQuery);
-    } catch (err) {
-      if (err.statusCode === 400)
-        return res.status(400).json({ error: err.message });
-      throw err;
-    }
+    // Everything except the two fragments cde.trajectory_track_stats has no
+    // column to answer: depth (tracks carry no depth extent) and pointPKs (a
+    // profile-level key). The rest — including the polygon and the lat/lon
+    // rectangle, which this route used to drop silently — applies against the
+    // per-trajectory summary row, which the `cand` CTE exposes under the names
+    // the shared filter is written in (see below).
+    const { depthMin, depthMax, pointPKs, ...trackQuery } = req.query;
+    const filters = await createDBFilter(trackQuery);
 
     // Correctness invariant: lines are assembled from the FULL time window
     // with no per-point spatial predicate — a segment can cross a tile that
@@ -634,7 +575,15 @@ router.get(
     // ST_AsMVTGeom does the actual clipping with its built-in buffer.
     const SQL = `
   WITH te AS (SELECT ST_TileEnvelope(:z, :x, :y) tile_envelope),
-    cand AS (
+    -- The shared filter is written against the profile column names, so the
+    -- candidate row carries them: the track's summary bbox stands in for
+    -- search_geom (the spatial predicates are ST_Intersects against an extent
+    -- either way), and the dataset columns the filter may reference ride along
+    -- under the alias d that it qualifies pk_url/obis_nodes/erddap_url with.
+    -- Selected here rather than in the outer WHERE because a SELECT alias is
+    -- not visible to its own WHERE; the subquery has no LIMIT or grouping, so
+    -- the planner flattens it and the bbox GiST index is still used.
+    cand_rows AS (
       -- gap_secs: per-trajectory time-gap split threshold — 4x the
       -- trajectory's MEDIAN inter-fix gap (its typical reporting cadence,
       -- robust to idle periods; the mean fallback covers pre-migration NULL
@@ -645,10 +594,13 @@ router.get(
       -- The threshold lives in SQL (trajectory_gap_secs, 4_create_hexes.sql)
       -- because the hex coverage sweep applies the same one: a chord this
       -- route refuses to draw must not light hexes either.
-      SELECT s.dataset_pk, s.trajectory_id,
+      SELECT s.dataset_pk, s.trajectory_id, s.time_min, s.time_max,
+             s.bbox AS search_geom,
              trajectory_gap_secs(
                s.median_gap_secs, s.time_min, s.time_max, s.n_points
-             ) AS gap_secs
+             ) AS gap_secs,
+             d.pk_url, d.eovs, d.platform, d.organization_pks,
+             d.obis_nodes, d.erddap_url
       FROM cde.trajectory_track_stats s
       JOIN cde.datasets d ON d.pk = s.dataset_pk, te
       WHERE s.bbox && ST_Expand(
@@ -658,10 +610,14 @@ router.get(
         AND s.time_max >= :timeMin::timestamptz
         AND s.time_min <= :timeMax::timestamptz
         ${trackTypeFilter}
-        ${filters.hasShared ? "AND :filters" : ""}
+    ),
+    cand AS (
+      SELECT dataset_pk, trajectory_id, gap_secs
+      FROM cand_rows d
+      ${filters.hasShared ? "WHERE :filters" : ""}
       -- Cap per tile (see TRACKS_MAX_PER_TILE): keep the most recently-active
       -- trajectories; tie-break on the pk for deterministic, cache-stable tiles.
-      ORDER BY s.time_max DESC, s.dataset_pk, s.trajectory_id
+      ORDER BY time_max DESC, dataset_pk, trajectory_id
       LIMIT :maxTracksPerTile
     ),
     pts AS (
@@ -777,28 +733,18 @@ router.get(
         AS st_asmvt;
   `;
 
-    try {
-      const q = db.raw(SQL, {
-        filters: filters.shared,
-        timeMin,
-        timeMax,
-        maxTracksPerTile: TRACKS_MAX_PER_TILE,
-        z,
-        x,
-        y,
-      });
+    const tileRaw = await db.raw(SQL, {
+      filters: filters.shared,
+      timeMin,
+      timeMax,
+      maxTracksPerTile: TRACKS_MAX_PER_TILE,
+      z,
+      x,
+      y,
+    });
 
-      const tileRaw = await q;
-      const tile = tileRaw.rows[0];
-
-      res.setHeader("Content-Type", "application/x-protobuf");
-      res.status(200).send(tile.st_asmvt);
-    } catch (e) {
-      console.error(e);
-      res.status(500).send({
-        error: e.toString(),
-      });
-    }
+    res.setHeader("Content-Type", "application/x-protobuf");
+    res.status(200).send(tileRaw.rows[0].st_asmvt);
   },
 );
 

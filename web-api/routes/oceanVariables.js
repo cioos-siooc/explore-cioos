@@ -2,7 +2,7 @@ const express = require("express");
 
 const router = express.Router();
 const db = require("../db");
-const cache = require("../utils/cache");
+const { pipeline } = require("../utils/routePipeline");
 
 /**
  * @swagger
@@ -28,14 +28,18 @@ const cache = require("../utils/cache");
  *
  * */
 
-router.get("/", cache.route(), async (req, res, next) => {
-  res.send(
-    (
-      await db.raw(
-        "SELECT DISTINCT UNNEST(eovs) ocean_variables FROM cde.datasets",
-      )
-    ).rows.map((e) => e.ocean_variables),
-  );
-});
+router.get(
+  "/",
+  ...pipeline({ filters: false, cacheFor: "5 minutes" }),
+  async (req, res) => {
+    res.send(
+      (
+        await db.raw(
+          "SELECT DISTINCT UNNEST(eovs) ocean_variables FROM cde.datasets",
+        )
+      ).rows.map((e) => e.ocean_variables),
+    );
+  },
+);
 
 module.exports = router;
