@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from "react";
 
 // useState for a UI preference the user sets once and expects to find again (the
 // map's layer switches, the projection, what the hex ramp counts), kept under a
@@ -8,23 +8,23 @@ import { useEffect, useState } from 'react'
 // Storage is best-effort: private-mode Safari and blocked third-party storage
 // both throw on access, and a preference is never worth crashing the app over,
 // so failures fall back to the in-memory default.
-const PREFIX = 'cde.'
+const PREFIX = "cde.";
 
-function read (key, fallback) {
+function read(key, fallback) {
   try {
-    const stored = window.localStorage.getItem(PREFIX + key)
-    return stored === null ? fallback : JSON.parse(stored)
+    const stored = window.localStorage.getItem(PREFIX + key);
+    return stored === null ? fallback : JSON.parse(stored);
   } catch (error) {
-    console.warn(`could not read ${key} from localStorage:`, error)
-    return fallback
+    console.warn(`could not read ${key} from localStorage:`, error);
+    return fallback;
   }
 }
 
-function persist (key, value) {
+function persist(key, value) {
   try {
-    window.localStorage.setItem(PREFIX + key, JSON.stringify(value))
+    window.localStorage.setItem(PREFIX + key, JSON.stringify(value));
   } catch (error) {
-    console.warn(`could not persist ${key} to localStorage:`, error)
+    console.warn(`could not persist ${key} to localStorage:`, error);
   }
 }
 
@@ -41,15 +41,15 @@ function persist (key, value) {
 //
 // There was a plain localStorage-only variant of this alongside it. Every
 // preference the map has is shareable now, so it had no callers left.
-export function useUrlSeededPersistentState (key, param, defaultValue, parse) {
+export function useUrlSeededPersistentState(key, param, defaultValue, parse) {
   const [value, setValue] = useState(() => {
-    const raw = new URL(window.location.href).searchParams.get(param)
-    return raw === null ? read(key, defaultValue) : parse(raw)
-  })
+    const raw = new URL(window.location.href).searchParams.get(param);
+    return raw === null ? read(key, defaultValue) : parse(raw);
+  });
 
   useEffect(() => {
-    persist(key, value)
-  }, [key, value])
+    persist(key, value);
+  }, [key, value]);
 
-  return [value, setValue]
+  return [value, setValue];
 }

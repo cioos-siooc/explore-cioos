@@ -67,6 +67,8 @@ The production build will be generated in the `dist` folder.
 
 **Note**: The `API_URL` environment variable must be set at build time as it gets embedded into the bundle via Vite's `define` option.
 
+**Sentry**: `SENTRY_DSN` (a build-time `define` value) both points the browser SDK at a project and switches it on — leave it empty and Sentry is inert. It is the same variable web-api uses, so one value covers both, but web-api reads it at runtime while this is embedded at build time: changing it needs a frontend rebuild, and the value is public in the shipped bundle.
+
 **Sentry tracing**: `SENTRY_TRACES_SAMPLE_RATE` (also a build-time `define` value, `0.0`–`1.0`) controls the fraction of transactions Sentry traces. It is optional and defaults to `1.0` in development and `0.1` in production. Because it is embedded at build time, override it on the build command (e.g. `SENTRY_TRACES_SAMPLE_RATE=1.0 npm run build`) — not at runtime.
 
 To inspect bundle composition, run `npm run build:analyze` — it writes and opens `dist/stats.html`.

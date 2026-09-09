@@ -67,10 +67,7 @@ def extract_variables(df_variables, names=None):
 
     variables = []
     for name in names:
-        if name in df_variables.index:
-            row = df_variables.loc[name]
-        else:
-            row = {}
+        row = df_variables.loc[name] if name in df_variables.index else {}
         variable = {"name": name, "type": _clean(row.get("type"))}
         for attribute in PERSISTED_VARIABLE_ATTRIBUTES:
             variable[attribute] = _clean(row.get(attribute))

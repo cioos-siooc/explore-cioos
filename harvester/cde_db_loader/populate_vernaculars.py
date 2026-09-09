@@ -3,7 +3,7 @@
 import sys
 import warnings
 
-from cde_harvester.loading.populate_vernaculars import (  # noqa: F401 — re-exported
+from cde_harvester.loading.populate_vernaculars import (
     logger,
     main,
 )

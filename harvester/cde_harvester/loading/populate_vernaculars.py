@@ -417,7 +417,7 @@ def process_chunk(
     # Split into immediate misses (no AphiaID) and pending taxon-data fetches.
     results: list[TaxonResult] = []
     pending = []
-    for name, (aid, rank) in zip(names, matches):
+    for name, (aid, rank) in zip(names, matches, strict=True):
         if aid is None:
             results.append(TaxonResult(name, None, None, [], [], [], STATUS_NOT_FOUND))
         else:

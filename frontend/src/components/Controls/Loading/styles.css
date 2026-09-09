@@ -12,6 +12,7 @@
   align-items: center;
   justify-content: center;
   background-color: var(--cioos-scrim);
+
   /* For the inline variant's bare mark: the stacked logo colours its own
      parts. Both its mesh and its dots take currentColor. */
   color: var(--cioos-primary);
@@ -29,7 +30,7 @@
    since this splash is already naming the same waits. */
 .loading-brand {
   z-index: var(--cioos-z-splash, 32);
-  background-color: var(--cioos-scrim-soft, rgba(238, 246, 244, 0.55));
+  background-color: var(--cioos-scrim-soft, rgb(238 246 244 / 55%));
   transition: opacity 0.6s ease-out;
 }
 
@@ -68,6 +69,7 @@
   top: calc(100% + var(--cioos-space-md, 12px));
   left: 50%;
   transform: translateX(-50%);
+
   /* Shrink-wrap the rows rather than inherit the anchor's width, which is the
      logo's — a long label would otherwise wrap inside the wordmark's column. */
   width: max-content;

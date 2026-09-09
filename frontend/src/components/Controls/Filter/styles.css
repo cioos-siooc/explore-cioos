@@ -17,7 +17,9 @@
   color: var(--cioos-ink);
   font: inherit;
   font-weight: 500;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 /* Active filter: teal-light fill + a thin primary ring so an applied
@@ -53,7 +55,7 @@
 }
 
 .filterHeader > * {
-  margin: 0px 5px;
+  margin: 0 5px;
   height: 28px;
 }
 
@@ -87,7 +89,7 @@
   pointer-events: all;
   position: absolute;
   top: 48px;
-  left: 0px;
+  left: 0;
   z-index: 10;
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
@@ -107,10 +109,12 @@
   border: 1px solid var(--cioos-primary);
   border-radius: var(--cioos-radius-pill);
   padding: 0 14px;
-  margin: 5px 5px;
+  margin: 5px;
   height: 30px;
   font-weight: 600;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .filterOptionsActions button:hover {
@@ -129,6 +133,7 @@
   width: 100%;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-sm);
+
   /* Trailing room reserved for the clear button, so long search terms run
      behind it rather than under it. */
   padding: 6px 42px 6px 10px;
@@ -174,7 +179,7 @@
   position: absolute;
   border-radius: var(--cioos-radius-sm);
   height: 30px;
-  width: 60;
+  width: 60px;
   bottom: 16px;
   right: 8px;
 }
@@ -184,7 +189,7 @@
 }
 
 .filterInfoButton svg {
-  margin: 6px 7px 7px 7px;
+  margin: 6px 7px 7px;
 }
 
 .obisIcon {
@@ -205,6 +210,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+
   /* No minimum width: the Filters pane owns the width and zeroes the one the
      filter bodies used to bring with them (see .filterOptionsBody > * in the
      panel stylesheet), so asking for one here only reads as a promise it
@@ -230,6 +236,7 @@
 
 .filterRangeLabel {
   flex: 0 0 auto;
+
   /* Holds the longest of the names in either locale ("Profondeur min. (m)")
      without wrapping, so every field starts at the same x — in the Depth
      filter and in the Time filter above it alike. */
@@ -312,6 +319,7 @@
 @media (max-width: 700px) {
   .filterSearch {
     min-height: 44px;
+
     /* Deliberately not a --cioos-font-size-* token: this is iOS's zoom
        threshold, not a step on the type scale, and must not move with it. */
     font-size: 16px;

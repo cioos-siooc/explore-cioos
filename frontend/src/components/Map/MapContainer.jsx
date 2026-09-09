@@ -1,17 +1,17 @@
-import * as React from 'react'
+import * as React from "react";
 
-import Map from './Map.jsx'
-import { server } from '../../config'
-import fetchJson from '../../state/fetchJson.js'
-import reportError from '../../state/reportError.js'
-import { useFilters } from '../../state/filters/FilterProvider.jsx'
-import { useMapState } from '../../state/map/MapStateProvider.jsx'
-import { useSelection } from '../../state/selection/SelectionProvider.jsx'
+import Map from "./Map.jsx";
+import { server } from "../../config";
+import fetchJson from "../../state/fetchJson.js";
+import reportError from "../../state/reportError.js";
+import { useFilters } from "../../state/filters/FilterProvider.jsx";
+import { useMapState } from "../../state/map/MapStateProvider.jsx";
+import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 
 // Single adapter between the state providers and the imperative Map
 // component — Map.js keeps its prop-based interface untouched.
-export default function MapContainer () {
-  const { setDatasetsSelected } = useFilters()
+export default function MapContainer() {
+  const { setDatasetsSelected } = useFilters();
   const {
     mapQueryString,
     setLoading,
@@ -29,15 +29,15 @@ export default function MapContainer () {
     projection,
     zoomTarget,
     drawRequest,
-    mapRef,
+    setMapInstance,
     featureQuery,
     setFeatureQuery,
     sharedFeatureQueryAt,
     tracksMode,
     debouncedScrubTime,
     trailingDays,
-    dataLayers
-  } = useMapState()
+    dataLayers,
+  } = useMapState();
   const {
     polygon,
     setPolygon,
@@ -52,8 +52,8 @@ export default function MapContainer () {
     selectedTrajectory,
     selectTrajectoryFromMap,
     pointsData,
-    combinedQueries
-  } = useSelection()
+    combinedQueries,
+  } = useSelection();
 
   // The generic click path (a hex, a coverage cell, a track, a grid, or a
   // cluster of markers too ambiguous for onMarkerClick below) reports what it
@@ -67,9 +67,9 @@ export default function MapContainer () {
   // while the list is already showing would spam browser history for
   // nothing.
   const handleFeatureQuery = (query) => {
-    if (query && inspectDataset) returnToDatasetList()
-    setFeatureQuery(query)
-  }
+    if (query && inspectDataset) returnToDatasetList();
+    setFeatureQuery(query);
+  };
 
   // A click that landed on exactly one marker naming exactly one dataset (see
   // Map.jsx's handleMapClick) — unambiguous enough to skip the "what's here"
@@ -86,8 +86,8 @@ export default function MapContainer () {
   // Only a single matching record gets highlighted; more than one is
   // genuinely ambiguous and is left for the record list itself to browse.
   const onMarkerClick = async (datasetPk, pointPk) => {
-    const row = pointsData.find((point) => Number(point.pk) === datasetPk)
-    if (!row) return
+    const row = pointsData.find((point) => Number(point.pk) === datasetPk);
+    if (!row) return;
     // A second marker click resets the page for the new one rather than
     // stacking on top of whatever the previous click left behind: any
     // preview the user opened from it closes (it would otherwise show a
@@ -98,25 +98,25 @@ export default function MapContainer () {
     // navigation entry is replaced rather than pushed, so browsing several
     // stations by clicking around the map doesn't turn "Back" into a
     // step-by-step replay of every marker visited.
-    setShowPreviewModal(false)
-    setInspectRecordID(undefined)
-    setHighlightedRecord(undefined)
-    setInspectDataset(row, { replace: true })
+    setShowPreviewModal(false);
+    setInspectRecordID(undefined);
+    setHighlightedRecord(undefined);
+    setInspectDataset(row, { replace: true });
     try {
-      const params = new URLSearchParams(combinedQueries)
-      params.set('datasetPKs', datasetPk)
-      params.set('pointPKs', pointPk)
+      const params = new URLSearchParams(combinedQueries);
+      params.set("datasetPKs", datasetPk);
+      params.set("pointPKs", pointPk);
       const record = await fetchJson(
-        `${server}/datasetRecordsList?${params.toString()}`
-      )
-      const profiles = record?.profiles || []
+        `${server}/datasetRecordsList?${params.toString()}`,
+      );
+      const profiles = record?.profiles || [];
       if (profiles.length === 1) {
-        setHighlightedRecord({ datasetPk, profileId: profiles[0].profile_id })
+        setHighlightedRecord({ datasetPk, profileId: profiles[0].profile_id });
       }
     } catch (error) {
-      reportError('datasetRecordsList fetch failed', error)
+      reportError("datasetRecordsList fetch failed", error);
     }
-  }
+  };
 
   // A click that landed on exactly one track (see Map.jsx's handleMapClick) is
   // handed to selectTrajectoryFromMap below — onTrackClick is to a track what
@@ -156,8 +156,8 @@ export default function MapContainer () {
       projection={projection}
       zoomTarget={zoomTarget}
       drawRequest={drawRequest}
-      mapRef={mapRef}
+      onMapReady={setMapInstance}
       onFirstPaint={reportFirstPaint}
     />
-  )
+  );
 }

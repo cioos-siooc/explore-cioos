@@ -1,6 +1,5 @@
 const express = require("express");
-// helps with async error handling in express < v5
-require("express-async-errors");
+const { check } = require("express-validator");
 const Sentry = require("@sentry/node");
 
 /**
@@ -46,8 +45,8 @@ const router = express.Router();
 const axios = require("axios");
 const db = require("../db");
 const cache = require("../utils/cache");
-const { validatorMiddleware } = require("../utils/validatorMiddlewares");
-const { ALL_TRAJECTORY_TYPES } = require("../utils/datasetTypes");
+const { pipeline } = require("../utils/routePipeline");
+const { ALL_TRAJECTORY_TYPES } = require("../utils/dataTypes");
 
 // A record id goes into ERDDAP as a regex constraint (`=~"..."`), and ERDDAP
 // regexes are Java regexes matched against the WHOLE value. Escaping the
@@ -60,7 +59,9 @@ const escapeErddapRegex = (value) =>
 
 // Fixed vocabulary, not user input, so it is safe to inline into the SQL — the
 // same reasoning tiles.js's trajectoryTypePredicate() relies on.
-const TRAJECTORY_TYPES_SQL = ALL_TRAJECTORY_TYPES.map((t) => `'${t}'`).join(",");
+const TRAJECTORY_TYPES_SQL = ALL_TRAJECTORY_TYPES.map((t) => `'${t}'`).join(
+  ",",
+);
 
 /*
  * /preview
@@ -161,11 +162,18 @@ LIMIT 1`;
 
 router.get(
   "/",
-  validatorMiddleware(),
-  // Cache the good answer, never the failure: this is the one data route that
-  // calls ERDDAP live, so an uncached error meant every render re-hit a server
-  // that had just failed.
-  cache.route("5 minutes", cache.onlyOk),
+  ...pipeline({
+    // dataset and profile are the only params this route reads; the shared
+    // filter set does not apply to it. Both are bound into the query below, so
+    // the caps are about size, not injection.
+    filters: false,
+    // Cache the good answer, never the failure: this is the one data route that
+    // calls ERDDAP live, so an uncached error meant every render re-hit a server
+    // that had just failed.
+    cacheFor: "5 minutes",
+    cacheToggle: cache.onlyOk,
+    checks: [check(["dataset", "profile"]).isLength({ max: 256 })],
+  }),
   async (req, res, next) => {
     const NUM_RECORDS = 1000;
     const { dataset, profile } = req.query;
@@ -207,7 +215,7 @@ router.get(
     }
 
     const constraint = `${profile_variable}=~${encodeURIComponent(
-      `"${escapeErddapRegex(profile_id)}"`
+      `"${escapeErddapRegex(profile_id)}"`,
     )}`;
     let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?&${constraint}`;
     if (!use_whole_profile) {
@@ -248,10 +256,10 @@ router.get(
       // (fall back to column names) from "metadata says nothing about this one".
       if (Array.isArray(table_variables)) {
         const byName = new Map(
-          table_variables.map((variable) => [variable.name, variable])
+          table_variables.map((variable) => [variable.name, variable]),
         );
         data.table.columnMeta = (data.table.columnNames || []).map(
-          (name) => byName.get(name) ?? null
+          (name) => byName.get(name) ?? null,
         );
       }
       return res.send(data);
@@ -262,7 +270,8 @@ router.get(
       const status = error.response?.status;
       const body = String(error.response?.data ?? "");
       const isEmpty =
-        status === 404 || body.includes("Your query produced no matching results");
+        status === 404 ||
+        body.includes("Your query produced no matching results");
 
       if (isEmpty) {
         return res
@@ -284,7 +293,7 @@ router.get(
         upstreamStatus: status ?? null,
       });
     }
-  }
+  },
 );
 
 module.exports = router;

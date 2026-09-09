@@ -7,17 +7,12 @@ that method to return the standard info fixture so no HTTP calls occur.
 """
 
 import pandas as pd
-import pytest
-
 from conftest import (
     DATASET_ID,
     ERDDAP_INFO_CSV,
-    ERDDAP_INFO_DEPTH_AND_ALTITUDE_CSV,
-    ERDDAP_INFO_INGEST_FALSE_CSV,
     ERDDAP_INFO_NO_EOVS_CSV,
     ERDDAP_INFO_QC_AND_LOG_CSV,
     ERDDAP_URL,
-    build_variables_df,
     mock_erddap_server,  # noqa: F401 — imported for pytest fixture discovery
 )
 
@@ -269,7 +264,6 @@ class TestDatasetEOVMapping:
 
 class TestDatasetGetDf:
     def test_get_df_returns_dataframe(self, mock_erddap_server):
-        from cde_harvester.dataset_types import extract_features as get_profiles
 
         ds = _make_dataset(mock_erddap_server)
         # get_df requires profile_ids to be set; set a minimal value

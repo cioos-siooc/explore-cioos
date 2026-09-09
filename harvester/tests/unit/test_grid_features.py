@@ -1,12 +1,9 @@
 """Unit tests for the griddap handler (cde_harvester.dataset_types.grid)."""
 
 import logging
-from io import StringIO
 from unittest.mock import MagicMock
 
-import pandas as pd
 import pytest
-
 from cde_harvester.dataset_types.grid import (
     GridHandler,
     extract_grid_extent,

@@ -7,8 +7,7 @@ written to a tmp_path file, avoiding the large Canada EEZ polygon.
 
 import numpy as np
 import pytest
-
-from cde_harvester.sources.obis.geo_filter import ObisGeoFilter, DEFAULT_EXEMPT_NODE_IDS
+from cde_harvester.sources.obis.geo_filter import DEFAULT_EXEMPT_NODE_IDS, ObisGeoFilter
 
 # A small box on the BC coast: lon -130..-120, lat 48..55
 TEST_POLYGON_WKT = (

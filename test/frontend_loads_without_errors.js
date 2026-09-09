@@ -11,26 +11,26 @@ const errors = [];
 const url = "http://localhost:8098";
 
 const launchArgs = [
-  '--no-sandbox',
-  '--disable-setuid-sandbox',
-  '--disable-dev-shm-usage',
-  '--disable-gpu',
-  '--no-zygote',
-  '--no-first-run'
+  "--no-sandbox",
+  "--disable-setuid-sandbox",
+  "--disable-dev-shm-usage",
+  "--disable-gpu",
+  "--no-zygote",
+  "--no-first-run",
 ];
 
 (async () => {
   let browser;
   try {
     browser = await puppeteer.launch({
-      headless: 'new',
+      headless: "new",
       args: launchArgs,
     });
   } catch (e) {
-    console.error('Failed to launch browser:', e);
+    console.error("Failed to launch browser:", e);
     process.exit(1);
   }
-  console.log("Testing frontend at", url, "with args", launchArgs.join(' '));
+  console.log("Testing frontend at", url, "with args", launchArgs.join(" "));
 
   console.log("Opening page");
   const page = await browser.newPage();
@@ -44,8 +44,8 @@ const launchArgs = [
   page
     .on("pageerror", ({ message }) => errors.push(message))
     .on("requestfailed", (request) =>
-      errors.push(`${request.failure().errorText} ${request.url()}`)
-  );
+      errors.push(`${request.failure().errorText} ${request.url()}`),
+    );
   console.log("Going to ", url);
   await page.goto(url, {
     waitUntil: "domcontentloaded",

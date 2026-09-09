@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
-import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
-import { SWATCHES } from '../DatasetPreview/previewColors.js'
+import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
+import { SWATCHES } from "../DatasetPreview/previewColors.js";
 
 // The colour one variable draws in. Twelve preset swatches, "back to what the
 // dataset says", and a native field for anything else.
@@ -19,48 +19,48 @@ import { SWATCHES } from '../DatasetPreview/previewColors.js'
 // local state and the choice is committed once the pointer has been still for a
 // moment. The field is also deliberately NOT a Dropdown.Item: an Item closes the
 // menu on click (ui/Dropdown.jsx), and the menu has to outlive the dialog.
-const COMMIT_DELAY_MS = 250
+const COMMIT_DELAY_MS = 250;
 
-export default function VariableColorPicker ({
+export default function VariableColorPicker({
   color,
   defaultColor,
   onPick,
-  label
+  label,
 }) {
-  const { t } = useTranslation()
-  const [draft, setDraft] = useState(null)
-  const timer = useRef(null)
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState(null);
+  const timer = useRef(null);
 
-  useEffect(() => () => clearTimeout(timer.current), [])
+  useEffect(() => () => clearTimeout(timer.current), []);
 
-  const inUse = draft || color || defaultColor
+  const inUse = draft || color || defaultColor;
 
   const pick = (value) => {
-    clearTimeout(timer.current)
-    setDraft(null)
-    onPick(value)
-  }
+    clearTimeout(timer.current);
+    setDraft(null);
+    onPick(value);
+  };
 
   const drag = (value) => {
-    setDraft(value)
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => onPick(value), COMMIT_DELAY_MS)
-  }
+    setDraft(value);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => onPick(value), COMMIT_DELAY_MS);
+  };
 
   return (
     <DropdownButton
-      className='dropdownButtonSwatch'
-      align='center'
+      className="dropdownButtonSwatch"
+      align="center"
       tooltip={label}
       title={
         <span
-          className='colorSwatch'
+          className="colorSwatch"
           style={{ backgroundColor: inUse }}
-          aria-hidden='true'
+          aria-hidden="true"
         />
       }
     >
-      <div className='colorSwatchGrid'>
+      <div className="colorSwatchGrid">
         {SWATCHES.map((hex) => (
           <Dropdown.Item
             key={hex}
@@ -70,9 +70,9 @@ export default function VariableColorPicker ({
             aria-label={hex}
           >
             <span
-              className='colorSwatch'
+              className="colorSwatch"
               style={{ backgroundColor: hex }}
-              aria-hidden='true'
+              aria-hidden="true"
             />
           </Dropdown.Item>
         ))}
@@ -80,20 +80,20 @@ export default function VariableColorPicker ({
       <hr />
       <Dropdown.Item active={!color} onClick={() => pick(null)}>
         <span
-          className='colorSwatch'
+          className="colorSwatch"
           style={{ backgroundColor: defaultColor }}
-          aria-hidden='true'
+          aria-hidden="true"
         />
-        {t('datasetPreviewPlotColorDefault')}
+        {t("datasetPreviewPlotColorDefault")}
       </Dropdown.Item>
-      <label className='colorSwatchCustom'>
-        {t('datasetPreviewPlotColorCustom')}
+      <label className="colorSwatchCustom">
+        {t("datasetPreviewPlotColorCustom")}
         <input
-          type='color'
+          type="color"
           value={inUse}
           onChange={(event) => drag(event.target.value)}
         />
       </label>
     </DropdownButton>
-  )
+  );
 }

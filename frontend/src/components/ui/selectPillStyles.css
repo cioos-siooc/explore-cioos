@@ -7,6 +7,7 @@
   gap: 4px;
   min-width: 0;
   max-width: 100%;
+
   /* No padding on the trailing edge: it belongs either to the caret (which
      lives in the select's own padding) or to a trailing segment, which runs to
      the pill's edge. */
@@ -47,6 +48,7 @@
   display: inline-block;
   min-width: 0;
   max-width: 100%;
+
   /* The rung the pager's controls sit on: these say how the list is arranged,
      the cards below are what is being read. It also keeps both pills on one
      row at phone width in French, where the longest pair of options
@@ -62,6 +64,7 @@
   visibility: hidden;
   overflow: hidden;
   white-space: nowrap;
+
   /* Trailing room for the caret, plus slack for the width a browser gives a
      select's text over the span's. */
   padding: 4px 18px 4px 0;

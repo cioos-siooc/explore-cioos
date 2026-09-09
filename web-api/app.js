@@ -8,13 +8,11 @@ require("express-async-errors");
 
 const createError = require("http-errors");
 const express = require("express");
-const path = require("path");
-const cookieParser = require("cookie-parser");
 const logger = require("morgan");
 const cors = require("cors");
 
 const Sentry = require("@sentry/node");
-const Tracing = require("@sentry/tracing");
+const swaggerUi = require("swagger-ui-express");
 const downloadRouter = require("./routes/download");
 const indexRouter = require("./routes/index");
 const legendRouter = require("./routes/legend");
@@ -36,33 +34,15 @@ const harvestRouter = require("./routes/harvest");
 const harvestDownloadsRouter = require("./routes/harvestDownloads");
 const trajectoriesRouter = require("./routes/trajectories");
 const nonnaRouter = require("./routes/nonna");
-const swaggerSpec = require('./swagger');
-const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require("./swagger");
 
 const app = express();
 
-// Importing @sentry/tracing patches the global hub for tracing to work.
-
-if (process.env.ENVIRONMENT === "production") {
-  console.log("Using sentry");
-  // Tracing every request (1.0) adds per-request overhead across the
-  // initial-load burst, so sample only a fraction in production. Defaults to
-  // 1.0 in development and 0.1 in production; override with
-  // SENTRY_TRACES_SAMPLE_RATE (e.g. set it to 1.0 to trace everything).
-  const defaultTracesSampleRate = process.env.ENVIRONMENT === "production" ? 0.1 : 1.0;
-  const tracesSampleRate = process.env.SENTRY_TRACES_SAMPLE_RATE
-    ? Number(process.env.SENTRY_TRACES_SAMPLE_RATE)
-    : defaultTracesSampleRate;
-  Sentry.init({
-    dsn: "https://ccb1d8806b1c42cb83ef83040dc0d7c0@o56764.ingest.sentry.io/5863595",
-    tracesSampleRate,
-  });
-  app.use(Sentry.Handlers.requestHandler());
-}
+// Sentry.init() runs in instrument.js, loaded first by bin/www.
 
 // if environement variables are set via docker, leave them
 // otherwise load from .env
-if (!process.env.DB_USER) require("dotenv").config();
+if (!process.env.DB_USER) require("dotenv").config({ quiet: true });
 
 // CORS configuration via environment variable:
 //  - CORS_ORIGINS="*" (default) allows all origins
@@ -99,12 +79,13 @@ if (!process.env.DB_USER) require("dotenv").config();
   app.use(cors(corsOptions));
 })();
 
-
+// No view engine and no static dir. views/*.jade, public/, cookie-parser and
+// the jade engine were express-generator scaffolding in a service that only
+// ever answers JSON and vector tiles — and `jade` was never installed, so
+// every res.render() threw. Nothing here sets or reads a cookie either.
 app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, "public")));
 
 app.use("/", indexRouter);
 app.use("/download", downloadRouter);
@@ -131,49 +112,62 @@ app.use("/trajectories", trajectoriesRouter);
 app.use("/nonna", nonnaRouter);
 
 // Swagger docs - conditionally enabled via ENABLE_API_DOCS environment variable
-if (process.env.ENABLE_API_DOCS !== 'false') {
-  app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: true }));
-  app.get('/openapi.json', (_req, res) => res.json(swaggerSpec));
+if (process.env.ENABLE_API_DOCS !== "false") {
+  app.use(
+    "/docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, { explorer: true }),
+  );
+  app.get("/openapi.json", (_req, res) => res.json(swaggerSpec));
   console.log("API documentation enabled at /docs and /openapi.json");
 } else {
   // Redirect to BASE_URL when API docs are disabled
-  const redirectUrl = process.env.BASE_URL || '/';
-  app.use('/docs', (_req, res) => res.redirect(redirectUrl));
-  app.get('/openapi.json', (_req, res) => res.redirect(redirectUrl));
-  console.log(`API documentation disabled via ENABLE_API_DOCS=false (redirecting to ${redirectUrl})`);
+  const redirectUrl = process.env.BASE_URL || "/";
+  app.use("/docs", (_req, res) => res.redirect(redirectUrl));
+  app.get("/openapi.json", (_req, res) => res.redirect(redirectUrl));
+  console.log(
+    `API documentation disabled via ENABLE_API_DOCS=false (redirecting to ${redirectUrl})`,
+  );
 }
-
-app.use(Sentry.Handlers.errorHandler());
 
 // catch 404 and forward to error handler
 app.use((req, res, next) => {
   next(createError(404));
 });
 
-// error handler
+// After the routes and the 404, before the JSON handler below — it only
+// sees errors from middleware registered above it, and it reports 500s.
+Sentry.setupExpressErrorHandler(app);
+
+// The one place a route error becomes a response. Routes throw (or let a
+// rejection escape — express-async-errors, required at the top of this file,
+// forwards it here) and this decides the status: `statusCode` is what
+// utils/dbFilter.js marks its client errors with, `status` is http-errors'
+// spelling, and anything unlabelled is a 500. Routes used to each re-shape the
+// same database error, in four different ways — 500, rethrow, next(err), and
+// /download answering 404 — with the `ScientificNameSelectionTooBroadError` ->
+// 400 block copy-pasted ten times.
 //
-// This is a JSON API, so errors have to be machine-readable: the frontend calls
-// response.json() on failures to show the real cause. Returning a rendered HTML
-// page (as this used to) makes every 500 indistinguishable from every other.
+// JSON, and the stack only outside production — express's default handler was
+// answering every error with an HTML page containing the full stack trace,
+// because the res.render() above it threw first.
 app.use((err, req, res, next) => {
-  const status = err.status || err.statusCode || 500;
+  const status = err.statusCode || err.status || 500;
+  if (status >= 500) console.error(err);
 
-  // Server-side faults are ours to see; 4xx are the caller's problem and would
-  // just be log noise.
-  if (status >= 500) console.error("Unhandled error:", err);
-
-  // Something already started writing — the response is no longer ours to shape,
-  // so let Express finalize/destroy it.
+  // Something already started writing — the response is no longer ours to
+  // shape, so let express finalize/destroy it rather than append a JSON body
+  // to a half-sent one.
   if (res.headersSent) return next(err);
 
-  // Gated on ENVIRONMENT, not Express's app.get("env"): NODE_ENV is unset in the
-  // container, so Express reports "development" everywhere and would leak stacks.
   res.status(status).json({
     error: err.message || "Internal Server Error",
-    // Postgres puts the useful part (missing column, bad syntax) in these.
-    ...(process.env.ENVIRONMENT === "production"
-      ? {}
-      : { detail: err.detail, hint: err.hint, stack: err.stack }),
+    // detail/hint are where Postgres puts the useful part of a query error
+    // (missing column, bad syntax); they ride along with the stack, outside
+    // production only.
+    ...(req.app.get("env") === "development"
+      ? { detail: err.detail, hint: err.hint, stack: err.stack }
+      : {}),
   });
 });
 

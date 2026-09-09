@@ -1,25 +1,38 @@
 #!/usr/bin/env node
 
+// Must be first: Sentry instruments modules as they load, so it has to
+// initialise before ../app pulls in express.
+require("../instrument");
+
 /**
  * Module dependencies.
  */
 
-var app = require("../app");
-var debug = require("debug")("cde-web-api:server");
-var http = require("http");
+const app = require("../app");
+const debug = require("debug")("cde-web-api:server");
+const http = require("http");
 
 /**
  * Get port from environment and store in Express.
  */
 
-var port = normalizePort(process.env.PORT || "5000");
+const port = normalizePort(process.env.PORT || "5000");
 app.set("port", port);
+
+// The database target, not a connection: knex connects on first query, so
+// nothing here proves the DB is reachable. Logged once at startup because the
+// host/name/port are what you want in the logs when a deploy points at the
+// wrong database — see db.js.
+console.log(
+  "DB target:",
+  `${process.env.DB_HOST}/${process.env.DB_NAME}:${process.env.DB_PORT || 5432}`,
+);
 
 /**
  * Create HTTP server.
  */
 
-var server = http.createServer(app);
+const server = http.createServer(app);
 
 /**
  * Listen on provided port, on all network interfaces.
@@ -34,7 +47,7 @@ server.on("listening", onListening);
  */
 
 function normalizePort(val) {
-  var port = parseInt(val, 10);
+  const port = parseInt(val, 10);
 
   if (isNaN(port)) {
     // named pipe
@@ -58,7 +71,7 @@ function onError(error) {
     throw error;
   }
 
-  var bind = typeof port === "string" ? "Pipe " + port : "Port " + port;
+  const bind = typeof port === "string" ? "Pipe " + port : "Port " + port;
 
   // handle specific listen errors with friendly messages
   switch (error.code) {
@@ -80,7 +93,7 @@ function onError(error) {
  */
 
 function onListening() {
-  var addr = server.address();
-  var bind = typeof addr === "string" ? "pipe " + addr : "port " + addr.port;
+  const addr = server.address();
+  const bind = typeof addr === "string" ? "pipe " + addr : "port " + addr.port;
   debug("Listening on " + bind);
 }

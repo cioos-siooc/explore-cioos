@@ -88,6 +88,7 @@
 .datasetPreviewPlot {
   flex: 1;
   min-width: 0;
+
   /* Profiles widen past the modal once panels hit their minimum width; that
      scrolls here rather than in the modal's vertical scroller. */
   overflow-x: auto;
@@ -124,7 +125,7 @@
 }
 
 .labelEditorToggle:hover {
-  color: #52A79B;
+  color: #52a79b;
 }
 
 .labelEditor {
@@ -154,7 +155,7 @@
   gap: 6px;
 }
 
-.labelEditorRow input[type='text'] {
+.labelEditorRow input[type="text"] {
   flex: 1 1 auto;
   min-width: 0;
   box-sizing: border-box;
@@ -183,6 +184,7 @@
    .dropdownButtonSwatch, because ui/Dropdown portals the menu into
    document.body — the same reason .dropdownButtonLeft's own menu cap lives in
    ui/dropdownStyles.css. */
+
 /* Six 26px items a row (16px chip + 4px padding + 1px border, doubled), so the
    twelve land as two even rows rather than five-five-two. */
 .colorSwatchGrid {

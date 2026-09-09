@@ -1,0 +1,3 @@
+{
+  "overrides": [{ "files": "web-api/bin/www", "options": { "parser": "babel" } }]
+}

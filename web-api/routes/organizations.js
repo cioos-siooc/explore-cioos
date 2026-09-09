@@ -2,7 +2,7 @@ const express = require("express");
 
 const router = express.Router();
 const db = require("../db");
-const cache = require("../utils/cache");
+const { pipeline } = require("../utils/routePipeline");
 const { changePKtoPkURL } = require("../utils/misc");
 
 /**
@@ -28,8 +28,16 @@ const { changePKtoPkURL } = require("../utils/misc");
  *                     type: string
  */
 
-router.get("/", cache.route(), async (req, res, next) => {
-  res.send((await db("cde.organizations").orderByRaw("UPPER(name)")).map(changePKtoPkURL));
-});
+router.get(
+  "/",
+  ...pipeline({ filters: false, cacheFor: "5 minutes" }),
+  async (req, res) => {
+    res.send(
+      (await db("cde.organizations").orderByRaw("UPPER(name)")).map(
+        changePKtoPkURL,
+      ),
+    );
+  },
+);
 
 module.exports = router;

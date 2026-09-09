@@ -14,7 +14,7 @@
 // SelectionProvider's pendingHighlight). A highlight points a row out; this
 // opens its plot. Sharing one name would have made every marker click open the
 // modal the user had not asked to see.
-export const RECORD_PARAM = 'preview'
+export const RECORD_PARAM = "preview";
 
 // How that record is being drawn. Each of these is written ONLY when it differs
 // from the default the dataset type implies, so an untouched plot adds nothing
@@ -29,13 +29,7 @@ export const RECORD_PARAM = 'preview'
 //   pmode    markers | lines | markers+lines
 //   pcolors  per-variable colours, `column~rrggbb` comma-separated
 //                                  (default: the variable's own ERDDAP palette)
-export const PLOT_PARAMS = [
-  'vis',
-  'pvars',
-  'paxis',
-  'pmode',
-  'pcolors'
-]
+export const PLOT_PARAMS = ["vis", "pvars", "paxis", "pmode", "pcolors"];
 
 // Written by an earlier version of the plot and never again. They stay in the
 // cleanup list so a link made before them does not leave orphans in the address
@@ -49,22 +43,20 @@ export const PLOT_PARAMS = [
 //                         note the singular/plural, they are different things,
 //                         and `pcolor` is retired rather than reused so a link
 //                         made yesterday cannot be misread as the new one.
-const RETIRED_PLOT_PARAMS = [
-  'px', 'py', 'p2', 'pscale2', 'pcolor', 'pscale'
-]
+const RETIRED_PLOT_PARAMS = ["px", "py", "p2", "pscale2", "pcolor", "pscale"];
 
 export const PREVIEW_PARAMS = [
   RECORD_PARAM,
   ...PLOT_PARAMS,
-  ...RETIRED_PLOT_PARAMS
-]
+  ...RETIRED_PLOT_PARAMS,
+];
 
 // Closing the preview has to delete all of these in ONE setSearchParams call:
 // react-router hands a functional updater the params from the last RENDER, not
 // the ones the previous call just wrote, so two calls in one handler would leave
 // only the second one's work behind.
-export function withoutPreviewParams (params) {
-  const next = new URLSearchParams(params)
-  PREVIEW_PARAMS.forEach((param) => next.delete(param))
-  return next
+export function withoutPreviewParams(params) {
+  const next = new URLSearchParams(params);
+  PREVIEW_PARAMS.forEach((param) => next.delete(param));
+  return next;
 }

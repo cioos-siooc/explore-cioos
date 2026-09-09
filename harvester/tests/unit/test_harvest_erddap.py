@@ -6,22 +6,20 @@ Individual Dataset objects are returned as pre-built MagicMocks.
 harvest_erddap is a Prefect @task; .fn() bypasses the task wrapper.
 """
 
-import pandas as pd
-import pytest
 from unittest.mock import MagicMock, patch
 
-from conftest import (
-    DATASET_ID,
-    ERDDAP_URL,
-    build_mock_dataset,
-    ERDDAP_INFO_NO_EOVS_CSV,
-)
-from cde_harvester.sources.erddap.harvester import harvest_erddap
+import pandas as pd
 from cde_harvester.core.errors import (
     CDM_DATA_TYPE_UNSUPPORTED,
     HTTP_ERROR,
 )
-
+from cde_harvester.sources.erddap.harvester import harvest_erddap
+from conftest import (
+    DATASET_ID,
+    ERDDAP_INFO_NO_EOVS_CSV,
+    ERDDAP_URL,
+    build_mock_dataset,
+)
 
 # ---------------------------------------------------------------------------
 # Fixture helpers

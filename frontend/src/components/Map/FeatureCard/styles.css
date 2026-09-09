@@ -18,6 +18,7 @@
   left: 12px;
   top: 12px;
   z-index: calc(var(--cioos-z-dock, 35) + 2);
+
   /* The same goldenrod the map rings the clicked region in and the pinned
      rows in the datasets list and the inspector's table wear too
      (--cioos-map-click, see theme.css). Three surfaces, one colour, so "the
@@ -167,6 +168,7 @@
   flex: 0 0 auto;
   display: grid;
   place-items: center;
+
   /* Lines the marker dot up with the first line of the title rather than the
      middle of a two-line block. */
   height: 1.15em;
@@ -279,7 +281,8 @@
   font-size: var(--cioos-font-size-xs);
   font-weight: 600;
   cursor: pointer;
-  transition: background-color var(--cioos-transition-fast),
+  transition:
+    background-color var(--cioos-transition-fast),
     border-color var(--cioos-transition-fast);
 }
 
@@ -335,10 +338,7 @@
 @media (max-width: 700px) {
   .featureCard {
     position: fixed;
-    left: 0;
-    right: 0;
-    top: auto;
-    bottom: 0;
+    inset: auto 0 0;
     width: auto;
     max-width: none;
     transform: none;
@@ -380,6 +380,7 @@
   from {
     transform: translateY(100%);
   }
+
   to {
     transform: translateY(0);
   }

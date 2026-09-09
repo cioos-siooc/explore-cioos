@@ -15,6 +15,7 @@
  * content and hand the overflow to this scroller rather than to the page. */
 .dataPreviewModal .modal-content {
   overflow: hidden;
+
   /* A definite height, not the shared max-height.
    *
    * The plot's height is computed from the scroll container's measured height,
@@ -40,13 +41,13 @@
   position: relative; /* anchors the loading scrim to the preview area */
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden auto;
+
   /* Horizontal overflow belongs to the plot area, which sizes its own figure —
      a scrollbar here would be a second one for the same axis. */
-  overflow-x: hidden;
 }
 
- .backButton {
+.backButton {
   text-align: center;
   border: 2px solid var(--cioos-hairline);
   border-radius: 10px;
@@ -73,13 +74,12 @@
 
 .tableAndPlotGridContainer .toggleButton {
   height: 42px;
-  margin: 0px 16.5px;
+  margin: 0 16.5px;
   background-color: white;
   border-radius: 5px;
   border: 2px solid var(--cioos-hairline);
   color: var(--cioos-ink);
   line-height: 15px;
-  font-size: auto;
   min-width: 100px;
   max-width: 100px;
 }
@@ -97,7 +97,7 @@
   margin: 10px auto;
 }
 
-.tableAndPlotGridItem .dropdown{
+.tableAndPlotGridItem .dropdown {
   display: inline;
   margin-right: 10px;
 }
@@ -107,7 +107,7 @@
 }
 
 .tableAndPlotGridItem hr {
-  margin-top: 0px;
+  margin-top: 0;
 }
 
 /* Copy-link button. Shares the toggle buttons' shape but not their fixed width:

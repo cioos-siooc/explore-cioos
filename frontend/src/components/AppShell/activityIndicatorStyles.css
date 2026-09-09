@@ -15,6 +15,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+
   /* The wrapper is as tall as the open panel, so it must not swallow clicks on
      the map around it — only the panel itself takes pointer events. */
   pointer-events: none;

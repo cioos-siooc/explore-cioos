@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from "react";
 
 // Live { width, height } of an element, in CSS pixels.
 //
@@ -16,13 +16,13 @@ import { useEffect, useRef, useState } from 'react'
 // Measure a container whose size is an INPUT to the plot, never the plot's own
 // box — feeding a measured height back in as the plot's height is an infinite
 // loop.
-export default function useElementSize () {
-  const ref = useRef(null)
-  const [size, setSize] = useState({ width: 0, height: 0 })
+export default function useElementSize() {
+  const ref = useRef(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
-    const el = ref.current
-    if (!el) return undefined
+    const el = ref.current;
+    if (!el) return undefined;
     const publish = () => {
       // clientWidth/Height, not getBoundingClientRect: the border box would
       // include padding the plot cannot draw in, and a scrolling container's
@@ -31,18 +31,18 @@ export default function useElementSize () {
       setSize((previous) =>
         previous.width === el.clientWidth && previous.height === el.clientHeight
           ? previous
-          : { width: el.clientWidth, height: el.clientHeight }
-      )
-    }
-    publish()
-    const observer = new ResizeObserver(publish)
-    observer.observe(el)
-    window.addEventListener('resize', publish)
+          : { width: el.clientWidth, height: el.clientHeight },
+      );
+    };
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    window.addEventListener("resize", publish);
     return () => {
-      observer.disconnect()
-      window.removeEventListener('resize', publish)
-    }
-  }, [])
+      observer.disconnect();
+      window.removeEventListener("resize", publish);
+    };
+  }, []);
 
-  return [ref, size]
+  return [ref, size];
 }

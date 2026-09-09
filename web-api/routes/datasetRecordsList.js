@@ -1,10 +1,9 @@
 const express = require("express");
-const db = require("../db");
+const { check } = require("express-validator");
 const { getShapeQuery } = require("../utils/shapeQuery");
-const cache = require("../utils/cache");
+const { pipeline } = require("../utils/routePipeline");
 
 const router = express.Router();
-const { datasetDetailsMiddleware } = require("../utils/validatorMiddlewares");
 
 /**
  * @swagger
@@ -34,20 +33,18 @@ const { datasetDetailsMiddleware } = require("../utils/validatorMiddlewares");
  *
  * This endpoint takes any of the filters and requires a dataset PK
  * It needs all the filters so that it can estimate download size
-  *
+ *
  * It is called when a user clicks to see details on a dataset
  *
  * Shape is not required
  */
-router.get("/", datasetDetailsMiddleware(), cache.route(), async (req, res, next) => {
-  let rows;
-  try {
-    rows = await getShapeQuery(req.query, false, true);
-  } catch (err) {
-    if (err.statusCode === 400) return res.status(400).json({ error: err.message });
-    throw err;
-  }
-  res.send(rows.pop());
-});
+router.get(
+  "/",
+  ...pipeline({ checks: [check("datasetPKs").isInt()] }),
+  async (req, res) => {
+    const rows = await getShapeQuery(req.query, false, true);
+    res.send(rows.pop());
+  },
+);
 
 module.exports = router;

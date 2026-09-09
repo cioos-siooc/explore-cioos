@@ -10,53 +10,59 @@
 
 :root {
   /* --- Shared base palette --- */
-  --cioos-navy:        #152F37;
-  --cioos-sand:        #F3F0EC;
-  --cioos-teal-light:  #C6E3DF;
-  --cioos-white:       #FFFFFF;
+  --cioos-navy: #152f37;
+  --cioos-sand: #f3f0ec;
+  --cioos-teal-light: #c6e3df;
+  --cioos-white: #fff;
 
   /* --- National primary --- */
-  --cioos-primary:     #52A79B;
-  --cioos-primary-700: #3C8377; /* hover/pressed — darker teal */
+  --cioos-primary: #52a79b;
+  --cioos-primary-700: #3c8377; /* hover/pressed — darker teal */
 
   /* --- Derived neutrals (navy-tinted, never pure grey/black) --- */
-  --cioos-ink:         #152F37; /* body + heading text */
-  --cioos-ink-60:      rgba(21, 47, 55, 0.62); /* secondary text */
-  --cioos-ink-40:      rgba(21, 47, 55, 0.40); /* muted text / icons */
-  --cioos-hairline:    #DCE8E5; /* hairline borders between sand & teal-light */
-  --cioos-surface-2:   #EEF6F4; /* subtle hover wash on white surfaces */
-  --cioos-scrim:       rgba(238, 246, 244, 0.82); /* surface-2, over content being replaced */
+  --cioos-ink: #152f37; /* body + heading text */
+  --cioos-ink-60: rgb(21 47 55 / 62%); /* secondary text */
+  --cioos-ink-40: rgb(21 47 55 / 40%); /* muted text / icons */
+  --cioos-hairline: #dce8e5; /* hairline borders between sand & teal-light */
+  --cioos-surface-2: #eef6f4; /* subtle hover wash on white surfaces */
+
+  /* surface-2, over content being replaced */
+  --cioos-scrim: rgb(238 246 244 / 82%);
+
   /* Deliberately thinner than the scrim above. That one covers content being
      replaced, where what's underneath no longer means anything and the overlay's
      legibility wins. This one covers content still arriving, where seeing it come
      in is the whole point — the first-paint splash uses it so the basemap and its
-     coastlines read from the first frame. At 0.82 they barely register. */
-  --cioos-scrim-soft:  rgba(238, 246, 244, 0.55); /* surface-2, over content still arriving */
+     coastlines read from the first frame. At 82% they barely register. */
+  --cioos-scrim-soft: rgb(238 246 244 / 55%);
 
   /* --- Status palette (CIOOS-aligned) --- */
-  --cioos-success:     #52A79B;
-  --cioos-success-bg:  #C6E3DF;
-  --cioos-error:       #E25563; /* Atlantic red-coral, reused for errors */
-  --cioos-error-bg:    #FBE3E6;
-  --cioos-warn:        #B07A00;
-  --cioos-info:        #0F6D8E;
+  --cioos-success: #52a79b;
+  --cioos-success-bg: #c6e3df;
+  --cioos-error: #e25563; /* Atlantic red-coral, reused for errors */
+  --cioos-error-bg: #fbe3e6;
+  --cioos-warn: #b07a00;
+  --cioos-info: #0f6d8e;
 
   /* --- Map data keys --- */
+
   /* Colours that identify one layer or tool wherever it shows up: the paint on
      the map, its legend swatch, and the control that drives it. The track
      purple is `trackLineColor` in components/config.js — the map paints from
      there, the chrome from here, and the two have to stay in step. */
-  --cioos-track:       #6749AC; /* trajectory track lines + the scrub control */
-  --cioos-track-700:   #543A90; /* hover/pressed */
-  --cioos-track-bg:    rgba(103, 73, 172, 0.14); /* trailing-window wash */
-  --cioos-track-surface: #EFEAF8; /* opaque sibling of -bg, for cards over the map */
+  --cioos-track: #6749ac; /* trajectory track lines + the scrub control */
+  --cioos-track-700: #543a90; /* hover/pressed */
+  --cioos-track-bg: rgb(103 73 172 / 14%); /* trailing-window wash */
+  --cioos-track-surface: #efeaf8; /* opaque sibling of -bg, for cards over the map */
+
   /* The gridded-data amber, paired the same way: the map paints the active
      grid's footprint in it (griddap-highlight in Map.jsx), and the controls
      that say which slice of that grid is drawn — its marker on the time bar and
      on the depth strip — carry it too. */
-  --cioos-grid:        #FBB03B; /* griddap coverage highlight + its markers */
-  --cioos-grid-700:    #C77F14; /* hover/pressed, and label text on white */
-  --cioos-grid-surface: #FDF1DC; /* opaque tint, for pills over the map */
+  --cioos-grid: #fbb03b; /* griddap coverage highlight + its markers */
+  --cioos-grid-700: #c77f14; /* hover/pressed, and label text on white */
+  --cioos-grid-surface: #fdf1dc; /* opaque tint, for pills over the map */
+
   /* The map-click goldenrod, paired the same way: the map rings whatever the
      last click found in it (the click-highlight-* layers in Map.jsx, painted
      from `clickHighlightColor` in components/config.js), and the chrome that
@@ -66,55 +72,55 @@
      list needs no legend. A clicked platform's drawn track is the same answer
      in line form, so it and its row in the inspector's platform list are
      goldenrod as well. */
-  --cioos-map-click:         #DAA520; /* click highlight ring + the row accents */
-  --cioos-map-click-glow:    rgba(218, 165, 32, 0.35); /* the ring/glow shadows */
-  --cioos-map-click-surface: #FBF1D9; /* opaque tint, the map fill's counterpart */
+  --cioos-map-click: #daa520; /* click highlight ring + the row accents */
+  --cioos-map-click-glow: rgb(218 165 32 / 35%); /* the ring/glow shadows */
+  --cioos-map-click-surface: #fbf1d9; /* opaque tint, the map fill's counterpart */
 
   /* --- Elevation --- */
-  --cioos-shadow-card:    0 2px 8px rgba(21, 47, 55, 0.08);
-  --cioos-shadow-float:   0 4px 16px rgba(21, 47, 55, 0.16);
-  --cioos-ring:           0 0 0 2px rgba(21, 47, 55, 0.10); /* default chrome ring */
+  --cioos-shadow-card: 0 2px 8px rgb(21 47 55 / 8%);
+  --cioos-shadow-float: 0 4px 16px rgb(21 47 55 / 16%);
+  --cioos-ring: 0 0 0 2px rgb(21 47 55 / 10%); /* default chrome ring */
+
   /* 3D depth: a bright inset top-highlight + darker inset base sculpt the
      element's edge thickness, and the graduated ambient spread lifts it
      strongly off the map. Pair with `--cioos-perspective` on the same element
      for the raised, physical read. `-3d` is for cards/panels, `-3d-sm` for
      chips/pills. */
   --cioos-shadow-3d:
-    inset 0 1px 0 rgba(255, 255, 255, 0.90),
-    inset 0 -2px 3px rgba(21, 47, 55, 0.08),
-    0 1px 2px rgba(21, 47, 55, 0.14),
-    0 4px 8px rgba(21, 47, 55, 0.16),
-    0 10px 20px rgba(21, 47, 55, 0.18),
-    0 20px 40px rgba(21, 47, 55, 0.20);
+    inset 0 1px 0 rgb(255 255 255 / 90%), inset 0 -2px 3px rgb(21 47 55 / 8%),
+    0 1px 2px rgb(21 47 55 / 14%), 0 4px 8px rgb(21 47 55 / 16%),
+    0 10px 20px rgb(21 47 55 / 18%), 0 20px 40px rgb(21 47 55 / 20%);
   --cioos-shadow-3d-sm:
-    inset 0 1px 0 rgba(255, 255, 255, 0.90),
-    inset 0 -1px 2px rgba(21, 47, 55, 0.08),
-    0 1px 2px rgba(21, 47, 55, 0.14),
-    0 3px 6px rgba(21, 47, 55, 0.16),
-    0 6px 14px rgba(21, 47, 55, 0.18);
-  --cioos-perspective:    perspective(800px) translateZ(0);
+    inset 0 1px 0 rgb(255 255 255 / 90%), inset 0 -1px 2px rgb(21 47 55 / 8%),
+    0 1px 2px rgb(21 47 55 / 14%), 0 3px 6px rgb(21 47 55 / 16%),
+    0 6px 14px rgb(21 47 55 / 18%);
+  --cioos-perspective: perspective(800px) translateZ(0);
 
   /* --- Shape --- */
-  --cioos-radius-lg:   16px;  /* floating panels / menus */
-  --cioos-radius:      8px;   /* cards, surfaces, buttons */
-  --cioos-radius-sm:   6px;   /* inputs, small controls */
+  --cioos-radius-lg: 16px; /* floating panels / menus */
+  --cioos-radius: 8px; /* cards, surfaces, buttons */
+  --cioos-radius-sm: 6px; /* inputs, small controls */
   --cioos-radius-pill: 999px; /* filter chips, toggles */
 
   /* --- Type --- */
-  --cioos-font-body:    'Montserrat', system-ui, -apple-system, sans-serif;
-  --cioos-font-display: 'Sora', 'Montserrat', system-ui, sans-serif;
+  --cioos-font-body: "Montserrat", system-ui, -apple-system, sans-serif;
+  --cioos-font-display: "Sora", "Montserrat", system-ui, sans-serif;
+
   /* The CIOOS/SIOOC logo only — the brand card's lockup and the loading
      splash's, both drawn by CioosLogo rather than loaded as an image.
      The real wordmark is set in Volte Rounded, which is a licensed face and
      not on Google Fonts; Quicksand is the closest thing there — geometric
      with the same circular bowls and rounded terminals, and within ~3% of
      the wordmark's own letter widths at matched cap height. */
-  --cioos-font-brand: 'Quicksand', 'Montserrat', 'Segoe UI', sans-serif;
+  --cioos-font-brand: "Quicksand", "Montserrat", "Segoe UI", sans-serif;
 
   /* --- Signature: the ocean "water column" gradient (surface → depth) --- */
-  --cioos-depth-gradient: linear-gradient(180deg, var(--cioos-primary) 0%, var(--cioos-navy) 100%);
-
-  --cioos-focus: 0 0 0 3px rgba(82, 167, 155, 0.55);
+  --cioos-depth-gradient: linear-gradient(
+    180deg,
+    var(--cioos-primary) 0%,
+    var(--cioos-navy) 100%
+  );
+  --cioos-focus: 0 0 0 3px rgb(82 167 155 / 55%);
 
   /* --- Layout: selection-panel width ---
      Single source of truth for how wide the sidebar reads. Capped at 580px on
@@ -172,6 +178,7 @@
   --cioos-font-size-base: 14px;
   --cioos-font-size-md: 16px;
   --cioos-font-size-lg: 18px;
+
   /* The brand lockup, and the top of the scale: the only thing in the chrome
      set larger than a heading. It sizes the compact lockup whole — the mark is
      a multiple of it — so it is the one number that makes the logo bigger. */
@@ -193,14 +200,18 @@
   /* --- Table & Rows --- */
   --cioos-row-height: 80px;
   --cioos-row-height-mobile: 72px;
-  --cioos-row-hover-bg: linear-gradient(90deg, var(--cioos-teal-light) 0%, transparent 100%);
+  --cioos-row-hover-bg: linear-gradient(
+    90deg,
+    var(--cioos-teal-light) 0%,
+    transparent 100%
+  );
   --cioos-row-stripe-bg: var(--cioos-surface-2);
 
   /* --- Shadows (Enhanced) --- */
-  --cioos-shadow-sm: 0 1px 3px rgba(21, 47, 55, 0.12);
-  --cioos-shadow-md: 0 2px 8px rgba(21, 47, 55, 0.08);
-  --cioos-shadow-lg: 0 4px 12px rgba(21, 47, 55, 0.10);
-  --cioos-shadow-lift: 0 6px 16px rgba(21, 47, 55, 0.08);
+  --cioos-shadow-sm: 0 1px 3px rgb(21 47 55 / 12%);
+  --cioos-shadow-md: 0 2px 8px rgb(21 47 55 / 8%);
+  --cioos-shadow-lg: 0 4px 12px rgb(21 47 55 / 10%);
+  --cioos-shadow-lift: 0 6px 16px rgb(21 47 55 / 8%);
 
   /* --- Z-Index Stack ---
      map (0) < map corner controls < in-panel chrome < shell (brand/search)
@@ -280,7 +291,6 @@
     --cioos-panel-w: 100vw;
     --cioos-header-height: var(--cioos-header-height-mobile);
     --cioos-row-height: var(--cioos-row-height-mobile);
-
     --cioos-font-size-3xs: 10px;
     --cioos-font-size-2xs: 12px;
     --cioos-font-size-xs: 13px;
@@ -289,7 +299,6 @@
     --cioos-font-size-md: 17px;
     --cioos-font-size-lg: 20px;
     --cioos-font-size-xl: 28px;
-
     --cioos-space-md: 10px;
     --cioos-space-lg: 12px;
     --cioos-space-xl: 16px;
@@ -369,7 +378,12 @@ svg {
   width: auto;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   margin-top: 0;
   margin-bottom: 0.5rem;
   font-family: var(--cioos-font-display);
@@ -422,14 +436,16 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0;
   margin: -1px;
   overflow: hidden;
-  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
   white-space: nowrap;
   border-width: 0;
 }
 
 /* Honour reduced-motion: the panel/legend slide transitions are decorative. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     transition-duration: 0.001ms !important;
     animation-duration: 0.001ms !important;
   }

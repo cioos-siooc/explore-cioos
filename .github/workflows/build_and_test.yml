@@ -6,9 +6,68 @@ on:
       - main
       - master # Keep coverage while master remains the repository default branch.
       - "development*"
+  # Deploy is triggered by this workflow completing successfully on a
+  # deployable branch, so it has to run on those pushes and not only on PRs.
+  push:
+    branches:
+      - master
+      - development
   workflow_dispatch:
 
 jobs:
+  # Fast gate, runs alongside the compose job. Deploy triggers on THIS
+  # workflow's conclusion, so a lint or build failure here blocks the deploy —
+  # which is the point: ESLint and ruff configs existed but nothing ran them.
+  lint:
+    name: Lint and build
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          version: "0.12.8"
+
+      # Config: [tool.ruff] in the root pyproject.toml governs every Python
+      # project here (ruff walks up to the nearest one that has the section).
+      - name: Ruff
+        run: uvx ruff@0.16.6 check .
+
+      # `uv sync --locked` in harvester/Dockerfile and
+      # download_scheduler/Dockerfile fails the BUILD on a stale lock, so catch
+      # it here instead of at deploy time.
+      - name: Lockfiles are current
+        run: |
+          for project in . harvester downloader download_scheduler; do
+            echo "::group::uv lock --check $project"
+            (cd "$project" && uv lock --check)
+            echo "::endgroup::"
+          done
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      # ESLint, Prettier and stylelint are configured once at the root and
+      # cover frontend/, web-api/ and test/ together.
+      - name: Lint and check formatting
+        run: |
+          npm ci --quiet
+          npm run lint
+          npm run lint:css
+          npm run format:check
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci --quiet
+          npm run build
+
   docker:
     name: Compose harvest, API, and download
     timeout-minutes: 45
@@ -67,7 +126,9 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          # Match the app runtime: frontend/package.json requires >=22 and
+          # frontend/Dockerfile builds on node:22-alpine.
+          node-version: 22
           cache: npm
           cache-dependency-path: test/package-lock.json
 

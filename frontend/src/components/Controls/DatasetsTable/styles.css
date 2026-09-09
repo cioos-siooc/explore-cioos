@@ -49,7 +49,8 @@
   font-weight: 600;
   color: var(--cioos-ink-60);
   cursor: pointer;
-  transition: background-color var(--cioos-transition-fast),
+  transition:
+    background-color var(--cioos-transition-fast),
     color var(--cioos-transition-fast);
 }
 
@@ -159,7 +160,8 @@
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-white);
   box-shadow: var(--cioos-shadow-card);
-  transition: box-shadow var(--cioos-transition-fast),
+  transition:
+    box-shadow var(--cioos-transition-fast),
     border-color var(--cioos-transition-fast),
     background-color var(--cioos-transition-fast);
 }
@@ -178,8 +180,10 @@
    border are left to `:not(.selected)`, the selection's own teal border and
    background wash being the more important of the two facts about such a row. */
 .datasetCard.fromMapClick {
-  box-shadow: 0 0 0 2px var(--cioos-map-click-glow),
-    0 0 10px 1px var(--cioos-map-click-glow), var(--cioos-shadow-card);
+  box-shadow:
+    0 0 0 2px var(--cioos-map-click-glow),
+    0 0 10px 1px var(--cioos-map-click-glow),
+    var(--cioos-shadow-card);
 }
 
 .datasetCard.fromMapClick:not(.selected) {
@@ -203,7 +207,7 @@
 }
 
 .datasetCard.selected {
-  background-color: rgba(198, 227, 223, 0.35);
+  background-color: rgb(198 227 223 / 35%);
   border-color: var(--cioos-primary);
 }
 
@@ -347,6 +351,7 @@
   width: 22px;
   height: 22px;
   padding: 0;
+
   /* No pill around it. The border and its inner padding took most of a small
      box and left the glyph cramped; the icon is a complete shape on its own (a
      plus, then a filled tick), so it carries the control unaided. */
@@ -418,6 +423,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
+
   /* Clears the add-to-selection button in the bottom-right corner, which floats
      over this row. */
   padding-right: 26px;
@@ -485,7 +491,7 @@
 }
 
 .datasetsTableSpinner {
-  opacity: 30%;
+  opacity: 0.3;
 }
 
 .datasetCardSizeUnavailable {

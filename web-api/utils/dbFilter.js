@@ -11,11 +11,55 @@ const db = require("../db");
 // programmatic clients.
 const MAX_EXPANDED_APHIA_IDS = 5000;
 
+// Pre-computes the rolldown expansion in one fast query (~30ms even for
+// Phylum). Returns the set of AphiaIDs a selection rolls down to: the selected
+// names' accepted AphiaIDs (covers synonyms via shared valid_AphiaID) UNION
+// every taxon whose ancestor chain contains one. The GIN index on
+// ancestor_aphia_ids makes this index-only.
+const APHIA_EXPANSION_SQL = `
+      WITH selected_aids AS (
+        SELECT DISTINCT aphia_id
+          FROM cde.scientific_name_vernaculars
+         WHERE scientific_name = ANY(:scientificNamesArr)
+           AND aphia_id IS NOT NULL
+      )
+      SELECT aphia_id FROM selected_aids
+      UNION
+      SELECT v.aphia_id
+        FROM cde.scientific_name_vernaculars v
+       WHERE v.ancestor_aphia_ids && ARRAY(SELECT aphia_id FROM selected_aids)
+         AND v.aphia_id IS NOT NULL`;
+
+/*
+ * The ONLY query this module runs — everything else it does is string
+ * assembly, which is why it is injectable: with a fetcher supplied,
+ * createDBFilter is pure and every predicate it emits can be asserted without
+ * a live Postgres. Reached only when `scientificNames` is set.
+ */
+async function fetchAphiaIdsFromDb(scientificNamesArr) {
+  const { rows } = await db.raw(APHIA_EXPANSION_SQL, { scientificNamesArr });
+  return rows.map((r) => r.aphia_id);
+}
+
+class InvalidPolygonError extends Error {
+  constructor() {
+    // polygonJSONToWKT returns false for unparseable JSON, a non-array, or a
+    // ring with fewer than 4 points. Binding that false into ST_GeomFromText
+    // is a 500 on every route that takes a polygon, so reject it here as the
+    // client error it is.
+    super(
+      "Invalid polygon: expected a closed ring of at least 4 [lon,lat] pairs.",
+    );
+    this.name = "InvalidPolygonError";
+    this.statusCode = 400;
+  }
+}
+
 class ScientificNameSelectionTooBroadError extends Error {
   constructor(expandedCount, threshold) {
     super(
       `Scientific-name selection rolls down to ${expandedCount} taxa (max ${threshold}). ` +
-      "Pick a Family or below.",
+        "Pick a Family or below.",
     );
     this.name = "ScientificNameSelectionTooBroadError";
     this.statusCode = 400;
@@ -24,7 +68,10 @@ class ScientificNameSelectionTooBroadError extends Error {
   }
 }
 
-async function createDBFilter(request) {
+async function createDBFilter(
+  request,
+  { fetchAphiaIds = fetchAphiaIdsFromDb } = {},
+) {
   const {
     timeMin,
     timeMax,
@@ -66,9 +113,10 @@ async function createDBFilter(request) {
     // datasets.eovs.
     //
     // Every branch reading FROM cde.profiles must apply this, or it silently
-    // keeps the old dataset-level behaviour — there is no error to catch it.
-    // The five today: shapeQuery's profilesBranch, tiles.js (the hex/point
-    // route), legend.js, timeExtent.js and download.js. Branches that cannot
+    // keeps the old dataset-level behaviour — there is no error to catch it,
+    // which is why utils/selectionAgreement.test.js checks all five: the
+    // shape query's profilesBranch, tiles.js (the hex/point route), legend.js,
+    // timeExtent.js and download.js. Branches that cannot
     // answer it stay dataset-level via `filters`, which is why that clause is
     // kept there: obis_cells, trajectory cells and track stats, the griddap
     // pseudo-branch, and the two coverage-cell queries (/tiles/cells and the
@@ -110,9 +158,9 @@ async function createDBFilter(request) {
     parameters.rectLonMax = lonMax || 180;
     parameters.rectLatMax = clampLat(latMax, 85.05);
     filters.push(
-      "ST_Intersects(search_geom, ST_Transform(ST_MakeEnvelope("
-      + "(:rectLonMin)::double precision,(:rectLatMin)::double precision,"
-      + "(:rectLonMax)::double precision,(:rectLatMax)::double precision,4326),3857))",
+      "ST_Intersects(search_geom, ST_Transform(ST_MakeEnvelope(" +
+        "(:rectLonMin)::double precision,(:rectLatMin)::double precision," +
+        "(:rectLonMax)::double precision,(:rectLatMax)::double precision,4326),3857))",
     );
   }
 
@@ -159,7 +207,9 @@ async function createDBFilter(request) {
     parameters.erddapServersArray = erddapServers.split(",");
   }
   if (obisNodes && erddapServers) {
-    filters.push("(d.obis_nodes && :obisNodesArr OR d.erddap_url = ANY(:erddapServersArray))");
+    filters.push(
+      "(d.obis_nodes && :obisNodesArr OR d.erddap_url = ANY(:erddapServersArray))",
+    );
   } else if (obisNodes) {
     filters.push("d.obis_nodes && :obisNodesArr");
   } else if (erddapServers) {
@@ -168,40 +218,29 @@ async function createDBFilter(request) {
 
   if (polygon) {
     const wktPolygon = polygonJSONToWKT(polygon);
+    if (!wktPolygon) throw new InvalidPolygonError();
     parameters.wktPolygon = wktPolygon;
     // Extent-based: a feature matches when its search_geom intersects the drawn
     // polygon (was ST_Contains on the single point).
-    filters.push("ST_Intersects(search_geom, ST_Transform(ST_GeomFromText(:wktPolygon,4326),3857)) is true");
+    filters.push(
+      "ST_Intersects(search_geom, ST_Transform(ST_GeomFromText(:wktPolygon,4326),3857)) is true",
+    );
   }
 
   if (scientificNames) {
     const scientificNamesArr = unique(
-      scientificNames.split(",").map((s) => s.trim()).filter(Boolean),
+      scientificNames
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
     );
     parameters.scientificNamesArr = scientificNamesArr;
 
-    // Pre-compute the rolldown expansion in one fast query (~30ms even for
-    // Phylum). Returns the set of AphiaIDs that selection rolls down to:
-    // selected names' accepted AphiaIDs (covers synonyms via shared
-    // valid_AphiaID) UNION every taxon whose ancestor chain contains one.
-    // The GIN index on ancestor_aphia_ids makes this index-only.
-    const expansionSql = `
-      WITH selected_aids AS (
-        SELECT DISTINCT aphia_id
-          FROM cde.scientific_name_vernaculars
-         WHERE scientific_name = ANY(:scientificNamesArr)
-           AND aphia_id IS NOT NULL
-      )
-      SELECT aphia_id FROM selected_aids
-      UNION
-      SELECT v.aphia_id
-        FROM cde.scientific_name_vernaculars v
-       WHERE v.ancestor_aphia_ids && ARRAY(SELECT aphia_id FROM selected_aids)
-         AND v.aphia_id IS NOT NULL`;
-    const { rows: expRows } = await db.raw(expansionSql, { scientificNamesArr });
-    const expandedAphiaIds = expRows
-      .map((r) => r.aphia_id)
-      .filter((n) => Number.isInteger(n));
+    // Non-integer ids (NULL on not_found rows) are dropped here rather than in
+    // the fetcher, so the guarantee holds whatever supplied them.
+    const expandedAphiaIds = (await fetchAphiaIds(scientificNamesArr)).filter(
+      (n) => Number.isInteger(n),
+    );
 
     if (expandedAphiaIds.length > MAX_EXPANDED_APHIA_IDS) {
       throw new ScientificNameSelectionTooBroadError(
@@ -229,16 +268,20 @@ async function createDBFilter(request) {
   const obisSql = obisFilters.join(" AND \n") || "TRUE";
   const profileSql = profileFilters.join(" AND \n") || "TRUE";
 
+  // `hasShared` exists because the shared fragment is the only one a caller
+  // can omit: it lands in an outer WHERE that is dropped entirely when nothing
+  // narrows it. The other two are bound inside a branch's own WHERE, where
+  // "TRUE" is the right answer and no caller ever needs to ask.
   return {
     shared: db.raw(sharedSql, parameters),
     obisOnly: db.raw(obisSql, parameters),
     profileOnly: db.raw(profileSql, parameters),
     hasShared: filters.length > 0,
-    hasObisOnly: obisFilters.length > 0,
-    hasProfileOnly: profileFilters.length > 0,
   };
 }
 
 module.exports = createDBFilter;
-module.exports.ScientificNameSelectionTooBroadError = ScientificNameSelectionTooBroadError;
+module.exports.ScientificNameSelectionTooBroadError =
+  ScientificNameSelectionTooBroadError;
+module.exports.InvalidPolygonError = InvalidPolygonError;
 module.exports.MAX_EXPANDED_APHIA_IDS = MAX_EXPANDED_APHIA_IDS;

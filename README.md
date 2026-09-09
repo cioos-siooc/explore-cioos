@@ -181,7 +181,7 @@ For complete local development with all services running outside Docker (advance
    # Harvester
    cd harvester
    uv sync
-   
+
    # Download Scheduler
    cd ../download_scheduler
    uv sync
@@ -411,4 +411,3 @@ socket). Since we use Prefect for orchestration, you don't need a system cron jo
    Remote workers set `REGISTER_DEPLOYMENTS=false` so they only poll. Note that
    CSV/log output and caches are local to each host (plain named volumes aren't
    shared across hosts); the DB is the source of truth.
-

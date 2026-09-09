@@ -1,21 +1,73 @@
-.DS_Store
-dist
-.vscode/settings.json
-*.pdf
-*.egg-info*
-__pycache__
-node_modules
+# Root build context. Used by the two services that build from `.`:
+# prefect_worker (harvester/Dockerfile) and scheduler
+# (download_scheduler/Dockerfile). Both need only the Python projects, the
+# numbered SQL files and Obis_Datasets.json — everything else is transfer cost.
+#
+# NOTE ON SYNTAX: .dockerignore is NOT .gitignore. A bare `node_modules` here
+# matches ONLY a top-level entry, so anything meant to be excluded at any depth
+# needs an explicit `**/` prefix. That is how 148 MB of
+# harvester/ckan_harvester_cache stayed in the context while the root-level
+# name was listed. Keep the two files in step in intent, not in syntax.
+
+# --- Subtrees no root-context image needs -----------------------------------
+# frontend/ (529 MB with node_modules) and web-api/ build from their OWN
+# contexts; nginx and database likewise. test/ and docs/ ship in nothing.
+frontend
+web-api
+nginx
+test
+docs
+.github
+.git
+.vscode
+
+# --- Virtualenvs and caches -------------------------------------------------
+# `venv` alone never matched `.venv`, which is the name uv actually creates:
+# four of them, 1.6 GB.
+**/venv
+**/.venv
+**/__pycache__
+**/*.egg-info
+**/.pytest_cache
+**/.ruff_cache
+**/node_modules
+
+# --- Harvest / download artefacts -------------------------------------------
+# harvester/ckan_harvester_cache alone is 148 MB; harvest-prod 96 MB. None of
+# it is build input — the caches are re-fetched at run time into volumes.
+**/harvester_cache
+**/ckan_harvester_cache
+**/harvester_logs
+**/harvest
+**/harvest-prod
+**/downloads
+**/cde_download*
+**/obis
+**/obis_cache
+nginx/logs
+nginx/logrotate_state
+
+# --- Runtime config, never baked into an image ------------------------------
+# The harvest config is supplied at run time on purpose (see harvester/Dockerfile).
+harvest_config.yaml
+harvest_config.production.yaml
+docker-compose.override.yaml
+
+# --- Secrets and local junk -------------------------------------------------
+**/*.env
+**/.env.*
+.claude
+**/.DS_Store
 notforrepo
 .vscode_
+**/.ipynb_checkpoints
+**/*.ipynb
+
+# --- Build outputs and bulk data --------------------------------------------
+**/dist
+**/build
 out
-cde_download*
-venv
-*.rdb
-*.env
-.ipynb_checkpoints
-*.ipynb
-ckan_harvester_cache
-build
-*.csv
+**/*.pdf
+**/*.rdb
+**/*.csv
 !harvester/**/*.csv
-harvest

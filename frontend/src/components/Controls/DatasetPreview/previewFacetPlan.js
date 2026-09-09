@@ -24,125 +24,126 @@
 import {
   idVariablesFor,
   isDownwardVertical,
-  measurementsOf
-} from './previewVariables.js'
+  measurementsOf,
+} from "./previewVariables.js";
 
-export const COLUMNS = 'columns' // profiles: panels across, shared Y
-export const ROWS = 'rows' // timeseries: panels stacked, shared X
+export const COLUMNS = "columns"; // profiles: panels across, shared Y
+export const ROWS = "rows"; // timeseries: panels stacked, shared X
 
 const PROFILE_TYPES = new Set([
-  'Profile',
-  'TimeSeriesProfile',
-  'TrajectoryProfile'
-])
+  "Profile",
+  "TimeSeriesProfile",
+  "TrajectoryProfile",
+]);
 
-const find = (variables, predicate) => variables.find(predicate)
+const find = (variables, predicate) => variables.find(predicate);
 
 const verticalCoordinate = (variables) =>
   find(
     variables,
     (variable) =>
-      variable.kind === 'coordinate' &&
-      (variable.axis === 'Z' ||
-        variable.standardName === 'depth' ||
-        variable.standardName === 'altitude' ||
-        variable.columnName.toLowerCase() === 'depth')
-  )
+      variable.kind === "coordinate" &&
+      (variable.axis === "Z" ||
+        variable.standardName === "depth" ||
+        variable.standardName === "altitude" ||
+        variable.columnName.toLowerCase() === "depth"),
+  );
 
 const timeCoordinate = (variables) =>
   find(
     variables,
     (variable) =>
-      variable.kind === 'coordinate' &&
-      (variable.axis === 'T' ||
-        variable.standardName === 'time' ||
-        variable.unit === 'UTC')
-  )
+      variable.kind === "coordinate" &&
+      (variable.axis === "T" ||
+        variable.standardName === "time" ||
+        variable.unit === "UTC"),
+  );
 
 // Whichever of latitude / longitude actually moves over the record. The image
 // writes this as max([lat],[lon]): a north-south track is best read against
 // latitude, an east-west one against longitude, and picking the wrong one
 // collapses the plot onto a single value.
-function trackCoordinate (variables, data) {
-  const candidates = ['longitude', 'latitude']
+function trackCoordinate(variables, data) {
+  const candidates = ["longitude", "latitude"]
     .map((standardName) =>
       find(
         variables,
         (variable) =>
-          variable.kind === 'coordinate' && variable.standardName === standardName
-      )
+          variable.kind === "coordinate" &&
+          variable.standardName === standardName,
+      ),
     )
-    .filter(Boolean)
-  if (candidates.length < 2 || !data || !data.length) return candidates[0]
+    .filter(Boolean);
+  if (candidates.length < 2 || !data || !data.length) return candidates[0];
 
   const spanOf = (variable) => {
-    let min = Infinity
-    let max = -Infinity
+    let min = Infinity;
+    let max = -Infinity;
     data.forEach((row) => {
-      const value = Number(row[variable.columnName])
-      if (!Number.isFinite(value)) return
-      if (value < min) min = value
-      if (value > max) max = value
-    })
-    return max > min ? max - min : 0
-  }
+      const value = Number(row[variable.columnName]);
+      if (!Number.isFinite(value)) return;
+      if (value < min) min = value;
+      if (value > max) max = value;
+    });
+    return max > min ? max - min : 0;
+  };
   return spanOf(candidates[1]) > spanOf(candidates[0])
     ? candidates[1]
-    : candidates[0]
+    : candidates[0];
 }
 
 // Columns offerable as the shared axis, most plausible first. Coordinates lead
 // because they are what the layouts assume; every measurement follows so
 // "salinity against temperature" stays reachable, which is the whole point of
 // keeping the axis overridable.
-export function sharedCandidatesFor (variables) {
+export function sharedCandidatesFor(variables) {
   const coordinates = (variables || []).filter(
-    (variable) => variable.kind === 'coordinate'
-  )
-  return [...coordinates, ...measurementsOf(variables)]
+    (variable) => variable.kind === "coordinate",
+  );
+  return [...coordinates, ...measurementsOf(variables)];
 }
 
 // The shared axis a dataset type implies, or undefined when nothing fits.
-function defaultSharedFor (dataset, variables, data) {
-  const type = (dataset && dataset.cdm_data_type) || ''
-  if (PROFILE_TYPES.has(type)) return verticalCoordinate(variables)
-  if (type === 'TimeSeries') return timeCoordinate(variables)
-  if (type === 'Trajectory') {
-    return trackCoordinate(variables, data) || timeCoordinate(variables)
+function defaultSharedFor(dataset, variables, data) {
+  const type = (dataset && dataset.cdm_data_type) || "";
+  if (PROFILE_TYPES.has(type)) return verticalCoordinate(variables);
+  if (type === "TimeSeries") return timeCoordinate(variables);
+  if (type === "Trajectory") {
+    return trackCoordinate(variables, data) || timeCoordinate(variables);
   }
-  if (type === 'Point') return measurementsOf(variables)[0]
-  return undefined
+  if (type === "Point") return measurementsOf(variables)[0];
+  return undefined;
 }
 
 // The panels a record opens on: the dataset's own first EOV column when it is
 // plottable, else the first measurement. One panel, matching what the preview
 // showed before faceting.
-function defaultPanelsFor (dataset, variables, shared) {
+function defaultPanelsFor(dataset, variables, shared) {
   const measurements = measurementsOf(variables).filter(
-    (variable) => !shared || variable.columnName !== shared.columnName
-  )
-  if (!measurements.length) return []
+    (variable) => !shared || variable.columnName !== shared.columnName,
+  );
+  if (!measurements.length) return [];
   const preferred =
     dataset &&
     dataset.first_eov_column &&
     measurements.find(
-      (variable) => variable.columnName === dataset.first_eov_column
-    )
-  return [(preferred || measurements[0]).columnName]
+      (variable) => variable.columnName === dataset.first_eov_column,
+    );
+  return [(preferred || measurements[0]).columnName];
 }
 
 // null when this record cannot be plotted — the caller shows the table, which is
 // what Grid and any unrecognised cdm_data_type get.
-export function facetPlanFor (dataset, variables, data) {
-  if (!dataset || !variables || !variables.length) return null
-  const type = dataset.cdm_data_type || ''
-  const orientation = PROFILE_TYPES.has(type) ? COLUMNS : ROWS
+export function facetPlanFor(dataset, variables, data) {
+  if (!dataset || !variables || !variables.length) return null;
+  const type = dataset.cdm_data_type || "";
+  const orientation = PROFILE_TYPES.has(type) ? COLUMNS : ROWS;
 
-  const shared = defaultSharedFor(dataset, variables, data)
-  if (!shared) return null
+  const shared = defaultSharedFor(dataset, variables, data);
+  if (!shared) return null;
 
-  const panelDefaults = defaultPanelsFor(dataset, variables, shared)
-  if (!panelDefaults.length) return null
+  const panelDefaults = defaultPanelsFor(dataset, variables, shared);
+  if (!panelDefaults.length) return null;
 
   return {
     orientation,
@@ -150,34 +151,34 @@ export function facetPlanFor (dataset, variables, data) {
     // A depth axis runs downwards; nothing else is reversed.
     sharedReversed: orientation === COLUMNS && isDownwardVertical(shared),
     sharedCandidates: sharedCandidatesFor(variables).map(
-      (variable) => variable.columnName
+      (variable) => variable.columnName,
     ),
     // What names the record: the cf_role columns, which the figure turns into
     // its title. Here rather than in the figure because this is the module that
     // answers "what is drawn", and because it keeps the figure's inputs to a
     // plan plus a payload.
     titleColumns: idVariablesFor(variables).map(
-      (variable) => variable.columnName
+      (variable) => variable.columnName,
     ),
-    panelDefaults
-  }
+    panelDefaults,
+  };
 }
 
 // Resolve a plan against the user's choices. The shared axis is never also a
 // panel, and a column named in a link that this dataset does not have is
 // dropped rather than drawn empty.
-export function resolvePanels (panels, variables, sharedAxis) {
+export function resolvePanels(panels, variables, sharedAxis) {
   const available = new Set(
-    (variables || []).map((variable) => variable.columnName)
-  )
-  const seen = new Set()
+    (variables || []).map((variable) => variable.columnName),
+  );
+  const seen = new Set();
   return (panels || []).filter((columnName) => {
-    if (columnName === sharedAxis) return false
-    if (!available.has(columnName)) return false
-    if (seen.has(columnName)) return false
-    seen.add(columnName)
-    return true
-  })
+    if (columnName === sharedAxis) return false;
+    if (!available.has(columnName)) return false;
+    if (seen.has(columnName)) return false;
+    seen.add(columnName);
+    return true;
+  });
 }
 
 // Table or plot when the link says nothing.
@@ -190,13 +191,13 @@ export function resolvePanels (panels, variables, sharedAxis) {
 // plot than by silently reverting to the table.
 const PLOTTABLE_TYPES = new Set([
   ...PROFILE_TYPES,
-  'TimeSeries',
-  'Trajectory',
-  'Point'
-])
+  "TimeSeries",
+  "Trajectory",
+  "Point",
+]);
 
-export function defaultVisFor (dataset) {
-  return PLOTTABLE_TYPES.has((dataset && dataset.cdm_data_type) || '')
-    ? 'plot'
-    : 'table'
+export function defaultVisFor(dataset) {
+  return PLOTTABLE_TYPES.has((dataset && dataset.cdm_data_type) || "")
+    ? "plot"
+    : "table";
 }

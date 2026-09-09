@@ -24,16 +24,31 @@ const legend = await cdeQuery("/legend");
 assert.ok(legend.recordsCount, "/legend has no recordsCount");
 
 const organizations = await cdeQuery("/organizations");
-assert.equal(Array.isArray(organizations), true, "/organizations must return an array");
+assert.equal(
+  Array.isArray(organizations),
+  true,
+  "/organizations must return an array",
+);
 
 const oceanVariables = await cdeQuery("/oceanVariables");
-assert.equal(Array.isArray(oceanVariables), true, "/oceanVariables must return an array");
+assert.equal(
+  Array.isArray(oceanVariables),
+  true,
+  "/oceanVariables must return an array",
+);
 
 const delta = 0.01;
 const pointQuery = await cdeQuery(
   `/pointQuery?latMin=${latitude - delta}&lonMin=${longitude - delta}&latMax=${latitude + delta}&lonMax=${longitude + delta}`,
 );
-assert.equal(Array.isArray(pointQuery), true, "/pointQuery must return an array");
-assert.ok(pointQuery.length > 0, "the harvested data is not queryable through /pointQuery");
+assert.equal(
+  Array.isArray(pointQuery),
+  true,
+  "/pointQuery must return an array",
+);
+assert.ok(
+  pointQuery.length > 0,
+  "the harvested data is not queryable through /pointQuery",
+);
 
 console.log(`Verified API data from ${datasets.length} harvested dataset(s).`);

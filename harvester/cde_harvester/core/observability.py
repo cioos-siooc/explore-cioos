@@ -3,7 +3,7 @@
 import logging
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import sentry_sdk
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -105,7 +105,7 @@ def setup_logging(log_time, log_level, log_dir=None):
     # Add file handler with timestamped filename if log directory is specified
     if log_dir:
         os.makedirs(log_dir, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         log_file = os.path.join(log_dir, f"harvest_{timestamp}.log")
 
         f_handler = logging.FileHandler(log_file)
