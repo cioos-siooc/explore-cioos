@@ -2,12 +2,6 @@ name: Integration Tests
 
 on:
   pull_request:
-    branches:
-      - main
-      - master # Keep coverage while master remains the repository default branch.
-      - "development*"
-  # Deploy is triggered by this workflow completing successfully on a
-  # deployable branch, so it has to run on those pushes and not only on PRs.
   push:
     branches:
       - master
@@ -130,13 +124,15 @@ jobs:
           # frontend/Dockerfile builds on node:22-alpine.
           node-version: 22
           cache: npm
-          cache-dependency-path: test/package-lock.json
+          cache-dependency-path: |
+            test/package-lock.json
+            frontend/package-lock.json
 
       - name: Install integration-test dependencies
         working-directory: test
         run: npm ci --quiet
 
-      - name: Run JavaScript API and frontend tests
+      - name: Run the API tests
         env:
           CI: "true"
         run: |
@@ -148,9 +144,33 @@ jobs:
           test -n "${latitude:-}" && test -n "${longitude:-}"
           CI_LATITUDE="$latitude" CI_LONGITUDE="$longitude" npm --prefix test test
 
+      # The frontend half of this job used to be a puppeteer script asserting
+      # "no console errors on load". It is now a Playwright spec doing the same
+      # thing against the same stack — one browser-automation stack in the repo
+      # instead of two, and this one keeps a trace and a video when it fails.
+      # Unlike the mocked suite in test-frontend.yaml, nothing here is stubbed:
+      # this is the check that the real API and database actually serve the app.
+      - name: Frontend smoke test against the compose stack
+        working-directory: frontend
+        env:
+          CI: "true"
+          LIVE_BASE_URL: http://localhost:8098
+        run: |
+          npm ci --quiet
+          npx playwright install --with-deps chromium
+          npm run test:e2e:live
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: frontend-live-smoke-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
+
       - name: Submit and complete a download request
         run: .github/scripts/test-download-request.sh
-
 
       - name: Print Compose diagnostics
         if: failure()

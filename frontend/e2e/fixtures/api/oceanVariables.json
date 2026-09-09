@@ -1,0 +1,17 @@
+[
+  "phytoplanktonBiomassAndDiversity",
+  "oceanSound",
+  "seaSurfaceHeight",
+  "dissolvedOrganicCarbon",
+  "seaState",
+  "nutrients",
+  "seaSurfaceSalinity",
+  "inorganicCarbon",
+  "oxygen",
+  "subSurfaceSalinity",
+  "subSurfaceTemperature",
+  "oceanColour",
+  "oceanSurfaceStress",
+  "particulateMatter",
+  "subSurfaceCurrents"
+]

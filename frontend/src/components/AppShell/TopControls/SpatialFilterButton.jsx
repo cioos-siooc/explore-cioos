@@ -74,6 +74,7 @@ export default function SpatialFilterButton() {
 
   return (
     <DropdownButton
+      data-testid="topbar-spatial-filter"
       onOpenChange={handleOpenChange}
       toggleClassName={classNames("topBarButton topBarSpatialFilterToggle", {
         // Solid/active while the menu itself is open; once it's closed, a
