@@ -23,6 +23,7 @@
 - [ ] Give the datasets sheet a mid snap point on phones, so the list and the
       map are visible together. Deliberately left alone for now: the sheet drag
       was removed on purpose in "on phones the sheet waits to be asked for".
+- [ ] Same view for the wms map layer, improve that too
 - [ ] Long-press on the map as "add everything here" without opening the card.
 
 ### Downloader — test and fix
