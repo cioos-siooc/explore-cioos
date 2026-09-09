@@ -4,12 +4,10 @@
  */
 
 -- NOTE: Postgres runs this file ONCE, on a fresh volume, and db_migrate never
--- re-applies it (the DROP TABLEs below would wipe live data). So a column added
--- here reaches new databases only.
--- WHEN YOU ADD A COLUMN HERE, ADD IT TO migrations/0-migration-helper.sql TOO —
--- that inventory is what brings existing databases up to date on the next
--- deploy. Skipping it is how datasets.source_type / .obis_nodes went missing and
--- took down /obisNodes + /erddapServers.
+-- re-applies it (the DROP TABLEs below would wipe live data). A column added
+-- here therefore reaches new databases only: per database/README.md this repo
+-- is fresh-only, so a schema change means dropping the volume and re-harvesting
+-- rather than migrating a live database in place.
 
 
 -- We are using features from PostGIS 3
