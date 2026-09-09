@@ -44,6 +44,11 @@ docs
 **/cde_download*
 **/obis
 **/obis_cache
+# ...but `**/obis` also matched harvester/cde_harvester/sources/obis, so the
+# image shipped without the OBIS source package and every container died on
+# `import cde_harvester.__main__` -> ModuleNotFoundError: cde_harvester.sources.obis.
+# Re-include it explicitly (same idiom as the CSV rule at the bottom).
+!harvester/cde_harvester/sources/obis
 nginx/logs
 nginx/logrotate_state
 
