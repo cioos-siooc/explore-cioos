@@ -700,6 +700,13 @@ export default function CreateMap({
   // reports the measurement is registered once.
   const onViewportHexRangeRef = useRef(onViewportHexRange);
   onViewportHexRangeRef.current = onViewportHexRange;
+  // Read by the track-focus paint (see applyTrackFocus). It also fed a
+  // "click to show this platform's full track" line on the track tooltips,
+  // which the chips dropped: every hover said the same thing, and it said it
+  // about a gesture the user had not made yet.
+  const selectedTrajectoryRef = useRef(selectedTrajectory);
+  selectedTrajectoryRef.current = selectedTrajectory;
+
   // Raw selected-track response, cached so re-renders don't re-fetch.
   const rawTrackRef = useRef(null);
   // The selection the camera was last framed for, so a redraw from a filter
@@ -894,7 +901,7 @@ export default function CreateMap({
       map.current.setPaintProperty(
         "points-halo",
         "circle-opacity",
-        pointsHaloOpacity,
+        pointsHaloOpacity(),
       );
     }
   }
@@ -1007,7 +1014,9 @@ export default function CreateMap({
   // fades it back rather than leaving grey dots ringed in white. Only halfway
   // back: the other datasets stay on the map to be seen, just quietly, and the
   // casing is what keeps a grey dot legible over a dark sea.
-  const pointsHaloOpacity = ["case", IS_DIMMED, 0.5, 0.9];
+  function pointsHaloOpacity() {
+    return ["case", IS_DIMMED, 0.5, 0.9];
+  }
 
   // setFeatureState addresses a source and source-layer, not a style layer, so
   // this maps the layers a focus can dim onto where their features live.
@@ -1224,18 +1233,17 @@ export default function CreateMap({
   // ramp's own alpha (toRampStops), so this layer opacity is free to be a plain
   // number per zoom: MapLibre multiplies the two, and the count-driven half is
   // recomputed only when the domain moves rather than on every settled camera.
-  const hexOpacityExpression = () => [
-    "interpolate",
-    ["linear"],
-    ["zoom"],
-    ...HEX_OPACITY_STOPS.flat(),
-  ];
-  const coverageHexOpacityExpression = () => [
-    "interpolate",
-    ["linear"],
-    ["zoom"],
-    ...COVERAGE_HEX_OPACITY_STOPS.flat(),
-  ];
+  function hexOpacityExpression() {
+    return ["interpolate", ["linear"], ["zoom"], ...HEX_OPACITY_STOPS.flat()];
+  }
+  function coverageHexOpacityExpression() {
+    return [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      ...COVERAGE_HEX_OPACITY_STOPS.flat(),
+    ];
+  }
 
   // The outline layer comes up exactly as the fill goes, over the same span, so
   // a cell is never both uncoloured and unmarked — it keeps its place on the
@@ -1251,20 +1259,22 @@ export default function CreateMap({
   // expression that is not the input to a top-level step/interpolate — a
   // throwing setPaintProperty would abort the rest of the paint pass and leave
   // the hex layers stuck at the opacity 0 they are created with.
-  const coverageHexOutlineOpacityExpression = () => [
-    "interpolate",
-    ["linear"],
-    ["zoom"],
-    HEX_FILL_FADE_START_ZOOM,
-    0,
-    HEX_FILL_FADE_END_ZOOM,
-    [
-      "case",
-      IS_DIMMED,
-      COVERAGE_HEX_OUTLINE_OPACITY * 0.35,
-      COVERAGE_HEX_OUTLINE_OPACITY,
-    ],
-  ];
+  function coverageHexOutlineOpacityExpression() {
+    return [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      HEX_FILL_FADE_START_ZOOM,
+      0,
+      HEX_FILL_FADE_END_ZOOM,
+      [
+        "case",
+        IS_DIMMED,
+        COVERAGE_HEX_OUTLINE_OPACITY * 0.35,
+        COVERAGE_HEX_OUTLINE_OPACITY,
+      ],
+    ];
+  }
 
   // The border IS the ramp once the fill has gone, so it draws the same colour
   // the fill would have — including the grey a focused page puts on everything
@@ -2045,26 +2055,19 @@ export default function CreateMap({
   const onTrackClickRef = useRef(onTrackClick);
   onTrackClickRef.current = onTrackClick;
 
-  // Read by the track-focus paint (see applyTrackFocus). It also fed a
-  // "click to show this platform's full track" line on the track tooltips,
-  // which the chips dropped: every hover said the same thing, and it said it
-  // about a gesture the user had not made yet.
-  const selectedTrajectoryRef = useRef(selectedTrajectory);
-  selectedTrajectoryRef.current = selectedTrajectory;
-
   // The filter query and the data-layer selection combine into one suffix
   // shared by both source URLs — see buildTileSuffix. The two routes split the
   // zoom range for the same selection: /tiles folds the trajectory counts into
   // the combined green hexes below z7, /tiles/cells carries the dedicated
   // trajectory/OBIS coverage ramp at and above it. They take the same params so
   // the hex switch can't leave trajectory counts showing in one and not the other.
-  const tileUrls = (queryString) => {
+  function tileUrls(queryString) {
     const filterSuffix = buildTileSuffix(queryString, dataLayersRef.current);
     return {
       tileQuery: `${server}/tiles/{z}/{x}/{y}.mvt${filterSuffix}`,
       cellTileQuery: `${server}/tiles/cells/{z}/{x}/{y}.mvt${filterSuffix}`,
     };
-  };
+  }
 
   useEffect(() => {
     // Guard on source existence, not map.loaded(): the sources and layers are
@@ -2565,7 +2568,7 @@ export default function CreateMap({
             // Zero until the ramp is final — see revealData. It has no colour
             // on the ramp, but its radius is sized off the same one the points
             // are, and a casing without its point is just a white dot.
-            "circle-opacity": dataRevealed.current ? pointsHaloOpacity : 0,
+            "circle-opacity": dataRevealed.current ? pointsHaloOpacity() : 0,
             "circle-radius-transition": NO_TRANSITION,
             "circle-radius": radiusExpression(pointRadiusRange.current, 1.25),
           },
@@ -3518,7 +3521,7 @@ export default function CreateMap({
     // that doubles back can be hit several times over. Shared by the card's
     // query and by the single-track shortcut below, which both have to agree
     // on how many distinct tracks a click actually landed on.
-    const trackItemsIn = (hits) => {
+    function trackItemsIn(hits) {
       const tracks = [];
       const seen = new Set();
       hits
@@ -3548,7 +3551,7 @@ export default function CreateMap({
           });
         });
       return tracks;
-    };
+    }
 
     // Everything one click found, grouped the way the card reads it out. Returns
     // null when the click landed on empty water.
