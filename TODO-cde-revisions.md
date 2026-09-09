@@ -418,21 +418,53 @@ by the styling-unification pass; see that section and the verification at the en
 Each of these is a larger piece of work. See the HTML review for before/after diagrams.
 **Do not start these until P0's CI items are done.**
 
-### P2.1 — One module owns what a selection is `[Strong]`
+### P2.1 — One module owns what a selection is — **DONE** (2026-09-09)
 
-`web-api/utils/dbFilter.js`, `utils/shapeQuery.js`, `routes/{tiles,legend,timeExtent,download,griddapCoverage}.js`
+`web-api/utils/selection.js` and `utils/hexTiers.js` (new), `utils/{dbFilter,shapeQuery,hexMetric}.js`,
+`routes/{tiles,legend,timeExtent,download,griddapCoverage}.js`
 
-- [ ] The profiles / trajectory / obis / griddap branch set is written out **five times** and its
-      `includeProfiles` gating predicate **six times**, verbatim. The copies have already drifted —
-      three of the P0 correctness bugs above are that drift.
-- [ ] Also drifted: `download.js:113-124` omits the obis branch entirely, so `/downloadEstimate` and
-      `/download` disagree about what a selection contains. `shapeQuery.js:29` omits `show_as_point`
-      where `timeExtent.js:99` applies it, so the time axis and the dataset list are computed over
-      different feature sets.
-- [ ] Hex-tier thresholds are encoded four times: `tiles.js:148-154`, `tiles.js:387-389`,
-      `tiles.js:47`, and again in SQL at `4_create_hexes.sql:49,56,66,78`.
-- [ ] `dbFilter.js` returns `hasObisOnly` and `hasProfileOnly`, which have **zero consumers**.
-- [ ] Target: one module returning the branch set for a query; routes compose it.
+- [x] **The gates now have one owner.** `utils/selection.js` exports `erddapVisible(query)` and
+      `obisVisible(query)` — the two predicates that were written out **eight** and **six** times
+      respectively, verbatim, across five files. Every route asks; none answers for itself.
+- [x] **What was left of the branch-set duplication, likewise.** `TRAJECTORY_COVERAGE_FROM` (three
+      copies), `GRIDDAP_FROM` + `GRIDDAP_TIME_DEPTH_COLUMNS` (two), and `unionBranches()` — the
+      UNION-ALL-plus-empty-guard idiom, six copies of a subtle four-liner. The **projections stay
+      with the routes**: each selects the columns its own query needs, and forcing those through a
+      shared shape would have been a parameter list as long as the thing it replaced.
+- [x] **`show_as_point` resolved in favour of the selection.** It is a *display* flag — the harvester
+      (`dataset_types/geo.py`) sets it false for a feature whose bbox has no meaningful single point,
+      which is "still searchable via the stored bbox". So the map keeps it (`/tiles`, `/tiles/cells`,
+      `/legend`, now via the named `DRAWN_AS_POINT` so its absence elsewhere reads as deliberate) and
+      **`/timeExtent` drops it**, joining the shape query and `/download`. The time axis now spans the
+      same features as the dataset list it bounds. *This is the pass's one behaviour change:* the
+      slider's axis can widen on a selection holding region-spanning features.
+- [x] **Hex tiers.** `utils/hexTiers.js` owns the two grids and the four names the schema gives each
+      one (tier number, `cde.hexes_zoom_*`, `hex_*_pk`, edge length) plus `tierForZoom(z)`. That
+      replaces seven encodings across five files, including `tiles.js`'s `250000 / 25000` prefilter
+      constants (now `edgeMetres * 2.5`). `database/4_create_hexes.sql` still spells the two edge
+      lengths independently — JS cannot share a constant with it — so hexTiers.js cross-references it
+      and says changing one means changing both and re-tiling.
+- [x] `hasObisOnly` / `hasProfileOnly` deleted from `dbFilter.js` (zero consumers). `hasShared` stays,
+      with a comment saying why it is the only one anybody needs: it gates an *outer* WHERE that is
+      dropped entirely when nothing narrows it, where the other two land inside a branch's own WHERE
+      and "TRUE" is the right answer.
+- [x] `hexMetric.js`'s `nullMetricExpr` deleted: the legend's coverage guard used to spell out a
+      typed NULL shell whose column names and types had to be kept in step with the real branch by
+      hand. It now wraps the real branch, like the other five guards, so it cannot fall out of sync.
+- [x] **The drift now has a gate.** `utils/selectionAgreement.test.js` drives each route's handler
+      with `../db` stubbed by a builder-only knex that captures SQL instead of executing, and asserts
+      the cross-route rules: same gate everywhere, every `cde.profiles` branch binds the
+      feature-level EOV filter, only the map routes restrict to `show_as_point`, trajectory coverage
+      read at one tier outside the map, and an empty selection still yields runnable SQL. Verified by
+      mutation — reinstating `show_as_point` in `/timeExtent`, pointing `/download` at the coarse
+      tier, dropping a gate or an EOV filter each turn it red. Plus `selection.test.js` (10) and
+      `hexTiers.test.js` (4). **68 pass**, up from 47.
+- [x] **Behaviour-preservation proof.** A throwaway harness captured every statement all six routes
+      emit across 15 selections x 4 zooms — 995 statements — before and after. **955 byte-identical
+      modulo whitespace**; the 40 that differ are exactly three intended groups: 26 the griddap arm
+      gaining the table alias `d` (`FROM cde.datasets d`, same statement), 13 `/timeExtent` losing
+      `show_as_point`, 1 the legend's empty coverage guard. The trajectory/profiles/obis branch set
+      itself is unchanged in every one of the 995.
 
 ### P2.2 — Accept the database, don't construct it — **DONE, SCOPED DOWN** (2026-09-08)
 
@@ -494,8 +526,9 @@ now split, was two specific call sites.
       `shapeQuery.test.js` (13, two of them **characterisation** tests pinning the §P2.1 drift so
       whoever unifies the branch set can see exactly which queries change), `cache.test.js` (5) and
       `rawBindings.test.js` (4). **38 pass**, up from 3.
-- [ ] Still open, and belongs to P2.1/P2.3 rather than here: `dbFilter.js` returns `hasObisOnly` and
-      `hasProfileOnly` with zero consumers, and the branch set is still written out five times.
+- [x] Handed to §P2.1 and done there: `dbFilter.js`'s consumer-less `hasObisOnly` / `hasProfileOnly`
+      are deleted, and the branch set has one owner. The two characterisation tests
+      `shapeQuery.test.js` carried for it now assert the agreed contract instead.
 
 ### P2.3 — Every route through the same shape — **DONE** (2026-09-08)
 

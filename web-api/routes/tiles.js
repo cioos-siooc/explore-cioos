@@ -17,6 +17,13 @@ const {
   metricJoin,
   countAggregate,
 } = require("../utils/hexMetric");
+const { tierForZoom } = require("../utils/hexTiers");
+const {
+  erddapVisible,
+  obisVisible,
+  DRAWN_AS_POINT,
+  unionBranches,
+} = require("../utils/selection");
 
 // Per-tile cap on how many trajectories a single /tiles/tracks tile assembles.
 // A low-zoom tile spans a huge area: with a long trail (e.g. "All time") its
@@ -50,7 +57,9 @@ const PREFILTER_MIN_ZOOM = 3;
 function tileCellPrefilter(z) {
   const zi = Number(z);
   if (zi < PREFILTER_MIN_ZOOM) return null;
-  const hexDiameterM = zi < 5 ? 250000 : 25000; // > true diameter (hex_0 200km / hex_1 20km)
+  // 2.5x the cell EDGE, i.e. comfortably more than its 2x diameter — the
+  // prefilter only has to be a superset, so err wide.
+  const hexDiameterM = tierForZoom(zi).edgeMetres * 2.5;
   const tileWidthM = 40075016.686 / 2 ** zi;
   const expandM = Math.ceil(Math.max(tileWidthM * 0.25, hexDiameterM));
   return `geom && ST_Expand(ST_TileEnvelope(:z, :x, :y), ${expandM})`;
@@ -129,16 +138,18 @@ router.get(
 
     // zoom levels: 0-4,5-6,7+
     const isHexGrid = z < 7;
-    const zoomPKColumn = z < 5 ? "hex_0_pk" : "hex_1_pk";
-    const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
-    // cde.trajectory_hexes stores one row per tier instead of two hex FK
-    // columns (each tier's day count is aggregated independently, so they
-    // can't share a row). Numeric literal, never user input.
-    const hexTier = z < 5 ? 0 : 1;
+    // Which hex grid this zoom aggregates on, and the three names the schema
+    // gives it — see utils/hexTiers.js. `tier` is a numeric literal from that
+    // table, never user input.
+    const {
+      tier: hexTier,
+      hexesTable,
+      pointColumn: zoomPKColumn,
+    } = tierForZoom(z);
     // Prune each branch's scan to the tile region (see tileCellPrefilter).
     const cellPrefilter = tileCellPrefilter(z);
 
-    const includeObis = req.query.includeObis !== "false";
+    const includeObis = obisVisible(req.query);
     // What the hex/point `count` property means — see utils/hexMetric.js. The
     // same metric must reach /legend, or the ramp domain won't match the tiles.
     const metric = parseMetric(req.query.metric);
@@ -151,16 +162,13 @@ router.get(
     const trajectoryToggledOn = req.query.includeTrajectory !== "false";
     const trajectoryTypes = requestedTrajectoryTypes(req.query);
     // ERDDAP-sourced data (profiles + trajectory coverage) is hidden wholesale
-    // when an OBIS-only filter is active: scientific-name filters are
-    // OBIS-only, and an OBIS-node selection also hides it, unless ERDDAP
-    // servers are selected alongside it (combined Source filter — show both,
-    // OR'd in the shared dataset filter).
-    const erddapVisible =
-      !req.query.scientificNames &&
-      (!req.query.obisNodes || Boolean(req.query.erddapServers));
-    const includeProfiles = erddapVisible && profileTypes.length > 0;
+    // when the selection is OBIS-only — see utils/selection.js. The layer
+    // toggles above narrow that further; they are display state, not part of
+    // what the selection contains.
+    const erddap = erddapVisible(req.query);
+    const includeProfiles = erddap && profileTypes.length > 0;
     const includeTrajectory =
-      trajectoryToggledOn && erddapVisible && trajectoryTypes.length > 0;
+      trajectoryToggledOn && erddap && trajectoryTypes.length > 0;
 
     // At hex zoom we only need the hex FK and point_pk (for distinct counts);
     // the polygon is fetched once per hex via JOIN to hexes_zoom_*. At point
@@ -183,7 +191,7 @@ router.get(
     const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${metricValueExpr("profiles", metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
     FROM cde.profiles ${metricJoin("profiles", metric)}
-    WHERE show_as_point${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ""} AND :profileFilters`;
+    WHERE ${DRAWN_AS_POINT}${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ""} AND :profileFilters`;
     // Both cell tables (trajectory coverage cells and OBIS occurrence cells)
     // merge into the combined hex counts (z<7, the green ramp) but never
     // appear as individual points (z>=7). Their cell spacing is a grid
@@ -217,12 +225,7 @@ router.get(
     // at point zoom they're shown via the dedicated /tiles/cells layer.
     if (includeTrajectory && isHexGrid) branches.push(trajectoryBranch);
     if (includeObis && isHexGrid) branches.push(obisBranch);
-    // Guard: if nothing to show, return an empty CTE that still has the right
-    // columns. Wrapped in a subquery so it holds even when profilesBranch
-    // carries its own WHERE (profile-type filter).
-    const combinedInner = branches.length
-      ? branches.join("\n    UNION ALL\n    ")
-      : `SELECT * FROM (${profilesBranch}) empty_combined WHERE FALSE`;
+    const combinedInner = unionBranches(branches, profilesBranch);
 
     // `count` is the same quantity at both tiers — the aggregated metric. It
     // used to be count(distinct point_pk) at hex zoom and a sum at point zoom,
@@ -348,30 +351,28 @@ router.get(
 
     const filters = await createDBFilter(req.query);
 
-    // Only two hex grids exist (hex_0 for z<5, hex_1 for z>=5); hex_1 is
-    // reused uncapped past zoom 6 so coverage cells never become points.
-    const zoomPKColumn = z < 5 ? "hex_0_pk" : "hex_1_pk";
-    const hexesTable = z < 5 ? "cde.hexes_zoom_0" : "cde.hexes_zoom_1";
-    const hexTier = z < 5 ? 0 : 1; // see the main tile route
+    // Only two hex grids exist (utils/hexTiers.js); the fine one is reused
+    // uncapped past zoom 6 so coverage cells never become points.
+    const {
+      tier: hexTier,
+      hexesTable,
+      pointColumn: zoomPKColumn,
+    } = tierForZoom(z);
     // Prune each branch's scan to the tile region (see tileCellPrefilter).
     const cellPrefilter = tileCellPrefilter(z);
 
-    const includeObis = req.query.includeObis !== "false";
+    const includeObis = obisVisible(req.query);
     const metric = parseMetric(req.query.metric);
-    // Same gating as the main tile route: scientific-name filters are
-    // OBIS-only, so they hide the (ERDDAP) trajectory cells; an OBIS-node
-    // selection does too, unless ERDDAP servers are selected alongside it.
-    // On top of that, an explicit includeTrajectory=false hides them — the
-    // trajectories layer toggle, and tracks mode (where track lines replace
-    // the coverage hexes but OBIS cells stay).
-    // ...and, since the two trajectory geometries are separate layers, the
-    // requested subset of them; with neither on there is nothing to draw.
+    // Trajectory cells are ERDDAP data, so an OBIS-only selection hides them
+    // (utils/selection.js). On top of that, an explicit includeTrajectory=false
+    // hides them — the trajectories layer toggle, and tracks mode (where track
+    // lines replace the coverage hexes but OBIS cells stay) — and, since the
+    // two trajectory geometries are separate layers, so does deselecting both.
     const trajectoryTypes = requestedTrajectoryTypes(req.query);
-    const includeProfiles =
+    const includeTrajectory =
       req.query.includeTrajectory !== "false" &&
       trajectoryTypes.length > 0 &&
-      !req.query.scientificNames &&
-      (!req.query.obisNodes || Boolean(req.query.erddapServers));
+      erddapVisible(req.query);
 
     // A `src` discriminator lets one pass over the union produce both the
     // unified count that colours the hex AND the per-kind figures the hover
@@ -393,14 +394,9 @@ router.get(
     WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ""}`;
 
     const branches = [];
-    if (includeProfiles) branches.push(trajectoryBranch);
+    if (includeTrajectory) branches.push(trajectoryBranch);
     if (includeObis) branches.push(obisBranch);
-    // Guard: if nothing to show, return an empty CTE that still has the right
-    // columns. Wrapped in a subquery so it holds even when trajectoryBranch
-    // carries its own WHERE (the tile prefilter, present from z3 up).
-    const combinedInner = branches.length
-      ? branches.join("\n    UNION ALL\n    ")
-      : `SELECT * FROM (${trajectoryBranch}) empty_combined WHERE FALSE`;
+    const combinedInner = unionBranches(branches, trajectoryBranch);
 
     // The tile-envelope test is applied BEFORE the aggregation (hexes are
     // disjoint, so filtering hexes before or after grouping yields identical
@@ -534,18 +530,17 @@ router.get(
     }
 
     // Tracks are ERDDAP data, so the OBIS-only modes hide them wholesale —
-    // same gate as the hex, cell, legend and shape queries. This route used to
-    // hand-pick six filter keys, which dropped scientificNames on the floor:
-    // a taxon selection left every track drawn over an otherwise OBIS-only map.
-    const erddapVisible =
-      !req.query.scientificNames &&
-      (!req.query.obisNodes || Boolean(req.query.erddapServers));
+    // the same gate as the hex, cell, legend and shape queries, which is the
+    // point of it living in utils/selection.js. This route used to hand-pick
+    // six filter keys, which dropped scientificNames on the floor: a taxon
+    // selection left every track drawn over an otherwise OBIS-only map.
+    //
     // Track lines are drawn for whichever trajectory geometries are switched
     // on. With neither on the client stops asking for this layer at all, but
     // answer honestly rather than serving every track if a request arrives.
     const trajectoryTypes = requestedTrajectoryTypes(req.query);
     if (
-      !erddapVisible ||
+      !erddapVisible(req.query) ||
       !trajectoryTypes.length ||
       req.query.includeTrajectory === "false"
     ) {

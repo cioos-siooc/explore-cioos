@@ -2,6 +2,14 @@ const db = require("../db");
 const { changePKtoPkURL } = require("./misc");
 
 const createDBFilter = require("./dbFilter");
+const {
+  erddapVisible,
+  obisVisible,
+  TRAJECTORY_COVERAGE_FROM,
+  GRIDDAP_TIME_DEPTH_COLUMNS,
+  GRIDDAP_FROM,
+  unionBranches,
+} = require("./selection");
 
 /*
  * Assembles the shape query without running it: returns { sql, params } ready
@@ -26,19 +34,12 @@ async function buildShapeSql(
     timeMax = null,
     depthMin = null,
     depthMax = null,
-    includeObis = "true",
-    scientificNames,
-    obisNodes,
-    erddapServers,
   } = query;
 
-  // Scientific-name filters are OBIS-only: hide profiles when set. An
-  // OBIS-node selection also hides profiles, unless ERDDAP servers are
-  // selected alongside it (combined Source filter — show both, OR'd in the
-  // shared dataset filter).
-  const includeProfiles =
-    !scientificNames && (!obisNodes || Boolean(erddapServers));
-  const showObis = includeObis !== "false";
+  // Which feature sources this selection contains — see utils/selection.js,
+  // which every route asking the same question goes through.
+  const includeProfiles = erddapVisible(query);
+  const showObis = obisVisible(query);
 
   // search_geom is the geometry the shared spatial filter (dbFilter) matches
   // against: the per-feature bbox for profiles (extent search), the cell point
@@ -58,43 +59,31 @@ async function buildShapeSql(
   // elapsed span — pairing this rate with a span over-counted every trajectory
   // estimate by span/days-with-data, which for a ship that samples a few weeks
   // a year is an order of magnitude.
-  // Only the 10 km tier: the 100 km rows describe the same data at
-  // a coarser grain and would double-count every estimate.
-  // search_geom is the HEX POLYGON, not its centroid — a drawn polygon smaller
-  // than a hex still selects the data the track left inside it.
   const trajectoryBranch = `SELECT t.dataset_pk, t.time_min, t.time_max, t.depth_min, t.depth_max, t.records_per_day,
                t.day_ranges,
                t.trajectory_id as profile_id, NULL as timeseries_id, NULL::text[] as feature_eovs,
                t.latitude, t.longitude, NULL::integer AS point_pk, t.geom, h.geom AS search_geom
-        FROM cde.trajectory_hexes t
-        JOIN cde.hexes_zoom_1 h ON h.pk = t.hex_pk
-        WHERE t.hex_tier = 1`;
+        ${TRAJECTORY_COVERAGE_FROM}`;
   const obisBranch = `SELECT dataset_pk, time_min, time_max, depth_min, depth_max, 0 as records_per_day,
                day_ranges,
                NULL as profile_id, NULL as timeseries_id, NULL::text[] as feature_eovs,
                latitude, longitude, point_pk, geom, geom AS search_geom
         FROM cde.obis_cells
         WHERE :obisFilters`;
-  // Griddap datasets are metadata-only: no feature rows, their coverage lives
-  // on cde.datasets (coverage_* columns). The coverage_* names are aliased
-  // back to the combined-CTE contract here because dbFilter emits unqualified
-  // time_min/time_max/depth_* predicates that would otherwise be ambiguous.
-  // Timeless (static) grids coalesce to +-infinity so any time filter matches;
-  // NULL point_pk keeps grids out of map-click (pointPKs) queries.
-  const griddapBranch = `SELECT pk AS dataset_pk,
-               coalesce(coverage_time_min, '-infinity'::timestamptz) AS time_min,
-               coalesce(coverage_time_max, 'infinity'::timestamptz) AS time_max,
-               coalesce(coverage_depth_min, 0) AS depth_min,
-               coalesce(coverage_depth_max, 0) AS depth_max,
+  // Griddap footprints. The row set and the time/depth aliases come from
+  // selection.js, which explains why the coverage_* columns have to be renamed
+  // at all; the order below is the combined-CTE contract, so point_pk and
+  // search_geom sit at their positions in it rather than beside them.
+  const griddapBranch = `SELECT d.pk AS dataset_pk,
+               ${GRIDDAP_TIME_DEPTH_COLUMNS},
                0 AS records_per_day,
                NULL::daterange[] AS day_ranges,
                NULL::text AS profile_id, NULL::text AS timeseries_id,
                NULL::text[] AS feature_eovs,
                NULL::double precision AS latitude, NULL::double precision AS longitude,
                NULL::integer AS point_pk, NULL::geometry AS geom,
-               coverage_bbox AS search_geom
-        FROM cde.datasets
-        WHERE cdm_data_type = 'Grid' AND coverage_bbox IS NOT NULL`;
+               d.coverage_bbox AS search_geom
+        ${GRIDDAP_FROM}`;
 
   const branches = [];
   if (includeProfiles) branches.push(profilesBranch, trajectoryBranch);
@@ -102,9 +91,7 @@ async function buildShapeSql(
   // Grids appear in /pointQuery and /datasetRecordsList but never in the
   // download-estimate path (metadata-only, downloads happen on ERDDAP).
   if (includeProfiles && !doEstimate) branches.push(griddapBranch);
-  const combinedInner = branches.length
-    ? branches.join("\n        UNION ALL\n        ")
-    : `SELECT * FROM (${profilesBranch}) empty_combined WHERE FALSE`;
+  const combinedInner = unionBranches(branches, profilesBranch);
 
   // The record list is one row per *record* (profile / trajectory / OBIS
   // dataset), not one per matched feature. Trajectory and OBIS coverage is

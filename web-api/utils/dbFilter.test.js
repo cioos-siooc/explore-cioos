@@ -22,8 +22,6 @@ test("no filters emits TRUE, not an empty predicate", async () => {
   assert.equal(f.obisOnly.toString(), "TRUE");
   assert.equal(f.profileOnly.toString(), "TRUE");
   assert.equal(f.hasShared, false);
-  assert.equal(f.hasObisOnly, false);
-  assert.equal(f.hasProfileOnly, false);
 });
 
 test("time and depth bounds are emitted as bounded, cast predicates", async () => {
@@ -48,7 +46,6 @@ test("eovs is applied at BOTH dataset and feature level", async () => {
   const f = await createDBFilter({ eovs: "temperature,salinity" });
   assert.match(f.shared.toString(), /eovs && /);
   assert.match(f.profileOnly.toString(), /eovs && /);
-  assert.equal(f.hasProfileOnly, true);
 });
 
 test("comma-separated keys bind as arrays, not as the raw string", async () => {
@@ -153,7 +150,6 @@ test("scientificNames expands via the injected fetcher and filters OBIS only", a
   assert.match(obis, /aphia_ids && /);
   assert.match(obis, /126436/);
   assert.match(obis, /scientific_names && /);
-  assert.equal(f.hasObisOnly, true);
 });
 
 test("non-integer aphia ids are dropped whatever supplied them", async () => {

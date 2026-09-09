@@ -4,6 +4,11 @@ const router = express.Router();
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { pipeline } = require("../utils/routePipeline");
+const {
+  erddapVisible,
+  GRIDDAP_TIME_DEPTH_COLUMNS,
+  GRIDDAP_FROM,
+} = require("../utils/selection");
 
 /**
  * /griddapCoverage
@@ -32,32 +37,25 @@ const { pipeline } = require("../utils/routePipeline");
  *               type: object
  */
 router.get("/", ...pipeline(), async (req, res) => {
-  const { scientificNames, obisNodes, erddapServers } = req.query;
-  // Same gating as shapeQuery's includeProfiles: scientific-name filters and
-  // OBIS-node-only selections hide ERDDAP data, and griddap is ERDDAP-only.
-  const includeProfiles =
-    !scientificNames && (!obisNodes || Boolean(erddapServers));
-  if (!includeProfiles) {
+  // Griddap is ERDDAP-only, so an OBIS-only selection contains none of it —
+  // see utils/selection.js for what makes a selection OBIS-only.
+  if (!erddapVisible(req.query)) {
     return res.send({ type: "FeatureCollection", features: [] });
   }
 
   const filters = await createDBFilter(req.query);
 
   // The CTE aliases the coverage_* columns back to the names dbFilter's
-  // unqualified predicates expect (time_min, depth_min, point_pk,
-  // search_geom); d.* keeps every dataset column the shared filters may
-  // reference (pk_url, eovs, platform, organization_pks, obis_nodes,
-  // erddap_url). NULL point_pk keeps grids out of map-click queries.
+  // unqualified predicates expect — see utils/selection.js, which the shape
+  // query's griddap arm takes the same aliases from. `d.*` keeps every dataset
+  // column the shared filters may reference (pk_url, eovs, platform,
+  // organization_pks, obis_nodes, erddap_url) alongside them.
   const sql = `WITH grids AS (
         SELECT d.*,
-               coalesce(d.coverage_time_min, '-infinity'::timestamptz) AS time_min,
-               coalesce(d.coverage_time_max, 'infinity'::timestamptz) AS time_max,
-               coalesce(d.coverage_depth_min, 0) AS depth_min,
-               coalesce(d.coverage_depth_max, 0) AS depth_max,
+               ${GRIDDAP_TIME_DEPTH_COLUMNS},
                NULL::integer AS point_pk,
                d.coverage_bbox AS search_geom
-          FROM cde.datasets d
-         WHERE d.cdm_data_type = 'Grid' AND d.coverage_bbox IS NOT NULL)
+        ${GRIDDAP_FROM})
   SELECT json_build_object(
            'type', 'FeatureCollection',
            'features', coalesce(json_agg(

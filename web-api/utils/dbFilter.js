@@ -113,9 +113,10 @@ async function createDBFilter(
     // datasets.eovs.
     //
     // Every branch reading FROM cde.profiles must apply this, or it silently
-    // keeps the old dataset-level behaviour — there is no error to catch it.
-    // The five today: shapeQuery's profilesBranch, tiles.js (the hex/point
-    // route), legend.js, timeExtent.js and download.js. Branches that cannot
+    // keeps the old dataset-level behaviour — there is no error to catch it,
+    // which is why utils/selectionAgreement.test.js checks all five: the
+    // shape query's profilesBranch, tiles.js (the hex/point route), legend.js,
+    // timeExtent.js and download.js. Branches that cannot
     // answer it stay dataset-level via `filters`, which is why that clause is
     // kept there: obis_cells, trajectory cells and track stats, the griddap
     // pseudo-branch, and the two coverage-cell queries (/tiles/cells and the
@@ -267,13 +268,15 @@ async function createDBFilter(
   const obisSql = obisFilters.join(" AND \n") || "TRUE";
   const profileSql = profileFilters.join(" AND \n") || "TRUE";
 
+  // `hasShared` exists because the shared fragment is the only one a caller
+  // can omit: it lands in an outer WHERE that is dropped entirely when nothing
+  // narrows it. The other two are bound inside a branch's own WHERE, where
+  // "TRUE" is the right answer and no caller ever needs to ask.
   return {
     shared: db.raw(sharedSql, parameters),
     obisOnly: db.raw(obisSql, parameters),
     profileOnly: db.raw(profileSql, parameters),
     hasShared: filters.length > 0,
-    hasObisOnly: obisFilters.length > 0,
-    hasProfileOnly: profileFilters.length > 0,
   };
 }
 
