@@ -10,6 +10,7 @@ const shared = {
   eqeqeq: ["error", "always", { null: "ignore" }],
   "no-var": "error",
   "prefer-const": "error",
+  "no-use-before-define": ["error", { functions: false }],
   "no-unused-vars": [
     "error",
     {

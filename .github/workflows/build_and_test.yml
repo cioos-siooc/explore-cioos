@@ -2,12 +2,6 @@ name: Integration Tests
 
 on:
   pull_request:
-    branches:
-      - main
-      - master # Keep coverage while master remains the repository default branch.
-      - "development*"
-  # Deploy is triggered by this workflow completing successfully on a
-  # deployable branch, so it has to run on those pushes and not only on PRs.
   push:
     branches:
       - master
@@ -150,7 +144,6 @@ jobs:
 
       - name: Submit and complete a download request
         run: .github/scripts/test-download-request.sh
-
 
       - name: Print Compose diagnostics
         if: failure()

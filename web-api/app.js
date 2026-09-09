@@ -154,9 +154,20 @@ Sentry.setupExpressErrorHandler(app);
 app.use((err, req, res, next) => {
   const status = err.statusCode || err.status || 500;
   if (status >= 500) console.error(err);
+
+  // Something already started writing — the response is no longer ours to
+  // shape, so let express finalize/destroy it rather than append a JSON body
+  // to a half-sent one.
+  if (res.headersSent) return next(err);
+
   res.status(status).json({
     error: err.message || "Internal Server Error",
-    ...(req.app.get("env") === "development" ? { stack: err.stack } : {}),
+    // detail/hint are where Postgres puts the useful part of a query error
+    // (missing column, bad syntax); they ride along with the stack, outside
+    // production only.
+    ...(req.app.get("env") === "development"
+      ? { detail: err.detail, hint: err.hint, stack: err.stack }
+      : {}),
   });
 });
 

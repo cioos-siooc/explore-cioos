@@ -196,6 +196,7 @@ function pipeline({
   tileParams = null,
   checks = [],
   cacheFor = DEFAULT_CACHE_DURATION,
+  cacheToggle = undefined,
 } = {}) {
   return [
     ...(tileParams ? tileParamValidators(tileParams) : []),
@@ -203,7 +204,9 @@ function pipeline({
     ...(shape ? shapeValidators() : []),
     ...checks,
     errorHandler,
-    ...(cacheFor === null ? [] : [cache.route(cacheFor)]),
+    // `cacheToggle` decides per response whether it may be stored/served —
+    // see cache.onlyOk, for a route whose upstream can fail.
+    ...(cacheFor === null ? [] : [cache.route(cacheFor, cacheToggle)]),
   ];
 }
 

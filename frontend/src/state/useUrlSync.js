@@ -9,6 +9,7 @@ import {
 import { wmsSliceParams } from "../wmsUtilities.js";
 import { anyTrajectoryLayerOn, dataLayersAreDefault } from "./dataLayers.js";
 import { GROUP_NONE } from "./datasetGroups.js";
+import { PLOT_PARAMS, RECORD_PARAM } from "./selection/previewParams.js";
 import { defaultTrailingDays } from "../components/config.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
@@ -25,10 +26,13 @@ import { useSelection } from "./selection/SelectionProvider.jsx";
 // seeds the filters, MapStateProvider the camera, SelectionProvider the
 // selection / search / grouping), each from the address the app was opened at.
 //
-// The open dataset page is the exception: SelectionProvider owns the
-// dataset/server params and derives its state from them, so this sync must
-// carry them through rather than drop them (it rebuilds the whole search
-// string from scratch on every map pan).
+// The open dataset page and the record preview are the exception:
+// SelectionProvider and usePreviewPlotParams own those params and derive their
+// state from them, so this sync must carry them through rather than drop them
+// (it rebuilds the whole search string from scratch on every map pan). Anything
+// not named in PRESERVED_PARAMS below is gone the moment the map moves.
+const PRESERVED_PARAMS = ["server", RECORD_PARAM, ...PLOT_PARAMS];
+
 export default function UrlSync() {
   const [searchParams] = useSearchParams();
   const { i18n } = useTranslation();
@@ -37,7 +41,6 @@ export default function UrlSync() {
   // would undo the stored preference on the first sync.
   const lang = searchParams.get("lang") || i18n.resolvedLanguage;
   const dataset = searchParams.get("dataset");
-  const server = searchParams.get("server");
   const navigate = useNavigate();
 
   const { query } = useFilters();
@@ -96,11 +99,27 @@ export default function UrlSync() {
       ...(groupBy && groupBy !== GROUP_NONE ? { groupBy } : {}),
       ...(hiddenGroupsParam ? { hiddenGroups: hiddenGroupsParam } : {}),
       ...(dataset ? { dataset } : {}),
-      ...(dataset && server ? { server } : {}),
-      // What the open dataset page is pointing at, all of it keyed to the
-      // ?dataset= above and gone with it: which slice of a griddap overlay is
-      // drawn, and which subset of the dataset is highlighted — the record a
-      // marker click pinned, or the platform whose track is on the map.
+      // Everything that hangs off the dataset page. The server that
+      // disambiguates it and the open preview (which record, and how it is
+      // drawn) are carried through from the address as-is, because
+      // SelectionProvider and usePreviewPlotParams own those params and this
+      // sync would otherwise drop them on the next map pan. With no dataset
+      // there is nothing for them to describe, so they go rather than linger
+      // as stale keys pointing at a page that is closed.
+      ...(dataset
+        ? Object.fromEntries(
+            PRESERVED_PARAMS.map((param) => [
+              param,
+              searchParams.get(param),
+            ]).filter(([, value]) => value !== null),
+          )
+        : {}),
+      // The rest is derived from state rather than preserved, and is likewise
+      // keyed to the ?dataset= above and gone with it: which slice of a griddap
+      // overlay is drawn, and which subset of the dataset is highlighted — the
+      // record a marker click pinned, or the platform whose track is on the map.
+      // Note these are the HIGHLIGHT, distinct from the ?preview= above: they
+      // point a row out on the dataset page without opening its plot.
       ...(activeWmsOverlay ? wmsSliceParams(activeWmsOverlay) : {}),
       ...(highlightedRecord ? { record: highlightedRecord.profileId } : {}),
       ...(selectedTrajectory ? { track: selectedTrajectory.trajectoryId } : {}),
@@ -143,11 +162,6 @@ export default function UrlSync() {
     // the URL, so an entry per map pan would only bury the history entries
     // that do mean something (opening a dataset page).
     navigate("?" + combined.toString(), { replace: true });
-    // What this effect reads is not what it should re-run for. `isPageLoad` is
-    // the one-shot guard it consumes; `scrubTime` is represented by its
-    // debounced twin above; `dataset`, `server` and `lang` are carried through
-    // the URL untouched, and re-navigating when they change would fight the
-    // navigations that set them.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     query,
@@ -175,7 +189,7 @@ export default function UrlSync() {
     if (lang !== i18n.language) {
       i18n.changeLanguage(lang);
     }
-  }, [lang, i18n]);
+  }, [lang]);
 
   return null;
 }
