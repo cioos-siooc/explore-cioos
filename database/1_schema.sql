@@ -3,6 +3,12 @@
 
  */
 
+-- NOTE: Postgres runs this file ONCE, on a fresh volume, and db_migrate never
+-- re-applies it (the DROP TABLEs below would wipe live data). A column added
+-- here therefore reaches new databases only: per database/README.md this repo
+-- is fresh-only, so a schema change means dropping the volume and re-harvesting
+-- rather than migrating a live database in place.
+
 
 -- We are using features from PostGIS 3
 CREATE EXTENSION IF NOT EXISTS postgis;
@@ -84,6 +90,11 @@ CREATE TABLE datasets (
     coverage_time_max timestamptz,
     coverage_depth_min double precision,
     coverage_depth_max double precision,
+    -- Per-variable metadata for every dataset type, harvested from
+    -- /info/{id}/index.csv: long_name, units, cf_role, axis, colorBar*, ...
+    -- See harvester/cde_harvester/core/variables.py. NULL until a dataset is
+    -- (re)harvested, so consumers must tolerate its absence.
+    table_variables jsonb,
     grid_variables jsonb,
     grid_dimensions jsonb,
     wms_url text,

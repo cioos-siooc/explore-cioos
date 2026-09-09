@@ -529,6 +529,8 @@ export function boundsAreFramed(map, bounds) {
   return offset < 40;
 }
 
+const unique = (arr) => [...new Set(arr)];
+
 export function polygonIsRectangle(polygon) {
   if (polygon.length !== 5) return false;
   const p = polygon.slice(0, 4);
@@ -538,7 +540,6 @@ export function polygonIsRectangle(polygon) {
 
   return lons.length === 2 && lats.length === 2;
 }
-const unique = (arr) => [...new Set(arr)];
 
 // translate a rectangular polygon to a bounding box query using lat/long min/max
 function polygonToMaxMins(polygon) {

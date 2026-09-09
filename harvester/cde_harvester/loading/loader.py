@@ -426,10 +426,11 @@ def main(folder, incremental=False):
     if "obis_nodes" not in datasets.columns:
         datasets["obis_nodes"] = [[] for _ in range(len(datasets))]
 
-    # Griddap metadata columns. All nullable; absent entirely from pre-griddap
-    # harvest folders. coverage_time_* is normalized to datetime so NaT binds
-    # as NULL on the timestamptz columns.
-    for col in ("grid_variables", "grid_dimensions"):
+    # jsonb metadata columns (table_variables for every dataset type, the two
+    # grid_* ones for griddap). All nullable; absent entirely from older harvest
+    # folders. coverage_time_* is normalized to datetime so NaT binds as NULL on
+    # the timestamptz columns.
+    for col in ("table_variables", "grid_variables", "grid_dimensions"):
         if col not in datasets.columns:
             datasets[col] = None
     for col in ("coverage_time_min", "coverage_time_max"):
