@@ -7,6 +7,7 @@ import traceback
 import sentry_sdk
 from jinja2 import Environment, FileSystemLoader
 from loguru import logger
+from prefect import flow, get_run_logger
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -350,8 +351,6 @@ def _mirror_logs_to_prefect():
     (PREFECT_LOGGING_EXTRA_LOGGERS only reaches stdlib loggers). Returns None
     outside a run context, so the caller knows there is no sink to remove.
     """
-    from prefect import get_run_logger
-
     try:
         run_logger = get_run_logger()
     except Exception:
@@ -370,8 +369,6 @@ def run_download_observed(row):
     if not _prefect_enabled():
         run_download(row)
         return
-
-    from prefect import flow
 
     # Declared per job so the run can be named after it, while the flow NAME
     # stays constant so Prefect still groups every download under one flow.

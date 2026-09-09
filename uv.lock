@@ -418,6 +418,7 @@ dependencies = [
     { name = "downloader" },
     { name = "jinja2" },
     { name = "loguru" },
+    { name = "prefect" },
     { name = "sentry-sdk" },
     { name = "sqlalchemy" },
 ]
@@ -428,6 +429,7 @@ requires-dist = [
     { name = "downloader", editable = "downloader" },
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "loguru", specifier = ">=0.7.3" },
+    { name = "prefect", specifier = ">=3.6.23" },
     { name = "sentry-sdk", specifier = ">=2.38.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0,<3.0.0" },
 ]

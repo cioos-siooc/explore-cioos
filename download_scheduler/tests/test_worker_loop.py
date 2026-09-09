@@ -31,6 +31,20 @@ def job(monkeypatch):
     return row
 
 
+@pytest.fixture(scope="module")
+def prefect_server():
+    """An ephemeral Prefect API, yielded as the URL to point the scheduler at.
+
+    Module-scoped: standing one up runs a database migration and costs seconds,
+    and the flow tests only read from it.
+    """
+    from prefect.settings import PREFECT_API_URL as PREFECT_API_URL_SETTING
+    from prefect.testing.utilities import prefect_test_harness
+
+    with prefect_test_harness():
+        yield PREFECT_API_URL_SETTING.value() or "http://ephemeral.invalid/api"
+
+
 def test_returns_true_and_runs_the_job_on_the_happy_path(monkeypatch, job, updates):
     ran = []
     monkeypatch.setattr(ds, "run_download", ran.append)
@@ -226,6 +240,34 @@ class TestPrefectObservability:
 
         with pytest.raises(TypeError):
             ds.run_download_observed(job)
+
+    def test_the_flow_path_actually_runs_the_job(self, prefect_server, monkeypatch, job):
+        """The PREFECT_API_URL branch, against a real (ephemeral) Prefect.
+
+        Every other test here unsets the variable and so only ever exercises
+        the passthrough. That gap let the branch ship broken: dropping the
+        `harvester` dependency took Prefect out of the scheduler image with it,
+        and docker-compose sets PREFECT_API_URL by default, so the first real
+        download died on `from prefect import flow` while the whole unit suite
+        stayed green.
+        """
+        monkeypatch.setenv("PREFECT_API_URL", prefect_server)
+        ran = []
+        monkeypatch.setattr(ds, "run_download", lambda row: ran.append(row) or "completed")
+
+        ds.run_download_observed(job)
+
+        assert ran == [job]
+
+    def test_a_failed_job_does_not_raise_out_of_a_real_flow_run(
+        self, prefect_server, monkeypatch, job
+    ):
+        """As above, but through the flow: DownloadJobFailed marks the run red
+        and stops there. Raised inside the flow, caught outside it."""
+        monkeypatch.setenv("PREFECT_API_URL", prefect_server)
+        monkeypatch.setattr(ds, "run_download", lambda row: "failed")
+
+        ds.run_download_observed(job)  # must not raise
 
     def test_failed_status_set_is_only_real_faults(self):
         """no-data and over-limit are outcomes the user is emailed about, not
