@@ -661,31 +661,75 @@ now split, was two specific call sites.
 
 ### P2.6 — Give `Map.jsx` a seam that isn't WebGL `[Strong]` — *largest prize, largest risk*
 
-`frontend/src/components/Map/Map.jsx` — 3508 lines, one default export
+`frontend/src/components/Map/Map.jsx` — 4320 lines, one default export
 
-- [ ] 21 `useEffect`, 38 `useRef`, 2 `useState`, 29 props, 21 `addLayer`. **~1900 lines sit behind a
-      live WebGL context.** The mount effect alone is 1481 lines (1879–3359). **[verified]**
-- [ ] The render body monkey-patches MapboxDraw's mode table (266–331) and allocates a fresh
-      `MapboxDraw` (450) and `Popup` (699) on **every render**, plus nine ref writes during render.
-- [ ] **Twin maths kept in step by hand**: `radiusExpression` (854–869) builds a MapLibre expression
-      and `pointRadiusFor` (873–884) re-implements the same arithmetic in JS. The test that would
-      keep them honest cannot be written — neither is exported, and one reads
-      `pointRadiusRange.current` from closure rather than taking it as an argument. **Fix this slice first.**
-- [ ] Re-entrancy is held by **eight ad-hoc idempotence guards** (`hexRangeDirty`, `appliedFocus`,
-      `trackFocusApplied`, `hexesRevealed`, `rampMeasuredForPk`, `wmsRenderToken`,
-      `lastClickHandledAt`, `appliedTrailRef`), each documented as fixing one loop or flicker.
-- [ ] Pure but unexported, so untestable: `buildTileSuffix` (163–190, the whole tile query contract),
-      `tracksTimeWindow` (519–537), `rampExpression` (826–830), `featureHasDataset` (752–758),
-      `dedupeGriddapByPk`, `datasetPksOf`, and the dedupe/role/bbox rules inside `buildFeatureQuery`
-      (2824–3049, 225 lines).
-- [ ] `setColorStops` (908–1004, 96 lines) has **five entry points** — an effect, a `zoomend`
-      listener, the `load` handler, and two functions reached via `setColorStopsRef`.
-- [ ] Dead: prop `setDatasetsSelected` (:230) is never used, yet `MapContainer.jsx:14` reads it from
-      context solely to forward it. Layer id `'points-hovered'` (:894) is in `POINT_LAYERS` but never
-      added; a `getLayer` guard makes it silently inert. **[verified]**
-- [ ] `Map.jsx` reads the URL directly twice (`useSearchParams` at 247, and `new URL(window.location.href)`
-      at 2467 inside the `load` handler), bypassing both context and its props. There are five
-      independent readers of `window.location` across the state modules.
+> **Re-verified 2026-09-09 against `fix/p0-cleanup-backlog @ b233d792`.** The file has grown 23%
+> since the 2026-08-27 survey (3508 → 4320), so every reference below has been refreshed and will
+> drift again. Every finding still holds, and all but one of the counts understated it.
+>
+> **Prerequisite — do not start this item yet.** Its whole payoff is testability, and there is no
+> frontend test harness on this branch: `frontend/package.json:43` is still
+> `"test": "echo \"Error: no test specified\" && exit 1"` — no vitest, no `*.test.jsx`, no
+> `playwright.config`. The four-layer suite exists on `feat/frontend-test-suite` (`8abc8b87`) and is
+> **unmerged**. CI's only frontend gate is `test/frontend_loads_without_errors.js`, 62 lines that
+> exit 1 on a console error: it catches a mount-effect crash, not a radius formula drifting from its
+> expression or a hit-test ranking regression. Extracting these functions without it is an
+> unverified refactor with a live WebGL blast radius — which is the failure this file's own preamble
+> names. **Merge `feat/frontend-test-suite` first.**
+
+- [ ] 22 `useEffect`, 42 `useRef`, 2 `useState`, 32 props, 22 `addLayer`. **~1900 lines sit behind a
+      live WebGL context.** The mount effect alone is 1750 lines (2359–4108). **[re-verified]**
+- [ ] The render body monkey-patches MapboxDraw's mode table (393–478, plus 79–81 at module scope)
+      and allocates a fresh `MapboxDraw` (640) and `Popup` (963) on **every render**, plus eight ref
+      writes during render (668, 702, 1380, 2032, 2039, 2044, 2046, 2053).
+- [ ] **Twin maths kept in step by hand**: `radiusExpression` (1157–1170) builds a MapLibre
+      expression and `pointRadiusFor` (1176–1186) re-implements the same arithmetic in JS. The test
+      that would keep them honest cannot be written — neither is exported, and one reads
+      `pointRadiusRange.current` from closure rather than taking it as an argument. They agree today
+      (both clamp outside the domain; the comment at 1172–1175 says why), which is exactly the state
+      that rots silently.
+- [ ] Re-entrancy is held by **five ad-hoc idempotence guards** (`appliedFocus` :679,
+      `trackFocusApplied` :683, `appliedTrailRef` :758, `wmsRenderToken` :1646,
+      `lastClickHandledAt` :3769 — a plain `let`, not a ref), each documented as fixing one loop or flicker. **[re-verified — the
+      survey named eight: `hexesRevealed` is now `dataRevealed` (:662), `rampMeasuredForPk` is now
+      `rampMeasuredFor` (:692), and `hexRangeDirty` is gone entirely]**
+- [ ] Pure but unexported, so untestable: `buildTileSuffix` (226–253, the whole tile query contract —
+      already at module scope, so `export` is a one-word diff), `tracksTimeWindow` (716–726),
+      `rampExpression` (1127–1131), `featureHasDataset` (1026–1032), `dedupeGriddapByPk` (1676–1683),
+      `datasetPksOf` (3507–3514), and the dedupe/role/bbox rules inside `buildFeatureQuery`
+      (3555–3762, 208 lines).
+- [ ] **The seam is the hit-test group, and it is only two map methods wide.** `isOnAPointIn` (3116),
+      `trackFeatureIn` (3131), `griddapCoveredIn` (3145), `griddapOutranksHexesIn` (3156),
+      `datasetPksOf` (3507), `trackItemsIn` (3521) and `buildFeatureQuery` (3555) are ~420 lines of
+      array-of-feature ranking and dedupe buried inside the mount effect. Their *entire* dependency
+      on MapLibre is `map.current.getZoom()` and `map.current.project(lngLat)`. A module taking
+      `(hits, { zoom, project })` lifts all of it out — a camera seam, not a WebGL abstraction.
+      **[new — the survey scattered these across bullets and missed that they group]**
+- [ ] `setColorStops` (1274–1379, 106 lines) has **four entry points** — the `[rangeLevels,
+      coverageRangeLevels]` effect (1041), the `load` handler (2410), a `zoomend` listener (4254),
+      and `refreshViewportHexRange` via `setColorStopsRef` (1522). **[re-verified — the survey said
+      five, counting two functions through the ref; only one reaches it now]**
+- [ ] Dead: `Map.jsx` no longer declares a `setDatasetsSelected` prop, yet `MapContainer.jsx:14`
+      still reads it from context and `:146` still forwards it — a prop handed to a component that
+      does not accept it. Layer id `'points-hovered'` (:1207) is in `POINT_LAYERS` but never added
+      anywhere in the repo; a `getLayer` guard makes it silently inert. Both are safe to delete
+      today, independently of everything else in this section. **[re-verified]**
+- [ ] `Map.jsx` reads the URL directly twice (`useSearchParams` at 375, and
+      `new URL(window.location.href)` at 3076 inside the `load` handler), bypassing both context and
+      its props. There are now **eight** independent modules reading `window.location` across eleven
+      sites (`index.jsx:36`, `config.js:13`, `state/usePersistentState.js:46`,
+      `FilterProvider.jsx:249`, `SelectionProvider.jsx:75`, `MapStateProvider.jsx:107,177,218,249,269`),
+      up from the five the survey counted.
+
+**Suggested order once the test suite is merged**, cheapest proof first:
+
+1. `buildTileSuffix` — already module-level and pure, zero closure captures. Add `export`, test the
+   tile query contract. The cheapest possible demonstration that the seam works.
+2. The twin maths — give `pointRadiusFor` the range as a parameter instead of reading the ref, move
+   both into a module, and test that they agree across a swept range.
+3. The hit-test group above — the largest prize, and much narrower than "largest risk" implies.
+4. The 1750-line mount effect and the guards — leave alone until there is a Playwright gate.
+   Nothing in 1–3 requires moving them.
 
 ### P2.7 — One descriptor for the metric and the tiers `[Worth exploring]`
 
