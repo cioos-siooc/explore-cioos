@@ -132,10 +132,10 @@ describe('GET /download — shape validation', () => {
 });
 
 describe('GET /download — error handling', () => {
-  it('returns 404 with error message when db.raw throws', async () => {
+  it('returns 500 with error message when db.raw throws', async () => {
     db.raw = jest.fn().mockRejectedValue(new Error('DB connection lost'));
     const res = await request(app).get('/download').query(BASE_QUERY);
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(500);
     expect(res.body).toHaveProperty('error');
   });
 });

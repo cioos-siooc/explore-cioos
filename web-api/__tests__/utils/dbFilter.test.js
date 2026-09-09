@@ -1,7 +1,7 @@
 /**
  * Unit tests for utils/dbFilter.js — createDBFilter
  *
- * createDBFilter is async; it returns { shared, obisOnly, hasShared, hasObisOnly }.
+ * createDBFilter is async; it returns { shared, obisOnly, profileOnly, hasShared }.
  * db.raw is called twice per invocation (once for shared filters, once for obisOnly).
  * We capture both calls and assert on the first (shared) call for non-OBIS filters.
  */
@@ -25,12 +25,12 @@ beforeEach(() => {
 afterEach(() => jest.clearAllMocks());
 
 describe('createDBFilter', () => {
-  it('returns an object with shared/obisOnly/hasShared/hasObisOnly properties', async () => {
+  it('returns an object with shared/obisOnly/profileOnly/hasShared properties', async () => {
     const result = await createDBFilter({});
     expect(result).toHaveProperty('shared');
     expect(result).toHaveProperty('obisOnly');
     expect(result).toHaveProperty('hasShared');
-    expect(result).toHaveProperty('hasObisOnly');
+    expect(result).toHaveProperty('profileOnly');
   });
 
   it('produces TRUE SQL and hasShared=false for an empty query', async () => {
@@ -62,16 +62,18 @@ describe('createDBFilter', () => {
     expect(rawCalls[0].params.timeMax).toBe('2023-12-31T00:00:00Z');
   });
 
-  it('adds latMin / latMax filters', async () => {
+  it('converts latMin / latMax into an extent filter', async () => {
     await createDBFilter({ latMin: '45', latMax: '55' });
-    expect(rawCalls[0].sql).toContain('latitude >= (:latMin)::double precision');
-    expect(rawCalls[0].sql).toContain('latitude <= (:latMax)::double precision');
+    expect(rawCalls[0].sql).toContain('ST_MakeEnvelope');
+    expect(rawCalls[0].params.rectLatMin).toBe(45);
+    expect(rawCalls[0].params.rectLatMax).toBe(55);
   });
 
-  it('adds lonMin / lonMax filters', async () => {
+  it('converts lonMin / lonMax into an extent filter', async () => {
     await createDBFilter({ lonMin: '-130', lonMax: '-120' });
-    expect(rawCalls[0].sql).toContain('longitude >= (:lonMin)::double precision');
-    expect(rawCalls[0].sql).toContain('longitude <= (:lonMax)::double precision');
+    expect(rawCalls[0].sql).toContain('ST_MakeEnvelope');
+    expect(rawCalls[0].params.rectLonMin).toBe('-130');
+    expect(rawCalls[0].params.rectLonMax).toBe('-120');
   });
 
   it('adds depthMin / depthMax filters', async () => {
@@ -91,10 +93,10 @@ describe('createDBFilter', () => {
     expect(rawCalls[0].sql).toContain('organization_pks && :organizationsString');
   });
 
-  it('adds polygon filter with ST_Contains', async () => {
+  it('adds polygon filter with ST_Intersects', async () => {
     const polygon = JSON.stringify([[-130, 45], [-120, 45], [-120, 55], [-130, 55], [-130, 45]]);
     await createDBFilter({ polygon });
-    expect(rawCalls[0].sql).toContain('ST_Contains');
+    expect(rawCalls[0].sql).toContain('ST_Intersects');
     expect(rawCalls[0].params.wktPolygon).toMatch(/^POLYGON\(/);
   });
 
@@ -203,8 +205,8 @@ describe('createDBFilter — scientificNames filter', () => {
     // First call is the expansion query
     expect(rawCalls[0].sql).toContain('scientific_name_vernaculars');
     expect(rawCalls[0].params.scientificNamesArr).toEqual(['Orcinus orca']);
-    // obisOnly SQL should contain the combined AphiaID + name match
-    expect(result.hasObisOnly).toBe(true);
+    // obisOnly SQL should contain the combined AphiaID + name match.
+    expect(result.obisOnly.sql).toContain('aphia_ids && :expandedAphiaIds');
   });
 
   it('passes expandedAphiaIds and scientificNamesArr to the obisOnly filter', async () => {
