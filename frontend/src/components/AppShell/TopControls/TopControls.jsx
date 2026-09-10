@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useRef } from "react";
-import { Filter, GraphUp, ListUl } from "react-bootstrap-icons";
+import { BarChartLine, Filter, ListUl } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
@@ -133,7 +133,7 @@ export default function TopControls() {
             onClick={() => setShowCoverageModal(true)}
             title={t('coverageButtonTitle')}
           >
-            <GraphUp size={18} aria-hidden='true' />
+            <BarChartLine size={18} aria-hidden='true' />
             <span className='topBarButtonLabel'>{t('coverageButton')}</span>
           </button>
         </div>

@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { GraphUp } from 'react-bootstrap-icons'
+import { BarChartLine } from 'react-bootstrap-icons'
 
 import Modal from '../../ui/Modal.jsx'
 import Spinner from '../../ui/Spinner.jsx'
@@ -82,7 +82,7 @@ export default function CoverageModal () {
       <Modal.Header closeButton>
         <Modal.Title id='coverageModalTitle'>
           <span className='downloadModalTitleIcon' aria-hidden='true'>
-            <GraphUp size={20} />
+            <BarChartLine size={20} />
           </span>
           <span className='downloadModalTitleText'>
             <span className='downloadModalTitleHeading'>
