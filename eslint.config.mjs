@@ -52,7 +52,10 @@ export default [
   {
     files: ["frontend/**/*.{js,jsx,mjs}"],
     ...react.configs.flat.recommended,
-    settings: { react: { version: "detect" } },
+    // The root tooling package intentionally does not depend on React; the
+    // application package pins React 18.3. Detection from the root would
+    // otherwise warn before ESLint reaches app code.
+    settings: { react: { version: "18.3" } },
   },
   reactHooks.configs.flat.recommended,
   {

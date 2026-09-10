@@ -132,7 +132,7 @@ jobs:
         working-directory: test
         run: npm ci --quiet
 
-      - name: Run the API tests
+      - name: Run API integration tests
         env:
           CI: "true"
         run: |
@@ -142,7 +142,7 @@ jobs:
               -c "SELECT latitude, longitude FROM cde.profiles WHERE latitude IS NOT NULL AND longitude IS NOT NULL LIMIT 1"
           )
           test -n "${latitude:-}" && test -n "${longitude:-}"
-          CI_LATITUDE="$latitude" CI_LONGITUDE="$longitude" npm --prefix test test
+          CI_LATITUDE="$latitude" CI_LONGITUDE="$longitude" npm --prefix test run test:integration
 
       # The frontend half of this job used to be a puppeteer script asserting
       # "no console errors on load". It is now a Playwright spec doing the same
