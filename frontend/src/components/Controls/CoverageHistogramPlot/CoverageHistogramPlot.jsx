@@ -85,7 +85,7 @@ export default function CoverageHistogramPlot ({ histogram }) {
 
   // Axis + hover wording follows what the bars count (datasets vs features).
   const countLabel =
-    histogram.metric === 'features'
+    histogram.count === 'features'
       ? t('coverageCountFeatures')
       : t('coverageCountDatasets')
 

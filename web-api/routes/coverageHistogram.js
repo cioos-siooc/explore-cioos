@@ -2,6 +2,7 @@ const express = require("express");
 
 const router = express.Router();
 const db = require("../db");
+const { check } = require("express-validator");
 const { pipeline } = require("../utils/routePipeline");
 
 const createDBFilter = require("../utils/dbFilter");
@@ -38,6 +39,13 @@ const TIME_BIN_WIDTHS_MS = [
   YEAR_MS, 2 * YEAR_MS, 5 * YEAR_MS, 10 * YEAR_MS, 25 * YEAR_MS,
 ];
 const TARGET_TIME_BINS = 60;
+
+// What each bar counts. Deliberately NOT the `metric` query parameter: that
+// name belongs to the hex ramp (utils/hexMetric.js METRICS = records/days/
+// datasets), which the shared filter validators check strictly. Overloading it
+// here meant "datasets" validated by coincidence and "features" was rejected
+// outright — the default worked, so only picking Features in the UI broke.
+const COUNTS = ["datasets", "features"];
 
 // The grouping dimension → the SQL expression that yields each dataset's
 // series key, plus the `kind` the frontend uses to resolve a display label.
@@ -109,13 +117,13 @@ function buildTimeBins(timeMin, timeMax) {
  *         schema: { type: string, enum: [source, platform, dataType, organization] }
  *         description: Series dimension (default source).
  *       - in: query
- *         name: metric
+ *         name: count
  *         schema: { type: string, enum: [datasets, features] }
  *         description: >
  *           What each bar counts — distinct datasets (default) or distinct
  *           cf_role features (profiles / timeseries / trajectories). OBIS and
  *           griddap have no cf_role features and are absent from the features
- *           metric.
+ *           count.
  *       - in: query
  *         name: timeMin
  *         schema: { type: string, format: date-time }
@@ -162,14 +170,17 @@ function buildTimeBins(timeMin, timeMax) {
  *                   items:
  *                     type: array
  */
-router.get("/", ...pipeline(), async (req, res) => {
+router.get(
+  "/",
+  ...pipeline({ checks: [check("count").isIn(COUNTS).optional()] }),
+  async (req, res) => {
     const groupByKey = Object.prototype.hasOwnProperty.call(GROUP_BY, req.query.groupBy)
       ? req.query.groupBy
       : "source";
     const group = GROUP_BY[groupByKey];
     // What each bar counts: distinct datasets (default) or distinct cf_role
     // features (individual profiles / timeseries / trajectories).
-    const metric = req.query.metric === "features" ? "features" : "datasets";
+    const count = COUNTS.includes(req.query.count) ? req.query.count : "datasets";
 
     // Client errors (a bad polygon, too broad a taxon selection) carry a
     // statusCode that app.js's error handler turns into the response.
@@ -188,7 +199,7 @@ router.get("/", ...pipeline(), async (req, res) => {
     const timeBins = buildTimeBins(timeMin, timeMax);
 
     // The counted entity: distinct datasets, or distinct cf_role features.
-    const entityCol = metric === "features" ? "feature_key" : "dataset_pk";
+    const entityCol = count === "features" ? "feature_key" : "dataset_pk";
 
     // Depth NULLs coalesce to 0 so the shared depth filter treats depth-less
     // features as surface. Only the columns the filter, the grouping and the
@@ -202,10 +213,10 @@ router.get("/", ...pipeline(), async (req, res) => {
     // day_ranges rides along on every branch: the bins are built from the real
     // observation-day set wherever it is known (see the spans CTE below).
     //
-    // feature_key identifies one cf_role instance for the "features" metric:
+    // feature_key identifies one cf_role instance for the "features" count:
     // a profile/timeseries cast, or a trajectory. OBIS occurrences and griddap
     // grids have no cf_role, so their key is NULL and they drop out of that
-    // metric entirely.
+    // count entirely.
     const profilesBranch = `SELECT dataset_pk, time_min, time_max,
                coalesce(depth_min, 0) AS depth_min,
                coalesce(depth_max, depth_min, 0) AS depth_max,
@@ -262,7 +273,7 @@ router.get("/", ...pipeline(), async (req, res) => {
         WHERE  ${filters.hasShared ? ":filters" : "TRUE"}
         AND    p.time_max >= :timeStart::timestamptz
         AND    p.time_min <= :timeEnd::timestamptz
-        ${metric === "features" ? "AND p.feature_key IS NOT NULL" : ""}
+        ${count === "features" ? "AND p.feature_key IS NOT NULL" : ""}
     ),
     spans AS (
         SELECT entity, series_key, series_kind,
@@ -339,7 +350,7 @@ router.get("/", ...pipeline(), async (req, res) => {
 
     res.send({
       groupBy: groupByKey,
-      metric,
+      count,
       timeBinEdges: timeBins.edges,
       series: seriesRows.rows.map((r) => ({
         key: r.series_key,
@@ -348,6 +359,7 @@ router.get("/", ...pipeline(), async (req, res) => {
       })),
       cells: cellRows.rows.map((r) => [r.t, r.series_key, r.count]),
     });
-});
+  },
+);
 
 module.exports = router;

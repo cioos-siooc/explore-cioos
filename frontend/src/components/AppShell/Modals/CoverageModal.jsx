@@ -23,8 +23,8 @@ const CoverageHistogramPlot = lazy(() =>
 // groupBy values.
 const GROUP_OPTIONS = ['source', 'platform', 'dataType', 'organization']
 
-// What the bars count. Keys match the API's metric values.
-const METRIC_OPTIONS = ['datasets', 'features']
+// What the bars count. Keys match the API's `count` values.
+const COUNT_OPTIONS = ['datasets', 'features']
 
 // The dataset-coverage figure, launched from the top bar: a histogram of how
 // many datasets match the applied filters over time, with the bars split by a
@@ -34,7 +34,7 @@ export default function CoverageModal () {
   const { showCoverageModal, setShowCoverageModal } = useUI()
   const { query } = useFilters()
   const [groupBy, setGroupBy] = useState('source')
-  const [metric, setMetric] = useState('datasets')
+  const [count, setCount] = useState('datasets')
   const [histogram, setHistogram] = useState()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
@@ -49,7 +49,7 @@ export default function CoverageModal () {
     setError(false)
     const filterString = createDataFilterQueryString(query)
     fetch(
-      `${server}/coverageHistogram?groupBy=${groupBy}&metric=${metric}&${filterString}`,
+      `${server}/coverageHistogram?groupBy=${groupBy}&count=${count}&${filterString}`,
       { signal: controller.signal }
     )
       .then((response) => {
@@ -67,7 +67,7 @@ export default function CoverageModal () {
         setLoading(false)
       })
     return () => controller.abort()
-  }, [showCoverageModal, query, groupBy, metric])
+  }, [showCoverageModal, query, groupBy, count])
 
   const isEmpty = histogram && histogram.cells.length === 0
 
@@ -97,12 +97,12 @@ export default function CoverageModal () {
       <Modal.Body>
         <div className='coverageToolbar'>
           <span className='coverageToolbarLabel'>{t('coverageCountByLabel')}</span>
-          <DropdownButton title={t(`coverageMetric_${metric}`)}>
-            {METRIC_OPTIONS.map((option) => (
+          <DropdownButton title={t(`coverageMetric_${count}`)}>
+            {COUNT_OPTIONS.map((option) => (
               <Dropdown.Item
                 key={option}
-                active={option === metric}
-                onClick={() => setMetric(option)}
+                active={option === count}
+                onClick={() => setCount(option)}
               >
                 {t(`coverageMetric_${option}`)}
               </Dropdown.Item>
