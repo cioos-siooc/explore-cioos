@@ -9,8 +9,13 @@ these tests exist to prevent coming back -- it averaged 2171 days per cell and
 reached 65454, which is why OBIS outweighed every other source in 87% of the
 hexes holding both.
 """
+import ast
+import datetime
+
 import pandas as pd
 
+from cde_harvester.core.day_sets import ranges_to_csv_cell
+from cde_harvester.loading.loader import prepare_obis_cells_dataframe
 from cde_harvester.sources.obis.harvester import OBISHarvester
 
 DAY = 86_400_000  # OBIS dates are epoch milliseconds
@@ -184,3 +189,71 @@ class TestLoaderRoundTrip:
         assert len(out) == 1
         assert out["days"].iloc[0] == 3
         assert out["n_records"].iloc[0] == 6
+
+
+class TestCsvRoundTrip:
+    """obis_cells day_ranges through the CSV, the way a real run loads them.
+
+    The harvest writes CSVs and the loader reads them back in a separate task,
+    so this is the only path a deployed run ever takes. It went untested: the
+    TestLoaderRoundTrip cases above hand prepare_obis_cells_dataframe a frame
+    with no day_ranges column at all, and the CSV serialization was omitted for
+    obis_cells while profiles had it -- so every OBIS load failed in
+    merge_ranges with "not enough values to unpack (expected 2, got 1)".
+    """
+
+    def _to_csv_and_back(self, cells, tmp_path):
+        """Mirror __main__.write_dataframes -> loader read for obis_cells."""
+        cells = cells.copy()
+        cells["day_ranges"] = cells["day_ranges"].apply(ranges_to_csv_cell)
+        path = tmp_path / "obis_cells.csv"
+        cells.to_csv(path, index=False)
+        return pd.read_csv(path)
+
+    def test_day_ranges_survive_the_csv(self, tmp_path):
+        cells = cells_for([occurrence(10), occurrence(11), occurrence(3650)])
+        loaded = self._to_csv_and_back(cells, tmp_path)
+
+        out = prepare_obis_cells_dataframe(loaded)
+
+        # two runs: the consecutive pair, then the visit a decade later
+        assert out["day_ranges"].iloc[0] == [
+            (datetime.date(1970, 1, 11), datetime.date(1970, 1, 13)),
+            (datetime.date(1979, 12, 30), datetime.date(1979, 12, 31)),
+        ]
+
+    def test_written_cell_is_literal_evaluable(self, tmp_path):
+        """The defect itself: repr(datetime.date(...)) cannot be read back."""
+        cells = cells_for([occurrence(10)])
+        loaded = self._to_csv_and_back(cells, tmp_path)
+        assert ast.literal_eval(loaded["day_ranges"].iloc[0]) == [["1970-01-11", "1970-01-12"]]
+
+    def test_float_split_cells_union_their_day_sets(self, tmp_path):
+        """Rows the dedup merges are the same cell, so the sets union."""
+        cells = pd.concat(
+            [
+                cells_for([occurrence(10, lat=44.6)]),
+                cells_for([occurrence(20, lat=44.600000000000001)]),
+            ],
+            ignore_index=True,
+        )
+        loaded = self._to_csv_and_back(cells, tmp_path)
+
+        out = prepare_obis_cells_dataframe(loaded)
+
+        assert len(out) == 1
+        assert out["day_ranges"].iloc[0] == [
+            (datetime.date(1970, 1, 11), datetime.date(1970, 1, 12)),
+            (datetime.date(1970, 1, 21), datetime.date(1970, 1, 22)),
+        ]
+
+    def test_missing_day_ranges_column_still_loads(self, tmp_path):
+        """A CSV predating day sets must not become unloadable."""
+        cells = cells_for([occurrence(10)]).drop(columns=["day_ranges"])
+        path = tmp_path / "obis_cells.csv"
+        cells.to_csv(path, index=False)
+
+        out = prepare_obis_cells_dataframe(pd.read_csv(path))
+
+        assert "day_ranges" not in out.columns
+        assert out["days"].iloc[0] == 1

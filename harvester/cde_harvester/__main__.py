@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
-from cde_harvester.core.day_sets import ranges_to_iso
+from cde_harvester.core.day_sets import ranges_to_csv_cell
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     get_ckan_records,
     unescape_ascii,
@@ -285,10 +285,10 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
         )
     # Same treatment for the day set, with one extra step: literal_eval only
     # accepts literals, and the repr of a datetime.date is a constructor call —
-    # so the runs go through as ISO-string pairs (day_sets.ranges_to_iso).
+    # so the runs go through as ISO-string pairs (day_sets.ranges_to_csv_cell).
     if "day_ranges" in erddap_profiles.columns:
         erddap_profiles["day_ranges"] = erddap_profiles["day_ranges"].apply(
-            lambda x: repr(ranges_to_iso(x)) if isinstance(x, (list, tuple)) else x
+            ranges_to_csv_cell
         )
     erddap_profiles.drop_duplicates().to_csv(profiles_file, index=False)
     if not df_ckan.empty:
@@ -296,6 +296,11 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     skipped_datasets.drop_duplicates().to_csv(skipped_datasets_file, index=False)
 
     if not obis_cells.empty:
+        # Same ISO-pair treatment as erddap_profiles above: aggregate_cells
+        # builds day_ranges as datetime.date tuples too.
+        if "day_ranges" in obis_cells.columns:
+            obis_cells = obis_cells.copy()
+            obis_cells["day_ranges"] = obis_cells["day_ranges"].apply(ranges_to_csv_cell)
         obis_cells.to_csv(obis_cells_file, index=False)
 
     if not erddap_trajectory_days.empty:
