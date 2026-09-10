@@ -169,6 +169,16 @@
   color: var(--cioos-ink-60);
 }
 
+/* Caveat shown under the toolbar for a grouping whose series overlap, so the
+   stacked total reads higher than the entity count. */
+.coverageToolbarNote {
+  flex: 0 0 auto;
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink-60);
+  padding-bottom: var(--cioos-space-sm);
+  text-align: right;
+}
+
 .coverageToolbar .dropdown-toggle {
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-sm);

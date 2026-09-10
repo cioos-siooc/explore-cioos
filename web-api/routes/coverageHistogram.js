@@ -2,10 +2,17 @@ const express = require("express");
 
 const router = express.Router();
 const db = require("../db");
-const { validatorMiddleware } = require("../utils/validatorMiddlewares");
-const cache = require("../utils/cache");
+const { pipeline } = require("../utils/routePipeline");
 
 const createDBFilter = require("../utils/dbFilter");
+const {
+  erddapVisible,
+  obisVisible,
+  TRAJECTORY_COVERAGE_FROM,
+  GRIDDAP_TIME_DEPTH_COLUMNS,
+  GRIDDAP_FROM,
+  unionBranches,
+} = require("../utils/selection");
 
 /*
  * /coverageHistogram
@@ -52,6 +59,19 @@ const GROUP_BY = {
     keyExpr: "coalesce(nullif(d.cdm_data_type, ''), 'unknown')",
     kindExpr: "'dataType'",
   },
+  // The only multi-valued dimension: cde.datasets.organizations is a text[]
+  // and a dataset can belong to several, so this one needs a lateral to
+  // produce a row per (dataset, organization). A dataset with N organizations
+  // therefore lands in N series and the stacked bars sum ABOVE the dataset
+  // count — each series still reads correctly on its own as "datasets this
+  // organization has here", which is the same thing the organizations filter
+  // means (dbFilter matches on array overlap, not on a single owner).
+  organization: {
+    join: "CROSS JOIN LATERAL unnest(CASE WHEN coalesce(array_length(d.organizations, 1), 0) = 0 "
+      + "THEN ARRAY['unknown']::text[] ELSE d.organizations END) AS org(name)",
+    keyExpr: "org.name",
+    kindExpr: "'organization'",
+  },
 };
 
 function buildTimeBins(timeMin, timeMax) {
@@ -80,13 +100,13 @@ function buildTimeBins(timeMin, timeMax) {
  *     tags: [CoverageHistogram]
  *     description: >
  *       Returns the number of distinct datasets whose filtered coverage
- *       overlaps each time bin, split into series by data source, platform, or
- *       data type. Accepts the same filter parameters as /pointQuery; the depth
+ *       overlaps each time bin, split into series by data source, platform, data
+ *       type, or organization. Accepts the same filter parameters as /pointQuery; the depth
  *       filter selects a depth layer. Features without depth count as surface.
  *     parameters:
  *       - in: query
  *         name: groupBy
- *         schema: { type: string, enum: [source, platform, dataType] }
+ *         schema: { type: string, enum: [source, platform, dataType, organization] }
  *         description: Series dimension (default source).
  *       - in: query
  *         name: metric
@@ -142,11 +162,7 @@ function buildTimeBins(timeMin, timeMax) {
  *                   items:
  *                     type: array
  */
-router.get(
-  "/",
-  cache.route(),
-  validatorMiddleware(),
-  async (req, res, next) => {
+router.get("/", ...pipeline(), async (req, res) => {
     const groupByKey = Object.prototype.hasOwnProperty.call(GROUP_BY, req.query.groupBy)
       ? req.query.groupBy
       : "source";
@@ -155,111 +171,130 @@ router.get(
     // features (individual profiles / timeseries / trajectories).
     const metric = req.query.metric === "features" ? "features" : "datasets";
 
-    let filters;
-    try {
-      filters = await createDBFilter(req.query);
-    } catch (err) {
-      if (err.statusCode === 400) return res.status(400).json({ error: err.message });
-      throw err;
-    }
+    // Client errors (a bad polygon, too broad a taxon selection) carry a
+    // statusCode that app.js's error handler turns into the response.
+    const filters = await createDBFilter(req.query);
 
-    const {
-      timeMin, timeMax, includeObis, scientificNames, obisNodes, erddapServers,
-    } = req.query;
+    const { timeMin, timeMax } = req.query;
 
-    // Same source gating as shapeQuery: scientific-name filters are OBIS-only;
-    // an OBIS-node selection hides profiles unless ERDDAP servers are selected
-    // alongside it.
-    const includeProfiles = !scientificNames && (!obisNodes || Boolean(erddapServers));
-    const showObis = includeObis !== "false";
+    // Which sources this selection contains. utils/selection.js owns that gate
+    // for every route that answers a question about a selection off the map;
+    // this used to be a fourth hand-written copy of it, which is how the
+    // trajectory branch here went on reading cde.trajectory_cells for weeks
+    // after that table was replaced.
+    const erddap = erddapVisible(req.query);
+    const obis = obisVisible(req.query);
 
     const timeBins = buildTimeBins(timeMin, timeMax);
 
+    // The counted entity: distinct datasets, or distinct cf_role features.
+    const entityCol = metric === "features" ? "feature_key" : "dataset_pk";
+
     // Depth NULLs coalesce to 0 so the shared depth filter treats depth-less
-    // features as surface. Only the columns the filter and binning need are
-    // selected; depth is not an output dimension here.
+    // features as surface. Only the columns the filter, the grouping and the
+    // binning need are selected; depth is not an output dimension here.
+    //
+    // point_pk is carried for the same reason the shape query carries it: a
+    // map-click selection puts an UNQUALIFIED point_pk predicate in the shared
+    // filter, and a branch missing the name makes the whole statement fail to
+    // parse. Grids and trajectory hexes have no point, so they spell it NULL.
+    //
+    // day_ranges rides along on every branch: the bins are built from the real
+    // observation-day set wherever it is known (see the spans CTE below).
+    //
     // feature_key identifies one cf_role instance for the "features" metric:
-    // a profile/timeseries cast (profiles) or a trajectory (trajectory_cells).
-    // OBIS occurrences and griddap grids have no cf_role, so their key is NULL
-    // and they drop out of the features count entirely.
+    // a profile/timeseries cast, or a trajectory. OBIS occurrences and griddap
+    // grids have no cf_role, so their key is NULL and they drop out of that
+    // metric entirely.
     const profilesBranch = `SELECT dataset_pk, time_min, time_max,
                coalesce(depth_min, 0) AS depth_min,
                coalesce(depth_max, depth_min, 0) AS depth_max,
                dataset_pk::text || ':p:' || coalesce(timeseries_id, '')
                  || '|' || coalesce(profile_id, '') AS feature_key,
-               bbox AS search_geom
-        FROM cde.profiles`;
-    const trajectoryBranch = `SELECT dataset_pk, time_min, time_max,
-               coalesce(depth_min, 0) AS depth_min,
-               coalesce(depth_max, depth_min, 0) AS depth_max,
-               dataset_pk::text || ':t:' || coalesce(trajectory_id, '') AS feature_key,
-               geom AS search_geom
-        FROM cde.trajectory_cells`;
+               point_pk, bbox AS search_geom, day_ranges
+        FROM cde.profiles
+        WHERE :profileFilters`;
+    // One tier only, matching against the hex POLYGON rather than the row's
+    // centroid — see utils/selection.js. Reading both tiers would count each
+    // trajectory twice; only the distinct-count downstream hid that before.
+    const trajectoryBranch = `SELECT t.dataset_pk, t.time_min, t.time_max,
+               coalesce(t.depth_min, 0) AS depth_min,
+               coalesce(t.depth_max, t.depth_min, 0) AS depth_max,
+               t.dataset_pk::text || ':t:' || coalesce(t.trajectory_id, '') AS feature_key,
+               NULL::integer AS point_pk, h.geom AS search_geom, t.day_ranges
+        ${TRAJECTORY_COVERAGE_FROM}`;
     const obisBranch = `SELECT dataset_pk, time_min, time_max,
                coalesce(depth_min, 0) AS depth_min,
                coalesce(depth_max, depth_min, 0) AS depth_max,
                NULL::text AS feature_key,
-               geom AS search_geom
+               point_pk, geom AS search_geom, day_ranges
         FROM cde.obis_cells
         WHERE :obisFilters`;
-    const griddapBranch = `SELECT pk AS dataset_pk,
-               coalesce(coverage_time_min, '-infinity'::timestamptz) AS time_min,
-               coalesce(coverage_time_max, 'infinity'::timestamptz) AS time_max,
-               coalesce(coverage_depth_min, 0) AS depth_min,
-               coalesce(coverage_depth_max, coverage_depth_min, 0) AS depth_max,
+    const griddapBranch = `SELECT d.pk AS dataset_pk,
+               ${GRIDDAP_TIME_DEPTH_COLUMNS},
                NULL::text AS feature_key,
-               coverage_bbox AS search_geom
-        FROM cde.datasets
-        WHERE cdm_data_type = 'Grid' AND coverage_bbox IS NOT NULL`;
+               NULL::integer AS point_pk,
+               d.coverage_bbox AS search_geom,
+               NULL::daterange[] AS day_ranges
+        ${GRIDDAP_FROM}`;
 
     const branches = [];
-    if (includeProfiles) branches.push(profilesBranch, trajectoryBranch, griddapBranch);
-    if (showObis) branches.push(obisBranch);
-    const combinedInner = branches.length
-      ? branches.join("\n        UNION ALL\n        ")
-      : `${profilesBranch} WHERE FALSE`;
+    if (erddap) branches.push(profilesBranch, trajectoryBranch, griddapBranch);
+    if (obis) branches.push(obisBranch);
 
     // `filtered` also derives each row's series key/kind from the joined
-    // dataset. Shared by both queries below; declared as a string so the scan
-    // definition stays identical between them. NOTE: knex substitutes named
-    // bindings even inside SQL comments, so never write a colon-prefixed word
-    // in comments here.
+    // dataset, and `spans` turns each row into the stretches of time it
+    // actually holds data over. Shared by both queries below; declared as a
+    // string so the scan definition stays identical between them. NOTE: knex
+    // substitutes named bindings even inside SQL comments, so never write a
+    // colon-prefixed word in comments here.
     const combinedAndFiltered = `combined AS (
-        ${combinedInner}
+        ${unionBranches(branches, profilesBranch)}
     ),
     filtered AS (
-        SELECT p.dataset_pk, p.feature_key, p.time_min, p.time_max,
+        SELECT p.${entityCol} AS entity, p.time_min, p.time_max, p.day_ranges,
                ${group.keyExpr} AS series_key,
                ${group.kindExpr} AS series_kind
         FROM   combined p
         JOIN   cde.datasets d
         ON     p.dataset_pk = d.pk
+        ${group.join || ""}
         WHERE  ${filters.hasShared ? ":filters" : "TRUE"}
         AND    p.time_max >= :timeStart::timestamptz
         AND    p.time_min <= :timeEnd::timestamptz
         ${metric === "features" ? "AND p.feature_key IS NOT NULL" : ""}
+    ),
+    spans AS (
+        SELECT entity, series_key, series_kind,
+               lower(r)::timestamp AT TIME ZONE 'UTC' AS span_min,
+               (upper(r) - 1)::timestamp AT TIME ZONE 'UTC' AS span_max
+        FROM filtered
+        CROSS JOIN LATERAL unnest(day_ranges) r
+        WHERE day_ranges IS NOT NULL
+        UNION ALL
+        SELECT entity, series_key, series_kind, time_min, time_max
+        FROM filtered
+        WHERE coalesce(array_length(day_ranges, 1), 0) = 0
     )`;
 
-    // The counted entity: distinct datasets, or distinct cf_role features.
-    const entityCol = metric === "features" ? "feature_key" : "dataset_pk";
-
-    // Cells: bucket each feature's time extent into a 1-based bin-index range,
-    // collapse to DISTINCT (dataset, series, tb0, tb1) tuples first (buckets
-    // are coarse, so a dataset's features mostly share a tuple), then expand
-    // into the bins each tuple spans and count distinct datasets per
-    // (bin, series).
+    // Cells: bucket each span into a 1-based bin-index range, collapse to
+    // DISTINCT (entity, series, tb0, tb1) tuples first (buckets are coarse, so
+    // a dataset's spans mostly share a tuple), then expand into the bins each
+    // tuple covers and count distinct entities per (bin, series).
     const cellsSql = `WITH ${combinedAndFiltered},
     bucketed AS (
-        SELECT DISTINCT ${entityCol} AS entity, series_key,
+        SELECT DISTINCT entity, series_key,
             least(greatest(width_bucket(
-                extract(epoch from greatest(time_min, :timeStart::timestamptz))::double precision,
+                extract(epoch from greatest(span_min, :timeStart::timestamptz))::double precision,
                 (:epochStart)::double precision, (:epochEnd)::double precision, (:numTimeBins)::integer
             ), 1), (:numTimeBins)::integer) AS tb0,
             least(greatest(width_bucket(
-                extract(epoch from least(time_max, :timeEnd::timestamptz))::double precision,
+                extract(epoch from least(span_max, :timeEnd::timestamptz))::double precision,
                 (:epochStart)::double precision, (:epochEnd)::double precision, (:numTimeBins)::integer
             ), 1), (:numTimeBins)::integer) AS tb1
-        FROM filtered
+        FROM spans
+        WHERE span_max >= :timeStart::timestamptz
+        AND   span_min <= :timeEnd::timestamptz
     ),
     expanded AS (
         SELECT DISTINCT entity, series_key, t.t
@@ -270,19 +305,24 @@ router.get(
     FROM expanded
     GROUP BY t, series_key`;
 
-    // Series totals: distinct datasets per series over the whole filtered set
-    // (not the sum of per-bin counts, which would multiply a long-lived
-    // dataset across its bins). Used to rank series and pick the top ones.
+    // Series totals: distinct entities per series over the whole window (not
+    // the sum of per-bin counts, which would multiply a long-lived dataset
+    // across its bins). Read from the same spans as the bars, so a row whose
+    // extent overlaps the window but whose real day set does not is absent
+    // from both. Used to rank series and pick the top ones.
     const seriesSql = `WITH ${combinedAndFiltered}
     SELECT series_key, min(series_kind) AS series_kind,
-           count(DISTINCT ${entityCol})::integer AS total
-    FROM filtered
+           count(DISTINCT entity)::integer AS total
+    FROM spans
+    WHERE span_max >= :timeStart::timestamptz
+    AND   span_min <= :timeEnd::timestamptz
     GROUP BY series_key
     ORDER BY total DESC`;
 
     const bindings = {
       filters: filters.shared,
       obisFilters: filters.obisOnly,
+      profileFilters: filters.profileOnly,
       timeStart: new Date(timeBins.start).toISOString(),
       timeEnd: new Date(timeBins.end).toISOString(),
       epochStart: timeBins.start / 1000,
@@ -308,7 +348,6 @@ router.get(
       })),
       cells: cellRows.rows.map((r) => [r.t, r.series_key, r.count]),
     });
-  },
-);
+});
 
 module.exports = router;

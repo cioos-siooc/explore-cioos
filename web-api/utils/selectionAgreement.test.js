@@ -68,6 +68,7 @@ const ROUTES = {
   timeExtent: { module: "../routes/timeExtent", path: "/" },
   download: { module: "../routes/download", path: "/" },
   griddapCoverage: { module: "../routes/griddapCoverage", path: "/" },
+  coverageHistogram: { module: "../routes/coverageHistogram", path: "/" },
 };
 
 function handlerFor(name) {
@@ -128,7 +129,7 @@ test("every route hides ERDDAP data for a taxon selection", async () => {
   // all; the rest must drop their ERDDAP arms.
   const taxon = { scientificNames: "Gadus morhua" };
 
-  for (const name of ["tiles", "tiles/cells", "legend", "timeExtent"]) {
+  for (const name of ["tiles", "tiles/cells", "legend", "timeExtent", "coverageHistogram"]) {
     const sql = (await sqlFrom(name, taxon)).map(stripEmptyGuard).join(" ");
     assert.ok(!readsProfiles(sql), `${name} still reads cde.profiles`);
     assert.ok(!readsTrajectory(sql), `${name} still reads trajectory hexes`);
@@ -145,7 +146,7 @@ test("every route hides ERDDAP data for a taxon selection", async () => {
 });
 
 test("an obisNodes selection hides ERDDAP data unless erddapServers joins it", async () => {
-  for (const name of ["tiles", "tiles/cells", "legend", "timeExtent"]) {
+  for (const name of ["tiles", "tiles/cells", "legend", "timeExtent", "coverageHistogram"]) {
     const nodesOnly = (await sqlFrom(name, { obisNodes: "n1" }))
       .map(stripEmptyGuard)
       .join(" ");
@@ -161,7 +162,7 @@ test("an obisNodes selection hides ERDDAP data unless erddapServers joins it", a
 });
 
 test("includeObis=false drops the OBIS arm from every route that has one", async () => {
-  for (const name of ["tiles", "tiles/cells", "legend", "timeExtent"]) {
+  for (const name of ["tiles", "tiles/cells", "legend", "timeExtent", "coverageHistogram"]) {
     const sql = (await sqlFrom(name, { includeObis: "false" }))
       .map(stripEmptyGuard)
       .join(" ");
@@ -184,7 +185,7 @@ test("only the map routes restrict profiles to drawable features", async () => {
       assert.match(sql, /show_as_point/, `${name} must gate on show_as_point`);
     }
   }
-  for (const name of ["timeExtent", "download"]) {
+  for (const name of ["timeExtent", "download", "coverageHistogram"]) {
     const sql = (await sqlFrom(name)).join(" ");
     assert.doesNotMatch(
       sql,
@@ -205,6 +206,7 @@ test("every branch reading cde.profiles binds the feature-level EOV filter", asy
     ...(await sqlFrom("legend", query)),
     ...(await sqlFrom("timeExtent", query)),
     ...(await sqlFrom("download", query)),
+    ...(await sqlFrom("coverageHistogram", query)),
     await shapeSql(query),
   ].filter(readsProfiles);
 
@@ -226,7 +228,7 @@ test("outside the map, trajectory coverage is read at one tier only", async () =
   // counting a trajectory once has to pin a tier. The tile routes pick theirs
   // from the zoom instead, and /legend's hex query deliberately reads both —
   // it splits them into the two zoom buckets it ramps separately.
-  for (const name of ["timeExtent", "download"]) {
+  for (const name of ["timeExtent", "download", "coverageHistogram"]) {
     const statements = (await sqlFrom(name)).filter(readsTrajectory);
     assert.ok(statements.length, `${name} emitted no trajectory branch`);
     // Per statement: /download emits its own branch set AND the shape query's,
@@ -253,7 +255,7 @@ test("a selection containing no source still yields runnable SQL", async () => {
     includeTrajectory: "false",
     profileTypes: "",
   };
-  for (const name of ["tiles", "tiles/cells", "legend", "timeExtent"]) {
+  for (const name of ["tiles", "tiles/cells", "legend", "timeExtent", "coverageHistogram"]) {
     const sql = (await sqlFrom(name, nothing)).join(" ");
     assert.match(sql, /empty_combined WHERE FALSE/, name);
     assert.doesNotMatch(sql, /UNION ALL\s*\)/, `${name} left a dangling UNION`);

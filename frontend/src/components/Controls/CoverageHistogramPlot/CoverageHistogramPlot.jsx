@@ -47,7 +47,8 @@ function seriesLabel (key, kind, language) {
       return key
     }
   }
-  // OBIS nodes, platforms and data types are already display-ready.
+  // OBIS nodes, platforms, data types and organization names are already
+  // display-ready.
   return key
 }
 

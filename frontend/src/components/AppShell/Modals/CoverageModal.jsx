@@ -21,7 +21,7 @@ const CoverageHistogramPlot = lazy(() =>
 
 // The dimensions the bars can be split (coloured) by. Keys match the API's
 // groupBy values.
-const GROUP_OPTIONS = ['source', 'platform', 'dataType']
+const GROUP_OPTIONS = ['source', 'platform', 'dataType', 'organization']
 
 // What the bars count. Keys match the API's metric values.
 const METRIC_OPTIONS = ['datasets', 'features']
@@ -121,6 +121,14 @@ export default function CoverageModal () {
             ))}
           </DropdownButton>
         </div>
+        {/* Organizations are the one multi-valued dimension: a dataset in two
+            of them lands in both series, so the stack total is not the
+            dataset count. Say so rather than let the axis imply otherwise. */}
+        {groupBy === 'organization' && (
+          <div className='coverageToolbarNote'>
+            {t('coverageOrganizationNote')}
+          </div>
+        )}
         <div className='coveragePlotArea'>
           {loading && (
             <div className='coverageModalStatus'>
