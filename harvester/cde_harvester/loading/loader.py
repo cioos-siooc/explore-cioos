@@ -17,6 +17,7 @@ from cde_harvester.core.day_sets import (
     ranges_from_iso,
     ranges_to_pg_literal,
     ranges_to_psycopg,
+    total_days,
 )
 from cde_harvester.core.db import create_db_engine, db_host
 from cde_harvester.core.observability import init_sentry
@@ -181,6 +182,13 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
         .agg(**aggregations)
         .reset_index()
     )
+
+    if has_day_ranges:
+        # days has to report the union day_ranges now holds. max() is right
+        # only while the merged rows' day sets overlap; where they don't -- two
+        # float-noise halves of a cell sampled on different days -- it
+        # understates, and the two columns disagree about the same cell.
+        agg["days"] = agg["day_ranges"].apply(total_days)
 
     if name_to_aphia:
 

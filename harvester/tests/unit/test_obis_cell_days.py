@@ -14,7 +14,7 @@ import datetime
 
 import pandas as pd
 
-from cde_harvester.core.day_sets import ranges_to_csv_cell
+from cde_harvester.core.day_sets import ranges_to_csv_cell, total_days
 from cde_harvester.loading.loader import prepare_obis_cells_dataframe
 from cde_harvester.sources.obis.harvester import OBISHarvester
 
@@ -257,3 +257,23 @@ class TestCsvRoundTrip:
 
         assert "day_ranges" not in out.columns
         assert out["days"].iloc[0] == 1
+
+    def test_days_reports_the_union_not_the_larger_half(self, tmp_path):
+        """days and day_ranges must agree about the same cell.
+
+        max() is right only while the merged rows overlap. Two float-noise
+        halves sampled on different days union to two days; max() says one.
+        """
+        cells = pd.concat(
+            [
+                cells_for([occurrence(10, lat=44.6)]),
+                cells_for([occurrence(20, lat=44.600000000000001)]),
+            ],
+            ignore_index=True,
+        )
+        loaded = self._to_csv_and_back(cells, tmp_path)
+
+        out = prepare_obis_cells_dataframe(loaded)
+
+        assert out["days"].iloc[0] == 2
+        assert out["days"].iloc[0] == total_days(out["day_ranges"].iloc[0])
