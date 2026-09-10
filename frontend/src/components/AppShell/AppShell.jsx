@@ -12,6 +12,7 @@ import Sidebar from "./Sidebar/Sidebar.jsx";
 import TopControls from "./TopControls/TopControls.jsx";
 import FiltersModal from "./Modals/FiltersModal.jsx";
 import DownloadModal from "./Modals/DownloadModal.jsx";
+import CoverageModal from "./Modals/CoverageModal.jsx";
 import PreviewHost from "./Panels/PreviewHost.jsx";
 import Loading from "../Controls/Loading/Loading.jsx";
 import Legend from "../Controls/Legend/Legend.jsx";
@@ -167,6 +168,7 @@ export default function AppShell() {
       <TopControls />
       <FiltersModal />
       <DownloadModal />
+      <CoverageModal />
       <Legend
         currentRangeLevel={currentRangeLevel}
         hexRangeLevel={hexRangeLevel}

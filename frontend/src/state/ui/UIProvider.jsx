@@ -55,9 +55,11 @@ export default function UIProvider({ children }) {
   useEffect(() => {
     if (!sidebarChosenRef.current) setSidebarOpenState(wideScreen);
   }, [wideScreen]);
-  // The two modal surfaces: filter management and the download order.
+  // The modal surfaces: filter management, the download order, and the
+  // dataset-coverage figure.
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [showCoverageModal, setShowCoverageModal] = useState(false);
   // Which filter flyout is open inside the filters modal (one at a time).
   const [openFilter, setOpenFilter] = useState();
   const introOpenCookie = !getCookieValue("introModalOpen");
@@ -108,6 +110,8 @@ export default function UIProvider({ children }) {
     setShowFiltersModal,
     showDownloadModal,
     setShowDownloadModal,
+    showCoverageModal,
+    setShowCoverageModal,
     openFilter,
     setOpenFilter,
     showIntroModal,

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useRef } from "react";
-import { Filter, ListUl } from "react-bootstrap-icons";
+import { Filter, GraphUp, ListUl } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
@@ -57,8 +57,13 @@ export default function TopControls() {
     timeFilterActive,
     depthFilterActive,
   } = useFilters();
-  const { showFiltersModal, setShowFiltersModal, sidebarOpen, setSidebarOpen } =
-    useUI();
+  const {
+    showFiltersModal,
+    setShowFiltersModal,
+    setShowCoverageModal,
+    sidebarOpen,
+    setSidebarOpen,
+  } = useUI();
   const { inspectDataset, returnToDatasetList } = useSelection();
 
   const barRef = useRef(null);
@@ -121,6 +126,15 @@ export default function TopControls() {
                 {activeFilterCount}
               </span>
             )}
+          </button>
+          <button
+            type='button'
+            className='topBarButton'
+            onClick={() => setShowCoverageModal(true)}
+            title={t('coverageButtonTitle')}
+          >
+            <GraphUp size={18} aria-hidden='true' />
+            <span className='topBarButtonLabel'>{t('coverageButton')}</span>
           </button>
         </div>
       </BrandSearch>
