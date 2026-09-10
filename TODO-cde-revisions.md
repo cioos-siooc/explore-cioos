@@ -777,78 +777,112 @@ now split, was two specific call sites.
 
 ### P2.6 — Give `Map.jsx` a seam that isn't WebGL `[Strong]` — *largest prize, largest risk*
 
-`frontend/src/components/Map/Map.jsx` — 4320 lines, one default export
+`frontend/src/components/Map/Map.jsx` — 4338 lines, one default export
 
-> **Re-verified 2026-09-09 against `fix/p0-cleanup-backlog @ b233d792`.** The file has grown 23%
-> since the 2026-08-27 survey (3508 → 4320), so every reference below has been refreshed and will
-> drift again. Every finding still holds, and all but one of the counts understated it.
+> **Re-verified 2026-09-10 against `fix/p0-cleanup-backlog @ 8f5f36e1`.** References below are
+> anchored by **symbol name**, not line number: the 2026-09-09 pass refreshed every offset and they
+> had all drifted again by +11 to +18 within a day, while *every function span was byte-for-byte
+> unchanged*. Line numbers are given only where a symbol does not identify the site.
 >
-> **Prerequisite — do not start this item yet.** Its whole payoff is testability, and there is no
-> frontend test harness on this branch: `frontend/package.json:43` is still
-> `"test": "echo \"Error: no test specified\" && exit 1"` — no vitest, no `*.test.jsx`, no
-> `playwright.config`. The four-layer suite exists on `feat/frontend-test-suite` (`8abc8b87`) and is
-> **unmerged**. CI's only frontend gate is `test/frontend_loads_without_errors.js`, 62 lines that
-> exit 1 on a console error: it catches a mount-effect crash, not a radius formula drifting from its
-> expression or a hit-test ranking regression. Extracting these functions without it is an
-> unverified refactor with a live WebGL blast radius — which is the failure this file's own preamble
-> names. **Merge `feat/frontend-test-suite` first.**
+> **Prerequisite — now partly satisfied.** The four-layer suite is merged (PR #143): `vitest run`
+> at `frontend/package.json:51`, 12 test files, `playwright.config.js`, and — the part that matters
+> here — `vite.config.mjs` already aliases `maplibre-gl` to `src/test/stubs/maplibre.js`, which is
+> the harness a seam module needs.
+>
+> **But there is still no behavioural gate on map interaction, so steps 3–4 stay gated.** The e2e
+> suite asserts only that the map *paints*: `e2e/specs/smoke.spec.js:7` and `mobile.spec.js:13`
+> check `map-container` is visible, `visual.spec.js:22` **hides the WebGL canvas** in every shot
+> (`.maplibregl-canvas{visibility:hidden!important}`), and `axeBaseline.js:29` excludes
+> `.maplibregl-canvas-container`. Nothing anywhere clicks or hovers the canvas; there is no
+> `FeatureCard` assertion in the repo. Hover/click ranking — precisely what step 3 moves — has no
+> regression net. Steps 1–2 are pure functions under vitest and are unblocked today.
 
-- [ ] 22 `useEffect`, 42 `useRef`, 2 `useState`, 32 props, 22 `addLayer`. **~1900 lines sit behind a
-      live WebGL context.** The mount effect alone is 1750 lines (2359–4108). **[re-verified]**
+- [ ] 22 `useEffect`, 42 `useRef`, **3** `useState`, 32 props, 22 `addLayer`. **~1900 lines sit
+      behind a live WebGL context.** The mount effect alone is 1749 lines (2371–4119).
+      **[re-verified 2026-09-10 — `useState` was 2, now 3; the other four are exact]**
 - [ ] The render body monkey-patches MapboxDraw's mode table (393–478, plus 79–81 at module scope)
-      and allocates a fresh `MapboxDraw` (640) and `Popup` (963) on **every render**, plus eight ref
-      writes during render (668, 702, 1380, 2032, 2039, 2044, 2046, 2053).
-- [ ] **Twin maths kept in step by hand**: `radiusExpression` (1157–1170) builds a MapLibre
-      expression and `pointRadiusFor` (1176–1186) re-implements the same arithmetic in JS. The test
-      that would keep them honest cannot be written — neither is exported, and one reads
-      `pointRadiusRange.current` from closure rather than taking it as an argument. They agree today
-      (both clamp outside the domain; the comment at 1172–1175 says why), which is exactly the state
-      that rots silently.
-- [ ] Re-entrancy is held by **five ad-hoc idempotence guards** (`appliedFocus` :679,
-      `trackFocusApplied` :683, `appliedTrailRef` :758, `wmsRenderToken` :1646,
-      `lastClickHandledAt` :3769 — a plain `let`, not a ref), each documented as fixing one loop or flicker.
-      One of them is also wrong today: `wmsRenderToken` is bumped only on overlay removal, so it does
-      not discard a stale same-overlay render — a one-line fix, filed in P1 (2026-09-09) so it is not
-      blocked behind this section's test-suite prerequisite. **[re-verified — the
-      survey named eight: `hexesRevealed` is now `dataRevealed` (:662), `rampMeasuredForPk` is now
-      `rampMeasuredFor` (:692), and `hexRangeDirty` is gone entirely]**
-- [ ] Pure but unexported, so untestable: `buildTileSuffix` (226–253, the whole tile query contract —
-      already at module scope, so `export` is a one-word diff), `tracksTimeWindow` (716–726),
-      `rampExpression` (1127–1131), `featureHasDataset` (1026–1032), `dedupeGriddapByPk` (1676–1683),
-      `datasetPksOf` (3507–3514), and the dedupe/role/bbox rules inside `buildFeatureQuery`
-      (3555–3762, 208 lines).
-- [ ] **The seam is the hit-test group, and it is only two map methods wide.** `isOnAPointIn` (3116),
-      `trackFeatureIn` (3131), `griddapCoveredIn` (3145), `griddapOutranksHexesIn` (3156),
-      `datasetPksOf` (3507), `trackItemsIn` (3521) and `buildFeatureQuery` (3555) are ~420 lines of
-      array-of-feature ranking and dedupe buried inside the mount effect. Their *entire* dependency
-      on MapLibre is `map.current.getZoom()` and `map.current.project(lngLat)`. A module taking
-      `(hits, { zoom, project })` lifts all of it out — a camera seam, not a WebGL abstraction.
-      **[new — the survey scattered these across bullets and missed that they group]**
-- [ ] `setColorStops` (1274–1379, 106 lines) has **four entry points** — the `[rangeLevels,
-      coverageRangeLevels]` effect (1041), the `load` handler (2410), a `zoomend` listener (4254),
-      and `refreshViewportHexRange` via `setColorStopsRef` (1522). **[re-verified — the survey said
-      five, counting two functions through the ref; only one reaches it now]**
+      and allocates a fresh `MapboxDraw` (640) and `Popup` (978) on **every render**, plus eight ref
+      writes during render (`rangeLevelsRef`, `onViewportHexRangeRef`, `selectedTrajectoryRef`,
+      `setColorStopsRef`, `mapQueryRef`, `onFeatureQueryRef`, `onMarkerClickRef`, `onTrackClickRef`).
+      **[re-verified — still eight, one substitution: `selectedTrajectoryRef` is new]**
+- [ ] **Twin maths kept in step by hand**: `radiusExpression` builds a MapLibre expression and
+      `pointRadiusFor` re-implements the same arithmetic in JS. The test that would keep them honest
+      cannot be written — neither is exported, and `pointRadiusFor` reads `pointRadiusRange.current`
+      from closure rather than taking it as an argument. They agree today (both clamp outside the
+      domain; the comment above `pointRadiusFor` says why), which is exactly the state that rots
+      silently. Note they only *need* to agree at `padding = 0`: `radiusExpression` takes a padding
+      the JS twin has no parameter for, and the `points` layer that `isOnAPointIn` hit-tests is the
+      `padding = 0` entry in `POINT_LAYERS`. **[re-verified]**
+- [ ] Re-entrancy is held by **five ad-hoc idempotence guards** (`appliedFocus`,
+      `trackFocusApplied`, `appliedTrailRef`, `wmsRenderToken`, `lastClickHandledAt` — a plain
+      `let`, not a ref), each documented as fixing one loop or flicker. One of them is also wrong
+      today: `wmsRenderToken` is bumped only on overlay removal (`removeWmsOverlay`), so it does not
+      discard a stale same-overlay render — a one-line fix, filed in P1 (2026-09-09) so it is not
+      blocked behind this section. **Still unfixed as of 2026-09-10.** The survey named eight:
+      `hexesRevealed` is now `dataRevealed`, `rampMeasuredForPk` is now `rampMeasuredFor`, and
+      `hexRangeDirty` is gone entirely. **[re-verified — all seven refs present]**
+- [x] Pure but unexported, so untestable: **`buildTileSuffix` and `griddapOutranksHexesIn` are done**
+      — see step 1 below. Still inside `Map.jsx`: `filterTimeWindow` (16 lines — the obvious
+      co-mover into `tileQuery.js`, it parses the same query string), `tracksTimeWindow` (11),
+      `rampExpression` (5), `featureHasDataset` (7), `dedupeGriddapByPk` (8), `datasetPksOf` (8),
+      and the dedupe/role/bbox rules inside `buildFeatureQuery` (208).
+      **[re-verified — every span byte-identical to the 2026-09-09 pass]**
+- [ ] **The seam is the hit-test group, and it is three map methods wide.** `isOnAPointIn`,
+      `trackFeatureIn`, `griddapCoveredIn`, `datasetPksOf`, `trackItemsIn`
+      and `buildFeatureQuery` are ~280 lines of array-of-feature ranking and dedupe buried inside the
+      mount effect. Their dependency on MapLibre is `map.current.getZoom()`,
+      `map.current.project(lngLat)` — **and `map.current.queryRenderedFeatures` (`:3610`)**, the
+      re-query that pulls every rendered fragment sharing a hex's `pk` so the turf union can rebuild
+      the cell from its MVT slivers. That third method is materially heavier to stub than the two
+      arithmetic ones: it reads the live tile cache. So either the seam takes it as a third injected
+      function — `(hits, { zoom, project, queryRendered })`, whose stub is a canned fragment array —
+      or the fragment-union block stays in `Map.jsx` and only the ranking/dedupe rules move, which is
+      where the untested logic actually lives. **Decide this before moving anything.**
+      **[corrected 2026-09-10 — the 2026-09-09 pass claimed the *entire* MapLibre dependency was two
+      methods and missed `queryRenderedFeatures`]**
+- [ ] **`buildFeatureQuery`'s event coupling is already gone in practice.** It is declared
+      `(e, hits)` but reads only `e.lngLat` (`:3765`), and the second of its two call sites (`:4102`)
+      *already* fabricates `{ lngLat: { lng, lat } }` from a bare coordinate pair. Narrowing the
+      signature to `(lngLat, hits)` is a no-behaviour-change diff at both call sites, and it is worth
+      doing *before* the risky move rather than as part of it. **[new 2026-09-10]**
+- [ ] `setColorStops` (106 lines) has **four entry points** — the `[rangeLevels,
+      coverageRangeLevels]` effect, the `load` handler, a `zoomend` listener, and
+      `refreshViewportHexRange` via `setColorStopsRef`. **[re-verified]**
 - [ ] Dead: `Map.jsx` no longer declares a `setDatasetsSelected` prop, yet `MapContainer.jsx:14`
       still reads it from context and `:146` still forwards it — a prop handed to a component that
-      does not accept it. Layer id `'points-hovered'` (:1207) is in `POINT_LAYERS` but never added
-      anywhere in the repo; a `getLayer` guard makes it silently inert. Both are safe to delete
-      today, independently of everything else in this section. **[re-verified]**
+      does not accept it. Layer id `'points-hovered'` is in `POINT_LAYERS` but never added anywhere
+      in the repo (`Map.jsx:1224` is its sole occurrence); a `getLayer` guard makes it silently
+      inert. Both are safe to delete today, independently of everything else in this section.
+      **[re-verified]**
 - [ ] `Map.jsx` reads the URL directly twice (`useSearchParams` at 375, and
-      `new URL(window.location.href)` at 3076 inside the `load` handler), bypassing both context and
-      its props. There are now **eight** independent modules reading `window.location` across eleven
+      `new URL(window.location.href)` at 3087 inside the `load` handler), bypassing both context and
+      its props. There are **eight** independent modules reading `window.location` across eleven
       sites (`index.jsx:36`, `config.js:13`, `state/usePersistentState.js:46`,
-      `FilterProvider.jsx:249`, `SelectionProvider.jsx:75`, `MapStateProvider.jsx:107,177,218,249,269`),
-      up from the five the survey counted.
+      `FilterProvider.jsx:249`, `SelectionProvider.jsx:89`,
+      `MapStateProvider.jsx:107,177,218,249,269`). **[re-verified — count unchanged;
+      `SelectionProvider` moved 75 → 89]**
 
-**Suggested order once the test suite is merged**, cheapest proof first:
+**Suggested order**, cheapest proof first. Steps 1–3 are unblocked; 4–5 are not.
 
-1. `buildTileSuffix` — already module-level and pure, zero closure captures. Add `export`, test the
-   tile query contract. The cheapest possible demonstration that the seam works.
+1. ~~`griddapOutranksHexesIn` and `buildTileSuffix`~~ — **DONE 2026-09-10.** `buildTileSuffix` moved
+   to `Map/tileQuery.js` (body byte-identical, verified mechanically); `griddapOutranksHexesIn` moved
+   to `Map/hitTest.js` as `(hits, zoom)`, taking the camera scalar as an argument instead of reading
+   `map.current` — the first function through the seam. `griddapPriorityZoom` went with it as the
+   exported `GRIDDAP_PRIORITY_ZOOM`, so `griddapCoveredIn` (still in `Map.jsx`, it is part of the
+   step-4 group) now imports the threshold its other half tests. 22 tests in
+   `tileQuery.test.js` + `hitTest.test.js`; suite 117 passed, `eslint .` clean, `vite build` passes.
+   `HEX_METRIC` and `PROFILE_TYPE_KEYS` left `Map.jsx`'s import list with the function.
 2. The twin maths — give `pointRadiusFor` the range as a parameter instead of reading the ref, move
-   both into a module, and test that they agree across a swept range.
-3. The hit-test group above — the largest prize, and much narrower than "largest risk" implies.
-4. The 1750-line mount effect and the guards — leave alone until there is a Playwright gate.
-   Nothing in 1–3 requires moving them.
+   both into a module, and test that they agree across a swept range at `padding = 0`.
+3. `buildFeatureQuery(e, hits)` → `(lngLat, hits)`. Zero-behaviour diff, removes the last event
+   coupling, done before the risky move rather than inside it.
+4. The hit-test group above — the largest prize, and much narrower than "largest risk" implies, but
+   there is no e2e gate under hover/click ranking (see the preamble). So: settle the
+   `queryRenderedFeatures` question, then move in a commit that is *provably* a pure move — bodies
+   byte-identical, no tidying — and add characterisation tests against the new module immediately.
+   Extract-and-tidy in one commit is still an unverified refactor.
+5. The 1749-line mount effect and the guards — leave alone until there is a Playwright gate that
+   actually drives the canvas. Nothing in 1–4 requires moving them.
 
 ### P2.7 — One descriptor for the metric and the tiers `[Worth exploring]`
 
