@@ -326,6 +326,7 @@
   "harvest.recentRuns": "Dernières exécutions",
   "harvest.topFailureReasons": "Principales causes d'échec",
   "harvest.dataset.historyTitle": "Historique des tentatives",
+  "harvest.dataset.historyTruncated": "Affichage des {{count}} tentatives les plus récentes.",
   "harvest.dataset.viewOnObis": "Voir sur OBIS ↗",
   "harvest.dataset.viewOnErddap": "Voir sur ERDDAP ↗",
   "harvest.dataset.requestUrls": "URLs des requêtes ({{count}})",

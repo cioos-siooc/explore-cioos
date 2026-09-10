@@ -15,6 +15,10 @@ let rawCalls = [];
 
 beforeEach(() => {
   rawCalls = [];
+  // The AphiaID expansion is memoized process-wide (see dbFilter.js), so
+  // without this a case that expands "Orcinus orca" hands its answer to the
+  // next case that uses the same name under a different mock.
+  createDBFilter._resetAphiaCacheForTests();
   db.mockImplementation(() => ({}));
   db.raw = jest.fn((sql, params) => {
     rawCalls.push({ sql: sql || "", params: params || {} });
@@ -336,5 +340,85 @@ describe("createDBFilter — scientificNames filter", () => {
     await createDBFilter({ scientificNames: "Orcinus orca" });
     const obisCall = rawCalls[2];
     expect(obisCall.params.expandedAphiaIds).toEqual([7]);
+  });
+});
+
+/*
+ * The memo exists because every route calls createDBFilter once per request,
+ * so one taxon selection re-derived the same expansion ~20 times for the tiles
+ * of a single viewport. It is exercised through memoizeAphiaFetch rather than
+ * the module-level instance so a case can count calls to its own fetcher.
+ */
+describe("AphiaID expansion memo", () => {
+  const { memoizeAphiaFetch, APHIA_CACHE_TTL_MS } = createDBFilter;
+
+  it("expands one name list once, however many callers ask", async () => {
+    const fetcher = jest.fn(() => Promise.resolve([1, 2]));
+    const memoized = memoizeAphiaFetch(fetcher);
+
+    // Issued together, as the tiles of one viewport are: the promise is
+    // memoized, not just the settled value, so the batch shares one query.
+    const results = await Promise.all([
+      memoized(["Orcinus orca"]),
+      memoized(["Orcinus orca"]),
+      memoized(["Orcinus orca"]),
+    ]);
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(results).toEqual([
+      [1, 2],
+      [1, 2],
+      [1, 2],
+    ]);
+  });
+
+  it("keys on the set of names, not their order", async () => {
+    const fetcher = jest.fn(() => Promise.resolve([1]));
+    const memoized = memoizeAphiaFetch(fetcher);
+
+    await memoized(["Gadus morhua", "Orcinus orca"]);
+    await memoized(["Orcinus orca", "Gadus morhua"]);
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats a different selection as a different query", async () => {
+    const fetcher = jest.fn(() => Promise.resolve([1]));
+    const memoized = memoizeAphiaFetch(fetcher);
+
+    await memoized(["Orcinus orca"]);
+    await memoized(["Gadus morhua"]);
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("re-fetches once the entry has expired", async () => {
+    jest.useFakeTimers();
+    try {
+      const fetcher = jest.fn(() => Promise.resolve([1]));
+      const memoized = memoizeAphiaFetch(fetcher);
+
+      await memoized(["Orcinus orca"]);
+      jest.advanceTimersByTime(APHIA_CACHE_TTL_MS + 1);
+      await memoized(["Orcinus orca"]);
+
+      expect(fetcher).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("does not memoize a failure", async () => {
+    const fetcher = jest
+      .fn()
+      .mockRejectedValueOnce(new Error("db down"))
+      .mockResolvedValueOnce([3]);
+    const memoized = memoizeAphiaFetch(fetcher);
+
+    await expect(memoized(["Orcinus orca"])).rejects.toThrow("db down");
+    // A blip must not pin the process to it for the whole TTL — the same
+    // reasoning as utils/redis.js's readyPromise.
+    await expect(memoized(["Orcinus orca"])).resolves.toEqual([3]);
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
 });
