@@ -20,7 +20,18 @@ function Probe() {
   // the catalog: that load settling recomputes pointsToReview and, seeing it
   // empty (nothing pre-selected), resets pointsToDownload — a race that would
   // otherwise clobber a value a test sets right after "ready".
-  const ready = filters.catalogLoaded && selection.initialPointsQueryComplete;
+  //
+  // initialPointsQueryComplete and pointsToReview are set by two SEPARATE
+  // effects one render apart (pointsData -> pointsToReview -> the
+  // pointsToDownload reset), so initialPointsQueryComplete alone can flip
+  // true a render before that chain has actually settled. pointsToReview
+  // starts undefined and is only ever set (even to []) once that chain has
+  // run, so wait for it too — otherwise the reset can still land after a
+  // test's own act() and silently clobber what it just set.
+  const ready =
+    filters.catalogLoaded &&
+    selection.initialPointsQueryComplete &&
+    selection.pointsToReview !== undefined;
   return <span data-testid="state">{ready ? "ready" : "loading"}</span>;
 }
 
