@@ -24,7 +24,7 @@ const CoverageHistogramPlot = lazy(() =>
 const GROUP_OPTIONS = ['source', 'platform', 'dataType', 'organization']
 
 // What the bars count. Keys match the API's `count` values.
-const COUNT_OPTIONS = ['datasets', 'features']
+const COUNT_OPTIONS = ['datasets', 'features', 'days']
 
 // The dataset-coverage figure, launched from the top bar: a histogram of how
 // many datasets match the applied filters over time, with the bars split by a
@@ -128,6 +128,12 @@ export default function CoverageModal () {
           <div className='coverageToolbarNote'>
             {t('coverageOrganizationNote')}
           </div>
+        )}
+        {/* Days are per-feature and added up, so a bar measures observation
+            effort and routinely exceeds the number of calendar days in its
+            period. Deliberately unlike the map's days ramp, which unions. */}
+        {count === 'days' && (
+          <div className='coverageToolbarNote'>{t('coverageDaysNote')}</div>
         )}
         <div className='coveragePlotArea'>
           {loading && (

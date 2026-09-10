@@ -45,7 +45,7 @@ const TARGET_TIME_BINS = 60;
 // datasets), which the shared filter validators check strictly. Overloading it
 // here meant "datasets" validated by coincidence and "features" was rejected
 // outright — the default worked, so only picking Features in the UI broke.
-const COUNTS = ["datasets", "features"];
+const COUNTS = ["datasets", "features", "days"];
 
 // The grouping dimension → the SQL expression that yields each dataset's
 // series key, plus the `kind` the frontend uses to resolve a display label.
@@ -118,12 +118,16 @@ function buildTimeBins(timeMin, timeMax) {
  *         description: Series dimension (default source).
  *       - in: query
  *         name: count
- *         schema: { type: string, enum: [datasets, features] }
+ *         schema: { type: string, enum: [datasets, features, days] }
  *         description: >
- *           What each bar counts — distinct datasets (default) or distinct
- *           cf_role features (profiles / timeseries / trajectories). OBIS and
- *           griddap have no cf_role features and are absent from the features
- *           count.
+ *           What each bar counts — distinct datasets (default), distinct
+ *           cf_role features (profiles / timeseries / trajectories), or days
+ *           of data. OBIS and griddap have no cf_role features and are absent
+ *           from the features count. `days` sums each feature's own days
+ *           within the bin across features, so two moorings recording the same
+ *           90 days contribute 180: it measures observation effort and can
+ *           exceed the number of calendar days in the bin. That is deliberately
+ *           unlike the map's `days` ramp, which unions them.
  *       - in: query
  *         name: timeMin
  *         schema: { type: string, format: date-time }
@@ -199,7 +203,18 @@ router.get(
     const timeBins = buildTimeBins(timeMin, timeMax);
 
     // The counted entity: distinct datasets, or distinct cf_role features.
-    const entityCol = count === "features" ? "feature_key" : "dataset_pk";
+    // What one counted thing is. For "days" the unit is the FEATURE, falling
+    // back to the dataset where there is no cf_role: a trajectory is stored as
+    // one row per hex, so its days have to be unioned up to the trajectory
+    // before they are added to anything, or a ship crossing fifty hexes in a
+    // day contributes fifty days. Same for OBIS cells. feature_key always
+    // contains a colon, so it can never collide with a bare dataset pk.
+    const entityExpr =
+      count === "features"
+        ? "p.feature_key"
+        : count === "days"
+          ? "coalesce(p.feature_key, p.dataset_pk::text)"
+          : "p.dataset_pk::text";
 
     // Depth NULLs coalesce to 0 so the shared depth filter treats depth-less
     // features as surface. Only the columns the filter, the grouping and the
@@ -263,7 +278,7 @@ router.get(
         ${unionBranches(branches, profilesBranch)}
     ),
     filtered AS (
-        SELECT p.${entityCol} AS entity, p.time_min, p.time_max, p.day_ranges,
+        SELECT ${entityExpr} AS entity, p.time_min, p.time_max, p.day_ranges,
                ${group.keyExpr} AS series_key,
                ${group.kindExpr} AS series_kind
         FROM   combined p
@@ -286,13 +301,73 @@ router.get(
         SELECT entity, series_key, series_kind, time_min, time_max
         FROM filtered
         WHERE coalesce(array_length(day_ranges, 1), 0) = 0
+    ),
+    /* For the days count: one row per entity carrying every day range it
+       holds, plus the extent to pair it against bins cheaply. Rows whose day
+       set is unknown contribute their span clamped to the query window, which
+       is also what keeps a static grid (time bounds coalesced to infinity in
+       selection.js) finite here. day_range_overlap_days unions the array
+       before measuring, so ranges arriving from several hexes or cells for the
+       same entity overlap harmlessly instead of adding up. */
+    row_ranges AS (
+        SELECT entity, series_key, series_kind,
+               CASE WHEN coalesce(array_length(day_ranges, 1), 0) > 0
+                    THEN day_ranges
+                    ELSE ARRAY[daterange(
+                           clamped_lo::date,
+                           GREATEST(clamped_hi::date, clamped_lo::date) + 1)]
+               END AS ranges
+        FROM filtered
+        CROSS JOIN LATERAL (
+            SELECT GREATEST(time_min, :timeStart::timestamptz) AS clamped_lo,
+                   LEAST(time_max, :timeEnd::timestamptz) AS clamped_hi
+        ) clamp
+    ),
+    entity_ranges AS (
+        SELECT entity, series_key, min(series_kind) AS series_kind,
+               array_agg(r) AS ranges,
+               min(lower(r)) AS d_min, max(upper(r)) AS d_max
+        FROM row_ranges
+        CROSS JOIN LATERAL unnest(ranges) r
+        GROUP BY entity, series_key
+    ),
+    bins AS (
+        SELECT i AS idx,
+               daterange(
+                 (to_timestamp((:epochStart)::double precision
+                   + (i - 1) * (:binWidthSec)::double precision) AT TIME ZONE 'UTC')::date,
+                 (to_timestamp((:epochStart)::double precision
+                   + i * (:binWidthSec)::double precision) AT TIME ZONE 'UTC')::date
+               ) AS win
+        FROM generate_series(1, (:numTimeBins)::integer) i
     )`;
 
     // Cells: bucket each span into a 1-based bin-index range, collapse to
     // DISTINCT (entity, series, tb0, tb1) tuples first (buckets are coarse, so
     // a dataset's spans mostly share a tuple), then expand into the bins each
     // tuple covers and count distinct entities per (bin, series).
-    const cellsSql = `WITH ${combinedAndFiltered},
+    // Days: each entity's own day set, measured against each bin it reaches
+    // and then ADDED UP across entities — so two moorings recording the same
+    // 90 days contribute 180. That is observation effort, not calendar
+    // coverage, and it deliberately differs from the map's `days` ramp, which
+    // unions instead (utils/hexMetric.js). A bar can exceed the number of
+    // calendar days in its period; the figure says so.
+    const daysCellsSql = `WITH ${combinedAndFiltered}
+    SELECT b.idx AS t, e.series_key,
+           sum(day_range_overlap_days(e.ranges, b.win))::integer AS count
+    FROM entity_ranges e
+    JOIN bins b ON daterange(e.d_min, e.d_max) && b.win
+    GROUP BY b.idx, e.series_key
+    HAVING sum(day_range_overlap_days(e.ranges, b.win)) > 0`;
+
+    const daysSeriesSql = `WITH ${combinedAndFiltered}
+    SELECT series_key, min(series_kind) AS series_kind,
+           sum(day_range_overlap_days(ranges, :windowRange::daterange))::integer AS total
+    FROM entity_ranges
+    GROUP BY series_key
+    ORDER BY total DESC`;
+
+    const entityCellsSql = `WITH ${combinedAndFiltered},
     bucketed AS (
         SELECT DISTINCT entity, series_key,
             least(greatest(width_bucket(
@@ -321,7 +396,7 @@ router.get(
     // across its bins). Read from the same spans as the bars, so a row whose
     // extent overlaps the window but whose real day set does not is absent
     // from both. Used to rank series and pick the top ones.
-    const seriesSql = `WITH ${combinedAndFiltered}
+    const entitySeriesSql = `WITH ${combinedAndFiltered}
     SELECT series_key, min(series_kind) AS series_kind,
            count(DISTINCT entity)::integer AS total
     FROM spans
@@ -329,6 +404,9 @@ router.get(
     AND   span_min <= :timeEnd::timestamptz
     GROUP BY series_key
     ORDER BY total DESC`;
+
+    const cellsSql = count === "days" ? daysCellsSql : entityCellsSql;
+    const seriesSql = count === "days" ? daysSeriesSql : entitySeriesSql;
 
     const bindings = {
       filters: filters.shared,
@@ -339,6 +417,11 @@ router.get(
       epochStart: timeBins.start / 1000,
       epochEnd: timeBins.end / 1000,
       numTimeBins: timeBins.numBins,
+      // The days query builds its bins as date ranges rather than by bucketing
+      // an epoch, because a day set is measured in whole UTC days.
+      binWidthSec: (timeBins.end - timeBins.start) / 1000 / timeBins.numBins,
+      windowRange: `[${new Date(timeBins.start).toISOString().slice(0, 10)},`
+        + `${new Date(timeBins.end).toISOString().slice(0, 10)})`,
     };
 
     // Both scan the same tables independently; run concurrently so latency is

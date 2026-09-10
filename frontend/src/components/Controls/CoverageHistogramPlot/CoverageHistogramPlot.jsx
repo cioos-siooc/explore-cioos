@@ -83,11 +83,13 @@ export default function CoverageHistogramPlot ({ histogram }) {
   const { t, i18n } = useTranslation()
   const locale = i18n.language === 'fr' ? 'fr-CA' : 'en-CA'
 
-  // Axis + hover wording follows what the bars count (datasets vs features).
-  const countLabel =
-    histogram.count === 'features'
-      ? t('coverageCountFeatures')
-      : t('coverageCountDatasets')
+  // Axis + hover wording follows what the bars count.
+  const COUNT_LABELS = {
+    features: 'coverageCountFeatures',
+    days: 'coverageCountDays',
+    datasets: 'coverageCountDatasets'
+  }
+  const countLabel = t(COUNT_LABELS[histogram.count] || COUNT_LABELS.datasets)
 
   const { traces, periodLabels, binCenters, binWidths } = useMemo(() => {
     const { timeBinEdges, series, cells } = histogram
