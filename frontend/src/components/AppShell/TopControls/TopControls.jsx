@@ -104,6 +104,16 @@ export default function TopControls() {
               {t("topBarDatasetsLabel")}
             </span>
           </button>
+          <button
+            type="button"
+            className="topBarButton topBarIconButton"
+            data-testid="topbar-coverage-button"
+            onClick={() => setShowCoverageModal(true)}
+            aria-label={t("coverageButton")}
+            title={t("coverageButtonTitle")}
+          >
+            <BarChartLine size={18} aria-hidden="true" />
+          </button>
           <SpatialFilterButton />
           <button
             type="button"
@@ -126,15 +136,6 @@ export default function TopControls() {
                 {activeFilterCount}
               </span>
             )}
-          </button>
-          <button
-            type='button'
-            className='topBarButton'
-            onClick={() => setShowCoverageModal(true)}
-            title={t('coverageButtonTitle')}
-          >
-            <BarChartLine size={18} aria-hidden='true' />
-            <span className='topBarButtonLabel'>{t('coverageButton')}</span>
           </button>
         </div>
       </BrandSearch>
