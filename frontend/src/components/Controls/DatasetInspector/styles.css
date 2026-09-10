@@ -367,10 +367,10 @@
   background-color: var(--cioos-surface-2);
 }
 
-/* The caption over a record or platform list: the CF role its ids carry
-   (cf_role=profile_id / timeseries_id / trajectory_id) and, after it, the
-   variable carrying that role — set in mono so it reads as the source column's
-   own name rather than more prose. */
+/* The caption over the record list: what a card's id is called, the CF role it
+   comes from (cf_role = profile_id / timeseries_id / trajectory_id) and the
+   variable carrying that role — the last two set in mono so they read as names
+   out of the dataset rather than more prose. */
 .recordIdCaption {
   display: block;
   margin-top: 2px;
@@ -379,6 +379,7 @@
   color: var(--cioos-ink-60);
 }
 
+.recordIdRole,
 .recordIdVariable {
   margin-left: 6px;
   font-family: ui-monospace, monospace;
@@ -386,6 +387,14 @@
   font-weight: 400;
   color: var(--cioos-ink-40);
   overflow-wrap: anywhere;
+}
+
+/* The role itself carries the declaration, so it is the one of the two given a
+   ground of its own. */
+.recordIdRole {
+  padding: 1px 5px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-surface-2);
 }
 
 /* --- Record and platform cards (ListCard.jsx, listed by CardList.jsx) ---
@@ -424,11 +433,17 @@
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-white);
   box-shadow: var(--cioos-shadow-card);
-  cursor: pointer;
   transition:
     background-color var(--cioos-transition-fast),
     border-color var(--cioos-transition-fast),
     box-shadow var(--cioos-transition-fast);
+}
+
+/* A record with no id has nothing to open (see ListCard's onClick): it keeps
+   the card's shape and its own controls, but not the pointer that would promise
+   a click does something. */
+.listCard.clickable {
+  cursor: pointer;
 }
 
 .listCard:hover {
@@ -456,13 +471,13 @@
     var(--cioos-shadow-card);
 }
 
-/* The platform whose track is drawn on the map, in the goldenrod the map now
+/* The record whose track is drawn on the map, in the goldenrod the map now
    draws that track in (--cioos-map-click, see theme.css) — the same pairing as
-   .pinned above, and for the same reason: this row and that line are two ends
+   .pinned above, and for the same reason: this card and that line are two ends
    of one answer. It carried the track purple while the map drew the selected
-   track in a crimson of its own, so the row matched neither. Ring-less, so the
-   record a click resolved to still stands out from it. Clicking it again
-   clears the track. */
+   track in a crimson of its own, so the card matched neither. Ring-less, so the
+   record a click resolved to still stands out from it. The card's track button
+   (.listCardTrack) is what draws and clears it. */
 .listCard.selected {
   border-color: var(--cioos-map-click);
   background-color: var(--cioos-map-click-surface);
@@ -477,15 +492,61 @@
   border-color: var(--cioos-map-click);
 }
 
+/* The id and, beside it, whatever control belongs to the record itself (a
+   trajectory's track toggle) — which stays at the top right however far the id
+   wraps under it. */
+.listCardHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
 /* The id is what the card is called: given the width of the card and set in
    mono, since it is a value out of the dataset rather than prose. */
 .listCardId {
+  flex: 1 1 auto;
+  min-width: 0;
   font-family: ui-monospace, monospace;
   font-size: var(--cioos-font-size-base);
   font-weight: 700;
   line-height: 1.25;
   color: var(--cioos-ink);
   overflow-wrap: anywhere;
+}
+
+/* Draws this record's track on the map, or clears it. Borderless like
+   DatasetCard's add-to-download control, for the same reason: at 22px a pill
+   leaves the glyph no room, and the icon is a complete shape on its own. Turns
+   the map's goldenrod once its track is the one drawn, matching the accent
+   .listCard.selected puts on the card around it. */
+.listCardTrack {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--cioos-ink-40);
+  cursor: pointer;
+  transition: color var(--cioos-transition-fast);
+}
+
+@media (hover: hover) {
+  .listCardTrack:hover {
+    color: var(--cioos-primary-700);
+  }
+}
+
+.listCardTrack:focus-visible {
+  border-radius: var(--cioos-radius-sm);
+  box-shadow: var(--cioos-focus);
+  outline: none;
+}
+
+.listCardTrack.drawn {
+  color: var(--cioos-map-click);
 }
 
 .listCardFields {
