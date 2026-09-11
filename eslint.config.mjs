@@ -90,7 +90,25 @@ export default [
         beforeEach: "readonly",
         afterAll: "readonly",
         afterEach: "readonly",
+        // jsdom's Vitest environment exposes Node's `global` as the window
+        // object; tests swap `global.fetch` for a scenario-specific stub and
+        // restore it, which is a reassignment, not a read.
+        global: "writable",
       },
+    },
+    rules: {
+      // A `let latest; function Probe() { latest = useX(); return <span/>; }`
+      // pattern reads a provider's live hook output out into the surrounding
+      // test scope — Probe is deliberately a plain render target, never a
+      // component under concurrent-rendering assumptions, so the module-level
+      // reassignment this rule warns about for real components is exactly the
+      // point here. Used throughout src/state/**/*.test.jsx and friends.
+      "react-hooks/globals": "off",
+      // Same reasoning one level down: a helper like recordEachRender(...)
+      // that calls a hook is only ever invoked from inside renderHook()'s own
+      // callback (see src/useChanged.test.js), which IS a valid hook context —
+      // the rule can't see that and flags the helper's name instead.
+      "react-hooks/rules-of-hooks": "off",
     },
   },
   {

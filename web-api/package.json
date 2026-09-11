@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "start": "node ./bin/www",
-    "test": "npm run test:unit && npm run test:contract",
+    "test": "npm run test:unit && npm run test:routes && npm run test:contract",
     "test:unit": "node --test \"utils/**/*.test.js\"",
+    "test:routes": "node --test --test-force-exit \"routes/**/*.test.js\"",
     "test:contract": "jest",
     "test:api": "npm run test:contract",
     "test:coverage": "jest --coverage"
