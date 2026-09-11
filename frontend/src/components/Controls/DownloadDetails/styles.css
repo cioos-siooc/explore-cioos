@@ -61,21 +61,43 @@
   color: var(--cioos-primary);
 }
 
-/* --- Filter band: the time / depth / space filters applied to the order.
-   Sits under the header as part of the top "chrome" zone (sand). --- */
-.filterDownloadToggles {
+/* --- Settings band: one row in sand above the dataset list, holding the two
+   settings that decide what the order is — which of the map's filters it
+   narrows by (FilterDownloadToggles) and what the direct links return
+   (DownloadFormats). Each is a captioned group; they share the row so the
+   chrome costs one row rather than two, and wrap onto their own lines when
+   there is no width for that. --- */
+.downloadBandRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 8px 16px;
   min-height: auto;
   padding: 8px 16px;
   background-color: var(--cioos-sand);
   border-bottom: 1px solid var(--cioos-hairline);
 }
 
-.filterDownloadTogglesTitle {
+.downloadBandGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* The chips take the row's slack: there can be three of them, each as wide as
+   the shape or date range it names, while the format pills are two at most. */
+.filterDownloadToggles {
+  flex: 1 1 auto;
+}
+
+.downloadFormats {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.downloadBandLabel {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -89,20 +111,19 @@
   white-space: nowrap;
 }
 
-.filterDownloadTogglesChips {
+.downloadBandContent {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
   gap: 8px;
   flex: 1 1 auto;
 }
 
-.filterDownloadToggles .helpIcon {
+.downloadBandRow .helpIcon {
   margin: 0;
 }
 
-.filterDownloadToggles .noFiltersMessage {
+.downloadBandRow .noFiltersMessage {
   color: var(--cioos-ink-60);
 }
 
@@ -226,10 +247,56 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px 24px;
-  padding: 12px 16px;
+  gap: 10px 24px;
+  padding: 10px 16px;
   border-top: 1px solid var(--cioos-hairline);
   background-color: var(--cioos-white);
+}
+
+/* --- Direct links, as a file. Its own full-width line of the order bar under
+   the summary and the email, because it is about the whole selection while
+   they are about the ticked part of it. --- */
+.downloadExports {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+.downloadExportsLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--cioos-ink-60);
+  font-weight: 600;
+}
+
+.downloadExportsButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.downloadExportButton {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 7px 12px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
+  color: var(--cioos-ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.downloadExportButton:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-surface-2);
 }
 
 .downloadSummary {
@@ -361,6 +428,19 @@
 }
 
 @media (max-width: 700px) {
+  /* At this width the panel is the whole screen and the fixed frame has
+     nothing left to give the card list once the band, the toolbar, the legend
+     and the order bar have taken theirs. So the frame goes: the modal body
+     scrolls (Modals/styles.css) and every zone here takes its natural height,
+     the list included (DatasetsTable/styles.css). */
+  .downloadDetails.container {
+    height: auto;
+  }
+
+  .downloadDataRow.row {
+    flex: 0 0 auto;
+  }
+
   .downloadOrderBar {
     flex-direction: column;
     align-items: stretch;
@@ -379,5 +459,22 @@
   .downloadSubmit .emailAddress,
   .submitRequestButton {
     flex: 1 1 100%;
+  }
+
+  /* The order bar is a column here, so the row-wrapping basis above would
+     ask for the whole of its height rather than the whole of its width. */
+  .downloadExports {
+    flex: 0 0 auto;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .downloadExportsButtons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .downloadExportButton {
+    justify-content: center;
   }
 }
